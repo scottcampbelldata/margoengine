@@ -4,9 +4,9 @@
 // @margoengine/materials + @margoengine/gltf-pro built from `ref` and from the candidate.
 // Run: node examples/package-benchmarks/proofs/materials-uv-transform.proof.js [ref] [pin] [--current]
 // Pinned: 1970fda (before the transforms) against 700838e, the commit that added them and made this claim. --current:
-// 57250a49 against the working tree, including the approved cotangent frame (and 44592a3's +b on normal-mapped
-// materials meshes), compact discard guards, PBR Neutral output and the earlier normal-frame, topology, uniform and
-// batching changes (claims.md).
+// c640305c against the working tree (a material without maps reads no textures; 57250a49 before it), including the
+// approved cotangent frame (and 44592a3's +b on normal-mapped materials meshes), compact discard guards, PBR Neutral
+// output and the earlier normal-frame, topology, uniform and batching changes (claims.md).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -20,7 +20,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/'),
-  { ref, pin } = refs('1970fda', '700838e', '57250a49');
+  { ref, pin } = refs('1970fda', '700838e', 'c640305c');
 const sources = ['materials/src', 'gltf-pro/src', 'shared'].map((name) => slash(resolve(root, 'packages', name)) + '/');
 const show = (from, file) => {
   try {

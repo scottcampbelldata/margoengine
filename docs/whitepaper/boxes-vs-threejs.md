@@ -82,6 +82,76 @@ Reading (diagnostic only; the quiet-PC run decides any claim):
   12.9 / 12.0 (the mesh <-> mesh three `Mesh` variants were not run here).- Open follow-ups (packages, not core): give `CulledInstances` the same back-culled, discard-free pipeline for
   single-sided unmirrored batches, and a bulk transform upload; check gltf-pro's single-sided GPU cost.
 
+## Instanced: fixes and what is left (2026-10-25)
+
+**Diagnostic, busy machine, not for publication.** The instanced <-> instanced table above (where three.js wins) stays
+as measured. This section is a second machine, the cause of each gap, what was fixed, and an after table. The
+quiet-machine run (HANDOFF item 36) decides any public claim.
+
+Machine: AMD Ryzen 9 9950X, NVIDIA RTX A6000 (driver 617.42), Windows 11, Edge 156 headless, 1280x720, DPR 1, 4x
+MSAA, GPU lock held, quiet gate skipped (other sessions were building). Scenes: the shared `boxes` scene of the bench
+tool (`bench/scenes/catalog.js`), Margo's `createInstancedMesh` (`mode=instanced`) and `CulledInstances`
+(`mode=culled`) against three.js r186 `InstancedMesh` on its WebGL2 and WebGPU renderers (written against three's
+public API in `engine-bench/margo-bench/`, outside this repository). Engines alternate within every repetition; 3 runs
+x 300 frames; medians. Cells: FPS / CPU ms per frame / GPU ms per frame. GPU time is the sum of pass timestamps for
+WebGPU and `TIME_ELAPSED` around the render call for WebGL2, so the WebGL2 column is not the same timer.
+
+**Before** (`benchmarks/records/20261025-073632-e166a074-dev.json`: packages at `e166a074`, the bench suite of the next
+commit):
+
+| Case | Margo `createInstancedMesh` | Margo `CulledInstances` | three WebGL2 | three WebGPU |
+| --- | --- | --- | --- | --- |
+| 1k | 2,568 / 0.095 / 0.049 | 3,380 / 0.070 / 0.040 | 2,974 / 0.050 / 0.030 | 2,541 / 0.140 / 0.050 |
+| 10k | 3,109 / 0.085 / 0.171 | 3,432 / 0.065 / 0.098 | 3,359 / 0.045 / 0.127 | 2,489 / 0.145 / 0.145 |
+| 50k | 1,322 / 0.080 / 0.666 | 1,950 / 0.070 / 0.362 | 2,028 / 0.040 / 0.466 | 2,033 / 0.145 / 0.374 |
+| 10k moving | 527 / 1.595 / 0.164 | 69 / 13.605 / 1.082 | 1,117 / 0.625 / 0.162 | 862 / 0.890 / 0.137 |
+
+**Diagnosis**, cause by cause (each measured by changing one thing; the shader and pass variants were patched in the
+page, `diag` scripts of this change's session):
+
+1. *CulledInstances drew with the shader that keeps the back-face discard.* Its main pass copied core's cull-none
+   pipeline, whose `discard` costs early depth testing for every fragment. Fixed: single-sided batches without
+   mirrored parts use core's back-culled variant (the same switch core and `@margoengine/scatter` use). Trade-off:
+   one more pipeline per shader; a batch with a mirrored part keeps the old one.
+2. *createInstancedMesh was not missing the culled pipeline.* gltf-pro already culls back faces and compiles the
+   discard out; the earlier "ACES" remark no longer applies (both use PBR Neutral). Its costs were elsewhere:
+   - a plain `Material` read ten textures per fragment (gltf-pro's white defaults times the materials package's).
+     Fixed: a standard material with no maps reads none (same pixels). Gain at 50k: 0.669 -> 0.629 ms.
+   - the rest is vertex fetch. gltf-pro's vertex is 80 bytes (position, normal, tangent, UVs, colour) and the
+     vertex stage reads all of it for a material that uses none of the extras: reading only position and normal
+     takes 50k from 0.642 to 0.47 ms, level with three. Not fixed yet (known-bugs).
+3. *CulledInstances' compute culling pays for itself.* At 10k and 50k it is the fastest of the four on the GPU. At 1k
+   both Margo paths lose about 0.01 ms to a fixed cost: a package's own render pass makes core store and reload its
+   multisampled targets and resolve in an extra pass (three passes against one). Not fixable inside the core freeze
+   (known-bugs).
+4. *Moving instances.* `CulledInstances.setTransform` wrote two buffers per part (20,000 GPU calls a frame) and
+   computed each part's bounding sphere on the CPU: now one upload per frame for the changed range, and the cull pass
+   derives the sphere from the matrix. Both paths also gained from a closed-form `Quaternion.setFromEuler` (the
+   bench composes every moving box's matrix, as three's side does) and a one-test row validation. The bench scene
+   itself allocated a rotation array per box per frame; it no longer does. What is left is Margo's per-row
+   validation and its 96-byte rows (three uploads 64 bytes and validates nothing; known-bugs).
+
+**After** (`benchmarks/records/20261025-104804-26e20b90-dev.json`: the code of the commit before the one that added
+this section; `26e20b90` is its id before rebasing onto main; rerun:
+`npm run build:packages`, then, under the GPU lock, `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu
+--runs=3 --no-gate --no-compare --no-fail --label=dev`; on a quiet machine drop `--no-gate`):
+
+| Case | Margo `createInstancedMesh` | Margo `CulledInstances` | three WebGL2 | three WebGPU |
+| --- | --- | --- | --- | --- |
+| 1k | 3,080 / 0.080 / 0.039 | **3,432** / 0.065 / 0.038 | 3,382 / 0.045 / 0.030 | 2,534 / 0.140 / 0.050 |
+| 10k | 3,160 / 0.080 / 0.158 | **3,456** / 0.070 / **0.093** | 3,323 / 0.045 / 0.128 | 2,575 / 0.135 / 0.145 |
+| 50k | 1,378 / 0.075 / 0.628 | **2,443** / 0.065 / **0.300** | 2,024 / 0.040 / 0.472 | 2,102 / 0.130 / 0.370 |
+| 10k moving | 664 / 1.225 / 0.155 | 618 / 1.335 / 0.089 | 1,101 / 0.620 / 0.161 | 820 / 0.905 / 0.136 |
+
+Reading (diagnostic only):
+
+- `CulledInstances` now has the highest frame rate of the four at 1k, 10k and 50k static boxes and the lowest GPU
+  time at 10k and 50k (0.300 against 0.472 ms at 50k). Its moving case went from 69 to 618 FPS.
+- Still open, each with its cause and plan in [known-bugs.md](../known-bugs.md#performance-losses-still-open):
+  `createInstancedMesh` GPU at 10k-50k (vertex fetch), the 1k GPU time of both paths (a package pass's fixed MSAA
+  cost; 0.038-0.039 against 0.030 ms), and CPU for moving instances (1.2-1.3 against 0.62 ms; three's WebGPU
+  renderer 0.91 ms).
+
 ## Answer
 
 The smoke run's result was real and has one main cause in core: **Margo core never culls back faces in the

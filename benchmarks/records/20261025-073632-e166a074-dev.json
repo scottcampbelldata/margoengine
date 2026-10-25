@@ -1,0 +1,4351 @@
+{
+ "schema": "margo-bench/1",
+ "id": "20261025-073632-e166a074-dev",
+ "label": "dev",
+ "date": "2026-10-25T07:36:32.094Z",
+ "valid": false,
+ "invalid": [
+  "quiet gate skipped (--no-gate)",
+  "instanced/boxes-1000-instanced cpuMs spread 10.5%",
+  "instanced/boxes-1000-instanced@three-webgpu cpuMs spread 10.7%",
+  "instanced/boxes-10000-instanced@three-webgl cpuMs spread 11.1%",
+  "instanced/boxes-50000-instanced@three-webgl cpuMs spread 12.5%",
+  "instanced/boxes-50000-culled cpuMs spread 14.3%"
+ ],
+ "options": {
+  "runs": 3,
+  "warmup": 1,
+  "frames": 300,
+  "noise": 0.1,
+  "threshold": 0.05,
+  "engines": [
+   "margo",
+   "three-webgl",
+   "three-webgpu"
+  ],
+  "suites": [
+   "instanced"
+  ],
+  "cases": null
+ },
+ "env": {
+  "host": {
+   "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+   "cores": 32,
+   "memoryGB": 94,
+   "os": "win32",
+   "osRelease": "10.0.26300",
+   "osVersion": "Windows 11 Pro",
+   "node": "v26.12.0"
+  },
+  "gpu": [
+   {
+    "name": "NVIDIA RTX A6000",
+    "driver": "617.42",
+    "utilizationPercent": 0,
+    "source": "nvidia-smi"
+   }
+  ],
+  "machine": "e69318ab6f",
+  "engine": {
+   "name": "margo",
+   "version": "1.0.0",
+   "commit": "e166a074",
+   "commitFull": "e166a0742452580c7b9fd4e5d30d30f18ab4f7b1",
+   "branch": "worktree-margo-instanced",
+   "dirty": true
+  },
+  "browser": {
+   "browser": {
+    "name": "chromium",
+    "channel": "msedge",
+    "version": "156.0.4314.42"
+   },
+   "webgpu": {
+    "vendor": "nvidia",
+    "architecture": "ampere",
+    "device": "0x2230",
+    "description": "NVIDIA RTX A6000",
+    "fallback": false
+   },
+   "webgl": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0"
+  }
+ },
+ "gate": {
+  "ac": true,
+  "lock": {
+   "held": "by the wrapping gpu-lock run",
+   "dir": "<main checkout>/test-results/gpu.lock"
+  },
+  "quiet": {
+   "skipped": true,
+   "cpuLoadPercent": 17,
+   "checkedAt": "2026-10-25T07:36:33.083Z"
+  },
+  "rules": {
+   "quietMax": 20,
+   "quietHold": 20,
+   "gpuMax": 20,
+   "timeout": 1800
+  }
+ },
+ "suites": {
+  "instanced": {
+   "title": "Instanced boxes: static and moving",
+   "uses": "gpu",
+   "status": "ok",
+   "cases": {
+    "boxes-1000-instanced": {
+     "title": "Boxes n=1000 mode=instanced",
+     "engine": "margo",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.095,
+        0.095,
+        0.085
+       ],
+       "n": 3,
+       "median": 0.095,
+       "p95": 0.095,
+       "min": 0.085,
+       "max": 0.095,
+       "mean": 0.0917,
+       "spread": 0.1053,
+       "noisy": true
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.049,
+        0.048,
+        0.049
+       ],
+       "n": 3,
+       "median": 0.049,
+       "p95": 0.049,
+       "min": 0.048,
+       "max": 0.049,
+       "mean": 0.0487,
+       "spread": 0.0204,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        2568.1,
+        2530.4,
+        2887.1
+       ],
+       "n": 3,
+       "median": 2568.1,
+       "p95": 2887.1,
+       "min": 2530.4,
+       "max": 2887.1,
+       "mean": 2661.8667,
+       "spread": 0.1389,
+       "noisy": true
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.77,
+        3.545,
+        3.495
+       ],
+       "n": 3,
+       "median": 3.545,
+       "p95": 3.77,
+       "min": 3.495,
+       "max": 3.77,
+       "mean": 3.6033,
+       "spread": 0.0776,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        258.5,
+        246.9,
+        235
+       ],
+       "n": 3,
+       "median": 246.9,
+       "p95": 258.5,
+       "min": 235,
+       "max": 258.5,
+       "mean": 246.8,
+       "spread": 0.0952,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        64,
+        64.5,
+        60.8
+       ],
+       "n": 3,
+       "median": 64,
+       "p95": 64.5,
+       "min": 60.8,
+       "max": 64.5,
+       "mean": 63.1,
+       "spread": 0.0578,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        61,
+        57.6,
+        53.7
+       ],
+       "n": 3,
+       "median": 57.6,
+       "p95": 61,
+       "min": 53.7,
+       "max": 61,
+       "mean": 57.4333,
+       "spread": 0.1267,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        21.4,
+        16.6,
+        15.9
+       ],
+       "n": 3,
+       "median": 16.6,
+       "p95": 21.4,
+       "min": 15.9,
+       "max": 21.4,
+       "mean": 17.9667,
+       "spread": 0.3313,
+       "noisy": true
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.35,
+        3.35,
+        3.35
+       ],
+       "n": 3,
+       "median": 3.35,
+       "p95": 3.35,
+       "min": 3.35,
+       "max": 3.35,
+       "mean": 3.35,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        28.22,
+        28.22,
+        28.22
+       ],
+       "n": 3,
+       "median": 28.22,
+       "p95": 28.22,
+       "min": 28.22,
+       "max": 28.22,
+       "mean": 28.22,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        28.28,
+        28.28,
+        28.28
+       ],
+       "n": 3,
+       "median": 28.28,
+       "p95": 28.28,
+       "min": 28.28,
+       "max": 28.28,
+       "mean": 28.28,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        491952,
+        491952,
+        491952
+       ],
+       "n": 3,
+       "median": 491952,
+       "p95": 491952,
+       "min": 491952,
+       "max": 491952,
+       "mean": 491952,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 9,
+     "interleaved": {
+      "order": [
+       "boxes-1000-instanced",
+       "boxes-1000-instanced@three-webgl",
+       "boxes-1000-instanced@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "info": {
+      "drawCalls": 1,
+      "note": "1 instanced draws, not counted by core",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ]
+     }
+    },
+    "boxes-1000-instanced@three-webgl": {
+     "title": "Boxes n=1000 mode=instanced",
+     "engine": "three-webgl",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.05,
+        0.05,
+        0.05
+       ],
+       "n": 3,
+       "median": 0.05,
+       "p95": 0.05,
+       "min": 0.05,
+       "max": 0.05,
+       "mean": 0.05,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.03,
+        0.028,
+        0.03
+       ],
+       "n": 3,
+       "median": 0.03,
+       "p95": 0.03,
+       "min": 0.028,
+       "max": 0.03,
+       "mean": 0.0293,
+       "spread": 0.0667,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        2973.8,
+        1776.8,
+        3004.8
+       ],
+       "n": 3,
+       "median": 2973.8,
+       "p95": 3004.8,
+       "min": 1776.8,
+       "max": 3004.8,
+       "mean": 2585.1333,
+       "spread": 0.4129,
+       "noisy": true
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.33,
+        4.97,
+        5.02
+       ],
+       "n": 3,
+       "median": 5.02,
+       "p95": 5.33,
+       "min": 4.97,
+       "max": 5.33,
+       "mean": 5.1067,
+       "spread": 0.0717,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        144.6,
+        149.2,
+        154.9
+       ],
+       "n": 3,
+       "median": 149.2,
+       "p95": 154.9,
+       "min": 144.6,
+       "max": 154.9,
+       "mean": 149.5667,
+       "spread": 0.069,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        15.4,
+        16.2,
+        16.7
+       ],
+       "n": 3,
+       "median": 16.2,
+       "p95": 16.7,
+       "min": 15.4,
+       "max": 16.7,
+       "mean": 16.1,
+       "spread": 0.0802,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        7.6,
+        8.2,
+        8.1
+       ],
+       "n": 3,
+       "median": 8.1,
+       "p95": 8.2,
+       "min": 7.6,
+       "max": 8.2,
+       "mean": 7.9667,
+       "spread": 0.0741,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        2.5,
+        2.9,
+        2.6
+       ],
+       "n": 3,
+       "median": 2.6,
+       "p95": 2.9,
+       "min": 2.5,
+       "max": 2.9,
+       "mean": 2.6667,
+       "spread": 0.1538,
+       "noisy": true
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        4.43,
+        4.43,
+        4.43
+       ],
+       "n": 3,
+       "median": 4.43,
+       "p95": 4.43,
+       "min": 4.43,
+       "max": 4.43,
+       "mean": 4.43,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        910932,
+        910932,
+        910932
+       ],
+       "n": 3,
+       "median": 910932,
+       "p95": 910932,
+       "min": 910932,
+       "max": 910932,
+       "mean": 910932,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 9,
+     "interleaved": {
+      "order": [
+       "boxes-1000-instanced",
+       "boxes-1000-instanced@three-webgl",
+       "boxes-1000-instanced@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "info": {
+      "drawCalls": 1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED"
+     }
+    },
+    "boxes-1000-instanced@three-webgpu": {
+     "title": "Boxes n=1000 mode=instanced",
+     "engine": "three-webgpu",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.155,
+        0.14,
+        0.14
+       ],
+       "n": 3,
+       "median": 0.14,
+       "p95": 0.155,
+       "min": 0.14,
+       "max": 0.155,
+       "mean": 0.145,
+       "spread": 0.1071,
+       "noisy": true
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.05,
+        0.05,
+        0.05
+       ],
+       "n": 3,
+       "median": 0.05,
+       "p95": 0.05,
+       "min": 0.05,
+       "max": 0.05,
+       "mean": 0.05,
+       "spread": 0,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        2224,
+        2541.2,
+        2587.8
+       ],
+       "n": 3,
+       "median": 2541.2,
+       "p95": 2587.8,
+       "min": 2224,
+       "max": 2587.8,
+       "mean": 2451,
+       "spread": 0.1432,
+       "noisy": true
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.51,
+        3.5,
+        3.495
+       ],
+       "n": 3,
+       "median": 3.5,
+       "p95": 3.51,
+       "min": 3.495,
+       "max": 3.51,
+       "mean": 3.5017,
+       "spread": 0.0043,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        248.5,
+        239,
+        248.4
+       ],
+       "n": 3,
+       "median": 248.4,
+       "p95": 248.5,
+       "min": 239,
+       "max": 248.5,
+       "mean": 245.3,
+       "spread": 0.0382,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        92.1,
+        86.4,
+        88.9
+       ],
+       "n": 3,
+       "median": 88.9,
+       "p95": 92.1,
+       "min": 86.4,
+       "max": 92.1,
+       "mean": 89.1333,
+       "spread": 0.0641,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        25.6,
+        24.5,
+        25.3
+       ],
+       "n": 3,
+       "median": 25.3,
+       "p95": 25.6,
+       "min": 24.5,
+       "max": 25.6,
+       "mean": 25.1333,
+       "spread": 0.0435,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        2.9,
+        2.8,
+        2.9
+       ],
+       "n": 3,
+       "median": 2.9,
+       "p95": 2.9,
+       "min": 2.8,
+       "max": 2.9,
+       "mean": 2.8667,
+       "spread": 0.0345,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        7.08,
+        7.08,
+        7.08
+       ],
+       "n": 3,
+       "median": 7.08,
+       "p95": 7.08,
+       "min": 7.08,
+       "max": 7.08,
+       "mean": 7.08,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        52.81,
+        52.81,
+        52.81
+       ],
+       "n": 3,
+       "median": 52.81,
+       "p95": 52.81,
+       "min": 52.81,
+       "max": 52.81,
+       "mean": 52.81,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        52.87,
+        52.87,
+        52.87
+       ],
+       "n": 3,
+       "median": 52.87,
+       "p95": 52.87,
+       "min": 52.87,
+       "max": 52.87,
+       "mean": 52.87,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1355761,
+        1355761,
+        1355761
+       ],
+       "n": 3,
+       "median": 1355761,
+       "p95": 1355761,
+       "min": 1355761,
+       "max": 1355761,
+       "mean": 1355761,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 9,
+     "interleaved": {
+      "order": [
+       "boxes-1000-instanced",
+       "boxes-1000-instanced@three-webgl",
+       "boxes-1000-instanced@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "info": {
+      "drawCalls": 1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store"
+      ]
+     }
+    },
+    "boxes-1000-culled": {
+     "title": "Boxes n=1000 mode=culled",
+     "engine": "margo",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.065,
+        0.07,
+        0.07
+       ],
+       "n": 3,
+       "median": 0.07,
+       "p95": 0.07,
+       "min": 0.065,
+       "max": 0.07,
+       "mean": 0.0683,
+       "spread": 0.0714,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.04,
+        0.04,
+        0.04
+       ],
+       "n": 3,
+       "median": 0.04,
+       "p95": 0.04,
+       "min": 0.04,
+       "max": 0.04,
+       "mean": 0.04,
+       "spread": 0,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        3703,
+        3380.1,
+        3329.1
+       ],
+       "n": 3,
+       "median": 3380.1,
+       "p95": 3703,
+       "min": 3329.1,
+       "max": 3703,
+       "mean": 3470.7333,
+       "spread": 0.1106,
+       "noisy": true
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.515,
+        3.495,
+        3.545
+       ],
+       "n": 3,
+       "median": 3.515,
+       "p95": 3.545,
+       "min": 3.495,
+       "max": 3.545,
+       "mean": 3.5183,
+       "spread": 0.0142,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        274.7,
+        266.3,
+        286.6
+       ],
+       "n": 3,
+       "median": 274.7,
+       "p95": 286.6,
+       "min": 266.3,
+       "max": 286.6,
+       "mean": 275.8667,
+       "spread": 0.0739,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        109.1,
+        108.9,
+        117.9
+       ],
+       "n": 3,
+       "median": 109.1,
+       "p95": 117.9,
+       "min": 108.9,
+       "max": 117.9,
+       "mean": 111.9667,
+       "spread": 0.0825,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        57.1,
+        54,
+        55.9
+       ],
+       "n": 3,
+       "median": 55.9,
+       "p95": 57.1,
+       "min": 54,
+       "max": 57.1,
+       "mean": 55.6667,
+       "spread": 0.0555,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        8.5,
+        8.2,
+        10.5
+       ],
+       "n": 3,
+       "median": 8.5,
+       "p95": 10.5,
+       "min": 8.2,
+       "max": 10.5,
+       "mean": 9.0667,
+       "spread": 0.2706,
+       "noisy": true
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        2.38,
+        2.38,
+        2.38
+       ],
+       "n": 3,
+       "median": 2.38,
+       "p95": 2.38,
+       "min": 2.38,
+       "max": 2.38,
+       "mean": 2.38,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        47.09,
+        47.09,
+        47.09
+       ],
+       "n": 3,
+       "median": 47.09,
+       "p95": 47.09,
+       "min": 47.09,
+       "max": 47.09,
+       "mean": 47.09,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        47.16,
+        47.16,
+        47.16
+       ],
+       "n": 3,
+       "median": 47.16,
+       "p95": 47.16,
+       "min": 47.16,
+       "max": 47.16,
+       "mean": 47.16,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        141311,
+        141311,
+        141311
+       ],
+       "n": 3,
+       "median": 141311,
+       "p95": 141311,
+       "min": 141311,
+       "max": 141311,
+       "mean": 141311,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        16,
+        16,
+        16
+       ],
+       "n": 3,
+       "median": 16,
+       "p95": 16,
+       "min": 16,
+       "max": 16,
+       "mean": 16,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 2,
+     "interleaved": {
+      "order": [
+       "boxes-1000-culled@three-webgpu",
+       "boxes-1000-culled",
+       "boxes-1000-culled@three-webgl"
+      ],
+      "firstEngine": "three-webgpu"
+     },
+     "info": {
+      "drawCalls": 16,
+      "note": "16 instanced draws, not counted by core",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Compute ",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ]
+     }
+    },
+    "boxes-1000-culled@three-webgl": {
+     "title": "Boxes n=1000 mode=culled",
+     "engine": "three-webgl",
+     "metrics": {},
+     "cpuBefore": 2,
+     "interleaved": {
+      "order": [
+       "boxes-1000-culled@three-webgpu",
+       "boxes-1000-culled",
+       "boxes-1000-culled@three-webgl"
+      ],
+      "firstEngine": "three-webgpu"
+     },
+     "unsupported": "not implemented by three-webgl"
+    },
+    "boxes-1000-culled@three-webgpu": {
+     "title": "Boxes n=1000 mode=culled",
+     "engine": "three-webgpu",
+     "metrics": {},
+     "cpuBefore": 2,
+     "interleaved": {
+      "order": [
+       "boxes-1000-culled@three-webgpu",
+       "boxes-1000-culled",
+       "boxes-1000-culled@three-webgl"
+      ],
+      "firstEngine": "three-webgpu"
+     },
+     "unsupported": "not implemented by three-webgpu"
+    },
+    "boxes-10000-instanced": {
+     "title": "Boxes n=10000 mode=instanced",
+     "engine": "margo",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.085,
+        0.08,
+        0.085
+       ],
+       "n": 3,
+       "median": 0.085,
+       "p95": 0.085,
+       "min": 0.08,
+       "max": 0.085,
+       "mean": 0.0833,
+       "spread": 0.0588,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.171,
+        0.172,
+        0.17
+       ],
+       "n": 3,
+       "median": 0.171,
+       "p95": 0.172,
+       "min": 0.17,
+       "max": 0.172,
+       "mean": 0.171,
+       "spread": 0.0117,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        2989.1,
+        3108.5,
+        3141.7
+       ],
+       "n": 3,
+       "median": 3108.5,
+       "p95": 3141.7,
+       "min": 2989.1,
+       "max": 3141.7,
+       "mean": 3079.7667,
+       "spread": 0.0491,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.515,
+        3.525,
+        3.57
+       ],
+       "n": 3,
+       "median": 3.525,
+       "p95": 3.57,
+       "min": 3.515,
+       "max": 3.57,
+       "mean": 3.5367,
+       "spread": 0.0156,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        238.1,
+        238.1,
+        248.8
+       ],
+       "n": 3,
+       "median": 238.1,
+       "p95": 248.8,
+       "min": 238.1,
+       "max": 248.8,
+       "mean": 241.6667,
+       "spread": 0.0449,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        62.2,
+        59.7,
+        61.7
+       ],
+       "n": 3,
+       "median": 61.7,
+       "p95": 62.2,
+       "min": 59.7,
+       "max": 62.2,
+       "mean": 61.2,
+       "spread": 0.0405,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        55.3,
+        53.9,
+        62.8
+       ],
+       "n": 3,
+       "median": 55.3,
+       "p95": 62.8,
+       "min": 53.9,
+       "max": 62.8,
+       "mean": 57.3333,
+       "spread": 0.1609,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        22.2,
+        22.5,
+        23.3
+       ],
+       "n": 3,
+       "median": 22.5,
+       "p95": 23.3,
+       "min": 22.2,
+       "max": 23.3,
+       "mean": 22.6667,
+       "spread": 0.0489,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.24,
+        5.24,
+        5.24
+       ],
+       "n": 3,
+       "median": 5.24,
+       "p95": 5.24,
+       "min": 5.24,
+       "max": 5.24,
+       "mean": 5.24,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        29.04,
+        29.04,
+        29.04
+       ],
+       "n": 3,
+       "median": 29.04,
+       "p95": 29.04,
+       "min": 29.04,
+       "max": 29.04,
+       "mean": 29.04,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        29.11,
+        29.11,
+        29.11
+       ],
+       "n": 3,
+       "median": 29.11,
+       "p95": 29.11,
+       "min": 29.11,
+       "max": 29.11,
+       "mean": 29.11,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        491952,
+        491952,
+        491952
+       ],
+       "n": 3,
+       "median": 491952,
+       "p95": 491952,
+       "min": 491952,
+       "max": 491952,
+       "mean": 491952,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 7,
+     "interleaved": {
+      "order": [
+       "boxes-10000-instanced",
+       "boxes-10000-instanced@three-webgl",
+       "boxes-10000-instanced@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "info": {
+      "drawCalls": 1,
+      "note": "1 instanced draws, not counted by core",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ]
+     }
+    },
+    "boxes-10000-instanced@three-webgl": {
+     "title": "Boxes n=10000 mode=instanced",
+     "engine": "three-webgl",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.045,
+        0.05,
+        0.045
+       ],
+       "n": 3,
+       "median": 0.045,
+       "p95": 0.05,
+       "min": 0.045,
+       "max": 0.05,
+       "mean": 0.0467,
+       "spread": 0.1111,
+       "noisy": true
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.127,
+        0.133,
+        0.127
+       ],
+       "n": 3,
+       "median": 0.127,
+       "p95": 0.133,
+       "min": 0.127,
+       "max": 0.133,
+       "mean": 0.129,
+       "spread": 0.0472,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        3358.5,
+        3090.6,
+        3496.1
+       ],
+       "n": 3,
+       "median": 3358.5,
+       "p95": 3496.1,
+       "min": 3090.6,
+       "max": 3496.1,
+       "mean": 3315.0667,
+       "spread": 0.1207,
+       "noisy": true
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        4.98,
+        5.135,
+        4.75
+       ],
+       "n": 3,
+       "median": 4.98,
+       "p95": 5.135,
+       "min": 4.75,
+       "max": 5.135,
+       "mean": 4.955,
+       "spread": 0.0773,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        145.4,
+        150.1,
+        137.1
+       ],
+       "n": 3,
+       "median": 145.4,
+       "p95": 150.1,
+       "min": 137.1,
+       "max": 150.1,
+       "mean": 144.2,
+       "spread": 0.0894,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        16.5,
+        18.3,
+        16.2
+       ],
+       "n": 3,
+       "median": 16.5,
+       "p95": 18.3,
+       "min": 16.2,
+       "max": 18.3,
+       "mean": 17,
+       "spread": 0.1273,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        7.1,
+        7.9,
+        6.8
+       ],
+       "n": 3,
+       "median": 7.1,
+       "p95": 7.9,
+       "min": 6.8,
+       "max": 7.9,
+       "mean": 7.2667,
+       "spread": 0.1549,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.4,
+        5.4,
+        5.1
+       ],
+       "n": 3,
+       "median": 5.4,
+       "p95": 5.4,
+       "min": 5.1,
+       "max": 5.4,
+       "mean": 5.3,
+       "spread": 0.0556,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        6.15,
+        6.15,
+        6.15
+       ],
+       "n": 3,
+       "median": 6.15,
+       "p95": 6.15,
+       "min": 6.15,
+       "max": 6.15,
+       "mean": 6.15,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        910932,
+        910932,
+        910932
+       ],
+       "n": 3,
+       "median": 910932,
+       "p95": 910932,
+       "min": 910932,
+       "max": 910932,
+       "mean": 910932,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 7,
+     "interleaved": {
+      "order": [
+       "boxes-10000-instanced",
+       "boxes-10000-instanced@three-webgl",
+       "boxes-10000-instanced@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "info": {
+      "drawCalls": 1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED"
+     }
+    },
+    "boxes-10000-instanced@three-webgpu": {
+     "title": "Boxes n=10000 mode=instanced",
+     "engine": "three-webgpu",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.145,
+        0.145,
+        0.14
+       ],
+       "n": 3,
+       "median": 0.145,
+       "p95": 0.145,
+       "min": 0.14,
+       "max": 0.145,
+       "mean": 0.1433,
+       "spread": 0.0345,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.144,
+        0.145,
+        0.145
+       ],
+       "n": 3,
+       "median": 0.145,
+       "p95": 0.145,
+       "min": 0.144,
+       "max": 0.145,
+       "mean": 0.1447,
+       "spread": 0.0069,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        2489.3,
+        2416.4,
+        2542.7
+       ],
+       "n": 3,
+       "median": 2489.3,
+       "p95": 2542.7,
+       "min": 2416.4,
+       "max": 2542.7,
+       "mean": 2482.8,
+       "spread": 0.0507,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.475,
+        3.525,
+        3.38
+       ],
+       "n": 3,
+       "median": 3.475,
+       "p95": 3.525,
+       "min": 3.38,
+       "max": 3.525,
+       "mean": 3.46,
+       "spread": 0.0417,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        231.5,
+        234.9,
+        256.4
+       ],
+       "n": 3,
+       "median": 234.9,
+       "p95": 256.4,
+       "min": 231.5,
+       "max": 256.4,
+       "mean": 240.9333,
+       "spread": 0.106,
+       "noisy": true
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        80.1,
+        82.5,
+        84.7
+       ],
+       "n": 3,
+       "median": 82.5,
+       "p95": 84.7,
+       "min": 80.1,
+       "max": 84.7,
+       "mean": 82.4333,
+       "spread": 0.0558,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        24.7,
+        25.6,
+        28.7
+       ],
+       "n": 3,
+       "median": 25.6,
+       "p95": 28.7,
+       "min": 24.7,
+       "max": 28.7,
+       "mean": 26.3333,
+       "spread": 0.1563,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        4.5,
+        4.5,
+        5.4
+       ],
+       "n": 3,
+       "median": 4.5,
+       "p95": 5.4,
+       "min": 4.5,
+       "max": 5.4,
+       "mean": 4.8,
+       "spread": 0.2,
+       "noisy": true
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        8.81,
+        8.81,
+        8.81
+       ],
+       "n": 3,
+       "median": 8.81,
+       "p95": 8.81,
+       "min": 8.81,
+       "max": 8.81,
+       "mean": 8.81,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        53.46,
+        53.46,
+        53.46
+       ],
+       "n": 3,
+       "median": 53.46,
+       "p95": 53.46,
+       "min": 53.46,
+       "max": 53.46,
+       "mean": 53.46,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        53.52,
+        53.52,
+        53.52
+       ],
+       "n": 3,
+       "median": 53.52,
+       "p95": 53.52,
+       "min": 53.52,
+       "max": 53.52,
+       "mean": 53.52,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1355761,
+        1355761,
+        1355761
+       ],
+       "n": 3,
+       "median": 1355761,
+       "p95": 1355761,
+       "min": 1355761,
+       "max": 1355761,
+       "mean": 1355761,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 7,
+     "interleaved": {
+      "order": [
+       "boxes-10000-instanced",
+       "boxes-10000-instanced@three-webgl",
+       "boxes-10000-instanced@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "info": {
+      "drawCalls": 1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store"
+      ]
+     }
+    },
+    "boxes-10000-culled": {
+     "title": "Boxes n=10000 mode=culled",
+     "engine": "margo",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.07,
+        0.065,
+        0.065
+       ],
+       "n": 3,
+       "median": 0.065,
+       "p95": 0.07,
+       "min": 0.065,
+       "max": 0.07,
+       "mean": 0.0667,
+       "spread": 0.0769,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.098,
+        0.098,
+        0.098
+       ],
+       "n": 3,
+       "median": 0.098,
+       "p95": 0.098,
+       "min": 0.098,
+       "max": 0.098,
+       "mean": 0.098,
+       "spread": 0,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        3396.5,
+        3740.9,
+        3431.9
+       ],
+       "n": 3,
+       "median": 3431.9,
+       "p95": 3740.9,
+       "min": 3396.5,
+       "max": 3740.9,
+       "mean": 3523.1,
+       "spread": 0.1004,
+       "noisy": true
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.52,
+        3.535,
+        3.545
+       ],
+       "n": 3,
+       "median": 3.535,
+       "p95": 3.545,
+       "min": 3.52,
+       "max": 3.545,
+       "mean": 3.5333,
+       "spread": 0.0071,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        281.1,
+        281.5,
+        300.3
+       ],
+       "n": 3,
+       "median": 281.5,
+       "p95": 300.3,
+       "min": 281.1,
+       "max": 300.3,
+       "mean": 287.6333,
+       "spread": 0.0682,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        110.9,
+        110.8,
+        114.7
+       ],
+       "n": 3,
+       "median": 110.9,
+       "p95": 114.7,
+       "min": 110.8,
+       "max": 114.7,
+       "mean": 112.1333,
+       "spread": 0.0352,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        55.7,
+        57.8,
+        60
+       ],
+       "n": 3,
+       "median": 57.8,
+       "p95": 60,
+       "min": 55.7,
+       "max": 60,
+       "mean": 57.8333,
+       "spread": 0.0744,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        15.8,
+        15.9,
+        17.4
+       ],
+       "n": 3,
+       "median": 15.9,
+       "p95": 17.4,
+       "min": 15.8,
+       "max": 17.4,
+       "mean": 16.3667,
+       "spread": 0.1006,
+       "noisy": true
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.04,
+        5.04,
+        5.04
+       ],
+       "n": 3,
+       "median": 5.04,
+       "p95": 5.04,
+       "min": 5.04,
+       "max": 5.04,
+       "mean": 5.04,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        49.02,
+        49.02,
+        49.02
+       ],
+       "n": 3,
+       "median": 49.02,
+       "p95": 49.02,
+       "min": 49.02,
+       "max": 49.02,
+       "mean": 49.02,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        49.08,
+        49.08,
+        49.08
+       ],
+       "n": 3,
+       "median": 49.08,
+       "p95": 49.08,
+       "min": 49.08,
+       "max": 49.08,
+       "mean": 49.08,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        141311,
+        141311,
+        141311
+       ],
+       "n": 3,
+       "median": 141311,
+       "p95": 141311,
+       "min": 141311,
+       "max": 141311,
+       "mean": 141311,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        16,
+        16,
+        16
+       ],
+       "n": 3,
+       "median": 16,
+       "p95": 16,
+       "min": 16,
+       "max": 16,
+       "mean": 16,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 13,
+     "interleaved": {
+      "order": [
+       "boxes-10000-culled",
+       "boxes-10000-culled@three-webgl",
+       "boxes-10000-culled@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "info": {
+      "drawCalls": 16,
+      "note": "16 instanced draws, not counted by core",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Compute ",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ]
+     }
+    },
+    "boxes-10000-culled@three-webgl": {
+     "title": "Boxes n=10000 mode=culled",
+     "engine": "three-webgl",
+     "metrics": {},
+     "cpuBefore": 13,
+     "interleaved": {
+      "order": [
+       "boxes-10000-culled",
+       "boxes-10000-culled@three-webgl",
+       "boxes-10000-culled@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "unsupported": "not implemented by three-webgl"
+    },
+    "boxes-10000-culled@three-webgpu": {
+     "title": "Boxes n=10000 mode=culled",
+     "engine": "three-webgpu",
+     "metrics": {},
+     "cpuBefore": 13,
+     "interleaved": {
+      "order": [
+       "boxes-10000-culled",
+       "boxes-10000-culled@three-webgl",
+       "boxes-10000-culled@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "unsupported": "not implemented by three-webgpu"
+    },
+    "boxes-50000-instanced": {
+     "title": "Boxes n=50000 mode=instanced",
+     "engine": "margo",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.08,
+        0.08,
+        0.085
+       ],
+       "n": 3,
+       "median": 0.08,
+       "p95": 0.085,
+       "min": 0.08,
+       "max": 0.085,
+       "mean": 0.0817,
+       "spread": 0.0625,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.666,
+        0.666,
+        0.666
+       ],
+       "n": 3,
+       "median": 0.666,
+       "p95": 0.666,
+       "min": 0.666,
+       "max": 0.666,
+       "mean": 0.666,
+       "spread": 0,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1317.1,
+        1321.5,
+        1322.3
+       ],
+       "n": 3,
+       "median": 1321.5,
+       "p95": 1322.3,
+       "min": 1317.1,
+       "max": 1322.3,
+       "mean": 1320.3,
+       "spread": 0.0039,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.55,
+        3.545,
+        3.52
+       ],
+       "n": 3,
+       "median": 3.545,
+       "p95": 3.55,
+       "min": 3.52,
+       "max": 3.55,
+       "mean": 3.5383,
+       "spread": 0.0085,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        289.8,
+        273.1,
+        285.6
+       ],
+       "n": 3,
+       "median": 285.6,
+       "p95": 289.8,
+       "min": 273.1,
+       "max": 289.8,
+       "mean": 282.8333,
+       "spread": 0.0585,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        64.7,
+        65.1,
+        67.8
+       ],
+       "n": 3,
+       "median": 65.1,
+       "p95": 67.8,
+       "min": 64.7,
+       "max": 67.8,
+       "mean": 65.8667,
+       "spread": 0.0476,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        56.5,
+        56.7,
+        59.1
+       ],
+       "n": 3,
+       "median": 56.7,
+       "p95": 59.1,
+       "min": 56.5,
+       "max": 59.1,
+       "mean": 57.4333,
+       "spread": 0.0459,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        53,
+        50.9,
+        51.8
+       ],
+       "n": 3,
+       "median": 51.8,
+       "p95": 53,
+       "min": 50.9,
+       "max": 53,
+       "mean": 51.9,
+       "spread": 0.0405,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        13.06,
+        13.06,
+        13.06
+       ],
+       "n": 3,
+       "median": 13.06,
+       "p95": 13.06,
+       "min": 13.06,
+       "max": 13.06,
+       "mean": 13.06,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        32.71,
+        32.71,
+        32.71
+       ],
+       "n": 3,
+       "median": 32.71,
+       "p95": 32.71,
+       "min": 32.71,
+       "max": 32.71,
+       "mean": 32.71,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        32.77,
+        32.77,
+        32.77
+       ],
+       "n": 3,
+       "median": 32.77,
+       "p95": 32.77,
+       "min": 32.77,
+       "max": 32.77,
+       "mean": 32.77,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        491952,
+        491952,
+        491952
+       ],
+       "n": 3,
+       "median": 491952,
+       "p95": 491952,
+       "min": 491952,
+       "max": 491952,
+       "mean": 491952,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 10,
+     "interleaved": {
+      "order": [
+       "boxes-50000-instanced@three-webgl",
+       "boxes-50000-instanced@three-webgpu",
+       "boxes-50000-instanced"
+      ],
+      "firstEngine": "three-webgl"
+     },
+     "info": {
+      "drawCalls": 1,
+      "note": "1 instanced draws, not counted by core",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ]
+     }
+    },
+    "boxes-50000-instanced@three-webgl": {
+     "title": "Boxes n=50000 mode=instanced",
+     "engine": "three-webgl",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.045,
+        0.04,
+        0.04
+       ],
+       "n": 3,
+       "median": 0.04,
+       "p95": 0.045,
+       "min": 0.04,
+       "max": 0.045,
+       "mean": 0.0417,
+       "spread": 0.125,
+       "noisy": true
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.471,
+        0.463,
+        0.466
+       ],
+       "n": 3,
+       "median": 0.466,
+       "p95": 0.471,
+       "min": 0.463,
+       "max": 0.471,
+       "mean": 0.4667,
+       "spread": 0.0172,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        2027.6,
+        2052.7,
+        1988.8
+       ],
+       "n": 3,
+       "median": 2027.6,
+       "p95": 2052.7,
+       "min": 1988.8,
+       "max": 2052.7,
+       "mean": 2023.0333,
+       "spread": 0.0315,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        4.99,
+        4.955,
+        4.985
+       ],
+       "n": 3,
+       "median": 4.985,
+       "p95": 4.99,
+       "min": 4.955,
+       "max": 4.99,
+       "mean": 4.9767,
+       "spread": 0.007,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        150.1,
+        157.3,
+        159.7
+       ],
+       "n": 3,
+       "median": 157.3,
+       "p95": 159.7,
+       "min": 150.1,
+       "max": 159.7,
+       "mean": 155.7,
+       "spread": 0.061,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        21,
+        20.3,
+        22
+       ],
+       "n": 3,
+       "median": 21,
+       "p95": 22,
+       "min": 20.3,
+       "max": 22,
+       "mean": 21.1,
+       "spread": 0.081,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        8.2,
+        7.8,
+        9.2
+       ],
+       "n": 3,
+       "median": 8.2,
+       "p95": 9.2,
+       "min": 7.8,
+       "max": 9.2,
+       "mean": 8.4,
+       "spread": 0.1707,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        12.9,
+        13.9,
+        13.9
+       ],
+       "n": 3,
+       "median": 13.9,
+       "p95": 13.9,
+       "min": 12.9,
+       "max": 13.9,
+       "mean": 13.5667,
+       "spread": 0.0719,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        13.21,
+        13.21,
+        13.22
+       ],
+       "n": 3,
+       "median": 13.21,
+       "p95": 13.22,
+       "min": 13.21,
+       "max": 13.22,
+       "mean": 13.2133,
+       "spread": 0.0008,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        910932,
+        910932,
+        910932
+       ],
+       "n": 3,
+       "median": 910932,
+       "p95": 910932,
+       "min": 910932,
+       "max": 910932,
+       "mean": 910932,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 10,
+     "interleaved": {
+      "order": [
+       "boxes-50000-instanced@three-webgl",
+       "boxes-50000-instanced@three-webgpu",
+       "boxes-50000-instanced"
+      ],
+      "firstEngine": "three-webgl"
+     },
+     "info": {
+      "drawCalls": 1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED"
+     }
+    },
+    "boxes-50000-instanced@three-webgpu": {
+     "title": "Boxes n=50000 mode=instanced",
+     "engine": "three-webgpu",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.145,
+        0.145,
+        0.135
+       ],
+       "n": 3,
+       "median": 0.145,
+       "p95": 0.145,
+       "min": 0.135,
+       "max": 0.145,
+       "mean": 0.1417,
+       "spread": 0.069,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.374,
+        0.372,
+        0.377
+       ],
+       "n": 3,
+       "median": 0.374,
+       "p95": 0.377,
+       "min": 0.372,
+       "max": 0.377,
+       "mean": 0.3743,
+       "spread": 0.0134,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        2010.8,
+        2032.8,
+        2075.3
+       ],
+       "n": 3,
+       "median": 2032.8,
+       "p95": 2075.3,
+       "min": 2010.8,
+       "max": 2075.3,
+       "mean": 2039.6333,
+       "spread": 0.0317,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.51,
+        3.51,
+        3.535
+       ],
+       "n": 3,
+       "median": 3.51,
+       "p95": 3.535,
+       "min": 3.51,
+       "max": 3.535,
+       "mean": 3.5183,
+       "spread": 0.0071,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        269.6,
+        256.3,
+        254.5
+       ],
+       "n": 3,
+       "median": 256.3,
+       "p95": 269.6,
+       "min": 254.5,
+       "max": 269.6,
+       "mean": 260.1333,
+       "spread": 0.0589,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        87.6,
+        86.5,
+        88.1
+       ],
+       "n": 3,
+       "median": 87.6,
+       "p95": 88.1,
+       "min": 86.5,
+       "max": 88.1,
+       "mean": 87.4,
+       "spread": 0.0183,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        25.7,
+        25.5,
+        24.7
+       ],
+       "n": 3,
+       "median": 25.5,
+       "p95": 25.7,
+       "min": 24.7,
+       "max": 25.7,
+       "mean": 25.3,
+       "spread": 0.0392,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        13,
+        13.2,
+        12.7
+       ],
+       "n": 3,
+       "median": 13,
+       "p95": 13.2,
+       "min": 12.7,
+       "max": 13.2,
+       "mean": 12.9667,
+       "spread": 0.0385,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        15.87,
+        15.87,
+        15.87
+       ],
+       "n": 3,
+       "median": 15.87,
+       "p95": 15.87,
+       "min": 15.87,
+       "max": 15.87,
+       "mean": 15.87,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        56.36,
+        56.36,
+        56.36
+       ],
+       "n": 3,
+       "median": 56.36,
+       "p95": 56.36,
+       "min": 56.36,
+       "max": 56.36,
+       "mean": 56.36,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        56.42,
+        56.42,
+        56.42
+       ],
+       "n": 3,
+       "median": 56.42,
+       "p95": 56.42,
+       "min": 56.42,
+       "max": 56.42,
+       "mean": 56.42,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1355761,
+        1355761,
+        1355761
+       ],
+       "n": 3,
+       "median": 1355761,
+       "p95": 1355761,
+       "min": 1355761,
+       "max": 1355761,
+       "mean": 1355761,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 10,
+     "interleaved": {
+      "order": [
+       "boxes-50000-instanced@three-webgl",
+       "boxes-50000-instanced@three-webgpu",
+       "boxes-50000-instanced"
+      ],
+      "firstEngine": "three-webgl"
+     },
+     "info": {
+      "drawCalls": 1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store"
+      ]
+     }
+    },
+    "boxes-50000-culled": {
+     "title": "Boxes n=50000 mode=culled",
+     "engine": "margo",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.065,
+        0.07,
+        0.075
+       ],
+       "n": 3,
+       "median": 0.07,
+       "p95": 0.075,
+       "min": 0.065,
+       "max": 0.075,
+       "mean": 0.07,
+       "spread": 0.1429,
+       "noisy": true
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.364,
+        0.359,
+        0.362
+       ],
+       "n": 3,
+       "median": 0.362,
+       "p95": 0.364,
+       "min": 0.359,
+       "max": 0.364,
+       "mean": 0.3617,
+       "spread": 0.0138,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1950.3,
+        2181.7,
+        1938.4
+       ],
+       "n": 3,
+       "median": 1950.3,
+       "p95": 2181.7,
+       "min": 1938.4,
+       "max": 2181.7,
+       "mean": 2023.4667,
+       "spread": 0.1248,
+       "noisy": true
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.565,
+        3.545,
+        3.56
+       ],
+       "n": 3,
+       "median": 3.56,
+       "p95": 3.565,
+       "min": 3.545,
+       "max": 3.565,
+       "mean": 3.5567,
+       "spread": 0.0056,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        313.9,
+        323.5,
+        314.2
+       ],
+       "n": 3,
+       "median": 314.2,
+       "p95": 323.5,
+       "min": 313.9,
+       "max": 323.5,
+       "mean": 317.2,
+       "spread": 0.0306,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        118.8,
+        120.7,
+        113.7
+       ],
+       "n": 3,
+       "median": 118.8,
+       "p95": 120.7,
+       "min": 113.7,
+       "max": 120.7,
+       "mean": 117.7333,
+       "spread": 0.0589,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        56.8,
+        56.3,
+        56.1
+       ],
+       "n": 3,
+       "median": 56.3,
+       "p95": 56.8,
+       "min": 56.1,
+       "max": 56.8,
+       "mean": 56.4,
+       "spread": 0.0124,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        42.6,
+        44.3,
+        42.9
+       ],
+       "n": 3,
+       "median": 42.9,
+       "p95": 44.3,
+       "min": 42.6,
+       "max": 44.3,
+       "mean": 43.2667,
+       "spread": 0.0396,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        16.25,
+        16.25,
+        16.25
+       ],
+       "n": 3,
+       "median": 16.25,
+       "p95": 16.25,
+       "min": 16.25,
+       "max": 16.25,
+       "mean": 16.25,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        57.56,
+        57.56,
+        57.56
+       ],
+       "n": 3,
+       "median": 57.56,
+       "p95": 57.56,
+       "min": 57.56,
+       "max": 57.56,
+       "mean": 57.56,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        57.63,
+        57.63,
+        57.63
+       ],
+       "n": 3,
+       "median": 57.63,
+       "p95": 57.63,
+       "min": 57.63,
+       "max": 57.63,
+       "mean": 57.63,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        141311,
+        141311,
+        141311
+       ],
+       "n": 3,
+       "median": 141311,
+       "p95": 141311,
+       "min": 141311,
+       "max": 141311,
+       "mean": 141311,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        16,
+        16,
+        16
+       ],
+       "n": 3,
+       "median": 16,
+       "p95": 16,
+       "min": 16,
+       "max": 16,
+       "mean": 16,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 7,
+     "interleaved": {
+      "order": [
+       "boxes-50000-culled",
+       "boxes-50000-culled@three-webgl",
+       "boxes-50000-culled@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "info": {
+      "drawCalls": 16,
+      "note": "16 instanced draws, not counted by core",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Compute ",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ]
+     }
+    },
+    "boxes-50000-culled@three-webgl": {
+     "title": "Boxes n=50000 mode=culled",
+     "engine": "three-webgl",
+     "metrics": {},
+     "cpuBefore": 7,
+     "interleaved": {
+      "order": [
+       "boxes-50000-culled",
+       "boxes-50000-culled@three-webgl",
+       "boxes-50000-culled@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "unsupported": "not implemented by three-webgl"
+    },
+    "boxes-50000-culled@three-webgpu": {
+     "title": "Boxes n=50000 mode=culled",
+     "engine": "three-webgpu",
+     "metrics": {},
+     "cpuBefore": 7,
+     "interleaved": {
+      "order": [
+       "boxes-50000-culled",
+       "boxes-50000-culled@three-webgl",
+       "boxes-50000-culled@three-webgpu"
+      ],
+      "firstEngine": "margo"
+     },
+     "unsupported": "not implemented by three-webgpu"
+    },
+    "boxes-10000-instanced-moving": {
+     "title": "Boxes n=10000 mode=instanced move=1",
+     "engine": "margo",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        1.595,
+        1.545,
+        1.6
+       ],
+       "n": 3,
+       "median": 1.595,
+       "p95": 1.6,
+       "min": 1.545,
+       "max": 1.6,
+       "mean": 1.58,
+       "spread": 0.0345,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.164,
+        0.163,
+        0.164
+       ],
+       "n": 3,
+       "median": 0.164,
+       "p95": 0.164,
+       "min": 0.163,
+       "max": 0.164,
+       "mean": 0.1637,
+       "spread": 0.0061,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        524.5,
+        551,
+        527.4
+       ],
+       "n": 3,
+       "median": 527.4,
+       "p95": 551,
+       "min": 524.5,
+       "max": 551,
+       "mean": 534.3,
+       "spread": 0.0502,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.345,
+        4.955,
+        4.91
+       ],
+       "n": 3,
+       "median": 4.955,
+       "p95": 5.345,
+       "min": 4.91,
+       "max": 5.345,
+       "mean": 5.07,
+       "spread": 0.0878,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        240.7,
+        241.9,
+        238.5
+       ],
+       "n": 3,
+       "median": 240.7,
+       "p95": 241.9,
+       "min": 238.5,
+       "max": 241.9,
+       "mean": 240.3667,
+       "spread": 0.0141,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        60.6,
+        60.2,
+        59.7
+       ],
+       "n": 3,
+       "median": 60.2,
+       "p95": 60.6,
+       "min": 59.7,
+       "max": 60.6,
+       "mean": 60.1667,
+       "spread": 0.015,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        56.1,
+        57.8,
+        54.5
+       ],
+       "n": 3,
+       "median": 56.1,
+       "p95": 57.8,
+       "min": 54.5,
+       "max": 57.8,
+       "mean": 56.1333,
+       "spread": 0.0588,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        23,
+        24.8,
+        22.5
+       ],
+       "n": 3,
+       "median": 23,
+       "p95": 24.8,
+       "min": 22.5,
+       "max": 24.8,
+       "mean": 23.4333,
+       "spread": 0.1,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.25,
+        5.26,
+        5.26
+       ],
+       "n": 3,
+       "median": 5.26,
+       "p95": 5.26,
+       "min": 5.25,
+       "max": 5.26,
+       "mean": 5.2567,
+       "spread": 0.0019,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        29.04,
+        29.04,
+        29.04
+       ],
+       "n": 3,
+       "median": 29.04,
+       "p95": 29.04,
+       "min": 29.04,
+       "max": 29.04,
+       "mean": 29.04,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        29.11,
+        29.11,
+        29.11
+       ],
+       "n": 3,
+       "median": 29.11,
+       "p95": 29.11,
+       "min": 29.11,
+       "max": 29.11,
+       "mean": 29.11,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        491952,
+        491952,
+        491952
+       ],
+       "n": 3,
+       "median": 491952,
+       "p95": 491952,
+       "min": 491952,
+       "max": 491952,
+       "mean": 491952,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 4,
+     "interleaved": {
+      "order": [
+       "boxes-10000-instanced-moving@three-webgpu",
+       "boxes-10000-instanced-moving",
+       "boxes-10000-instanced-moving@three-webgl"
+      ],
+      "firstEngine": "three-webgpu"
+     },
+     "info": {
+      "drawCalls": 1,
+      "note": "1 instanced draws, not counted by core",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ]
+     }
+    },
+    "boxes-10000-instanced-moving@three-webgl": {
+     "title": "Boxes n=10000 mode=instanced move=1",
+     "engine": "three-webgl",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.62,
+        0.635,
+        0.625
+       ],
+       "n": 3,
+       "median": 0.625,
+       "p95": 0.635,
+       "min": 0.62,
+       "max": 0.635,
+       "mean": 0.6267,
+       "spread": 0.024,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.163,
+        0.162,
+        0.162
+       ],
+       "n": 3,
+       "median": 0.162,
+       "p95": 0.163,
+       "min": 0.162,
+       "max": 0.163,
+       "mean": 0.1623,
+       "spread": 0.0062,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1126,
+        1117.4,
+        1074.5
+       ],
+       "n": 3,
+       "median": 1117.4,
+       "p95": 1126,
+       "min": 1074.5,
+       "max": 1126,
+       "mean": 1105.9667,
+       "spread": 0.0461,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.5,
+        5.475,
+        5.49
+       ],
+       "n": 3,
+       "median": 5.49,
+       "p95": 5.5,
+       "min": 5.475,
+       "max": 5.5,
+       "mean": 5.4883,
+       "spread": 0.0046,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        141,
+        147.4,
+        150.1
+       ],
+       "n": 3,
+       "median": 147.4,
+       "p95": 150.1,
+       "min": 141,
+       "max": 150.1,
+       "mean": 146.1667,
+       "spread": 0.0617,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        17.9,
+        19.2,
+        18.4
+       ],
+       "n": 3,
+       "median": 18.4,
+       "p95": 19.2,
+       "min": 17.9,
+       "max": 19.2,
+       "mean": 18.5,
+       "spread": 0.0707,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        6.9,
+        7.3,
+        6.9
+       ],
+       "n": 3,
+       "median": 6.9,
+       "p95": 7.3,
+       "min": 6.9,
+       "max": 7.3,
+       "mean": 7.0333,
+       "spread": 0.058,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.1,
+        5.4,
+        5
+       ],
+       "n": 3,
+       "median": 5.1,
+       "p95": 5.4,
+       "min": 5,
+       "max": 5.4,
+       "mean": 5.1667,
+       "spread": 0.0784,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        6.18,
+        6.18,
+        6.18
+       ],
+       "n": 3,
+       "median": 6.18,
+       "p95": 6.18,
+       "min": 6.18,
+       "max": 6.18,
+       "mean": 6.18,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        910932,
+        910932,
+        910932
+       ],
+       "n": 3,
+       "median": 910932,
+       "p95": 910932,
+       "min": 910932,
+       "max": 910932,
+       "mean": 910932,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 4,
+     "interleaved": {
+      "order": [
+       "boxes-10000-instanced-moving@three-webgpu",
+       "boxes-10000-instanced-moving",
+       "boxes-10000-instanced-moving@three-webgl"
+      ],
+      "firstEngine": "three-webgpu"
+     },
+     "info": {
+      "drawCalls": 1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "EXT_disjoint_timer_query_webgl2 TIME_ELAPSED"
+     }
+    },
+    "boxes-10000-instanced-moving@three-webgpu": {
+     "title": "Boxes n=10000 mode=instanced move=1",
+     "engine": "three-webgpu",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.89,
+        0.91,
+        0.885
+       ],
+       "n": 3,
+       "median": 0.89,
+       "p95": 0.91,
+       "min": 0.885,
+       "max": 0.91,
+       "mean": 0.895,
+       "spread": 0.0281,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.137,
+        0.136,
+        0.137
+       ],
+       "n": 3,
+       "median": 0.137,
+       "p95": 0.137,
+       "min": 0.136,
+       "max": 0.137,
+       "mean": 0.1367,
+       "spread": 0.0073,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        866.6,
+        836.1,
+        862.4
+       ],
+       "n": 3,
+       "median": 862.4,
+       "p95": 866.6,
+       "min": 836.1,
+       "max": 866.6,
+       "mean": 855.0333,
+       "spread": 0.0354,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        4.51,
+        4.54,
+        4.09
+       ],
+       "n": 3,
+       "median": 4.51,
+       "p95": 4.54,
+       "min": 4.09,
+       "max": 4.54,
+       "mean": 4.38,
+       "spread": 0.0998,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        238.4,
+        240.8,
+        246.1
+       ],
+       "n": 3,
+       "median": 240.8,
+       "p95": 246.1,
+       "min": 238.4,
+       "max": 246.1,
+       "mean": 241.7667,
+       "spread": 0.032,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        84.6,
+        87.9,
+        82.5
+       ],
+       "n": 3,
+       "median": 84.6,
+       "p95": 87.9,
+       "min": 82.5,
+       "max": 87.9,
+       "mean": 85,
+       "spread": 0.0638,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        25.4,
+        25.8,
+        25.3
+       ],
+       "n": 3,
+       "median": 25.4,
+       "p95": 25.8,
+       "min": 25.3,
+       "max": 25.8,
+       "mean": 25.5,
+       "spread": 0.0197,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        4.5,
+        5.2,
+        5.1
+       ],
+       "n": 3,
+       "median": 5.1,
+       "p95": 5.2,
+       "min": 4.5,
+       "max": 5.2,
+       "mean": 4.9333,
+       "spread": 0.1373,
+       "noisy": true
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        8.85,
+        8.85,
+        8.85
+       ],
+       "n": 3,
+       "median": 8.85,
+       "p95": 8.85,
+       "min": 8.85,
+       "max": 8.85,
+       "mean": 8.85,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        53.46,
+        53.46,
+        53.46
+       ],
+       "n": 3,
+       "median": 53.46,
+       "p95": 53.46,
+       "min": 53.46,
+       "max": 53.46,
+       "mean": 53.46,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        53.52,
+        53.52,
+        53.52
+       ],
+       "n": 3,
+       "median": 53.52,
+       "p95": 53.52,
+       "min": 53.52,
+       "max": 53.52,
+       "mean": 53.52,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1355761,
+        1355761,
+        1355761
+       ],
+       "n": 3,
+       "median": 1355761,
+       "p95": 1355761,
+       "min": 1355761,
+       "max": 1355761,
+       "mean": 1355761,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        1,
+        1,
+        1
+       ],
+       "n": 3,
+       "median": 1,
+       "p95": 1,
+       "min": 1,
+       "max": 1,
+       "mean": 1,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 4,
+     "interleaved": {
+      "order": [
+       "boxes-10000-instanced-moving@three-webgpu",
+       "boxes-10000-instanced-moving",
+       "boxes-10000-instanced-moving@three-webgl"
+      ],
+      "firstEngine": "three-webgpu"
+     },
+     "info": {
+      "drawCalls": 1,
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store"
+      ]
+     }
+    },
+    "boxes-10000-culled-moving": {
+     "title": "Boxes n=10000 mode=culled move=1",
+     "engine": "margo",
+     "metrics": {
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        13.605,
+        13.64,
+        13.575
+       ],
+       "n": 3,
+       "median": 13.605,
+       "p95": 13.64,
+       "min": 13.575,
+       "max": 13.64,
+       "mean": 13.6067,
+       "spread": 0.0048,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        1.082,
+        1.065,
+        1.082
+       ],
+       "n": 3,
+       "median": 1.082,
+       "p95": 1.082,
+       "min": 1.065,
+       "max": 1.082,
+       "mean": 1.0763,
+       "spread": 0.0157,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        68.7,
+        68.7,
+        68
+       ],
+       "n": 3,
+       "median": 68.7,
+       "p95": 68.7,
+       "min": 68,
+       "max": 68.7,
+       "mean": 68.4667,
+       "spread": 0.0102,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        25.1,
+        25.09,
+        24.99
+       ],
+       "n": 3,
+       "median": 25.09,
+       "p95": 25.1,
+       "min": 24.99,
+       "max": 25.1,
+       "mean": 25.06,
+       "spread": 0.0044,
+       "noisy": false
+      },
+      "loadMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        312.2,
+        333.6,
+        341
+       ],
+       "n": 3,
+       "median": 333.6,
+       "p95": 341,
+       "min": 312.2,
+       "max": 341,
+       "mean": 328.9333,
+       "spread": 0.0863,
+       "noisy": false
+      },
+      "firstFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        138.3,
+        135.2,
+        142.8
+       ],
+       "n": 3,
+       "median": 138.3,
+       "p95": 142.8,
+       "min": 135.2,
+       "max": 142.8,
+       "mean": 138.7667,
+       "spread": 0.055,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        58.7,
+        60.4,
+        56
+       ],
+       "n": 3,
+       "median": 58.7,
+       "p95": 60.4,
+       "min": 56,
+       "max": 60.4,
+       "mean": 58.3667,
+       "spread": 0.075,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        16.1,
+        18.3,
+        15.7
+       ],
+       "n": 3,
+       "median": 16.1,
+       "p95": 18.3,
+       "min": 15.7,
+       "max": 18.3,
+       "mean": 16.7,
+       "spread": 0.1615,
+       "noisy": true
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.07,
+        5.07,
+        5.07
+       ],
+       "n": 3,
+       "median": 5.07,
+       "p95": 5.07,
+       "min": 5.07,
+       "max": 5.07,
+       "mean": 5.07,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        49.02,
+        49.02,
+        49.02
+       ],
+       "n": 3,
+       "median": 49.02,
+       "p95": 49.02,
+       "min": 49.02,
+       "max": 49.02,
+       "mean": 49.02,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuPeakMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        49.08,
+        49.08,
+        49.08
+       ],
+       "n": 3,
+       "median": 49.08,
+       "p95": 49.08,
+       "min": 49.08,
+       "max": 49.08,
+       "mean": 49.08,
+       "spread": 0,
+       "noisy": false
+      },
+      "jsBytes": {
+       "unit": "B",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        141311,
+        141311,
+        141311
+       ],
+       "n": 3,
+       "median": 141311,
+       "p95": 141311,
+       "min": 141311,
+       "max": 141311,
+       "mean": 141311,
+       "spread": 0,
+       "noisy": false
+      },
+      "drawCalls": {
+       "unit": "",
+       "better": "lower",
+       "primary": false,
+       "exact": true,
+       "samples": [
+        16,
+        16,
+        16
+       ],
+       "n": 3,
+       "median": 16,
+       "p95": 16,
+       "min": 16,
+       "max": 16,
+       "mean": 16,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 3,
+     "interleaved": {
+      "order": [
+       "boxes-10000-culled-moving@three-webgpu",
+       "boxes-10000-culled-moving",
+       "boxes-10000-culled-moving@three-webgl"
+      ],
+      "firstEngine": "three-webgpu"
+     },
+     "info": {
+      "drawCalls": 16,
+      "note": "16 instanced draws, not counted by core",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Compute ",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ]
+     }
+    },
+    "boxes-10000-culled-moving@three-webgl": {
+     "title": "Boxes n=10000 mode=culled move=1",
+     "engine": "three-webgl",
+     "metrics": {},
+     "cpuBefore": 3,
+     "interleaved": {
+      "order": [
+       "boxes-10000-culled-moving@three-webgpu",
+       "boxes-10000-culled-moving",
+       "boxes-10000-culled-moving@three-webgl"
+      ],
+      "firstEngine": "three-webgpu"
+     },
+     "unsupported": "not implemented by three-webgl"
+    },
+    "boxes-10000-culled-moving@three-webgpu": {
+     "title": "Boxes n=10000 mode=culled move=1",
+     "engine": "three-webgpu",
+     "metrics": {},
+     "cpuBefore": 3,
+     "interleaved": {
+      "order": [
+       "boxes-10000-culled-moving@three-webgpu",
+       "boxes-10000-culled-moving",
+       "boxes-10000-culled-moving@three-webgl"
+      ],
+      "firstEngine": "three-webgpu"
+     },
+     "unsupported": "not implemented by three-webgpu"
+    }
+   },
+   "seconds": 112.1
+  }
+ },
+ "settings": {
+  "browser": {
+   "name": "chromium",
+   "channel": "msedge",
+   "version": "156.0.4314.42"
+  },
+  "canvas": [
+   1280,
+   720
+  ],
+  "dpr": 1,
+  "flags": [
+   "--disable-gpu-vsync",
+   "--disable-frame-rate-limit",
+   "--enable-precise-memory-info",
+   "--js-flags=--expose-gc"
+  ],
+  "serving": "production bundles, no compression, no cache, cross-origin isolated",
+  "assets": "examples/assets (the same files for every engine)",
+  "frames": {
+   "frames": 300,
+   "warmup": 60,
+   "gpuFrames": 60,
+   "serialFrames": 30
+  },
+  "runs": 3,
+  "warmupRuns": 1,
+  "interleaved": true,
+  "engines": {
+   "margo": {
+    "version": "1.0.0",
+    "commit": "e166a074"
+   },
+   "three-webgl": {
+    "version": "0.186.1",
+    "package": "three"
+   },
+   "three-webgpu": {
+    "version": "0.186.1",
+    "package": "three"
+   }
+  }
+ },
+ "seconds": 113.3
+}

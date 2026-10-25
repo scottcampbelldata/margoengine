@@ -379,16 +379,25 @@ These entries have no timing. The loss is a feature that did not work.
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
 
-- **three.js `InstancedMesh` beats Margo's instanced paths on static boxes.**
-  - Source: [boxes-vs-threejs.md](boxes-vs-threejs.md), "Instanced <-> instanced";
-    `examples/package-benchmarks/results/vs-threejs-boxes-pairs.json` (diagnostic, busy machine, Arc 140V).
-  - At 10k boxes: three.js WebGL2 `InstancedMesh` reached 645 FPS, Margo `createInstancedMesh` 212 FPS and
-    `CulledInstances` 270 FPS.
-  - Neither Margo instanced path gets core's culled pipeline: `createInstancedMesh` uses gltf-pro's heavier PBR shader,
-    and `CulledInstances` draws with culling off plus the `discard`.
-  - [claims.md](claims.md) records that there is no publishable result yet. Work is in progress.
-- **Moving `CulledInstances`.** `setTransform` makes one 64-byte write per part: 187 ms CPU per frame for 10,000 moving
-  boxes (same source, diagnostic).
+- **three.js `InstancedMesh` against Margo's instanced paths: partly closed.**
+  - Before: [boxes-vs-threejs.md](boxes-vs-threejs.md), "Instanced <-> instanced";
+    `examples/package-benchmarks/results/vs-threejs-boxes-pairs.json` (diagnostic, busy machine, Arc 140V). At 10k
+    boxes three.js WebGL2 `InstancedMesh` reached 645 FPS, Margo `createInstancedMesh` 212 FPS and `CulledInstances`
+    270 FPS; moving `CulledInstances` took 187 ms CPU per frame for 10,000 boxes.
+  - Causes and fixes (2026-10-25): `CulledInstances` drew with the pipeline that keeps the back-face discard (now
+    core's back-culled variant), wrote two buffers per moved part (now one upload per frame) and computed bounding
+    spheres on the CPU (now in the cull pass); a plain `Material` read ten textures per fragment (now none);
+    `Quaternion.setFromEuler` is closed form.
+  - After: [boxes-vs-threejs.md](boxes-vs-threejs.md), "Instanced: fixes and what is left" (RTX A6000, diagnostic;
+    `benchmarks/records/20261025-073632-e166a074-dev.json` before, `20261025-104804-26e20b90-dev.json` after). At 50k
+    static boxes `CulledInstances` reached 2,443 FPS and 0.300 ms GPU against three.js WebGL2's 2,024 FPS and 0.472 ms;
+    moving `CulledInstances` (10k) went from 13.6 to 1.34 ms CPU per frame.
+  - Rerun: `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3`.
+  - Guard: `packages/culling/test/culling.test.js`, `packages/materials/test/materials.test.js`,
+    `packages/math/test/euler-quaternion.test.js`, `packages/gltf-pro/tests/instancing.test.js`.
+  - Still open: `createInstancedMesh` vertex fetch at 10k-50k, the 1k GPU cost of a package pass, and CPU for moving
+    instances. Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
+  - [claims.md](claims.md) records that there is no publishable result yet.
 - **Galaxy S23 Ultra island demo.** A report of 3–5 FPS on that phone, with particles off making no difference.
   - Partial fixes: `909e384a`, and `1c627cdc` (scatter compiles the fade `discard` only when instances can fade).
   - No after number is recorded. The project has no S23 to test on.

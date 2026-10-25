@@ -150,7 +150,7 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 | materials-atlas (measurement, no baseline) | geometry + materials at `700838e` | - |
 | binding-limit | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | - |
 | gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `57250a49`: 4,476 calls |
-| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `57250a49`: 1,321 calls |
+| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `c640305c`: 1,296 calls |
 | lines-perspective | `96edc75` -> `6da7f7e`: 946 calls | `2d192a71` (per-line clipping planes at `86063c47`: the style uniform grew from 128 to 224 bytes and the shader gained a world-position varying and a zero-count plane loop; then `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose both times) |
 | math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
 | post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `57250a49` |
@@ -250,6 +250,13 @@ changes only `packages/post/src/fxaa.ts`: the FXAA fragment shader is rewritten 
 for the 3x3 neighbourhood, its own contrast thresholds 0.15/0.05, a 10-step end search with an end threshold of a
 quarter of the gradient, sub-pixel preset 0.75). Both stacks end in FXAA, so their FXAA shader module text differs
 from `de93aa5`; the call counts are unchanged and the full traces match `151aa744` at 12,431 and 37,182 calls.
+
+**materials-uv-transform, advanced to `c640305c` on 2026-10-25 (a material without maps reads no textures):** the
+story's untextured materials box (`new Material({color: '#3080ff'})`) now draws materials' bare shader: its texture
+reads are constant texels and gltf-pro creates none of its five default textures for it. Against `57250a49`, 1,321
+-> 1,296 calls: 5 fewer textures, texture writes, views, samplers and destroys, and one new shader module (the bare
+one); every other kind of call has the same count (84 draws, 110 uniform writes) and every earlier shader module is
+still compiled. The full trace matches `c640305c` at 1,296 calls.
 
 **taa-velocity, advanced to `d41cdafd` on 2026-10-21:** a hygiene pass converted TAA's bare Errors.
 The story records each thrown error as a `throw` entry (class and message), and exactly three per run changed: the
