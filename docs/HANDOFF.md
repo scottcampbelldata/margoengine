@@ -38,10 +38,9 @@ galaxy; web: the studio scene with shadows and a turntable; react/next: shapes i
 (0.5 to 1.3 s, packages linked, no install). Every package README shows `margoengine/...` imports;
 `margoengine/dist/importmap.json` maps every entry to jsDelivr for pages without a bundler.
 `npm run modern:test:bundlers` (`scripts/bundler-matrix.mjs`) installs the packed packages and builds one app with
-Vite, webpack, esbuild and Rollup (passing), Next webpack/Turbopack and an import map. Open: `@margoengine/react`'s
-root reaches `import('@dimforge/rapier3d-compat')`, so webpack/Turbopack builds fail without Rapier installed; the
-React session is splitting it out. Until then the react and next templates list Rapier, and the matrix is not yet in
-`check:merge`.
+Vite, webpack, esbuild and Rollup (each bundle holds only the imported packages), Next with webpack and Turbopack, and
+an import map in Edge; it is the last step of `check:merge` (about 260 s). It caught `@margoengine/react`'s root
+reaching Rapier (fixed: physics is `margoengine/react/physics`), so the react and next templates need no Rapier.
 
 ## Landed 2026-10-24: parity closing follow-ups (Collada scene, clipIntersection, DepthTexture checks)
 
