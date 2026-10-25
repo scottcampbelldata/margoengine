@@ -126,18 +126,17 @@ try {
           assert(passes === 1, 'Material change did not invalidate the cache');
           target.setMaterial(originalMaterial);
           e.render();
-          const pending = e.pick(64, 64);
-          await e.pick(64, 64).then(
-            () => {
-              throw new Error('Concurrent pick was accepted');
-            },
-            () => {},
-          );
+          // engine.pick queues an overlapping call (core, 59e32ef7): it waits for the readback in flight, then reads
+          // the scene as it is on its turn.
+          const pending = e.pick(64, 64),
+            queued = e.pick(64, 64);
           target.dispose();
           const reused = e.createMesh().setGeometry(geometry);
           assert((await pending) === null, 'Disposed slot was returned after reuse');
+          const later = await queued;
+          assert(later === null || later === reused, 'Queued pick returned the disposed mesh');
           reused.dispose();
-          checks.push({ name: 'Freshness, concurrent readback and stale slot guards' });
+          checks.push({ name: 'Freshness, queued overlapping picks and stale slot guards' });
           for (const mesh of [...e.meshes.values()]) mesh.dispose();
           e.camera.position = [0, 0, 2];
           e.camera.target = [0, 0, 0];

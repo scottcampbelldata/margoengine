@@ -51,11 +51,13 @@ const lighting = () => runtime().lighting;
 const lightsOff = () => { lighting().direction[3] = 0; lighting().radiance[3] = 0; };
 const device = () => runtime().gpu;
 const look = (position, target) => { engine.camera.position = position; engine.camera.target = target; };
-function worldOf(cells) {
+// sky: fill every light byte with open sky (0xf0). Without light bytes the sun does not reach a face (voxel README,
+// "Without light bytes every face sits in the dark"), so a scene lit by engine.lighting's sun needs it.
+function worldOf(cells, sky = false) {
   const world = new VoxelWorld({ blocks });
   const keys = new Set();
   for (const [x, y, z] of cells) keys.add(`${x >> 5},0,${z >> 5}`);
-  for (const key of keys) { const [x, , z] = key.split(',').map(Number); world.addChunk(x, 0, z); }
+  for (const key of keys) { const [x, , z] = key.split(',').map(Number); world.addChunk(x, 0, z); if (sky) world.getChunk(x, 0, z).fillLight(0xf0); }
   world.setBlocks(cells.flat());
   return { world, keys: [...keys] };
 }
@@ -86,8 +88,8 @@ const at = (img, x, y) => { const p = (y * canvas.width + x) * 4; return [img[p]
 const mid = (img) => at(img, canvas.width >> 1, canvas.height >> 1);
 const redOf = (c) => c[0] > 80 && c[0] > c[1] * 1.4 && c[0] > c[2] * 1.4;
 const lit = (img) => { let n = 0; for (let i = 0; i < img.length; i += 4) if (redOf([img[i], img[i + 1], img[i + 2]])) n++; return n; };
-async function draw(cells, options, position, target) {
-  const { world, keys } = worldOf(cells);
+async function draw(cells, { sky, ...options }, position, target) {
+  const { world, keys } = worldOf(cells, sky);
   const renderer = attachVoxels({ world, textures, workers: 1, ...options });
   look(position, target);
   await ready(renderer, world, keys, options.bevel);
@@ -146,7 +148,8 @@ async function gapLightmap(bevel,offset=0,withHooks=false) {
  if(withHooks){uniform=device().createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});device().queue.writeBuffer(uniform,0,new Float32Array([1,.2,.1,1]));const hooks={declarations:'@group(1) @binding(0) var<uniform> lightmapTest:vec4f;',direct:d=>`(${d})*lightmapTest.x`,light:'vec3f(lightmapTest.z)',ambient:'vec3f(lightmapTest.y)',output:c=>`(${c})*lightmapTest.w`};renderer.addLighting({pbr:()=>hooks,bindings:()=>[{binding:0,resource:{buffer:uniform}}]});}
  await ready(renderer,world,keys,bevel); const img=await hdrShot(post), left=at(img,...project([offset+.2,.5,1])),right=at(img,...project([offset+.8,.5,1]));
  upload(true);const swapped=at(await hdrShot(post),...project([offset+.2,.5,1]));
- renderer.lightmap=undefined; for(let i=0;i<15;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise(r=>setTimeout(r,1));}
+ // Clearing the lightmap rebuilds the pipelines (asynchronously): wait for them as for a new renderer.
+ renderer.lightmap=undefined; await ready(renderer,world,keys,bevel);
  const cleared=mid(await hdrShot(post));renderer.dispose();post.dispose();texture.destroy();uniform?.destroy();return {left,right,swapped,cleared,hooks:withHooks};
 }
 async function gapReplay(bevel,material=RED) {
@@ -205,9 +208,9 @@ window.check = {
     const plain = await draw([[0, 0, 0, PLAIN]], { bevel: 0.15 }, [0.5, 0.5, 3.2], [0.5, 0.5, 0]);
     lighting().direction = [0, 0, 1, 1];
     lighting().radiance = [1, 1, 1, 0];
-    const metal = await draw([[0, 0, 0, METAL]], { bevel: 0.15 }, [0.5, 0.5, 3.2], [0.5, 0.5, 0]);
-    const roughMetal = await draw([[0, 0, 0, ROUGH_METAL]], { bevel: 0.15 }, [0.5, 0.5, 3.2], [0.5, 0.5, 0]);
-    const normalMetal = await draw([[0, 0, 0, NORMAL_METAL]], { bevel: 0.15 }, [0.5, 0.5, 3.2], [0.5, 0.5, 0]);
+    const metal = await draw([[0, 0, 0, METAL]], { bevel: 0.15, sky: true }, [0.5, 0.5, 3.2], [0.5, 0.5, 0]);
+    const roughMetal = await draw([[0, 0, 0, ROUGH_METAL]], { bevel: 0.15, sky: true }, [0.5, 0.5, 3.2], [0.5, 0.5, 0]);
+    const normalMetal = await draw([[0, 0, 0, NORMAL_METAL]], { bevel: 0.15, sky: true }, [0.5, 0.5, 3.2], [0.5, 0.5, 0]);
     lightsOff();
     const glassHard = await draw([[0, 0, 0, GLASS]], {}, [0.5, 0.5, 3.2], [0.5, 0.5, 0]);
     const glassBevel = await draw([[0, 0, 0, GLASS]], { bevel: 0.15 }, [0.5, 0.5, 3.2], [0.5, 0.5, 0]);

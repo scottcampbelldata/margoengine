@@ -79,12 +79,25 @@ try {
     };
   };
   await page.addInitScript(instrument);
-  await page.goto(`${server.resolvedUrls.local[0]}examples/earth/`);
-  await page.waitForFunction(() => document.body.dataset.ready === 'true' || document.body.dataset.error === 'true');
-  assert.equal(await page.locator('body').getAttribute('data-error'), null, await page.locator('#error').textContent());
+  // Desktops start on the light tier (1× MSAA, docs/HANDOFF.md "Quality tiers"); `?quality=high` is the 4× tier.
+  const earth = async (search) => {
+    await page.goto(`${server.resolvedUrls.local[0]}examples/earth/${search}`);
+    await page.waitForFunction(() => document.body.dataset.ready === 'true' || document.body.dataset.error === 'true');
+    assert.equal(
+      await page.locator('body').getAttribute('data-error'),
+      null,
+      await page.locator('#error').textContent(),
+    );
+  };
+  await earth('');
+  assert(
+    await page.evaluate(() => !earthAudit.textures.includes(4) && !earthAudit.boundSamples.has(4)),
+    'Desktop light-tier globe rendered with 4× MSAA',
+  );
+  await earth('?quality=high');
   assert(
     await page.evaluate(() => earthAudit.textures.includes(4) && earthAudit.boundSamples.has(4)),
-    'Desktop globe did not render with 4× MSAA',
+    'Desktop high-tier globe did not render with 4× MSAA',
   );
   await page.locator('#pause').click();
   assert.equal(await page.locator('#pause').getAttribute('aria-pressed'), 'true');
@@ -245,7 +258,7 @@ try {
       };
     });
     assert(!quality.samples.includes(4) && !quality.textures.includes(4));
-    assert.equal(quality.dpr, 2);
+    assert.equal(quality.dpr, 1, 'Phones render at DPR 1 (@margoengine/quality phone tier)');
     assert(!quality.overflow && !quality.open);
     assert.equal(await mobile.locator('#pause').getAttribute('aria-pressed'), 'true');
     const original = await mobile.evaluate(() => earthAudit.frame);
@@ -285,7 +298,7 @@ try {
     assert.equal(await mobile.evaluate(() => earthAudit.live.size), 0);
     checks.mobile = quality;
     checks.checks.push(
-      'Mobile uses 1× MSAA/DPR 2, collapsible controls, paused pinch/reset, reduced motion and clean teardown',
+      'Mobile uses 1× MSAA/DPR 1, collapsible controls, paused pinch/reset, reduced motion and clean teardown',
     );
   } finally {
     await mobileContext.close();

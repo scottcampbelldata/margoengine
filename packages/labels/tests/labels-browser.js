@@ -2,6 +2,7 @@ import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { LabelRenderer, cssPointToWorld } from '@margoengine/labels';
 import { projectPoint } from '@margoengine/math/mat4';
+import { webglRenderer } from '@margoengine/webgl';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -47,6 +48,7 @@ async function scenario(backend) {
   const canvas = document.getElementById('view');
   const engine = await Engine.create(canvas, {
     backend,
+    fallback: webglRenderer,
     camera: { position: [0, 1.5, 6], target: [0, 0, 0], near: 0.1, far: 100 },
   });
   assert(engine.backend === backend, `Expected ${backend}, got ${engine.backend}`);

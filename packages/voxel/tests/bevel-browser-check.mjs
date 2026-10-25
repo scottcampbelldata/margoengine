@@ -120,7 +120,7 @@ try {
       assert.ok(map.swapped[2] > 1.8 && map.swapped[0] < 0.1, 'texture upload changes sampled output');
       assert.ok(
         map.cleared.every((v) => Math.abs(v - (map.hooks ? 0.3 : 0)) < 0.001),
-        'clearing restores live lighting',
+        `clearing restores live lighting ${JSON.stringify(map)}`,
       );
     }
     assert.ok(

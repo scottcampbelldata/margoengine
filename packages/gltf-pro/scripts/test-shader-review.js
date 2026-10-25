@@ -50,7 +50,7 @@ try {
             camera: { position: [0, 0, 3], target: [0, 0, 0] },
           }),
           device = engine.gpu,
-          modules = [];
+          compilations = [];
         let namedShaders = 0,
           baselineReplacements = 0;
         device.pushErrorScope('validation');
@@ -68,7 +68,8 @@ try {
             baselineReplacements++;
           }
           const module = create({ ...descriptor, code });
-          modules.push(module);
+          // Asked for now: on an idle device a later getCompilationInfo() can stay pending (Chromium).
+          compilations.push(module.getCompilationInfo());
           return module;
         };
         const model = parseGLTF(
@@ -192,8 +193,8 @@ try {
           await device.queue.onSubmittedWorkDone();
           const validation = await device.popErrorScope();
           assert(!validation, validation?.message);
-          for (const module of modules) {
-            const info = await module.getCompilationInfo();
+          for (const pending of compilations) {
+            const info = await pending;
             assert(!info.messages.some((message) => message.type === 'error'), JSON.stringify(info.messages));
           }
           assert(namedShaders >= 4, 'The runtime bundle does not contain the new named-light shader; rebuild gltf-pro');

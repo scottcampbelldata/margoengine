@@ -1,37 +1,24 @@
-// Real-GPU check (repository root, after building packages, AC power; takes the GPU lock):
-//   node packages/staging/test/browser-check.mjs
+// Real-GPU check (repository root, after building packages, AC power; takes the GPU lock through scripts/gpu-lock.mjs,
+// so it also runs inside a holder such as check:gpu-packages):
+//   node packages/staging/test/browser-check.mjs [--no-record]
 // Renders a floor, a core cube touching it, a materials (gltf-pro) sphere touching it and a cube floating above the
 // shadow height, with contact shadows off (opacity 0) and on, and asserts pixels; then times the contact-shadow
-// passes with timestamp queries. Writes examples/package-benchmarks/results/staging-contact.json and
-// test-results/staging-contact.png.
+// passes with timestamp queries. Writes test-results/staging-contact.png and, unless --no-record (test runs), the
+// timings to examples/package-benchmarks/results/staging-contact.json (a checked-in record).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { acPower } from '../../../examples/package-benchmarks/cad/power.mjs';
+import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');
 // Desktops without a battery report AC power (true); only a laptop on battery (false) refuses.
 const power = () => acPower() !== false;
-const lock = resolve(
-  dirname(
-    execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim(),
-  ),
-  'test-results/gpu.lock',
-);
 assert.ok(power(), 'On battery: run real-GPU checks on AC power');
-for (;;) {
-  try {
-    mkdirSync(lock);
-    break;
-  } catch (e) {
-    if (e.code !== 'EEXIST') throw e;
-    console.log('GPU lock held, waiting');
-    await new Promise((r) => setTimeout(r, 15000));
-  }
-}
+const release = await acquire({ owner: 'staging-browser-check' });
 const report = {
   recordedAt: new Date().toISOString(),
   commit: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(),
@@ -116,11 +103,12 @@ try {
   }
   report.acPowerAfter = power();
   assert.ok(report.acPowerAfter, 'Power dropped to battery during the run; discard it');
-  writeFileSync(
-    resolve(root, 'examples/package-benchmarks/results/staging-contact.json'),
-    JSON.stringify(report, null, 1) + '\n',
-  );
+  if (!process.argv.includes('--no-record'))
+    writeFileSync(
+      resolve(root, 'examples/package-benchmarks/results/staging-contact.json'),
+      JSON.stringify(report, null, 1) + '\n',
+    );
   console.log('staging browser check passed');
 } finally {
-  rmdirSync(lock);
+  release();
 }

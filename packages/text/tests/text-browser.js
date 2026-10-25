@@ -2,6 +2,7 @@ import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { SceneTarget } from '../../shared/msaa.js';
 import { TextRenderer, Text, Font } from '@margoengine/text';
+import { webglRenderer } from '@margoengine/webgl';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -488,7 +489,7 @@ window.runTextTests = async () => {
     warn = console.warn;
   console.warn = (...args) => warnings.push(String(args[0]));
   try {
-    const gl = await Engine.create(glCanvas, { backend: 'webgl2' }),
+    const gl = await Engine.create(glCanvas, { backend: 'webgl2', fallback: webglRenderer }),
       glText = new TextRenderer({ name: 'gl-text' });
     gl.use(glText);
     glText.add(new Text({ text: 'noop', font }));
