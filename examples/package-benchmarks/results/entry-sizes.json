@@ -1,5 +1,5 @@
 {
-  "commit": "53159fa1",
+  "commit": "454df8f3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -286,28 +286,28 @@
     },
     "@margoengine/exporters": {
       ".": {
-        "raw": 95466,
-        "gzip": 32605
+        "raw": 96504,
+        "gzip": 32947
       },
       "./usdz": {
-        "raw": 29436,
-        "gzip": 10525
+        "raw": 29506,
+        "gzip": 10542
       },
       "./model": {
-        "raw": 23088,
-        "gzip": 8963
+        "raw": 23826,
+        "gzip": 9229
       },
       "./dae": {
-        "raw": 26712,
-        "gzip": 9792
+        "raw": 27302,
+        "gzip": 9998
       },
       "./capture": {
         "raw": 17345,
         "gzip": 6684
       },
       "./roblox": {
-        "raw": 54761,
-        "gzip": 17841
+        "raw": 55382,
+        "gzip": 18048
       },
       "./roblox-chunks": {
         "raw": 25353,
@@ -349,13 +349,21 @@
         "raw": 49056,
         "gzip": 14220
       },
+      "./unity-pixel-art": {
+        "raw": 1350,
+        "gzip": 675
+      },
       "./unreal-precision": {
-        "raw": 88818,
-        "gzip": 27420
+        "raw": 89716,
+        "gzip": 27737
       },
       "./unreal-precision-importer": {
-        "raw": 57370,
-        "gzip": 16022
+        "raw": 58268,
+        "gzip": 16348
+      },
+      "./unreal-pixel-art": {
+        "raw": 1994,
+        "gzip": 870
       },
       "./godot-precision-addon": {
         "raw": 20359,
@@ -388,8 +396,8 @@
         "gzip": 17741
       },
       "dist/workers/fbx.js": {
-        "raw": 150161,
-        "gzip": 49044
+        "raw": 150782,
+        "gzip": 49229
       }
     },
     "@margoengine/fsm": {
@@ -674,12 +682,12 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 169409,
-        "gzip": 52584
+        "raw": 171495,
+        "gzip": 53340
       },
       "./atlas": {
-        "raw": 1818,
-        "gzip": 994
+        "raw": 3899,
+        "gzip": 1758
       },
       "./transmission": {
         "raw": 17719,
@@ -1431,9 +1439,9 @@
       "brotli": 12708
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 149004,
-      "gzip": 48957,
-      "brotli": 42823
+      "raw": 149625,
+      "gzip": 49144,
+      "brotli": 43106
     },
     "packages/usdz/dist/workers/usdz.js": {
       "raw": 153407,
