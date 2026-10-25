@@ -15,6 +15,11 @@ export type { XTFile, XTNode, XTValue } from './xt/read.js';
 export { xtToSTEP } from './xt/step.js';
 export type { XTConversion, XTOptions } from './xt/step.js';
 import { xtToSTEP } from './xt/step.js';
+import { igesToSTEP } from './iges/step.js';
+export { igesToSTEP } from './iges/step.js';
+export type { IGESConversion } from './iges/step.js';
+export { isIGES, readIGES } from './iges/file.js';
+export type { IGESEntity, IGESFile, IGESGlobal, IGESValue } from './iges/file.js';
 import type { JTModel } from './jt/read.js';
 
 export { STEPFile, Ref, Enum, Typed, DERIVED, stepText } from './step/file.js';
@@ -89,6 +94,21 @@ export function parseSAT(input: string | ArrayBuffer | ArrayBufferView, options:
  */
 export function parseXT(input: string | ArrayBuffer | ArrayBufferView, options: STEPOptions = {}): STEPModel {
   const conversion = xtToSTEP(input),
+    model = parseSTEP(conversion.step, options);
+  return { ...model, warnings: [...conversion.warnings, ...model.warnings] };
+}
+
+/**
+ * Reads an IGES 5.3 file (fixed ASCII format, as most CAD tools export .igs/.iges) through {@link igesToSTEP}, so it
+ * meshes with {@link tessellateSTEP} like a STEP file: manifold solid B-rep objects become solids, trimmed and bounded
+ * surfaces the faces of a surface model, in millimetres. What the conversion left out comes first in `warnings`.
+ * Throws a TypeError for a file it cannot read, or one with no surfaces or solids.
+ * @example
+ * const model = parseIGES(await (await fetch('/part.igs')).arrayBuffer());
+ * const meshes = tessellateSTEP(model);
+ */
+export function parseIGES(input: string | ArrayBuffer | ArrayBufferView, options: STEPOptions = {}): STEPModel {
+  const conversion = igesToSTEP(input),
     model = parseSTEP(conversion.step, options);
   return { ...model, warnings: [...conversion.warnings, ...model.warnings] };
 }

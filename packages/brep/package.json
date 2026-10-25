@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/brep",
   "version": "1.0.0",
-  "description": "Margo's own CAD kernel: STEP (ISO 10303-21) reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation.",
+  "description": "Margo's own CAD kernel: STEP (ISO 10303-21) and IGES 5.3 reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -11,7 +11,8 @@
     "step",
     "nurbs",
     "tessellation",
-    "jt"
+    "jt",
+    "iges"
   ],
   "homepage": "https://margoengine.com",
   "bugs": {

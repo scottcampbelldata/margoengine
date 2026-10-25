@@ -52,8 +52,26 @@ for (const check of validateSTEP(model, tessellateSTEP(model)))
 
 ## Other B-rep formats
 
-ACIS SAT and Parasolid XT (also inside JT files) are converted to STEP entities and then read and meshed by the same
-kernel:
+ACIS SAT, Parasolid XT (also inside JT files) and IGES are converted to STEP entities and then read and meshed by the
+same kernel:
+
+- **IGES** (`parseIGES`, `igesToSTEP`, `readIGES` for the raw entities, `isIGES` to detect a file): IGES 5.3 fixed
+  ASCII files, written from the published specification (US PRO/IPO-100-1996). The Start, Global, Directory Entry,
+  Parameter Data and Terminate sections; parameter and record delimiters from the Global section, Hollerith strings
+  across lines, D exponents and defaulted fields; units flag and model space scale (the result is in millimetres);
+  transformation matrices (124), chained. Manifold solid B-rep objects (186) with their shells, faces, loops, edge and
+  vertex lists (514, 510, 508, 504, 502) become solids, voids included; trimmed (144) and bounded (143, 141) surfaces,
+  bounded planes (108) and untrimmed surfaces become the faces of one surface model. Curves: circular and conic arcs
+  (100, 104; parabolas and hyperbolas as exact rational quadratics), composite curves (102), linear paths (106),
+  lines (110), parametric splines (112, exact), rational B-splines (126), offset curves (130, fitted), curves on
+  surfaces (142: the model-space curve, else the parameter-space curve mapped through its surface and fitted).
+  Surfaces: planes (108, 190), ruled surfaces (118: exact for matching rails,
+  sampled otherwise), surfaces of revolution (120), tabulated cylinders (122), rational B-spline surfaces (128), offset
+  surfaces (140), cylinders, cones, spheres and tori (192 to 198). Colour numbers and colour definitions (314) colour
+  the faces. Not yet: parametric spline surfaces (114, refused with a MargoError until their coefficient order is
+  verified; `docs/known-bugs.md`), the Compressed and Binary formats, subfigure and solid instances (308/408, 430), CSG
+  solids (150 to 184), and wireframe-only files (nothing to mesh). Faces of trimmed-surface files keep their own edges (they
+  are not sewn into solids).
 
 - **ACIS SAT** (`parseSAT`, `satToSTEP`): save versions before and after ACIS 7.0, written from Spatial's published SAT
   format chapter and class restore descriptions. Bodies, lumps, shells, faces, loops, coedges, edges, vertices; plane,
