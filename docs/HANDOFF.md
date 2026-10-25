@@ -655,8 +655,8 @@ it with every number (on battery Windows throttles the CPU/GPU and may drop the 
      load and draw. 20 cycles of load -> render -> unload of all 13: live GPU objects return to the pre-load baseline
      (1 buffer, 2 textures) every cycle, 147 buffers and 40 textures created and destroyed per cycle, zero growth in
      count or bytes from cycle 2 to 20, JS heap -1.5 MB.
-   - Helmet SSAO fixture: `examples/assets/damaged-helmet.glb` (Khronos DamagedHelmet, in the repo) is used;
-     `modern-extension-tests.js` passes.
+   - Helmet SSAO fixture: was `examples/assets/damaged-helmet.glb` (Khronos DamagedHelmet); now
+     `examples/assets/scifi-helmet.glb` (SciFiHelmet, CC0). `modern-extension-tests.js` passes.
    [Done earlier: size comparison is `npm run measure:threejs` (scripts/compare-threejs-size.js).] (Security review: later
    commit reviews in the security log report clean; the one timeout was the service being busy.)
 
@@ -2747,9 +2747,9 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    `site/images/flight-helmet.jpg`, sitemap, footer link "Demo asset credits" (`/demos/assets/ATTRIBUTION.md`),
    visual-regression views `flight-helmet-{high,light,phone}` (bit-identical over 4 runs), csp-check, demo
    subject/desktop/streaming/extension tests, READMEs and docs. `damaged-helmet-mobile.glb` and the old tile are
-   deleted; `damaged-helmet.glb` stays for tests/benchmarks (credits now `examples/assets/damaged-helmet-CREDITS.md`,
-   not copied to the site). Remaining DamagedHelmet mentions are internal: package tests, `examples/package-benchmarks`
-   and their results, measurement notes in package READMEs/docs/whitepaper (labelled as such), this file's history.
+   deleted. Later (2026-10-25) `damaged-helmet.glb` and its credits left the repository too: tests and benchmarks use
+   `examples/assets/scifi-helmet.glb` (SciFiHelmet, CC0). Remaining DamagedHelmet mentions only name the scene older
+   measurements were taken on (recorded results, package README notes, this file's history); no file loads it.
    Not re-measured: the demo-load and frame-rate tables in `docs/demo-loading.md` / `docs/desktop-frame-rate.md`
    (rows labelled "former demo").
    RECHECKED 2026-10-16 at `05d9cf1`: `scripts/test-helmet-streaming.js` exits 0 under the GPU lock on Edge
