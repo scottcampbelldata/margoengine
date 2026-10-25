@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Millions of points · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+  <style>.controls{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;margin:0 0 16px}.controls label{display:flex;gap:8px;align-items:center;color:#d8e4f5}select{font:inherit;background:#263449;color:#edf2fa;border:1px solid #62718b;border-radius:6px;padding:4px 8px}</style>
+</head>
+<body>
+  <h1>Millions of points with level of detail</h1>
+  <p><code>@margoengine/sciviz</code> + <code>@margoengine/compute</code> · A seeded Gaussian mixture sampled on the GPU, coloured by distance from its cluster centre. The point budget draws an even sample of the cloud each frame, so orbiting stays smooth at any size.</p>
+  <div class="controls">
+    <label>Points <select id="count"><option value="1000000">1 million</option><option value="2000000" selected>2 million</option><option value="4000000">4 million</option></select></label>
+    <label>Budget <select id="budget"><option value="500000">0.5 million</option><option value="1000000" selected>1 million</option><option value="4000000">4 million</option></select></label>
+    <label><input id="edl" type="checkbox" checked> Eye-dome lighting</label>
+  </div>
+  <div class="views">
+    <canvas id="viewport" aria-label="A cloud of millions of coloured points in several clusters inside labelled axes"></canvas>
+  </div>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-points.ts'));
+  </script>
+</body>
+</html>

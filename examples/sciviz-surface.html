@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Surface plot · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+  <style>.controls{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;margin:0 0 16px}.controls label{display:flex;gap:8px;align-items:center;color:#d8e4f5}select{font:inherit;background:#263449;color:#edf2fa;border:1px solid #62718b;border-radius:6px;padding:4px 8px}</style>
+</head>
+<body>
+  <h1>A surface computed on the GPU, every frame</h1>
+  <p><code>@margoengine/sciviz</code> + <code>@margoengine/compute</code> · A 256 × 256 height field of interfering waves, recomputed each frame by one fused GPU kernel and drawn by the surface plot straight from the same buffer: nothing goes back to the CPU. Contours mark even heights; drag to orbit, scroll to zoom.</p>
+  <div class="controls">
+    <label>Colour map <select id="map"><option>aurora</option><option>ember</option><option>glacier</option><option>coolwarm</option><option>cubehelix</option><option>gray</option></select></label>
+    <label><input id="animate" type="checkbox" checked> Animate</label>
+  </div>
+  <div class="views">
+    <canvas id="viewport" aria-label="A rippling surface plot coloured by height with contour lines, axes and a colour bar"></canvas>
+  </div>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-surface.ts'));
+  </script>
+</body>
+</html>

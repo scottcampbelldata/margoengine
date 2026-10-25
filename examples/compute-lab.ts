@@ -51,11 +51,10 @@ async function run(): Promise<void> {
   const hist = gpu.histogram(samples, { bins: BINS, range: RANGE });
   const sorted = gpu.sort(samples);
   // Evenly spaced order statistics for the CDF line, and the quartiles.
-  const positions = gpu
-    .linspace(0, n - 1, CDF_POINTS)
-    .round()
-    .astype('i32');
-  const cdf = gpu.take(sorted, positions);
+  // The order-statistic indices are a lazy expression over the spaced array: take() evaluates it, and only the spaced
+  // array (a GpuArray) needs disposing.
+  const spaced = gpu.linspace(0, n - 1, CDF_POINTS);
+  const cdf = gpu.take(sorted, spaced.round().astype('i32'));
   const quartiles = gpu.quantile(samples, [0.25, 0.5, 0.75]);
   const mean = samples.mean(),
     std = samples.std(),
@@ -71,7 +70,7 @@ async function run(): Promise<void> {
     hi.item({ signal }),
   ]);
   const ms = performance.now() - t0;
-  for (const x of [samples, hist.counts, hist.edges, sorted, positions, cdf, quartiles, mean, std, lo, hi]) x.dispose();
+  for (const x of [samples, hist.counts, hist.edges, sorted, spaced, cdf, quartiles, mean, std, lo, hi]) x.dispose();
   if (signal.aborted) return;
   redraw = () => draw(counts as Uint32Array, curve as Float32Array, n);
   redraw();

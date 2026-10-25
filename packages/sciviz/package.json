@@ -1,0 +1,65 @@
+{
+  "name": "@margoengine/sciviz",
+  "version": "1.0.0",
+  "description": "Scientific visualisation for Margo Engine: volume rendering with transfer functions, slices and GPU isosurfaces, million-point scatter plots, surface and line plots with axes, ticks, labels and colour bars, and perceptual colour maps.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "scientific-visualization",
+    "volume-rendering",
+    "plot",
+    "data-science"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/sciviz"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./colormaps": {
+      "types": "./dist/colormaps.d.ts",
+      "import": "./dist/colormaps.js"
+    },
+    "./maths": {
+      "types": "./dist/maths.d.ts",
+      "import": "./dist/maths.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/compute": "^1.0.0",
+    "@margoengine/controls": "^1.0.0",
+    "@margoengine/labels": "^1.0.0",
+    "@margoengine/lines": "^1.0.0",
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/points": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js sciviz",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:browser": "npm run build && node tests/sciviz-browser.mjs",
+    "prepack": "npm run build"
+  }
+}
