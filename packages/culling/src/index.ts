@@ -71,12 +71,21 @@ export class CulledInstances implements EnginePlugin {
   private device?: GPUDevice;
   private readonly batches: readonly CulledBatch[];
   private readonly records: Float32Array;
-  private readonly spheres: Float32Array;
+  // Per batch: the geometry's local bounding sphere (the cull pass places it under each part's matrix).
+  private readonly bounds: Float32Array;
   private readonly batchOf: Uint32Array;
   private readonly table: Uint32Array;
   private readonly args: Uint32Array;
   private readonly earlyReset: Uint32Array;
-  private readonly hidden: Uint8Array;
+  private readonly hidden: Uint32Array;
+  // 1 for a part whose transform mirrors it (negative determinant); per batch, how many such parts it has.
+  private readonly flipped: Uint8Array;
+  private readonly flips: Uint32Array;
+  // Parts changed since the last upload, [low, high): one write per buffer before the next frame's culling.
+  private low = Infinity;
+  private high = 0;
+  private hiddenLow = Infinity;
+  private hiddenHigh = 0;
   private readonly uniform = new ArrayBuffer(448);
   private readonly floats = new Float32Array(this.uniform);
   private readonly words = new Uint32Array(this.uniform);
@@ -100,9 +109,13 @@ export class CulledInstances implements EnginePlugin {
   private width = 0;
   private height = 0;
   private levels = 0;
+  // The main pass draws with core's pipeline state; single-sided batches without mirrored parts use its back-culled
+  // variant (cullMode back, override C=1 compiles out the back-face discard), as core does for its own batches.
   private pipeline?: GPURenderPipeline;
+  private culledPipeline?: GPURenderPipeline;
   private pipelineKey = '';
   private group?: GPUBindGroup;
+  private culledGroup?: GPUBindGroup;
   private bindings: GPUBindGroupEntry[] = [];
   private readonly color: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
   private readonly target: GPURenderPassDepthStencilAttachment = {
@@ -156,9 +169,11 @@ export class CulledInstances implements EnginePlugin {
     this.count = count;
     this.starts = starts;
     this.records = new Float32Array(count * 24);
-    this.spheres = new Float32Array(count * 4);
+    this.bounds = new Float32Array(batches.length * 4);
     this.batchOf = new Uint32Array(count);
-    this.hidden = new Uint8Array(count);
+    this.hidden = new Uint32Array(count);
+    this.flipped = new Uint8Array(count);
+    this.flips = new Uint32Array(batches.length);
     this.table = new Uint32Array(batches.length * 4);
     this.args = new Uint32Array(batches.length * 5);
     this.earlyReset = new Uint32Array(batches.length * 5);
@@ -166,6 +181,7 @@ export class CulledInstances implements EnginePlugin {
       const start = starts[batch],
         end = start + b.transforms.length / 16;
       this.table.set([start, end, b.geometry.indices.length, 0], batch * 4);
+      this.bounds.set(b.geometry.bounds, batch * 4);
       this.args[batch * 5] = this.earlyReset[batch * 5] = b.geometry.indices.length;
       for (let i = start; i < end; i++) {
         this.batchOf[i] = batch;
@@ -176,22 +192,22 @@ export class CulledInstances implements EnginePlugin {
     });
   }
 
-  /** Replaces one part's world matrix (column-major affine). */
+  /**
+   * Replaces one part's world matrix (column-major affine). Changes reach the GPU together before the next frame: one
+   * write per buffer covering every part changed since the last frame, so moving many parts costs no per-part GPU call.
+   */
   setTransform(batch: number, index: number, matrix: ArrayLike<number>): void {
     const i = this.index(batch, index);
     this.write(i, matrix);
-    const d = this.device;
-    if (d) {
-      d.queue.writeBuffer(this.buffers.records, i * 96, this.records.subarray(i * 24, i * 24 + 16));
-      d.queue.writeBuffer(this.buffers.spheres, i * 16, this.spheres.subarray(i * 4, i * 4 + 4));
-    }
+    this.dirty(i);
   }
+  /** Hides or shows one part (uploaded with the next frame, like {@link setTransform}). */
   setVisible(batch: number, index: number, visible: boolean): void {
     const i = this.index(batch, index);
     if (typeof visible !== 'boolean') throw new TypeError('Invalid visibility');
     this.hidden[i] = +!visible;
-    this.sphere(i);
-    this.device?.queue.writeBuffer(this.buffers.spheres, i * 16, this.spheres.subarray(i * 4, i * 4 + 4));
+    if (i < this.hiddenLow) this.hiddenLow = i;
+    if (i >= this.hiddenHigh) this.hiddenHigh = i + 1;
   }
   /** Reads back how many parts of each batch were drawn in the latest submitted frame (for tests and benchmarks). */
   async readCounts(): Promise<number[]> {
@@ -244,7 +260,8 @@ export class CulledInstances implements EnginePlugin {
       );
       buffer('records', n * 96, S, this.records);
       buffer('drawn', n * 96, S | GPUBufferUsage.VERTEX);
-      buffer('spheres', n * 16, S, this.spheres);
+      buffer('hidden', n * 4, S, this.hidden);
+      buffer('bounds', B * 16, S, this.bounds);
       buffer('visible', n * 4, S);
       buffer('local', n * 4, S);
       buffer('groups', Math.ceil(n / 256) * 4, S);
@@ -271,6 +288,8 @@ export class CulledInstances implements EnginePlugin {
       this.release();
       throw error;
     }
+    this.low = this.hiddenLow = Infinity;
+    this.high = this.hiddenHigh = 0;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -295,44 +314,49 @@ export class CulledInstances implements EnginePlugin {
       throw new RangeError('Invalid culled instance');
     return start + index;
   }
+  private dirty(i: number): void {
+    if (i < this.low) this.low = i;
+    if (i >= this.high) this.high = i + 1;
+  }
+  // The changed parts' records, and the changed visibility flags, one contiguous range each.
+  private flush(d: GPUDevice): void {
+    if (this.high > this.low) {
+      const { low, high } = this;
+      d.queue.writeBuffer(
+        this.buffers.records,
+        low * 96,
+        this.records as Float32Array<ArrayBuffer>,
+        low * 24,
+        (high - low) * 24,
+      );
+      this.low = Infinity;
+      this.high = 0;
+    }
+    if (this.hiddenHigh > this.hiddenLow) {
+      const { hiddenLow: low, hiddenHigh: high } = this;
+      d.queue.writeBuffer(this.buffers.hidden, low * 4, this.hidden as Uint32Array<ArrayBuffer>, low, high - low);
+      this.hiddenLow = Infinity;
+      this.hiddenHigh = 0;
+    }
+  }
   private write(i: number, m: ArrayLike<number>): void {
     if (m?.length !== 16) throw new TypeError('Expected 16 matrix values');
-    for (let k = 0; k < 16; k++)
-      if (typeof m[k] !== 'number' || !Number.isFinite(Math.fround(m[k])))
-        throw new RangeError('Invalid instance transform');
+    // One finiteness test for the matrix (a NaN or infinite float32 value makes the sum non-finite; 16 finite float32
+    // values cannot overflow a double); plain arrays are also checked for non-numbers, typed arrays hold numbers.
+    let sum = 0;
+    for (let k = 0; k < 16; k++) sum += Math.fround(m[k]);
+    if (!Number.isFinite(sum)) throw new RangeError('Invalid instance transform: pass 16 finite float32 values');
+    if (!ArrayBuffer.isView(m))
+      for (let k = 0; k < 16; k++)
+        if (typeof m[k] !== 'number') throw new RangeError('Invalid instance transform: pass 16 finite float32 values');
     const det =
       m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
     if (m[3] || m[7] || m[11] || m[15] !== 1 || !Number.isFinite(det) || !det)
       throw new RangeError('Expected nonsingular affine instance transforms');
     this.records.set(m, i * 24);
-    this.sphere(i);
-  }
-  // World bounding sphere from the geometry's local sphere, padded for float32 vertex transform error.
-  private sphere(i: number): void {
-    const m = this.records,
-      o = i * 24,
-      b = this.batches[this.batchOf[i]].geometry.bounds,
-      s = this.spheres;
-    if (this.hidden[i]) {
-      s.fill(0, i * 4, i * 4 + 3);
-      s[i * 4 + 3] = -1;
-      return;
-    }
-    const x = m[o] * b[0] + m[o + 4] * b[1] + m[o + 8] * b[2] + m[o + 12],
-      y = m[o + 1] * b[0] + m[o + 5] * b[1] + m[o + 9] * b[2] + m[o + 13],
-      z = m[o + 2] * b[0] + m[o + 6] * b[1] + m[o + 10] * b[2] + m[o + 14];
-    const scale = Math.sqrt(
-        Math.max(
-          m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2,
-          m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2,
-          m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2,
-        ),
-      ),
-      r = b[3] * scale;
-    s[i * 4] = x;
-    s[i * 4 + 1] = y;
-    s[i * 4 + 2] = z;
-    s[i * 4 + 3] = r + 1e-5 * (Math.hypot(x, y, z) + r);
+    const flip = +(det < 0);
+    this.flips[this.batchOf[i]] += flip - this.flipped[i];
+    this.flipped[i] = flip;
   }
   private bind(
     pipeline: GPUComputePipeline | GPURenderPipeline,
@@ -382,12 +406,14 @@ export class CulledInstances implements EnginePlugin {
       p = this.compute;
     this.groups.early = this.bind(p.early, [
       [0, r('uniform')],
-      [1, r('spheres')],
+      [1, r('hidden')],
       [2, r('visible')],
       [6, r('batchOf')],
       [7, r('batches')],
       [9, r('earlyArgs')],
       [10, r('earlyList')],
+      [11, r('records')],
+      [15, r('bounds')],
     ]);
     this.groups.scan = this.bind(p.scan, [
       [0, r('uniform')],
@@ -443,11 +469,14 @@ export class CulledInstances implements EnginePlugin {
     ]);
     this.groups.cull = this.bind(p.cull, [
       [0, { buffer: b.uniform }],
-      [1, { buffer: b.spheres }],
+      [1, { buffer: b.hidden }],
       [2, { buffer: b.visible }],
       [3, { buffer: b.local }],
       [4, { buffer: b.groups }],
       [5, hiz],
+      [6, { buffer: b.batchOf }],
+      [11, { buffer: b.records }],
+      [15, { buffer: b.bounds }],
     ]);
     this.levelGroups = Array.from({ length: this.levels }, (_, l) =>
       this.bind(p.reduce, [
@@ -494,6 +523,7 @@ export class CulledInstances implements EnginePlugin {
     this.words.set([width, height, this.levels, this.count, mode, this.batches.length, depthKind(m)], 40);
     f[47] = this.occluderSize;
     d.queue.writeBuffer(b.uniform, 0, this.words);
+    this.flush(d);
     const lighting = this.engine!.lighting;
     this.frame.set(c.camera.matrix);
     this.frame.set(c.camera.position, 16);
@@ -550,20 +580,28 @@ export class CulledInstances implements EnginePlugin {
     // Main pass: core's own shader and pipeline state (sections, fog and other shader hooks apply), core's targets.
     const key = c.shader + c.format + c.descriptor.multisample?.count + c.descriptor.depthStencil!.format;
     if (key !== this.pipelineKey) {
-      const module = d.createShaderModule({ code: c.shader });
-      this.pipeline = d.createRenderPipeline({
-        ...c.descriptor,
-        vertex: { ...c.descriptor.vertex, module },
-        fragment: { ...c.descriptor.fragment!, module, targets: [{ format: c.format }] },
-      });
+      const module = d.createShaderModule({ code: c.shader }),
+        fragment = { ...c.descriptor.fragment!, module, targets: [{ format: c.format }] },
+        descriptor = { ...c.descriptor, vertex: { ...c.descriptor.vertex, module }, fragment };
+      this.pipeline = d.createRenderPipeline(descriptor);
+      // Only a shader that still has core's switch for its back-face discard (package hooks keep it).
+      this.culledPipeline = c.shader.includes('override C=')
+        ? d.createRenderPipeline({
+            ...descriptor,
+            primitive: { ...c.descriptor.primitive, cullMode: 'back' },
+            fragment: { ...fragment, constants: { ...fragment.constants, C: 1 } },
+          })
+        : undefined;
       this.pipelineKey = key;
-      this.group = undefined;
+      this.group = this.culledGroup = undefined;
     }
     if (!this.group || !sameBindings(this.bindings, c.bindings)) {
-      this.group = this.bind(this.pipeline!, [
+      const entries: [number, GPUBindingResource][] = [
         [0, { buffer: b.frame }],
         ...c.bindings.map((e) => [e.binding, e.resource] as [number, GPUBindingResource]),
-      ]);
+      ];
+      this.group = this.bind(this.pipeline!, entries);
+      this.culledGroup = this.culledPipeline && this.bind(this.culledPipeline, entries);
       this.bindings = c.bindings.map(({ binding, resource }) => ({
         binding,
         resource: 'buffer' in resource ? { ...resource } : resource,
@@ -573,9 +611,16 @@ export class CulledInstances implements EnginePlugin {
     this.target.view = c.depth;
     this.target.stencilReadOnly = c.descriptor.depthStencil!.format.includes('stencil') || undefined;
     const main = c.encoder.beginRenderPass(this.main);
-    main.setPipeline(this.pipeline!);
-    main.setBindGroup(0, this.group);
+    let current: GPURenderPipeline | undefined;
     this.batches.forEach((batch, i) => {
+      // The back faces of a single-sided batch without mirrored parts are exactly what core's discard removes.
+      const culled = this.culledPipeline && batch.material.data[6] < 0.5 && !this.flips[i],
+        pipeline = culled ? this.culledPipeline! : this.pipeline!;
+      if (pipeline !== current) {
+        current = pipeline;
+        main.setPipeline(pipeline);
+        main.setBindGroup(0, culled ? this.culledGroup! : this.group!);
+      }
       const g = this.geometryBuffers.get(batch.geometry)!;
       main.setVertexBuffer(0, g.vertex);
       main.setVertexBuffer(1, b.drawn, this.starts[i] * 96);
@@ -597,7 +642,7 @@ export class CulledInstances implements EnginePlugin {
     this.groups = {};
     this.levelGroups = [];
     this.depth = this.hiz = undefined;
-    this.compute = this.prepass = this.pipeline = this.group = undefined;
+    this.compute = this.prepass = this.pipeline = this.group = this.culledPipeline = this.culledGroup = undefined;
     this.pipelineKey = '';
     this.bindings = [];
     this.samples = this.width = this.height = 0;

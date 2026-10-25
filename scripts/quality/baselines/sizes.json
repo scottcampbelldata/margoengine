@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 2976008,
+  "total": 2976430,
   "history": [
     {
       "date": "2026-10-24",
@@ -146,6 +146,12 @@
       "commit": "9c66245f",
       "reason": "React stage 2b (item 17): Sun, AmbientLight, HemisphereLight and Fog components; Environment rotation and blur; Html label options (environment loads lazily)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "ed610956",
+      "reason": "culling: back-culled pipeline per batch and bounding spheres in the cull pass (instanced parity with three.js InstancedMesh)",
+      "grew": 1
     }
   ],
   "items": {
@@ -190,7 +196,7 @@
     "@margoengine/creative/stars": 2909,
     "@margoengine/creative/targets": 2821,
     "@margoengine/creative/toon": 1188,
-    "@margoengine/culling": 9150,
+    "@margoengine/culling": 9572,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,
     "@margoengine/decoders/ktx": 2851,

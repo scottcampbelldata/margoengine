@@ -30,15 +30,19 @@ function harness() {
   };
   h.context.camera.matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -0.001, -1, 0, 0, 1, 0]);
   h.engine.lighting = { direction: new Float32Array([0, 1, 0, 1]), radiance: new Float32Array([1, 1, 1, 0.2]) };
-  const passes = [];
+  const passes = [],
+    bound = []; // [pass index, pipeline] for every setPipeline in a render pass
   const begin = h.context.encoder.beginRenderPass;
   h.context.encoder.beginRenderPass = (descriptor) => {
-    passes.push(descriptor);
-    return begin(descriptor);
+    const at = passes.push(descriptor) - 1,
+      pass = begin(descriptor);
+    pass.setPipeline = (pipeline) => bound.push([at, pipeline]);
+    return pass;
   };
   return {
     ...h,
     passes,
+    bound,
     run(frames = 1) {
       for (let i = 0; i < frames; i++) h.engine.frameGraph.execute(h.context);
     },
@@ -67,11 +71,13 @@ test('uploads parts once and draws them with compute culling and indirect draws,
   assert.deepEqual(Array.from(records.subarray(24 + 12, 24 + 16)), [4, 0, 0, 1]);
   assert.equal(records[23], -1, 'no core mesh id');
   assert.equal(records[48 + 22], 0, 'single-sided material flag reaches the shader');
-  const spheres = new Float32Array(h.resources.find((r) => r.size === 48 && r.usage === (128 | 8)).data);
-  assert.ok(
-    Math.abs(spheres[4] - 4) < 1e-6 && spheres[7] >= Math.sqrt(3) && spheres[7] < Math.sqrt(3) * 1.001,
-    'world sphere scales with the instance',
-  );
+  // World spheres are computed in the cull pass from each record's matrix and its batch's local sphere.
+  const bounds = new Float32Array(parts['buffers'].bounds.data);
+  assert.deepEqual([...bounds], [...box().bounds, ...box(0.5).bounds]);
+  const cullCode = h.pipelines.find((p) => p.compute?.entryPoint === 'cull').compute.module.code;
+  assert.match(cullCode, /fn sphereOf\(i:u32\)->vec4f/);
+  assert.match(cullCode, /let s=sphereOf\(i\);if\(inside\(s\)/);
+  assert.match(cullCode, /max\(dot\(m\[0\]\.xyz,m\[0\]\.xyz\)/, 'radius scales with the largest axis');
   const args = new Uint32Array(h.resources.find((r) => r.size === 40 && r.usage === (128 | 256 | 4 | 8)).data);
   assert.deepEqual(Array.from(args), [36, 0, 0, 0, 0, 36, 0, 0, 0, 0]);
   const main = h.pipelines.find((p) => p.fragment?.module?.code === wgsl);
@@ -202,24 +208,108 @@ test('transform and visibility updates write only the changed part', () => {
   h.engine.use(parts);
   h.run();
   const records = h.resources.find((r) => r.size === 3 * 96 && r.usage === (128 | 8)),
-    spheres = h.resources.find((r) => r.size === 48 && r.usage === (128 | 8));
+    hidden = parts['buffers'].hidden;
   parts.setTransform(0, 1, translate(-2, 1, 0));
+  h.run();
   assert.deepEqual(Array.from(new Float32Array(records.data).subarray(24 + 12, 24 + 16)), [-2, 1, 0, 1]);
   assert.equal(
     new Float32Array(records.data)[24 + 16],
     new PbrMaterial({ color: '#ff0000' }).data[0],
     'material untouched',
   );
-  assert.equal(new Float32Array(spheres.data)[4], -2);
+  h.bufferWrites.length = 0;
   parts.setVisible(1, 0, false);
-  assert.equal(new Float32Array(spheres.data)[11], -1);
+  h.run();
+  assert.deepEqual([...new Uint32Array(hidden.data, 0, 3)], [0, 0, 1]);
+  assert.deepEqual(
+    h.bufferWrites
+      .filter((w) => w.buffer === hidden || w.buffer === records)
+      .map((w) => [w.buffer === hidden, w.offset, w.bytes]),
+    [[true, 8, 4]],
+    'visibility uploads only its flag',
+  );
   parts.setVisible(1, 0, true);
-  assert.ok(new Float32Array(spheres.data)[11] > 0.43);
+  h.run();
+  assert.deepEqual([...new Uint32Array(hidden.data, 0, 3)], [0, 0, 0]);
   assert.throws(() => parts.setTransform(0, 2, translate(0, 0, 0)), /instance/);
   assert.throws(() => parts.setTransform(2, 0, translate(0, 0, 0)), /instance/);
   assert.throws(() => parts.setVisible(0, 0, 1), /visibility/);
   assert.throws(() => parts.setTransform(0, 0, [1]), /16/);
+  // One finiteness test per matrix still catches every bad value; plain arrays are checked for non-numbers.
+  for (const bad of [NaN, Infinity, 3.5e38, '1'])
+    assert.throws(() => parts.setTransform(0, 0, Object.assign(translate(0, 0, 0), { 13: bad })), /transform/);
+  parts.setTransform(0, 0, new Float64Array(translate(3e38, 0, 0)));
   parts.dispose();
+});
+
+test('moving many parts costs one records upload per frame, covering only the changed range', () => {
+  // Regression: setTransform wrote 2 buffers per call (20,000 GPU calls a frame for 10,000 moving parts) and computed
+  // each part's bounding sphere on the CPU; the cull pass now derives it from the uploaded matrix.
+  const n = 1000,
+    h = harness(),
+    parts = new CulledInstances([
+      {
+        geometry: box(),
+        material: new PbrMaterial({ doubleSided: false }),
+        transforms: new Float32Array(Array.from({ length: n }, () => translate(0, 0, 0)).flat()),
+      },
+    ]);
+  // Before attaching: kept on the CPU and uploaded with everything at setup.
+  for (let i = 0; i < n; i++) parts.setTransform(0, i, translate(i, 0, 0));
+  h.engine.use(parts);
+  h.run();
+  const records = h.resources.find((r) => r.size === n * 96 && r.usage === (128 | 8)),
+    to = (buffer) => h.bufferWrites.filter((w) => w.buffer === buffer);
+  h.bufferWrites.length = 0;
+  for (let i = 10; i < 600; i++) parts.setTransform(0, i, translate(i, 2, 0));
+  assert.equal(h.bufferWrites.length, 0, 'no GPU call per part');
+  h.run();
+  assert.deepEqual(
+    to(records).map((w) => [w.offset, w.bytes]),
+    [[10 * 96, 590 * 96]],
+  );
+  assert.equal(to(parts['buffers'].hidden).length, 0, 'visibility flags untouched');
+  const r = new Float32Array(records.data);
+  assert.deepEqual([...r.subarray(599 * 24 + 12, 599 * 24 + 16)], [599, 2, 0, 1]);
+  assert.deepEqual([...r.subarray(600 * 24 + 12, 600 * 24 + 16)], [600, 0, 0, 1]);
+  h.bufferWrites.length = 0;
+  h.run();
+  assert.equal(to(records).length, 0, 'an unchanged frame uploads nothing');
+  parts.dispose();
+});
+
+test('single-sided batches without mirrored parts draw back-culled without the discard; others keep core state', () => {
+  const h = harness(),
+    parts = new CulledInstances(batches());
+  h.engine.use(parts);
+  h.run();
+  const plain = h.pipelines.find((p) => p.fragment?.module?.code === wgsl && !p.primitive?.cullMode),
+    culled = h.pipelines.find((p) => p.fragment?.module?.code === wgsl && p.primitive?.cullMode === 'back');
+  assert.ok(plain && culled);
+  assert.equal(culled.fragment.constants.C, 1, 'override C=1 compiles out the back-face discard');
+  assert.deepEqual(culled.depthStencil, plain.depthStencil);
+  const main = () => {
+    const last = h.passes.length - 1;
+    return h.bound.filter(([at]) => at === last).map(([, p]) => p);
+  };
+  // Batch 0 is double-sided (core's default), batch 1 single-sided.
+  assert.deepEqual(main(), [plain, culled]);
+  // A mirrored part (negative determinant) needs its back faces: the batch keeps the discard until it is unmirrored.
+  parts.setTransform(1, 0, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 3, 0, 1]);
+  h.run();
+  assert.deepEqual(main(), [plain]);
+  parts.setTransform(1, 0, translate(0, 3, 0));
+  h.run();
+  assert.deepEqual(main(), [plain, culled]);
+  parts.dispose();
+  // A shader without core's discard switch (a package replaced the fragment stage) gets no culled pipeline.
+  const g = harness();
+  g.context.shader = wgsl.replace('override C=false;', '').replaceAll('!C&&', '');
+  const other = new CulledInstances(batches());
+  g.engine.use(other);
+  g.run();
+  assert.equal(g.pipelines.filter((p) => p.primitive?.cullMode === 'back').length, 0);
+  other.dispose();
 });
 
 test('rejects malformed batches and transforms, and rolls back partial uploads', () => {

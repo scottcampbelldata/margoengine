@@ -1,7 +1,7 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 1760,
+  "total": 1758,
   "history": [
     {
       "date": "2026-10-24",
@@ -133,7 +133,7 @@
     "no-fix packages/creative/src/post.ts": 5,
     "no-fix packages/creative/src/targets.ts": 1,
     "no-fix packages/creative/src/toon.ts": 1,
-    "no-fix packages/culling/src/index.ts": 7,
+    "no-fix packages/culling/src/index.ts": 6,
     "no-fix packages/culling/src/meshes.ts": 1,
     "no-fix packages/decoders/src/codec.ts": 30,
     "no-fix packages/decoders/src/decoder.worker.ts": 1,
@@ -187,7 +187,7 @@
     "no-fix packages/gltf-pro/src/compression.ts": 11,
     "no-fix packages/gltf-pro/src/extended.ts": 2,
     "no-fix packages/gltf-pro/src/index.ts": 42,
-    "no-fix packages/gltf-pro/src/instancing.ts": 10,
+    "no-fix packages/gltf-pro/src/instancing.ts": 9,
     "no-fix packages/gltf-pro/src/material-extension.ts": 5,
     "no-fix packages/gltf-pro/src/pack.ts": 7,
     "no-fix packages/gltf-pro/src/progressive.ts": 2,

@@ -10,7 +10,7 @@ struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
 export const computeShader = (samples: number): string =>
   common +
   `
-@group(0) @binding(1) var<storage,read> spheres:array<vec4f>;
+@group(0) @binding(1) var<storage,read> hidden:array<u32>;
 @group(0) @binding(2) var<storage,read_write> visible:array<u32>;
 @group(0) @binding(3) var<storage,read_write> local:array<u32>;
 @group(0) @binding(4) var<storage,read_write> groups:array<u32>;
@@ -24,7 +24,17 @@ export const computeShader = (samples: number): string =>
 @group(0) @binding(12) var<storage,read_write> drawn:array<Record>;
 @group(0) @binding(13) var<uniform> level:vec4u;
 @group(0) @binding(14) var depth:${samples > 1 ? 'texture_depth_multisampled_2d' : 'texture_depth_2d'};
+@group(0) @binding(15) var<storage,read> bounds:array<vec4f>;
 var<workgroup> scratch:array<u32,256>;
+
+// World bounding sphere of part i: its batch's local sphere under the part's matrix (radius times the largest axis
+// scale), padded for float32 transform error. Hidden parts get a negative radius.
+fn sphereOf(i:u32)->vec4f {
+  if(hidden[i]!=0u){return vec4f(0.0,0.0,0.0,-1.0);}
+  let m=records[i].m;let b=bounds[batchOf[i]];let c=(m*vec4f(b.xyz,1.0)).xyz;
+  let r=b.w*sqrt(max(dot(m[0].xyz,m[0].xyz),max(dot(m[1].xyz,m[1].xyz),dot(m[2].xyz,m[2].xyz))));
+  return vec4f(c,r+1e-5*(length(c)+r));
+}
 
 // Bounding sphere against the six frustum planes (hidden parts carry a negative radius).
 fn inside(s:vec4f)->bool {
@@ -66,7 +76,8 @@ fn unoccluded(s:vec4f)->bool {
 // Pass 1 (occlusion only): large parts drawn last frame and still in the frustum, appended per batch for the depth
 // prepass. Any subset of real geometry is a valid occluder set; small parts cost vertex work and hide little.
 @compute @workgroup_size(256) fn early(@builtin(global_invocation_id) g:vec3u) {
-  let i=g.x;if(i>=u.size.w||visible[i]==0u||!inside(spheres[i])||!occluder(spheres[i])){return;}
+  let i=g.x;if(i>=u.size.w||visible[i]==0u){return;}
+  let s=sphereOf(i);if(!inside(s)||!occluder(s)){return;}
   let b=batchOf[i];earlyList[batches[b].x+atomicAdd(&earlyArgs[b*5u+1u],1u)]=i;
 }
 // Hi-Z level 0: farthest (smallest reversed-Z) depth over every sample of each pixel.
@@ -84,7 +95,7 @@ fn unoccluded(s:vec4f)->bool {
 // Pass 2: visibility of every part, then an exclusive scan inside each workgroup of 256.
 @compute @workgroup_size(256) fn cull(@builtin(global_invocation_id) g:vec3u,@builtin(local_invocation_index) l:u32,@builtin(workgroup_id) w:vec3u) {
   let i=g.x;var f=0u;
-  if(i<u.size.w){let s=spheres[i];if(inside(s)&&(u.mode.x<2u||unoccluded(s))){f=1u;}visible[i]=f;}
+  if(i<u.size.w){let s=sphereOf(i);if(inside(s)&&(u.mode.x<2u||unoccluded(s))){f=1u;}visible[i]=f;}
   scratch[l]=f;workgroupBarrier();
   for(var o=1u;o<256u;o=o<<1u){var v=0u;if(l>=o){v=scratch[l-o];}workgroupBarrier();scratch[l]+=v;workgroupBarrier();}
   if(i<u.size.w){local[i]=scratch[l]-f;}

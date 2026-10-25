@@ -33,8 +33,14 @@ export function optionalGPU() {
     };
     return b;
   };
-  engine.gpu.queue.writeBuffer = (b, offset, value) => {
-    new Uint8Array(b.data).set(new Uint8Array(value.buffer, value.byteOffset, value.byteLength), offset);
+  const bufferWrites = [];
+  // As WebGPU: dataOffset and size count elements of a typed array (bytes of an ArrayBuffer).
+  engine.gpu.queue.writeBuffer = (b, offset, value, dataOffset = 0, size) => {
+    const unit = value.BYTES_PER_ELEMENT ?? 1,
+      start = (value.byteOffset ?? 0) + dataOffset * unit,
+      bytes = size === undefined ? (value.byteLength ?? value.length * unit) - dataOffset * unit : size * unit;
+    new Uint8Array(b.data).set(new Uint8Array(value.buffer ?? value, start, bytes), offset);
+    bufferWrites.push({ buffer: b, offset, bytes });
   };
   engine.gpu.createSampler = () => ({});
   engine.gpu.importExternalTexture = (descriptor) => descriptor;
@@ -88,6 +94,7 @@ export function optionalGPU() {
   };
   return {
     ...h,
+    bufferWrites,
     cleanup() {
       for (const r of resources) if (!r.destroyed) r.destroy();
     },
