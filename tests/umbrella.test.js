@@ -5,8 +5,9 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
-import { umbrellaEntries } from '../scripts/umbrella.mjs';
+import { KITS, umbrellaEntries } from '../scripts/umbrella.mjs';
 
 const root = join(import.meta.dirname, '..');
 const manifest = JSON.parse(readFileSync(join(root, 'packages/margoengine/package.json'), 'utf8'));
@@ -68,7 +69,10 @@ async function bundle(code) {
     }
   return {
     code: chunks.map((chunk) => chunk.code).join('\n'),
-    modules: chunks.flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/')),
+    // Modules that contributed code (tree-shaken ones render nothing).
+    modules: chunks
+      .flatMap((chunk) => Object.entries(chunk.modules).filter(([, module]) => module.renderedLength > 0))
+      .map(([id]) => id.replaceAll('\\', '/')),
   };
 }
 
@@ -91,4 +95,46 @@ test('importing through margoengine bundles the same code as importing the packa
   const packages = new Set(modules.map((id) => /\/packages\/([^/]+)\//.exec(id)?.[1]).filter(Boolean));
   for (const name of packages) assert.ok(['core', 'margoengine', 'shared', 'stage'].includes(name), name);
   assert.ok(packages.has('core') && packages.has('stage'));
+});
+
+test('each kit re-exports exactly the names it lists, as the same bindings', async () => {
+  const kits = {
+    game: await import('margoengine/game'),
+    cad: await import('margoengine/cad'),
+    viz: await import('margoengine/viz'),
+    web: await import('margoengine/web'),
+  };
+  assert.deepEqual(Object.keys(kits).sort(), Object.keys(KITS).sort());
+  for (const [kit, { from }] of Object.entries(KITS)) {
+    const names = from.flatMap(([, list]) => list);
+    assert.deepEqual(Object.keys(kits[kit]).sort(), [...names].sort(), kit);
+    for (const [source, list] of from) {
+      const module = await import(source);
+      for (const name of list) assert.equal(kits[kit][name], module[name], `margoengine/${kit} ${name} from ${source}`);
+    }
+  }
+});
+
+test('a kit costs only what the app uses, and its full size is what docs/guides/kits.md states', async () => {
+  const docs = readFileSync(join(root, 'docs/guides/kits.md'), 'utf8');
+  for (const [kit, { from }] of Object.entries(KITS)) {
+    // One name from the kit bundles the same code as importing it from its package.
+    const [source, [name]] = from[1];
+    const [a, b] = await Promise.all([
+      bundle(`import { ${name} } from 'margoengine/${kit}'; export { ${name} };`),
+      bundle(`import { ${name} } from '${source}'; export { ${name} };`),
+    ]);
+    // Same modules; the bytes may differ by the bundler's ordering and naming only.
+    assert.deepEqual(a.modules.sort(), b.modules.sort(), `margoengine/${kit} ${name}`);
+    assert.ok(Math.abs(gzipSync(a.code).length - gzipSync(b.code).length) <= 64, `margoengine/${kit} ${name}`);
+    // Everything in the kit, the size an app pays when it uses all of it at startup.
+    const all = gzipSync((await bundle(`export * from 'margoengine/${kit}';`)).code).length;
+    const row = new RegExp(String.raw`\| \x60margoengine/${kit}\x60 \|[^\n]*?\| ([\d,]+) B \|`);
+    const stated = Number(row.exec(docs)?.[1].replaceAll(',', ''));
+    assert.ok(stated > 0, `docs/guides/kits.md states no size for margoengine/${kit}`);
+    assert.ok(
+      Math.abs(all - stated) <= Math.max(256, stated * 0.03),
+      `margoengine/${kit}: ${all} B, docs/guides/kits.md says ${stated} B`,
+    );
+  }
 });

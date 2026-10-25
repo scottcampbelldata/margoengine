@@ -160,7 +160,7 @@ if (want('harness')) {
     build: { outDir: dist, emptyOutDir: true, target: 'es2022', assetsInlineLimit: 0 },
   });
   // The harness ships the create-margo headers unchanged: one strict policy (no 'unsafe-eval') on the page and every worker.
-  copyFileSync(join(root, 'tools/create-margo/template/public/_headers'), join(dist, '_headers'));
+  copyFileSync(join(root, 'tools/create-margo/templates/shared/public/_headers'), join(dist, '_headers'));
   builds.push({
     name: 'harness',
     dist,

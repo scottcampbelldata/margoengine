@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3126015,
+  "total": 3129920,
   "history": [
     {
       "date": "2026-10-24",
@@ -98,6 +98,12 @@
       "commit": "2f7f9d34",
       "reason": "parity follow-ups 2026-10-24: Collada lookat/skew, cameras and lights (loaders); clipIntersection (materials, lines)",
       "grew": 3
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "302cf731",
+      "reason": "One install: the stage facade moved from margoengine to @margoengine/stage (same code), and the kits margoengine/game, /cad, /viz and /web (re-export files)",
+      "grew": 5
     }
   ],
   "items": {
@@ -337,6 +343,7 @@
     "@margoengine/splats": 8739,
     "@margoengine/splats/data": 1629,
     "@margoengine/splines": 1555,
+    "@margoengine/stage": 3197,
     "@margoengine/staging": 6296,
     "@margoengine/stats": 4934,
     "@margoengine/taa": 9899,
@@ -421,6 +428,10 @@
     "leak @margoengine/shader/graph -> @margoengine/materials": 1,
     "leak @margoengine/usdz -> @margoengine/gltf-pro": 1,
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
-    "margoengine": 3058
+    "margoengine": 308,
+    "margoengine/cad": 1029,
+    "margoengine/game": 1030,
+    "margoengine/viz": 800,
+    "margoengine/web": 599
   }
 }

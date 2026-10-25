@@ -90,7 +90,8 @@ export async function sizesGate({ root, packages }) {
     return out;
   };
   const leaks = {};
-  for (const pkg of packages)
+  // margoengine's kits re-export other packages by design; tests/umbrella.test.js shows an unused name costs nothing.
+  for (const pkg of packages.filter((p) => p.name !== 'margoengine'))
     for (const entry of pkg.entries) {
       const heavy = [...reachOf(entry.specifier)].filter(
         (t) => !FOUNDATION.has(t) && bySpecifier.get(t) && !t.startsWith(pkg.name + '/') && t !== pkg.name,

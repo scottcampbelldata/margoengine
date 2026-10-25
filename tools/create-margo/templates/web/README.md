@@ -10,7 +10,8 @@ npm run build     # type-check, then a production build in dist/
 npm run preview   # serve dist/
 ```
 
-The whole scene is `src/main.ts`. Each `@margoengine/*` package is optional: install only what you import.
+The whole scene is `src/main.ts`. `margoengine` is the only dependency: every package is a subpath
+(`margoengine/environment`, `margoengine/controls/orbit`), and the build keeps only what you import.
 
 `public/_headers` (copied into `dist/`) gives Cloudflare Pages and Netlify a Content Security Policy that Margo works
 under and a year-long cache for fingerprinted assets. The Margo Engine deploying guide

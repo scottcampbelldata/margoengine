@@ -10,7 +10,9 @@ const published = ['packages', 'tools']
   .flatMap((dir) => readdirSync(join(root, dir)).map((name) => join(dir, name, 'package.json')))
   .filter((path) => existsSync(join(root, path)));
 const consumers = [
-  'tools/create-margo/template/package.json',
+  ...readdirSync(join(root, 'tools/create-margo/templates'))
+    .map((name) => join('tools/create-margo/templates', name, 'package.json'))
+    .filter((path) => existsSync(join(root, path))),
   ...read('package.json')
     .workspaces.filter((w) => !w.startsWith('packages/'))
     .map((w) => join(w, 'package.json')),

@@ -10,7 +10,11 @@ const internal = (name) => name === 'margoengine' || name.startsWith('@margoengi
 const manifests = ['packages', 'tools']
   .flatMap((dir) => readdirSync(dir).map((name) => join(dir, name, 'package.json')))
   .filter(existsSync)
-  .concat('tools/create-margo/template/package.json');
+  .concat(
+    readdirSync('tools/create-margo/templates')
+      .map((name) => join('tools/create-margo/templates', name, 'package.json'))
+      .filter(existsSync),
+  );
 // Workspace apps and examples are not published; only their internal ranges follow.
 const consumers = JSON.parse(readFileSync('package.json', 'utf8'))
   .workspaces.filter((w) => !w.startsWith('packages/'))
@@ -19,7 +23,7 @@ const consumers = JSON.parse(readFileSync('package.json', 'utf8'))
 for (const path of [...manifests, ...consumers]) {
   const text = readFileSync(path, 'utf8'),
     manifest = JSON.parse(text);
-  if (manifests.includes(path) && !path.includes('template')) manifest.version = version;
+  if (manifests.includes(path) && !path.includes('templates')) manifest.version = version;
   for (const field of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies'])
     for (const name of Object.keys(manifest[field] ?? {})) if (internal(name)) manifest[field][name] = `^${version}`;
   writeFileSync(path, JSON.stringify(manifest, null, 2) + (text.endsWith('\n') ? '\n' : ''));

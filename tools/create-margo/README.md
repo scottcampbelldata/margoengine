@@ -1,14 +1,26 @@
 # create-margo
 
-Start a [Margo Engine](https://margoengine.com) app (Vite + TypeScript) with one command:
+Start a [Margo Engine](https://margoengine.com) app with one command:
 
 ```sh
 npm create margo@latest my-app
-# or: pnpm create margo my-app / yarn create margo my-app / bun create margo my-app
+# a game, a CAD viewer, a visualization, React or Next.js:
+npm create margo@latest my-game -- --template game
+# pnpm create margo my-game --template game / yarn create margo ... / bun create margo ...
 ```
 
-It copies a small scene with image-based lighting, orbit controls, the stats overlay and measured quality tiers into
-`my-app` (default `margo-app`), asks no questions and refuses to write into a non-empty directory. No dependencies.
+| Template | Starts |
+| --- | --- |
+| `web` (default) | A lit scene with image-based lighting, orbit controls, the stats overlay and measured quality tiers |
+| `game` | A small physics game: roll a ball into crates, with shadows (the `margoengine/game` kit and Rapier) |
+| `cad` | A CAD viewer: SolidWorks-style mouse, view cube, section plane, open STEP/IGES/STL/OBJ/glTF (`margoengine/cad`) |
+| `viz` | 200,000 points, a grid and an HTML label (`margoengine/viz`) |
+| `react` | React + Vite: JSX components from `margoengine/react` |
+| `next` | Next.js app router with `margoengine/react` |
 
-Tests: `node --test tests/create-margo.test.js` from the repository root (scaffolds, type-checks and builds the app
-against the local packages); `node tools/create-margo/test/browser-check.mjs` renders it in a real browser.
+Every template depends on `margoengine` alone (plus Rapier for `game`, React for `react` and `next`), asks no
+questions and refuses to write into a non-empty directory. No dependencies of its own.
+
+Tests: `node --test tests/create-margo.test.js` from the repository root (scaffolds every template, type-checks and
+builds it against the local packages); `node tools/create-margo/test/browser-check.mjs` renders the default one in a
+real browser.

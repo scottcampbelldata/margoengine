@@ -29,7 +29,7 @@ for (const file of guides)
       for (const [, from] of code.matchAll(/from '([^']+)'/g))
         assert.match(
           from,
-          /^(margoengine|@margoengine\/[a-z0-9-]+(\/[a-z0-9-]+)?|@dimforge\/rapier3d-compat)$/,
+          /^(margoengine(\/[a-z0-9-]+){0,2}|@margoengine\/[a-z0-9-]+(\/[a-z0-9-]+)?|@dimforge\/rapier3d-compat)$/,
           `snippet at line ${line} imports ${from}`,
         );
     // Inside the repository so package resolution finds node_modules; test-results is git-ignored.

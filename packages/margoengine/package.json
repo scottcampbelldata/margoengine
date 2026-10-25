@@ -1143,6 +1143,22 @@
     "./xr": {
       "types": "./dist/xr.d.ts",
       "import": "./dist/xr.js"
+    },
+    "./game": {
+      "types": "./dist/game.d.ts",
+      "import": "./dist/game.js"
+    },
+    "./cad": {
+      "types": "./dist/cad.d.ts",
+      "import": "./dist/cad.js"
+    },
+    "./viz": {
+      "types": "./dist/viz.d.ts",
+      "import": "./dist/viz.js"
+    },
+    "./web": {
+      "types": "./dist/web.d.ts",
+      "import": "./dist/web.js"
     }
   },
   "dependencies": {

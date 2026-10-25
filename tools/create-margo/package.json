@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Start a Margo Engine app: npm create margo@latest my-app",
+  "description": "Start a Margo Engine app: npm create margo@latest my-app (templates: web, game, cad, viz, react, next)",
   "bin": {
     "create-margo": "index.js"
   },
   "files": [
     "index.js",
-    "template"
+    "templates"
   ],
   "engines": {
     "node": ">=20.19"
