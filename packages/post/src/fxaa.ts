@@ -14,37 +14,75 @@ import { margoError } from '../../shared/errors.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
-// FXAA 3.11-style edge walk (after Timothy Lottes) on display-encoded colour, so luma is already perceptual.
+// Luma-driven edge anti-aliasing after T. Lottes, "FXAA", NVIDIA whitepaper (2009, revised 2011): find local contrast
+// in luma, decide the edge's orientation and side, walk along the edge to both ends, then shift one bilinear fetch
+// across the edge by how close the pixel sits to the nearer end (or by a sub-pixel aliasing estimate). Built from the
+// paper's prose; the thresholds, step schedule and filter weights below are this file's own choices.
+// - Luma: ITU-R BT.601 weights (0.299, 0.587, 0.114) on the display-encoded colour, which is already perceptual.
+// - RELATIVE 0.15: skip pixels whose contrast is under 15% of the brightest neighbour (soft gradients stay sharp).
+// - FLOOR 0.05: absolute floor (about 13 of 255 codes) so near-black noise is not smoothed.
+// - END 0.25: an edge ends where the along-edge luma leaves the edge's mid luma by a quarter of the step across it.
+// - Steps: 1, 1, 1, 1 then 2, 3, 4, 5, 6, 7 pixels (10 fetches per side, 31 pixels reach): exact near the pixel,
+//   coarser far away where the shift is small anyway. Steps are whole pixels so each fetch stays on the boundary.
+// - Sub-pixel: tent low-pass (direct neighbours weight 2, diagonals 1, over 12); strength 0.75 so an isolated dot is
+//   softened but never fully replaced by its surroundings.
 const shader =
   fullscreen +
   `
 @group(0) @binding(0) var image:texture_2d<f32>;
 @group(0) @binding(1) var bilinear:sampler;
-fn luma(uv:vec2f)->f32 {return dot(textureSampleLevel(image,bilinear,uv,0).rgb,vec3f(0.299,0.587,0.114));}
-@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {
- let texel=1/vec2f(textureDimensions(image));let uv=p.xy*texel;let center=textureSampleLevel(image,bilinear,uv,0);
- let m=dot(center.rgb,vec3f(0.299,0.587,0.114));
- let n=luma(uv-vec2f(0,texel.y));let s=luma(uv+vec2f(0,texel.y));let w=luma(uv-vec2f(texel.x,0));let e=luma(uv+vec2f(texel.x,0));
- let high=max(m,max(max(n,s),max(w,e)));let range=high-min(m,min(min(n,s),min(w,e)));
- if(range<max(0.0312,high*0.125)){return center;}
- let nw=luma(uv-texel);let se=luma(uv+texel);let ne=luma(uv+vec2f(texel.x,-texel.y));let sw=luma(uv+vec2f(-texel.x,texel.y));
- // A horizontal edge has the larger vertical second derivative.
- let horizontal=abs(nw+sw-2*w)+2*abs(n+s-2*m)+abs(ne+se-2*e)>=abs(nw+ne-2*n)+2*abs(w+e-2*m)+abs(sw+se-2*s);
- let l1=select(w,n,horizontal);let l2=select(e,s,horizontal);let g1=abs(l1-m);let g2=abs(l2-m);let gradient=0.25*max(g1,g2);
- var stride=select(texel.x,texel.y,horizontal);var edge=0.5*(m+l2);if(g1>=g2){stride=-stride;edge=0.5*(m+l1);}
- let across=select(vec2f(stride,0),vec2f(0,stride),horizontal);let along=select(vec2f(0,texel.y),vec2f(texel.x,0),horizontal);
- var p1=uv+across*0.5-along;var p2=uv+across*0.5+along;var d1=luma(p1)-edge;var d2=luma(p2)-edge;
- var done1=abs(d1)>=gradient;var done2=abs(d2)>=gradient;var steps=array<f32,11>(1,1,1,1,1.5,2,2,2,2,4,8);
- for(var i=0;i<11&&!(done1&&done2);i++){
-  if(!done1){p1-=along*steps[i];d1=luma(p1)-edge;done1=abs(d1)>=gradient;}
-  if(!done2){p2+=along*steps[i];d2=luma(p2)-edge;done2=abs(d2)>=gradient;}
+const RELATIVE=0.15;
+const FLOOR=0.05;
+const END=0.25;
+const SUBPIXEL=0.75;
+fn luma(c:vec4f)->f32 {return dot(c.rgb,vec3f(0.299,0.587,0.114));}
+fn texel(q:vec2i)->f32 {return luma(textureLoad(image,clamp(q,vec2i(0),vec2i(textureDimensions(image))-1),0));}
+fn along(uv:vec2f)->f32 {return luma(textureSampleLevel(image,bilinear,uv,0));}
+@fragment fn fragment(v:Vertex)->@location(0) vec4f {
+ let q=vec2i(v.position.xy);
+ let centre=textureLoad(image,q,0);
+ let m=luma(centre);
+ let n=texel(q+vec2i(0,-1));let s=texel(q+vec2i(0,1));let w=texel(q+vec2i(-1,0));let e=texel(q+vec2i(1,0));
+ let hi=max(m,max(max(n,s),max(w,e)));let lo=min(m,min(min(n,s),min(w,e)));
+ let contrast=hi-lo;
+ if(contrast<max(FLOOR,hi*RELATIVE)){return centre;}
+ let nw=texel(q+vec2i(-1,-1));let ne=texel(q+vec2i(1,-1));let sw=texel(q+vec2i(-1,1));let se=texel(q+vec2i(1,1));
+ // Orientation: total luma change across rows against across columns (centre row/column counts twice).
+ let rows=2*(abs(n-m)+abs(s-m))+abs(nw-w)+abs(sw-w)+abs(ne-e)+abs(se-e);
+ let columns=2*(abs(w-m)+abs(e-m))+abs(nw-n)+abs(ne-n)+abs(sw-s)+abs(se-s);
+ let horizontal=rows>=columns;
+ let size=1/vec2f(textureDimensions(image));
+ // Side: the neighbour across the edge with the larger step; 'across' points at it, one pixel long.
+ let before=select(w,n,horizontal);let after=select(e,s,horizontal);
+ let toBefore=abs(before-m)>=abs(after-m);
+ let gradient=max(abs(before-m),abs(after-m));
+ let mid=0.5*(m+select(after,before,toBefore));
+ var across=select(vec2f(size.x,0),vec2f(0,size.y),horizontal);
+ if(toBefore){across=-across;}
+ let tangent=select(vec2f(0,size.y),vec2f(size.x,0),horizontal);
+ // End search from the pixel boundary, where each bilinear fetch averages both sides of the edge.
+ let start=v.position.xy*size+0.5*across;
+ let limit=END*gradient;
+ var back=0.0;var forth=0.0;var backDelta=0.0;var forthDelta=0.0;var backDone=false;var forthDone=false;
+ for(var i=0u;i<10u;i++){
+  let stride=select(1.0,f32(i)-2.0,i>=4u);
+  if(!backDone){back+=stride;backDelta=along(start-tangent*back)-mid;backDone=abs(backDelta)>=limit;}
+  if(!forthDone){forth+=stride;forthDelta=along(start+tangent*forth)-mid;forthDone=abs(forthDelta)>=limit;}
+  if(backDone&&forthDone){break;}
  }
- let dist1=select(uv.y-p1.y,uv.x-p1.x,horizontal);let dist2=select(p2.y-uv.y,p2.x-uv.x,horizontal);
- // Shift toward the nearer edge end only when its luma turns the right way; blend sub-pixel aliasing either way.
- let correct=(select(d2,d1,dist1<dist2)<0)!=(m<edge);
- let sub=clamp(abs((2*(n+s+w+e)+nw+ne+sw+se)/12-m)/range,0,1);let blend=(3-2*sub)*sub*sub;
- let offset=max(select(0.0,0.5-min(dist1,dist2)/(dist1+dist2),correct),blend*blend*0.75);
- return textureSampleLevel(image,bilinear,uv+across*offset,0);
+ // Edge shift: largest beside an end, zero mid-span, and only where the end turns toward this pixel's own side.
+ let nearBack=back<forth;
+ let nearest=min(back,forth);
+ let endDelta=select(forthDelta,backDelta,nearBack);
+ let endFound=select(forthDone,backDone,nearBack);
+ var shift=0.0;
+ if(endFound&&((m-mid)<0)!=(endDelta<0)){shift=0.5-nearest/(back+forth);}
+ // Sub-pixel shift: how far the centre stands out from a low-pass of its neighbourhood, relative to the contrast.
+ let low=(2*(n+s+w+e)+nw+ne+sw+se)/12;
+ let blend=smoothstep(0.0,1.0,clamp(abs(low-m)/contrast,0.0,1.0));
+ shift=max(shift,SUBPIXEL*blend*blend);
+ if(shift<=0){return centre;}
+ return textureSampleLevel(image,bilinear,v.position.xy*size+across*shift,0);
 }`;
 
 /** Fast approximate anti-aliasing for single-sampled (phone or light-tier) output. Alone it captures the finished frame
