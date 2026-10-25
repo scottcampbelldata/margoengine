@@ -140,9 +140,9 @@ test('f16 members encode as IEEE binary16 with round-to-nearest-even', () => {
   );
 });
 
-test('createCompute without WebGPU rejects with a coded unsupported error and a help link', async () => {
+test("createCompute({ backend: 'webgpu' }) without WebGPU rejects with a coded unsupported error and a help link", async () => {
   await assert.rejects(
-    () => createCompute(),
+    () => createCompute({ backend: 'webgpu' }),
     (e) => e.name === 'MargoError' && e.code === 'unsupported' && /errors#compute/.test(e.message),
   );
   const engine = { gpu: null };

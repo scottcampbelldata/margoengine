@@ -3,8 +3,6 @@ import { arrayType, bytesOf, toTyped, type DType, type TypedArrayFor } from './d
 import { Operand, type Node, type Storage } from './expr.js';
 import type { ComputeContext } from './context.js';
 
-declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number; COPY_DST: number };
-
 /** Options for reading results back. */
 export interface ReadOptions {
   /** Abandons the read: the promise rejects with the signal's reason. */
@@ -90,10 +88,7 @@ export class GpuArray<T extends DType = DType> extends Operand {
         'compute',
       );
     this.storage = {
-      buffer: context.device.createBuffer({
-        size: Math.max(16, Math.ceil(bytes / 16) * 16),
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | usage,
-      }),
+      buffer: context.allocate(Math.max(16, Math.ceil(bytes / 16) * 16), usage, dtype),
       dtype,
       disposed: false,
     };

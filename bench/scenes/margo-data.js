@@ -13,7 +13,7 @@ const compute = () => import('@margoengine/compute');
 const task = (setup) => async (_canvas, data, marks, params) => {
   const s = performance.now(),
     { createCompute } = await compute(),
-    gpu = await createCompute();
+    gpu = await createCompute({ backend: params.backend });
   marks.createMs = +(performance.now() - s).toFixed(1);
   const b = performance.now(),
     job = await setup(gpu, data, params);
@@ -30,22 +30,25 @@ const task = (setup) => async (_canvas, data, marks, params) => {
       free(last);
       last = result;
     },
-    // The sum of the job's pass times from timestamp queries (gpu.profile), per call.
-    async gpuTimes(calls) {
-      const times = [];
-      for (let k = 0; k < calls; k++) {
-        let result = null;
-        const passes = await gpu.profile(() => {
-          result = job.run();
-        });
-        await gpu.done();
-        free(result);
-        if (passes.length) times.push(passes.reduce((sum, p) => sum + p.ms, 0));
-      }
-      return times;
-    },
+    // The sum of the job's pass times from timestamp queries (gpu.profile), per call; none on the CPU backend.
+    gpuTimes:
+      gpu.backend === 'cpu'
+        ? undefined
+        : async (calls) => {
+            const times = [];
+            for (let k = 0; k < calls; k++) {
+              let result = null;
+              const passes = await gpu.profile(() => {
+                result = job.run();
+              });
+              await gpu.done();
+              free(result);
+              if (passes.length) times.push(passes.reduce((sum, p) => sum + p.ms, 0));
+            }
+            return times;
+          },
     output: async () => ({ n: params.n, check: await job.check(last) }),
-    info: () => ({ note: `backend ${gpu.backend ?? 'webgpu'}` }),
+    info: () => ({ note: `backend ${gpu.backend}` }),
   };
 };
 

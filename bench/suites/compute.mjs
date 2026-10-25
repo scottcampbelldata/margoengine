@@ -5,7 +5,8 @@
 // `rate` is the job's throughput on the GPU (GB/s, GFLOP/s or Mkeys/s from the scene's work(), over taskGpuMs), and
 // `wallRate` the same over taskMs. taskGpuMs alone decides validity: Chromium reports finished work either about
 // 0.3 ms or about 3 ms after it ends (docs/benchmarking.md "GPU compute"), so taskMs is bimodal for jobs near that
-// edge and its spread says nothing about Margo. Other engines join through engine-bench.
+// edge and its spread says nothing about Margo. Cases with backend=cpu run the CPU fallback: taskMs is their compute
+// time and decides validity, and `rate` is over it. Other engines join through engine-bench.
 import { sceneCases } from '../lib/browser.mjs';
 import { SCENES } from '../scenes/catalog.js';
 
@@ -17,6 +18,10 @@ export const withRate = (suite) => (ctx) =>
   })(ctx).map((c) => {
     const work = SCENES[c.scene].work(c.params),
       per = (ms) => +(work.amount / (ms / 1000) / work.scale).toFixed(2);
+    if (c.params.backend === 'cpu') {
+      c.metrics.taskMs.primary = true;
+      delete c.metrics.taskGpuMs;
+    }
     return {
       ...c,
       metrics: {
@@ -26,7 +31,9 @@ export const withRate = (suite) => (ctx) =>
       },
       async run(runCtx) {
         const r = await c.run(runCtx);
-        if (r.values?.taskGpuMs > 0) r.values.rate = per(r.values.taskGpuMs);
+        // On the CPU backend the call is the whole job: its wall time is its compute time.
+        const busy = c.params.backend === 'cpu' ? r.values?.taskMs : r.values?.taskGpuMs;
+        if (busy > 0) r.values.rate = per(busy);
         if (r.values?.taskMs > 0) r.values.wallRate = per(r.values.taskMs);
         return r;
       },

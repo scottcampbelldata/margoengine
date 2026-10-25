@@ -3,7 +3,8 @@
 // The page (compute-browser.js) checks map, reduce, scan, sort, argsort, sortByKey and histogram against CPU references
 // at sizes around every block boundary, kernels bound by name, coded GPU errors, AbortSignal, disposal, the 2D grid
 // past 65,535 workgroups and device sharing with an engine; compute-extras-browser.js checks linalg, fft, signal,
-// random, stream and frame. Results go to test-results/compute-browser.json.
+// random, stream and frame; compute-cpu-browser.js runs the same operations on the CPU backend and the GPU and
+// compares them. Results go to test-results/compute-browser.json.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -22,13 +23,17 @@ page.on('console', (m) => {
 page.setDefaultTimeout(600_000);
 try {
   await page.waitForFunction(
-    () => typeof window.runComputeTests === 'function' && typeof window.runExtrasTests === 'function',
+    () =>
+      typeof window.runComputeTests === 'function' &&
+      typeof window.runExtrasTests === 'function' &&
+      typeof window.runCpuParityTests === 'function',
   );
   const core = await page.evaluate(() => window.runComputeTests());
   const extras = await page.evaluate(() => window.runExtrasTests());
+  const cpu = await page.evaluate(() => window.runCpuParityTests());
   const report = {
-    checks: [...core.checks, ...extras.checks],
-    timings: { ...core.timings, ...extras.timings },
+    checks: [...core.checks, ...extras.checks, ...cpu.checks],
+    timings: { ...core.timings, ...extras.timings, ...cpu.timings },
     adapter: core.adapter,
   };
   assert.deepEqual(errors, []);

@@ -11,7 +11,8 @@ read from the source. Optional entries add matrix products (`/linalg`), Fourier 
 engine's frame (`/frame`).
 
 The package is optional and tree-shakable, adds nothing to core, and needs no engine: without one it opens a
-headless device of its own.
+headless device of its own. Without WebGPU (Node, an older browser, a blocklisted GPU) the same code runs on the CPU.
+
 
 ```ts
 import { createCompute } from '@margoengine/compute';
@@ -256,6 +257,35 @@ frame.add(step, (dt) => (step.set('p', { dt }), { count: 4096 }));
 engine.start();
 ```
 
+## CPU fallback
+
+`createCompute()` uses WebGPU when the runtime has a usable adapter and otherwise falls back to the CPU, so code
+written for the GPU also runs in Node and on machines without WebGPU. `gpu.backend` says which you got
+(`'webgpu'` or `'cpu'`). `createCompute({ backend: 'cpu' })` always picks the CPU and `{ backend: 'webgpu' }` never
+does (it rejects instead). The CPU code loads with `import()` only when it is used.
+
+The CPU backend has the same API and the same results as the GPU path:
+
+- Arrays, views, broadcasting and fused expressions run through an interpreter of the same expression tree. Every
+  value is rounded to its element type as on the GPU (f32 rounding, 32-bit integer wrap).
+- Reductions, scans and sorts give the same orders, counts and integer results. Float sums are accumulated in double
+  precision, so they agree with the GPU to f32 rounding.
+- `/linalg`, `/fft`, `/signal`, `/random` and `/stream` work unchanged. `Random` draws the same Philox stream, word
+  for word.
+- What needs a GPU throws a MargoError with code `unsupported`: your own WGSL (`gpu.kernel`, `gpu.map`, custom
+  `{ combine, identity }` operators), `f16` arrays and `/frame`.
+
+The browser test compares the two backends on the same inputs. The CPU runs on the calling thread and is much slower
+than a GPU: the `compute` benchmark suite times both ([docs/benchmarking.md](../../docs/benchmarking.md#gpu-compute)).
+
+```ts
+import { createCompute } from '@margoengine/compute';
+
+using gpu = await createCompute(); // WebGPU when available, otherwise the CPU
+const x = gpu.array(new Float32Array([4, 1, 3, 2]));
+console.log(gpu.backend, await gpu.sort(x).read(), await x.mean().item()); // 'cpu' in Node: [1, 2, 3, 4] 2.5
+```
+
 ## Errors, waiting and profiling
 
 Operations queue GPU work and return at once. Anything that waits (`read`, `item`, `done`, `profile`, `filter`) takes
@@ -272,6 +302,7 @@ mistakes throw `TypeError` or `RangeError` at once, naming the fix, and every me
 | --- | --- | --- |
 | `createCompute({ engine })` | none | share the engine's WebGPU device |
 | `createCompute({ device })` | none | share a GPUDevice you made |
+| `createCompute({ backend })` | `'auto'` | `'auto'`, `'webgpu'` or `'cpu'` (see [CPU fallback](#cpu-fallback)) |
 | `createCompute({ powerPreference })` | `'high-performance'` | adapter choice for a device of its own |
 | `createCompute({ signal })` | none | abandon device creation |
 | `array(data, { dtype })` | from the TypedArray, else `'f32'` | element type |

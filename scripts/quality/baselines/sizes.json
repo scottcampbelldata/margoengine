@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3084572,
+  "total": 3091968,
   "history": [
     {
       "date": "2026-10-24",
@@ -194,6 +194,12 @@
       "commit": "103d9eca",
       "reason": "sciviz: hover picking, tooltips, box and lasso selection (pick maths in sciviz/maths)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "2dfd5c2e",
+      "reason": "compute CPU fallback: lazy cpu chunk loaded only without WebGPU (counted by the gate's all-chunks method)",
+      "grew": 1
     }
   ],
   "items": {
@@ -221,12 +227,12 @@
     "@margoengine/clustered/projector": 2874,
     "@margoengine/clustered/shadows": 10577,
     "@margoengine/clustered/units": 1089,
-    "@margoengine/compute": 25153,
-    "@margoengine/compute/fft": 6082,
+    "@margoengine/compute": 32690,
+    "@margoengine/compute/fft": 6037,
     "@margoengine/compute/frame": 25383,
-    "@margoengine/compute/linalg": 5812,
+    "@margoengine/compute/linalg": 5764,
     "@margoengine/compute/random": 2746,
-    "@margoengine/compute/signal": 7544,
+    "@margoengine/compute/signal": 7496,
     "@margoengine/compute/stream": 1422,
     "@margoengine/controls": 22891,
     "@margoengine/controls/arcball": 4582,

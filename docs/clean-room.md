@@ -546,6 +546,7 @@ expect; the documentation describes behaviour, not code.
 | Random numbers | J. K. Salmon, M. A. Moraes, R. O. Dror and D. E. Shaw, "Parallel random numbers: as easy as 1, 2, 3", SC11 (Philox4x32-10 constants and the published known-answer vectors, used as test data); G. E. P. Box and M. E. Muller, Ann. Math. Statist. 29(2), 1958; D. Lemire, "Fast random integer generation in an interval", ACM TOMACS 29(1), 2019 |
 | `log1p`, `expm1` | D. Goldberg, "What every computer scientist should know about floating-point arithmetic", ACM Computing Surveys 23(1), 1991 |
 | Streaming mean and variance | T. F. Chan, G. H. Golub and R. J. LeVeque, "Algorithms for computing the sample variance", Amer. Statistician 37(3), 1983 |
+| CPU fallback (interpreter, LSD radix sort, host kernels) | The WGSL conversion and arithmetic rules above; D. E. Knuth, "The Art of Computer Programming" vol. 3, section 5.2.5 (radix sorting); the package's own WGSL kernels, transcribed |
 
 ## Data track: `@margoengine/sciviz`
 

@@ -49,8 +49,10 @@ export class ComputeContext {
     readonly lost: Promise<GPUDeviceLostInfo>;
     constructor(device: GPUDevice, ownsDevice: boolean);
     get disposed(): boolean;
+    get backend(): 'webgpu' | 'cpu';
     get f16(): boolean;
     check(): void;
+    allocate(size: number, usage: number, _dtype: DType): GPUBuffer;
     empty<T extends DType>(shape: readonly number[], dtype: T, usage?: number): GpuArray<T>;
     array<T extends DType = 'f32'>(data: ArrayLike<number> | ArrayBufferView, options?: ArrayOptions<T> | T): GpuArray<T>;
     indirectArgs(workgroups?: readonly [number, number, number]): GpuArray<'u32'>;
@@ -171,6 +173,7 @@ export interface CreateComputeOptions {
     readonly device?: GPUDevice;
     readonly powerPreference?: GPUPowerPreference;
     readonly signal?: AbortSignal;
+    readonly backend?: 'auto' | 'webgpu' | 'cpu';
 }
 
 export type DType = 'f32' | 'f16' | 'i32' | 'u32';

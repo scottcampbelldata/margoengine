@@ -327,7 +327,8 @@ function computeScenes() {
     title,
     draws,
     measures: ['taskMs (queue + GPU finish, inputs on the GPU)', 'coldMs (first call: shader compile)'],
-    params: { n },
+    // backend 'cpu': the same job on @margoengine/compute's CPU fallback (createCompute({ backend: 'cpu' })).
+    params: { n, backend: 'webgpu' },
     work,
     data,
   });
@@ -508,6 +509,11 @@ export const STANDARD = {
     ),
     ...[256, 1024, 2048].map((n) => ({ scene: 'compute-matmul', params: { n } })),
     ...[1 << 16, 1 << 20, 1 << 22].map((n) => ({ scene: 'compute-fft', params: { n } })),
+    // The CPU fallback on the same jobs, at the sizes it finishes in reasonable time.
+    ...['compute-sort', 'compute-scan', 'compute-reduce', 'compute-histogram', 'compute-random', 'compute-fft'].map(
+      (scene) => ({ scene, params: { n: 1 << 20, backend: 'cpu' } }),
+    ),
+    ...[256, 512].map((n) => ({ scene: 'compute-matmul', params: { n, backend: 'cpu' } })),
   ],
   viz: [
     ...[100_000, 1_000_000, 4_000_000].map((n) => ({ scene: 'viz-scatter', params: { n } })),

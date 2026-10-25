@@ -36,6 +36,13 @@ export interface CreateComputeOptions {
   readonly powerPreference?: GPUPowerPreference;
   /** Abandons device creation: the promise rejects with the signal's reason. */
   readonly signal?: AbortSignal;
+  /**
+   * Where the work runs. `'auto'` (default): WebGPU when the runtime has a usable adapter, otherwise the CPU.
+   * `'webgpu'`: WebGPU or reject (MargoError `unsupported`). `'cpu'`: always the CPU, in JavaScript on the calling
+   * thread, with the same API except your own WGSL (`kernel`, `map`, custom operators). Ignored with `device` or
+   * `engine`, which are WebGPU.
+   */
+  readonly backend?: 'auto' | 'webgpu' | 'cpu';
 }
 
 /** Waiting options: an AbortSignal. */
@@ -178,6 +185,11 @@ export class ComputeContext {
     return this.#disposed;
   }
 
+  /** Where the work runs: `'webgpu'`, or `'cpu'` for the fallback (`createCompute({ backend })`). */
+  get backend(): 'webgpu' | 'cpu' {
+    return 'webgpu';
+  }
+
   /** True when the device can run `f16` arrays (the `shader-f16` feature). */
   get f16(): boolean {
     return this.device.features.has('shader-f16');
@@ -194,6 +206,14 @@ export class ComputeContext {
       throw typeError(`dtype must be 'f32', 'f16', 'i32' or 'u32', got ${String(dtype)}`, 'compute');
     if (dtype === 'f16' && !this.f16)
       throw fault('unsupported', "This GPU has no shader-f16 feature; use 'f32' arrays", 'compute');
+  }
+
+  /** @internal A zero-filled buffer of `size` bytes for an array of `dtype`: STORAGE, COPY_SRC, COPY_DST and `usage`. */
+  allocate(size: number, usage: number, _dtype: DType): GPUBuffer {
+    return this.device.createBuffer({
+      size,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | usage,
+    });
   }
 
   /** @internal An array of `shape`, zero-filled (WebGPU clears new buffers), with extra buffer `usage` flags. */
@@ -948,16 +968,27 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
   }
 }
 
+// The CPU backend, loaded only when it is used.
+const cpu = async (signal: AbortSignal | undefined): Promise<ComputeContext> => {
+  const { cpuContext } = await import('./cpu.js');
+  aborted(signal);
+  return cpuContext();
+};
+
 /**
  * Opens a compute context. With `engine` (WebGPU backend) or `device` it shares that device; otherwise it opens a
  * headless device of its own with the adapter's largest buffer limits (so big arrays fit) and, where available, the
- * `shader-f16` and `timestamp-query` features. Rejects with a MargoError (`unsupported`) without WebGPU.
+ * `shader-f16` and `timestamp-query` features. Without WebGPU it falls back to the CPU (`backend`, default
+ * `'auto'`; check `gpu.backend`); with `backend: 'webgpu'` it rejects with a MargoError (`unsupported`) instead.
  * @example
  * using gpu = await createCompute();
  * const sorted = await gpu.sort(gpu.array([3, 1, 2])).read(); // Float32Array [1, 2, 3]
  */
 export async function createCompute(options: CreateComputeOptions = {}): Promise<ComputeContext> {
   aborted(options.signal);
+  const backend = options.backend ?? 'auto';
+  if (backend !== 'auto' && backend !== 'webgpu' && backend !== 'cpu')
+    throw typeError(`createCompute backend must be 'auto', 'webgpu' or 'cpu', got ${String(backend)}`, 'compute');
   if (options.device) return new ComputeContext(options.device, false);
   if (options.engine) {
     const device = (options.engine as unknown as { gpu: GPUDevice | null }).gpu;
@@ -969,13 +1000,24 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
       );
     return new ComputeContext(device, false);
   }
+  if (backend === 'cpu') return cpu(options.signal);
   const gpu = (globalThis.navigator as Navigator | undefined)?.gpu;
-  if (!gpu) throw fault('unsupported', 'WebGPU unavailable; use a browser or runtime with WebGPU', 'compute');
+  if (!gpu) {
+    if (backend === 'auto') return cpu(options.signal);
+    throw fault('unsupported', "WebGPU unavailable; use a runtime with WebGPU, or backend: 'cpu'", 'compute');
+  }
   const adapter = await abortable(
     gpu.requestAdapter({ powerPreference: options.powerPreference ?? 'high-performance' }),
     options.signal,
   );
-  if (!adapter) throw fault('unsupported', 'WebGPU adapter unavailable; check that the GPU is enabled', 'compute');
+  if (!adapter) {
+    if (backend === 'auto') return cpu(options.signal);
+    throw fault(
+      'unsupported',
+      "WebGPU adapter unavailable; check that the GPU is enabled, or use backend: 'cpu'",
+      'compute',
+    );
+  }
   const wanted: GPUFeatureName[] = ['shader-f16', 'timestamp-query'];
   const device = await adapter.requestDevice({
     requiredFeatures: wanted.filter((f) => adapter.features.has(f)),

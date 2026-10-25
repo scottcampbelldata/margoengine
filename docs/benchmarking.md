@@ -345,6 +345,24 @@ What these numbers show, losses included:
 - The matrix product reaches 8.0 TFLOP/s at 2048^3, about a fifth of the card's 38.7 TFLOP/s f32 peak.
 - The FFT of 2^22 points runs at 171 GFLOP/s; each of its 22 radix-2 passes goes through memory.
 
+The CPU fallback (`createCompute({ backend: 'cpu' })`, cases `-backendcpu`) on the same machine, in the same
+browser, run `20261025-222755-6d0bc1cd-dev` (not official: the sort and sum cases varied by 25 and 18 percent between
+runs, from garbage collection). `taskMs` is the whole job here, with the GPU's wall time beside it:
+
+| Case | CPU ms | CPU rate | GPU wall ms | GPU is faster by |
+| --- | --- | --- | --- | --- |
+| sort-1048576 | 51.9 | 20.2 Mkeys/s | 4.07 | 13x |
+| scan-1048576 | 3.43 | 2.4 GB/s | 0.54 | 6x |
+| reduce-1048576 | 1.83 | 2.3 GB/s | 0.39 | 5x |
+| histogram-1048576 | 3.75 | 1.1 GB/s | 0.46 | 8x |
+| random-1048576 | 35.2 | 0.12 GB/s | 0.41 | 86x |
+| fft-1048576 | 72.4 | 1.4 GFLOP/s | 3.73 | 19x |
+| matmul-256 | 10.6 | 3.2 GFLOP/s | 0.45 | 24x |
+| matmul-512 | 81.8 | 3.3 GFLOP/s | - | - |
+
+The CPU backend is single-threaded JavaScript, there so code runs everywhere, not to compete. Its normal random
+numbers spend their time in Math.log, Math.sin and Math.cos, and its matrix product is a plain triple loop.
+
 The `viz` suite on the same run (`@margoengine/sciviz` figures with axes, camera orbiting):
 
 | Case | Build ms | CPU ms per frame | GPU ms per frame | fps |
