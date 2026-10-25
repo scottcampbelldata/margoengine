@@ -1110,3 +1110,30 @@ test('Html imports the optional peer, shares an overlay and releases portal anch
   assert.equal(overlay.disposals, 1);
   assert.equal(dom.window.document.body.textContent, '');
 });
+
+test('Html applies anchor, distance scale, sorting, culling, visibility and pointer events live', async () => {
+  const label = (props) =>
+    tree(React.createElement(Margo.Html, { key: 'label', ...props }, React.createElement('span', null, 'Pin')));
+  const view = render(
+    label({ anchor: [0, 1], distanceScale: { reference: 10, min: 0.5 }, sort: true, pointerEvents: 'auto' }),
+  );
+  await flush();
+  const overlay = overlays.at(-1),
+    [item] = overlay.labels;
+  assert.deepEqual(item.anchor, [0, 1]);
+  assert.deepEqual(item.distanceScale, { reference: 10, min: 0.5 });
+  assert.equal(item.sort, true);
+  assert.equal(item.frustumCulling, true);
+  assert.equal(item.visible, true);
+  assert.equal(item.element.style.pointerEvents, 'auto');
+  view.rerender(label({ visible: false, frustumCulling: false, followVisibility: false }));
+  await flush();
+  assert.equal([...overlay.labels][0], item, 'option changes keep the same label');
+  assert.deepEqual(item.anchor, [0.5, 0.5], 'removed props return to the defaults');
+  assert.equal(item.distanceScale, null);
+  assert.equal(item.sort, false);
+  assert.equal(item.visible, false);
+  assert.equal(item.frustumCulling, false);
+  assert.equal(item.followVisibility, false);
+  assert.equal(item.element.style.pointerEvents, 'none');
+});

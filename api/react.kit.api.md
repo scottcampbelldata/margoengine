@@ -28,12 +28,14 @@ export const ContactShadows: import("react").ForwardRefExoticComponent<ContactSh
 export interface ContactShadowsProps extends MeshProps, ErrorProps, ContactGroundOptions {
 }
 
-export function Environment({ src, exposure, background, onError }: EnvironmentProps): null;
+export function Environment({ src, exposure, background, rotation, blur, onError }: EnvironmentProps): null;
 
 export interface EnvironmentProps {
     src?: string;
     exposure?: number;
     background?: boolean;
+    rotation?: number;
+    blur?: number;
     onError?: (error: unknown) => void;
 }
 
@@ -58,7 +60,7 @@ interface ModelProps extends PointerHandlers {
     onError?: (error: unknown) => void;
 }
 
-export function Html({ children, position, className, style, occlude, onError }: HtmlProps): import("react").ReactPortal | null;
+export function Html({ children, position, className, style, occlude, anchor, distanceScale, sort, frustumCulling, followVisibility, visible, pointerEvents, onError }: HtmlProps): import("react").ReactPortal | null;
 
 export interface HtmlProps {
     children?: ReactNode;
@@ -66,6 +68,17 @@ export interface HtmlProps {
     className?: string;
     style?: CSSProperties;
     occlude?: boolean;
+    anchor?: readonly [number, number];
+    distanceScale?: number | {
+        reference: number;
+        min?: number;
+        max?: number;
+    };
+    sort?: boolean;
+    frustumCulling?: boolean;
+    followVisibility?: boolean;
+    visible?: boolean;
+    pointerEvents?: 'none' | 'auto';
     onError?: (error: unknown) => void;
 }
 

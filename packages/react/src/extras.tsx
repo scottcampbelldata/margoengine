@@ -10,36 +10,12 @@ import type { SectionOptions, SectionPlanes as SectionPlugin } from '@margoengin
 import { MargoError } from '@margoengine/math/errors';
 import { composeMatrix } from '@margoengine/math/mat4';
 import { eulerToQuaternion } from '@margoengine/math/quat';
-import { useCommit, useCreated, useScene, type Scene } from './internal.js';
+import { useCommit, useCreated, useModelSources, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 
-type Model = Scene['resources']['models'] extends Set<infer T> ? T : never;
 interface ErrorProps {
   /** Loading the optional package or attaching failed. */
   onError?: (error: unknown) => void;
-}
-
-// Keeps `effect` given every live PBR model of the Canvas, now and as they load or unmount (the SSAO pattern).
-function useModelSources(scene: Scene, effect: { add(model: never): () => void } | null): void {
-  useCommit(() => {
-    if (!effect) return;
-    const added = new Map<Model, () => void>();
-    const sync = () => {
-      for (const [model, remove] of added)
-        if (!scene.resources.models.has(model) || model.disposed) {
-          remove();
-          added.delete(model);
-        }
-      for (const model of scene.resources.models)
-        if (!model.disposed && !added.has(model)) added.set(model, effect.add(model as never));
-    };
-    sync();
-    scene.frames.callbacks.add(sync);
-    return () => {
-      scene.frames.callbacks.delete(sync);
-      for (const remove of added.values()) remove();
-    };
-  }, [scene, effect]);
 }
 
 const BatchContext = createContext<Batch | null>(null);

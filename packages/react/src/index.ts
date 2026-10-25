@@ -8,3 +8,4 @@ export { MeshTransmissionMaterial, type MeshTransmissionMaterialProps } from './
 export * from './hooks.js';
 export * from './extras.js';
 export * from './views.js';
+export * from './lights.js';

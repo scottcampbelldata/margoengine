@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3151735,
+  "total": 3152766,
   "history": [
     {
       "date": "2026-10-24",
@@ -140,6 +140,12 @@
       "commit": "06cfcbf4",
       "reason": "IGES 5.3 reader in brep (+~11 KB), clean-room FXAA (+~80 B), CIE L* voxel light curve (+~200 B)",
       "grew": 3
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "9c66245f",
+      "reason": "React stage 2b (item 17): Sun, AmbientLight, HemisphereLight and Fog components; Environment rotation and blur; Html label options (environment loads lazily)",
+      "grew": 2
     }
   ],
   "items": {
@@ -352,8 +358,8 @@
     "@margoengine/procedural/voronoi": 5026,
     "@margoengine/quality": 1879,
     "@margoengine/quality/warm": 1536,
-    "@margoengine/react": 22302,
-    "@margoengine/react/kit": 10785,
+    "@margoengine/react": 23007,
+    "@margoengine/react/kit": 11111,
     "@margoengine/react/physics": 5204,
     "@margoengine/react/post": 3770,
     "@margoengine/react/xr": 3429,

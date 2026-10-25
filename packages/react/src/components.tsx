@@ -735,9 +735,20 @@ export interface EnvironmentProps {
   src?: string;
   exposure?: number;
   background?: boolean;
+  /** Turn the environment about +Y, in radians: its lighting and background together. Default 0. */
+  rotation?: number;
+  /** Background blur: 0 sharp to 1 the roughest prefiltered level. Default 0. */
+  blur?: number;
   onError?: (error: unknown) => void;
 }
-export function Environment({ src, exposure = 1, background = true, onError }: EnvironmentProps) {
+export function Environment({
+  src,
+  exposure = 1,
+  background = true,
+  rotation = 0,
+  blur = 0,
+  onError,
+}: EnvironmentProps) {
   const { engine, resources, assetCache } = useScene(),
     [environment, setEnvironment] = useState<IBLEnvironment | null>(null);
   const [loading, setLoading] = useState<Loading | null>(null),
@@ -855,8 +866,14 @@ export function Environment({ src, exposure = 1, background = true, onError }: E
     };
   }, [engine, environment, module, background]);
   useCommit(() => {
-    if (backdrop.current) backdrop.current.exposure = exposure;
-  }, [environment, module, background, exposure]);
+    if (backdrop.current) {
+      backdrop.current.exposure = exposure;
+      backdrop.current.blur = blur;
+    }
+  }, [environment, module, background, exposure, blur]);
+  useCommit(() => {
+    if (environment && !environment.disposed) environment.rotation = rotation;
+  }, [environment, rotation]);
   if (loading && loading.src === src && loading.pending) throw loading.promise;
   return null;
 }
@@ -895,14 +912,44 @@ function releaseOverlay(engine: Engine, entry: OverlayEntry): void {
 }
 export interface HtmlProps {
   children?: ReactNode;
+  /** World position, or the offset from the enclosing `<Mesh>`. Default [0, 0, 0]. */
   position?: Vec3;
   className?: string;
   style?: CSSProperties;
+  /** Hide the label when scene geometry is in front of it (WebGPU depth). Default true. */
   occlude?: boolean;
+  /** Point of the label placed on the anchor, in fractions of its size: [0.5, 0.5] centres it. Default [0.5, 0.5]. */
+  anchor?: readonly [number, number];
+  /** Scale with distance: a reference distance in world units (or `{ reference, min, max }`) at which scale is 1. */
+  distanceScale?: number | { reference: number; min?: number; max?: number };
+  /** Stack nearer labels above farther ones. Default false. */
+  sort?: boolean;
+  /** Hide the label when its anchor is outside the view. Default true. */
+  frustumCulling?: boolean;
+  /** Hide with an invisible enclosing mesh. Default true. */
+  followVisibility?: boolean;
+  /** Default true. */
+  visible?: boolean;
+  /** `'auto'` lets the label take clicks; default `'none'` lets them through to the canvas. */
+  pointerEvents?: 'none' | 'auto';
   onError?: (error: unknown) => void;
 }
 /** Optional projected React DOM content, sharing one HTML plugin per canvas. */
-export function Html({ children, position = zero, className, style, occlude = true, onError }: HtmlProps) {
+export function Html({
+  children,
+  position = zero,
+  className,
+  style,
+  occlude = true,
+  anchor = [0.5, 0.5],
+  distanceScale,
+  sort = false,
+  frustumCulling = true,
+  followVisibility = true,
+  visible = true,
+  pointerEvents = 'none',
+  onError,
+}: HtmlProps) {
   const { engine, registry } = useScene();
   const [portal, setPortal] = useState<{
     element: HTMLElement;
@@ -963,8 +1010,31 @@ export function Html({ children, position = zero, className, style, occlude = tr
       if (registry?.current) item.setMesh(registry.current as unknown as MeshHandle).setOffset(position);
       else item.setPosition(position);
       item.occlude = occlude ? occlusion.current : () => false;
+      // The label's live fields; pointer events are a style on the element this component owns.
+      item.anchor = [anchor[0], anchor[1]];
+      item.distanceScale = distanceScale ?? null;
+      item.sort = sort;
+      item.frustumCulling = frustumCulling;
+      item.followVisibility = followVisibility;
+      item.visible = visible;
+      if (portal) portal.element.style.pointerEvents = pointerEvents;
     }
-  }, [registry, portal, position[0], position[1], position[2], occlude]);
+  }, [
+    registry,
+    portal,
+    position[0],
+    position[1],
+    position[2],
+    occlude,
+    anchor[0],
+    anchor[1],
+    typeof distanceScale === 'object' ? JSON.stringify(distanceScale) : distanceScale,
+    sort,
+    frustumCulling,
+    followVisibility,
+    visible,
+    pointerEvents,
+  ]);
   return portal
     ? portal.create(
         <div className={className} style={style}>

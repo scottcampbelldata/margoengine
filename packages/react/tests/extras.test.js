@@ -67,6 +67,21 @@ Depth.prototype.onResize = function (listener) {
 mock.module('@margoengine/post/depth', { namedExports: { DepthTexture: Depth } });
 mock.module('@margoengine/post/mrt', { namedExports: { SceneTargets: plugin('targets') } });
 const Section = plugin('section');
+mock.module('@margoengine/environment', {
+  namedExports: {
+    AmbientLight: plugin('ambient', { color: '#ffffff', intensity: 1 }),
+    HemisphereLight: plugin('hemisphere', { sky: '#ffffff', ground: undefined, intensity: 1 }),
+    Fog: plugin('fog', {
+      color: '#ffffff',
+      near: 1,
+      far: 1000,
+      density: 0,
+      heightFalloff: 0,
+      height: 0,
+      enabled: true,
+    }),
+  },
+});
 mock.module('@margoengine/machinery/section', {
   namedExports: {
     SectionPlanes: class extends Section {
@@ -86,6 +101,7 @@ for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'na
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { Context } = await import('../dist/internal.js');
 const { BatchedMesh, BatchedItem, DepthTexture, SceneTargets, SectionPlanes } = await import('../dist/extras.js');
+const { Sun, AmbientLight, HemisphereLight, Fog } = await import('../dist/lights.js');
 const { render, act, cleanup } = await import('@testing-library/react');
 const flush = () => act(async () => {});
 const h = React.createElement;
@@ -109,6 +125,11 @@ function scene() {
         effect?.dispose();
       },
       hasPlugin: (name) => plugins.has(name),
+      lighting: {
+        direction: new Float32Array([3, 5, 4, 3]),
+        radiance: new Float32Array([1, 1, 1, 0.15]),
+        ambient: new Float32Array([1, 1, 1]),
+      },
     },
     resources: { models: new Set(), lighting: new Map() },
     frames: { callbacks: new Set() },
@@ -236,4 +257,53 @@ test('SectionPlanes moves planes live and recreates only when the plane count or
   await flush();
   assert.notEqual(ref.current, section, 'a second plane recreates it');
   assert.equal(section.disposals, 1);
+});
+
+test('Sun sets the sun in linear colour and restores the previous sun on unmount', async () => {
+  const value = scene(),
+    lighting = value.engine.lighting;
+  const view = render(tree(value, h(Sun, { direction: [0, 1, 0], color: '#ff0000', intensity: 2 })));
+  await flush();
+  assert.deepEqual([...lighting.direction], [0, 1, 0, 2]);
+  assert.deepEqual([...lighting.radiance], [1, 0, 0, Math.fround(0.15)], 'sRGB red is linear red; ambient untouched');
+  view.rerender(tree(value, h(Sun, { color: [0, 0.5, 0] })));
+  await flush();
+  assert.deepEqual([...lighting.direction], [3, 5, 4, 3], 'defaults');
+  assert.deepEqual([...lighting.radiance].slice(0, 3), [0, 0.5, 0], 'a linear colour is used as given');
+  view.unmount();
+  await flush();
+  assert.deepEqual([...lighting.direction], [3, 5, 4, 3]);
+  assert.deepEqual([...lighting.radiance], [1, 1, 1, Math.fround(0.15)], 'the previous sun is back');
+  // StrictMode runs the effect twice, so React reports both RangeErrors together.
+  assert.throws(
+    () => render(tree(value, h(Sun, { intensity: -1 }))),
+    (error) => [error, ...(error.errors ?? [])].some((e) => /intensity must be a finite number/.test(e.message)),
+  );
+});
+
+test('AmbientLight, HemisphereLight and Fog attach once, light every PBR model and take live props', async () => {
+  const value = scene(),
+    first = { disposed: false },
+    ambient = React.createRef(),
+    hemisphere = React.createRef(),
+    fog = React.createRef();
+  value.resources.models.add(first);
+  const children = (props) => [
+    h(AmbientLight, { key: 'a', ref: ambient, color: '#202020', intensity: props.intensity }),
+    h(HemisphereLight, { key: 'h', ref: hemisphere, sky: '#88aaff', ground: '#443322' }),
+    h(Fog, { key: 'f', ref: fog, color: '#ccddee', near: props.near, far: 80 }),
+  ];
+  const view = render(tree(value, children({ intensity: 0.5, near: 10 })));
+  await flush();
+  for (const light of [ambient.current, hemisphere.current, fog.current])
+    assert.deepEqual([...light.sources], [first], `${light.kind} lights the PBR model`);
+  assert.equal(ambient.current.intensity, 0.5);
+  assert.equal(hemisphere.current.ground, '#443322');
+  assert.equal(fog.current.near, 10);
+  const kept = [ambient.current, hemisphere.current, fog.current];
+  view.rerender(tree(value, children({ intensity: 2, near: undefined })));
+  await flush();
+  assert.deepEqual([ambient.current, hemisphere.current, fog.current], kept, 'prop changes keep the plugins');
+  assert.equal(ambient.current.intensity, 2);
+  assert.equal(fog.current.near, 1, 'a removed fog option returns to its default');
 });

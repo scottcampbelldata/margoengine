@@ -215,3 +215,27 @@ export function useCreated<A, T>(scene: Scene, options: Created<A, T>, keys: rea
   }, [ref, value]);
   return value;
 }
+
+type Model = Scene['resources']['models'] extends Set<infer T> ? T : never;
+// Keeps `effect` given every live PBR model of the Canvas, now and as they load or unmount (the SSAO pattern).
+export function useModelSources(scene: Scene, effect: { add(model: never): () => void } | null): void {
+  useCommit(() => {
+    if (!effect) return;
+    const added = new Map<Model, () => void>();
+    const sync = () => {
+      for (const [model, remove] of added)
+        if (!scene.resources.models.has(model) || model.disposed) {
+          remove();
+          added.delete(model);
+        }
+      for (const model of scene.resources.models)
+        if (!model.disposed && !added.has(model)) added.set(model, effect.add(model as never));
+    };
+    sync();
+    scene.frames.callbacks.add(sync);
+    return () => {
+      scene.frames.callbacks.delete(sync);
+      for (const remove of added.values()) remove();
+    };
+  }, [scene, effect]);
+}

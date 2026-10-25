@@ -301,6 +301,27 @@
         "react"
       ],
       "reason": "One thing, two forms: @margoengine/core's RenderView and @margoengine/react's <RenderView> JSX component that adds one to engine.views. Decision in docs/conventions.md."
+    },
+    "AmbientLight": {
+      "packages": [
+        "environment",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/environment's AmbientLight plugin and @margoengine/react's <AmbientLight> JSX component that attaches it with the same options. Decision in docs/conventions.md."
+    },
+    "HemisphereLight": {
+      "packages": [
+        "environment",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/environment's HemisphereLight plugin and @margoengine/react's <HemisphereLight> JSX component that attaches it with the same options. Decision in docs/conventions.md."
+    },
+    "Fog": {
+      "packages": [
+        "environment",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/environment's Fog plugin and @margoengine/react's <Fog> JSX component that attaches it with the same options. Decision in docs/conventions.md."
     }
   }
 }

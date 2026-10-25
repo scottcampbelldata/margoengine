@@ -1038,3 +1038,19 @@ test('Mesh layers set the render-layer mask, and removing the prop sets layer 1'
   await flush();
   assert.equal(node.layers, 1);
 });
+
+test('Environment rotation turns the environment and blur softens the background, both live', async () => {
+  const child = (rotation, blur) => React.createElement(Environment, { src: '/turn.hdr', rotation, blur });
+  const view = render(tree(child(0.5, 0.25)));
+  await flush();
+  await flush();
+  const environment = environments.at(-1),
+    background = backgrounds.at(-1);
+  assert.equal(environment.rotation, 0.5);
+  assert.equal(background.blur, 0.25);
+  view.rerender(tree(child(1.5, 0)));
+  await flush();
+  assert.equal(environments.at(-1), environment, 'no reload');
+  assert.equal(environment.rotation, 1.5);
+  assert.equal(background.blur, 0);
+});

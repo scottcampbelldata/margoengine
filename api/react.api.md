@@ -6,6 +6,7 @@
 import { ArcballControls, ArcballProjection, ControlEvent, MapControls, NavigationProfile, OrbitControls, PROFILES, PointerLockControls, TransformControls, TransformControlsOptions } from "@margoengine/controls";
 import { Camera, EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, RenderView, Vec3 } from "@margoengine/core";
 import { DOF, DOFOptions } from "@margoengine/dof";
+import { AmbientLight, Fog, FogOptions, HemisphereLight } from "@margoengine/environment";
 import { SectionOptions, SectionPlanes } from "@margoengine/machinery";
 import { Material, MeshGeometry, TransmissionOptions } from "@margoengine/materials";
 import { BatchedMesh, BatchedMeshOptions } from "@margoengine/materials/batched";
@@ -25,6 +26,13 @@ import { CSSProperties, ReactNode, RefObject } from "react";
 export function Afterimage({ onReady, onError, ...options }: AfterimageProps): null;
 
 export interface AfterimageProps extends AfterimageOptions, Callbacks<AfterimageEffect> {
+}
+
+export const AmbientLight: import("react").ForwardRefExoticComponent<AmbientLightProps & import("react").RefAttributes<AmbientPlugin>>;
+
+export interface AmbientLightProps extends ErrorProps {
+    color?: ColorInput;
+    intensity?: number;
 }
 
 export function Animation(props: AnimationProps): null;
@@ -168,12 +176,14 @@ export interface EffectComposerProps {
     onError?: (error: unknown) => void;
 }
 
-export function Environment({ src, exposure, background, onError }: EnvironmentProps): null;
+export function Environment({ src, exposure, background, rotation, blur, onError }: EnvironmentProps): null;
 
 export interface EnvironmentProps {
     src?: string;
     exposure?: number;
     background?: boolean;
+    rotation?: number;
+    blur?: number;
     onError?: (error: unknown) => void;
 }
 
@@ -185,6 +195,12 @@ export interface FXAAProps extends Callbacks<FXAAEffect> {
 export function Fbx(props: FbxProps): import("react").JSX.Element;
 
 export type FbxProps = ModelProps;
+
+export const Fog: import("react").ForwardRefExoticComponent<FogProps & import("react").RefAttributes<FogPlugin>>;
+
+export interface FogProps extends Omit<FogOptions, 'name'>, ErrorProps {
+    enabled?: boolean;
+}
 
 export function GTAO({ onReady, onError, ...options }: GTAOProps): null;
 
@@ -222,7 +238,15 @@ const Mesh: import("react").ForwardRefExoticComponent<MeshProps & import("react"
 
 export type GroupProps = MeshProps;
 
-export function Html({ children, position, className, style, occlude, onError }: HtmlProps): import("react").ReactPortal | null;
+export const HemisphereLight: import("react").ForwardRefExoticComponent<HemisphereLightProps & import("react").RefAttributes<HemispherePlugin>>;
+
+export interface HemisphereLightProps extends ErrorProps {
+    sky?: ColorInput;
+    ground?: ColorInput;
+    intensity?: number;
+}
+
+export function Html({ children, position, className, style, occlude, anchor, distanceScale, sort, frustumCulling, followVisibility, visible, pointerEvents, onError }: HtmlProps): import("react").ReactPortal | null;
 
 export interface HtmlProps {
     children?: ReactNode;
@@ -230,6 +254,17 @@ export interface HtmlProps {
     className?: string;
     style?: CSSProperties;
     occlude?: boolean;
+    anchor?: readonly [number, number];
+    distanceScale?: number | {
+        reference: number;
+        min?: number;
+        max?: number;
+    };
+    sort?: boolean;
+    frustumCulling?: boolean;
+    followVisibility?: boolean;
+    visible?: boolean;
+    pointerEvents?: 'none' | 'auto';
     onError?: (error: unknown) => void;
 }
 
@@ -481,6 +516,14 @@ export interface StageProps {
     children?: ReactNode;
 }
 
+export function Sun({ direction, color, intensity }: SunProps): null;
+
+export interface SunProps {
+    direction?: Vec3;
+    color?: ColorInput;
+    intensity?: number;
+}
+
 export function TAA({ onReady, onError, ...options }: TAAProps): null;
 
 export interface TAAProps extends TAAOptions, Callbacks<TAAEffect> {
@@ -589,6 +632,10 @@ interface ContactGroundOptions {
     height?: number;
     opacity?: number;
     color?: readonly [number, number, number];
+}
+
+interface ErrorProps {
+    onError?: (error: unknown) => void;
 }
 
 interface ErrorProps {

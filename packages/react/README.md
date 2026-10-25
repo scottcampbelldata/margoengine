@@ -193,6 +193,23 @@ export function SplitScreen() {
 }
 ```
 
+Lights: `<Sun direction color intensity>` sets the directional sun light every mesh, model and shadow uses (any backend; inside a `<Scene>`, that scene's). `<AmbientLight color intensity>` and `<HemisphereLight sky ground intensity>` light core meshes and models from every direction, and `<Fog color near far density heightFalloff height>` fogs them in their shaders, transparent models included; all three come from `@margoengine/environment`, take live props and need WebGPU. `<Environment>` also takes `rotation` (radians about +Y, lighting and background together) and `blur` (background, 0 to 1). `<Html>` takes the label options `anchor`, `distanceScale`, `sort`, `frustumCulling`, `followVisibility`, `visible` and `pointerEvents`, all live.
+
+```tsx
+import { Canvas, Sun, HemisphereLight, Fog, Model } from '@margoengine/react';
+
+export function Valley() {
+  return (
+    <Canvas>
+      <Sun direction={[1, 2, 1]} color="#fff4e0" intensity={3} />
+      <HemisphereLight sky="#bcd8ff" ground="#5a4a3a" intensity={0.6} />
+      <Fog color="#bcd8ff" near={20} far={120} />
+      <Model src="/valley.glb" />
+    </Canvas>
+  );
+}
+```
+
 `useFrame((engine, deltaSeconds) => ...)` updates meshes without React renders or re-subscribing when the callback changes. The canvas serializes initialization, disposes superseded engines, and disconnects ResizeObserver during cleanup. It handles StrictMode, HMR effect replacement, late initialization after unmount, and `capacity`/`backend` changes. Camera changes update the existing engine. Errors reach `onError` and an accessible alert.
 
 SSR emits an accessible canvas without accessing GPU APIs. The ESM output preserves `use client` and includes TypeScript declarations. Peer ranges accept the current core 0.1.x workspace and the requested core 1.x release, plus React 18/19.
