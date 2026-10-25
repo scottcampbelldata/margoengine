@@ -160,7 +160,7 @@ packages/shared and every top-level WGSL builder called with each combination of
 constants and 42 builder variants, 180 distinct sources, 16 of them fragments joined elsewhere, 26 builders skipped
 (they take source text or option objects), 1.7 s. scripts/support/wgsl-guard.js also checks every module any page
 opened by scripts/browser.js or the visual check creates, so check:views, the package tests and the 72 views fail on a
-WGSL error too. `npm run check:tracer` (in check:merge) runs the tracer's compile and shapes checks.
+WGSL error too. `npm run check:tracer` runs (check:merge gets the same checks through check:gpu-packages, voxel-pathtracer `test:gpu`) the tracer's compile and shapes checks.
 
 ## Landed 2026-10-24: core bug fixes; the freeze blocks features, not fixes
 
