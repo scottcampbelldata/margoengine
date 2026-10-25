@@ -1,0 +1,192 @@
+# Browser and packaging checks. These take a long time and need a GPU-capable runner, so they run on demand.
+name: Browser checks
+on:
+  workflow_dispatch:
+jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Rust toolchain pinned in rust-toolchain.toml
+        run: rustc --version
+      - name: Run native kernel unit tests
+        run: cargo test --locked --manifest-path packages/kernel/Cargo.toml
+  node-compatibility:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        node: ['22.12.0', '26']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Compile core for the CAD lifecycle regression
+        run: node node_modules/typescript/bin/tsc -p packages/core/tsconfig.json
+      - name: Verify CAD initialization and disposal on supported Node versions
+        run: node --test tests/deep-ingestion-cad-initialization.test.js
+  packages:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build Margo Engine packages and enforce core + stage gzip ceiling
+        run: npm run build:packages
+      - name: Quality gate (size budgets, duplicates, tests floor, API conventions, clean room)
+        run: |
+          npm run api:check
+          npm run quality
+      - name: Strict TypeScript checks for all packages
+        run: npm run typecheck
+      - name: Build and test the offline gameplay sandbox
+        run: |
+          npm run build --workspace examples/gameplay-sandbox
+          npm run test --workspace examples/gameplay-sandbox
+      - name: Build and test the voxel sandbox
+        run: |
+          npm run build --workspace examples/voxel-sandbox
+          npm run test --workspace examples/voxel-sandbox
+      - run: npm run test:all
+      - run: npm run modern:test:react
+      - run: npm run modern:test:usdz
+      - name: Verify Python .margo writer fixtures
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python tools/blender-addon/tests/test_format.py
+      - run: python tools/blender-addon/tests/test_package.py
+      - run: npm run package:blender
+      - uses: actions/upload-artifact@v4
+        with:
+          name: margo-blender-addon
+          path: dist/margo-blender-addon-v*.zip
+      - name: Verify XR sessions, IFC geometry and USDZ interop
+        run: npm run modern:test:interop
+      - name: Verify standalone packed interop exports and TypeScript consumers
+        run: npm run modern:test:interop:packages
+      - name: Verify packed game modules and standalone TypeScript examples
+        run: npm run modern:test:game:packages
+      - name: Verify packed DOF and tonemapping exports and strict declarations
+        run: npm run modern:test:postfx:packages
+      - name: Verify every packed package and strict TypeScript consumers
+        run: npm run test:modules:packages
+      - run: npx playwright install chromium
+      - name: Verify production demo build and visible-frame timing semantics
+        run: |
+          node scripts/build-site.js
+          node scripts/demo-subject-tests.js --audit-only
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Stress minimum limits, device loss, rollback and lifecycle cleanup
+        timeout-minutes: 10
+        run: npm run modern:test:stress -- --sessions=22 --frames=24 --cycles=3
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify stereo pixels with simulated XR sessions and real WebGPU
+        run: npm run modern:test:xr:browser
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify USDZ PBR texture packing and file-picker demo
+        run: npm run modern:test:usdz:browser
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify extensions and demos in WebGPU
+        run: npm run modern:test:extensions
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify production compressed glTF loading with bundled workers and Wasm
+        run: npm run modern:test:gltf-compression
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify offline .margo PBR, textures and device restoration
+        run: npm run modern:test:blender
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify optional game modules in WebGPU
+        run: npm run modern:test:game
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify arm constraints and dragging through torso proxies
+        run: npm run test:browser --workspace @margoengine/kinematics-constraints
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify DOF and tonemapping pixels, LUTs and device restoration
+        run: npm run modern:test:postfx:browser
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify Margo modules and required real FBX skin playback and seek pixels
+        run: npm run test:modules:browser
+        env:
+          MARGOENGINE_FBX_FIXTURE: /packages/fbx/test/fixtures/blender-rig.fbx
+          BROWSER_CHANNEL: bundled
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify MRT picking, micro-frustum culling, neighborhood resolve and device restoration
+        run: npm run test:browser --workspace @margoengine/selection
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify procedural wind, clouds and finite grazing-angle lighting
+        run: node tests/nature.browser.mjs
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify real Rapier simulation and rendered transform synchronization
+        run: npm run test:browser --workspace @margoengine/physics
+        env:
+          BROWSER_CHANNEL: chromium
+          BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Build standalone DOF and tonemapping demos
+        run: |
+          npm --prefix packages/dof run build:demo
+          npm --prefix packages/tonemap run build:demo
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle-sizes
+          path: |
+            test-results/stress/
+            test-results/modern-bundle-sizes.json
+            test-results/modern-game.json
+            test-results/modern-temporal.json
+            test-results/local-shadows-webgpu.json
+            test-results/deformed-picking-webgpu.json
+            test-results/silent-geometry-webgpu.json
+            test-results/pbr-box-webgpu.json
+            test-results/scene-helpers-webgpu.json
+            test-results/modern-xr.json
+            test-results/modern-usdz.json
+            test-results/gltf-compression-browser/report.json
+            test-results/modern-blender.json
+            test-results/blender/render-*.png
+            test-results/modern-postfx.json
+            test-results/margo-modules.json
+            test-results/margo-fbx.png
+            test-results/selection-picking.json
+            test-results/margo-debug-mobile.png
+            test-results/dof-demo.png
+            test-results/tonemap-demo.png
+            test-results/nature-*.json
+            test-results/temporal-splats.png
+            test-results/kinematics-constraints-demo.json
+            test-results/kinematics-constraints-demo.png
+            test-results/kinematics-constraints-interactions.json
+            test-results/kinematics-constraints-waist.png
+            test-results/kinematics-constraints-overhead.png
