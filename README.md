@@ -1,6 +1,6 @@
 # Margo Engine
 
-A small WebGPU engine for the web, with a Rust/Wasm core and its own B-rep CAD kernel.
+A small WebGPU engine for the web, with a Rust/Wasm core and CAD tools built on OpenCascade.
 
 [![CI](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml/badge.svg)](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/margoengine.svg)](https://www.npmjs.com/package/margoengine)
@@ -10,8 +10,8 @@ A small WebGPU engine for the web, with a Rust/Wasm core and its own B-rep CAD k
 
 | | | |
 | --- | --- | --- |
-| ![Night Citadel](site/images/night-citadel.jpg) | ![Flight Helmet](site/images/flight-helmet.jpg) | ![Flange from the B-rep kernel](docs/images/brep-flange.png) |
-| [Night Citadel](apps/showcase-night-citadel/README.md) | [glTF PBR](examples/flight-helmet.html) | [B-rep flange](examples/brep/README.md) |
+| ![Night Citadel](site/images/night-citadel.jpg) | ![Flight Helmet](site/images/flight-helmet.jpg) | ![Gameplay sandbox](site/images/gameplay-sandbox.jpg) |
+| [Night Citadel](apps/showcase-night-citadel/README.md) | [glTF PBR](examples/flight-helmet.html) | [Gameplay sandbox](examples/gameplay-sandbox/README.md) |
 
 Live demos: [margoengine.com](https://margoengine.com)
 
@@ -60,7 +60,7 @@ change the kernel.
 
 ```sh
 npm run dev               # Night Citadel showcase
-npm run dev:examples      # every page in examples/, e.g. /examples/brep-flange.html
+npm run dev:examples      # every page in examples/, e.g. /examples/cad-views.html
 npm run lint              # Biome
 npm run typecheck         # strict TypeScript for all packages
 npm run test:all          # every Node test in the repo
@@ -74,7 +74,8 @@ npm run measure:size      # core + stage size check
   field. Each one is its own package.
 - Rust/Wasm transform kernel with GPU culling and instancing.
 - Loaders for glTF/GLB (Draco, Meshopt, KTX2), FBX, USDZ, OBJ, STL, PLY, 3MF, COLLADA, IFC and more.
-- B-rep CAD kernel: read STEP, ACIS SAT and Parasolid XT, model solids, write STEP, and mesh exact geometry.
+- CAD import: STEP and IGES through OpenCascade (WebAssembly, in a worker, loaded only when you use it), plus STL
+  and OBJ.
 - CAD tools: section planes with capped cutaways, measurement, a view cube, GPU picking and selection outlines.
 - Skinning, morph targets, blend trees and IK.
 - Physics on Rapier, navmesh, ECS, input and audio.
@@ -82,65 +83,37 @@ npm run measure:size      # core + stage size check
 - React 18 and 19 components (`@margoengine/react`).
 - Optional WebGL2 fallback for basic scenes.
 
-## Example: a part from code
+## Example: load a STEP file
 
 ```js
-import { model, parseSTEP, tessellateSTEP } from '@margoengine/brep';
+import { Engine } from 'margoengine/core';
+import { loadCAD } from 'margoengine/machinery/cad';
 
-const { box, cylinder, boolean, fillet, frameOf, massProperties, bodiesToSTEP } = model;
-const mm = 0.001; // the modeler works in metres
-const at = (x, y, z) => frameOf([x * mm, y * mm, z * mm], [0, 0, 1], [1, 0, 0]);
-
-// A 60 x 40 x 10 mm plate with rounded corners and four holes.
-const plate = box('plate', [60 * mm, 40 * mm, 10 * mm]);
-const corners = plate.edges.filter((e) => e.name.includes(':side:')).map((e) => e.name);
-let part = fillet('plate', plate, corners, 4 * mm);
-for (const [x, y] of [[10, 10], [50, 10], [10, 30], [50, 30]])
-  part = boolean('plate', 'subtract', part, cylinder('hole', 3 * mm, 20 * mm, at(x, y, -5)));
-
-console.log(massProperties(part).volume); // exact, from the B-rep
-const step = bodiesToSTEP([part]); // a STEP file as a string
-const [mesh] = tessellateSTEP(parseSTEP(step)); // positions, normals, indices
-```
-
-The full, runnable version is [examples/brep/model-to-step.mjs](examples/brep/model-to-step.mjs):
-
-```sh
-npm run build:packages
-node examples/brep/model-to-step.mjs plate.step
-```
-
-```
-modeled: volume 22731.7 mm^3, area 7231.6 mm^2
-STEP: 22729 bytes
-body 0: 14 faces, 460 triangles, 0 failed faces
-read back: volume 22731.7 mm^3
+const engine = await Engine.create(document.querySelector('canvas'));
+// OpenCascade tessellates the file in a worker; the model's parts arrive as core meshes, in meters.
+const model = await loadCAD(engine, '/parts/assembly.step');
+console.log(model.meshes.length, 'parts');
+engine.start();
 ```
 
 More in [examples/](examples/README.md).
 
-## B-rep CAD
+## CAD
 
-[`@margoengine/brep`](packages/brep/README.md) is a CAD kernel written from the published standards, with no
-OpenCascade or other third-party CAD code. It runs in the browser and in Node.
+[`@margoengine/machinery`](packages/machinery/README.md) reads STEP and IGES with
+[OpenCascade](https://dev.opencascade.org/) through `occt-import-js`, compiled to WebAssembly. The importer runs in a
+worker and is loaded only when a STEP or IGES file is, so it is not part of the core size. OpenCascade is LGPL-2.1
+(with the Open CASCADE exception); its files ship separately in `dist/workers` and can be replaced with your own
+build ([THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
 
-- Reads STEP (AP203, AP214, AP242), including product structure, units and colours.
-- Reads ACIS SAT and Parasolid XT (text and binary, also inside JT files) by converting them to STEP entities.
-- Evaluates the exact geometry: planes, cylinders, cones, spheres, tori, NURBS and swept surfaces.
-- Tessellates with one discretization per shared edge, so meshes have no cracks between faces.
-- Models solids: boxes, cylinders, spheres, tori, extrusions and revolutions, booleans, fillets and chamfers, with
-  persistent face and edge names. Writes the result as STEP.
-- Reports mass properties and checks a body for problems.
-- Checks meshes against the validation properties a STEP file states about itself.
+- STEP and IGES become core meshes with OpenCascade's surface normals; STL and OBJ load too.
+- Section planes with capped cutaways, feature edges, exploded views and an assembly BVH for picking.
+- Measurement: vertex, edge, face and hole anchors, distances and clearance.
+- [`margo-convert`](tools/margo-convert/README.md) turns a STEP file into a GLB at build time, so a site can show it
+  without loading OpenCascade.
 
-![A flange modeled with the B-rep kernel](docs/images/brep-flange.png)
-
-The flange above is [examples/brep/flange.js](examples/brep/flange.js): cylinders unioned and subtracted, the outer
-edge filleted, written to STEP, read back and meshed in the page. [docs/brep-kernel.md](docs/brep-kernel.md)
-describes the design and what is still missing.
-
-`@margoengine/machinery` can still import STEP and IGES through OpenCascade (`occt-import-js`, LGPL-2.1, loaded in
-a worker only when you use it). The B-rep kernel is the path that is replacing it.
+Sizes, load times and limits are in [docs/cad-performance.md](docs/cad-performance.md) and
+[docs/limits.md](docs/limits.md).
 
 ## Browser support
 
@@ -192,7 +165,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-79 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
+78 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -307,12 +280,11 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/net`](packages/net/README.md) | Hermite and quaternion snapshot interpolation with bounded prediction. |
 | [`@margoengine/voxel-net`](packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
-### CAD and engineering (5)
+### CAD and engineering (4)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/machinery`](packages/machinery/README.md) | Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine. |
-| [`@margoengine/brep`](packages/brep/README.md) | Margo's own CAD kernel: STEP (ISO 10303-21) and IGES 5.3 reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation. |
 | [`@margoengine/bvh`](packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
 | [`@margoengine/geometry`](packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 | [`@margoengine/mesh-edit`](packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |
@@ -328,7 +300,6 @@ changing the base, so the base stays small and an app only pays for what it impo
 ## Roadmap
 
 - Publish 1.0.0 to npm.
-- B-rep: more modeling operations (shell, draft, offsets), and replacing OpenCascade for STEP import.
 - A fuller WebGL2 fallback ([docs/webgl2-compat-roadmap.md](docs/webgl2-compat-roadmap.md)).
 - Testing on more hardware: Apple silicon, AMD, Android, Firefox and macOS Safari.
 - Published benchmark comparisons with their method and raw results.
@@ -341,7 +312,7 @@ in [SECURITY.md](SECURITY.md).
 
 ## License
 
-[Apache-2.0](LICENSE) (see also [NOTICE](NOTICE)), including the B-rep kernel. Third-party code and assets keep their own licenses; see
+[Apache-2.0](LICENSE) (see also [NOTICE](NOTICE)). Third-party code and assets keep their own licenses; see
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 Made by Scott Campbell. [margoengine.com](https://margoengine.com)

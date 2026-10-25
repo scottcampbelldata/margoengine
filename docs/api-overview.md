@@ -66,19 +66,17 @@ shadows.add(cube);
 
 The [package list](../README.md#packages) and the [catalog](README.md) describe each one.
 
-## B-rep
+## CAD
 
 ```ts
-import { parseSTEP, tessellateSTEP, validateSTEP, parseSAT, parseXT, parseJT, model } from '@margoengine/brep';
+import { loadCAD } from 'margoengine/machinery/cad';
 
-const step = parseSTEP(bytes); // header, products, instances, bodies
-const meshes = tessellateSTEP(step, { relativeDeflection: 0.001, angle: 0.5 });
-
-const body = model.box('block', [0.05, 0.05, 0.02]); // metres
-const step2 = model.bodiesToSTEP([body]);
+// STEP and IGES go through OpenCascade (WebAssembly) in a worker; STL and OBJ load too.
+const model = await loadCAD(engine, '/parts/assembly.step', { linearDeflection: 0.0001 });
+model.dispose();
 ```
 
-See the [brep README](../packages/brep/README.md) and [examples/brep](../examples/brep/README.md).
+See the [machinery README](../packages/machinery/README.md).
 
 ## Errors
 

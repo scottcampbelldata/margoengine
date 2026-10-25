@@ -12,6 +12,14 @@ from the median GGX facet tilt and Snell's law; voxel light levels 0-15 are equa
 verified, [known-bugs.md](known-bugs.md)). Eight voxel views re-recorded (light curve); post-ssr and post-ssr-models
 advanced for the FXAA shader. Core + stage unchanged at 22,737 B; brep entry 104,982 -> 119,209 B gzip.
 
+## 2026-10-25: brep is private; public CAD is OpenCascade
+
+Scott: brep becomes a private paid product. Public docs, site, whitepaper (HTML and PDF), catalog (now 78 packages,
+brep unlisted in `scripts/build-catalog.js`) and package READMEs describe CAD as STEP/IGES through OpenCascade. Still
+public in code, for a later step: `margoengine/brep` (stage subpath), machinery's `kernel: 'margo'` option and its TSDoc,
+the `cad` starter (models its bracket with brep), `examples/brep*`, and brep rows in api-surface and the notices
+(legal, while the package is published). Rule in AGENTS.md.
+
 ## Landed 2026-10-24: pixel-exact drawing (`exactSize`)
 
 Core sized the backbuffer from CSS size x pixel ratio and always used 4x MSAA on desktop, so a pixel-art app could

@@ -32,8 +32,6 @@ or in Safari. [docs/limits.md](../limits.md) lists what is untested.
 | Every other package is optional and has its own size | README | `entry-sizes.json` (every exports entry and worker) | `npm run build:site` | PROVEN |
 | An engine starts with 1,024 entity slots and doubles up to 8,388,608 | site | `packages/core/src/kernel.ts`; `tests/core-dirty-transforms.test.js` (1,000,000 entities) | `npm test` | PROVEN |
 | Meshes sharing a geometry draw in one instanced call per pass | site | `cad/results-*.json` (`drawCalls`) | `node examples/package-benchmarks/cad/run.mjs` | PROVEN |
-| The modeled plate in the README: volume 22731.7 mm^3, 14 faces, 460 triangles, same volume after a STEP round trip | README | `examples/brep/model-to-step.mjs` prints these lines | `npm run build:packages && node examples/brep/model-to-step.mjs plate.step` | PROVEN |
-| The B-rep kernel uses no OpenCascade or other third-party CAD code | README, packages/brep | `packages/brep/package.json`: its only runtime dependency is `@margoengine/math` | `npm ls -w @margoengine/brep --omit=dev` | PROVEN |
 | Speed compared with three.js | nowhere | No claim is made. See below. | - | no claim |
 
 ## Whitepapers
@@ -52,7 +50,7 @@ and commit.
 | engine | Voxel multiplayer: 900 spread / 350 crowded at 20 ticks per second | `packages/voxel-net/bench/results.json`, `docs/voxel-net-capacity-2026-10-21.md` | PROVEN |
 | engine | 62 visual views, 4 captures each | `tests/visual/profiles/nvidia-ampere-msedge-156` | PROVEN |
 | engine | About 88% of browsers support WebGPU (85.8% full + 2.02% partial) | external: caniuse.com/webgpu, StatCounter data for September 2026, read 2026-10-24 | external source, dated |
-| engine | The engine, the B-rep kernel included, is Apache-2.0; IGES in brep and the OpenCascade removal are in progress | `LICENSE`, `NOTICE`, `packages/brep/package.json`; the other two are stated as work in progress, with no number | PROVEN / no claim |
+| engine | The engine is Apache-2.0; STEP and IGES import uses OpenCascade (LGPL-2.1), shipped as separate files | `LICENSE`, `NOTICE`, `THIRD-PARTY-NOTICES.md`, `packages/machinery/src/workers/OCCT-NOTICE.txt` | PROVEN |
 | engine | Kernel scaling, CAD orbit before and after, culling, BVH picks, large coordinates, design envelope | `cad/results-*.json`, `results-scale-node.json`, `large-coordinates-gpu.json`, the LIM rows below | PROVEN (dated) |
 | engine | 51 proofs, 20 ongoing | `proofs/*.proof.js` and the `ongoing` list in `proofs/run.mjs` | PROVEN (file counts) |
 | engine | Speed against three.js or any other engine | None. The page makes no claim and quotes no comparison. | no claim |

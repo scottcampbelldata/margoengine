@@ -51,7 +51,11 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     (`6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a`) and `basis_transcoder.js`
     (`8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1`, before the build's static-embind step).
 - **LGPL-2.1 (occt-import-js and the OpenCascade code compiled into it, `@margoengine/machinery`).** We ship the
-  library unchanged as Wasm plus a modified copy of its JavaScript glue. How each obligation is met:
+  library unchanged as Wasm plus a modified copy of its JavaScript glue. Margo Engine's STEP and IGES import is
+  OpenCascade: `loadCAD` and `parseCADAsync` hand those files to this library in a worker. OpenCascade Technology
+  (Open Cascade SAS) is licensed under LGPL-2.1 with the Open CASCADE Exception 1.0
+  (https://dev.opencascade.org/resources/licensing); its source is https://github.com/Open-Cascade-SAS/OCCT, and the
+  exact revision occt-import-js 0.0.23 builds is linked from OCCT-NOTICE.txt. How each obligation is met:
   - *Licence and notice* (s. 1, 2): `dist/workers/OCCT-LICENSE.txt` (the upstream LGPL-2.1 text) and
     `dist/workers/OCCT-NOTICE.txt` ship next to the files.
   - *Modified files carry a notice of the change* (s. 2b): the glue's first line says it was modified by Margo Engine's
@@ -64,7 +68,9 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     pinned by its git submodule; OCCT-NOTICE.txt links both.
   - *Replace or relink* (s. 6): the glue and Wasm are separate files loaded by URL at run time
     (`dist/workers/occt-import-js.js`, `.wasm`), never bundled into our code, so a user can drop in their own
-    interface-compatible build. `margo-convert` depends on the unmodified npm package, so npm can swap it.
+    interface-compatible build: replace `dist/workers/occt-import-js.js` and `occt-import-js.wasm` in the
+    installed package with your own build under the same names (machinery resolves them as `./workers/...` from its
+    `dist` files). `margo-convert` depends on the unmodified npm package, so npm can swap it.
 - **MPL-2.0 (web-ifc, peer of `@margoengine/ifc`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves `web-ifc.wasm` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
 - **Siemens JT notice (`@margoengine/brep`).** The JT reader in `packages/brep/src/jt` reads the format as

@@ -162,26 +162,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
 - **Rerun:** `node examples/package-benchmarks/vfx-gpu.mjs --a=test-results/vfx-base --b=packages/vfx/dist`.
 - **Guard:** `packages/vfx/test/traces.js` with its `fixtures/traces.json`.
 
-### 7. B-rep drilling slowed by correctness fixes
-
-- **Loss:** `edae3daa` and `fdbe1612` fixed thread and apex cases, and in doing so made drilling the Jubilee solids
-  twice as slow. Import and mass properties became 25% slower (`6f2ca571` message).
-  - Machine-gated medians: the 72 drill cuts took 9.46 s without the later fix (`16a4cbef` message, quiet gate before
-    each of 5 rounds).
-  - Machine: not named in the record.
-- **Cause:** the fixes made `probe()` try up to eight starting points per loop. Each one cast rays across every segment
-  and allocated temporary arrays. That added up to 6.6 s of the 8.3 s that the 72 cuts spend in Booleans.
-- **Fix:**
-  - `6f2ca571` brought import, holes and mass properties back to 1.40 s, 2.39 s and 1.26 s, against 1.9 s, 5.2 s and
-    1.9 s before.
-  - `16a4cbef` perf(brep): a split face's probe points 17 times faster.
-- **After:** the drill cuts take 2.14 s (median over 5 rounds, 2.09–2.23 s, quiet-gated; `16a4cbef` message).
-  - On a busy machine: 2.71–2.76 s against 7.12–7.26 s (diagnostic).
-  - Results are unchanged: 145 of 145 Jubilee drills, brep tests 103/103.
-- **Rerun:** not recorded; no script is named in the commits.
-- **Guard:** `packages/brep` tests guard correctness only. No timing check guards this.
-
-### 8. Voxel sandbox world fill
+### 7. Voxel sandbox world fill
 
 - **Loss:** at render distance 16 the world took 8.8–9.2 s to fill (`71f5c376` message; RTX A6000, quiet-gated).
 - **Cause:** while the world filled, the sandbox joined only 0.5 ms of chunks per frame. That caused about 20,433
@@ -193,7 +174,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
 - **Rerun:** `node examples/voxel-sandbox/bench.mjs --distances=8,16 --loads=3`.
 - **Guard:** none beyond the benchmark.
 
-### 9. Kernel snapshot compare at 100k entities
+### 8. Kernel snapshot compare at 100k entities
 
 - **Loss:** 3.65 ms per frame (`aa9e8eb4` message, "in its benchmark").
   - Machine and result file: not recorded.
@@ -204,7 +185,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
 - **Rerun:** not recorded.
 - **Guard:** not recorded beyond the kernel's own tests.
 
-### 10. Packages loading code they never use (static leaks)
+### 9. Packages loading code they never use (static leaks)
 
 - **Loss:** startup gzip of each entry, including what bundlers pulled in:
   - gltf-pro 525,254 B;
@@ -222,7 +203,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
 
 ## Size of the frozen core
 
-### 11. Core grows from error handling, then shrinks
+### 10. Core grows from error handling, then shrinks
 
 - **Loss:** core + stage went from 22,253 to 23,271 B gzip (`59e32ef7` message; record `8c59117c`: core 20,899 B). The
   growth had three parts:
@@ -245,7 +226,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
   - The 20 KiB core check in `scripts/build-modern.js`.
   - `tests/core-errors.test.js` and `tests/errors-page.test.js`.
 
-### 12. Duplicate cleanup grew core, then was trimmed
+### 11. Duplicate cleanup grew core, then was trimmed
 
 - **Loss:** the first pass of the duplicate cleanup moved core's private copies onto shared helpers. Core + stage went
   from 22,253 to 22,403 B gzip, and core from 20,015 to 20,155 B (`1fda3719` message). Package root entries grew too.
@@ -276,7 +257,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
 
 These entries have no timing. The loss is a feature that did not work.
 
-### 13. Voxel path tracer: trace shader never compiled
+### 12. Voxel path tracer: trace shader never compiled
 
 - **Loss:** `5c75e38a` (slabs and stairs) left `d>vec3f(0.0)&(...)` in the octant walk. WGSL requires parentheses when a
   comparison is mixed with `&`, so `createShaderModule` failed and no path tracer pipeline could be built.
@@ -292,7 +273,7 @@ These entries have no timing. The loss is a feature that did not work.
   - `scripts/support/wgsl-guard.js`, which fails any browser page whose WGSL has errors;
   - `packages/voxel-pathtracer/tests/browser-check.mjs`.
 
-### 14. Iridescent materials failed to compile on a real GPU
+### 13. Iridescent materials failed to compile on a real GPU
 
 - **Loss:** after the clean-room rewrite `dd13beb9`, every iridescent material failed to compile. The visual check
   caught it in the khronos-IridescenceLamp view.
@@ -302,7 +283,7 @@ These entries have no timing. The loss is a feature that did not work.
 - **Rerun:** `npm run check:wgsl`, `npm run visual:check`.
 - **Guard:** the WGSL compile gate and the visual baselines.
 
-### 15. React `<Environment>` did not compile on gltf-pro models (10 days)
+### 14. React `<Environment>` did not compile on gltf-pro models (10 days)
 
 - **Loss:** `<Environment src=...>` failed on every gltf-pro model with "cannot take the address of 'var iblBrdf' in
   handle address space".
@@ -318,7 +299,7 @@ These entries have no timing. The loss is a feature that did not work.
     model's IBL is the environment package's own;
   - the WGSL page guard.
 
-### 16. Unreal precision export had never passed a real import
+### 15. Unreal precision export had never passed a real import
 
 - **Loss:** the importer, moved from the MargoTile app in `6d695f61`, failed its first real Unreal Engine 5.8.4 run:
   "Native setting did not stick: override_pipelines".
@@ -334,7 +315,7 @@ These entries have no timing. The loss is a feature that did not work.
 - **Rerun:** not recorded. The fixture script named in the record is not in this repository.
 - **Guard:** `packages/exporters/tests/precision-native.test.js` pins each of the three fixes.
 
-### 17. Next.js apps could not build without Rapier
+### 16. Next.js apps could not build without Rapier
 
 - **Loss:** `next build` failed with "Can't resolve '@dimforge/rapier3d-compat'" for any app that used
   `@margoengine/react`. The bundler matrix added in `b803742a` found it.
@@ -349,7 +330,7 @@ These entries have no timing. The loss is a feature that did not work.
 - **Guard:** `packages/react/tests/subpaths.test.js`, which fails if anything in the root entry's import graph names
   Rapier, and the bundler matrix.
 
-### 18. Normal maps mirrored on models without tangents
+### 17. Normal maps mirrored on models without tangents
 
 - **Loss:** ToyCar, SheenChair, MaterialsVariantsShoe and DiffuseTransmissionTeacup rendered with mirrored normal maps.
   The proof triage found it.
@@ -359,7 +340,7 @@ These entries have no timing. The loss is a feature that did not work.
 - **Guard:** the pinned shader fingerprints in `packages/gltf-pro/tests/physical-map-renderer.test.js`, and the gltf-pro
   proofs.
 
-### 19. Fuzzing: unbounded allocations, including a zip bomb
+### 18. Fuzzing: unbounded allocations, including a zip bomb
 
 - **Loss:** a 314-byte PLY file made the loader allocate 336 MiB, and ZIP entries had no ratio limit (`1316caaf`
   message).
@@ -373,7 +354,7 @@ These entries have no timing. The loss is a feature that did not work.
 - **Rerun:** `npm run fuzz`.
 - **Guard:** `tests/fuzz-regressions.test.js`.
 
-### 20. Prototype pollution through JSON keys
+### 19. Prototype pollution through JSON keys
 
 - **Loss:** `__proto__`, `constructor` and `prototype` keys in untrusted JSON could reach parsed results.
   - `splitGLB` still used plain `JSON.parse` on caller files after the main fix.
@@ -383,7 +364,7 @@ These entries have no timing. The loss is a feature that did not work.
 - **Rerun:** `node --test tests/security.test.js packages/exporters/tests/glb-append.test.js`.
 - **Guard:** `tests/security.test.js` and `packages/exporters/tests/glb-append.test.js`.
 
-### 21. Workers needed `'unsafe-eval'` in the Content Security Policy
+### 20. Workers needed `'unsafe-eval'` in the Content Security Policy
 
 - **Loss:** the decoder worker loaded its code with `eval`, and the embind glue used `new Function`. Pages with a strict
   CSP failed.
@@ -420,7 +401,7 @@ These entries lack a recorded number, a named machine or a quiet run:
 2. Back-face culling, boxes (entry 2): a quiet run instead of the diagnostic busy-machine numbers.
 3. CAD 10k single-sided (entry 3): a quiet run.
 4. gltf-pro plain materials (entry 5): the after time on DamagedHelmet.
-5. Kernel snapshot compare (entry 9): before and after with the machine and a committed result.
+5. Kernel snapshot compare (entry 8): before and after with the machine and a committed result.
 6. three.js `InstancedMesh` against Margo instanced (open loss): a quiet run once the fix lands.
 7. Galaxy S23 Ultra island (open loss): an after number, which needs the device.
 

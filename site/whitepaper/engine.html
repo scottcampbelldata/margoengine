@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Margo Engine whitepaper</title>
-  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 22,737 bytes gzip; 79 optional packages behind one install; a named source for every number. Coming soon.">
+  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 22,737 bytes gzip; 78 optional packages behind one install; a named source for every number. Coming soon.">
   <link rel="canonical" href="https://margoengine.com/whitepaper/engine">
   <meta name="theme-color" content="#0b1020">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Margo Engine whitepaper">
-  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 22,737 bytes gzip; 79 optional packages behind one install; a named source for every number. Coming soon.">
+  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 22,737 bytes gzip; 78 optional packages behind one install; a named source for every number. Coming soon.">
   <meta property="og:url" content="https://margoengine.com/whitepaper/engine">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="../favicon.ico" sizes="32x32">
@@ -30,13 +30,13 @@
 <header class="masthead">
   <p class="eyebrow">Whitepaper · October 2026 · coming soon</p>
   <h1>Margo Engine</h1>
-  <p class="deck">A WebGPU engine for the web. Core plus stage is 22,737 bytes gzipped. Everything else comes from 79 optional packages behind one install. Every number we publish names its source.</p>
+  <p class="deck">A WebGPU engine for the web. Core plus stage is 22,737 bytes gzipped. Everything else comes from 78 optional packages behind one install. Every number we publish names its source.</p>
   <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Sizes at commit 454df8f3; tests at 8cc9e939; other figures name their own commit or date</span><span><a href="./engine.pdf">PDF</a></span></div>
 </header>
 
 <div class="ledger" role="list">
   <div role="listitem"><b>22,737 B</b><span>core + stage, min + gzip, Wasm kernel and WebGPU backend included; CI fails a change at 25,000</span><i>entry-sizes.json · 454df8f3</i></div>
-  <div role="listitem"><b>79</b><span>optional packages, all reachable from <code>npm i margoengine</code></span><i>docs/catalog.json</i></div>
+  <div role="listitem"><b>78</b><span>optional packages, all reachable from <code>npm i margoengine</code></span><i>docs/catalog.json</i></div>
   <div role="listitem"><b>5,059</b><span>Node tests in every <code>npm run verify</code>, all passing</span><i>results/test-count.json · 8cc9e939</i></div>
   <div role="listitem"><b>153 of 161</b><span>three.js features with an equivalent Margo package; 4 partial, 4 missing</span><i>docs/three-parity-matrix.md · bec8b597</i></div>
 </div>
@@ -72,7 +72,7 @@
 
 <h2 id="abstract"><span class="n">0</span>Abstract</h2>
 <p>Margo Engine is a 3D engine for web applications, written in TypeScript. It has a Rust kernel compiled to WebAssembly and a WebGPU renderer. Core plus the high-level stage (<code>createStage</code>) measures 57,590 bytes minified and 22,737 bytes gzipped. The build fails at 25,000.</p>
-<p>Everything else lives in 79 optional, side-effect-free packages: glTF PBR, shadows, post-processing, physics, CAD, voxel worlds with multiplayer, a path tracer, exporters and React. A bundle contains only the packages it imports, and large runtimes load only when a file needs them.</p>
+<p>Everything else lives in 78 optional, side-effect-free packages: glTF PBR, shadows, post-processing, physics, CAD, voxel worlds with multiplayer, a path tracer, exporters and React. A bundle contains only the packages it imports, and large runtimes load only when a file needs them.</p>
 <p>This paper covers the design, what we have measured, how the engine was built, and the limits we know about. Each figure names the file it came from. Where we have no committed measurement, we say so. A companion paper covers <a href="./voxel.html">Margo Voxel</a>.</p>
 
 <pre><code>import {createStage} from 'margoengine';
@@ -97,7 +97,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <div class="table"><table>
 <thead><tr><th>Starter</th><th>What it shows</th><th class="num">First frame</th></tr></thead>
 <tbody>
-<tr><td>cad</td><td>a bracket modeled in code, exact volume and mass, click-to-measure, section, view cube</td><td class="num">533 ms</td></tr>
+<tr><td>cad</td><td>a bracket part with click-to-measure, a section and the view cube</td><td class="num">533 ms</td></tr>
 <tr><td>web</td><td>a studio scene with shadows and a turntable</td><td class="num">788 ms</td></tr>
 <tr><td>react</td><td>shapes in sun with soft shadows and bloom</td><td class="num">835 ms</td></tr>
 <tr><td>viz</td><td>a 300,000-point galaxy with bloom and labels</td><td class="num">968 ms</td></tr>
@@ -211,15 +211,14 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <tr><td>Path tracing</td><td>a progressive WebGPU path tracer for voxel models, through the engine camera</td><td>packages/voxel-pathtracer · <a href="./voxel.html">voxel whitepaper</a></td></tr>
 <tr><td>Export</td><td>glTF 2.0 / GLB, STL, OBJ with MTL, PLY, static USDZ and COLLADA 1.4.1</td><td>packages/exporters/README.md</td></tr>
 <tr><td>Frameworks</td><td>React 18 and 19 components, and a Next.js starter</td><td>packages/react · tools/create-margo</td></tr>
-<tr><td>CAD</td><td>section planes with caps, feature edges, exploded views, measurement, kinematics; our own B-rep kernel (below)</td><td>packages/machinery, brep</td></tr>
+<tr><td>CAD</td><td>STEP and IGES import through OpenCascade (below), section planes with caps, feature edges, exploded views, measurement, kinematics</td><td>packages/machinery</td></tr>
 <tr><td>Simulation</td><td>Rapier physics, navigation meshes, ECS, state machines, networking</td><td>package READMEs</td></tr>
 </tbody></table></div>
 <p>Of three.js's feature list, 153 of 161 rows have a Margo package a three.js user would accept as equivalent, 4 are partial and 4 are missing. Margo is not a drop-in replacement for three.js: the API is its own, and <code>docs/from-threejs.md</code> maps one to the other.</p>
 <span class="src">docs/three-parity-matrix.md · bec8b597</span>
-<h3>The CAD kernel</h3>
-<p><code>@margoengine/brep</code> is a B-rep kernel written from the published standards (ISO 10303-21 and ISO 10303-42, the AP203, AP214 and AP242 schemas) and textbook geometry. It is Apache-2.0 licensed like the rest of the engine. It reads STEP, ACIS SAT, Parasolid XT and JT 9.5 and later, evaluates analytic and NURBS geometry exactly, and meshes each body without cracks: every edge is discretized once and shared by both faces, with robust predicates. A first cut of modeling (Booleans, fillets and chamfers, exact mass properties) is in the package.</p>
-<p>STEP and IGES load through OpenCascade (occt-import-js, LGPL-2.1) in a worker today. Reading IGES in our own kernel is landing now, and OpenCascade is being removed. Freeform (spline) Booleans and healing broken files are still behind OpenCascade; closing that gap is in progress, and corpus numbers will be published when they are committed. We make no speed or completeness claim for it until the comparison runs are committed.</p>
-<span class="src">packages/brep/package.json · LICENSE · NOTICE · docs/brep-occt-gaps.md</span>
+<h3>CAD import</h3>
+<p>STEP and IGES load through OpenCascade, compiled to WebAssembly by occt-import-js. The importer runs in a worker and is fetched only when a STEP or IGES file is, so it adds nothing to the core size; the OpenCascade <code>.wasm</code> is 7,604,031 bytes (3,110,912 gzip). Its triangles become core meshes in meters, with OpenCascade's surface normals. OpenCascade is LGPL-2.1 with the Open CASCADE exception; its two files ship unmodified apart from a CSP-safe change to the JavaScript glue, separate from Margo's code, so an application can serve its own build instead. <code>margo-convert</code> turns STEP into a GLB at build time for pages that should not load OpenCascade at all.</p>
+<span class="src">packages/machinery/src/cad-async.ts · THIRD-PARTY-NOTICES.md · docs/limits.md · examples/package-benchmarks/cad/results-step.json</span>
 
 <h2 id="perf"><span class="n">7</span>Internal measurements</h2>
 <p>These are measurements of Margo against earlier Margo, on named hardware. They are not comparisons with other engines. The method: headless Edge with vsync and the frame cap off, WebGPU timestamp queries on every pass, a GPU lock so only one GPU job runs at a time, and a quiet-machine gate. Our benchmark tool, <code>npm run bench</code>, now runs every such measurement this way.</p>
@@ -271,7 +270,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <ul>
   <li><strong>WebGPU only today.</strong> PBR, shadows, image-based lighting and most packages need WebGPU, which about 88% of browsers in use support (caniuse.com/webgpu, September 2026). A WebGL2 fallback for the optional packages is planned; today WebGL2 draws basic meshes only.</li>
   <li><strong>Not yet verified</strong> on Firefox, Safari, macOS, Linux, Android or iPhone. Real-GPU results come from Edge on Windows 11, on an Intel Arc 140V laptop and an NVIDIA RTX A6000 desktop.</li>
-  <li><strong>CAD kernel robustness</strong> against OpenCascade is still in progress (section 6). STEP and IGES still load through OpenCascade until our own readers replace it.</li>
+  <li><strong>CAD import is tessellation only.</strong> STEP and IGES become triangle meshes through OpenCascade; the exact geometry is not kept, and the 3.1 MB (gzip) OpenCascade download comes with the first CAD file.</li>
   <li><strong>No editor yet.</strong> Scenes are built in code or imported from files.</li>
   <li><strong>No comparison with other engines yet.</strong> The tool runs the same scenes in other engines, interleaved on one machine, but the quiet-machine runs have not been made. Until they are, we make no speed claim against any other engine.</li>
   <li><strong>Next.js production builds</strong> need Rapier installed today, because the React package's root reaches it. The React package is being split so they do not.</li>
@@ -283,7 +282,6 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
   <li>The packages on npm, <code>npm create margo</code>, and the public repository.</li>
   <li>A WebGL2 fallback for the optional packages.</li>
   <li>Firefox, Safari and phone verification.</li>
-  <li>IGES in our own kernel, and OpenCascade removed.</li>
   <li>Quiet-machine comparisons with other engines, published with their method and the places other engines win.</li>
   <li>Data visualization and GPU compute suites.</li>
   <li>An editor.</li>
@@ -305,7 +303,7 @@ npm run check:merge           # verify + site, visual, views, WGSL and packed-pa
 </main>
 
 <footer>
-  <p>Margo Engine's own code, the B-rep kernel included, is Apache-2.0 licensed. Third-party code that ships inside packages (Draco and Basis decoders, and OpenCascade for STEP and IGES until it is removed) is listed with its licence in <code>THIRD-PARTY-NOTICES.md</code>.</p>
+  <p>Margo Engine's own code is Apache-2.0 licensed. Third-party code that ships inside packages (Draco and Basis decoders, and OpenCascade for STEP and IGES) is listed with its licence in <code>THIRD-PARTY-NOTICES.md</code>.</p>
   <p class="links"><a href="./engine.pdf">This paper as a PDF</a> <a href="./voxel.html">Margo Voxel whitepaper</a> <a href="../sizes.html">Sizes</a> <a href="../catalog/">Catalog</a> <a href="../THIRD-PARTY-NOTICES.md">Third-party notices</a></p>
   <p>Built with precision, named with love. For Margie.</p>
 </footer>

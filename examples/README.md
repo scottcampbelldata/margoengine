@@ -22,7 +22,6 @@ All pages need a browser with WebGPU. A page shows a short notice when WebGPU is
 | --- | --- |
 | [animation-formats.html](animation-formats.html) | Collada skins and glTF animation pointers |
 | [batched-mesh.html](batched-mesh.html) | Many shapes drawn in one call |
-| [brep-flange.html](brep-flange.html) | A flange modeled with the B-rep kernel, exported to STEP and rendered ([details](brep/README.md)) |
 | [cad-views.html](cad-views.html) | Top, front, right and perspective views of one model |
 | [character-animation.html](character-animation.html) | A walking robot with blendable expressions |
 | [clipping-planes.html](clipping-planes.html) | Section planes on every material |
@@ -63,6 +62,5 @@ These are separate npm workspaces with their own dev server.
 
 | Folder | What it is |
 | --- | --- |
-| [brep/](brep/) | Node scripts for the B-rep kernel: model a part and write STEP |
 | [package-benchmarks/](package-benchmarks/) | Workloads that measure individual packages ([details](package-benchmarks/README.md)) |
 | [assets/](assets/) | Models and textures used by the examples, with their credits |
