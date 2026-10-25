@@ -163,7 +163,8 @@ export class ComputeContext {
   readonly #staging = new Set<GPUBuffer>();
   #errors: Promise<GPUError | null>[] = [];
   #disposed = false;
-  #timings: Promise<PassTiming[]>[] | undefined;
+  // While profiling: the timestamps of each timed submit, read once the submits' error scopes have resolved.
+  #timings: { staging: GPUBuffer; queries: GPUQuerySet; labels: string[] }[] | undefined;
 
   /** @internal Use {@link createCompute}. */
   constructor(device: GPUDevice, ownsDevice: boolean) {
@@ -500,21 +501,8 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
       encoder.copyBufferToBuffer(resolve, 0, staging, 0, size);
       temporary.push(resolve);
       this.#staging.add(staging);
-      const labels = passes.map((p) => p.program.label);
-      // Mapping waits for the submit, which follows this call in the same task.
-      this.#timings!.push(
-        Promise.resolve()
-          .then(() => staging.mapAsync(GPUMapMode.READ))
-          .then(() => {
-            const ticks = new BigUint64Array(staging.getMappedRange().slice(0));
-            return labels.map((label, k) => ({ label, ms: Number(ticks[2 * k + 1] - ticks[2 * k]) / 1e6 }));
-          })
-          .finally(() => {
-            this.#staging.delete(staging);
-            staging.destroy();
-            queries.destroy();
-          }),
-      );
+      // Mapped by profile() after its error-scope round trip (see #flush), long after the submit that follows.
+      this.#timings!.push({ staging, queries, labels: passes.map((p) => p.program.label) });
     }
     return temporary;
   }
@@ -644,9 +632,13 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
     }
   }
 
-  // Waits for every error scope so far and throws the first GPU error as a MargoError.
+  // Waits for every error scope so far and throws the first GPU error as a MargoError. One more (empty) scope makes a
+  // round trip to the GPU process even when nothing is pending. Callers ask for completion (onSubmittedWorkDone,
+  // mapAsync) only after this resolves: asked for earlier, Chromium reports completion about 3 ms late even for
+  // finished work; asked for after the round trip, about 0.3 ms (measured on Edge, docs/benchmarking.md "compute").
   async #flush(): Promise<void> {
-    const pending = this.#errors;
+    this.device.pushErrorScope('validation');
+    const pending = [...this.#errors, this.device.popErrorScope()];
     this.#errors = [];
     const error = (await Promise.all(pending)).find((e) => e);
     if (error)
@@ -661,9 +653,8 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
   async done(options: WaitOptions = {}): Promise<void> {
     this.check();
     aborted(options.signal);
-    const work = this.device.queue.onSubmittedWorkDone();
     await this.#flush();
-    await abortable(work, options.signal);
+    await abortable(this.device.queue.onSubmittedWorkDone(), options.signal);
   }
 
   /**
@@ -675,15 +666,28 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
     this.check();
     if (this.#timings) throw fault('state', 'profile() is already running; await it before profiling again', 'compute');
     this.#timings = [];
-    let pending: Promise<PassTiming[]>[];
+    let pending: { staging: GPUBuffer; queries: GPUQuerySet; labels: string[] }[] = [];
     try {
-      await work();
+      try {
+        await work();
+      } finally {
+        pending = this.#timings!;
+        this.#timings = undefined;
+      }
+      await this.#flush();
+      const read = async ({ staging, labels }: (typeof pending)[number]) => {
+        await staging.mapAsync(GPUMapMode.READ);
+        const ticks = new BigUint64Array(staging.getMappedRange().slice(0));
+        return labels.map((label, k) => ({ label, ms: Number(ticks[2 * k + 1] - ticks[2 * k]) / 1e6 }));
+      };
+      return (await abortable(Promise.all(pending.map(read)), options.signal)).flat();
     } finally {
-      pending = this.#timings;
-      this.#timings = undefined;
+      for (const { staging, queries } of pending) {
+        this.#staging.delete(staging);
+        staging.destroy();
+        queries.destroy();
+      }
     }
-    await this.#flush();
-    return (await abortable(Promise.all(pending), options.signal)).flat();
   }
 
   /**
