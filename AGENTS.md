@@ -59,11 +59,12 @@ Scott's rule (2026-10-24): every API and tool should feel modern and familiar, s
 
 ## brep is private
 
-Scott's decision (2026-10-25): `@margoengine/brep` is a private, future paid product. Public docs, the site, the
+Scott's decision (2026-10-25): `@margoengine/brep` is a private, future paid product. It no longer lives in this
+repo: it moved, with its history, to the private repo `scottcampbelldata/margo-cad-kernel`. Public docs, the site, the
 whitepaper, the catalog and package READMEs present CAD as built on OpenCascade (STEP and IGES through
-`occt-import-js` in machinery's worker). Do not advertise brep, its formats (SAT, XT, JT), exact Booleans or other
-brep-only features in public text, and never claim a CAD kernel on par with OpenCascade. `scripts/build-catalog.js`
-keeps brep out of the catalog. packages/brep and its own docs stay in the repo until it moves out.
+`occt-import-js` in machinery's worker). Do not advertise or reintroduce brep, its formats, exact Booleans or other
+brep-only features here, and never claim a CAD kernel on par with OpenCascade. Machinery's generic `importer` option
+(`loadCAD`, `parseCADAsync`) is the only plug-in point; it never names the kernel.
 
 ## Before every push to main
 

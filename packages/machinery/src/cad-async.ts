@@ -3,8 +3,18 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Mesh } from '@margoengine/core/extension';
 import type { CADModel } from './cad.js';
 import { capError, maxBytes } from './cad-parser.js';
-import { parseSTEPWithMargo } from './brep-async.js';
-export type CADFormat = 'stl' | 'obj' | 'step' | 'iges' | 'sat' | 'xt';
+export type CADFormat = 'stl' | 'obj' | 'step' | 'iges';
+/**
+ * Reads a STEP or IGES file in place of the bundled OpenCascade worker. It gets the same arguments as
+ * {@link parseCADAsync} (the engine, the file's bytes, its format, the import options) and resolves with the model.
+ * Every part it creates must belong to `engine`; if it throws or rejects, it must dispose what it created.
+ */
+export type CADImporter = (
+  engine: EngineKernel,
+  buffer: ArrayBuffer,
+  format: 'step' | 'iges',
+  options: CADImportOptions,
+) => Promise<CADModel>;
 export interface CADImportOptions {
   signal?: AbortSignal;
   onProgress?: (percent: number) => void;
@@ -32,27 +42,20 @@ export interface CADImportOptions {
   /**
    * STEP and IGES only: the largest distance, in meters, that OpenCascade's tessellation may stray from the true surface
    * (its absolute linear deflection). Smaller values give finer triangles. Omitted, OpenCascade keeps its default
-   * tessellation. STL and OBJ are already triangles and ignore it. With `kernel: 'margo'`, the kernel's chord deflection
-   * in meters (default 0.001 of each body's bounding-box diagonal).
+   * tessellation. STL and OBJ are already triangles and ignore it. A custom `importer` receives the value as given.
    */
   linearDeflection?: number;
   /**
-   * STEP: `'occt'` (default) reads the file with OpenCascade in one worker; `'margo'` reads it with Margo's own
-   * kernel (`@margoengine/brep`) in a pool of workers, one body at a time, largest first, and keeps the file's face
-   * and body colours. IGES needs `'occt'`; ACIS SAT (format `'sat'`) and Parasolid XT (`'xt'`, .x_t and .x_b) always take Margo's kernel.
+   * Reads STEP and IGES with your own function instead of OpenCascade (default none: the bundled OpenCascade worker).
+   * It is called after the size and option checks, with the same engine, bytes, format and options, and its model is
+   * returned as is. STL and OBJ never use it. Use it to plug in a reader the engine does not ship.
+   *
+   * @example
+   * ```ts
+   * const model = await loadCAD(engine, 'part.step', { importer: (engine, bytes, format, options) => myReader(engine, bytes, options) });
+   * ```
    */
-  kernel?: 'occt' | 'margo';
-  /** `kernel: 'margo'`: most workers, 1 to 64 (default the device's logical cores less one, at most 8). */
-  workers?: number;
-  /** `kernel: 'margo'`: the model is visible from its first part, which joins it as soon as it is meshed (default true). */
-  progressive?: boolean;
-  /** `kernel: 'margo'`: called with each part as it joins the model. */
-  onPart?: (mesh: Mesh) => void;
-  /**
-   * `kernel: 'margo'`: keeps one worker with the exact shapes after loading, so `model.refine()` can re-mesh parts
-   * finer for the current view; `model.dispose()` ends it (default false).
-   */
-  refine?: boolean;
+  importer?: CADImporter;
 }
 export function parseCADAsync(
   instance: EngineKernel,
@@ -61,11 +64,7 @@ export function parseCADAsync(
   options: CADImportOptions = {},
 ): Promise<CADModel> {
   options.signal?.throwIfAborted();
-  if (
-    !(buffer instanceof ArrayBuffer) ||
-    !buffer.byteLength ||
-    !['stl', 'obj', 'step', 'iges', 'sat', 'xt'].includes(format)
-  )
+  if (!(buffer instanceof ArrayBuffer) || !buffer.byteLength || !['stl', 'obj', 'step', 'iges'].includes(format))
     throw new TypeError('Invalid CAD input');
   if (buffer.byteLength > maxBytes)
     throw capError(`CAD exceeds 64 MiB (${buffer.byteLength} > ${maxBytes} bytes)`, format);
@@ -82,19 +81,9 @@ export function parseCADAsync(
     throw new RangeError('creaseAngle must be a number of degrees from 0 to 180');
   const engine = engineRuntime(instance);
   if (engine.disposed) throw new Error('Engine is disposed');
-  const kernel = options.kernel ?? 'occt';
-  if (kernel !== 'occt' && kernel !== 'margo') throw new TypeError("kernel must be 'occt' or 'margo'");
-  if (kernel === 'margo' && format === 'iges') throw new TypeError("kernel 'margo' reads STEP; use 'occt' for IGES");
-  // ACIS SAT and Parasolid XT have no OpenCascade path here: Margo's kernel reads them whatever the kernel option says.
-  if ((kernel === 'margo' && format === 'step') || format === 'sat' || format === 'xt')
-    return parseSTEPWithMargo(
-      engine,
-      buffer,
-      new URL(/* @vite-ignore */ './workers/brep-runtime.js?no-inline', import.meta.url),
-      options,
-      timeoutMs,
-      format,
-    );
+  const { importer } = options;
+  if (importer !== undefined && typeof importer !== 'function') throw new TypeError('importer must be a function');
+  if (importer && (format === 'step' || format === 'iges')) return importer(instance, buffer, format, options);
   const workerURL = new URL(/* @vite-ignore */ './workers/cad-runtime.js?no-inline', import.meta.url),
     occtURL = new URL(/* @vite-ignore */ './workers/occt-import-js.js?no-inline', import.meta.url),
     wasmURL = new URL(/* @vite-ignore */ './workers/occt-import-js.wasm?no-inline', import.meta.url);

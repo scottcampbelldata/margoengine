@@ -4,9 +4,8 @@
 
 ```ts
 import { EngineKernel, Mesh } from "@margoengine/core";
-import { Mesh } from "@margoengine/core/extension";
 
-export type CADFormat = 'stl' | 'obj' | 'step' | 'iges' | 'sat' | 'xt';
+export type CADFormat = 'stl' | 'obj' | 'step' | 'iges';
 
 export interface CADImportOptions {
     signal?: AbortSignal;
@@ -16,12 +15,10 @@ export interface CADImportOptions {
     maxParts?: number;
     timeoutMs?: number;
     linearDeflection?: number;
-    kernel?: 'occt' | 'margo';
-    workers?: number;
-    progressive?: boolean;
-    onPart?: (mesh: Mesh) => void;
-    refine?: boolean;
+    importer?: CADImporter;
 }
+
+export type CADImporter = (engine: EngineKernel, buffer: ArrayBuffer, format: 'step' | 'iges', options: CADImportOptions) => Promise<CADModel>;
 
 export function parseCADAsync(instance: EngineKernel, buffer: ArrayBuffer, format: CADFormat, options?: CADImportOptions): Promise<CADModel>;
 
@@ -31,12 +28,5 @@ interface CADModel {
     root: MeshHandle;
     meshes: readonly MeshHandle[];
     dispose(): void;
-    failedFaces?: number;
-    refine?: (options?: CADRefineOptions) => Promise<number>;
-}
-
-interface CADRefineOptions {
-    pixels?: number;
-    maxTriangles?: number;
 }
 ```

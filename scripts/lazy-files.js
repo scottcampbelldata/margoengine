@@ -85,14 +85,6 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/machinery',
-    file: 'packages/machinery/dist/workers/brep-runtime.js',
-    label: 'workers/brep-runtime.js',
-    kind: 'Worker',
-    measure: 'file',
-    when: "STEP with `kernel: 'margo'`: a pool of these workers (`parseCADAsync()` / `loadCAD()`), no OpenCascade",
-  },
-  {
-    package: '@margoengine/machinery',
     file: 'packages/machinery/dist/workers/occt-import-js.js',
     label: 'workers/occt-import-js.js',
     kind: 'OCCT glue',

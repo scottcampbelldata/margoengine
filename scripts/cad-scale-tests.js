@@ -2,7 +2,7 @@
 //
 //   node scripts/cad-scale-tests.js --class=workstation|laptop|entry [--ladder] [--corpus] [--quiet]
 //        [--sizes=1000,2500,5000,10000,25000,50000,100000] [--detail=low|normal|high] [--paths=obj,glb]
-//        [--frames=120] [--all] [--kernel=occt|margo] [--only=<part of a corpus file name>]
+//        [--frames=120] [--all] [--only=<part of a corpus file name>]
 //
 // --ladder (default with no mode flag): generated machinery assemblies (scripts/cad-scale/assembly.mjs) of growing
 //   size through two paths: `obj` (world-space parts through parseCADAsync, with PartInstancer: a file a user drops
@@ -10,8 +10,6 @@
 //   stops at its first failing size (--all keeps going); its ceiling is the largest size that passed.
 // --corpus: every file listed in test-results/cad-corpus/manifest.json ({ file, format, source, license, ... }),
 //   loaded the same way and held to the same limits.
-// --kernel=margo: STEP files read and tessellated by our own kernel (@margoengine/brep) instead of OpenCascade; with
-//   --corpus only the STEP files run, and results and screenshots are kept apart (results-<class>-margo.json).
 // A run passes when it loads without error, keeps every part and triangle (generated assemblies), and meets the
 // class's limits below. Each run opens a fresh browser (Edge, physical WebGPU) under the shared GPU lock and saves three
 // screenshots: the whole model; cut at its middle height keeping the upper half (the timed section view); and keeping
@@ -59,7 +57,6 @@ const ladder = arg('ladder', false) || !arg('corpus', false),
   frames = Number(arg('frames', 120)),
   detail = arg('detail', 'normal'),
   paths = String(arg('paths', 'obj,glb')).split(','),
-  kernel = String(arg('kernel', 'occt')),
   only = arg('only', null),
   sizes = String(arg('sizes', '1000,2500,5000,10000,25000,50000,100000')).split(',').map(Number);
 assert.ok(
@@ -70,8 +67,6 @@ assert.ok(
   paths.every((p) => p === 'obj' || p === 'glb'),
   '--paths takes obj and/or glb',
 );
-assert.ok(kernel === 'occt' || kernel === 'margo', '--kernel takes occt or margo');
-const tag = kernel === 'margo' ? '-margo' : '';
 
 const commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(),
   dirty = execFileSync('git', ['status', '--porcelain', '--', 'packages'], { encoding: 'utf8' }).trim() !== '';
@@ -113,7 +108,6 @@ async function measure({ file, format, label, bounds, smoothing = true }) {
   if (quiet) await waitForQuiet();
   const q = new URLSearchParams({ url: `/${file.replaceAll('\\', '/')}`, format, frames: String(frames) });
   if (!smoothing) q.set('smoothing', 'false');
-  if (kernel === 'margo' && format === 'step') q.set('kernel', 'margo');
   if (bounds)
     ['minx', 'miny', 'minz', 'maxx', 'maxy', 'maxz'].forEach((k, i) =>
       q.set(k, String(i < 3 ? bounds.min[i] : bounds.max[i - 3])),
@@ -172,7 +166,6 @@ const report = {
   commit,
   dirty,
   timing: quiet ? 'quiet-gated' : 'diagnostic',
-  kernel,
   detail,
   started: new Date().toISOString(),
   hardware: null,
@@ -181,7 +174,7 @@ const report = {
 };
 const row = (r) =>
   r.ok
-    ? `${String(r.parts).padStart(7)} parts ${String(r.triangles).padStart(10)} tris  load ${r.loadMs.toFixed(0).padStart(6)} ms  orbit ${r.orbit.median.toFixed(1)}/${r.orbit.p95.toFixed(1)} ms (encode ${r.orbit.encode.median.toFixed(1)})  pick ${r.pick.median.toFixed(0)} ms  section ${r.section.median.toFixed(1)} ms (encode ${r.section.encode.median.toFixed(1)})  draws ${r.draws}${r.kernel === 'margo' ? `  margo kernel: ${r.failedFaces} faces failed, first part ${r.firstPartMs?.toFixed(0) ?? '-'} ms` : ''}`
+    ? `${String(r.parts).padStart(7)} parts ${String(r.triangles).padStart(10)} tris  load ${r.loadMs.toFixed(0).padStart(6)} ms  orbit ${r.orbit.median.toFixed(1)}/${r.orbit.p95.toFixed(1)} ms (encode ${r.orbit.encode.median.toFixed(1)})  pick ${r.pick.median.toFixed(0)} ms  section ${r.section.median.toFixed(1)} ms (encode ${r.section.encode.median.toFixed(1)})  draws ${r.draws}`
     : `FAILED at ${r.stage}: ${r.error ?? r.errors?.join('; ')}`;
 
 const release = await acquire({ owner: 'cad-scale-tests' });
@@ -232,10 +225,9 @@ try {
   if (corpus) {
     const manifest = JSON.parse(await readFile('test-results/cad-corpus/manifest.json', 'utf8'));
     for (const entry of manifest) {
-      if (kernel === 'margo' && entry.format !== 'step') continue;
       if (only && !entry.file.includes(only)) continue;
       const file = `test-results/cad-corpus/${entry.file}`,
-        result = await measure({ file, format: entry.format, label: `corpus${tag}-${entry.file}` });
+        result = await measure({ file, format: entry.format, label: `corpus-${entry.file}` });
       report.hardware ??= result.hardware;
       const why = failures(result, null);
       report.corpus.push({ ...entry, result, failures: why });
@@ -248,7 +240,7 @@ try {
   release();
   report.finished = new Date().toISOString();
   await mkdir(OUT, { recursive: true });
-  await writeFile(`${OUT}/results-${machine}${tag}.json`, `${JSON.stringify(report, null, 2)}\n`);
+  await writeFile(`${OUT}/results-${machine}.json`, `${JSON.stringify(report, null, 2)}\n`);
 }
 
 console.log(`\nCeilings on ${machine} (${report.timing}, ${commit}${dirty ? ', packages dirty' : ''}):`);
@@ -258,4 +250,4 @@ for (const [path, r] of Object.entries(report.ladder))
   );
 if (report.corpus.length)
   console.log(`  corpus: ${report.corpus.filter((c) => !c.failures.length).length}/${report.corpus.length} files pass`);
-console.log(`Results: ${OUT}/results-${machine}${tag}.json`);
+console.log(`Results: ${OUT}/results-${machine}.json`);

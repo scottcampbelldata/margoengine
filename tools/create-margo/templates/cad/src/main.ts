@@ -1,5 +1,3 @@
-import { Geometry } from 'margoengine';
-import { model } from 'margoengine/brep';
 import { Raycaster } from 'margoengine/bvh';
 import {
   Dimensions,
@@ -15,23 +13,9 @@ import {
 import type { Anchor } from 'margoengine/machinery/dimensions';
 import { Environment } from 'margoengine/environment';
 
-// A mounting bracket modeled in code with Margo's own B-rep kernel (a union, four holes cut by Booleans, exact mass
-// properties), drawn with CAD navigation, dimensions, a section plane and click-to-measure.
+// A STEP part (public/plate.step) read with OpenCascade, drawn with CAD navigation, dimensions, a section plane and
+// click-to-measure. Open your own STEP, IGES, STL, OBJ or glTF part with the file picker or by dropping it on the page.
 const info = document.querySelector('#info')!;
-
-function bracket() {
-  const { box, cylinder, boolean, frameOf } = model;
-  let part = boolean('bracket', 'union', box('base', [0.08, 0.05, 0.008]), box('wall', [0.08, 0.008, 0.05]));
-  [0.015, 0.065].forEach((x, i) => {
-    const hole = cylinder(`hole${i}`, 0.005, 0.02, frameOf([x, 0.032, -0.005], [0, 0, 1], [1, 0, 0]));
-    part = boolean(`base-hole${i}`, 'subtract', part, hole);
-  });
-  [0.025, 0.055].forEach((x, i) => {
-    const hole = cylinder(`slot${i}`, 0.006, 0.02, frameOf([x, -0.005, 0.03], [0, 1, 0], [1, 0, 0]));
-    part = boolean(`wall-hole${i}`, 'subtract', part, hole);
-  });
-  return part;
-}
 
 // A soft studio for image-based lighting: sky gradient, floor, two soft boxes.
 function studio(width = 128, height = 64) {
@@ -58,50 +42,46 @@ async function start() {
   const cube = ViewCube.attach(engine);
   EnvironmentLighting.attach(engine, await Environment.attach(engine, studio()));
   const shadows = Shadows.attach(engine, { resolution: 2048, distance: 0.5 });
-
-  const started = performance.now();
-  const part = bracket();
-  const { volume, area } = model.massProperties(part);
-  const [mesh] = model.meshBodies([part], { relativeDeflection: 0.0005, angle: 0.25 }).meshes;
-  const ms = performance.now() - started;
-  const solid = stage.mesh(new Geometry(mesh.positions, mesh.normals, mesh.indices), {
-    color: '#a9b8c8',
-    metalness: 1,
-    roughness: 0.32,
-  });
-  const floor = stage.box({
-    size: [0.6, 0.004, 0.6],
-    position: [0.04, -0.002, 0.025],
-    color: '#2b3038',
-    roughness: 0.9,
-  });
-  shadows.add(solid);
-  shadows.add(floor);
-  info.innerHTML =
-    `<b>Bracket</b>, modeled in ${ms.toFixed(0)} ms: ${part.faces.length} faces, ` +
-    `volume ${(volume * 1e6).toFixed(2)} cm³, area ${(area * 1e4).toFixed(1)} cm², ` +
-    `${(volume * 2.7e6).toFixed(1)} g in aluminium. Click two points to measure.`;
-
-  // Dimensions follow the part: hole spacing, the wall's height and a hole diameter.
   const dimensions = Dimensions.attach(engine, { color: '#ffd166' });
-  const at = (point: [number, number, number]): Anchor => ({ point, node: solid });
-  dimensions.add({ a: at([0.015, 0.032, 0.008]), b: at([0.065, 0.032, 0.008]), offset: 28 });
-  dimensions.add({ a: at([0.08, 0, 0]), b: at([0.08, 0, 0.05]), offset: -24 });
-  dimensions.add({ kind: 'radius', center: at([0.065, 0.032, 0.008]), a: at([0.07, 0.032, 0.008]), diameter: true });
+  const raycaster = new Raycaster();
+  const section = new SectionPlanes({ planes: [[0, 0, -1, 0.004]] });
+  section.enabled = false;
+  engine.use(section);
+  document.querySelector('#section')!.addEventListener('click', () => {
+    section.enabled = !section.enabled;
+  });
+
+  // The part on screen: STEP and IGES come through OpenCascade in a worker, in meters.
+  let part: Awaited<ReturnType<typeof stage.load>> | null = null;
+  const show = async (url: string, name: string, format?: 'step' | 'iges' | 'stl' | 'obj' | 'gltf' | 'glb') => {
+    const next = await stage.load(url, { format });
+    part?.destroy();
+    dimensions.clear();
+    part = next;
+    for (const mesh of next.meshes) shadows.add(mesh);
+    // Overall size, drawn along three edges of the part's bounding box.
+    const [x0, y0, z0, x1, y1, z1] = next.bounds;
+    dimensions.add({ a: { point: [x0, y0, z0] }, b: { point: [x1, y0, z0] }, offset: 28 });
+    dimensions.add({ a: { point: [x1, y0, z0] }, b: { point: [x1, y1, z0] }, offset: 28 });
+    dimensions.add({ a: { point: [x1, y0, z0] }, b: { point: [x1, y0, z1] }, offset: 28 });
+    const size = [x1 - x0, y1 - y0, z1 - z0].map((v) => (v * 1000).toFixed(1)).join(' x ');
+    info.textContent = `${name}: ${size} mm. Click two points to measure; drag to rotate (SolidWorks mouse).`;
+    cube.view('iso');
+  };
 
   // Click two points on the part: each snaps to the nearest corner or edge, and the distance is drawn between them.
-  const raycaster = new Raycaster();
   let first: Anchor | null = null,
     measured: ReturnType<typeof dimensions.add> | null = null,
     down = [0, 0];
   const canvas = engine.canvas as HTMLCanvasElement;
   canvas.addEventListener('pointerdown', (event) => (down = [event.clientX, event.clientY]));
   canvas.addEventListener('pointerup', (event) => {
-    if (Math.hypot(event.clientX - down[0], event.clientY - down[1]) > 4) return; // that was a drag
-    const [hit] = raycaster.setFromEngine(engine, event.offsetX, event.offsetY).intersectObjects(engine, [solid]);
+    if (!part || Math.hypot(event.clientX - down[0], event.clientY - down[1]) > 4) return; // none yet, or a drag
+    const [hit] = raycaster.setFromEngine(engine, event.offsetX, event.offsetY).intersectObjects(engine, part.meshes);
     if (!hit) return;
     const point = hit.point as [number, number, number];
-    const anchor = snapFeature(solid, point, 'vertex', 0.004) ?? snapFeature(solid, point, 'edge', 0.003) ?? { point };
+    const anchor = snapFeature(hit.mesh, point, 'vertex', 0.004) ??
+      snapFeature(hit.mesh, point, 'edge', 0.003) ?? { point };
     if (!first) {
       if (measured) dimensions.remove(measured);
       first = anchor;
@@ -111,23 +91,14 @@ async function start() {
     }
   });
 
-  const section = new SectionPlanes({ planes: [[0, 0, -1, 0.032]] });
-  section.enabled = false;
-  engine.use(section);
-  document.querySelector('#section')!.addEventListener('click', () => {
-    section.enabled = !section.enabled;
-  });
-  cube.view('iso');
+  await show('/plate.step', 'plate.step');
 
   // Your own part: STEP, IGES, STL, OBJ or glTF, from the file picker or dropped on the page.
   const open = async (file: File) => {
     const format = file.name.split('.').pop()?.toLowerCase().replace('stp', 'step').replace('igs', 'iges');
     const url = URL.createObjectURL(file);
     try {
-      solid.visible = false;
-      dimensions.clear();
-      await stage.load(url, { format: format as 'step' | 'iges' | 'stl' | 'obj' | 'gltf' | 'glb' });
-      info.textContent = `${file.name}: drag to rotate (SolidWorks mouse), click the view cube to snap.`;
+      await show(url, file.name, format as 'step' | 'iges' | 'stl' | 'obj' | 'gltf' | 'glb');
     } finally {
       URL.revokeObjectURL(url);
     }

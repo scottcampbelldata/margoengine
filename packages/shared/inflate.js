@@ -1,7 +1,7 @@
 // zlib (RFC 1950) and DEFLATE (RFC 1951) decoder, written from the two RFCs: EXR ZIP and ZIPS chunks
 // (@margoengine/environment) and PNG image data (@margoengine/decoders/png), whose decompressed size is known up front
-// and fills one buffer of exactly that size, and JT segments (@margoengine/brep), whose size is not stored: the buffer
-// grows up to a limit. Every input read, output write and back reference is bounds checked, and damaged data throws
+// and fills one buffer of exactly that size. With a `{ limit }` option the size need not be stored: the buffer grows
+// up to that limit. Every input read, output write and back reference is bounds checked, and damaged data throws
 // MargoError 'failed'.
 import { margoError } from './errors.js';
 

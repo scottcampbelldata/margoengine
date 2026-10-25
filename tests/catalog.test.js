@@ -27,8 +27,7 @@ test('catalog covers every public package with matching versions and imports, an
       if (error.code === 'ENOENT') continue;
       throw error;
     }
-    // brep is a private product kept out of the catalog (scripts/build-catalog.js `unlisted`).
-    if (manifest.private || id === 'brep') continue;
+    if (manifest.private) continue;
     const entry = entries.find((entry) => entry.id === id);
     assert.ok(entry, `${id} missing from catalog`);
     assert.equal(entry.package, manifest.name);

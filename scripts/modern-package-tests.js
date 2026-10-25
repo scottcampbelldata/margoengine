@@ -33,8 +33,6 @@ const packedNames = JSON.parse(await readFile('package.json', 'utf8'))
   .workspaces.filter((path) => path.startsWith('packages/'))
   .map((path) => path.slice('packages/'.length));
 const noticeFiles = new Map([
-  // The Siemens JT Data Format notice the JT reader must ship (docs/jt-licensing.md).
-  ['brep', 'NOTICE'],
   ['post', 'NOTICE.md'],
   ['tonemap', 'NOTICE.md'],
 ]);
@@ -130,7 +128,6 @@ for (const name of packedNames) {
   if (name === 'machinery')
     for (const file of [
       'cad-runtime.js',
-      'brep-runtime.js',
       'occt-import-js.js',
       'occt-import-js.wasm',
       'OCCT-LICENSE.txt',
@@ -165,7 +162,7 @@ try {
       await readFile(join(fixture, `node_modules/${packageName(name)}/LICENSE`), 'utf8'),
       await readFile('LICENSE', 'utf8'),
     );
-    // Apache-2.0 s. 4(d): the NOTICE travels with every installed package (brep's adds the JT notice below it).
+    // Apache-2.0 s. 4(d): the NOTICE travels with every installed package.
     assert.ok(
       (await readFile(join(fixture, `node_modules/${packageName(name)}/NOTICE`), 'utf8')).startsWith(
         await readFile('NOTICE', 'utf8'),

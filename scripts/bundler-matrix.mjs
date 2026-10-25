@@ -49,7 +49,6 @@ const check = (bundler, modules) => {
   for (const name of [
     '@margoengine/physics',
     '@margoengine/voxel',
-    '@margoengine/brep',
     '@margoengine/fbx',
     '@margoengine/splats',
     '@margoengine/react',

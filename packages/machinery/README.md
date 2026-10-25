@@ -39,6 +39,20 @@ OBJ triangles and quads become triangles directly (a quad splits along its insid
 
 For STEP and IGES, `parseCADAsync` and `loadCAD` take an optional `linearDeflection`: the largest distance in meters that OpenCascade's triangles may stray from the true surface (smaller is finer). Omitted, the OpenCascade call is unchanged. The 100,000-part default `maxParts` is unchanged.
 
+To read STEP or IGES with a reader of your own instead of OpenCascade, pass an `importer` to `loadCAD` or `parseCADAsync` (default none). It gets the engine, the file's bytes, the format and the import options after the size and option checks, and returns the `CADModel`:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadCAD, type CADModel } from 'margoengine/machinery/cad';
+
+declare function readStep(engine: Engine, bytes: ArrayBuffer): Promise<CADModel>;
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const model = await loadCAD(engine, '/part.step', {
+  importer: (engine, bytes) => readStep(engine as Engine, bytes),
+});
+```
+
 `PartInstancer.attach(engine)` (WebGPU) first runs `deduplicateParts`, which shares Geometry between identical core parts and points identical static glTF-pro primitives of one model at one GPU buffer pair (skinned and morphed primitives keep their own). It then packs small closed static parts that have their own Geometry and equal material values under one root into root-space GPU buffers: each part stays a visible mesh with its name, Geometry, material and parent, core skips its claimed batch, and the plugin draws each pack once inside every core draw with that draw's pipeline and bindings, so section clips, caps, bloom and SSAO include packed triangles. Picks still draw the parts themselves; selection's id capture (`DrawOptions.partIds`) draws a pack part by part. A part returns to its own draw when it moves, hides, changes material or geometry, or another visible mesh starts sharing its geometry. Big parts (`partVertices`, default 4,096), shared Geometry and open shells stay on their own draws; `instancer.pack = false` restores one draw per part, and `refresh()` packs parts loaded later. Pass the instancer to `shadows.add` for the packs' directional shadows (clipped by sections). Packed parts keep their own GPU buffers too, so their vertex memory doubles. `node scripts/machinery-pack-tests.js` (after `npm run build:packages`) checks draws, picks, section beauty, shadow and cap pixels, glTF buffer sharing and `linearDeflection` on loaded files on a real GPU.
 
 Use `@margoengine/machinery/cad` for `loadCAD`, `parseCAD`, `deduplicateParts` and `PartInstancer`, or `@margoengine/machinery/cad-async` for `parseCADAsync` and its option types. These entries exclude unrelated machinery systems and share module identity with the existing package root. CAD worker assets remain in `dist/workers` and resolve relative to the shipped JavaScript; retain that directory when copying the package directly.

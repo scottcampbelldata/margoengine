@@ -54,7 +54,6 @@ Security problems go to the address in [SECURITY.md](SECURITY.md), not a public 
 | `packages/core` | Engine, scene, renderer, the Wasm kernel binding |
 | `packages/kernel` | Rust source of the kernel |
 | `packages/stage` | `createStage` |
-| `packages/brep` | Private B-rep kernel: not published, not part of the public engine, not advertised |
 | `packages/*` | Everything else, one package per feature |
 | `examples/` | Runnable demos |
 | `docs/` | Design notes, limits and guides |

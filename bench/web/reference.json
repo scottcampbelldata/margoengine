@@ -262,16 +262,6 @@
    "tickMs": 1.1396,
    "tickCullMs": 1.2205
   },
-  "cad/brep-drill-16": {
-   "booleanMs": 72.9123,
-   "meshMs": 16.5332
-  },
-  "cad/brep-step-roundtrip": {
-   "writeMs": 0.4988,
-   "parseMs": 0.3676,
-   "tessellateMs": 5.3397,
-   "stepBytes": 35169
-  },
   "cad/cad-10000": {
    "cpuMs": 0.65,
    "gpuMs": 0.219,

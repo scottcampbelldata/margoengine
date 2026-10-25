@@ -103,9 +103,6 @@ const layers = {
 };
 const order = Object.values(layers).flat(),
   categoryOf = (id) => Object.keys(layers).find((name) => layers[name].includes(id));
-// Workspace packages kept out of the public catalog, package lists and site: brep is a private product (Scott,
-// 2026-10-25) that machinery and the stage still use internally.
-const unlisted = new Set(['brep']);
 const entries = [];
 for (const id of await readdir('packages')) {
   let manifest;
@@ -115,7 +112,7 @@ for (const id of await readdir('packages')) {
     if (error.code === 'ENOENT') continue;
     throw error;
   }
-  if (manifest.private || unlisted.has(id)) continue;
+  if (manifest.private) continue;
   const previous = existing.find((entry) => entry.id === id);
   const exports = Object.keys(await import(pathToFileURL(resolve(`packages/${id}/dist/index.js`)))).sort();
   assert.ok(exports.length, `${manifest.name} has no runtime exports`);

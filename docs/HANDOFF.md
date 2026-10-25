@@ -8,17 +8,16 @@ Provenance sweep: FXAA rebuilt from Lottes' FXAA whitepaper (`post/fxaa`); the t
 from the median GGX facet tilt and Snell's law; voxel light levels 0-15 are equal CIE L* steps; Phong
 `refractionRatio` defaults to 1/1.5 and rgbShift to 0.002; citation comments at every lighting formula site and
 [clean-room.md](clean-room.md) with the full table; FBX Phong shininess maps to roughness like materials. New:
-`@margoengine/brep` reads IGES 5.3 (`parseIGES`, `readIGES`, `igesToSTEP`, `isIGES`; entity 114 refused until
-verified, [known-bugs.md](known-bugs.md)). Eight voxel views re-recorded (light curve); post-ssr and post-ssr-models
-advanced for the FXAA shader. Core + stage unchanged at 22,737 B; brep entry 104,982 -> 119,209 B gzip.
+Eight voxel views re-recorded (light curve); post-ssr and post-ssr-models advanced for the FXAA shader. Core + stage
+unchanged at 22,737 B.
 
 ## 2026-10-25: brep is private; public CAD is OpenCascade
 
-Scott: brep becomes a private paid product. Public docs, site, whitepaper (HTML and PDF), catalog (now 78 packages,
-brep unlisted in `scripts/build-catalog.js`) and package READMEs describe CAD as STEP/IGES through OpenCascade. Still
-public in code, for a later step: `margoengine/brep` (stage subpath), machinery's `kernel: 'margo'` option and its TSDoc,
-the `cad` starter (models its bracket with brep), `examples/brep*`, and brep rows in api-surface and the notices
-(legal, while the package is published). Rule in AGENTS.md.
+Scott: brep is a private paid product and no longer lives in this repo. It moved, with its history, to the private
+repo `scottcampbelldata/margo-cad-kernel` (clone at `C:\Development\Projects\margo-cad-kernel`). Here, STEP and IGES
+stay on OpenCascade; machinery takes an optional `importer` function on `loadCAD` / `parseCADAsync` for a reader the
+engine does not ship (TSDoc, README, `tests/cad-importer.test.js`). The `cad` starter loads a STEP part through
+OpenCascade. Rule in AGENTS.md.
 
 ## Landed 2026-10-24: pixel-exact drawing (`exactSize`)
 
@@ -49,8 +48,8 @@ full sizes in [guides/kits.md](guides/kits.md); an unused name costs nothing, ch
 "which import do I need" page is [guides/imports.md](guides/imports.md).
 
 Second landing: every template opens to a lit, animated scene with a README of three things to try (game: Prototype
-Pete walks and runs in a sunny field with physics crates and six orbs to collect; cad: a bracket modeled in code with
-`margoengine/brep`, exact volume and mass, live dimensions, click-to-measure, section, view cube; viz: a 300,000-point
+Pete walks and runs in a sunny field with physics crates and six orbs to collect; cad: a STEP
+plate read through OpenCascade, live dimensions, click-to-measure, section, view cube; viz: a 300,000-point
 galaxy; web: the studio scene with shadows and a turntable; react/next: shapes in sun with soft shadows and bloom).
 `tools/create-margo/test/browser-check.mjs` runs each under `vite` dev in Edge and times create to first frame
 (0.5 to 1.3 s, packages linked, no install). Every package README shows `margoengine/...` imports;

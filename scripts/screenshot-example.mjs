@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 // Saves a screenshot of an example page served by `npm run dev:examples`, using SwiftShader WebGPU so it runs without a GPU.
-// node scripts/screenshot-example.mjs http://127.0.0.1:5173/examples/brep-flange.html out.png [width] [height] [waitMs]
+// node scripts/screenshot-example.mjs http://127.0.0.1:5173/examples/cad-views.html out.png [width] [height] [waitMs]
 const [url, out, w = 1280, h = 720, wait = 9000] = process.argv.slice(2);
 const browser = await chromium.launch({
   channel: 'chromium',

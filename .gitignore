@@ -2,7 +2,6 @@ node_modules/
 dist/
 packages/*/LICENSE
 packages/*/NOTICE
-!packages/brep/NOTICE
 test-results/
 *.log
 packages/*/target/

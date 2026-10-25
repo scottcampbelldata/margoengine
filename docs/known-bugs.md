@@ -54,25 +54,3 @@ Measured but not fixed. Their history, sources and rerun commands are in
   diagnostic run). **Needed to close:** one upload per frame for all moved parts, then a re-measure.
 - **Galaxy S23 Ultra island demo at 3-5 FPS** (particles off does not help). Partial fixes have landed; no after number
   exists. **Needed to close:** the device, then a measured run.
-
-## Unverified against the specification
-
-### IGES parametric spline surface (entity 114): coefficient order not checked
-
-- **What:** `igesToSTEP` and `parseIGES` in `@margoengine/brep` (`packages/brep/src/iges/step.ts`) refuse entity 114
-  with `MargoError` code `unsupported`; a file holding other surfaces converts with the 114 left out and named in
-  `warnings`.
-- **Why:** the IGES 5.3 specification (US PRO/IPO-100-1996) gives the 114 bicubic patch polynomial only as a formula
-  image, which could not be viewed when the reader was written. The order of the 16 coefficients per coordinate
-  (48 per patch: x, then y, then z, named A to S) was taken from memory, not the text, so it was not shipped.
-- **Needed to close:**
-  1. Read the specification's section on entity 114 (section 4.15, "Parametric Spline Surface Entity"; the request
-     that opened this item said 4.25, which is the Offset Curve Entity) and its Appendix B.5, and write down the
-     formula image: which power of s = u - TU(i) and t = v - TV(j) each of the 16 coefficients multiplies.
-  2. Confirm or correct the assumed order 1, s, s^2, s^3, t, s t, s^2 t, s^3 t, t^2, ..., s^3 t^3, and confirm the
-     patch order (u patches outer, with the (N + 1)-th placeholder column per row).
-  3. Restore the power-to-Bezier conversion of each patch into one B-spline surface (knots at the breakpoints with
-     multiplicity 3) and enable the 114 case.
-  4. Test against an analytic bicubic with cross terms (for example x = s, y = t, z = s^2 t^3 over two patches each
-     way), comparing sampled points and the meshed area with the exact values, and replace the refusal test in
-     `packages/brep/tests/iges.test.js`.

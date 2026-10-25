@@ -71,10 +71,6 @@
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"
     },
-    "./brep": {
-      "types": "./dist/brep.d.ts",
-      "import": "./dist/brep.js"
-    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"
@@ -1193,7 +1189,6 @@
     "@margoengine/animator": "^1.0.0",
     "@margoengine/audio": "^1.0.0",
     "@margoengine/blender": "^1.0.0",
-    "@margoengine/brep": "^1.0.0",
     "@margoengine/bvh": "^1.0.0",
     "@margoengine/cache": "^1.0.0",
     "@margoengine/cameras": "^1.0.0",

@@ -38,7 +38,6 @@
     "packages/ifc",
     "packages/loaders",
     "packages/exporters",
-    "packages/brep",
     "packages/machinery",
     "packages/kinematics-constraints",
     "packages/creative",

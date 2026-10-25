@@ -3,14 +3,14 @@
 
 Margo Engine's own code is licensed under the Apache License 2.0 (`LICENSE` and `NOTICE`; every tarball ships both). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 81 published packages (79 in `packages/`
+assets the site and examples use. It covers all 80 published packages (78 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-72 of 81 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+71 of 80 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
@@ -73,9 +73,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     `dist` files). `margo-convert` depends on the unmodified npm package, so npm can swap it.
 - **MPL-2.0 (web-ifc, peer of `@margoengine/ifc`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves `web-ifc.wasm` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
-- **Siemens JT notice (`@margoengine/brep`).** The JT reader in `packages/brep/src/jt` reads the format as
-  described in the Siemens JT File Format Reference and ISO 14306. `packages/brep/NOTICE` ships in the tarball with
-  the reference licence terms, the royalty-free patent notice and the trademark note.
 - **Development tools only (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries (LGPL-3.0) are
   installed as an optional dependency of Next.js for `examples/next`, and `scripts/optimize-demo-assets.js` and
   `scripts/build-scifi-helmet.mjs` use sharp to resize textures. Neither is in any tarball or served by the site.
@@ -92,7 +89,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/animator` | none | none | LICENSE, NOTICE |
 | `@margoengine/audio` | none | none | LICENSE, NOTICE |
 | `@margoengine/blender` | none | none | LICENSE, NOTICE |
-| `@margoengine/brep` | none | none | LICENSE, NOTICE |
 | `@margoengine/bvh` | none | none | LICENSE, NOTICE |
 | `@margoengine/cache` | none | none | LICENSE, NOTICE |
 | `@margoengine/cameras` | none | none | LICENSE, NOTICE |

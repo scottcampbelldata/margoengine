@@ -1,7 +1,7 @@
 {
   "gate": "tests",
   "about": "packages with no test in verify; public entries no test imports",
-  "total": 37,
+  "total": 36,
   "history": [
     {
       "date": "2026-10-24",
@@ -16,7 +16,6 @@
     "unimported @margoengine/creative/stars": 1,
     "unimported @margoengine/creative/targets": 1,
     "unimported @margoengine/machinery/assembly": 1,
-    "unimported @margoengine/machinery/cad-async": 1,
     "unimported @margoengine/machinery/clearance": 1,
     "unimported @margoengine/machinery/exploded": 1,
     "unimported @margoengine/machinery/kinematics": 1,

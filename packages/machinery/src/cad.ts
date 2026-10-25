@@ -21,22 +21,6 @@ export interface CADModel {
   root: MeshHandle;
   meshes: readonly MeshHandle[];
   dispose(): void;
-  /** STEP with `kernel: 'margo'`: faces the kernel could not mesh (left out of their parts). */
-  failedFaces?: number;
-  /**
-   * STEP with `kernel: 'margo'` and `refine`: re-meshes, from the exact shapes, the bodies whose triangles stray from
-   * the true surface by more than `pixels` on screen from the engine's current camera, the coarsest-looking first,
-   * within `maxTriangles`; every placement of a body takes its finer geometry. Resolves with the number of bodies
-   * re-meshed. A call while one runs returns that one. Call it when the camera comes to rest after a zoom or orbit.
-   */
-  refine?: (options?: CADRefineOptions) => Promise<number>;
-}
-/** Options of {@link CADModel.refine}. */
-export interface CADRefineOptions {
-  /** Largest gap on screen, in canvas pixels, between the triangles and the exact surface (default 0.5). */
-  pixels?: number;
-  /** Most triangles the placed parts may total after refining (default three times the loaded model's, at least 5,000,000). */
-  maxTriangles?: number;
 }
 export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number; unique: number } {
   const seen = new Map<string, Array<{ data: Float32Array; geometry: Geometry }>>(),
@@ -182,21 +166,13 @@ export async function loadCAD(
   signal?.throwIfAborted();
   const data = await readResponse(await get(target, { signal }), { maxBytes, signal, label: 'CAD download' }),
     extension = target.pathname.toLowerCase().split('.').at(-1),
-    kind =
-      format ??
-      (extension === 'stp'
-        ? 'step'
-        : extension === 'igs'
-          ? 'iges'
-          : extension && /^(x_[tb]|xmt_txt|xmt_bin)$/.test(extension)
-            ? 'xt'
-            : extension);
-  if (kind !== 'stl' && kind !== 'obj' && kind !== 'step' && kind !== 'iges' && kind !== 'sat' && kind !== 'xt')
-    throw new TypeError('Specify STL, OBJ, STEP, IGES, SAT or XT format');
+    kind = format ?? (extension === 'stp' ? 'step' : extension === 'igs' ? 'iges' : extension);
+  if (kind !== 'stl' && kind !== 'obj' && kind !== 'step' && kind !== 'iges')
+    throw new TypeError('Specify STL, OBJ, STEP or IGES format');
   signal?.throwIfAborted();
-  if (typeof Worker === 'undefined') {
-    if (kind === 'step' || kind === 'iges' || kind === 'sat' || kind === 'xt')
-      throw new Error('B-Rep import requires Web Workers');
+  const stepOrIges = kind === 'step' || kind === 'iges';
+  if (typeof Worker === 'undefined' && !(stepOrIges && options.importer)) {
+    if (stepOrIges) throw new Error('STEP and IGES import requires Web Workers or an importer');
     return parseCAD(engine, data, kind, options);
   }
   const buffer =
