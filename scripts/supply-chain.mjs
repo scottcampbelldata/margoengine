@@ -1,4 +1,4 @@
-// Supply-chain record for every published package (HANDOFF launch gate 11c): runtime npm dependencies (direct and
+// Supply-chain record for every published package: runtime npm dependencies (direct and
 // transitive, from package-lock.json), third-party code shipped inside our tarballs, the licence obligations that
 // come with it, and the asset credits of the site and examples. Writes THIRD-PARTY-NOTICES.md; re-run before every
 // release (docs/releasing.md):

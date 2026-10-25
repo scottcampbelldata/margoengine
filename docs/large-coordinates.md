@@ -126,7 +126,7 @@ Works (unit-tested in `packages/cameras/test/origin.test.js` on the real kernel,
 - Core meshes and their children; gltf-pro models (`origin.place(model.root, world)`), and so materials meshes and
   anything else parented to a placed root.
 - `CADCameraControls`, `OrbitControls` (and every control that reads `camera.position`/`target` each update): rebases
-  happen between frames and shift the camera, so orbit, pan and dolly continue seamlessly.
+  happen between frames and shift the camera, so orbit, pan and dolly continue without a jump.
 - `engine.pick` (GPU run above) and bvh `Raycaster` hits (unit test): computed in local coordinates;
   `origin.toWorld(hit.point)` gives float64 world (within 1 µm at 6,000 km in the test). The selection `Picking`
   plugin reads the same matrices (not separately tested).
