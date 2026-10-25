@@ -1,10 +1,10 @@
 {
-  "commit": "6bd032da",
+  "commit": "1a1a9758",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 57590,
-    "gzip": 22737,
+    "raw": 57642,
+    "gzip": 22761,
     "limit": 25000
   },
   "packages": {
@@ -154,12 +154,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 50698,
-        "gzip": 20432
+        "raw": 50750,
+        "gzip": 20454
       },
       "./extension": {
-        "raw": 47545,
-        "gzip": 19520
+        "raw": 47597,
+        "gzip": 19544
       }
     },
     "@margoengine/creative": {
@@ -198,8 +198,8 @@
     },
     "@margoengine/culling": {
       ".": {
-        "raw": 26837,
-        "gzip": 8883
+        "raw": 28200,
+        "gzip": 9293
       }
     },
     "@margoengine/decoders": {
@@ -454,8 +454,8 @@
         "gzip": 6248
       },
       "./instancing": {
-        "raw": 5985,
-        "gzip": 2465
+        "raw": 6407,
+        "gzip": 2623
       },
       "./prepare": {
         "raw": 46962,
@@ -672,8 +672,8 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 171514,
-        "gzip": 53351
+        "raw": 172481,
+        "gzip": 53683
       },
       "./atlas": {
         "raw": 3899,
@@ -684,14 +684,14 @@
         "gzip": 6711
       },
       "./batched": {
-        "raw": 97954,
-        "gzip": 30426
+        "raw": 98921,
+        "gzip": 30744
       }
     },
     "@margoengine/math": {
       ".": {
-        "raw": 39723,
-        "gzip": 12304
+        "raw": 40041,
+        "gzip": 12439
       },
       "./vector2": {
         "raw": 2094,
@@ -706,8 +706,8 @@
         "gzip": 669
       },
       "./quaternion": {
-        "raw": 3437,
-        "gzip": 1412
+        "raw": 3755,
+        "gzip": 1550
       },
       "./euler": {
         "raw": 2167,
@@ -778,12 +778,12 @@
         "gzip": 259
       },
       "./billboard": {
-        "raw": 5696,
-        "gzip": 2466
+        "raw": 6014,
+        "gzip": 2597
       },
       "./affine": {
-        "raw": 9002,
-        "gzip": 3736
+        "raw": 9320,
+        "gzip": 3871
       }
     },
     "@margoengine/mesh-edit": {
@@ -934,8 +934,8 @@
     },
     "@margoengine/react": {
       ".": {
-        "raw": 65335,
-        "gzip": 22336
+        "raw": 69520,
+        "gzip": 23575
       },
       "./kit": {
         "raw": 30360,
@@ -946,8 +946,8 @@
         "gzip": 3514
       },
       "./physics": {
-        "raw": 12716,
-        "gzip": 5069
+        "raw": 14819,
+        "gzip": 5687
       },
       "./xr": {
         "raw": 7742,
@@ -1000,8 +1000,8 @@
         "gzip": 7372
       },
       "./raw": {
-        "raw": 26048,
-        "gzip": 9618
+        "raw": 26121,
+        "gzip": 9646
       },
       "./effects": {
         "raw": 19390,
