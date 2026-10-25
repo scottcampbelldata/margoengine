@@ -164,7 +164,10 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       bindings() {
         return gpu?.bindings ?? [];
       },
-      update({ direction, radiance }, sky, l, night) {
+      update({ direction, radiance }, sky, l, ambient, night) {
+        if (ambient) for (let i = 0; i < 3; i++) floor[i] = ambient.day[i] * (1 - night) + ambient.night[i] * night;
+        // Without `lighting` only the ambient floor moves: the fallback environment never drives the engine light.
+        if (!l) return;
         // shortcut: one directional source shares PCSS, use separate shadow maps for simultaneous sun/moon shadows.
         // The engine light is whichever of sun and moon is stronger. The sun fades out through its own transmittance
         // as its disc sets before the moon fades in, so at dusk the light switches direction while both are near zero
@@ -177,10 +180,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
           radiance[i] = body.radiance[i];
         }
         direction[3] = Math.max(l.minimum ?? 0, body.direction[3]);
-        if (l.ambient) {
-          for (let i = 0; i < 3; i++) floor[i] = l.ambient.day[i] * (1 - night) + l.ambient.night[i] * night;
-          radiance[3] = Math.max(floor[0], floor[1], floor[2]);
-        }
+        if (ambient) radiance[3] = Math.max(floor[0], floor[1], floor[2]);
       },
       pass(c) {
         const g = (gpu ??= build()),

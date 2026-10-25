@@ -68,6 +68,20 @@ try {
   assert.ok(!dominant(corner, 0), `the corner shows the background, got ${corner}`);
   result.checks.push({ name: 'Voxels: a VoxelWorld meshed in workers and lit by VoxelLighting', block, corner });
 
+  // A metal sphere under Sky-only light: the sky's fallback environment lights it; without it the metal is black.
+  const brightness = (rgb) => (rgb[0] + rgb[1] + rgb[2]) / 3;
+  image = await shot('sky-metal-off');
+  const unlit = sample(image, 0.5, 0.5, 10);
+  image = await shot('sky-metal');
+  const metal = sample(image, 0.5, 0.5, 10);
+  assert.ok(brightness(unlit) < 30, `without the fallback the metal sphere is black, got ${unlit}`);
+  assert.ok(brightness(metal) > 40, `a metal sphere under Sky-only light is not black, got ${metal}`);
+  assert.ok(
+    brightness(metal) > 3 * brightness(unlit),
+    `the fallback environment lights the metal, ${unlit} -> ${metal}`,
+  );
+  result.checks.push({ name: 'Sky: a metal sphere lit only by the sky is not black', unlit, metal });
+
   await page.evaluate(() => window.extras.unmount());
   assert.deepEqual(await page.evaluate(() => window.extras.state.errors), []);
   assert.deepEqual(errors, []);

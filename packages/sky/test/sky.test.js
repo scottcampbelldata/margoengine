@@ -620,3 +620,55 @@ test('optional procedural clouds share retained frame data and night sky works w
   for (const clouds of [null, { coverage: -0.1 }, { coverage: 1.1 }, { speed: NaN }, { height: 0 }])
     assert.throws(() => new Sky({ clouds }), /clouds/);
 });
+
+test('a sky with environment lights PBR meshes as a fallback environment, without driving the sun, and yields to EnvironmentLighting', async () => {
+  const { Sky: BaseSky } = await import('../dist/base.js'),
+    { skyEnvironmentFloor } = await import('../dist/index.js');
+  const h = optionalGPU(),
+    engineLight = { direction: new Float32Array([0, 1, 0, 3]), radiance: new Float32Array([1, 1, 1, 0.15]) };
+  h.engine.lighting = engineLight;
+  const sky = new Sky({ hours: 12, timeScale: 0, environment: true });
+  h.engine.use(sky);
+  const frame = () => {
+    sky.onPreUpdate(h.context.delta);
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+  };
+  frame();
+  // Metals get image-based light: the sky's own split-sum term replaces core's constant ambient (zero for metals).
+  assert.match(h.context.shader, /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x\);/);
+  assert.ok(h.context.bindings.some((e) => e.binding === 10) && h.context.bindings.some((e) => e.binding === 11));
+  const ambient = h.resources.find((r) => !r.destroyed && r.size === 160),
+    floor = new Float32Array(ambient.data).subarray(36, 39);
+  assert.deepEqual(Array.from(floor), skyEnvironmentFloor.day.map(Math.fround));
+  // The environment is a fallback, not a light: the engine's sun is untouched.
+  assert.deepEqual(Array.from(engineLight.direction), [0, 1, 0, 3]);
+  assert.deepEqual(Array.from(engineLight.radiance), [1, 1, 1, Math.fround(0.15)]);
+  // Without the option the shader is left alone.
+  sky.options.environment = false;
+  frame();
+  assert.equal(h.context.shader, wgsl);
+  // An explicit environment wins: a scene effect that patched the shader first (EnvironmentLighting runs at order -1
+  // and leaves margoAmbient in it) is left alone, and the sky adds no bindings.
+  sky.options.environment = true;
+  const explicit = 'let margoAmbient=iblLight(n,v);let linear=0.0+margoAmbient;';
+  let patched = true;
+  h.engine.frameGraph.add({
+    name: 'test:explicit-environment',
+    order: -1,
+    execute: (c) => {
+      if (patched) c.shader = explicit;
+    },
+  });
+  frame();
+  assert.equal(h.context.shader, explicit);
+  assert.equal(h.context.bindings.length, 0);
+  patched = false;
+  frame();
+  assert.notEqual(h.context.shader, wgsl);
+  assert.match(h.context.shader, /skyLighting/);
+  sky.dispose();
+  assert.throws(() => new BaseSky({ environment: true }), /lighting from @margoengine\/sky\/lighting/);
+  assert.throws(() => new Sky({ environment: 1 }), RangeError);
+});

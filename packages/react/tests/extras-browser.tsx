@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { boxGeometry } from '@margoengine/geometry';
 import { BlockTypes, VoxelWorld } from '@margoengine/voxel';
 import { BlockTextures } from '@margoengine/voxel/render';
+import { Sphere, Sky } from '@margoengine/react/kit';
 import {
   Canvas,
   Mesh,
@@ -18,7 +19,7 @@ import {
   useFrame,
 } from '@margoengine/react';
 
-type Mode = 'views' | 'batched' | 'section' | 'voxels';
+type Mode = 'views' | 'batched' | 'section' | 'voxels' | 'sky-metal' | 'sky-metal-off';
 // A 4 x 4 x 4 block of one red stone type, textured from raw pixels (no image files).
 const blocks = new BlockTypes(),
   stone = blocks.define('stone'),
@@ -77,6 +78,13 @@ function App({ mode }: { mode: Mode }) {
           </BatchedMesh>
         )}
         {mode === 'voxels' && <Voxels world={world} textures={textures} />}
+        {/* A metal sphere whose only light is the Sky; the fallback environment is what lights it. */}
+        {(mode === 'sky-metal' || mode === 'sky-metal-off') && (
+          <>
+            <Sky hours={12} timeScale={0} environment={mode === 'sky-metal'} />
+            <Sphere args={[1.6, 48, 24]} color="#ffffff" metalness={1} roughness={0.25} />
+          </>
+        )}
         {mode === 'section' && (
           <>
             <Red />

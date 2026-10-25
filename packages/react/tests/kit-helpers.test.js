@@ -434,10 +434,11 @@ test('Sky dynamically owns one plugin in StrictMode and updates its options with
   assert.equal(skies.length, start + 1);
   assert.equal(scene.engine.plugins.get('sky'), sky);
   assert.equal(sky.options.hours, 6);
+  assert.equal(sky.options.environment, true, 'a React Sky supplies the fallback environment by default');
   view.rerender(tree(scene, React.createElement(Sky, { ref, hours: 18, exposure: 1 })));
   await flush();
   assert.equal(ref.current, sky);
-  assert.deepEqual(sky.options, { hours: 18, exposure: 1 });
+  assert.deepEqual(sky.options, { environment: true, hours: 18, exposure: 1 });
   view.unmount();
   assert.equal(sky.disposals, 1);
 });

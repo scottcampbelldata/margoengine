@@ -89,7 +89,10 @@ interface SkyFeatures {
     lighting?: {
         validate(lighting: SkyLightingOptions): void;
         create(device: GPUDevice, code: string, entries: GPUBindGroupEntry[], owned: Owned): {
-            update(target: Lights, sky: Sky, lighting: SkyLightingOptions, night: number): void;
+            update(target: Lights, sky: Sky, lighting: SkyLightingOptions | undefined, ambient: {
+                readonly day: Vec3;
+                readonly night: Vec3;
+            } | undefined, night: number): void;
             pass(c: SkyPassContext): void;
             pbr(group: number): {
                 readonly declarations: string;
@@ -158,6 +161,7 @@ interface SkyOptions {
     turbidity?: number;
     exposure?: number;
     lighting?: SkyLightingOptions;
+    environment?: boolean;
 }
 
 type SkyPassContext = Extract<PassContext, {

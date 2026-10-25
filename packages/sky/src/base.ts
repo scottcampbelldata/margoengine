@@ -115,7 +115,19 @@ export interface SkyOptions {
   exposure?: number;
   /** Sun/moon scene lighting (needs `lighting`). Omitted: the sky does not drive engine lighting. */
   lighting?: SkyLightingOptions;
+  /**
+   * Fallback image-based lighting from this sky (needs `lighting`), without driving the sun: PBR meshes get diffuse
+   * light from the sky's spherical harmonics and split-sum sky reflections, so metals are not black when the sky is
+   * the only light. Gives way to an explicit environment: when an `EnvironmentLighting` has already patched the
+   * scene shader the sky adds nothing, and `lighting.ambient` (when set) takes precedence over it. The floor is {@link skyEnvironmentFloor}. Default false.
+   */
+  environment?: boolean;
 }
+/** Least diffuse light (linear RGB) the `environment` fallback gives any side, by day and by night. */
+export const skyEnvironmentFloor: { readonly day: Vec3; readonly night: Vec3 } = {
+  day: [0.04, 0.04, 0.04],
+  night: [0.01, 0.015, 0.03],
+};
 /**
  * Unit sun direction for a clock time: rises at 6 (+x), zenith at 12 (+y), sets at 18 (-x), in the XY plane. Writes
  * into `out` (3 elements) and returns it.
@@ -197,7 +209,13 @@ export interface SkyFeatures {
       entries: GPUBindGroupEntry[],
       owned: Owned,
     ): {
-      update(target: Lights, sky: Sky, lighting: SkyLightingOptions, night: number): void;
+      update(
+        target: Lights,
+        sky: Sky,
+        lighting: SkyLightingOptions | undefined,
+        ambient: { readonly day: Vec3; readonly night: Vec3 } | undefined,
+        night: number,
+      ): void;
       pass(c: SkyPassContext): void;
       pbr(group: number): { readonly declarations: string; readonly ambient: string } | undefined;
       bindings(): GPUBindGroupEntry[];
@@ -340,11 +358,19 @@ export class Sky implements EnginePlugin {
   }
   /** Native PBR hook for optional surface renderers; undefined until this sky's ambient resources are ready. */
   pbr(group: number): { readonly declarations: string; readonly ambient: string } | undefined {
-    return this.options.lighting?.ambient ? this.lit?.pbr(group) : undefined;
+    return this.ambient() ? this.lit?.pbr(group) : undefined;
   }
   /** Bindings of the native PBR sky ambient hook, borrowed until device restoration. */
   bindings(): GPUBindGroupEntry[] {
-    return this.options.lighting?.ambient ? (this.lit?.bindings() ?? []) : [];
+    return this.ambient() ? (this.lit?.bindings() ?? []) : [];
+  }
+  /**
+   * The ambient floor in force this frame: `lighting.ambient`, else the `environment` fallback, else undefined.
+   */
+  private ambient(): { readonly day: Vec3; readonly night: Vec3 } | undefined {
+    const o = this.options;
+    if (o.lighting?.ambient) return o.lighting.ambient;
+    return o.environment ? skyEnvironmentFloor : undefined;
   }
   private validate(): void {
     const o = this.options,
@@ -372,6 +398,10 @@ export class Sky implements EnginePlugin {
       throw new RangeError('Invalid sky options');
     if ((o.model !== undefined || f.preetham || f.bruneton) && !f[model])
       throw new TypeError(`Sky model '${model}' needs ${model} from @margoengine/sky/${model}`);
+    if (o.environment !== undefined && typeof o.environment !== 'boolean')
+      throw new RangeError('Sky environment must be true or false; pass a boolean');
+    if (o.environment && !f.lighting)
+      throw new TypeError('Sky environment needs lighting from @margoengine/sky/lighting');
     for (const key of ['clouds', 'fog', 'night', 'lighting'] as const) {
       const value = o[key],
         feature = f[key];
@@ -417,6 +447,24 @@ export class Sky implements EnginePlugin {
         execute: (c) => {
           // The scene's ambient light is the sky of this frame: upload it first, then render and project it.
           if (c.backend === 'webgpu' && this.options.lighting?.ambient) {
+            this.prepare(c);
+            this.lit!.pass(c);
+          }
+        },
+      });
+    if (this.features.lighting)
+      graph.add({
+        name: 'sky:environment',
+        // After the scene effects that patch the shader at -1 (EnvironmentLighting, light probes): the fallback only
+        // lights what no explicit environment has already lit, found by the term they leave in the shader.
+        order: -0.5,
+        execute: (c) => {
+          if (
+            c.backend === 'webgpu' &&
+            this.options.environment &&
+            !this.options.lighting?.ambient &&
+            !c.shader.includes('let margoAmbient=')
+          ) {
             this.prepare(c);
             this.lit!.pass(c);
           }
@@ -473,7 +521,8 @@ export class Sky implements EnginePlugin {
     this.lights[1].direction.set(this.moon);
     this.lights[1].direction[3] = this.values[31];
     this.lights[1].radiance.set(l?.moon?.color ?? moonColor);
-    if (l && this.lit) this.lit.update(this.engine!.lighting, this, l, night);
+    if (this.lit && (l || this.options.environment))
+      this.lit.update(this.engine!.lighting, this, l, this.ambient(), night);
   }
   /** Uploads this frame's uniform and refreshes the tables; idempotent within a frame (lighting runs it earlier). */
   private prepare(c: SkyPassContext): void {

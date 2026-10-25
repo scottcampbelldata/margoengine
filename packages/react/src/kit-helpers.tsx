@@ -134,7 +134,8 @@ export const Plane = forwardRef<MeshRef, PlaneProps>(function Plane(
 
 export interface SkyProps extends SkyOptions, ErrorProps {}
 export const Sky = forwardRef<SkyPlugin, SkyProps>(function Sky({ onError, ...props }, ref) {
-  const options: SkyOptions = { ...props },
+  // The sky is the only light of many scenes, so it supplies the fallback environment (metals are black without one).
+  const options: SkyOptions = { environment: true, ...props },
     scene = useScene(),
     latest = useRef({ options, onError }),
     [sky, setSky] = useState<SkyPlugin | null>(null),

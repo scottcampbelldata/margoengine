@@ -13,6 +13,7 @@ export {
   sunDirectionFromAngles,
   type SkyLightingTarget,
   sunlight,
+  skyEnvironmentFloor,
   type SkyOptions,
   type SkyLightingOptions,
   type SkyCloudOptions,

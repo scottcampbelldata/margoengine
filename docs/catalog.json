@@ -768,6 +768,7 @@
     "imports": "import { Sky } from '@margoengine/sky';",
     "exports": [
       "Sky",
+      "skyEnvironmentFloor",
       "sunDirection",
       "sunDirectionFromAngles",
       "sunlight"

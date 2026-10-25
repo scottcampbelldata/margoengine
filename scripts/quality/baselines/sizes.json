@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3052587,
+  "total": 3053116,
   "history": [
     {
       "date": "2026-10-24",
@@ -170,6 +170,12 @@
       "commit": "5130e135",
       "reason": "New optional @margoengine/compute (data track, queue item 22): NumPy-style GPU arrays and primitives; linalg, fft, signal, random, stream and frame entries",
       "grew": 7
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "4457ff31",
+      "reason": "sky: environment fallback option and its pass (+70 B min+gzip)",
+      "grew": 1
     }
   ],
   "items": {
@@ -404,7 +410,7 @@
     "@margoengine/shader/raw": 9906,
     "@margoengine/shader/readback": 7620,
     "@margoengine/shadows": 13099,
-    "@margoengine/sky": 15211,
+    "@margoengine/sky": 15740,
     "@margoengine/sky/base": 6395,
     "@margoengine/sky/bruneton": 2627,
     "@margoengine/sky/clouds": 2338,

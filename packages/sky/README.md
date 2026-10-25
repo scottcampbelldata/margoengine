@@ -200,6 +200,20 @@ named `margoAmbient`, so SSAO occludes it; `EnvironmentLighting` uses the same n
 use one or the other. It composes with shadows and clustered lights; custom
 renderers using their own shaders need their own ambient integration.
 
+When the sky is the only light, set `environment: true` (needs the `lighting` entry) to get that sky light as a
+fallback environment without driving the sun: metals, which have no diffuse term, are lit by the sky's reflections
+instead of rendering black. It uses the floor `skyEnvironmentFloor` (day `[0.04, 0.04, 0.04]`, night
+`[0.01, 0.015, 0.03]`), gives way to `lighting.ambient` when you set both, and adds nothing while an
+`EnvironmentLighting` (or anything else that patches the scene shader first) has already lit the meshes, so an
+explicit environment always wins. Default false; `@margoengine/react`'s `<Sky>` turns it on.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+Sky.attach(engine, {hours: 12, environment: true});
+```
+
 `sky.nightFactor` exposes the same dusk/dawn blend: 0 in daylight and 1 at night.
 It updates before rendering, including paused manual renders. To switch local
 lights and emissive batches together, set `lights.intensityScale =
