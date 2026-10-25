@@ -163,7 +163,7 @@ meshes (no textures, effects or picking).
 | --- | --- | --- |
 | core + stage (`import { createStage } from 'margoengine'`) | 22,737 B | 57,590 B |
 
-Recorded at commit `36ac9af6` in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
+Recorded at commit `454df8f3` in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
 the package build, gzips it at the default level and prints the figure for your checkout. The build fails if
 core + stage reaches 25,000 B gzip.
