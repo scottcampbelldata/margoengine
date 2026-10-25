@@ -70,7 +70,7 @@ test('COLLADA pixelArt writes NEAREST and NEAREST_MIPMAP_NEAREST samplers', asyn
 
 test('exportModel pixelArt rewrites every loaded sampler', () =>
   headlessModels(async () => {
-    const file = await readFile(new URL('../../../examples/assets/damaged-helmet.glb', import.meta.url)),
+    const file = await readFile(new URL('../../../examples/assets/scifi-helmet.glb', import.meta.url)),
       model = await parseGLTFAsync(await headless(), new Uint8Array(file));
     const plain = readGLB(await exportModel(model, { binary: true })).json,
       pixel = readGLB(await exportModel(model, { binary: true, pixelArt: { mipmaps: 'nearest' } })).json;
