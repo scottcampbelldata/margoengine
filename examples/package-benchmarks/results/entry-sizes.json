@@ -1,5 +1,5 @@
 {
-  "commit": "b37ede2b",
+  "commit": "67941770",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -964,12 +964,12 @@
     },
     "@margoengine/react": {
       ".": {
-        "raw": 69520,
-        "gzip": 23575
+        "raw": 69896,
+        "gzip": 23696
       },
       "./kit": {
-        "raw": 30360,
-        "gzip": 10787
+        "raw": 30734,
+        "gzip": 10902
       },
       "./post": {
         "raw": 9818,
@@ -1004,6 +1004,20 @@
       "./sky": {
         "raw": 292,
         "gzip": 218
+      }
+    },
+    "@margoengine/sciviz": {
+      ".": {
+        "raw": 55700,
+        "gzip": 18777
+      },
+      "./colormaps": {
+        "raw": 5639,
+        "gzip": 2827
+      },
+      "./maths": {
+        "raw": 2315,
+        "gzip": 1217
       }
     },
     "@margoengine/selection": {
@@ -1046,12 +1060,12 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 42153,
-        "gzip": 15101
+        "raw": 42804,
+        "gzip": 15281
       },
       "./base": {
-        "raw": 15738,
-        "gzip": 6154
+        "raw": 16395,
+        "gzip": 6340
       },
       "./preetham": {
         "raw": 1621,
@@ -1078,8 +1092,8 @@
         "gzip": 1143
       },
       "./lighting": {
-        "raw": 7515,
-        "gzip": 3361
+        "raw": 7509,
+        "gzip": 3367
       }
     },
     "@margoengine/splats": {
@@ -1379,9 +1393,9 @@
       "brotli": 11027
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 21313,
-      "gzip": 8491,
-      "brotli": 7610
+      "raw": 21945,
+      "gzip": 8662,
+      "brotli": 7751
     },
     "packages/creative/dist/particles.js": {
       "raw": 29009,
