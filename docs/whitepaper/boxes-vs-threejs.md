@@ -16,7 +16,7 @@ No round overlapped another GPU run: every round held the GPU lock.
 
 ## Update 2026-10-15: fix B is in core; like-for-like pairs
 
-Scott approved fix B (below). Core `d96e2d7` draws a geometry batch with a second, back-culled pipeline whose shader has
+Fix B (below) is merged. Core `d96e2d7` draws a geometry batch with a second, back-culled pipeline whose shader has
 no `discard` when every drawn instance is single-sided and unmirrored; core + stage 19,577 -> **19,793 B** gzip (+216).
 Frames are unchanged: `examples/package-benchmarks/cad/cull-pixels.mjs` renders a mixed scene (single-sided closed
 boxes, open shells showing their inner back faces, a mirrored instance, double-sided parts, `material.set({doubleSided})`
@@ -179,9 +179,9 @@ WebGL2). Its small, dense parts make it geometry-bound; not diagnosed further he
 | C. Engine plugin that rewrites the main pass (12 lines; the harness's `margo+plugin`) | a leaf package | 0 in core | 0.54 / 1.80 / 5.91 (span 0.75 / 2.02 / 6.26) | culls every core mesh: only for scenes of closed, unmirrored, single-sided solids; its pass makes core keep MSAA buffers and resolve in an extra pass (+0.2-0.35 ms span; already paid when any other package adds a pass); must run after any package that replaces the shader text |
 
 Core was at 19,577 B after the material setters (perf/auto-quality e2cc4c5), so A and B both broke the 19,600 target
-(B would land near 19,789). Scott then approved B and moved the working target to ~19,800 (B landed at 19,793). C needs no core change and matches the decision that pipeline culling is a
+(B would land near 19,789). B was merged and landed at 19,793. C needs no core change and matches the decision that pipeline culling is a
 leaf-package option for closed solids; `@margoengine/culling` is the natural home (`BackfaceCulling.attach(engine)`,
-following the `X.attach` standard). Not built: it is a new package feature, so it waits for Scott.
+following the `X.attach` standard). Not built yet.
 
 With any of the three, Margo's GPU time on the boxes is 63-79% of three's WebGPURenderer's and 0.9-1.3x
 its WebGL2 renderer's, on this one integrated GPU.
@@ -213,4 +213,4 @@ its WebGL2 renderer's, on this one integrated GPU.
   (`gpuSpanMs`); `--variants=` with `?diag=` patches (Margo: `double`, `cull`, `plugin`, `pass`, `nodiscard`,
   `nostencil`, `flat`, `msaa1`; three: `double`, `flat`, `msaa1`); `--dump` records every shader and pipeline.
 - **Quiet gate**: `scripts/quiet-gate.mjs` before every run; `--busy` skips it and records the CPU load instead and
-  labels the JSON (Scott's call for this diagnosis).
+  labels the JSON.

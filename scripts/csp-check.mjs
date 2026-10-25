@@ -280,8 +280,8 @@ const report = {
   if (!onAC()) throw new Error('Lost AC power during the run: discard it');
 }
 report.acPower = 'before and after';
-// The full default run is the committed evidence for docs/deploying.md (docs/whitepaper/claims.md DOC-072). Override
-// (negative) runs of the harness are evidence too (DOC-074, LIM-024): each is kept in csp-check-negative.json under its
+// The full default run is the committed evidence for docs/deploying.md (docs/whitepaper/claims.md LIM-023). Override
+// (negative) runs of the harness are evidence too (LIM-024): each is kept in csp-check-negative.json under its
 // policy, and is expected to fail.
 const results = join(root, 'examples/package-benchmarks/results');
 if (!only.length && !report.override)

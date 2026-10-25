@@ -31,7 +31,7 @@ changes them.
 ## Whitepaper timing run (pending: needs a quiet PC)
 
 No timing number is whitepaper data yet. The tool has only been smoke-tested (labelled "smoke", not for
-publication). When Scott confirms the machine is quiet (no other apps, no builds, on AC power), run
+publication). When the machine is quiet (no other apps, no builds, on AC power), run
 this once on the release commit:
 
 ```sh
@@ -90,5 +90,5 @@ engines").
 ## A second machine
 
 On a discrete-GPU desktop or a Mac: the setup above, then `npm run bench` and `npm run bench -- features`, and
-send back the `benchmarks/runs/` folder. On Linux or macOS the AC check returns `null` (recorded, not enforced). Set
+keep the `benchmarks/runs/` folder. On Linux or macOS the AC check returns `null` (recorded, not enforced). Set
 `BROWSER_CHANNEL=chrome` where Edge is not installed. Phones are not scripted yet.
