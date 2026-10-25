@@ -20,6 +20,7 @@ export type {
   PointSelection,
 } from './figure.js';
 export { RectsLayer } from './rects.js';
+export type { PNGOptions, SVGOptions } from './export.js';
 export { histogram } from './charts.js';
 export type { Bins, BinOptions } from './charts.js';
 export { SurfaceLayer } from './surface.js';

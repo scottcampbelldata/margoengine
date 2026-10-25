@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3096998,
+  "total": 3099640,
   "history": [
     {
       "date": "2026-10-24",
@@ -206,6 +206,12 @@
       "commit": "b752d7d4",
       "reason": "sciviz: 2D charts (bar, histogram, heatmap) with 2D axes, pan and zoom",
       "grew": 2
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "1ff80aff",
+      "reason": "sciviz: figure.toPNG() and toSVG() export (export code loads on first use)",
+      "grew": 1
     }
   ],
   "items": {
@@ -432,7 +438,7 @@
     "@margoengine/scatter": 11893,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
-    "@margoengine/sciviz": 28324,
+    "@margoengine/sciviz": 30966,
     "@margoengine/sciviz/colormaps": 4433,
     "@margoengine/sciviz/maths": 3729,
     "@margoengine/selection": 13905,

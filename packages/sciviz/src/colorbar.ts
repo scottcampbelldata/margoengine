@@ -17,6 +17,10 @@ export interface ColorBarOptions {
 export class ColorBar {
   /** The root element (absolutely positioned over the canvas's container). */
   readonly element: HTMLDivElement;
+  /** The colour map the bar shows. */
+  readonly colormap: Colormap;
+  /** @internal The gradient element, for export. */
+  readonly bar: HTMLDivElement;
   #disposed = false;
 
   /** @internal Use `figure.colorbar()`. */
@@ -59,6 +63,8 @@ export class ColorBar {
     root.append(body);
     host.append(root);
     this.element = root;
+    this.colormap = map;
+    this.bar = bar;
   }
 
   /** Removes the legend. */

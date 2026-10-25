@@ -38,6 +38,8 @@ export class Axes {
   readonly #drawn: Line[] = [];
   readonly #texts: Label[] = [];
   #loading: Promise<void> | undefined;
+  /** @internal The tick values last drawn on x and y, for export. */
+  drawnTicks: { x: readonly number[]; y: readonly number[] } = { x: [], y: [] };
   #disposed = false;
 
   /** @param lines The figure's lines plugin (shared: one per engine under its default name). */
@@ -69,6 +71,7 @@ export class Axes {
       tx = ticks(x0, x1, count),
       ty = ticks(y0, y1, count),
       tz = ticks(z0, z1, count);
+    this.drawnTicks = { x: tx.values, y: ty.values };
     if (flat) return this.#flat(Line, bounds, model, tx, ty);
     // The box: 12 edges.
     const box = [
@@ -173,6 +176,11 @@ export class Axes {
       ),
     );
     place(yTitle, x0, (y0 + y1) / 2, [1, 0.5]);
+  }
+
+  /** @internal The tick label and title elements, for export. */
+  elements(): HTMLElement[] {
+    return this.#texts.map((label) => label.element);
   }
 
   /** Removes the lines, the labels and both plugins. */

@@ -21,6 +21,8 @@ import { IsosurfaceLayer, levelColour, type IsosurfaceLayerOptions } from './iso
 import { dataToClip, nearestPoint, screenRay, selectPoints, type SelectRegion } from './pick.js';
 import { packColour, RectsLayer } from './rects.js';
 import { formatValue } from './ticks.js';
+import type { PNGOptions, SVGOptions } from './export.js';
+import { projectPoint } from '@margoengine/math/mat4';
 import {
   dataToScene,
   extent,
@@ -316,6 +318,8 @@ export class Figure extends EventTarget {
   #margin: Required<Margin>;
   #offFrame: (() => void) | undefined;
   #axesQueued = false;
+  // Colours and widths of scatter and line layers, for SVG export.
+  readonly #styles = new WeakMap<Layer, { color: string; colors?: Float32Array; width: number }>();
   // Axis updates run after one another; ready() waits for them and reports their errors.
   #pending: Promise<void> = Promise.resolve();
   #disposed = false;
@@ -809,7 +813,16 @@ export class Figure extends EventTarget {
         },
       }),
     );
-    return this.#add({ kind: 'scatter', cloud, bounds, count, positions, values: colourData, name: options.name });
+    const style = { color: toHex(uniform), colors: colours, width: options.size ?? (count > 200_000 ? 2 : 3) };
+    return this.#style(style, {
+      kind: 'scatter',
+      cloud,
+      bounds,
+      count,
+      positions,
+      values: colourData,
+      name: options.name,
+    });
   }
 
   /** A line plot through (x, y, z) (z omitted for a flat line), coloured by `color` data through a colour map. */
@@ -851,7 +864,17 @@ export class Figure extends EventTarget {
         cap: 'round',
       }),
     );
-    return this.#add({ kind: 'line', line, bounds: boundsOf(x, y, z), positions, values: c, name: options.name });
+    return this.#style(
+      { color: colours ? '#ffffff' : colour, colors: colours, width: options.width ?? 2 },
+      {
+        kind: 'line',
+        line,
+        bounds: boundsOf(x, y, z),
+        positions,
+        values: c,
+        name: options.name,
+      },
+    );
   }
 
   /** A surface plot of heights `z` over a grid (`nx` columns; a GpuArray of shape [ny, nx] is read in place). */
@@ -984,6 +1007,175 @@ export class Figure extends EventTarget {
     const rects = heatmapRects(v, nx, ny, x, y),
       { colours, swatch } = this.#colours(v.length, v, options, 'heatmap');
     return this.#rects('heatmap', rects, Float32Array.from(v), colours, options.name, swatch);
+  }
+
+  #style<L extends ScatterLayer | LineLayer>(
+    style: { color: string; colors?: Float32Array; width: number },
+    layer: L,
+  ): L {
+    this.#styles.set(layer, style);
+    return this.#add(layer);
+  }
+
+  // The elements whose text export paints: tick labels, titles and colour bars.
+  #overlayRoots(): Element[] {
+    return [...(this.#axes?.elements() ?? []), ...[...this.#bars].map((b) => b.element)];
+  }
+
+  /**
+   * The figure as a PNG at the canvas's resolution: a fresh frame with the tick labels, titles and colour bars painted
+   * over it (`overlays: false` leaves them out). Waits for pending axis updates.
+   */
+  async toPNG(options: PNGOptions = {}): Promise<Blob> {
+    // Export code loads on first use.
+    const { paintOverlays, textRuns } = await import('./export.js');
+    await this.#pending;
+    this.#check();
+    const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas;
+    this.render();
+    const bitmap = await createImageBitmap(canvas),
+      out = new OffscreenCanvas(bitmap.width, bitmap.height),
+      g = out.getContext('2d')!;
+    g.drawImage(bitmap, 0, 0);
+    if (options.overlays ?? true) {
+      const origin = canvas.getBoundingClientRect(),
+        bars = [...this.#bars].map((b) => ({ bar: b.bar, map: b.colormap }));
+      paintOverlays(
+        g,
+        textRuns(this.#overlayRoots(), origin),
+        bars,
+        origin,
+        bitmap.width / (origin.width || bitmap.width),
+      );
+    }
+    bitmap.close();
+    return out.convertToBlob({ type: 'image/png' });
+  }
+
+  /**
+   * The figure as SVG in CSS pixels: tick labels, titles and colour bars as text and shapes. A 2D chart whose layers
+   * are bars, histograms, heatmaps, lines and scatters of up to 50,000 points is drawn with vector shapes throughout;
+   * anything else is a fresh frame embedded as a PNG under the vector text (`vector: false` forces that).
+   */
+  async toSVG(options: SVGOptions = {}): Promise<string> {
+    const ex = await import('./export.js'),
+      { base64, svgBars, svgText, textRuns } = ex;
+    await this.#pending;
+    this.#check();
+    const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas,
+      origin = canvas.getBoundingClientRect(),
+      { width, height } = this.#canvasSize();
+    const vector =
+      (options.vector ?? true) &&
+      this.#flat &&
+      [...this.#layers].every(
+        (l) =>
+          l instanceof RectsLayer ||
+          ('kind' in l && (l.kind === 'line' || (l.kind === 'scatter' && l.count <= 50_000))),
+      );
+    // A frame places the HTML labels as well as drawing the layers.
+    this.render();
+    let body: string;
+    if (vector) body = this.#vectorSVG(width, height, ex);
+    else {
+      const bitmap = await createImageBitmap(canvas),
+        out = new OffscreenCanvas(bitmap.width, bitmap.height);
+      out.getContext('2d')!.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      const bytes = new Uint8Array(await (await out.convertToBlob({ type: 'image/png' })).arrayBuffer());
+      body = `<image x="0" y="0" width="${width}" height="${height}" href="data:image/png;base64,${base64(bytes)}"/>`;
+    }
+    const bars = svgBars(
+        [...this.#bars].map((b) => ({ bar: b.bar, map: b.colormap })),
+        origin,
+      ),
+      text = svgText(textRuns(this.#overlayRoots(), origin));
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${body}\n${bars}\n${text}\n</svg>\n`;
+  }
+
+  // A 2D chart as SVG shapes: background, grid and frame, then rectangles, points and lines in drawing order, clipped
+  // to the plot area.
+  #vectorSVG(width: number, height: number, { hex, escapeXML }: typeof import('./export.js')): string {
+    const m = this.#margin,
+      { matrix } = this.#view(),
+      p = { x: 0, y: 0, depth: 0, w: 0, inFront: false, inFrustum: false },
+      at = (x: number, y: number): [number, number] => {
+        projectPoint(matrix, x, y, 0, width, height, 'webgpu', p);
+        return [Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100];
+      };
+    const [x0, x1, y0, y1] = this.#bounds,
+      pw = width - m.left - m.right,
+      ph = height - m.top - m.bottom,
+      out: string[] = [
+        `<rect width="${width}" height="${height}" fill="${this.theme.background}"/>`,
+        `<clipPath id="sciviz-plot"><rect x="${m.left}" y="${m.top}" width="${pw}" height="${ph}"/></clipPath>`,
+      ];
+    if ((this.#options.grid ?? true) && this.#axes) {
+      const grid: string[] = [];
+      for (const x of this.#axes.drawnTicks.x) {
+        const [sx] = at(x, y0);
+        grid.push(`M${sx} ${m.top}V${m.top + ph}`);
+      }
+      for (const y of this.#axes.drawnTicks.y) {
+        const [, sy] = at(x0, y);
+        grid.push(`M${m.left} ${sy}H${m.left + pw}`);
+      }
+      out.push(`<path d="${grid.join('')}" stroke="${this.theme.grid}" stroke-width="1" fill="none"/>`);
+    }
+    out.push('<g clip-path="url(#sciviz-plot)">');
+    const layers = [...this.#layers],
+      rgb = (c: number) => hex((c & 255) / 255, ((c >>> 8) & 255) / 255, ((c >>> 16) & 255) / 255);
+    for (const layer of layers.filter((l): l is RectsLayer => l instanceof RectsLayer)) {
+      const r = layer.rects,
+        colours = layer.colours;
+      for (let k = 0; k < layer.values.length; k++) {
+        if (r[k * 4] === r[k * 4 + 2] && r[k * 4 + 1] === r[k * 4 + 3]) continue;
+        const [ax, ay] = at(r[k * 4], r[k * 4 + 3]),
+          [bx, by] = at(r[k * 4 + 2], r[k * 4 + 1]);
+        out.push(
+          `<rect x="${ax}" y="${ay}" width="${Math.round((bx - ax) * 100) / 100}" height="${Math.round((by - ay) * 100) / 100}" fill="${rgb(colours[k])}"/>`,
+        );
+      }
+    }
+    for (const layer of layers)
+      if ('kind' in layer && layer.kind === 'scatter') {
+        const style = this.#styles.get(layer)!,
+          pos = layer.positions;
+        for (let i = 0; i < layer.count; i++) {
+          const [sx, sy] = at(pos[i * 3], pos[i * 3 + 1]),
+            c = style.colors;
+          const fill = c ? hex(c[i * 3], c[i * 3 + 1], c[i * 3 + 2]) : style.color;
+          out.push(`<circle cx="${sx}" cy="${sy}" r="${style.width / 2}" fill="${fill}"/>`);
+        }
+      }
+    for (const layer of layers)
+      if ('kind' in layer && layer.kind === 'line') {
+        const style = this.#styles.get(layer)!,
+          pos = layer.positions,
+          n = pos.length / 3,
+          c = style.colors;
+        const attrs = `stroke-width="${style.width}" stroke-linecap="round" stroke-linejoin="round" fill="none"`;
+        if (c)
+          // Coloured by data: one segment per pair of vertices, in the first vertex's colour.
+          for (let i = 0; i + 1 < n; i++) {
+            const [ax, ay] = at(pos[i * 3], pos[i * 3 + 1]),
+              [bx, by] = at(pos[i * 3 + 3], pos[i * 3 + 4]);
+            out.push(
+              `<path d="M${ax} ${ay}L${bx} ${by}" stroke="${hex(c[i * 3], c[i * 3 + 1], c[i * 3 + 2])}" ${attrs}/>`,
+            );
+          }
+        else {
+          const points = Array.from({ length: n }, (_, i) => at(pos[i * 3], pos[i * 3 + 1]).join(',')).join(' ');
+          out.push(`<polyline points="${points}" stroke="${escapeXML(style.color)}" ${attrs}/>`);
+        }
+      }
+    out.push('</g>');
+    out.push(
+      `<rect x="${m.left}" y="${m.top}" width="${pw}" height="${ph}" fill="none" stroke="${this.theme.axis}" stroke-width="1.5"/>`,
+    );
+    // The window's data range, for tools that read the file.
+    out.push(`<desc>x ${x0} to ${x1}, y ${y0} to ${y1}</desc>`);
+    return out.join('\n');
   }
 
   /** A colour bar legend for `colormap` over `range`, at the canvas's right edge. */

@@ -49,6 +49,8 @@ export interface ClipPlane {
 
 export class ColorBar {
     readonly element: HTMLDivElement;
+    readonly colormap: Colormap;
+    readonly bar: HTMLDivElement;
     constructor(canvas: HTMLCanvasElement, map: Colormap, range: readonly [number, number], theme: Theme, options?: ColorBarOptions);
     dispose(): void;
     [Symbol.dispose](): void;
@@ -131,6 +133,8 @@ export class Figure extends EventTarget {
     }, options?: BarLayerOptions): Promise<RectsLayer>;
     histogram(values: DataSource, options?: HistogramLayerOptions): Promise<RectsLayer>;
     heatmap(values: DataSource, options?: HeatmapLayerOptions): Promise<RectsLayer>;
+    toPNG(options?: PNGOptions): Promise<Blob>;
+    toSVG(options?: SVGOptions): Promise<string>;
     colorbar(colormap: ColormapSource, range: readonly [number, number], options?: ColorBarOptions): ColorBar;
     remove(layer: Layer): void;
     dispose(): void;
@@ -222,6 +226,10 @@ export interface Margin {
     readonly left?: number;
 }
 
+export interface PNGOptions {
+    readonly overlays?: boolean;
+}
+
 export interface PickResult {
     readonly layer: ScatterLayer | LineLayer | SurfaceLayer | RectsLayer;
     readonly index: number;
@@ -247,6 +255,7 @@ export class RectsLayer implements Drawable {
     readonly rects: Float32Array;
     readonly values: Float32Array;
     readonly swatch: string;
+    get colours(): Uint32Array;
     constructor(renderer: SciRenderer, kind: 'bar' | 'histogram' | 'heatmap', rects: Float32Array, values: Float32Array, colours: Uint32Array, options: {
         readonly name?: string;
         readonly swatch: string;
@@ -263,6 +272,10 @@ export class RectsLayer implements Drawable {
 }
 
 export type SRGB = readonly [number, number, number];
+
+export interface SVGOptions {
+    readonly vector?: boolean;
+}
 
 export type ScatterData = {
     readonly x: DataSource;

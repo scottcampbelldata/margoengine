@@ -493,29 +493,92 @@ window.runSciVizTests = async () => {
     figure.dispose();
   });
 
+  await check('toPNG paints the frame with the tick labels and titles over it', async () => {
+    const figure = await Figure.create(canvas, { mode: '2d', titles: { x: 'Month', y: 'Sales' } });
+    figure.engine.stop?.();
+    watch(figure);
+    await figure.bar({ x: [1, 2, 3], y: [3, 1, 2] }, { color: '#ffffff' });
+    const level = figure.colorbar('gray', [0, 1], { label: 'Level' });
+    const blob = await figure.toPNG();
+    assert(blob.type === 'image/png', `a PNG: ${blob.type}`);
+    const bitmap = await createImageBitmap(blob);
+    assert(bitmap.width === canvas.width && bitmap.height === canvas.height, 'at the canvas resolution');
+    const copy = new OffscreenCanvas(bitmap.width, bitmap.height),
+      g = copy.getContext('2d', { willReadFrequently: true });
+    g.drawImage(bitmap, 0, 0);
+    // The x title sits below the plot, where the GPU frame has only background: painted text makes it brighter.
+    const title = [...document.querySelectorAll('span')].find((s) => !s.firstElementChild && s.textContent === 'Month'),
+      r = title.getBoundingClientRect(),
+      c = canvas.getBoundingClientRect(),
+      scale = bitmap.width / c.width;
+    const box = g.getImageData((r.left - c.left) * scale, (r.top - c.top) * scale, r.width * scale, r.height * scale);
+    let brightest = 0;
+    for (let i = 0; i < box.data.length; i += 4)
+      brightest = Math.max(brightest, luminance([box.data[i], box.data[i + 1], box.data[i + 2]]));
+    assert(brightest > 120, `the title is painted (${brightest})`);
+    // The colour bar's gradient is painted too: white near its top, dark near its bottom in the gray map.
+    const bar = level.bar.getBoundingClientRect(),
+      px = (bar.left - c.left + bar.width / 2) * scale,
+      top = g.getImageData(px, (bar.top - c.top + 4) * scale, 1, 1).data,
+      bottom = g.getImageData(px, (bar.bottom - c.top - 4) * scale, 1, 1).data;
+    assert(luminance([...top]) > 200 && luminance([...bottom]) < 60, `bar gradient ${top} .. ${bottom}`);
+    figure.dispose();
+  });
+
+  await check('toSVG writes a 2D chart as vector shapes and text, and a 3D figure as an image under text', async () => {
+    const chart = await Figure.create(canvas, { mode: '2d', titles: { x: 'Month', y: 'Sales' } });
+    chart.engine.stop?.();
+    watch(chart);
+    await chart.bar({ x: [1, 2, 3], y: [3, 1, 2] }, { color: '#ff0000' });
+    await chart.line({ x: [1, 2, 3], y: [2, 2.5, 1] }, { color: '#00ff00' });
+    const svg = new DOMParser().parseFromString(await chart.toSVG(), 'image/svg+xml');
+    assert(!svg.querySelector('parsererror'), 'well-formed SVG');
+    assert(svg.querySelectorAll('rect[fill="#ff0000"]').length === 3, 'three red bars');
+    assert(svg.querySelector('polyline[stroke="#00ff00"]'), 'the line as a polyline');
+    assert(!svg.querySelector('image'), 'no raster');
+    const texts = [...svg.querySelectorAll('text')].map((t) => t.textContent);
+    assert(texts.includes('Month') && texts.includes('Sales'), `titles in ${texts.slice(0, 10)}`);
+    // The tallest bar (3) reaches higher on the page than the shortest (1).
+    const bars = [...svg.querySelectorAll('rect[fill="#ff0000"]')].map((e) => Number(e.getAttribute('y')));
+    assert(bars[0] < bars[1], `bar tops ${bars}`);
+    chart.dispose();
+    const figure = await figureOn(canvas, { axes: true });
+    figure.surface([0, 1, 1, 0], { nx: 2 });
+    const raster = new DOMParser().parseFromString(await figure.toSVG(), 'image/svg+xml');
+    assert(raster.querySelector('image')?.getAttribute('href').startsWith('data:image/png;base64,'), 'an embedded PNG');
+    assert(raster.querySelectorAll('text').length > 3, 'tick labels as text');
+    figure.dispose();
+  });
+
   await check('colour maps the page can use as CSS', async () => {
     assert(colormap('aurora').css().startsWith('linear-gradient('), 'css');
   });
 
-  await check('figure.controls are the orbit controls Figure.create attached, and a selecting drag mode turns them off', async () => {
-    const figure = await Figure.create(canvas, { axes: false });
-    figure.engine.stop?.();
-    const controls = figure.controls;
-    assert(controls && typeof controls.addEventListener === 'function' && controls.enabled, 'Figure.create attaches controls');
-    let changed = 0;
-    controls.addEventListener('change', () => changed++);
-    controls.rotateLeft(0.3);
-    controls.update(1 / 60);
-    assert(changed > 0, 'their change event follows the camera');
-    figure.dragMode = 'lasso';
-    assert(!controls.enabled, 'lasso mode turns orbiting off');
-    figure.dragMode = 'orbit';
-    assert(controls.enabled, 'orbit mode turns it back on');
-    figure.dispose();
-    const bare = await figureOn(canvas, { axes: false });
-    assert(bare.controls === undefined, 'controls: false leaves none');
-    bare.dispose();
-  });
+  await check(
+    'figure.controls are the orbit controls Figure.create attached, and a selecting drag mode turns them off',
+    async () => {
+      const figure = await Figure.create(canvas, { axes: false });
+      figure.engine.stop?.();
+      const controls = figure.controls;
+      assert(
+        controls && typeof controls.addEventListener === 'function' && controls.enabled,
+        'Figure.create attaches controls',
+      );
+      let changed = 0;
+      controls.addEventListener('change', () => changed++);
+      controls.rotateLeft(0.3);
+      controls.update(1 / 60);
+      assert(changed > 0, 'their change event follows the camera');
+      figure.dragMode = 'lasso';
+      assert(!controls.enabled, 'lasso mode turns orbiting off');
+      figure.dragMode = 'orbit';
+      assert(controls.enabled, 'orbit mode turns it back on');
+      figure.dispose();
+      const bare = await figureOn(canvas, { axes: false });
+      assert(bare.controls === undefined, 'controls: false leaves none');
+      bare.dispose();
+    },
+  );
 
   assert(errors.length === 0, `WebGPU errors: ${errors.join('; ')}`);
   return { checks };

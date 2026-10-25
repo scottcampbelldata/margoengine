@@ -562,6 +562,7 @@ under the AGENTS.md exception for standard files (THIRD-PARTY-NOTICES.md, `packa
 | Tick spacing | P. S. Heckbert, "Nice numbers for graph labels", Graphics Gems, 1990 |
 | Histogram bins | D. Freedman and P. Diaconis, "On the histogram as a density estimator: L2 theory", Z. Wahrscheinlichkeitstheorie verw. Gebiete 57, 1981; H. A. Sturges, "The choice of a class interval", JASA 21(153), 1926 |
 | Lasso selection (point in polygon) | M. Shimrat, "Algorithm 112: Position of point relative to polygon", CACM 5(8), 1962 (even-odd crossing rule) |
+| PNG and SVG export | W3C SVG 1.1 (Second Edition) recommendation; the WHATWG HTML standard's canvas 2D context and OffscreenCanvas `convertToBlob` |
 | Surface picking | Ray-height-field intersection by stepping and bisection on the bilinear surface (standard numerical root bracketing; W. H. Press et al., *Numerical Recipes*, 3rd ed., section 9.1) |
 | cubehelix | D. A. Green, Bull. Astr. Soc. India 39, 289 (2011) |
 | coolwarm | K. Moreland, "Diverging color maps for scientific visualization", ISVC 2009 |

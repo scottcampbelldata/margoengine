@@ -174,6 +174,28 @@ const left = fig.select({ rect: [0, 0, canvas.clientWidth / 2, canvas.clientHeig
 console.log(left.points[0].indices.length);
 ```
 
+## Export
+
+`await fig.toPNG()` returns a PNG `Blob` at the canvas's resolution: a fresh frame with the tick labels, titles and
+colour bars painted over it (`{ overlays: false }` leaves them out). `await fig.toSVG()` returns SVG text in CSS
+pixels. A 2D chart whose layers are bars, histograms, heatmaps, lines and scatters of up to 50,000 points is written
+as vector shapes throughout. Any other figure is a fresh frame embedded as a PNG, with the text and colour bars as
+vector elements over it; `{ vector: false }` forces that for a chart too.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+
+const canvas = document.querySelector('canvas')!;
+const chart = await Figure.create(canvas, { mode: '2d', titles: { x: 'Day', y: 'Visits' } });
+await chart.bar({ x: [1, 2, 3, 4, 5], y: [120, 98, 143, 160, 151] });
+const png = await chart.toPNG();
+const svg = await chart.toSVG();
+const link = document.createElement('a');
+link.href = URL.createObjectURL(png);
+link.download = 'visits.png';
+console.log(png.size, svg.length);
+```
+
 ## Colour maps
 
 Margo's own maps are computed from their published definitions:

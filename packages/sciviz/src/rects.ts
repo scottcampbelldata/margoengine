@@ -49,6 +49,11 @@ export class RectsLayer implements Drawable {
   /** A representative colour (`#rrggbb`) for legends. */
   readonly swatch: string;
   readonly #colours: Uint32Array;
+
+  /** Each rectangle's packed sRGB colour (red in the low byte). */
+  get colours(): Uint32Array {
+    return this.#colours;
+  }
   readonly #renderer: SciRenderer;
   readonly #uniform = new Float32Array(20);
   #model: Float32Array = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
