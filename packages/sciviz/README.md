@@ -104,12 +104,17 @@ await fig.line({ x: [0, 10, 20], y: [0, 15, 0], z: [1.2, 1.2, 1.2] }, { width: 3
 
 ## Colour maps
 
-Every map is computed from its published definition; no colour tables are copied:
+Margo's own maps are computed from their published definitions:
 
 - `cubehelix`: Green 2011;
 - `coolwarm`: Moreland's Msh diverging map, 2009;
 - `aurora` (the default), `ember`, `glacier` and `gray`: lightness rising linearly through OKLab (Ottosson 2020);
 - `phase`: cyclic, constant lightness.
+
+The standard maps people already know are the authors' published tables, recorded as data:
+
+- `viridis`, `magma`, `inferno` and `plasma`: Smith and van der Walt (CC0);
+- `cividis`: Nuñez, Anderton and Renslow, PLOS ONE 2018 (CC BY 4.0), made for red-green colour vision deficiency.
 
 `colormap(['#000004', '#b63679', '#fcfdbf'])` builds a map from your own stops, interpolated in OKLab.
 `map.table(n, { linear })` gives RGBA floats for your own shaders, and `map.css()` a gradient string.

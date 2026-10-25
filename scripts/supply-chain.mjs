@@ -81,6 +81,17 @@ export const BUNDLED = [
     modified: 're-derived; ACES fit written for Margo',
     notices: ['NOTICE.md'],
   },
+  {
+    package: '@margoengine/sciviz',
+    component:
+      'Standard colour-map tables: viridis, magma, inferno, plasma (Smith and van der Walt); cividis (Nuñez, Anderton and Renslow 2018)',
+    licence: 'CC0-1.0 (viridis family); CC-BY-4.0 (cividis)',
+    files: 'dist/tables.js (data only, 256 colours per map)',
+    source:
+      'https://github.com/BIDS/colormap/blob/master/colormaps.py (CC0); PLOS ONE 13(7): e0199239 supporting file S2, https://doi.org/10.1371/journal.pone.0199239.s002 (CC BY 4.0)',
+    modified: 'values rounded to 8 bits per channel and written as hex',
+    notices: ['NOTICE.md'],
+  },
 ];
 
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */

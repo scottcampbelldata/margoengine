@@ -10,7 +10,7 @@ the allowed list, or a runtime dependency has an install script, a deprecation o
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-73 of 82 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+72 of 82 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
@@ -33,6 +33,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | @margoengine/decoders | Basis Universal transcoder (Binomial LLC) | Apache-2.0 | dist/basis/basis_transcoder.wasm, dist/basis/basis_transcoder.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/machinery | occt-import-js 0.0.23 with OpenCascade (Viktor Kovacs; Open Cascade SAS) | LGPL-2.1 | dist/workers/occt-import-js.wasm, dist/workers/occt-import-js.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/workers/OCCT-NOTICE.txt, dist/workers/OCCT-LICENSE.txt |
 | @margoengine/post, @margoengine/tonemap | Colour-transform references: AgX (Troy Sobotka, Eary Chow), ACES filmic curve (Krzysztof Narkowicz), Khronos PBR Neutral; the ACES 1.x style fit written for Margo | attribution (formulas and constants; agx.test.js re-derives every AgX matrix and constant, aces.test.js measures the own ACES fit against its sample table) | AgX/ACES shader code: AgX and the Narkowicz curve also compiled into post (ImagePost) and voxel-pathtracer from packages/shared; the own ACES fit only into tonemap | re-derived; ACES fit written for Margo | NOTICE.md |
+| @margoengine/sciviz | Standard colour-map tables: viridis, magma, inferno, plasma (Smith and van der Walt); cividis (Nuñez, Anderton and Renslow 2018) | CC0-1.0 (viridis family); CC-BY-4.0 (cividis) | dist/tables.js (data only, 256 colours per map) | values rounded to 8 bits per channel and written as hex | NOTICE.md |
 
 ### Licence obligations and how they are met
 
@@ -136,7 +137,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/road` | none | none | LICENSE, NOTICE |
 | `@margoengine/scatter` | none | none | LICENSE, NOTICE |
 | `@margoengine/scenery` | none | none | LICENSE, NOTICE |
-| `@margoengine/sciviz` | none | none | LICENSE, NOTICE |
+| `@margoengine/sciviz` | none | Standard colour-map tables: viridis, magma, inferno, plasma (CC0-1.0) | LICENSE, NOTICE, NOTICE.md |
 | `@margoengine/selection` | none | none | LICENSE, NOTICE |
 | `@margoengine/shader` | none | none | LICENSE, NOTICE |
 | `@margoengine/shadows` | none | none | LICENSE, NOTICE |

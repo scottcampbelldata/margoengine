@@ -60,15 +60,15 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2, `./mrt` 4, `./depth` 2 | 21 |  | 38,957 |
 | @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 7,307 |
 | @margoengine/quality | `.` 17, `./warm` 3 | 1 |  | 1,634 |
-| @margoengine/react | `.` 146, `./kit` 29, `./post` 30, `./physics` 34, `./xr` 12 | 33 |  | 23,575 |
+| @margoengine/react | `.` 146, `./kit` 29, `./post` 30, `./physics` 34, `./xr` 12 | 33 |  | 23,696 |
 | @margoengine/road | `.` 3 |  |  | 915 |
 | @margoengine/scatter | `.` 18 | 1 |  | 11,560 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
-| @margoengine/sciviz | `.` 42, `./colormaps` 11, `./maths` 9 | 2 |  |  |
+| @margoengine/sciviz | `.` 42, `./colormaps` 11, `./maths` 9 | 2 |  | 18,777 |
 | @margoengine/selection | `.` 10 | 1 |  | 13,593 |
 | @margoengine/shader | `.` 142, `./noise` 9, `./graph` 17, `./readback` 4, `./raw` 13, `./effects` 19 | 142 |  | 12,152 |
 | @margoengine/shadows | `.` 8 | 1 |  | 12,888 |
-| @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1 | 92 |  | 15,101 |
+| @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1 | 92 |  | 15,281 |
 | @margoengine/splats | `.` 5, `./data` 3 |  |  | 8,551 |
 | @margoengine/splines | `.` 3 |  |  | 1,299 |
 | @margoengine/stage | `.` 24 | 1 |  | 2,941 |

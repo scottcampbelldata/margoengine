@@ -52,7 +52,7 @@ export class Colormap {
 
 export type ColormapKind = 'sequential' | 'diverging' | 'cyclic';
 
-export type ColormapName = 'aurora' | 'ember' | 'glacier' | 'gray' | 'cubehelix' | 'coolwarm' | 'phase';
+export type ColormapName = 'aurora' | 'ember' | 'glacier' | 'gray' | 'cubehelix' | 'coolwarm' | 'phase' | 'viridis' | 'magma' | 'inferno' | 'plasma' | 'cividis';
 
 export type ColormapSource = ColormapName | Colormap | readonly (string | SRGB | readonly [number, string | SRGB])[];
 

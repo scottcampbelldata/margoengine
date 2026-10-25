@@ -6,14 +6,29 @@
 // - aurora, ember, glacier, gray, phase: paths through OKLab (B. Ottosson, "A perceptual color space for image
 //   processing", 2020) whose lightness changes linearly (sequential maps) or stays constant (the cyclic phase map),
 //   so equal data steps look like equal colour steps, with chroma pulled in until each colour fits the sRGB gamut.
+// - viridis, magma, inferno, plasma (Smith and van der Walt) and cividis (Nuñez et al. 2018) are the authors' published
+//   tables, recorded as data in tables.ts, read with linear interpolation between neighbouring entries.
 import { LinearToSRGB, SRGBToLinear, hexColor } from '@margoengine/math/color';
 import { rangeError, typeError } from '../../shared/errors.js';
+import { TABLES } from './tables.js';
 
 /** An sRGB colour as three numbers in [0, 1]. */
 export type SRGB = readonly [number, number, number];
 
 /** The built-in colour maps. */
-export type ColormapName = 'aurora' | 'ember' | 'glacier' | 'gray' | 'cubehelix' | 'coolwarm' | 'phase';
+export type ColormapName =
+  | 'aurora'
+  | 'ember'
+  | 'glacier'
+  | 'gray'
+  | 'cubehelix'
+  | 'coolwarm'
+  | 'phase'
+  | 'viridis'
+  | 'magma'
+  | 'inferno'
+  | 'plasma'
+  | 'cividis';
 
 /** How a map is meant to be read: ordered data, data around a centre, or angles. */
 export type ColormapKind = 'sequential' | 'diverging' | 'cyclic';
@@ -161,6 +176,24 @@ interface Definition {
 const path = (L0: number, L1: number, h0: number, h1: number, chroma: number) => (t: number) =>
   oklch(L0 + (L1 - L0) * t, chroma * (0.35 + 0.65 * Math.sin(Math.PI * Math.min(1, t * 1.1))), h0 + (h1 - h0) * t);
 
+// A recorded table (tables.ts) read at t: decoded once on first use, linear between neighbouring entries.
+const table = (name: keyof typeof TABLES) => {
+  let rows: Float32Array | undefined;
+  return (t: number): SRGB => {
+    if (!rows) {
+      const text = TABLES[name],
+        bytes = [0, 2, 4].map((k) => Number.parseInt(text.slice(k, k + 2), 16));
+      for (let k = 6; k < text.length; k++) bytes.push(bytes[bytes.length - 3] + text.charCodeAt(k) - 79);
+      rows = new Float32Array(bytes.map((v) => v / 255));
+    }
+    const last = rows.length / 3 - 1,
+      x = t * last,
+      k = Math.min(last - 1, Math.floor(x)),
+      f = x - k;
+    return [0, 1, 2].map((c) => rows![3 * k + c] * (1 - f) + rows![3 * k + 3 + c] * f) as unknown as SRGB;
+  };
+};
+
 const DEFINITIONS: Record<ColormapName, Definition> = {
   aurora: {
     kind: 'sequential',
@@ -189,6 +222,31 @@ const DEFINITIONS: Record<ColormapName, Definition> = {
     kind: 'cyclic',
     about: 'a full hue turn at constant lightness and chroma; the ends meet, for angles and phases',
     sample: (t) => oklch(0.7, 0.12, 30 + 360 * t),
+  },
+  viridis: {
+    kind: 'sequential',
+    about: 'Smith and van der Walt: dark blue through teal and green to yellow; the matplotlib default',
+    sample: table('viridis'),
+  },
+  magma: {
+    kind: 'sequential',
+    about: 'Smith and van der Walt: black through purple and pink to pale yellow',
+    sample: table('magma'),
+  },
+  inferno: {
+    kind: 'sequential',
+    about: 'Smith and van der Walt: black through purple, red and orange to pale yellow',
+    sample: table('inferno'),
+  },
+  plasma: {
+    kind: 'sequential',
+    about: 'Smith and van der Walt: blue through purple and orange to yellow',
+    sample: table('plasma'),
+  },
+  cividis: {
+    kind: 'sequential',
+    about: 'Nuñez et al. 2018: blue to yellow, read the same with red-green colour vision deficiency',
+    sample: table('cividis'),
   },
 };
 

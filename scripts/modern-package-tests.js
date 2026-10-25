@@ -18,6 +18,7 @@ import { mkdir, mkdtemp, writeFile, readFile, copyFile, readdir, rm, realpath, s
 import { resolve, join, dirname, basename } from 'node:path';
 import { cpus, tmpdir } from 'node:os';
 import { openBrowser } from './browser.js';
+import { BUNDLED } from './supply-chain.mjs';
 
 const names = [
     'core',
@@ -46,10 +47,17 @@ const names = [
 const packedNames = JSON.parse(await readFile('package.json', 'utf8'))
   .workspaces.filter((path) => path.startsWith('packages/'))
   .map((path) => path.slice('packages/'.length));
-const noticeFiles = new Map([
-  ['post', 'NOTICE.md'],
-  ['tonemap', 'NOTICE.md'],
-]);
+// Top-level notice files the supply-chain list (scripts/supply-chain.mjs BUNDLED) says a package ships; dist/ notices
+// are covered by the dist/ rule below. One list, so a new notice can't pass one check and fail this one.
+const noticeFiles = new Map(
+  BUNDLED.flatMap((b) =>
+    b.package
+      .split(', ')
+      .flatMap((pkg) =>
+        b.notices.filter((n) => !n.startsWith('dist/')).map((n) => [pkg.replace('@margoengine/', ''), n]),
+      ),
+  ),
+);
 const packageDocuments = new Map([...noticeFiles, ['blender', 'FORMAT.md']]);
 const packageName = (name) => (name === 'margoengine' ? 'margoengine' : `@margoengine/${name}`);
 assert.ok(npm, 'Run this check through npm run modern:test:packages');

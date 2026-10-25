@@ -40,6 +40,7 @@
   "files": [
     "dist",
     "LICENSE",
+    "NOTICE.md",
     "NOTICE"
   ],
   "publishConfig": {

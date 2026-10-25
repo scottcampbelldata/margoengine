@@ -550,8 +550,9 @@ expect; the documentation describes behaviour, not code.
 ## Data track: `@margoengine/sciviz`
 
 Written clean room from the sources below. No source code of plotting or visualisation libraries (plotly, vtk.js,
-deck.gl, regl, three.js, matplotlib, ParaView, napari, ipyvolume, anywidget and the like) was read. Colour maps are
-computed from their published definitions; no colour table was copied.
+deck.gl, regl, three.js, matplotlib, ParaView, napari, ipyvolume, anywidget and the like) was read. Margo's own colour maps are
+computed from their published definitions. The five standard maps are the authors' published tables, recorded as data
+under the AGENTS.md exception for standard files (THIRD-PARTY-NOTICES.md, `packages/sciviz/NOTICE.md`).
 
 | Area | Source |
 | --- | --- |
@@ -560,4 +561,14 @@ computed from their published definitions; no colour table was copied.
 | Tick spacing | P. S. Heckbert, "Nice numbers for graph labels", Graphics Gems, 1990 |
 | cubehelix | D. A. Green, Bull. Astr. Soc. India 39, 289 (2011) |
 | coolwarm | K. Moreland, "Diverging color maps for scientific visualization", ISVC 2009 |
+| viridis, magma, inferno, plasma (recorded data, CC0) | N. Smith and S. van der Walt, mpl-colormaps, https://github.com/BIDS/colormap (the authors' table file `colormaps.py`; data only) |
+| cividis (recorded data, CC BY 4.0) | J. R. Nuñez, C. R. Anderton and R. S. Renslow, PLOS ONE 13(7): e0199239 (2018), supporting file S2 |
 | OKLab and the perceptual maps | B. Ottosson, "A perceptual color space for image processing" (2020); sRGB transfer from IEC 61966-2-1; CIELAB and D65 from CIE 15:2004 |
+
+## Data track: the Python package (`python/`)
+
+Written clean room; no source of ipywidgets' widget implementations, anywidget, ipyvolume or similar was read.
+
+| Area | Source |
+| --- | --- |
+| Jupyter widget | The Jupyter widgets messaging protocol 2.1 (ipywidgets documentation) and the Jupyter messaging specification (comms); the JupyterLab extension guide (prebuilt extensions, shared modules); webpack's Module Federation documentation (the container's `init`/`get` interface) |

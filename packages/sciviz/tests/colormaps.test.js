@@ -111,3 +111,51 @@ test('tables, reversed maps, CSS gradients and custom stops interpolated in OKLa
   assert.throws(() => colormap(['#fff']), TypeError);
   assert.throws(() => map.table(1), RangeError);
 });
+
+test('the recorded standard maps match their published tables (viridis family CC0, cividis PLOS ONE S2)', () => {
+  // [t, published row] pairs: first, middle (entry 128 of 256) and last entries of each table, read to 8 bits.
+  const known = {
+    viridis: [
+      [0, [0.267004, 0.004874, 0.329415]],
+      [128 / 255, [0.127568, 0.566949, 0.550556]],
+      [1, [0.993248, 0.906157, 0.143936]],
+    ],
+    magma: [
+      [0, [0.001462, 0.000466, 0.013866]],
+      [128 / 255, [0.716387, 0.214982, 0.47529]],
+      [1, [0.987053, 0.991438, 0.749504]],
+    ],
+    inferno: [
+      [0, [0.001462, 0.000466, 0.013866]],
+      [128 / 255, [0.735683, 0.215906, 0.330245]],
+      [1, [0.988362, 0.998364, 0.644924]],
+    ],
+    plasma: [
+      [0, [0.050383, 0.029803, 0.527975]],
+      [128 / 255, [0.798216, 0.280197, 0.469538]],
+      [1, [0.940015, 0.975158, 0.131326]],
+    ],
+    cividis: [
+      [0, [0, 0.1262, 0.3015]],
+      [128 / 255, [0.4897, 0.4856, 0.4714]],
+      [1, [1, 0.9169, 0.2731]],
+    ],
+  };
+  for (const [name, rows] of Object.entries(known)) {
+    assert.equal(describeColormap(name).kind, 'sequential');
+    for (const [t, want] of rows)
+      colormap(name)
+        .sample(t)
+        .forEach((v, c) =>
+          assert.ok(
+            Math.abs(v - want[c]) <= 0.5 / 255 + 1e-6,
+            `${name}(${t}) = ${colormap(name).sample(t)}, want ${want}`,
+          ),
+        );
+  }
+  // Between entries the map interpolates: halfway between viridis entries 0 and 1.
+  const a = colormap('viridis').sample(0),
+    b = colormap('viridis').sample(1 / 255),
+    half = colormap('viridis').sample(0.5 / 255);
+  half.forEach((v, c) => assert.ok(Math.abs(v - (a[c] + b[c]) / 2) < 1e-6));
+});
