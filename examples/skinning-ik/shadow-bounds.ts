@@ -1,5 +1,5 @@
 // Original Light Keeper geometry, evaluated at bind frame 1 in glTF Y-up metres.
-// Regenerate through Blender MCP with source/skinning_ik/extract_shadow_bounds.py.
+// Regenerate in Blender with source/skinning_ik/extract_shadow_bounds.py.
 // Scene convex hull plus a radius .78 arm/orb envelope at [-.24, 1.03, 0].
 // Facet-tested expansion contains the full analytic sphere, not an inscribed sample.
 // Separate runtime orb is excluded from scene input; no asset geometry is changed.

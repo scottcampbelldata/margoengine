@@ -1,4 +1,4 @@
-// Real-GPU check of HANDOFF 5c (run on AC power, holding the GPU lock, after npm run build:packages):
+// Real-GPU check of the texture binding limit (run on AC power, holding the GPU lock, after npm run build:packages):
 //   node examples/package-benchmarks/binding-limit-gpu.mjs [ref]
 // binding-limit.html draws a PHYSICAL-variant gltf-pro sphere grid with shadows, environment IBL + fog, clustered lights and
 // LocalShadows. 1. With environment as of `ref` (BRDF LUT texture) on a default-limits device the frame fails with gltf-pro's

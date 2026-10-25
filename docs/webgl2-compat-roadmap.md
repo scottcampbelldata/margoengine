@@ -47,7 +47,7 @@ compute shaders and no storage buffers; it has two indirect draw calls (`rendere
 
 ## Decision record
 
-- HANDOFF closed "WebGL beyond core" as won't-do for v1.0 on 2026-10-14 (gap 8), because the alternative was a second
+- "WebGL beyond core" was closed as won't-do for v1.0 on 2026-10-14 (gap 8), because the alternative was a second
   renderer for every package. v1.0 keeps that decision and ships `@margoengine/webgl` as the preview.
 - On 2026-10-21 Scott asked for a complete roadmap to implement the full fallback in the next version. This document is
   that roadmap. The core freeze and the 25,000-byte core + stage gzip gate stay in force: the plan needs zero core bytes.

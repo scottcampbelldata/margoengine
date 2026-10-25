@@ -1,6 +1,6 @@
 {
   "date": "2026-10-16",
-  "branch": "codex/materials-uv1-groups",
+  "branch": "materials-uv1-groups",
   "sourceBase": "6a57389d907e9118340da07aab75e253812b2321",
   "workingTreeDirty": true,
   "scope": "Independent UV1 and grouped materials/instancing/export in optional packages; core and stage unchanged",

@@ -46,7 +46,7 @@ changed since); **[need]** no data yet.
 - Realistic apps: each demo's eager JS (`npm run bench -- size --cases=demo-`) and the vs-three.js harness bundles (Margo vs three
   WebGL vs three WebGPU for the same three scenes, `results/vs-threejs.json` `bundles`). **[have]** (harness) / **[rerun]**
   (demos, after the demo rebuild).
-- Per-package sizes and the cost of every optimization (HANDOFF records bytes per change). **[have]**
+- Per-package sizes and the cost of every optimization (bytes recorded per change). **[have]**
 
 ## 3. Performance methodology
 

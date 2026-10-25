@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>warmUp first-use hitch</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body>
 <canvas id="viewport"></canvas>
 <script type="module">
-// Driven by warm-up-gpu.mjs (HANDOFF 5i.c). One run per fresh browser (cold shader caches): the helmet scene renders to
+// Driven by warm-up-gpu.mjs. One run per fresh browser (cold shader caches): the helmet scene renders to
 // a steady state, then one feature is attached and the first frame that draws it is timed (render() call to
 // onSubmittedWorkDone). With `warm`, `await warmUp(engine)` runs first; its warm frames are offscreen, so the timed
 // frame is again the first visible frame that draws the feature (the warm frames' own times are reported too). The page is left

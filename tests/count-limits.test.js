@@ -1,4 +1,4 @@
-// HANDOFF 5j limit (1): the per-file node and part caps (glTF, gltf-pro, .margo, OBJ, SurfacePhysics) default to 100,000
+// The per-file node and part caps (glTF, gltf-pro, .margo, OBJ, SurfacePhysics) default to 100,000
 // and are options up to core's 8,388,608 entities; the error names the option.
 import test from 'node:test';
 import assert from 'node:assert/strict';

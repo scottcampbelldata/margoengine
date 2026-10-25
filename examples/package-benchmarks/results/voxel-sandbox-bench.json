@@ -28,22 +28,22 @@
     "cpuSeconds": 43509
    },
    {
-    "Name": "ChatGPT",
+    "Name": "desktop-app",
     "Id": 25824,
     "cpuSeconds": 17064
    },
    {
-    "Name": "ChatGPT",
+    "Name": "desktop-app",
     "Id": 37500,
     "cpuSeconds": 8843
    },
    {
-    "Name": "codex",
+    "Name": "desktop-app",
     "Id": 34076,
     "cpuSeconds": 8250
    },
    {
-    "Name": "ChatGPT",
+    "Name": "desktop-app",
     "Id": 68440,
     "cpuSeconds": 6612
    }

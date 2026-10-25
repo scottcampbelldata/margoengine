@@ -32,7 +32,7 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   allocation (NURBS evaluation took 3x less time once it stopped allocating). A Rust/Wasm port of hot loops only where
   measurement shows JS is the limit.
 
-## Stages (each one commit series, tested by Codex before the next)
+## Stages (each one commit series, tested before the next)
 
 1. **Topology core.** A mutable half-edge B-rep (bodies, shells, faces, loops, coedges, edges, vertices) built from
    the readers' STEP model; Euler operators (make/kill edge-vertex, edge-face, loop); `validate` (closed, oriented,
@@ -119,12 +119,12 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   end of a blended straight edge is a corner of three planar faces (running out through a face square to it, a
   mirror-image mitre, or a ball corner), and for full circles where a plane meets a coaxial cylinder, the faces are set
   back and the blend faces put in place (`model/setback.ts`); otherwise each blend is a solid the Booleans subtract or
-  add. Against OpenCascade on the operations benchmark (Codex's harness, best of 3 cold calls): Margo faster in 50 of
+  add. Against OpenCascade on the operations benchmark (paired harness, best of 3 cold calls): Margo faster in 50 of
   66 cases at 7243c0e; at 0b17142 in 67 of 67 against that run's paired OpenCascade times, and in 65 of 66 against the
   7243c0e and b1f5d2e OpenCascade times (the boss-on-plate fillet: 0.457 ms against 0.452 and 0.446 ms). Sub-millisecond
   cases vary by 20 to 60% from run to run. The box with all 12 edges rounded (radius 2 of 10)
   takes 0.4 ms in Node (best of 5; 4.4 to 4.6 ms for a fresh process's first call); OpenCascade's
-  BRepFilletAPI_MakeFillet took 14.1 ms on it (Codex, b1f5d2e step 9), and the Booleans 2,691 ms before ca361d2.
+  BRepFilletAPI_MakeFillet took 14.1 ms on it (at b1f5d2e), and the Booleans 2,691 ms before ca361d2.
 - `model.revolve`: lines and arcs round an axis (planes, cylinders, cones, tori, spheres).
 - `model.bodiesFromSTEP`: a parsed STEP file's solids and sheets as modeler bodies (SAT, Parasolid and JT B-reps
   arrive as STEP), so every operation works on imported parts: planes, cylinders, cones, spheres, tori and B-splines as
@@ -160,4 +160,4 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   matches its closed form to 4e-16, and on Jubilee the volume moves at most 1.4e-11 per mm of that point (before, up to
   1.9e-5).
 - Next: blends on curved faces and along traced edges, setbacks and variable radius, freeform (spline) Booleans,
-  healing (docs/brep-occt-gaps.md); the operations benchmark against OpenCascade (Codex prompt 511d19d, step 9).
+  healing (docs/brep-occt-gaps.md); the operations benchmark against OpenCascade.

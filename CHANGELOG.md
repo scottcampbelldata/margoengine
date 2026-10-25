@@ -51,7 +51,7 @@ clustered, shadows, taa, splats and creative already did.
 
 The scenery `sky-moon` implementation was deliberately replaced by the
 `SkyMoon` preset over `@margoengine/sky`. Keep that single implementation rather
-than restoring `SkyMoonPass`. The [consolidation record](docs/repository-consolidation-2026-10-16.md)
+than restoring `SkyMoonPass`. The consolidation record
 lists all 74 public packages, preserved optional entries and audit decisions.
 
 ### USDZ dependency cleanup

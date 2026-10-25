@@ -76,17 +76,17 @@
    "checkedAt": "2026-10-15T18:59:13.439Z",
    "topProcesses": [
     {
-     "Name": "claude",
+     "Name": "desktop-app",
      "Id": 13528,
      "cpuSeconds": 7343
     },
     {
-     "Name": "claude",
+     "Name": "desktop-app",
      "Id": 12156,
      "cpuSeconds": 5705
     },
     {
-     "Name": "claude",
+     "Name": "desktop-app",
      "Id": 15776,
      "cpuSeconds": 3133
     },
@@ -96,7 +96,7 @@
      "cpuSeconds": 2035
     },
     {
-     "Name": "claude",
+     "Name": "desktop-app",
      "Id": 12224,
      "cpuSeconds": 1081
     },
@@ -118,6 +118,6 @@
    ]
   },
   "status": "quiet-gated",
-  "note": "Diagnostic: the quiet gate passed (AC, CPU <= 20%), but other agents' sessions were open. Frame time = render + onSubmittedWorkDone, 800x600, shadows resolution 1024."
+  "note": "Diagnostic: the quiet gate passed (AC, CPU <= 20%), but other jobs were running. Frame time = render + onSubmittedWorkDone, 800x600, shadows resolution 1024."
  }
 }

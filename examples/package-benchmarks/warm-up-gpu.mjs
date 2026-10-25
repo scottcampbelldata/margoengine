@@ -1,4 +1,4 @@
-// First-use hitch per feature with and without warmUp (@margoengine/quality/warm, HANDOFF 5i.c), real GPU.
+// First-use hitch per feature with and without warmUp (@margoengine/quality/warm), real GPU.
 // After npm run build:packages, on AC power, holding the GPU lock:
 //   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/warm-up-gpu.mjs [--runs=3] [--only=ssao,dof] [--no-quiet]
 // Every sample launches a fresh browser (fresh profile: cold shader caches, as on a first visit). Runs the quiet gate

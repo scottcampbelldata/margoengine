@@ -1,4 +1,4 @@
-// Gives a git worktree of this repository a real node_modules folder (docs/HANDOFF.md, "Worker practice"):
+// Gives a git worktree of this repository a real node_modules folder:
 // third-party entries are junctions to the main checkout's node_modules, and every @margoengine/* package (and the
 // `margoengine` stage) is a junction to THIS worktree's own packages, so builds and tests use the worktree's code.
 // Usage, from inside a worktree: node scripts/worktree-node-modules.mjs

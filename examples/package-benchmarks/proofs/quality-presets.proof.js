@@ -1,4 +1,4 @@
-// Proof for tier presets (HANDOFF 5i.b): every package that reads `globalThis.margoPreset` (set by @margoengine/quality)
+// Proof for tier presets: every package that reads `globalThis.margoPreset` (set by @margoengine/quality)
 // 1. records exactly the GPU calls it made at `ref` when no preset is set (apps without the quality package: unchanged),
 // 2. with the light preset set, records exactly the calls of the same story given the preset's values as options
 //    (the preset only fills options), and those differ from the defaults (the preset is visible on the GPU),

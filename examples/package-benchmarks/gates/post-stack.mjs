@@ -1,4 +1,4 @@
-// Post full-stack gate (HANDOFF item 0) and the SSAO-with-IBL cost. Real GPU, serial, under the GPU lock, on AC power.
+// Post full-stack gate and the SSAO-with-IBL cost. Real GPU, serial, under the GPU lock, on AC power.
 // From the repository root after `npm run build:packages`:
 //   node examples/package-benchmarks/gates/post-stack.mjs [--rounds=8] [--frames=120]
 // Scene: DamagedHelmet (gltf-pro) + core boxes on a floor, environment IBL from a procedural HDR sky, 1280x720, DPR 1,

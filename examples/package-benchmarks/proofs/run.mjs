@@ -85,7 +85,7 @@ function run(name) {
   });
 }
 
-// Two at a time: some proofs hold ~1 GB and time interleaved runs, and the machine is shared (HANDOFF: never all cores).
+// Two at a time: some proofs hold ~1 GB and time interleaved runs, and the machine is shared (never all cores).
 const queue = [...names],
   rows = [],
   width = Math.min(2, Math.max(1, availableParallelism() >> 1));

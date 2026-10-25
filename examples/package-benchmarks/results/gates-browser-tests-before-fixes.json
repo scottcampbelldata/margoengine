@@ -19,7 +19,7 @@
    "seconds": 8,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: Error: WebGPU unavailable\r\n    at http://127.0.0.1:5193/packages/core/dist/engine.js:1:4747\r\n    at e.create (http://127.0.0.1:5193/packages/core/dist/engine.js:1:4777)\r\n    at async Object.core (http://127.0.0.1:5193/tests/modern-browser.tsx:125:18)\r\n    at async <anonymous>:396:30\r\n    at C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\scripts\\modern-browser-tests.js:16:29 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: Error: WebGPU unavailable\r\n    at http://127.0.0.1:5193/packages/core/dist/engine.js:1:4747\r\n    at e.create (http://127.0.0.1:5193/packages/core/dist/engine.js:1:4777)\r\n    at async Object.core (http://127.0.0.1:5193/tests/modern-browser.tsx:125:18)\r\n    at async <anonymous>:396:30\r\n    at <repo>\\scripts\\modern-browser-tests.js:16:29 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-domain-tests.js",
@@ -37,7 +37,7 @@
    "seconds": 11,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Expression 0 did not change the face during playback: 0\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-extension-tests.js:121:16\r\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Expression 0 did not change the face during playback: 0\r\n    at file:///<repo>/scripts/modern-extension-tests.js:121:16\r\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-finalization-tests.js",
@@ -46,7 +46,7 @@
    "seconds": 7.1,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://127.0.0.1:5194/\r\nCall log:\r\n\u001b[2m  - navigating to \"http://127.0.0.1:5194/\", waiting until \"load\"\u001b[22m\r\n\r\n    at C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\scripts\\modern-finalization-tests.js:16:13 {\r\n  log: [\r\n    '  - navigating to \"http://127.0.0.1:5194/\", waiting until \"load\"'\r\n  ],\r\n  name: 'Error'\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://127.0.0.1:5194/\r\nCall log:\r\n\u001b[2m  - navigating to \"http://127.0.0.1:5194/\", waiting until \"load\"\u001b[22m\r\n\r\n    at <repo>\\scripts\\modern-finalization-tests.js:16:13 {\r\n  log: [\r\n    '  - navigating to \"http://127.0.0.1:5194/\", waiting until \"load\"'\r\n  ],\r\n  name: 'Error'\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-game-package-tests.js",
@@ -55,7 +55,7 @@
    "seconds": 0.1,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Run through npm run modern:test:game:packages\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-game-package-tests.js:6:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: undefined,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Run through npm run modern:test:game:packages\r\n    at file:///<repo>/scripts/modern-game-package-tests.js:6:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: undefined,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-game-tests.js",
@@ -73,7 +73,7 @@
    "seconds": 11,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Desktop did not draw with 4× MSAA\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-grass-tests.js:165:3 {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Desktop did not draw with 4× MSAA\r\n    at file:///<repo>/scripts/modern-grass-tests.js:165:3 {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-hardware-gpu-tests.js",
@@ -82,7 +82,7 @@
    "seconds": 0.7,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Select a physical GPU with GPU_VENDOR and BROWSER_ARGS\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-hardware-gpu-tests.js:9:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Select a physical GPU with GPU_VENDOR and BROWSER_ARGS\r\n    at file:///<repo>/scripts/modern-hardware-gpu-tests.js:9:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-machinery-runtime-tests.js",
@@ -91,7 +91,7 @@
    "seconds": 7.2,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: Error: WebGPU unavailable\r\n    at http://127.0.0.1:5193/packages/core/dist/engine.js:1:4747\r\n    at e.create (http://127.0.0.1:5193/packages/core/dist/engine.js:1:4777)\r\n    at async eval (eval at evaluate (:370:30), <anonymous>:1:21)\r\n    at async <anonymous>:396:30\r\n    at C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\scripts\\modern-machinery-runtime-tests.js:32:28 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: Error: WebGPU unavailable\r\n    at http://127.0.0.1:5193/packages/core/dist/engine.js:1:4747\r\n    at e.create (http://127.0.0.1:5193/packages/core/dist/engine.js:1:4777)\r\n    at async eval (eval at evaluate (:370:30), <anonymous>:1:21)\r\n    at async <anonymous>:396:30\r\n    at <repo>\\scripts\\modern-machinery-runtime-tests.js:32:28 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-night-citadel-tests.js",
@@ -109,7 +109,7 @@
    "seconds": 0.7,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Run this check through npm run modern:test:packages\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-package-tests.js:10:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: undefined,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Run this check through npm run modern:test:packages\r\n    at file:///<repo>/scripts/modern-package-tests.js:10:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: undefined,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-postfx-tests.js",
@@ -127,7 +127,7 @@
    "seconds": 5.8,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: TypeError: Cannot read properties of undefined (reading '4')\r\n    at render (eval at evaluate (:370:30), <anonymous>:45:163)\r\n    at eval (eval at evaluate (:370:30), <anonymous>:55:93)\r\n    at async <anonymous>:396:30\r\n    at C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\scripts\\modern-sky-fog-tests.js:17:34 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: TypeError: Cannot read properties of undefined (reading '4')\r\n    at render (eval at evaluate (:370:30), <anonymous>:45:163)\r\n    at eval (eval at evaluate (:370:30), <anonymous>:55:93)\r\n    at async <anonymous>:396:30\r\n    at <repo>\\scripts\\modern-sky-fog-tests.js:17:34 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-stress-tests.js",
@@ -136,7 +136,7 @@
    "seconds": 51.4,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "    at e.create (http://127.0.0.1:61553/test-results/stress/seed-20261011-shard-0/harness/assets/modern-stress-CCYQph7F.js:24:6564)\n    at async A (http://127.0.0.1:61553/test-results/stress/seed-20261011-shard-0/harness/assets/modern-stress-CCYQph7F.js:24:22708)\n    at async window.runStress (http://127.0.0.1:61553/test-results/stress/seed-20261011-shard-0/harness/assets/modern-stress-CCYQph7F.js:650:24580)\n    at async <anonymous>:396:30\n22 sessions: 16 passed, 6 failed (50s)\nStress evidence: C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\test-results\\stress\\seed-20261011-shard-0/report.json\nnode:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: 6 stress sessions failed; see C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\test-results\\stress\\seed-20261011-shard-0/report.json\r\n\r\n6 !== 0\r\n\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-stress-tests.js:90:8\r\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: 6,\r\n  expected: 0,\r\n  operator: 'strictEqual',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "    at e.create (http://127.0.0.1:61553/test-results/stress/seed-20261011-shard-0/harness/assets/modern-stress-CCYQph7F.js:24:6564)\n    at async A (http://127.0.0.1:61553/test-results/stress/seed-20261011-shard-0/harness/assets/modern-stress-CCYQph7F.js:24:22708)\n    at async window.runStress (http://127.0.0.1:61553/test-results/stress/seed-20261011-shard-0/harness/assets/modern-stress-CCYQph7F.js:650:24580)\n    at async <anonymous>:396:30\n22 sessions: 16 passed, 6 failed (50s)\nStress evidence: <repo>\\test-results\\stress\\seed-20261011-shard-0/report.json\nnode:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: 6 stress sessions failed; see <repo>\\test-results\\stress\\seed-20261011-shard-0/report.json\r\n\r\n6 !== 0\r\n\r\n    at file:///<repo>/scripts/modern-stress-tests.js:90:8\r\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: 6,\r\n  expected: 0,\r\n  operator: 'strictEqual',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-temporal-tests.js",
@@ -154,7 +154,7 @@
    "seconds": 0.7,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/fs/promises:640\r\n  return new FileHandle(await PromisePrototypeThen(\r\n                        ^\r\n\r\nError: ENOENT: no such file or directory, open 'C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\test-results\\usdz-textured.usdz'\r\n    at async open (node:internal/fs/promises:640:25)\r\n    at async readFile (node:internal/fs/promises:1287:14)\r\n    at async file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-usdz-tests.js:5:25 {\r\n  errno: -4058,\r\n  code: 'ENOENT',\r\n  syscall: 'open',\r\n  path: 'C:\\\\Dev\\\\Projects\\\\margo-engine\\\\.claude\\\\worktrees\\\\agent-aaeb47dfc2c9520a2\\\\test-results\\\\usdz-textured.usdz'\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/fs/promises:640\r\n  return new FileHandle(await PromisePrototypeThen(\r\n                        ^\r\n\r\nError: ENOENT: no such file or directory, open '<repo>\\test-results\\usdz-textured.usdz'\r\n    at async open (node:internal/fs/promises:640:25)\r\n    at async readFile (node:internal/fs/promises:1287:14)\r\n    at async file:///<repo>/scripts/modern-usdz-tests.js:5:25 {\r\n  errno: -4058,\r\n  code: 'ENOENT',\r\n  syscall: 'open',\r\n  path: '<repo>\\\\test-results\\\\usdz-textured.usdz'\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-visual-parity-tests.js",
@@ -172,7 +172,7 @@
    "seconds": 4.8,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: Error: WebGPU unavailable\r\n    at http://127.0.0.1:5193/packages/core/dist/engine.js:1:4747\r\n    at e.create (http://127.0.0.1:5193/packages/core/dist/engine.js:1:4777)\r\n    at async Module.l (http://127.0.0.1:5193/packages/margoengine/dist/index.js:1:3751)\r\n    at async eval (eval at evaluate (:370:30), <anonymous>:3:19)\r\n    at async <anonymous>:396:30\r\n    at C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\scripts\\modern-wrapper-tests.js:26:16 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: Error: WebGPU unavailable\r\n    at http://127.0.0.1:5193/packages/core/dist/engine.js:1:4747\r\n    at e.create (http://127.0.0.1:5193/packages/core/dist/engine.js:1:4777)\r\n    at async Module.l (http://127.0.0.1:5193/packages/margoengine/dist/index.js:1:3751)\r\n    at async eval (eval at evaluate (:370:30), <anonymous>:3:19)\r\n    at async <anonymous>:396:30\r\n    at <repo>\\scripts\\modern-wrapper-tests.js:26:16 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-xr-tests.js",

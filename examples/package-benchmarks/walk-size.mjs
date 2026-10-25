@@ -1,4 +1,4 @@
-// Bytes an app adds for a walkthrough controller (HANDOFF 5l.t point 4): WalkControls (Wasm-free, on the bvh trees)
+// Bytes an app adds for a walkthrough controller: WalkControls (Wasm-free, on the bvh trees)
 // against @margoengine/physics + Rapier. Method as entry-sizes.mjs (vite minify es2022 + compactOutput, zlib default
 // gzip); Rapier is measured as installed (@dimforge/rapier3d-compat, whose module inlines the Wasm as base64).
 // Run (after npm run build:packages): node examples/package-benchmarks/walk-size.mjs

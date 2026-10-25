@@ -4,7 +4,7 @@ Date: 2026-10-16. Updated after the first native importer landed. Core and the s
 
 The first implementation is in the tree. `@margoengine/exporters` writes skins, morphs, and clips on a data scene, and engine-scene export stays static. `@margoengine/fbx` parses binary and ASCII FBX itself and calls `exportGLB`. `convertFBX`, `parseFBX`, and `loadFBX` are unchanged. The package has no Three.js runtime dependency. The root `three` and `@types/three` development dependencies are removed. The size benchmark (`npm run bench -- size`) resolves the other engines it measures from the sibling `engine-bench` checkout; nothing in this repository installs them.
 
-The FBX suite passed 53 tests on 2026-10-16 under Node 24, including the checked-in Blender fixture, with zero failures or skips. `npm test --workspace @margoengine/exporters` passed 17 tests. `npm run measure:size` reported core plus stage at 19,999 bytes gzip, under the 20,000-byte gate. The supported subset is in `packages/fbx/README.md` and `docs/native-fbx-plan.md`. The CC0 Blender fixture gate recorded in `docs/code-to-nine.md` is closed. Broader DCC certification remains separate. This file keeps the design. Where the implementation disagreed with the first draft, the notes below follow the code.
+The FBX suite passed 53 tests on 2026-10-16 under Node 24, including the checked-in Blender fixture, with zero failures or skips. `npm test --workspace @margoengine/exporters` passed 17 tests. `npm run measure:size` reported core plus stage at 19,999 bytes gzip, under the 20,000-byte gate. The supported subset is in `packages/fbx/README.md`. The CC0 Blender fixture gate is closed. Broader DCC certification remains separate. This file keeps the design. Where the implementation disagreed with the first draft, the notes below follow the code.
 
 Corrections that the code made to this design:
 
@@ -408,7 +408,7 @@ The browser fixture behind `MARGOENGINE_FBX_FIXTURE` defaults to the checked-in 
 
 ## Order of work
 
-Steps 1 through 9 are in the tree: the exporter data-scene fields, the binary and ASCII readers, mesh conversion, the `Move` clip, materials, units, axes, skin reduction, morphs, and the removal of the Three.js imports from this package. The licensed Blender fixture now passes headless numeric checks and WebGPU rendering. Broader DCC certification remains separate from this supported-subset proof. `docs/native-fbx-plan.md` records the checked boxes.
+Steps 1 through 9 are in the tree: the exporter data-scene fields, the binary and ASCII readers, mesh conversion, the `Move` clip, materials, units, axes, skin reduction, morphs, and the removal of the Three.js imports from this package. The licensed Blender fixture now passes headless numeric checks and WebGPU rendering. Broader DCC certification remains separate from this supported-subset proof. 
 
 ## Explicit non-goals
 

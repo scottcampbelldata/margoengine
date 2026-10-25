@@ -9,131 +9,131 @@ until the workload runs.
 Build the packages with `npm run build:packages`, then run
 `npx vite --host 127.0.0.1`. Open one of these paths:
 
-- [ECS](./index.html?package=ecs): 10,000 entities by default. Intersect packed
+- ECS: 10,000 entities by default. Intersect packed
   position/velocity components and integrate every matching entity each frame.
-- [FSM](./index.html?package=fsm): 1,000 hierarchical state machines. Each updates
+- FSM: 1,000 hierarchical state machines. Each updates
   a parent/child path and processes staggered events, with visible state changes
   and 0.2-second cross-fades.
-- [Tween](./index.html?package=tween): 1,000 eased tracks. Staggered completion
+- Tween: 1,000 eased tracks. Staggered completion
   callbacks reverse each track continuously; callback-driven track creation is
   included in the workload measurement.
-- [Net](./index.html?package=net): 256 remote actors. Simulated 20 Hz packets feed
+- Net: 256 remote actors. Simulated 20 Hz packets feed
   32-slot snapshot rings; each frame samples Hermite positions and quaternion
   rotations with a 100 ms playback delay. Periodic packet losses exercise capped
   prediction. This page sends no network packets.
-- [BVH](./index.html?package=bvh): deform and refit a 20,000-triangle heightfield,
+- BVH: deform and refit a 20,000-triangle heightfield,
   then cast 256 rays per frame and query a moving broad-phase region with
   `shapecast`. Green and amber markers show actual hits; red markers show misses.
   Its counters separate build, refit, raycast and shapecast CPU work.
-- [Splines](./index.html?package=splines): 384 rendered samples by default: 48
+- Splines: 384 rendered samples by default: 48
   fixed path markers and 336 followers. Real Catmull-Rom, Bezier and Hermite
   curves drive positions and headings through parameter/tangent and cached
   arc-length queries. The initial arc-cache setup CPU is recorded separately.
-- [Navmesh](./index.html?package=navmesh): 96 actors by default: 32 walkable-polygon
+- Navmesh: 96 actors by default: 32 walkable-polygon
   markers and 64 agents. Real A*/funnel paths route around a blocked center;
   simultaneous ORCA velocities use nearby agents, and a caller boundary guard
   rejects steps outside the walkable mesh. Purple marks polygons, amber marks
   changed velocities and red marks rejected steps. Package ORCA does not supply
   static-wall constraints; the demo does not claim agent-radius wall clearance.
-- [WFC](./index.html?package=wfc): 64 generated cells by default. Seeded weighted
+- WFC: 64 generated cells by default. Seeded weighted
   WFC enforces reciprocal height-level adjacency and pinned opposite corners.
   Run changes the seed once per simulation second; solve/validation CPU and
   startup setup CPU are recorded separately. Frames between solves render the
   existing solution. Larger presets expose synchronous generation stalls; this
   is bounded propagation/restart generation, not an exhaustive backtracking solver.
-- [Navigation](./index.html?package=navigation): `@margoengine/navmesh/build`
+- Navigation: `@margoengine/navmesh/build`
   voxelises the floor triangles and answers funnel path queries around a missing
   central floor. The default is 72 input floor markers plus 56 agents; it
   provides paths without crowd avoidance. The navmesh build elapsed is included
   in readiness and separated from synchronous query CPU. Recorded before the
   generator replaced the Recast wrapper (2026-10-24): Native baseline averaged 120 callbacks/s;
   its 1,409 ms initial principal opportunity missed the startup deadline.
-- [Physics](./index.html?package=physics): 64 rotation-locked Rapier cubes and
+- Physics: 64 rotation-locked Rapier cubes and
   16 real downward ray-hit markers by default. The Margo Physics package performs
   fixed steps, contacts, impulses and scene queries. Initialization elapsed is
   separated from simulation/query CPU. Native baseline averaged 120 callbacks/s;
   its 1,454 ms initial principal opportunity missed the startup deadline.
-- [Road](./index.html?package=road): actual spline road sweeps with 16 segments
+- Road: actual spline road sweeps with 16 segments
   by default. Its 136 markers show eight unique cross-section corners per row;
   generated normals, UVs and triangle counts are separate. This is a vertex view
   rather than a filled road rendering. Native baseline averaged 119.6 callbacks/s;
   its initial principal opportunity was 389 ms.
-- [Gizmo](./index.html?package=gizmo): 16 selectable cubes and the real transform
+- Gizmo: 16 selectable cubes and the real transform
   overlay. Drag handles to translate/rotate/scale, change world/local space or
   reset the attached pose. Snap steps are 0.25 units, 15 degrees and 0.25 scale.
-- [Inspector](./index.html?package=inspector): 16 selectable cubes in the actual
+- Inspector: 16 selectable cubes in the actual
   hierarchy/property editor, with independent materials. WebGPU renders AABB
   bounds by default; its own controls also enable wireframes or vertex normals.
   Effect fields remain disabled because this scene has no attached effects.
-- [Labels](./index.html?package=labels): 16 mesh-following, clickable 2D labels
+- Labels: 16 mesh-following, clickable 2D labels
   with depth sorting, plus one actual CSS3D selection card. Toggle a label or
   remove/re-add the first using the package's ownership API.
-- [HTML](./index.html?package=html): 16 cubes with 32 actual anchors. Clickable
+- HTML: 16 cubes with 32 actual anchors. Clickable
   labels sit above each cube; inside anchors use asynchronous rendered-depth
   occlusion on WebGPU. Move those anchors above/inside to compare visibility.
   Startup and paused toggles use one completion wait and two bounded preview
   frames to display the asynchronous result; this is outside FPS measurement.
   WebGL provides projection without inventing rendered-depth support.
 
-The seven runtime/UI cases have [local native and Intel phone-layout evidence](../../docs/package-ui-runtime-workloads-2026-10-13.md).
+The seven runtime/UI cases have local native and Intel phone-layout evidence.
 Those short runs do not establish physical-mobile or cold-hosted acceptance.
 
-- [Loaders](./index.html?package=loaders): the Margo-made PLY torus from the loaders
+- Loaders: the Margo-made PLY torus from the loaders
   fixtures. Fetch limits, parsing, normal/geometry construction and visible
   surfaces use the actual package. Run repeats a bounded parse batch each second.
-- [Exporters](./index.html?package=exporters): the fixture knight is written to
+- Exporters: the fixture knight is written to
   GLB, binary PLY, STL and OBJ/MTL; displayed surfaces come from parsing the PLY
   output. Writer CPU, reimport CPU and output sizes are separately reported.
-- [USDZ-export](./index.html?package=usdz-export): the same fixture knight uses
+- USDZ-export: the same fixture knight uses
   the actual standalone aligned-USDZ serializer and is parsed back for display.
   This covers static untextured export, with no Apple Quick Look claim.
-- [Decoders](./index.html?package=decoders): actual Draco Avocado geometry from
+- Decoders: actual Draco Avocado geometry from
   the package fixture, decoded through a two-worker pool with accessor checks.
   The surface uses transferred geometry, without source textures or KTX2 coverage.
-- [IFC](./index.html?package=ifc): the actual IFC4 wall fixture goes through
+- IFC: the actual IFC4 wall fixture goes through
   initialized web-ifc and Margo's tessellator, retaining meter geometry and BIM
   identifiers. Source wall dimensions remain recorded before display normalization.
-- [FBX](./index.html?package=fbx): the existing ASCII triangle fixture goes
+- FBX: the existing ASCII triangle fixture goes
   through actual FBX→GLB conversion. Its converted geometry is displayed;
   this tiny static fixture does not establish production skin/texture/clip support.
-- [Points](./index.html?package=points): four real 397-point bunny PCD clouds
+- Points: four real 397-point bunny PCD clouds
   and four billboard sprites. Every frame updates a 32-point range in each cloud
   and rotates the sprite markers. Toggle eye-dome lighting, recolor a selected
   cloud or click drawn points to invoke package picking. Input/drawn point counts
   and actual GPU-upload bytes are separate from the small core anchor cubes.
-- [Toon](./index.html?package=toon): four PLY torus surfaces with the specific
+- Toon: four PLY torus surfaces with the specific
   Toon package's stepped lighting and front-culled expanded silhouette hull.
   Run rotates the models; the toggle removes/re-attaches the actual plugin.
-- [Transitions](./index.html?package=transitions): real knight/torus scenes
+- Transitions: real knight/torus scenes
   captured and blended through wipe, seeded dissolve, radial and chromatic passes.
   Run changes geometry every 1.5 seconds and animates each 0.75-second transition.
   The button starts a new transition; progress requires Run while paused.
-- [Animator](./index.html?package=animator): one real skinned RobotExpressive
+- Animator: one real skinned RobotExpressive
   model by default, with actual Idle/Walking/Running blends, state cross-fades
   and a masked right-arm Wave additive layer. Model nodes and skinning buffers
   are owned by the existing PBR/Animation packages; actor boxes are cleared.
-- [TAA](./index.html?package=taa): actual temporal accumulation, animated-vertex
+- TAA: actual temporal accumulation, animated-vertex
   and parent-motion velocity on the same walking robot. Toggle/reset the effect
   and inspect history controls; no empty actor-box TAA surrogate is used.
-- [Text](./index.html?package=text): 16 real two-line SDF text blocks over depth
+- Text: 16 real two-line SDF text blocks over depth
   anchors. Local monospace font setup, atlas/glyph counts, fixed-length string
   changes, and outline/shadow toggles use the actual TextRenderer package.
-- [Splats](./index.html?package=splats): one combined, globally sorted Gaussian
+- Splats: one combined, globally sorted Gaussian
   cloud with 397 input samples per bunny group. It uses actual anisotropic
   covariance/SH input and camera motion. This is a derived PCD fixture; it does
   not claim trained photogrammetry or every external splat file format.
-- [Audio](./index.html?package=audio): four generated looping tones in real
+- Audio: four generated looping tones in real
   positional Web Audio sources, with mesh-following panners, cone/distance
   attenuation and reused FFT analysis. **Enable sound** is explicit; the default
   is silent. Run moves emitters, and Pause suspends sound. This covers generated
   buffers and graph/spatial work, without a decoded-file or hearing-test claim.
-- [Video](./index.html?package=video): four external-texture surfaces share one
+- Video: four external-texture surfaces share one
   actual HTMLVideoElement fed by a generated 256 × 128 Canvas MediaStream.
   Source drawing and explicit frame requests are included in workload CPU;
   delivered video-frame counts are recorded separately. First mount waits for
   an actual source frame, and disposal stops tracks/callbacks/media ownership.
   This covers external media textures; file decoding/codecs are not exercised.
-- [Blender](./index.html?package=blender): four complete, textured `.margo`
+- Blender: four complete, textured `.margo`
   fixture models, each with two triangles sharing geometry and an authored
   mirrored transform. The 1,004-byte fixture comes from the existing Python
   format writer. Mount uses actual image decode and PBR upload; Run separately
@@ -244,7 +244,7 @@ or an unprofiled render interval exceeds 16.67 ms plus 0.2 ms timing tolerance.
 This strict local target does not substitute for physical display/mobile or
 hosted cold-load proof; timestamp-profiled runs are recorded separately.
 Use `WORKLOAD_PACKAGES=splines,navmesh,wfc` to select the new workloads explicitly.
-Their [native and Intel phone-layout measurements](../../docs/package-routing-workloads-2026-10-13.md)
+Their native and Intel phone-layout measurements
 include startup misses and cadence tails. Physical-mobile/cold-hosted acceptance
 remains open; bounded defaults are not a performance guarantee. Asset families
 and Points/Toon/Transitions completed 18 actual native/layout diagnostic cases
@@ -252,14 +252,14 @@ and 72 timing windows, including exact output metadata, real Draco workers,
 controls and cleanup. Sixteen strict local targets failed. Traces isolate
 repeated synchronous export work and development-server import delays; built
 startup, untraced cadence and physical-device acceptance remain open. See
-[the asset/effect measurements](../../docs/package-asset-effect-workloads-2026-10-13.md).
+the asset/effect measurements.
 Animator/TAA/Text/Splats, Audio/Video and Blender now have recorded actual native
 and Intel phone-layout runs: all14 functional cases/56 windows pass, while five
 strict local startup/tail targets fail. Real TAA validation isolated a static PBR
 buffer-usage bug; the glTF-pro fix also passes actual prepared-model/reboot and
 bit-exact non-TAA image checks. Hosted cold loads, physical phones and complete
 optimization acceptance remain pending. Details and limitations are in
-[the render/media workload log](../../docs/package-render-media-workloads-2026-10-13.md).
+the render/media workload log.
 Correctness self-checks exercise the same workload factories without a browser:
 
 ```sh
@@ -279,5 +279,5 @@ do not establish a device performance guarantee.
   Stats profiler, light and full tier.
 - `vfx-size.mjs`: min+gzip of every vfx entry at a ref and now.
 
-Results (`results/vfx-*.json`) back the numbers in `packages/vfx/README.md` and `docs/HANDOFF.md` item 0b; the
+Results (`results/vfx-*.json`) back the numbers in `packages/vfx/README.md`; the
 `vfx-gpu-<candidate>.json` files record each idea tried, kept or rejected.

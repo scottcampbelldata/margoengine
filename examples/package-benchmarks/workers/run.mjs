@@ -1,4 +1,4 @@
-// HANDOFF 1f.j / 1g.f, real browser. From the repository root after `npm run build:packages`:
+// real browser. From the repository root after `npm run build:packages`:
 //   node examples/package-benchmarks/workers/run.mjs [--rounds=6] [--skip-parse] [--skip-offscreen]
 // Takes the GPU lock (main checkout's test-results/gpu.lock, checked every 60 s), requires AC power before and after.
 // 1. offscreen.html in Edge and Chrome: core + packages on a transferred OffscreenCanvas in a worker, platform features

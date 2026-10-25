@@ -1,4 +1,4 @@
-// Shadow shimmer under slow camera motion (HANDOFF 1f.i), real GPU. Run from the repository root after
+// Shadow shimmer under slow camera motion, real GPU. Run from the repository root after
 // `npm run build:packages`, on AC power (takes the GPU lock):
 //   node examples/package-benchmarks/shadow-shimmer.mjs [--low] [--frames=64]
 // Scene: examples/package-benchmarks/shadow-shimmer.html (thin posts, a beam and plates on a floor; @margoengine/shadows

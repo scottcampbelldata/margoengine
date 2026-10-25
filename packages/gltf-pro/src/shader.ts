@@ -97,7 +97,7 @@ ${lightingTerms}@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->
 }
 `;
 
-// margoFaceTest/margoAlphaTest are pipeline constants (HANDOFF 1e.f): gltf-pro turns them off where they can never discard
+// margoFaceTest/margoAlphaTest are pipeline constants: gltf-pro turns them off where they can never discard
 // (back faces are culled; only MASK materials alpha-test), because any discard in the shader costs early depth testing
 // (0.85 -> 0.52 ms GPU, full-screen DamagedHelmet, Arc 140V).
 export const extendedPBRShader = /* wgsl */ `

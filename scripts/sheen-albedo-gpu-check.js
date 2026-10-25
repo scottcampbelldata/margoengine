@@ -5,7 +5,7 @@
 //     (its function body read from git, never stored in the tree); the pixel change is measured and bounded.
 //  3. With sheen off (no lobes, lobes with black sheen, black sheen plus specular) the pixels are bit-identical.
 // node scripts/gpu-lock.mjs run --owner=sheen-albedo -- node scripts/sheen-albedo-gpu-check.js [--reference=<rev>]
-// In a worktree outside .claude/worktrees, set MARGO_GPU_LOCK to the main checkout's test-results/gpu.lock.
+// In a worktree outside the main checkout, set MARGO_GPU_LOCK to the main checkout's test-results/gpu.lock.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';

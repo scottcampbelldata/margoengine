@@ -171,7 +171,7 @@ The tool runs the gate before every run, so numbers from a busy or throttled mac
 
 1. **AC power.** On battery the run refuses to start. `BENCH_ALLOW_BATTERY=1` runs anyway and marks it invalid.
 2. **GPU lock.** Any suite that uses the GPU holds `test-results/gpu.lock` in the main checkout
-   (`scripts/gpu-lock.mjs`) for the whole run, so no other agent's GPU job overlaps it.
+   (`scripts/gpu-lock.mjs`) for the whole run, so no other GPU job overlaps it.
 3. **Idle baseline.** Whole-machine CPU must stay at or under `--quiet-max` (20%) for `--quiet-hold` (20 s), from
    `scripts/quiet-gate.mjs`. On NVIDIA GPUs, utilisation must also be at or under `--gpu-max` (20%) in three
    samples. A GPU that stays busy marks the run invalid.
@@ -225,7 +225,7 @@ export async function create(canvas, { scene, params, data }, marks) {
 ```
 
 Margo's implementation is `bench/scenes/margo.js`. **Other engines' implementations never live in this repository.**
-AGENTS.md "Clean room" forbids it. They live in `C:\Development\Projects\engine-bench\margo-bench\`, written there and
+The clean-room rule forbids it. They live in a separate `engine-bench/margo-bench/` folder next to this checkout, written there and
 built there:
 
 ```text

@@ -1,4 +1,4 @@
-// Real-GPU check and cost of SSR's model capture (`ssr.add(model)`, HANDOFF 5l.l). Run on AC power, holding the GPU lock,
+// Real-GPU check and cost of SSR's model capture (`ssr.add(model)`). Run on AC power, holding the GPU lock,
 // after npm run build:packages:
 //   node examples/package-benchmarks/ssr-models-gpu.mjs [--rounds=3] [--frames=90] [--no-timing] [--diagnostic]
 // Correctness (ssr.html, each scene rendered with SSR on and off in the same PostStack pipeline):

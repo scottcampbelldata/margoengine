@@ -210,7 +210,7 @@ test('a refractor captures through the main camera and keeps only what lies beyo
 
 test('a cube camera renders six standard faces, each culled against its own face, not the main view', async (t) => {
   const e = await engine(t),
-    behind = e.createMesh().setGeometry(box()).setMaterial(new PbrMaterial()).setPosition([0, 0, 20]),
+    _behind = e.createMesh().setGeometry(box()).setMaterial(new PbrMaterial()).setPosition([0, 0, 20]),
     faces = [];
   e.frameGraph.add({
     name: 'faces',

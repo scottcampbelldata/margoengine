@@ -1,7 +1,7 @@
 """Build the Tokyo corner diorama and optionally export it.
 
 Headless:  blender --background --factory-startup --python build.py -- --out tokyo-diorama.glb [--blend tokyo-diorama.blend]
-Live (Blender MCP):  runpy.run_path(r'<repo>/examples/assets/source/tokyo_diorama/build.py', run_name='tokyo_build')['main']()
+Live (Blender Python console):  runpy.run_path(r'<repo>/examples/assets/source/tokyo_diorama/build.py', run_name='tokyo_build')['main']()
 """
 import importlib
 import os
@@ -65,7 +65,7 @@ def export(path):
 def main(out=None, blend=None):
     prefs = bpy.context.preferences
     saved = (prefs.edit.keyframe_new_interpolation_type, prefs.filepaths.save_version)
-    try:  # build-time settings only; a live MCP build must leave the user's preferences as they were
+    try:  # build-time settings only; a live build must leave the user's preferences as they were
         prefs.edit.keyframe_new_interpolation_type = 'LINEAR'
         build()
         if out:

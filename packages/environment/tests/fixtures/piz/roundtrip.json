@@ -1,5 +1,5 @@
 {
- "about": "PIZ files written by a scratch encoder from the format description (tools/pizgen.mjs; the clean agent does not need it). expectedDataSha256 is the SHA-256 of the Float32Array RGBA (little-endian, alpha 1 when absent) computed from the source samples without Margo code. Binding: parseEXR must return exactly these bytes.",
+ "about": "PIZ files written by a scratch encoder from the format description (tools/pizgen.mjs). expectedDataSha256 is the SHA-256 of the Float32Array RGBA (little-endian, alpha 1 when absent) computed from the source samples without Margo code. Binding: parseEXR must return exactly these bytes.",
  "results": [
   {
    "file": "vectors/exr-piz/half-rgba-smooth.exr",

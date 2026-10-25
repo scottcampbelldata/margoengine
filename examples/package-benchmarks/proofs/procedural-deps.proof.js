@@ -1,4 +1,4 @@
-// Record for @margoengine/procedural dropping its third-party runtime dependencies (HANDOFF 5l.v): `simplex-noise` 4.0.3
+// Record for @margoengine/procedural dropping its third-party runtime dependencies: `simplex-noise` 4.0.3
 // gave way to the package's own seamless simplex and `isosurface` 1.0.0 to its own marching tetrahedra. Output is
 // intentionally different (seamless 0.5 kernel; tetrahedra instead of cubes), so this compares speed and bundle bytes, not
 // values. The baseline is the package at `ref` built by the shared harness; it imports the two old packages, so they must

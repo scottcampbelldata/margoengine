@@ -71,7 +71,7 @@ for (const name of ['environment', 'post', 'clustered', 'gltf-pro', 'materials',
   }
 }
 // Those entries' GPU calls without probes: part 3 below, gltf-pro-lighting-hooks.proof.js and oit-detached.proof.js with
-// these refs (identical, recorded in HANDOFF 5l.e).
+// these refs (identical).
 assert.ok(differ.includes('post/ssr') && differ.includes('gltf-pro'), 'the SSR wiring is in the bundles');
 // GPU calls of the scene effects the probes share code with (environment root), before and after.
 const { baseline, candidate } = await versions('environment', ref, undefined, pin);

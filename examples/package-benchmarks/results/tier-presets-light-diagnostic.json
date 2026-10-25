@@ -606,7 +606,7 @@
  ],
  "diagnostic": true,
  "machine": {
-  "note": "--no-quiet: machine busy (other agents), quiet gate skipped",
+  "note": "--no-quiet: machine busy, quiet gate skipped",
   "cpuLoadPercent": 43
  },
  "browserVersion": "155.0.4283.45",

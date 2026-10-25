@@ -1,4 +1,4 @@
-// Proof for the math consolidation (HANDOFF queue item 5): every helper that moved into @margoengine/math gives
+// Proof for the math consolidation: every helper that moved into @margoengine/math gives
 // bit-identical results to the package copy it replaced. The old copies are built from `ref` with the repo harness
 // (compare.js `versions`); copies that were not exported are first checked to be textually identical (whitespace and
 // types aside) to one that is. Inputs mix random values with ±0, NaN, ±Infinity, subnormals, huge values and singular

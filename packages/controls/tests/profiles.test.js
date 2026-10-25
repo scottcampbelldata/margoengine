@@ -1,4 +1,4 @@
-// CAD navigation profiles (HANDOFF 5h.b): the default replays a recorded input script, each profile maps
+// CAD navigation profiles: the default replays a recorded input script, each profile maps
 // its gestures to the right camera motion, and browser gesture conflicts are handled.
 // Re-record the replay (only when an orbit behaviour change is intended): RECORD=1 node --test tests/profiles.test.js
 import test from 'node:test';

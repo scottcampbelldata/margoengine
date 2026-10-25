@@ -1,5 +1,5 @@
-// Launch gate 11a, part 1: one regression per parser fuzz finding (scripts/fuzz/targets-formats.js, `npm run fuzz`;
-// results in HANDOFF gate 11). Each input once crashed a parser with an engine-internal error (TypeError: Cannot read
+// Launch gate 11a, part 1: one regression per parser fuzz finding (scripts/fuzz/targets-formats.js, `npm run fuzz`).
+// Each input once crashed a parser with an engine-internal error (TypeError: Cannot read
 // properties..., SyntaxError, RangeError: Invalid typed array length, Maximum call stack size exceeded, a DOMException
 // or a Wasm trap), hung, read outside its input or allocated far more than its size allows. Each must now end in the
 // package's own error, judged by the fuzzer's own oracle (isNamed). Fuzz-found binary inputs are in tests/fixtures/fuzz/.

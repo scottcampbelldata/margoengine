@@ -570,7 +570,7 @@ decals.setDecals([
   'neutral'); over a cube's top edge the top face is marked and the 90-degree side faces are untouched (0/255), and the
   floor below the box's depth range stays untouched; an `over` decal on the atlas's red quadrant shows exactly
   tonemap(0.6, 0, 0); a box containing the camera still draws; an empty Decals equals none.
-- **Cost** (diagnostic: the quiet gate passed at 6% CPU, but other agents' sessions were open): GPU time of the whole frame, 4x MSAA, 1 m
+- **Cost** (diagnostic: the quiet gate passed at 6% CPU, but other jobs were running): GPU time of the whole frame, 4x MSAA, 1 m
   decals on the floor in front of the camera: 1280 x 720 1.64 ms without, 1.64 / 1.97 / 6.36 ms with 1 / 16 / 256
   decals (256 overlap about four deep); 1920 x 1080 3.67 ms -> 3.93 / 4.33 / 14.03 ms. The first decal's cost is mostly
   its own pass over the multisampled target; each covered pixel then reads five depth values (position and normal) and

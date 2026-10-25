@@ -438,7 +438,7 @@ export class FeatureEdges implements EnginePlugin {
     if (!pipeline) {
       pipeline = device.createRenderPipeline(descriptor(section));
       this.pipelines.set(key(section), pipeline);
-      // Compile the other variant in the background, so adding or removing SectionPlanes later does not stall (HANDOFF 1d'').
+      // Compile the other variant in the background, so adding or removing SectionPlanes later does not stall.
       const other = key(!section);
       if (!this.pipelines.has(other) && device.createRenderPipelineAsync)
         device.createRenderPipelineAsync(descriptor(!section)).then(

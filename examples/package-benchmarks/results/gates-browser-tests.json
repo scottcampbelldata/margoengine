@@ -100,7 +100,7 @@
    "seconds": 0.7,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Select a physical GPU with GPU_VENDOR and BROWSER_ARGS\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-hardware-gpu-tests.js:9:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Select a physical GPU with GPU_VENDOR and BROWSER_ARGS\r\n    at file:///<repo>/scripts/modern-hardware-gpu-tests.js:9:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-machinery-runtime-tests.js",
@@ -127,7 +127,7 @@
    "seconds": 712.3,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "npm error 404\nnpm error 404  The requested resource '@margoengine/math@0.1.0' could not be found or you do not have permission to access it.\nnpm error 404\nnpm error 404 Note that you can also install from a\nnpm error 404 tarball, folder, http url, or git url.\nnpm error A complete log of this run can be found in: \\AppData\\Local\\npm-cache\\_logs\\2026-10-14T17_44_48_344Z-debug-0.log\nnode:internal/errors:985\r\n  const err = new Error(message);\r\n              ^\r\n\r\nError: Command failed: C:\\Program Files\\nodejs\\node.exe C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js install --ignore-scripts --no-audit --no-fund\r\n    at genericNodeError (node:internal/errors:985:15)\r\n    at wrappedFn (node:internal/errors:539:14)\r\n    at checkExecSyncError (node:child_process:925:11)\r\n    at execFileSync (node:child_process:961:15)\r\n    at file:///C:/Dev/Projects/margo-engine/.claude/worktrees/agent-aaeb47dfc2c9520a2/scripts/modern-package-tests.js:33:3 {\r\n  status: 1,\r\n  signal: null,\r\n  output: [ null, null, null ],\r\n  pid: 38340,\r\n  stdout: null,\r\n  stderr: null\r\n}\r\n\r\nNode.js v24.15.0"
+   "tail": "npm error 404\nnpm error 404  The requested resource '@margoengine/math@0.1.0' could not be found or you do not have permission to access it.\nnpm error 404\nnpm error 404 Note that you can also install from a\nnpm error 404 tarball, folder, http url, or git url.\nnpm error A complete log of this run can be found in: C:\\Users\\user\\AppData\\Local\\npm-cache\\_logs\\2026-10-14T17_44_48_344Z-debug-0.log\nnode:internal/errors:985\r\n  const err = new Error(message);\r\n              ^\r\n\r\nError: Command failed: C:\\Program Files\\nodejs\\node.exe C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js install --ignore-scripts --no-audit --no-fund\r\n    at genericNodeError (node:internal/errors:985:15)\r\n    at wrappedFn (node:internal/errors:539:14)\r\n    at checkExecSyncError (node:child_process:925:11)\r\n    at execFileSync (node:child_process:961:15)\r\n    at file:///<repo>/scripts/modern-package-tests.js:33:3 {\r\n  status: 1,\r\n  signal: null,\r\n  output: [ null, null, null ],\r\n  pid: 38340,\r\n  stdout: null,\r\n  stderr: null\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
    "script": "scripts/modern-postfx-tests.js",
@@ -154,7 +154,7 @@
    "seconds": 40.4,
    "acPowerBefore": true,
    "acPowerAfter": true,
-   "tail": "10 sessions: 10 passed, 0 failed (13s)\n20 sessions: 20 passed, 0 failed (30s)\n22 sessions: 22 passed, 0 failed (39s)\nStress evidence: C:\\Dev\\Projects\\margo-engine\\.claude\\worktrees\\agent-aaeb47dfc2c9520a2\\test-results\\stress\\seed-20261011-shard-0/report.json"
+   "tail": "10 sessions: 10 passed, 0 failed (13s)\n20 sessions: 20 passed, 0 failed (30s)\n22 sessions: 22 passed, 0 failed (39s)\nStress evidence: <repo>\\test-results\\stress\\seed-20261011-shard-0/report.json"
   },
   {
    "script": "scripts/modern-temporal-tests.js",

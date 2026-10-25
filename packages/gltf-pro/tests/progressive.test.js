@@ -1,4 +1,4 @@
-// HANDOFF 5g.c: @margoengine/gltf-pro/progressive. Once `complete` resolves the model's GPU data (every draw resource's
+// @margoengine/gltf-pro/progressive. Once `complete` resolves the model's GPU data (every draw resource's
 // vertex, index and uniform bytes, every bound texture's descriptor and uploads, every sampler) and its CPU side (document,
 // buffers, accessors, primitives, images, transform store) equal a plain loadGLTF of the same file, byte for byte; over HTTP
 // range requests and a server without range support, on the main thread and through the worker script.

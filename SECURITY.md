@@ -7,7 +7,7 @@
 | 1.x (latest minor) | Yes: security fixes ship as patch releases of every affected package |
 | < 1.0 | No |
 
-All 75 published packages (`margoengine`, the `@margoengine/*` packages, `create-margo` and `margo-convert`) share one
+All published packages (`margoengine`, the `@margoengine/*` packages, `create-margo` and `margo-convert`) share one
 version, so a fix is always "upgrade to 1.x.y or later" for every package.
 
 ## Reporting a vulnerability
@@ -16,7 +16,7 @@ Please report privately, not in a public issue, pull request or discussion.
 
 1. **Preferred:** GitHub private vulnerability reporting: the **Security** tab of
    https://github.com/scottcampbelldata/margoengine, then **Report a vulnerability**.
-2. **Email:** security@margoengine.com
+2. **Email:** hello@margointeractive.com
 
 Include the affected package(s) and version, what an attacker controls (a model file, a URL, a network message, page
 content), what happens (crash, hang, memory blowup, script execution, file or cross-origin access), and a minimal file

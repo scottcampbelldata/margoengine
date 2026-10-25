@@ -1,4 +1,4 @@
-// Light tier with and without the tier presets (HANDOFF 5i.b), on the island (examples/gameplay-sandbox) and the depth-of-field
+// Light tier with and without the tier presets, on the island (examples/gameplay-sandbox) and the depth-of-field
 // demo (packages/dof/examples). Each run loads the page fresh at `?quality=low` (1x MSAA, DPR 1, paced to ~60 FPS);
 // variant "off" blocks `globalThis.margoPreset` before the page runs (every package keeps its defaults), "on" is the page
 // as shipped. Rounds alternate the order (ABBA). Island: engine frames per second and the Stats profiler's whole-frame GPU
@@ -102,7 +102,7 @@ const report = {
 assert.ok(onAC(), 'On battery: GPU timing is throttled, run on AC power');
 try {
   if (process.argv.includes('--no-quiet'))
-    throw new Error('--no-quiet: machine busy (other agents), quiet gate skipped');
+    throw new Error('--no-quiet: machine busy, quiet gate skipped');
   report.machine = await waitForQuiet({ timeout: 600 });
   report.diagnostic = false;
 } catch (error) {

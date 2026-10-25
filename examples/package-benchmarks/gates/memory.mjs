@@ -1,4 +1,4 @@
-// Loader gate (HANDOFF item 0): native FBX, USD (USDA/USDC/USDZ), loaders formats and gltf-pro models in a real browser,
+// Loader gate: native FBX, USD (USDA/USDC/USDZ), loaders formats and gltf-pro models in a real browser,
 // then a memory audit. Real GPU, under the GPU lock, on AC power. From the repository root after `npm run build:packages`:
 //   node examples/package-benchmarks/gates/memory.mjs [--cycles=20]
 // 1. Each model is loaded, framed and screenshotted (test-results/gates-load-<name>.png); it must draw something.

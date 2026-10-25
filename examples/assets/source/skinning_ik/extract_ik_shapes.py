@@ -1,6 +1,6 @@
 """Refresh exact rigid arm collision hulls from the exported original GLB.
 
-Run through Blender MCP with runpy.run_path(path, run_name="__main__").
+Run in a live Blender session with runpy.run_path(path, run_name="__main__").
 Uses temporary in-memory bmesh data; never changes the open Blender scene.
 Copyright (c) 2026 Scott Campbell. MIT license.
 """

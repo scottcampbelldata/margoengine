@@ -1,4 +1,4 @@
-// HANDOFF 5g.c, real browser. From the repository root after `npm run build:packages`:
+// real browser. From the repository root after `npm run build:packages`:
 //   node examples/package-benchmarks/progressive/run.mjs [--rounds=4] [--profiles=broadband,4g] [--diagnostic] [--output=path.json]
 // Serves the models from a local server with a shared bandwidth limit and round-trip latency (HTTP range support on, no
 // caching), so the page's fetches, range requests and worker fetches all see the same throttled link. For each model and

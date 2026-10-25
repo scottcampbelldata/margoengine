@@ -1,4 +1,4 @@
-// HANDOFF 1f.j: parseUSDInWorker's worker (dist/workers/usdz.js) + modelFromPrepared build the same model as
+// parseUSDInWorker's worker (dist/workers/usdz.js) + modelFromPrepared build the same model as
 // parseUSDZ/parseUSDC/parseUSDA + create, compared byte for byte (see tests/support/pbr-snapshot.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';

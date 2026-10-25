@@ -153,7 +153,7 @@ review. Generated Wasm blueprints are verified losslessly by the package build.
 
 ## Complete package follow-up
 
-The [package optimization audit](package-optimization-audit.md) records the later
+The package optimization audit records the later
 full authored-file review across all 61 package manifests plus Kernel/shared,
 compatible allocation/cache/parser/lifecycle fixes and narrower optional imports.
 Core + Stage remains 19,997 gzip bytes. All 627 repository unit tests and all 61
@@ -172,7 +172,7 @@ and lifecycle defects while retaining optional imports, features, shader math
 and the existing density/sampling policy. Core + Stage measures **19,999 gzip
 bytes / 47,983 raw bytes**. All **754 unit tests**, all 61 strict packed consumers,
 28 sequential native browser programs and eight depth-format/sample combinations
-pass. See [the current package audit](package-optimization-audit.md#second-deep-pass-2026-10-12)
+pass. See the current package audit
 for source coverage, changed diagnostic text and fixture-specific limits.
 
 The current production deployment is
@@ -198,7 +198,7 @@ reported regression on other PCs.
 The final hardware timing run measures CPU callback medians of 0.20–0.60 ms
 and GPU pass-span medians of 3.21–7.41 ms. All 12 sparse samples per demo are
 below 16.67 ms in this run. The full table, timing-method limits and raw-report
-reference are in [the current CPU/GPU measurements](package-optimization-audit.md#current-deployed-cpugpu-measurements).
+reference are in the current CPU/GPU measurements.
 These measurements retain native frame scheduling and do not establish sustained
 60 FPS on a physical display. Confirming that outcome requires a browser test
 on a PC's physical display outside RDP.

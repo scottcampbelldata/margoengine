@@ -1,7 +1,7 @@
 # Why three.js matched or beat Margo on GPU time for static boxes
 
-**Diagnostic, busy machine, not for publication.** Every number below comes from runs on a laptop that other agents
-were using for builds (CPU load at each run's start is in the JSON, 0-91%). GPU timestamps are less sensitive to CPU
+**Diagnostic, busy machine, not for publication.** Every number below comes from runs on a laptop that was also running
+builds (CPU load at each run's start is in the JSON, 0-91%). GPU timestamps are less sensitive to CPU
 load than frame rates, the variants alternated within every round and the order rotated between rounds, and only
 ratios between variants of the same run are used. Do not quote these numbers as engine performance.
 
@@ -12,8 +12,7 @@ docs/benchmarking.md, and the commands below need a checkout from before that da
 Raw JSON: `examples/package-benchmarks/results/vs-threejs-boxes-{diag1,diag2,proto,fps}.json` (per-run `resources`
 lists stripped). Reproduce: `node examples/package-benchmarks/vs-threejs/run.mjs --busy --rounds=3 --frames=120
 --only=boxes:1000,boxes:10000,boxes:50000,cad:50000 --variants=margo,margo+double,margo+cull,margo+plugin,margo+pass,three-webgpu-instanced,three-webgl-instanced`.
-No round overlapped another agent's GPU run: the stray transparency check ran under a lock this worker had taken at
-20:40 and released, without measuring, when the quiet gate kept it waiting; `diag1` took the lock afterwards.
+No round overlapped another GPU run: every round held the GPU lock.
 
 ## Update 2026-10-15: fix B is in core; like-for-like pairs
 
@@ -180,7 +179,7 @@ WebGL2). Its small, dense parts make it geometry-bound; not diagnosed further he
 | C. Engine plugin that rewrites the main pass (12 lines; the harness's `margo+plugin`) | a leaf package | 0 in core | 0.54 / 1.80 / 5.91 (span 0.75 / 2.02 / 6.26) | culls every core mesh: only for scenes of closed, unmirrored, single-sided solids; its pass makes core keep MSAA buffers and resolve in an extra pass (+0.2-0.35 ms span; already paid when any other package adds a pass); must run after any package that replaces the shader text |
 
 Core was at 19,577 B after the material setters (perf/auto-quality e2cc4c5), so A and B both broke the 19,600 target
-(B would land near 19,789). Scott then approved B and moved the working target to ~19,800 (B landed at 19,793). C needs no core change and matches HANDOFF's decision that pipeline culling is a
+(B would land near 19,789). Scott then approved B and moved the working target to ~19,800 (B landed at 19,793). C needs no core change and matches the decision that pipeline culling is a
 leaf-package option for closed solids; `@margoengine/culling` is the natural home (`BackfaceCulling.attach(engine)`,
 following the `X.attach` standard). Not built: it is a new package feature, so it waits for Scott.
 
@@ -196,7 +195,7 @@ its WebGL2 renderer's, on this one integrated GPU.
 - **CPU per frame: no win in these scenes** (against `InstancedMesh`; for the like-for-like pairs see the update at the top). Margo spends 0.3 / 1.9 / 8.0 ms (boxes) and 11.3 ms (CAD 50k) per frame
   against three's 0.1-0.7 ms. An `InstancedMesh` with a static matrix buffer costs three nothing per instance, while
   Margo's kernel culls every entity each frame and, as the orbiting camera changes the visible set, re-collects the
-  instance buffer (HANDOFF 1e'; `@margoengine/culling` is the existing fix). Margo's CPU advantage is against one
+  instance buffer (`@margoengine/culling` is the existing fix). Margo's CPU advantage is against one
   `Mesh` per object, the variant most three.js code uses (not re-measured here).
 - **Delivered frame rate follows from the two.** With the corrected `fps` (`vs-threejs-boxes-fps.json`, 2 rounds x 300
   frames, a busier session: all GPU times 10-40% higher than above), single-sided Margo with plugin culling reaches

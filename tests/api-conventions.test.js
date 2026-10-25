@@ -1,4 +1,4 @@
-// API conventions every package class follows (HANDOFF "Scott's decisions (2026-10-14, 17:10)"):
+// API conventions every package class follows:
 // - engine features (EnginePlugin classes, and classes whose constructor takes the engine) have `static attach(engine, ...)`;
 // - a class with `destroy()` also has `dispose()` (`destroy` is the deprecated alias);
 // - a class with `dispose()` also has `[Symbol.dispose]()` where the runtime defines `Symbol.dispose`;
@@ -21,7 +21,7 @@ const isClass = (value) => typeof value === 'function' && /^class\b/.test(Functi
 async function packageClasses() {
   const found = new Map();
   for (const dir of (await readdir('packages')).sort()) {
-    // core and the stage are frozen (AGENTS.md); margoengine re-exports the stage.
+    // core and the stage are frozen for 1.0; margoengine re-exports the stage.
     if (dir === 'core' || dir === 'stage' || dir === 'margoengine' || dir === 'shared') continue;
     let manifest;
     try {

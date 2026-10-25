@@ -1,4 +1,4 @@
-// SectionPlanes.enabled (HANDOFF 1d''): switching is a uniform change, and the cap pipelines compile in the background while off.
+// SectionPlanes.enabled: switching is a uniform change, and the cap pipelines compile in the background while off.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mockGPU, passes, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';

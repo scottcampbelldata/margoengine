@@ -31,7 +31,7 @@ changes them.
 ## Whitepaper timing run (pending: needs a quiet PC)
 
 No timing number is whitepaper data yet. The tool has only been smoke-tested (labelled "smoke", not for
-publication). When Scott confirms the machine is quiet (no other apps, no builds, no other agents, on AC power), run
+publication). When Scott confirms the machine is quiet (no other apps, no builds, on AC power), run
 this once on the release commit:
 
 ```sh

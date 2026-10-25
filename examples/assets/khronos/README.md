@@ -1,7 +1,7 @@
 # Khronos glTF sample assets
 
 Reference models from the official [Khronos glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets)
-repository, used by the visual-regression suite and real-asset checks (HANDOFF "LAUNCH GATES" #5). Each model keeps
+repository, used by the visual-regression suite and real-asset checks. Each model keeps
 its own licence; only models whose `metadata.json` lists nothing but CC0 1.0 and/or CC BY 4.0 are added, and only
 after Scott approves them (FlightHelmet 2026-10-15; the `SHORTLIST.md` tiers 2026-10-15).
 
@@ -10,8 +10,7 @@ variant where one exists, otherwise `glTF` + `.bin` + images; every file's size 
 listing. `screenshot.*` is Khronos's reference render (for eyeballing ours). Binary files are stored with Git LFS
 (`.gitattributes`). `manifest.json` holds the licence records and the validator results;
 `node scripts/khronos-assets.mjs` re-validates every model (Khronos glTF-Validator, the `gltf-validator` dev
-dependency) and regenerates the two generated sections below. Render check: `examples/khronos-gallery.html` (see
-HANDOFF 5w).
+dependency) and regenerates the two generated sections below. Render check: `examples/khronos-gallery.html`.
 
 ## Models
 

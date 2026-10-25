@@ -1,4 +1,4 @@
-// Visual regression for the site demos (HANDOFF 1h.f). Needs a real GPU, so it is not part of `npm run verify`.
+// Visual regression for the site demos. Needs a real GPU, so it is not part of `npm run verify`.
 //   npm run visual:check  [-- --only=earth,dof-high] [--runs=N] [--no-build]   compare against matching hardware baselines
 //   npm run visual:update [-- --only=...] [--runs=3] [--no-build]             re-capture baselines and noise tolerances
 //   npm run visual:device-loss [-- --only=...] [--no-build]                     device loss in every site demo (5i.d)
@@ -157,7 +157,7 @@ const demos = [
   { id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'" },
   { id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo', views: ['high', 'light', 'phone'] },
   { id: 'tonemap', path: 'demos/tonemap/', ready: '!!window.tonemapDemo', views: ['high', 'phone'] },
-  // Khronos sample assets (HANDOFF 5w): one small view per model, served by a Vite dev server from the repo root
+  // Khronos sample assets: one small view per model, served by a Vite dev server from the repo root
   // (`dev`) because the site build must not ship 250 MB of models. Models that fail to load are left out.
   ...JSON.parse(readFileSync(resolve(import.meta.dirname, '../examples/assets/khronos/manifest.json'), 'utf8'))
     .models.filter((m) => m.render?.verdict !== 'fails')

@@ -1,4 +1,4 @@
-// Proof that gltf-pro's lighting hooks (HANDOFF 1g.c) change nothing on the GPU: shadows, clustered lights, environment IBL and
+// Proof that gltf-pro's lighting hooks change nothing on the GPU: shadows, clustered lights, environment IBL and
 // fog used to find their places in gltf-pro's WGSL by text search; now each hands gltf-pro a `pbr(group)` contribution and
 // gltf-pro composes it. A 14-frame story (effects added in different orders, a text-patching custom effect in between, the
 // environment going away and back, removals, an HDR and a canvas target, MSAA 1x/4x, beauty/SSAO-ambient/G-buffer draws, the

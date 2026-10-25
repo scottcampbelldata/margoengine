@@ -31,7 +31,7 @@ eye sees as shaking). Results: `examples/package-benchmarks/results/large-coordi
 
 - **Kernel world matrix** (`store.matrices`, the per-instance model matrix): the root translation is rounded to the
   float32 grid, and child matrices are composed in float64 but stored in float32, so the 1 mm bolts snap to the grid
-  (at 6,000 km the two bolts 7 mm apart land on the same grid point, 0 mm apart in world space; machinery `measureDistance` composes the hierarchy in float64 below the common ancestor since HANDOFF 5l.d and still reads 7 mm; `packages/cameras/test/origin.test.js`). Mostly a
+  (at 6,000 km the two bolts 7 mm apart land on the same grid point, 0 mm apart in world space; machinery `measureDistance` composes the hierarchy in float64 below the common ancestor and still reads 7 mm; `packages/cameras/test/origin.test.js`). Mostly a
   static misplacement, not jitter.
 - **View-projection matrix** (`camera.matrix`, float64 in `Camera.update`, stored float32): its translation column holds
   eye-distance terms of the size of the coordinates, so rounding changes every frame as the camera moves. This is the

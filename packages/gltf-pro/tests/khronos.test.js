@@ -1,4 +1,4 @@
-// HANDOFF 5w: Khronos glTF-Sample-Assets that used to fail or render incompletely (examples/assets/khronos, Git LFS),
+// Khronos glTF-Sample-Assets that used to fail or render incompletely (examples/assets/khronos, Git LFS),
 // checked headless on the CPU side: primitive modes, KHR_meshopt_compression, KHR_lights_punctual and glTF cameras.
 // The GPU side (what they look like) is the visual-regression view `khronos-<Model>-model`.
 import test from 'node:test';

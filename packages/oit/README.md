@@ -67,7 +67,7 @@ MSAA 4x, against a reference that sorts every translucent triangle separately. A
 | Sorted per primitive (default) | 13 | 78 | 1.41 % | 7.5 / 29.8 |
 | OIT | 0 | 5 | 0.36 % | 6.7 / 22.8 |
 
-GPU time (Stats timestamp profiler, median, MSAA 4x, the same scene; diagnostic, measured while other agents kept the
+GPU time (Stats timestamp profiler, median, MSAA 4x, the same scene; diagnostic, measured while other jobs kept the
 CPU at 45-100 %):
 
 | Resolution | Opaque only | + sorted transparency | + OIT | OIT accumulate pass | OIT composite pass |

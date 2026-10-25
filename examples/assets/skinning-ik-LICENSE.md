@@ -50,9 +50,6 @@ to the model or embed it in the workshop GLB.
 
 The Blender source and generators are under `source/skinning-ik.blend` and
 `source/skinning_ik/`. No third-party geometry, rig, or animation is included.
-The user-approved visual reference is preserved separately as
-`source/skinning_ik/visual-target.png`; it is an art-direction reference and is
-not embedded in the runtime assets.
 
 The interaction design was studied from the Three.js
 [skinning / inverse kinematics example](https://threejs.org/examples/#webgl_animation_skinning_ik).

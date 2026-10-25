@@ -19,7 +19,7 @@ runpy.run_path(os.path.join(HERE, '..', 'examples', 'assets', 'source', 'tokyo_d
 scene = bpy.data.scenes['Diorama']
 failures = []
 
-# User preferences must survive a build (a live MCP build would otherwise change them for every project).
+# User preferences must survive a build (a live build in an open Blender session would otherwise change them for every project).
 after = (prefs.edit.keyframe_new_interpolation_type, prefs.filepaths.save_version)
 if after != before:
     failures.append('preferences changed by the build: %r -> %r' % (before, after))

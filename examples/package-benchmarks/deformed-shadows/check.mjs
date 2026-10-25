@@ -1,4 +1,4 @@
-// Real-GPU check of shadows for deformed casters and lighting for VAT crowds (HANDOFF 5l.j). Run from the repository root
+// Real-GPU check of shadows for deformed casters and lighting for VAT crowds. Run from the repository root
 // after `npm run build:packages`, with the GPU lock held:
 //   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/deformed-shadows/check.mjs [--timing]
 //  - skinned: RobotExpressive walking (gltf-pro + GPU skinning) as the only caster; the shadow map's silhouette at two clip

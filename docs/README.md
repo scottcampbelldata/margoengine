@@ -9,7 +9,7 @@ Draco/Meshopt support in glTF Pro and synchronous parsing behavior. The current
 consolidated build measures **18,876 bytes gzip** for core and **50,207 bytes raw /
 21,107 bytes gzip** for core + stage, below the 25,000-byte combined gzip ceiling.
 Package versions and npm availability remain independent of these source changes.
-The optional React entry measures **20,966 bytes gzip**, with React and optional package peers external; those peers and application code are additional. See the [entry measurements](../examples/package-benchmarks/results/entry-sizes.json) and [74-package consolidation record](repository-consolidation-2026-10-16.md).
+The optional React entry measures **20,966 bytes gzip**, with React and optional package peers external; those peers and application code are additional. See the [entry measurements](../examples/package-benchmarks/results/entry-sizes.json) and 74-package consolidation record.
 
 Publishing uses the manual, gated [Publish workflow](../.github/workflows/publish.yml)
 from `main`; see the [release guide](releasing.md). `npm run publish:dry-run` checks

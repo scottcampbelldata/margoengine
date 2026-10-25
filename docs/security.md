@@ -1,9 +1,9 @@
 # Security model
 
-What Margo trusts, what it does not, what it guarantees and what your app still has to do. Findings and their tests are
-in HANDOFF.md, launch gate 11 (b); parser fuzzing is gate 11 (a).
+What Margo trusts, what it does not, what it guarantees and what your app still has to do. Parser fuzzing and its
+regression tests are described below.
 
-Report vulnerabilities privately through GitHub private vulnerability reporting or to security@margoengine.com; see
+Report vulnerabilities privately through GitHub private vulnerability reporting or to hello@margointeractive.com; see
 [SECURITY.md](../SECURITY.md). Dependencies and licences: [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md).
 Release integrity: [releasing.md](releasing.md).
 

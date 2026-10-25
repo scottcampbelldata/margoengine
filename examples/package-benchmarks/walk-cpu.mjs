@@ -1,4 +1,4 @@
-// CPU cost of WalkControls.update() per frame (HANDOFF 5l.t point 4). Node, one thread, fixed 1/60 s steps, no GPU.
+// CPU cost of WalkControls.update() per frame. Node, one thread, fixed 1/60 s steps, no GPU.
 // Scenes: the generated two-storey house walked along its scripted path; a 4 x 4 block of those houses (1,700+ meshes)
 // walked through one of them. The 62 MB conveyor GLB scene went with the conveyor example (deleted 2026-10-24).
 // First-touch frames build BVHs synchronously, so each path runs twice and the second (warm) pass is reported; the

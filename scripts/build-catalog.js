@@ -30,7 +30,7 @@ const siteExamples = {
     exampleSource: false,
   },
 };
-// Layers from docs/HANDOFF.md "Release presentation": the catalog and the sizes page list packages in this order.
+// Package layers: the catalog and the sizes page list packages in this order.
 const layers = {
   'Start here': ['margoengine', 'stage', 'core'],
   'Setup and diagnostics': ['math', 'quality', 'webgl', 'stats', 'inspector'],

@@ -13,7 +13,7 @@ Margo replaces three.js.
 
 ## WebGL2 draws core meshes only
 
-That is a closed decision for v1.0: HANDOFF records WebGL beyond core as gap 8, closed as won't-do on 2026-10-14.
+That is a closed decision for v1.0: WebGL beyond core was closed as won't-do on 2026-10-14.
 `@margoengine/webgl` implements one `Renderer` that draws core meshes (constant colours, one directional light, no
 textures or effects); an app opts in with `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`. A full
 WebGL2 path at zero core bytes is planned for the next version in

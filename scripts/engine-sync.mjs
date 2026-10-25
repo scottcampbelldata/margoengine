@@ -1,5 +1,5 @@
 // The one way a Margo app gets the engine: the sibling checkout `../margoengine`, always on the latest `origin/main`.
-// Apps run it through their `engine:sync` script (predev, pretest, prebuild, postinstall); see docs/workspace-setup.md.
+// Apps run it through their `engine:sync` script (predev, pretest, prebuild, postinstall).
 //
 //   node <engine>/scripts/engine-sync.mjs [--app <dir>]   fast-forward, build if needed, write <app>/.engine/manifest.json
 //   node <engine>/scripts/engine-sync.mjs --check [--app <dir>]   check the app only (its check:engine-apis runs this)

@@ -1,4 +1,4 @@
-// Render check for the Khronos sample assets (HANDOFF launch gate 5, queue 5w). Serve the repo root with Vite
+// Render check for the Khronos sample assets. Serve the repo root with Vite
 // (`npx vite`) after `npm run build:packages`, then open /examples/khronos-gallery.html: every model in
 // assets/khronos/manifest.json is loaded in turn and reported (loads or the error, extensions gltf-pro ignores, GPU
 // validation errors). `?model=Name` shows one model as a still frame; that is the view scripts/visual-regression.js
@@ -92,7 +92,7 @@ async function main() {
   const camera = engine.camera,
     fov = camera.fov,
     light = [engine.lighting.direction.slice(), engine.lighting.radiance.slice()];
-  // ABeautifulGame's 33 2048x2048 textures decode to 528 MiB, over the default image budget (4 x 128 MiB): HANDOFF 5w.c.
+  // ABeautifulGame's 33 2048x2048 textures decode to 528 MiB, over the default image budget (4 x 128 MiB).
   const maxDownloadBytes = 160 * 1024 * 1024;
 
   const report = [],

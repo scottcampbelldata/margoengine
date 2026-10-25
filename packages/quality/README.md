@@ -111,7 +111,7 @@ redrawAfterRestore(engine, () => engine.render({delta: 0})); // only for apps th
   runs `render` on the two frames after every restoration (effects that read the previous frame, such as water
   refraction and sky reflections, settle on the second).
 - First-use hitch per feature (`node examples/package-benchmarks/warm-up-gpu.mjs`, results
-  `examples/package-benchmarks/results/warm-up-gpu.json`): see the table there and in docs/HANDOFF.md 5i.c.
+  `examples/package-benchmarks/results/warm-up-gpu.json`): see the table there.
 
 MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

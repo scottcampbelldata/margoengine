@@ -1,6 +1,6 @@
 // Vite plugin for the Margo apps: stamps the engine commit that `engine:sync` recorded (<app>/.engine/manifest.json)
 // into every build, as `<meta name="margo-engine" content="<commit>">` in index.html and `build-info.json` beside it,
-// and as `import.meta.env.MARGO_ENGINE_COMMIT` for an About box. See docs/workspace-setup.md.
+// and as `import.meta.env.MARGO_ENGINE_COMMIT` for an About box.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

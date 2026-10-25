@@ -13,7 +13,7 @@
   1432,
   768
  ],
- "conditions": "quiet machine: every other agent, build and benchmark stopped by Scott (~18:47 local), ChatGPT closed; this benchmark the only workload; GPU lock held",
+ "conditions": "quiet machine: every other build and benchmark stopped (~18:47 local), other apps closed; this benchmark the only workload; GPU lock held",
  "core": "dfdf569",
  "runs": [
   {

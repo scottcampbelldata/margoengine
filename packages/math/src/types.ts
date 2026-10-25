@@ -1,4 +1,4 @@
-// The one home of the type-only shapes the Margo packages share (HANDOFF 5k gate 5). Everything here is erased at
+// The one home of the type-only shapes the Margo packages share. Everything here is erased at
 // build time: importing it costs 0 runtime bytes. Packages import these instead of declaring their own copies.
 
 /**

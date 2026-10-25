@@ -4,11 +4,10 @@ Goal (Scott, 2026-10-19): `@margoengine/voxel-pathtracer` renders any MagicaVoxe
 does, and exceeds it everywhere else. MagicaVoxel is the most used voxel editor and renderer and it is free, so a
 commercial replacement must beat it, not tie it.
 
-Clean room: MagicaVoxel (0.99.7.2 in `C:\Tools`) is used only as a black box. We write our own `.vox` scenes, it renders
+Clean room: MagicaVoxel (0.99.7.2) is used only as a black box. We write our own `.vox` scenes, it renders
 them, we compare its PNG snapshots with ours. Its code, shaders, `config/` and `shader/` folders are never read.
 
-This work landed on main on 2026-10-20 (Scott's request; it had been held on branch
-`worktree-agent-a63cac143225721f2` at Codex's request). Nothing touches `@margoengine/core` or the stage.
+This work landed on main on 2026-10-20. Nothing touches `@margoengine/core` or the stage.
 
 ## How to compare
 
@@ -241,7 +240,7 @@ checked unchanged afterwards). Snapshots in `test-results/mv-calib` (git-ignored
 ## Exceed MagicaVoxel
 
 Scott (2026-10-20): better in every way (faster, leaner, better parity, features and integration) without bloat;
-the best value first. Parity items still open above are finished after Codex frees the desktop.
+the best value first. Parity items still open above come next.
 
 Measured (RTX A6000, Edge headless, 960 x 800, `L-bg-off`: slab, two cubes, sun, sky, ground):
 
@@ -319,7 +318,7 @@ blocks. Photo mode leaves grass and flowers out and shows torches as small glowi
   the scatter cap and a three-voxel sunlit slab lit through its own volume under opaque shadows, ground fade and its
   start, fog, the ACES and gamma byte) and `projections` check (panorama fitted to the height, stereographic fisheye);
   Biome format and lint clean; hygiene 10.0 on every gate for the package (2026-10-20, after the parity work).
-- 2026-10-20 (branch `claude/quizzical-northcutt-b56ae0`, after the subsurface, horizon, camera and defaults work):
+- 2026-10-20 (on a branch, after the subsurface, horizon, camera and defaults work):
   `npm run verify` passed (3,116 of 3,116 tests, API reports match, core + stage 21,343 bytes gzip, proofs 15 of 15);
   the package bundle grew by 1,030 bytes gzip (esbuild, minified: 59,281 -> 60,311).
 - 2026-10-21: that branch's 12 commits landed on main, ported onto main's model material tables and `options.ts`. Our
@@ -329,25 +328,4 @@ blocks. Photo mode leaves grass and flowers out and shows torches as small glowi
   names exists in `packages/voxel-pathtracer/src` (`bounceLimits.subsurface` and `internalReflections`, `sunlit`,
   `contactTransmission`, `environment.fog`, `groundFade`, `background`, `vignette`, `edges`, `grid`, `capture({transparent})`,
   `voxelScale`, `panoramaFit`, the stereographic lens, `bakeAtmosphere(..., 'surface')` and its 512-row map).
-- Open: size entries (`entry-sizes.json` still records the build before the port, `99ed7335`), rebuild the tarballs
-  for Codex.
-
-## Paused when the voxel and path tracer work began (do not lose)
-
-Scott (2026-10-20): list what was set aside on 2026-10-19 and continue it. Checked with `git worktree list`, `git cherry
-origin/main <branch>` (patch-level, so rebased copies do not count) and the handoff files.
-
-1. CAD kernel, `@margoengine/brep`: landed. Checklist 1.1-1.3 (`massProperties`, `bodiesFromSTEP`, `checkBody`, in
-   `packages/brep/src/model/`) are on main and the branch `claude/kernel` no longer exists. Codex's corpus findings
-   (Jubilee and Radial Engine bodies) and the work after them are tracked in `docs/brep-kernel-checklist.md`. The
-   tile editor's engine-gap notes are on main (`9dad7b9e docs(studio)`).
-2. Sky: `fix(night-citadel): water reflects the actual night sky` landed on main (`f2df8fcc`).
-3. Voxel sandbox: render distance 16 fill time, done 2026-10-20 (3.6-3.7 s, was 8.8-9.2 s; docs/limits.md); visual
-   references for the Intel laptop profile (record there and add its profile id to `VOXEL` in
-   `scripts/visual-regression.js`).
-4. Path tracer: light sampling through glass costs about 2x per sample in the glass scene; the denoiser on the caustic
-   scene is just under 2x better than raw (target 2x).
-5. `C:\Development\Projects\margoengine\.claude\launch.json` (untracked, voxel-sandbox dev server): keep or delete;
-   `margo3d-studio` (HANDOFF step 6's posed-picking fixture) is on this PC, not yet used.
-
-Not ours: Codex's own branches (`codex/margotile-*`, its test branches) and its worktrees.
+- Open: size entries (`entry-sizes.json` still records the build before the port, `99ed7335`), rebuild the tarballs.

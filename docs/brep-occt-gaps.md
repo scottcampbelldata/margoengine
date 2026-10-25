@@ -86,7 +86,7 @@ To do:
 
 ### C. STEP round trips
 
-Margo today: Codex checks every exported test result in OpenCascade (BRepCheck, GProp, occt-import-js). The exporter
+Margo today: the validation runs check every exported test result in OpenCascade (BRepCheck, GProp, occt-import-js). The exporter
 wrote closed curved faces without seam edges, which OpenCascade's mesher misread; fixed 2026-10-18 (below).
 
 To do, the highest validation priority: import STEP, edit in Margo (blend, Boolean), export STEP, open the result in
@@ -97,7 +97,7 @@ them flags for missing seam edges, inverted faces or unstitched sheets.
 
 ### Night Citadel is darker on the CAD branch
 
-Found by Codex's b1f5d2e validation (2026-10-18, `test-results/b1f5d2e-validation/browser/NIGHT-NUMBERS.md` in the
+Found by the b1f5d2e validation (2026-10-18, `test-results/b1f5d2e-validation/browser/NIGHT-NUMBERS.md` in the
 split worktree). Same fixed view, branch against main 1f7d19f: mean screen brightness is about 62% of main's on desktop
 (26.7 against 43.1, 8-bit luminance) and 66% on the phone. The castle stone, island rock and sea read nearly black;
 stars now show and the moon is brighter. Likely cause: the sky-lighting and display-curve commits of 2026-10-17 on
@@ -110,7 +110,7 @@ Related: the Night Citadel browser test expects phones at 2 device pixels per CS
 
 ### STEP export: OpenCascade misread faces on closed surfaces (fixed 2026-10-18)
 
-Found by Codex's b1f5d2e and 7243c0e validations. Three causes in `bodiesToSTEP`, all fixed in `model/seams.ts`:
+Found by the b1f5d2e and 7243c0e validations. Three causes in `bodiesToSTEP`, all fixed in `model/seams.ts`:
 
 - A face going round a cylinder, cone, sphere or torus (a sphere or torus less a hole, a cap over a pole) was bounded
   only by its own edges, and OpenCascade's mesher filled the wrong side. It is now cut open along the surface's seam by

@@ -1,4 +1,4 @@
-// HANDOFF 1f.j: parseFBXInWorker's worker (dist/workers/fbx.js) + modelFromPrepared build the same model as parseFBX,
+// parseFBXInWorker's worker (dist/workers/fbx.js) + modelFromPrepared build the same model as parseFBX,
 // compared byte for byte (see tests/support/pbr-snapshot.js for what is compared).
 import test from 'node:test';
 import { readFileSync } from 'node:fs';

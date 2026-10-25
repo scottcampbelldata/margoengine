@@ -6,12 +6,12 @@
     "checkedAt": "2026-10-15T11:36:04.700Z",
     "topProcesses": [
       {
-        "Name": "claude",
+        "Name": "desktop-app",
         "Id": 13528,
         "cpuSeconds": 1023
       },
       {
-        "Name": "claude",
+        "Name": "desktop-app",
         "Id": 12156,
         "cpuSeconds": 1021
       },
@@ -21,27 +21,27 @@
         "cpuSeconds": 817
       },
       {
-        "Name": "claude",
+        "Name": "desktop-app",
         "Id": 15776,
         "cpuSeconds": 804
       },
       {
-        "Name": "ChatGPT",
+        "Name": "desktop-app",
         "Id": 21032,
         "cpuSeconds": 755
       },
       {
-        "Name": "ChatGPT",
+        "Name": "desktop-app",
         "Id": 18852,
         "cpuSeconds": 543
       },
       {
-        "Name": "ChatGPT",
+        "Name": "desktop-app",
         "Id": 4960,
         "cpuSeconds": 421
       },
       {
-        "Name": "claude",
+        "Name": "desktop-app",
         "Id": 12224,
         "cpuSeconds": 403
       }

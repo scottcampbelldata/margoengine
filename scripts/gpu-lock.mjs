@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const main = resolve(import.meta.dirname, '..').replace(/[\\/]\.claude[\\/]worktrees[\\/][^\\/]+$/, '');
+const main = resolve(import.meta.dirname, '..').replace(/[\\/]\.[\w-]+[\\/]worktrees[\\/][^\\/]+$/, '');
 export const lockDir = process.env.MARGO_GPU_LOCK ?? join(main, 'test-results', 'gpu.lock');
 const ownerFile = join(lockDir, 'owner.json');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

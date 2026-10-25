@@ -1,4 +1,4 @@
-// Public API snapshots (HANDOFF 1h.c). For every `exports` entry of every workspace package, list each exported name with
+// Public API snapshots. For every `exports` entry of every workspace package, list each exported name with
 // its declaration from the emitted dist/*.d.ts (comments and private class members dropped), plus the package-local
 // types those declarations reference but the entry does not export. One report per entry in api/, like API Extractor's
 // .api.md. `npm run api:check` (default) fails with a diff when a report changed; `npm run api:update` rewrites them and

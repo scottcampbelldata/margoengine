@@ -13,7 +13,7 @@ import { parseSync } from 'rolldown/utils';
 export const WINDOW = 6;
 export const MIN_CHARS = 200;
 
-/** Signatures of algorithms known to be copied (HANDOFF dedupe list); packages/shared holds the sanctioned copies. */
+/** Signatures of algorithms known to be copied; packages/shared holds the sanctioned copies. */
 export const FAMILIES = {
   'crc32-table': /0xedb88320/i, // CRC-32 (IEEE) table polynomial: shared/crc32.js
   'inflate-tables': /3,\s*4,\s*5,\s*6,\s*7,\s*8,\s*9,\s*10,\s*11,\s*13,\s*15,\s*17/, // DEFLATE length bases: shared/inflate.js

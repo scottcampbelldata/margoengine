@@ -39,7 +39,7 @@ Run `npm test --workspace @margoengine/fbx`. The 53 tests include the original 5
 
 `npm run test:modules:browser` requires the checked-in Blender rig by default; the primary CI job explicitly selects that same file. It checks retained skin attributes/deformation buffers, clip playback, changed pixels after playback and seek, and a repeatable first frame. `MARGOENGINE_FBX_FIXTURE` can override its Vite-served URL. The asset's documented export settings exercise the existing subset and do not certify every Blender/Maya/Max convention.
 
-See [the implementation plan and progress](../../docs/native-fbx-plan.md) for completed checks and remaining compatibility work.
+See the implementation plan and progress for completed checks and remaining compatibility work.
 
 MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

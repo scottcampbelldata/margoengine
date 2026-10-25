@@ -1,4 +1,4 @@
-// Metrology (HANDOFF 5l.d): float64 measurement through the common ancestor, and snapping to CAD features (feature edges and
+// Metrology: float64 measurement through the common ancestor, and snapping to CAD features (feature edges and
 // corners), never to triangulation diagonals or face interiors.
 import test from 'node:test';
 import assert from 'node:assert/strict';

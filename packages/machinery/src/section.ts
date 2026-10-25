@@ -301,7 +301,7 @@ export class SectionPlanes implements EnginePlugin {
   }
   private drawCaps(context: GPUContext): void {
     const key = (this.capKey = context.descriptor.multisample?.count + context.format + this.base);
-    // Disabled: compile this view's cap pipelines in the background (HANDOFF 1d''); enabling waits for them instead of stalling.
+    // Disabled: compile this view's cap pipelines in the background; enabling waits for them instead of stalling.
     if (!this.active) {
       if (!this.enabled && !this.pipelines.has(key) && !this.warming.has(key)) {
         this.warming.add(key);

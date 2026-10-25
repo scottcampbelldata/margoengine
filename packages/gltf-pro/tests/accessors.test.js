@@ -1,4 +1,4 @@
-// HANDOFF 5l.p: the conveyor example's Untitled.glb (Blender I/O 5.3; example deleted 2026-10-24) was rejected with
+// The conveyor example's Untitled.glb (Blender I/O 5.3; example deleted 2026-10-24) was rejected with
 // "Unsupported glTF accessor" only because two uint32 index accessors held more than 1,000,000 elements (accessor 174:
 // 1,021,494 for mesh 66 "Mesh_16"; accessor 487: 1,480,944 for mesh 171 "Mesh_15"). The decoded-size budget bounds
 // accessors now; vertices stay capped at 1M per primitive on both the main-thread and worker paths. Errors name mesh,
@@ -127,7 +127,7 @@ test('an accessor gltf-pro cannot decode names mesh, primitive, attribute and ac
     assert.throws(() => modelFromPrepared(engine, prepared), { name: 'TypeError', message });
   }));
 
-// HANDOFF 5l.r: the main-thread path packs a mesh once and its nodes share the arrays, so PBRModel.setup (whose upload
+// The main-thread path packs a mesh once and its nodes share the arrays, so PBRModel.setup (whose upload
 // cache is keyed by array) creates one vertex and one index buffer per mesh primitive, like the worker path.
 // Two of these nodes are static and share a material, so setup also uploads one baked batch pair.
 test('nodes sharing a mesh share its packed arrays and GPU buffers; uploads equal the worker-packed bytes', () =>

@@ -52,7 +52,7 @@ These are thin components over plugins that already exist. Each one is a dynamic
 
 ## Wait for the engine, not the React wrapper
 
-A click on a skinned character misses until picking uses the deformed vertices. That work is `docs/three-parity-next.md`. The React event props should not pretend a skinned hit works before that lands.
+A click on a skinned character misses until picking uses the deformed vertices. That work is still to do. The React event props should not pretend a skinned hit works before that lands.
 
 `<MeshTransmissionMaterial>` waits for transmission in `docs/materials-extensions.md`. The component is a material attachment, like `<PbrMaterial>`, once that lobe exists.
 

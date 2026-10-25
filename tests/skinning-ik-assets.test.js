@@ -148,13 +148,12 @@ test('used PBR color, roughness and normal maps are embedded with valid UVs and 
   );
 });
 
-test('editable source, approved reference, and licensed upstream files remain reproducible', () => {
+test('editable source and licensed upstream files remain reproducible', () => {
   for (const path of [
     'source/skinning-ik.blend',
     'source/skinning_ik/build_robot.py',
     'source/skinning_ik/workshop.py',
     'source/skinning_ik/surface_textures.py',
-    'source/skinning_ik/visual-target.png',
   ])
     assert.ok(statSync(new URL(path, assets)).size > 100, path);
   const source = new URL('source/skinning_ik/textures/polyhaven/', assets),

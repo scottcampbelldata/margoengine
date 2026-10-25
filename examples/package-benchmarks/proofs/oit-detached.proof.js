@@ -1,4 +1,4 @@
-// Proof that gltf-pro's transparency hook (HANDOFF 5f.b, @margoengine/oit) changes nothing on the GPU while no hook is set:
+// Proof that gltf-pro's transparency hook (@margoengine/oit) changes nothing on the GPU while no hook is set:
 // gltf-pro at `ref` (before the hook) and in the working tree record every GPU call, descriptor, shader module and buffer
 // write of a 6-frame story: opaque, MASK, BLEND (twice), BLEND + clearcoat (physical) and a BLEND material
 // with a custom renderState, a text-patching lighting effect added and removed, a hidden blended node, an HDR and a

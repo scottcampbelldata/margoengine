@@ -1,4 +1,4 @@
-"""Original Margo Light Keeper workshop island; execute through Blender MCP.
+"""Original Margo Light Keeper workshop island; run it in a live Blender session.
 
 All geometry, the joint hierarchy, smooth skin weights, materials and furniture
 are authored here. Coordinates below use glTF Y-up. Semantic forward is -Z.
@@ -380,7 +380,7 @@ def export(path,selected=False,animations=False):
 
 def build():
     EVIDENCE.mkdir(parents=True,exist_ok=True)
-    # The dedicated MCP instance contains only a startup file or this source.
+    # The Blender instance should contain only a startup file or this source.
     if bpy.data.filepath and Path(bpy.data.filepath).name!="skinning-ik.blend":
         raise RuntimeError("Preserve the open source and open an empty file first")
     if not bpy.data.filepath and bpy.data.is_dirty:

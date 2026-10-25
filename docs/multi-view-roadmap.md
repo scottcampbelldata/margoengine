@@ -21,7 +21,7 @@ rendered to a texture). Effects with history keep it per view.
 | Views, scenes, 4x target views and the kernel changes below | 22,210 | 2,790 |
 
 The views and scenes code adds about 2.7 KB; a smaller kernel pays for most of it: the transform kernel's snapshot
-compares four lanes at once with Wasm SIMD (Codex measured 3.65 to 2.94 ms per frame at 100,000 entities, 1% moving, 3 ticks) and its
+compares four lanes at once with Wasm SIMD (measured 3.65 to 2.94 ms per frame at 100,000 entities, 1% moving, 3 ticks) and its
 redundant slice bounds checks became unchecked accessors under one safety note, which shrinks the embedded Wasm from
 7,092 to 4,580 base64 characters.
 

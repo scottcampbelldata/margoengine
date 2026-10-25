@@ -1,6 +1,6 @@
 """Original, fully modeled workshop dressing for the Light Keeper.
 
-Called by build_robot.py through Blender MCP. All authored positions are glTF
+Called by build_robot.py in a live Blender session. All authored positions are glTF
 Y-up metres; the front of the workbench and tool stand is -Z. No downloads,
 external scene objects, generated text or standalone Blender process are used.
 """

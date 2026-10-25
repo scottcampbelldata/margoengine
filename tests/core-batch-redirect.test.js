@@ -5,7 +5,7 @@ import { FrameGraph } from '../packages/core/dist/plugin.js';
 import { Camera } from '../packages/core/dist/camera.js';
 import { box } from '../packages/core/dist/index.js';
 
-// Core hook for package GPU culling (HANDOFF 5m.b): passes see this frame's batches, and a batch's `redirect` makes every
+// Core hook for package GPU culling: passes see this frame's batches, and a batch's `redirect` makes every
 // core draw of it read a package's compacted instances and indirect arguments, while core still uploads its own buffer.
 test('passes see the frame batches; a redirect replaces the instance buffer and count of every core draw, uploads unchanged', () => {
   globalThis.GPUBufferUsage = {

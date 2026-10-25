@@ -108,17 +108,17 @@
     "checkedAt": "2026-10-15T16:45:29.919Z",
     "topProcesses": [
       {
-        "Name": "claude",
+        "Name": "desktop-app",
         "Id": 13528,
         "cpuSeconds": 5285
       },
       {
-        "Name": "claude",
+        "Name": "desktop-app",
         "Id": 12156,
         "cpuSeconds": 3850
       },
       {
-        "Name": "claude",
+        "Name": "desktop-app",
         "Id": 15776,
         "cpuSeconds": 2612
       },
@@ -133,7 +133,7 @@
         "cpuSeconds": 1030
       },
       {
-        "Name": "claude",
+        "Name": "desktop-app",
         "Id": 12224,
         "cpuSeconds": 974
       },

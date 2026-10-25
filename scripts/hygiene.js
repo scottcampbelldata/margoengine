@@ -1,4 +1,4 @@
-// Code hygiene scorecard (HANDOFF 5k, launch gate 6): `npm run hygiene` measures each 5k gate per package and overall,
+// Code hygiene scorecard: `npm run hygiene` measures each 5k gate per package and overall,
 // prints a table and writes test-results/hygiene.json. Needs `npm run build:packages` and current api/ reports (gates
 // 3, 5 and 6 read the built dist/*.d.ts and api/*.api.md). `node scripts/hygiene.js --verify` runs only gates 1-2
 // (Biome format check + lint, about 2 s, no build needed) and never fails: the gates are in warn mode until phase 2
@@ -23,7 +23,7 @@
 //   7 errors   units: `throw new X(` sites in src; violation: a bare `Error` (the convention, docs/conventions.md:
 //              TypeError/RangeError for arguments, MargoError with a code otherwise), beyond the allowlist's `errors`
 //              count for that file (frozen core + stage only).
-//   8 api      not measured here: the open items of "API rough edges before 1.0" in docs/HANDOFF.md are a manual list.
+//   8 api      not measured here: API rough edges are reviewed by hand before each release.
 //   9 dead     units: src files + their named exports; violation: a file no package entry, worker URL or build script
 //              reaches, or an export nothing imports (any repo file), re-exports or makes public.
 // Score per gate: max(0, 10 - 100 * violations / units): each 1% of units in violation costs one point, so 10 means
@@ -497,7 +497,7 @@ if (quick) {
   console.log('violations/units score per gate (score: 10 - 1 point per 1% of units in violation)\n');
   console.log(fmt(header));
   for (const l of lines) console.log(fmt(l));
-  console.log(`\nHygiene score ${overall} / 10 (mean of gates 1-7 and 9; gate 8 is the manual HANDOFF list).`);
+  console.log(`\nHygiene score ${overall} / 10 (mean of gates 1-7 and 9; gate 8 is reviewed by hand).`);
   mkdirSync(join(root, 'test-results'), { recursive: true });
   writeFileSync(
     join(root, 'test-results', 'hygiene.json'),

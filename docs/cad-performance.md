@@ -18,8 +18,8 @@ numbers only within one session. Raw JSON: `examples/package-benchmarks/cad/resu
 `examples/package-benchmarks/cad/assembly.js`: five distinct part shapes (plate with 8 holes, L bracket, hex-head bolt,
 chamfered hex nut, washer) instanced into modules of 27 parts (1 plate, 2 brackets, 8 bolts, 8 nuts, 8 washers) under a
 5-level hierarchy: root > zone (32 modules) > module > fastener set > part. 30 entities per module (27 parts + 3 groups).
-The core capped a TransformStore at 100,000 entities until HANDOFF 5m.a, so the largest case here is 89,883 parts in 99,976 entities;
-the store now grows on demand (see [Beyond 100,000 entities](#beyond-100000-entities-growth-on-demand-handoff-5ma)).
+The core capped a TransformStore at 100,000 entities until the growth change, so the largest case here is 89,883 parts in 99,976 entities;
+the store now grows on demand (see [Beyond 100,000 entities](#beyond-100000-entities-growth-on-demand)).
 
 | Case | Parts | Entities | Instanced triangles | Distinct triangles |
 | --- | --- | --- | --- | --- |
@@ -80,7 +80,7 @@ assembly (`node examples/package-benchmarks/cad/kernel-node.mjs`, `results-kerne
 5. **`Engine.remove` scans every mesh** to unparent children: about 3 ms per removal at 100k entities, so disposing a
    90k-part assembly mesh by mesh is O(n²), minutes.
 6. **100,000-entity cap** in `TransformStore.create`: a 100,000-part assembly does not fit once assembly nodes are counted.
-   (Fixed by HANDOFF 5m.a: the store grows on demand up to 2^23 slots.)
+   (Fixed since: the store grows on demand up to 2^23 slots.)
 
 ## Core static-scene fast paths (merged 2026-10-14: steps 1, 2, 3 and 5; step 4 not merged)
 
@@ -109,8 +109,8 @@ from-scratch render: 0 differing pixels over 25 comparisons plus 4 unchanged red
 
 ### Before / after on a quiet machine (2026-10-14, 19:08-19:21 local)
 
-Same host and browser setup as above, measured after Scott stopped every other agent, build and benchmark (and closed
-other apps), with this benchmark the only workload, on AC power (checked before and after every run, recorded in each
+Same host and browser setup as above, measured after every other build and benchmark was stopped (and other apps
+closed), with this benchmark the only workload, on AC power (checked before and after every run, recorded in each
 JSON as `acPowerAtStart`/`acPowerAtEnd`, plus a `conditions` note and the `core` commit), holding the GPU lock. Before =
 core at `261f1d4`, after = this branch. Before and after alternate per case in two rounds (round 1 before then after,
 round 2 after then before); each cell is the mean of the two rounds' medians. Raw JSON:
@@ -177,7 +177,7 @@ MSAA; 4 runs per case over two alternating rounds, median shown; raw `results-cu
 So: about 2 ms (12%) of GPU per frame on the 50k CAD scene and up to 2.5x on heavy overdraw drawn back to front; the
 CAD runs are noisier (single runs between 8.7 and 15.7 ms).
 
-## Prototype: static-scene fast paths in core (branch `worktree-agent-a46261c57b837ecd0`; steps 1, 2, 3, 5 merged above)
+## Prototype: static-scene fast paths in core (prototype branch; steps 1, 2, 3, 5 merged above)
 
 Hot spots 1-5 above, one commit per step so each can be accepted alone. Same API, identical pixels
 (`node examples/package-benchmarks/cad/pixels-check.mjs`: a static + moving mix with hide/show, reparent, material
@@ -276,7 +276,7 @@ Before and after were measured locally for that change (not committed); "Now" is
 | `@margoengine/machinery` root | 33,121 B | 33,849 B | 33,418 B |
 | core + stage (`npm run measure:size`, untouched) | 18,681 B | 18,681 B | 19,577 B (core fast paths and material setters since) |
 
-## Beyond 100,000 entities: growth on demand (HANDOFF 5m.a)
+## Beyond 100,000 entities: growth on demand
 
 `Engine.create`'s `capacity` is now the initial size; `createMesh` doubles the store when it is full, up to 2^23
 (8,388,608) slots. Growing drops the Wasm kernel and creates a larger one at the same address (one kernel per Wasm
@@ -316,7 +316,7 @@ Browser CAD orbit, before (b6a3796) / after, DIAGNOSTIC (machine busy, quiet gat
 `results-cap-{before1,after1,after2}-orbit.json`): kernel in frame 0.59 / 3.55 / 5.87 ms vs 0.46-0.56 / 2.48-2.85 /
 5.39-6.0 ms at 10k / 50k / 90k parts; collection 1.36 / 9.0 / 14.4 vs 1.0 / 5.7-6.6 / 13.6 ms. Nothing slower; a quiet
 re-run (and 200k / 500k / 1M browser runs) is still owed.
-## GPU culling: `@margoengine/culling` (HANDOFF 1f.a)
+## GPU culling: `@margoengine/culling`
 
 Measured 2026-10-14 in one session (Arc 140V, headless Edge, 1432x768, 4x MSAA, AC power checked before and after every
 run, GPU lock held; 0 runs discarded). Raw JSON: `examples/package-benchmarks/cad/results-culling.json`, script
@@ -367,7 +367,7 @@ plates show everywhere, so coplanar ties still resolve to the later batch.
 
 Package size: 7,060 B min+gzip at `e2cc4c5` (core external; entry-sizes.json), most of it WGSL. Zero cost when not (separate package, `sideEffects: false`, no core change).
 
-## GPU culling of core meshes: `CulledMeshes` (HANDOFF 5l.b / 5m.b)
+## GPU culling of core meshes: `CulledMeshes`
 
 Package-side alone does not work. Core's main pass draws every collected batch from core's own instance buffer, and
 nothing documented lets a package make it skip one: the instance upload happens inside the draw loop (zeroing a
@@ -390,17 +390,17 @@ view with most parts outside the frustum, explode 0.6 via `ExplodedView`, side v
 hidden, view from below, 400 parts added so A's store grows from 1,024 to 2,048): 0 differing pixels in every step; the GPU dropped parts where it should (drew 237 and 171 of 648 in the close views, 757 of 1,021 at the end) and drew all 648 in the overview. `engine.pick` over a
 grid returns the same meshes on both engines (23 of 40 grid points hit) and an `AssemblyBVH` ray hits. With `--edges`
 (FeatureEdges on both): steps 0-6 identical, step 7 has 160 pixels that differ by 1 in one channel; FeatureEdges appends visible parts with atomics, so its line order and the blending of overlapping
-antialiased lines vary run to run (the same happens between two plain-core runs). Since HANDOFF 5l.c the edges of
+antialiased lines vary run to run (the same happens between two plain-core runs). Since the edge change the edges of
 parts between `minRadius` and twice that fade in with alpha below 1, which makes that blend more order-dependent: step 7
 now differs in about 5,000 pixels by at most 3 (re-run twice, `5l-all` session below); steps 0-6 by at most 1. A missing
 or extra line would differ by about 100.
 
-## 100,000 parts: small-part culling, subassembly imposters, cheaper edges (HANDOFF 5l.a-c)
+## 100,000 parts: small-part culling, subassembly imposters, cheaper edges
 
 Same harness as the tables above (`run.mjs`, 1432x768, 4x MSAA, overview orbit, vsync off), 100,008 parts in 111,237
 entities (12.9 M instanced triangles), Arc 140V, Edge, GPU lock held, AC power, every run after `scripts/quiet-gate.mjs`
 passed (CPU <= 20 % for 20 s) unless marked DIAGNOSTIC. Two sessions on 2026-10-15 (14:20-14:31 and 14:45-14:58 UTC):
-the quiet gate only watches the CPU, and the same configuration varied up to 40 % in FPS between them (other agents'
+the quiet gate only watches the CPU, and the same configuration varied up to 40 % in FPS between them (other
 GPU-free work, thermals), so both are shown. Raw JSON: `examples/package-benchmarks/cad/results-5l-*.json` (`-2` = second
 session); before = this branch's parent (machinery dist copied before the change, `--machinery=` for edges).
 
@@ -438,7 +438,7 @@ Picking at 100k: `engine.pick` (core, frozen; it re-renders the scene) takes 34-
 and 11-12 ms with imposters showing (fewer parts collected); `AssemblyBVH.raycast` answers in 0.68 ms median (1.2 ms p95;
 create 88 ms, rebuild after a transform change 51 ms), so the < 10 ms pick target holds on the BVH path only.
 
-Section caps on open shells (HANDOFF 5l.d, `node packages/machinery/test/section-open-check.mjs`, a closed box and a
+Section caps on open shells (`node packages/machinery/test/section-open-check.mjs`, a closed box and a
 single open sheet cut at y = 0, seen from above behind the sheet): before, 9,429 cap-coloured pixels on the sheet (a
 stray cap where there is no material) and 8,337 on the box; after, 0 on the sheet and 8,337 on the box.
 
@@ -473,7 +473,7 @@ node examples/package-benchmarks/cad/culling.mjs --check --views=orbit,still,gra
 node examples/package-benchmarks/cad/kernel-node.mjs
 node examples/package-benchmarks/proofs/machinery-cad.proof.js
 node packages/machinery/test/edges-check.mjs
-# 100k parts (HANDOFF 5l): small-part culling, imposters, edges; before = a copy of the old dist via --machinery=
+# 100k parts: small-part culling, imposters, edges; before = a copy of the old dist via --machinery=
 node examples/package-benchmarks/cad/run.mjs --sizes=100000 --culled=1.5 --edges --no-bvh --no-explode --label=after
 node examples/package-benchmarks/cad/run.mjs --sizes=100000 --culled=1.5 --imposters=12 --edges --no-bvh --no-explode --label=imposters
 node packages/machinery/test/section-open-check.mjs

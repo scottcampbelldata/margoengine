@@ -12,7 +12,7 @@ For release fault injection, deterministic hardware-limit fuzzing, lifecycle soa
 
 The [local stress validation results](stress-results.md) record the completed NVIDIA/AMD campaigns, 3M-splat run, 100-cycle soak and remaining release gaps.
 
-The 11 October 2026 conveyor comparison with Three.js **0.186.1** (`results.md`, `conveyor-simulator.md`) and its runners were deleted on 24 October 2026 with the conveyor simulator, a port of a three.js app: other engines now run only from the engine-bench folder next to this repository, through `npm run bench -- --engines=...` (AGENTS.md, clean room).
+The 11 October 2026 conveyor comparison with Three.js **0.186.1** (`results.md`, `conveyor-simulator.md`) and its runners were deleted on 24 October 2026 with the conveyor simulator, a port of a three.js app: other engines now run only from the engine-bench folder next to this repository, through `npm run bench -- --engines=...` (clean room).
 
 These measurements were captured on 11 October 2026 before the Margo Engine rename. Historical captures retain their original package names. Raw traces, heap profiles, machine inventories, logs and recovery archives remain local; this repository contains portable summaries and the scripts needed to repeat the checks.
 

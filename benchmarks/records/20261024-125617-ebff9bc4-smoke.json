@@ -66,7 +66,7 @@
    "version": "1.0.0",
    "commit": "ebff9bc4",
    "commitFull": "ebff9bc4dc8739b908bc5ef660542ebea8cc4146",
-   "branch": "claude/margo-bench-609bda",
+   "branch": "margo-bench",
    "dirty": true
   },
   "browser": {
@@ -90,7 +90,7 @@
   "ac": true,
   "lock": {
    "held": "by the wrapping gpu-lock run",
-   "dir": "C:/Development/Projects/margoengine/test-results/gpu.lock"
+   "dir": "<repo>/test-results/gpu.lock"
   },
   "quiet": {
    "ac": true,
@@ -99,7 +99,7 @@
    "checkedAt": "2026-10-24T12:56:41.849Z",
    "topProcesses": [
     {
-     "Name": "claude",
+     "Name": "desktop-app",
      "Id": 104792,
      "cpuSeconds": 23780
     },
@@ -124,7 +124,7 @@
      "cpuSeconds": 3090
     },
     {
-     "Name": "claude",
+     "Name": "desktop-app",
      "Id": 93220,
      "cpuSeconds": 2995
     },

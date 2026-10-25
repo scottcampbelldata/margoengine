@@ -262,7 +262,7 @@ test('the instanced vertex patch applies after material and shader-node patches,
   assert.throws(() => instancedShader('fn x(){}'), /instancing patch target missing/);
 });
 
-test('texture binding limit (HANDOFF 5c): over the device limit, the draw throws naming the material and effects', async () => {
+test('texture binding limit: over the device limit, the draw throws naming the material and effects', async () => {
   const { gpu, engine, store, view } = await scene(),
     fixture = animatedTriangle();
   fixture.doc.materials = [{ extensions: { KHR_materials_clearcoat: { clearcoatFactor: 1 } } }];

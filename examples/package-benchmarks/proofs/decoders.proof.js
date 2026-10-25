@@ -110,7 +110,7 @@ for (const [name, source, n, stride, mode, filter] of streams) {
 }
 const vectors = JSON.parse(fileAt('packages/decoders/tests/fixtures/meshopt-vectors.json', pin)),
   unpack = (text) => new Uint8Array(Buffer.from(text, 'base64'));
-// Cases 9-12 are KHR_meshopt_compression (vertex codec v1, COLOR filter, HANDOFF 5w.b), which the baseline rejects: only
+// Cases 9-12 are KHR_meshopt_compression (vertex codec v1, COLOR filter), which the baseline rejects: only
 // the reference decoder's expected bytes apply to them.
 for (const [i, c] of vectors.cases.entries()) {
   if (i < 8) agree(`fixture ${c.name}`, unpack(c.encoded), c.count, c.stride, c.mode, c.filter);

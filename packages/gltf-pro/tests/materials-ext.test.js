@@ -1,4 +1,4 @@
-// HANDOFF 5w.e/f: KHR_materials_iridescence, anisotropy, diffuse_transmission (extended materials), KHR_materials_variants
+// KHR_materials_iridescence, anisotropy, diffuse_transmission (extended materials), KHR_materials_variants
 // and transmission under ambient hooks. The BRDF terms are checked against tests/support/khr-brdf.js (written from the
 // specs) here on the CPU side and in WGSL on a real GPU by scripts/gltf-pro-materials-gpu-check.js.
 import test from 'node:test';

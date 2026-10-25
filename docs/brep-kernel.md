@@ -1,6 +1,6 @@
 # Margo B-rep kernel: our own STEP reader (design)
 
-Status, 2026-10-17: stages 1 to 4 written (`packages/brep`), waiting for Codex's tests; stage 5 next. Replaces OpenCascade (`occt-import-js`) for STEP, then IGES. Clean room: written only from
+Status, 2026-10-17: stages 1 to 4 written (`packages/brep`), in test; stage 5 next. Replaces OpenCascade (`occt-import-js`) for STEP, then IGES. Clean room: written only from
 the published standards (ISO 10303-21 file syntax, ISO 10303-42 geometry and topology, the AP203/AP214/AP242 schemas)
 and textbook geometry (NURBS evaluation, constrained Delaunay triangulation). No OpenCascade, three.js or Babylon.js
 source is read. OpenCascade stays only as a test oracle (dev dependency) until our reader passes the corpus, then it is
@@ -26,7 +26,7 @@ Faces: 4,129 `ADVANCED_FACE` on `PLANE` 1,469, `CYLINDRICAL_SURFACE` 1,814, `CON
 `NEXT_ASSEMBLY_USAGE_OCCURRENCE` with `ITEM_DEFINED_TRANSFORMATION`, 42 `MAPPED_ITEM`. Colours: 5,154 `STYLED_ITEM`.
 Some files also carry AP242 tessellated geometry (2,296 `COMPLEX_TRIANGULATED_SURFACE_SET`), which can be read as is.
 
-## Stages (each one commit series, tested by Codex before the next)
+## Stages (each one commit series, tested before the next)
 
 1. **Part 21 reader and product structure.** Streaming tokenizer (strings with `''` and `\X2\` escapes, reals with
    exponents, enumerations, `$`, `*`, typed parameters, complex instances), an entity table indexed by id, units (SI

@@ -1,6 +1,6 @@
 # Package conventions
 
-Rules every Margo package follows for shared types, errors and export names (HANDOFF 5k gates 5 and 7, 1h.h).
+Rules every Margo package follows for shared types, errors and export names.
 `npm run hygiene` measures them; `scripts/hygiene-allowlist.json` holds the few justified exceptions.
 
 ## Shared types: one definition, in `@margoengine/math`
@@ -105,7 +105,7 @@ A name declared and exported by two packages must mean the same thing, or be ren
 | `ExpandOptions` | lines, procedural | lines' renamed `ExpandLineOptions` (its function is `expandLine`). |
 | `SurfaceOptions` | procedural, machinery | procedural's renamed `MarchingCubesOptions`. |
 | `Vector3` (navmesh/build) | math | `Navigation` takes math's `Vec3Like`; math's `Vector3` is the class. |
-| `loadGLTF`, `parseGLTF` | gltf, gltf-pro | Open, group B (HANDOFF "API rough edges" item 7). |
+| `loadGLTF`, `parseGLTF` | gltf, gltf-pro | Open, group B. |
 | `texture` (vfx) | shader | vfx's `@margoengine/vfx/texture` feature object renamed `textureFeature` (pass `{texture: textureFeature}`); shader's `texture()` node keeps the name. |
 | `Environment`, `Sky`, `Bloom`, `SSAO`, `TAA`, `Tonemap`, `Shadows`, `OrbitControls`, `MapControls`, `ArcballControls` | environment, sky, post, taa, tonemap, shadows, controls; react | Kept: the plugin or pass class and react's JSX component that adds it with the same options (React names components after what they render). Allowlisted. |
 | `Vec3` (lod), `Color` (sky, terrain), `HeightField` (terrain) | math | Math's: lod uses `MutableVec3` / `Vec3`, sky and terrain colours are `Vec3`, terrain re-exports math's `HeightField`. |

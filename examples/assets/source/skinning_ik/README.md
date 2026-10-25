@@ -20,10 +20,10 @@ to zero, and uses normal strength `0.25`. `apply_dry_concrete(scene, root)` can
 repair that material without changing geometry or UVs. The full builder applies
 the same finish automatically. Source CC0 maps remain unchanged.
 
-The builder uses Blender's Python API and is run through the existing Blender
-MCP socket. Open an empty file, or this scene, before running it. It intentionally
+The builder uses Blender's Python API and is run in a live Blender
+session. Open an empty file, or this scene, before running it. It intentionally
 refuses to clear an unrelated saved Blender file. Schedule the build with a
-Blender timer so the MCP request can return before rendering finishes:
+Blender timer so the script call can return before rendering finishes:
 
 ```python
 import bpy, runpy
@@ -54,7 +54,7 @@ It preserves the exact convex support of the exported geometry and exempts
 only the authored shoulder cap, spherical bearing, washers, axle, and hex hubs.
 The analytic primitive union uses a one-micrometre float guard and retains the
 visible proximal shaft that a broad shoulder sphere would hide. Run its `extract()`
-function through Blender MCP after changing arm geometry; it does not change
+function in Blender after changing arm geometry; it does not change
 the open scene. The matching saved Blender scene must be open at bind frame 1:
 its native loose components produce separate `upperArmPieces` for the bellows,
 piston barrel, sculpted armor, and copper shaft. Keeping those four hulls separate

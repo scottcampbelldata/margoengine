@@ -1,6 +1,6 @@
 // Run before any timing benchmark: require AC power, wait until the machine is quiet, and return the conditions
 // to record with the results. CLI: `node scripts/quiet-gate.mjs [--max=20] [--hold=20] [--timeout=1800]` prints JSON.
-// ponytail: whole-machine CPU threshold, not per-process attribution; good enough to wait out other agents' builds.
+// Whole-machine CPU threshold, not per-process attribution; good enough to wait out other builds.
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 

@@ -1,4 +1,4 @@
-"""Export the original workshop's compact shadow support volume via Blender MCP.
+"""Export the original workshop's compact shadow support volume from a live Blender session.
 
 The current saved Light Keeper scene supplies evaluated world geometry; a sampled
 sphere includes the interactive arm and held orb's reachable swept volume.
@@ -84,7 +84,7 @@ def extract():
     if np.any(reduced.min(axis=0) < fixed_min) or np.any(reduced.max(axis=0) > fixed_max):
         raise ValueError("Conservative shadow hull exceeds the demo's fixed bounds")
     header = ("// Original Light Keeper geometry, evaluated at bind frame 1 in glTF Y-up metres.\n"
-              "// Regenerate through Blender MCP with source/skinning_ik/extract_shadow_bounds.py.\n"
+              "// Regenerate in Blender with source/skinning_ik/extract_shadow_bounds.py.\n"
               "// Scene convex hull plus a radius .78 arm/orb envelope at [-.24, 1.03, 0].\n"
               "// Facet-tested expansion contains the full analytic sphere, not an inscribed sample.\n"
               "// Separate runtime orb is excluded from scene input; no asset geometry is changed.\n")

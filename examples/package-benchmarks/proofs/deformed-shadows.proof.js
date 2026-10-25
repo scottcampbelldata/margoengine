@@ -1,4 +1,4 @@
-// Proof for HANDOFF 5l.j (VAT crowd shadows + IBL, shadows fitted to small scenes) that apps not using the new paths see
+// Proof (VAT crowd shadows + IBL, shadows fitted to small scenes) that apps not using the new paths see
 // the same GPU calls as `ref`:
 //  - vat: a VATCrowd with no lighting effect (instances added and edited, a format switch, device restoration, removal)
 //    records every GPU call of @margoengine/animation/vat at `ref` and in the working tree: identical.

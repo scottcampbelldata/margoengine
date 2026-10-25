@@ -137,7 +137,7 @@ Vite and TypeScript resolve the packages through their public distribution expor
 without source aliases. Run `npm run build:packages` before standalone workspace
 builds/tests; `npm run dev:sandbox` builds the packages automatically. The example
 adds no features to core or stage. CI builds/tests this workspace and retains the
-core + stage gzip gate of 25,000 bytes (AGENTS.md).
+core + stage gzip gate of 25,000 bytes.
 
 Before the shrub-spacing adjustment, the physical NVIDIA Ampere production run at 1440 × 900
 measured 60.03 / 60.07 / 60.00 FPS at 100k / 500k / 1M particles. The 600-frame

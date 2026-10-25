@@ -1,4 +1,4 @@
-// HANDOFF 1f.j: the worker path (dist/workers/gltf.js + modelFromPrepared) builds the same model as main-thread parsing,
+// The worker path (dist/workers/gltf.js + modelFromPrepared) builds the same model as main-thread parsing,
 // compared byte for byte: document, buffers, every accessor, packed vertices/indices, materials, images and the node
 // transforms/hierarchy written into the engine's transform store.
 import test from 'node:test';

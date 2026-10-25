@@ -1,4 +1,4 @@
-// Real-GPU measurements for HANDOFF 1d''/1e.f. From the repo root after build:packages, under the GPU lock on AC:
+// Real-GPU measurements for the pipeline toggles. From the repo root after build:packages, under the GPU lock on AC:
 //   node examples/package-benchmarks/pipeline-toggles/toggle.mjs [stall|pixels|gpu|override]...
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';

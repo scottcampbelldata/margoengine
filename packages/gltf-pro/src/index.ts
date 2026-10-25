@@ -2088,7 +2088,7 @@ export class PBRModel implements EnginePlugin {
                     : 'ambientFragment',
           lit = mode === 'beauty' || through || capture;
         // Every pipeline sets the face and alpha tests as constants (face, mask below), so plain opaque and blended
-        // materials compile without a discard and keep early depth testing (HANDOFF 1e.f). The compact path had lost
+        // materials compile without a discard and keep early depth testing. The compact path had lost
         // this outside instancing and MASK in the consolidation (8f710eb3).
         if (compact) code = compactTests(code);
         const source = p.extension ?? m.extension;

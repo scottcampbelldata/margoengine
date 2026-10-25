@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Texture binding limit GPU check</title><style>body{margin:0}#host{width:1280px;height:720px}</style></head><body><div id="host"></div>
 <script type="module">
-// Driven by binding-limit-gpu.mjs (HANDOFF 5c). A gltf-pro PHYSICAL-variant grid of spheres (roughness 0..1 across, dielectric
+// Driven by binding-limit-gpu.mjs. A gltf-pro PHYSICAL-variant grid of spheres (roughness 0..1 across, dielectric
 // and metal rows, one clearcoat row) on a floor, lit by @margoengine/shadows, environment IBL + fog, clustered lights with a
 // LocalShadows point light: 16 sampled textures per fragment stage. Query: ?env=ref loads environment as of e017d50 (BRDF LUT
 // texture: 17 textures; the device is then created with the adapter's raised limits unless &limits=default);

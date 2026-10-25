@@ -1,4 +1,4 @@
-// The shared error convention (HANDOFF 1h.h, docs/conventions.md). Argument errors use the built-in classes (TypeError for a
+// The shared error convention (docs/conventions.md). Argument errors use the built-in classes (TypeError for a
 // wrong type or shape, RangeError for a value outside its range); everything else throws a MargoError with a code.
 
 /**

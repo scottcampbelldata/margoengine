@@ -1,4 +1,4 @@
-// Per-file node and part caps (HANDOFF 5j, docs/limits.md): they bound memory for untrusted files at 100,000 by default,
+// Per-file node and part caps (docs/limits.md): they bound memory for untrusted files at 100,000 by default,
 // and an option raises them up to core's entity cap (2^23 slots).
 
 /** Validates the count-cap option `name`: an integer from 1 to 8,388,608 (default 100,000). */

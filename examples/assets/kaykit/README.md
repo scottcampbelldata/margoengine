@@ -1,6 +1,6 @@
 # KayKit assets (Kay Lousberg, CC0 1.0)
 
-For the example game (HANDOFF 5l.q). All files are CC0 1.0 (public domain dedication); credit is optional and given
+For the example game. All files are CC0 1.0 (public domain dedication); credit is optional and given
 here: Kay Lousberg, www.kaylousberg.com. Licence texts are kept next to the files.
 
 | File | Source | Size | Contents | glTF-Validator |

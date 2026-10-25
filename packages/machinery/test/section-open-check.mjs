@@ -1,4 +1,4 @@
-// Real-adapter check for section caps on open shells (HANDOFF 5l.d), from the repository root after building packages, holding
+// Real-adapter check for section caps on open shells, from the repository root after building packages, holding
 // the GPU lock: node packages/machinery/test/section-open-check.mjs [--base=/test-results/machinery-old]
 // The closed box must be capped; the open sheet must not be (a stray cap there is the bug this guards).
 import assert from 'node:assert/strict';

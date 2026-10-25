@@ -225,7 +225,6 @@ export class ArcballControls extends Controls {
       t0 = camera.target,
       u0 = camera.up,
       f = this.enableDamping ? 1 - (1 - clamp(this.dampingFactor, 0, 1)) ** (60 * Math.max(0, delta)) : 1,
-      keep = 1 - f,
       // Share of a pending amount to apply now; `reach` turns the amount into world units moved. Once a damped step
       // would move less than the change threshold, the rest is taken at once, so an update that reports no change
       // leaves nothing pending to creep on.

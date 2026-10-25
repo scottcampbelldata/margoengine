@@ -1,4 +1,4 @@
-// Proof for SSR's model capture (`ssr.add(model)`, HANDOFF 5l.l): with no model added, SSR makes exactly the GPU calls it
+// Proof for SSR's model capture (`ssr.add(model)`): with no model added, SSR makes exactly the GPU calls it
 // made at 3cf1453 (before the capture), and stacks without SSR are unchanged too, over a story of resizes, option edits,
 // SSR toggles, depth-format, sample-count and canvas-format changes, a rejected frame, device restoration and disposal at
 // 1x and 4x, with core's plain shader and with an IBL-patched one (margoAmbient + environment's BRDF helper).

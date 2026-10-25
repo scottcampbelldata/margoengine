@@ -1,4 +1,4 @@
-// Real-GPU check of physical materials on meshes built in code (HANDOFF 5l.g). Correctness only (no timing). After
+// Real-GPU check of physical materials on meshes built in code. Correctness only (no timing). After
 // npm run build:packages, on AC power, under the GPU lock:
 //   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/physical-gpu.mjs [--only=side,brdf,refraction,lit]
 // 1. Side by side: a materials sphere and the equivalent glTF sphere (gltf-pro) for glass (refracting a checkerboard),

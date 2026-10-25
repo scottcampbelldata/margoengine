@@ -1,4 +1,4 @@
-// Proof for HANDOFF 5c (environment's BRDF LUT moved from a texture to a storage buffer; gltf-pro names the combination when
+// Proof (environment's BRDF LUT moved from a texture to a storage buffer; gltf-pro names the combination when
 // a shader declares more sampled textures or samplers than the device allows). The 14-frame story of
 // gltf-pro-lighting-hooks.proof.js (shadows, clustered, environment IBL, fog and a text-patching effect added, removed and
 // reordered; HDR and canvas targets; MSAA 1x/4x; beauty, SSAO-ambient and G-buffer draws; standard, physical, unlit and

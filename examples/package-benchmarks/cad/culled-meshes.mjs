@@ -1,4 +1,4 @@
-// Real-GPU check for @margoengine/culling's CulledMeshes on regular core meshes (HANDOFF 5m.b): engine A draws through
+// Real-GPU check for @margoengine/culling's CulledMeshes on regular core meshes: engine A draws through
 // the GPU culler (core's CPU culling off), engine B is plain core drawing every part; every step's frames must be identical, the culler must
 // actually drop parts in partial views, and engine.pick, FeatureEdges, ExplodedView and AssemblyBVH must keep working.
 // Run from the repository root after building packages, holding the GPU lock:

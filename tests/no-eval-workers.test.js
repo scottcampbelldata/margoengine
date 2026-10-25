@@ -1,4 +1,4 @@
-// The Draco/KTX2 decoder worker and the STEP/IGES CAD worker run without eval or new Function (HANDOFF 5l.o), so the
+// The Draco/KTX2 decoder worker and the STEP/IGES CAD worker run without eval or new Function, so the
 // strict CSP in docs/deploying.md (no 'unsafe-eval') covers them. A Node vm context with code generation from strings
 // disabled throws EvalError exactly where such a CSP refuses: each Emscripten glue file runs there, worker-style (classic
 // script in global scope, as importScripts runs it), and must match the unpatched vendor glue byte for byte.

@@ -52,7 +52,7 @@ compacted list too, so edges get the same frustum and screen-size culling. `engi
 core's CPU instance data and is unaffected. With `minRadius: 0` (default) frames are pixel-identical to core
 (`examples/package-benchmarks/cad/culled-meshes.mjs`). Limits: frustum and screen size only (no Hi-Z occlusion yet; use
 `CulledInstances` for occlusion on static parts); with `engine.render()` (CPU culling on) the GPU test only adds the
-screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies (HANDOFF 5l.a; numbers in
+screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies (numbers in
 [cad-performance.md](../../docs/cad-performance.md)): a dropped part simply disappears, so keep it under the size where a
 part is still recognisable.
 

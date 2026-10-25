@@ -420,7 +420,7 @@ voxels.dispose();
   one with the new in the same step. Removing `voxels.body` disposes the VoxelPhysics.
 
 Measured with Node 26 on the reference desktop (NVIDIA RTX A6000, AMD Ryzen 9 9950X, 32 logical cores; 2026-10-19,
-other agents' jobs running, 11-15% total CPU; three runs of `node --test packages/voxel/tests/physics.test.js`, which
+other jobs running, 11-15% total CPU; three runs of `node --test packages/voxel/tests/physics.test.js`, which
 prints yours; time spent in VoxelPhysics per physics step). One chunk built all at once (best of 3): a terrain-surface
 chunk's voxel collider 0.6 ms and triangle mesh 2.3-2.5 ms (2 pieces); a uniform stone chunk 0.9-1.0 ms and 1.0-1.1 ms;
 a 50% random cave chunk 1.7-2.5 ms and 38-41 ms (60 pieces), the worst case for a ball. Per physics step:

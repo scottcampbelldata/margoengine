@@ -1,4 +1,4 @@
-// Real-adapter check of gltf-pro's extended materials (HANDOFF 5w.e/f): every feature permutation of the extended
+// Real-adapter check of gltf-pro's extended materials: every feature permutation of the extended
 // shader, the worst-case texture plan and the transmissive variant compile and build pipelines (all entry points) with
 // shadows, clustered lights + LocalShadows and environment IBL composed (fog adds no bindings), with zero WebGPU
 // validation errors; and the WGSL thin-film Fresnel and direct-light BRDF (isotropic and anisotropic, iridescence, transmission, diffuse

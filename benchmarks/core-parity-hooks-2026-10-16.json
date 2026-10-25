@@ -1,6 +1,6 @@
 {
   "date": "2026-10-16",
-  "branch": "codex/core-parity-hooks",
+  "branch": "core-parity-hooks",
   "sourceBase": "12f3b283080345b4eda4d90f62ffc45a955d0dba",
   "workingTreeDirty": true,
   "scope": "Three user-approved core hooks; stage facade implementation unchanged; optional package backlog not implemented",

@@ -1,4 +1,4 @@
-// Runs every real-browser test script once, serially, under the GPU lock and on AC power (HANDOFF item 0).
+// Runs every real-browser test script once, serially, under the GPU lock and on AC power.
 // From the repository root, after `npm run build:packages`:
 //   node examples/package-benchmarks/gates/run-browser-tests.mjs [--only=substring,substring] [--label=browser-tests]
 // Takes test-results/gpu.lock in the main checkout around each script (scripts that take it themselves run without it),

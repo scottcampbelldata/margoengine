@@ -1,4 +1,4 @@
-// Cross-package WGSL contracts (HANDOFF 1g.c, docs/shader-contracts.md). Core's mesh shader is frozen for 1.0, so packages
+// Cross-package WGSL contracts (docs/shader-contracts.md). Core's mesh shader is frozen for 1.0, so packages
 // that extend it still patch its text (PassContext.shader). Every anchor they rely on is listed here: the test fails, naming
 // the package, when an anchor leaves the shader it targets or when the package stops using the listed anchor (update both).
 // gltf-pro's own lighting hooks are checked in packages/gltf-pro/tests; terrain mirrors core's lighting lines on purpose.

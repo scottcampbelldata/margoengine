@@ -192,7 +192,7 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
    bytes for lossless round trips. Fixtures: our own files written by `writeVox`, plus one sample from
    ephtracy/voxel-model (MIT since 2026-04-29) with its licence noted.
 
-## Phases (one worktree agent each; every phase runs AGENTS.md gates; shader phases add build:site + visual:check)
+## Phases (each phase runs the repository gates; shader phases add build:site + visual:check)
 1. Storage (`.`): registry, chunk, world, dirty tracking, pack/unpack. Node tests vs a dense-array oracle, palette
    growth/shrink, border edits mark neighbours dirty. Creates the package (package.json, README, build wiring,
    catalog) and commits this design as packages/voxel/DESIGN.md.

@@ -1,7 +1,7 @@
-// Khronos sample assets (HANDOFF launch gate 5): runs the Khronos glTF-Validator on every model in
+// Khronos sample assets: runs the Khronos glTF-Validator on every model in
 // examples/assets/khronos/manifest.json, records size, triangles, extensions and the result there, and regenerates the
 // model table and third-party notices in examples/assets/khronos/README.md (between the <!-- models --> and
-// <!-- notices --> markers). `render` (the eyeballed gallery verdict, HANDOFF 5w) is written by hand and kept.
+// <!-- notices --> markers). `render` (the eyeballed gallery verdict) is written by hand and kept.
 //   node scripts/khronos-assets.mjs
 import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';

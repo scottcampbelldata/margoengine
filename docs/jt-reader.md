@@ -51,7 +51,7 @@ Licensing and the notice it must carry: `docs/jt-licensing.md`. Code: `packages/
 
 ## First real files (2026-10-18)
 
-Codex's step-10 samples (NIST models, US public domain, mirrored by Innerscene; in the ignored corpus, never committed):
+Sample files (NIST models, US public domain, mirrored by Innerscene; in the ignored corpus, never committed):
 
 - NIST MTC CRADA assembly, literal JT 10.5 (DM 9.8): structure reads in about 140 ms: 179 nodes, 13 parts, 41
   instances, millimetres, part names from the instance nodes. Its segments are XZ containers of LZMA2 (not bare LZMA),

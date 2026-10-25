@@ -34,7 +34,7 @@ Nothing is published without Scott's go-ahead for that release. The only publish
    why it cannot be reached. `npm audit` (dev included) and `npm audit signatures` too. These need the registry.
 5. `npm run supply-chain` (rewrites THIRD-PARTY-NOTICES.md) and review the diff: a new dependency needs a reason, an
    allowed licence and no install script. For every runtime dependency and peer, check it is still maintained
-   (`npm view <name> time.modified repository.url`) and record anything worrying in the HANDOFF.
+   (`npm view <name> time.modified repository.url`) and record anything worrying in the release notes.
 6. `npm run check:merge` passes, then `npm run publish:dry-run` and read the file lists.
 
 ## Publishing
@@ -62,4 +62,4 @@ badge on npmjs.com, tag the commit `v<x.y.z>`, and refresh the catalog and site 
 
 ## Contacts
 
-Security reports: GitHub private vulnerability reporting or security@margoengine.com (SECURITY.md).
+Security reports: GitHub private vulnerability reporting or hello@margointeractive.com (SECURITY.md).
