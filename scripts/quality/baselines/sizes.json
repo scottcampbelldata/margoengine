@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3132741,
+  "total": 3133301,
   "history": [
     {
       "date": "2026-10-24",
@@ -109,6 +109,12 @@
       "date": "2026-10-25",
       "commit": "6dbc8729",
       "reason": "padTileGrid/remapTileUVs in materials/atlas (+508 B); new unity-pixel-art and unreal-pixel-art script generators",
+      "grew": 3
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "dd9b0e14",
+      "reason": "React stage 2a (item 17): kit re-exports the richer OrbitControls (every live prop, events, CAD profiles, keys); physics and xr share the new useCreated helper; the root shrinks now that physics is only on its subpath",
       "grew": 3
     }
   ],
@@ -322,11 +328,11 @@
     "@margoengine/procedural/voronoi": 5026,
     "@margoengine/quality": 1879,
     "@margoengine/quality/warm": 1536,
-    "@margoengine/react": 21372,
-    "@margoengine/react/kit": 10034,
-    "@margoengine/react/physics": 4905,
+    "@margoengine/react": 20237,
+    "@margoengine/react/kit": 11136,
+    "@margoengine/react/physics": 5204,
     "@margoengine/react/post": 3125,
-    "@margoengine/react/xr": 3135,
+    "@margoengine/react/xr": 3429,
     "@margoengine/road": 1171,
     "@margoengine/scatter": 11893,
     "@margoengine/scenery": 474,

@@ -119,7 +119,11 @@ test('package exports preserve independent public runtime and declaration paths 
   const base = await import(specifier('.'));
   for (const [subpath, names] of Object.entries(expected)) {
     const subpathApi = await import(specifier(subpath));
-    for (const name of names) assert.equal(base[name], subpathApi[name], name + ' is available from one root import');
+    // Physics stays off the root: its Rapier import() would be a required install for every bundled app.
+    if (subpath === './physics')
+      for (const name of names) assert.equal(base[name], undefined, name + ' is only on the physics subpath');
+    else
+      for (const name of names) assert.equal(base[name], subpathApi[name], name + ' is available from one root import');
   }
   assert.equal(typeof base.Animation, 'function');
   assert.equal(typeof base.MeshTransmissionMaterial, 'function');
@@ -179,7 +183,8 @@ const baseConsumer = `import {createElement as h} from 'react';
   import {Canvas,Stage,Mesh,BoxGeometry,PbrMaterial} from '@margoengine/react';
   export const PickingCube=()=>h(Canvas,{frameloop:'demand'},h(Stage,null,h(Mesh,{onClick:event=>console.log(event.object.name)},h(BoxGeometry),h(PbrMaterial,{color:'#84d6bd'}))));`;
 const optionalConsumer = `import {createElement as h} from 'react';
-  import {Canvas,Box,Text,Gltf,EffectComposer,Bloom,Physics,RigidBody,XR,Controller} from '@margoengine/react';
+  import {Canvas,Box,Text,Gltf,EffectComposer,Bloom,XR,Controller} from '@margoengine/react';
+  import {Physics,RigidBody} from '@margoengine/react/physics';
   export const OptionalScene=()=>h(Canvas,null,h(Box),h(Text,null,'Margo'),h(Gltf,{src:'/model.glb'}),h(EffectComposer,null,h(Bloom)),h(Physics,null,h(RigidBody,null,h(Box))),h(XR,null,h(Controller)));`;
 function staticChunks(outputs) {
   const chunks = new Map(outputs.filter((item) => item.type === 'chunk').map((chunk) => [chunk.fileName, chunk])),
@@ -331,3 +336,25 @@ test('strict TypeScript consumers compile every public React subpath, callbacks 
     );
     await runNode([join(repository, 'node_modules/typescript/bin/tsc'), '-p', join(directory, 'tsconfig.json')]);
   }));
+
+test('the root entry never names Rapier, so apps without physics build with webpack and Turbopack', async () => {
+  // Bundlers resolve every string-literal import() they reach, used or not: one inside the root's module graph made
+  // `@dimforge/rapier3d-compat` a required install for any app importing '@margoengine/react' (bundler matrix,
+  // 2026-10-25). Physics lives only in '@margoengine/react/physics'.
+  const seen = new Set(),
+    pending = [join(packageRoot, 'dist/index.js')];
+  while (pending.length) {
+    const file = pending.pop();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const code = await readFile(file, 'utf8');
+    assert.equal(code.includes('rapier3d'), false, `${file} names Rapier`);
+    for (const [, path] of code.matchAll(/(?:from|import)\s*\(?\s*['"](\.\.?\/[^'"]+)['"]/g))
+      pending.push(join(dirname(file), path));
+  }
+  assert.ok(seen.size > 5, 'the walk reached the root modules');
+  assert.equal(
+    [...seen].some((file) => file.endsWith('physics.js')),
+    false,
+  );
+});

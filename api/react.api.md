@@ -7,7 +7,6 @@ import { ArcballControls, ArcballProjection, ControlEvent, MapControls, Navigati
 import { EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, Vec3 } from "@margoengine/core";
 import { DOF, DOFOptions } from "@margoengine/dof";
 import { TransmissionOptions } from "@margoengine/materials";
-import { Physics } from "@margoengine/physics";
 import { Bloom, BloomOptions, SSAO, SSAOOptions } from "@margoengine/post";
 import { ShadowOptions } from "@margoengine/shadows";
 import { Sky, SkyOptions } from "@margoengine/sky";
@@ -48,20 +47,10 @@ export interface ArcballControlsProps extends ControlEventProps {
     projection?: ArcballProjection | null;
 }
 
-export type AutomaticColliderMode = 'cuboid' | 'hull' | 'trimesh';
-
-export function BallCollider({ args, position, rotation, scale, onError, ...options }: BallColliderProps): import("react").JSX.Element;
-
-export interface BallColliderProps extends ColliderBaseProps {
-    args: readonly [radius: number];
-}
-
 export function Bloom({ onReady, onError, ...options }: BloomProps): null;
 
 export interface BloomProps extends BloomOptions, Callbacks<BloomEffect> {
 }
-
-export { BodyOptions } from "@margoengine/physics";
 
 export const Box: import("react").ForwardRefExoticComponent<BoxProps & import("react").RefAttributes<MeshHandle>>;
 
@@ -96,8 +85,6 @@ export interface CenterProps extends MeshProps {
     disableZ?: boolean;
 }
 
-export { ColliderOptions } from "@margoengine/physics";
-
 export const ContactShadows: import("react").ForwardRefExoticComponent<ContactShadowsProps & import("react").RefAttributes<MeshHandle>>;
 
 export interface ContactShadowsProps extends MeshProps, ErrorProps, ContactGroundOptions {
@@ -130,12 +117,6 @@ export interface ControllerProps extends MeshProps {
     onSqueeze?: (event: ControllerEvent) => void;
     onSqueezeStart?: (event: ControllerEvent) => void;
     onSqueezeEnd?: (event: ControllerEvent) => void;
-}
-
-export function CuboidCollider({ args, position, rotation, scale, onError, ...options }: CuboidColliderProps): import("react").JSX.Element;
-
-export interface CuboidColliderProps extends ColliderBaseProps {
-    args: Triple;
 }
 
 export function DepthOfField({ onReady, onError, ...options }: DepthOfFieldProps): null;
@@ -332,19 +313,6 @@ export interface PbrMaterialProps {
     metalness?: number;
 }
 
-export function Physics({ children, rapier, onReady, onError, gravity, paused, timeScale, ...options }: PhysicsProps): import("react").JSX.Element;
-
-export { PhysicsBody } from "@margoengine/physics";
-
-export { PhysicsOptions } from "@margoengine/physics";
-
-export interface PhysicsProps extends Omit<PhysicsOptions, 'rapier'> {
-    children?: ReactNode;
-    rapier?: RapierModule | PromiseLike<RapierModule>;
-    onReady?: (physics: PhysicsWorld) => void;
-    onError?: (error: unknown) => void;
-}
-
 export const Plane: import("react").ForwardRefExoticComponent<PlaneProps & import("react").RefAttributes<MeshHandle>>;
 
 export interface PlaneProps extends ShapeProps {
@@ -373,18 +341,6 @@ export interface PointerLockProps extends ErrorProps {
 }
 
 export type ProfileName = keyof typeof PROFILES;
-
-export { RapierModule } from "@margoengine/physics";
-
-export function RigidBody({ children, position, rotation, scale, onClick, onPointerOver, onPointerOut, ...options }: RigidBodyProps): import("react").JSX.Element;
-
-export type RigidBodyColliders = ColliderOptions | readonly ColliderOptions[] | AutomaticColliderMode | false;
-
-export interface RigidBodyProps extends Omit<BodyOptions, 'position' | 'rotation' | 'colliders'>, MeshProps {
-    colliders?: RigidBodyColliders;
-    onReady?: (body: PhysicsBody) => void;
-    onError?: (error: unknown) => void;
-}
 
 export function SSAO({ onReady, onError, ...options }: SSAOProps): null;
 
@@ -504,8 +460,6 @@ export function useMargo(): MargoContextValue;
 
 export function useMargoStage(): EngineKernel;
 
-export function usePhysics(): PhysicsWorld | null;
-
 export function useProgress(): LoadProgress;
 
 export function useXR(): XRContextValue;
@@ -518,12 +472,6 @@ interface Callbacks<T> {
     onReady?: (effect: T) => void;
     onError?: (error: unknown) => void;
 }
-
-type ColliderBaseProps = Omit<Extract<ColliderOptions, {
-    shape: 'box';
-}>, 'shape' | 'halfExtents' | 'offset' | 'rotation'> & Pick<MeshProps, 'position' | 'rotation' | 'scale'> & {
-    onError?: (error: unknown) => void;
-};
 
 interface ContactGroundOptions {
     width?: number;
@@ -545,6 +493,4 @@ type ObjectTarget = MeshHandle | RefObject<MeshHandle | null> | null;
 interface ShapeProps extends MeshProps, ErrorProps, PbrMaterialProps {
     castShadow?: boolean;
 }
-
-type Triple = readonly [number, number, number];
 ```

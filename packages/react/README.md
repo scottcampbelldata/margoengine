@@ -4,8 +4,9 @@ Install `npm i margoengine` and import `margoengine/react` (or this package alon
 
 React 18/19 integration with a native canvas, pointer events, Suspense, stable mesh refs and frame callbacks. There is no custom reconciler.
 
-Scene helpers, post effects, physics and XR are available from one
-`@margoengine/react` import. The [`kit`, `post`, `physics` and `xr` subpaths](SCENE.md)
+Scene helpers, controls, post effects and XR are available from one
+`@margoengine/react` import; physics comes from `@margoengine/react/physics`, so an app without it never needs
+Rapier installed (bundlers resolve every `import()` they reach). The [`kit`, `post`, `physics` and `xr` subpaths](SCENE.md)
 remain available. Unused bindings are tree-shaken, and optional native peers
 load only when their components need them.
 
