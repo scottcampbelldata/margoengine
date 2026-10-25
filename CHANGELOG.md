@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Open source release
+
+- Every package, including the B-rep kernel (`@margoengine/brep`), is now under the MIT License.
+- Every package.json has repository, homepage, bugs, keywords, license and author fields.
+- New B-rep examples: `examples/brep/model-to-step.mjs` models a plate and writes STEP, and
+  `examples/brep-flange.html` models a flange and renders it in the browser.
+- Added CONTRIBUTING.md, CODE_OF_CONDUCT.md, issue and pull request templates, `.editorconfig`,
+  `examples/README.md` and `docs/api-overview.md`.
+- CI runs lint, typecheck, the package build, the API report check, quality checks, the full test suite and the
+  kernel tests on every push and pull request.
+
 Verified on 16 October 2026. These changes are available in source; this entry
 does not announce an npm publication or a package version change.
 

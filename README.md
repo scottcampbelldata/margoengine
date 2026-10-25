@@ -1,82 +1,193 @@
 # Margo Engine
 
-The product is six packages: the [`margoengine`](packages/margoengine/README.md) stage, [`@margoengine/core`](packages/core/README.md), [`@margoengine/react`](packages/react/README.md), [`@margoengine/gltf`](packages/gltf/README.md), [`@margoengine/gltf-pro`](packages/gltf-pro/README.md), and [`@margoengine/machinery`](packages/machinery/README.md). The demo is [Night Citadel](apps/showcase-night-citadel/README.md): `npm run dev`.
+A small WebGPU engine for the web, with a Rust/Wasm core and its own B-rep CAD kernel.
 
-The current consolidated build measures **20,432 bytes gzip** (50,698 raw) for core and **22,737 bytes gzip** (57,590 raw) for core plus the stage facade, including the embedded Wasm kernel and the WebGPU backend. Those bytes are a mesh, one directional light, orbit controls, and the loader shell. WebGL2 is the optional `@margoengine/webgl` package, passed as `fallback`. That is below the gate. CI rejects a combined size of **25,000 bytes gzip or above**.
+[![CI](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml/badge.svg)](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/margoengine.svg)](https://www.npmjs.com/package/margoengine)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-The optional React entry measures **20,966 bytes gzip** on its own, with React and optional package peers external. It is additional to the base; an application bundle also includes the peers it uses. Measurements are recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json).
+![Tokyo corner diorama rendered by Margo Engine](site/images/tokyo-diorama.jpg)
 
-A small Rust/Wasm engine for web apps, with WebGPU rendering, an optional WebGL2 fallback, ordinary React components and optional domain packs.
+| | | |
+| --- | --- | --- |
+| ![Night Citadel](site/images/night-citadel.jpg) | ![Flight Helmet](site/images/flight-helmet.jpg) | ![Flange from the B-rep kernel](docs/images/brep-flange.png) |
+| [Night Citadel](apps/showcase-night-citadel/README.md) | [glTF PBR](examples/flight-helmet.html) | [B-rep flange](examples/brep/README.md) |
 
-Official website: [margoengine.com](https://margoengine.com). Built with precision, named with love. For Margie.
+Live demos: [margoengine.com](https://margoengine.com)
 
-The implementation lives in `packages/`, with Vite and Next.js starters in `examples/`. Small internal helpers shared by the optional packs live in `packages/shared/`. Source is available in the public [Margo Engine repository](https://github.com/scottcampbelldata/margoengine). The renamed packages use `@margoengine/*`, with `margoengine` as the meta-package. Build from source or install local tarballs until the renamed packages are published.
+The core and the stage together are 22,662 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+(glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
 
-## Use Margo Engine
-
-One install has everything: `npm i margoengine`. The root is the stage, and every package is a subpath
-(`margoengine/gltf-pro`, `margoengine/shadows`, `margoengine/physics`, `margoengine/react`); an app bundles only
-what it imports. [Which import do I need](docs/guides/imports.md) maps tasks to imports, and the [kits](docs/guides/kits.md)
-(`margoengine/game`, `/cad`, `/viz`, `/web`) put an app's usual set in one import line. To start an app:
-
-```sh
-npm create margo@latest my-game -- --template game   # or web, cad, viz, react, next
-```
-
-For the high-level API built from this checkout, see [`margoengine`](packages/margoengine/README.md). It mounts the canvas, enables camera controls and starts rendering:
-
-```ts
-import {createStage} from 'margoengine';
-const app = await createStage('#scene');
-const orb = app.sphere({color: '#84d6bd', roughness: 0.25, scale: [1, 0.85, 1]});
-app.onTick(delta => {orb.rotation.z += delta;});
-window.addEventListener('pagehide', () => app.dispose(), {once: true});
-```
-
-Provide a container such as `<div id="scene" style="height:400px"></div>` and call `app.dispose()` on unmount. Models, machinery, creative effects and scenery load on demand through the same wrapper. PBR rendering, image-based lighting, and shadows require WebGPU; WebGL2 supports basic meshes. The new facade package is available locally and has not been published yet. Run `npm run modern:dev` and open `/quickstart.html` to try it.
-
-Use the source setup below, or build local tarballs with `npm run pack:packages`.
-Registry installation commands will be added with a verified package release.
-The [React guide](packages/react/README.md) covers React 18 and 19; optional packs
-are selected by importing the packages used by your scene.
-
-## Run from source
+## Quick start
 
 ```sh
-git clone https://github.com/scottcampbelldata/margoengine.git margoengine
+npm install margoengine
+```
+
+```html
+<div id="scene" style="height: 400px"></div>
+<script type="module">
+  import { createStage } from 'margoengine';
+
+  const stage = await createStage('#scene');
+  const orb = stage.sphere({ color: '#84d6bd', roughness: 0.25 });
+  stage.onTick((delta) => { orb.rotation.y += delta; });
+  window.addEventListener('pagehide', () => stage.dispose(), { once: true });
+</script>
+```
+
+`createStage` mounts a canvas, adds orbit controls and starts rendering. Load a model with
+`await stage.load('/part.glb')` (glTF, GLB, STL, OBJ, STEP and IGES).
+
+The packages are not on npm yet. Until the first release, build from source as below and install the tarballs from
+`npm run pack:packages`.
+
+## Build from source
+
+You need Node.js 22.12+ (or 24+) and [Git LFS](https://git-lfs.com) for the test assets.
+
+```sh
+git clone https://github.com/scottcampbelldata/margoengine.git
 cd margoengine
+git lfs install
+git lfs pull
 npm ci
-npm run dev
+npm test
 ```
 
-Open the localhost URL printed by Vite for the standalone [Night Citadel showcase](apps/showcase-night-citadel/README.md): procedural architecture and cliffs, a moving moon, stars, shadows, atmospheric controls and live telemetry. `npm run modern:dev` opens the original starter, with nested rotating geometry, PBR controls, lazy glTF import, GPU leaves, CAD navigation, conveyor machinery, capped cutaways, dimensions, STL/OBJ upload, atmosphere/FX and device restoration. Its **Toggle moonlit scenery** button still loads the scenery package on demand. Consumers use the checked-in Wasm and need no Rust toolchain.
+`npm test` builds every package from the checked-in Wasm and runs the unit tests. You don't need Rust unless you
+change the kernel.
 
 ```sh
-npm test                      # builds packages and runs modern unit checks
-npm run test:kernel           # native kernel tests; requires the pinned Rust toolchain
-npm run build:packages        # builds workspace libraries with precompiled Wasm
-npm run typecheck             # strict checks for all 74 packages after build
-npm run measure:size          # verifies the combined core + stage gzip ceiling
-npm run build                 # builds packages, both starters and Night Citadel
-npm run pack:packages         # rebuilds and writes npm tarballs to test-results/
-npm run package:blender       # creates dist/margo-blender-addon-v1.0.0.zip (Python 3.11+)
-npm run modern:test:browser   # after build: GPU checks and production starter flows
-npm run modern:test:domains   # caps, sorting, FX and real GPU-loss recovery
-npm run modern:test:sky       # scenery phases, stars, depth and plugin lifecycle on WebGPU
-npm run modern:test:citadel   # showcase pixels, controls, pacing, resize and orbit heap profile
-npm run modern:test:packages  # frozen exports/types and React 18 lifecycle
-npm run test:modules:packages # all 74 packed exports and strict Bundler/NodeNext consumers
-npm run modern:test:usdz      # USDA/USDC fixtures, archive integrity and limits
-npm run modern:test:gltf-compression # production Draco/Meshopt loading and decoder teardown
-npm run modern:test:wrapper   # five-line setup, loading, lazy packs and teardown
-npm run modern:test:finalization # picking, industrial depth and conveyor stress; dev server required
-npm run modern:dev               # original Vite starter / machinery checks
-npm run dev --workspace @margoengine/starter-next
+npm run dev               # Night Citadel showcase
+npm run dev:examples      # every page in examples/, e.g. /examples/brep-flange.html
+npm run lint              # Biome
+npm run typecheck         # strict TypeScript for all packages
+npm run test:all          # every Node test in the repo
+npm run test:kernel       # Rust kernel tests (toolchain pinned in rust-toolchain.toml)
+npm run measure:size      # core + stage size check
 ```
+
+## Features
+
+- WebGPU renderer with PBR, image-based lighting, cascaded shadows, clustered lights, SSAO, bloom, TAA and depth of
+  field. Each one is its own package.
+- Rust/Wasm transform kernel with GPU culling and instancing.
+- Loaders for glTF/GLB (Draco, Meshopt, KTX2), FBX, USDZ, OBJ, STL, PLY, 3MF, COLLADA, IFC and more.
+- B-rep CAD kernel: read STEP, ACIS SAT and Parasolid XT, model solids, write STEP, and mesh exact geometry.
+- CAD tools: section planes with capped cutaways, measurement, a view cube, GPU picking and selection outlines.
+- Skinning, morph targets, blend trees and IK.
+- Physics on Rapier, navmesh, ECS, input and audio.
+- Terrain, water, sky, procedural scenery, voxels and a progressive voxel path tracer.
+- React 18 and 19 components (`@margoengine/react`).
+- Optional WebGL2 fallback for basic scenes.
+
+## Example: a part from code
+
+```js
+import { model, parseSTEP, tessellateSTEP } from '@margoengine/brep';
+
+const { box, cylinder, boolean, fillet, frameOf, massProperties, bodiesToSTEP } = model;
+const mm = 0.001; // the modeler works in metres
+const at = (x, y, z) => frameOf([x * mm, y * mm, z * mm], [0, 0, 1], [1, 0, 0]);
+
+// A 60 x 40 x 10 mm plate with rounded corners and four holes.
+const plate = box('plate', [60 * mm, 40 * mm, 10 * mm]);
+const corners = plate.edges.filter((e) => e.name.includes(':side:')).map((e) => e.name);
+let part = fillet('plate', plate, corners, 4 * mm);
+for (const [x, y] of [[10, 10], [50, 10], [10, 30], [50, 30]])
+  part = boolean('plate', 'subtract', part, cylinder('hole', 3 * mm, 20 * mm, at(x, y, -5)));
+
+console.log(massProperties(part).volume); // exact, from the B-rep
+const step = bodiesToSTEP([part]); // a STEP file as a string
+const [mesh] = tessellateSTEP(parseSTEP(step)); // positions, normals, indices
+```
+
+The full, runnable version is [examples/brep/model-to-step.mjs](examples/brep/model-to-step.mjs):
+
+```sh
+npm run build:packages
+node examples/brep/model-to-step.mjs plate.step
+```
+
+```
+modeled: volume 22731.7 mm^3, area 7231.6 mm^2
+STEP: 22729 bytes
+body 0: 14 faces, 460 triangles, 0 failed faces
+read back: volume 22731.7 mm^3
+```
+
+More in [examples/](examples/README.md).
+
+## B-rep CAD
+
+[`@margoengine/brep`](packages/brep/README.md) is a CAD kernel written from the published standards, with no
+OpenCascade or other third-party CAD code. It runs in the browser and in Node.
+
+- Reads STEP (AP203, AP214, AP242), including product structure, units and colours.
+- Reads ACIS SAT and Parasolid XT (text and binary, also inside JT files) by converting them to STEP entities.
+- Evaluates the exact geometry: planes, cylinders, cones, spheres, tori, NURBS and swept surfaces.
+- Tessellates with one discretization per shared edge, so meshes have no cracks between faces.
+- Models solids: boxes, cylinders, spheres, tori, extrusions and revolutions, booleans, fillets and chamfers, with
+  persistent face and edge names. Writes the result as STEP.
+- Reports mass properties and checks a body for problems.
+- Checks meshes against the validation properties a STEP file states about itself.
+
+![A flange modeled with the B-rep kernel](docs/images/brep-flange.png)
+
+The flange above is [examples/brep/flange.js](examples/brep/flange.js): cylinders unioned and subtracted, the outer
+edge filleted, written to STEP, read back and meshed in the page. [docs/brep-kernel.md](docs/brep-kernel.md)
+describes the design and what is still missing.
+
+`@margoengine/machinery` can still import STEP and IGES through OpenCascade (`occt-import-js`, LGPL-2.1, loaded in
+a worker only when you use it). The B-rep kernel is the path that is replacing it.
+
+## Browser support
+
+Margo Engine needs WebGPU. Without it, pass the `@margoengine/webgl` fallback to get a basic WebGL2 preview of plain
+meshes (no textures, effects or picking).
+
+| Browser | Status |
+| --- | --- |
+| Chrome and Edge (desktop) | Tested. Automated suites run in Chromium, on real GPUs and on SwiftShader in CI. |
+| Safari on iPhone | Demos run, checked by hand only. |
+| Safari on macOS | Has WebGPU, not tested. |
+| Firefox | Not tested. |
+| Android | Not tested. |
+
+[docs/limits.md](docs/limits.md) lists the hardware these results come from and what has not been checked.
+
+## Size
+
+| Bundle | gzip | raw |
+| --- | --- | --- |
+| core + stage (`import { createStage } from 'margoengine'`) | 22,662 B | 57,349 B |
+
+Measured with `npm run measure:size`, which bundles the entry with esbuild, minified, and gzips it at level 9. CI
+fails if core + stage reaches 25,000 B gzip. Per-package sizes are in
+[entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json).
+
+`npm run bench` runs the render, load, CAD, physics and memory suites with medians, p95 and machine checks. See
+[docs/benchmarking.md](docs/benchmarking.md). No comparisons with other engines are published here yet.
+
+## Architecture
+
+```
+your app
+  margoengine            createStage: canvas, camera, controls, loading
+  @margoengine/core      Engine, Scene, Mesh, Geometry, PbrMaterial; WebGPU renderer
+    kernel (Rust/Wasm)   transforms, bounds and culling in one flat buffer
+  @margoengine/*         optional packages, attached through core's extension hooks
+```
+
+Core is frozen: packages add render passes, materials and loaders through `@margoengine/core/extension` instead of
+changing the base, so the base stays small and an app only pays for what it imports. The Rust source is in
+`packages/kernel`; the compiled Wasm is checked in, so building the JavaScript never needs Rust.
+
+[MODERN-ENGINE.md](MODERN-ENGINE.md) covers the architecture, lifecycle rules and limits in detail.
+[docs/api-overview.md](docs/api-overview.md) is a short tour of the API.
 
 ## Packages
-
-Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. The workspace libraries use version `1.0.0`. The [catalog](docs/README.md) lists every package, runtime export and npm publication status.
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
@@ -213,119 +324,23 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 
 <!-- /package-list -->
 
-The current consolidated build measures **20,432 bytes gzip** for core and **22,737 bytes gzip** for core plus the stage facade, including the embedded Wasm kernel and the WebGPU backend. Those bytes are a mesh, one directional light, orbit controls, and the loader shell. WebGL2 is the optional `@margoengine/webgl` package, passed as `fallback`. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **25,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no separate 25 KiB ceiling.
+## Roadmap
 
-The six requested game modules (shadows, clustered, animator, TAA, VFX and splats), plus terrain, use those hooks. Build with `npm run build:packages`; run `npm run modern:test:game` for their combined WebGPU rendering/culling/cache/IK/particle checks, temporal reprojection/clamping, skinned motion, stable radix sorting and ellipse blending. `npm run modern:test:game:packages` checks ten packed packages and seven standalone README TypeScript examples. The normal sort test covers 66,049 splats across hierarchical scan blocks; set `SPLAT_STRESS=1` for the additional three-million-splat capacity/sort check. Million-particle, three-million-splat and 1,024-light execution tests validate correctness separately from FPS claims. These source packages have not been published by this change.
+- Publish 1.0.0 to npm.
+- B-rep: more modeling operations (shell, draft, offsets), and replacing OpenCascade for STEP import.
+- A fuller WebGL2 fallback ([docs/webgl2-compat-roadmap.md](docs/webgl2-compat-roadmap.md)).
+- Testing on more hardware: Apple silicon, AMD, Android, Firefox and macOS Safari.
+- Published benchmark comparisons with their method and raw results.
 
-```tsx
-import { useRef } from 'react';
-import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame, type MeshRef } from '@margoengine/react';
+## Contributing
 
-function Cube() {
-  const mesh = useRef<MeshRef>(null);
-  useFrame((_, delta) => { if (mesh.current) mesh.current.rotation.y += delta; });
-  return <Mesh ref={mesh}>
-    <BoxGeometry />
-    <PbrMaterial color="#84d6bd" roughness={0.3} />
-  </Mesh>;
-}
-export default function App() {
-  return <Canvas style={{ height: 400 }}><Cube /></Canvas>;
-}
-```
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, tests and what a good pull
+request looks like. Please follow the [code of conduct](CODE_OF_CONDUCT.md), and report security issues as described
+in [SECURITY.md](SECURITY.md).
 
-`EngineKernel`/`Engine`, Canvas callbacks and React mesh refs expose the frozen portable TypeScript API; raw Wasm/GPU state is available only through the explicit `@margoengine/core/extension` entry. Entity creation occurs in effects. Nested components register upward to support child-first commit order. Frame callbacks mutate stable refs without scheduling React renders.
+## License
 
-[MODERN-ENGINE.md](MODERN-ENGINE.md) contains the architecture, API examples, lifecycle rules, size evidence, supported loader subset, verification and remaining domain features. Thirty-one JavaScript tests, four Rust checks and 32 browser check groups passed after the modern-only cleanup, including production Vite/Next rendering, actual particle storage readback, packed consumers and React 18/19 lifecycle checks. Chrome conveyor captures verify UI picking/orbit, instanced draws, coupled timing and 15-second GC/allocation traces; the observed collections do not establish zero-GC. AMD Radeon integrated graphics and NVIDIA baseline measurements are recorded in the [benchmark summary](benchmarks/README.md). Raw captures and recovery archives remain local. Firefox/Safari and mobile GPU hardware remain unverified.
+[MIT](LICENSE), including the B-rep kernel. Third-party code and assets keep their own licenses; see
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-Node.js 22.12+ or 24+ is required; TypeScript consumers need TypeScript 7+ with DOM types; Wasm initialization uses SIMD and DecompressionStream gzip. WebGPU uses HTTPS/localhost; basic scenes fall back to WebGL2. GPU particles, sections, creative and scenery rendering require WebGPU; solid caps also require depth32float-stencil8 support; CPU machinery/CAD/annotations work with either backend. The libraries are [MIT licensed](LICENSE). The workspace root and starter apps remain private.
-
-`npm run build:packages` uses the checked-in Wasm, emits ESM and TypeScript declarations, removes stale distribution files, copies the root license into each package and enforces the existing size/isolation budgets. Each library's `prepack` hook runs that same workspace build before `npm pack` or `npm publish`. Tarballs contain only built files, package metadata, a package README and the MIT license. To try local changes, install a rebuilt tarball from `test-results/`; optional packs require the matching core tarball. Existing `modern:*` commands remain available, including `modern:build` for rebuilding the Rust kernel.
-
-Import the scoped packages listed above. Native STEP/IGES solids and heavier renderer/physics features remain deferred; implemented domain features and their limits are documented in MODERN-ENGINE.md. The public repository contains the modern modular engine; the earlier renderer and recovery archives are excluded.
-
-Run `npm run modern:dev:extensions`, then open `/examples/damaged-helmet.html` for PBR and the SSAO toggle or `/examples/robot-expressive.html` for clip playback and facial morph sliders. The demos download credited sample assets. The three extension packages are local workspace packages and have not been published. Their READMEs document supported glTF features and limits. `npm run modern:test:extensions` checks GPU deformation readback, a 1,001-joint skin, ambient-only SSAO, resize/device recovery, and both demos; `npm run modern:test:packages` checks standalone tarballs and TypeScript consumers.
-
-
-## Benchmarks
-
-`npm run bench` is Margo's benchmark tool. It has 15 suites:
-
-- size, startup, render, objects, scaling
-- math, glTF, loaders, CAD, voxel, physics
-- memory, React
-- compute and viz (stubs until the data track lands)
-
-It checks the machine before every run: AC power, the GPU lock, and an idle CPU and GPU. It runs each case 5 times and
-reports the median, p95 and spread, and it marks a noisy run invalid. Each run writes a versioned JSON result with
-Markdown and HTML reports to `benchmarks/runs/`. Every result records the commit, machine, GPU, driver and browser.
-
-```sh
-npm run build:packages
-npm run bench                    # every suite
-npm run bench:render             # one suite
-npm run bench -- --baseline      # save this machine's baseline
-npm run bench -- --compare=last  # deltas; a regression over 5% fails the run
-```
-
-The same scenes run in your browser at [margoengine.com/bench/](https://margoengine.com/bench/). Your numbers appear
-next to ours. Other engines run the same scene descriptions from their own folder (engine-bench), never from this
-repository. How to run it, read results, add a suite or a scene, and the quiet-machine rules:
-[docs/benchmarking.md](docs/benchmarking.md).
-
-## Asset loading and release verification
-
-The six core launch packages are the stage facade, `core`, `react`, `gltf`,
-`gltf-pro` and `machinery`. USDZ remains an ancillary optional format outside
-that launch set. Its USDA/USDC parsers are Margo's own; the
-root and package manifests require neither `three` nor `@types/three`.
-Visual-parity tools use a separately cached, pinned Three.js 0.186.1
-reference; benchmarks run other engines only from engine-bench.
-
-`@margoengine/gltf-pro` automatically loads Draco and Meshopt glTF/GLB through
-`loadGLTF`. In-memory `parseGLTF` remains synchronous for uncompressed and Meshopt
-data; use `parseGLTFAsync` for Draco or embedded KTX2. Meshopt decodes at the buffer-view boundary
-without workers or Wasm. Draco starts its bundled worker/Wasm decoder only when
-needed and releases temporary workers after success, failure or cancellation.
-Caller-supplied decoders remain caller-owned. KTX2/BasisU glTF textures transcode
-to enabled GPU compression formats, retain their mip chains, and release their
-temporary workers. Texture transforms and UV1 keep the fixed vertex layout;
-nonidentity transforms use the optional group 3 uniform slot. Animation supports
-four or eight normalized joint influences per vertex.
-
-[`@margoengine/materials`](packages/materials/README.md) adds clearcoat, sheen,
-specular color, anisotropy, iridescence, transmission, IOR, volume, and a closed TypeScript node graph through the optional
-material extension slot. Install optional glTF metadata explicitly with
-`materials.install(model)`, or compile an authored graph with `nodeMaterial()`.
-Refraction samples the opaque screen color once; there is no ray-traced or
-multi-bounce transmission, participating media, or node-graph file format.
-Transmissive surfaces do not cast shadows or receive cascaded shadows. The new
-lobes affect directional lighting and fixed hemispherical ambient; clustered and
-environment lighting retain their base PBR response. Three.js TSL remains unsupported.
-These features stay outside the frozen core and stage bundle.
-
-Registered PBR models also support GPU picking and selection outlines through
-`@margoengine/selection`, including current skin and morph deformation.
-`@margoengine/bvh` provides an explicit asynchronous `intersectModel()` query
-against a snapshot of that GPU pose. Core picking and ordinary PBR bindings stay
-unchanged; models opt in through registration.
-
-Historical verification on 16 October 2026, before this consolidation, passed
-1,189 Node 24 tests, strict TypeScript checks and packed imports across the then
-63 packages, the existing production browser
-regressions, 42 node-material captures, 59 additional-lobe captures, 82 texture
-captures, complete Khronos material/KTX2/UV1 assets, and eight-influence character
-GPU readback, plus 45 local-shadow and 46 deformed-picking captures.
-These results describe that earlier checkout, not a rerun of its browser captures
-on the consolidated tree. The current `npm run measure:size` result is
-**57,590 bytes raw / 22,737 bytes gzip** for core + stage.
-The [release notes](CHANGELOG.md#unreleased) record the parser,
-normalization, index-boundary and lifecycle checks.
-
-## Package catalog and release
-
-Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md). All 74 packages use their Margo names. `npm run catalog:build` refreshes the catalog from built runtime exports and checks exact-version availability on npm. [Release notes](CHANGELOG.md) describe source changes and their verification; an Unreleased entry does not indicate npm publication.
-
-`npm run release:check` builds and tests the engine, enforces the 25,000-byte core + stage ceiling, and verifies every tarball's exports, TypeScript declarations and internal dependency versions. `npm run publish:dry-run` runs the local release and supply-chain checks and previews the workspace tarballs without publishing. Releases use the manual [Publish workflow](.github/workflows/publish.yml) from `main`; it defaults to a dry run and requires `NPM_PUBLISH_ENABLED=true` and the `npm-publish` environment. Follow the [release guide](docs/releasing.md) for approval, credentials and publishing the libraries and tools. Starter apps and showcases are private. Refresh the catalog after publishing and run `npm run build:site` to assemble the website.
-
-[Committed SwiftShader results](benchmarks/README.md#swiftshader-runs-no-gpu) include repeat commands. Software-renderer timings do not establish physical GPU performance.
+Made by Scott Campbell. [margoengine.com](https://margoengine.com)
