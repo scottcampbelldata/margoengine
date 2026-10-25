@@ -107,6 +107,11 @@ const ASSETS = [
     'examples/assets/scifi-helmet-CREDITS.md',
     'SciFiHelmet test and benchmark model (Michael Pavlovic, Norbert Nopper, CC0 1.0)',
   ],
+  [
+    'examples/assets/skinning-ik-LICENSE.md',
+    'Light Keeper workshop demo: Margo-made model and rig, Poly Haven surface textures (CC0 1.0)',
+  ],
+  ['tools/create-margo/templates/game/public/pete-LICENSE.txt', 'game starter character (Kay Lousberg, KayKit, CC0)'],
   ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],
   [
     'packages/loaders/tests/fixtures/SOURCES.txt',
