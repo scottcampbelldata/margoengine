@@ -86,6 +86,9 @@ const pages = [
   'animation-formats',
   'texture-formats',
   'compute-lab',
+  'sciviz-volume',
+  'sciviz-points',
+  'sciviz-surface',
 ];
 await site({
   configFile: false,

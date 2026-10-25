@@ -546,3 +546,18 @@ expect; the documentation describes behaviour, not code.
 | Random numbers | J. K. Salmon, M. A. Moraes, R. O. Dror and D. E. Shaw, "Parallel random numbers: as easy as 1, 2, 3", SC11 (Philox4x32-10 constants and the published known-answer vectors, used as test data); G. E. P. Box and M. E. Muller, Ann. Math. Statist. 29(2), 1958; D. Lemire, "Fast random integer generation in an interval", ACM TOMACS 29(1), 2019 |
 | `log1p`, `expm1` | D. Goldberg, "What every computer scientist should know about floating-point arithmetic", ACM Computing Surveys 23(1), 1991 |
 | Streaming mean and variance | T. F. Chan, G. H. Golub and R. J. LeVeque, "Algorithms for computing the sample variance", Amer. Statistician 37(3), 1983 |
+
+## Data track: `@margoengine/sciviz`
+
+Written clean room from the sources below. No source code of plotting or visualisation libraries (plotly, vtk.js,
+deck.gl, regl, three.js, matplotlib, ParaView, napari, ipyvolume, anywidget and the like) was read. Colour maps are
+computed from their published definitions; no colour table was copied.
+
+| Area | Source |
+| --- | --- |
+| Volume ray marching | J. Kruger and R. Westermann, "Acceleration techniques for GPU-based volume rendering", IEEE Visualization 2003 (front-to-back compositing, early ray termination); opacity correction for the step length from the emission-absorption model (N. Max, "Optical models for direct volume rendering", IEEE TVCG 1(2), 1995) |
+| Marching cubes table (derived, not copied) | W. E. Lorensen and H. E. Cline, "Marching cubes", SIGGRAPH 1987; face-consistent disambiguation as required by G. M. Nielson and B. Hamann, "The asymptotic decider", IEEE Visualization 1991 |
+| Tick spacing | P. S. Heckbert, "Nice numbers for graph labels", Graphics Gems, 1990 |
+| cubehelix | D. A. Green, Bull. Astr. Soc. India 39, 289 (2011) |
+| coolwarm | K. Moreland, "Diverging color maps for scientific visualization", ISVC 2009 |
+| OKLab and the perceptual maps | B. Ottosson, "A perceptual color space for image processing" (2020); sRGB transfer from IEC 61966-2-1; CIELAB and D65 from CIE 15:2004 |

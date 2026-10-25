@@ -3,14 +3,14 @@
 
 Margo Engine's own code is licensed under the Apache License 2.0 (`LICENSE` and `NOTICE`; every tarball ships both). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 81 published packages (79 in `packages/`
+assets the site and examples use. It covers all 82 published packages (80 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-72 of 81 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+73 of 82 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
@@ -136,6 +136,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/road` | none | none | LICENSE, NOTICE |
 | `@margoengine/scatter` | none | none | LICENSE, NOTICE |
 | `@margoengine/scenery` | none | none | LICENSE, NOTICE |
+| `@margoengine/sciviz` | none | none | LICENSE, NOTICE |
 | `@margoengine/selection` | none | none | LICENSE, NOTICE |
 | `@margoengine/shader` | none | none | LICENSE, NOTICE |
 | `@margoengine/shadows` | none | none | LICENSE, NOTICE |

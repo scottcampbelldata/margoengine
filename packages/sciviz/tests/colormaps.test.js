@@ -71,6 +71,18 @@ test('sequential maps rise monotonically in perceived lightness; the cyclic map 
   phase.sample(0).forEach((v, k) => assert.ok(Math.abs(v - phase.sample(1)[k]) < 1e-9, 'the ends meet'));
 });
 
+test('each sequential map passes through the colours it is named for', () => {
+  // ember: purple, red, orange, yellow (red leads in the middle); glacier: blue to white; aurora: violet, teal, yellow.
+  const [r, g, b] = colormap('ember').sample(0.5);
+  assert.ok(r > g && r > b, `ember's middle is red-orange, got ${[r, g, b]}`);
+  const [er, , eb] = colormap('ember').sample(0.2);
+  assert.ok(er > 0.2 && eb > 0.15, `ember starts purple-red, got ${colormap('ember').sample(0.2)}`);
+  const [, ag, ab] = colormap('aurora').sample(0.5);
+  assert.ok(ag > ab * 0.8, `aurora's middle is teal-green, got ${colormap('aurora').sample(0.5)}`);
+  const [gr, gg, gb] = colormap('glacier').sample(0.3);
+  assert.ok(gb > gr && gb > gg * 0.9, `glacier is blue, got ${[gr, gg, gb]}`);
+});
+
 test('tables, reversed maps, CSS gradients and custom stops interpolated in OKLab', () => {
   const map = colormap('aurora');
   const table = map.table(256);

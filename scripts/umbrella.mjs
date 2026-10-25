@@ -78,10 +78,12 @@ export const KITS = {
     ],
   },
   viz: {
-    about: 'Data and scientific visualization: points, lines, splats, terrain, labels and text',
+    about: 'Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text',
     from: [
       ['@margoengine/stage', ['createStage', 'Stage']],
       ['@margoengine/points', ['PointsPlugin', 'PointCloud', 'PointsMaterial']],
+      ['@margoengine/sciviz', ['Figure', 'createFigure', 'colormap']],
+      ['@margoengine/compute', ['createCompute']],
       ['@margoengine/lines', ['Lines', 'Line', 'LineMaterial', 'GridHelper', 'AxesHelper']],
       ['@margoengine/splats', ['Splats', 'parseSplat']],
       ['@margoengine/terrain', ['Terrain']],

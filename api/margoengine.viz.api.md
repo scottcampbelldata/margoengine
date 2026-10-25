@@ -13,6 +13,8 @@ export { EnvironmentLighting } from "@margoengine/environment";
 
 export { FXAA } from "@margoengine/post";
 
+export { Figure } from "@margoengine/sciviz";
+
 export { GridHelper } from "@margoengine/lines";
 
 export { HTML } from "@margoengine/html";
@@ -54,6 +56,12 @@ export { TextRenderer } from "@margoengine/text";
 export { Tonemap } from "@margoengine/tonemap";
 
 export { Tween } from "@margoengine/tween";
+
+export { colormap } from "@margoengine/sciviz";
+
+export { createCompute } from "@margoengine/compute";
+
+export { createFigure } from "@margoengine/sciviz";
 
 export { createStage } from "@margoengine/stage";
 

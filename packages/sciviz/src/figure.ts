@@ -164,6 +164,8 @@ export class Figure {
   #model: Float32Array;
   #bounds: Bounds = [-1, 1, -1, 1, -1, 1];
   #ownsEngine = false;
+  // Axis updates run after one another; ready() waits for them and reports their errors.
+  #pending: Promise<void> = Promise.resolve();
   #disposed = false;
 
   /** Adds a figure to `engine` (WebGPU backend). The engine's camera, controls and background are left to you. */
@@ -184,8 +186,7 @@ export class Figure {
     }
     const figure = new Figure(engine, options);
     figure.#ownsEngine = true;
-    const runtime = engine as unknown as { background?: string | null };
-    runtime.background = figure.theme.background;
+    engine.scene.background = figure.theme.background;
     engine.camera.position = [2.6, 1.7, 2.9];
     engine.camera.target = [0, 0, 0];
     engine.camera.near = 0.01;
@@ -213,9 +214,8 @@ export class Figure {
     this.engine = engine;
     this.theme = THEMES[theme];
     this.#options = options;
-    this.renderer = new SciRenderer();
-    (engine as unknown as Engine).use(this.renderer);
-    if (options.axes ?? true) this.#axes = new Axes(engine, this.theme, options);
+    this.renderer = SciRenderer.attach(engine);
+    if (options.axes ?? true) this.#axes = new Axes(engine, this.theme, options, () => this.#linesPlugin());
     this.#model = dataToScene(this.#bounds, aspect);
   }
 
@@ -239,6 +239,19 @@ export class Figure {
   /** The data-to-scene transform (column-major 4x4): data x, y, z to scene x, -z, y inside the plot box. */
   get model(): Float32Array {
     return this.#model;
+  }
+
+  // The one lines plugin per figure, shared by line layers and the axes.
+  #linesPlugin(): Promise<Lines> {
+    return (this.#lines ??= import('@margoengine/lines').then(({ Lines }) => Lines.attach(this.engine)));
+  }
+
+  /**
+   * Resolves once the axes, tick labels and other updates started by adding or removing layers are done; rejects with
+   * the error if one failed.
+   */
+  ready(): Promise<void> {
+    return this.#pending;
   }
 
   /** The layers, in the order they were added. */
@@ -270,7 +283,7 @@ export class Figure {
       else if ('kind' in layer && layer.kind === 'line') layer.line.setMatrix(this.#model);
       else layer.setModel(this.#model);
     }
-    void this.#axes?.update(this.#bounds, this.#model);
+    if (this.#axes) this.#pending = this.#pending.then(() => this.#axes!.update(this.#bounds, this.#model));
   }
 
   #add<L extends Layer>(layer: L): L {
@@ -360,7 +373,7 @@ export class Figure {
     if (c && c.length !== x.length)
       throw rangeError(`line color has ${c.length} values for ${x.length} points`, 'sciviz');
     const colours = c ? mapColours(c, map, rangeOption(options.range, 'line range') ?? extent(c)) : undefined;
-    const lines = await (this.#lines ??= import('@margoengine/lines').then(({ Lines }) => Lines.attach(this.engine)));
+    const lines = await this.#linesPlugin();
     const { Line } = await import('@margoengine/lines');
     this.#check();
     const colour =

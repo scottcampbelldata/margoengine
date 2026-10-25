@@ -37,7 +37,8 @@ fig.colorbar('coolwarm', [-1, 1], { label: 'sin x cos y' });
 - a camera framing the plot box;
 - orbit controls (drag to orbit, scroll to zoom, right-drag to pan).
 
-`Figure.attach(engine)` adds a figure to an engine you already have. A figure maps data units into a box, with data
+`Figure.attach(engine)` adds a figure to an engine you already have. Axes and tick labels load and draw in the
+background; `await fig.ready()` waits for them and rejects if they failed. A figure maps data units into a box, with data
 z pointing up. The box spans the union of its layers' bounds, or fixed `limits`. Axes draw the box outline, grid
 lines at the ticks and HTML tick labels.
 

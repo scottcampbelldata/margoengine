@@ -907,6 +907,18 @@
       "types": "./dist/scenery/sky.d.ts",
       "import": "./dist/scenery/sky.js"
     },
+    "./sciviz": {
+      "types": "./dist/sciviz.d.ts",
+      "import": "./dist/sciviz.js"
+    },
+    "./sciviz/colormaps": {
+      "types": "./dist/sciviz/colormaps.d.ts",
+      "import": "./dist/sciviz/colormaps.js"
+    },
+    "./sciviz/maths": {
+      "types": "./dist/sciviz/maths.d.ts",
+      "import": "./dist/sciviz/maths.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
@@ -1263,6 +1275,7 @@
     "@margoengine/road": "^1.0.0",
     "@margoengine/scatter": "^1.0.0",
     "@margoengine/scenery": "^1.0.0",
+    "@margoengine/sciviz": "^1.0.0",
     "@margoengine/selection": "^1.0.0",
     "@margoengine/shader": "^1.0.0",
     "@margoengine/shadows": "^1.0.0",

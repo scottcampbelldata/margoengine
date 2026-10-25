@@ -101,7 +101,8 @@
     "packages/voxel-edit",
     "packages/lightmap",
     "packages/mesh-edit",
-    "packages/compute"
+    "packages/compute",
+    "packages/sciviz"
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",

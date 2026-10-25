@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3053116,
+  "total": 3077013,
   "history": [
     {
       "date": "2026-10-24",
@@ -176,6 +176,12 @@
       "commit": "4457ff31",
       "reason": "sky: environment fallback option and its pass (+70 B min+gzip)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "9352d82b",
+      "reason": "New optional @margoengine/sciviz (data track, queue item 22): figures, volumes, surfaces, isosurfaces, scatter and line layers; colormaps and maths entries",
+      "grew": 3
     }
   ],
   "items": {
@@ -402,6 +408,9 @@
     "@margoengine/scatter": 11893,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
+    "@margoengine/sciviz": 19341,
+    "@margoengine/sciviz/colormaps": 3083,
+    "@margoengine/sciviz/maths": 1473,
     "@margoengine/selection": 13905,
     "@margoengine/shader": 12517,
     "@margoengine/shader/effects": 8386,

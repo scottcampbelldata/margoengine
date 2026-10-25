@@ -42,7 +42,7 @@ and commit.
 | Page | Figures | Evidence | Status |
 | --- | --- | --- | --- |
 | engine | Core 20,432 B, core + stage 22,737 B (57,590 raw), 2,263 B under the gate | `entry-sizes.json` at `454df8f3` (dirty: false) | PROVEN |
-| engine | 79 packages; `npm i margoengine`; kit sizes (game 288,197, cad 199,438, viz 197,231, web 143,159 B) | `docs/catalog.json`; `docs/guides/kits.md`, re-measured by `tests/umbrella.test.js` (fails on a 3% move) | PROVEN |
+| engine | 79 packages; `npm i margoengine`; kit sizes (game 288,197, cad 199,438, viz 246,963, web 143,159 B) | `docs/catalog.json`; `docs/guides/kits.md`, re-measured by `tests/umbrella.test.js` (fails on a 3% move) | PROVEN |
 | engine | Starter first frames: cad 533, web 788, react 835, viz 968, game 1,308 ms (vite dev, packages linked, one run each, RTX A6000 PC) | `examples/package-benchmarks/results/starters-first-frame.json` (`tools/create-margo/test/browser-check.mjs`) | PROVEN (dated, one run) |
 | engine | 5,059 tests | `examples/package-benchmarks/results/test-count.json` | PROVEN |
 | engine | Parity 153 / 4 / 4 of 161 three.js rows | `docs/three-parity-matrix.md` | PROVEN |

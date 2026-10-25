@@ -24,15 +24,14 @@ const watch = (figure) => {
   return device;
 };
 
-// The canvas's pixels after a rendered frame.
+// The canvas's pixels after a rendered frame. The bitmap is taken in the same task as the render, while the frame
+// is still the canvas's current image.
 async function pixels(figure) {
   const engine = figure.engine;
   engine.render();
-  await figure.renderer.device.queue.onSubmittedWorkDone();
-  const canvas = engine.canvas,
-    bitmap = await createImageBitmap(canvas),
+  const bitmap = await createImageBitmap(engine.canvas),
     copy = new OffscreenCanvas(bitmap.width, bitmap.height),
-    g = copy.getContext('2d');
+    g = copy.getContext('2d', { willReadFrequently: true });
   g.drawImage(bitmap, 0, 0);
   const image = g.getImageData(0, 0, bitmap.width, bitmap.height);
   return {
@@ -64,7 +63,8 @@ async function figureOn(canvas, options = {}) {
   figure.engine.stop?.();
   watch(figure);
   // Straight down onto the plot box, so screen x follows data x and screen y follows data -y.
-  figure.engine.camera.position = [0, 4, 0.0001];
+  // Close enough that the plot box ([-1, 1] across) fills the middle 60% of the view.
+  figure.engine.camera.position = [0, 2.2, 0.0001];
   figure.engine.camera.target = [0, 0, 0];
   figure.engine.camera.up = [0, 0, -1];
   return figure;
@@ -87,6 +87,11 @@ window.runSciVizTests = async () => {
         right = image.at(image.width * 0.7, image.height / 2);
       assert(luminance(right) > luminance(left) + 40, `left ${left} right ${right}`);
       assert(image.lit(BACKGROUND) > image.width * image.height * 0.2, 'the surface covers the box');
+      const corner = image.at(2, 2);
+      assert(
+        corner.every((c, k) => Math.abs(c - BACKGROUND[k]) <= 2),
+        `the theme background fills the canvas: ${corner}`,
+      );
       figure.dispose();
     },
   );
@@ -120,11 +125,13 @@ window.runSciVizTests = async () => {
         for (let y = 0; y < n; y++)
           for (let x = 0; x < n; x++)
             data[(z * n + y) * n + x] = Math.max(0, 1 - Math.hypot(x - 23.5, y - 23.5, z - 23.5) / 18);
+      // Only the dense core (values above 0.5) is opaque: front-to-back compositing stops at the first opaque shell, so
+      // an opacity curve rising from low values would show the dim outer shell instead of the bright core.
       const volume = figure.volume(data, {
         colormap: 'gray',
         opacity: [
           [0, 0],
-          [0.2, 0.3],
+          [0.5, 0],
           [1, 1],
         ],
         shading: false,
@@ -137,8 +144,8 @@ window.runSciVizTests = async () => {
       // Cut away everything with x > 0.5 (box coordinates): the right half goes dark.
       volume.clip = [{ normal: [-1, 0, 0], offset: 0.5 }];
       image = await pixels(figure);
-      assert(luminance(image.at(image.width * 0.6, image.height / 2)) < 50, 'clipped half is clear');
-      assert(luminance(image.at(image.width * 0.4, image.height / 2)) > 60, 'kept half still shows');
+      assert(luminance(image.at(image.width * 0.54, image.height / 2)) < 50, 'clipped half is clear');
+      assert(luminance(image.at(image.width * 0.46, image.height / 2)) > 60, 'kept half still shows');
       volume.clip = [];
       volume.mode = 'mip';
       image = await pixels(figure);
@@ -246,8 +253,8 @@ window.runSciVizTests = async () => {
   await check('axes, tick labels and the colour bar appear over the canvas', async () => {
     const figure = await figureOn(canvas, { titles: { x: 'Time', y: 'Depth', z: 'Value' } });
     await figure.line({ x: [0, 1, 2, 3], y: [0, 1, 0, 1], z: [0, 0.5, 1, 1.5] });
-    // Axes load their packages asynchronously; give them a frame.
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Axes load their packages asynchronously; ready() resolves when they are drawn (and rejects if they fail).
+    await figure.ready();
     figure.engine.render();
     const texts = [...document.querySelectorAll('span')].map((s) => s.textContent);
     assert(

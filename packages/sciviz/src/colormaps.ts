@@ -170,7 +170,8 @@ const DEFINITIONS: Record<ColormapName, Definition> = {
   ember: {
     kind: 'sequential',
     about: 'near black through purple, red and orange to pale yellow; lightness rises linearly',
-    sample: path(0.16, 0.97, 300, 95, 0.2),
+    // Hue rises from 300 through 360 (red) to 455, i.e. 95 (yellow); going down would pass through blue and green.
+    sample: path(0.16, 0.97, 300, 455, 0.2),
   },
   glacier: {
     kind: 'sequential',

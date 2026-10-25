@@ -169,7 +169,8 @@ export class IsosurfaceLayer implements Drawable {
   /** @internal Use `figure.isosurface()`. */
   constructor(renderer: SciRenderer, gpu: ComputeContext, data: DataSource, options: IsosurfaceLayerOptions = {}) {
     this.#renderer = renderer;
-    this.#gpu = gpu;
+    // A GpuArray is worked on in its own compute context (on the same device as the engine); CPU data in the figure's.
+    this.#gpu = isGpuArray(data) ? data.context : gpu;
     const size = sizeOf(data),
       shape = isGpuArray(data) ? data.shape : undefined,
       side = Math.round(Math.cbrt(size));
@@ -194,8 +195,8 @@ export class IsosurfaceLayer implements Drawable {
     }
     const tables = cubeTables();
     this.#tables = {
-      counts: gpu.array(tables.counts, 'u32'),
-      edges: gpu.array(tables.edges, 'u32'),
+      counts: this.#gpu.array(tables.counts, 'u32'),
+      edges: this.#gpu.array(tables.edges, 'u32'),
       stride: tables.stride,
     };
     this.#colour = linearHex(options.color ?? '#9cc9ff');

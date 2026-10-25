@@ -99,7 +99,7 @@ const layers = {
   ],
   'Simulation and games': ['physics', 'navmesh', 'ecs', 'fsm', 'net', 'voxel-net'],
   'CAD and engineering': ['machinery', 'bvh', 'geometry', 'mesh-edit'],
-  'Data and science': ['compute'],
+  'Data and science': ['compute', 'sciviz'],
   'Frameworks': ['react'],
 };
 const order = Object.values(layers).flat(),

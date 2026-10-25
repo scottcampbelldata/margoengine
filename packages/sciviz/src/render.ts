@@ -2,6 +2,7 @@
 // with pipelines of their own (surfaces, slices, isosurfaces opaque with depth; volumes blended over them), reading the
 // camera from the frame. Layers may also encode compute work before the pass (an isosurface extraction, an upload).
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
+import type { EngineKernel } from '@margoengine/core';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
@@ -71,6 +72,14 @@ export class SciRenderer implements EnginePlugin {
   #engine: Engine | undefined;
   #disposed = false;
 
+  /** Creates a renderer and adds it to `engine` (WebGPU backend). */
+  static attach(engine: EngineKernel, options: { readonly order?: number } = {}): SciRenderer {
+    const renderer = new SciRenderer(options);
+    (engine as unknown as Engine).use(renderer);
+    return renderer;
+  }
+
+  /** @param options `order` in the frame graph (default 5). Attach with {@link SciRenderer.attach}. */
   constructor(options: { readonly order?: number } = {}) {
     this.order = options.order ?? 5;
   }

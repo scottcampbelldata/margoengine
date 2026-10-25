@@ -40,21 +40,20 @@ export class Axes {
   #loading: Promise<void> | undefined;
   #disposed = false;
 
+  /** @param lines The figure's lines plugin (shared: one per engine under its default name). */
   constructor(
     readonly engine: EngineKernel,
     readonly theme: Theme,
-    readonly options: AxesOptions = {},
+    readonly options: AxesOptions,
+    readonly lines: () => Promise<Lines>,
   ) {}
 
   /** Draws (or redraws) the axes for `bounds` under the figure transform `model`. */
   async update(bounds: Bounds, model: Float32Array): Promise<void> {
     this.#loading ??= (async () => {
-      const [{ Lines }, { LabelRenderer }] = await Promise.all([
-        import('@margoengine/lines'),
-        import('@margoengine/labels'),
-      ]);
+      const [lines, { LabelRenderer }] = await Promise.all([this.lines(), import('@margoengine/labels')]);
       if (this.#disposed) return;
-      this.#lines = Lines.attach(this.engine);
+      this.#lines = lines;
       this.#labels = LabelRenderer.attach(this.engine);
     })();
     await this.#loading;
@@ -123,9 +122,8 @@ export class Axes {
   dispose(): void {
     this.#disposed = true;
     for (const label of this.#texts.splice(0)) label.remove();
-    this.#drawn.length = 0;
     const engine = this.engine as unknown as { removePlugin(name: string): void };
-    if (this.#lines) engine.removePlugin(this.#lines.name);
+    for (const line of this.#drawn.splice(0)) this.#lines?.remove(line);
     if (this.#labels) engine.removePlugin(this.#labels.name);
   }
 }

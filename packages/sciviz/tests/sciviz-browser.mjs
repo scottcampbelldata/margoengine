@@ -26,6 +26,18 @@ try {
   assert.deepEqual(errors, []);
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/sciviz-browser.json', JSON.stringify({ hardware, ...report }, null, 2));
+  // The site demos built on this package start, finish their first result and log no errors.
+  for (const demo of ['sciviz-surface', 'sciviz-volume', 'sciviz-points']) {
+    await page.goto(new URL(`/examples/${demo}.html`, page.url()).href);
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.ready === 'true', null, {
+      timeout: 120_000,
+    });
+    await page.waitForTimeout(500);
+    const status = await page.evaluate(() => document.querySelector('#status')?.textContent ?? '');
+    assert.deepEqual(errors, [], `${demo}: ${status}`);
+    assert.doesNotMatch(status, /Could not/, `${demo}: ${status}`);
+    report.checks.push(`demo ${demo} runs: ${status}`);
+  }
   for (const name of report.checks) console.log(`ok - ${name}`);
   console.log(`${report.checks.length} sciviz browser checks passed`);
 } finally {
