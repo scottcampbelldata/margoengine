@@ -1,0 +1,98 @@
+{
+  "date": "2026-10-25",
+  "engine": "5.8.4-58902052+++UE5+Release-5.8",
+  "machine": "scott dev PC (RTX A6000), UnrealEditor-Cmd -unattended -nop4 -nosplash -NullRHI",
+  "fixture": "MargoTile precision appearance fixture (scripts/prepare-unreal-precision-appearance.mjs), layout objects, transformMode preserve, static",
+  "importer": {
+    "package": "@margoengine/exporters/unreal-precision-importer",
+    "sha256": "80e134d48102dd305a8264fd42c01f8a26f54420c8939c7a3d4418f8e434c01f",
+    "note": "MargoTile appName text with this commit's three fixes, patched into the app-exported bundle; manifest importerSha256 updated to match"
+  },
+  "before": {
+    "importerSha256": "5a1b337928f0adbe839533c2878508b2e5b1c529b4c0cb2484ad4f765aeeef67",
+    "result": "FAIL ValueError: MARGOTILE_UNREAL_PRECISION: Native setting did not stick: override_pipelines"
+  },
+  "after": {
+    "result": "PASS",
+    "status": "native-adapter-storage-passed-render-gates-open",
+    "scope": "Adapter storage only: source UID/labels/metadata, bulk native positions/indices/sections/local state, byte-identical saved original mesh packages and texture source-art/configuration. Complete split normal/UV/RGBA corner conservation, render buffers/RHI/shaders, fresh-process persistence and million-triangle performance require independent actual native gates. No averaged/arbitrary overlay values are used."
+  },
+  "report": {
+    "version": 1,
+    "processId": 28072,
+    "engineVersion": "5.8.4-58902052+++UE5+Release-5.8",
+    "status": "native-adapter-storage-passed-render-gates-open",
+    "assetRoot": "/Game/MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1",
+    "mapAssetPath": "/Game/MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Scene",
+    "reportDirectory": "C:\\Development\\Projects\\margoengine\\test-results\\uep\\new\\Saved\\MargoTilePrecision_ed24ec322e384455816a8e79bdc12a6c",
+    "sourceManifestSha256": "452aa0a7e5d8db4f12657cda2266cf1f0d1caf74024ff8014d3c67f03c5b253d",
+    "sourceGlbSha256": "f065a93ca8ae1f1fbc8d63f77e58e563ed877b2fd2e1c6fb88f7748be5415c40",
+    "sourceMasterSha256": "d4890fcfb02f766328307591713c62a09b74a1dafa7fb3e143a6266eaba5986e",
+    "originalRgbaSha256": "3d06394ff9f13d97af02d999130f9403421ef1b8e7a5748aee672147478f35d2",
+    "importerSha256": "80e134d48102dd305a8264fd42c01f8a26f54420c8939c7a3d4418f8e434c01f",
+    "originalNativeNamesPreserved": false,
+    "renderCornerCorrespondenceQualified": false,
+    "completeSourceModelCornersQualified": false,
+    "masterToEvaluatedGlbReconstructionQualifiedByHelper": false,
+    "rhiPixelsQualified": false,
+    "activeShaderQualified": false,
+    "freshProcessQualified": false,
+    "scope": "Adapter storage only: source UID/labels/metadata, bulk native positions/indices/sections/local state, byte-identical saved original mesh packages and texture source-art/configuration. Complete split normal/UV/RGBA corner conservation, render buffers/RHI/shaders, fresh-process persistence and million-triangle performance require independent actual native gates. No averaged/arbitrary overlay values are used.",
+    "pipelineTemplates": [
+      "/Interchange/Pipelines/DefaultGLTFSceneAssetsPipeline.DefaultGLTFSceneAssetsPipeline",
+      "/Interchange/Pipelines/DefaultGLTFPipeline.DefaultGLTFPipeline",
+      "/Interchange/Pipelines/DefaultSceneLevelPipeline.DefaultSceneLevelPipeline"
+    ],
+    "originalMaterialBinding": {
+      "nativePath": "/Game/MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Imported/geometry/Materials/Atlas.Atlas",
+      "glbMaterialIndex": 0,
+      "nativeName": "Atlas",
+      "directAuthoredNamePreserved": false
+    },
+    "labels": [
+      {
+        "id": "object",
+        "name": "Source-authored sampling panels",
+        "glbNodeIndex": 0,
+        "nativeActor": "/Game/MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Scene.Scene:PersistentLevel.geometry_node_0",
+        "metadataJSON": "{\"authoredTransformJSON\":\"{\\\"position\\\":[0,0,0],\\\"rotation\\\":[0,0,0,1],\\\"scale\\\":[1,1,1]}\",\"glbNodeIndex\":0,\"id\":\"object\",\"kind\":\"object\",\"name\":\"Source-authored sampling panels\",\"parentId\":null,\"sourceGlbSha256\":\"f065a93ca8ae1f1fbc8d63f77e58e563ed877b2fd2e1c6fb88f7748be5415c40\",\"version\":1}"
+      }
+    ],
+    "nativeStorageBeforeSha256": "c0c40f47101e8a97d224d55b04a5f681db93ecc9ec9fd1c4198ec1c3e8707702",
+    "nativeStorageAfterSha256": "c0c40f47101e8a97d224d55b04a5f681db93ecc9ec9fd1c4198ec1c3e8707702",
+    "meshPackagesBefore": [
+      {
+        "mesh": "/Game/MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Imported/geometry/StaticMeshes/Source-authored_sampling_panels.Source-authored_sampling_panels",
+        "relativePath": "MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Imported/geometry/StaticMeshes/Source-authored_sampling_panels.uasset",
+        "size": 82743,
+        "sha256": "8ce79c7284f0014c98326d8bd2b574a9ebf71f6dc8e93ec66be5d58f0e40a313"
+      }
+    ],
+    "triangles": 26,
+    "objects": 1,
+    "nativeActorCount": 2,
+    "nativeMaterial": "/Game/MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Adapted/MargoMaterial_0.MargoMaterial_0",
+    "nativeTexture": "/Game/MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Imported/geometry/Textures/atlas.atlas",
+    "atlasParameter": "MargoTileOriginalAtlas",
+    "atlasMetadataJSON": "{\"height\":2,\"id\":\"atlas\",\"kind\":\"atlas\",\"name\":\"Four frames\",\"origin\":\"top-left\",\"rgbaSha256\":\"3d06394ff9f13d97af02d999130f9403421ef1b8e7a5748aee672147478f35d2\",\"sourceGlbSha256\":\"f065a93ca8ae1f1fbc8d63f77e58e563ed877b2fd2e1c6fb88f7748be5415c40\",\"version\":1,\"width\":2}",
+    "materialMetadataJSON": "{\"glbMaterialIndex\":0,\"id\":\"material\",\"kind\":\"material\",\"name\":\"Atlas\",\"sourceAssetId\":\"atlas\",\"sourceGlbSha256\":\"f065a93ca8ae1f1fbc8d63f77e58e563ed877b2fd2e1c6fb88f7748be5415c40\",\"version\":1}",
+    "meshPackagesAfter": [
+      {
+        "mesh": "/Game/MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Imported/geometry/StaticMeshes/Source-authored_sampling_panels.Source-authored_sampling_panels",
+        "relativePath": "MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Imported/geometry/StaticMeshes/Source-authored_sampling_panels.uasset",
+        "size": 82743,
+        "sha256": "8ce79c7284f0014c98326d8bd2b574a9ebf71f6dc8e93ec66be5d58f0e40a313"
+      }
+    ],
+    "meshPackagesReopened": [
+      {
+        "mesh": "/Game/MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Imported/geometry/StaticMeshes/Source-authored_sampling_panels.Source-authored_sampling_panels",
+        "relativePath": "MargoTilePrecision_ae94f888f1d54a7bb1908f74adc0c0a1/Imported/geometry/StaticMeshes/Source-authored_sampling_panels.uasset",
+        "size": 82743,
+        "sha256": "8ce79c7284f0014c98326d8bd2b574a9ebf71f6dc8e93ec66be5d58f0e40a313"
+      }
+    ],
+    "nativeStorageReopenedSha256": "c0c40f47101e8a97d224d55b04a5f681db93ecc9ec9fd1c4198ec1c3e8707702",
+    "originalInputsUnchanged": true
+  }
+}

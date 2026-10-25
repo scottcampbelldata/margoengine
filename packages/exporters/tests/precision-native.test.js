@@ -78,3 +78,67 @@ test('Godot suffix import names the node Godot keeps and turns name suffixes on'
   assert.match(GODOT_SUFFIX_IMPORT_SETTINGS, /^\[remap\]\nimporter="scene"/);
   assert.match(GODOT_SUFFIX_IMPORT_SETTINGS, /nodes\/use_name_suffixes=true/);
 });
+
+// The first native Unreal 5.8 run (examples/package-benchmarks/results/unreal-precision-import.json) failed in turn on
+// three checks that could never pass; these pin each fix in the importer text.
+const unrealText = () => createUnrealPrecisionImporter({ ...hooks, appName: 'Acme', masterFile: 'source.acme' });
+const pythonBlock = (text, name) => {
+  const start = text.indexOf(`def ${name}(`);
+  assert.ok(start >= 0, name);
+  const end = text.indexOf('\n\n\n', start);
+  return text.slice(start, end < 0 ? undefined : end);
+};
+
+test('Unreal set_exact compares struct values (SoftObjectPath) by their exported text, lists element by element', async () => {
+  const text = unrealText();
+  assert.match(pythonBlock(text, 'comparable'), /isinstance\(value, unreal\.StructBase\)[\s\S]*export_text\(\)/);
+  // Run the importer's own need/comparable/set_exact against a fake unreal module whose structs compare by identity,
+  // as Unreal's Python wrappers do: the read-back copy of a SoftObjectPath list must still count as the value set.
+  const { spawnSync } = await import('node:child_process');
+  const script = `
+class StructBase:
+    pass
+class SoftObjectPath(StructBase):
+    def __init__(self, path): self.path = path
+    def export_text(self): return self.path
+class _Unreal: pass
+unreal = _Unreal(); unreal.StructBase = StructBase
+def need(ok, message):
+    if not ok: raise ValueError(message)
+${pythonBlock(text, 'comparable')}
+
+${pythonBlock(text, 'set_exact')}
+
+class Owner:
+    def __init__(self): self.values = {}
+    def set_editor_property(self, name, value):
+        self.values[name] = [SoftObjectPath(v.path) for v in value] if isinstance(value, list) else value
+    def get_editor_property(self, name): return self.values[name]
+owner = Owner()
+set_exact(owner, "override_pipelines", [SoftObjectPath("/Interchange/Pipelines/A.A"), SoftObjectPath("/Interchange/Pipelines/B.B")])
+set_exact(owner, "is_automated", True)
+try:
+    owner.set_editor_property = lambda name, value: owner.values.__setitem__(name, [SoftObjectPath("/Other.Other")])
+    set_exact(owner, "override_pipelines", [SoftObjectPath("/Interchange/Pipelines/A.A")])
+    print("MISSED")
+except ValueError:
+    print("OK")
+`;
+  const python = ['python3', 'python'].find((cmd) => spawnSync(cmd, ['--version']).status === 0);
+  if (!python) return; // no Python on this machine; the text assertion above still holds
+  const run = spawnSync(python, ['-c', script], { encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal(run.stdout.trim(), 'OK', 'equal paths pass, a different path still fails');
+});
+
+test('Unreal texture policy uses only properties UE 5.8 has, and the used-texture check allows a NullRHI editor', () => {
+  const text = unrealText(),
+    policy = pythonBlock(text, 'texture_policy');
+  assert.doesNotMatch(policy, /"compression_none":/, 'UE 5.8 Texture2D has no compression_none');
+  assert.match(policy, /"lossy_compression_amount": unreal\.TextureLossyCompressionAmount\.TLCA_NONE/);
+  assert.match(policy, /TC_VECTOR_DISPLACEMENTMAP/);
+  assert.match(
+    pythonBlock(text, 'inspect_unlit'),
+    /need\(used in \(\[\], \[texture\]\), "Actual native graph must bind only the exact owned atlas"\)/,
+  );
+});

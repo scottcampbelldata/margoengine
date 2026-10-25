@@ -414,14 +414,24 @@ def owned_asset(value, owner):
     return path
 
 
+def comparable(value):
+    # Struct wrappers (SoftObjectPath) compare by identity in Python, so a read-back copy never equals the value set:
+    # compare their exported text (the object path) instead.
+    if isinstance(value, unreal.StructBase):
+        return value.export_text()
+    return value
+
+
 def set_exact(owner, name, value):
     owner.set_editor_property(name, value)
     actual = owner.get_editor_property(name)
     # Reflected arrays and FName values retain native wrappers in Python.
     if isinstance(value, list):
-        actual = list(actual)
+        actual, value = [comparable(item) for item in actual], [comparable(item) for item in value]
     elif isinstance(value, str):
         actual = str(actual)
+    else:
+        actual, value = comparable(actual), comparable(value)
     need(actual == value, "Native setting did not stick: " + name)
 
 
@@ -602,7 +612,9 @@ def source_texture_pixels(texture, directory, name, expected):
 
 def texture_policy():
     return {"compression_settings": unreal.TextureCompressionSettings.TC_VECTOR_DISPLACEMENTMAP,
-            "compression_none": True, "compression_no_alpha": False,
+            # TC_VECTOR_DISPLACEMENTMAP is stored uncompressed (8 bits per channel); UE 5.8 has no compression_none,
+            # so lossy compression is ruled out explicitly instead.
+            "lossy_compression_amount": unreal.TextureLossyCompressionAmount.TLCA_NONE, "compression_no_alpha": False,
             "mip_gen_settings": unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS,
             "max_texture_size": 0, "lod_bias": 0, "num_cinematic_mip_levels": 0,
             "filter": unreal.TextureFilter.TF_NEAREST, "address_x": unreal.TextureAddress.TA_CLAMP,
@@ -670,7 +682,10 @@ def inspect_unlit(material, texture, owner, row, source_sha):
     need(lib.get_material_property_input_node(material, unreal.MaterialProperty.MP_EMISSIVE_COLOR) == sample
          and lib.get_material_property_input_node_output_name(material, unreal.MaterialProperty.MP_EMISSIVE_COLOR) == "RGB",
          "Actual native emissive source/output differs")
-    need(list(lib.get_material_used_textures(material)) == [texture], "Actual native graph must bind only the exact owned atlas")
+    # The single sample node above already binds only the atlas; the compiled list is empty when no shader map exists
+    # (an unattended -NullRHI editor), and must be exactly the atlas otherwise.
+    used = list(lib.get_material_used_textures(material))
+    need(used in ([], [texture]), "Actual native graph must bind only the exact owned atlas")
     for name in ("MP_BASE_COLOR", "MP_OPACITY", "MP_OPACITY_MASK", "MP_NORMAL", "MP_WORLD_POSITION_OFFSET", "MP_MATERIAL_ATTRIBUTES"):
         need(lib.get_material_property_input_node(material, getattr(unreal.MaterialProperty, name)) is None,
              "Unexpected native material input: " + name)
