@@ -54,7 +54,7 @@ Some files also carry AP242 tessellated geometry (2,296 `COMPLEX_TRIANGULATED_SU
 
 ## Feature parity with OpenCascade
 
-Scott's rule (2026-10-17): match what OpenCascade can do, learned from its public documentation and feature lists, never
+The rule (2026-10-17): match what OpenCascade can do, learned from its public documentation and feature lists, never
 from its source. The list below is the target, and the status of each item.
 
 | OpenCascade capability (documented) | Margo |
@@ -81,4 +81,4 @@ from its source. The list below is the target, and the status of each item.
 Package: `@margoengine/brep` (optional; never core or the stage). Not in scope for the first version: repairing
 broken files, offset and swept surfaces beyond revolution and extrusion, Boolean operations, PMI display.
 
-Order (Scott, 2026-10-17): the demo packages come first; this work starts after them.
+Order (2026-10-17): the demo packages come first; this work starts after them.

@@ -5,7 +5,7 @@
 33 FPS (GPU-bound, unchanged), and the kernel is 2.6-4x cheaper in every case. The first results table below is an
 earlier (11:53) session from before those core changes, kept for the hot-spot analysis; do not quote it as current.
 
-Measured 2026-10-14 (11:53-12:02 UTC) on Scott's laptop: Intel Core Ultra 7 258V, Intel Arc 140V (WebGPU `intel` /
+Measured 2026-10-14 (11:53-12:02 UTC) on a laptop: Intel Core Ultra 7 258V, Intel Arc 140V (WebGPU `intel` /
 `xe-2lpg`), 31 GB, headless Edge 155 through Playwright, canvas 1432x768 at DPR 1, 4x MSAA (the desktop full tier),
 vsync and the frame-rate limit off (FPS is throughput, not a 60 Hz cap), cross-origin isolated (5 µs timers). All
 numbers below come from one session on AC power (checked before and after every run and recorded in each JSON file as
@@ -84,8 +84,8 @@ assembly (`node examples/package-benchmarks/cad/kernel-node.mjs`, `results-kerne
 
 ## Core static-scene fast paths (merged 2026-10-14: steps 1, 2, 3 and 5; step 4 not merged)
 
-Scott approved steps 1, 2, 3 and 5 of the prototype below; they are ported onto `perf/auto-quality`, one commit per step,
-together with two small approved core fixes. Step 4 (pick pipeline reuse) is not merged, so `engine.pick` still
+Steps 1, 2, 3 and 5 of the prototype below were accepted; they are ported onto `perf/auto-quality`, one commit per step,
+together with two small core fixes. Step 4 (pick pipeline reuse) is not merged, so `engine.pick` still
 re-renders the scene; it got faster only because the `update()` it runs (kernel + collection) did.
 
 | Commit | What | core + stage gzip |
@@ -143,7 +143,7 @@ the frame is GPU-bound and the GPU time rose; not explained. The quiet-machine "
 
 ### Back-face culling in core (merged 2026-10-15, `d96e2d7`)
 
-Scott approved the smaller per-batch variant instead of the per-cull-group branch below: core builds a second main
+The smaller per-batch variant was chosen instead of the per-cull-group branch below: core builds a second main
 pipeline (`cullMode: 'back'`, the shader's `discard` compiled out by an override) and uses it for a geometry batch
 when every drawn instance is single-sided and unmirrored; any other batch, package shader variants and draws with extra
 bindings keep the cull-none pipeline. Core + stage 19,577 -> 19,793 B gzip. Same pixels (`cad/cull-pixels.mjs`

@@ -1,6 +1,6 @@
 # WebGL2 compatibility layer: roadmap for the next version
 
-Date: 2026-10-21. Status: PAUSED by Scott on 2026-10-24 until his apps ship (few of his customers lack WebGPU, and his apps run on Electron, which has it). Before that it was planned for the version after v1.0.0. Nothing here is implemented yet.
+Date: 2026-10-21. Status: PAUSED on 2026-10-24 (the apps built on Margo so far run on Electron, which has WebGPU). Before that it was planned for the version after v1.0.0. Nothing here is implemented yet.
 
 ## What visitors without WebGPU see today (2026-10-24)
 
@@ -49,7 +49,7 @@ compute shaders and no storage buffers; it has two indirect draw calls (`rendere
 
 - "WebGL beyond core" was closed as won't-do for v1.0 on 2026-10-14 (gap 8), because the alternative was a second
   renderer for every package. v1.0 keeps that decision and ships `@margoengine/webgl` as the preview.
-- On 2026-10-21 Scott asked for a complete roadmap to implement the full fallback in the next version. This document is
+- On 2026-10-21 a complete roadmap was requested to implement the full fallback in the next version. This document is
   that roadmap. The core freeze and the 25,000-byte core + stage gzip gate stay in force: the plan needs zero core bytes.
 - The translation-layer design replaces "a WebGL2 version of every package" (37 packages with WGSL shaders today). One
   translator and one API layer serve all of them, including packages written later.
@@ -230,7 +230,7 @@ Relative sizes are planning guesses, not measurements: S (days), M (one to two w
 
 | # | Milestone | Size | Done when |
 | --- | --- | --- | --- |
-| M0 | Decisions and corpus | S | Package name, support matrix and tiers agreed with Scott; the WGSL corpus recorder lands and the corpus covers every package with shaders. |
+| M0 | Decisions and corpus | S | Package name, support matrix and tiers agreed; the WGSL corpus recorder lands and the corpus covers every package with shaders. |
 | M1 | WGSL front end and IR | L | The whole corpus parses and type-checks; errors point at the right line; unit tests per language feature. |
 | M2 | GLSL back end for render shaders + core | L | Core's basic scene, instancing, MSAA, picking and device loss run unmodified on the layer; forced-compat pixels match native WebGPU within tolerance (max channel error and mean error set in M0) on the basic-scene and PBR checks. |
 | M3 | Textures, samplers, render targets, copies, readback | M | gltf-pro, materials, shadows, tonemap and environment backgrounds pass their GPU checks in forced-compat mode. |
@@ -277,7 +277,7 @@ of native frame time on the desktop GPU. M7 replaces these with measured numbers
 WebXR on WebGL2, the voxel path tracer, GPU timestamps, zero-copy video, per-sample MSAA effects, 1,000,000-particle
 budgets and GPU-driven culling on WebGL2.
 
-## Open decisions for Scott
+## Open decisions
 
 1. Package name (`@margoengine/webgl2-compat` proposed) and whether `@margoengine/webgl` stays as the small preview.
 2. Minimum browser tier: require `EXT_color_buffer_float` (full HDR), or also support half-float-only and LDR devices.

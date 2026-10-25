@@ -1,6 +1,6 @@
 # Releasing to npm
 
-Nothing is published without Scott's go-ahead for that release. The only publish path is the manual
+Nothing is published without the maintainer's go-ahead for that release. The only publish path is the manual
 `.github/workflows/publish.yml` workflow; `npm run publish:dry-run` runs the same checks locally and publishes nothing.
 
 ## Accounts and credentials
@@ -18,7 +18,7 @@ Nothing is published without Scott's go-ahead for that release. The only publish
   and delete the secret right after that first release, then switch every package to trusted publishing.
 - **Provenance:** every publish uses `--provenance`, so npm shows which commit and workflow built each tarball. It
   requires each package's `repository.url` to be this GitHub repository (`scripts/supply-chain.mjs` checks it).
-- One-time GitHub setup (Scott): an `npm-publish` environment with Scott as required reviewer and `main` as the only
+- One-time GitHub setup (maintainer): an `npm-publish` environment with the maintainer as required reviewer and `main` as the only
   allowed branch; the repository variable `NPM_PUBLISH_ENABLED=true` when a release is due (the workflow does nothing
   without it); private vulnerability reporting enabled (Settings, Security), which SECURITY.md points to.
 

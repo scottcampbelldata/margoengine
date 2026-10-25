@@ -29,7 +29,7 @@ import { acquire } from './gpu-lock.mjs';
 import { waitForQuiet } from './quiet-gate.mjs';
 import { GENERATOR, assembly, summary, writeGLB, writeOBJ } from './cad-scale/assembly.mjs';
 
-// Pass limits per machine class (proposed; Scott confirms). Frame times include GPU completion.
+// Pass limits per machine class (proposed). Frame times include GPU completion.
 export const CLASSES = {
   workstation: {
     loadMs: 10_000,

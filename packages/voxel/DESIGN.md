@@ -1,7 +1,7 @@
-# @margoengine/voxel: approved design (names chosen 2026-10-19; Scott delegated naming)
+# @margoengine/voxel: approved design (names chosen 2026-10-19)
 
-Goal: a Minecraft-style voxel game on Margo, and later a MagicaVoxel-style editor sharing the package. Scott is
-building Margo as the base of his own 3D modeller and game engine: it must look good and run well. Core and stage
+Goal: a Minecraft-style voxel game on Margo, and later a MagicaVoxel-style editor sharing the package. Margo is
+also the base for a 3D modeller and a game engine, so it must look good and run well. Core and stage
 are frozen (gzip gate 25,000; 21,343 now). Never one core entity per block, never vertex colours on core Geometry,
 keep buffers within default WebGPU limits (128 MiB per storage binding, 256 MiB per buffer). Clean-room code (no
 other engine code). No new runtime dependency. Margo names. Errors per docs/conventions.md, TSDoc on every public export, tree-shakable subpath entries.
@@ -176,7 +176,7 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
   <= 3 ms per chunk mesh per worker (3 workers >= 600 meshes/s), spawn RD4 < 1 s and RD16 < 6 s, edit to pixels <= 2
   frames. Targets until phase 13 measures them.
 
-## Decisions on the open questions (made 2026-10-19, report them; Scott can overrule)
+## Decisions on the open questions (made 2026-10-19)
 1. Quads stay 12 bytes with baked per-vertex smooth light (best look now; a per-chunk 3D light texture is a later option).
 2. 256 texture layers in v1 (default limits; no core change).
 3. Translucency sorted in v1; no generic OIT source API.

@@ -1,15 +1,15 @@
-# Khronos sample-asset shortlist (for Scott's approval)
+# Khronos sample-asset shortlist
 
 **Status 2026-10-15: approved and downloaded**, except the 22 models whose `metadata.json` adds a
 `LicenseRef-LegalMark-*` trademark notice to CC0/CC BY (all 16 Compare models, MultiUVTest, CesiumMan, CarConcept,
-SunglassesKhronos, ChronographWatch, AntiqueCamera), skipped pending Scott's decision. The "verify licence"
+SunglassesKhronos, ChronographWatch, AntiqueCamera), skipped pending a decision. The "verify licence"
 TextureTransformTest is CC0 (Microsoft). What was added and why anything was skipped: `README.md`.
 
 Built 2026-10-15 from each model's `metadata.json` in the official
 [Khronos glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets) repo (150 models checked: 82 CC0,
 57 CC-BY 4.0, 4 CC0+CC-BY, 7 restricted). Every model below is **CC0 or CC-BY 4.0** (CC-BY = credit the author on the
 demo/site and in the third-party notices). Purpose: the visual-regression suite and the "real assets render
-correctly" launch gate. Nothing below is downloaded until Scott approves the list.
+correctly" check. Nothing below is downloaded until the list is reviewed.
 
 ## Tier 1 - recommended (compliance + showcase)
 

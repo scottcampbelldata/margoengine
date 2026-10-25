@@ -84,10 +84,10 @@ itself, as the table above says.
 
 ## Core freeze
 
-`@margoengine/core` and the stage facade are frozen for v1.0.0 against new features, not against bug fixes (Scott,
+`@margoengine/core` and the stage facade are frozen for v1.0.0 against new features, not against bug fixes (since
 2026-10-24). A bug, an unsafe API (a throw that cannot be branched on, a race, a leak) or a message that names no fix
 is fixed in core, with a test, inside the 25,000-byte core + stage gzip gate; record the bytes it costs. New
-capabilities go in optional packages, and a fix that would add a capability is listed for Scott instead.
+capabilities go in optional packages, and a fix that would add a capability is listed for the maintainer instead.
 
 ## Names exported by more than one package
 
@@ -109,7 +109,7 @@ A name declared and exported by two packages must mean the same thing, or be ren
 | `texture` (vfx) | shader | vfx's `@margoengine/vfx/texture` feature object renamed `textureFeature` (pass `{texture: textureFeature}`); shader's `texture()` node keeps the name. |
 | `Environment`, `Sky`, `Bloom`, `SSAO`, `TAA`, `Tonemap`, `Shadows`, `OrbitControls`, `MapControls`, `ArcballControls` | environment, sky, post, taa, tonemap, shadows, controls; react | Kept: the plugin or pass class and react's JSX component that adds it with the same options (React names components after what they render). Allowlisted. |
 | `Vec3` (lod), `Color` (sky, terrain), `HeightField` (terrain) | math | Math's: lod uses `MutableVec3` / `Vec3`, sky and terrain colours are `Vec3`, terrain re-exports math's `HeightField`. |
-| `PbrMaterial` | core, materials, react | Kept, one meaning (Scott's naming): materials' `PbrMaterial` takes every core `PbrMaterial` option with the same meaning and adds maps and physical options, with a textured material's defaults (white, roughness 1, metalness 0, front side) rather than core's indigo double-sided placeholder; core's stays the constant-colour material of core meshes, and react's is the JSX element that builds core's. Allowlisted. |
+| `PbrMaterial` | core, materials, react | Kept, one meaning: materials' `PbrMaterial` takes every core `PbrMaterial` option with the same meaning and adds maps and physical options, with a textured material's defaults (white, roughness 1, metalness 0, front side) rather than core's indigo double-sided placeholder; core's stays the constant-colour material of core meshes, and react's is the JSX element that builds core's. Allowlisted. |
 
 ## Quality gate
 

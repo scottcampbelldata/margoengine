@@ -1,6 +1,6 @@
 # MagicaVoxel parity: status and open work
 
-Goal (Scott, 2026-10-19): `@margoengine/voxel-pathtracer` renders any MagicaVoxel 0.99.7 `.vox` the way MagicaVoxel
+Goal (2026-10-19): `@margoengine/voxel-pathtracer` renders any MagicaVoxel 0.99.7 `.vox` the way MagicaVoxel
 does, and exceeds it everywhere else. MagicaVoxel is the most used voxel editor and renderer and it is free, so a
 commercial replacement must beat it, not tie it.
 
@@ -221,7 +221,7 @@ This work landed on main on 2026-10-20. Nothing touches `@margoengine/core` or t
 
 ## MagicaVoxel renders, 2026-10-20
 
-Scott freed the desktop; all nine were rendered (MagicaVoxel 0.99.7.2, 960 x 800, open the file, camera slot 1, L,
+All nine were rendered (MagicaVoxel 0.99.7.2, 960 x 800, open the file, camera slot 1, L,
 type the zoom; answer No when it asks to save the camera change, so it never writes our scene files; the files were
 checked unchanged afterwards). Snapshots in `test-results/mv-calib` (git-ignored).
 
@@ -239,7 +239,7 @@ checked unchanged afterwards). Snapshots in `test-results/mv-calib` (git-ignored
 
 ## Exceed MagicaVoxel
 
-Scott (2026-10-20): better in every way (faster, leaner, better parity, features and integration) without bloat;
+Goal (2026-10-20): better in every way (faster, leaner, better parity, features and integration) without bloat;
 the best value first. Parity items still open above come next.
 
 Measured (RTX A6000, Edge headless, 960 x 800, `L-bg-off`: slab, two cubes, sun, sky, ground):
@@ -279,19 +279,19 @@ Large worlds need no work (row above). Done: the denoiser's caustic chain runs o
 256 MiB and from 18.7-19.0 to 14.4-14.6 ms per frame. Next candidate: render the large world in MagicaVoxel for a
 speed comparison.
 
-## Voxel sandbox photo mode (Scott, 2026-10-20)
+## Voxel sandbox photo mode (2026-10-20)
 
-Scott asked for the worthwhile parts of a path-traced photo mode for the Minecraft-style voxel sandbox
+The plan covers the worthwhile parts of a path-traced photo mode for the Minecraft-style voxel sandbox
 (`examples/voxel-sandbox` on main, drawn by `@margoengine/voxel`'s raster renderer), in this order after the
 MagicaVoxel parity work (parity is blocked while it needs the desktop, so this may start earlier):
 
 1. Block textures in the path tracer: per-face texture layers (the sandbox's 16 x 16 pixel art: +x, -x, +y, -y, +z,
-   -z), nearest filtering, multiplying the material colour; the denoiser demodulates them like any albedo. Also a
-   selling point over MagicaVoxel, which has no textures.
+   -z), nearest filtering, multiplying the material colour; the denoiser demodulates them like any albedo. MagicaVoxel
+   has no textures.
 2. See-through texture pixels (cutout): a face pixel with low alpha lets the ray pass on through the voxel (leaves).
 3. Photo mode in the sandbox: its chunks as path-tracer models (about a dozen block types, well under 255 materials;
    an edited chunk re-uploads alone), water and glass as glass, torch light as an emitter. Main merged into this
-   branch (Scott's go-ahead) and then rebased onto it for main; `examples/voxel-sandbox/src/photo.ts` (P toggles, Enter
+   branch and then rebased onto it for main; `examples/voxel-sandbox/src/photo.ts` (P toggles, Enter
    saves a PNG, `?photo` starts in it).
 
 Status: 1 and 2 committed (b7d16afd); the texture and cut-out GPU checks pass. 3 builds and passes the sandbox's

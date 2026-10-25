@@ -1,6 +1,6 @@
 # JT reader: licensing and patents
 
-Research by Scott, 2026-10-18 (not legal advice; the open items below want counsel). Summary for whoever builds or
+Research notes, 2026-10-18 (not legal advice; the open items below want counsel). Summary for whoever builds or
 ships the JT (ISO 14306) reader in `@margoengine/brep`.
 
 ## What permits it

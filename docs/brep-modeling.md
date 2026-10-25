@@ -2,7 +2,7 @@
 
 Status, 2026-10-17: stages 1 and 2 done (topology, primitives, extrude, names, STEP export); stage 4 has a first cut
 (Booleans in general position, below). The kernel reads and meshes STEP, ACIS SAT and Parasolid XT
-(`docs/brep-kernel.md`). Goal (Scott, 2026-10-17): beat OpenCascade on web speed, desktop speed and modeling
+(`docs/brep-kernel.md`). Goal (2026-10-17): beat OpenCascade on web speed, desktop speed and modeling
 features. Clean room as before: published standards, textbooks and papers only; OpenCascade stays a measured reference.
 
 ## Where we stand (measured 2026-10-17, this PC)

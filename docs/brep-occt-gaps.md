@@ -1,7 +1,7 @@
 # Where OpenCascade still leads, and testing to commercial grade (roadmap, to address later)
 
-Noted 2026-10-17 from Scott's review. Each item is where OpenCascade (OCCT) is still ahead of `@margoengine/brep`, with
-where Margo stands today and what matching it would take. Goal (Scott): match or beat OCCT on all of it.
+Noted 2026-10-17. Each item is where OpenCascade (OCCT) is still ahead of `@margoengine/brep`, with
+where Margo stands today and what matching it would take. The goal is to match or beat OCCT on all of it.
 
 ## 1. Freeform NURBS-to-NURBS surface intersection
 
@@ -54,7 +54,7 @@ To match:
 
 ## 4. Testing to commercial grade
 
-Noted 2026-10-18 from Scott. Buyers of a CAD kernel (CAD/CAM tools, robotics simulators, generative design, web
+Noted 2026-10-18. Users of a CAD kernel (CAD/CAM tools, robotics simulators, generative design, web
 configurators) judge it by how it behaves at the boundaries and whether it ever crashes, not by benchmarks. Three
 suites take Margo from measured-on-clean-files to that standard.
 

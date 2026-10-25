@@ -3,7 +3,7 @@
 Reference models from the official [Khronos glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets)
 repository, used by the visual-regression suite and real-asset checks. Each model keeps
 its own licence; only models whose `metadata.json` lists nothing but CC0 1.0 and/or CC BY 4.0 are added, and only
-after Scott approves them (FlightHelmet 2026-10-15; the `SHORTLIST.md` tiers 2026-10-15).
+after review (FlightHelmet 2026-10-15; the `SHORTLIST.md` tiers 2026-10-15).
 
 Downloaded 2026-10-15 from Khronos commit `edc7c9e67c639d230715049ee31f9a96a6babbbe` (`main`), the `glTF-Binary` (GLB)
 variant where one exists, otherwise `glTF` + `.bin` + images; every file's size was checked against the GitHub tree
@@ -57,7 +57,7 @@ Size excludes the screenshot. Validator codes list errors and warnings only.
 
 - Licence differs from plain CC0 / CC BY 4.0 (their `metadata.json` adds a `LicenseRef-LegalMark-*` trademark notice
   for a logo inside the model, e.g. the glTF logo; Khronos's notice says the model licence confers no right to use
-  the mark beyond its Legal Mark Usage Guidelines). Not downloaded; awaiting Scott's decision: the 16 Compare models
+  the mark beyond its Legal Mark Usage Guidelines). Not downloaded; not decided yet: the 16 Compare models
   (CompareBaseColor, CompareMetallic, CompareRoughness, CompareNormal, CompareAmbientOcclusion, CompareAlphaCoverage,
   CompareEmissiveStrength, CompareClearcoat, CompareSheen, CompareSpecular, CompareTransmission, CompareVolume,
   CompareIor, CompareIridescence, CompareAnisotropy, CompareDispersion: CC0 + Khronos mark), MultiUVTest (CC BY +

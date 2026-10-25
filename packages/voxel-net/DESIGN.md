@@ -1,6 +1,6 @@
 # @margoengine/voxel-net: design (approved 2026-10-21)
 
-Scott approved this design and the four questions at the end on 2026-10-21 ("all thats fine"): the name, the
+This design and the four questions at the end were accepted on 2026-10-21: the name, the
 distances, the bench scenarios, and the faster `EntityCodec` path. It is built: README.md, `bench/`, and the measured
 results in `docs/voxel-net-capacity-2026-10-21.md`.
 
@@ -187,7 +187,7 @@ Bots: four bots for two seconds with no errors.
 
 Accounts and login, saving to disk, mobs, chat, inventories, TLS, several server processes for one world.
 
-## Questions for Scott (all answered yes)
+## Open questions (all answered yes)
 
 1. **Name**: `@margoengine/voxel-net` (proposed), `@margoengine/voxel-server` or `@margoengine/voxel-multiplayer`?
 2. **Distances**: view 6 chunks (192 blocks, a client may ask 2 to 8), simulation 3 chunks, players within 96 blocks.

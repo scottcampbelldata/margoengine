@@ -1,6 +1,6 @@
 # Khronos sample models for format tests
 
-Downloaded unchanged from the official KhronosGroup repositories at pinned commits (2026-10-24, with Scott's approval)
+Downloaded unchanged from the official KhronosGroup repositories at pinned commits (2026-10-24)
 for the Collada and KHR_animation_pointer tests and the `animation-formats` demo. Data only.
 
 | File | Source (pinned commit) | sha256 | Licence and credit |

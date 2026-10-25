@@ -299,7 +299,7 @@ Release compilation explicitly freezes `opt-level=3`, `lto="fat"`, `codegen-unit
 
 A twelve-candidate Chrome comparison used 976 conveyor entities, changing Euler values in linear memory, three rounds of 5,000 ticks and alternating candidate order. The size-oriented Rust baseline measured 0.169 ms median versus 0.052 ms for the initial Rust level 3 plus stripped Binaryen O3 selection. Rust level 3 without Binaryen exceeded the core budget at 21,110 gzip bytes. Initial fixture matrices matched every candidate exactly; the final converged build also passes the full checks below. These isolated timings exclude GPU staging and do not measure branch prediction. [Compiler evidence](benchmarks/README.md). Cargo recommends measuring profiles rather than assuming higher levels are faster: [Cargo profiles](https://doc.rust-lang.org/cargo/reference/profiles.html#opt-level).
 
-Verified on 11 October 2026 in this workspace:
+Checked on 11 October 2026 on the development machines. These are notes from local runs and their raw results are not committed, so treat the numbers and the NVIDIA and AMD results below as history, not as published claims (see [docs/whitepaper/claims.md](docs/whitepaper/claims.md) for what a committed result backs):
 
 - Twenty-seven JavaScript tests and four Rust checks: independent transform reference, stable memory, SIMD remainder/tangent cases, atomic rejection, hierarchy, camera depth, geometry/material validation, stale refs, instancing ownership, GLB import/shared primitives/rollback, plugin cleanup and machinery limits.
  Thirty-two shared math/camera checks also pass, including retained inverse workspace, pivoting, overlapping output, alias rejection and atomic failure.

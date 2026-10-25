@@ -1,8 +1,7 @@
 # Multiple views and scenes
 
 Date: 2026-10-24. Status: **views (part 1), the package work (part 2) and separate scenes (part 3) are in core**,
-landed as an approved exception to the v1.0 core freeze (Scott, 2026-10-23: "the core size change and additions to it
-are approved"), and every package is view-aware. The three demos (M7) are on the site; part 4 is optional. The
+landed as an accepted exception to the v1.0 core freeze (2026-10-23), and every package is view-aware. The three demos (M7) are on the site; part 4 is optional. The
 real-GPU check `npm run check:views` runs in `check:merge`.
 
 ## Summary
