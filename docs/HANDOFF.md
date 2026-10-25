@@ -15,7 +15,9 @@ webglRenderer`; creative expected 4x MSAA and DPR 2 from the light tier and the 
 selection expected a rejected overlapping pick (core queues it since 59e32ef7); staging took the lock by hand and
 deadlocked inside any holder; voxel's bevel check lit metal in a world with no sky light (README: no light bytes, no
 sun) and sampled a cleared lightmap before its pipelines were rebuilt; gltf-pro's shader review asked
-`getCompilationInfo()` on an idle device, which Chromium leaves pending.
+`getCompilationInfo()` on an idle device, which Chromium leaves pending (RawShaderMaterial's error report did the same;
+fixed in shader). After the rebase it caught a new bug: materials' no-map `bareShader` (c640305c) left reads of undeclared
+maps over gltf-pro's KHR physical shader (`specularColorMap`); fixed in materials with a regression test.
 
 ## Landed 2026-10-25: provenance sweep and IGES reader
 

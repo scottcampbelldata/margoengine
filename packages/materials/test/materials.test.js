@@ -163,6 +163,18 @@ test('a standard material without maps reads no texture: constant texels, no tex
   }
 });
 
+test('a material without maps over the KHR physical shader reads no dropped texture', async () => {
+  // Regression: bareShader dropped every group-1 declaration but replaced only the five core maps' reads, so over
+  // gltf-pro's physical variant it left reads of undeclared maps (`unresolved value 'specularColorMap'`).
+  const { pbrShader, physicalShader } = await import('../../gltf-pro/src/shader.ts');
+  for (const source of [pbrShader, physicalShader()]) {
+    const code = new Material({ color: [0.5, 0.25, 1] }).shader(source, 2);
+    assert.ok(!code.includes('textureSample('), 'no texture read');
+    assert.ok(!/@group\(1\) @binding/.test(code), 'no group-1 binding');
+  }
+  assert.ok(new Material().shader(physicalShader(), 2).includes('let cm=vec4f(0.5,0.5,1,1).xyz'), 'flat coat normal');
+});
+
 test('createMesh draws through gltf-pro with patched shader and default bindings', async () => {
   const s = await scene();
   try {

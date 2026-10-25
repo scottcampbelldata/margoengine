@@ -1730,7 +1730,11 @@ const bareCode = new Map<string, string>();
 function bareShader(source: string): string {
   let out = bareCode.get(source);
   if (out !== undefined) return out;
-  out = source.replace(/@group\(1\) @binding\(\d+\) var \w+:[^;]+;\n?/g, '');
+  const dropped: string[] = [];
+  out = source.replace(/@group\(1\) @binding\(\d+\) var (\w+):[^;]+;\n?/g, (_, name: string) => {
+    dropped.push(name);
+    return '';
+  });
   let count = 0;
   const edit = (from: string | RegExp, to: string) => {
     const next = out!.replace(from, () => to);
@@ -1740,7 +1744,12 @@ function bareShader(source: string): string {
   for (const map of ['base', 'mr', 'ao', 'emissive'])
     edit(new RegExp(`textureSample\\(${map}Map,${map}Sampler,uv\\(i,f\\.coords[AB]\\.[xyzw]\\)\\)`, 'g'), 'vec4f(1)');
   edit(/textureSample\(normalMap,normalSampler,uv\(i,f\.coordsA\.z\)\)/g, 'vec4f(0.5,0.5,1,1)');
-  if (count !== 5 || /textureSample\((base|mr|normal|ao|emissive)Map/.test(out))
+  // gltf-pro's KHR physical and extended variants read their extension maps (slots 5-17) from group 1 too; a missing
+  // one holds white, the clearcoat normal map a flat normal (gltf-pro's normalMaps).
+  out = out.replace(/textureSample\((\w+)Map,\1Sampler,uv\(i,\d+\)\)/g, (_, name: string) =>
+    name === 'clearcoatNormal' ? 'vec4f(0.5,0.5,1,1)' : 'vec4f(1)',
+  );
+  if (count !== 5 || dropped.some((name) => new RegExp(`\\b${name}\\b`).test(out!)))
     throw new MargoError(
       'unsupported',
       'Materials require the standard gltf-pro PBR shader; draw the mesh with gltf-pro',
