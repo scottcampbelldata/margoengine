@@ -71,6 +71,21 @@ A DataArray's dimensions are read in `(z, y, x)` order for volumes and `(y, x)` 
 be evenly spaced; a decreasing one (latitude stored north to south, say) is flipped for you. Pass `bounds=` or
 `x=` / `y=` to override them.
 
+## Camera events
+
+A figure is a [traitlets](https://traitlets.readthedocs.io) object, like every ipywidget. Its `camera` trait follows the
+view as you orbit, pan and zoom (reported at most ten times a second), and setting it moves the view:
+
+```python
+fig = margo.scatter(df, x="x", y="y", z="z", color="r")
+fig.camera = {"position": [0.5, 2.5, 1.5], "target": [0, 0, 0]}   # any of position, target, up, fov
+fig.observe(lambda change: print(change["new"]["position"]), names="camera")
+fig   # drag in the view: the new camera prints in the kernel
+```
+
+The camera is in scene units (the plot box spans about -1 to 1 on its longest side). `save_html` and `to_png` start
+from it.
+
 ## API
 
 | Function | What it does |
@@ -105,7 +120,7 @@ node python/build-frontend.mjs
 pip install ./python
 ```
 
-The package needs only `comm` (already present in Jupyter kernels). NumPy, pandas, Polars and xarray inputs are used when installed.
+The package needs only `comm` and `traitlets` (both present in every Jupyter kernel). NumPy, pandas, Polars and xarray inputs are used when installed.
 Plain lists and `array.array` also work.
 
 ## How it works
@@ -115,6 +130,7 @@ Plain lists and `array.array` also work.
    buffers, with their `buffer_paths`.
 2. In JupyterLab, the prebuilt extension `@margoengine/jupyter` is a hand-written federated container
    (`remoteEntry.js`). It registers `MargoFigureModel` and `MargoFigureView` with the widget manager.
-3. The view rebuilds the specification as a `@margoengine/sciviz` figure.
+3. The view rebuilds the specification as a `@margoengine/sciviz` figure. Its `camera` attribute syncs both ways
+   like the specification.
 
 Run the tests with `python -m unittest discover -s python/tests` or `pytest python/tests`.

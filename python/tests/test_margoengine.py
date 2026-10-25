@@ -236,6 +236,54 @@ class Figures(unittest.TestCase):
         self.assertIn("build-frontend.mjs", str(caught.exception))
 
 
+class Camera(unittest.TestCase):
+    def setUp(self):
+        FakeComm.opened.clear()
+
+    def test_the_view_reports_the_camera_into_the_trait_without_sending_it_back(self):
+        fig = margo.scatter(x=[0, 1], y=[0, 1], comm_factory=FakeComm)
+        fig._repr_mimebundle_()
+        comm = FakeComm.opened[0]
+        self.assertIsNone(comm.open_args["data"]["state"]["camera"])
+        seen = []
+        fig.observe(lambda change: seen.append(change["new"]), names="camera")
+        reported = {"position": [1, 2, 3], "target": [0, 0, 0], "up": [0, 1, 0], "fov": 60}
+        comm.receive({"method": "update", "state": {"camera": reported}, "buffer_paths": []})
+        self.assertEqual(fig.camera["position"], [1.0, 2.0, 3.0])
+        self.assertEqual(seen, [fig.camera])
+        # Only the protocol's echo goes back, no second update from the trait.
+        self.assertEqual([m["data"]["method"] for m in comm.sent], ["echo_update"])
+
+    def test_setting_the_camera_merges_parts_and_moves_the_view(self):
+        fig = margo.scatter(x=[0, 1], y=[0, 1], comm_factory=FakeComm)
+        fig.camera = {"position": [2, 2, 2], "target": [0, 0, 0]}
+        fig._repr_mimebundle_()
+        comm = FakeComm.opened[0]
+        self.assertEqual(comm.open_args["data"]["state"]["camera"], {"position": [2.0, 2.0, 2.0], "target": [0.0, 0.0, 0.0]})
+        fig.camera = {"fov": 35}
+        self.assertEqual(comm.sent[-1]["data"]["state"]["camera"], {"position": [2.0, 2.0, 2.0], "target": [0.0, 0.0, 0.0], "fov": 35.0})
+    def test_bad_cameras_are_refused(self):
+        from traitlets import TraitError
+
+        fig = margo.figure(comm_factory=FakeComm)
+        for bad in ({"eye": [1, 1, 1]}, {"position": [1, 2]}, {"position": [1, float("nan"), 0]}, {"fov": 200}, {"position": [0, 0, 0], "target": [0, 0, 0]}):
+            with self.assertRaises(TraitError):
+                fig.camera = bad
+        self.assertEqual(fig.camera, {})
+
+    def test_the_standalone_page_starts_at_the_camera(self):
+        original = figure_module._frontend_bundle
+        figure_module._frontend_bundle = lambda: ""
+        try:
+            fig = margo.scatter(x=[0, 1], y=[0, 1], comm_factory=FakeComm)
+            self.assertIsNone(json.loads(fig.to_html().split('id="margo-spec">')[1].split("</script>")[0])["camera"])
+            fig.camera = {"position": [1, 1, 1]}
+            payload = json.loads(fig.to_html().split('id="margo-spec">')[1].split("</script>")[0])
+        finally:
+            figure_module._frontend_bundle = original
+        self.assertEqual(payload["camera"], {"position": [1.0, 1.0, 1.0]})
+
+
 class PngExport(unittest.TestCase):
     """The DevTools WebSocket client and to_png's checks (the drawing itself is checked by jupyter-browser.mjs)."""
 

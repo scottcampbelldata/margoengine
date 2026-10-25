@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from ._arrays import Encoded, column, encode, extent, frame, is_labeled, label, labeled_grid
+from traitlets import Dict as DictTrait, HasTraits, TraitError, observe, validate
+
 from ._widget import WidgetModel, split_buffers
 
 __all__ = ["Figure", "COLORMAPS"]
@@ -66,7 +68,7 @@ def _array(value: Any, name: str) -> Dict[str, Any]:
     return {**encoded.descriptor(), "buffer": encoded.data}
 
 
-class Figure:
+class Figure(HasTraits):
     """A 3D figure. Add layers with :meth:`scatter`, :meth:`line`, :meth:`surface`, :meth:`volume`,
     :meth:`isosurface` and :meth:`colorbar` (each returns the figure, so calls chain). The figure shows itself as the
     last expression of a notebook cell; :meth:`save_html` writes a standalone page.
@@ -109,7 +111,54 @@ class Figure:
             "layers": [],
             "colorbars": [],
         }
-        self._model = WidgetModel({"spec": self._spec}, comm_factory=comm_factory)
+        super().__init__()
+        self._receiving = False
+        self._model = WidgetModel({"spec": self._spec, "camera": None}, comm_factory=comm_factory)
+        self._model.on_update(self._from_frontend)
+
+    # ----- camera -----
+
+    camera = DictTrait(
+        help="The view's camera in scene units (the plot box spans about -1 to 1): position, target, up and fov "
+        "(vertical field of view in degrees). The view reports it as you orbit, pan and zoom; set it (all or some "
+        "parts) to move the view. Watch it with fig.observe(callback, names='camera')."
+    )
+
+    @validate("camera")
+    def _check_camera(self, proposal: Any) -> Dict[str, Any]:
+        value = proposal["value"]
+        unknown = set(value) - {"position", "target", "up", "fov"}
+        if unknown:
+            raise TraitError(f"camera takes position, target, up and fov, not {', '.join(sorted(unknown))}")
+        merged: Dict[str, Any] = dict(self.camera or {})
+        for key in ("position", "target", "up"):
+            if key in value:
+                vector = [float(v) for v in value[key]]
+                if len(vector) != 3 or not all(math.isfinite(v) for v in vector):
+                    raise TraitError(f"camera {key} must be three finite numbers, got {value[key]!r}")
+                merged[key] = vector
+        if "fov" in value:
+            fov = float(value["fov"])
+            if not 0 < fov < 180:
+                raise TraitError(f"camera fov must be between 0 and 180 degrees, got {fov}")
+            merged["fov"] = fov
+        if "position" in merged and merged.get("position") == merged.get("target"):
+            raise TraitError("camera position and target must differ")
+        return merged
+
+    @observe("camera")
+    def _send_camera(self, change: Any) -> None:
+        # A camera the view reported is already there; one set from Python moves the view.
+        if not self._receiving:
+            self._model.set(camera=change["new"])
+
+    def _from_frontend(self, changes: Dict[str, Any]) -> None:
+        if changes.get("camera"):
+            self._receiving = True
+            try:
+                self.camera = changes["camera"]
+            finally:
+                self._receiving = False
 
     # ----- layers -----
 
@@ -365,16 +414,21 @@ class Figure:
 
         display(self._model.mimebundle(), raw=True)
 
-    def to_html(self, *, title: str = "Margo figure") -> str:
-        """A self-contained HTML page with the figure: the frontend bundle inline, arrays as base64."""
-        bundle = _frontend_bundle()
+    def _payload(self) -> str:
+        # The specification with its arrays as base64, and the camera, as JSON safe inside a <script> element.
         state, paths, buffers = split_buffers(self._spec)
         payload = {
             "spec": state,
             "bufferPaths": paths,
+            "camera": dict(self.camera) or None,
             "buffers": [base64.b64encode(bytes(b)).decode("ascii") for b in buffers],
         }
-        data = json.dumps(payload, separators=(",", ":")).replace("</", "<\\/")
+        return json.dumps(payload, separators=(",", ":")).replace("</", "<\\/")
+
+    def to_html(self, *, title: str = "Margo figure") -> str:
+        """A self-contained HTML page with the figure: the frontend bundle inline, arrays as base64."""
+        bundle = _frontend_bundle()
+        data = self._payload()
         return f"""<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{html.escape(title)}</title>
