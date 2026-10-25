@@ -4,7 +4,8 @@ This page lists the numbers and capability statements in the docs, the script or
 status. If a number in the README, on margoengine.com or in `docs/` is not here or in a committed result file,
 treat it as unverified and open an issue.
 
-Commands for rerunning everything are in [reproduce.md](reproduce.md).
+Commands for rerunning everything are in [reproduce.md](reproduce.md). Every past performance loss and significant
+bug the checks caught, with its cause, fix, after number and guard, is in [perf-history.md](perf-history.md).
 
 Status:
 

@@ -39,3 +39,18 @@ does not own. Each entry says exactly what is needed to close it.
 - **Needed to close:** an Android phone with ARCore and a Chromium browser that exposes WebXR `immersive-ar` with the
   WebGPU XR binding (`XRGPUBinding`), or an AR headset with the same; then a reticle placed on a real floor and a real
   table (viewer source) and by screen tap (transient source), one placement anchored, and the result recorded here.
+
+## Performance losses still open
+
+Measured but not fixed. Their history, sources and rerun commands are in
+[whitepaper/perf-history.md](whitepaper/perf-history.md#open-losses).
+
+- **three.js `InstancedMesh` beats Margo's instanced paths on static boxes.** In the diagnostic comparison
+  ([boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md)), 10k static boxes ran at 645 FPS with three.js WebGL2
+  `InstancedMesh` against 212 FPS (`createInstancedMesh`) and 270 FPS (`CulledInstances`). Neither Margo instanced
+  path uses core's back-face-culled pipeline. **Needed to close:** route instanced core geometry through the culled
+  pipeline, then a quiet-machine run against three.js.
+- **Moving `CulledInstances` costs one buffer write per part:** 187 ms CPU per frame for 10,000 moving boxes (same
+  diagnostic run). **Needed to close:** one upload per frame for all moved parts, then a re-measure.
+- **Galaxy S23 Ultra island demo at 3-5 FPS** (particles off does not help). Partial fixes have landed; no after number
+  exists. **Needed to close:** the device, then a measured run.
