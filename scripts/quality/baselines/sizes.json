@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3133301,
+  "total": 3133595,
   "history": [
     {
       "date": "2026-10-24",
@@ -116,6 +116,12 @@
       "commit": "dd9b0e14",
       "reason": "React stage 2a (item 17): kit re-exports the richer OrbitControls (every live prop, events, CAD profiles, keys); physics and xr share the new useCreated helper; the root shrinks now that physics is only on its subpath",
       "grew": 3
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "b4b8e8b2",
+      "reason": "React stage 2b (item 17): EffectComposer stacks effects through PostStack and adds GTAO, SSR, SSGI, MotionBlur, LensFlare, SMAA, FXAA, Glitch and Afterimage (each lazily imported)",
+      "grew": 1
     }
   ],
   "items": {
@@ -329,9 +335,9 @@
     "@margoengine/quality": 1879,
     "@margoengine/quality/warm": 1536,
     "@margoengine/react": 20237,
-    "@margoengine/react/kit": 11136,
+    "@margoengine/react/kit": 10785,
     "@margoengine/react/physics": 5204,
-    "@margoengine/react/post": 3125,
+    "@margoengine/react/post": 3770,
     "@margoengine/react/xr": 3429,
     "@margoengine/road": 1171,
     "@margoengine/scatter": 11893,

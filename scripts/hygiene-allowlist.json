@@ -196,6 +196,69 @@
         "shadows"
       ],
       "reason": "One thing, two forms: @margoengine/shadows's Shadows plugin and @margoengine/react's <Shadows> JSX component that turns on the Canvas shadows with the same options. Decision in docs/conventions.md."
+    },
+    "GTAO": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's GTAO pass and @margoengine/react's <GTAO> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "SSR": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's SSR pass and @margoengine/react's <SSR> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "SSGI": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's SSGI pass and @margoengine/react's <SSGI> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "MotionBlur": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's MotionBlur pass and @margoengine/react's <MotionBlur> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "LensFlare": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's LensFlare pass and @margoengine/react's <LensFlare> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "SMAA": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's SMAA pass and @margoengine/react's <SMAA> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "FXAA": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's FXAA pass and @margoengine/react's <FXAA> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "Glitch": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's Glitch pass and @margoengine/react's <Glitch> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "Afterimage": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's Afterimage pass and @margoengine/react's <Afterimage> JSX component that adds it with the same options. Decision in docs/conventions.md."
     }
   }
 }

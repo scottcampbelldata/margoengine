@@ -10,7 +10,7 @@ physics world, pointer lock or XR session. `sideEffects` remains `false`.
 | --- | --- | --- |
 | `@margoengine/react` | All bindings below, plus `MeshTransmissionMaterial` and `Animation` | Material uses `@margoengine/materials`/`gltf-pro`; animation uses `animation` and optionally `animator`; loaded-model events use `selection`. |
 | `@margoengine/react/kit` | `Gltf`, `Fbx`, `preload`, `Environment`, `Sky`, `ContactShadows`, `Center`, `OrbitControls`, `PointerLock`, `TransformControls`, `Html`, `Text`, `Box`, `Sphere`, `Plane` | Install the corresponding `@margoengine/gltf-pro`, `fbx`, `environment`, `sky`, `shadows`, `controls`, `gizmo`, `html`, `text` or `geometry` package. `Html` also uses `react-dom`. |
-| `@margoengine/react/post` | `EffectComposer`, `Bloom`, `SSAO`, `DepthOfField`, `Tonemap`, `TAA` | `@margoengine/post`, `dof`, `tonemap`, `taa`, according to the effects used |
+| `@margoengine/react/post` | `EffectComposer`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `DepthOfField`, `Tonemap`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `TAA` | `@margoengine/post`, `dof`, `tonemap`, `taa`, according to the effects used |
 | `@margoengine/react/physics` | `Physics`, `RigidBody`, `CuboidCollider`, `BallCollider`, `usePhysics` | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
 | `@margoengine/react/xr` | `XR`, `Controller`, `useXR` | `@margoengine/xr` |
 
@@ -123,10 +123,12 @@ resource failures in its alert.
 ## Post effects
 
 ```tsx
-import {EffectComposer, DepthOfField, Tonemap, TAA} from '@margoengine/react/post';
+import {EffectComposer, SSAO, DepthOfField, Bloom, Tonemap, TAA} from '@margoengine/react/post';
 
 <EffectComposer onError={console.error}>
+  <SSAO/>
   <DepthOfField focalDistance={5} aperture={2.8}/>
+  <Bloom strength={0.6}/>
   <Tonemap curve="agx" exposure={0.5}/>
   <TAA historyWeight={0.9}/>
 </EffectComposer>;
@@ -134,19 +136,19 @@ import {EffectComposer, DepthOfField, Tonemap, TAA} from '@margoengine/react/pos
 
 Effects require WebGPU and forward their native options. `onReady` receives the
 native effect. `EffectComposer enabled={false}` disposes its effects and can be
-re-enabled. Mutable options update the existing effect; changing Tonemap's fixed
-source reattaches that effect. `Tonemap` also accepts a native/string `lut`.
-SSAO and TAA register current and subsequently loaded models. DOF's HDR output
-automatically feeds Tonemap, and the selected capture effect's depth feeds TAA.
+re-enabled. Mutable options update the existing effect. `Tonemap` also accepts a native/string `lut`.
 
-The existing native effects impose capture limits: **Bloom, SSAO and
-DepthOfField are mutually exclusive**. Bloom already tone maps and cannot be
-combined with Tonemap. SSAO plus Tonemap requires an explicit HDR `source`.
-The three-effect Bloom/SSAO/DepthOfField example in the scene plan therefore
-cannot run with the current native APIs; the composer reports this before
-attaching effects. It does not bypass native ownership checks or claim that
-conflicting effects compose. TAA can accompany one capture effect, and
-DepthOfField + Tonemap is supported as shown above.
+One effect attaches on its own. Two or more share one HDR scene capture through
+`@margoengine/post`'s `PostStack`, in stack order whatever the JSX order: HDR effects
+(`SSAO` or `GTAO`, `SSGI`, `SSR`, `MotionBlur`, `DepthOfField`, `Bloom`, `LensFlare`,
+`Afterimage`), then `Tonemap`, then `SMAA` or `FXAA` and `Glitch`. So Bloom, SSAO and
+DepthOfField combine, with or without Tonemap. Adding or removing an effect rebuilds
+the stack. `TAA` attaches beside it and reads its depth. SSAO, GTAO, SSR, SSGI and
+TAA register current and later loaded models. `MotionBlur` reads the motion
+vectors of a `<TAA>` in the same composer unless given `velocity`. The composer
+reports, before attaching anything: SMAA with FXAA, SSAO with GTAO, a duplicate
+effect, and MotionBlur with neither TAA nor `velocity`. A lone Tonemap reads its
+`source` once, so changing it reattaches that effect.
 
 ## Physics
 

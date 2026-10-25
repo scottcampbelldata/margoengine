@@ -6,11 +6,51 @@ import type { SSAO as SSAOEffect, SSAOOptions } from '@margoengine/post/ssao';
 import type { DOF as DepthOfFieldEffect, DOFOptions } from '@margoengine/dof';
 import type { Tonemap as TonemapEffect, TonemapOptions, CubeLUT } from '@margoengine/tonemap';
 import type { TAA as TAAEffect, TAAOptions, VelocityPrimitive, VelocitySource } from '@margoengine/taa';
+import type { GTAO as GTAOEffect, GTAOOptions } from '@margoengine/post/gtao';
+import type { SSR as SSREffect, SSROptions } from '@margoengine/post/ssr';
+import type { SSGI as SSGIEffect, SSGIOptions } from '@margoengine/post/ssgi';
+import type { MotionBlur as MotionBlurEffect, MotionBlurOptions } from '@margoengine/post/motion-blur';
+import type { LensFlare as LensFlareEffect, LensFlareOptions } from '@margoengine/post/lens-flare';
+import type { SMAA as SMAAEffect, SMAAOptions } from '@margoengine/post/smaa';
+import type { FXAA as FXAAEffect } from '@margoengine/post/fxaa';
+import type { Glitch as GlitchEffect, GlitchOptions } from '@margoengine/post/glitch';
+import type { Afterimage as AfterimageEffect, AfterimageOptions } from '@margoengine/post/afterimage';
+import type { PostStack } from '@margoengine/post/stack';
 import { useScene, useCommit, useResourceEffect, type Scene } from './internal.js';
 import { optionalPeer } from './optional.js';
 
-type Kind = 'bloom' | 'ssao' | 'dof' | 'tonemap' | 'taa';
-type Effect = BloomEffect | SSAOEffect | DepthOfFieldEffect | TonemapEffect | TAAEffect;
+// Stack order: HDR effects, the display effect, then LDR effects (PostStack's rule); TAA attaches on its own, last.
+const order = [
+  'ssao',
+  'gtao',
+  'ssgi',
+  'ssr',
+  'motionBlur',
+  'dof',
+  'bloom',
+  'lensFlare',
+  'afterimage',
+  'tonemap',
+  'smaa',
+  'fxaa',
+  'glitch',
+  'taa',
+] as const;
+type Kind = (typeof order)[number];
+type Effect =
+  | BloomEffect
+  | SSAOEffect
+  | DepthOfFieldEffect
+  | TonemapEffect
+  | TAAEffect
+  | SSREffect
+  | SSGIEffect
+  | MotionBlurEffect
+  | LensFlareEffect
+  | SMAAEffect
+  | FXAAEffect
+  | GlitchEffect
+  | AfterimageEffect;
 type Options = Record<string, unknown>;
 interface Callbacks<T> {
   onReady?: (effect: T) => void;
@@ -28,6 +68,24 @@ export interface TonemapProps extends TonemapOptions, Callbacks<TonemapEffect> {
   lut?: CubeLUT | string | null;
 }
 export interface TAAProps extends TAAOptions, Callbacks<TAAEffect> {}
+/** Props of `<GTAO>`: ground-truth ambient occlusion, SSAO's options plus GTAO's own. */
+export interface GTAOProps extends GTAOOptions, Callbacks<GTAOEffect> {}
+/** Props of `<SSR>`: screen-space reflections on the Canvas's PBR models. */
+export interface SSRProps extends SSROptions, Callbacks<SSREffect> {}
+/** Props of `<SSGI>`: screen-space indirect light on the Canvas's PBR models. */
+export interface SSGIProps extends SSGIOptions, Callbacks<SSGIEffect> {}
+/** Props of `<MotionBlur>`. `velocity` defaults to the motion vectors of a `<TAA>` in the same composer. */
+export interface MotionBlurProps extends Partial<MotionBlurOptions>, Callbacks<MotionBlurEffect> {}
+/** Props of `<LensFlare>`. */
+export interface LensFlareProps extends LensFlareOptions, Callbacks<LensFlareEffect> {}
+/** Props of `<SMAA>`: morphological anti-aliasing (one of SMAA or FXAA per composer). */
+export interface SMAAProps extends SMAAOptions, Callbacks<SMAAEffect> {}
+/** Props of `<FXAA>`: fast approximate anti-aliasing (one of SMAA or FXAA per composer). */
+export interface FXAAProps extends Callbacks<FXAAEffect> {}
+/** Props of `<Glitch>`. */
+export interface GlitchProps extends GlitchOptions, Callbacks<GlitchEffect> {}
+/** Props of `<Afterimage>`: frames fade into the next. */
+export interface AfterimageProps extends AfterimageOptions, Callbacks<AfterimageEffect> {}
 interface Pass {
   kind: Kind;
   options: Options;
@@ -52,13 +110,20 @@ interface RecordEntry {
   options: Options;
   lut?: CubeLUT | string | null;
   sources: Map<Model, SourceBinding>;
+  /** Owned by the composer's PostStack, which detaches it. */
+  stacked?: boolean;
 }
 interface Lease {
   active: boolean;
   closed: boolean;
 }
-type Factory = (engine: EngineKernel, options: never) => Effect;
-const priority: Record<Kind, number> = { bloom: 0, ssao: 0, dof: 0, tonemap: 1, taa: 2 };
+interface EffectClass {
+  new (options: never): Effect;
+  attach(engine: EngineKernel, options: never): Effect;
+}
+const priority = Object.fromEntries(order.map((kind, index) => [kind, index])) as Record<Kind, number>;
+// Effects that add each PBR model as a source.
+const modelKinds = new Set<Kind>(['ssao', 'gtao', 'ssr', 'ssgi', 'taa']);
 declare const GPUBufferUsage: { VERTEX: number; STORAGE: number; COPY_DST: number };
 
 // Native static glTF vertex buffers are VERTEX-only. TAA's snapshot compute
@@ -162,30 +227,52 @@ function velocitySource(scene: Scene, model: Model) {
   };
 }
 
-async function factory(kind: Kind): Promise<Factory> {
+// Each import is a literal, so a bundle includes only the effects an app's components reach.
+async function effectClass(kind: Kind): Promise<EffectClass> {
+  const peer = <T,>(name: string, load: () => Promise<T>) => optionalPeer(name, load);
   switch (kind) {
     case 'bloom':
-      return (await optionalPeer('@margoengine/post/bloom', () => import('@margoengine/post/bloom'))).Bloom.attach;
+      return (await peer('@margoengine/post/bloom', () => import('@margoengine/post/bloom'))).Bloom;
     case 'ssao':
-      return (await optionalPeer('@margoengine/post/ssao', () => import('@margoengine/post/ssao'))).SSAO.attach;
+      return (await peer('@margoengine/post/ssao', () => import('@margoengine/post/ssao'))).SSAO;
+    case 'gtao':
+      return (await peer('@margoengine/post/gtao', () => import('@margoengine/post/gtao'))).GTAO;
+    case 'ssr':
+      return (await peer('@margoengine/post/ssr', () => import('@margoengine/post/ssr'))).SSR;
+    case 'ssgi':
+      return (await peer('@margoengine/post/ssgi', () => import('@margoengine/post/ssgi'))).SSGI;
+    case 'motionBlur':
+      return (await peer('@margoengine/post/motion-blur', () => import('@margoengine/post/motion-blur'))).MotionBlur;
+    case 'lensFlare':
+      return (await peer('@margoengine/post/lens-flare', () => import('@margoengine/post/lens-flare'))).LensFlare;
+    case 'smaa':
+      return (await peer('@margoengine/post/smaa', () => import('@margoengine/post/smaa'))).SMAA;
+    case 'fxaa':
+      return (await peer('@margoengine/post/fxaa', () => import('@margoengine/post/fxaa'))).FXAA as never;
+    case 'glitch':
+      return (await peer('@margoengine/post/glitch', () => import('@margoengine/post/glitch'))).Glitch;
+    case 'afterimage':
+      return (await peer('@margoengine/post/afterimage', () => import('@margoengine/post/afterimage'))).Afterimage;
     case 'dof':
-      return (await optionalPeer('@margoengine/dof', () => import('@margoengine/dof'))).DOF.attach;
+      return (await peer('@margoengine/dof', () => import('@margoengine/dof'))).DOF;
     case 'tonemap':
-      return (await optionalPeer('@margoengine/tonemap', () => import('@margoengine/tonemap'))).Tonemap.attach;
+      return (await peer('@margoengine/tonemap', () => import('@margoengine/tonemap'))).Tonemap;
     case 'taa':
-      return (await optionalPeer('@margoengine/taa', () => import('@margoengine/taa'))).TAA.attach;
+      return (await peer('@margoengine/taa', () => import('@margoengine/taa'))).TAA;
   }
 }
 
-// Each engine plugin keeps its existing frame-graph ownership. This is a lifecycle
-// coordinator; combinations rejected by the native plugins remain unsupported.
+// A lifecycle coordinator over the native plugins. One effect (plus TAA) attaches on its own; two or more share one
+// HDR scene capture through a PostStack, in stack order, so any combination works (one display effect, one of SMAA
+// and FXAA). A change in which effects are present rebuilds the stack; option changes update the live effects.
 function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
   const passes = new Set<Pass>(),
     records = new Map<Kind, RecordEntry>();
   let lease: Lease | undefined,
     revision = 0,
     scheduled = false,
-    queue = Promise.resolve();
+    queue = Promise.resolve(),
+    stack: { key: string; plugin: PostStack } | null = null;
   const live = (current = lease) =>
     !!current && current === lease && current.active && !current.closed && !scene.engine.disposed;
   const report = (failure: unknown, pass?: Pass) => {
@@ -198,19 +285,32 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     record.sources.clear();
     record.effect.dispose();
   };
+  // The stack detaches its effects first; their own dispose then frees what they hold.
+  const clearStack = () => {
+    if (!stack) return;
+    stack.plugin.dispose();
+    stack = null;
+    for (const [kind, record] of [...records].reverse())
+      if (record.stacked) {
+        dispose(record);
+        records.delete(kind);
+      }
+  };
   const clear = () => {
+    clearStack();
     for (const record of [...records.values()].reverse()) dispose(record);
     records.clear();
   };
   const depth = () => {
+    if (stack) return stack.plugin.depthTexture;
     const record = records.get('dof') ?? records.get('ssao') ?? records.get('bloom');
     return record ? (record.effect as DepthOfFieldEffect | SSAOEffect | BloomEffect).depthTexture : undefined;
   };
-  const source = () => (records.get('dof')?.effect as DepthOfFieldEffect | undefined)?.outputTexture;
+  const velocity = () => (records.get('taa')?.effect as TAAEffect | undefined)?.velocity;
   const syncSources = () => {
     if (!live()) return;
     for (const [kind, record] of records) {
-      if (kind !== 'ssao' && kind !== 'taa') continue;
+      if (!modelKinds.has(kind)) continue;
       for (const [model, binding] of record.sources)
         if (!scene.resources.models.has(model) || model.disposed) {
           binding.remove();
@@ -218,7 +318,10 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
         } else binding.refresh?.();
       for (const model of scene.resources.models)
         if (!model.disposed && !record.sources.has(model)) {
-          if (kind === 'ssao') record.sources.set(model, { remove: (record.effect as SSAOEffect).add(model) });
+          if (kind !== 'taa')
+            record.sources.set(model, {
+              remove: (record.effect as SSAOEffect | SSREffect | SSGIEffect).add(model as never),
+            });
           else {
             const adapter = velocitySource(scene, model);
             try {
@@ -244,14 +347,36 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
       if (kinds.has(pass.kind)) throw new Error('EffectComposer cannot attach duplicate ' + pass.kind + ' passes');
       kinds.add(pass.kind);
     }
-    if (['bloom', 'ssao', 'dof'].filter((kind) => kinds.has(kind as Kind)).length > 1)
-      throw new Error(
-        'EffectComposer: Bloom, SSAO and DepthOfField own scene capture and cannot be combined; choose one capture effect',
-      );
-    if (kinds.has('bloom') && kinds.has('tonemap'))
-      throw new Error('EffectComposer: Bloom already owns tone mapping and cannot be combined with Tonemap');
-    if (kinds.has('ssao') && desired.some((pass) => pass.kind === 'tonemap' && !pass.options.source))
-      throw new Error('EffectComposer: Tonemap with SSAO requires an explicit HDR source');
+    if (kinds.has('smaa') && kinds.has('fxaa'))
+      throw new TypeError('EffectComposer takes one anti-aliasing effect; keep <SMAA> or <FXAA>, not both');
+    if (kinds.has('ssao') && kinds.has('gtao'))
+      throw new TypeError('EffectComposer takes one ambient occlusion effect; keep <SSAO> or <GTAO>, not both');
+    if (desired.some((pass) => pass.kind === 'motionBlur' && !pass.options.velocity) && !kinds.has('taa'))
+      throw new TypeError('MotionBlur reads TAA motion vectors; add <TAA> to the same EffectComposer or pass velocity');
+  };
+  const update = (record: RecordEntry, pass: Pass, options: Options) => {
+    record.pass = pass;
+    const changed = Object.keys({ ...record.options, ...options }).some((key) => record.options[key] !== options[key]);
+    if (changed) {
+      // FXAA has no options, so FXAA props never change here.
+      const target = (record.effect as unknown as { options: Options }).options;
+      for (const key of Object.keys(target)) if (!(key in options)) delete target[key];
+      Object.assign(target, options);
+      record.options = options;
+      if (pass.kind === 'taa') (record.effect as TAAEffect).reset();
+    }
+    if (pass.kind === 'tonemap' && record.lut !== pass.lut) {
+      (record.effect as TonemapEffect).setLUT(pass.lut ?? null);
+      record.lut = pass.lut;
+    }
+  };
+  const created = (record: RecordEntry) => {
+    records.set(record.pass.kind, record);
+    if (record.pass.kind === 'tonemap' && record.pass.lut !== undefined) {
+      (record.effect as TonemapEffect).setLUT(record.pass.lut);
+      record.lut = record.pass.lut;
+    }
+    record.pass.onReady?.(record.effect);
   };
   const reconcile = async (version: number) => {
     const current = lease;
@@ -262,66 +387,75 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
       if (desired.length && (scene.engine.backend !== 'webgpu' || !scene.engine.gpu))
         throw new Error('EffectComposer requires WebGPU');
       validate(desired);
-      const imports = await Promise.all(
-        desired.map(async (pass) => {
-          try {
-            return [pass.kind, await factory(pass.kind)] as const;
-          } catch (failure) {
-            throw new PassLoadFailure(pass, failure);
-          }
-        }),
-      );
+      const effects = desired.filter((pass) => pass.kind !== 'taa'),
+        stacked = effects.length > 1;
+      const [imports, Stack] = await Promise.all([
+        Promise.all(
+          desired.map(async (pass) => {
+            try {
+              return [pass.kind, await effectClass(pass.kind)] as const;
+            } catch (failure) {
+              throw new PassLoadFailure(pass, failure);
+            }
+          }),
+        ),
+        stacked
+          ? optionalPeer('@margoengine/post/stack', () => import('@margoengine/post/stack')).then(
+              (api) => api.PostStack,
+            )
+          : null,
+      ]);
       if (!live(current) || version !== revision) return;
-      const factories = new Map(imports),
+      const classes = new Map(imports),
         kinds = new Set(desired.map((pass) => pass.kind));
       const optionsFor = (pass: Pass): Options => ({
         ...pass.options,
-        ...(pass.kind === 'tonemap' && !pass.options.source && kinds.has('dof') ? { source } : {}),
-        ...(pass.kind === 'taa' &&
-        !pass.options.depth &&
-        ['dof', 'ssao', 'bloom'].some((kind) => kinds.has(kind as Kind))
-          ? { depth }
-          : {}),
+        ...(pass.kind === 'taa' && !pass.options.depth && kinds.size > 1 ? { depth } : {}),
+        ...(pass.kind === 'motionBlur' && !pass.options.velocity ? { velocity } : {}),
       });
+      // Effects whose stack (or lack of one) no longer matches go first; TAA is kept unless its pass changed.
+      const key = stacked ? effects.map((pass) => pass.kind).join() : '';
+      if (stack && (stack.key !== key || effects.some((pass) => records.get(pass.kind)?.pass !== pass))) clearStack();
       for (const [kind, record] of [...records].reverse()) {
         const next = desired.find((pass) => pass.kind === kind);
-        if (
-          !next ||
-          next !== record.pass ||
-          (kind === 'tonemap' && record.options.source !== optionsFor(next).source)
-        ) {
+        // Tonemap reads `source` once, when it is created.
+        const source = kind === 'tonemap' && next && record.options.source !== optionsFor(next).source;
+        if (!record.stacked && (!next || next !== record.pass || source || (stacked && kind !== 'taa'))) {
           dispose(record);
           records.delete(kind);
         }
       }
+      if (stacked && !stack) {
+        const made: RecordEntry[] = [];
+        try {
+          for (const pass of effects) {
+            attaching = pass;
+            const options = optionsFor(pass),
+              Effect = classes.get(pass.kind)!;
+            made.push({ pass, effect: new Effect(options as never), options, sources: new Map(), stacked: true });
+          }
+          attaching = undefined;
+          stack = {
+            key,
+            plugin: Stack!.attach(
+              scene.engine as unknown as EngineKernel,
+              made.map((r) => r.effect),
+            ),
+          };
+        } catch (failure) {
+          for (const record of made) record.effect.dispose();
+          throw failure;
+        }
+        for (const record of made) created(record);
+      }
       for (const pass of desired) {
         attaching = pass;
-        const options = optionsFor(pass);
-        let record = records.get(pass.kind);
-        if (!record) {
-          const effect = factories.get(pass.kind)!(scene.engine as unknown as EngineKernel, options as never);
-          record = { pass, effect, options, lut: undefined, sources: new Map() };
-          records.set(pass.kind, record);
-          if (pass.kind === 'tonemap' && pass.lut !== undefined) {
-            (effect as TonemapEffect).setLUT(pass.lut);
-            record.lut = pass.lut;
-          }
-          pass.onReady?.(effect);
-        } else {
-          const changed = Object.keys({ ...record.options, ...options }).some(
-            (key) => record!.options[key] !== options[key],
-          );
-          if (changed) {
-            const target = record.effect.options as Options;
-            for (const key of Object.keys(target)) if (!(key in options)) delete target[key];
-            Object.assign(target, options);
-            record.options = options;
-            if (pass.kind === 'taa') (record.effect as TAAEffect).reset();
-          }
-          if (pass.kind === 'tonemap' && record.lut !== pass.lut) {
-            (record.effect as TonemapEffect).setLUT(pass.lut ?? null);
-            record.lut = pass.lut;
-          }
+        const options = optionsFor(pass),
+          record = records.get(pass.kind);
+        if (record) update(record, pass, options);
+        else {
+          const effect = classes.get(pass.kind)!.attach(scene.engine as unknown as EngineKernel, options as never);
+          created({ pass, effect, options, sources: new Map() });
         }
       }
       syncSources();
@@ -418,5 +552,50 @@ export function Tonemap({ onReady, onError, lut, ...options }: TonemapProps) {
 }
 export function TAA({ onReady, onError, ...options }: TAAProps) {
   usePass('taa', options, { onReady, onError });
+  return null;
+}
+/** Ground-truth ambient occlusion: SSAO's options plus GTAO's own. Use it or `<SSAO>`, not both. */
+export function GTAO({ onReady, onError, ...options }: GTAOProps) {
+  usePass('gtao', options, { onReady, onError });
+  return null;
+}
+/** Screen-space reflections on the Canvas's PBR models (`Model`, `Gltf`). */
+export function SSR({ onReady, onError, ...options }: SSRProps) {
+  usePass('ssr', options, { onReady, onError });
+  return null;
+}
+/** Screen-space indirect light (one bounce) on the Canvas's PBR models. */
+export function SSGI({ onReady, onError, ...options }: SSGIProps) {
+  usePass('ssgi', options, { onReady, onError });
+  return null;
+}
+/** Motion blur from per-pixel motion vectors: by default those of a `<TAA>` in the same composer. */
+export function MotionBlur({ onReady, onError, ...options }: MotionBlurProps) {
+  usePass('motionBlur', options, { onReady, onError });
+  return null;
+}
+/** Lens flare from the sun and bright lights. */
+export function LensFlare({ onReady, onError, ...options }: LensFlareProps) {
+  usePass('lensFlare', options, { onReady, onError });
+  return null;
+}
+/** Morphological anti-aliasing on the final image. */
+export function SMAA({ onReady, onError, ...options }: SMAAProps) {
+  usePass('smaa', options, { onReady, onError });
+  return null;
+}
+/** Fast approximate anti-aliasing on the final image. */
+export function FXAA({ onReady, onError }: FXAAProps) {
+  usePass('fxaa', {}, { onReady, onError });
+  return null;
+}
+/** Digital glitch on the final image. */
+export function Glitch({ onReady, onError, ...options }: GlitchProps) {
+  usePass('glitch', options, { onReady, onError });
+  return null;
+}
+/** Afterimage: each frame fades into the next. */
+export function Afterimage({ onReady, onError, ...options }: AfterimageProps) {
+  usePass('afterimage', options, { onReady, onError });
   return null;
 }

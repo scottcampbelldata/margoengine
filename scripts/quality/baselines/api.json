@@ -1,7 +1,7 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 1835,
+  "total": 1830,
   "history": [
     {
       "date": "2026-10-24",
@@ -72,13 +72,13 @@
     "bare-error packages/physics/src/joints.ts": 1,
     "bare-error packages/physics/src/physics.ts": 13,
     "bare-error packages/react/src/animation.tsx": 3,
-    "bare-error packages/react/src/components.tsx": 3,
+    "bare-error packages/react/src/components.tsx": 2,
     "bare-error packages/react/src/internal.ts": 2,
     "bare-error packages/react/src/kit-contact.ts": 1,
     "bare-error packages/react/src/kit-helpers.tsx": 1,
     "bare-error packages/react/src/materials.tsx": 1,
     "bare-error packages/react/src/physics.tsx": 8,
-    "bare-error packages/react/src/post.tsx": 7,
+    "bare-error packages/react/src/post.tsx": 4,
     "bare-error packages/react/src/xr.tsx": 2,
     "bare-error packages/selection/src/index.ts": 3,
     "bare-error packages/selection/src/picking-primitives.ts": 9,
@@ -302,7 +302,7 @@
     "no-fix packages/react/src/kit-helpers.tsx": 3,
     "no-fix packages/react/src/model.tsx": 2,
     "no-fix packages/react/src/physics.tsx": 1,
-    "no-fix packages/react/src/post.tsx": 2,
+    "no-fix packages/react/src/post.tsx": 1,
     "no-fix packages/road/src/index.ts": 3,
     "no-fix packages/scatter/src/candidates.ts": 4,
     "no-fix packages/scatter/src/index.ts": 4,

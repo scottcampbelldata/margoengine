@@ -7,7 +7,7 @@ import { ArcballControls, ArcballProjection, ControlEvent, MapControls, Navigati
 import { EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, Vec3 } from "@margoengine/core";
 import { DOF, DOFOptions } from "@margoengine/dof";
 import { TransmissionOptions } from "@margoengine/materials";
-import { Bloom, BloomOptions, SSAO, SSAOOptions } from "@margoengine/post";
+import { Afterimage, AfterimageOptions, Bloom, BloomOptions, FXAA, GTAO, GTAOOptions, Glitch, GlitchOptions, LensFlare, LensFlareOptions, MotionBlur, MotionBlurOptions, SMAA, SMAAOptions, SSAO, SSAOOptions, SSGI, SSGIOptions, SSR, SSROptions } from "@margoengine/post";
 import { ShadowOptions } from "@margoengine/shadows";
 import { Sky, SkyOptions } from "@margoengine/sky";
 import { Stage } from "@margoengine/stage";
@@ -16,6 +16,11 @@ import { Text, TextOptions } from "@margoengine/text";
 import { CubeLUT, Tonemap, TonemapOptions } from "@margoengine/tonemap";
 import { XR } from "@margoengine/xr";
 import { CSSProperties, ReactNode, RefObject } from "react";
+
+export function Afterimage({ onReady, onError, ...options }: AfterimageProps): null;
+
+export interface AfterimageProps extends AfterimageOptions, Callbacks<AfterimageEffect> {
+}
 
 export function Animation(props: AnimationProps): null;
 
@@ -141,13 +146,28 @@ export interface EnvironmentProps {
     onError?: (error: unknown) => void;
 }
 
+export function FXAA({ onReady, onError }: FXAAProps): null;
+
+export interface FXAAProps extends Callbacks<FXAAEffect> {
+}
+
 export function Fbx(props: FbxProps): import("react").JSX.Element;
 
 export type FbxProps = ModelProps;
 
+export function GTAO({ onReady, onError, ...options }: GTAOProps): null;
+
+export interface GTAOProps extends GTAOOptions, Callbacks<GTAOEffect> {
+}
+
 export function GeometryResource({ geometry }: {
     geometry: Geometry;
 }): null;
+
+export function Glitch({ onReady, onError, ...options }: GlitchProps): null;
+
+export interface GlitchProps extends GlitchOptions, Callbacks<GlitchEffect> {
+}
 
 export { Model as Gltf };
 function Model(props: ModelProps): import("react").JSX.Element;
@@ -180,6 +200,11 @@ export interface HtmlProps {
     style?: CSSProperties;
     occlude?: boolean;
     onError?: (error: unknown) => void;
+}
+
+export function LensFlare({ onReady, onError, ...options }: LensFlareProps): null;
+
+export interface LensFlareProps extends LensFlareOptions, Callbacks<LensFlareEffect> {
 }
 
 export interface LoadProgress {
@@ -277,6 +302,11 @@ export interface ModelProps extends PointerHandlers {
     onError?: (error: unknown) => void;
 }
 
+export function MotionBlur({ onReady, onError, ...options }: MotionBlurProps): null;
+
+export interface MotionBlurProps extends Partial<MotionBlurOptions>, Callbacks<MotionBlurEffect> {
+}
+
 export const OrbitControls: import("react").ForwardRefExoticComponent<OrbitControlsProps & import("react").RefAttributes<OrbitInstance>>;
 
 export interface OrbitControlsProps extends ControlEventProps {
@@ -342,9 +372,24 @@ export interface PointerLockProps extends ErrorProps {
 
 export type ProfileName = keyof typeof PROFILES;
 
+export function SMAA({ onReady, onError, ...options }: SMAAProps): null;
+
+export interface SMAAProps extends SMAAOptions, Callbacks<SMAAEffect> {
+}
+
 export function SSAO({ onReady, onError, ...options }: SSAOProps): null;
 
 export interface SSAOProps extends SSAOOptions, Callbacks<SSAOEffect> {
+}
+
+export function SSGI({ onReady, onError, ...options }: SSGIProps): null;
+
+export interface SSGIProps extends SSGIOptions, Callbacks<SSGIEffect> {
+}
+
+export function SSR({ onReady, onError, ...options }: SSRProps): null;
+
+export interface SSRProps extends SSROptions, Callbacks<SSREffect> {
 }
 
 export function Shadows(props: ShadowsProps): null;

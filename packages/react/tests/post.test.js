@@ -83,14 +83,15 @@ function model(count = 0) {
     },
   };
 }
+// The natives' shape: `new X(options)` validates and builds an unattached effect (what a PostStack takes), and
+// `X.attach(engine, options)` builds and attaches one.
 function implementation(name, Native) {
   return class Plugin {
-    static attach(engine, options) {
+    constructor(options = {}) {
       new Native(options);
-      const effect = new Plugin();
-      Object.assign(effect, {
+      Object.assign(this, {
         name,
-        engine,
+        engine: null,
         options,
         sources: new Set(),
         disposals: 0,
@@ -98,8 +99,13 @@ function implementation(name, Native) {
         luts: [],
         depthTexture: { name: name + ' depth' },
         outputTexture: { name: name + ' output' },
+        velocity: name === 'taa' ? { texture: { name: 'taa velocity' } } : undefined,
       });
-      effects.push(effect);
+      effects.push(this);
+    }
+    static attach(engine, options = {}) {
+      const effect = new Plugin(options);
+      effect.engine = engine;
       engine.use(effect);
       return effect;
     }
@@ -119,9 +125,50 @@ function implementation(name, Native) {
       if (this.disposals) return;
       this.disposals++;
       this.sources.clear();
-      this.engine.removePlugin(this.name);
+      if (this.engine?.hasPlugin(this.name)) this.engine.removePlugin(this.name);
     }
   };
+}
+// PostStack's lifecycle: it attaches its effects in order and detaches them on dispose.
+const stacks = [];
+class PostStack {
+  static attach(engine, list) {
+    const stack = Object.assign(new PostStack(), {
+      name: 'post:stack',
+      engine,
+      effects: list,
+      disposals: 0,
+      depthTexture: { name: 'stack depth' },
+    });
+    engine.use(stack);
+    for (const effect of list) {
+      effect.engine = engine;
+      engine.use(effect);
+    }
+    stacks.push(stack);
+    return stack;
+  }
+  dispose() {
+    if (this.disposals) return;
+    this.disposals++;
+    this.engine.removePlugin(this.name);
+    for (const effect of this.effects) if (this.engine.hasPlugin(effect.name)) this.engine.removePlugin(effect.name);
+  }
+}
+mock.module('@margoengine/post/stack', { namedExports: { PostStack } });
+for (const [file, name, kind] of [
+  ['gtao', 'GTAO', 'gtao'],
+  ['ssr', 'SSR', 'ssr'],
+  ['ssgi', 'SSGI', 'ssgi'],
+  ['motion-blur', 'MotionBlur', 'motion-blur'],
+  ['lens-flare', 'LensFlare', 'lens-flare'],
+  ['smaa', 'SMAA', 'smaa'],
+  ['fxaa', 'FXAA', 'fxaa'],
+  ['glitch', 'Glitch', 'glitch'],
+  ['afterimage', 'Afterimage', 'afterimage'],
+]) {
+  const Native = (await import(`../../post/dist/${file}.js`))[name];
+  mock.module(`@margoengine/post/${file}`, { namedExports: { [name]: implementation(kind, Native) } });
 }
 mock.module('@margoengine/post/bloom', { namedExports: { Bloom: implementation('bloom', NativeBloom) } });
 mock.module('@margoengine/post/ssao', { namedExports: { SSAO: implementation('ssao', NativeSSAO) } });
@@ -133,7 +180,8 @@ for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'na
   Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { Context } = await import('../dist/internal.js');
-const { EffectComposer, Bloom, SSAO, DepthOfField, Tonemap, TAA } = await import('../dist/post.js');
+const { EffectComposer, Bloom, SSAO, DepthOfField, Tonemap, TAA, GTAO, SSR, MotionBlur, SMAA, FXAA, Glitch } =
+  await import('../dist/post.js');
 const { render, act, cleanup } = await import('@testing-library/react');
 const flush = () => act(async () => {});
 const h = React.createElement;
@@ -188,13 +236,42 @@ afterEach(async () => {
   );
 });
 
-test('post subpath has only its six runtime exports and isolates dynamic optional imports', async () => {
+test('post subpath has only its effect components and isolates dynamic optional imports', async () => {
   const api = await import('../dist/post.js');
-  assert.deepEqual(Object.keys(api).sort(), ['Bloom', 'DepthOfField', 'EffectComposer', 'SSAO', 'TAA', 'Tonemap']);
+  assert.deepEqual(
+    Object.keys(api).sort(),
+    [
+      'Afterimage',
+      'Bloom',
+      'DepthOfField',
+      'EffectComposer',
+      'FXAA',
+      'GTAO',
+      'Glitch',
+      'LensFlare',
+      'MotionBlur',
+      'SMAA',
+      'SSAO',
+      'SSGI',
+      'SSR',
+      'TAA',
+      'Tonemap',
+    ].sort(),
+  );
   const source = await readFile(new URL('../dist/post.js', import.meta.url), 'utf8');
   for (const name of [
     '@margoengine/post/bloom',
     '@margoengine/post/ssao',
+    '@margoengine/post/gtao',
+    '@margoengine/post/ssr',
+    '@margoengine/post/ssgi',
+    '@margoengine/post/motion-blur',
+    '@margoengine/post/lens-flare',
+    '@margoengine/post/smaa',
+    '@margoengine/post/fxaa',
+    '@margoengine/post/glitch',
+    '@margoengine/post/afterimage',
+    '@margoengine/post/stack',
     '@margoengine/dof',
     '@margoengine/tonemap',
     '@margoengine/taa',
@@ -239,7 +316,7 @@ test('StrictMode creates one Bloom, updates native options in place, and dispose
   assert.equal(value.engine.plugins.size, 0);
 });
 
-test('DOF and Tonemap attach in dependency order, share HDR, update LUT, and TAA gets current depth', async () => {
+test('DOF and Tonemap share one PostStack in stack order, update the LUT, and TAA gets the stack depth', async () => {
   const value = scene(),
     before = effects.length,
     lut = { data: new Float32Array(1) };
@@ -250,10 +327,12 @@ test('DOF and Tonemap attach in dependency order, share HDR, update LUT, and TAA
   ];
   const view = render(tree(value, child(8, 1, lut, 0.8)));
   await flush();
-  const [dof, tone, taa] = effects.slice(before);
+  const [dof, tone, taa] = effects.slice(before),
+    stack = stacks.at(-1);
   assert.deepEqual([dof.name, tone.name, taa.name], ['dof', 'tonemap', 'taa']);
-  assert.equal(tone.options.source(), dof.outputTexture);
-  assert.equal(taa.options.depth(), dof.depthTexture);
+  assert.deepEqual(stack.effects, [dof, tone], 'HDR before display, TAA outside the stack');
+  assert.equal(value.engine.plugins.get('post:stack'), stack);
+  assert.equal(taa.options.depth(), stack.depthTexture);
   assert.deepEqual(tone.luts, [lut]);
   view.rerender(tree(value, child(12, 2, null, 0.7)));
   await flush();
@@ -266,7 +345,7 @@ test('DOF and Tonemap attach in dependency order, share HDR, update LUT, and TAA
   assert.deepEqual(value.errors, []);
 });
 
-test('Tonemap reattaches when its fixed source changes and when automatic DOF capture is removed', async () => {
+test('a lone Tonemap reattaches when its fixed source changes; a second effect moves both into a stack and back', async () => {
   const value = scene(),
     sourceA = () => ({ a: true }),
     sourceB = () => ({ b: true });
@@ -281,11 +360,20 @@ test('Tonemap reattaches when its fixed source changes and when automatic DOF ca
   assert.equal(second.options.source, sourceB);
   view.rerender(tree(value, [h(DepthOfField, { key: 'dof' }), h(Tonemap, { key: 'tone' })]));
   await flush();
-  const third = value.engine.plugins.get('tonemap');
-  assert.equal(third.options.source(), value.engine.plugins.get('dof').outputTexture);
+  const stack = value.engine.plugins.get('post:stack'),
+    third = value.engine.plugins.get('tonemap');
+  assert.ok(stack, 'two effects share a PostStack');
+  assert.equal(second.disposals, 1, 'the lone Tonemap made way for the stacked one');
+  assert.deepEqual(stack.effects, [value.engine.plugins.get('dof'), third]);
+  view.rerender(tree(value, [h(DepthOfField, { key: 'dof', focalDistance: 4 }), h(Tonemap, { key: 'tone' })]));
+  await flush();
+  assert.equal(value.engine.plugins.get('post:stack'), stack, 'an option change keeps the stack');
+  assert.equal(stack.effects[0].options.focalDistance, 4);
   view.rerender(tree(value, [h(Tonemap, { key: 'tone' })]));
   await flush();
   const fourth = value.engine.plugins.get('tonemap');
+  assert.equal(stack.disposals, 1, 'one effect left: the stack goes');
+  assert.equal(value.engine.plugins.has('post:stack'), false);
   assert.notEqual(fourth, third);
   assert.equal(third.disposals, 1);
   assert.equal(fourth.options.source, undefined);
@@ -483,38 +571,48 @@ test('TAA adapter cleans partial upload failures and refuses stale CPU data for 
   assert.match(second.errors[0].message, /storage-capable deformed buffer/);
 });
 
-test('the native capture ownership restrictions reject the documented conflicting pass combination before attachment', async () => {
+test('any combination of capture effects stacks: SSAO, DOF, Bloom, Tonemap, SSR, MotionBlur, SMAA and Glitch', async () => {
   const value = scene(),
     errors = [],
-    before = effects.length;
+    first = model();
+  value.resources.models.add(first);
   render(
-    tree(value, [h(Bloom, { key: 'b' }), h(SSAO, { key: 's' }), h(DepthOfField, { key: 'd' })], {
-      onError: (error) => errors.push(error),
-    }),
+    tree(
+      value,
+      [
+        h(Glitch, { key: 'g' }),
+        h(SMAA, { key: 'a' }),
+        h(Tonemap, { key: 't' }),
+        h(Bloom, { key: 'b' }),
+        h(DepthOfField, { key: 'd' }),
+        h(MotionBlur, { key: 'm' }),
+        h(SSR, { key: 'r' }),
+        h(SSAO, { key: 's' }),
+        h(TAA, { key: 'taa' }),
+      ],
+      { onError: (error) => errors.push(error) },
+    ),
   );
   await flush();
-  assert.equal(effects.length, before);
-  assert.equal(errors.length, 1);
-  assert.match(errors[0].message, /own scene capture/);
-  assert.equal(value.errors.length, 0);
-  assert.throws(
-    () => new NativeBloom().setup({ gpu: {}, hasPlugin: (name) => name === 'ssao' }),
-    /owns the output target/,
+  assert.deepEqual(errors, []);
+  const stack = value.engine.plugins.get('post:stack');
+  assert.deepEqual(
+    stack.effects.map((effect) => effect.name),
+    ['ssao', 'ssr', 'motion-blur', 'dof', 'bloom', 'tonemap', 'smaa', 'glitch'],
+    'HDR effects, the display effect, then LDR effects',
   );
-  assert.throws(
-    () => new NativeSSAO().setup({ gpu: {}, hasPlugin: (name) => name === 'bloom' }),
-    /owns the output target/,
-  );
-  assert.throws(() => new NativeDOF().setup({ gpu: {}, hasPlugin: (name) => name === 'ssao' }), /owns scene capture/);
+  assert.deepEqual([...value.engine.plugins.get('ssao').sources], [first]);
+  assert.deepEqual([...value.engine.plugins.get('ssr').sources], [first], 'SSR gets the PBR models too');
+  const blur = value.engine.plugins.get('motion-blur');
+  assert.equal(blur.options.velocity(), value.engine.plugins.get('taa').velocity, 'MotionBlur reads TAA vectors');
 });
 
-test('ownership checks reject conflicting capture pairs, duplicate passes and redundant Bloom tonemapping', async () => {
+test('one anti-aliasing and one occlusion effect per composer, and MotionBlur needs TAA vectors', async () => {
   for (const [children, pattern] of [
-    [[h(Bloom, { key: 'b' }), h(DepthOfField, { key: 'd' })], /own scene capture/],
-    [[h(SSAO, { key: 's' }), h(DepthOfField, { key: 'd' })], /own scene capture/],
-    [[h(Bloom, { key: 'b' }), h(Tonemap, { key: 't' })], /already owns tone mapping/],
+    [[h(SMAA, { key: 'a' }), h(FXAA, { key: 'f' })], /one anti-aliasing effect; keep <SMAA> or <FXAA>/],
+    [[h(SSAO, { key: 's' }), h(GTAO, { key: 'g' })], /one ambient occlusion effect; keep <SSAO> or <GTAO>/],
+    [[h(MotionBlur, { key: 'm' })], /MotionBlur reads TAA motion vectors; add <TAA>/],
     [[h(Bloom, { key: 'a' }), h(Bloom, { key: 'b' })], /duplicate bloom/],
-    [[h(SSAO, { key: 's' }), h(Tonemap, { key: 't' })], /explicit HDR source/],
   ]) {
     const value = scene(),
       view = render(tree(value, children));
@@ -525,6 +623,18 @@ test('ownership checks reject conflicting capture pairs, duplicate passes and re
     view.unmount();
     await flush();
   }
+});
+
+test('alone, the native effects still guard their capture ownership', () => {
+  assert.throws(
+    () => new NativeBloom().setup({ gpu: {}, hasPlugin: (name) => name === 'ssao' }),
+    /owns the output target/,
+  );
+  assert.throws(
+    () => new NativeSSAO().setup({ gpu: {}, hasPlugin: (name) => name === 'bloom' }),
+    /owns the output target/,
+  );
+  assert.throws(() => new NativeDOF().setup({ gpu: {}, hasPlugin: (name) => name === 'ssao' }), /owns scene capture/);
 });
 
 test('native option validation errors reach pass onError with no plugin leak', async () => {

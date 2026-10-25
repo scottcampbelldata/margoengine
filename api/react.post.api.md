@@ -4,10 +4,15 @@
 
 ```ts
 import { DOF, DOFOptions } from "@margoengine/dof";
-import { Bloom, BloomOptions, SSAO, SSAOOptions } from "@margoengine/post";
+import { Afterimage, AfterimageOptions, Bloom, BloomOptions, FXAA, GTAO, GTAOOptions, Glitch, GlitchOptions, LensFlare, LensFlareOptions, MotionBlur, MotionBlurOptions, SMAA, SMAAOptions, SSAO, SSAOOptions, SSGI, SSGIOptions, SSR, SSROptions } from "@margoengine/post";
 import { TAA, TAAOptions } from "@margoengine/taa";
 import { CubeLUT, Tonemap, TonemapOptions } from "@margoengine/tonemap";
 import { ReactNode } from "react";
+
+export function Afterimage({ onReady, onError, ...options }: AfterimageProps): null;
+
+export interface AfterimageProps extends AfterimageOptions, Callbacks<AfterimageEffect> {
+}
 
 export function Bloom({ onReady, onError, ...options }: BloomProps): null;
 
@@ -27,9 +32,49 @@ export interface EffectComposerProps {
     onError?: (error: unknown) => void;
 }
 
+export function FXAA({ onReady, onError }: FXAAProps): null;
+
+export interface FXAAProps extends Callbacks<FXAAEffect> {
+}
+
+export function GTAO({ onReady, onError, ...options }: GTAOProps): null;
+
+export interface GTAOProps extends GTAOOptions, Callbacks<GTAOEffect> {
+}
+
+export function Glitch({ onReady, onError, ...options }: GlitchProps): null;
+
+export interface GlitchProps extends GlitchOptions, Callbacks<GlitchEffect> {
+}
+
+export function LensFlare({ onReady, onError, ...options }: LensFlareProps): null;
+
+export interface LensFlareProps extends LensFlareOptions, Callbacks<LensFlareEffect> {
+}
+
+export function MotionBlur({ onReady, onError, ...options }: MotionBlurProps): null;
+
+export interface MotionBlurProps extends Partial<MotionBlurOptions>, Callbacks<MotionBlurEffect> {
+}
+
+export function SMAA({ onReady, onError, ...options }: SMAAProps): null;
+
+export interface SMAAProps extends SMAAOptions, Callbacks<SMAAEffect> {
+}
+
 export function SSAO({ onReady, onError, ...options }: SSAOProps): null;
 
 export interface SSAOProps extends SSAOOptions, Callbacks<SSAOEffect> {
+}
+
+export function SSGI({ onReady, onError, ...options }: SSGIProps): null;
+
+export interface SSGIProps extends SSGIOptions, Callbacks<SSGIEffect> {
+}
+
+export function SSR({ onReady, onError, ...options }: SSRProps): null;
+
+export interface SSRProps extends SSROptions, Callbacks<SSREffect> {
 }
 
 export function TAA({ onReady, onError, ...options }: TAAProps): null;

@@ -1,7 +1,7 @@
 {
   "gate": "tests",
   "about": "packages with no test in verify; public entries no test imports",
-  "total": 47,
+  "total": 37,
   "history": [
     {
       "date": "2026-10-24",
@@ -40,17 +40,7 @@
     "unimported @margoengine/math/vector2": 1,
     "unimported @margoengine/math/vector3": 1,
     "unimported @margoengine/math/vector4": 1,
-    "unimported @margoengine/post/afterimage": 1,
-    "unimported @margoengine/post/fxaa": 1,
-    "unimported @margoengine/post/glitch": 1,
-    "unimported @margoengine/post/gtao": 1,
     "unimported @margoengine/post/image": 1,
-    "unimported @margoengine/post/lens-flare": 1,
-    "unimported @margoengine/post/motion-blur": 1,
-    "unimported @margoengine/post/smaa": 1,
-    "unimported @margoengine/post/ssgi": 1,
-    "unimported @margoengine/post/ssr": 1,
-    "unimported @margoengine/post/stack": 1,
     "unimported @margoengine/sky/bruneton": 1,
     "unimported @margoengine/sky/fog": 1,
     "unimported @margoengine/sky/preetham": 1,
