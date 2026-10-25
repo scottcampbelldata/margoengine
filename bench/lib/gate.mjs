@@ -45,7 +45,9 @@ export async function openGate({ needsGpu, skip, quietMax, quietHold, gpuMax, ti
   if (needsGpu) {
     const nested = !!process.env.MARGO_GPU_LOCK_NESTED;
     release = await acquire({ owner, log });
-    lock = nested ? { held: 'by the wrapping gpu-lock run', dir: lockDir } : { ...status(), dir: lockDir };
+    // Results are committed: the lock's place, not this machine's path.
+    const dir = lockDir.replaceAll('\\', '/').replace(/^.*\/(test-results\/gpu\.lock)$/, '<main checkout>/$1');
+    lock = nested ? { held: 'by the wrapping gpu-lock run', dir } : { ...status(), dir };
   }
   let quiet;
   try {

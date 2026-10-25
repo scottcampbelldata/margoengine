@@ -87,6 +87,21 @@ export async function composer() {
     return parent ? m.premultiply(parent) : m;
   };
 }
+// Per-frame form for moving boxes: the item's matrix with its y rotation replaced, without allocating (as other engines'
+// implementations compose theirs).
+async function mover() {
+  const { Matrix4, Euler, Quaternion, Vector3 } = await import('@margoengine/math'),
+    one = new Vector3(1, 1, 1),
+    q = new Quaternion(),
+    e = new Euler(),
+    p = new Vector3(),
+    m = new Matrix4();
+  return (item, ry) => {
+    const a = item.position,
+      r = item.rotation;
+    return m.compose(p.set(a[0], a[1], a[2]), q.setFromEuler(e.set(r[0], ry, r[2])), one).elements;
+  };
+}
 /** Core meshes for a list of {position, rotation, color | material} items; returns the meshes. */
 export function meshes(engine, def, materials) {
   const geometry = box(def.size, def.size, def.size);
@@ -129,6 +144,7 @@ const builders = {
     if (views !== 1 && (views !== 4 || mode === 'instanced'))
       throw new RangeError(`boxes views=${views}: 1, or 4 with mode=mesh`);
     if (mode === 'instanced') return instancedBoxes(canvas, data, marks, { n, move });
+    if (mode === 'culled') return culledBoxes(canvas, data, marks, { n, move });
     const engine = await engineFor(canvas, data.camera, n + 8, marks),
       s = performance.now(),
       list = meshes(engine, data, palette(data));
@@ -350,10 +366,9 @@ async function instancedBoxes(canvas, data, marks, { n, move }) {
   const engine = await engineFor(canvas, data.camera, 64, marks),
     s = performance.now(),
     at = await composer();
-  const [{ createInstancedMesh, Material }, { boxGeometry }, { Matrix4 }] = await Promise.all([
+  const [{ createInstancedMesh, Material }, { boxGeometry }] = await Promise.all([
     import('@margoengine/materials'),
     import('@margoengine/geometry'),
-    import('@margoengine/math'),
   ]);
   const mesh = createInstancedMesh(
     engine,
@@ -366,17 +381,51 @@ async function instancedBoxes(canvas, data, marks, { n, move }) {
     mesh.instances.setColorAt(i, linear(PALETTE[b.color]));
   });
   marks.buildMs = +(performance.now() - s).toFixed(1);
-  const scratch = new Matrix4(),
+  const turn = await mover(),
+    moving = move ? n : 0;
+  return app(
+    engine,
+    (t) => {
+      for (let i = 0; i < moving; i++)
+        mesh.instances.setMatrixAt(i, turn(data.items[i], data.items[i].rotation[1] + t));
+    },
+    { camera: data.camera, draws: 1 },
+  );
+}
+
+async function culledBoxes(canvas, data, marks, { n, move }) {
+  // @margoengine/culling CulledInstances: one batch per palette colour (core's box and PbrMaterial), GPU frustum culling.
+  const engine = await engineFor(canvas, data.camera, 64, marks),
+    s = performance.now(),
+    at = await composer(),
+    { CulledInstances } = await import('@margoengine/culling'),
+    geometry = box(data.size, data.size, data.size),
+    materials = palette(data),
+    slots = data.items.map(() => 0),
+    counts = materials.map(() => 0);
+  data.items.forEach((b, i) => (slots[i] = counts[b.color]++));
+  const transforms = counts.map((c) => new Float32Array(c * 16));
+  data.items.forEach((b, i) => transforms[b.color].set(at(b.position, b.rotation).elements, slots[i] * 16));
+  const parts = CulledInstances.attach(
+    engine,
+    materials
+      .map((material, k) => ({ geometry, material, transforms: transforms[k] }))
+      .filter((b) => b.transforms.length),
+  );
+  // Batch index per colour (colours without boxes have no batch).
+  const batchOf = counts.map((_, k) => counts.slice(0, k).filter(Boolean).length);
+  marks.buildMs = +(performance.now() - s).toFixed(1);
+  const turn = await mover(),
     moving = move ? n : 0;
   return app(
     engine,
     (t) => {
       for (let i = 0; i < moving; i++) {
         const b = data.items[i];
-        mesh.instances.setMatrixAt(i, at(b.position, [0, b.rotation[1] + t, 0], null, scratch).elements);
+        parts.setTransform(batchOf[b.color], slots[i], turn(b, b.rotation[1] + t));
       }
     },
-    { camera: data.camera, draws: 1 },
+    { camera: data.camera, draws: parts.starts.length },
   );
 }
 

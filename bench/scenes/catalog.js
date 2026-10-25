@@ -222,7 +222,8 @@ export const SCENES = {
     title: 'Boxes',
     draws:
       'n boxes of 0.5 m on a cubic grid with 16 colours and an orbiting camera. move=1 spins every box every frame; ' +
-      'mode=instanced draws them through the engine instancing API (static matrices, one batch). views=4 draws the ' +
+      'mode=instanced draws them through the engine instancing API (static matrices, one batch); mode=culled through ' +
+      'its GPU-culled instancing, where it has one (Margo: @margoengine/culling CulledInstances). views=4 draws the ' +
       'boxes four times a frame, one quarter of the canvas each (split screen), through four cameras on the same ' +
       'orbit a quarter turn apart.',
     measures: ['cpuMs', 'gpuMs', 'fps', 'buildMs', 'drawCalls'],
@@ -324,6 +325,12 @@ export const STANDARD = {
     { scene: 'boxes', params: { n: 10_000, move: 1 } },
     { scene: 'boxes', params: { n: 10_000, mode: 'instanced' } },
     { scene: 'boxes', params: { n: 10_000, mode: 'instanced', move: 1 } },
+  ],
+  instanced: [
+    ...[1000, 10_000, 50_000].flatMap((n) =>
+      ['instanced', 'culled'].map((mode) => ({ scene: 'boxes', params: { n, mode } })),
+    ),
+    ...['instanced', 'culled'].map((mode) => ({ scene: 'boxes', params: { n: 10_000, mode, move: 1 } })),
   ],
   scaling: [
     ...[1, 100, 1000, 10_000, 100_000].map((n) => ({ scene: 'boxes', params: { n } })),

@@ -79,6 +79,7 @@ The tool takes the lock itself when it is not wrapped, so both forms are safe.
 | `startup` | browser | Time to the first finished frame of a one-box scene in a fresh browser per run. Then every site demo loaded cold under a phone profile (`LOAD_PROFILE`, default `phone-layout-cold`) when `site/dist` is built. |
 | `render` | browser | 10,000 boxes, 256 materials, 64 moving point lights, a 2048 shadow map, and SSAO + bloom + tone mapping + FXAA. |
 | `objects` | browser | 10,000 objects as static meshes, moving meshes, instances and moving instances. |
+| `instanced` | browser | Instanced boxes, static at 1,000, 10,000 and 50,000 and moving at 10,000, through each instancing path (Margo: `createInstancedMesh` and `CulledInstances`, `mode=culled`). The instanced comparison of `docs/whitepaper/boxes-vs-threejs.md`. |
 | `scaling` | browser | 1, 100, 1,000, 10,000 and 100,000 meshes, then 100,000 and 250,000 instances, then 400, 5,000 and 10,000 shadow casters. |
 | `math` | Node | Kernel world matrices and frustum culling for 100,000 meshes, 100,000 matrix compositions, BVH build and rays on 500,000 triangles, rays against a 500-part assembly. |
 | `gltf` | browser | Load and draw SciFiHelmet, FlightHelmet and RobotExpressive, then the helmet with image-based lighting and shadows. |
@@ -220,6 +221,8 @@ engine implements the scenes as an ES module:
 
 ```js
 export const scenes = ['boxes', 'materials']; // scene ids this engine implements; others are skipped
+// Optional: false skips a case the engine has no variant for (such as boxes mode=culled), reported as unsupported.
+export const supports = (scene, params) => true;
 export async function create(canvas, { scene, params, data }, marks) {
   // Build `scene` from `data` (the catalog's description) on `canvas`. Fill marks.createMs and marks.buildMs.
   return {

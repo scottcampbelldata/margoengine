@@ -5,6 +5,7 @@ export const SUITES = [
   'startup',
   'render',
   'objects',
+  'instanced',
   'scaling',
   'math',
   'gltf',
