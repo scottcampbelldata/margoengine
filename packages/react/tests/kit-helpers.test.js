@@ -786,3 +786,38 @@ test('shadow-only receiver samples the existing map, blends only occlusion, and 
   assert.ok(buffers.every((buffer) => buffer.destroys === 1));
   mesh.dispose();
 });
+
+for (const [name, make, disposed] of [
+  ['Sky', (ref) => React.createElement(Sky, { ref }), (sky) => sky.disposals > 0],
+  ['PointerLock', (ref) => React.createElement(PointerLock, { ref }), (controls) => controls.disposals > 0],
+  ['TransformControls', (ref) => React.createElement(TransformControls, { ref }), (controls) => controls.disposals > 0],
+  [
+    'Text',
+    (ref) => React.createElement(Text, { ref, text: 'live' }),
+    (item) => !renderers.some((renderer) => renderer.texts.has(item)),
+  ],
+])
+  test(`${name} ref never points at a disposed object when its effect recreates it (StrictMode)`, async () => {
+    // The effect that creates the object reruns when the engine changes. Between that cleanup and the new object's
+    // creation no render happens, so a ref that was a state snapshot kept pointing at the disposed object.
+    const first = makeScene(),
+      second = makeScene();
+    let current = null;
+    const track = (value) => {
+      current = value;
+    };
+    const view = render(tree(first, make(track)));
+    await flush();
+    const original = current;
+    assert.ok(original, `${name} exposes its object through the ref`);
+    assert.equal(disposed(original), false);
+    view.rerender(tree(second, make(track)));
+    // The old object is disposed and the new one is not created yet (its package import is still pending).
+    assert.equal(disposed(original), true);
+    assert.ok(current === null || !disposed(current), `${name} ref points at a disposed object`);
+    await flush();
+    assert.ok(current && !disposed(current) && current !== original, `${name} ref reaches the new live object`);
+    view.unmount();
+    await flush();
+    assert.equal(current, null, `${name} ref is cleared on unmount`);
+  });

@@ -1,5 +1,5 @@
 'use client';
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type Ref, type RefObject } from 'react';
+import { forwardRef, useEffect, useRef, useState, type Ref, type RefObject } from 'react';
 import type { EngineKernel, FrameCallback, Mesh as MeshHandle } from '@margoengine/core';
 import type { Geometry, Mesh as EngineMesh } from '@margoengine/core/extension';
 import type {
@@ -15,6 +15,8 @@ import {
   useScene,
   useMesh,
   useCommit,
+  useLiveRef,
+  assignRef,
   live,
   setGeometry,
   zero,
@@ -131,10 +133,13 @@ export const Plane = forwardRef<MeshRef, PlaneProps>(function Plane(
 });
 
 export interface SkyProps extends SkyOptions, ErrorProps {}
-export const Sky = forwardRef<SkyPlugin, SkyProps>(function Sky({ onError, ...options }, ref) {
-  const scene = useScene(),
+export const Sky = forwardRef<SkyPlugin, SkyProps>(function Sky({ onError, ...props }, ref) {
+  const options: SkyOptions = { ...props },
+    scene = useScene(),
     latest = useRef({ options, onError }),
-    [sky, setSky] = useState<SkyPlugin | null>(null);
+    [sky, setSky] = useState<SkyPlugin | null>(null),
+    handle = useRef(ref);
+  handle.current = ref;
   latest.current = { options, onError };
   useEffect(() => {
     let active = true,
@@ -144,6 +149,7 @@ export const Sky = forwardRef<SkyPlugin, SkyProps>(function Sky({ onError, ...op
         if (!active || scene.engine.disposed) return;
         current = new Sky({ ...latest.current.options });
         scene.engine.use(current);
+        assignRef(handle.current, current);
         setSky(current);
       })
       .catch((error) => {
@@ -152,8 +158,11 @@ export const Sky = forwardRef<SkyPlugin, SkyProps>(function Sky({ onError, ...op
     return () => {
       active = false;
       if (current) {
-        scene.engine.removePlugin(current.name);
-        current.dispose();
+        const made = current;
+        assignRef(handle.current, null);
+        setSky((state) => (state === made ? null : state));
+        scene.engine.removePlugin(made.name);
+        made.dispose();
       }
     };
   }, [scene.engine]);
@@ -162,7 +171,7 @@ export const Sky = forwardRef<SkyPlugin, SkyProps>(function Sky({ onError, ...op
     for (const key of Object.keys(sky.options)) delete (sky.options as Record<string, unknown>)[key];
     Object.assign(sky.options, options);
   });
-  useImperativeHandle(ref, () => sky!, [sky]);
+  useLiveRef(ref, sky);
   return null;
 });
 
@@ -328,7 +337,9 @@ export interface PointerLockProps extends ErrorProps {
 export const PointerLock = forwardRef<PointerControls, PointerLockProps>(function PointerLock(props, ref) {
   const scene = useScene(),
     latest = useRef(props),
-    [controls, setControls] = useState<PointerControls | null>(null);
+    [controls, setControls] = useState<PointerControls | null>(null),
+    handle = useRef(ref);
+  handle.current = ref;
   latest.current = props;
   useEffect(() => {
     let active = true,
@@ -362,9 +373,12 @@ export const PointerLock = forwardRef<PointerControls, PointerLockProps>(functio
           control.removeEventListener('unlock', unlock);
           control.removeEventListener('change', change);
           control.removeEventListener('error', error);
+          assignRef(handle.current, null);
+          setControls((state) => (state === control ? null : state));
           if (control.isLocked) control.unlock();
           control.dispose();
         };
+        assignRef(handle.current, control);
         setControls(control);
       })
       .catch((error) => {
@@ -405,7 +419,7 @@ export const PointerLock = forwardRef<PointerControls, PointerLockProps>(functio
     props.minPolarAngle,
     props.maxPolarAngle,
   ]);
-  useImperativeHandle(ref, () => controls!, [controls]);
+  useLiveRef(ref, controls);
   return null;
 });
 
@@ -434,7 +448,9 @@ function TransformBinding({
 }) {
   const scene = useScene(),
     latest = useRef(options),
-    [controls, setControls] = useState<GizmoControls | null>(null);
+    [controls, setControls] = useState<GizmoControls | null>(null),
+    handle = useRef(controlRef);
+  handle.current = controlRef;
   latest.current = options;
   useEffect(() => {
     let active = true,
@@ -465,9 +481,12 @@ function TransformBinding({
           control.removeEventListener('change', change);
           control.removeEventListener('objectChange', objectChange);
           control.removeEventListener('dragging-changed', dragging);
+          assignRef(handle.current, null);
+          setControls((state) => (state === control ? null : state));
           control.dispose();
         };
         attach();
+        assignRef(handle.current, control);
         setControls(control);
       })
       .catch((error) => {
@@ -520,7 +539,7 @@ function TransformBinding({
       else controls.detach();
     }
   });
-  useImperativeHandle(controlRef, () => controls!, [controls]);
+  useLiveRef(controlRef, controls);
   return null;
 }
 export const TransformControls = forwardRef<GizmoControls, TransformControlsProps>(function TransformControls(
@@ -609,7 +628,9 @@ const textDefaults = {
 export const Text = forwardRef<TextBlock, TextProps>(function Text(props, ref) {
   const scene = useScene(),
     latest = useRef(props),
-    [item, setItem] = useState<TextBlock | null>(null);
+    [item, setItem] = useState<TextBlock | null>(null),
+    handle = useRef(ref);
+  handle.current = ref;
   latest.current = props;
   const font = useRef<{ input: TextOptions['font']; value: Font } | null>(null),
     apply = useRef<(text: TextBlock) => void>(() => {});
@@ -654,6 +675,7 @@ export const Text = forwardRef<TextBlock, TextProps>(function Text(props, ref) {
         apply.current(current);
         renderer.add(current);
         scene.registry?.attachments.add(attach);
+        assignRef(handle.current, current);
         setItem(current);
       })
       .catch((error) => {
@@ -663,13 +685,18 @@ export const Text = forwardRef<TextBlock, TextProps>(function Text(props, ref) {
     return () => {
       active = false;
       scene.registry?.attachments.delete(attach);
-      if (current) renderer?.remove(current);
+      if (current) {
+        const made = current;
+        assignRef(handle.current, null);
+        setItem((state) => (state === made ? null : state));
+        renderer?.remove(made);
+      }
       releaseTextRenderer(scene, entry);
     };
   }, [scene.engine, scene.registry]);
   useCommit(() => {
     if (item) apply.current(item);
   });
-  useImperativeHandle(ref, () => item!, [item]);
+  useLiveRef(ref, item);
   return null;
 });

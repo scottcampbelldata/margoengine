@@ -163,6 +163,19 @@ export function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
   if (typeof ref === 'function') ref(value);
   else if (ref) (ref as { current: T | null }).current = value;
 }
+/**
+ * Keeps `ref` on the live object of an async-created binding. The creating effect assigns it the moment the object
+ * exists and its cleanup clears it before the object is disposed, so a ref never holds a disposed object between an
+ * effect replay (StrictMode, a Suspense reveal) and the next render. This hook only re-points the ref when its identity
+ * changes.
+ */
+export function useLiveRef<T>(ref: Ref<T> | undefined, value: T | null): void {
+  useCommit(() => {
+    if (!ref || value === null) return;
+    assignRef(ref, value);
+    return () => assignRef(ref, null);
+  }, [ref, value]);
+}
 export interface Created<A, T> {
   /** Imports the optional package (wrap it in `optionalPeer`). */
   load: () => Promise<A>;
