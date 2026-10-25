@@ -202,7 +202,7 @@
     "publish:dry-run": "npm run release:check && node scripts/supply-chain.mjs --check && npm publish --workspace packages --ignore-scripts --access public --dry-run",
     "supply-chain": "node scripts/supply-chain.mjs",
     "catalog:build": "node scripts/build-catalog.js",
-    "build:site": "npm run catalog:build && node examples/package-benchmarks/entry-sizes.mjs && node scripts/gpu-lock.mjs run --owner=build-site -- npm run test:basic-scene && node scripts/build-site.js",
+    "build:site": "npm run catalog:build && node examples/package-benchmarks/entry-sizes.mjs && npm run test:basic-scene && node scripts/build-site.js",
     "whitepaper:pdf": "node scripts/whitepaper-pdf.mjs",
     "test:basic-scene": "node scripts/basic-scene-network.mjs",
     "site:check": "node scripts/site-check.mjs",

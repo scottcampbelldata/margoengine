@@ -6,6 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { setupMergeDrivers } from './setup-merge-drivers.mjs';
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const root = resolve(git('rev-parse', '--show-toplevel')),
@@ -27,3 +28,5 @@ for (const dir of readdirSync(join(root, 'packages'))) {
     symlinkSync(join(root, 'packages', dir), join(target, name), 'junction');
 }
 console.log(`node_modules ready in ${target} (third-party from ${main})`);
+// The generated-file merge drivers (.gitattributes) are registered in the shared git config once per clone.
+setupMergeDrivers(root);

@@ -3,7 +3,7 @@
 // voxel sandbox under /voxel/ and the example pages) each under their own folder.
 // Run `npm run build:packages` first. Deploy the folder with `npx wrangler pages deploy site/dist`.
 // `npm run build:site` measures every package (entry-sizes.mjs) and a basic glTF scene's network log
-// (basic-scene-network.mjs, under the GPU lock) first, for /sizes.html.
+// (basic-scene-network.mjs, which takes the GPU lock only around its browser) first, for /sizes.html.
 import { execFileSync } from 'node:child_process';
 import { cp, rm, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';

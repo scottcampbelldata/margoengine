@@ -4,8 +4,9 @@
 // and shadow packs. In a real browser (Playwright's network log) the page must fetch exactly its HTML, the entry
 // chunk and its static imports, the @margoengine/gltf chunk and the model: no Wasm, no worker, no other pack.
 // Records every request and the bytes transferred to examples/package-benchmarks/results/basic-scene-network.json,
-// which margoengine.com/sizes.html lists (`npm run build:site` runs this). Needs WebGPU, so after build:packages:
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/basic-scene-network.mjs
+// which margoengine.com/sizes.html lists (`npm run build:site` runs this). Needs WebGPU, so after build:packages.
+// The GPU lock (test-results/gpu.lock) is taken here, around the browser only (launch to close, a few seconds). The
+// Vite build before it and the hashing after it run without it, so callers do not wrap this script in the lock.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -14,6 +15,7 @@ import { join, resolve } from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { chromium } from '@playwright/test';
 import { build, preview } from 'vite';
+import { acquire } from './gpu-lock.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   fixture = resolve(root, 'tests/fixtures/basic-scene');
@@ -134,8 +136,15 @@ const server = await preview({
   build: { outDir: out },
   preview: { host: '127.0.0.1', port, strictPort: true },
 });
-const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true });
+const release = await acquire({ owner: 'basic-scene-network', poll: 2000 });
+let held = true;
+const releaseGpu = () => {
+  if (held) release();
+  held = false;
+};
+let browser;
 try {
+  browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true });
   const context = await browser.newContext({ viewport: { width: 800, height: 600 } }),
     page = await context.newPage(),
     requests = [],
@@ -169,6 +178,8 @@ try {
     return info ? `${info.vendor} ${info.architecture} ${info.description}`.trim() : null;
   });
   await context.close();
+  await browser.close();
+  releaseGpu(); // nothing below touches the GPU
 
   const path = (url) => {
     const { pathname } = new URL(url);
@@ -235,6 +246,7 @@ try {
     `basic scene: ${files.length} requests, ${result.total.transferred} B transferred; ${result.notFetched.length} built files not fetched`,
   );
 } finally {
-  await browser.close();
+  await browser?.close();
+  releaseGpu();
   await new Promise((done) => server.httpServer.close(done));
 }

@@ -92,6 +92,15 @@ Several agents push to `main`. Each push must leave it at least as clean as it f
 - `npm run proofs -- --current` passes. If a deliberate change alters what a feature-off path emits, advance that proof's current reference to your commit and say why in `docs/whitepaper/claims.md`; never leave a proof failing.
 - Public numbers stay true: `site/index.html`, `README.md` and `docs/limits.md` must match `npm run measure:size`. When work affects a launch gate, update its status in `docs/HANDOFF.md`.
 - `git pull --rebase` before pushing (no merge commits of `main` into itself), one commit per change, and no repeated record-only commits.
+- Generated records (`api/*.api.md`, `docs/api-surface.md`, `entry-sizes.json`, `basic-scene-network.json`, the quality
+  baselines) no longer conflict on a rebase. `node scripts/worktree-node-modules.mjs` (main checkout:
+  `node scripts/setup-merge-drivers.mjs`) registers two merge drivers once per clone: the generated files keep main's
+  copy, the baselines merge item by item (limits only shrink, every reasoned history entry stays). Do not resolve them
+  by hand. Inside the landing lock, right after the rebase and from a clean tree, run `node scripts/land-records.mjs`:
+  it rebuilds, rewrites the API reports, shrinks the baselines (a baseline that would grow stops it, as
+  `npm run quality -- --update` does), measures both size records at the rebased `HEAD`, checks that they name one
+  commit and makes one `records:` commit. Then run `verify` and push. Commit nothing else by hand in those files.
+  `build:site` and `test:basic-scene` take the GPU lock themselves, only around the browser; do not wrap them in it.
 
 ## One branch: main
 
