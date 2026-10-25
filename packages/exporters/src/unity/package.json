@@ -6,5 +6,11 @@
   "unity": "6000.0",
   "dependencies": {
     "com.unity.cloud.gltfast": "6.20.0"
-  }
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Scott Campbell",
+    "url": "https://margoengine.com"
+  },
+  "documentationUrl": "https://github.com/scottcampbelldata/margoengine/tree/main/packages/exporters/src/unity"
 }

@@ -1,4 +1,4 @@
-# Margo Unity exact support 0.3.0 — isolated source draft
+# Margo Unity exact support 0.3.0: isolated source draft
 
 This is a proposed source-only policy revision. It is not installed or natively
 accepted; the canonical 0.2.0 candidate remains unchanged. Applying this draft
