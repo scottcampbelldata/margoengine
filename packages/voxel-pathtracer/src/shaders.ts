@@ -27,6 +27,10 @@
 // - random numbers: PCG (O'Neill 2014) with the hash of Jarzynski and Olano (2020);
 // - denoising: the edge-avoiding a-trous wavelet filter (Dammertz et al. 2010) with variance-guided luminance weights
 //   (Schied et al. 2017, "Spatiotemporal Variance-Guided Filtering"), on albedo-demodulated radiance.
+// - also: exact Fresnel per Born & Wolf (PBRT 4e sec. 9.3); cosine sampling by Malley's method; Russian roulette
+//   (Arvo & Kirk 1990); temporal variance clipping (Salvi 2016, GDC); Rec. 709 luminance (ITU-R BT.709). The
+//   roulette bounds, UNLIKELY and the fog-glow model are Margo tuning; MagicaVoxel-look paths are fitted to observed
+//   MagicaVoxel output (magicavoxel.ts).
 // Material flags and record sizes must match scene.ts and layout.ts.
 import { displayShader } from '../../shared/display.js';
 import { agxShader } from '../../shared/agx.js';

@@ -2,6 +2,8 @@ import { group, compute, dispatch } from '../../shared/gpu.js';
 import { head, mid } from './atmosphere.js';
 import type { SkyFeatures, SkyTables } from './base.js';
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
+// Rayleigh phase 3/(16 pi)(1 + nu^2) and Cornette-Shanks Mie phase with g = 0.8: Bruneton & Neyret 2008 eq. 2-3;
+// Hillaire 2020 sec. 3. The coarse 8 x 16 x 32 x 8 table (tail) is Margo's variant of Bruneton & Neyret 2008 sec. 4.
 const phase = `fn phaseR(nu:f32)->f32{return 0.0596831037*(1.0+nu*nu);}
 fn phaseM(nu:f32)->f32 {let g=0.8;return 0.1193662073*(1.0-g*g)*(1.0+nu*nu)/((2.0+g*g)*pow(max(0.01,1.0+g*g-2.0*g*nu),1.5));}
 `;
@@ -16,6 +18,8 @@ fn directions(c:vec4f)->mat2x3f{
  return mat2x3f(w,vec3f(sx,c.z,sqrt(max(0.0,1.0-c.z*c.z-sx*sx))));
 }`;
 const atmosphere = head + phase + mid + tail;
+// Single scattering (32 steps), then three more orders: Bruneton & Neyret 2008 sec. 4. The factor 20.0 on the single
+// scattering is a Margo exposure scale (sky brightness in sky units), not from Bruneton & Neyret.
 const single =
   atmosphere +
   `
@@ -29,6 +33,7 @@ const single =
   result+=throughput*sqrt(absorb)*trans(transmission,r,dot(p/r,sun))*(BETA_R*rho.x*phaseR(nu)+vec3f(mie()*rho.y*phaseM(nu)))*step*20.0;throughput*=absorb;
  }textureStore(output,vec2i(id.xy),vec4f(result,1));textureStore(total,vec2i(id.xy),vec4f(result,1));
 }`;
+// Scattering density over a 32-point golden-angle (Vogel / Fibonacci) sphere, 2.39996323 rad per point.
 const density =
   atmosphere +
   `

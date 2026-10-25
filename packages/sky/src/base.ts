@@ -123,6 +123,7 @@ export interface SkyOptions {
  */
 export function sunDirection(hours: number, out = new Float32Array(3)): Float32Array {
   if (!Number.isFinite(hours) || out.length !== 3) throw new RangeError('Invalid sun clock');
+  // Margo clock model (not astronomical): the sun moves on a circle through east and the zenith.
   const angle = (((hours % 24) - 6) * Math.PI) / 12;
   out[0] = Math.cos(angle);
   out[1] = Math.sin(angle);
@@ -221,6 +222,7 @@ fn cloudSky(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {r
 @group(0) @binding(1) var scattering:texture_2d<f32>;
 @group(0) @binding(2) var transmission:texture_2d<f32>;
 ` +
+      // Margo tuning: the night fallback gradient and, below, the sun disc x60 and bloom x0.8.
       (f.night?.wgsl ?? '') +
       `// footprint: the sample's angular size in radians, which filters stars and the moon; 0 leaves them out (fog).
 fn nightSky(w:vec3f,footprint:f32)->vec3f {
@@ -447,6 +449,7 @@ export class Sky implements EnginePlugin {
       const length = Math.hypot(...this.options.sunDirection);
       for (let i = 0; i < 3; i++) this.sun[i] = this.options.sunDirection[i] / length;
     } else sunDirection(this.options.hours, this.sun);
+    // Margo design choices: the day/night blend window (sun.y + 0.12) / 0.2 and the moon at 0.1 x the sun.
     const l = this.options.lighting,
       t = Math.max(0, Math.min(1, (this.sun[1] + 0.12) / 0.2)),
       night = 1 - t * t * (3 - 2 * t);

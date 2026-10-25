@@ -68,6 +68,7 @@ export function catcherLit(code: string): string {
       : shadowed
         ? `\n  lit+=dot(clusterLighting${args}; all+=dot(margoCatcherLights${args};`
         : `\n  let margoLocal=dot(clusterLighting${args}; lit+=margoLocal; all+=margoLocal;`;
+  // Luminance weights 0.2126, 0.7152, 0.0722: ITU-R BT.709-6.
   out = edit(
     code,
     placeholder,

@@ -127,6 +127,7 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
         specular = mat.color.slice(0, 3).map((v) => 0.04 + (v - 0.04) * m);
       technique =
         `<phong>${emission}<diffuse>${diffuse}</diffuse><specular><color>${rgba(specular)}</color></specular>` +
+        // Inverse of the Walter et al. 2007 sec. 5.2 mapping: n = 2 / roughness^4 - 2.
         `<shininess><float>${num(2 / Math.max(mat.roughness ** 4, 1e-4) - 2)}</float></shininess>${transparent}</phong>`;
     }
     effects.push(

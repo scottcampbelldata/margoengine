@@ -118,6 +118,7 @@ const entry = (code: string, stage: string): string | undefined =>
 
 // Colour helpers for the shader: margoDisplay is the scene's display transform (PBR Neutral + sRGB on display targets),
 // margoEncode the sRGB encoding alone (unlit colour, as lines and points write it). An HDR capture keeps linear light.
+// Sources: Khronos PBR Neutral specification (2024); sRGB encoding IEC 61966-2-1.
 const helpers = `${neutralShader.replace('pbrNeutral', 'margoNeutral')}fn margoSRGB(x:vec3f)->vec3f {return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}
 fn margoDisplay(c:vec4f)->vec4f {if(camera.encoding==0.0){return c;}let x=margoNeutral(max(c.rgb,vec3f(0)));if(camera.encoding==2.0){return vec4f(x,c.a);}return vec4f(margoSRGB(x),c.a);}
 fn margoEncode(c:vec4f)->vec4f {if(camera.encoding!=1.0){return c;}return vec4f(margoSRGB(max(c.rgb,vec3f(0))),c.a);}

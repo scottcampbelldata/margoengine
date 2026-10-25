@@ -58,7 +58,8 @@ const finiteNumber = (value: unknown, label: string, min = -Infinity, max = Infi
 /**
  * Draws an Environment behind the scene. The full-screen triangle sits at reversed-Z depth 0 with a
  * read-only `greater-equal` depth test, so it only covers pixels whose depth still holds the cleared 0 and
- * never touches geometry. Output follows core: Reinhard tone mapping and sRGB encoding into the canvas
+ * never touches geometry. Output follows core: Khronos PBR Neutral tone mapping and sRGB encoding
+ * (shared/display.js) into the canvas
  * format, or linear radiance when the pass target is rgba16float (an HDR capture such as creative's
  * PostProcessing). Also usable without an engine through `record(context)`.
  */
@@ -457,6 +458,7 @@ export class ImageBackground {
     this.order = finiteNumber(options.order ?? 0.5, 'order');
     if (this.order <= 0) throw new RangeError('Background order must be greater than 0 (after the main pass)');
     this.filter = options.filter ?? 'linear';
+    // Margo default: a cylinder of circumference 2 pi shows the image at its own aspect ratio.
     this.height = options.height ?? (2 * Math.PI * images[0].height) / images[0].width;
     this.rotation = options.rotation ?? 0;
   }

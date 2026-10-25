@@ -111,6 +111,7 @@ export class PbrMaterial {
     if ([...rgb, roughness, metalness].some((v) => !Number.isFinite(v) || v < 0 || v > 1))
       throw rangeError('Invalid material', 'material');
     if (typeof doubleSided !== 'boolean') throw typeError('Invalid material', 'material');
+    // 0.045: minimum perceptual roughness, Filament design document (published engine standard).
     this.data.set([...rgb, 1, Math.max(0.045, roughness), metalness, +doubleSided]);
   }
 }

@@ -1,4 +1,6 @@
 // Real L2 spherical harmonics: basis, evaluation and CPU projection.
+// Basis constants: Ramamoorthi & Hanrahan 2001 eq. 3; Sloan 2008, "Stupid Spherical Harmonics Tricks". Ring solid
+// angle (2 pi / w)(cos t0 - cos t1) is exact sphere geometry.
 import type { FloatImage } from './hdr.js';
 
 /** Basis constants, in coefficient order (l,m) = (0,0), (1,-1), (1,0), (1,1), (2,-2), (2,-1), (2,0), (2,1), (2,2). */

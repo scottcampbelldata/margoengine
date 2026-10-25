@@ -50,7 +50,8 @@ export interface SSRModel {
 // Material replay outputs: environment specular already in the scene (rgb) + roughness, split-sum weight F0*A+B (rgb) +
 // coverage, world normal. With `margoAmbient` from EnvironmentLighting the weight and specular come from its own LUT and
 // prefiltered cube, so the composite removes exactly the IBL specular it replaces; without IBL nothing is removed and
-// the weight is Karis' analytic split-sum fit. With LightProbes (`probeSpecular`, @margoengine/environment/probes) the
+// the weight is Karis' analytic split-sum fit (B. Karis, "Physically Based Shading on Mobile", Unreal Engine blog 2014,
+// a published engine standard after Lazarov 2013; F0 0.04 from glTF 2.0 Appendix B). With LightProbes (`probeSpecular`, @margoengine/environment/probes) the
 // specular removed is the probes' own at the pixel's world position (`margoPosition`, set by the replay and by gltf-pro's
 // capture), so reflection probes are what SSR falls back to off screen.
 const replayTail = (code: string) => {

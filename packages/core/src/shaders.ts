@@ -1,6 +1,6 @@
 // Direct lighting is the glTF 2.0 metal-rough BRDF (specification Appendix B): GGX distribution (Walter et al. 2007),
-// separable Smith masking, Schlick Fresnel and Lambert diffuse. The display curve is Khronos PBR
-// Neutral (the Khronos Group's published specification), then the exact sRGB encoding; packages/shared/display.js holds
+// separable Smith masking, Schlick Fresnel and Lambert diffuse. The display curve is Khronos PBR Neutral (the Khronos
+// Group's published specification), then the exact sRGB encoding (IEC 61966-2-1); packages/shared/display.js holds
 // the same curve for every other package. The curve sits above the vertex function: packages replace everything from
 // "@vertex fn vertex(" up to "@fragment" with their own vertex stage. Tests read the shader as this file's first
 // backtick-quoted text, so comments above it use none.

@@ -108,6 +108,8 @@ export function bloomWeights(radius: number, levels: number): number[] {
 // 8-bit step (settings.z; 0 for float targets), hashed from the pixel position so a frame repeats exactly. The noise
 // also stays within each channel's distance to 0 and 1, so black stays black, nothing clips (no bias) and a
 // transparent pixel stays transparent.
+// Dither hash: C. Wellons' "lowbias32" ("Prospecting for Hash Functions", 2018, public domain), seeded with the
+// golden-ratio and MurmurHash3 fmix constants.
 const composite =
   displayShader +
   tent +

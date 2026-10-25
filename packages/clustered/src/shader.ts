@@ -5,6 +5,8 @@ struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec
 @group(${group}) @binding(4) var<uniform> clusterFrame:ClusterFrame;
 @group(${group}) @binding(5) var<storage,read> clusterLights:array<ClusterLight>;
 `;
+// Clustered shading (Olsson, Billeter & Assarsson 2012): exponential depth slices, sphere-AABB and cone-sphere culling.
+// The 1024 indices per cell is Margo's cap.
 export const cullingShader =
   declarations(0) +
   /* wgsl */ `
@@ -60,6 +62,9 @@ export interface ClusteredSamplingHooks {
    */
   terms?: readonly { declarations(group: number): string; readonly term: string }[];
 }
+// BRDF: GGX D and separable Smith-GGX G (Walter et al. 2007 eq. 33-34), Schlick 1994 Fresnel, F0 0.04 and Lambert / pi
+// (glTF 2.0 Appendix B). Roughness floor 0.045: the minimum perceptual roughness of the Filament design document, a
+// published engine standard.
 /**
  * WGSL for the clustered light loop in bind group `group`, for custom forward materials (`Clustered.pbr` and
  * `Clustered.shader` call it): the cluster bindings 4-7 and `clusterLighting(pixel, position, n, eye, base, roughness,
@@ -115,6 +120,7 @@ ${/* @__PURE__ */ clusterCell('position')}
   return shadows ? localShadowSampling(group) + code : code;
 }
 
+// Integrated point/spot shadow maps: 3x3 PCF (Reeves, Salesin & Cook 1987) with normal offset (Holbert 2011).
 /** Bindings 8/9 are already used by optional camera, sky and terrain effects. */
 function localShadowSampling(group: number): string {
   return /* wgsl */ `

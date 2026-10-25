@@ -29,6 +29,7 @@ export interface HemisphereLightOptions {
   /** Plugin and pass name. Default 'environment:hemisphere'. */
   name?: string;
 }
+// Classical hemisphere lighting: mix(ground, sky, n.y / 2 + 1/2).
 const wgsl = (group: number) => `struct MargoSkyLight {sky:vec4f, ground:vec4f}
 @group(${group}) @binding(${HEMISPHERE_BINDING}) var<uniform> margoSkyLightData:MargoSkyLight;
 fn margoSkyLight(n:vec3f)->vec3f {return mix(margoSkyLightData.ground.rgb,margoSkyLightData.sky.rgb,clamp(n.y*0.5+0.5,0.0,1.0));}

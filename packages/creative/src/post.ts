@@ -26,6 +26,10 @@ const vertex = `struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
 const frame = `struct Frame {inverse:mat4x4f,eye:vec4f,sun:vec4f,fog:vec4f,color:vec4f,grade:vec4f,lens:vec4f,settings:vec4f,gain:vec4f,lift:vec4f,camera:mat4x4f}
 @group(0) @binding(0) var<uniform> f:Frame;
 fn world(uv:vec2f,depth:f32)->vec3f{let p=f.inverse*vec4f(uv*vec2f(2,-2)+vec2f(-1,1),depth,1);return p.xyz/p.w;}`;
+// Height fog: closed-form integral of an exponential height density along the ray (Wenzel, "Real-time Atmospheric
+// Effects in Games", SIGGRAPH 2006 course). God rays: the radial-blur method of Mitchell, "Volumetric Light Scattering
+// as a Post-Process" (GPU Gems 3 ch. 13, 2007), with Margo's own sample count, decay and tint. Grade: ASC CDL v1.2
+// form (slope/offset/saturation), BT.709 luma, 18% grey pivot. Focus blur taps and radius cap are Margo's.
 const resolve =
   frame +
   `
@@ -124,7 +128,7 @@ export class PostProcessing implements EnginePlugin {
   constructor(readonly options: PostOptions = {}) {
     this.validate();
   }
-  /** In a PostStack, grades (fog, focus blur, ACES, grain) the stack's HDR result as its display effect. */
+  /** In a PostStack, grades (fog, focus blur, Khronos PBR Neutral, grain) the stack's HDR result as its display effect. */
   private joinStack(host: StackHost): StackStage {
     if (this.device || this.host)
       throw new MargoError('attached', 'PostProcessing is already attached; create a new PostProcessing');

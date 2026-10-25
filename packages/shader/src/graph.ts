@@ -474,6 +474,7 @@ export function surfaceGraphSampler(value: SurfaceGraph): (sample: SurfaceSample
           if (!length) throw new RangeError('Surface graph normal is zero; supply a nonzero normal');
           v = map([v], (x) => x / length);
         }
+        // Roughness floor 0.045: minimum perceptual roughness, Filament design document (published engine standard).
         if (['opacity', 'metalness', 'roughness'].includes(slot))
           v = Math.max(slot === 'roughness' ? 0.045 : 0, Math.min(1, v as number));
         output[slot] = typeof v === 'number' ? v : [...v];

@@ -184,6 +184,7 @@ async function finish(
           ]);
         }
     }
+  // Direct form factor cos_i cos_j A / (pi r^2): Goral et al. 1984; Cohen & Wallace 1993.
   for (const [{ corner, u, v, normal, radiance, twoSided }, from] of sources) {
     const area = length(cross(u, v));
     for (let i = 0; i < samples; i++) {
@@ -236,6 +237,8 @@ async function finish(
       tried = new Uint32Array(input.count);
     for (let i = 0; i < samples; i++) {
       if (!(i & 31)) await checkpoint(t.signal);
+      // Bounce gather: cosine-weighted hemisphere rays by Malley's method (PBRT 4e sec. A.5) in a branchless basis (Duff
+      // et al. 2017); the 1e-3 ray offset is Margo's.
       const [rx, ry, rz] = normals.subarray(i * 3, i * 3 + 3),
         sign = rz >= 0 ? 1 : -1,
         k = -1 / (sign + rz || 1),

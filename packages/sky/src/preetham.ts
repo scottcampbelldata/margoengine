@@ -1,4 +1,7 @@
 import type { SkyFeatures } from './base.js';
+// Perez distribution, its turbidity coefficients and the zenith luminance and chromaticity polynomials: Preetham,
+// Shirley & Smits 1999, Appendix A.2; XYZ to linear sRGB matrix: IEC 61966-2-1. The 0.05 luminance scale, the
+// horizon fade smoothstep(-0.2, 0.05, sun.y) and the 0.01 / 0.001 clamps are Margo tuning.
 /** Preetham analytic day model (the default `model`); needs no precomputed tables. */
 export const preetham: NonNullable<SkyFeatures['preetham']> = {
   wgsl: `fn perez(theta:f32,gamma:f32,a:f32,b:f32,c:f32,d:f32,e:f32)->f32{return (1.0+a*exp(b/max(0.01,cos(theta))))*(1.0+c*exp(d*gamma)+e*cos(gamma)*cos(gamma));}

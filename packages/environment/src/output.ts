@@ -35,6 +35,8 @@ export interface ColorOutputOptions {
 
 // Reads the canvas-format image the frame drew (sRGB-encoded, Rec.709), adds Tonemap's linear excess (HDR highlights
 // and colours outside sRGB), converts to linear P3 when asked, clamps to the output range and encodes again.
+// sRGB transfer: IEC 61966-2-1. Linear sRGB to linear Display P3 matrix derived from the BT.709 and SMPTE EG 432-1
+// (P3, D65) primaries.
 const shader = /* wgsl */ `
 @group(0) @binding(0) var image:texture_2d<f32>;
 @group(0) @binding(1) var excess:texture_2d<f32>;

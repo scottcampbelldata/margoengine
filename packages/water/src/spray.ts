@@ -6,8 +6,12 @@ import { fogWgsl } from '../../shared/fog.js';
 import { margoError } from '../../shared/errors.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+// random(): the xxHash32 avalanche finaliser (Y. Collet, xxHash specification): primes 2246822519 = 0x85EBCA77 and
+// 3266489917 = 0xC2B2AE3D with shifts 16 / 13 / 16.
 const particles = `struct Particle {position:vec4f,velocity:vec4f}
 fn random(value:u32)->f32 {var x=value;x=(x^(x>>16u))*2246822519u;x=(x^(x>>13u))*3266489917u;return f32(x^(x>>16u))/4294967295.0;}`;
+// Seed primes 73856093, 19349663 and 83492791: Teschner et al. 2003, "Optimized Spatial Hashing for Collision Detection
+// of Deformable Objects". Ballistics under g = 9.81; spawn rates and droplet sizes 0.018 / 0.025 are Margo's.
 const simulate =
   waterFrame +
   particles +

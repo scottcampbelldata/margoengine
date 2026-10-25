@@ -49,6 +49,8 @@ export interface SelectionOptions {
   /** Also outline the hidden (occluded) parts, dashed by default (`true` = `{dash: 4, opacity: 0.85}`). Mutable like the other options. */
   xray?: boolean | XRayOptions;
 }
+// Outline distance field by jump flooding: Rong & Tan, "Jump Flooding in GPU with Applications to Voronoi Diagram and
+// Distance Transform" (I3D 2006).
 const seedCode = `
 @group(0) @binding(0) var mask:texture_2d<f32>;
 @group(0) @binding(1) var output:texture_storage_2d<rg32sint,write>;

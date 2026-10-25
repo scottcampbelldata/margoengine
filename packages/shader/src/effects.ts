@@ -95,6 +95,7 @@ export interface VignetteOptions extends NodePassOptions {
  * Darkens towards the screen corners. Distance from the centre is measured in UV units scaled so the corners are 1
  * (not aspect-corrected, so the falloff is an ellipse on non-square screens); pixels inside `radius` are unchanged and
  * the darkening rises with a smoothstep over `softness`. The result is clamped to 0..1.
+ * The parameterisation and its defaults are a Margo design choice.
  * @throws RangeError when a given option is not a finite number.
  */
 export function vignette(options: VignetteOptions = {}): ScreenEffect<{

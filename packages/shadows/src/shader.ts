@@ -12,6 +12,7 @@ const filters: Record<ShadowFilter, string> = {
   // arrays in per-pixel scratch memory, which phone GPUs handle badly. Each pixel starts the spiral at its own angle
   // from interleaved gradient noise of its screen position (Jimenez 2014), so a penumbra shows fine noise instead of
   // the steps of one pattern shared by every pixel. No time term: the same view renders the same pixels every frame.
+  // PCSS blocker search and penumbra estimate: Fernando 2005, "Percentage-Closer Soft Shadows".
   soft: /* wgsl */ `
   let angle=noise.x*6.2831853;let turn=vec2f(cos(angle),sin(angle));
   let search=max(texel.x,shadowFrame.settings.x*reference*shadowFrame.ranges[layer]*length(rowX)*0.5);
@@ -36,6 +37,7 @@ const filters: Record<ShadowFilter, string> = {
   return visibility/32.0;`,
   // Each tap is the sampler's 2x2 bilinear comparison; four of them half a texel apart add up to a 3x3-texel
   // quadratic B-spline. Written out, not looped: no arrays, no blocker search, no transcendental per tap.
+  // PCF: Reeves, Salesin & Cook 1987, "Rendering Antialiased Shadows with Depth Maps".
   pcf: /* wgsl */ `
   let h=texel*0.5;let tapLayer=i32(layer);let a=vec2f(h.x,-h.y);
   return (textureSampleCompareLevel(shadowMap,shadowSampler,uv-h,tapLayer,reference-dot(h,slope))+textureSampleCompareLevel(shadowMap,shadowSampler,uv+h,tapLayer,reference+dot(h,slope))+textureSampleCompareLevel(shadowMap,shadowSampler,uv-a,tapLayer,reference-dot(a,slope))+textureSampleCompareLevel(shadowMap,shadowSampler,uv+a,tapLayer,reference+dot(a,slope)))*0.25;`,
@@ -43,6 +45,8 @@ const filters: Record<ShadowFilter, string> = {
   return textureSampleCompareLevel(shadowMap,shadowSampler,uv,i32(layer),reference);`,
 };
 // Compare on the receiver plane; cover comparison-sampler subtexel footprints.
+// Receiver-plane depth bias: Isidoro 2006, GDC "Shadow Mapping: GPU-based Tips and Techniques". Normal-offset
+// receiver position: Holbert 2011, "Normal Offset Shadows". shadowNoise is interleaved gradient noise (Jimenez 2014).
 // Directional lights use angular size and orthographic depth separation.
 // shadowNoise rebuilds the fragment's screen pixel from the camera view and settings.w (pixels per unit at depth 1), so
 // it needs no fragment input: x is interleaved gradient noise of the pixel, y of the transposed pixel (a second pattern,

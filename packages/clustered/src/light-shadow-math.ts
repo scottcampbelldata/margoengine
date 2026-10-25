@@ -208,6 +208,7 @@ export function viewSlices(
     farCorner = depth(unproject(-1, -1, 0)),
     far = Number.isFinite(farCorner) && farCorner > near ? farCorner : Infinity,
     end = Math.max(Math.min(distance, far), near + 1e-4 * Math.max(1, Math.abs(near))),
+    // Practical split scheme with lambda 0.5: Zhang et al. 2006, "Parallel-Split Shadow Maps".
     split = (i: number) => {
       const t = i / count,
         uniform = near + (end - near) * t;

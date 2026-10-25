@@ -80,6 +80,10 @@ fn sliceDepth(s:f32)->f32 {let x=s/volume.grid.z;return volume.shape.x*x*x;}
 `;
 // t = distance beyond the near plane along the view axis: dot(plane, (p, 1)), for perspective and orthographic cameras.
 // A screen point's ray runs from its near-plane point n through the depth-0.5 point; p(t) = n + d * t / dot(d, plane.xyz).
+// Sources: Henyey & Greenstein 1941 phase (12.5663706 = 4 pi); froxel grid and reprojection after Wronski 2014;
+// per-slice analytic, energy-conserving integration (S - S T) / sigma after Hillaire 2015, "Physically Based and
+// Unified Volumetric Rendering in Frostbite". Noise weights 1.3333 / 0.6667, lacunarity 2.11, the offset and the four
+// stratified shadow samples are Margo tuning.
 const compute = (lights: string | undefined, shadows: string | undefined) =>
   struct +
   (lights ?? '') +
@@ -175,6 +179,7 @@ ${/* @__PURE__ */ clusterCell('p')}
     textureStore(integrated,vec3u(id.xy,z),vec4f(light,optical));
   }
 }`;
+// Opacity 1 - exp(-tau): Beer-Lambert.
 // Premultiplied over the scene: rgb = in-scattered light, a = 1 - transmittance. Tone mapped like sky fog on a display target.
 const composite =
   struct +
@@ -197,6 +202,7 @@ const finite = (value: unknown): value is number => typeof value === 'number' &&
 const vector = (value: Vec3 | undefined, min: number, max = Infinity): boolean =>
   value === undefined ||
   (Array.isArray(value) && value.length === 3 && value.every((v) => finite(v) && v >= min && v <= max));
+// Halton 1960 low-discrepancy sequence for the froxel jitter.
 const halton = (index: number, base: number): number => {
   let f = 1,
     r = 0;

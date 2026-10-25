@@ -15,6 +15,7 @@ fn groupMax(v:f32,local:u32)->f32 {
 
 // Orthographic cameras (ortho.x): reversed-Z depth is linear in view distance, and blur grows linearly with defocus.
 // Each 8x8 workgroup also writes its tile's largest near-field radius.
+// Circle of confusion from the thin-lens equation (Potmesil & Chakravarty, "A Lens and Aperture Camera Model", 1981).
 export const cocShader = `${params}
 @group(0) @binding(1) var depth:texture_depth_2d;
 @group(0) @binding(2) var coc:texture_storage_2d<rg32float,write>;
@@ -33,6 +34,7 @@ ${groupMax}
   if(local==0u){textureStore(tiles,vec2i(tile.xy),vec4f(m,0,0,0));}
 }`;
 
+// Spiral taps on the golden angle (Vogel 1979).
 // Far-field gather of n spiral taps over the center's own disk into farColor/farWeight; only background samples
 // count, so foreground stays in its own layer. A constant n lets the compiler fold the tap offsets.
 const far = (n: number) => `for(var i=0u;i<${n}u;i++){

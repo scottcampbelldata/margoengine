@@ -4,6 +4,9 @@ import { cotangentFrameShader } from '../../shared/tangent-frame.js';
 import { ggxD, smithG } from '../../shared/light-terms.js';
 import { sheenAlbedoWGSL, sheenBrdfWGSL } from '../../shared/sheen.js';
 // Hemisphere ambient and GGX direct light, shared by the compact and extended shaders.
+// Direct light: glTF 2.0 specification Appendix B (GGX D: Walter et al. 2007, eq. 33; Smith G: eq. 34; Fresnel:
+// Schlick 1994; dielectric F0 0.04 = IOR 1.5). Hemisphere ambient (ground (0.35, 0.3, 0.25) to sky 1 by n.y / 2 + 1/2,
+// specular weight f0 x 0.5): a Margo design choice.
 const lightingTerms = /* wgsl */ `fn hemisphere_ambient(s:Surface)->vec3f {
   let f0=mix(vec3f(0.04),s.base.rgb,s.metal);
   let hemisphere=mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0));
@@ -22,6 +25,7 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
   return ((1-fresnel)*(1-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
 }
 `;
+// Minimum perceptual roughness 0.045 (the s.roughness clamp): Filament design document (published engine standard).
 export const pbrShader = /* wgsl */ `
 ${neutralShader}
 ${cotangentFrameShader}
@@ -100,6 +104,7 @@ ${lightingTerms}@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->
 // margoFaceTest/margoAlphaTest are pipeline constants: gltf-pro turns them off where they can never discard
 // (back faces are culled; only MASK materials alpha-test), because any discard in the shader costs early depth testing
 // (0.85 -> 0.52 ms GPU, full-screen DamagedHelmet, Arc 140V).
+// Minimum perceptual roughness 0.045: Filament design document (published engine standard).
 export const extendedPBRShader = /* wgsl */ `
 ${neutralShader}
 ${cotangentFrameShader}
@@ -384,6 +389,10 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {return margoAmbientTerm(i
   return out;
 }
 // The physical variant's edits; `sample(name)` is a map slot's vec4f and `bindings` its group-1 declarations.
+// Sources: dielectric F0 ((ior - 1) / (ior + 1))^2 x specular: KHR_materials_ior, KHR_materials_specular; clearcoat
+// F0 0.04 and the cc x Fresnel mix: KHR_materials_clearcoat; sheen albedo scaling: KHR_materials_sheen "Albedo-scaling
+// technique"; coat roughness floor 0.045: Filament design document; sheen roughness floor 0.03 and coat ambient 0.5:
+// Margo design choices.
 const physicalEdits = (sample: (name: string) => string, bindings: string): [string, string][] => [
   ['emissive:vec3f}', 'emissive:vec3f, f0:vec3f, tr:f32, th:f32, cn:vec3f, cc:f32, cr:f32, sh:vec4f}'],
   ['var emissiveSampler:sampler;', 'var emissiveSampler:sampler;\n' + bindings],
@@ -532,6 +541,7 @@ fn margoIridescence(f0:vec3f,c1:f32,thickness:f32,film:f32)->vec3f {
 `;
 // KHR_materials_anisotropy: the texture's direction (default +X) rotated by anisotropyRotation in tangent space, as a
 // world tangent orthogonal to the shading normal, and the strength; plus the bent normal its notes suggest for IBL.
+// Bent-normal weight (1 - s (1 - r))^4: KHR_materials_anisotropy, "Image-based lighting".
 const anisotropyWgsl = `fn margoAnisotropy(n:vec3f,t:vec3f,b:vec3f,a:vec3f)->vec4f {
   let d=a.xy*2-1; let dir=select(vec2f(1,0),d/length(d),dot(d,d)>1e-8); let r=vec2f(f.aniso.y*dir.x-f.aniso.z*dir.y,f.aniso.z*dir.x+f.aniso.y*dir.y);
   let ta=t*r.x+b*r.y; let o=ta-n*dot(n,ta); return vec4f(o/max(length(o),1e-6),f.aniso.x*a.z);
@@ -544,6 +554,8 @@ fn margoBent(s:Surface,v:vec3f)->vec3f {
  * Direct light: GGX (Burley's anisotropic form when anisotropic, with the height-correlated visibility of the
  * KHR_materials_anisotropy notes), Fresnel mixed with the thin-film Fresnel (diffuse weighted by 1 - its largest channel),
  * diffuse reduced by transmission and split into reflection and back-side transmission (KHR_materials_diffuse_transmission).
+ * Sources: anisotropic D and V: KHR_materials_anisotropy "Implementation" (Burley 2012; Heitz 2014); isotropic
+ * separable Smith V: glTF 2.0 Appendix B.
  */
 export const directWgsl = (anisotropic: boolean): string => `fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {
   let h=normalize(v+l); let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
@@ -567,6 +579,7 @@ export const directWgsl = (anisotropic: boolean): string => `fn margoDirect(s:Su
 // hook weighs it by the front interface's Fresnel at n.v), anisotropic bent normal.
 // ponytail: transmission scales the base colour, so partly metallic transmissive texels also lose metal F0, and anisotropy
 // bends the diffuse normal too; an exact split needs hooks that take diffuse colour and F0 separately.
+// The layering above is a Margo derivation; margoSky is the Margo design-choice hemisphere of lightingTerms.
 const ambientWgsl = (
   plan: ExtendedPlan,
 ) => `fn margoSky(n:vec3f)->vec3f {return mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(n.y*0.5+0.5,0.0,1.0));}

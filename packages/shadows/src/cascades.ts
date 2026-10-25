@@ -5,6 +5,7 @@ import { finiteVector } from '@margoengine/math/validate';
  * Far distance of each cascade, blending logarithmic (`lambda` 1) and uniform (`lambda` 0) splits of [near, far].
  * With `count` below 4 the first `count` entries split the range and the rest repeat `far`, so a shader that selects
  * a cascade by comparing view depth against the splits never picks an unused one.
+ * Practical split scheme: Zhang, Sun, Xu & Lo 2006, "Parallel-Split Shadow Maps".
  */
 export function cascadeSplits(
   near: number,
@@ -37,6 +38,7 @@ export function cascadeSplits(
  * Fits one light-space orthographic matrix per cascade (16 floats each in `matrices`) around a bounding sphere of
  * the camera slice between consecutive `splits`, snapped to whole texels. `ranges` receives each cascade's depth
  * extent. Only the first `count` cascades are fitted; the rest of `matrices` and `ranges` is zeroed.
+ * Sphere fit and texel snapping: Valient 2008, "Stable Rendering of Cascaded Shadow Maps" (ShaderX6).
  */
 export function fitCascades(
   camera: Camera,

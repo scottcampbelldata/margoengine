@@ -87,6 +87,7 @@ const shell = (i: number): number => {
  * frames. Chunks whose light changed, and loaded neighbours whose border shell holds a changed cell, go into
  * `world.dirty`. A removed chunk's cells keep their heights in the heightmap, so caves stay dark when the chunks above
  * them unload; light that reached other chunks through it goes.
+ * Breadth-first flood fill (textbook); 4-bit levels 0-15 are a common block-game design choice.
  */
 export class VoxelLighting {
   private readonly world: VoxelWorld;

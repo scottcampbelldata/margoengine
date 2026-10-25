@@ -1,4 +1,6 @@
 // Screen-space tracing shared by SSR and SSGI: the fullscreen vertex stage, the Hi-Z reduction and the Hi-Z ray march.
+// Hi-Z tracing after Y. Uludag, "Hi-Z Screen-Space Cone-Traced Reflections" (GPU Pro 5, 2014) and McGuire & Mara,
+// "Efficient GPU Screen-Space Ray Tracing" (JCGT 3(4), 2014); the start offset and nudge constants are Margo's.
 // SSR's composite is assembled from these pieces, so its shader text is what it was before they moved here.
 export const vertex =
   '@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}\n';

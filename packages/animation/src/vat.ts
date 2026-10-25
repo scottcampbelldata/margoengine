@@ -272,6 +272,7 @@ fn texel(row:u32,v:u32,k:u32)->vec4f {let i=(row*u32(f.vat.x)+v)*2u+k;let w=u32(
 `,
   srgbShader =
     'fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}\n';
+// GGX (Walter et al. 2007) + Schlick, F0 0.04 (glTF 2.0 App. B); hemisphere fill is Margo design (gltf-pro's).
 export const vatShader = `${neutralShader}${vatVertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, PBR Neutral + sRGB unless the target is HDR.
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let albedo=(f.base*textureSample(map,mapSampler,i.uv)).rgb;let rough=f.options.z;let metal=f.options.w;
@@ -584,6 +585,7 @@ export class VATCrowd implements EnginePlugin {
     f.set(e.lighting.radiance, 24);
     f.set(this.color, 28);
     f[32] = this.time;
+    // 0.045: minimum perceptual roughness of the Filament design document (published engine standard).
     f[34] = Math.min(1, Math.max(0.045, this.roughness));
     f[35] = this.metalness;
     f[36] = this.vat.vertexCount;

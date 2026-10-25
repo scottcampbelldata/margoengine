@@ -57,6 +57,8 @@ export interface SSAOSource {
     external?: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction },
   ): void;
 }
+// 32-sample kernel on a golden-angle spiral (Vogel 1979), lengths lerp(0.1, 1, s^2) toward the centre as in
+// J. Chapman, "SSAO Tutorial" (2013).
 function hemisphere(): Float32Array {
   const values = new Float32Array(128);
   for (let i = 0; i < 32; i++) {
@@ -250,6 +252,7 @@ export class SSAO implements EnginePlugin {
       format: 'rgba8unorm',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
+    // 4x4 tiled rotation vectors (Chapman 2013), angles on the golden-angle spiral.
     const noise = new Uint8Array(64);
     for (let i = 0; i < 16; i++) {
       const a = i * 2.399963229728653;
@@ -380,7 +383,7 @@ export class SSAO implements EnginePlugin {
     pass.draw(3);
     pass.end();
   }
-  /** Stacked: darken the ambient term of `input`; Reinhard-encoded only as the display output. */
+  /** Stacked: darken the ambient term of `input`; Khronos PBR Neutral encoded only as the display output. */
   private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
     const key = output.format + output.multisample.count + output.hdr;
     if (this.key !== key) {

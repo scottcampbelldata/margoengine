@@ -186,6 +186,7 @@ function resolveSettings(device: GPUDevice, source: EnvironmentSource, options: 
   if (!isPowerOfTwo(specularSize) || specularSize > size)
     throw new RangeError('specularSize must be a power of two no larger than size');
   const maxMips = Math.log2(specularSize) + 1;
+  // Margo design choice: log2(size) - 2 mips (at least 2), roughness linear in mip (r x (mips - 1)).
   const specularMips = options.specularMips ?? Math.min(maxMips, Math.max(2, Math.log2(specularSize) - 2));
   if (!Number.isInteger(specularMips) || specularMips < 1 || specularMips > maxMips)
     throw new RangeError(`specularMips must be an integer from 1 to ${maxMips}`);

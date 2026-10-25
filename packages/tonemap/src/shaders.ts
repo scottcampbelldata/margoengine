@@ -1,4 +1,8 @@
 // Color transforms from the references in ../NOTICE.md.
+// ACEScg (AP1, D60) to linear sRGB: derived from the ACES S-2014-004 AP1 and BT.709 primaries with Bradford D60 to
+// D65 adaptation. sRGB <-> Display P3: derived from the SMPTE EG 432-1 (D65) and BT.709 primaries. 3D LUT: Adobe Cube
+// LUT Specification 1.0, trilinear lookup. Exposure exp2(stops); contrast about 18% grey (Margo's form). sRGB:
+// IEC 61966-2-1. HDR rolloff: Khronos PBR Neutral's compression aimed at the display peak (Margo derivation).
 import { agxShader } from '../../shared/agx.js';
 import { acesShader } from '../../shared/aces.js';
 import { neutralShader } from '../../shared/display.js';

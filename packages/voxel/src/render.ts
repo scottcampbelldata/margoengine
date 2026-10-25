@@ -125,6 +125,8 @@ const SUN = 'fn voxelSun(p:vec3f,sky:f32)->f32 {return sky*sky;}',
 // The lit part of both beauty shaders (quads and bevel triangles): frame uniform, surface, sun, ambient and the PBR
 // direct term. `f.glow` is the block light colour and time, `f.ambient.w` the daylight. MODE: 0 opaque, 1 cutout (alpha
 // test), 2 cutout (alpha to coverage), 3 translucent (premultiplied).
+// direct_light: GGX D (Walter et al. 2007, eq. 33), Smith G (Heitz 2014), Schlick 1994 Fresnel, F0 0.04 from
+// glTF 2.0 Appendix B. ambient: Margo design (the gltf-pro hemisphere ground tint and f0*0.5 specular share).
 const LIT = /* wgsl */ `${displayShader}
 struct Frame {camera:mat4x4f,inverse:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,ambient:vec4f,glow:vec4f,viewport:vec4f,settings:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -148,6 +150,9 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
 // ambient term and the sun, so caves and nights stay dark. Its lines keep gltf-pro's hook points
 // (packages/shared/pbr-hooks.js) for shadows, clustered lights, IBL and fog. Transmission (MODE 3) lowers alpha and
 // mixes in the base colour; scatter halves that see-through part at 1.
+// Constants: sRGB decode per IEC 61966-2-1; roughness floor 0.045 is the minimum perceptual roughness of the
+// Filament design document (published engine standard); AO 0.4 + 0.2 x level and the 0.03 ambient floor are Margo
+// design (the corner AO rule itself is Lysenko 2013, see mesher.ts).
 const SHADE = /* wgsl */ `
  let tc=unpack4x8unorm(m.y).rgb;let tint=select(tc/12.92,pow((tc+0.055)/1.055,vec3f(2.4)),tc>vec3f(0.04045));
  let texel=textureSampleGrad(voxelTextures,voxelSampler,uv,voxelLayer(m,f.glow.w),dx,dy);

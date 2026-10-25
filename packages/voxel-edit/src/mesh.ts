@@ -473,6 +473,7 @@ function greedy(
                 axis === 1 ? Math.sign(face) : 0,
                 axis === 2 ? Math.sign(face) : 0,
               );
+              // Corner AO level 0-3 (rule: Lysenko 2013, 0fps.net); the 0.4-1.0 light mapping is Margo design.
               if (shade) out.ao.push(0.4 + ((corners >>> ((a ? (b ? 2 : 1) : b ? 3 : 0) * 2)) & 3) * 0.2);
             }
             out.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);

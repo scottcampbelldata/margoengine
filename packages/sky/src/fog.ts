@@ -3,6 +3,8 @@ import type { SkyFeatures } from './base.js';
 import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
+// Exponential and EXP2 distance fog beyond `start` as the OpenGL fog equations; the height boost
+// (1 + max(-y, 0) h) is Margo's.
 const fragment = `
 @group(0) @binding(3) var sceneDepth:texture_depth_2d;
 @group(0) @binding(4) var<uniform> fog:array<vec4f,2>;

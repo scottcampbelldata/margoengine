@@ -5,6 +5,9 @@ const frame = `struct Frame {camera:mat4x4f,view:mat4x4f,eye:vec4f,viewport:vec4
 struct Ellipse {center:vec4f,axes:vec4f}`;
 // Orthographic cameras (settings.w): the projection is affine, so the Jacobian is the constant pixel scale, sort keys
 // count from the (possibly negative) near plane and spherical harmonics use the fixed view direction.
+// Real SH basis constants: Sloan 2008, "Stupid Spherical Harmonic Tricks", App. A; sign pattern and +0.5 DC offset
+// are the 3DGS asset convention (Kerbl et al. 2023). EWA projection Jacobian and low-pass: Zwicker et al. 2001; the
+// 0.3 px^2 dilation is the 3DGS asset convention (Kerbl et al. 2023) that trained files expect.
 export const project =
   frame +
   `
@@ -58,6 +61,7 @@ export function foggedProject(): string {
     ) + fogWgsl(0, 8)
   );
 }
+// Gaussian falloff to 3 sigma (-4.5 = -0.5 x 3^2), alpha cap 0.99 and 1/255 discard: Kerbl et al. 2023, App. C.
 export const render =
   frame +
   `

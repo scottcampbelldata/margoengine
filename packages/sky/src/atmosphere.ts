@@ -1,4 +1,7 @@
 // Earth, kilometer units. Coarse four-dimensional tables keep this optional pass lightweight.
+// Sources: radii 6360 / 6460 km and scale heights 8 / 1.2 km from Bruneton & Neyret 2008 sec. 2; Rayleigh
+// (5.802, 13.558, 33.1)e-6 /m and Mie 3.996e-6 /m scattering from Hillaire 2020 Table 1; Mie extinction = scattering /
+// 0.9 from Bruneton & Neyret 2008. The turbidity factor max(0.25, (T - 1) / 2) and the sun-disc fade are Margo's.
 // The header is split so a sky without Bruneton omits its phase functions and table lookups; with Bruneton the
 // pieces join back into the exact original text (see bruneton.ts).
 export const head = `

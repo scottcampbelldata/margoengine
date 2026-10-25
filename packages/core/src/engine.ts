@@ -333,6 +333,7 @@ export class Scene {
   readonly stats = { visible: 0, drawCalls: 0 };
   readonly lighting = {
     direction: new Float32Array([3, 5, 4, 3]),
+    // Sun strength 3 and ambient strength 0.15: Margo design choices.
     radiance: new Float32Array([1, 1, 1, 0.15]),
     ambient: new Float32Array([1, 1, 1]),
   };
@@ -697,6 +698,7 @@ export class Engine {
         finite(material, 8, 'Material');
         for (let i = 0; i < 8; i++)
           if (material[i] < 0 || material[i] > 1) throw rangeError('Invalid material', 'material');
+        // 0.045: minimum perceptual roughness, Filament design document (published engine standard).
         if (material[3] !== 1 || material[4] < Math.fround(0.045) || (material[6] !== 0 && material[6] !== 1))
           throw rangeError('Invalid material', 'material');
         this.checkedMaterials.set(mesh.material, this.materialFrame);

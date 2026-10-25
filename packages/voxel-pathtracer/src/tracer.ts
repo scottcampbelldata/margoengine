@@ -228,6 +228,7 @@ interface View extends Targets {
 }
 
 let serial = 0;
+// Khronos PBR Neutral tone mapper (Khronos specification, 2024), CPU twin of shared/display.js.
 const neutral = (c: number[]) => {
   const x = Math.min(c[0], c[1], c[2]),
     offset = x < 0.08 ? x - 6.25 * x * x : 0.04,
@@ -246,6 +247,7 @@ const moving = (s: SceneSnapshot, o: Settings): SceneSnapshot => {
   return s;
 };
 /** 8-bit display value: sRGB, or the power 1 / gamma. */
+// sRGB encoding: IEC 61966-2-1.
 const encode = (v: number, gamma?: number) => {
   const x = Math.min(1, Math.max(0, v));
   return Math.round(255 * (gamma ? x ** (1 / gamma) : x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055));
@@ -572,6 +574,7 @@ export class VoxelPathTracer implements EnginePlugin {
             if (vignette > 0) {
               const x = (i % o.width) + 0.5 - o.width / 2,
                 y = y0 + Math.floor(i / o.width) + 0.5 - o.height / 2,
+                // cos^4 natural vignetting, 1 / (1 + t^2)^2; the 0.2238 scale is fitted to observed MagicaVoxel output.
                 t = (vignette * Math.hypot(x, y)) / (0.2238 * o.height);
               gain /= (1 + t * t) ** 2;
             }

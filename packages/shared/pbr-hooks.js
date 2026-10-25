@@ -11,6 +11,7 @@ export function lightPBR(code, hooks) {
 }
 // gltf-pro's built-in sky light, a fixed gradient times the ambient strength f.radiance.w, wherever a shader writes it (the
 // hemisphere ambient, the clearcoat and sheen defaults, a light probe's fallback; also in materials' and VAT's shaders).
+// The gradient (ground (0.35, 0.3, 0.25) to sky 1) and the f0 x 0.5 ambient specular are Margo design choices.
 const gradient = /mix\(vec3f\(0\.35,0\.3,0\.25\),vec3f\(1(?:\.0)?\),clamp\(([\w.]+)\.y\*0\.5\+0\.5,0\.0,1\.0\)\)/g;
 /** `text` with the built-in sky gradient replaced by the `sky` hook (margoSkyHook) and its strength (`*f.radiance.w`) dropped. */
 const skyText = (text) => text.replace(gradient, 'margoSkyHook($1)').replaceAll('*f.radiance.w', '');

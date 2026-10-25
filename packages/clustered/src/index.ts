@@ -268,6 +268,7 @@ export class Clustered implements EnginePlugin {
         !Number.isFinite(Math.fround(light.intensity ?? 1)) ||
         (light.intensity ?? 1) < 0 ||
         // A wide-gamut (Display P3) colour keeps negative linear sRGB channels; its luminance cannot be negative.
+        // Luma weights: ITU-R BT.709.
         (light.color !== undefined &&
           !(0.2126 * light.color[0] + 0.7152 * light.color[1] + 0.0722 * light.color[2] >= 0))
       )

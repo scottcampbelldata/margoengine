@@ -42,6 +42,8 @@ var<workgroup> sums:array<array<vec3f,9>,64>;
  var scale=array<f32,9>(0.0795775,0.1591549,0.1591549,0.1591549,0.2984155,0.2984155,0.0248680,0.2984155,0.0746039);
  if(t<9u){light[t]=vec4f(sums[0][t]*scale[t],0);}
 }`;
+// Analytic environment BRDF in skyLighting: Karis 2014, "Physically Based Shading on Mobile" (after Lazarov 2013), a
+// published engine standard. Reflection mip = roughness x 3 is Margo's.
 // Patched into the scene shader as margoAmbient, the name SSAO looks for to occlude ambient light.
 const declarations = `@group(0) @binding(8) var<uniform> skyLight:array<vec4f,10>;
 @group(0) @binding(10) var skyLightMap:texture_2d<f32>;

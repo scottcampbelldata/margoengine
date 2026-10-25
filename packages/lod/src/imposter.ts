@@ -576,6 +576,9 @@ export class Imposter {
   }
 }
 
+// Octahedral view grid: Praun & Hoppe 2003, Cigolle et al. 2014 (JCGT 3(2)). Dither: interleaved gradient noise
+// (Jimenez 2014). Relight: GGX (Walter et al. 2007) + Schlick, F0 0.04 (glTF 2.0 App. B); roughness floor 0.045 is
+// the minimum perceptual roughness of the Filament design document (published engine standard).
 /** Draws one atlas: camera-facing quads that reproject the three nearest views (one depth parallax step each), blend them, relight and write per-pixel depth. */
 export const imposterShader = `${neutralShader}
 ${octWGSL}
@@ -635,7 +638,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  let f0=mix(vec3f(0.04),albedo,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
  let direct=((1.0-fresnel)*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*frame.radiance.rgb*frame.light.w;
  var color:vec3f;
- // Match the source's renderer: gltf-pro (hemisphere fill, ACES) or core (flat ambient, Reinhard).
+ // Match the source's renderer: gltf-pro (hemisphere fill) or core (flat ambient), both Khronos PBR Neutral.
  if(atlas.grid.z>0.5){color=direct+(albedo*(1.0-metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(nn.y*0.5+0.5,0.0,1.0))*frame.radiance.w;if(frame.options.x<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}}
  else{color=direct+albedo*(1.0-metal)*frame.radiance.w;if(frame.options.x<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}}
  return Pixel(vec4f(color,coverage),clamp(clip.z/clip.w,0.0,1.0));

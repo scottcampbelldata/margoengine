@@ -111,6 +111,7 @@ export class NodeMaterial extends Material {
       [colorNode, (v) => (colorNode!.type === 'vec4f' ? `s.base = ${v};` : `s.base = vec4f(${v}, s.base.a);`)],
       [opacityNode === undefined ? undefined : cast(opacityNode, 'f32', 'opacityNode'), (v) => `s.base.a = ${v};`],
       [
+        // 0.045: minimum perceptual roughness, Filament design document (published engine standard).
         roughnessNode === undefined ? undefined : cast(roughnessNode, 'f32', 'roughnessNode'),
         (v) => `s.roughness = clamp(${v}, 0.045, 1.0);`,
       ],

@@ -905,6 +905,7 @@ export async function verifyRobloxChunkGLB<S extends PrecisionScene>(
       Boolean(material!.extensions?.KHR_materials_unlit) !== (appearance.shading === 'basic') ||
       !equal(material!.emissiveFactor ?? [0, 0, 0], appearance.emissive) ||
       (pbr?.metallicFactor ?? 1) !== 0 ||
+      // Phong exponent to roughness as exporters/model.ts (Walter et al. 2007 sec. 5.2).
       (pbr?.roughnessFactor ?? 1) !== (appearance.shading === 'phong' ? (2 / (appearance.shininess + 2)) ** 0.25 : 1)
     )
       fail('material appearance');

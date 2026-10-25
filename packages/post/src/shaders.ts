@@ -28,6 +28,8 @@ export const extractShader =
   textureStore(output,p,vec4f(normal,-c.z));
 }
 `;
+// SSAO: normal-oriented hemisphere kernel with a range check, after Mittring, "Finding Next Gen: CryEngine 2"
+// (SIGGRAPH 2007 course) and J. Chapman, "SSAO Tutorial" (2013).
 export const ssaoShader =
   frame +
   `
@@ -57,6 +59,7 @@ export const ssaoShader =
   textureStore(output,p,vec4f(clamp(1-occlusion/f32(samples),0.0,1.0)));
 }
 `;
+// Separable 9-tap bilateral AO blur: Gaussian, depth and normal weights are Margo's own tuning (no external values).
 export const blurShader = `
 @group(0) @binding(0) var input:texture_2d<f32>;
 @group(0) @binding(1) var gbuffer:texture_2d<f32>;
@@ -75,6 +78,7 @@ export const blurShader = `
   textureStore(output,p,vec4f(sum/max(total,0.000001)));
 }
 `;
+// Composite: removes only the ambient share times (1 - AO) (Margo design), then Khronos PBR Neutral via toDisplay.
 export const compositeShader = `
 struct Out {@builtin(position) clip:vec4f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Out {

@@ -54,6 +54,8 @@ export function clearcoatShader(
   coatNormal=select(n,mappedNormal/max(mappedLength,0.000001),mappedLength>0.000001);
 `
     : '';
+  // Coat: GGX (glTF 2.0 Appendix B) with F0 0.04 for IOR 1.5 (KHR_materials_clearcoat); roughness floor 0.045 is the
+  // minimum perceptual roughness of the Filament design document (published engine standard).
   return {
     wgsl: `let materialClearcoat=materialClearcoatLighting(i,front${values ? ',' + values.factor + ',' + values.roughness + (values.normal ? ',' + values.normal : '') : ''});`,
     // Skip even the addition when factor is zero, preserving the base operation order.

@@ -6,7 +6,11 @@ import { LinearToSRGB, parseColor } from '@margoengine/math/color';
 /** Bytes of the fog uniform: colour and height, near/far/density/falloff, camera position. */
 export const FOG_BYTES = 48;
 
-/** WGSL: the fog uniform at `@group(group) @binding(binding)` and `fogAmount(world position)`, 0 (clear) to 1. */
+/**
+ * WGSL: the fog uniform at `@group(group) @binding(binding)` and `fogAmount(world position)`, 0 (clear) to 1.
+ * Linear and EXP2 fog are the OpenGL 1.x fixed-function fog equations; the height term
+ * exp(-falloff max(y - h, 0)) is Margo's.
+ */
 export const fogWgsl = (group, binding) => `
 struct MargoFog {color:vec4f,params:vec4f,eye:vec4f}
 @group(${group}) @binding(${binding}) var<uniform> margoFog:MargoFog;

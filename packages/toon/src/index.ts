@@ -14,7 +14,8 @@ export interface ToonPipelineOptions extends ToonOptions {
 }
 /**
  * Toon look for core meshes: `ToonShading`'s stepped diffuse ramp plus a front-culled inverted-hull pass for
- * silhouette outlines. `Toon.attach(engine, options)`; WebGPU only.
+ * silhouette outlines (back faces pushed out: Raskar & Cohen, "Image Precision Silhouette Edges", I3D 1999; the
+ * default thickness and colour are Margo's). `Toon.attach(engine, options)`; WebGPU only.
  * @throws RangeError when `outline` or `color` is out of range (and ToonShading's own option errors).
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
  */

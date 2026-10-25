@@ -83,6 +83,7 @@ export interface Plan {
 type Extension = (input: BakeInput) => Plan;
 
 const byte = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 255);
+// sRGB encoding per IEC 61966-2-1.
 const srgbByte = (v: number) => byte(v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
 
 /** Yields to the event loop, then throws if `signal` aborted. */

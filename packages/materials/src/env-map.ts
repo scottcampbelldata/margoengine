@@ -47,6 +47,8 @@ export function packEnv(
   if (sh) for (let k = 0; k < 9; k++) out.set([sh[k * 3], sh[k * 3 + 1], sh[k * 3 + 2]], 12 + k * 4);
   return out;
 }
+// Roughness to mip: lod = roughness x top mip (linear; Margo's choice). Ambient = radiance x (F0 A + B) + diffuse
+// irradiance: Karis 2013 split sum ("Real Shading in Unreal Engine 4"); SH basis: Ramamoorthi and Hanrahan 2001.
 const declarations = (
   group: number,
   f0: string,

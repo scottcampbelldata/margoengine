@@ -1,3 +1,5 @@
+// Margo stylised sun and moon: radii 0.014 / 0.018 rad are enlarged for readability (the real sun is about
+// 0.00465 rad); the glow width (/8) and the moon's x4 + pow 8 x 0.025 limb are Margo tuning.
 export const celestialShader = /* wgsl */ `
 const SUN_RADIUS=0.014;const MOON_RADIUS=0.018;
 fn celestialProfile(ray:vec3f,direction:vec3f,radius:f32,angularFootprint:f32)->vec2f {

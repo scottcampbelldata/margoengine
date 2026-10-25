@@ -1174,6 +1174,7 @@ function paste(world: VoxelWorld, placed: readonly Placement[], shift: readonly 
  *   point to tune.
  * - `media`: a translucent block with `scatter` = `_weight`.
  * - `metal`, `glass` and `blend`: `roughness` = `_rough` when stored.
+ * Key meanings follow the MagicaVoxel .vox MATL chunk notes (ephtracy/voxel-model, file-format semantics).
  * A plain diffuse material gives `{}`.
  */
 export function voxBlockOptions(material: VoxMaterial): BlockTypeOptions {

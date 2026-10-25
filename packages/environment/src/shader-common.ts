@@ -1,5 +1,7 @@
 // WGSL helpers shared by the environment bakes: cube faces, equirect lookup, Hammersley points and GGX importance
 // samples. Kept apart from shaders.ts so entries that need only these (probes) do not bundle the other shaders.
+// Hammersley points: van der Corput radical inverse (2^-32 = 2.3283064365386963e-10); GGX half-vector sampling
+// cosTheta = sqrt((1 - xi) / (1 + (alpha^2 - 1) xi)): Walter et al. 2007 eq. 35-36.
 export const common = /* wgsl */ `
 const PI = 3.141592653589793;
 fn faceDirection(face: u32, uv: vec2f) -> vec3f {

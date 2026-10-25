@@ -9,6 +9,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { clusterBrdf } from '../../shared/light-terms.js';
 
 /** Module-scope WGSL of the toon ramp in bind group `group`. */
+// Ramp lookup on half-Lambert n.l x 0.5 + 0.5: Mitchell, McTaggart and Green 2006 ("Shading in Valve's Source Engine").
 export const toonDeclarations = (group: number): string => `@group(${group}) @binding(191) var<uniform> margoToon:vec4f;
 @group(${group}) @binding(192) var margoToonMap:texture_2d<f32>;
 @group(${group}) @binding(193) var margoToonSampler:sampler;
@@ -21,7 +22,8 @@ fn margoToonRamp(nl:f32)->vec3f {
 /**
  * Edits of gltf-pro's lit PBR shader for toon shading: the hemisphere and direct terms (Lambert's hemisphere, the ramped
  * direct light), the layered-hook surface (margoFront: roughness 1, no metal) and, so the G-buffer and ambient entries
- * keep the beauty bind group layout, the ramp's bindings named in `surface`.
+ * keep the beauty bind group layout, the ramp's bindings named in `surface`. The hemisphere colours are a Margo design
+ * choice.
  */
 export const toonEdits: readonly [RegExp | string, string][] = [
   [

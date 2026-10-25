@@ -11,6 +11,9 @@ consolidated build measures **18,876 bytes gzip** for core and **50,207 bytes ra
 Package versions and npm availability remain independent of these source changes.
 The optional React entry measures **20,966 bytes gzip**, with React and optional package peers external; those peers and application code are additional. See the [entry measurements](../examples/package-benchmarks/results/entry-sizes.json) and 74-package consolidation record.
 
+Margo is written clean room: the rule, the process and the source of every lighting and post-processing formula
+are in [clean-room.md](clean-room.md).
+
 Publishing uses the manual, gated [Publish workflow](../.github/workflows/publish.yml)
 from `main`; see the [release guide](releasing.md). `npm run publish:dry-run` checks
 and previews the workspace tarballs locally without publishing.

@@ -21,6 +21,10 @@ export interface LobeShaderConfig {
 }
 
 /** Optional lobes replace only the existing directional BRDF and hemisphere approximation. */
+// Sources: anisotropic GGX D and the mix(a, 1, s^2) width: KHR_materials_anisotropy "Implementation" (Burley 2012);
+// separable anisotropic Smith G1: Heitz 2014; specular-extension Fresnel mix and diffuse x (1 - max F):
+// KHR_materials_specular; sheen albedo scaling: KHR_materials_sheen "Albedo-scaling technique". The hemisphere ambient
+// (ground (0.35, 0.3, 0.25), specular weight 0.5) is a Margo design choice.
 export function lobeShader(
   config: LobeShaderConfig,
 ): Pick<MaterialExtension, 'wgsl' | 'declarations' | 'direct' | 'ambient'> {

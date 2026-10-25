@@ -105,6 +105,12 @@ export interface WaterOptions {
    */
   shadows?: WaterShadowSource;
 }
+// Sources: Gerstner waves (Fournier & Reeves 1986; Tessendorf 2001 sec. 3); Schlick 1994 Fresnel with F0 0.02 =
+// ((1.33 - 1) / (1.33 + 1))^2; sun glint GGX D (Walter et al. 2007) with the Schlick-GGX k = (r + 1)^2 / 8 of Karis
+// 2013; roughness from normal variance after Toksvig 2005 and LEAN (Olano & Baker 2010); Lambert / pi foam; display
+// Khronos PBR Neutral then sRGB (IEC 61966-2-1). Absorption (0.38, 0.10, 0.045) /m is Margo art of the order of
+// pure-water absorption (Pope & Fry 1997); seabed, foam and scatter colours, the sky blur, the roughness constants and
+// the ripple layers are Margo tuning.
 const shader =
   waterFrame +
   oceanWaves +
@@ -411,6 +417,7 @@ export class Water implements EnginePlugin {
       height = 0,
       color = [0.01, 0.18, 0.25],
       foamDistance = 1,
+      // Margo default swell trains.
       waves = [
         { direction: [1, 0.3], amplitude: 0.3, wavelength: 12.73, phase: 0.43 },
         { direction: [1, 0.6], amplitude: 0.15, wavelength: 7.19, phase: 2.17 },
@@ -498,6 +505,7 @@ export class Water implements EnginePlugin {
           w.amplitude,
           k,
           q,
+          // Deep-water dispersion omega = sqrt(g k) (Tessendorf 2001).
           Math.sqrt(9.81 * k),
           w.phase ?? 0,
           t * t * (3 - 2 * t),

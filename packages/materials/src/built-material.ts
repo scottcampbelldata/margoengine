@@ -1475,6 +1475,9 @@ const liveColor = (values: number[], label: string): LiveColor =>
 // (area lights) shade the surface as a dielectric of the matching microfacet roughness (Walter et al. 2007: Beckmann
 // alpha = sqrt(2/(n+2)), roughness = sqrt(alpha); Lambert is roughness 1), and an ambient hook (IBL, probes) keeps only
 // its diffuse part, the term on the surface minus the term on a black surface.
+// Normalisation (n+2)/(8 pi): Akenine-Moller et al., Real-Time Rendering; Hoffman 2010 SIGGRAPH course notes. The
+// hemisphere ambient (ground (0.35, 0.3, 0.25) to sky 1) is a Margo design choice; the margoFront roughness floor 0.045
+// is the minimum perceptual roughness of the Filament design document (published engine standard).
 const phongLobe = (n: string) => `mat_phong.rgb*(mat_phong.w+2)/25.13274123*pow(max(dot(${n},h),0.0001),mat_phong.w)`;
 const litEdits = (phong: boolean): [RegExp | string, string][] => [
   [
@@ -1620,6 +1623,7 @@ function featureUniform(m: Material, device: GPUDevice, owner: object): GPUBuffe
   const buffer = materialBuffer(m, device, owner, 144, 'features'),
     data = (mapState(m, owner).featureData ??= new Float32Array(36));
   data.set(m['featureValues']);
+  // Lambertian response: radiance = irradiance / pi (Lambert).
   if (m.lightMapResponse === 'lambertian') data[3] = m.lightMapIntensity / Math.PI;
   device.queue.writeBuffer(buffer, 0, data);
   return buffer;
@@ -2098,6 +2102,7 @@ export class Material {
     if ((o.specular !== undefined || o.shininess !== undefined) && shading !== 'phong')
       throw new TypeError("Material specular and shininess need phong shading; set shading: 'phong'");
     this.highlight = liveColor(linear(o.specular ?? '#111111', 'specular').slice(0, 3), 'specular');
+    // 30 (Margo's): the exponent whose Walter et al. 2007 GGX roughness (2/(n+2))^(1/4) is 0.5, core's default.
     this.shininess = o.shininess ?? 30;
     if ((o.steps !== undefined || o.gradientMap != null) && shading !== 'toon')
       throw new TypeError("Material steps and gradientMap need toon shading; set shading: 'toon'");

@@ -37,6 +37,7 @@ export interface SMAAOptions {
   enabled?: boolean;
 }
 
+// Preset thresholds and step counts as the SMAA authors publish them (Jimenez et al. 2012).
 const presets: Record<SMAAQuality, readonly [number, number, number]> = {
   low: [0.15, 4, 1],
   medium: [0.1, 8, 1],
@@ -124,6 +125,8 @@ fn contrast(a:vec4f,b:vec4f)->f32 {let d=abs(a-b);return max(select(abs(dot(a.rg
 // Pass 2, blending weights per edge: walk to both ends, read the crossing edges there, look up the covered areas.
 // Out: x, y for the edge on the pixel's top (the pixel above takes this one's colour by x; this one the above's by y),
 // z, w alike for the edge on its left.
+// Edge walk: bilinear double fetch after Jimenez et al., "Practical Morphological Antialiasing" (GPU Pro 2, 2011);
+// its stop thresholds 0.83 and 0.015 follow from Margo's 21/7/3/1 (in 32nds) edge encoding.
 const weightShader =
   fullscreen +
   uniforms +

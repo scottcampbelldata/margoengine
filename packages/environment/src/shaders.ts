@@ -2,7 +2,7 @@
 // Cube face convention (WebGPU/D3D/GL): layers +X, -X, +Y, -Y, +Z, -Z; within a face u grows to the right
 // and v grows down the texel rows, both in -1..1.
 // Equirect convention: u = 0.5 + atan2(d.x, -d.z) / 2PI (image center faces -Z, +X is right of center),
-// v = acos(d.y) / PI (row 0 is straight up, +Y).
+// v = acos(d.y) / PI (row 0 is straight up, +Y). Standard latitude-longitude mapping; the orientation is Margo's choice.
 import { displayShader } from '../../shared/display.js';
 import { ggxDenominator } from '../../shared/light-terms.js';
 import { common } from './shader-common.js';
@@ -31,6 +31,7 @@ export const equirectToCube =
 }
 `;
 
+// 2x2 box filter (0.25 per texel) for the cube mip chain.
 export const downsample = /* wgsl */ `
 @group(0) @binding(0) var source: texture_2d_array<f32>;
 @group(0) @binding(1) var destination: texture_storage_2d_array<rgba16float, write>;
@@ -47,6 +48,8 @@ export const downsample = /* wgsl */ `
 // Karis split-sum specular prefilter with N = V = R, rendered one face and mip at a time. Each sample reads
 // the source mip whose texel solid angle matches the sample's solid angle (GPU Gems 3 ch. 20 filtered
 // importance sampling), which removes fireflies from small bright sources at low sample counts.
+// Sources: Karis 2013, "Real Shading in Unreal Engine 4", eq. 4-6 (split sum, pdf = D/4 with V = N); Colbert &
+// Krivanek, GPU Gems 3 ch. 20, eq. 13 (lod = 0.5 log2(Omega_s / Omega_p) + 1, the +1 bias included).
 export const prefilter =
   common +
   /* wgsl */ `
@@ -94,6 +97,8 @@ struct Params { roughness: f32, sourceSize: f32, samples: u32, lod0: f32, face: 
 // Projects the cube onto the 9 real L2 spherical harmonics with exact per-texel solid angles, reduced in
 // one 64-thread workgroup. Output: result[0..8] = irradiance / PI coefficients (diffuse ready),
 // result[16..24] = radiance coefficients.
+// Ramamoorthi & Hanrahan 2001 eq. 3 (real SH basis constants) and eq. 8 (irradiance bands 1, 2/3, 1/4); Sloan 2008,
+// "Stupid Spherical Harmonics Tricks". The per-texel solid angle (atan area element) is exact cube geometry.
 export const sphericalHarmonics =
   common +
   /* wgsl */ `
@@ -149,6 +154,8 @@ fn areaElement(x: f32, y: f32) -> f32 { return atan(x * y / sqrt(x * x + y * y +
 
 // Split-sum environment BRDF: x = NdotV, y = perceptual roughness (texel centers), output (scale, bias)
 // so that specular = prefiltered * (F0 * scale + bias). Uses the same GGX D and separable Smith-GGX G as core.
+// Karis 2013 eq. 8-9 (split-sum scale and bias); Walter et al. 2007 eq. 33-35 (GGX D, Smith G1, sampling);
+// Schlick 1994 Fresnel weight (1 - v.h)^5.
 // Written as size x size f16 pairs into a storage buffer (not a texture): IBL then binds one sampled texture.
 export const brdfLut =
   common +
@@ -196,7 +203,8 @@ struct Varyings { @builtin(position) position: vec4f, @location(0) ndc: vec2f }
 `;
 
 // Full-screen background at reversed-Z depth 0, so the 'greater-equal' test only passes where the depth
-// buffer still holds its cleared value. Output matches core: Reinhard then sRGB encode into the canvas
+// buffer still holds its cleared value. Output matches core: Khronos PBR Neutral then sRGB encode
+// (shared/display.js) into the canvas
 // format, or linear radiance when the destination is an HDR rgba16float buffer (outputHdr).
 export const background =
   common +
@@ -233,6 +241,7 @@ ${screen}${displayShader}
 // image's own pixels show, as ColorBackground's colour does); on an HDR target the linear value (outputHdr).
 // Cylinder: u as the equirect; v linear in height on the unit-radius cylinder, the image spanning params.z of it
 // centred on the horizon; clamping v repeats the top and bottom rows above and below.
+// sRGB encoding per IEC 61966-2-1 (12.92, 1.055, 2.4, 0.0031308).
 export const imageBackground = (shape: 'box' | 'sphere' | 'cylinder'): string =>
   common +
   /* wgsl */ `

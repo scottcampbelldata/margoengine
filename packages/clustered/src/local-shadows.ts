@@ -227,6 +227,7 @@ export class LocalShadowMaps {
       )
         throw new TypeError('Local shadow settings must be numbers');
       const far = Math.fround(settings.far ?? light.range);
+      // Margo defaults: near min(0.1, far / 100), bias 0.0005, normalBias 0.02.
       const near = Math.fround(settings.near ?? Math.min(0.1, far / 100)),
         bias = Math.fround(settings.bias ?? 0.0005),
         normalBias = Math.fround(settings.normalBias ?? 0.02);

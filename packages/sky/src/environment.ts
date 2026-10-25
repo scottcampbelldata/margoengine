@@ -1,5 +1,6 @@
 // The sky as surroundings: what water reflects and what lights the scene. Shared by the reflection and lighting
 // features; both compile it after the sky's own WGSL (`code`), which supplies daySky, nightSky, moonRadiance and cloudSky.
+// The below-horizon ground colour (0.015, 0.018, 0.012) is a Margo choice.
 export const environment = /* wgsl */ `
 // Radiance arriving from direction w, without the sun's disc (the engine light carries the sun). footprint is the
 // sample's angular size in radians.

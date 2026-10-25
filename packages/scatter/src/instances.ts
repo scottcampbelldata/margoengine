@@ -77,6 +77,7 @@ const translucentLayouts: GPUVertexBufferLayout[] = [
 // Light through thin leaves (Barre-Brisebois and Bouchard 2011): a lobe around the direction away from the sun, bent by
 // the normal so curved canopies light unevenly, plus wrapped diffuse on the shadow side. Unshadowed (a canopy's own
 // shadow map would hide its back-lit side); baked occlusion stands in for thickness.
+// Wrapped diffuse: Green 2004, GPU Gems ch. 16. Distortion 0.4, power 4 and weight 0.3 are Margo tuning.
 /** The first @location a struct does not use: patches that add varyings to a shared struct must not collide. */
 export const freeLocation = (struct: string): number =>
   Math.max(-1, ...[...struct.matchAll(/@location\((\d+)\)/g)].map((m) => Number(m[1]))) + 1;

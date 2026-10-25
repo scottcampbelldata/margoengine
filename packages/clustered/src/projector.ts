@@ -49,6 +49,7 @@ const MAX_LIGHTS = 1024,
 
 // Header: light entries; per image its word offset, width, height and sRGB flag; per light its image (index + 1, 0 for
 // none), the tangent of its vertical half-angle (0: the cone's) and its aspect; then the texels.
+// sRGB decode per IEC 61966-2-1.
 const sampling = (group: number) => /* wgsl */ `
 struct ClusterProjectorData {header:vec4u,images:array<vec4u,${MAX_PROJECTOR_IMAGES}>,words:array<u32>}
 @group(${group}) @binding(${BINDING}) var<storage,read> clusterProjectorData:ClusterProjectorData;

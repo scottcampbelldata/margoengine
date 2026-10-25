@@ -297,6 +297,7 @@ const finite = (value: number, label: string, min = -Infinity): number => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min) throw new RangeError(`Invalid fog ${label}`);
   return value;
 };
+// Linear and EXP2 fog as the OpenGL 1.x fixed-function fog equations; height thinning is a plain exponential density.
 const fogWgsl = (group: number) => `struct MargoFog {color:vec4f, params:vec4f}
 @group(${group}) @binding(${FOG_BINDING}) var<uniform> margoFog:MargoFog;
 fn fogAmount(p:vec3f,eye:vec3f)->f32 {

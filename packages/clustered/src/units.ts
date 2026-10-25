@@ -99,6 +99,7 @@ export function lumensToNits(lumens: number, width: number, height: number, twoS
 export function nitsToCandela(nits: number, width: number, height: number): number {
   return positive(nits, 'Nits') * positive(width, 'Width') * positive(height, 'Height');
 }
+// EV = log2(N^2 / t) at ISO 100: ISO 2720.
 /** Exposure value at ISO 100 of a camera with f-number `aperture`, `shutter` seconds and `iso` sensitivity. */
 export function ev100(aperture: number, shutter: number, iso = 100): number {
   if (!(aperture > 0 && shutter > 0 && iso > 0) || ![aperture, shutter, iso].every(Number.isFinite))

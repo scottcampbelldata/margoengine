@@ -77,6 +77,8 @@ function checkedOptions(value: ImagePostOptions): ImagePostOptions {
 
 // Both the PostStack display and exported image use this one engine-owned pass. The prepass uses mode 3 to apply
 // the producer's exposure/vignette before bloom; the viewport producer has already done that to its HDR target.
+// Vignette: the natural-vignetting cos^4 law, 1/(1 + t^2)^2; its 0.2238 field scale is fitted to observed MagicaVoxel
+// output (docs/magicavoxel-parity.md). sRGB encode: IEC 61966-2-1.
 const shader =
   neutralShader +
   agxShader +

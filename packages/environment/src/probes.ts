@@ -183,6 +183,10 @@ fn probeOct(d:vec3f)->vec2f {
   return q*0.5+0.5;
 }
 `;
+// Sources: octahedral maps Cigolle et al. 2014 (JCGT 3(2)); L1/L2 SH Ramamoorthi & Hanrahan 2001; box-projected
+// reflections Bjorke 2004 (GPU Gems ch. 19) and Lagarde & Zanuttini 2012; split sum Karis 2013. Without an
+// Environment the analytic environment BRDF is Karis 2014, "Physically Based Shading on Mobile" (after Lazarov 2013),
+// a published engine standard. The 1e-3 box-fade floor is Margo's.
 // Shading: volume irradiance (trilinear over the eight nearest probes, evaluated like environment's iblIrradiance) and
 // reflection radiance (box projection, trilinear over the prefiltered octahedral levels), mixed with the fallback by weight.
 const shadingWgsl = (group: number, environment: boolean) =>
@@ -267,6 +271,8 @@ fn probeShade(p:vec3f,n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32,ambient:vec
 // add their sums in workgroup memory, so no thread runs a long chain of dependent texture reads (one thread per texel
 // looping over every sample was latency-bound: a 2.0 ms median for a 128 px probe at 256 samples on an RTX A6000).
 // Same samples, same estimate.
+// GGX prefilter after Walter et al. 2007 and Karis 2013 (weight D nl / r^3); cube texel weight (1 + u^2 + v^2)^-3/2
+// is the exact texel solid angle, normalised to 4 pi.
 const bakeWgsl = (environment: boolean, sampled: boolean) =>
   dataWgsl('read_write', 0, 0) +
   (sampled ? common : '') +
@@ -672,6 +678,7 @@ export class LightProbes extends ShaderEffect {
   }
   protected hooks(group: number): PBRHooks {
     // Without an environment the fallback is gltf-pro's own hemisphere ambient (its `ambient(s)`, which the hook replaces).
+    // Ground (0.35, 0.3, 0.25) and the 0.5 specular weight are Margo design choices.
     const ambient = this.environment
       ? 'vec3f(0)'
       : '(s.base.rgb*(1.0-s.metal)+mix(vec3f(0.04),s.base.rgb,s.metal)*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w';

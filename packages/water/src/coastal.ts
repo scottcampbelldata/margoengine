@@ -8,6 +8,7 @@ struct Light {direction:vec4f,radiance:vec4f}
 struct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,color:vec4f,cameraData:vec4f,waves:array<Wave,8>,coast:vec4f,flow:vec4f,sun:vec4f,radiance:vec4f,lights:array<Light,2>}
 @group(0) @binding(0) var<uniform> frame:Frame;
 `;
+// Margo's three-component swell spectrum and crest bend (all constants are Margo tuning).
 export const oceanWaves = `
 struct Swell {direction:vec2f,gradient:vec2f,phase:f32,amplitude:f32}
 fn swell(w:Wave,xz:vec2f,index:u32,sampleWidth:f32)->Swell {
@@ -66,6 +67,8 @@ fn join(a:u32,b:u32){
 @compute @workgroup_size(8,8) fn compress(@builtin(global_invocation_id) id:vec3u){
  let size=textureDimensions(terrain);if(any(id.xy>=size)){return;}let index=id.y*size.x+id.x+1u;if(atomicLoad(&connected[index])!=0xffffffffu){atomicStore(&connected[index],root(index));}
 }`;
+// Virtual-pipe shallow water (O'Brien & Hodgins 1995; Mei, Decaudin & Hu 2007) with g = 9.81; the damping 0.12, the
+// Froude breaker band 0.45-1.0 and the 0.65-2.4 depth band are Margo's.
 const flow =
   waterFrame +
   `

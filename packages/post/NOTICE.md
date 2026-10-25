@@ -38,3 +38,9 @@ Anti-aliasing and screen-look references (our own code, written from the papers 
   George Marsaglia, "Xorshift RNGs", Journal of Statistical Software 8(14), 2003. Per-pixel hash: PCG hash from Mark
   Jarzynski and Marc Olano, "Hash Functions for GPU Rendering", Journal of Computer Graphics Techniques 9(3), 2020.
 - Afterimage: `max(current, history x keep)` with `keep = 0.5 ^ (delta / halfLife)`, `halfLife` default 0.15 s.
+
+Screen-space reflection references (our own code)
+
+- Analytic split-sum environment BRDF used by SSR when no image-based lighting is bound: Brian Karis, "Physically
+  Based Shading on Mobile", Unreal Engine blog, 2014 (a published engine standard, after Dimitar Lazarov, "Getting
+  More Physical in Call of Duty: Black Ops II", SIGGRAPH 2013 course), kept with this citation.

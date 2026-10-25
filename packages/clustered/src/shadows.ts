@@ -129,6 +129,8 @@ const SUN_LIST = 16,
   noAreas: readonly AreaShadowLight[] = [];
 // Reversed depth (near 1, far 0) for float precision. lights[k]: first layer, point (1) or spot (0), texel size per unit distance.
 // A point light picks the cube face by the major axis of the offset receiver, so faces need no seam filtering.
+// 3x3 PCF (Reeves, Salesin & Cook 1987) with slope and normal offsets (Holbert 2011); the default bias 1 and
+// normalBias 1.5 texels are Margo's.
 const sampling = (group: number, sun = false, area = false) =>
   /* wgsl */ `
 struct LocalShadowFrame {settings:vec4f,lights:array<vec4f,${MAX_LIGHTS}>,matrices:array<mat4x4f,${LAYERS}>${sun || area ? extendedFrame : ''}}
@@ -154,6 +156,7 @@ fn clusterShadow(light:ClusterLight,position:vec3f,n:vec3f)->f32 {
 const extendedFrame = `,sun:array<vec4f,${SUN_LIST}>,sunCascades:array<vec4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,sunMatrices:array<mat4x4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,area:array<vec4f,${AREA_LIST}>,areaSlots:array<vec4f,${MAX_AREA_SHADOWS}>,areaMatrices:array<mat4x4f,${MAX_AREA_SHADOWS * 6}>`;
 // Directional light j: sun[j] is (first layer, slot + 1, cascades); per cascade, the world size of a texel and the UV box
 // whose 3x3 filter stays inside the map. The finest cascade holding the receiver shades it; outside all of them it is lit.
+// Cascaded shadow maps after Engel 2006 and Dimitrov 2007.
 const sunShadow = /* wgsl */ `fn clusterDirectionalShadow(j:u32,position:vec3f,n:vec3f,l:vec3f)->f32 {
   let info=localShadowFrame.sun[j];if(info.y<0.5){return 1.0;}
   let first=(u32(info.y)-1u)*4u;
@@ -174,6 +177,8 @@ const sunShadow = /* wgsl */ `fn clusterDirectionalShadow(j:u32,position:vec3f,n
 // -n). PCSS (Fernando 2005): blockers found within the light's footprint give the penumbra, the light's half extents
 // at the receiver times (receiver - blocker) / blocker depth, filtered over a disk of comparisons. The receiver's
 // tangent plane mapped into the face (planes stay planes under a projection) is the reference depth at every tap.
+// Taps on a Vogel 1979 spiral (golden angle 2.39996323); receiver-plane depth bias after Isidoro 2006 (GDC). The 16
+// blocker / 24 filter taps, the x3 reach and the 0.01 x distance tangent are Margo tuning.
 const areaShadow = /* wgsl */ `fn localShadowTap(i:u32,count:u32)->vec2f {let a=f32(i)*2.39996323;return vec2f(cos(a),sin(a))*sqrt(f32(i)/f32(count));}
 fn clusterAreaShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f)->f32 {
   let info=localShadowFrame.area[j];if(info.y<0.5){return 1.0;}

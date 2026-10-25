@@ -52,6 +52,8 @@ export class ToonShading implements EnginePlugin {
         }
         let shader = shaders.get(context.shader);
         if (shader === undefined) {
+          // Cel bands: Lake, Marshall, Harris and Blackstein, "Stylized Rendering Techniques for Scalable Real-Time 3D
+          // Animation" (NPAR 2000); the rim exponent 3 and the defaults (4 bands, rim 0.15) are Margo's.
           shader =
             `@group(0) @binding(${binding}) var<uniform> toon:vec4f;\n` +
             context.shader

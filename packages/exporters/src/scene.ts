@@ -750,6 +750,7 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
     alphaMode,
     alphaCutoff: m.alphaCutoff,
     doubleSided: m.doubleSided ?? false,
+    // Phong exponent to glTF roughness: Walter et al. 2007 sec. 5.2 (Beckmann alpha = sqrt(2 / (n + 2))), then sqrt.
     roughness: shading === 'phong' ? (2 / (shininess + 2)) ** 0.25 : lit ? 1 : unit(m.roughness, 'Roughness', 1),
     metalness: lit ? 0 : unit(m.metalness, 'Metalness', 0),
     baseColorTexture,

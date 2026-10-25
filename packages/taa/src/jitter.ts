@@ -1,3 +1,4 @@
+// Halton 1964; the 8-sample Halton (2, 3) jitter cycle as in Karis 2014, "High Quality Temporal Supersampling".
 /**
  * Element `index` of the Halton low-discrepancy sequence in `base` (radical inverse), in [0, 1).
  * @throws RangeError unless `index` is a safe integer >= 0 and `base` a safe integer >= 2.

@@ -55,7 +55,10 @@ export function inputDepth(coord?: NodeInput<'vec2f'>): Node<'f32'> {
 let passes = 0;
 /** Options for `new NodePass(node, options)`. */
 export interface NodePassOptions {
-  /** `'ldr'` (default) runs after tonemapping on display colour; `'hdr'` runs on linear light before it (and tonemaps with ACES when last). */
+  /**
+   * `'ldr'` (default) runs after tonemapping on display colour; `'hdr'` runs on linear light before it (and, when last,
+   * applies the display curve, Khronos PBR Neutral, then the sRGB encoding).
+   */
   kind?: 'hdr' | 'ldr';
   /** Plugin and debug name. Default `'shader:pass:<n>'` (n counts passes). */
   name?: string;
@@ -97,6 +100,7 @@ export class NodePass implements EnginePlugin {
     this.value = node.type === 'vec3f' ? `vec4f(${s.values[0]}, 1.0)` : s.values[0];
   }
   /** The pass WGSL; `encode` adds the display curve (PBR Neutral) and sRGB encoding (an HDR pass that ends the chain). */
+  // Khronos PBR Neutral specification (2024); sRGB encoding IEC 61966-2-1.
   code(encode = false): string {
     const out = encode
       ? `let c = ${this.value};\n  let x = pbrNeutral(max(c.rgb, vec3f(0.0)));\n  return vec4f(select(x * 12.92, 1.055 * pow(x, vec3f(1.0 / 2.4)) - 0.055, x >= vec3f(0.0031308)), c.a);`

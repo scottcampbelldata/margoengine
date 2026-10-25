@@ -26,6 +26,9 @@ const LIGHT_FLOATS = 16,
 // LTC table as pack2x16float pairs, three u32 per cell, filtered bilinearly by hand (environment's BRDF LUT does the same).
 // Each light integrates the quad, clipped to the horizon, under the GGX LTC (specular) and the cosine (diffuse).
 // `shadow` (LocalShadows' clusterAreaShadow factor, from Clustered) darkens each light; absent, the text is unchanged.
+// LTC: Heitz, Dupuy, Hill & Neubelt 2016; Fresnel split f0 x magnitude + (1 - f0) x fresnel: Hill & Heitz 2016 course
+// notes. Roughness floor 0.045: the minimum perceptual roughness of the Filament design document, a published engine
+// standard.
 const sampling = (group: number, shadow?: string) => /* wgsl */ `
 struct AreaLight {center:vec4f,right:vec4f,up:vec4f,color:vec4f}
 struct AreaLightData {count:vec4u,lights:array<AreaLight,${MAX_AREA_LIGHTS}>,lut:array<u32>}

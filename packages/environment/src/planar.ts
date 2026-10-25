@@ -79,6 +79,7 @@ export interface PlanarOptions {
   name?: string;
 }
 
+// Projective texture lookup (Segal et al. 1992); distortion offset and mip blur are Margo design choices.
 const SURFACE = /* wgsl */ `
 ${displayShader}
 struct Surface { viewProj:mat4x4f, capture:mat4x4f, model:mat4x4f, size:vec4f, tint:vec4f, normal:vec4f, flags:vec4f }

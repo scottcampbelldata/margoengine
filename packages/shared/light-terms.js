@@ -13,6 +13,7 @@ export const decayTerms =
   'let kind=light.params.y;let reach=distance/light.positionRange.w;let fade=clamp(1.0-reach*reach*reach*reach,0.0,1.0);let fresh=kind<-0.5||kind>1.5;let power=select(distance*distance,pow(max(distance,0.000001),select(-1.0-kind,kind-2.0,kind>1.5)),fresh);let falloff=fade*fade/max(power,0.000244140625);var cone=1.0;if(kind>0.5){let along=dot(-l,light.directionOuter.xyz);let lo=light.directionOuter.w;let hi=light.params.x;if(fresh){cone=select(select(0.0,1.0,along>=lo),smoothstep(lo,hi,along),hi>lo);}else{let ramp=clamp((along-lo)/max(hi-lo,0.000001),0.0,1.0);cone=ramp*ramp*(3.0-2.0*ramp);}}';
 // The per-light BRDF of clustered's light loop (GGX with Fresnel, as gltf-pro's direct light), in the loop's locals (n, v,
 // l, h, base, metal, nl, nv, d, g, fresnel). @margoengine/materials' Lambert and Phong put their own BRDF in its place.
+// Lambert/pi + D G F / (4 nl nv): glTF 2.0 specification, Appendix B (B.3.5).
 export const clusterBrdf = '((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))';
 // The cluster lookup that opens clustered's light loop and environment's volumetric local lights: from the pixel and
 // world point `p` (a WGSL name), returns vec3f(0) outside the cluster depth range, else declares `cell`, `count` and
@@ -30,11 +31,11 @@ export const clusterCell = (
 // The GGX (Trowbridge-Reitz) microfacet terms every PBR shader in the engine writes, as source text over the names a2
 // (roughness^4), nh, nv and nl. The Float forms spell 1.0 and 2.0 (as GLSL needs and some shaders write), so each
 // shader's text stays as it was.
-/** GGX normal distribution `a2 / (pi (nh^2 (a2 - 1) + 1)^2)`. */
+/** GGX normal distribution `a2 / (pi (nh^2 (a2 - 1) + 1)^2)` (Walter et al. 2007, eq. 33; glTF 2.0 Appendix B.3.2). */
 export const ggxD = 'a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0))';
 /** {@link ggxD} with float literals. */
 export const ggxDFloat = 'a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0))';
-/** Smith-GGX geometry term (uncorrelated, both directions). */
+/** Smith-GGX geometry term (uncorrelated, both directions): Walter et al. 2007, eq. 34. */
 export const smithG = '2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001)';
 /** {@link smithG} with float literals. */
 export const smithGFloat = '2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001)';

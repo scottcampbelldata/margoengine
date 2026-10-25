@@ -115,6 +115,7 @@ export function clip(
   return exit > enter ? { enter, exit, entry, leaving } : undefined;
 }
 
+// Exact dielectric Fresnel equations, averaged over both polarisations (PBRT 4e sec. 9.3).
 /** Unpolarized Fresnel reflectance at a smooth boundary from IOR `from` into `to`; 1 under total internal reflection. */
 export function fresnel(cosine: number, from: number, to: number): number {
   if (from === to) return 0;
@@ -129,6 +130,7 @@ export function fresnel(cosine: number, from: number, to: number): number {
 }
 
 /** Share of one channel left after `distance` inside `medium`. A black channel stays black on any positive path. */
+// Beer-Lambert law.
 export const beer = (medium: Medium, channel: number, distance: number): number =>
   !medium.inverseDistance || !(distance > 0)
     ? 1

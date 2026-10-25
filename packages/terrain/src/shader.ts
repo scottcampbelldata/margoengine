@@ -1,5 +1,6 @@
 import { neutralShader } from '../../shared/display.js';
 import { ggxD, smithG } from '../../shared/light-terms.js';
+// Vertex morph between grid levels: Strugar 2009, "Continuous Distance-Dependent Level of Detail" (CDLOD), JGT.
 export const terrainVertex = /* wgsl */ `
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,grid:vec4f,offset:vec4f,map:vec4f,heights:vec4f}
 struct Layer {heightSlope:vec4f,params:vec4f}
@@ -25,6 +26,8 @@ struct Output {@builtin(position) clip:vec4f,@location(0) position:vec3f,@locati
   var o:Output;o.position=position;o.clip=frame.camera*vec4f(position,1);o.normal=normal;o.color=vec3f(1);o.material=vec4f(0.9,0,1,1);return o;
 }
 `;
+// Triplanar weights abs(n)^8 (Geiss 2007, GPU Gems 3 ch. 1; exponent 8 is Margo's); GGX + Schlick (F0 0.04) + Lambert
+// sun per glTF 2.0 Appendix B (Walter et al. 2007; Schlick 1994); Khronos PBR Neutral, then sRGB (IEC 61966-2-1).
 export const terrainFragment = /* wgsl */ `${neutralShader}
 fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   let slope=1-clamp(normal.y,0.0,1.0);let axes=pow(abs(normal),vec3f(8));let projection=axes/max(axes.x+axes.y+axes.z,0.00001);let dx=dpdx(position);let dy=dpdy(position);var color=vec3f(0);var total=0.0;var fallback=vec3f(0);
