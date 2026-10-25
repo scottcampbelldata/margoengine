@@ -363,17 +363,23 @@ test('pipelines compile asynchronously; a WGSL error is reported once with its l
     ).length,
     1,
   );
-  // A broken shader: the module reports an error two lines into the user's code.
+  // A broken shader: the module reports an error two lines into the user's code. Like Chromium on an idle device,
+  // the mock answers getCompilationInfo() only when asked before the pipeline is requested; later it stays pending.
   const lines = m.prelude(mesh).split('\n').length - 1,
     device = h.gpu.device,
     create = device.createShaderModule;
+  let pipelineRequested = false;
   device.createShaderModule = (d) =>
     Object.assign(create(d), {
-      getCompilationInfo: async () => ({
-        messages: [{ type: 'error', lineNum: lines + 2, linePos: 5, message: "unresolved value 'nope'" }],
-      }),
+      getCompilationInfo: () =>
+        pipelineRequested
+          ? new Promise(() => {})
+          : Promise.resolve({
+              messages: [{ type: 'error', lineNum: lines + 2, linePos: 5, message: "unresolved value 'nope'" }],
+            }),
     });
   device.createRenderPipelineAsync = async () => {
+    pipelineRequested = true;
     throw new Error('validation failed');
   };
   const errors = [];
@@ -381,8 +387,8 @@ test('pipelines compile asynchronously; a WGSL error is reported once with its l
   m.vertexShader = shader.replace('uniforms.gain', 'nope');
   const broken = h.gpu.record(() => h.frame());
   assert.equal(named(broken, 'pass.drawIndexed').length, 0);
-  await raw.ready();
-  assert.equal(errors.length, 1);
+  await Promise.race([raw.ready(), new Promise((resolve) => setTimeout(resolve, 1000))]);
+  assert.equal(errors.length, 1, 'the compile error is reported although the device went idle');
   assert.equal(errors[0].name, 'MargoError');
   assert.equal(errors[0].code, 'failed');
   assert.match(errors[0].message, /vertexShader line 2:5: unresolved value 'nope'/);

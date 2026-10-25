@@ -554,6 +554,8 @@ export class RawShaderMaterial {
       if (!m) {
         m = device.createShaderModule({ label: `shader:raw:${this.name}:${stage}`, code: this.code(stage, mesh) });
         gpu.modules.set(k, m);
+        // Asked now, for the error report: a request made later, on an idle device, can stay pending (Chromium).
+        compilations.set(m, m.getCompilationInfo?.().catch(() => undefined) ?? Promise.resolve(undefined));
       }
       return m;
     };
@@ -599,7 +601,7 @@ export class RawShaderMaterial {
           ['vertex', vertex],
           ['fragment', fragment],
         ] as const) {
-          const info = await m.getCompilationInfo?.().catch(() => undefined),
+          const info = await compilations.get(m),
             error = info?.messages.find((x) => x.type === 'error');
           if (error) {
             const line = error.lineNum - lines;
@@ -626,6 +628,9 @@ export class RawShaderMaterial {
     return undefined;
   }
 }
+
+/** Each shader module's compilation info, requested when the module is created. */
+const compilations = new WeakMap<GPUShaderModule, Promise<GPUCompilationInfo | undefined>>();
 
 interface Attribute {
   name: string;
