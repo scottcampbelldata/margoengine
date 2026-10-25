@@ -2,6 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
+import { Worker } from 'node:worker_threads';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Physics } from '@margoengine/physics';
@@ -34,12 +36,15 @@ const rtest = (name, fn) => test(name, { skip }, fn);
 
 // Rapier calls counted, to tell in-place updates (setVoxel) from rebuilds (ColliderDesc.voxels or .trimesh), with the
 // largest triangle mesh built.
-const calls = { builds: 0, setVoxel: 0, propagate: 0, combine: 0, meshes: 0, triangles: 0 };
+// `meshed` is every triangle handed to trimesh and every cell handed to voxels so far: the work of building colliders,
+// which wall time only estimates.
+const calls = { builds: 0, setVoxel: 0, propagate: 0, combine: 0, meshes: 0, triangles: 0, meshed: 0 };
 if (RAPIER) {
   const trimesh = RAPIER.ColliderDesc.trimesh;
   RAPIER.ColliderDesc.trimesh = function (vertices, indices, flags) {
     calls.meshes++;
     calls.triangles = Math.max(calls.triangles, indices.length / 3);
+    calls.meshed += indices.length / 3;
     return trimesh.call(this, vertices, indices, flags);
   };
   const count = (owner, name, counter) => {
@@ -48,6 +53,11 @@ if (RAPIER) {
       calls[counter]++;
       return original.apply(this, args);
     };
+  };
+  const voxels = RAPIER.ColliderDesc.voxels;
+  RAPIER.ColliderDesc.voxels = function (cells, ...rest) {
+    calls.meshed += cells.length / 3;
+    return voxels.call(this, cells, ...rest);
   };
   count(RAPIER.ColliderDesc, 'voxels', 'builds');
   count(RAPIER.ColliderDesc, 'trimesh', 'builds');
@@ -74,17 +84,24 @@ const setup = (options, gravity = [0, -9.81, 0]) => {
     voxels = new VoxelPhysics(physics, world, options);
   return { physics, world, voxels };
 };
-// Like setup, and `spent` gets the milliseconds each step spends in VoxelPhysics (its beforestep listener).
+// Like setup, and `spent` gets the milliseconds each step spends in VoxelPhysics (its beforestep listener), printed
+// only. `work` gets the collider work (triangles and voxel cells) done in the same step: tests assert on that, which a busy machine cannot change.
 const timed = (options, gravity, world = new VoxelWorld({ blocks })) => {
   const physics = new Physics(null, { rapier: RAPIER, gravity }),
-    spent = [];
-  let start = 0;
+    spent = [],
+    work = [];
+  let start = 0,
+    meshed = 0;
   physics.on('beforestep', () => {
     start = performance.now();
+    meshed = calls.meshed;
   });
   const voxels = new VoxelPhysics(physics, world, options);
-  physics.on('beforestep', () => spent.push(performance.now() - start));
-  return { physics, world, voxels, spent };
+  physics.on('beforestep', () => {
+    spent.push(performance.now() - start);
+    work.push(calls.meshed - meshed);
+  });
+  return { physics, world, voxels, spent, work };
 };
 // A chunk with each cell stone at random (seeded), unless `keep` says no: about 66,000 triangles of open faces, the
 // worst case for a ball's mesh.
@@ -672,12 +689,13 @@ for (const mesh of [false, true])
 rtest('a cave chunk entering a ball radius is meshed piece by piece within the budget (measured)', (t) => {
   // The cave chunk x 2 enters the radius when a kinematic ball moves into chunk 1, 24 m from it.
   const approach = (budget) => {
-    const { physics, world, voxels, spent } = timed({ budget }, [0, 0, 0]);
+    const { physics, world, voxels, spent, work } = timed({ budget }, [0, 0, 0]);
     world.addChunk(2, 0, 0, caves(3));
     const ball = ballBody(physics, 0.4, [16, 16, 16], { body: { type: 'kinematicPosition' } });
     physics.step();
     assert.equal(voxels.colliders.size, 0, 'two chunks away: no collider yet');
     spent.length = 0;
+    work.length = 0;
     calls.triangles = 0;
     ball.setPosition([40, 16, 16]);
     const seen = new Set();
@@ -691,7 +709,7 @@ rtest('a cave chunk entering a ball radius is meshed piece by piece within the b
       triangles = calls.triangles;
     assert.deepEqual(kinds(voxels), { '2,0,0': 'mesh' });
     physics.dispose();
-    return { steps, spent, seen, pieces: pieces.length, triangles };
+    return { steps, spent, work, seen, pieces: pieces.length, triangles };
   };
   approach(Infinity); // warm up
   const whole = approach(Infinity),
@@ -701,12 +719,44 @@ rtest('a cave chunk entering a ball radius is meshed piece by piece within the b
   assert.ok(spread.pieces >= 32, `the cave chunk is ${spread.pieces} pieces`);
   assert.ok(spread.steps >= 10, `spread over ${spread.steps} steps`);
   assert.deepEqual([...spread.seen], ['voxels'], 'until its mesh is complete the chunk keeps its voxel collider');
-  const worst = max(spread.spent);
+  const worst = max(spread.spent),
+    worstWork = max(spread.work);
   t.diagnostic(
     `cave chunk meshed for a ball: all at once ${whole.spent[0].toFixed(1)} ms in one step; budget 2: ` +
       `${spread.steps} steps, at most ${worst.toFixed(2)} ms a step (${spread.pieces} pieces)`,
   );
-  assert.ok(worst < whole.spent[0] / 4, `no step pays more than a quarter of the whole build (${worst} ms)`);
+  assert.ok(
+    worstWork < whole.work[0] / 4,
+    `no step meshes more than a quarter of the whole build (${worstWork} of ${whole.work[0]} triangles)`,
+  );
+});
+
+rtest('the budget tests measure meshing work, which a busy machine cannot change', async () => {
+  // The budget tests assert on triangles meshed per step, never on milliseconds. Hog every core with busy-loop workers:
+  // the work of the one-step build must come out exactly as on an idle machine.
+  const build = () => {
+    const { physics, world, work } = timed({ budget: Infinity }, [0, 0, 0]);
+    world.addChunk(2, 0, 0, caves(3));
+    const ball = ballBody(physics, 0.4, [16, 16, 16], { body: { type: 'kinematicPosition' } });
+    physics.step();
+    work.length = 0;
+    ball.setPosition([40, 16, 16]);
+    physics.step();
+    physics.dispose();
+    return work[0];
+  };
+  const idle = build();
+  assert.ok(idle > 1000, `the build meshes ${idle} triangles`);
+  const hogs = Array.from(
+    { length: Math.max(2, availableParallelism()) },
+    () => new Worker('const end = Date.now() + 60000; while (Date.now() < end);', { eval: true }),
+  );
+  try {
+    assert.equal(build(), idle, 'the same triangles meshed while every core is busy');
+    assert.equal(build(), idle);
+  } finally {
+    await Promise.all(hogs.map((hog) => hog.terminate()));
+  }
 });
 
 rtest('a ball spawned inside a cave chunk gets the mesh around it at once; no body falls through', (t) => {
@@ -760,7 +810,7 @@ rtest('a ball spawned inside a cave chunk gets the mesh around it at once; no bo
 rtest('chunks entering a moving body radius are built within the budget, never under it (measured)', (t) => {
   // Cave chunks at chunk y -1 under a one-cell floor (top y 1) over chunks x -3..3, z -1..1.
   const cross = (budget) => {
-    const { physics, world, voxels, spent } = timed({ budget }, [0, 0, 0]);
+    const { physics, world, voxels, spent, work } = timed({ budget }, [0, 0, 0]);
     for (let cx = -3; cx <= 3; cx++)
       for (let cz = -1; cz <= 1; cz++) {
         world.addChunk(cx, -1, cz, caves(cx * 7 + cz + 20));
@@ -774,6 +824,7 @@ rtest('chunks entering a moving body radius are built within the budget, never u
     });
     physics.step();
     spent.length = 0;
+    work.length = 0;
     let holes = 0;
     // 12 m/s along x across chunk borders -64, -32, 0, 32 and 64.
     for (let x = -80; x < 80; x += 0.2) {
@@ -784,7 +835,7 @@ rtest('chunks entering a moving body radius are built within the budget, never u
       if (!have.has(chunkKey(cx, 0, 0)) || !have.has(chunkKey(cx, -1, 0))) holes++;
     }
     physics.dispose();
-    return { spent, holes };
+    return { spent, work, holes };
   };
   cross(Infinity); // warm up
   const whole = cross(Infinity),
@@ -795,7 +846,10 @@ rtest('chunks entering a moving body radius are built within the budget, never u
       `budget 2: ${top(spread.spent).map((v) => v.toFixed(1))} ms`,
   );
   assert.equal(spread.holes, 0, 'the chunk under the body always had its collider');
-  assert.ok(max(spread.spent) < max(whole.spent) / 2, 'the border crossing cost is spread');
+  assert.ok(
+    max(spread.work) < max(whole.work) / 2,
+    `the border crossing cost is spread (${max(spread.work)} of ${max(whole.work)} units in the worst step)`,
+  );
 });
 
 rtest('contacts with blocks raise Physics collision events naming voxels.body and the chunk', () => {
