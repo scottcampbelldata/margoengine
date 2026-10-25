@@ -247,3 +247,57 @@ test('OBJ opacity maps hold a MASK or BLEND texture alpha in every channel; unli
     );
   assert.throws(() => exportOBJ(scene, { materials: true, opacityMaps: true }), /opacityMaps needs textures: true/);
 });
+
+test('OBJ usemtl groups without an MTL, and faces with their own corners (shareVertices: false)', () => {
+  // Two meshes, each a strip of two quads sharing their middle edge (6 indexed corners), one palette slot each.
+  const strip = (z) => ({
+      positions: [0, 0, z, 1, 0, z, 2, 0, z, 0, 1, z, 1, 1, z, 2, 1, z],
+      normals: Array.from({ length: 6 }, () => [0, 0, 1]).flat(),
+      indices: [0, 1, 4, 0, 4, 3, 1, 2, 5, 1, 5, 4],
+      faceSizes: [4, 4],
+    }),
+    scene = {
+      nodes: [
+        { name: 'front', geometry: strip(0), material: { name: 'palette_10' } },
+        { name: 'back', geometry: strip(1), material: { name: 'palette_12' } },
+      ],
+    };
+  // Defaults are unchanged: no usemtl, shared corners.
+  const plain = exportOBJ(scene);
+  assert.equal(exportOBJ(scene, { usemtl: false, shareVertices: true }).obj, plain.obj);
+  const shared = readOBJ(plain.obj);
+  assert.equal(shared.v.length, 12);
+  assert.deepEqual(
+    shared.objects.map((o) => o.material),
+    [null, null],
+  );
+  // usemtl alone: the palette names group the faces, with no mtllib and no MTL text.
+  const grouped = exportOBJ(scene, { usemtl: true }),
+    read = readOBJ(grouped.obj);
+  assert.equal(grouped.mtl, null);
+  assert.equal(read.mtllib, null);
+  assert.deepEqual(
+    read.objects.map((o) => [o.name, o.material]),
+    [
+      ['front', 'palette_10'],
+      ['back', 'palette_12'],
+    ],
+  );
+  // With materials the same names reach usemtl and the MTL.
+  assert.deepEqual(
+    readOBJ(exportOBJ(scene, { materials: true, usemtl: true }).obj).objects.map((o) => o.material),
+    ['palette_10', 'palette_12'],
+  );
+  // Unwelded: every quad has four corners of its own, at its source positions.
+  const loose = readOBJ(exportOBJ(scene, { usemtl: true, shareVertices: false }).obj);
+  assert.equal(loose.v.length, 16);
+  assert.equal(loose.vn.length, 16);
+  const used = loose.objects.flatMap((o) => o.faces.flatMap((f) => f.map((c) => c.v)));
+  assert.equal(new Set(used).size, used.length, 'no corner is shared between faces');
+  assert.deepEqual(
+    loose.objects[0].faces.map((f) => f.map((c) => loose.v[c.v - 1])),
+    shared.objects[0].faces.map((f) => f.map((c) => shared.v[c.v - 1])),
+  );
+  assert.throws(() => exportOBJ(scene, { mergeVertices: true, shareVertices: false }), TypeError);
+  assert.throws(() => exportOBJ(scene, { usemtl: 'yes' }), TypeError);
+});

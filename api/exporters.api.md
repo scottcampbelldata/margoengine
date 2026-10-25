@@ -285,6 +285,7 @@ export interface MorphData {
 
 export interface OBJOptions extends SceneOptions {
     materials?: boolean;
+    usemtl?: boolean;
     mtlName?: string;
     colors?: boolean;
     colorSpace?: 'srgb' | 'linear';
@@ -293,6 +294,7 @@ export interface OBJOptions extends SceneOptions {
     texturePrefix?: string;
     groups?: boolean;
     mergeVertices?: boolean;
+    shareVertices?: boolean;
     scale?: number;
 }
 

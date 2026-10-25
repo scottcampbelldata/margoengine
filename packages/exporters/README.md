@@ -120,6 +120,8 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | `textures`, `texturePrefix` | OBJ | `false`, `''`. With `materials`, writes `map_Kd` (plus `map_d` for MASK/BLEND) and returns the images in `textures` |
 | `groups` | OBJ | `true`, one `g` per mesh; `false` writes `o` objects |
 | `mergeVertices` | OBJ | `false`. Welds a mesh's corners whose position, uv, normal and written color agree within 1e-5 |
+| `usemtl` | OBJ | `false`. Writes `usemtl <material name>` per mesh without `materials`: one group per palette slot, no `mtllib` and no MTL |
+| `shareVertices` | OBJ | `true`, faces share the mesh's indexed corners. `false` gives every face its own `v`/`vt`/`vn` corners (not with `mergeVertices`) |
 | `scale` | OBJ | `1`. Multiplies every position |
 
 `GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's v-up UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales (or [0, 0, 0], below) and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with the UV set they sample.

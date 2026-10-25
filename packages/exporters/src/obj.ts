@@ -16,6 +16,12 @@ import {
 export interface OBJOptions extends SceneOptions {
   /** Also write an MTL file and `usemtl` lines. Default false. */
   materials?: boolean;
+  /**
+   * Write a `usemtl <material name>` line before each mesh's faces without `materials`: no `mtllib` line and no MTL,
+   * so the material names alone group the faces (a palette's slots, a tool's own library). Meshes without a material
+   * get none. Default false; `materials` implies it.
+   */
+  usemtl?: boolean;
   /** File name written in `mtllib`. Default 'scene.mtl'. */
   mtlName?: string;
   /** Append vertex colors to `v` lines (a common extension) when geometry has colors. Default false. */
@@ -39,6 +45,11 @@ export interface OBJOptions extends SceneOptions {
   groups?: boolean;
   /** Weld a mesh's corners whose position, uv, normal and written color agree within 1e-5. Default false. */
   mergeVertices?: boolean;
+  /**
+   * Faces share the vertices their geometry's indices share (true, default), or each face gets its own corners
+   * (false): no vertex is shared between faces, as voxel editors write unwelded quads. Not with `mergeVertices`.
+   */
+  shareVertices?: boolean;
   /** Multiplies every position. Default 1. */
   scale?: number;
 }
@@ -68,6 +79,8 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     withOpacity = options.opacityMaps ?? false,
     groups = options.groups ?? true,
     merge = options.mergeVertices ?? false,
+    share = options.shareVertices ?? true,
+    usemtl = options.usemtl ?? false,
     scale = options.scale ?? 1;
   if (typeof withMaterials !== 'boolean' || typeof colors !== 'boolean')
     throw new TypeError('materials and colors must be boolean');
@@ -79,6 +92,10 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
   if (withTextures && !withMaterials) throw new TypeError('textures needs materials: true to write the MTL');
   if (typeof withOpacity !== 'boolean') throw new TypeError('opacityMaps must be boolean');
   if (withOpacity && !withTextures) throw new TypeError('opacityMaps needs textures: true to name the texture files');
+  if (typeof usemtl !== 'boolean' || typeof share !== 'boolean')
+    throw new TypeError('usemtl and shareVertices must be boolean');
+  if (merge && !share)
+    throw new TypeError('mergeVertices welds corners that shareVertices: false keeps apart; pass one of them');
   if (typeof scale !== 'number') throw new TypeError('scale must be a number');
   if (!(scale > 0) || !Number.isFinite(scale)) throw new RangeError('scale must be positive and finite');
   const lines = ['# Margo Engine OBJ export'],
@@ -102,13 +119,15 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     groupNames.add(group);
     index++;
     lines.push(`${groups ? 'g' : 'o'} ${group}`);
-    if (withMaterials && item.material) {
+    if ((withMaterials || usemtl) && item.material) {
       let name = names.get(item.material);
       if (!name) {
         const base = token(item.material.name, `material_${names.size}`);
         name = base;
         for (let n = 2; [...names.values()].includes(name); n++) name = `${base}_${n}`;
         names.set(item.material, name);
+      }
+      if (withMaterials && !mtl.includes(`newmtl ${name}`)) {
         const m = item.material,
           kd = m.color.slice(0, 3).map((v) => num(toSrgb(v)));
         mtl.push(
@@ -139,12 +158,14 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
       }
       lines.push(`usemtl ${name}`);
     }
-    // Written vertices: every source vertex, or with `merge` the first corner of each welded set.
+    // Written vertices: every source vertex, with `merge` the first corner of each welded set, or without `share`
+    // each face corner in face order (faces then index written vertices 0, 1, 2, ...).
     // ponytail: welding buckets values on a 1e-5 grid, so corners straddling a cell edge stay apart.
-    const remap = new Uint32Array(geo.count),
-      kept: number[] = [],
+    const faces = polygons(geo.faceSizes, indices),
+      remap = new Uint32Array(geo.count),
+      kept: number[] = share ? [] : faces.flat(),
       seen = new Map<string, number>();
-    for (let i = 0; i < geo.count; i++) {
+    for (let i = 0; share && i < geo.count; i++) {
       let at: number | undefined;
       if (merge) {
         const key = [...positions.subarray(i * 3, i * 3 + 3), ...normals.subarray(i * 3, i * 3 + 3)];
@@ -169,11 +190,12 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     if (uvs) for (const i of kept) lines.push(`vt ${num(uvs[i * 2])} ${num(1 - uvs[i * 2 + 1])}`);
     for (const i of kept) lines.push(`vn ${num(normals[i * 3])} ${num(normals[i * 3 + 1])} ${num(normals[i * 3 + 2])}`);
     const t = uvBase - vertexBase;
-    for (const face of polygons(geo.faceSizes, indices))
+    let corner = 0;
+    for (const face of faces)
       lines.push(
         `f ${face
           .map((i) => {
-            const a = remap[i] + vertexBase;
+            const a = (share ? remap[i] : corner++) + vertexBase;
             return uvs ? `${a}/${a + t}/${a}` : `${a}//${a}`;
           })
           .join(' ')}`,
