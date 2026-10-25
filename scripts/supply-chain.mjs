@@ -241,7 +241,11 @@ export function collect() {
       name,
       external,
       bundled: bundled.map((b) => `${b.component.split(' (')[0]} (${b.licence.split(' ')[0]})`),
-      notices: ['LICENSE', ...new Set(bundled.flatMap((b) => b.notices))],
+      notices: [
+        'LICENSE',
+        ...(manifest.files?.includes('NOTICE') ? ['NOTICE'] : []),
+        ...new Set(bundled.flatMap((b) => b.notices)),
+      ],
     });
   }
   for (const [path] of ASSETS) if (!existsSync(join(root, path))) problems.push(`asset credit file missing: ${path}`);
@@ -340,6 +344,12 @@ ${table(
     interface-compatible build. \`margo-convert\` depends on the unmodified npm package, so npm can swap it.
 - **MPL-2.0 (web-ifc, peer of \`@margoengine/ifc\`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves \`web-ifc.wasm\` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
+- **Siemens JT notice (\`@margoengine/brep\`).** The JT reader in \`packages/brep/src/jt\` reads the format as
+  described in the Siemens JT File Format Reference and ISO 14306. \`packages/brep/NOTICE\` ships in the tarball with
+  the reference licence terms, the royalty-free patent notice and the trademark note.
+- **Development tools only (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries (LGPL-3.0) are
+  installed as an optional dependency of Next.js for \`examples/next\`, and \`scripts/optimize-demo-assets.js\` and
+  \`scripts/build-scifi-helmet.mjs\` use sharp to resize textures. Neither is in any tarball or served by the site.
 - **MIT (React).** Keep the copyright and permission notice: npm dependencies carry their own
   LICENSE files.
 - **Site and demos.** The site build copies this file to \`/THIRD-PARTY-NOTICES.md\`, so the demos that bundle Draco,
