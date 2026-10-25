@@ -236,6 +236,79 @@ class Figures(unittest.TestCase):
         self.assertIn("build-frontend.mjs", str(caught.exception))
 
 
+class PngExport(unittest.TestCase):
+    """The DevTools WebSocket client and to_png's checks (the drawing itself is checked by jupyter-browser.mjs)."""
+
+    def test_client_frames_are_masked_with_the_right_length_encoding(self):
+        from margoengine._png import WebSocket
+
+        mask = b"\x01\x02\x03\x04"
+        for size, header in ((5, b"\x81\x85"), (300, b"\x81\xfe\x01\x2c"), (70000, b"\x81\xff" + struct.pack("!Q", 70000))):
+            payload = bytes(range(256)) * (size // 256) + bytes(range(size % 256))
+            frame = WebSocket.frame(payload, mask=mask)
+            self.assertEqual(frame[: len(header)], header)
+            self.assertEqual(frame[len(header) : len(header) + 4], mask)
+            body = frame[len(header) + 4 :]
+            self.assertEqual(bytes(b ^ mask[i % 4] for i, b in enumerate(body)), payload)
+
+    def test_client_reads_fragmented_and_long_server_messages_and_answers_pings(self):
+        import socket
+        import threading
+        from margoengine._png import WebSocket
+
+        server = socket.socket()
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        port = server.getsockname()[1]
+        received = []
+
+        def serve():
+            conn, _ = server.accept()
+            request = b""
+            while b"\r\n\r\n" not in request:
+                request += conn.recv(4096)
+            # The handshake reply arrives together with the first frames: the client must keep the extra bytes.
+            long_text = ("x" * 70000).encode()
+            conn.sendall(
+                b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n"
+                + b"\x01\x03abc"  # first fragment, not final
+                + b"\x89\x02hi"  # a ping between fragments
+                + b"\x80\x03def"  # final continuation
+                + b"\x81\x7f" + struct.pack("!Q", len(long_text)) + long_text
+            )
+            pong = conn.recv(2)
+            received.append(pong + conn.recv(6))
+            conn.close()
+
+        thread = threading.Thread(target=serve)
+        thread.start()
+        ws = WebSocket(f"ws://127.0.0.1:{port}/devtools/browser/x", timeout=10)
+        self.assertEqual(ws.receive(), "abcdef")
+        self.assertEqual(ws.receive(), "x" * 70000)
+        thread.join()
+        ws.close()
+        server.close()
+        pong = received[0]
+        self.assertEqual(pong[:2], b"\x8a\x82")
+        self.assertEqual(bytes(b ^ pong[2 + i % 4] for i, b in enumerate(pong[6:])), b"hi")
+
+    def test_to_png_checks_its_options_and_names_a_missing_browser(self):
+        fig = margo.scatter(x=[0, 1], y=[0, 1], comm_factory=FakeComm)
+        with self.assertRaises(ValueError):
+            fig.to_png("out.png", width=0)
+        with self.assertRaises(ValueError):
+            fig.to_png("out.png", scale=10)
+        original = figure_module._frontend_bundle
+        figure_module._frontend_bundle = lambda: ""
+        try:
+            with self.assertRaises(FileNotFoundError) as caught:
+                fig.to_png("out.png", browser="no-such-browser-margo")
+        finally:
+            figure_module._frontend_bundle = original
+        self.assertIn("Chrome, Edge or Chromium", str(caught.exception))
+        self.assertFalse(Path("out.png").exists())
+
+
 @unittest.skipIf(np is None, "NumPy is not installed")
 class NumPyInputs(unittest.TestCase):
     def test_any_numeric_dtype_and_layout_becomes_contiguous_float32(self):

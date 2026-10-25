@@ -36,7 +36,12 @@ fig = margo.figure(theme="light", titles={"x": "lon", "y": "lat", "z": "depth (k
 fig.scatter(quakes, x="lon", y="lat", z="depth", color="mag", colorbar="magnitude")
 fig.line(x=path_lon, y=path_lat, z=path_depth, width=3)
 fig.save_html("quakes.html")
+fig.to_png("quakes.png", width=1200, scale=2)   # 2400 x 960 pixels
 ```
+
+`to_png` draws the figure with WebGPU in a headless Chrome, Edge or Chromium that it starts and closes itself (no
+Python packages needed). It finds an installed browser; set `browser=` or the `MARGO_BROWSER` environment variable to
+choose one.
 
 Polars DataFrames and LazyFrames work like pandas ones (a LazyFrame reads only the columns you name; nulls draw as
 gaps). An xarray DataArray brings its own grid: a volume's bounds and a surface's ranges come from the coordinates,
@@ -77,6 +82,7 @@ be evenly spaced; a decreasing one (latitude stored north to south, say) is flip
 | `margo.isosurface(values, level, bounds=, color=)` | an isosurface extracted by GPU marching cubes |
 | `margo.figure(theme="dark", height=480, aspect=(1, 1, 0.75), titles=, axes=True, point_budget=2_000_000)` | an empty figure; its methods have the names above plus `colorbar(colormap, range, label=)`, and they chain |
 | `fig.save_html(path)` / `fig.to_html()` | a self-contained page with the figure |
+| `fig.to_png(path, width=960, height=None, scale=1, browser=None, timeout=60)` | a PNG image, drawn in a headless Chrome, Edge or Chromium; `height` defaults to the figure's |
 | `fig.show()` | display the figure from anywhere in a cell |
 
 Colour maps: `aurora` (default), `ember`, `glacier`, `gray`, `cubehelix`, `coolwarm`, `phase`, `viridis`, `magma`,

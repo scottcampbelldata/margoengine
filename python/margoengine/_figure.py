@@ -383,7 +383,7 @@ class Figure:
 <script type="application/json" id="margo-spec">{data}</script>
 <script>{bundle}</script>
 <script>
-MargoFigure.renderPayload(document.getElementById('figure'), JSON.parse(document.getElementById('margo-spec').textContent));
+window.margoFigure = MargoFigure.renderPayload(document.getElementById('figure'), JSON.parse(document.getElementById('margo-spec').textContent));
 </script>
 </body>
 </html>
@@ -393,6 +393,41 @@ MargoFigure.renderPayload(document.getElementById('figure'), JSON.parse(document
         """Writes :meth:`to_html` to ``path`` and returns the path. Opens in any WebGPU browser, no server needed."""
         target = Path(path)
         target.write_text(self.to_html(title=title), encoding="utf-8")
+        return target
+
+    def to_png(
+        self,
+        path: Union[str, Path],
+        *,
+        width: int = 960,
+        height: Optional[int] = None,
+        scale: float = 1.0,
+        browser: Optional[str] = None,
+        timeout: float = 60.0,
+    ) -> Path:
+        """Writes a PNG image of the figure to ``path`` and returns the path.
+
+        The figure is drawn with WebGPU in a headless Chrome, Edge or Chromium (found automatically, or ``browser`` /
+        ``$MARGO_BROWSER``), from the same page :meth:`save_html` writes; no Python packages are needed.
+
+        Args:
+            width: Image width in CSS pixels. Default 960.
+            height: Image height in CSS pixels. Default the figure's height.
+            scale: Device pixel ratio; 2 gives an image twice as wide and tall. Default 1.
+            browser: Browser executable name or path. Default: an installed Chrome, Edge or Chromium.
+            timeout: Seconds to wait for the browser and the drawing. Default 60.
+        """
+        from ._png import render_png
+
+        height = self._spec["height"] if height is None else height
+        for name, value in (("width", width), ("height", height)):
+            if not (isinstance(value, int) and 16 <= value <= 8192):
+                raise ValueError(f"{name} must be a whole number of pixels from 16 to 8192, got {value!r}")
+        if not (isinstance(scale, (int, float)) and 0.25 <= scale <= 4):
+            raise ValueError(f"scale must be from 0.25 to 4, got {scale!r}")
+        png = render_png(self.to_html(), width=width, height=height, scale=float(scale), browser=browser, timeout=float(timeout))
+        target = Path(path)
+        target.write_bytes(png)
         return target
 
 

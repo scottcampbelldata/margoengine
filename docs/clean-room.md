@@ -574,3 +574,5 @@ Written clean room; no source of ipywidgets' widget implementations, anywidget, 
 | Area | Source |
 | --- | --- |
 | Jupyter widget | The Jupyter widgets messaging protocol 2.1 (ipywidgets documentation) and the Jupyter messaging specification (comms); the JupyterLab extension guide (prebuilt extensions, shared modules); webpack's Module Federation documentation (the container's `init`/`get` interface) |
+| PNG export (`Figure.to_png`) | RFC 6455 "The WebSocket Protocol" (opening handshake, framing, client masking); the Chrome DevTools Protocol documentation (`Target.attachToTarget` flat sessions, `SystemInfo.getProcessInfo`, `Emulation.setDeviceMetricsOverride`, `Page.navigate`, `Runtime.evaluate`, `Page.captureScreenshot`, `Browser.close`; the `DevToolsActivePort` file) |
+| Polars and xarray inputs | The Polars and xarray user guides (DataFrame and LazyFrame `select` and `collect`, `Series.to_numpy`; DataArray `dims`, `coords` and `attrs`) and the CF conventions (`long_name`, `units`) |

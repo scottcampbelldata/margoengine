@@ -6,7 +6,7 @@
 //   node scripts/gpu-lock.mjs run --owner=<you> -- node python/tests/jupyter-browser.mjs
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { decodePNG } from '../../tests/support/png.js';
@@ -58,14 +58,14 @@ const server = spawn(
 let log = '';
 server.stdout.on('data', (d) => (log += d));
 server.stderr.on('data', (d) => (log += d));
-let browser;
+let browser, page;
 try {
   for (let t = 0; !log.includes(`127.0.0.1:${port}`); t++) {
     assert.ok(t < 600, `jupyter lab did not start:\n${log}`);
     await new Promise((r) => setTimeout(r, 100));
   }
   browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true });
-  const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+  page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
@@ -108,6 +108,10 @@ try {
   assert.equal(drawn.length, 3, `${drawn.length} figures`);
   for (const [k, lit] of drawn.entries()) assert.ok(lit > 500, `figure ${k} drew ${lit} bright pixels`);
   console.log(`jupyter: 3 figures drawn in JupyterLab (${drawn.join(', ')} bright pixels); screenshot test-results/jupyter-browser.png`);
+} catch (error) {
+  // The page as it was when the check failed, for diagnosis.
+  await page?.screenshot({ path: join(root, 'test-results/jupyter-browser.png'), fullPage: true });
+  throw error;
 } finally {
   await browser?.close();
   // The jupyter launcher starts the server and its kernels as child processes; on Windows kill() stops only the
@@ -115,3 +119,25 @@ try {
   if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(server.pid), '/T', '/F'], { stdio: 'ignore' });
   else server.kill();
 }
+
+// fig.to_png: the package draws a surface in its own headless browser (Edge, as above) and writes a PNG, which must
+// have the asked size and show the plot.
+const python = ['Scripts/python.exe', 'bin/python'].map((p) => join(venv, p)).find(existsSync);
+const png = join(root, 'test-results/python-to-png.png');
+rmSync(png, { force: true });
+const script = [
+  'import sys, numpy as np',
+  `sys.path.insert(0, ${JSON.stringify(join(root, 'python'))})`,
+  'import margoengine as margo',
+  'x = np.linspace(-3, 3, 64)',
+  'fig = margo.surface(np.sin(x)[None, :] * np.cos(x)[:, None], x=(-3, 3), y=(-3, 3))',
+  `fig.to_png(${JSON.stringify(png)}, width=500, height=300, scale=2, browser=${JSON.stringify(process.env.MARGO_BROWSER ?? 'msedge')})`,
+].join('\n');
+const run = spawnSync(python, ['-c', script], { encoding: 'utf8' });
+assert.equal(run.status, 0, `to_png failed:\n${run.stdout}\n${run.stderr}`);
+const image = await decodePNG(new Uint8Array(readFileSync(png)));
+assert.deepEqual([image.width, image.height], [1000, 600], 'to_png size at scale 2');
+let lit = 0;
+for (let i = 0; i < image.data.length; i += 4) if (image.data[i] + image.data[i + 1] + image.data[i + 2] > 3 * 60) lit++;
+assert.ok(lit > 5000, `to_png drew ${lit} bright pixels`);
+console.log(`jupyter: fig.to_png wrote 1000 x 600 with ${lit} bright pixels (test-results/python-to-png.png)`);
