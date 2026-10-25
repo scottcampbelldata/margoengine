@@ -9,3 +9,4 @@ export * from './hooks.js';
 export * from './extras.js';
 export * from './views.js';
 export * from './lights.js';
+export * from './voxels.js';

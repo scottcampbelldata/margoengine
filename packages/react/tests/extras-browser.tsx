@@ -2,6 +2,8 @@
 import React, { StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { boxGeometry } from '@margoengine/geometry';
+import { BlockTypes, VoxelWorld } from '@margoengine/voxel';
+import { BlockTextures } from '@margoengine/voxel/render';
 import {
   Canvas,
   Mesh,
@@ -12,10 +14,18 @@ import {
   BatchedMesh,
   BatchedItem,
   SectionPlanes,
+  Voxels,
   useFrame,
 } from '@margoengine/react';
 
-type Mode = 'views' | 'batched' | 'section';
+type Mode = 'views' | 'batched' | 'section' | 'voxels';
+// A 4 x 4 x 4 block of one red stone type, textured from raw pixels (no image files).
+const blocks = new BlockTypes(),
+  stone = blocks.define('stone'),
+  world = new VoxelWorld({ blocks }),
+  red = new Uint8Array(16 * 16 * 4).map((_, i) => [220, 40, 40, 255][i % 4]),
+  textures = new BlockTextures({ images: [{ width: 16, height: 16, data: red }] });
+for (let x = -2; x < 2; x++) for (let y = 62; y < 66; y++) for (let z = -2; z < 2; z++) world.setBlock(x, y, z, stone);
 const state = { frames: 0, errors: [] as string[] };
 const cube = boxGeometry(1.6, 1.6, 1.6);
 function Count() {
@@ -38,7 +48,11 @@ function App({ mode }: { mode: Mode }) {
       <Canvas
         backend="webgpu"
         camera={
-          mode === 'section' ? { position: [0, 0, 6], target: [0, 0, 0] } : { position: [0, 0, 7], target: [0, 0, 0] }
+          mode === 'voxels'
+            ? { position: [6, 70, 9], target: [0, 64, 0] }
+            : mode === 'section'
+              ? { position: [0, 0, 6], target: [0, 0, 0] }
+              : { position: [0, 0, 7], target: [0, 0, 0] }
         }
         onError={(error) => state.errors.push(String(error))}
       >
@@ -62,6 +76,7 @@ function App({ mode }: { mode: Mode }) {
             <BatchedItem geometry={cube} position={[2.2, 0, 0]} color="#2020ff" />
           </BatchedMesh>
         )}
+        {mode === 'voxels' && <Voxels world={world} textures={textures} />}
         {mode === 'section' && (
           <>
             <Red />

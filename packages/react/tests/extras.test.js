@@ -82,6 +82,31 @@ mock.module('@margoengine/environment', {
     }),
   },
 });
+const Renderer = plugin('voxels', { daylight: 1, blockLightColor: [1, 0.8, 0.6], lightmap: undefined });
+const lightings = [];
+mock.module('@margoengine/voxel/render', { namedExports: { VoxelRenderer: Renderer } });
+mock.module('@margoengine/voxel/light', {
+  namedExports: {
+    VoxelLighting: {
+      attach(world, options) {
+        const lighting = {
+          world,
+          options,
+          updates: 0,
+          disposals: 0,
+          update() {
+            this.updates++;
+          },
+          dispose() {
+            this.disposals++;
+          },
+        };
+        lightings.push(lighting);
+        return lighting;
+      },
+    },
+  },
+});
 mock.module('@margoengine/machinery/section', {
   namedExports: {
     SectionPlanes: class extends Section {
@@ -102,6 +127,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { Context } = await import('../dist/internal.js');
 const { BatchedMesh, BatchedItem, DepthTexture, SceneTargets, SectionPlanes } = await import('../dist/extras.js');
 const { Sun, AmbientLight, HemisphereLight, Fog } = await import('../dist/lights.js');
+const { Voxels } = await import('../dist/voxels.js');
 const { render, act, cleanup } = await import('@testing-library/react');
 const flush = () => act(async () => {});
 const h = React.createElement;
@@ -306,4 +332,43 @@ test('AmbientLight, HemisphereLight and Fog attach once, light every PBR model a
   assert.deepEqual([ambient.current, hemisphere.current, fog.current], kept, 'prop changes keep the plugins');
   assert.equal(ambient.current.intensity, 2);
   assert.equal(fog.current.near, 1, 'a removed fog option returns to its default');
+});
+
+test('Voxels attaches the renderer and lighting, updates light from the frame loop, and keeps them through live props', async () => {
+  const value = scene(),
+    ref = React.createRef(),
+    world = { name: 'world' },
+    textures = { name: 'textures' };
+  const view = render(tree(value, h(Voxels, { ref, world, textures, daylight: 0.4, fancyLeaves: false })));
+  await flush();
+  const renderer = ref.current,
+    lighting = lightings.at(-1);
+  assert.equal(renderer.kind, 'voxels');
+  assert.deepEqual(renderer.args[0], {
+    world,
+    textures,
+    workers: undefined,
+    maxQuadBytes: undefined,
+    fancyLeaves: false,
+    bevel: undefined,
+    daylight: 0.4,
+    lightmap: undefined,
+  });
+  assert.equal(lighting.world, world, 'VoxelLighting lights the same world');
+  for (const callback of value.frames.callbacks) callback(value.engine, 0.016);
+  assert.equal(lighting.updates, 1, 'light updates run from the Canvas frame loop');
+  view.rerender(
+    tree(value, h(Voxels, { ref, world, textures, daylight: 0.1, blockLightColor: [1, 0.5, 0.2], fancyLeaves: false })),
+  );
+  await flush();
+  assert.equal(ref.current, renderer, 'live props keep the renderer');
+  assert.equal(renderer.daylight, 0.1);
+  assert.deepEqual(renderer.blockLightColor, [1, 0.5, 0.2]);
+  view.rerender(tree(value, h(Voxels, { ref, world, textures, fancyLeaves: true, lighting: false })));
+  await flush();
+  assert.notEqual(ref.current, renderer, 'a construction option recreates it');
+  assert.equal(renderer.disposals, 1);
+  assert.equal(lighting.disposals, 1, 'and disposes its lighting');
+  assert.equal(lightings.at(-1), lighting, 'lighting: false attaches none');
+  assert.equal(value.frames.callbacks.size, 0);
 });

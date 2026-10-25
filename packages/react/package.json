@@ -88,7 +88,8 @@
     "@margoengine/stage": "^1.0.0",
     "@margoengine/cache": "^1.0.0",
     "@margoengine/machinery": "^1.0.0",
-    "@margoengine/cameras": "^1.0.0"
+    "@margoengine/cameras": "^1.0.0",
+    "@margoengine/voxel": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/materials": {
@@ -164,6 +165,9 @@
       "optional": true
     },
     "@margoengine/cameras": {
+      "optional": true
+    },
+    "@margoengine/voxel": {
       "optional": true
     }
   }

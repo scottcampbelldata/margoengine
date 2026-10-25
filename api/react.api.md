@@ -20,6 +20,8 @@ import { Stage } from "@margoengine/stage";
 import { TAA, TAAOptions } from "@margoengine/taa";
 import { Text, TextOptions } from "@margoengine/text";
 import { CubeLUT, Tonemap, TonemapOptions } from "@margoengine/tonemap";
+import { VoxelLightingOptions } from "@margoengine/voxel/light";
+import { BlockTextures, VoxelRenderer, VoxelRendererOptions } from "@margoengine/voxel/render";
 import { XR } from "@margoengine/xr";
 import { CSSProperties, ReactNode, RefObject } from "react";
 
@@ -553,6 +555,16 @@ export interface TransformControlsProps extends Omit<TransformControlsOptions, '
     onDraggingChange?: (event: ControlEvent) => void;
 }
 
+export const Voxels: import("react").ForwardRefExoticComponent<VoxelsProps & import("react").RefAttributes<VoxelRenderer>>;
+
+export interface VoxelsProps extends Omit<VoxelRendererOptions, 'daylight' | 'lightmap'> {
+    daylight?: number;
+    blockLightColor?: Vec3;
+    lightmap?: VoxelRendererOptions['lightmap'];
+    lighting?: boolean | VoxelLightingOptions;
+    onError?: (error: unknown) => void;
+}
+
 export function XR({ children, ...props }: XRProps): import("react").JSX.Element;
 
 export interface XRContextValue {
@@ -601,6 +613,8 @@ export { PbrMaterial as meshStandardMaterial };
 function PbrMaterial({ color, roughness, metalness }: PbrMaterialProps): null;
 
 export function preload(src: string, kind?: AssetKind): Promise<void>;
+
+export function useBlockTextures(urls: readonly string[]): BlockTextures;
 
 export function useCamera(): EngineKernel['camera'];
 

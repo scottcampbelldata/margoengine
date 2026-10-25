@@ -210,6 +210,35 @@ export function Valley() {
 }
 ```
 
+`<Voxels world textures>` draws a `VoxelWorld` from `@margoengine/voxel`: chunks are meshed in workers and lit by `@margoengine/voxel/light` (on by default, updated from the Canvas frame loop). Edit the world with `world.setBlock` and the change shows two frames later with no React render; `daylight`, `blockLightColor` and `lightmap` are live. `useBlockTextures(urls)` loads the block textures, one layer per URL, and suspends until they are ready. Needs WebGPU and Web Workers.
+
+```tsx
+import { Suspense, useMemo } from 'react';
+import { BlockTypes, VoxelWorld } from '@margoengine/voxel';
+import { Canvas, Voxels, useBlockTextures } from '@margoengine/react';
+
+function Island() {
+  const textures = useBlockTextures(['/stone.png', '/grass-top.png']);
+  const world = useMemo(() => {
+    const blocks = new BlockTypes(),
+      stone = blocks.define('stone'),
+      island = new VoxelWorld({ blocks });
+    for (let x = -8; x < 8; x++) for (let z = -8; z < 8; z++) island.setBlock(x, 64, z, stone);
+    return island;
+  }, []);
+  return <Voxels world={world} textures={textures} daylight={0.8} />;
+}
+export function Game() {
+  return (
+    <Canvas camera={{ position: [12, 72, 12], target: [0, 64, 0] }}>
+      <Suspense fallback={null}>
+        <Island />
+      </Suspense>
+    </Canvas>
+  );
+}
+```
+
 `useFrame((engine, deltaSeconds) => ...)` updates meshes without React renders or re-subscribing when the callback changes. The canvas serializes initialization, disposes superseded engines, and disconnects ResizeObserver during cleanup. It handles StrictMode, HMR effect replacement, late initialization after unmount, and `capacity`/`backend` changes. Camera changes update the existing engine. Errors reach `onError` and an accessible alert.
 
 SSR emits an accessible canvas without accessing GPU APIs. The ESM output preserves `use client` and includes TypeScript declarations. Peer ranges accept the current core 0.1.x workspace and the requested core 1.x release, plus React 18/19.
