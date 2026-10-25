@@ -188,6 +188,7 @@
     "test:all": "npm run build:packages && node --experimental-test-module-mocks --test --test-concurrency=4 tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js",
     "test:modules:browser": "node scripts/margo-module-tests.js",
     "test:catalog:browser": "node --test tests/browser/catalog.test.js",
+    "test:python:browser": "node python/build-frontend.mjs && node python/tests/jupyter-browser.mjs",
     "test:modules:packages": "node scripts/margo-package-tests.js",
     "test:browser": "node scripts/modern-browser-tests.js",
     "modern:test:game": "node scripts/modern-game-tests.js",

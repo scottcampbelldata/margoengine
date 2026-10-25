@@ -166,6 +166,18 @@ test('a documents-only change skips every GPU step and the bundler matrix, and k
   );
 });
 
+test('a Python package change runs only the Python notebook suite, not the full GPU run', () => {
+  const { decision, planned } = planFor(['python/margoengine/_figure.py', 'python/frontend/figure.ts']);
+  assert.equal(decision.mode, 'affected', decision.reason);
+  assert.deepEqual(decision.hits, ['gpu/root/test:python:browser']);
+  assert.match(
+    planned.find((p) => stepName(p.command) === 'check:gpu-packages').command,
+    /--select=root\/test:python:browser$/,
+  );
+  // The suite also runs when sciviz, which draws its figures, changes.
+  assert.ok(planFor(['packages/sciviz/src/figure.ts']).decision.hits.includes('gpu/root/test:python:browser'));
+});
+
 test('a documents-only change outside any package still runs the packed smoke test, with no package examples', () => {
   const { planned } = planFor(['docs/HANDOFF.md']);
   assert.equal(

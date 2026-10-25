@@ -284,6 +284,30 @@ class Camera(unittest.TestCase):
         self.assertEqual(payload["camera"], {"position": [1.0, 1.0, 1.0]})
 
 
+class Colab(unittest.TestCase):
+    def test_in_colab_the_figure_displays_as_an_inline_page_not_a_widget(self):
+        import types
+
+        original = figure_module._frontend_bundle
+        figure_module._frontend_bundle = lambda: "var MargoFigure = { renderPayload() {} };"
+        sys.modules["google.colab"] = types.ModuleType("google.colab")
+        FakeComm.opened.clear()
+        try:
+            fig = margo.scatter(x=[1.5, 2], y=[3, 4], comm_factory=FakeComm)
+            fig.camera = {"position": [1, 1, 1]}
+            bundle = fig._repr_mimebundle_()
+        finally:
+            del sys.modules["google.colab"]
+            figure_module._frontend_bundle = original
+        self.assertEqual(set(bundle), {"text/html", "text/plain"})
+        self.assertEqual(FakeComm.opened, [], "no comm is opened in Colab")
+        page = bundle["text/html"]
+        self.assertIn('style="position:relative;width:100%;height:480px"', page)
+        payload = json.loads(page.split("document.getElementById(")[1].split("), ", 1)[1].rsplit(");</script>", 1)[0])
+        self.assertEqual(floats(base64.b64decode(payload["buffers"][0])), [1.5, 2])
+        self.assertEqual(payload["camera"], {"position": [1.0, 1.0, 1.0]})
+
+
 class PngExport(unittest.TestCase):
     """The DevTools WebSocket client and to_png's checks (the drawing itself is checked by jupyter-browser.mjs)."""
 

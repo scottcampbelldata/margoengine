@@ -35,3 +35,4 @@ packages = ["margoengine"]
 
 [tool.hatch.build.targets.wheel.shared-data]
 "margoengine/labextension" = "share/jupyter/labextensions/@margoengine/jupyter"
+"margoengine/nbextension" = "share/jupyter/nbextensions/@margoengine/jupyter"

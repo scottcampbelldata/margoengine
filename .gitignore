@@ -30,3 +30,4 @@ benchmarks/runs/
 # Built by python/build-frontend.mjs (the Python package's browser bundles).
 python/margoengine/labextension/
 python/margoengine/static/
+python/margoengine/nbextension/

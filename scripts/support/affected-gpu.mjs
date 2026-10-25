@@ -296,6 +296,8 @@ export function buildFootprints({ root, workspaces, tests, scripts }) {
         if (w) print.packages.add(w.name);
       }
       if (test.name === 'test:catalog:browser') print.patterns.push(/^docs\/(?!.*\.md$)/);
+      // The Python package is not a workspace: every file under python/ is this suite's.
+      if (test.name === 'test:python:browser') print.patterns.push(/^python\//);
       // A suite whose sources name no package at all cannot be mapped: run it whenever a package is affected.
       out[id] = print.packages.size || print.files.size ? print : everything(print);
     } else {

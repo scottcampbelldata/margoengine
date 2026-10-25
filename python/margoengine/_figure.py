@@ -12,6 +12,7 @@ import base64
 import html
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -406,13 +407,17 @@ class Figure(HasTraits):
         return self._model
 
     def _repr_mimebundle_(self, include: Any = None, exclude: Any = None) -> Dict[str, Any]:
+        if _in_colab():
+            # Colab's widget manager loads third-party widget code only from npm, where @margoengine/jupyter is not
+            # published: Colab gets the figure as an inline page instead (it draws and orbits; no events reach Python).
+            return {"text/html": self._inline_html(), "text/plain": "<Margo figure>"}
         return self._model.mimebundle()
 
     def show(self) -> None:
         """Displays the figure (in a notebook cell, without being its last expression)."""
         from IPython.display import display  # Present in every Jupyter kernel.
 
-        display(self._model.mimebundle(), raw=True)
+        display(self._repr_mimebundle_(), raw=True)
 
     def _payload(self) -> str:
         # The specification with its arrays as base64, and the camera, as JSON safe inside a <script> element.
@@ -424,6 +429,15 @@ class Figure(HasTraits):
             "buffers": [base64.b64encode(bytes(b)).decode("ascii") for b in buffers],
         }
         return json.dumps(payload, separators=(",", ":")).replace("</", "<\\/")
+
+    def _inline_html(self) -> str:
+        """The figure as an HTML fragment (frontend bundle and data inline) for notebook outputs without the widget."""
+        host = f"margo-{id(self):x}-{len(self._spec['layers'])}"
+        return (
+            f'<div id="{host}" style="position:relative;width:100%;height:{self._spec["height"]}px"></div>\n'
+            f"<script>{_frontend_bundle()}</script>\n"
+            f"<script>MargoFigure.renderPayload(document.getElementById({json.dumps(host)}), {self._payload()});</script>"
+        )
 
     def to_html(self, *, title: str = "Margo figure") -> str:
         """A self-contained HTML page with the figure: the frontend bundle inline, arrays as base64."""
@@ -483,6 +497,11 @@ window.margoFigure = MargoFigure.renderPayload(document.getElementById('figure')
         target = Path(path)
         target.write_bytes(png)
         return target
+
+
+def _in_colab() -> bool:
+    # Colab kernels have imported google.colab by the time a cell runs.
+    return "google.colab" in sys.modules
 
 
 def _frontend_bundle(folder: Optional[Path] = None) -> str:

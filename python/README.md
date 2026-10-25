@@ -123,14 +123,33 @@ pip install ./python
 The package needs only `comm` and `traitlets` (both present in every Jupyter kernel). NumPy, pandas, Polars and xarray inputs are used when installed.
 Plain lists and `array.array` also work.
 
+## Where it runs
+
+| Notebook | How the figure loads | Checked |
+| --- | --- | --- |
+| JupyterLab 4 | prebuilt extension `@margoengine/jupyter` (installed with the package) | automatically: `npm run test:python:browser` draws three figures and checks the camera both ways |
+| Notebook 7 | the same prebuilt extension | automatically, by the same test |
+| VS Code notebooks | the classic AMD module `share/jupyter/nbextensions/@margoengine/jupyter/index.js` in the kernel's environment (installed with the package) | by hand, below |
+| Google Colab | an inline page instead of the widget: Colab's custom widget manager loads widget code only from npm, and `@margoengine/jupyter` is not published there. The figure draws and orbits; `camera` events do not reach Python | by hand, below |
+
+Checks done by hand (no automated VS Code or Colab session here):
+
+1. VS Code: install the package into the kernel's environment (`pip install ./python`), open a notebook with that
+   kernel, run `margo.scatter(x=np.random.rand(1000), y=np.random.rand(1000))`. The figure draws; drag it, then
+   run `fig.camera` in the next cell and see the position change.
+2. Colab: upload a wheel built with `pip wheel ./python`, `pip install` it in the notebook and run the same cell. The
+   figure draws and orbits (WebGPU needs Chrome or Edge).
+
 ## How it works
 
 1. A figure is a widget speaking the Jupyter widget messaging protocol 2.1. Its state is a plot specification:
    theme, axes, and layers whose arrays are float32 bytes plus a shape. The bytes go in the comm message's binary
    buffers, with their `buffer_paths`.
 2. In JupyterLab, the prebuilt extension `@margoengine/jupyter` is a hand-written federated container
-   (`remoteEntry.js`). It registers `MargoFigureModel` and `MargoFigureView` with the widget manager.
+   (`remoteEntry.js`). It registers `MargoFigureModel` and `MargoFigureView` with the widget manager. VS Code loads the
+   same classes from the AMD module in `nbextensions`.
 3. The view rebuilds the specification as a `@margoengine/sciviz` figure. Its `camera` attribute syncs both ways
    like the specification.
 
-Run the tests with `python -m unittest discover -s python/tests` or `pytest python/tests`.
+Run the tests with `python -m unittest discover -s python/tests` or `pytest python/tests`, and the notebook check
+(JupyterLab, Notebook 7, camera, `to_png`; GPU lock) with `npm run test:python:browser`.
