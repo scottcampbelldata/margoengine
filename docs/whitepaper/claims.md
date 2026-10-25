@@ -18,14 +18,15 @@ Unless a row says otherwise, real-GPU numbers come from one machine:
 - Headless Edge 155, vsync and the frame-rate cap off.
 - AC power checked before and after, with a GPU lock held so no other benchmark runs at the same time.
 
-Nothing has been measured yet on NVIDIA or AMD with a committed result, on Apple silicon, on Android, in Firefox or
-in Safari. [docs/limits.md](../limits.md) lists what is untested.
+Some newer results (the voxel sandbox and multiplayer, the create-margo starters) come from a desktop with an AMD
+Ryzen 9 9950X and an NVIDIA RTX A6000, and say so. Nothing has been measured on Apple silicon, on Android, in Firefox
+or in Safari. [docs/limits.md](../limits.md) lists what is untested.
 
 ## Headline numbers
 
 | Claim | Where | Evidence | Command | Status |
 | --- | --- | --- | --- | --- |
-| Core + stage is 22,737 B gzip (57,590 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` at `36ac9af6` | `npm run build:packages && npm run measure:size` | PROVEN |
+| Core + stage is 22,737 B gzip (57,590 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` at `454df8f3` | `npm run build:packages && npm run measure:size` | PROVEN |
 | The build fails at 25,000 B gzip for core + stage | README, site | `scripts/core-budget.js`, run by `build:packages` and `measure:size` | `npm run build:packages` | PROVEN |
 | Every other package is optional and has its own size | README | `entry-sizes.json` (every exports entry and worker) | `npm run build:site` | PROVEN |
 | An engine starts with 1,024 entity slots and doubles up to 8,388,608 | site | `packages/core/src/kernel.ts`; `tests/core-dirty-transforms.test.js` (1,000,000 entities) | `npm test` | PROVEN |
@@ -41,11 +42,19 @@ and commit.
 
 | Page | Figures | Evidence | Status |
 | --- | --- | --- | --- |
-| engine | Sizes (core, core + stage, packages, brep), the six-request basic page | `entry-sizes.json`, `basic-scene-network.json` at `36ac9af6` | PROVEN |
-| engine | three.js r186 size table | `threejs-size.json` at `80b4a1f`, Margo's side shown at both commits | PROVEN (dated) |
+| engine | Core 20,432 B, core + stage 22,737 B (57,590 raw), 2,263 B under the gate | `entry-sizes.json` at `454df8f3` (dirty: false) | PROVEN |
+| engine | 79 packages; `npm i margoengine`; kit sizes (game 288,197, cad 199,438, viz 197,231, web 143,159 B) | `docs/catalog.json`; `docs/guides/kits.md`, re-measured by `tests/umbrella.test.js` (fails on a 3% move) | PROVEN |
+| engine | Starter first frames: cad 533, web 788, react 835, viz 968, game 1,308 ms (vite dev, packages linked, one run each, RTX A6000 PC) | `examples/package-benchmarks/results/starters-first-frame.json` (`tools/create-margo/test/browser-check.mjs`) | PROVEN (dated, one run) |
+| engine | 5,059 tests | `examples/package-benchmarks/results/test-count.json` | PROVEN |
+| engine | Parity 153 / 4 / 4 of 161 three.js rows | `docs/three-parity-matrix.md` | PROVEN |
+| engine | Views and scenes: +867 B gzip | `docs/multi-view-roadmap.md` size table (21,343 -> 22,210 B) | PROVEN (dated) |
+| engine | Voxel multiplayer: 900 spread / 350 crowded at 20 ticks per second | `packages/voxel-net/bench/results.json`, `docs/voxel-net-capacity-2026-10-21.md` | PROVEN |
+| engine | 62 visual views, 4 captures each | `tests/visual/profiles/nvidia-ampere-msedge-156` | PROVEN |
+| engine | About 88% of browsers support WebGPU (85.8% full + 2.02% partial) | external: caniuse.com/webgpu, StatCounter data for September 2026, read 2026-10-24 | external source, dated |
+| engine | The B-rep kernel is MIT; IGES in brep and the OpenCascade removal are in progress | `packages/brep/package.json`; the other two are stated as work in progress, with no number | PROVEN / no claim |
 | engine | Kernel scaling, CAD orbit before and after, culling, BVH picks, large coordinates, design envelope | `cad/results-*.json`, `results-scale-node.json`, `large-coordinates-gpu.json`, the LIM rows below | PROVEN (dated) |
-| engine | Number of optimization proofs | `proofs/*.proof.js` and the `ongoing` list in `proofs/run.mjs` | PROVEN (file counts) |
-| engine | Speed against three.js | None. The page makes no claim and quotes no diagnostic number. | no claim |
+| engine | 51 proofs, 20 ongoing | `proofs/*.proof.js` and the `ongoing` list in `proofs/run.mjs` | PROVEN (file counts) |
+| engine | Speed against three.js or any other engine | None. The page makes no claim and quotes no comparison. | no claim |
 | voxel | Path tracer GPU timings, denoiser error ratios, correctness checks, limits | `packages/voxel-pathtracer/README.md` (asserted in its browser checks, no committed result file) | UNPROVEN |
 | voxel | Sandbox render distance, multiplayer capacity, package sizes | `voxel-sandbox-bench.json`, `packages/voxel-net/bench/results.json`, `entry-sizes.json` | PROVEN |
 | voxel | Voxel Studio app tests, comparisons with other engines, native 4K timing | Margo Voxel Studio's own `docs/verification.md`; raw reports are not committed | UNPROVEN |
@@ -60,11 +69,8 @@ engine-bench (see [docs/benchmarking.md](../benchmarking.md)). The scenes pair c
 instanced meshes with three.js `InstancedMesh`, at 4x MSAA on both sides, with GPU timestamps on WebGPU and
 `EXT_disjoint_timer_query_webgl2` on WebGL2.
 
-The only runs so far were on a busy machine and are diagnostics, not results
-(`results/vs-threejs-boxes-pairs.json`, discussed in [boxes-vs-threejs.md](boxes-vs-threejs.md)):
-
-- mesh against mesh, Margo used less CPU and ran at a higher frame rate from 1k to 50k boxes;
-- instanced against instanced, three.js's WebGL2 `InstancedMesh` was ahead at every size.
+The only runs so far were diagnostics on a busy machine (`results/vs-threejs-*.json`, discussed in
+[boxes-vs-threejs.md](boxes-vs-threejs.md)). They are not results and are not quoted anywhere as a comparison.
 
 The quiet-machine run, with an A/A run to show the noise floor, decides what gets published.
 
@@ -92,7 +98,7 @@ backs them yet:
 
 | ID | Claim | Evidence | Command | Status | Note |
 | --- | --- | --- | --- | --- | --- |
-| LIM-001 | "core plus the stage facade is 22,737 B gzip"; the build fails at 25,000 bytes (docs/limits.md, intro) | `examples/package-benchmarks/results/entry-sizes.json` at `36ac9af6` (`coreStage.gzip` 22737); `scripts/core-budget.js` (`CORE_STAGE_GZIP_LIMIT`) | `npm run build:packages && npm run measure:size` | PROVEN | The figure moves a little with most changes to core; the record names its commit. |
+| LIM-001 | "core plus the stage facade is 22,737 B gzip"; the build fails at 25,000 bytes (docs/limits.md, intro) | `examples/package-benchmarks/results/entry-sizes.json` at `454df8f3` (`coreStage.gzip` 22737); `scripts/core-budget.js` (`CORE_STAGE_GZIP_LIMIT`) | `npm run build:packages && npm run measure:size` | PROVEN | The figure moves a little with most changes to core; the record names its commit. |
 | LIM-002 | Entities: "8,388,608 slots (2^23)", starts at `capacity` (default 1,024) and doubles; `RangeError: Capacity` / `Capacity: 1..8388608`; a failed growth leaves the store as it was (docs/limits.md, Scale) | `packages/core/src/kernel.ts` (`create`, `grow`), `engine.ts` `createMesh` and `Engine.create` (`capacity ?? 1024`); `tests/core-dirty-transforms.test.js` asserts `/Capacity/` at 2^23 + 1 and growth from 1,024 (in verify) | `node --test tests/core-dirty-transforms.test.js` | PROVEN | See also S-04. |
 | LIM-003 | "352.1 B of kernel memory per slot at 1,048,576 slots (351 B by layout)" (docs/limits.md, Scale) | `examples/package-benchmarks/cad/results-scale-node.json` (`kernelBytesPerSlot` 352.1 at 1,000,012 entities; Node 24, AC, quiet-gated at 8% CPU, not diagnostic); layout in `packages/kernel/src/lib.rs` (86 float columns + 7 flag bytes) | `node --expose-gc examples/package-benchmarks/cad/scale-node.mjs` | PROVEN | - |
 | LIM-004 | "a static kernel tick costs 3.3 ms at 100,006 entities, 20.2 ms at 499,992 and 41.5 ms at 1,000,012"; "about 41 ns per entity per frame even when nothing moves"; above 1,048,576 slots "not measured" (docs/limits.md, Scale) | Same JSON (`tickStaticMs` 3.328 / 20.153 / 41.461); 41.461 ms / 1,000,012 = 41 ns | same | PROVEN | Node CPU timings, same Wasm as the browser, fake renderer. |

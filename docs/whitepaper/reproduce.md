@@ -91,4 +91,4 @@ engines").
 
 On a discrete-GPU desktop or a Mac: the setup above, then `npm run bench` and `npm run bench -- features`, and
 send back the `benchmarks/runs/` folder. On Linux or macOS the AC check returns `null` (recorded, not enforced). Set
-`BROWSER_CHANNEL=chrome` where Edge is not installed. Phones are not scripted yet (see outline.md).
+`BROWSER_CHANNEL=chrome` where Edge is not installed. Phones are not scripted yet.
