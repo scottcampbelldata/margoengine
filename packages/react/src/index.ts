@@ -6,3 +6,4 @@ export * from './xr.js';
 export { Animation, type AnimationProps } from './animation.js';
 export { MeshTransmissionMaterial, type MeshTransmissionMaterialProps } from './materials.js';
 export * from './hooks.js';
+export * from './extras.js';

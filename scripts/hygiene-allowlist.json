@@ -259,6 +259,34 @@
         "react"
       ],
       "reason": "One thing, two forms: @margoengine/post's Afterimage pass and @margoengine/react's <Afterimage> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "BatchedMesh": {
+      "packages": [
+        "materials",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/materials's BatchedMesh plugin and @margoengine/react's <BatchedMesh> JSX component that attaches it with the same options. Decision in docs/conventions.md."
+    },
+    "DepthTexture": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's DepthTexture plugin and @margoengine/react's <DepthTexture> JSX component that attaches it with the same options. Decision in docs/conventions.md."
+    },
+    "SceneTargets": {
+      "packages": [
+        "post",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/post's SceneTargets plugin and @margoengine/react's <SceneTargets> JSX component that attaches it with the same options. Decision in docs/conventions.md."
+    },
+    "SectionPlanes": {
+      "packages": [
+        "machinery",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/machinery's SectionPlanes plugin and @margoengine/react's <SectionPlanes> JSX component that attaches it with the same options. Decision in docs/conventions.md."
     }
   }
 }

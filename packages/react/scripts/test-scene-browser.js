@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
+import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
+// Real GPU: one browser suite at a time (part of check:merge; inside `gpu-lock run` this is a no-op).
+const release = await acquire({ owner: 'react-scene-browser' });
 const browser = await openBrowser({ port: 5197, startPath: '/packages/react/tests/scene-browser.html' }),
   { page, hardware } = browser;
 const errors = [];
@@ -140,4 +143,5 @@ try {
   throw error;
 } finally {
   await browser.close();
+  release();
 }

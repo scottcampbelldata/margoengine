@@ -6,8 +6,13 @@
 import { ArcballControls, ArcballProjection, ControlEvent, MapControls, NavigationProfile, OrbitControls, PROFILES, PointerLockControls, TransformControls, TransformControlsOptions } from "@margoengine/controls";
 import { EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, Vec3 } from "@margoengine/core";
 import { DOF, DOFOptions } from "@margoengine/dof";
-import { TransmissionOptions } from "@margoengine/materials";
+import { SectionOptions, SectionPlanes } from "@margoengine/machinery";
+import { Material, MeshGeometry, TransmissionOptions } from "@margoengine/materials";
+import { BatchedMesh, BatchedMeshOptions } from "@margoengine/materials/batched";
+import { ColorInput } from "@margoengine/math";
 import { Afterimage, AfterimageOptions, Bloom, BloomOptions, FXAA, GTAO, GTAOOptions, Glitch, GlitchOptions, LensFlare, LensFlareOptions, MotionBlur, MotionBlurOptions, SMAA, SMAAOptions, SSAO, SSAOOptions, SSGI, SSGIOptions, SSR, SSROptions } from "@margoengine/post";
+import { DepthTexture, DepthTextureOptions } from "@margoengine/post/depth";
+import { SceneTargets, SceneTargetsOptions } from "@margoengine/post/mrt";
 import { ShadowOptions } from "@margoengine/shadows";
 import { Sky, SkyOptions } from "@margoengine/sky";
 import { Stage } from "@margoengine/stage";
@@ -50,6 +55,26 @@ export interface ArcballControlsProps extends ControlEventProps {
     minZoom?: number;
     maxZoom?: number;
     projection?: ArcballProjection | null;
+}
+
+export function BatchedItem({ geometry, position, rotation, scale, matrix, color, visible }: BatchedItemProps): null;
+
+export interface BatchedItemProps {
+    geometry: MeshGeometry;
+    position?: Vec3;
+    rotation?: Vec3;
+    scale?: Vec3;
+    matrix?: ArrayLike<number>;
+    color?: ColorInput;
+    visible?: boolean;
+}
+
+export const BatchedMesh: import("react").ForwardRefExoticComponent<BatchedMeshProps & import("react").RefAttributes<Batch>>;
+
+export interface BatchedMeshProps extends BatchedMeshOptions, ErrorProps {
+    material?: Material;
+    castShadow?: boolean;
+    children?: ReactNode;
 }
 
 export function Bloom({ onReady, onError, ...options }: BloomProps): null;
@@ -127,6 +152,12 @@ export interface ControllerProps extends MeshProps {
 export function DepthOfField({ onReady, onError, ...options }: DepthOfFieldProps): null;
 
 export interface DepthOfFieldProps extends DOFOptions, Callbacks<DepthOfFieldEffect> {
+}
+
+export const DepthTexture: import("react").ForwardRefExoticComponent<DepthTextureProps & import("react").RefAttributes<DepthPlugin>>;
+
+export interface DepthTextureProps extends DepthTextureOptions, ErrorProps {
+    onResize?: (depth: DepthPlugin) => void;
 }
 
 export function EffectComposer({ children, enabled, onError }: EffectComposerProps): import("react").JSX.Element;
@@ -392,6 +423,17 @@ export function SSR({ onReady, onError, ...options }: SSRProps): null;
 export interface SSRProps extends SSROptions, Callbacks<SSREffect> {
 }
 
+export const SceneTargets: import("react").ForwardRefExoticComponent<SceneTargetsProps & import("react").RefAttributes<TargetsPlugin>>;
+
+export interface SceneTargetsProps extends SceneTargetsOptions, ErrorProps {
+}
+
+export const SectionPlanes: import("react").ForwardRefExoticComponent<SectionPlanesProps & import("react").RefAttributes<SectionPlugin>>;
+
+export interface SectionPlanesProps extends SectionOptions, ErrorProps {
+    enabled?: boolean;
+}
+
 export function Shadows(props: ShadowsProps): null;
 
 export type ShadowsProps = Omit<ShadowOptions, 'cascades'>;
@@ -523,6 +565,10 @@ interface ContactGroundOptions {
     height?: number;
     opacity?: number;
     color?: readonly [number, number, number];
+}
+
+interface ErrorProps {
+    onError?: (error: unknown) => void;
 }
 
 interface ErrorProps {

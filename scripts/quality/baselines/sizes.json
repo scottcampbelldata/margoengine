@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3133595,
+  "total": 3134840,
   "history": [
     {
       "date": "2026-10-24",
@@ -122,6 +122,12 @@
       "commit": "b4b8e8b2",
       "reason": "React stage 2b (item 17): EffectComposer stacks effects through PostStack and adds GTAO, SSR, SSGI, MotionBlur, LensFlare, SMAA, FXAA, Glitch and Afterimage (each lazily imported)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "e542c8f5",
+      "reason": "React stage 2b (item 17): BatchedMesh/BatchedItem, DepthTexture, SceneTargets and SectionPlanes components on the root (their engine packages load lazily)",
+      "grew": 1
     }
   ],
   "items": {
@@ -151,7 +157,7 @@
     "@margoengine/clustered/shadows": 10577,
     "@margoengine/clustered/units": 1089,
     "@margoengine/controls": 22891,
-    "@margoengine/controls/arcball": 4587,
+    "@margoengine/controls/arcball": 4582,
     "@margoengine/controls/drag": 2633,
     "@margoengine/controls/orbit": 5726,
     "@margoengine/controls/profiles": 960,
@@ -328,13 +334,13 @@
     "@margoengine/post/ssr": 11154,
     "@margoengine/post/stack": 4001,
     "@margoengine/procedural": 7492,
-    "@margoengine/procedural/expression": 4733,
+    "@margoengine/procedural/expression": 4720,
     "@margoengine/procedural/lsystem": 2454,
     "@margoengine/procedural/noise": 2314,
     "@margoengine/procedural/voronoi": 5026,
     "@margoengine/quality": 1879,
     "@margoengine/quality/warm": 1536,
-    "@margoengine/react": 20237,
+    "@margoengine/react": 21500,
     "@margoengine/react/kit": 10785,
     "@margoengine/react/physics": 5204,
     "@margoengine/react/post": 3770,

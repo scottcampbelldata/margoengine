@@ -1127,6 +1127,11 @@ test('Frozen core entry stays portable and React exposes its complete scene bind
   assert.deepEqual(
     Object.keys(react).sort(),
     [
+      'BatchedItem',
+      'BatchedMesh',
+      'DepthTexture',
+      'SceneTargets',
+      'SectionPlanes',
       'Afterimage',
       'FXAA',
       'GTAO',
