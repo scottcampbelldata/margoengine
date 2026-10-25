@@ -5,7 +5,7 @@ import { FrameGraph, Engine, TransformStore } from '../../core/dist/extension.js
 import { parseGLTF } from '../../gltf-pro/dist/index.js';
 import { extendedMaterials } from '../../gltf-pro/dist/extended.js';
 import { PBRInstances } from '../../gltf-pro/dist/instancing.js';
-import { Material, createMesh } from '../../materials/dist/index.js';
+import { Material, Texture, createMesh } from '../../materials/dist/index.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 import { wgsl } from '../../core/dist/shaders.js';
 import { PostStack, SSR, SSAO } from '../dist/index.js';
@@ -241,6 +241,21 @@ async function models(gpu) {
   store.tick(false);
   return { engine, model, mesh };
 }
+test('ssr.add(mesh) captures a textured materials mesh through its maps', async () => {
+  // A material without maps reads constant texels (materials' bare shader); one with a map must still sample it.
+  const h = harness(4),
+    ssr = new SSR();
+  h.engine.use(new PostStack([ssr]));
+  const { mesh } = await models(h.gpu);
+  mesh.material.map = new Texture({ data: new Uint8Array(16).fill(200), width: 2, height: 2 }, { mipmaps: false });
+  ssr.add(mesh);
+  const log = h.gpu.record(() => h.frame()),
+    code = log.filter((e) => e[0] === 'module' && e[2].code.includes('@fragment fn capture(')).map((e) => e[2].code);
+  assert.ok(
+    code.some((c) => /textureSample\(mat_baseMap,[\s\S]*margoCapture\(s,v,vec3f\(1\)\)/.test(c)),
+    'the capture shader samples the material map',
+  );
+});
 for (const samples of [4, 1])
   test(`ssr.add(model) draws gltf-pro and materials into the replay targets with their own materials (${samples}x)`, async () => {
     const h = harness(samples),
@@ -303,8 +318,8 @@ for (const samples of [4, 1])
     );
     assert.match(
       code.at(-1),
-      /exp2\(-9\.28\*nv\)[\s\S]*mat_baseMap[\s\S]*margoCapture\(s,v,vec3f\(1\)\)/,
-      'materials mesh without IBL: analytic weight, its own maps',
+      /exp2\(-9\.28\*nv\)[\s\S]*s\.base=vec4f\(1\)\*f\.base\*i\.color[\s\S]*margoCapture\(s,v,vec3f\(1\)\)/,
+      'materials mesh without IBL: analytic weight, its (absent) maps read as constants',
     );
     // One capture pass after the core replay, loading SSR's three targets and the depth the Hi-Z is built from.
     const begins = log.map((e, i) => [e, i]).filter(([e]) => e[0] === 'beginRenderPass'),

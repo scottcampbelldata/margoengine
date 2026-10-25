@@ -1710,6 +1710,45 @@ function mapPlan(m: Material) {
   });
   return { textures, samplers, slots };
 }
+/** True for a standard material with no texture at all: it draws {@link bareShader} and binds no textures. */
+function bare(m: Material): boolean {
+  return (
+    !m.physical &&
+    m.shading === 'standard' &&
+    slots.every((k) => m[k] == null) &&
+    !featureMapsUsed(m).some(Boolean) &&
+    !m.envMap
+  );
+}
+const bareCode = new Map<string, string>();
+/**
+ * gltf-pro's shader for a standard material without maps: each texture read becomes the value of the texture a missing
+ * map stands for (white; the flat normal (0.5, 0.5, 1), exactly what the defaults hold), and gltf-pro's group-1
+ * textures are dropped. Without it such a material read ten textures per fragment (gltf-pro's white defaults times
+ * this package's). The tangent frame stays: extension lobes on the primitive may still use it.
+ */
+function bareShader(source: string): string {
+  let out = bareCode.get(source);
+  if (out !== undefined) return out;
+  out = source.replace(/@group\(1\) @binding\(\d+\) var \w+:[^;]+;\n?/g, '');
+  let count = 0;
+  const edit = (from: string | RegExp, to: string) => {
+    const next = out!.replace(from, () => to);
+    if (next !== out) count++;
+    out = next;
+  };
+  for (const map of ['base', 'mr', 'ao', 'emissive'])
+    edit(new RegExp(`textureSample\\(${map}Map,${map}Sampler,uv\\(i,f\\.coords[AB]\\.[xyzw]\\)\\)`, 'g'), 'vec4f(1)');
+  edit(/textureSample\(normalMap,normalSampler,uv\(i,f\.coordsA\.z\)\)/g, 'vec4f(0.5,0.5,1,1)');
+  if (count !== 5 || /textureSample\((base|mr|normal|ao|emissive)Map/.test(out))
+    throw new MargoError(
+      'unsupported',
+      'Materials require the standard gltf-pro PBR shader; draw the mesh with gltf-pro',
+    );
+  if (bareCode.size >= 64) bareCode.clear();
+  bareCode.set(source, out);
+  return out;
+}
 /** Rewrites gltf-pro's beauty shader to multiply in this package's maps (group 2, bindings 32-43) and, for non-standard shading, return early. */
 export function materialShader(source: string, group: number, shading: Shading): string {
   let cache = patched.get(source);
@@ -2796,6 +2835,7 @@ export class Material {
   /** gltf-pro beauty shader patch; subclasses (such as `@margoengine/shader`'s NodeMaterial) may extend it. */
   shader(source: string, group: number): string {
     if (mapped(this)) return physicalMapsShader(source, group, mapPlan(this).slots);
+    if (bare(this)) return bareShader(source);
     return materialShader(source, group, this.shading);
   }
   /** @internal gltf-pro LightingEffect bindings for one device; `engine` is the drawing engine. */
@@ -2822,6 +2862,7 @@ export class Material {
     }
     const d = defaults(device),
       entries: GPUBindGroupEntry[] = [];
+    if (bare(this)) return entries;
     for (let i = 0; i < (this.shading === 'matcap' ? 6 : 5); i++) {
       const texture = this[slots[i]],
         bound = texture?.sampled(device, i === 0 || i >= 4, slots[i]) ?? [i === 2 ? d.normal : d.white, d.sampler];
@@ -3313,7 +3354,8 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
       enumerable: true,
       value: {
         get replacesTextures() {
-          return mapped(current());
+          const m = current();
+          return mapped(m) || bare(m);
         },
         get texturedTint() {
           const m = current();

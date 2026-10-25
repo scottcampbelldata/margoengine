@@ -201,8 +201,10 @@ test('depth uniforms follow the owning engine and recreate for a replacement GPU
 test('existing modes retain their texture bindings without allocating the depth uniform', async () => {
   const s = await scene();
   try {
+    // A standard material without maps binds no textures at all (bareShader); with one map it binds every slot.
+    assert.deepEqual(new Material().bindings(s.device, s.engine), []);
     for (const shading of ['standard', 'basic', 'normal', 'matcap']) {
-      const material = new Material({ shading });
+      const material = new Material({ shading, ...(shading === 'standard' ? { aoMap: texture() } : {}) });
       const entries = material.bindings(s.device, s.engine);
       assert.deepEqual(
         entries.map((e) => e.binding),

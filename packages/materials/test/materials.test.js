@@ -146,10 +146,28 @@ test('Texture validates sources and options', () => {
   assert.equal(new Texture({ videoWidth: 0, videoHeight: 0, readyState: 0 }).isVideo, true);
 });
 
+test('a standard material without maps reads no texture: constant texels, no texture bindings', async () => {
+  // Regression: a plain Material drew with ten texture reads per fragment (gltf-pro's white defaults times this
+  // package's), the largest GPU cost of createInstancedMesh boxes against core's untextured shader.
+  const s = await scene();
+  try {
+    createMesh(s.engine, boxGeometry(1, 1, 1), new Material({ color: [0.5, 0.25, 1] }));
+    s.frame();
+    const code = s.h.pipelines.find((p) => p.fragment?.entryPoint === 'fragment').vertex.module.code;
+    assert.ok(!code.includes('textureSample('), 'no texture read');
+    assert.ok(!/@group\(1\) @binding/.test(code) && !code.includes('@binding(32)'), 'no texture binding');
+    assert.ok(code.includes('vec4f(1)*f.base*i.color') && code.includes('vec4f(0.5,0.5,1,1).xyz*2-1'));
+    assert.ok(!s.lighting().some((g) => g?.entries.some((e) => e.binding >= 32 && e.binding < 44)));
+  } finally {
+    s.close();
+  }
+});
+
 test('createMesh draws through gltf-pro with patched shader and default bindings', async () => {
   const s = await scene();
   try {
-    const model = createMesh(s.engine, boxGeometry(1, 1, 1), new Material({ color: [0.5, 0.25, 1] }));
+    const emissiveMap = new Texture({ data: new Uint8Array(16).fill(200), width: 2, height: 2 });
+    const model = createMesh(s.engine, boxGeometry(1, 1, 1), new Material({ color: [0.5, 0.25, 1], emissiveMap }));
     assert.equal(model.primitives.length, 1);
     assert.ok(s.engine.hasPlugin(model.name));
     s.frame();
@@ -192,7 +210,9 @@ test('Material subclasses extend the shader patch and bindings that createMesh i
         return super.bindings(device, e);
       }
     }
-    const model = createMesh(s.engine, boxGeometry(1, 1, 1), new Tinted());
+    // One map, so the materials patch (not the bare shader) applies.
+    const aoMap = new Texture({ data: new Uint8Array(16).fill(200), width: 2, height: 2 });
+    const model = createMesh(s.engine, boxGeometry(1, 1, 1), new Tinted({ aoMap }));
     s.frame();
     const code = s.h.pipelines.find((p) => p.fragment?.entryPoint === 'fragment' && p.vertex.buffers?.length).vertex
       .module.code;
@@ -749,7 +769,9 @@ test('the missing normal map uploads an exactly neutral tangent-space normal', a
     return original(destination, data, ...args);
   };
   try {
-    createMesh(s.engine, triangle, new Material());
+    // A map elsewhere keeps the normal slot bound to its default (a material without maps binds none).
+    const aoMap = new Texture({ data: new Uint8Array(16).fill(200), width: 2, height: 2 });
+    createMesh(s.engine, triangle, new Material({ aoMap }));
     s.frame();
     const normal = s
         .lighting()

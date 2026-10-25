@@ -4,7 +4,7 @@ import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gp
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { parseGLTF } from '../../gltf-pro/dist/index.js';
 import { extendedMaterials } from '../../gltf-pro/dist/extended.js';
-import { Material, createMesh } from '../../materials/dist/index.js';
+import { Material, Texture, createMesh } from '../../materials/dist/index.js';
 import { OIT } from '../dist/index.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
@@ -219,8 +219,19 @@ test('removing a model, disposing it, and materials meshes (normal blending via 
   );
   assert.equal(of(log, 'renderPipeline').filter((e) => e[2].fragment.entryPoint === 'transparent').length, 1);
   assert.ok(
-    of(log, 'module').some((e) => e[2].code.includes('mat_baseMap') && e[2].code.includes('@fragment fn transparent(')),
+    // A material without maps draws materials' bare shader (constant texels, no texture reads).
+    of(log, 'module').some(
+      (e) => e[2].code.includes('s.base=vec4f(1)*f.base*i.color') && e[2].code.includes('@fragment fn transparent('),
+    ),
     'materials text patch composes with the hook',
+  );
+  // A map assigned live: the glass samples it through the materials patch inside the OIT hook.
+  glass.material.map = new Texture({ data: new Uint8Array(16).fill(200), width: 2, height: 2 }, { mipmaps: false });
+  assert.ok(
+    of(frame(2), 'module').some(
+      (e) => e[2].code.includes('textureSample(mat_baseMap,') && e[2].code.includes('@fragment fn transparent('),
+    ),
+    'a textured material still samples its map in OIT',
   );
   glass.material.transparent = false;
   assert.deepEqual(
