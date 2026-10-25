@@ -1,13 +1,15 @@
 # @margoengine/stats
 
+Install `npm i margoengine` and import `margoengine/stats` (or this package alone: `npm i @margoengine/stats`, imported as `@margoengine/stats`; the two are the same module).
+
 Zero runtime dependencies. Frame sampling uses a fixed Float64Array ring.
 `tick(milliseconds, drawCalls?, dispatches?)` performs numeric updates only;
 DOM strings and canvas drawing refresh separately every 150 ms. Encoder/pass wrappers
 and asynchronous GPU readback allocate outside `tick`.
 
 ```ts
-import {Stats} from '@margoengine/stats';
-import type {EngineKernel} from '@margoengine/core';
+import {Stats} from 'margoengine/stats';
+import type {EngineKernel} from 'margoengine/core';
 function attach(engine: EngineKernel) {
   return Stats.attach(engine, {samples: 120, profiling: true});
 }

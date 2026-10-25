@@ -1,11 +1,13 @@
 # @margoengine/labels
 
+Install `npm i margoengine` and import `margoengine/labels` (or this package alone: `npm i @margoengine/labels`, imported as `@margoengine/labels`; the two are the same module).
+
 HTML labels and CSS 3D objects kept in register with a Margo Engine canvas.
 
 Build from source with `npm run build` in `packages/labels`.
 
 ```ts
-import {LabelRenderer} from '@margoengine/labels';
+import {LabelRenderer} from 'margoengine/labels';
 
 const labels = LabelRenderer.attach(engine);
 

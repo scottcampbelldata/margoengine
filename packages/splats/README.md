@@ -1,5 +1,7 @@
 # @margoengine/splats
 
+Install `npm i margoengine` and import `margoengine/splats` (or this package alone: `npm i @margoengine/splats`, imported as `@margoengine/splats`; the two are the same module).
+
 Use `@margoengine/splats/data` for `parseSplat`, `validateSplats` and the
 `SplatData` type without loading GPU rendering or radix-sort shaders. Root
 exports retain the same functions for applications that also render splats.
@@ -7,8 +9,8 @@ exports retain the same functions for applications that also render splats.
 Optional WebGPU Gaussian rendering that accepts 1–3,000,000 world-space splats (an input cap, not a frame-rate promise: adapter storage/memory limits may allow fewer, and frame time at the cap depends on the GPU). Compute projects each positive-definite 3D covariance through the camera Jacobian into a 2D ellipse with a 0.3-pixel variance floor. Instanced quads cover three standard deviations; the fragment shader evaluates Gaussian opacity and blends far to near against read-only reversed scene depth.
 
 ```ts
-import {EngineKernel} from '@margoengine/core';
-import {Splats,parseSplat} from '@margoengine/splats';
+import {EngineKernel} from 'margoengine/core';
+import {Splats,parseSplat} from 'margoengine/splats';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const response = await fetch('/capture.splat');
 if (!response.ok) throw new Error('Failed to load splats: '+response.status);
@@ -30,9 +32,9 @@ Base GPU allocations are approximately 128 bytes per splat (384 MB at three mill
 `cloud.setFog(fog)` fogs the cloud with `@margoengine/environment`'s `Fog` or any object with its fields (`color`, `near`, `far`, `density`, `heightFalloff`, `height`, `enabled`), read every frame with Fog's maths. Each splat's colour fades toward the fog colour by the fog at its centre, in the projection pass and in linear before the display encoding; opacity is unchanged. The package does not import environment. `fog.enabled = false` clears it without recompiling; `cloud.setFog(null)` (the default) draws exactly as before.
 
 ```ts
-import type {EngineKernel} from '@margoengine/core';
-import {Fog} from '@margoengine/environment';
-import type {Splats} from '@margoengine/splats';
+import type {EngineKernel} from 'margoengine/core';
+import {Fog} from 'margoengine/environment';
+import type {Splats} from 'margoengine/splats';
 declare const engine: EngineKernel, cloud: Splats; // from the first example
 cloud.setFog(Fog.attach(engine, {color: '#8090a0', density: 0.02}));
 ```

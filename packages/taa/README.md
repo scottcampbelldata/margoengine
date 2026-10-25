@@ -1,10 +1,12 @@
 # @margoengine/taa
 
+Install `npm i margoengine` and import `margoengine/taa` (or this package alone: `npm i @margoengine/taa`, imported as `@margoengine/taa`; the two are the same module).
+
 Optional WebGPU temporal anti-aliasing. Eight Halton (2,3) projection offsets move raster samples by fractions of a pixel. An `rg16float` velocity buffer stores current minus previous UV coordinates. History is reprojected with bilinear depth-tested taps, clamped to the current 3×3 neighborhood in YCoCg, and blended in linear RGB. Two HDR color histories and two `r32float` depth histories alternate without GPU readback.
 
 ```ts
-import {EngineKernel,box} from '@margoengine/core';
-import {TAA} from '@margoengine/taa';
+import {EngineKernel,box} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 engine.createMesh().setGeometry(box());
 const taa = TAA.attach(engine, {historyWeight:0.9, depthThreshold:0.01});

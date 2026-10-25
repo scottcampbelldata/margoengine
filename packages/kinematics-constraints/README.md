@@ -1,5 +1,7 @@
 # @margoengine/kinematics-constraints
 
+Install `npm i margoengine` and import `margoengine/kinematics-constraints` (or this package alone: `npm i @margoengine/kinematics-constraints`, imported as `@margoengine/kinematics-constraints`; the two are the same module).
+
 Standalone capsule and sphere avoidance for IK targets and two-bone chains. The package projects targets out of proxy volumes, checks elbow and link clearance, and searches a shoulder swivel angle through a caller-supplied IK evaluator. It has no engine, renderer, physics, or Wasm dependency. ESM exports and declarations are tree-shakable; core, stage, animation, and the existing IK kernels remain unchanged.
 
 Version `0.1.0` is source-only and has not been published to npm. From the repository root:
@@ -41,7 +43,7 @@ Use one `AvoidanceSolver` per chain. Supply the initial hand and elbow from a kn
 import {
   AvoidanceSolver, CapsuleVolume, SolveStatus,
   type ElbowEvaluator, type SolveOptions, type Vec3View,
-} from '@margoengine/kinematics-constraints';
+} from 'margoengine/kinematics-constraints';
 
 export function createArmController(
   evaluateElbowIK: ElbowEvaluator,

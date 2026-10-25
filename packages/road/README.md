@@ -1,9 +1,11 @@
 # @margoengine/road
 
+Install `npm i margoengine` and import `margoengine/road` (or this package alone: `npm i @margoengine/road`, imported as `@margoengine/road`; the two are the same module).
+
 Arc-length spline sweeps generate a road surface, raised curbs, hard cross-section normals and tiled UV coordinates.
 
 ```ts
-import {road} from '@margoengine/road';
+import {road} from 'margoengine/road';
 const {geometry, uvs} = road(curve, {width: 6, curbWidth: 0.2, curbHeight: 0.15, uvMeters: 5});
 engine.createMesh().setGeometry(geometry);
 ```

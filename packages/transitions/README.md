@@ -1,9 +1,11 @@
 # @margoengine/transitions
 
+Install `npm i margoengine` and import `margoengine/transitions` (or this package alone: `npm i @margoengine/transitions`, imported as `@margoengine/transitions`; the two are the same module).
+
 WebGPU scene-to-scene wipes, seeded pixel-noise dissolves, radial clock wipes and chromatic displacement.
 
 ```ts
-import {Transitions} from '@margoengine/transitions';
+import {Transitions} from 'margoengine/transitions';
 const transitions = Transitions.attach(engine);
 engine.render(); // establishes the outgoing image
 transitions.start('dissolve', 0.75);

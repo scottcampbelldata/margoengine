@@ -1,9 +1,11 @@
 # @margoengine/ecs
 
+Install `npm i margoengine` and import `margoengine/ecs` (or this package alone: `npm i @margoengine/ecs`, imported as `@margoengine/ecs`; the two are the same module).
+
 A bounded sparse-set ECS with packed Float32, Float64, Int32, Uint32 and Uint8 component fields.
 
 ```ts
-import {World} from '@margoengine/ecs';
+import {World} from 'margoengine/ecs';
 const world = new World(1024);
 const position = world.component({x: Float32Array, y: Float32Array});
 const entity = world.create();

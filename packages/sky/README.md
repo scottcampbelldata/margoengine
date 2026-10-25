@@ -1,10 +1,12 @@
 # @margoengine/sky
 
+Install `npm i margoengine` and import `margoengine/sky` (or this package alone: `npm i @margoengine/sky`, imported as `@margoengine/sky`; the two are the same module).
+
 WebGPU atmospheric background with an analytical Preetham/Perez daytime sky and an Earth-based Bruneton-style precomputed Rayleigh/Mie model, an optional stylized night (stars, phased moon) and distance or height fog. This is Margo's one sky: scenery's `SkyMoon` is a midnight preset of it.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {Sky} from '@margoengine/sky';
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const sky = Sky.attach(engine, {model: 'bruneton', hours: 12, timeScale: 1 / 3600});
 sky.options.hours = 18;
@@ -16,10 +18,10 @@ sky.options.hours = 18;
 `@margoengine/sky/base` and pass only the feature entries the scene uses as the second argument:
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {Sky} from '@margoengine/sky/base';
-import {bruneton} from '@margoengine/sky/bruneton';
-import {clouds} from '@margoengine/sky/clouds';
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky/base';
+import {bruneton} from 'margoengine/sky/bruneton';
+import {clouds} from 'margoengine/sky/clouds';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {bruneton, clouds});
 ```
@@ -105,8 +107,8 @@ Stars twinkle on independent phases. The moon disc is drawn before its glow: the
 earthshine and reads as a darker disc inside the halo, and the rim is filtered by the pixel or texel footprint.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {Sky} from '@margoengine/sky';
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const sky = Sky.attach(engine, {hours: 0, timeScale: 0, night: {
   zenithColor: [0.015, 0.025, 0.065], horizonColor: [0.08, 0.09, 0.15], hazeDensity: 1,
@@ -128,9 +130,9 @@ replaces the separate preset moon; leave `lighting.moon` unset with it.
 For lightweight distance haze, provide sampleable reversed-Z scene depth:
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {Sky} from '@margoengine/sky';
-import {Bloom} from '@margoengine/post/bloom';
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+import {Bloom} from 'margoengine/post/bloom';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const bloom = Bloom.attach(engine);          // or @margoengine/water's Water: () => water.depthTexture
 const sky = Sky.attach(engine);

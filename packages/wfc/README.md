@@ -1,9 +1,11 @@
 # @margoengine/wfc
 
+Install `npm i margoengine` and import `margoengine/wfc` (or this package alone: `npm i @margoengine/wfc`, imported as `@margoengine/wfc`; the two are the same module).
+
 Seeded 3D Wave Function Collapse with weighted entropy, six-direction adjacency, pinned cells and bounded restart attempts.
 
 ```ts
-import {WFC} from '@margoengine/wfc';
+import {WFC} from 'margoengine/wfc';
 const generator = new WFC([4,4,4], [{neighbors: [[0],[0],[0],[0],[0],[0]]}]);
 const cells = generator.solve(123);
 ```
@@ -15,7 +17,7 @@ Tile IDs are 0..31; output is a flattened Uint8Array with X fastest, then Y, the
 Learns N x N patterns from a sample image and generates outputs in which every N x N window appears in the sample.
 
 ```ts
-import {OverlappingModel} from '@margoengine/wfc/overlapping';
+import {OverlappingModel} from 'margoengine/wfc/overlapping';
 // 0 floor, 1 wall, 2 door; any numbers work (palette indices, packed RGBA).
 const rows = ['11111111', '10000101', '10000201', '11211111', '10000001', '11111111'];
 const model = new OverlappingModel({data: rows.join('').split('').map(Number), width: 8, height: 6}, {N: 3, symmetry: 8});

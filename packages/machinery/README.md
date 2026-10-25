@@ -1,5 +1,7 @@
 # @margoengine/machinery
 
+Install `npm i margoengine` and import `margoengine/machinery` (or this package alone: `npm i @margoengine/machinery`, imported as `@margoengine/machinery`; the two are the same module).
+
 Joints and couplings, bounded IK, Wasm surface transport, binary telemetry, worker CAD import, stencil sections, assembly BVH picking and metrology for Margo Engine.
 
 Package name: `@margoengine/machinery`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
@@ -9,9 +11,9 @@ npm install @margoengine/core@0.1.0 @margoengine/machinery@0.1.0
 ```
 
 ```ts
-import { Engine, box } from '@margoengine/core';
-import { Kinematics } from '@margoengine/machinery/kinematics';
-import { industrialMaterial } from '@margoengine/machinery/materials';
+import { Engine, box } from 'margoengine/core';
+import { Kinematics } from 'margoengine/machinery/kinematics';
+import { industrialMaterial } from 'margoengine/machinery/materials';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas);

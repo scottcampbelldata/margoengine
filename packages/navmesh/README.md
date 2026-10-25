@@ -1,9 +1,11 @@
 # @margoengine/navmesh
 
+Install `npm i margoengine` and import `margoengine/navmesh` (or this package alone: `npm i @margoengine/navmesh`, imported as `@margoengine/navmesh`; the two are the same module).
+
 Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, and `@margoengine/navmesh/build` generates the walkable polygons from level triangles.
 
 ```ts
-import {NavMesh} from '@margoengine/navmesh';
+import {NavMesh} from 'margoengine/navmesh';
 const mesh = new NavMesh([[0,0,0], [10,0,0], [0,0,10]], [[0,1,2]]);
 const path = mesh.path([1,0,1], [2,0,2]);
 ```
@@ -13,8 +15,8 @@ Polygons must be strictly convex, planar and nonvertical. Neighbor polygons shar
 ## Generating a navmesh from triangles (`./build`)
 
 ```ts
-import {Navigation, buildNavMesh} from '@margoengine/navmesh/build';
-import {avoid} from '@margoengine/navmesh';
+import {Navigation, buildNavMesh} from 'margoengine/navmesh/build';
+import {avoid} from 'margoengine/navmesh';
 
 // Flat xyz positions and triangle indices of the level (Y up, any winding).
 const nav = await Navigation.create(positions, indices, {cs: 0.25, ch: 0.1, walkableRadius: 2});

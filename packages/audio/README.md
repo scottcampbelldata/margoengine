@@ -1,11 +1,13 @@
 # @margoengine/audio
 
+Install `npm i margoengine` and import `margoengine/audio` (or this package alone: `npm i @margoengine/audio`, imported as `@margoengine/audio`; the two are the same module).
+
 Web Audio listener, global and positional sounds, encoded-file loading and a frequency analyser for Margo Engine.
 
 Build from source with `npm run build` in `packages/audio`.
 
 ```ts
-import {AudioListener, Audio, PositionalAudio, AudioVoicePool, AudioAnalyser} from '@margoengine/audio';
+import {AudioListener, Audio, PositionalAudio, AudioVoicePool, AudioAnalyser} from 'margoengine/audio';
 
 const listener = AudioListener.attach(engine, {volume: 0.8}); // follows engine.camera every frame; resumes on the first click or key press
 

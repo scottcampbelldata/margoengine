@@ -1,12 +1,14 @@
 # @margoengine/cameras
 
+Install `npm i margoengine` and import `margoengine/cameras` (or this package alone: `npm i @margoengine/cameras`, imported as `@margoengine/cameras`; the two are the same module).
+
 Orthographic projection and exactly vertical (top-down and bottom-up) views for core's camera, for CAD, plans, maps
 and isometric views. Culling, `engine.pick`, selection, bvh rays, TAA and every pass that reads `camera.matrix` see the
 same view. It uses core's `camera.project` and `camera.up` hooks.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {CameraProjection} from '@margoengine/cameras';
+import {Engine} from 'margoengine/core';
+import {CameraProjection} from 'margoengine/cameras';
 
 const engine = await Engine.create(canvas, {camera: {position: [0, 40, 0], target: [0, 0, 0]}}); // straight down
 const projection = CameraProjection.attach(engine); // orthographic, framed like the perspective view at the target
@@ -63,7 +65,7 @@ that origin (one full transform update of the placed roots) when the camera drif
 of jitter at any distance up to 6,000 km ([docs/large-coordinates.md](../../docs/large-coordinates.md)). 0 core bytes.
 
 ```ts
-import {FloatingOrigin} from '@margoengine/cameras/origin';
+import {FloatingOrigin} from 'margoengine/cameras/origin';
 
 const origin = FloatingOrigin.attach(engine);          // default ratio 1000
 origin.place(flange, [2_880_000.12, 3_600_000.65, 3_840_000.31]); // float64 world metres; root meshes or model.root
@@ -100,7 +102,7 @@ mask shares a bit with its own. Core does the filtering while it collects instan
 `mesh.visible` stays yours.
 
 ```ts
-import {ALL_LAYERS, layerMask, setCameraLayers, setRenderLayers, withLayers} from '@margoengine/cameras/layers';
+import {ALL_LAYERS, layerMask, setCameraLayers, setRenderLayers, withLayers} from 'margoengine/cameras/layers';
 
 setRenderLayers(helpers.root, layerMask(1));      // a model by its root: children without a mask follow it
 setCameraLayers(engine.camera, layerMask(0));     // the engine camera now skips the helpers

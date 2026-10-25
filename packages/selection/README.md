@@ -1,9 +1,11 @@
 # @margoengine/selection
 
+Install `npm i margoengine` and import `margoengine/selection` (or this package alone: `npm i @margoengine/selection`, imported as `@margoengine/selection`; the two are the same module).
+
 Visible core and PBR selection outlines using Jump Flood Algorithm distance fields or circular morphological dilation. `Selection.set` discovers glTF Pro/FBX buffers from their loader-owned mesh nodes; no separate outline registration is required.
 
 ```ts
-import {Selection} from '@margoengine/selection';
+import {Selection} from 'margoengine/selection';
 const selection = Selection.attach(engine, {algorithm: 'jfa', width: 3, color: [1,0.5,0]});
 selection.set([mesh]);
 ```
@@ -11,7 +13,7 @@ selection.set([mesh]);
 `Picking.attach(engine)` enables faster `engine.pick(x, y)` in canvas CSS pixels:
 
 ```ts
-import {Picking} from '@margoengine/selection';
+import {Picking} from 'margoengine/selection';
 const picking = Picking.attach(engine);
 const mesh = await engine.pick(x, y);
 ```
@@ -29,9 +31,9 @@ Loader-owned PBR nodes are discovered automatically. Explicit `add(model)` regis
 Removing an explicit registration does not disable discovery of a loaded model. Hide its mesh nodes, remove the model, or dispose the picking effect to stop picking it. Unregistering a custom provider still removes that provider's draws.
 
 ```ts
-import {Picking, Selection} from '@margoengine/selection';
-import type {EngineKernel} from '@margoengine/core';
-import type {PBRModel} from '@margoengine/gltf-pro';
+import {Picking, Selection} from 'margoengine/selection';
+import type {EngineKernel} from 'margoengine/core';
+import type {PBRModel} from 'margoengine/gltf-pro';
 
 function selectModel(engine:EngineKernel, model:PBRModel) {
   const picking=Picking.attach(engine,{capture:false});

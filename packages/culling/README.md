@@ -1,13 +1,15 @@
 # @margoengine/culling
 
+Install `npm i margoengine` and import `margoengine/culling` (or this package alone: `npm i @margoengine/culling`, imported as `@margoengine/culling`; the two are the same module).
+
 GPU-driven static instances for large assemblies. Parts are uploaded once; every frame a compute pass tests each part
 against the view frustum and, optionally, a Hi-Z depth pyramid, compacts the visible parts in their original order and
 writes indirect draw arguments. The CPU does a fixed amount of work per frame (a few passes and two draws per batch),
 however many parts there are. WebGPU only.
 
 ```ts
-import {Engine, PbrMaterial} from '@margoengine/core';
-import {CulledInstances} from '@margoengine/culling';
+import {Engine, PbrMaterial} from 'margoengine/core';
+import {CulledInstances} from 'margoengine/culling';
 
 const engine = await Engine.create(canvas);
 const parts = CulledInstances.attach(engine, [
@@ -34,7 +36,7 @@ shader.
 `engine.pick`, `Picking`, hierarchy, `ExplodedView`, `AssemblyBVH` and `FeatureEdges` (checked on the GPU below).
 
 ```ts
-import {CulledMeshes} from '@margoengine/culling';
+import {CulledMeshes} from 'margoengine/culling';
 const culled = CulledMeshes.attach(engine);   // {minRadius: 2} also drops parts under 2 CSS px in radius
 // Let the GPU do the frustum test, so the kept set (and core's instance lists) stay stable while orbiting.
 engine.start({culling: false});   // or engine.render({culling: false}) from your own loop

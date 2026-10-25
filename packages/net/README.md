@@ -1,9 +1,11 @@
 # @margoengine/net
 
+Install `npm i margoengine` and import `margoengine/net` (or this package alone: `npm i @margoengine/net`, imported as `@margoengine/net`; the two are the same module).
+
 Bounded snapshot interpolation for position, quaternion and velocity, with capped dead reckoning.
 
 ```ts
-import {SnapshotBuffer, createSnapshot} from '@margoengine/net';
+import {SnapshotBuffer, createSnapshot} from 'margoengine/net';
 const buffer = new SnapshotBuffer(32);
 const output = createSnapshot();
 // buffer.push(timeSeconds, position, quaternion, velocity)

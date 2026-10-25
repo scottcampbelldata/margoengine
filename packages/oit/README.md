@@ -1,14 +1,16 @@
 # @margoengine/oit
 
+Install `npm i margoengine` and import `margoengine/oit` (or this package alone: `npm i @margoengine/oit`, imported as `@margoengine/oit`; the two are the same module).
+
 Order-independent transparency for glTF Pro BLEND primitives and `@margoengine/materials` transparent meshes:
 weighted blended OIT (McGuire and Bavoil, JCGT 2013). Overlapping transparent parts (a translucent CAD housing over
 translucent and opaque gears) no longer pop as the camera orbits, because nothing depends on draw order any more. Core
 meshes are opaque only and are not affected. WebGPU only.
 
 ```ts
-import {OIT} from '@margoengine/oit';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {Material, createMesh} from '@margoengine/materials';
+import {OIT} from 'margoengine/oit';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Material, createMesh} from 'margoengine/materials';
 
 const oit = OIT.attach(engine);                           // or OIT.attach(engine, {depthScale: 2})
 oit.add(await loadGLTF(engine, '/gearbox.glb'));          // its BLEND primitives

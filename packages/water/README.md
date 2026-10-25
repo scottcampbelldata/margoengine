@@ -1,9 +1,11 @@
 # @margoengine/water
 
+Install `npm i margoengine` and import `margoengine/water` (or this package alone: `npm i @margoengine/water`, imported as `@margoengine/water`; the two are the same module).
+
 A separate WebGPU water grid evaluates up to eight swell trains with analytical normals. Each train spreads into three Gerstner components with varied directions, wavelengths and gently bending crests. Advected gradient noise (random unit gradients, Perlin's 2002 quintic fade, analytic derivatives) adds wind agitation and micro-ripples, filtered separately by their screen footprint. Fresnel reflection, sun glints and wavelength-dependent absorption shade the surface. Optional terrain coupling adds conservative GPU shallow-water flow, moving breaker foam and a fixed GPU spray pool.
 
 ```ts
-import {Water} from '@margoengine/water';
+import {Water} from 'margoengine/water';
 const water = Water.attach(engine, {size: [100,100], segments: 128, height: 0});
 ```
 
@@ -122,7 +124,7 @@ same colour. Water does not import environment. `fog.enabled = false` clears it 
 `water.setFog(null)` (the default) draws exactly as before. The SSR capture keeps the unfogged reflection term.
 
 ```ts
-import {Fog} from '@margoengine/environment';
+import {Fog} from 'margoengine/environment';
 const fog = Fog.attach(engine, {color: '#8090a0', density: 0.02});
 water.setFog(fog);
 ```

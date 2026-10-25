@@ -1,13 +1,15 @@
 # @margoengine/quality
 
+Install `npm i margoengine` and import `margoengine/quality` (or this package alone: `npm i @margoengine/quality`, imported as `@margoengine/quality`; the two are the same module).
+
 Measured quality tiers. Desktops start on a light tier (single-sampled, pixel ratio capped, paced to at most about
 60 FPS) and time how long the GPU takes to finish each frame; a browser with clear headroom gets the full 4× MSAA tier
 from its next page load. No PC is first shown the 4× tier or reloaded by the probe (the light tier's own frame rate
 depends on the GPU), and no rule based on device names is involved.
 
 ```ts
-import {applyQualityTier, paceEngine, watchQuality} from '@margoengine/quality';
-import {Engine} from '@margoengine/core';
+import {applyQualityTier, paceEngine, watchQuality} from 'margoengine/quality';
+import {Engine} from 'margoengine/core';
 
 applyQualityTier();                       // before creating the engine
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
@@ -59,8 +61,8 @@ without `discard`: tile-based phone GPUs then keep early depth rejection under d
 `cascades: 4` or `lodFade: 2` to keep those on every tier.
 
 ```ts
-import {applyQualityTier, qualityPreset} from '@margoengine/quality';
-import {Shadows} from '@margoengine/shadows';
+import {applyQualityTier, qualityPreset} from 'margoengine/quality';
+import {Shadows} from 'margoengine/shadows';
 
 applyQualityTier();                                  // light tier: margoPreset.shadows = {resolution: 1024}
 const shadows = Shadows.attach(engine, {distance: 120});              // 1024 on light, 2048 on the full tier
@@ -85,8 +87,8 @@ const particles = qualityPreset().vfx?.capacity ?? 1_000_000;          // read a
 ## Pipeline warm-up and device restoration
 
 ```ts
-import {warmUp} from '@margoengine/quality/warm';
-import {redrawAfterRestore} from '@margoengine/quality';
+import {warmUp} from 'margoengine/quality/warm';
+import {redrawAfterRestore} from 'margoengine/quality';
 
 // ...attach features and build the scene, then, still behind the loading screen:
 const report = await warmUp(engine);      // {pipelines, fallbacks, rounds, rebooted}

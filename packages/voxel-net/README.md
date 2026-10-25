@@ -1,5 +1,7 @@
 # @margoengine/voxel-net
 
+Install `npm i margoengine` and import `margoengine/voxel-net` (or this package alone: `npm i @margoengine/voxel-net`, imported as `@margoengine/voxel-net`; the two are the same module).
+
 Multiplayer for `@margoengine/voxel` worlds: an authoritative Node server, a client that runs in browsers and Node,
 and headless bots for load tests. Clean-room code with no third-party runtime package: the WebSocket server (RFC 6455)
 is written here on `node:http` and `node:crypto`. Optional and tree-shakable; core and the stage never import it.
@@ -8,12 +10,12 @@ Design and decisions: [DESIGN.md](DESIGN.md). Measured capacity: [bench/results.
 
 ```ts
 // Server (Node)
-import { VoxelServer } from '@margoengine/voxel-net/server';
+import { VoxelServer } from 'margoengine/voxel-net/server';
 const server = new VoxelServer({ blocks, generator: { seed: 7 }, flight: true });
 await server.listen(8787, '0.0.0.0');
 
 // Client (browser): the world fills from the server; lighting and the renderer follow world.onChunk as usual.
-import { connectVoxelNet, Keys } from '@margoengine/voxel-net';
+import { connectVoxelNet, Keys } from 'margoengine/voxel-net';
 const client = connectVoxelNet('ws://127.0.0.1:8787', world, { name: 'Ada', view: 6 });
 engine.onFrame((_, dt) => {
   client.update(dt, { keys: Keys.forward | Keys.jump, yaw, pitch }); // moves client.player at 1/120 s steps

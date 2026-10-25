@@ -1,5 +1,7 @@
 # @margoengine/staging
 
+Install `npm i margoengine` and import `margoengine/staging` (or this package alone: `npm i @margoengine/staging`, imported as `@margoengine/staging`; the two are the same module).
+
 Product-shot staging. `ContactShadows`: a soft ground-contact shadow.
 The added meshes are drawn from the ground looking up into a small texture (darker the closer to the
 ground), softened by one separable Gaussian blur (sigma = half the `blur` radius, sized per axis so it stays round
@@ -7,9 +9,9 @@ in world units on a non-square plane), and laid on the ground as a shadow-catche
 background, nothing). No light direction and no shadow map, so it works with or without `@margoengine/shadows`.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {ContactShadows} from '@margoengine/staging';
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {ContactShadows} from 'margoengine/staging';
 
 const engine = await Engine.create(canvas);
 const model = await loadGLTF(engine, '/shoe.glb');

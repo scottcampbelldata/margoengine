@@ -1,11 +1,13 @@
 # @margoengine/decoders
 
+Install `npm i margoengine` and import `margoengine/decoders` (or this package alone: `npm i @margoengine/decoders`, imported as `@margoengine/decoders`; the two are the same module).
+
 Worker-pooled Draco geometry decoding, KTX2/Basis Universal texture transcoding and EXT_meshopt_compression decoding, and synchronous PNG, TGA, TIFF, DDS and KTX 1 reading (`@margoengine/decoders/png`, `/tga`, `/tiff`, `/dds`, `/ktx`), for Margo Engine.
 
 Build from source with `npm run build` in `packages/decoders`.
 
 ```ts
-import {DracoDecoder, KTX2Decoder} from '@margoengine/decoders';
+import {DracoDecoder, KTX2Decoder} from 'margoengine/decoders';
 
 const draco = new DracoDecoder({workerLimit: 4});
 const ktx2 = new KTX2Decoder({device: engine.gpu, workerLimit: 4});
@@ -46,7 +48,7 @@ colour management. It is synchronous and runs on the calling thread (no worker),
 inflater (the one EXR uses); it does not load the Draco or Basis decoders.
 
 ```ts
-import {decodePNG} from '@margoengine/decoders/png';
+import {decodePNG} from 'margoengine/decoders/png';
 
 const {width, height, data} = decodePNG(pngBytes);
 ```
@@ -86,9 +88,9 @@ Broken files throw `MargoError` `failed` naming the problem; a non-`Uint8Array` 
 `maxPixels` a RangeError.
 
 ```ts
-import {parseTGA} from '@margoengine/decoders/tga';
-import {parseTIFF} from '@margoengine/decoders/tiff';
-import {parseDDS, uploadTexture} from '@margoengine/decoders/dds';
+import {parseTGA} from 'margoengine/decoders/tga';
+import {parseTIFF} from 'margoengine/decoders/tiff';
+import {parseDDS, uploadTexture} from 'margoengine/decoders/dds';
 
 declare const device: GPUDevice;
 declare const tgaBytes: Uint8Array, tiffBytes: Uint8Array, ddsBytes: Uint8Array;

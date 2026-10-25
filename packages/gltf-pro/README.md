@@ -1,5 +1,7 @@
 # Margo Engine glTF Pro
 
+Install `npm i margoengine` and import `margoengine/gltf-pro` (or this package alone: `npm i @margoengine/gltf-pro`, imported as `@margoengine/gltf-pro`; the two are the same module).
+
 `Picking.attach(engine)` from `@margoengine/selection` discovers loader-owned
 primitive nodes automatically. `selection.set([primitive.node])` also discovers
 their model; explicit `add(model)` remains supported and is deduplicated.
@@ -31,7 +33,7 @@ Core + stage must remain below **25,000 bytes gzip**; CI rejects 25,000 bytes an
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF, type MaterialExtension} from '@margoengine/gltf-pro';
+import {loadGLTF, type MaterialExtension} from 'margoengine/gltf-pro';
 const stage = await createStage('#viewport', {backend:'webgpu'});
 const model = await loadGLTF(stage.engine, '/DamagedHelmet.glb');
 const b = model.bounds;
@@ -121,9 +123,9 @@ texture transforms, `model.lights`, `model.cameras`, node visibility) and lists 
 
 ```ts
 import {createStage} from 'margoengine';
-import {applyGLTFLights, loadGLTF, viewGLTFCamera} from '@margoengine/gltf-pro';
-import {Animation} from '@margoengine/animation';
-import {pointerChannels} from '@margoengine/animation/pointer';
+import {applyGLTFLights, loadGLTF, viewGLTFCamera} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {pointerChannels} from 'margoengine/animation/pointer';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/pointer-show.glb'); // extensionsRequired: ['KHR_animation_pointer']
 const animation = Animation.attach(model, {pointers: pointerChannels});
@@ -181,9 +183,9 @@ raw GPU records across core geometry and loaded glTF/FBX models:
 
 ```ts
 import {createStage} from 'margoengine';
-import {box} from '@margoengine/core';
-import {loadGLTF, type MaterialExtension} from '@margoengine/gltf-pro';
-import {getSceneBounds, fitScene, gatherSceneBuffers} from '@margoengine/gltf-pro/scene';
+import {box} from 'margoengine/core';
+import {loadGLTF, type MaterialExtension} from 'margoengine/gltf-pro';
+import {getSceneBounds, fitScene, gatherSceneBuffers} from 'margoengine/gltf-pro/scene';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/DamagedHelmet.glb');

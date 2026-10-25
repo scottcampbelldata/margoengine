@@ -1,5 +1,7 @@
 # @margoengine/cinematic
 
+Install `npm i margoengine` and import `margoengine/cinematic` (or this package alone: `npm i @margoengine/cinematic`, imported as `@margoengine/cinematic`; the two are the same module).
+
 `rig.setOrbitOffset(yaw, pitch, distance, height = 0)` writes the retained camera
 offset in place from orbit angles (no new vector is created). The sandbox uses this
 public method after its shared locomotion step.
@@ -7,7 +9,7 @@ public method after its shared locomotion step.
 A virtual camera with analytically integrated critically damped follow and look-at springs plus additive screen shake.
 
 ```ts
-import {Cinematic} from '@margoengine/cinematic';
+import {Cinematic} from 'margoengine/cinematic';
 const rig = Cinematic.attach(engine, {offset: [0,3,6], damping: 6});
 rig.follow(player);
 rig.shake(0.2, 0.4);

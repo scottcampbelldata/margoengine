@@ -1,12 +1,14 @@
 # @margoengine/animator
 
+Install `npm i margoengine` and import `margoengine/animator` (or this package alone: `npm i @margoengine/animator`, imported as `@margoengine/animator`; the two are the same module).
+
 Optional gameplay animation on the existing `@margoengine/animation` skinning pass. Named states select clips, 1D trees interpolate neighboring samples, and 2D trees use normalized inverse-square distance weights with exact sample reproduction. State transitions crossfade a captured pose into the destination. Masked additive layers apply translation/scale/quaternion and morph deltas relative to a sampled reference pose. A zero reference scale component contributes an identity scale delta on that axis. Primitives sharing a node must have matching morph target counts, as required by glTF.
 
 ```ts
-import {EngineKernel} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {Animation} from '@margoengine/animation';
-import {Animator, addCCDChain, type CCDChain} from '@margoengine/animator';
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {Animator, addCCDChain, type CCDChain} from 'margoengine/animator';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const model = await loadGLTF(engine, '/hero.glb'); // clips named Idle, Walk, Run
 const animation = Animation.attach(model);

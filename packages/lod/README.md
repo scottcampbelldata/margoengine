@@ -1,11 +1,13 @@
 # @margoengine/lod
 
+Install `npm i margoengine` and import `margoengine/lod` (or this package alone: `npm i @margoengine/lod`, imported as `@margoengine/lod`; the two are the same module).
+
 Level of detail for scenes with thousands of objects (CAD assemblies, simulators, forests, cities), plus
 GPU-baked octahedral imposters for the farthest level. Core is unchanged.
 
 ```ts
-import {Engine, PbrMaterial} from '@margoengine/core';
-import {LODSystem, Imposter} from '@margoengine/lod';
+import {Engine, PbrMaterial} from 'margoengine/core';
+import {LODSystem, Imposter} from 'margoengine/lod';
 
 const lods = LODSystem.attach(engine, {hysteresis: 0.1});
 const imposter = Imposter.bake(engine, highGeometry, {material, frames: 12, frameSize: 128}); // once, at load

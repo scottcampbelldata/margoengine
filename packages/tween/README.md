@@ -1,9 +1,11 @@
 # @margoengine/tween
 
+Install `npm i margoengine` and import `margoengine/tween` (or this package alone: `npm i @margoengine/tween`, imported as `@margoengine/tween`; the two are the same module).
+
 Numeric property interpolation and easing; `update` steps the existing tracks in place and creates no per-track objects.
 
 ```ts
-import {Tween, easeInOutCubic} from '@margoengine/tween';
+import {Tween, easeInOutCubic} from 'margoengine/tween';
 const timeline = new Tween();
 const cancel = timeline.to(object, 'opacity', 1, {duration: 0.5, easing: easeInOutCubic});
 timeline.update(1 / 60);

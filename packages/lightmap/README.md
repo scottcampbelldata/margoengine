@@ -1,12 +1,14 @@
 # @margoengine/lightmap
 
+Install `npm i margoengine` and import `margoengine/lightmap` (or this package alone: `npm i @margoengine/lightmap`, imported as `@margoengine/lightmap`; the two are the same module).
+
 Bakes lightmaps on the CPU: one padded UV atlas for a quad mesh with shadowed direct light and ambient occlusion,
 plus matching albedo, emission, normal and ORM textures. Built for exporting lit voxel and block models (each
 `meshGrid` quad of `@margoengine/voxel-edit` is a parallelogram) to glTF or any engine. No GPU or DOM; optional and
 tree-shakable, core and the stage never import it.
 
 ```ts
-import { bakeLightmap } from '@margoengine/lightmap';
+import { bakeLightmap } from 'margoengine/lightmap';
 
 const atlas = await bakeLightmap(
   { positions, albedo }, // 12 floats per quad (p0, p1, p2, p3), RGBA per quad

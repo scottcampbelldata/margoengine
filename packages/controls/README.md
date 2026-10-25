@@ -1,5 +1,7 @@
 # @margoengine/controls
 
+Install `npm i margoengine` and import `margoengine/controls` (or this package alone: `npm i @margoengine/controls`, imported as `@margoengine/controls`; the two are the same module).
+
 `stepLocomotion(state, actions, delta, height, options?)` provides ground-following
 character movement with normalized diagonals, damped speed and heading, and a
 50 ms movement-step limit. Retained state is `[x,y,z,heading,cameraYaw,cameraPitch,
@@ -15,8 +17,8 @@ Orbit, map, trackball, arcball, fly, first-person and pointer-lock camera contro
 Build from source with `npm run build` in `packages/controls`.
 
 ```ts
-import {Engine, box} from '@margoengine/core';
-import {OrbitControls, TransformControls} from '@margoengine/controls';
+import {Engine, box} from 'margoengine/core';
+import {OrbitControls, TransformControls} from 'margoengine/controls';
 
 const canvas = document.createElement('canvas');
 const engine = await Engine.create(canvas);
@@ -40,9 +42,9 @@ gizmo.dispose(); orbit.dispose();
 Drag core meshes and gltf-pro models (a model moves by its `root`), with the mouse or touch:
 
 ```ts
-import {Engine, box} from '@margoengine/core';
-import {DragControls, OrbitControls} from '@margoengine/controls';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {Engine, box} from 'margoengine/core';
+import {DragControls, OrbitControls} from 'margoengine/controls';
+import {loadGLTF} from 'margoengine/gltf-pro';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
 const mesh = engine.createMesh().setGeometry(box());
@@ -64,9 +66,9 @@ CPU against the cached triangle trees of the `@margoengine/bvh` Raycaster (core 
 so it costs nothing unless you import its entry. A whole recipe: [docs/guides/walkthrough.md](../../docs/guides/walkthrough.md).
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {WalkControls} from '@margoengine/controls/walk';
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {WalkControls} from 'margoengine/controls/walk';
 
 const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 1.65, 0], target: [0, 1.65, 1]}});
 const house = await loadGLTF(engine, '/house.glb');
@@ -153,9 +155,9 @@ on the plane through the target, within `minDistance` and `maxDistance`. Under a
 With `enableDamping`, rotation, pan and zoom ease out after release (a fling keeps spinning and slows to rest).
 
 ```ts
-import {Engine, box} from '@margoengine/core';
-import {CameraProjection} from '@margoengine/cameras';
-import {ArcballControls} from '@margoengine/controls/arcball';
+import {Engine, box} from 'margoengine/core';
+import {CameraProjection} from 'margoengine/cameras';
+import {ArcballControls} from 'margoengine/controls/arcball';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
 engine.createMesh().setGeometry(box());
@@ -181,10 +183,10 @@ at that one orientation.
 Engineers get the mouse, wheel, touch and keys of the tool they know, in one call:
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {OrbitControls, SOLIDWORKS} from '@margoengine/controls';
-import {CameraProjection} from '@margoengine/cameras';
-import {ViewCube} from '@margoengine/viewcube';
+import {Engine} from 'margoengine/core';
+import {OrbitControls, SOLIDWORKS} from 'margoengine/controls';
+import {CameraProjection} from 'margoengine/cameras';
+import {ViewCube} from 'margoengine/viewcube';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
 const projection = CameraProjection.attach(engine, {mode: 'perspective'});

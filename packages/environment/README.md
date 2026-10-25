@@ -1,5 +1,7 @@
 # @margoengine/environment
 
+Install `npm i margoengine` and import `margoengine/environment` (or this package alone: `npm i @margoengine/environment`, imported as `@margoengine/environment`; the two are the same module).
+
 HDR, EXR and UltraHDR loading, EXR writing, GPU image-based lighting (prefiltered specular, spherical-harmonic irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene-wide fog for Margo Engine on WebGPU.
 
 Build from source with `npm run build` in `packages/environment`.
@@ -9,9 +11,9 @@ Decodes Radiance `.hdr` (RGBE), OpenEXR (single-part scanline EXR with NONE, RLE
 The optional `/reflector`, `/refractor` and `/cube-camera` entries add a planar mirror, a planar see-through surface (glass, water) and a cube render target (see "Mirrors, glass and cube cameras"); `/exr-write` writes EXR files (see "Writing EXR").
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {Environment, EnvironmentBackground, EnvironmentLighting, loadEnvironmentImage} from '@margoengine/environment';
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Environment, EnvironmentBackground, EnvironmentLighting, loadEnvironmentImage} from 'margoengine/environment';
 
 const canvas = document.createElement('canvas');
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
@@ -27,9 +29,9 @@ engine.start();
 A plain color (or vertical gradient) background and fog, without any environment map:
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {ColorBackground, Fog} from '@margoengine/environment';
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {ColorBackground, Fog} from 'margoengine/environment';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 ColorBackground.attach(engine, {color: '#bcd4e6'});            // fills every pixel the scene left empty
 const fog = Fog.attach(engine, {color: '#bcd4e6', near: 10, far: 80}); // fogs core meshes; {density: 0.02} for exponential-squared fog; heightFalloff for height fog
@@ -40,8 +42,8 @@ fog.far = 120;                                                 // every option i
 A skybox from ordinary PNG/JPG images (box, sphere or cylinder), crisp for pixel art:
 
 ```ts
-import {EngineKernel} from '@margoengine/core';
-import {ImageBackground} from '@margoengine/environment';
+import {EngineKernel} from 'margoengine/core';
+import {ImageBackground} from 'margoengine/environment';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const box = await ImageBackground.load({shape: 'box', images: ['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png'], filter: 'nearest'});
 engine.use(box);
@@ -65,12 +67,12 @@ box.filter = 'linear';                                         // filter, rotati
 `@margoengine/environment/volumetric` is a separate entry (8.2 kB min+gzip on its own; nothing is loaded, compiled or run unless you import and attach it; the root entry is byte-identical without it):
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {Shadows} from '@margoengine/shadows';
-import {Clustered} from '@margoengine/clustered';
-import {LocalShadows} from '@margoengine/clustered/shadows';
-import {Tonemap} from '@margoengine/tonemap';
-import {VolumetricFog} from '@margoengine/environment/volumetric';
+import {Engine} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+import {Clustered} from 'margoengine/clustered';
+import {LocalShadows} from 'margoengine/clustered/shadows';
+import {Tonemap} from 'margoengine/tonemap';
+import {VolumetricFog} from 'margoengine/environment/volumetric';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 Tonemap.attach(engine);                                  // any post capture gives the fog its scene depth
 const shadows = Shadows.attach(engine, {distance: 80});  // sun shadows: light shafts through gaps
@@ -97,9 +99,9 @@ It bakes the scene into light probes on the GPU and uses them as the ambient lig
 you `add` (gltf-pro and materials models, terrain), the receivers clustered lights reach:
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {Environment, loadEnvironmentImage} from '@margoengine/environment';
-import {LightProbes} from '@margoengine/environment/probes';
+import {Engine} from 'margoengine/core';
+import {Environment, loadEnvironmentImage} from 'margoengine/environment';
+import {LightProbes} from 'margoengine/environment/probes';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const environment = await Environment.create(engine, await loadEnvironmentImage('/sky.hdr'));
 const probes = LightProbes.attach(engine, {
@@ -245,11 +247,11 @@ see-through surface such as glass or water) and `CubeCamera` (`/cube-camera`, a 
 does not change.
 
 ```ts
-import {Reflector} from '@margoengine/environment/reflector';
-import {Refractor} from '@margoengine/environment/refractor';
-import {CubeCamera} from '@margoengine/environment/cube-camera';
-import {EngineKernel} from '@margoengine/core';
-import {Environment, EnvironmentLighting} from '@margoengine/environment';
+import {Reflector} from 'margoengine/environment/reflector';
+import {Refractor} from 'margoengine/environment/refractor';
+import {CubeCamera} from 'margoengine/environment/cube-camera';
+import {EngineKernel} from 'margoengine/core';
+import {Environment, EnvironmentLighting} from 'margoengine/environment';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 // A flat normal map (RGBA8, +Z up); any width x height of RGBA bytes works.
 const ripples = {width: 1, height: 1, data: new Uint8Array([128, 128, 255, 255])};
@@ -325,9 +327,9 @@ await environment.refresh();                      // later: capture again and re
 Input colours can be Display P3 too: every environment colour (`Fog`, `ColorBackground`, `HemisphereLight`...) takes CSS `'color(display-p3 r g b)'` (math's `parseColor`), whose linear sRGB channels stay negative outside sRGB, so materials and lights carry the wide-gamut colour through Tonemap's excess output to a P3 canvas. A background colour outside sRGB is clipped on an sRGB canvas.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {ColorOutput} from '@margoengine/environment';
-import {Tonemap} from '@margoengine/tonemap';
+import {Engine} from 'margoengine/core';
+import {ColorOutput} from 'margoengine/environment';
+import {Tonemap} from 'margoengine/tonemap';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const output = ColorOutput.attach(engine); // defaults: {gamut: 'p3', hdr: true, peak: 4}
 Tonemap.attach(engine, {curve: 'neutral'}); // HDR highlights and colours outside sRGB come from Tonemap
@@ -407,7 +409,7 @@ validation errors.
 The parsers also work on their own, in the browser or Node:
 
 ```ts
-import {parseHDR, parseEXR} from '@margoengine/environment';
+import {parseHDR, parseEXR} from 'margoengine/environment';
 const bytes = await (await fetch('/studio.exr')).arrayBuffer();
 const {width, height, data} = parseEXR(bytes); // data: Float32Array RGBA, row 0 at the top
 ```
@@ -419,8 +421,8 @@ uncompressed single-part scanline EXR, row 0 at the top. HALF and FLOAT take a `
 `offset` and `stride` pick one lane of interleaved data. Channels are stored in name order; dotted names are layers.
 
 ```ts
-import {encodeEXR} from '@margoengine/environment/exr-write';
-import {parseHDR} from '@margoengine/environment';
+import {encodeEXR} from 'margoengine/environment/exr-write';
+import {parseHDR} from 'margoengine/environment';
 const [width, height] = [640, 360];
 const rgb = new Float32Array(width * height * 3), depth = new Float32Array(width * height);
 const ids = new Uint32Array(width * height), signal = new AbortController().signal;

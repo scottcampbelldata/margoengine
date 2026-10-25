@@ -1,5 +1,7 @@
 # Margo Engine Post
 
+Install `npm i margoengine` and import `margoengine/post` (or this package alone: `npm i @margoengine/post`, imported as `@margoengine/post`; the two are the same module).
+
 Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, lens flare, afterimage trails, SMAA and FXAA, a glitch and an effect stack, separate from the frozen core and stage.
 
 ## HDR images and render exports: `ImagePost`
@@ -8,7 +10,7 @@ Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, lens f
 its offscreen PNGs, so exports match what is on screen.
 
 ```js
-import { ImagePost } from '@margoengine/post/image';
+import { ImagePost } from 'margoengine/post/image';
 
 const post = ImagePost.attach(engine, { bloom: { strength: 0.8, threshold: 1, radius: 0.5 } });
 const png = await post.capture(await tracer.renderImage({ width, height, samples }), { signal });
@@ -37,12 +39,12 @@ capture in array order:
 
 ```ts
 import {createStage} from 'margoengine';
-import {PostStack} from '@margoengine/post/stack';
-import {SSAO} from '@margoengine/post/ssao';
-import {Bloom} from '@margoengine/post/bloom';
-import {FXAA} from '@margoengine/post/fxaa';
-import {DOF} from '@margoengine/dof';
-import {Tonemap} from '@margoengine/tonemap';
+import {PostStack} from 'margoengine/post/stack';
+import {SSAO} from 'margoengine/post/ssao';
+import {Bloom} from 'margoengine/post/bloom';
+import {FXAA} from 'margoengine/post/fxaa';
+import {DOF} from 'margoengine/dof';
+import {Tonemap} from 'margoengine/tonemap';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const stack = PostStack.attach(stage.engine, [new SSAO(), new DOF({focalDistance: 6}), new Bloom({strength: 0.6}), new Tonemap({curve: 'neutral'}), new FXAA()]);
 // TAA wraps the stack: TAA.attach(stage.engine, {depth: () => stack.depthTexture});
@@ -82,17 +84,17 @@ models, `@margoengine/materials` meshes, `Terrain` (@margoengine/terrain) and `W
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {EnvironmentLighting} from '@margoengine/environment';
-import {PostStack} from '@margoengine/post/stack';
-import {SSAO} from '@margoengine/post/ssao';
-import {SSR} from '@margoengine/post/ssr';
-import {Bloom} from '@margoengine/post/bloom';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {EnvironmentLighting} from 'margoengine/environment';
+import {PostStack} from 'margoengine/post/stack';
+import {SSAO} from 'margoengine/post/ssao';
+import {SSR} from 'margoengine/post/ssr';
+import {Bloom} from 'margoengine/post/bloom';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const ibl = await EnvironmentLighting.load(stage.engine, '/studio.hdr');
 const ssr = new SSR({maxRoughness: 0.6, thickness: 0.5, maxDistance: 100, steps: 64});
 const stack = PostStack.attach(stage.engine, [new SSAO(), ssr, new Bloom({strength: 0.6})]);
-const helmet = await loadGLTF(stage.engine, '/FlightHelmet.glb'); // from '@margoengine/gltf-pro'
+const helmet = await loadGLTF(stage.engine, '/FlightHelmet.glb'); // from 'margoengine/gltf-pro'
 ibl.add(helmet);                     // EnvironmentLighting, so SSR replaces its specular (below)
 const stop = ssr.add(helmet);        // glTF-pro model or materials mesh: its own surfaces reflect; stop() undoes it
 ssr.enabled = false; // pass-through, no recompiles
@@ -168,11 +170,11 @@ Jimenez, Wu, Pesce and Jarabo 2016 ("Practical Real-Time Strategies for Accurate
 `PostStack` effect; `GTAO.attach(engine, options)` runs it alone in its own one-effect stack (tone mapped like SSAO alone).
 
 ```ts
-import {PostStack} from '@margoengine/post/stack';
-import {GTAO} from '@margoengine/post/gtao';
-import {SSR} from '@margoengine/post/ssr';
+import {PostStack} from 'margoengine/post/stack';
+import {GTAO} from 'margoengine/post/gtao';
+import {SSR} from 'margoengine/post/ssr';
 import {createStage} from 'margoengine';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf-pro';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/scene.glb');
 const gtao = new GTAO({radius: 0.5, slices: 2, steps: 6});
@@ -212,11 +214,11 @@ that lit surfaces on screen throw onto their neighbours (a red wall tints the fl
 `PostStack` effect; `SSGI.attach(engine, options)` runs it alone in its own one-effect stack.
 
 ```ts
-import {PostStack} from '@margoengine/post/stack';
-import {SSGI} from '@margoengine/post/ssgi';
-import {SSR} from '@margoengine/post/ssr';
+import {PostStack} from 'margoengine/post/stack';
+import {SSGI} from 'margoengine/post/ssgi';
+import {SSR} from 'margoengine/post/ssr';
 import {createStage} from 'margoengine';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf-pro';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/scene.glb');
 const ssgi = new SSGI({rays: 4, maxDistance: 10, thickness: 0.5, steps: 32, intensity: 1});
@@ -266,10 +268,10 @@ vectors. It is an HDR `PostStack` effect fed by a velocity callback, like `TAA({
 `new MotionBlur({velocity: () => taa.velocity})`; any viewport-sized two-channel float texture of uv motion works too.
 
 ```ts
-import {TAA} from '@margoengine/taa';
-import {PostStack} from '@margoengine/post/stack';
-import {MotionBlur} from '@margoengine/post/motion-blur';
-import {Bloom} from '@margoengine/post/bloom';
+import {TAA} from 'margoengine/taa';
+import {PostStack} from 'margoengine/post/stack';
+import {MotionBlur} from 'margoengine/post/motion-blur';
+import {Bloom} from 'margoengine/post/bloom';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 let taa: TAA;
@@ -314,9 +316,9 @@ reflections) on the line from the sun through the screen centre. It is an HDR `P
 before Bloom so the flare glows. `LensFlare.attach(engine, options)` runs it alone.
 
 ```ts
-import {PostStack} from '@margoengine/post/stack';
-import {LensFlare} from '@margoengine/post/lens-flare';
-import {Bloom} from '@margoengine/post/bloom';
+import {PostStack} from 'margoengine/post/stack';
+import {LensFlare} from 'margoengine/post/lens-flare';
+import {Bloom} from 'margoengine/post/bloom';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 PostStack.attach(stage.engine, [new LensFlare({intensity: 0.1}), new Bloom()]);   // follows engine.lighting
@@ -352,11 +354,11 @@ stair steps of single-sampled output, but it rebuilds each edge's line from its 
 flat areas and straight, pixel-aligned shapes alone.
 
 ```ts
-import {SMAA} from '@margoengine/post/smaa';
-import {PostStack} from '@margoengine/post/stack';
-import {Bloom} from '@margoengine/post/bloom';
-import {Glitch} from '@margoengine/post/glitch';
-import {Tonemap} from '@margoengine/tonemap';
+import {SMAA} from 'margoengine/post/smaa';
+import {PostStack} from 'margoengine/post/stack';
+import {Bloom} from 'margoengine/post/bloom';
+import {Glitch} from 'margoengine/post/glitch';
+import {Tonemap} from 'margoengine/tonemap';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 SMAA.attach(stage.engine, {quality: 'high'});   // alone: wraps the finished frame, like FXAA
@@ -402,7 +404,7 @@ tearing (up to four bands of rows slide sideways, each line jittered). It is an 
 `PostStack` effect; `Glitch.attach` runs it alone.
 
 ```ts
-import {Glitch} from '@margoengine/post/glitch';
+import {Glitch} from 'margoengine/post/glitch';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const glitch = Glitch.attach(stage.engine, {seed: 7});
@@ -429,7 +431,7 @@ history. `keep = 0.5 ^ (delta / halfLife)` with the frame's `delta` in seconds, 
 seconds (default 0.15) at any frame rate; a paused render (`delta` 0) keeps it.
 
 ```ts
-import {Afterimage} from '@margoengine/post/afterimage';
+import {Afterimage} from 'margoengine/post/afterimage';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const trails = Afterimage.attach(stage.engine, {halfLife: 0.25});
@@ -463,8 +465,8 @@ frame's targets; a material that reads a target must not be added. Its own depth
 the drawing size and are replaced on resize (`onResize`). WebGPU only.
 
 ```ts
-import { Engine } from '@margoengine/core';
-import { SceneTargets } from '@margoengine/post/mrt';
+import { Engine } from 'margoengine/core';
+import { SceneTargets } from 'margoengine/post/mrt';
 
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
@@ -487,9 +489,9 @@ main pass, so a material reads this frame's depth: soft particles, shorelines, f
 into it; add gltf-pro models and materials meshes with `depth.add(model)`, but not one whose material reads the depth.
 
 ```ts
-import { Engine } from '@margoengine/core';
-import { Texture, WgslMaterial } from '@margoengine/materials';
-import { DepthTexture } from '@margoengine/post/depth';
+import { Engine } from 'margoengine/core';
+import { Texture, WgslMaterial } from 'margoengine/materials';
+import { DepthTexture } from 'margoengine/post/depth';
 
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
@@ -533,9 +535,9 @@ scene depth, keeps the pixels inside the box, fades by the angle between the sur
 texture atlas.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {Tonemap} from '@margoengine/tonemap';
-import {Decals} from '@margoengine/post/decals';
+import {Engine} from 'margoengine/core';
+import {Tonemap} from 'margoengine/tonemap';
+import {Decals} from 'margoengine/post/decals';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 Tonemap.attach(engine);                               // any post capture provides the scene depth
 const decals = Decals.attach(engine);                 // default white texel; pass {atlas} for a sampled 2D GPUTexture
@@ -623,8 +625,8 @@ descriptors are retained until resize or device restoration. The curve reference
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {SSAO} from '@margoengine/post/ssao';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {SSAO} from 'margoengine/post/ssao';
 const stage = await createStage('#viewport', {backend:'webgpu'});
 const model = await loadGLTF(stage.engine, '/FlightHelmet.glb');
 const ssao = SSAO.attach(stage.engine, {radius:0.5,bias:0.025,samples:32});

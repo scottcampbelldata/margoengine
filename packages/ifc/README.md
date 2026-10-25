@@ -1,12 +1,14 @@
 # @margoengine/ifc
 
+Install `npm i margoengine` and import `margoengine/ifc` (or this package alone: `npm i @margoengine/ifc`, imported as `@margoengine/ifc`; the two are the same module).
+
 IFC geometry and BIM identifiers using a caller-owned, initialized `web-ifc` runtime. The IFC Wasm parser stays outside the frozen core and stage facade.
 
 ```ts
 import {IfcAPI} from 'web-ifc';
-import {parseIFC} from '@margoengine/ifc';
-import {Engine} from '@margoengine/core';
-import {fetchBytes,createMeshes} from '@margoengine/loaders';
+import {parseIFC} from 'margoengine/ifc';
+import {Engine} from 'margoengine/core';
+import {fetchBytes,createMeshes} from 'margoengine/loaders';
 
 const api=new IfcAPI();
 api.SetWasmPath('/ifc/'); // browser: serve web-ifc.wasm here; Node can use Init() directly
@@ -25,7 +27,7 @@ Install `web-ifc@0.0.78` with the matching core/loaders/IFC packages, or build t
 For files from users, use the worker entry: web-ifc 0.0.78 can loop forever inside its Wasm on schema-invalid models (a string where a list belongs, a missing attribute), which no check in front of it can rule out, and `parseIFC` on the page would hang the tab. `parseIFCInWorker` runs it in a fresh worker that loads your web-ifc build and is terminated after `timeoutMs` (default 60,000 ms) with `LoaderError` code `limit`:
 
 ```js
-import {parseIFCInWorker} from '@margoengine/ifc/worker';
+import {parseIFCInWorker} from 'margoengine/ifc/worker';
 const model=await parseIFCInWorker(bytes,{webIfc:'/ifc/web-ifc-api-iife.js',wasmPath:'/ifc/',timeoutMs:30_000});
 ```
 

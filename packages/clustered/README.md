@@ -1,10 +1,12 @@
 # @margoengine/clustered
 
+Install `npm i margoengine` and import `margoengine/clustered` (or this package alone: `npm i @margoengine/clustered`, imported as `@margoengine/clustered`; the two are the same module).
+
 Optional clustered forward GGX lighting for up to 1,024 point/spot lights. A compute pass builds logarithmic-depth frustum AABBs and tests view-space light spheres and conservative spot-cone bounds. Fragment shaders calculate their screen/depth cluster and evaluate only its light list. This preserves forward alpha blending and does not require a deferred G-buffer.
 
 ```ts
-import {EngineKernel,box} from '@margoengine/core';
-import {Clustered} from '@margoengine/clustered';
+import {EngineKernel,box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 engine.createMesh().setGeometry(box());
 const lights = Clustered.attach(engine); // 16 × 9 × 24
@@ -50,9 +52,9 @@ Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or
 shaded in the same light loop as the point lights:
 
 ```ts
-import {EngineKernel} from '@margoengine/core';
-import {Clustered} from '@margoengine/clustered';
-import {DirectionalLights} from '@margoengine/clustered/directional';
+import {EngineKernel} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {DirectionalLights} from 'margoengine/clustered/directional';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const lights = Clustered.attach(engine), suns = DirectionalLights.attach(engine, {lights});
 suns.setLights([{direction: [-1, -2, 0.5], color: [1, 0.9, 0.8], intensity: 3}]); // direction: the way the light travels
@@ -74,11 +76,11 @@ meshes, glTF-pro models, materials and instanced meshes, `{dynamic: true}` for s
 and the same depth map array, after the point and spot layers. No binding is added.
 
 ```ts
-import {Clustered} from '@margoengine/clustered';
-import {LocalShadows} from '@margoengine/clustered/shadows';
-import {DirectionalLights} from '@margoengine/clustered/directional';
-import {AreaLights} from '@margoengine/clustered/area';
-import {EngineKernel, box} from '@margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {LocalShadows} from 'margoengine/clustered/shadows';
+import {DirectionalLights} from 'margoengine/clustered/directional';
+import {AreaLights} from 'margoengine/clustered/area';
+import {EngineKernel, box} from 'margoengine/core';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const floor = engine.createMesh().setGeometry(box()).setScale([10, 0.1, 10]);
 const table = engine.createMesh().setGeometry(box()).setPosition([0, 1, 0]);
@@ -127,9 +129,9 @@ local.add(table);
 shapes point and spot lights with them:
 
 ```ts
-import {EngineKernel} from '@margoengine/core';
-import {Clustered} from '@margoengine/clustered';
-import {IESLights, parseIES} from '@margoengine/clustered/ies';
+import {EngineKernel} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {IESLights, parseIES} from 'margoengine/clustered/ies';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const lights = Clustered.attach(engine);
 const profile = parseIES(await (await fetch('/downlight.ies')).text());
@@ -155,9 +157,9 @@ it adds nothing to the shaders or the GPU work.
 `@margoengine/clustered/projector` makes spot lights project an image:
 
 ```ts
-import {EngineKernel} from '@margoengine/core';
-import {Clustered} from '@margoengine/clustered';
-import {ProjectorLights} from '@margoengine/clustered/projector';
+import {EngineKernel} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {ProjectorLights} from 'margoengine/clustered/projector';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const lights = Clustered.attach(engine);
 const projectors = ProjectorLights.attach(engine, {lights});
@@ -188,9 +190,9 @@ passes through unchanged): a point or spot `intensity` is candela, a directional
 `@margoengine/clustered/units` holds the conversions, plain functions with no GPU work:
 
 ```ts
-import {EngineKernel} from '@margoengine/core';
-import {Clustered} from '@margoengine/clustered';
-import {lumensToCandela, nitsToLumens, ev100, exposureFromEV100} from '@margoengine/clustered/units';
+import {EngineKernel} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {lumensToCandela, nitsToLumens, ev100, exposureFromEV100} from 'margoengine/clustered/units';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const lights = Clustered.attach(engine);
 lights.setLights([
@@ -214,8 +216,8 @@ Opt into bounded local shadow maps when creating the effect, enable shadows on
 individual lights, and register their casters:
 
 ```ts
-import {Clustered} from '@margoengine/clustered';
-import {EngineKernel,type Mesh} from '@margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {EngineKernel,type Mesh} from 'margoengine/core';
 
 function localShadows(engine:EngineKernel,blocker:Mesh) {
   const lights=Clustered.attach(engine,{shadows:{resolution:512,maxLights:4}});
@@ -269,9 +271,9 @@ it did before these options existed, and the shaders never change.
 up to its own `resolution`, the same way (corner viewport, matching UVs, two-texel guard band, no shader change):
 
 ```ts
-import {EngineKernel, box} from '@margoengine/core';
-import {Clustered} from '@margoengine/clustered';
-import {LocalShadows} from '@margoengine/clustered/shadows';
+import {EngineKernel, box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {LocalShadows} from 'margoengine/clustered/shadows';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const blocker = engine.createMesh().setGeometry(box()).setPosition([0, 2, 0]);
 const lights = Clustered.attach(engine), local = LocalShadows.attach(engine, {lights, resolution: 1024});

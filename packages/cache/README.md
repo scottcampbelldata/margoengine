@@ -1,14 +1,16 @@
 # @margoengine/cache
 
+Install `npm i margoengine` and import `margoengine/cache` (or this package alone: `npm i @margoengine/cache`, imported as `@margoengine/cache`; the two are the same module).
+
 Opt-in offline asset cache. Heavy GLB, .bin, texture and STEP files are kept in IndexedDB, so repeat visits load them
 from disk and the viewer keeps working with bad or no Wi-Fi (a factory floor). `cache.fetch` is fetch-compatible and
 every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 2.4 kB
 min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and service workers.
 
 ```ts
-import {AssetCache} from '@margoengine/cache';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {loadCAD} from '@margoengine/machinery/cad';
+import {AssetCache} from 'margoengine/cache';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadCAD} from 'margoengine/machinery/cad';
 
 const cache = new AssetCache({
   name: 'plant-viewer',    // IndexedDB database name
@@ -48,11 +50,11 @@ option as `cache.fetch`, and every file a loader requests through it counts as o
 external buffers, `mtllib` files and textures the loader resolves next to it.
 
 ```ts
-import type {EngineKernel} from '@margoengine/core';
-import {AssetCache} from '@margoengine/cache';
-import {LoadingManager} from '@margoengine/cache/manager';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {loadOBJ} from '@margoengine/loaders/mtl';
+import type {EngineKernel} from 'margoengine/core';
+import {AssetCache} from 'margoengine/cache';
+import {LoadingManager} from 'margoengine/cache/manager';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadOBJ} from 'margoengine/loaders/mtl';
 
 declare const engine: EngineKernel;
 declare const dropped: Map<string, File>; // files dropped on the page, by name
@@ -132,7 +134,7 @@ then also covers loads made inside workers:
 
 ```js
 // sw.js (module service worker)
-import {AssetCache} from '@margoengine/cache';
+import {AssetCache} from 'margoengine/cache';
 const cache = new AssetCache({name: 'plant-viewer', version: '2026.10', maxBytes: 2 ** 30});
 self.addEventListener('fetch', event => {
   if (/\.(glb|gltf|bin|ktx2|png|jpg|webp|step|stp|iges|igs|stl|wasm|js)$/i.test(new URL(event.request.url).pathname))

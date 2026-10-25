@@ -1,5 +1,7 @@
 # @margoengine/text
 
+Install `npm i margoengine` and import `margoengine/text` (or this package alone: `npm i @margoengine/text`, imported as `@margoengine/text`; the two are the same module).
+
 Crisp GPU text for Margo Engine: signed distance field glyphs generated at runtime from any browser font, with wrapping, alignment, anchors, outlines, soft shadows and billboards, as a WebGPU engine plugin.
 
 Build from source with `npm run build` in `packages/text`.
@@ -7,8 +9,8 @@ Build from source with `npm run build` in `packages/text`.
 SDF `Text` for Latin, Greek, Cyrillic, CJK, Hebrew and emoji (no Arabic or Indic shaping and no ligatures; see Limits), for labels and signage. CAD dimension callouts with constant-pixel labels are built on it in `@margoengine/machinery/dimensions`.
 
 ```ts
-import {Engine, box} from '@margoengine/core';
-import {TextRenderer, Text, Font} from '@margoengine/text';
+import {Engine, box} from 'margoengine/core';
+import {TextRenderer, Text, Font} from 'margoengine/text';
 
 const engine = await Engine.create(canvas);
 const text = TextRenderer.attach(engine);

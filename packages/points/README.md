@@ -1,12 +1,14 @@
 # @margoengine/points
 
+Install `npm i margoengine` and import `margoengine/points` (or this package alone: `npm i @margoengine/points`, imported as `@margoengine/points`; the two are the same module).
+
 Large point clouds and instanced sprites for Margo Engine, WebGPU, built for big scans: the browser test culls and draws a 2,000,000-point cloud under a 500,000-point budget.
 
 Build from source with `npm run build` in `packages/points`.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {PointsPlugin, PointCloud, SpriteBatch, atlasRect} from '@margoengine/points';
+import {Engine} from 'margoengine/core';
+import {PointsPlugin, PointCloud, SpriteBatch, atlasRect} from 'margoengine/points';
 
 const engine = await Engine.create(canvas);
 const points = PointsPlugin.attach(engine, {pointBudget: 2_000_000});
@@ -105,7 +107,7 @@ painting it in the fog colour. Points does not import environment. `fog.enabled 
 `points.setFog(null)` (the default) draws exactly as before.
 
 ```ts
-import {Fog} from '@margoengine/environment';
+import {Fog} from 'margoengine/environment';
 points.setFog(Fog.attach(engine, {color: '#8090a0', density: 0.03}));
 labels.material.fog = false; // keep this batch clear
 ```
@@ -121,8 +123,8 @@ frame, no recompile). More than 6 planes throw a RangeError, a malformed plane o
 `clipIntersection: true` cuts only fragments behind every plane (their intersection) instead of any.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {PointsPlugin, PointCloud} from '@margoengine/points';
+import {Engine} from 'margoengine/core';
+import {PointsPlugin, PointCloud} from 'margoengine/points';
 
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);

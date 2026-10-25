@@ -1,14 +1,16 @@
 # @margoengine/voxel-edit
 
+Install `npm i margoengine` and import `margoengine/voxel-edit` (or this package alone: `npm i @margoengine/voxel-edit`, imported as `@margoengine/voxel-edit`; the two are the same module).
+
 Editing voxel models for voxel editors and tools: dense and sparse grids, modeling operations, brushes and
 selections, picking, export meshing, `.vox` scene editing and frame animation. CPU only, no renderer, no DOM: every
 function is pure and can run in a worker. Optional and tree-shakable; core and the stage never import it.
 
 ```ts
-import { combineGrids, mergePalettes, rotateGrid, type VoxelGrid } from '@margoengine/voxel-edit';
-import { sphereCells, connectedCells } from '@margoengine/voxel-edit/edit';
-import { pickRay, raycastGrid } from '@margoengine/voxel-edit/pick';
-import { meshGrid } from '@margoengine/voxel-edit/mesh';
+import { combineGrids, mergePalettes, rotateGrid, type VoxelGrid } from 'margoengine/voxel-edit';
+import { sphereCells, connectedCells } from 'margoengine/voxel-edit/edit';
+import { pickRay, raycastGrid } from 'margoengine/voxel-edit/pick';
+import { meshGrid } from 'margoengine/voxel-edit/mesh';
 
 const model: VoxelGrid = { size: [32, 32, 32], voxels: new Uint8Array(32 * 32 * 32) };
 const { grid } = rotateGrid(model, { axis: 'y', degrees: 90 }); // a new grid; `model` is unchanged

@@ -1,10 +1,12 @@
 # @margoengine/vfx
 
+Install `npm i margoengine` and import `margoengine/vfx` (or this package alone: `npm i @margoengine/vfx`, imported as `@margoengine/vfx`; the two are the same module).
+
 Optional GPU particle simulation and indirect billboard rendering, with capacity up to 1,000,000. One storage buffer holds particle position/life, velocity/size, color and rotation (birth angle, angular velocity, initial lifetime); each invocation owns one particle. Workgroups of 256 integrate gravity, analytic curl turbulence and ground-plane collisions, touching only position/life and velocity/size after birth. Atomic counters respawn dead slots, count live particles and compact the ones whose billboard can reach the screen into the indirect draw, one triangle per particle.
 
 ```ts
-import {EngineKernel} from '@margoengine/core';
-import {VFX} from '@margoengine/vfx';
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const sparks = VFX.attach(engine, {
   capacity:500_000, rate:20_000, position:[0,1,0], velocity:[0,5,0],
@@ -73,9 +75,9 @@ sRGB-encoded and a fully fogged particle matches the fogged background. VFX does
 `fog.enabled = false` clears it without recompiling; `effect.setFog(null)` (the default) draws exactly as before.
 
 ```ts
-import type {EngineKernel} from '@margoengine/core';
-import {Fog} from '@margoengine/environment';
-import type {VFX} from '@margoengine/vfx';
+import type {EngineKernel} from 'margoengine/core';
+import {Fog} from 'margoengine/environment';
+import type {VFX} from 'margoengine/vfx';
 declare const engine: EngineKernel, sparks: VFX; // from the first example
 const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 60});
 sparks.setFog(fog);
@@ -111,9 +113,9 @@ bundle that combines them adds less: the whole root is 8.1 kB. `node examples/pa
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
 
 ```ts
-import {EngineKernel} from '@margoengine/core';
-import {VFX} from '@margoengine/vfx/base';
-import {sort} from '@margoengine/vfx/sort';
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {sort} from 'margoengine/vfx/sort';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const smoke = VFX.attach(engine, {capacity: 4096, sort: true}, {sort});
 ```

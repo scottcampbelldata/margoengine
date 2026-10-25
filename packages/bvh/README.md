@@ -1,5 +1,7 @@
 # @margoengine/bvh
 
+Install `npm i margoengine` and import `margoengine/bvh` (or this package alone: `npm i @margoengine/bvh`, imported as `@margoengine/bvh`; the two are the same module).
+
 Triangle bounding volume hierarchy (`MeshBVH`, `shapecast`, `intersectsGeometry`), spatial queries and a CPU `Raycaster` for Margo Engine.
 
 Build from source with `npm run build` in `packages/bvh`.
@@ -11,8 +13,8 @@ use the exact triangle predicate, with full layered-hit results available for tr
 query correctness and traversal cost without changing mesh data, public signatures or the serialized BVH format.
 
 ```ts
-import {Engine, box} from '@margoengine/core';
-import {MeshBVH, Raycaster, buildAsync, computeGeometryBVHAsync} from '@margoengine/bvh';
+import {Engine, box} from 'margoengine/core';
+import {MeshBVH, Raycaster, buildAsync, computeGeometryBVHAsync} from 'margoengine/bvh';
 
 // Engine picking: canvas CSS pixels in, sorted hits out.
 const raycaster = new Raycaster();
@@ -99,8 +101,8 @@ occluder BVH; use `creasedNormals` from `@margoengine/geometry` for flat or smoo
 `limitPalette(colors, palette, mode)` snaps them to a palette.
 
 ```ts
-import {MeshBVH, worldTriangles} from '@margoengine/bvh';
-import {bakeVertexColors, limitPalette} from '@margoengine/bvh/bake';
+import {MeshBVH, worldTriangles} from 'margoengine/bvh';
+import {bakeVertexColors, limitPalette} from 'margoengine/bvh/bake';
 const cast = worldTriangles(engine, castAgainst); // Cast Against: the meshes that occlude
 const occluder = MeshBVH.build({positions: cast.vertices, indices: cast.indices});
 const colors = bakeVertexColors({positions, normals, colors: existing}, occluder, {

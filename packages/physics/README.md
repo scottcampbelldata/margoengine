@@ -1,5 +1,7 @@
 # @margoengine/physics
 
+Install `npm i margoengine` and import `margoengine/physics` (or this package alone: `npm i @margoengine/physics`, imported as `@margoengine/physics`; the two are the same module).
+
 Rigid-body physics for Margo Engine on [Rapier](https://rapier.rs): a fixed-step engine plugin with interpolation, colliders, joints, scene queries, collision events and a character controller.
 
 Build from source with `npm run build` in `packages/physics`.
@@ -8,8 +10,8 @@ Covers what Babylon.js offers with its Havok plugin (`HavokPlugin`, `PhysicsAggr
 
 ```ts
 import RAPIER from '@dimforge/rapier3d-compat';
-import {Engine, PbrMaterial, box} from '@margoengine/core';
-import {Physics, collisionGroups} from '@margoengine/physics';
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {Physics, collisionGroups} from 'margoengine/physics';
 
 await RAPIER.init();
 const engine = await Engine.create(canvas);

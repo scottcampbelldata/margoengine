@@ -1,13 +1,15 @@
 # @margoengine/webgl
 
+Install `npm i margoengine` and import `margoengine/webgl` (or this package alone: `npm i @margoengine/webgl`, imported as `@margoengine/webgl`; the two are the same module).
+
 WebGL2 fallback renderer for browsers without WebGPU. It draws core meshes with core's PBR
 material, shaded per pixel (GGX metallic-roughness from each mesh's constant colour and factors, one directional
 light plus ambient, no textures, effects or picking);
 optional packages that need WebGPU stay unavailable on this path.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {webglRenderer} from '@margoengine/webgl';
+import {Engine} from 'margoengine/core';
+import {webglRenderer} from 'margoengine/webgl';
 
 // WebGPU when available, otherwise WebGL2.
 const engine = await Engine.create(canvas, {backend: 'auto', fallback: webglRenderer});

@@ -1,14 +1,16 @@
 # @margoengine/exporters
 
+Install `npm i margoengine` and import `margoengine/exporters` (or this package alone: `npm i @margoengine/exporters`, imported as `@margoengine/exporters`; the two are the same module).
+
 glTF 2.0 / GLB, STL, OBJ (with MTL), PLY, static USDZ and static COLLADA 1.4.1 (`.dae`) export for Margo Engine scenes
 and plain geometry data, plus SHA-256 for checking exported files.
 
 Build from source with `npm run build` in `packages/exporters`.
 
 ```ts
-import {Engine, box, PbrMaterial} from '@margoengine/core';
-import {exportGLB, exportGLTF, exportSTL, exportOBJ, exportPLY} from '@margoengine/exporters';
-import {encodePNG} from '@margoengine/exporters/capture';
+import {Engine, box, PbrMaterial} from 'margoengine/core';
+import {exportGLB, exportGLTF, exportSTL, exportOBJ, exportPLY} from 'margoengine/exporters';
+import {encodePNG} from 'margoengine/exporters/capture';
 
 const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
 const body = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color: '#84d6bd'}));
@@ -50,9 +52,9 @@ const textured = exportGLB({nodes: [{
 Use `exportModel` from `@margoengine/exporters/model` to save loaded glTF models or meshes made by `@margoengine/materials`, including their live textures:
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {exportModel} from '@margoengine/exporters/model';
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {exportModel} from 'margoengine/exporters/model';
 
 const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
 const model = await loadGLTF(engine, '/DamagedHelmet.glb');
@@ -127,7 +129,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 Data-scene `ExportNode.retainedVisibility` writes `KHR_node_visibility` without filtering the node, geometry or descendants. Omit it for the default visible fallback; explicitly set `false` for a hidden collision helper whose geometry and socket nodes must survive export. The extension is listed in `extensionsUsed`, not `extensionsRequired`. Existing `visible: false` still controls `onlyVisible` filtering. Retained visibility needs hierarchy export; `flatten: true` rejects it with a `TypeError`.
 
 ```ts
-import {exportGLB} from '@margoengine/exporters';
+import {exportGLB} from 'margoengine/exporters';
 
 // A one-triangle collision helper.
 const geometry = {
@@ -148,7 +150,7 @@ const glb = exportGLB({nodes: [{name: 'Helper-colonly', geometry, retainedVisibi
 - Scene `materialAnimations` contain `{name?, channels}` and animate base-color UVs (a tile atlas cel, a scrolling texture) through `KHR_animation_pointer`. Each channel is `{material, texture: 'baseColorTexture', property: 'offset' | 'scale', times, values, interpolation: 'STEP'}`: `material` is the `MaterialData` object of an exported textured material that sets `baseColorTextureTransform: {offset, scale}` (written as a required `KHR_texture_transform`), and `values` hold two Float32 values per key. Material clips follow the node clips; a clip cannot target one material property twice, and `flatten: true` rejects them. `createMaterialAnimation(model)` in `@margoengine/animation` plays them back.
 
 ```ts
-import {exportGLB, type ExportNode} from '@margoengine/exporters';
+import {exportGLB, type ExportNode} from 'margoengine/exporters';
 
 // One triangle bound to one joint, with a morph target that raises its top vertex.
 const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
@@ -173,8 +175,8 @@ Load these GLBs with `@margoengine/gltf-pro` and attach `@margoengine/animation`
 ## OBJ textures and quads
 
 ```ts
-import {exportOBJ, type ExportScene} from '@margoengine/exporters';
-import {encodePNG} from '@margoengine/exporters/capture';
+import {exportOBJ, type ExportScene} from 'margoengine/exporters';
+import {encodePNG} from 'margoengine/exporters/capture';
 
 // Downloads a file in the browser.
 const save = (name: string, data: Uint8Array | string) => {
@@ -220,8 +222,8 @@ into `result.textures`.
 `texturePrefix`, named as for OBJ.
 
 ```ts
-import type {ExportScene} from '@margoengine/exporters';
-import {exportDAE} from '@margoengine/exporters/dae';
+import type {ExportScene} from 'margoengine/exporters';
+import {exportDAE} from 'margoengine/exporters/dae';
 
 // Downloads a file in the browser.
 const save = (name: string, data: Uint8Array | string) => {
@@ -270,8 +272,8 @@ written once. A gltf-pro `GLTFCamera` or `GLTFLight` record fits as it is. `flat
 Only the glTF writers use cameras and lights.
 
 ```ts
-import {exportGLB, type TextureData} from '@margoengine/exporters';
-import {encodePNG} from '@margoengine/exporters/capture';
+import {exportGLB, type TextureData} from 'margoengine/exporters';
+import {encodePNG} from 'margoengine/exporters/capture';
 
 const pngBytes = await encodePNG({width: 1, height: 1, data: new Uint8Array([90, 160, 255, 255])});
 const geometry = {
@@ -327,9 +329,9 @@ validator in the tests:
   record, so a game can reload the finished lighting.
 
 ```ts
-import {exportGLB, paletteTexture} from '@margoengine/exporters';
+import {exportGLB, paletteTexture} from 'margoengine/exporters';
 
-import {encodePNG} from '@margoengine/exporters/capture';
+import {encodePNG} from 'margoengine/exporters/capture';
 
 const rgbaBytes = new Uint8Array([200, 60, 40, 255, 120, 200, 255, 128]); // two palette entries
 const palette = await paletteTexture(rgbaBytes);             // {texture, size, uvs}
@@ -375,7 +377,7 @@ accessors, so for example 16,777,217 is a key of 16,777,216.
 | `animatePlacements(node, clip, matrices)` | A retained instance's placement per key from its local matrix, or `null` where it is hidden (scale 0); STEP channels; throws on shear |
 
 ```ts
-import {animateCels, animateTransforms, exportGLB, type ExportNode, type ExportPrimitive} from '@margoengine/exporters';
+import {animateCels, animateTransforms, exportGLB, type ExportNode, type ExportPrimitive} from 'margoengine/exporters';
 
 // Two geometry banks: a triangle and a taller triangle.
 const triangle = (height: number): ExportPrimitive[] => [{geometry: {
@@ -411,7 +413,7 @@ stored. Checkers that read exported files back use it with `splitGLB(bytes, {cop
 BIN is made. Only buffer 0 (the BIN chunk) is read; anything out of bounds or non-finite throws.
 
 ```ts
-import {appendGLBMeshes, exportGLB} from '@margoengine/exporters';
+import {appendGLBMeshes, exportGLB} from 'margoengine/exporters';
 
 const glb = exportGLB({nodes: [{name: 'Body', geometry: {
   positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
@@ -443,9 +445,9 @@ without renaming it; the seed `.glb.import` refers to the generated script at th
 creates its own UID and cache paths. The caller can package the entries with the existing public ZIP encoder:
 
 ```ts
-import {exportGLB} from '@margoengine/exporters';
-import {createGodotImportBundle} from '@margoengine/exporters/godot';
-import {encodeZIP} from '@margoengine/exporters/capture';
+import {exportGLB} from 'margoengine/exporters';
+import {createGodotImportBundle} from 'margoengine/exporters/godot';
+import {encodeZIP} from 'margoengine/exporters/capture';
 
 const glb = exportGLB({nodes: [
   {name: 'Waystone', extras: {id: 'waystone'}, geometry: {
@@ -541,8 +543,8 @@ mesh-space position, so the rest pose leaves every vertex in place. Put `root` b
 parent.
 
 ```ts
-import {exportGLB} from '@margoengine/exporters';
-import {humanoidJoints, skinHierarchy, skinWeights} from '@margoengine/exporters/skin';
+import {exportGLB} from 'margoengine/exporters';
+import {humanoidJoints, skinHierarchy, skinWeights} from 'margoengine/exporters/skin';
 
 // A 1 x 2 x 0.5 box figure, its origin at the bottom centre.
 type Vec3 = [number, number, number];
@@ -566,8 +568,8 @@ An optional subpath for content hashes of exported files and manifests, with no 
 | `new SHA256().update(a).update(b)`, `.digest()` / `.hex()` | Incremental, synchronous SHA-256 (FIPS 180-4): hash a file in pieces as it is written; no input is copied or kept |
 
 ```ts
-import {exportGLB} from '@margoengine/exporters';
-import {SHA256, sha256} from '@margoengine/exporters/hash';
+import {exportGLB} from 'margoengine/exporters';
+import {SHA256, sha256} from 'margoengine/exporters/hash';
 
 const glb = exportGLB({nodes: []});
 const header = new TextEncoder().encode('{"format":"model"}'), body = glb;
@@ -662,8 +664,8 @@ Material textures are the same `TextureData` (encoded PNG or JPEG bytes) the glT
 The image bytes are stored unchanged under `texturePrefix` (default `textures/`), each once, with every file's data 64-byte aligned. Vertex colors cannot be combined with a base color texture (UsdPreviewSurface has no multiply), a texture whose UV set is missing is refused, and sampler filters and mipmaps have no USD equivalent and are dropped.
 
 ```ts
-import { exportUSDZ } from '@margoengine/exporters/usdz';
-import type { TextureData } from '@margoengine/exporters';
+import { exportUSDZ } from 'margoengine/exporters/usdz';
+import type { TextureData } from 'margoengine/exporters';
 
 declare const albedoPNG: Uint8Array;
 const albedo: TextureData = { image: albedoPNG, mimeType: 'image/png', name: 'albedo' };
@@ -690,8 +692,8 @@ primitive split into parts of at most `maxTrianglesPerPart` (default 20,000) tri
 and exact vertex values and copies only the vertices it uses. Parts of shared geometry are written once.
 
 ```ts
-import {Engine, box, PbrMaterial} from '@margoengine/core';
-import {exportRobloxGLB} from '@margoengine/exporters/roblox';
+import {Engine, box, PbrMaterial} from 'margoengine/core';
+import {exportRobloxGLB} from 'margoengine/exporters/roblox';
 
 // Downloads a file in the browser.
 const save = (name: string, data: Uint8Array | string) => {
@@ -766,8 +768,8 @@ flipbooks on an imported scene. Native imports are run by the application's own 
 each encoder asks `frame(i)` for frame `i`, so set the scene state for that frame there, then call `capture`.
 
 ```ts
-import {Camera, Engine, box, PbrMaterial} from '@margoengine/core';
-import {capture, encodePNG, encodeJPEG, encodeSequence, encodeGIF, encodeWEBM} from '@margoengine/exporters/capture';
+import {Camera, Engine, box, PbrMaterial} from 'margoengine/core';
+import {capture, encodePNG, encodeJPEG, encodeSequence, encodeGIF, encodeWEBM} from 'margoengine/exporters/capture';
 
 // Downloads a file in the browser.
 const save = (name: string, data: Uint8Array | Blob) => {
@@ -847,8 +849,8 @@ stops between frames or entries and rejects with its reason, returning nothing p
 camera or naming fields), or is `false` to leave the file out; `entries` adds files such as a README.
 
 ```ts
-import {Engine, box, PbrMaterial} from '@margoengine/core';
-import {capture, encodeAtlasZIP} from '@margoengine/exporters/capture';
+import {Engine, box, PbrMaterial} from 'margoengine/core';
+import {capture, encodeAtlasZIP} from 'margoengine/exporters/capture';
 
 const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
 const walker = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color: '#84d6bd'}));
@@ -882,9 +884,9 @@ support and per-asset exports are separate artifacts. The file APIs never instal
 access a destination project, resize pixels or rewrite geometry, skin data or animation keys.
 
 ```ts
-import {exportGLB} from '@margoengine/exporters';
-import {createUnityImportBundle, createUnityImportSupportPackage} from '@margoengine/exporters/unity';
-import {encodeZIP, encodePNG} from '@margoengine/exporters/capture';
+import {exportGLB} from 'margoengine/exporters';
+import {createUnityImportBundle, createUnityImportSupportPackage} from 'margoengine/exporters/unity';
+import {encodeZIP, encodePNG} from 'margoengine/exporters/capture';
 
 // One quad textured with a 1 x 1 nearest/clamp atlas.
 const atlas = await encodePNG({width: 1, height: 1, data: new Uint8Array([200, 120, 60, 255])});

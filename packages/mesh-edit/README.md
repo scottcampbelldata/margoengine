@@ -1,9 +1,11 @@
 # @margoengine/mesh-edit
 
+Install `npm i margoengine` and import `margoengine/mesh-edit` (or this package alone: `npm i @margoengine/mesh-edit`, imported as `@margoengine/mesh-edit`; the two are the same module).
+
 Optional, tree-shakable CPU polygon editing, UV allocation and pixel painting for Margo. Input meshes retain indexed positions, caller face IDs and independent normalized top-left UVs at every polygon corner. Commands return owned geometry and explicit old-to-new component provenance; caller document metadata is excluded.
 
 ```ts
-import { createPrimitiveMesh, extrudeMeshFace, compilePolygonMesh } from '@margoengine/mesh-edit';
+import { createPrimitiveMesh, extrudeMeshFace, compilePolygonMesh } from 'margoengine/mesh-edit';
 const mesh = createPrimitiveMesh('cube', 'box');
 const edit = extrudeMeshFace(mesh, 'box-face-0', 0.25);
 const geometry = compilePolygonMesh(edit.mesh);

@@ -1,9 +1,11 @@
 # @margoengine/math
 
+Install `npm i margoengine` and import `margoengine/math` (or this package alone: `npm i @margoengine/math`, imported as `@margoengine/math`; the two are the same module).
+
 Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, Sphere, Plane, Ray, Frustum, Spherical and MathUtils. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
 
 ```ts
-import {Vector3, Quaternion, Euler, Color} from '@margoengine/math';
+import {Vector3, Quaternion, Euler, Color} from 'margoengine/math';
 const position = new Vector3(0, 1, 0).addScaledVector(new Vector3(1, 0, 0), 2);
 mesh.setPosition(position.toArray()).setQuaternion(new Quaternion().setFromEuler(new Euler(0, Math.PI / 4, 0)).toArray());
 engine.camera.position = new Vector3().copy(mesh.position).add(new Vector3(0, 2, 5)).toArray();
@@ -40,8 +42,8 @@ object shows `'S'`, behind it `'N'`, at the object's left (its local +X) `'W'`; 
 an animation has. Per frame, for unparented meshes:
 
 ```ts
-import {Matrix4, Vector3} from '@margoengine/math';
-import {billboardDirection, billboardRotation} from '@margoengine/math/billboard';
+import {Matrix4, Vector3} from 'margoengine/math';
+import {billboardDirection, billboardRotation} from 'margoengine/math/billboard';
 const c = engine.camera,
   eye = new Vector3(...c.position),
   cameraWorld = new Matrix4().lookAt(eye, new Vector3(...c.target), new Vector3(...c.up)).setPosition(eye).elements;

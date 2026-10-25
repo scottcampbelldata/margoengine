@@ -1,5 +1,7 @@
 # @margoengine/react
 
+Install `npm i margoengine` and import `margoengine/react` (or this package alone: `npm i @margoengine/react`, imported as `@margoengine/react`; the two are the same module).
+
 React 18/19 integration with a native canvas, pointer events, Suspense, stable mesh refs and frame callbacks. There is no custom reconciler.
 
 Scene helpers, post effects, physics and XR are available from one
@@ -16,7 +18,7 @@ uses. Registry installation commands will accompany a verified release.
 
 ```tsx
 import { Suspense } from 'react';
-import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial, Model } from '@margoengine/react';
+import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial, Model } from 'margoengine/react';
 
 export function App() {
   return (
@@ -42,7 +44,7 @@ export function App() {
 `Group` is a geometry-free `Mesh` for parent transforms. Lowercase exports are aliases of the same hook-based components: `mesh === Mesh`, `group === Group`, `boxGeometry === BoxGeometry`, and `meshStandardMaterial === PbrMaterial`. Use a namespace in JSX:
 
 ```tsx
-import * as Margo from '@margoengine/react';
+import * as Margo from 'margoengine/react';
 
 <Margo.Canvas style={{ height: 400 }}>
   <Margo.Stage camera={{ position: [0, 2, 5] }}>
@@ -63,7 +65,7 @@ Optional model, lighting and control components can be used directly under the c
 ```tsx
 'use client';
 import { Suspense } from 'react';
-import { MargoCanvas, Model, Environment, OrbitControls } from '@margoengine/react';
+import { MargoCanvas, Model, Environment, OrbitControls } from 'margoengine/react';
 
 export default function App() {
   return <MargoCanvas backend="webgpu" camera={{ position: [0, 2, 5] }} shadows style={{ height: 400 }}>
@@ -84,8 +86,8 @@ With `<Canvas frameloop="demand">`, the engine does not start an animation loop.
 
 ```tsx
 import { useEffect } from 'react';
-import { box, PbrMaterial as Material } from '@margoengine/core';
-import { useMargoStage } from '@margoengine/react';
+import { box, PbrMaterial as Material } from 'margoengine/core';
+import { useMargoStage } from 'margoengine/react';
 
 function ImperativeCube() {
   const engine = useMargoStage();

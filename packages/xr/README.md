@@ -1,10 +1,12 @@
 # @margoengine/xr
 
+Install `npm i margoengine` and import `margoengine/xr` (or this package alone: `npm i @margoengine/xr`, imported as `@margoengine/xr`; the two are the same module).
+
 Optional WebGPU WebXR session negotiation, input poses and instanced stereo PBR rendering. XR owns a compatible GPU device and attaches through the existing core extension interface. Core and the stage facade remain frozen.
 
 ```ts
-import {Engine,box} from '@margoengine/core';
-import {XR} from '@margoengine/xr';
+import {Engine,box} from 'margoengine/core';
+import {XR} from 'margoengine/xr';
 
 const canvas=document.createElement('canvas');document.body.append(canvas);
 const engine=await Engine.create(canvas,{backend:'webgpu'});
@@ -51,8 +53,8 @@ first, each with a column-major `matrix`, `position` and `orientation` in the se
 when the session ends. Not yet tried on an AR headset or phone; tested against the specification's interfaces.
 
 ```ts
-import { Engine, box } from '@margoengine/core';
-import { XR, HitTest } from '@margoengine/xr';
+import { Engine, box } from 'margoengine/core';
+import { XR, HitTest } from 'margoengine/xr';
 
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas, { backend: 'webgpu' });

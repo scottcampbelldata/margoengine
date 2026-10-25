@@ -1,9 +1,11 @@
 # @margoengine/splines
 
+Install `npm i margoengine` and import `margoengine/splines` (or this package alone: `npm i @margoengine/splines`, imported as `@margoengine/splines`; the two are the same module).
+
 Piecewise 3D Catmull-Rom, cubic Bezier and cubic Hermite curves, with a cached arc-length lookup.
 
 ```ts
-import {Spline} from '@margoengine/splines';
+import {Spline} from 'margoengine/splines';
 const curve = new Spline([[0,0,0], [5,1,5], [10,0,10]]);
 const point = new Float64Array(3);
 curve.atDistance(curve.length / 2, point);

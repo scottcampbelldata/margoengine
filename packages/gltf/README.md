@@ -1,5 +1,7 @@
 # @margoengine/gltf
 
+Install `npm i margoengine` and import `margoengine/gltf` (or this package alone: `npm i @margoengine/gltf`, imported as `@margoengine/gltf`; the two are the same module).
+
 Lazy static glTF/GLB loading, named nodes and shared primitive geometry for Margo Engine.
 
 Package name: `@margoengine/gltf`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
@@ -9,8 +11,8 @@ npm install @margoengine/core@1.0.0 @margoengine/gltf@1.0.0
 ```
 
 ```ts
-import { Engine } from '@margoengine/core';
-import { loadGLTF } from '@margoengine/gltf';
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas);

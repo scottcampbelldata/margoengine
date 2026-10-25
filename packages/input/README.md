@@ -1,9 +1,11 @@
 # @margoengine/input
 
+Install `npm i margoengine` and import `margoengine/input` (or this package alone: `npm i @margoengine/input`, imported as `@margoengine/input`; the two are the same module).
+
 Semantic actions combine keyboard codes, mouse buttons and relative motion, gamepad axes/buttons, and touch controls.
 
 ```ts
-import {Input} from '@margoengine/input';
+import {Input} from 'margoengine/input';
 const input = new Input({jump: [{type: 'key', code: 'Space'}]});
 input.update();
 const {pressed, value} = input.state('jump');

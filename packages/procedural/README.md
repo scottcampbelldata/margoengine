@@ -1,5 +1,7 @@
 # @margoengine/procedural
 
+Install `npm i margoengine` and import `margoengine/procedural` (or this package alone: `npm i @margoengine/procedural`, imported as `@margoengine/procedural`; the two are the same module).
+
 `generateCabinMesh(height, position = [0,0])` builds a 6 × 8 m timber cabin,
 35° roof, recessed windows/door and terrain-sunk stone/porch supports. `position`
 is the world XZ origin used for terrain sampling. It returns `floor`, `siding`,
@@ -41,7 +43,7 @@ and material albedo remain independent.
 Seeded 3D simplex, gradient Perlin and exact nearest-feature Worley noise, CPU Marching Cubes geometry, and standalone tree/shrub generators.
 
 ```ts
-import {Noise, marchingCubes} from '@margoengine/procedural';
+import {Noise, marchingCubes} from 'margoengine/procedural';
 const noise = new Noise(123);
 const geometry = marchingCubes((x,y,z) => x*x+y*y+z*z-0.5, {resolution: [32,32,32]});
 ```
@@ -49,7 +51,7 @@ const geometry = marchingCubes((x,y,z) => x*x+y*y+z*z-0.5, {resolution: [32,32,3
 Surface extraction is the package's own marching tetrahedra (since 5l.v; it replaced the `isosurface` dependency): each grid cube is split into six tetrahedra around its main diagonal, so neighbouring cubes cut shared faces the same way and the indexed mesh is closed wherever the surface stays inside the grid. It makes more, smaller triangles than classic Marching Cubes and none of its ambiguous-case holes. Negative density is inside; gradient normals and triangle winding face outward. Empty surfaces return null. Resolution is 3..128 on each axis, with a bounded output geometry. Worley searches a sufficient five-cell neighborhood per axis for F1. Sampling/extraction are CPU work, not frame-time GPU voxel meshing.
 
 ```ts
-import {generateTreeMesh, generateShrubMesh} from '@margoengine/procedural';
+import {generateTreeMesh, generateShrubMesh} from 'margoengine/procedural';
 const pine = generateTreeMesh('conifer'); // Also accepts 'broadleaf'.
 const bush = generateShrubMesh();
 ```
@@ -71,7 +73,7 @@ uses these exports with `ScatterInstances` and `PlacementLayout` from scatter.
 ## Noise (`@margoengine/procedural/noise`, 2.1 kB min+gzip)
 
 ```ts
-import {Noise, fbm, ridged, domainWarp} from '@margoengine/procedural/noise';
+import {Noise, fbm, ridged, domainWarp} from 'margoengine/procedural/noise';
 const noise = new Noise(42);
 const hills = fbm((x, y) => noise.simplex2(x, y), {octaves: 6});           // about [-1, 1]
 const peaks = ridged((x, y, z = 0) => noise.simplex(x, y, z), {octaves: 5}); // [0, 1], sharp crests
@@ -99,7 +101,7 @@ the same field on the GPU within f32 rounding. Coordinates are limited to |v| <=
 
 ```ts
 import {createStage} from 'margoengine';
-import {expand, interpret, tubes} from '@margoengine/procedural/lsystem';
+import {expand, interpret, tubes} from 'margoengine/procedural/lsystem';
 const stage = await createStage('#app');
 const rules = {
   X: [{successor: 'F[+X][-X]&[^X]!FX', weight: 3}, {successor: 'F!X', weight: 1}],    // stochastic: weighted choices
@@ -122,7 +124,7 @@ their parent and tips taper to `tipScale`. Tube ends are open; normals are radia
 
 ```ts
 import {createStage, sphere} from 'margoengine';
-import {voronoi2, voronoi3, fractureMesh} from '@margoengine/procedural/voronoi';
+import {voronoi2, voronoi3, fractureMesh} from 'margoengine/procedural/voronoi';
 const stage = await createStage('#app');
 const points = Array.from({length: 200}, () => Math.random() * 100), points3 = Array.from({length: 300}, () => Math.random() * 10);
 const {cells, edges, delaunay} = voronoi2(points, [0, 0, 100, 100]);   // cells[i].polygon, .edgeSites, .neighbors
@@ -147,7 +149,7 @@ expression language (version 1), so its saved expression text gives the same gri
 JavaScript runtime: it evaluates only its own syntax tree, with no host access.
 
 ```ts
-import {runVoxelExpression, VoxelExpressionError} from '@margoengine/procedural/expression';
+import {runVoxelExpression, VoxelExpressionError} from 'margoengine/procedural/expression';
 const {voxels} = runVoxelExpression({
   source: 'noise(x * f, y * f, z * f) > 0.5 ? tone : color', // one expression per cell
   size: [64, 32, 64], voxels: grid.voxels,                    // voxel-edit layout: x + sx * (z + sz * y), Y up

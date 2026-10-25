@@ -1,11 +1,13 @@
 # Margo Engine Animation
 
+Install `npm i margoengine` and import `margoengine/animation` (or this package alone: `npm i @margoengine/animation`, imported as `@margoengine/animation`; the two are the same module).
+
 Optional WebGPU skeletal animation and morph targets, isolated from core and stage.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {Animation} from '@margoengine/animation';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
 const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
 const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
 const animation = Animation.attach(model);
@@ -49,9 +51,9 @@ document needed). Bones live in the skinned mesh's local space; exactly one bone
 
 ```ts
 import {createStage} from 'margoengine';
-import {boxGeometry} from '@margoengine/geometry';
-import {Material, createMesh} from '@margoengine/materials';
-import {Skeleton, Skin} from '@margoengine/animation';
+import {boxGeometry} from 'margoengine/geometry';
+import {Material, createMesh} from 'margoengine/materials';
+import {Skeleton, Skin} from 'margoengine/animation';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const skeleton = new Skeleton([
   {name: 'upper', parent: -1},
@@ -87,7 +89,7 @@ Validation rejects bad indices and counts, repeated names, parent cycles and any
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf-pro';
 import {
   Animation,
   Skeleton,
@@ -97,7 +99,7 @@ import {
   createKeyframeClip,
   sampleKeyframes,
   segmentTime,
-} from '@margoengine/animation';
+} from 'margoengine/animation';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/face.glb');
 const skeleton = new Skeleton([{name: 'forearm', parent: -1}]);
@@ -180,7 +182,7 @@ applyKeyframeClip(clip, skeleton, t);
 ## Property tracks: any number, vector or colour
 
 ```ts
-import {applyKeyframeClip, bakeKeyframeTrack, createKeyframeClip, sampleKeyframes} from '@margoengine/animation';
+import {applyKeyframeClip, bakeKeyframeTrack, createKeyframeClip, sampleKeyframes} from 'margoengine/animation';
 const lamp = {intensity: 0, material: {roughness: 1, color: new Float32Array([1, 1, 1, 1])}};
 let fov = 60;
 const pulse = createKeyframeClip({name: 'Pulse', tracks: [
@@ -218,9 +220,9 @@ out (glTF nodes have no such paths); `AnimationGroup` and `retarget` ignore them
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF, viewGLTFCamera} from '@margoengine/gltf-pro';
-import {Animation} from '@margoengine/animation';
-import {pointerChannels} from '@margoengine/animation/pointer';
+import {loadGLTF, viewGLTFCamera} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {pointerChannels} from 'margoengine/animation/pointer';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/pointer-show.glb');
 const animation = Animation.attach(model, {pointers: pointerChannels});
@@ -268,8 +270,8 @@ and `Animation`s whose bones or nodes the tracks name. Each member can run ahead
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {Animation, AnimationGroup} from '@margoengine/animation';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation, AnimationGroup} from 'margoengine/animation';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const walkers = await Promise.all([0, 1, 2].map(() => loadGLTF(stage.engine, '/RobotExpressive.glb')));
 const crowd = new AnimationGroup('Walking', {speed: 1});
@@ -297,10 +299,10 @@ gltf-pro, for code that samples tracks itself (`@margoengine/animator` does).
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:
 
 ```ts
-import {Animation, AnimationGroup, applyKeyframeClip} from '@margoengine/animation';
-import {Retarget, cloneModel, retargetRig} from '@margoengine/animation/skeleton-utils';
+import {Animation, AnimationGroup, applyKeyframeClip} from 'margoengine/animation';
+import {Retarget, cloneModel, retargetRig} from 'margoengine/animation/skeleton-utils';
 import {createStage} from 'margoengine';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf-pro';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const [robot, mixamoModel, hero] = await Promise.all(
   ['/RobotExpressive.glb', '/mixamo-walk.glb', '/hero.glb'].map((url) => loadGLTF(stage.engine, url)),

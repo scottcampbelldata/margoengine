@@ -1,9 +1,11 @@
 # @margoengine/video
 
+Install `npm i margoengine` and import `margoengine/video` (or this package alone: `npm i @margoengine/video`, imported as `@margoengine/video`; the two are the same module).
+
 WebGPU external video textures from HTMLVideoElement or VideoFrame, imported with `importExternalTexture` (no JS-side copy; whether the browser copies depends on the platform), with a screen-rectangle surface and optional Web Audio frequency sampling.
 
 ```ts
-import {Video} from '@margoengine/video';
+import {Video} from 'margoengine/video';
 const surface = Video.attach(engine, videoElement, {rect: [0.1,0.1,0.8,0.8], audio: audioContext});
 const bins = surface.sampleFrequency();
 ```

@@ -1,5 +1,7 @@
 # @margoengine/shadows
 
+Install `npm i margoengine` and import `margoengine/shadows` (or this package alone: `npm i @margoengine/shadows`, imported as `@margoengine/shadows`; the two are the same module).
+
 Cascade descriptors, attachments and matrix views are retained between frames.
 Custom `drawShadow` callbacks receive a borrowed context reused for that cascade;
 consume it synchronously rather than retaining it after the pass.
@@ -7,8 +9,8 @@ consume it synchronously rather than retaining it after the pass.
 Optional WebGPU directional shadows. Four practical/logarithmic frustum splits (fewer with `cascades`) render to a `depth32float` 2D texture array. Stable spherical extents and world-space texel snapping limit edge swimming. PCSS searches 16 blockers and filters 32 comparison samples using directional-light angular size and blocker/receiver separation. The samples follow a golden-angle spiral that each pixel turns by interleaved gradient noise of its screen position, so penumbrae show fine noise instead of steps; there is no time term, so a still view renders the same pixels every frame. The last tenth of each cascade's depth range dithers into the next cascade with a second noise pattern, so a cascade switch shows no hard seam and still costs one map lookup per tap.
 
 ```ts
-import {EngineKernel,box} from '@margoengine/core';
-import {Shadows} from '@margoengine/shadows';
+import {EngineKernel,box} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const terrain = engine.createMesh().setGeometry(box()).setScale([100,1,100]);
 const character = engine.createMesh().setGeometry(box()).setPosition([0,2,0]);

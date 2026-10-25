@@ -1,11 +1,13 @@
 # @margoengine/shader
 
+Install `npm i margoengine` and import `margoengine/shader` (or this package alone: `npm i @margoengine/shader`, imported as `@margoengine/shader`; the two are the same module).
+
 Typed shader nodes that compile to readable WGSL. One graph API drives three hosts: `NodeMaterial` (a `@margoengine/materials` Material whose colour, normal, roughness, metalness, emissive, opacity and vertex position come from nodes), `NodePass` (a full-screen effect inside `@margoengine/post`'s PostStack) and `ComputePass` (a compute shader over a storage buffer, dispatched by the frame graph). Two more entries skip the graph: `@margoengine/shader/raw` draws your own WGSL with your own vertex layout, and `@margoengine/shader/effects` has ready-made screen effects. WebGPU only.
 
 ```ts
-import {createMesh, loadTexture} from '@margoengine/materials';
-import {sphereGeometry} from '@margoengine/geometry';
-import {NodeMaterial, uniform, texture, mix, color, uv, sin, time, positionLocal, normalLocal} from '@margoengine/shader';
+import {createMesh, loadTexture} from 'margoengine/materials';
+import {sphereGeometry} from 'margoengine/geometry';
+import {NodeMaterial, uniform, texture, mix, color, uv, sin, time, positionLocal, normalLocal} from 'margoengine/shader';
 const tint = uniform('#ff8800', {name: 'tint'});                      // live: tint.value = '#00ff00' never recompiles
 const wave = sin(time.add(uv().y.mul(10))).mul(0.5).add(0.5);
 const map = await loadTexture('/rock.jpg', {wrapS: 'repeat', wrapT: 'repeat'});
@@ -19,9 +21,9 @@ createMesh(stage.engine, sphereGeometry(1, 64, 32), material);
 ```
 
 ```ts
-import {PostStack} from '@margoengine/post';
-import {Tonemap} from '@margoengine/tonemap';
-import {NodePass, inputColor, inputDepth, screenUV, smoothstep, mix, vec3, uniform} from '@margoengine/shader';
+import {PostStack} from 'margoengine/post';
+import {Tonemap} from 'margoengine/tonemap';
+import {NodePass, inputColor, inputDepth, screenUV, smoothstep, mix, vec3, uniform} from 'margoengine/shader';
 const strength = uniform(0.8);
 const vignette = new NodePass(inputColor().rgb.mul(smoothstep(0.8, 0.2, screenUV.sub(0.5).length()).mul(strength)));
 const fog = new NodePass(mix(inputColor().rgb, vec3(0.6, 0.7, 0.8), inputDepth().mul(-40).add(1).saturate()), {kind: 'hdr'});
@@ -29,7 +31,7 @@ PostStack.attach(stage.engine, [fog, new Tonemap(), vignette]);      // hdr pass
 ```
 
 ```ts
-import {ComputePass, NodeMaterial, storage, vec4, deltaTime} from '@margoengine/shader';
+import {ComputePass, NodeMaterial, storage, vec4, deltaTime} from 'margoengine/shader';
 const field = storage(new Float32Array(4 * 1024), 'vec4f');          // or storage(1024, 'vec4f') for zeros
 ComputePass.attach(stage.engine, 1024, i => field.store(i, field.element(i).add(vec4(0, deltaTime, 0, 0))));
 new NodeMaterial({colorNode: field.element(3).xyz});                 // any node reads it; field.buffer(device) hands it to other passes
@@ -38,7 +40,7 @@ new NodeMaterial({colorNode: field.element(3).xyz});                 // any node
 Cut-outs and slicing with `discard(condition, value)`, GPU counters and compaction with atomics:
 
 ```ts
-import {NodeMaterial, ComputePass, storage, discard, texture, materialColor, positionWorld, uniform, select, uint} from '@margoengine/shader';
+import {NodeMaterial, ComputePass, storage, discard, texture, materialColor, positionWorld, uniform, select, uint} from 'margoengine/shader';
 const slice = uniform(1.5);
 new NodeMaterial({colorNode: discard(texture(leaf).a.lessThan(0.5), texture(leaf))});          // alpha cut-out
 new NodeMaterial({colorNode: discard(positionWorld.y.greaterThan(slice), materialColor)});   // section the part at y = slice
@@ -71,10 +73,10 @@ Float uniforms (scalars, vectors and matrices) must stay finite as float32; othe
 
 ```ts
 import {createStage} from 'margoengine';
-import {createMesh} from '@margoengine/materials';
-import {planeGeometry} from '@margoengine/geometry';
-import {NodeMaterial, positionLocal, normalLocal, uniform} from '@margoengine/shader';
-import {simplex2, simplex3, perlin3, fbm, ridged, domainWarp} from '@margoengine/shader/noise';
+import {createMesh} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {NodeMaterial, positionLocal, normalLocal, uniform} from 'margoengine/shader';
+import {simplex2, simplex3, perlin3, fbm, ridged, domainWarp} from 'margoengine/shader/noise';
 const stage = await createStage('#app');
 const p = positionLocal.xy.mul(0.4);
 const height = ridged(q => simplex2(q, 42), p, {octaves: 5});                            // GPU terrain, seed 42
@@ -98,8 +100,8 @@ Worley on the GPU. Example: `examples/noise.html` (terrain with CPU-placed marke
 `computeReadback` runs a body once and resolves with a copy of a storage buffer:
 
 ```ts
-import {storage, uint} from '@margoengine/shader';
-import {computeReadback} from '@margoengine/shader/readback';
+import {storage, uint} from 'margoengine/shader';
+import {computeReadback} from 'margoengine/shader/readback';
 const source = storage(Uint32Array.from(cells), 'u32'), output = storage(cells.length, 'u32');
 const controller = new AbortController();
 const {data} = await computeReadback(stage.engine, cells.length, i => output.store(i, source.element(i).add(uint(1))), output, {
@@ -138,7 +140,7 @@ entry points, any named attributes per vertex or per instance, live uniforms and
 and depth.
 
 ```ts
-import {RawShaders, RawShaderMaterial, RawMesh} from '@margoengine/shader/raw';
+import {RawShaders, RawShaderMaterial, RawMesh} from 'margoengine/shader/raw';
 const raw = RawShaders.attach(stage.engine);
 const material = new RawShaderMaterial({
   vertexShader: `
@@ -211,9 +213,9 @@ Ready-made `NodePass` effects for a PostStack, each with live `uniforms` (`effec
 default (after tonemapping, on display colour); `{kind: 'hdr'}` runs one on linear light before the display effect.
 
 ```ts
-import {PostStack} from '@margoengine/post';
-import {Tonemap} from '@margoengine/tonemap';
-import {vignette, rgbShift} from '@margoengine/shader/effects';
+import {PostStack} from 'margoengine/post';
+import {Tonemap} from 'margoengine/tonemap';
+import {vignette, rgbShift} from 'margoengine/shader/effects';
 const look = vignette({darkness: 0.6}), shift = rgbShift({amount: 0.004});
 PostStack.attach(stage.engine, [new Tonemap(), shift, look]);
 look.uniforms.darkness.value = 0.9;                   // live

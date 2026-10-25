@@ -1,5 +1,7 @@
 # @margoengine/creative
 
+Install `npm i margoengine` and import `margoengine/creative` (or this package alone: `npm i @margoengine/creative`, imported as `@margoengine/creative`; the two are the same module).
+
 WebGPU grass, a planet renderer, a leaf/weather particle preset, toon shading, HDR targets and a grading post effect (fog, god rays, focus blur, ACES, grain) for Margo Engine.
 
 Each capability has one implementation: `GPUParticles` is a preset over `@margoengine/vfx`, bloom is `Bloom` from `@margoengine/post/bloom`, and sky backdrops are `Sky` from `@margoengine/sky`.
@@ -11,8 +13,8 @@ npm install @margoengine/core@1.0.0 @margoengine/creative@1.0.0
 ```
 
 ```ts
-import { Engine } from '@margoengine/core';
-import { GPUParticles } from '@margoengine/creative/particles';
+import { Engine } from 'margoengine/core';
+import { GPUParticles } from 'margoengine/creative/particles';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, { backend: 'webgpu' });
@@ -34,7 +36,7 @@ Use a feature subpath for a static import or an on-demand `import()`:
 | `@margoengine/creative/planet` | `Planet` and planet option types |
 
 ```ts
-const {Planet} = await import('@margoengine/creative/planet'); // loaded only when this line runs
+const {Planet} = await import('margoengine/creative/planet'); // loaded only when this line runs
 ```
 
 `GPUParticles({count, gravity, wind, size, curl, obstacles, sort, texture})` keeps `count` particles drifting
@@ -56,7 +58,7 @@ Attach a grass field directly to an existing Stage, without extending the facade
 
 ```ts
 import {createStage} from 'margoengine';
-import {GrassField} from '@margoengine/creative/grass';
+import {GrassField} from 'margoengine/creative/grass';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const meadow = GrassField.attach(stage.engine, {
@@ -94,7 +96,7 @@ The source checkout also exports `Planet` and `PlanetOptions`. Planet is an opt-
 
 ```ts
 import {createStage} from 'margoengine';
-import {Planet} from '@margoengine/creative/planet';
+import {Planet} from 'margoengine/creative/planet';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const earth = await Planet.attach(stage.engine, {

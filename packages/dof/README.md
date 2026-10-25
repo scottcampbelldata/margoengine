@@ -1,10 +1,12 @@
 # @margoengine/dof
 
+Install `npm i margoengine` and import `margoengine/dof` (or this package alone: `npm i @margoengine/dof`, imported as `@margoengine/dof`; the two are the same module).
+
 Optional WebGPU depth of field; core and stage are unchanged.
 
 ```ts
 import {createStage} from 'margoengine';
-import {DOF} from '@margoengine/dof';
+import {DOF} from 'margoengine/dof';
 const stage = await createStage('#viewport', {backend:'webgpu'});
 const dof = DOF.attach(stage.engine, {focalDistance:5, focalLength:0.05, aperture:2.8});
 dof.options.focalDistance = 3;

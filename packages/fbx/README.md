@@ -1,10 +1,12 @@
 # @margoengine/fbx
 
+Install `npm i margoengine` and import `margoengine/fbx` (or this package alone: `npm i @margoengine/fbx`, imported as `@margoengine/fbx`; the two are the same module).
+
 Native binary and ASCII FBX import through Margo's first-party glTF exporter and optional PBR/animation pipeline. Core, stage, and the animation runtime are unchanged.
 
 ```ts
-import {loadFBX} from '@margoengine/fbx';
-import {Animation} from '@margoengine/animation';
+import {loadFBX} from 'margoengine/fbx';
+import {Animation} from 'margoengine/animation';
 const model = await loadFBX(engine, '/assets/character.fbx');
 const animation = Animation.attach(model);
 animation.play('Walking');

@@ -1,10 +1,12 @@
 # @margoengine/tonemap
 
+Install `npm i margoengine` and import `margoengine/tonemap` (or this package alone: `npm i @margoengine/tonemap`, imported as `@margoengine/tonemap`; the two are the same module).
+
 Optional WebGPU HDR presentation and color grading, separate from core and stage.
 
 ```ts
 import {createStage} from 'margoengine';
-import {Tonemap} from '@margoengine/tonemap';
+import {Tonemap} from 'margoengine/tonemap';
 const stage = await createStage('#viewport', {backend:'webgpu'});
 const tonemap = Tonemap.attach(stage.engine, {curve:'neutral', exposure:0, contrast:1});
 tonemap.options.exposure = 1;

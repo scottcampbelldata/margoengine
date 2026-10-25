@@ -1,5 +1,7 @@
 # @margoengine/brep
 
+Install `npm i margoengine` and import `margoengine/brep` (or this package alone: `npm i @margoengine/brep`, imported as `@margoengine/brep`; the two are the same module).
+
 Margo's own CAD kernel, written from the published standards (ISO 10303-21 for the file, ISO 10303-41/42/43 and the
 AP203, AP214 and AP242 schemas for the data) with no third-party CAD code. It is replacing OpenCascade in stages
 (`docs/brep-kernel.md`): it reads a STEP file's structure (stage 1), evaluates its exact geometry (stage 2) and
@@ -11,7 +13,7 @@ npm install @margoengine/brep@1.0.0
 ```
 
 ```ts
-import { parseSTEP } from '@margoengine/brep';
+import { parseSTEP } from 'margoengine/brep';
 
 const model = parseSTEP(await (await fetch('/assembly.step')).arrayBuffer());
 console.log(model.header.schema, model.products.map((p) => p.name));
@@ -25,7 +27,7 @@ for (const instance of model.instances) {
 To mesh the bodies:
 
 ```ts
-import { parseSTEP, tessellateSTEP } from '@margoengine/brep';
+import { parseSTEP, tessellateSTEP } from 'margoengine/brep';
 
 const model = parseSTEP(bytes);
 const meshes = tessellateSTEP(model, { relativeDeflection: 0.001, angle: 0.5 });
@@ -41,7 +43,7 @@ To check the meshes against what the file says about itself (many AP242 and AP20
 centre, bounding box or facet count as CAx-IF validation properties):
 
 ```ts
-import { parseSTEP, tessellateSTEP, validateSTEP } from '@margoengine/brep';
+import { parseSTEP, tessellateSTEP, validateSTEP } from 'margoengine/brep';
 
 const model = parseSTEP(bytes);
 for (const check of validateSTEP(model, tessellateSTEP(model)))

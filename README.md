@@ -14,6 +14,15 @@ The implementation lives in `packages/`, with Vite and Next.js starters in `exam
 
 ## Use Margo Engine
 
+One install has everything: `npm i margoengine`. The root is the stage, and every package is a subpath
+(`margoengine/gltf-pro`, `margoengine/shadows`, `margoengine/physics`, `margoengine/react`); an app bundles only
+what it imports. [Which import do I need](docs/guides/imports.md) maps tasks to imports, and the [kits](docs/guides/kits.md)
+(`margoengine/game`, `/cad`, `/viz`, `/web`) put an app's usual set in one import line. To start an app:
+
+```sh
+npm create margo@latest my-game -- --template game   # or web, cad, viz, react, next
+```
+
 For the high-level API built from this checkout, see [`margoengine`](packages/margoengine/README.md). It mounts the canvas, enables camera controls and starts rendering:
 
 ```ts

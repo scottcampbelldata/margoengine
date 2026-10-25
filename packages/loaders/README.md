@@ -1,5 +1,7 @@
 # @margoengine/loaders
 
+Install `npm i margoengine` and import `margoengine/loaders` (or this package alone: `npm i @margoengine/loaders`, imported as `@margoengine/loaders`; the two are the same module).
+
 PLY, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own, plus three optional entries: TrueType fonts and extruded 3D text (`@margoengine/loaders/font`), SVG (`@margoengine/loaders/svg`) and OBJ meshes with their MTL materials and textures (`@margoengine/loaders/mtl`).
 
 Packages that read their own formats import the shared parts without the other parsers: `@margoengine/loaders/common`
@@ -9,8 +11,8 @@ the shared types) and `@margoengine/loaders/usd` (`parseUSDA`, `parseUSDZ`, `rea
 Build from source with `npm run build` in `packages/loaders`.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {load, parse3MF, parsePLY, createMeshes, toGeometry} from '@margoengine/loaders';
+import {Engine} from 'margoengine/core';
+import {load, parse3MF, parsePLY, createMeshes, toGeometry} from 'margoengine/loaders';
 
 const engine = await Engine.create(canvas);
 
@@ -102,8 +104,8 @@ Root `npm run modern:test:interop` checks round trips, units, transforms, visibi
 Install `@margoengine/gltf-pro` alongside loaders to use this entry. The decode/root entry does not import it.
 
 ```ts
-import {parseUSDZ} from '@margoengine/loaders';
-import {createPBRMeshes} from '@margoengine/loaders/render';
+import {parseUSDZ} from 'margoengine/loaders';
+import {createPBRMeshes} from 'margoengine/loaders/render';
 
 const source = await parseUSDZ(bytes);
 const model = createPBRMeshes(engine, source, {
@@ -151,7 +153,7 @@ Pass `fetch: manager.fetch` from `@margoengine/cache/manager`'s `LoadingManager`
 `createMeshes` gives core `PbrMaterial` colours only. For textures, `@margoengine/loaders/mtl` builds `@margoengine/materials` meshes (an optional peer dependency: install it to use this entry). One call fetches the .obj, its `mtllib` files next to it and every texture relative to its .mtl file, and draws each `usemtl` group with its material:
 
 ```ts
-import {loadOBJ} from '@margoengine/loaders/mtl';
+import {loadOBJ} from 'margoengine/loaders/mtl';
 
 const {mesh, warnings, dispose} = await loadOBJ(engine, 'https://example.com/models/chair.obj', {signal});
 // mesh is a materials mesh (a gltf-pro model): move it with mesh.root, add it to shadows, clustered, ...
@@ -161,8 +163,8 @@ dispose(); // destroys the mesh, its materials and its textures
 Or step by step, with your own bytes and texture loader:
 
 ```ts
-import {parseMTL, parseOBJ} from '@margoengine/loaders';
-import {createMTLMaterials, createOBJMesh} from '@margoengine/loaders/mtl';
+import {parseMTL, parseOBJ} from 'margoengine/loaders';
+import {createMTLMaterials, createOBJMesh} from 'margoengine/loaders/mtl';
 
 const obj = await parseOBJ(bytes, {resolve});
 const set = await createMTLMaterials(obj.materials, {baseUrl: objUrl, bump: 'normal'});
@@ -180,8 +182,8 @@ const mesh = createOBJMesh(engine, obj, set); // one mesh, one material slot per
 `@margoengine/loaders/font` reads TrueType fonts into an `OutlineFont` and extrudes text with `@margoengine/geometry`:
 
 ```ts
-import {parseTTF, textGeometry} from '@margoengine/loaders/font';
-import {createMesh, Material} from '@margoengine/materials';
+import {parseTTF, textGeometry} from 'margoengine/loaders/font';
+import {createMesh, Material} from 'margoengine/materials';
 
 const font = parseTTF(await (await fetch('/fonts/Inter.ttf')).arrayBuffer());
 const geometry = textGeometry('Margo\nEngine', {font, size: 1, depth: 0.2, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.01});
@@ -200,9 +202,9 @@ const shapes = font.generateShapes('Logo', 10, {letterSpacing: 0.05, align: 'cen
 `@margoengine/loaders/svg` turns SVG drawings into geometry `Shape`s and stroke triangles:
 
 ```ts
-import {parseSVG} from '@margoengine/loaders/svg';
-import {extrudeGeometry} from '@margoengine/geometry';
-import {SRGBToLinear} from '@margoengine/math/color';
+import {parseSVG} from 'margoengine/loaders/svg';
+import {extrudeGeometry} from 'margoengine/geometry';
+import {SRGBToLinear} from 'margoengine/math/color';
 
 const {paths, viewBox, warnings} = parseSVG(await (await fetch('/logo.svg')).text());
 for (const path of paths) {
@@ -242,9 +244,9 @@ for (const path of paths) {
 - `daeEngineLights(dae, {pose, intensity})` converts them: each color splits into a unit color and its brightest channel as the intensity (times `intensity`). The first directional light is `sun`, for core's `engine.scene.lighting` (`toward` the light); others are `directional`, for `@margoengine/clustered/directional`; ambient lights sum into `ambient` for core's `scene.lighting.ambient` and `radiance[3]`. Point and spot lights become `local` entries for `Clustered.setLights` (`position`, `range`, `color`, `intensity`, `decay`, and `direction`, `outerAngle`, `innerAngle` for spots). Approximations: `1 / (c + l d + q d^2)` keeps only its strongest set term (q: `decay` 2 and intensity / q; else l: `decay` 1; else c: `decay` 0 and unlimited `range`), matching far away and brighter close to the light; `range` ends where the light falls to 1/256; `outerAngle` is half the falloff angle (at most a hemisphere) and the `cos^e` falloff becomes a smooth edge starting where cos^e is 1/2 (`innerAngle`), a hard edge for e = 0.
 
 ```ts
-import {parseDAE, daeCameraView, daeEngineLights} from '@margoengine/loaders';
-import {Clustered} from '@margoengine/clustered';
-import type {EngineKernel} from '@margoengine/core';
+import {parseDAE, daeCameraView, daeEngineLights} from 'margoengine/loaders';
+import {Clustered} from 'margoengine/clustered';
+import type {EngineKernel} from 'margoengine/core';
 
 declare const engine: EngineKernel, text: string;
 const dae = parseDAE(text);
@@ -274,10 +276,10 @@ The result also has `skins`, `morphs`, `animations` and `clips`, all in the same
 To play a rig on the GPU, `bindDAESkin(dae, instance?)` gives the animation package's `Skeleton` and `Skin` their inputs: the joint nodes and their ancestors as bones (named by `daeNodeNames`, split into translation, rotation and scale), inverse bind matrices, and four joints and weights per vertex of `geometry`, the mesh in its bind shape. Bones live in scene space, so keep the mesh at the scene root. `daeKeyframeClip(dae, {clip, fps})` turns the channels into `createKeyframeClip` input: COLLADA channels move single transform elements, so each animated node is sampled at its key times and every `1 / fps` second (default 30) and split into translation, rotation and scale tracks (nodes that only STEP keep their keys, `discrete`); animated morphs become `weights` tracks.
 
 ```ts
-import {parseDAE, bindDAESkin, daeKeyframeClip, morphDAE, poseDAE} from '@margoengine/loaders';
-import {Skeleton, Skin, createKeyframeClip, applyKeyframeClip, segmentTime} from '@margoengine/animation';
-import {Material, createMesh} from '@margoengine/materials';
-import type {EngineKernel} from '@margoengine/core';
+import {parseDAE, bindDAESkin, daeKeyframeClip, morphDAE, poseDAE} from 'margoengine/loaders';
+import {Skeleton, Skin, createKeyframeClip, applyKeyframeClip, segmentTime} from 'margoengine/animation';
+import {Material, createMesh} from 'margoengine/materials';
+import type {EngineKernel} from 'margoengine/core';
 
 declare const engine: EngineKernel, text: string;
 const dae = parseDAE(text);

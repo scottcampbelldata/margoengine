@@ -1,5 +1,7 @@
 # @margoengine/geometry
 
+Install `npm i margoengine` and import `margoengine/geometry` (or this package alone: `npm i @margoengine/geometry`, imported as `@margoengine/geometry`; the two are the same module).
+
 `wireframePositions(data, offsetY = 0)` expands distinct triangle edges into a
 contiguous line-position stream with an optional vertical lift for terrain debug views.
 
@@ -14,8 +16,8 @@ Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, e
 Build from source with `npm run build` in `packages/geometry`.
 
 ```ts
-import {Engine, PbrMaterial} from '@margoengine/core';
-import {CatmullRomCurve3, Path, Shape, computeTangents, extrudeGeometry, sphereGeometry, toGeometry, tubeGeometry} from '@margoengine/geometry';
+import {Engine, PbrMaterial} from 'margoengine/core';
+import {CatmullRomCurve3, Path, Shape, computeTangents, extrudeGeometry, sphereGeometry, toGeometry, tubeGeometry} from 'margoengine/geometry';
 
 // Radius, width segments, height segments.
 const sphere = computeTangents(sphereGeometry(1, 48, 24));
@@ -65,7 +67,7 @@ the other helpers). They are the same functions as the root's.
 returns the same `GeometryData` with unit normals and UVs.
 
 ```ts
-import {convexGeometry, decalGeometry, parametricGeometry, roundedBoxGeometry} from '@margoengine/geometry/extras';
+import {convexGeometry, decalGeometry, parametricGeometry, roundedBoxGeometry} from 'margoengine/geometry/extras';
 
 // Width, height, depth, facets per rounded edge, radius. Six groups like boxGeometry; radius 0 is the plain box.
 const button = roundedBoxGeometry(2, 1, 0.4, 4, 0.15);

@@ -1,5 +1,7 @@
 # @margoengine/blender
 
+Install `npm i margoengine` and import `margoengine/blender` (or this package alone: `npm i @margoengine/blender`, imported as `@margoengine/blender`; the two are the same module).
+
 Optional offline Blender `.margo` assets for Margo WebGPU PBR. Core and the stage facade remain unchanged. Geometry is validated and uploaded from views of the original binary buffer without glTF accessor decoding or vertex repacking. Repeated meshes share CPU views and GPU geometry buffers; each object keeps its own transform/material uniforms.
 
 Nothing is on npm yet. Once the runtime packages are published, install the peer packages too:
@@ -11,8 +13,8 @@ npm install @margoengine/core @margoengine/gltf-pro @margoengine/blender
 Workspace runtime packages remain at `0.1.0`; this change packages the Blender add-on as `1.0.0` and does not publish npm packages.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {loadMargo,parseMargo,decodeMargo} from '@margoengine/blender';
+import {Engine} from 'margoengine/core';
+import {loadMargo,parseMargo,decodeMargo} from 'margoengine/blender';
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, {backend:'webgpu',capacity:4096});
 const model = await loadMargo(engine, '/scene.margo');
@@ -45,7 +47,7 @@ With the existing stage facade (available locally as `margoengine`), load into i
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadMargo} from '@margoengine/blender';
+import {loadMargo} from 'margoengine/blender';
 const stage = await createStage('#scene', {backend:'webgpu',capacity:4096});
 const model = await loadMargo(stage.engine, '/assets/machine_cell.margo');
 const b = model.bounds;

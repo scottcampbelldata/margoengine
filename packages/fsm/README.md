@@ -1,9 +1,11 @@
 # @margoengine/fsm
 
+Install `npm i margoengine` and import `margoengine/fsm` (or this package alone: `npm i @margoengine/fsm`, imported as `@margoengine/fsm`; the two are the same module).
+
 Hierarchical states preserve common ancestors during transitions, bubble events from leaf to root, and expose previous/state/blend for cross-fades.
 
 ```ts
-import {StateMachine} from '@margoengine/fsm';
+import {StateMachine} from 'margoengine/fsm';
 const machine = new StateMachine({game: {}, idle: {parent: 'game'}, run: {parent: 'game'}}, 'idle', {}, [
   {from: 'idle', to: 'run', event: 'move', duration: 0.2}
 ]);

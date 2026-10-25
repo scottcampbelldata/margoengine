@@ -1,5 +1,7 @@
 # @margoengine/terrain
 
+Install `npm i margoengine` and import `margoengine/terrain` (or this package alone: `npm i @margoengine/terrain`, imported as `@margoengine/terrain`; the two are the same module).
+
 `heightfieldGeometry(height, {size, origin?, resolution?})` generates a Y-up mesh
 with recomputed slope normals. `origin` is the minimum world XZ corner; it defaults
 to a centered rectangle, and mesh resolution defaults to 192 segments.
@@ -75,8 +77,8 @@ the repository root after building the packages.
 Optional geometry clipmaps with vertex texture height/normal sampling and 4–8 terrain layers. Fixed grids form a center and concentric rings. Uniform origins follow the camera, inner ring edges follow the finer grid, and outer-edge vertices collapse onto the next coarser lattice to close seams. Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting; normalized slope/height weights blend an sRGB texture array.
 
 ```ts
-import {EngineKernel} from '@margoengine/core';
-import {Terrain} from '@margoengine/terrain';
+import {EngineKernel} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const terrain = Terrain.attach(engine, {
   resolution:64, levels:6, cellSize:1, origin:[-50,-50], size:[100,100], heightScale:20,

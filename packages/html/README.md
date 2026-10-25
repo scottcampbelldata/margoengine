@@ -1,9 +1,11 @@
 # @margoengine/html
 
+Install `npm i margoengine` and import `margoengine/html` (or this package alone: `npm i @margoengine/html`, imported as `@margoengine/html`; the two are the same module).
+
 World-space DOM anchors reuse labels' projection, frustum clipping, inherited visibility and CSS3D placement. 2D anchors additionally use asynchronous scene-depth occlusion.
 
 ```ts
-import {HTML} from '@margoengine/html';
+import {HTML} from 'margoengine/html';
 const html = HTML.attach(engine);
 html.add(element, {mesh, offset: [0,1,0]});
 ```

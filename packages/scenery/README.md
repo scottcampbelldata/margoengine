@@ -1,5 +1,7 @@
 # @margoengine/scenery
 
+Install `npm i margoengine` and import `margoengine/scenery` (or this package alone: `npm i @margoengine/scenery`, imported as `@margoengine/scenery`; the two are the same module).
+
 A moonlit night sky for Margo Engine: twinkling stars, a phased moon with glow, and horizon haze. `SkyMoon` is a
 preset of `Sky` from `@margoengine/sky` (Margo's one sky implementation) held at midnight with its stylized
 `night` options. `stage.sky()` loads it.
@@ -13,11 +15,11 @@ npm install @margoengine/core @margoengine/scenery
 ```
 
 ```ts
-import {Engine} from '@margoengine/core';
+import {Engine} from 'margoengine/core';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
-const {SkyMoon} = await import('@margoengine/scenery/sky');
+const {SkyMoon} = await import('margoengine/scenery/sky');
 const sky = SkyMoon.attach(engine, {moonDirection: [0.45, 0, -1], moonPhase: 0.85});
 engine.start();
 sky.config.moonPhase = 0.2; // read every frame

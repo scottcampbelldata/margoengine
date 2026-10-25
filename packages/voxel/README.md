@@ -1,11 +1,13 @@
 # @margoengine/voxel
 
+Install `npm i margoengine` and import `margoengine/voxel` (or this package alone: `npm i @margoengine/voxel`, imported as `@margoengine/voxel`; the two are the same module).
+
 Voxel worlds for Minecraft-style games and voxel editors: a block-type registry, 32 x 32 x 32 palette chunks with a
 light byte per cell, and a chunked world with dirty tracking and change events. This release is the storage layer;
 meshing, rendering, light, queries, streaming and `.vox` files follow as subpath entries (plan: [DESIGN.md](DESIGN.md)).
 
 ```ts
-import { BlockTypes, VoxelWorld, VoxelChunk, blockState, blockId, blockData } from '@margoengine/voxel';
+import { BlockTypes, VoxelWorld, VoxelChunk, blockState, blockId, blockData } from 'margoengine/voxel';
 
 const blocks = new BlockTypes(); // id 0 is 'air'
 const stone = blocks.define('stone');
@@ -66,7 +68,7 @@ worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data)
   whole, not by a cost.
 
 ```ts
-import { connectStairs, doubleSlabState, slabState, stairState, waterlogState } from '@margoengine/voxel';
+import { connectStairs, doubleSlabState, slabState, stairState, waterlogState } from 'margoengine/voxel';
 
 const water = blocks.define('water', { shape: 'liquid', liquid: true, solid: false, layer: 'translucent' });
 const slab = blocks.define('stone_slab', { shape: 'slab', textures: stone, waterlog: water });
@@ -93,7 +95,7 @@ Ray casts for picking (`engine.pick` does not see voxels), swept boxes for anyth
 player body.
 
 ```ts
-import { raycastVoxels, sweepBox, VoxelCharacter } from '@margoengine/voxel/query';
+import { raycastVoxels, sweepBox, VoxelCharacter } from 'margoengine/voxel/query';
 
 const hit = raycastVoxels(world, eye, forward, 8); // {cell, normal, adjacent, point, distance, state} or null
 if (hit) world.setBlock(...hit.adjacent, stone); // place against the face; setBlock(...hit.cell, 0) breaks it
@@ -146,8 +148,8 @@ and length is checked against the bytes before it is read or allocated, a deflat
 largest possible chunk (262,148 bytes), and anything malformed throws a `RangeError` naming the problem.
 
 ```ts
-import { encodeChunk, decodeChunk, encodeBlockChanges, applyBlockChanges, EntityCodec } from '@margoengine/voxel/codec';
-import { IndexedDBChunkStore, MemoryChunkStore } from '@margoengine/voxel/stream';
+import { encodeChunk, decodeChunk, encodeBlockChanges, applyBlockChanges, EntityCodec } from 'margoengine/voxel/codec';
+import { IndexedDBChunkStore, MemoryChunkStore } from 'margoengine/voxel/stream';
 
 const bytes = await encodeChunk(chunk); // deflate-raw by default; {light: false}, {compress: false}
 world.addChunk(cx, cy, cz, await decodeChunk(bytes));
@@ -198,7 +200,7 @@ bytes each. 1,000 entities: 17,940 bytes in full, 1,796 when 30% moved.
 that pulls vertices from a storage buffer. It is pure and synchronous (phase 3 runs it in workers).
 
 ```ts
-import { meshChunk, meshInput, decodeQuad, blockMaterials, QUAD_WORDS } from '@margoengine/voxel/mesher';
+import { meshChunk, meshInput, decodeQuad, blockMaterials, QUAD_WORDS } from 'margoengine/voxel/mesher';
 
 for (const key of world.dirty) {
   const input = meshInput(world, key); // {chunk: packed, shell, light, blocks}; undefined for a removed chunk
@@ -256,7 +258,7 @@ in one layer.
 Sky and block light in the chunks' light bytes, by breadth-first flood fill on the main thread with a per-call budget.
 
 ```ts
-import { VoxelLighting, MAX_LIGHT } from '@margoengine/voxel/light';
+import { VoxelLighting, MAX_LIGHT } from 'margoengine/voxel/light';
 
 const lighting = VoxelLighting.attach(world, { budget: 4096 }); // also lights the chunks already loaded
 engine.onFrame(() => lighting.update()); // at most `budget` cells a call, so big changes spread over frames
@@ -292,7 +294,7 @@ removed over a 30-deep room (70,000 cells) about 5,400-7,600 cells/ms, put back 
 ## MagicaVoxel `.vox` files (`@margoengine/voxel/vox`)
 
 ```ts
-import { parseVox, writeVox, pasteVoxModel, readVoxRenderDictionaries } from '@margoengine/voxel/vox';
+import { parseVox, writeVox, pasteVoxModel, readVoxRenderDictionaries } from 'margoengine/voxel/vox';
 
 const scene = parseVox(new Uint8Array(await (await fetch('castle.vox')).arrayBuffer()));
 scene.models[0].size; // [x, y, z], MagicaVoxel z up; voxels: Uint8Array of x, y, z, palette index
@@ -353,8 +355,8 @@ Rapier colliders for the chunks near moving bodies, so mobs, item drops, debris 
 peer: only this entry uses it) with `@dimforge/rapier3d-compat` 0.17.1 or newer.
 
 ```ts
-import { Physics } from '@margoengine/physics';
-import { VoxelPhysics } from '@margoengine/voxel/physics';
+import { Physics } from 'margoengine/physics';
+import { VoxelPhysics } from 'margoengine/voxel/physics';
 
 const physics = Physics.attach(engine, { rapier: RAPIER });
 const voxels = new VoxelPhysics(physics, world, { radius: 1, budget: 2 });
@@ -449,7 +451,7 @@ queue. The worker script ships as `dist/workers/mesher.js`, a classic script wit
 that your bundler copies as an asset.
 
 ```ts
-import { VoxelMesher } from '@margoengine/voxel/mesher';
+import { VoxelMesher } from 'margoengine/voxel/mesher';
 
 const mesher = new VoxelMesher(); // {workers}: default half the logical cores minus one, 1 to 4
 for (const key of world.dirty) {
@@ -486,7 +488,7 @@ rest: from the store first, else from a generator running in workers. `@margoeng
 generator, `noiseTerrain`, and `serveVoxelGenerator` for your own.
 
 ```ts
-import { IndexedDBChunkStore, VoxelStreamer } from '@margoengine/voxel/stream';
+import { IndexedDBChunkStore, VoxelStreamer } from 'margoengine/voxel/stream';
 
 const streamer = VoxelStreamer.attach(engine, {
   world,
@@ -503,7 +505,7 @@ await streamer.dispose(); // saves, flushes the store, stops the workers; the ch
 
 ```ts
 // islands.worker.js, your module worker. Vite: import islands from './islands.worker.js?worker&url'
-import { serveVoxelGenerator } from '@margoengine/voxel/generate';
+import { serveVoxelGenerator } from 'margoengine/voxel/generate';
 
 serveVoxelGenerator((chunk, cx, cy, cz, { blocks }) => {
   const stone = blocks.find((type) => type.name === 'stone').id; // the world's BlockTypes table
@@ -578,8 +580,8 @@ transmission and texture layers up to 2,047, about 0.3 KB the lightmap hooks, an
 builder and shader are in `./bevel` (2,201 B) and baked light in `./lightmap` (2,506 B), so plain worlds do not load them.
 
 ```ts
-import { BlockTextures, VoxelRenderer } from '@margoengine/voxel/render';
-import { VoxelLighting } from '@margoengine/voxel/light';
+import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
+import { VoxelLighting } from 'margoengine/voxel/light';
 
 const textures = await BlockTextures.load(['stone.png', 'dirt.png', 'grass-top.png', 'grass-side.png']); // layers 0-3
 // or BlockTextures.fromAtlas(image, { size: 16 }), or new BlockTextures({ images: [canvas, bitmap, ...] })
@@ -660,9 +662,9 @@ machine not quiet): the render-distance-16 world above spawns in 0.63 s; its vox
 ### Lighting effects, day and night, water and lava
 
 ```ts
-import { Shadows } from '@margoengine/shadows';
-import { Clustered } from '@margoengine/clustered';
-import { EnvironmentLighting, Fog } from '@margoengine/environment';
+import { Shadows } from 'margoengine/shadows';
+import { Clustered } from 'margoengine/clustered';
+import { EnvironmentLighting, Fog } from 'margoengine/environment';
 
 const shadows = Shadows.attach(engine, { distance: 96, cascades: 2 });
 shadows.add(voxels, { static: true }); // casts (opaque and cutout) and receives; the map is redrawn only on change
@@ -720,7 +722,7 @@ quads (a chamfer has no lowered liquid top). Translucent chamfers and quads of a
 front, within the same distance and per-frame budget as quads. Without `bevel` nothing changes.
 
 ```ts
-import { voxelLightmap } from '@margoengine/voxel/lightmap';
+import { voxelLightmap } from 'margoengine/voxel/lightmap';
 
 voxels.lightmap = voxelLightmap({ texture, positions, uv: atlas.uv, scale: atlas.lightmapScale, radiometry: 'physical' });
 voxels.lightmap = undefined; // live lighting again

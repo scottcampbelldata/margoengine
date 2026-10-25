@@ -1,15 +1,17 @@
 # @margoengine/viewcube
 
+Install `npm i margoengine` and import `margoengine/viewcube` (or this package alone: `npm i @margoengine/viewcube`, imported as `@margoengine/viewcube`; the two are the same module).
+
 A CAD orientation cube for Margo Engine: a small cube in a corner of the view that turns with the camera. Click a face,
 edge or corner and the camera animates around its target to that view (Top, Front, Right, ..., the twelve edge views
 and the eight isometric corners), keeping the distance. With `@margoengine/cameras` it also toggles perspective and
 orthographic projection.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {CameraProjection} from '@margoengine/cameras';
-import {OrbitControls} from '@margoengine/controls';
-import {ViewCube} from '@margoengine/viewcube';
+import {Engine} from 'margoengine/core';
+import {CameraProjection} from 'margoengine/cameras';
+import {OrbitControls} from 'margoengine/controls';
+import {ViewCube} from 'margoengine/viewcube';
 
 const engine = await Engine.create(canvas);           // the canvas needs a parent element; the cube is placed in it
 const projection = CameraProjection.attach(engine, {mode: 'perspective'});

@@ -1,5 +1,7 @@
 # @margoengine/scatter
 
+Install `npm i margoengine` and import `margoengine/scatter` (or this package alone: `npm i @margoengine/scatter`, imported as `@margoengine/scatter`; the two are the same module).
+
 `randomPlacements(count, bounds, [minScale,maxScale], seed)` generates seeded
 rectangle candidates. `radialPlacements(centers, perCenter, [minDistance,maxDistance],
 [minScale,maxScale], seed)` generates candidates around world XZ anchors. Both
@@ -18,7 +20,7 @@ height samples, scales and exclusion data.
 WebGPU seeded, stratified placement with density, world-height and slope rules. Compute culling packs instances into three distance LOD rings, followed by indexed indirect draws.
 
 ```ts
-import {Scatter} from '@margoengine/scatter';
+import {Scatter} from 'margoengine/scatter';
 const scatter = Scatter.attach(engine, [nearGeometry, midGeometry, farGeometry], {
   count: 10000, area: [50,50], density: 0.8, maxSlope: 45, lod: [25,60,120], lodFade: 2
 });
@@ -94,7 +96,7 @@ For fixed placement with the engine's PBR lighting and PCSS shadows, use the
 separate `ScatterInstances` export:
 
 ```ts
-import {ScatterInstances} from '@margoengine/scatter';
+import {ScatterInstances} from 'margoengine/scatter';
 const instances = ScatterInstances.attach(engine, () => generateBatches());
 shadows.add(instances, {static: true});
 ```
@@ -117,8 +119,8 @@ For collision-free ground decoration, use one shared occupancy layout before
 packing transforms:
 
 ```ts
-import {PlacementLayout, Scatter} from '@margoengine/scatter';
-import {footprintRadius} from '@margoengine/geometry';
+import {PlacementLayout, Scatter} from 'margoengine/scatter';
+import {footprintRadius} from 'margoengine/geometry';
 const layout = new PlacementLayout(buildingFootprints);
 const rocks = layout.place(rockCandidates, footprintRadius(rockMesh));
 const ferns = layout.place(fernCandidates, footprintRadius(fernMesh));
@@ -144,7 +146,7 @@ XZ bounds; increase their clearance to reserve paths or porches.
 For a single population, `spacePlacements` also filters ground placements:
 
 ```ts
-import {spacePlacements} from '@margoengine/scatter';
+import {spacePlacements} from 'margoengine/scatter';
 const placements = spacePlacements(candidates, meshFootprintRadius, 0.3);
 ```
 

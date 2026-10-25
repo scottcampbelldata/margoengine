@@ -1,5 +1,7 @@
 # @margoengine/lines
 
+Install `npm i margoengine` and import `margoengine/lines` (or this package alone: `npm i @margoengine/lines`, imported as `@margoengine/lines`; the two are the same module).
+
 Fat lines with joins, caps, dashes and antialiasing, plus the debug helpers, as a WebGPU engine plugin for Margo Engine.
 
 Build from source with `npm run build` in `packages/lines`.
@@ -7,8 +9,8 @@ Build from source with `npm run build` in `packages/lines`.
 Exports `Line` and `LineMaterial`, and `GridHelper`, `PolarGridHelper`, `AxesHelper`, `BoxHelper`, `Box3Helper`, `ArrowHelper`, `CameraHelper`, `PlaneHelper`, `VertexNormalsHelper`, `SkeletonHelper` and the light helpers (`PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`, `RectAreaLightHelper`).
 
 ```ts
-import {Engine, box} from '@margoengine/core';
-import {Lines, Line, LineMaterial, GridHelper, AxesHelper, BoxHelper} from '@margoengine/lines';
+import {Engine, box} from 'margoengine/core';
+import {Lines, Line, LineMaterial, GridHelper, AxesHelper, BoxHelper} from 'margoengine/lines';
 
 const engine = await Engine.create(canvas);
 const lines = new Lines();
@@ -106,7 +108,7 @@ environment. `fog.enabled = false` clears it without recompiling; `lines.setFog(
 before.
 
 ```ts
-import {Fog} from '@margoengine/environment';
+import {Fog} from 'margoengine/environment';
 const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 40});
 lines.setFog(fog);
 ```
@@ -121,8 +123,8 @@ plane or a zero normal a TypeError. `clipIntersection: true` cuts only where the
 intersection) instead of any. Lines cast no shadows, so there is no `clipShadows`.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {Lines, Line, LineMaterial} from '@margoengine/lines';
+import {Engine} from 'margoengine/core';
+import {Lines, Line, LineMaterial} from 'margoengine/lines';
 
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
@@ -143,7 +145,7 @@ Lines does not import animation. Colours run from `parentColor` (default green) 
 `setColors(color, parentColor)` changes them. It draws over the scene (`onTop`) and is not fogged unless asked.
 
 ```ts
-import {Lines, SkeletonHelper} from '@margoengine/lines';
+import {Lines, SkeletonHelper} from 'margoengine/lines';
 const lines = Lines.attach(engine);
 // An @margoengine/animation Skeleton, placed by the skinned mesh it deforms:
 const bones = lines.add(new SkeletonHelper(skeleton, {mesh: model.primitives[0].node, width: 2}));

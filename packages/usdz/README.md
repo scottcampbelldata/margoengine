@@ -1,12 +1,14 @@
 # @margoengine/usdz
 
+Install `npm i margoengine` and import `margoengine/usdz` (or this package alone: `npm i @margoengine/usdz`, imported as `@margoengine/usdz`; the two are the same module).
+
 Optional static USDA, USDC and USDZ ingestion into `@margoengine/gltf-pro`. Core and the stage facade are unchanged. The package uses Margo's shared bounded USDA tokenizer and ZIP reader, plus its native Crate decoder for USDC. Building and using it requires no external renderer or CAD runtime.
 
 USDZ remains an ancillary format outside the six core launch packages and is not a core launch blocker.
 
 ```ts
-import {Engine} from '@margoengine/core';
-import {loadUSDZ} from '@margoengine/usdz';
+import {Engine} from 'margoengine/core';
+import {loadUSDZ} from 'margoengine/usdz';
 
 const canvas=document.createElement('canvas');document.body.append(canvas);
 const engine=await Engine.create(canvas,{backend:'webgpu',capacity:10000});

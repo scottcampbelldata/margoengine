@@ -1,11 +1,13 @@
 # Margo Engine Materials
 
+Install `npm i margoengine` and import `margoengine/materials` (or this package alone: `npm i @margoengine/materials`, imported as `@margoengine/materials`; the two are the same module).
+
 Optional glTF clearcoat, sheen, specular color, anisotropy, iridescence, transmission, IOR, volume, and TypeScript node materials through `@margoengine/gltf-pro`'s material extension slot. This package is separate from the frozen core and stage facade, and importing `gltf-pro` does not import materials.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from '@margoengine/gltf-pro';
-import * as materials from '@margoengine/materials';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import * as materials from 'margoengine/materials';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/glass.glb');
@@ -24,7 +26,7 @@ Normalized author configuration is also supported: `material.clearcoat` uses `fa
 For caller-provided resources, `clearcoat(options)` returns a `MaterialExtension` that can be assigned to `model.primitives[i].extension`:
 
 ```ts
-import {clearcoat} from '@margoengine/materials';
+import {clearcoat} from 'margoengine/materials';
 
 const extension = clearcoat({factor: 1, roughnessFactor: 0.05});
 ```
@@ -48,7 +50,7 @@ The four additional glTF lobes share group 3 with clearcoat and transmission.
 metadata creates an installation plan on an ordinary PBR primitive.
 
 ```ts
-import {materialLobes, clearcoat} from '@margoengine/materials';
+import {materialLobes, clearcoat} from 'margoengine/materials';
 
 primitive.extension = materialLobes({
   sheen: {colorFactor: [0.4, 0.1, 0.05], roughnessFactor: 0.5},
@@ -119,8 +121,8 @@ cascaded shadow map in this version. A clearcoat lobe on the same transmissive m
 For a caller-owned screen capture, `transmission(options)` returns an extension without installing a scene pass:
 
 ```ts
-import {transmission} from '@margoengine/materials';
-import type {PBRPrimitive} from '@margoengine/gltf-pro';
+import {transmission} from 'margoengine/materials';
+import type {PBRPrimitive} from 'margoengine/gltf-pro';
 
 function applyTransmission(primitive: PBRPrimitive, opaqueTexture: GPUTexture) {
   primitive.extension = transmission({
@@ -150,8 +152,8 @@ images (`@margoengine/lightmap` does).
 `nodeMaterial(graph, options?)` compiles a small TypeScript object graph into one `MaterialExtension`. Connect nodes by object reference, list at least the output in `graph.nodes`, then assign the result to a primitive or material's extension slot:
 
 ```ts
-import {nodeMaterial} from '@margoengine/materials';
-import type {PBRPrimitive} from '@margoengine/gltf-pro';
+import {nodeMaterial} from 'margoengine/materials';
+import type {PBRPrimitive} from 'margoengine/gltf-pro';
 
 function applyBlueMaterial(primitive: PBRPrimitive) {
   primitive.extension = nodeMaterial({nodes: [{
@@ -190,7 +192,7 @@ An output can reference nested nodes absent from the root list. All listed nodes
 `installNodeMaterial(model, graph)` installs one graph on the model and automatically registers a plugin. Graph transmission acquires the same shared opaque-color capture as glTF transmission and sets the affected primitives to the existing blend path:
 
 ```ts
-import {installNodeMaterial} from '@margoengine/materials';
+import {installNodeMaterial} from 'margoengine/materials';
 
 const installation = installNodeMaterial(model, {nodes: [{
   type: 'emit',
@@ -236,7 +238,7 @@ double-sided) are only core's.
 Everything is live on a `createMesh` mesh, from the next frame:
 
 ```ts
-import {PbrMaterial, PhongMaterial, createMesh, loadTexture} from '@margoengine/materials';
+import {PbrMaterial, PhongMaterial, createMesh, loadTexture} from 'margoengine/materials';
 
 const tiles = await loadTexture('/tiles.png', {magFilter: 'nearest'});
 const paint = new PhongMaterial({color: 0x84d6bd, map: tiles});
@@ -274,7 +276,7 @@ paint.dispose();
 contain two finite values per vertex. UV0 defaults to zero; omitted UV1 copies UV0. The vertex layout remains 80 bytes.
 
 ```ts
-import {Material, createMesh, loadTexture} from '@margoengine/materials';
+import {Material, createMesh, loadTexture} from 'margoengine/materials';
 
 const surface = new Material({aoMap: await loadTexture('/occlusion.png')});
 surface.setUVTransform({texCoord: 1}, 'aoMap');
@@ -353,7 +355,7 @@ of neighbouring tiles. Tiles whose frame did not change upload nothing. Reading 
 application's job.
 
 ```ts
-import {createMesh, tileAnimator} from '@margoengine/materials';
+import {createMesh, tileAnimator} from 'margoengine/materials';
 
 const water = {frames: [
   {duration: 0.2, uvs: [0, 0, 0.25, 0, 0.25, 0.25, 0, 0.25]},
@@ -421,7 +423,7 @@ Use `stencilWriteMask: 0` for comparison without changing stencil. These propert
 alone keeps its pipeline (the reference is set per draw).
 
 ```ts
-import {Material, StencilBuffer, createMesh} from '@margoengine/materials';
+import {Material, StencilBuffer, createMesh} from 'margoengine/materials';
 
 StencilBuffer.attach(engine);
 const mask = new Material({
@@ -674,7 +676,7 @@ the hemisphere ambient, an environment's diffuse light and light maps light it a
 rough dielectric. There is no highlight. Use `magFilter: 'nearest'` on a gradient for hard steps.
 
 ```ts
-import {ToonMaterial, Texture, createMesh, toonModel} from '@margoengine/materials';
+import {ToonMaterial, Texture, createMesh, toonModel} from 'margoengine/materials';
 const bands = new Texture({data: new Uint8Array([40, 40, 40, 255, 140, 140, 140, 255, 255, 255, 255, 255]), width: 3, height: 1},
   {colorSpace: 'linear', magFilter: 'nearest', minFilter: 'nearest', mipmaps: false});
 createMesh(engine, geometry, new ToonMaterial({color: '#e07040', gradientMap: bands}));
@@ -710,7 +712,7 @@ Other shadings refuse an envMap. A `CubeTexture`'s mips are box filtered per fac
 surfaces blur toward the face averages; an `Environment` is prefiltered. Bindings 188-190 of the material's group.
 
 ```ts
-import {CubeTexture, PbrMaterial, UnlitMaterial, loadCubeTexture} from '@margoengine/materials';
+import {CubeTexture, PbrMaterial, UnlitMaterial, loadCubeTexture} from 'margoengine/materials';
 const sky = await loadCubeTexture(['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg']);
 const chrome = new PbrMaterial({metalness: 1, roughness: 0.1, envMap: sky});
 const glass = new UnlitMaterial({envMap: sky, envMapMode: 'refraction', refractionRatio: 0.66, combine: 'mix'});
@@ -768,10 +770,10 @@ gives an item's world box. Every item is its own copy of its geometry: for many 
 0.13 ms as one batch (`npm run bench -- scaling --cases=shapes`). WebGPU only.
 
 ```ts
-import { Engine } from '@margoengine/core';
-import { Material } from '@margoengine/materials';
-import { BatchedMesh } from '@margoengine/materials/batched';
-import { boxGeometry, sphereGeometry } from '@margoengine/geometry';
+import { Engine } from 'margoengine/core';
+import { Material } from 'margoengine/materials';
+import { BatchedMesh } from 'margoengine/materials/batched';
+import { boxGeometry, sphereGeometry } from 'margoengine/geometry';
 
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
@@ -794,9 +796,9 @@ option. `clipIntersection: true` cuts away only what is behind every plane (thei
 point-light shadows and GPU picking ignore material planes.
 
 ```ts
-import { Engine } from '@margoengine/core';
-import { Material, createMesh } from '@margoengine/materials';
-import { torusKnotGeometry } from '@margoengine/geometry';
+import { Engine } from 'margoengine/core';
+import { Material, createMesh } from 'margoengine/materials';
+import { torusKnotGeometry } from 'margoengine/geometry';
 
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
@@ -817,7 +819,7 @@ slots decode sRGB unless `colorSpace` says otherwise. `new Texture(await decoder
 decoder's GPUTexture instead (one device, its own format). The decoder rejects KTX2 cube maps, arrays and UASTC HDR.
 
 ```ts
-import {KTX2Decoder} from '@margoengine/decoders';
+import {KTX2Decoder} from 'margoengine/decoders';
 const decoder = new KTX2Decoder({device: engine.gpu});
 const albedo = await loadKTX2Texture('/textures/albedo.ktx2', {decoder});
 createMesh(engine, geometry, new PbrMaterial({map: albedo}));

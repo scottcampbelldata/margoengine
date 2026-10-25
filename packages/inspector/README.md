@@ -1,5 +1,7 @@
 # @margoengine/inspector
 
+Install `npm i margoengine` and import `margoengine/inspector` (or this package alone: `npm i @margoengine/inspector`, imported as `@margoengine/inspector`; the two are the same module).
+
 Optional DOM inspector for core entities, including `stage.engine`. The hierarchy
 updates as entities are added, renamed, reparented or disposed. Arrow keys select,
 expand and collapse tree items. Selected entities expose visibility, local
@@ -7,8 +9,8 @@ transforms and their core PBR material's roughness and metallic values. Editing 
 shared material changes every mesh using it.
 
 ```ts
-import {Inspector} from '@margoengine/inspector';
-import type {EngineKernel} from '@margoengine/core';
+import {Inspector} from 'margoengine/inspector';
+import type {EngineKernel} from 'margoengine/core';
 function attach(engine: EngineKernel, effects: {exposure: number; bloom: number}) {
   return Inspector.attach(engine, {effects});
 }

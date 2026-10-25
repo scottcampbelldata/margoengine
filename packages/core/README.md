@@ -1,5 +1,7 @@
 # @margoengine/core
 
+Install `npm i margoengine` and import `margoengine/core` (or this package alone: `npm i @margoengine/core`, imported as `@margoengine/core`; the two are the same module).
+
 WebGPU rendering (WebGL2 fallback via the optional `@margoengine/webgl`), a deterministic Rust/Wasm transform kernel, instanced drawing of one directional GGX light on position and normal, reversed float depth, picking and CAD camera controls. Materials are color, roughness, and metalness.
 
 Desktop scenes use 4× MSAA with a canvas DPR cap of 1; phones use single-sample rendering with a DPR cap of 2. For slower desktop GPUs, set `globalThis.margoLow` to a pixel ratio (for example `1` or `1.5`) before creating the engine: scenes then render single-sampled with the DPR capped at that value, which on an Intel Arc 140V laptop cut the island demo's GPU frame from about 20 to 10 ms (particles off) compared with 4× MSAA. The site demos choose this light tier by measuring the GPU rather than guessing from the device. Color and depth targets follow canvas resize. Optional scene captures retain that sampling policy and expose single-sample resolved textures. CSS layout and HTML text retain native density.
@@ -13,7 +15,7 @@ Entity capacity grows on demand: `Engine.create(canvas, {capacity})` sets the in
 Package name: `@margoengine/core`, version `1.0.0`. Build from source or install a local tarball until the package is published.
 
 ```ts
-import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
+import { Camera, Engine, box, PbrMaterial } from 'margoengine/core';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, { backend: 'auto' });
@@ -96,8 +98,8 @@ canvas.style.imageRendering = 'pixelated'; // nearest-neighbour scaling, no blur
 Extension users can tint core's diffuse ambient independently of the directional light:
 
 ```ts
-import { Engine } from '@margoengine/core';
-import { engineRuntime } from '@margoengine/core/extension';
+import { Engine } from 'margoengine/core';
+import { engineRuntime } from 'margoengine/core/extension';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas);
@@ -117,7 +119,7 @@ For packages supplying `Lighting` directly to a renderer, omitted `ambient` mean
 Inside a frame pass, `context.draw` accepts independent rectangles:
 
 ```ts
-import type { FramePass } from '@margoengine/core/extension';
+import type { FramePass } from 'margoengine/core/extension';
 
 const leftView: FramePass = {
   name: 'left-view',
