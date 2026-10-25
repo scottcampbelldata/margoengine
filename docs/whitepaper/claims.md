@@ -165,8 +165,8 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 | deformed-shadows | `38d448e` -> `282e751` | `2cd81c1` |
 | environment-volumetric | `7c47a09` -> `366ebff` | `2cd81c1`: 70 root calls; 344/533 isolated calls |
 | oit-detached | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until a later change replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `57250a49`: 2,732 calls |
-| post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `de93aa5`: 12,431 calls (AgX normalised for older refs, see below) |
-| post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `de93aa5`: 37,182 calls |
+| post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `151aa744`: 12,431 calls (AgX normalised for older refs, see below) |
+| post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `151aa744`: 37,182 calls |
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `d41cdafd` |
 | terrain-ssr | `6c20076d` (before terrain's capture hook) -> the water/terrain SSR commit: terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
 | water-ssr | `6c20076d` (before water's capture hook) -> the water/terrain SSR commit: 2,762 calls in 3 stories | `57250a49` |
@@ -246,6 +246,12 @@ rewrite; call counts, descriptors, bindings and every buffer write are unchanged
   and a second octave offset of (23.7, -11.3, 5.9) at x2.11 (`2d28deb2`); every other story matches.
 - **water-ssr:** 4 calls in each of 3 stories: the ripple gradient noise is rewritten (PCG-hashed corner angles,
   explicit quintic-fade derivatives; `2d28deb2`).
+
+**post-ssr and post-ssr-models, advanced to `151aa744` on 2026-10-25 (FXAA rebuilt clean room):** `151aa744`
+changes only `packages/post/src/fxaa.ts`: the FXAA fragment shader is rewritten from Lottes' whitepaper (texel loads
+for the 3x3 neighbourhood, its own contrast thresholds 0.15/0.05, a 10-step end search with an end threshold of a
+quarter of the gradient, sub-pixel preset 0.75). Both stacks end in FXAA, so their FXAA shader module text differs
+from `de93aa5`; the call counts are unchanged and the full traces match `151aa744` at 12,431 and 37,182 calls.
 
 **taa-velocity, advanced to `d41cdafd` on 2026-10-21:** a hygiene pass converted TAA's bare Errors.
 The story records each thrown error as a `throw` entry (class and message), and exactly three per run changed: the
