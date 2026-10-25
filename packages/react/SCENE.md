@@ -116,6 +116,30 @@ with a positive `blend` crossfades over that many seconds through
 model instance owns its playback, and unmount removes its plugins. The native
 packages are optional peers; the React file imports only the components.
 
+More control, all optional:
+
+```tsx
+import {useRef} from 'react';
+import {Gltf, Animation, type AnimationHandle} from '@margoengine/react';
+
+function Character() {
+  const handle = useRef<AnimationHandle>(null);
+  return <Gltf src="/character.glb">
+    <Animation ref={handle} clip="Locomotion" speed={1.5}
+      blendTrees={{Locomotion: {parameter: 'speed', samples: [{value: 0, clip: 'Idle'}, {value: 1, clip: 'Run'}]}}}
+      parameters={{speed: 0.6}}
+      layers={[{clip: 'Wave', weight: 1, mask: [4, 5, 6]}]}
+      onReady={(h) => console.log(h.names)}/>
+  </Gltf>;
+}
+```
+
+`speed` multiplies the clock (default 1). `time` seeks whenever it changes. With `loop={false}` the clip holds its
+last pose and `onFinished(clip)` fires once; seeking back re-arms it. `blendTrees` adds named 1D or 2D blend states that
+`clip` can select, `parameters` drives them live, and `layers` adds additive clips on a node mask; these load
+`@margoengine/animator` just like `blend`. `ref` and `onReady` give an `AnimationHandle` with `names`, `clip`, `time`,
+`seek(time)` and the native `animation` and `animator`.
+
 Optional-peer import failures name the package to install. Component `onError`
 callbacks retain native error details, and Canvas displays initialization and
 resource failures in its alert.

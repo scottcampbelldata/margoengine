@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 2977169,
+  "total": 2978445,
   "history": [
     {
       "date": "2026-10-24",
@@ -157,6 +157,12 @@
       "date": "2026-10-25",
       "commit": "0cb97a2f",
       "reason": "react/physics: seven more collider components, body collision callbacks, useJoint and physics step hooks",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "f207bc42",
+      "reason": "react Animation: speed, time, onFinished, blend trees, parameters, layers and a ref handle",
       "grew": 1
     }
   ],
@@ -368,7 +374,7 @@
     "@margoengine/procedural/voronoi": 5026,
     "@margoengine/quality": 1879,
     "@margoengine/quality/warm": 1536,
-    "@margoengine/react": 23007,
+    "@margoengine/react": 24283,
     "@margoengine/react/kit": 11111,
     "@margoengine/react/physics": 5943,
     "@margoengine/react/post": 3770,

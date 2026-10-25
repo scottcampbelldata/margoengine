@@ -206,6 +206,8 @@ mock.module('@margoengine/animator', {
         this.options = options;
         this.name = 'animator:' + animation.model.name;
         this.state = options.initial;
+        this.parameters = { ...options.parameters };
+        this.layers = new Set();
         this.time = 0;
         this.transitions = [];
         this.steps = [];
@@ -215,6 +217,10 @@ mock.module('@margoengine/animator', {
       setup(engine) {
         this.engine = engine;
         this.animation.playing = false;
+      }
+      addLayer(layer) {
+        this.layers.add(layer);
+        return () => this.layers.delete(layer);
       }
       transition(state, duration) {
         this.state = state;
@@ -578,4 +584,103 @@ test('native transmission setup failures keep a usable procedural mesh and repor
   assert.deepEqual(errors, [failure, failure]);
   assert.ok(ref.current.geometry);
   assert.equal(models.at(-1).disposed, true);
+});
+
+test('Animation speed, time and the ref handle drive the native playback', async () => {
+  const ref = createRef(),
+    ready = [];
+  const view = render(
+    tree(animated('/handle.gltf', { ref, speed: 2, time: 0.25, onReady: (value) => ready.push(value) })),
+  );
+  await flush();
+  const animation = animations.at(-1);
+  assert.equal(animation.options.speed, 2);
+  assert.deepEqual(animation.seeks, [0.25]);
+  assert.deepEqual(ready, [ref.current]);
+  assert.deepEqual(ref.current.names, ['Walk', 'Run']);
+  assert.equal(ref.current.clip, 'Walk');
+  assert.equal(ref.current.animation, animation);
+  assert.equal(ref.current.animator, null);
+  assert.equal(ref.current.time, 0.25);
+  view.rerender(tree(animated('/handle.gltf', { ref, speed: 0.5, time: 0.75 })));
+  await flush();
+  assert.equal(animation.options.speed, 0.5);
+  assert.deepEqual(animation.seeks, [0.25, 0.75]);
+  ref.current.seek(0.1);
+  assert.equal(animation.time, 0.1);
+  assert.throws(() => ref.current.seek(-1), RangeError);
+});
+test('invalid speed and time report one RangeError instead of reaching the native clock', async () => {
+  const errors = [];
+  render(tree(animated('/bad-speed.gltf', { speed: -1, onError: (error) => errors.push(error) })));
+  await flush();
+  assert.ok(errors.length >= 1);
+  assert.ok(errors.every((error) => error instanceof RangeError && /speed/.test(error.message)));
+});
+test('onFinished fires once when a non-looping native clip reaches its end and again after a new run', async () => {
+  nativePlayback = true;
+  const finished = [];
+  const view = render(tree(animated('/finish.gltf', { loop: false, onFinished: (clip) => finished.push(clip) })));
+  await flush();
+  const animation = animations.at(-1);
+  animation.onPreUpdate(0.5);
+  assert.deepEqual(finished, []);
+  animation.onPreUpdate(0.6);
+  animation.onPreUpdate(0.5);
+  assert.deepEqual(finished, ['Walk'], 'once, not per frame');
+  view.rerender(tree(animated('/finish.gltf', { loop: false, time: 0, onFinished: (clip) => finished.push(clip) })));
+  await flush();
+  animation.playing = true;
+  animation.onPreUpdate(1.2);
+  assert.deepEqual(finished, ['Walk', 'Walk']);
+  view.rerender(tree(animated('/finish.gltf', { loop: true, onFinished: (clip) => finished.push(clip) })));
+  await flush();
+  animation.onPreUpdate(5);
+  assert.equal(finished.length, 2, 'looping clips never finish');
+});
+test('blend trees, parameters and additive layers load the Animator and follow prop changes', async () => {
+  const locomotion = {
+    parameter: 'speed',
+    samples: [
+      { value: 0, clip: 'Walk' },
+      { value: 1, clip: 'Run' },
+    ],
+  };
+  const props = (extra) => ({ clip: 'Locomotion', blendTrees: { Locomotion: locomotion }, ...extra });
+  const start = animators.length,
+    view = render(tree(animated('/tree.gltf', props({ parameters: { speed: 0.5 } }))));
+  await flush();
+  const animator = animators.at(-1);
+  assert.equal(animators.length, start + 1);
+  assert.equal(animator.options.initial, 'Locomotion');
+  assert.deepEqual(animator.options.states.Locomotion, locomotion);
+  assert.equal(animator.options.states.Walk, 'Walk');
+  assert.equal(animator.parameters.speed, 0.5);
+  const layer = { clip: 'Run', weight: 0.5, mask: [0] };
+  view.rerender(tree(animated('/tree.gltf', props({ parameters: { speed: 0.9 }, layers: [layer] }))));
+  await flush();
+  assert.equal(animators.at(-1), animator);
+  assert.equal(animator.parameters.speed, 0.9);
+  assert.equal(animator.layers.size, 1);
+  view.rerender(tree(animated('/tree.gltf', props({ parameters: { speed: 0.9 }, layers: [] }))));
+  await flush();
+  assert.equal(animator.layers.size, 0);
+  view.rerender(tree(animated('/tree.gltf', props({ clip: 'Run', parameters: { speed: 0.9 } }))));
+  await flush();
+  assert.deepEqual(animator.transitions.at(-1), { state: 'Run', duration: 0 });
+});
+test('a blend tree naming an unknown clip or a clip name is reported before the Animator sees it', async () => {
+  const errors = [];
+  render(
+    tree(
+      animated('/bad-tree.gltf', {
+        clip: 'Tree',
+        blendTrees: { Tree: { parameter: 'p', samples: [{ value: 0, clip: 'Missing' }] } },
+        onError: (error) => errors.push(error),
+      }),
+    ),
+  );
+  await flush();
+  assert.ok(errors.length >= 1);
+  assert.match(errors[0].message, /blend tree clips must exist in the model, fix "Tree" which uses "Missing"/);
 });

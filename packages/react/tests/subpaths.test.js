@@ -156,7 +156,8 @@ test('package exports preserve independent public runtime and declaration paths 
     else
       for (const name of names) assert.equal(base[name], subpathApi[name], name + ' is available from one root import');
   }
-  assert.equal(typeof base.Animation, 'function');
+  // Animation takes a ref, so it is a forwardRef component object, like Mesh.
+  assert.equal(typeof base.Animation.render, 'function');
   assert.equal(typeof base.MeshTransmissionMaterial, 'function');
 });
 
