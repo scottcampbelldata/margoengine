@@ -228,6 +228,7 @@ mock.module('@margoengine/selection', {
 mock.module('@margoengine/controls', {
   namedExports: {
     OrbitControls: class {
+      enabled = true;
       constructor(camera, canvas) {
         this.camera = camera;
         this.canvas = canvas;
@@ -235,6 +236,8 @@ mock.module('@margoengine/controls', {
         this.disposals = 0;
         controls.push(this);
       }
+      addEventListener() {}
+      removeEventListener() {}
       update(delta) {
         this.updates.push(delta);
       }

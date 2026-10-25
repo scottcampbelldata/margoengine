@@ -168,6 +168,34 @@
         "shader"
       ],
       "reason": "One declaration in packages/shared/fractal.d.ts, surfaced in each package that uses it (packages/shared is bundled source, not a package to re-export from)."
+    },
+    "OrbitControls": {
+      "packages": [
+        "controls",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/controls's OrbitControls class and @margoengine/react's <OrbitControls> JSX component that drives it from the Canvas frame loop with the same options. Decision in docs/conventions.md."
+    },
+    "MapControls": {
+      "packages": [
+        "controls",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/controls's MapControls class and @margoengine/react's <MapControls> JSX component that drives it from the Canvas frame loop with the same options. Decision in docs/conventions.md."
+    },
+    "ArcballControls": {
+      "packages": [
+        "controls",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/controls's ArcballControls class and @margoengine/react's <ArcballControls> JSX component that drives it from the Canvas frame loop with the same options. Decision in docs/conventions.md."
+    },
+    "Shadows": {
+      "packages": [
+        "react",
+        "shadows"
+      ],
+      "reason": "One thing, two forms: @margoengine/shadows's Shadows plugin and @margoengine/react's <Shadows> JSX component that turns on the Canvas shadows with the same options. Decision in docs/conventions.md."
     }
   }
 }

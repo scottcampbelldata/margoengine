@@ -238,27 +238,70 @@ mock.module('@margoengine/environment', {
       [4, 5, 6, 7, 8].map((binding) => ({ binding, resource: { version: environment.version } })),
   },
 });
+// The real controls' shape: defaults (a prop removed again restores them), events, profiles and key listening.
+class MockControls {
+  enabled = true;
+  autoRotate = false;
+  autoRotateSpeed = 2;
+  enableDamping = false;
+  minDistance = 0;
+  maxDistance = Infinity;
+  zoomToCursor = false;
+  listeners = new Map();
+  profile = null;
+  keyTarget = null;
+  addEventListener(type, listener) {
+    this.listeners.set(listener, type);
+  }
+  removeEventListener(_type, listener) {
+    this.listeners.delete(listener);
+  }
+  emit(type) {
+    for (const [listener, kind] of this.listeners) if (kind === type) listener({ type, target: this });
+  }
+  constructor(camera, canvas, options) {
+    this.camera = camera;
+    this.canvas = canvas;
+    this.options = options;
+    this.updates = [];
+    this.listener = () => {};
+    canvas.addEventListener('pointerdown', this.listener);
+    this.disposals = 0;
+    controls.push(this);
+  }
+  setProfile(profile) {
+    this.profile = profile;
+    this.zoomToCursor = profile.zoomToCursor;
+    return this;
+  }
+  listenToKeyEvents(target) {
+    this.keyTarget = target;
+  }
+  stopListenToKeyEvents() {
+    this.keyTarget = null;
+  }
+  update(delta) {
+    this.updates.push(delta);
+  }
+  dispose() {
+    if (this.disposals) return;
+    this.disposals++;
+    this.canvas.removeEventListener('pointerdown', this.listener);
+  }
+}
+const profiles = {
+  margo: { name: 'margo', zoomToCursor: false },
+  solidworks: { name: 'solidworks', zoomToCursor: true },
+};
 mock.module('@margoengine/controls', {
   namedExports: {
-    OrbitControls: class {
-      constructor(camera, canvas) {
-        this.camera = camera;
-        this.canvas = canvas;
-        this.updates = [];
-        this.listener = () => {};
-        canvas.addEventListener('pointerdown', this.listener);
-        this.disposals = 0;
-        controls.push(this);
-      }
-      update(delta) {
-        this.updates.push(delta);
-      }
-      dispose() {
-        if (this.disposals) return;
-        this.disposals++;
-        this.canvas.removeEventListener('pointerdown', this.listener);
-      }
+    OrbitControls: class OrbitControls extends MockControls {},
+    MapControls: class MapControls extends MockControls {},
+    ArcballControls: class ArcballControls extends MockControls {
+      minZoom = 0;
+      maxZoom = Infinity;
     },
+    PROFILES: profiles,
   },
 });
 mock.module('@margoengine/shadows', {
@@ -276,8 +319,10 @@ mock.module('@margoengine/shadows', {
         shadows.push(effect);
         return effect;
       }
-      add(source) {
+      options = {};
+      add(source, options = {}) {
         this.sources.add(source);
+        this.added = { source, options };
         return () => this.sources.delete(source);
       }
       bindings() {
@@ -299,9 +344,24 @@ mock.module('@margoengine/shadows', {
     },
   },
 });
-const { MargoCanvas, Model, Environment, OrbitControls, useMargo, useMargoStage, useFrame } = await import(
-  '../dist/index.js'
-);
+const {
+  MargoCanvas,
+  Model,
+  Environment,
+  OrbitControls,
+  MapControls,
+  CadControls,
+  ArcballControls,
+  Shadows,
+  Mesh,
+  useMargo,
+  useMargoStage,
+  useFrame,
+  useEngine,
+  useCamera,
+  useLoader,
+  useProgress,
+} = await import('../dist/index.js');
 test('SSR skips all optional resources and hooks reject missing canvas providers', () => {
   const result = renderToString(
     React.createElement(
@@ -687,6 +747,196 @@ test('OrbitControls retains listeners and its frame subscription across prop mut
   assert.equal(control.minDistance, 2);
   assert.equal(control.maxDistance, 8);
   view.rerender(tree(null));
+  // Released a microtask after the effect cleanup, so a StrictMode replay keeps the same controls.
+  await flush();
   assert.equal(control.disposals, 1);
   assert.equal(engine.callbacks.size, 1);
+});
+
+test('CadControls applies a CAD profile and key listening; a removed prop restores the default', async () => {
+  const ref = React.createRef();
+  const view = render(tree(React.createElement(CadControls, { ref, profile: 'solidworks', minDistance: 2 })));
+  await flush();
+  const control = controls.at(-1);
+  assert.equal(control.constructor.name, 'OrbitControls');
+  assert.equal(ref.current, control, 'the ref is the live controls');
+  assert.equal(control.profile.name, 'solidworks');
+  assert.equal(control.zoomToCursor, true, 'the profile sets its own bindings');
+  assert.equal(control.keyTarget, window, 'CAD keys listen on window by default');
+  assert.equal(control.minDistance, 2);
+  view.rerender(tree(React.createElement(CadControls, { ref, keyEvents: false })));
+  assert.equal(controls.at(-1), control, 'prop changes keep the same controls');
+  assert.equal(control.profile.name, 'margo', 'the default profile is margo');
+  assert.equal(control.keyTarget, null);
+  assert.equal(control.minDistance, 0, 'removing minDistance restores the default');
+  assert.throws(
+    () => view.rerender(tree(React.createElement(CadControls, { profile: 'unknown' }))),
+    /Unknown navigation profile 'unknown'; use one of margo,solidworks/,
+  );
+  view.unmount();
+  await flush();
+  assert.equal(control.disposals, 1);
+  assert.equal(ref.current, null, 'the ref is cleared when the controls are disposed');
+});
+
+test('MapControls and ArcballControls mount their own class, forward events and refuse bad distances', async () => {
+  const changes = [],
+    arcball = React.createRef();
+  const view = render(
+    tree([
+      React.createElement(MapControls, { key: 'map', enableDamping: true }),
+      React.createElement(ArcballControls, {
+        key: 'arcball',
+        ref: arcball,
+        minZoom: 0.5,
+        projection: null,
+        onChange: (event) => changes.push(event.type),
+      }),
+    ]),
+  );
+  await flush();
+  const map = controls.find((control) => control.constructor.name === 'MapControls'),
+    ball = controls.find((control) => control.constructor.name === 'ArcballControls');
+  assert.equal(map.enableDamping, true);
+  assert.equal(arcball.current, ball);
+  assert.deepEqual(ball.options, { projection: null });
+  assert.equal(ball.minZoom, 0.5);
+  ball.emit('change');
+  ball.emit('start');
+  assert.deepEqual(changes, ['change'], 'onChange hears only change events');
+  const engine = engines.at(-1);
+  for (const callback of engine.callbacks) callback(engine, 0.016);
+  assert.equal(ball.updates.length, 1, 'the Canvas frame loop drives the controls');
+  ball.enabled = false;
+  for (const callback of engine.callbacks) callback(engine, 0.016);
+  assert.equal(ball.updates.length, 1, 'disabled controls are not updated');
+  assert.throws(
+    () =>
+      view.rerender(
+        tree([
+          React.createElement(MapControls, { key: 'map' }),
+          React.createElement(ArcballControls, { key: 'arcball', projection: null, minDistance: 5, maxDistance: 1 }),
+        ]),
+      ),
+    /Invalid ArcballControls distances: need 0 <= minDistance <= maxDistance/,
+  );
+});
+
+test('Shadows turns the Canvas shadows on, applies live options and restores removed ones; Mesh casts on request', async () => {
+  const view = render(
+    tree([
+      React.createElement(Shadows, { key: 'shadows', distance: 40, bias: 0.001, filter: 'pcf' }),
+      React.createElement(Mesh, { key: 'mesh', castShadow: true }),
+    ]),
+  );
+  await flush();
+  const effect = shadows.at(-1),
+    engine = engines.at(-1),
+    [caster] = engine.meshes.values();
+  assert.equal(effect.owner, engine);
+  assert.deepEqual(effect.options, { distance: 40, bias: 0.001, filter: 'pcf' });
+  assert.equal(effect.added.source, caster);
+  assert.deepEqual(effect.added.options, { castShadow: true, receiveShadow: true });
+  view.rerender(
+    tree([
+      React.createElement(Shadows, { key: 'shadows', distance: 80 }),
+      React.createElement(Mesh, { key: 'mesh', castShadow: true }),
+    ]),
+  );
+  assert.equal(shadows.at(-1), effect, 'option changes keep the same shadows');
+  assert.deepEqual(effect.options, { distance: 80 }, 'removed props return to the defaults');
+  view.rerender(tree(React.createElement(Mesh, { key: 'mesh' })));
+  await flush();
+  assert.equal(effect.disposals, 1, 'shadows switch off with their last request');
+});
+
+test('useEngine and useCamera return the Canvas engine and camera', async () => {
+  let seen;
+  function Probe() {
+    seen = { engine: useEngine(), camera: useCamera() };
+    return null;
+  }
+  render(tree(React.createElement(Probe)));
+  await flush();
+  const engine = engines.at(-1);
+  assert.equal(seen.engine, engine);
+  assert.equal(seen.camera, engine.camera);
+});
+
+test('useLoader suspends, shares one load per URL, counts fetches in useProgress, and keeps a failure', async () => {
+  const fetches = [],
+    saved = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    fetches.push(String(url));
+    if (String(url).includes('broken')) return new Response('', { status: 500 });
+    return new Response('1 2 3', { headers: { 'content-length': '5' } });
+  };
+  let calls = 0,
+    progress;
+  const numbers = async (url, { fetch, signal, engine }) => {
+    calls++;
+    assert.equal(engine, engines.at(-1));
+    const response = await fetch(url, { signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+    return (await response.text()).split(' ').map(Number);
+  };
+  function Values({ url }) {
+    return React.createElement('output', null, useLoader(numbers, url).join(','));
+  }
+  function Bar() {
+    progress = useProgress();
+    return null;
+  }
+  class Boundary extends React.Component {
+    state = { error: null };
+    static getDerivedStateFromError(error) {
+      return { error };
+    }
+    render() {
+      return this.state.error ? React.createElement('p', null, String(this.state.error.message)) : this.props.children;
+    }
+  }
+  try {
+    const view = render(
+      React.createElement(
+        MargoCanvas,
+        null,
+        React.createElement(Bar),
+        React.createElement(
+          React.Suspense,
+          { fallback: React.createElement('span', null, 'loading') },
+          React.createElement(Values, { url: '/a.txt' }),
+          React.createElement(Values, { url: '/a.txt' }),
+        ),
+      ),
+    );
+    await flush();
+    await flush();
+    assert.equal(view.getAllByText('1,2,3').length, 2);
+    assert.equal(calls, 1, 'two components share one load');
+    assert.deepEqual(fetches, ['/a.txt']);
+    assert.equal(progress.active, false);
+    assert.equal(progress.total, 1);
+    assert.equal(progress.loaded, 1);
+    assert.equal(progress.progress, 100);
+    view.rerender(
+      React.createElement(
+        MargoCanvas,
+        null,
+        React.createElement(Bar),
+        React.createElement(
+          Boundary,
+          null,
+          React.createElement(React.Suspense, { fallback: null }, React.createElement(Values, { url: '/broken.txt' })),
+        ),
+      ),
+    );
+    await flush();
+    await flush();
+    assert.ok(view.getByText('HTTP 500 for /broken.txt'));
+    assert.deepEqual(progress.errors, ['/broken.txt']);
+    assert.equal(calls, 2, 'a failed load is not retried by every render');
+  } finally {
+    globalThis.fetch = saved;
+  }
 });

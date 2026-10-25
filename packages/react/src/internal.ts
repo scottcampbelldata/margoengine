@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type Ref } from 'react';
 import type { Engine, Mesh as EngineMesh, Vec3, Geometry } from '@margoengine/core/extension';
 import type { FrameCallback, Mesh as MeshHandle } from '@margoengine/core';
 import type { PBRModel, LightingEffect } from '@margoengine/gltf-pro';
@@ -112,4 +112,70 @@ export function useResourceEffect(
       });
     };
   }, keys);
+}
+
+/** Sends `error` to the component's `onError`, then to the engine's (the Canvas `onError` and alert). */
+export function report(scene: Scene, error: unknown, onError?: (error: unknown) => void): void {
+  try {
+    onError?.(error);
+  } finally {
+    scene.engine.onError(error);
+  }
+}
+/** Points a ref (callback or object) at `value`. */
+export function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
+  if (typeof ref === 'function') ref(value);
+  else if (ref) (ref as { current: T | null }).current = value;
+}
+export interface Created<A, T> {
+  /** Imports the optional package (wrap it in `optionalPeer`). */
+  load: () => Promise<A>;
+  /** Builds and attaches the object once the package and the engine are ready. */
+  create: (api: A) => T;
+  /** Detaches and frees it. */
+  dispose: (value: T) => void;
+  ref?: Ref<T>;
+  onError?: (error: unknown) => void;
+}
+/**
+ * One object from an optional package for the life of a component: loaded after the first commit, created once the
+ * package arrives, disposed when `keys` change or the component unmounts, and kept through StrictMode's effect
+ * replay. Returns it once created, else null. `ref` follows it directly, so it never holds a disposed object.
+ */
+export function useCreated<A, T>(scene: Scene, options: Created<A, T>, keys: readonly unknown[]): T | null {
+  const [value, setValue] = useState<T | null>(null),
+    latest = useRef(options);
+  latest.current = options;
+  useResourceEffect(() => {
+    let current: T | undefined,
+      closed = false;
+    latest.current
+      .load()
+      .then((api) => {
+        if (closed || scene.engine.disposed) return;
+        const made = latest.current.create(api);
+        current = made;
+        assignRef(latest.current.ref, made);
+        setValue(made);
+      })
+      .catch((error) => {
+        if (!closed && !scene.engine.disposed) report(scene, error, latest.current.onError);
+      });
+    return () => {
+      closed = true;
+      if (current === undefined) return;
+      const made = current;
+      current = undefined;
+      assignRef(latest.current.ref, null);
+      setValue((state) => (state === made ? null : state));
+      latest.current.dispose(made);
+    };
+  }, [scene.engine, ...keys]);
+  const { ref } = options;
+  useCommit(() => {
+    if (!ref || value === null) return;
+    assignRef(ref, value);
+    return () => assignRef(ref, null);
+  }, [ref, value]);
+  return value;
 }

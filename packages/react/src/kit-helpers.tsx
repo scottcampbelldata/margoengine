@@ -11,19 +11,23 @@ import type {
 import type { Sky as SkyPlugin, SkyOptions } from '@margoengine/sky';
 import type { Text as TextBlock, TextOptions, TextRenderer, Font } from '@margoengine/text';
 import { Mesh, PbrMaterial, type PbrMaterialProps, type MeshProps, type MeshRef } from './components.js';
-import { useScene, useMesh, useCommit, live, setGeometry, zero, type Scene, type Registry } from './internal.js';
+import {
+  useScene,
+  useMesh,
+  useCommit,
+  live,
+  setGeometry,
+  zero,
+  report,
+  type Scene,
+  type Registry,
+} from './internal.js';
+import { MeshShadows } from './shadows.js';
 import { ContactGround, type ContactGroundOptions } from './kit-contact.js';
 import { optionalPeer } from './optional.js';
 
 interface ErrorProps {
   onError?: (error: unknown) => void;
-}
-function report(scene: Scene, error: unknown, onError?: ErrorProps['onError']): void {
-  try {
-    onError?.(error);
-  } finally {
-    scene.engine.onError(error);
-  }
 }
 
 type GeometryApi = typeof import('@margoengine/geometry');
@@ -77,36 +81,6 @@ function ShapeGeometry({
 interface ShapeProps extends MeshProps, ErrorProps, PbrMaterialProps {
   castShadow?: boolean;
 }
-function ShapeCaster({ enabled, onError }: { enabled: boolean; onError?: ErrorProps['onError'] }) {
-  const scene = useScene(),
-    registry = useMesh(),
-    error = useRef(onError);
-  error.current = onError;
-  useEffect(() => {
-    if (enabled) return scene.requestShadows();
-  }, [scene.requestShadows, enabled]);
-  useEffect(() => {
-    if (!enabled || !scene.shadows) return;
-    let remove: (() => void) | undefined;
-    const attach = (mesh: EngineMesh) => {
-      remove?.();
-      remove = undefined;
-      try {
-        remove = scene.shadows!.add(mesh as unknown as MeshHandle);
-      } catch (cause) {
-        report(scene, cause, error.current);
-      }
-    };
-    registry.attachments.add(attach);
-    const mesh = live(registry);
-    if (mesh) attach(mesh);
-    return () => {
-      registry.attachments.delete(attach);
-      remove?.();
-    };
-  }, [registry, scene.shadows, enabled]);
-  return null;
-}
 export interface BoxProps extends ShapeProps {
   args?: Parameters<GeometryApi['boxGeometry']>;
 }
@@ -124,7 +98,7 @@ export const Box = forwardRef<MeshRef, BoxProps>(function Box(
     <Mesh {...props} ref={ref}>
       <ShapeGeometry kind="boxGeometry" args={args as number[]} onError={onError} />
       <PbrMaterial color={color} roughness={roughness} metalness={metalness} />
-      <ShapeCaster enabled={castShadow} onError={onError} />
+      <MeshShadows castShadow={castShadow} onError={onError} />
       {children}
     </Mesh>
   );
@@ -137,7 +111,7 @@ export const Sphere = forwardRef<MeshRef, SphereProps>(function Sphere(
     <Mesh {...props} ref={ref}>
       <ShapeGeometry kind="sphereGeometry" args={args as number[]} onError={onError} />
       <PbrMaterial color={color} roughness={roughness} metalness={metalness} />
-      <ShapeCaster enabled={castShadow} onError={onError} />
+      <MeshShadows castShadow={castShadow} onError={onError} />
       {children}
     </Mesh>
   );
@@ -150,7 +124,7 @@ export const Plane = forwardRef<MeshRef, PlaneProps>(function Plane(
     <Mesh {...props} ref={ref}>
       <ShapeGeometry kind="planeGeometry" args={args as number[]} onError={onError} />
       <PbrMaterial color={color} roughness={roughness} metalness={metalness} />
-      <ShapeCaster enabled={castShadow} onError={onError} />
+      <MeshShadows castShadow={castShadow} onError={onError} />
       {children}
     </Mesh>
   );

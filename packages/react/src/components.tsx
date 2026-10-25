@@ -27,9 +27,10 @@ import { preparePicking, releasePicking } from './picking.js';
 import type { PBRModel, LightingEffect } from '@margoengine/gltf-pro';
 import type { Shadows } from '@margoengine/shadows';
 import type { Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment';
-import type { OrbitControls as CameraControls } from '@margoengine/controls';
 import { createAssetCache, activateAssetCache, disposeAssetCache, environmentAsset, retainAsset } from './assets.js';
 export { preload } from './assets.js';
+import { MeshShadows } from './shadows.js';
+export { Shadows, type ShadowsProps } from './shadows.js';
 
 import {
   Context,
@@ -482,10 +483,24 @@ export interface MeshProps extends PointerHandlers {
   position?: Vec3;
   rotation?: Vec3;
   scale?: Vec3;
+  /** Draw into the Canvas shadow map (turns shadows on; needs WebGPU and `@margoengine/shadows`). Default false. */
+  castShadow?: boolean;
+  /** Darken where shadows fall. Default true. */
+  receiveShadow?: boolean;
   children?: ReactNode;
 }
 export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
-  { position = zero, rotation = zero, scale = one, children, onClick, onPointerOver, onPointerOut },
+  {
+    position = zero,
+    rotation = zero,
+    scale = one,
+    castShadow = false,
+    receiveShadow = true,
+    children,
+    onClick,
+    onPointerOver,
+    onPointerOut,
+  },
   ref,
 ) {
   const parentScene = useScene(),
@@ -562,7 +577,18 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
   // useFrame callback writing to it throws "Mesh disposed". This runs after the creation effect above.
   useImperativeHandle(ref, () => registry.current!, [registry, node]);
   const scene = useMemo(() => ({ ...parentScene, registry }), [parentScene, registry]);
-  return <Context.Provider value={scene}>{children}</Context.Provider>;
+  // The shadow helper gets a provider of its own, so `children` keep their exact structure (an element stays an
+  // element, an array an array) and never remount when shadows are switched.
+  return (
+    <>
+      {(castShadow || !receiveShadow) && (
+        <Context.Provider value={scene}>
+          <MeshShadows castShadow={castShadow} receiveShadow={receiveShadow} />
+        </Context.Provider>
+      )}
+      <Context.Provider value={scene}>{children}</Context.Provider>
+    </>
+  );
 });
 
 export function BoxGeometry({ args = one }: { args?: Vec3 }) {
@@ -931,63 +957,5 @@ export function Html({ children, position = zero, className, style, occlude = tr
     : null;
 }
 
-export interface OrbitControlsProps {
-  autoRotate?: boolean;
-  autoRotateSpeed?: number;
-  enableDamping?: boolean;
-  minDistance?: number;
-  maxDistance?: number;
-}
-export function OrbitControls({
-  autoRotate = false,
-  autoRotateSpeed = 2,
-  enableDamping = false,
-  minDistance = 0,
-  maxDistance = Infinity,
-}: OrbitControlsProps) {
-  const { engine, frames } = useScene(),
-    [controls, setControls] = useState<CameraControls | null>(null);
-  useEffect(() => {
-    let cancelled = false,
-      current: CameraControls | undefined,
-      unsubscribe: (() => void) | undefined;
-    optionalPeer('@margoengine/controls', () => import('@margoengine/controls'))
-      .then(({ OrbitControls }) => {
-        if (cancelled || engine.disposed) return;
-        current = new OrbitControls(engine.camera, engine.canvas);
-        try {
-          const instance = current,
-            frame: FrameCallback = (_, delta) => instance.update(delta);
-          frames.callbacks.add(frame);
-          unsubscribe = () => {
-            frames.callbacks.delete(frame);
-          };
-          setControls(current);
-        } catch (error) {
-          current.dispose();
-          throw error;
-        }
-      })
-      .catch((error) => {
-        if (!cancelled && !engine.disposed) engine.onError(error);
-      });
-    return () => {
-      cancelled = true;
-      unsubscribe?.();
-      current?.dispose();
-    };
-  }, [engine, frames]);
-  useCommit(() => {
-    if (!controls) return;
-    if (
-      !Number.isFinite(autoRotateSpeed) ||
-      !Number.isFinite(minDistance) ||
-      minDistance < 0 ||
-      maxDistance < minDistance ||
-      Number.isNaN(maxDistance)
-    )
-      throw new RangeError('Invalid orbit controls options');
-    Object.assign(controls, { autoRotate, autoRotateSpeed, enableDamping, minDistance, maxDistance });
-  }, [controls, autoRotate, autoRotateSpeed, enableDamping, minDistance, maxDistance]);
-  return null;
-}
+export { OrbitControls, MapControls, CadControls, ArcballControls } from './controls.js';
+export type { OrbitControlsProps, ArcballControlsProps, ControlEventProps, ProfileName } from './controls.js';

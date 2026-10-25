@@ -110,7 +110,44 @@ Wrap `Model` and file-backed `Environment` components in React `Suspense` to sho
 
 `Html` dynamically imports optional `@margoengine/html` and `react-dom` peers and projects React DOM children into a shared overlay. Nested inside a `Mesh` or `Group`, its `position` is a local offset; otherwise it is a world position. It accepts `className`, `style`, and an `occlude` boolean (true by default), and removes its label and overlay resources on unmount.
 
-`OrbitControls` binds the active camera and canvas, updates from one stable frame subscription, and removes its listeners and subscription on unmount. Props are `autoRotate` (false), `autoRotateSpeed` (2), `enableDamping` (false), `minDistance` (0) and `maxDistance` (Infinity). `shadows` opts the canvas into `@margoengine/shadows`; model casting and receiving are independently opt-in. PBR models, HDR IBL and shadows require WebGPU; legacy meshes and neutral studio lighting support the WebGL fallback.
+`OrbitControls`, `MapControls`, `CadControls` and `ArcballControls` bind the active camera and canvas, update from the Canvas frame loop (so `frameloop="demand"` and `invalidate()` move them too), and remove their listeners on unmount. Every public field of the controls is a prop (`enableDamping`, `dampingFactor`, `rotateSpeed`, `zoomToCursor`, `minDistance`, `maxPolarAngle`, ...); a prop removed again restores the controls' default. `target` sets the orbit point when it changes. `onChange`, `onStart` and `onEnd` receive the controls' events, and the ref is the live controls object. `CadControls` navigates like a CAD tool: `profile` is `'margo'` (default), `'solidworks'`, `'autocad'`, `'inventor'`, `'fusion'`, `'blender'`, `'maya'`, `'onshape'` or `'rhino'`, and keyboard shortcuts are on (`keyEvents={false}` turns them off). `OrbitControls` takes the same `profile` and `keyEvents` props.
+
+```tsx
+import { Canvas, CadControls, Shadows, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+
+export function Part({ onViewChanged }: { onViewChanged: () => void }) {
+  return (
+    <Canvas>
+      <CadControls profile="solidworks" enableDamping onEnd={onViewChanged} />
+      <Shadows distance={60} filter="pcf" />
+      <Mesh castShadow position={[0, 1, 0]}>
+        <BoxGeometry />
+        <PbrMaterial color="#84d6bd" />
+      </Mesh>
+    </Canvas>
+  );
+}
+```
+
+`<Shadows>` turns on the Canvas's cascaded shadows while it is mounted and sets their live options (`resolution`, `distance`, `lambda`, `lightSize`, `bias`, `normalBias`, `casterMargin`, `filter`, `bounds` or `frustum`). `<Mesh castShadow>` (and `receiveShadow={false}`) adds a mesh to them, like `Box`, `Sphere`, `Plane` and `Model`.
+
+Hooks: `useEngine()` returns the Canvas engine and `useCamera()` its camera. `useLoader(loader, url)` loads any file and suspends until it is ready: the loader is `(url, { engine, signal, fetch }) => Promise<T>`, each Canvas shares one load per loader and URL, and a failed load throws to the nearest error boundary (call `clearLoader(loader, url)` before retrying). `useProgress()` reports `{ active, loaded, total, progress, item, errors }` across `Model`, `Fbx`, `Environment` and `useLoader` loads for a loading bar; it needs the optional `@margoengine/cache`.
+
+```tsx
+import { load, parsePLY, type LoadedGeometry } from '@margoengine/loaders';
+import { useLoader, useProgress, type Loader } from '@margoengine/react';
+
+// Defined once, outside components: the loader is the cache key.
+const ply: Loader<LoadedGeometry> = (url, { fetch, signal }) => load(url, parsePLY, { fetch, signal });
+function ScanInfo() {
+  const scan = useLoader(ply, '/scan.ply');
+  return <p>{scan.positions.length / 3} points</p>;
+}
+function LoadingBar() {
+  const { active, progress } = useProgress();
+  return active ? <progress max={100} value={progress} /> : null;
+}
+``` `shadows` opts the canvas into `@margoengine/shadows`; model casting and receiving are independently opt-in. PBR models, HDR IBL and shadows require WebGPU; legacy meshes and neutral studio lighting support the WebGL fallback.
 
 `useFrame((engine, deltaSeconds) => ...)` updates meshes without React renders or re-subscribing when the callback changes. The canvas serializes initialization, disposes superseded engines, and disconnects ResizeObserver during cleanup. It handles StrictMode, HMR effect replacement, late initialization after unmount, and `capacity`/`backend` changes. Camera changes update the existing engine. Errors reach `onError` and an accessible alert.
 

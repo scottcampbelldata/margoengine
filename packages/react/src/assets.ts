@@ -1,6 +1,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { optionalPeer } from './optional.js';
 import type { GLTFAsset, GLTFImage, PBRModel } from '@margoengine/gltf-pro';
+import type { LoadingManager } from '@margoengine/cache/manager';
 
 type EnvironmentAPI = typeof import('@margoengine/environment');
 export interface ModelSource {
@@ -21,12 +22,92 @@ export interface AssetEntry<T> {
   abort: AbortController;
   users: number;
 }
+/** Loading progress of one Canvas, from `useProgress()`. Counts restart when loading resumes after being idle. */
+export interface LoadProgress {
+  /** Files are loading. */
+  active: boolean;
+  /** Files finished, failed ones included. */
+  loaded: number;
+  /** Files started. */
+  total: number;
+  /** 0 to 100: by bytes when every size is known, else by files. */
+  progress: number;
+  /** The file most recently started or advanced. */
+  item: string;
+  /** URLs that failed since loading last started. */
+  errors: readonly string[];
+}
+/** What a `useLoader` loader receives besides the URL. */
+export interface LoaderContext {
+  /** The Canvas engine. */
+  engine: EngineKernel;
+  /** Aborts when the last component using the URL unmounts, or the Canvas is torn down. */
+  signal: AbortSignal;
+  /** Fetch that counts toward `useProgress`; pass it as the loader's `fetch` option. */
+  fetch: typeof fetch;
+}
+/** Loads one URL for `useLoader`, for example `(url, { fetch, signal }) => load(url, parsePLY, { fetch, signal })`. */
+export type Loader<T> = (url: string, context: LoaderContext) => Promise<T>;
+interface Tracker {
+  manager: Promise<LoadingManager | null> | null;
+  state: LoadProgress;
+  listeners: Set<() => void>;
+}
 export interface AssetCache {
   engine: EngineKernel | null;
   disposed: boolean;
   models: Map<string, AssetEntry<ModelSource>>;
   fbx: Map<string, AssetEntry<ModelSource>>;
   environments: Map<string, AssetEntry<EnvironmentSource>>;
+  loaders: Map<Loader<unknown>, Map<string, AssetEntry<unknown>>>;
+  tracker: Tracker;
+}
+/** Progress before anything loads. */
+export const idleProgress: LoadProgress = { active: false, loaded: 0, total: 0, progress: 0, item: '', errors: [] };
+// One LoadingManager per Canvas, made on the first load. Without the optional @margoengine/cache the loads run on
+// plain fetch and useProgress stays idle: progress is a convenience, never a reason for a load to fail.
+function trackedFetch(cache: AssetCache): Promise<typeof fetch> {
+  const tracker = cache.tracker;
+  tracker.manager ??= import('@margoengine/cache/manager').then(
+    ({ LoadingManager }) => {
+      const publish = (state: Partial<LoadProgress>) => {
+        tracker.state = { ...tracker.state, ...state };
+        for (const listener of tracker.listeners) listener();
+      };
+      return new LoadingManager({
+        onStart: (url, loaded, total) =>
+          publish({
+            active: true,
+            item: url,
+            loaded,
+            total,
+            // A new batch starts with its first item.
+            errors: total === 1 ? [] : tracker.state.errors,
+            progress: (100 * loaded) / total,
+          }),
+        onProgress: (url, loaded, total, bytes) =>
+          publish({
+            item: url,
+            loaded,
+            total,
+            progress: bytes.total ? (100 * bytes.loaded) / bytes.total : (100 * loaded) / total,
+          }),
+        onLoad: () => publish({ active: false, progress: 100 }),
+        onError: (url) => publish({ errors: [...tracker.state.errors, url] }),
+      });
+    },
+    () => null,
+  );
+  return tracker.manager.then((manager) =>
+    manager ? manager.fetch : (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init),
+  );
+}
+/** Subscribes to a Canvas's loading progress, for `useSyncExternalStore`. */
+export function subscribeProgress(cache: AssetCache, listener: () => void): () => void {
+  cache.tracker.listeners.add(listener);
+  return () => {
+    cache.tracker.listeners.delete(listener);
+  };
 }
 const active = new Set<AssetCache>();
 export type ModelFormat = 'model' | 'fbx';
@@ -36,7 +117,15 @@ const queued = new Map<
   { src: string; kind: AssetKind; promise: Promise<void>; resolve: () => void; reject: (error: unknown) => void }
 >();
 export function createAssetCache(engine: EngineKernel | null): AssetCache {
-  return { engine, disposed: false, models: new Map(), fbx: new Map(), environments: new Map() };
+  return {
+    engine,
+    disposed: false,
+    models: new Map(),
+    fbx: new Map(),
+    environments: new Map(),
+    loaders: new Map(),
+    tracker: { manager: null, state: idleProgress, listeners: new Set() },
+  };
 }
 
 function closeImages(images: readonly GLTFImage[]): void {
@@ -79,8 +168,9 @@ async function loadModel(
     format === 'fbx'
       ? (await optionalPeer('@margoengine/fbx', () => import('@margoengine/fbx'))).loadFBX
       : api.loadGLTF;
+  const fetch = await trackedFetch(cache);
   signal.throwIfAborted();
-  const model = await loader(cache.engine!, src, { signal });
+  const model = await loader(cache.engine!, src, { signal, fetch });
   model.root.visible = false;
   let copies: GLTFImage[] = [];
   try {
@@ -166,10 +256,38 @@ export function environmentAsset(cache: AssetCache, src: string): AssetEntry<Env
   return entry(cache, cache.environments, src, async (signal) => {
     const api = await optionalPeer('@margoengine/environment', () => import('@margoengine/environment'));
     signal.throwIfAborted();
-    const image = await api.loadEnvironmentImage(src, { signal });
+    const fetch = await trackedFetch(cache);
+    signal.throwIfAborted();
+    const image = await api.loadEnvironmentImage(src, { signal, fetch });
     signal.throwIfAborted();
     return { api, image };
   });
+}
+/** The entry of `load` for `src` on this Canvas, started on first use, and the map it lives in. */
+export function loaderAsset<T>(
+  cache: AssetCache,
+  load: Loader<T>,
+  src: string,
+): [AssetEntry<T>, Map<string, AssetEntry<T>>] {
+  let map = cache.loaders.get(load as Loader<unknown>) as Map<string, AssetEntry<T>> | undefined;
+  if (!map) cache.loaders.set(load as Loader<unknown>, (map = new Map()) as Map<string, AssetEntry<unknown>>);
+  const asset = entry(cache, map, src, async (signal) => {
+    const fetch = await trackedFetch(cache);
+    signal.throwIfAborted();
+    return load(src, { engine: cache.engine!, signal, fetch });
+  });
+  return [asset, map];
+}
+export function clearLoaderCache<T>(load: Loader<T>, src?: string): void {
+  for (const cache of active) {
+    const map = cache.loaders.get(load as Loader<unknown>);
+    if (!map) continue;
+    for (const [key, asset] of map)
+      if (src === undefined || key === src) {
+        if (!asset.users) asset.abort.abort();
+        map.delete(key);
+      }
+  }
 }
 export function retainAsset<T>(
   cache: AssetCache,
@@ -245,6 +363,8 @@ export function disposeAssetCache(cache: AssetCache): void {
       if (asset.value) disposeSource(asset.value);
     }
   for (const asset of cache.environments.values()) asset.abort.abort();
+  for (const map of cache.loaders.values()) for (const asset of map.values()) asset.abort.abort();
+  cache.loaders.clear();
   cache.models.clear();
   cache.fbx.clear();
   cache.environments.clear();

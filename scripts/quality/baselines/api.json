@@ -1,7 +1,7 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 1838,
+  "total": 1835,
   "history": [
     {
       "date": "2026-10-24",
@@ -297,7 +297,7 @@
     "no-fix packages/procedural/src/noise.ts": 3,
     "no-fix packages/procedural/src/voronoi.ts": 2,
     "no-fix packages/react/src/animation.tsx": 5,
-    "no-fix packages/react/src/components.tsx": 3,
+    "no-fix packages/react/src/components.tsx": 2,
     "no-fix packages/react/src/kit-contact.ts": 1,
     "no-fix packages/react/src/kit-helpers.tsx": 3,
     "no-fix packages/react/src/model.tsx": 2,
@@ -644,8 +644,6 @@
     "tsdoc react MeshTransmissionMaterialProps": 1,
     "tsdoc react Model": 1,
     "tsdoc react ModelProps": 1,
-    "tsdoc react OrbitControls": 1,
-    "tsdoc react OrbitControlsProps": 1,
     "tsdoc react PbrMaterial": 1,
     "tsdoc react PbrMaterialProps": 1,
     "tsdoc react PhysicsProps": 1,
