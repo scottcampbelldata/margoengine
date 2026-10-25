@@ -1,6 +1,6 @@
 /** A parsed 3D LUT (2³ to 65³ samples), as `parseCube` returns it and `Tonemap.setLUT` takes it. */
 export interface CubeLUT {
-  /** Samples per axis (integer 2–65). Omitted on legacy manually constructed LUTs means 33. */
+  /** Samples per axis (integer 2-65). Omitted on legacy manually constructed LUTs means 33. */
   size?: number;
   /** size³ RGBA samples (A = 1), red index varying fastest; display-linear RGB applied after the curve and contrast. */
   data: Float32Array;
@@ -11,10 +11,10 @@ export interface CubeLUT {
 }
 
 /**
- * Parse a 2³–65³ RGB .cube LUT, red index varying fastest. Text is capped at 32 × 1024² JavaScript characters.
+ * Parse a 2³-65³ RGB .cube LUT, red index varying fastest. Text is capped at 32 × 1024² JavaScript characters.
  * @throws TypeError when `text` is not a string, or on a malformed TITLE, size or domain header, sample row, number or
  * sample count.
- * @throws RangeError when the text is over the cap, the size is outside 2–65, a value is not a finite Float32, or a
+ * @throws RangeError when the text is over the cap, the size is outside 2-65, a value is not a finite Float32, or a
  * domain minimum is not below its maximum.
  */
 export function parseCube(text: string): CubeLUT {
@@ -86,7 +86,7 @@ function number(token: string, subject: string): number {
 function dimension(size: unknown): number {
   if (typeof size !== 'number') throw new TypeError('LUT size must be a number; supply an integer from 2 through 65');
   if (!Number.isInteger(size) || size < 2 || size > 65)
-    throw new RangeError('LUT size is outside 2–65; supply an integer from 2 through 65');
+    throw new RangeError('LUT size is outside 2-65; supply an integer from 2 through 65');
   return size;
 }
 export function validateLUT(lut: CubeLUT): void {

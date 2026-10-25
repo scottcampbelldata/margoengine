@@ -11,7 +11,7 @@ export interface CubeFace {
   y: number;
   /** Cell z of the face's origin. */
   z: number;
-  /** 0–5: +x, −x, +y, −y, +z, −z. Faces 6 and 7 (crosses) are skipped. */
+  /** 0-5: +x, −x, +y, −y, +z, −z. Faces 6 and 7 (crosses) are skipped. */
   face: number;
   /** Width in cells along the face's u axis: z on x faces, x on y and z faces. */
   w: number;
@@ -19,11 +19,11 @@ export interface CubeFace {
   h: number;
   /** Id copied onto every vertex of this face. Default 0. */
   material?: number;
-  /** Mesher corner AO (0–3) in the corner order (0,0), (w,0), (w,h), (0,h). Default 3 (open). */
+  /** Mesher corner AO (0-3) in the corner order (0,0), (w,0), (w,h), (0,h). Default 3 (open). */
   ao?: readonly number[];
-  /** Mesher corner sky light (0–15), same order. Default 15. */
+  /** Mesher corner sky light (0-15), same order. Default 15. */
   sky?: readonly number[];
-  /** Mesher corner block light (0–15), same order. Default 0. */
+  /** Mesher corner block light (0-15), same order. Default 0. */
   block?: readonly number[];
 }
 

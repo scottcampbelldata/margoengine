@@ -35,9 +35,9 @@ export interface TonemapOptions {
    * Tonemap without options keeps the scene's look), 'agx', or 'acescg' (ACES fitted).
    */
   curve?: TonemapCurve;
-  /** Exposure in stops, -16–16; default 0. */
+  /** Exposure in stops, -16-16; default 0. */
   exposure?: number;
-  /** Linear contrast about 18% gray, 0–4; default 1. */
+  /** Linear contrast about 18% gray, 0-4; default 1. */
   contrast?: number;
   /** Core produces linear-sRGB. Use acescg only for an external AP1/D60 source. */
   inputColorSpace?: 'linear-srgb' | 'acescg';

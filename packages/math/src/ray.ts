@@ -147,7 +147,7 @@ export class Ray {
     }
     return far < 0 ? null : Math.max(near, 0);
   }
-  /** Möller–Trumbore. With `backfaceCulling`, triangles wound clockwise as seen from the ray are skipped. */
+  /** Möller-Trumbore. With `backfaceCulling`, triangles wound clockwise as seen from the ray are skipped. */
   intersectTriangle<T extends Vec3Like>(
     a: Vec3Like,
     b: Vec3Like,

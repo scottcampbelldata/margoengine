@@ -5,7 +5,7 @@ in [Second deep package pass](#second-deep-package-pass); the shared
 `test-results/deployed-bundle-integrity.json` is replaced on deployment and
 now verifies only the current build. Gzip figures in this note are from these checks. The current build measures core at 18,876 bytes gzip and core plus stage at 21,107 bytes gzip. The gate rejects 25,000 bytes or above.
 
-The user reported approximately 60 FPS on mobile and 19–30 FPS on multiple
+The user reported approximately 60 FPS on mobile and 19-30 FPS on multiple
 desktop PCs and browsers after loading-time work. The screenshot's measured
 browser callback cadence was 19 Hz. Callback cadence alone cannot distinguish
 GPU backpressure from browser/display pacing.
@@ -97,7 +97,7 @@ DNS: this desktop's configured DNS resolves `static.cloudflareinsights.com` to
 `test-results/desktop-demos-production.json`; no DNS settings or analytics features
 were changed. It does not prevent rendering or controls.
 
-Native callback cadence remains approximately 31–32 Hz on this Remote Desktop
+Native callback cadence remains approximately 31-32 Hz on this Remote Desktop
 host. The live retest does not establish the original slowdown's cause or FPS on
 the user's other PCs. Dynamic resolution or an adjustable density scalar would be
 separate work under the v1.0.0 core freeze.
@@ -195,8 +195,8 @@ Remote presentation can therefore limit the displayed FPS even when engine work
 fits a 60 Hz budget. This does not establish the cause of the originally
 reported regression on other PCs.
 
-The final hardware timing run measures CPU callback medians of 0.20–0.60 ms
-and GPU pass-span medians of 3.21–7.41 ms. All 12 sparse samples per demo are
+The final hardware timing run measures CPU callback medians of 0.20-0.60 ms
+and GPU pass-span medians of 3.21-7.41 ms. All 12 sparse samples per demo are
 below 16.67 ms in this run. The full table, timing-method limits and raw-report
 reference are in the current CPU/GPU measurements.
 These measurements retain native frame scheduling and do not establish sustained

@@ -327,4 +327,4 @@ test("Studio's presets and a generated corpus give its interpreter's exact resul
   assert.equal(hash.digest('hex'), CORPUS_SHA256);
 });
 const CORPUS_EVALUATED = 367;
-const CORPUS_SHA256 = '22f9c3b2d1709284ad0a8fb3297a38ad75390e55c21b480c7043732ff3f7900f';
+const CORPUS_SHA256 = 'a538316065e1c6e1305ce5bfa1453d433a252100dd9e95c4721ba2059c9abfb3';

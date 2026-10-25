@@ -408,7 +408,7 @@ class Triangulation {
   }
 
   /**
-   * Flips edge h, a→b between triangles (a, b, c) and (b, a, d), to c–d: the triangles become (a, d, c) and (b, c, d).
+   * Flips edge h, a→b between triangles (a, b, c) and (b, a, d), to c-d: the triangles become (a, d, c) and (b, c, d).
    * Afterwards h is a→d, next(h) d→c, prev(h) c→a; tw[h] (call it g) is b→c, next(g) c→d, prev(g) d→b.
    */
   flip(h: number): void {
@@ -496,7 +496,7 @@ class Triangulation {
     );
   }
 
-  /** Whether segments c–d and a–b cross at a point interior to both. */
+  /** Whether segments c-d and a-b cross at a point interior to both. */
   crosses(c: number, d: number, a: number, b: number): boolean {
     return (
       sign(this.orient(a, b, c)) * sign(this.orient(a, b, d)) < 0 &&
@@ -504,7 +504,7 @@ class Triangulation {
     );
   }
 
-  /** Makes segment a–b a chain of mesh edges (split at the vertices on it) and marks them as constraints. */
+  /** Makes segment a-b a chain of mesh edges (split at the vertices on it) and marks them as constraints. */
   constrain(a: number, b: number, seeds: number[]): void {
     const { tw, fl } = this;
     for (let guard = this.real; a !== b; guard--) {
@@ -520,12 +520,12 @@ class Triangulation {
   }
 
   /**
-   * Makes a–v an edge, where v is b or the vertex nearest a on segment a–b, by flipping the edges the segment crosses
+   * Makes a-v an edge, where v is b or the vertex nearest a on segment a-b, by flipping the edges the segment crosses
    * (Sloan 1993); returns v. Every flipped edge's quadrilateral goes on `seeds` for the final Lawson pass.
    */
   recover(a: number, b: number, seeds: number[]): number {
     const { tv, tw, fl } = this;
-    // Around a: the edge to b, an edge along a–b, or the triangle segment a–b leaves a through.
+    // Around a: the edge to b, an edge along a-b, or the triangle segment a-b leaves a through.
     const first = this.vh[a];
     let e = first,
       h = -1;

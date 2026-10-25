@@ -104,7 +104,7 @@ export interface RectAreaLight {
   position: Vec3;
   /** The side the light faces (its normal), world space; need not be unit length. */
   direction: Vec3;
-  /** Size along the light's right axis, `direction Ã— up` (world units). */
+  /** Size along the light's right axis, `direction × up` (world units). */
   width: number;
   /** Size along the light's up axis, `up` made perpendicular to `direction` (world units). */
   height: number;
@@ -112,7 +112,7 @@ export interface RectAreaLight {
   up?: Vec3;
   /** Linear RGB, multiplied by `intensity` (default [1, 1, 1]). */
   color?: Vec3;
-  /** Emitted radiance (luminance; default 1). A light of area A matches a clustered point light of intensity `intensity Ã— A` facing the surface. */
+  /** Emitted radiance (luminance; default 1). A light of area A matches a clustered point light of intensity `intensity × A` facing the surface. */
   intensity?: number;
   /** Emit from both faces (default false). */
   twoSided?: boolean;

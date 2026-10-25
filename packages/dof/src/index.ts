@@ -33,7 +33,7 @@ export interface DOFOptions {
   focalLength?: number;
   /** Lens f-number, default 2.8. */
   aperture?: number;
-  /** Maximum disk radius in pixels, 1–32. Default 16. */
+  /** Maximum disk radius in pixels, 1-32. Default 16. */
   maxRadius?: number;
   /** False skips the blur and presents the scene sharp. Default true; also settable as `dof.enabled`. */
   enabled?: boolean;

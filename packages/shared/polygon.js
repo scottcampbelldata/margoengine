@@ -61,7 +61,7 @@ function polygonRings(contour, holes = [], { allowTouch = false, workCounter } =
   let count = 0;
   const rings = [contour, ...holes].map((ring) => {
     if (!Array.isArray(ring) || ring.length < 3 || (count += ring.length) > 4096)
-      throw new RangeError('Polygon requires 3–4096 total contour vertices');
+      throw new RangeError('Polygon requires 3-4096 total contour vertices');
     chargeContourWork(workCounter, ring.length * 3);
     const p = ring.map((v) => {
       finiteVector(v, 2, 'Polygon vertex');

@@ -115,8 +115,8 @@ test('workshop sparklines reuse SVG points while preserving rolling values, labe
     }
   }
   assert.match(toggle.textContent, /63 FPS · JS 47 MB/);
-  assert.match(f.doc.body.textContent, /GPU passes 1\.00–4\.00 ms/);
-  assert.match(f.doc.body.textContent, /JS heap 46\.9 MB\n35\.0–46\.9 MB · rolling 60 s/);
+  assert.match(f.doc.body.textContent, /GPU passes 1\.00-4\.00 ms/);
+  assert.match(f.doc.body.textContent, /JS heap 46\.9 MB\n35\.0-46\.9 MB · rolling 60 s/);
   toggle.click();
   assert.equal(toggle.getAttribute('aria-expanded'), 'false');
 });

@@ -30,7 +30,7 @@ export interface ScatterBatch {
   emissive?: readonly [number, number, number];
   /** Rooted wind bend `[directionX, directionZ, strength]`. Omitted: static. */
   wind?: ScatterWind;
-  /** Branch/foliage ripple, 0–1, layered over rooted wind. Defaults to 0. */
+  /** Branch/foliage ripple, 0-1, layered over rooted wind. Defaults to 0. */
   windDetail?: number;
   /**
    * Sunlight seen through thin foliage, 0-1 (default 0): wrapped back-light translucency after Barre-Brisebois and

@@ -231,9 +231,9 @@ export function createConstraintDemo() {
       nextGap = settings.minClearance ?? minClearance,
       nextDamping = settings.damping ?? damping;
     if (nextScene !== 'torso' && nextScene !== 'mixed') throw new RangeError('Unknown scene');
-    if (!Number.isFinite(nextGap) || nextGap < 0 || nextGap > 0.03) throw new RangeError('Gap must be 0–30 mm');
+    if (!Number.isFinite(nextGap) || nextGap < 0 || nextGap > 0.03) throw new RangeError('Gap must be 0-30 mm');
     if (!Number.isFinite(nextDamping) || nextDamping < 0 || nextDamping > 0.3)
-      throw new RangeError('Damping must be 0–0.3 seconds');
+      throw new RangeError('Damping must be 0-0.3 seconds');
     scene = nextScene;
     minClearance = nextGap;
     damping = nextDamping;

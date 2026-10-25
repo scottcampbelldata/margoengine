@@ -8,7 +8,7 @@ The FBX suite passed 53 tests on 2026-10-16 under Node 24, including the checked
 
 Corrections that the code made to this design:
 
-- Version 7500 widens node end offset, property count, and property-list length to `uint64`. Array count, encoding, and payload length stay `uint32` in every supported version. The null record is 25 bytes from 7500 and 13 bytes before that. The binary prefix is 23 bytes, and the version is the `uint32` at bytes 23–26.
+- Version 7500 widens node end offset, property count, and property-list length to `uint64`. Array count, encoding, and payload length stay `uint32` in every supported version. The null record is 25 bytes from 7500 and 13 bytes before that. The binary prefix is 23 bytes, and the version is the `uint32` at bytes 23-26.
 - All six fixed-axis Euler orders are accepted. Spherical rotation order throws. `InheritType` other than 0 still throws.
 - Concave polygons are triangulated with a work bound. A self-intersecting polygon throws. The first draft's triangle fan is not the implementation.
 - Cubic, mixed, and constant-next curves throw. They are not relabeled `LINEAR`. `LINEAR` transform tracks are adaptively baked, including full turns and moving pivots.
@@ -116,11 +116,11 @@ The parser accepts binary versions 7400 through 7700, and the ASCII form used by
 
 ### Binary header and nodes
 
-The binary prefix is 23 bytes, including the `Kaydara FBX Binary` magic and the `0x1A` byte. The little-endian `uint32` version occupies bytes 23–26. The triangle fixture writes version 7400 there.
+The binary prefix is 23 bytes, including the `Kaydara FBX Binary` magic and the `0x1A` byte. The little-endian `uint32` version occupies bytes 23-26. The triangle fixture writes version 7400 there.
 
 A node is:
 
-| Field | 7400–7499 | 7500+ |
+| Field | 7400-7499 | 7500+ |
 | --- | --- | --- |
 | End offset | `uint32` | `uint64` |
 | Property count | `uint32` | `uint64` |

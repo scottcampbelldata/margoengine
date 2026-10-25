@@ -1,4 +1,4 @@
-# Local release stress validation — 11 October 2026
+# Local release stress validation: 11 October 2026
 
 The production stress harness passed these completed campaigns on this Windows host. These are measurements of the current uncommitted workspace based on Git revision `9b98d25e25163d48d02de1c0eb8e8c1b9be4ab5a`; they are not clean-commit release certification. Repeat the release gate from a clean checkout before publishing. Commands and coverage are in [stress-testing.md](stress-testing.md).
 
@@ -13,7 +13,7 @@ The production stress harness passed these completed campaigns on this Windows h
 
 Physical campaigns verified non-fallback NVIDIA/AMD adapters. SwiftShader is software WebGPU validation; its WebGL scenarios used the host's available renderer. Intentional loss/failure scenarios assert their expected diagnostics and rollback, so the pass count means the specified failure contract held, not that no failures were injected. Failed initialization/recovery and context-loss scenarios intentionally submit fewer frames. Do not pool these different workloads into one universal reliability percentage.
 
-The main matrix covered all 11 scenarios, with 45–46 profiles each. It explicitly retired all **131,877 tracked GPU buffers/textures**, with zero tracked buffers/textures/devices remaining after each scenario. Forty-five same-page soaks stayed below the 8 MiB retained-heap regression threshold; maximum measured growth was 551,572 bytes across ten lifecycles. The separate 100-cycle Chrome soak grew by 642,976 bytes. Heap samples include instrumentation and JIT/browser caches; these results do not establish zero allocation or zero memory leaks.
+The main matrix covered all 11 scenarios, with 45-46 profiles each. It explicitly retired all **131,877 tracked GPU buffers/textures**, with zero tracked buffers/textures/devices remaining after each scenario. Forty-five same-page soaks stayed below the 8 MiB retained-heap regression threshold; maximum measured growth was 551,572 bytes across ten lifecycles. The separate 100-cycle Chrome soak grew by 642,976 bytes. Heap samples include instrumentation and JIT/browser caches; these results do not establish zero allocation or zero memory leaks.
 
 The 3,000,000-splat AMD fixture completed all 600 frames, recovered its device and destroyed all owned tracked resources. Instrumented completed-frame median/p95 was **181.4 / 210.9 ms**. This is a substantial workload on integrated graphics and is not a 60 FPS or physical-presentation result. Campaigns on the two physical GPUs overlapped, so the timings also include host contention.
 

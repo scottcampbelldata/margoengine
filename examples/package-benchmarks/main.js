@@ -233,9 +233,9 @@ function timestampSupport() {
 function refresh() {
   element('fps-placeholder').hidden = !!stats?.sampleCount;
   if (stats) stats.element.hidden = !stats.sampleCount;
-  element('workload-cpu').textContent = sampleCount ? `${(cpuTotal / sampleCount).toFixed(3)} ms` : '—';
-  element('render-cpu').textContent = sampleCount ? `${(renderTotal / sampleCount).toFixed(3)} ms` : '—';
-  element('visible').textContent = engine ? engine.stats.visible.toLocaleString() : '—';
+  element('workload-cpu').textContent = sampleCount ? `${(cpuTotal / sampleCount).toFixed(3)} ms` : '-';
+  element('render-cpu').textContent = sampleCount ? `${(renderTotal / sampleCount).toFixed(3)} ms` : '-';
+  element('visible').textContent = engine ? engine.stats.visible.toLocaleString() : '-';
   element('backend').textContent = engine
     ? `${engine.backend} · ${canvas.width} × ${canvas.height} backing pixels`
     : 'Waiting for the engine';

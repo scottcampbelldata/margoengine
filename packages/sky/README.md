@@ -55,8 +55,8 @@ readable through HDR bloom. Moon appearance follows the optional moon lighting
 described below; caller exposure and bloom strength still affect its glow.
 
 Set `clouds: {coverage: 0.45, speed: 8, height: 1500}` for an optional animated
-procedural cloud layer. Coverage is 0–1, speed is signed world meters per second
-along a fixed XZ wind direction, and height is 100–10,000 world meters. Defaults
+procedural cloud layer. Coverage is 0-1, speed is signed world meters per second
+along a fixed XZ wind direction, and height is 100-10,000 world meters. Defaults
 are 0.45, 8 and 1500; omitting `clouds` disables the layer. The layer is a curved
 shell at that height around the planet (radius 6,360 km), so clouds reach the
 horizon and only the ground hides them; they fade by distance into the haze (half
@@ -140,7 +140,7 @@ sky.options.fog = {depth: () => bloom.depthTexture, start: 45, density: 0.008};
 ```
 
 `start` is a clear distance in world meters (default 40); `density` is inverse
-meters (default 0.01, range 0–1). Visibility is
+meters (default 0.01, range 0-1). Visibility is
 `exp(-((max(0, distance - start) * density) ** 2))`; zero density disables the pass.
 Fog uses the sky model's direction-dependent radiance, exposure and night fade,
 with the same horizon sampling as the background and borrowed water environment.

@@ -1,4 +1,4 @@
-# Afterlight — gameplay sandbox
+# Afterlight: gameplay sandbox
 
 The sandbox consumes public package exports and built distributions. Cabin,
 foliage, grass, island height sampling, explorer rig/pose, placement, terrain mesh
@@ -114,7 +114,7 @@ npm run test:browser --workspace examples/gameplay-sandbox
 
 WASD / arrows move, Shift runs, drag looks, double-click captures the mouse, and
 Escape releases it. Touch devices expose movement and look sticks. The control
-pill adjusts the full 00:00–23:59 clock with Sun/day and Moon/night labels,
+pill adjusts the full 00:00-23:59 clock with Sun/day and Moon/night labels,
 actual particle capacity (Off, 100k, 500k or 1M), terrain wireframe and wave
 height. Reduced motion starts paused. WebGPU support is required and failures
 appear in the shell. Canvas size, texture resources and device restoration are

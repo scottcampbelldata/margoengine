@@ -214,7 +214,7 @@ try {
   Object.assign(window, { earthDemo: demo });
   controls.disabled = false;
   status.textContent = mobile
-    ? 'Ready. Explore the day–night boundary with the sun control.'
+    ? 'Ready. Explore the day-night boundary with the sun control.'
     : 'Ready. Full detail is loading.';
   document.body.dataset.ready = 'true';
   stage.engine.start();
@@ -233,7 +233,7 @@ try {
         () => {
           if (signal.aborted) return;
           demo.quality = 'full';
-          status.textContent = 'Ready. Explore the day–night boundary with the sun control.';
+          status.textContent = 'Ready. Explore the day-night boundary with the sun control.';
         },
         (error) => {
           if (signal.aborted) return;

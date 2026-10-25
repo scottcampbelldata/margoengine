@@ -455,7 +455,7 @@ export function compileVoxelExpression(source: string, parameters: readonly stri
           take(')');
           const fn = FUNCTIONS[name];
           if (args.length < fn.min || args.length > fn.max)
-            fail(`Function "${name}" requires ${fn.min === fn.max ? fn.min : `${fn.min}–${fn.max}`} arguments.`, token);
+            fail(`Function "${name}" requires ${fn.min === fn.max ? fn.min : `${fn.min}-${fn.max}`} arguments.`, token);
           return make({ ...at, kind: 'call', name, args }, args, fn.cost);
         }
         if (FORBIDDEN.has(name) || (!VARIABLES.has(name) && !names.has(name)))
@@ -738,7 +738,7 @@ export function runVoxelExpression(input: VoxelExpressionInput, signal?: AbortSi
       if (!Number.isInteger(value) || value < 0 || value > 255)
         throw new VoxelExpressionError(
           'evaluation',
-          `Output must be an integer palette index 0–255; got ${value} at voxel (${context.x},${context.y},${context.z}), iteration ${iteration}.`,
+          `Output must be an integer palette index 0-255; got ${value} at voxel (${context.x},${context.y},${context.z}), iteration ${iteration}.`,
           root.line,
           root.column,
         );

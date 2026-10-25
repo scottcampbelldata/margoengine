@@ -78,8 +78,8 @@ meadow.dispose();
 | `blades` | `100_000` | Positive integer, bounded by device storage and dispatch limits |
 | `area` | `[50, 50]` | Positive X/Z dimensions, up to 100,000 world units |
 | `bladeHeight` | `1.2` | Positive blade height, up to 100; instances vary from 0.7× to 1.25× |
-| `windSpeed` | `1.2` | Noise scrolling and spore drift speed, 0–100; mutable on the field |
-| `windStrength` | `0.45` | Bend strength, 0–2; mutable on the field |
+| `windSpeed` | `1.2` | Noise scrolling and spore drift speed, 0-100; mutable on the field |
+| `windStrength` | `0.45` | Bend strength, 0-2; mutable on the field |
 | `windDirection` | `[1, 0.35]` | Nonzero X/Z direction, normalized at creation |
 | `drawDistance` | `100` | Positive distance cutoff, up to 100,000 world units |
 | `spores` | `false` | Draw 240 drifting white dandelion particles |

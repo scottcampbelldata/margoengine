@@ -79,13 +79,13 @@ uploaded through a retained uniform each frame. Opaque scatter draws before sky
 and water, so water refraction and depth occlusion include grass and rocks.
 
 Both `ScatterOptions` and `ScatterBatch` accept `wind: [directionX, directionZ,
-strength]`, where direction is nonzero and strength is 0–1. Omit it for static
+strength]`, where direction is nonzero and strength is 0-1. Omit it for static
 geometry. Rooted GPU bends vary by world position and time, and normals follow
 the deformation. Grass LODs use identical motion; fixed instance shadows use the
 same bend and clock in every cascade. Use `shadows.add(instances)` for moving
 vegetation, without the static-shadow option. Cull bounds include wind movement.
 Use upright vegetation whose local origin is its ground root. This is a lightweight
-whole-plant bend. Fixed `ScatterBatch` can additionally set `windDetail: 1` (0–1)
+whole-plant bend. Fixed `ScatterBatch` can additionally set `windDetail: 1` (0-1)
 for faster branch/foliage ripple. Radial stiffness anchors the trunk and plant
 center, while two detail frequencies vary across each plant. Normals use the
 deformation's analytic inverse Jacobian, and all shadow cascades share the same

@@ -40,7 +40,7 @@ const median = (v) => {
   return s.length ? (s.length % 2 ? s[s.length >> 1] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null;
 };
 const fmt = (x) =>
-  x == null ? '–' : x >= 100 ? Math.round(x).toLocaleString('en-US') : x >= 10 ? x.toFixed(1) : x.toFixed(2);
+  x == null ? '-' : x >= 100 ? Math.round(x).toLocaleString('en-US') : x >= 10 ? x.toFixed(1) : x.toFixed(2);
 
 for (const [name, s] of Object.entries(SUITES))
   $('#suites').insertAdjacentHTML(
@@ -95,7 +95,7 @@ function row(suite, id, metric, mine) {
     ratio = mine != null && ours ? mine / ours : null,
     faster = ratio != null && (HIGHER.has(metric) ? ratio > 1 : ratio < 1);
   const tr = document.createElement('tr');
-  tr.innerHTML = `<td>${SUITES[suite].title}</td><td>${id}</td><td>${metric} (${UNITS[metric]})</td><td>${fmt(mine)}</td><td>${fmt(ours)}</td><td class="${ratio == null ? 'muted' : faster ? 'faster' : 'slower'}">${ratio == null ? '–' : `${ratio.toFixed(2)}x`}</td>`;
+  tr.innerHTML = `<td>${SUITES[suite].title}</td><td>${id}</td><td>${metric} (${UNITS[metric]})</td><td>${fmt(mine)}</td><td>${fmt(ours)}</td><td class="${ratio == null ? 'muted' : faster ? 'faster' : 'slower'}">${ratio == null ? '-' : `${ratio.toFixed(2)}x`}</td>`;
   $('#results tbody').append(tr);
 }
 

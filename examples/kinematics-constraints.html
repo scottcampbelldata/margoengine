@@ -76,7 +76,7 @@
       <div class="readout">
         <p id="status" role="status">Preparing scene…</p>
         <p id="status-detail">Loading the local engine and constraint package.</p>
-        <dl><dt id="gap-label">Link gap / required</dt><dd id="clearance">—</dd><dt>Accepted pole angle</dt><dd id="swivel">—</dd><dt>Allowed pole step</dt><dd id="window">—</dd><dt>Accepted pole step</dt><dd id="actual-step">—</dd><dt id="hand-step-label">Accepted hand step</dt><dd id="hand-step">—</dd></dl>
+        <dl><dt id="gap-label">Link gap / required</dt><dd id="clearance">-</dd><dt>Accepted pole angle</dt><dd id="swivel">-</dd><dt>Allowed pole step</dt><dd id="window">-</dd><dt>Accepted pole step</dt><dd id="actual-step">-</dd><dt id="hand-step-label">Accepted hand step</dt><dd id="hand-step">-</dd></dl>
       </div>
       <div class="controls">
         <label for="scene">Obstacle scene · resets pose</label><select id="scene" disabled><option value="torso">Capsule torso</option><option value="mixed">Torso + sphere + capsule rail</option></select>
@@ -95,7 +95,7 @@
           <label for="damping">Target damping time</label><select id="damping" disabled><option value="0">Off</option><option value="0.12" selected>0.12 s</option><option value="0.25">0.25 s</option></select>
           <label for="clock">Caller time step</label><select id="clock" disabled><option value="live">Frame delta · capped at 50 ms</option><option value="fixed60">Fixed 1/60 s per update</option><option value="fixed120">Fixed 1/120 s per update</option></select>
           <label for="budget">Additional angular samples / pass</label><select id="budget" disabled><option value="0">0 · center only</option><option value="32">32</option><option value="128" selected>128</option><option value="256">256</option></select>
-          <dl><dt>Checked geometry</dt><dd id="scope">—</dd><dt>Requested target contact</dt><dd id="contact">—</dd><dt>Render backend</dt><dd id="backend">—</dd><dt>Last caller dt</dt><dd id="dt-value">—</dd><dt>Iterations this update</dt><dd id="candidate-count">—</dd><dt>Accepted torso assist</dt><dd id="yaw-value">0°</dd></dl>
+          <dl><dt>Checked geometry</dt><dd id="scope">-</dd><dt>Requested target contact</dt><dd id="contact">-</dd><dt>Render backend</dt><dd id="backend">-</dd><dt>Last caller dt</dt><dd id="dt-value">-</dd><dt>Iterations this update</dt><dd id="candidate-count">-</dd><dt>Accepted torso assist</dt><dd id="yaw-value">0°</dd></dl>
           <p class="note">Scene, gap and damping changes start a newly validated pose. Speed and budget changes preserve solve history. Fixed dt is caller-supplied simulation time, not a display-rate guarantee.</p>
         </div></details>
         <details id="recording-panel"><summary>Record a problem</summary><div class="controls">
@@ -260,7 +260,7 @@
           : explanations[displayStatus] ?? '';
         if (chain && controller.clampActive) detail.textContent += ' Target projection band is also active.';
         const physicalGap = chain ? controller.clearance : controller.targetClearance;
-        clearanceReadout.textContent = Number.isFinite(physicalGap) ? (physicalGap * 1000).toFixed(1) + ' / ' + (controller.avoidance.minClearance * 1000).toFixed(1) + ' mm' : '—';
+        clearanceReadout.textContent = Number.isFinite(physicalGap) ? (physicalGap * 1000).toFixed(1) + ' / ' + (controller.avoidance.minClearance * 1000).toFixed(1) + ' mm' : '-';
         $('#gap-label').textContent = chain ? 'Link gap / required' : 'Target gap / required';
         swivelReadout.textContent = chain ? (controller.acceptedPole * 180 / Math.PI).toFixed(1) + '°' : 'Not evaluated';
         $('#window').textContent = chain ? '±' + windowDegrees.toFixed(2) + '°' : 'Not evaluated';

@@ -59,7 +59,7 @@ export function attachWorkshopStats(engine: EngineKernel, parent: HTMLElement) {
   toggle.setAttribute('aria-label', 'Expand performance statistics');
   toggle.style.cssText =
     'display:flex;align-items:center;justify-content:space-between;gap:6px;width:224px;max-width:100%;min-height:28px;padding:5px 9px;border:1px solid #4a7378;border-radius:5px;background:rgba(16,25,28,.94);color:#ddf8f8;font:10px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:nowrap;cursor:pointer;pointer-events:auto;box-shadow:0 3px 10px #0001';
-  pillText.textContent = 'Performance — FPS · JS — MB';
+  pillText.textContent = 'Performance: FPS · JS: MB';
   arrow.textContent = '▾';
   arrow.setAttribute('aria-hidden', 'true');
   toggle.append(pillText, arrow);
@@ -215,20 +215,20 @@ export function attachWorkshopStats(engine: EngineKernel, parent: HTMLElement) {
       heapIndex = (heapIndex + 1) % capacity;
       heapCount = Math.min(capacity, heapCount + 1);
       draw(heap, heapCount, heapIndex, heapChart);
-      heapChart.title.textContent = `JS heap ${megabytes.toFixed(1)} MB\n${heapChart.min.toFixed(1)}–${heapChart.max.toFixed(1)} MB · rolling 60 s`;
+      heapChart.title.textContent = `JS heap ${megabytes.toFixed(1)} MB\n${heapChart.min.toFixed(1)}-${heapChart.max.toFixed(1)} MB · rolling 60 s`;
       heapChart.graph.style.display = 'block';
     } else {
       heapChart.title.textContent = 'JS heap unavailable\nNot exposed by this browser';
       heapChart.graph.style.display = 'none';
     }
-    pillText.textContent = `Performance ${stats.sampleCount ? stats.fps.toFixed(0) : '—'} FPS · ${heapLabel}`;
+    pillText.textContent = `Performance ${stats.sampleCount ? stats.fps.toFixed(0) : '-'} FPS · ${heapLabel}`;
     const milliseconds = stats.gpuTime;
     if (milliseconds !== null && Number.isFinite(milliseconds)) {
       gpu[gpuIndex] = milliseconds;
       gpuIndex = (gpuIndex + 1) % capacity;
       gpuCount = Math.min(capacity, gpuCount + 1);
       draw(gpu, gpuCount, gpuIndex, gpuChart);
-      gpuChart.title.textContent = `GPU passes ${gpuChart.min.toFixed(2)}–${gpuChart.max.toFixed(2)} ms`;
+      gpuChart.title.textContent = `GPU passes ${gpuChart.min.toFixed(2)}-${gpuChart.max.toFixed(2)} ms`;
       gpuChart.graph.style.display = 'block';
     } else {
       gpuChart.title.textContent =

@@ -190,10 +190,10 @@ Each compute pipeline is classified when it is created, from the IR:
 
 | Tier | When it applies | How it runs |
 | --- | --- | --- |
-| A1 — fragment pass | Every invocation writes only its own texel of storage textures (`textureStore(t, id.xy, v)`), with no atomics and no workgroup memory | A full-target draw into those textures; the global id comes from `gl_FragCoord`. Up to the device's color-attachment count per pass, else several passes. |
-| A2 — transform feedback | Every invocation writes only its own records of storage buffers (`out[id.x] = f(...)`), no atomics, no workgroup memory | A vertex shader run with `gl.RASTERIZER_DISCARD` and transform feedback into the output buffers. Skinning and per-particle updates fit here. |
-| B — CPU | Small dispatches, or atomics, workgroup memory and barriers with inputs available on the CPU | The IR is also emitted as JavaScript and run per workgroup in phases between barriers (atomics are plain operations there). Inputs come from shadow copies; outputs upload once per dispatch. Optional worker. A per-frame budget, measured in milestone M5, decides when B is allowed. |
-| C — package path | Large dispatches with atomics, sorting or GPU-driven culling | The package itself takes another route on compatibility devices (below). The device refuses the pipeline with `MargoError('unsupported')` naming the package and the compat path, so nothing fails silently. |
+| A1: fragment pass | Every invocation writes only its own texel of storage textures (`textureStore(t, id.xy, v)`), with no atomics and no workgroup memory | A full-target draw into those textures; the global id comes from `gl_FragCoord`. Up to the device's color-attachment count per pass, else several passes. |
+| A2: transform feedback | Every invocation writes only its own records of storage buffers (`out[id.x] = f(...)`), no atomics, no workgroup memory | A vertex shader run with `gl.RASTERIZER_DISCARD` and transform feedback into the output buffers. Skinning and per-particle updates fit here. |
+| B: CPU | Small dispatches, or atomics, workgroup memory and barriers with inputs available on the CPU | The IR is also emitted as JavaScript and run per workgroup in phases between barriers (atomics are plain operations there). Inputs come from shadow copies; outputs upload once per dispatch. Optional worker. A per-frame budget, measured in milestone M5, decides when B is allowed. |
+| C: package path | Large dispatches with atomics, sorting or GPU-driven culling | The package itself takes another route on compatibility devices (below). The device refuses the pipeline with `MargoError('unsupported')` naming the package and the compat path, so nothing fails silently. |
 
 Packages read the tier through one helper in `packages/shared` (`compatTier(device)`: `'native'` or `'webgl2'`), never
 through browser sniffing.

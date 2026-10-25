@@ -391,7 +391,7 @@ test('moonlight, ambient color and the reflected night sky share a continuous cl
   options.hours = 0;
   h.frame();
   assert.deepEqual(h.engine.lighting.direction.slice(0, 3), sky.moon);
-  assert.ok(sky.moon[1] > 0.17 && sky.moon[1] < 0.26, 'Moon preset stays 10–15 degrees above the horizon');
+  assert.ok(sky.moon[1] > 0.17 && sky.moon[1] < 0.26, 'Moon preset stays 10-15 degrees above the horizon');
   assert.ok(Math.abs(h.engine.lighting.direction[3] - 0.6) < 1e-6);
   assert.deepEqual(Array.from(h.engine.lighting.radiance.subarray(0, 3)), options.lighting.moon.color.map(Math.fround));
   assert.deepEqual(Array.from(values().subarray(0, 3)), options.lighting.ambient.night.map(Math.fround));

@@ -303,7 +303,7 @@ edges; this filter does not model area-light penumbrae (area lights' own shadows
 recreates the maps and caster bindings; disposal releases owned resources.
 
 Without `ClusteredOptions.shadows`, the original shader, four lighting bindings
-and allocation path remain exact. Opted-in effects add bindings 16–18 in the
+and allocation path remain exact. Opted-in effects add bindings 16-18 in the
 existing lighting group (group 2 for glTF Pro); group 3 remains the independent
 material slot. TAA, sky and terrain's existing bindings remain available.
 
