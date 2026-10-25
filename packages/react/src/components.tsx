@@ -557,7 +557,10 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
     scale[1],
     scale[2],
   ]);
-  useImperativeHandle(ref, () => node!, [node]);
+  // The live mesh, not the `node` state: effects that recreate the mesh without a render (StrictMode's replay, a
+  // Suspense boundary revealing again) would otherwise hand the ref the disposed one until the next render, and a
+  // useFrame callback writing to it throws "Mesh disposed". This runs after the creation effect above.
+  useImperativeHandle(ref, () => registry.current!, [registry, node]);
   const scene = useMemo(() => ({ ...parentScene, registry }), [parentScene, registry]);
   return <Context.Provider value={scene}>{children}</Context.Provider>;
 });

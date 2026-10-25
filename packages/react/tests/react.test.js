@@ -433,6 +433,62 @@ test('Stage shadow requests share the Canvas effect and release the last request
   view.unmount();
   assert.equal(current.disposals, 1);
 });
+test('a Mesh ref never hands a frame callback a disposed mesh when effects recreate it', async () => {
+  // A Suspense boundary that shows its content again (and StrictMode's effect replay) recreates the mesh in effects
+  // alone, with no render between. A frame that lands then must see the live mesh or null, never the disposed one:
+  // tests/modern-browser.tsx failed with "Mesh disposed" from a useFrame callback in exactly that window. The Tick
+  // component runs the frame callbacks from its layout effect, which is that window.
+  let resolve,
+    suspend = false,
+    frames = 0;
+  const stale = [];
+  const wait = new Promise((done) => (resolve = done));
+  function Gate() {
+    if (suspend) throw wait;
+    return null;
+  }
+  function Tick() {
+    React.useLayoutEffect(() => {
+      const engine = instances.at(-1);
+      for (const callback of engine.callbacks) callback(engine, 1 / 60);
+    });
+    return null;
+  }
+  function Spinner() {
+    const ref = React.useRef(null);
+    useFrame((engine) => {
+      frames++;
+      const mesh = ref.current;
+      // Recorded rather than thrown: a throw inside the replayed layout effect makes React retry without end.
+      if (mesh && engine.meshes.get(mesh.id) !== mesh) stale.push(mesh.id);
+      else mesh?.setRotation([0, frames, 0]);
+    });
+    return React.createElement(
+      React.Suspense,
+      { fallback: null },
+      React.createElement(Mesh, { ref }, React.createElement(BoxGeometry)),
+      React.createElement(Tick),
+      React.createElement(Gate),
+    );
+  }
+  const tree = () =>
+    React.createElement(StrictMode, null, React.createElement(MargoCanvas, null, React.createElement(Spinner)));
+  const view = render(tree());
+  await act(async () => {});
+  suspend = true;
+  await act(async () => view.rerender(tree()));
+  suspend = false;
+  await act(async () => resolve());
+  await act(async () => {});
+  const engine = instances.at(-1),
+    [live] = engine.meshes.values();
+  assert.equal(engine.meshes.size, 1);
+  assert.ok(frames > 0, 'the frame callbacks ran inside the reveal');
+  assert.deepEqual(stale, [], 'no frame saw a disposed mesh through the ref');
+  for (const callback of engine.callbacks) callback(engine, 1 / 60);
+  assert.deepEqual(live.rotation, [0, frames, 0], 'the ref reaches the live mesh after the reveal');
+  view.unmount();
+});
 test('StrictMode, resize, stable frame callbacks and unmount release resources', async () => {
   let received,
     first = 0,
