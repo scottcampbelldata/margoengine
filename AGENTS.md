@@ -1,9 +1,5 @@
 # Project instructions
 
-## graphify
-
-- When the user types `/graphify`, read and use `~/.Codex/skills/graphify/SKILL.md` before doing anything else.
-
 ## v1.0.0 core freeze
 
 - Treat `@margoengine/core` and the stage facade as feature-frozen for v1.0.0. Do not add features to either, including material graphs, skinning math, or post-processing passes.
@@ -21,8 +17,8 @@ Scott's rule (2026-10-24): Margo never uses files from other repositories, whate
 - Write what Margo needs clean room, from public specs, papers and descriptions. Never copy, adapt or paste code or
   files from other engines or projects (three.js, Babylon, WAMR3D, WasmGPU, Blockbench, Crocotile, MagicaVoxel and
   the like), and never read their source while writing the matching Margo code.
-- Other engines are run only where they live (for benchmarks: `../engine-bench`). Margo's own benchmark scenes,
-  harnesses and scripts are written clean room too.
+- Other engines are run only where they live, in their own folder outside this repository (docs/benchmarking.md,
+  "Comparing engines"). Margo's own benchmark scenes, harnesses and scripts are written clean room too.
 - The one exception is large standard files that every engine uses, such as standard sample models, test assets and
   prebuilt decoders. Record each one's source and licence in `THIRD-PARTY-NOTICES.md`.
 
@@ -83,10 +79,7 @@ mixed up.
   Scott's go-ahead), then delete your branch (local and on GitHub) and remove your worktree.
 - If the work cannot land yet, rebase it onto current `main` anyway and say in your final report, in one line, what
   blocks it. Never leave a branch that is behind `main`.
-- Never delete or rewrite another chat's or Codex's branch or uncommitted work without Scott's say-so.
-- This applies to Codex as well. Codex: rebase your own branches and worktree commits onto current `main` and land
-  them the same way; a `codex/*` branch, a commit in a `~/.codex/worktrees` checkout or a `refs/codex/snapshots` entry
-  that is not on `main` is unlanded work.
-- Claude: when you find Codex work that is not on `main`, do not leave it behind. Either tell Scott in your report so
-  he can have Codex rebase and land it, or, with his go-ahead, rebase it onto `main` yourself, run the checks and land
-  it (keep Codex's authorship and say where it came from in the commit message). Report which one you did.
+- Never delete or rewrite another session's or agent's branch or uncommitted work without Scott's say-so.
+- Every coding agent follows these rules. Work by another agent that is not on `main` is unlanded: report it, or,
+  with Scott's go-ahead, rebase it onto `main`, run the checks and land it, keeping its authorship and saying where it
+  came from in the commit message.

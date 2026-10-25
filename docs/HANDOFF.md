@@ -284,7 +284,7 @@ Rebased, cleaned and landed as 12 commits; core + stage unchanged at 21,343 B gz
   views (controls `orbit-ownership-poles`, to keep through the planned controls rewrite), gltf-pro KHR_node_visibility
   import with hidden lights, and `parseGLTFAsync` decoding images by default.
 
-## Resume here (2026-10-19, moving from the laptop to scott dev)
+## Resume here (2026-10-19, moving from the laptop to the NVIDIA desktop)
 
 State on GitHub: `main` has everything finished (see the next two paragraphs). Branch `wip/voxel-phase4-renderer`
 (`814c02a8`, based on `993f2013`) holds voxel phase 4: `VoxelRenderer` and `BlockTextures` in
@@ -305,7 +305,7 @@ browser check, `build:site`, `visual:check` and `verify` (the agent paused becau
 3. Phase 5 (renderer lighting) and phase 13 (playable `examples/voxel-sandbox`, a `/voxel/` site page with visual
    baselines, benchmarks at render distance 8 and 16 behind the quiet gate, `docs/limits.md` rows): see
    `packages/voxel/DESIGN.md` (Renderer, Phases, and the As built section: its decisions bind later phases).
-4. If scott dev is the NVIDIA PC: run `npm run check:merge` to check the NVIDIA visual profile, unchecked since
+4. On the NVIDIA desktop: run `npm run check:merge` to check the NVIDIA visual profile, unchecked since
    `431222c0` (see the next paragraph for what changed). A view that changes on purpose:
    `npm run visual:update -- --only=<view>` with the reason in the commit.
 5. Rules that held this work: AGENTS.md; Margo clean-room names with three.js usage flow, never three.js names or
@@ -321,7 +321,7 @@ browser check, `build:site`, `visual:check` and `verify` (the agent paused becau
    `noiseTerrain` can leave water beside cave air and leaves inside caves; the catalog clipboard browser test is flaky
    under heavy load.
 
-Progress on scott dev (NVIDIA RTX A6000, 2026-10-19): step 1 done. Step 2 done: phase 4 rebased onto main and on main;
+Progress on the NVIDIA desktop (RTX A6000, 2026-10-19): step 1 done. Step 2 done: phase 4 rebased onto main and on main;
 its browser check passes on the A6000 at 4x and 1x (now including the 196,608-quads-per-layer worst case); cracks
 measured (14 pixels in a grazing view without the edge stretch, none with it). Greedy and naive images are equal except
 for sub-pixel edge ownership (0.04-0.52% of drawn pixels, never an area); bit-identical images are impossible with two
@@ -2783,7 +2783,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    and passes (twice). No page errors logged. Before launch: reproduce under a bounded load (half the cores) and find
    what the load event waits on (preview server starved vs the app's own init); a visitor's busy laptop must not hang.
    Status 2026-10-21: the three causes found on the old WIP branch for this gate (382ca278 / e179fb80, now only
-   `refs/backup/unlanded-gate9-wip`) are fixed on main. The hang was the harness: the Vite dev server's file watcher
+   a local backup ref) are fixed on main. The hang was the harness: the Vite dev server's file watcher
    crawled every worktree and blocked the process serving the pages (a5d08397: `watch: null` in every Vite server our
    scripts start). The sandbox scattered its particles differently each run (aa8e8e94: respawn seeds by slot and frame,
    not GPU thread order). Shots caught mid-raster under load (a5d08397: shoot until two in a row match). Baselines
@@ -2850,10 +2850,10 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    @margoengine + margoengine, then margo-convert, then create-margo; deprecate/unpublish). `.github/workflows/publish.yml`:
    manual only, inert until the repo variable `NPM_PUBLISH_ENABLED=true`, `npm-publish` environment, `--provenance`,
    dry run by default; requires a `## <version>` section in CHANGELOG.md (does not exist yet: 1g.g). `SECURITY.md`
-   (1.x supported; GitHub private vulnerability reporting preferred, security@margoengine.com; acknowledge 3 business
+   (1.x supported; GitHub private vulnerability reporting preferred, hello@margointeractive.com; acknowledge 3 business
    days, triage 10, fix or plan 30 days, coordinated disclosure at most 90 days) and a `docs/security.md` stub for the
-   gate 11 a/b write-up. **Scott, before launch:** create the security@margoengine.com mailbox (or forwarding) on
-   margoengine.com; enable private vulnerability reporting in the GitHub repo settings; 2FA on npm and GitHub;
+   gate 11 a/b write-up. **Scott, before launch:** check the hello@margointeractive.com mailbox (SECURITY.md) receives mail;
+   enable private vulnerability reporting in the GitHub repo settings; 2FA on npm and GitHub;
    create the `npm-publish` environment (Scott as reviewer, `main` only); after the first publish, configure
    trusted publishing per package and revoke the bootstrap token. Blender add-on (Python, not on npm) declares MIT;
    extensions.blender.org listing would need its licence policy checked first.
