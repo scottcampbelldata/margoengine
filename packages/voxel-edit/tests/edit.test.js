@@ -233,3 +233,33 @@ test('exposed-face ties cover sparse grids, reversed axes and corners', () => {
   const perspective = raycastGrid(box, { origin: [2.2, 40, 1.8], direction: [0.15, -1, 0.05] });
   assert.deepEqual(perspective.normal, [0, 1, 0]);
 });
+
+test('the camera from the Margo Voxel report picks the exposed top of a curtain at a cell edge and centre (E36)', () => {
+  // The view-projection matrix of the reported click (orthographic, Float32 values, reverse depth), and the 4 x 24 x 2
+  // curtain it looked at in an 8 x 48 x 8 grid. NDC (0, 0) lands on the edge between cells; the second point on a
+  // cell centre. Both enter the continuous top: normal +y, air above, eight cells of top face.
+  const matrix = [
+      0.015358395874500275, -0.010858053341507912, 0.0001249390043085441, 0, 0, 0.02895480953156948,
+      0.00009370425686938688, 0, -0.015358395874500275, -0.010858053341507912, 0.0001249390043085441, 0, 0,
+      -0.6080510020256042, 0.4967515766620636, 1,
+    ],
+    size = [8, 48, 8],
+    grid = empty(size);
+  for (const [x, y, z] of boxCells([2, 0, 3], [5, 23, 4])) grid.voxels[cellIndex(size, x, y, z)] = 10;
+  for (const [nx, ny] of [
+    [0, 0],
+    [0, 0.010858053341507912],
+  ]) {
+    const hit = raycastGrid(grid, pickRay(matrix, nx, ny));
+    assert.deepEqual(
+      [hit.cell, hit.normal],
+      [
+        [3, 23, 3],
+        [0, 1, 0],
+      ],
+      `NDC ${nx}, ${ny}`,
+    );
+    assert.equal(grid.voxels[cellIndex(size, ...hit.adjacent)], 0);
+    assert.equal(faceCells(grid, hit.cell, hit.normal).length, 8);
+  }
+});
