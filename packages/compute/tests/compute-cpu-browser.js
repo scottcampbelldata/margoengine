@@ -8,6 +8,7 @@ import { fft } from '@margoengine/compute/fft';
 import { convolve, convolve2d } from '@margoengine/compute/signal';
 import { Random } from '@margoengine/compute/random';
 import { bicgstab, cg, coo, diags } from '@margoengine/compute/sparse';
+import { grad } from '@margoengine/compute/autodiff';
 
 const checks = [];
 const timings = {};
@@ -116,6 +117,25 @@ window.runCpuParityTests = async () => {
   await parity('random uniform', (c) => new Random(c, { seed: 78 }).uniform(10_001, { low: -2, high: 3 }), 0);
   await parity('random integers', (c) => new Random(c, { seed: 79 }).integers(-50, 1000, 10_001), 0);
   await parity('random normal', (c) => new Random(c, { seed: 80 }).normal(10_001), 1e-5);
+
+  // Gradients: the same fused gradient kernels on both backends.
+  await parity(
+    'grad of a smooth expression with broadcasting',
+    (c, x, y) => {
+      const w = c.array([0.5, -1.5, 2], { shape: [3, 1] }),
+        xs = x.slice([0, 3000]).reshape(3, 1000);
+      return grad(xs.mul(w).sin().add(xs.square().mul(w).exp().log1p()), [w])[0];
+    },
+    1e-4,
+  );
+  await parity(
+    'grad through a transpose and a where',
+    (c, x) => {
+      const m = x.slice([0, 600]).reshape(20, 30).ascontiguous();
+      return grad(c.where(m.T.gt(0), m.T.tanh(), m.T.mul(0.1)), [m])[0];
+    },
+    1e-5,
+  );
 
   // Sparse: the 2-D Laplacian of an m x m grid (5-point stencil), symmetric positive definite.
   const laplacian = (ctx, m) => {

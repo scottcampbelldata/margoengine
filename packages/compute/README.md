@@ -7,8 +7,8 @@ GPU compute without the WebGPU boilerplate, for data science and for engine work
 typed arrays with views and broadcasting, element-wise expressions that fuse into a single kernel, reductions and
 statistics along axes, scans, sorting, selection and histograms. It also runs your own WGSL kernels, with bindings
 read from the source. Optional entries add matrix products (`/linalg`), Fourier transforms (`/fft`), convolution
-(`/signal`), reproducible random numbers (`/random`), sparse matrices and solvers (`/sparse`), data larger than GPU
-memory (`/stream`) and kernels inside an engine's frame (`/frame`).
+(`/signal`), reproducible random numbers (`/random`), sparse matrices and solvers (`/sparse`), gradients
+(`/autodiff`), data larger than GPU memory (`/stream`) and kernels inside an engine's frame (`/frame`).
 
 The package is optional and tree-shakable, adds nothing to core, and needs no engine: without one it opens a
 headless device of its own. Without WebGPU (Node, an older browser, a blocklisted GPU) the same code runs on the CPU.
@@ -241,6 +241,40 @@ using A = diags(gpu, [-1, 4, -1], [-1, 0, 1], [n, n]); // a diagonally dominant 
 const b = gpu.ones(n);
 const { x, iterations, converged } = await cg(A, b, { tol: 1e-6 });
 console.log(converged, iterations, await x.max().item());
+```
+
+## Gradients
+
+`@margoengine/compute/autodiff` differentiates element-wise expressions in reverse mode. `grad(output, [a, b])`
+returns the gradient of `sum(output)` with respect to each array, with the arrays' shapes. `valueAndGrad` also
+returns the sum. `{ seed }` weights the elements, giving `sum(output * seed)`.
+
+- Gradients are lazy expressions over the same tree. Each one runs as one fused kernel that recomputes the forward
+  values it needs.
+- They flow through arithmetic, maths functions, `where`, `minimum`, `maximum` and `clip`, and through broadcasting
+  (summed over the broadcast axes).
+- They flow through views: a transpose or slice adds into the array it reads.
+- Rounding, comparisons and bit operations have no gradient. `grad` by an integer array throws a TypeError.
+- Matrix products and reductions inside the expression are not differentiated: they are already arrays when the
+  expression reads them.
+
+```ts
+import { createCompute } from '@margoengine/compute';
+import { valueAndGrad } from '@margoengine/compute/autodiff';
+
+using gpu = await createCompute();
+const x = gpu.array([0, 1, 2, 3]),
+  y = gpu.array([1, 3, 5, 7]);
+const w = gpu.array([0], { shape: [] }),
+  b = gpu.array([0], { shape: [] });
+for (let step = 0; step < 200; step++) {
+  const { value, grads } = valueAndGrad(w.mul(x).add(b).sub(y).square(), [w, b]);
+  // Gradient descent step: w -= 0.02 * dw (written back into w's buffer).
+  w.write(await w.sub(grads[0].mul(0.02)).read());
+  b.write(await b.sub(grads[1].mul(0.02)).read());
+  for (const a of [value, ...grads]) a.dispose();
+}
+console.log(await w.item(), await b.item()); // close to 2 and 1
 ```
 
 ## Streams and frames

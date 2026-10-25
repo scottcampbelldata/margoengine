@@ -548,6 +548,7 @@ expect; the documentation describes behaviour, not code.
 | Streaming mean and variance | T. F. Chan, G. H. Golub and R. J. LeVeque, "Algorithms for computing the sample variance", Amer. Statistician 37(3), 1983 |
 | Sparse CSR, SpMV, `coo`, `csr`, `diags` | SciPy `scipy.sparse` documentation (formats and constructor semantics); N. Bell and M. Garland, "Implementing sparse matrix-vector multiplication on throughput-oriented processors", SC09 |
 | Conjugate gradient, BiCGSTAB, Jacobi preconditioning | M. R. Hestenes and E. Stiefel, J. Res. NBS 49(6), 1952; H. A. van der Vorst, SIAM J. Sci. Stat. Comput. 13(2), 1992; Y. Saad, "Iterative Methods for Sparse Linear Systems", 2nd ed., SIAM 2003, algorithms 9.1 and 7.7 |
+| Reverse-mode differentiation | A. Griewank and A. Walther, "Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation", 2nd ed., SIAM 2008, chapter 3; derivative rules from standard calculus tables |
 | CPU fallback (interpreter, LSD radix sort, host kernels) | The WGSL conversion and arithmetic rules above; D. E. Knuth, "The Art of Computer Programming" vol. 3, section 5.2.5 (radix sorting); the package's own WGSL kernels, transcribed |
 
 ## Data track: `@margoengine/sciviz`

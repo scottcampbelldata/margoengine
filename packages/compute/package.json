@@ -44,6 +44,10 @@
       "types": "./dist/random.d.ts",
       "import": "./dist/random.js"
     },
+    "./autodiff": {
+      "types": "./dist/autodiff.d.ts",
+      "import": "./dist/autodiff.js"
+    },
     "./sparse": {
       "types": "./dist/sparse.d.ts",
       "import": "./dist/sparse.js"
