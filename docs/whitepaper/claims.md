@@ -58,7 +58,7 @@ and commit.
 | voxel | Path tracer GPU timings, denoiser error ratios, correctness checks, limits | `packages/voxel-pathtracer/README.md` (asserted in its browser checks, no committed result file) | UNPROVEN |
 | voxel | Sandbox render distance, multiplayer capacity, package sizes | `voxel-sandbox-bench.json`, `packages/voxel-net/bench/results.json`, `entry-sizes.json` | PROVEN |
 | voxel | Voxel Studio app tests, comparisons with other engines, native 4K timing | Margo Voxel Studio's own `docs/verification.md`; raw reports are not committed | UNPROVEN |
-| voxel | MagicaVoxel pixel match and speed | `docs/magicavoxel-parity.md`; MagicaVoxel's renders are not committed and its times are by stopwatch | UNPROVEN (said on the page) |
+| voxel | MagicaVoxel pixel match | the Margo Voxel app repository's `docs/parity/magicavoxel-parity.md` (private); MagicaVoxel's renders are not committed. No speed comparison is published (MagicaVoxel was timed by stopwatch only) | UNPROVEN (said on the page) |
 
 ## Speed compared with three.js
 

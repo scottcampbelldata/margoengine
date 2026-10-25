@@ -5,14 +5,14 @@ Last updated 2026-10-24. Read this first when starting a new session. Update it 
 ## Landed 2026-10-24: pixel-exact drawing (`exactSize`)
 
 Core sized the backbuffer from CSS size x pixel ratio and always used 4x MSAA on desktop, so a pixel-art app could
-not draw at an exact size (Margo Pixel draws into a hidden canvas and copies back every frame). `Engine.create(canvas,
+not draw at an exact size (a pixel-art app drew into a hidden canvas and copied it back every frame). `Engine.create(canvas,
 {exactSize: [w, h] | true})` keeps the backbuffer at exactly that size (or the canvas attributes), skips the
 pixel-ratio resize and renders single-sampled; zoom with CSS and `image-rendering: pixelated` (core README, "Pixel-perfect
 rendering"). `sceneSamples(engine)` returns 1 for such an engine, and SceneFade, GrassField and Planet now pass their
 engine, so their pipelines match. An invalid size is a RangeError linked to margoengine.com/errors#pixel-exact.
 Tests: `tests/core-exact-size.test.js`, and `check:views`'s exact section (16 x 8 under a 64 x 32 CSS box, a 1-texel
 checker reads back exactly, a tilted box shows two colours: no MSAA). +101 B (core + stage 22,636 -> 22,737).
-Margo Pixel itself is unchanged (app work).
+Apps adopt it themselves.
 
 ## Landed 2026-10-24: one install (`npm i margoengine`)
 
@@ -269,7 +269,7 @@ ORCA and the funnel rewritten clean room too (78 packages). Renames: [renames-20
 The full WebGL2 fallback is paused by Scott (2026-10-24) until his apps ship: [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md),
 which also records what visitors without WebGPU see today (every site demo: a needs-WebGPU message, `check:no-webgpu`).
 
-## Landed 2026-10-24: Codex's Margo Mesh engine work (codex/mesh-rotation-visibility)
+## Landed 2026-10-24: Codex's mesh-edit engine work (codex/mesh-rotation-visibility)
 
 Rebased, cleaned and landed as 12 commits; core + stage unchanged at 21,343 B gzip.
 
@@ -314,7 +314,7 @@ browser check, `build:site`, `visual:check` and `verify` (the agent paused becau
    rendering feature gets a real-GPU check with numeric expectations; push verified work to main; downloads and
    anything posted publicly need Scott's OK.
 6. Posted 2026-10-19: the Rapier bug report, as dimforge/rapier#1046. Waiting on Scott: the
-   `margo3d-studio` posed-picking fixture (that repository was not on the laptop or GitHub).
+   posed-picking fixture from an app repository.
 7. Small follow-ups found on the way: a cave-heavy chunk near a ball builds a 125 ms triangle mesh in one frame;
    `.vox` paste is ~1 s per million voxels (per-cell setBlock); the streamer can spend 1.2-1.5 ms a frame unpacking at
    8 chunks per frame; a chunk-border crossing costs a 5-7 ms physics build; voxel contacts give no `Physics` events;
@@ -343,52 +343,23 @@ read 18-97% on this idle desktop. Step 7 done: ball meshes and border crossings 
 (`VoxelPhysics.budget`), voxel contacts raise `Physics` events (`voxels.body`), `.vox` paste by chunk (4-6x faster),
 `VoxelStreamer.frameBudget`, `noiseTerrain` without water beside caves or leaves in caves, the catalog clipboard test
 no longer races its 7 s status timer. Environment colour arrays are now linear like the rest of Margo (Scott,
-2026-10-19). The Rapier report is posted (#1046). `@margoengine/voxel-pathtracer` (for Codex's MagicaVoxel editor at
-C:\Development\Projects\MagicaVoxel) landed on main on 2026-10-20 at Scott's request (rebased, no merge commit); see
-the voxel path tracer paragraph below. `margo3d-studio` (step 6's posed-picking fixture) is on this PC at
-C:\Development\Projects\margo3d-studio.
+2026-10-19). The Rapier report is posted (#1046). `@margoengine/voxel-pathtracer` landed on main on 2026-10-20 at
+Scott's request (rebased, no merge commit); see the voxel path tracer paragraph below.
 
-Voxel path tracer (2026-10-19, for the clean-room MagicaVoxel-equivalent editor Codex builds in
-`C:\Development\Projects\MagicaVoxel`): new optional package `@margoengine/voxel-pathtracer` (`VoxelPathTracer`, the
-editor's agreed contract plus compatible additions; core and stage untouched, 42,991 B gzip root entry). Node tests
-(35, about 0.6 s) run in `npm run verify`; the real-GPU check `packages/voxel-pathtracer/tests/browser-check.mjs`
-(run under the GPU lock) passes on the A6000: per-pixel GPU/CPU traversal agreement (also panorama, fisheye and lens
-distortion), closed-form furnace, Beer-Lambert, irradiance and emitter-MIS values, energy-compensated white furnaces
-within 0.79%, light through glass and off mirrors, dispersion against Snell per wavelength, emissive media, area-light
-shadows, camera motion blur width, the Preetham sky against its formulas, 1/sqrt(N) convergence, denoiser error at
-least x2 lower at 4/16/64 samples on two glass scenes, the raster frame bit for bit when disabled or disposed, the same
-converged image after a device restore. Light sampling through glass costs time per sample (README, "Measured
-performance"). MagicaVoxel parity (Scott: match or exceed it in every way): the measured mapping, current scores and
-every open item, including the ones from before this work, are in `docs/magicavoxel-parity.md`; the comparison with
-MagicaVoxel 0.99.7.2 (a black box in C:\Tools rendering our own scenes) scores 99.2-99.97% of pixels within 3 levels
-on six default scenes, and `docs/magicavoxel-feature-table.md` sets the two side by side. Since 2026-10-20 also: the
-MagicaVoxel helpers (`magicaVoxelMaterial`, `magicaVoxelLighting`, `magicaVoxelCamera`, `magicaVoxelModel`,
-`magicaVoxelMatrix`), its atmosphere and image skies, display settings, a preview kernel and display-paced samples, a
-viewport denoiser that keeps history while the camera moves, transparent captures, block textures with cut-out texels,
-and the voxel sandbox's photo mode (P) on top of them. Open (in the parity doc): six MagicaVoxel renders that need the
-desktop (blend, transparent background, `_scale`, orthographic, isometric, `_proj`), sky-lit subsurface 7-12 levels
-dark. Margo Voxel Studio's 34 engine gaps (2026-10-21): all implemented and verified in the engine, none integrated in
-the Studio yet; status, commits, the denoiser's 72-gate result (72/72, was 60/72) and the migration guide for Codex
-are in `docs/studio-engine-gaps.md`.
+Voxel path tracer (2026-10-19, for a voxel editor app): new optional package `@margoengine/voxel-pathtracer`
+(`VoxelPathTracer`; core and stage untouched, 42,991 B gzip root entry). Node tests (35, about 0.6 s) run in
+`npm run verify`; the real-GPU check `packages/voxel-pathtracer/tests/browser-check.mjs` (run under the GPU lock) passes
+on the A6000: per-pixel GPU/CPU traversal agreement (also panorama, fisheye and lens distortion), closed-form furnace,
+Beer-Lambert, irradiance and emitter-MIS values, energy-compensated white furnaces within 0.79%, light through glass and
+off mirrors, dispersion against Snell per wavelength, emissive media, area-light shadows, camera motion blur width, the
+Preetham sky against its formulas, 1/sqrt(N) convergence, denoiser error at least x2 lower at 4/16/64 samples on two
+glass scenes, the raster frame bit for bit when disabled or disposed, the same converged image after a device restore.
+Light sampling through glass costs time per sample (README, "Measured performance"). The app's comparison with another
+voxel renderer and its integration status are kept in the app's own (private) repository.
 
-Early tracer line (checked 2026-10-21; kept only as `refs/backup/unlanded-early-tracer`, tip f345dad5): two commits
-on a copy of the tracer forked at 09805e10 (main's 0fcce6cc), d0e85c30 and f345dad5, compared with main behaviour by
-behaviour. Ported, each shown failing on main first by a new test in `tests/tracer.test.js`: the viewport drops its
-denoised image on every restart, not only camera and scene changes (after `reset()`, a sampling option or
-`resetOptions`, an image that converged in one frame kept showing the old denoised picture); the scene,
-material-table and environment buffers stop doubling at the storage binding limit (a scene just over half the limit
-got a buffer WebGPU refuses to bind). Superseded: per-model material banks (main's model material tables, ca109363),
-`focusDistance: null` (on main), the caustic chain and light through glass (4990213b, 7254d631), the denoiser changes
-(main's denoiser weighs edges against the raw mean without identity guides and passes the Studio's 72 gates,
-bb841e87), and continuous glass and media across touching or overlapping model tiles: main keeps volumes whole by
-taking models up to 2048 per axis and sparse blocks instead of tiles (65be98fc; two 200-cell glass tiles still differ
-from one 400-cell bar by RMS 0.85, so the Studio tiles only past 2048), and separate instances keep their own
-interfaces.
-
-Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
-own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and
-approved the engine gaps it needs; the 2026-10-17 "no further parity work is authorized" line below is superseded for
-this work. On main (`0b7a4e75`..`ffaccf80`), all in optional packages: Lambert/Phong shading, `mesh.setGeometry`
+Engine work for a tile editor app (2026-10-18/19), approved by Scott; the 2026-10-17 "no further parity work is
+authorized" line below is superseded for this work. On main (`0b7a4e75`..`ffaccf80`), all in optional packages:
+Lambert/Phong shading, `mesh.setGeometry`
 (ranged), `Texture.update(region)`, animated tiles; material classes (`UnlitMaterial`, `LambertMaterial`,
 `PhongMaterial`, `PbrMaterial` with untinted defaults, `NormalMaterial`, `MatcapMaterial`, `DepthMaterial`,
 `DistanceMaterial`) used like three.js materials (live `mesh.material` swaps, `color.set`, live render state and
@@ -414,8 +385,8 @@ tangents and through the extension helpers now bend the right way (they were inv
 materials meshes in glTF orientation (a round trip was inverting their normal maps; `exportGLB(engine)` now refuses
 their textures instead of dropping them); the stale `materials-uv-groups-gpu-check` matcap expectation (display-curve
 change `56ee9876`) updated; posed-picking metadata (`uv`, `primitiveIndex`, `nodeIndex` on
-`Raycaster.intersectModel` hits, `ab75f70b`; the consumer repo `margo3d-studio` is not on the laptop).
-`@margoengine/voxel` (Minecraft-style game and the MagicaVoxel-style editor; design and as-built notes in
+`Raycaster.intersectModel` hits, `ab75f70b`).
+`@margoengine/voxel` (voxel games and editors; design and as-built notes in
 `packages/voxel/DESIGN.md`): phases 1-3 and 6-12 on main (storage, mesher, worker mesher, light, queries, codec and
 store, streaming and `noiseTerrain`, `.vox` with the Margo-made `tree.vox` fixture, Rapier colliders with balls
 working via triangle meshes, `AudioVoicePool`, vfx `ParticleAtlas`). Remaining: phase 4 (chunk renderer), 5
@@ -598,7 +569,7 @@ suite nightly or manual. Public repositories get free standard Actions minutes, 
 
 Global rules: core + stage does not grow without Scott's say-so (limit 20,000; currently 18,681 after his approved
 `features` option and core hooks). Real-GPU browser
-checks and benchmarks run one at a time: take the lock with `mkdir C:\Dev\Projects\margo-engine\test-results\gpu.lock`
+checks and benchmarks run one at a time: take the lock with `mkdir <main checkout>/test-results/gpu.lock`
 (fails if held; wait and retry), remove it when done; never measure while other GPU work runs. Measure only on AC power: check
 `(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline` is True and record
 it with every number (on battery Windows throttles the CPU/GPU and may drop the display to 60 Hz).
@@ -2416,29 +2387,12 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    b. Live-editable examples: an "Edit" button on every docs example (StackBlitz/CodeSandbox once packages are on
       npm, or our own playground that loads the local build), so readers change numbers and see the canvas update.
    c. More tutorials after launch: stylized/retro rendering (voxel/tile art, nearest sampling, palettes, post),
-      spatial audio + particles + volumetric fog, and one per major package; short videos once Margo Studio exists.
+      spatial audio + particles + volumetric fog, and one per major package; short videos later.
    Rules: every code block type-checked (tests/from-threejs-snippets.test.js already covers docs/guides/*.md) and
    every tutorial runnable from the repo; numbers only with linked proofs (claims.md); docs pages captured in
    visual:check where they embed a live canvas.
-9. LATER (Scott, 2026-10-15, "maybe next week; finish the engine first"): Steam games built on Margo to make money.
-   Not started (research agent stopped on Scott's call). When resumed: (1) cited market research - which genres/tags
-   sell for 1-2 person teams (median vs top revenue, wishlist->sales, Next Fest, demos), (2) genre ranking by demand x
-   Margo fit x scope (factory/automation, stylized roguelike, atmospheric exploration, logistics puzzle are candidates
-   to test, not conclusions), (3) packaging reality check - Electron vs Tauri vs native Dawn/wgpu: verify WebGPU per
-   platform incl. Steam Deck/Linux (Tauri uses the system WebView: WebKitGTK on Linux), Steamworks bindings, (4) web
-   demo -> wishlist funnel evidence, (5) business basics (fees, revenue share, taxes - accountant), (6) phased plan
-   after 1.0 with kill/continue criteria, (7) honest odds. Plan doc goes to Scott's Google Drive folder
-   "Margo Engine - To Do". Graphics settings for games: frame cap 30/60/120 via `capFrameRate`/`engine.pace`
-   (exists); browsers are always vsynced; "VSync off"/uncapped only in the desktop wrapper (Electron
-   `--disable-frame-rate-limit`), check tearing support per wrapper during the research.
-7. POST-LAUNCH (Scott, 2026-10-15): "Margo Studio" - feature-for-feature equivalents of MagicaVoxel, Crocotile 3D
-   and Dust3D, built on and for Margo with new, modern code (no copied code or branding; their file formats are
-   supported for import/export). Plan, ground rules and draft feature inventories: `docs/margo-studio.md`. Each tool
-   starts with a feature audit against the current release and Scott's scope sign-off. Update 2026-10-18: Scott
-   started the tile editor before 1.0 (see the top of this file); the voxel and node editors remain later work.
-   The engine gaps the tile editor needs (editable meshes, OBJ/MTL, Crocotile and Collada formats, Lambert/Phong
-   materials, vertex-light baking, selection transforms, animation and rig authoring, render jobs, export options,
-   FBX limits) are listed in `docs/margo-studio.md` section 2 (Scott, 2026-10-18).
+7. POST-LAUNCH: apps built on Margo (planned privately, outside this repository). The engine gaps they need land
+   here as optional packages, like any other engine work.
 
 Worker practice: agents run in git worktrees; they must start from the current `main` (`git reset --hard origin/main`; worktrees
 default to an old base). `node scripts/worktree-node-modules.mjs` sets up node_modules as described next. Do not junction the whole node_modules (then `@margoengine/*` resolves to the main checkout's

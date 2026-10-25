@@ -35,7 +35,7 @@
 </header>
 
 <div class="ledger" role="list">
-  <div role="listitem"><b>99.3-99.97%</b><span>of pixels within 3/255 of MagicaVoxel's own render, six default-lit .vox scenes, black-box comparison</span><i>docs/magicavoxel-parity.md</i></div>
+  <div role="listitem"><b>99.3-99.97%</b><span>of pixels within 3/255 of MagicaVoxel's own render, six default-lit .vox scenes, black-box comparison</span><i>docs/parity/magicavoxel-parity.md (app)</i></div>
   <div role="listitem"><b>72 / 72</b><span>denoiser quality gates passed, measured against raw output at the same sample count</span><i>docs/verification.md</i></div>
   <div role="listitem"><b>2048</b><span>voxels per axis in one traced model, given as sparse blocks</span><i>voxel-pathtracer README</i></div>
   <div role="listitem"><b>900</b><span>bot players held at 20 ticks/s by one voxel-net server on a spread-out map</span><i>docs/voxel-net-capacity-2026-10-21.md</i></div>
@@ -184,11 +184,11 @@
 <tr><td>Looking into a low sun (5°)</td><td>98.66% (100% within 6 levels)</td></tr>
 <tr><td>Orthographic and isometric cameras</td><td>100%</td></tr>
 </tbody></table></div>
-<span class="src">docs/magicavoxel-parity.md, "Current scores" · RTX A6000, Edge 155 · 2026-10-20</span>
+<span class="src">docs/parity/magicavoxel-parity.md (app), "Current scores" · RTX A6000, Edge 155 · 2026-10-20</span>
 <p>Still open: some tiles next to subsurface blocks under the sun are 7-16 levels off, and subsurface is fitted at one density only; glass over a lit floor comes out 1-2 levels bright; grid lines match on 92.7-94.6% of pixels; depth of field never showed in MagicaVoxel's snapshots, so it is not compared.</p>
 <h3>How fast</h3>
-<p>On the same RTX A6000 at 960×800 and 1,024 samples, MagicaVoxel took about 14 s (glass) and 15 s (diffuse), timed by stopwatch on its progress bar to about ±1 s; ours took 1.85 s and 1.70 s, about 8x faster, and 1.7-2.2 s on all six scenes. On one scene (a slab, two cubes, sun, sky and ground), MagicaVoxel's image at 1,024 samples had an 8-bit RMS noise of 0.32 against a 16,384-sample reference; ours had 0.24 raw at the same count and 0.16 denoised. Ours reached MagicaVoxel's 1,024-sample noise level with 64 denoised samples in 0.48 s. Those are two scenes and one GPU, with a stopwatch on one side: treat them as an indication, not a benchmark.</p>
-<span class="src">docs/magicavoxel-parity.md, "Current scores" and "Exceed MagicaVoxel"</span>
+<p>Ours renders each of the six scenes at 960×800 and 1,024 samples in 1.7-2.2 s on the RTX A6000. MagicaVoxel could only be timed by stopwatch on its progress bar, so we publish no speed comparison.</p>
+<span class="src">docs/parity/magicavoxel-parity.md (app), "Current scores"</span>
 <p>Where MagicaVoxel is ahead: it is a complete, mature, free editor, and its renderer has years of use behind it. We have compared on one PC and one browser.</p>
 <h3>File limits</h3>
 <p>The engine's codec reads and writes versions 150 and 200 of the published format, and an unedited file writes back byte for byte. On export the app merges palette banks into one <code>.vox</code> palette when the occupied colours fit in 255 slots, splits large models into occupied buckets of at most 256 per axis, and refuses what <code>.vox</code> cannot hold (per-object clocks, procedural graphs, placements that are not whole-cell moves and quarter turns) rather than rounding it into something different.</p>

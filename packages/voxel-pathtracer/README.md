@@ -567,9 +567,8 @@ map to `environment.background`, `vignette`, `edges` and `grid`; a transparent b
 reported as `transparentBackground` (pass `transparent: true` to `capture`) and non-cubic voxels (`_setting _scale`)
 as `voxelScale`, which `magicaVoxelMatrix` takes as its fourth argument (the scene scaled about the origin); its image sky (`_env _mode 2`) needs the decoded HDR
 file passed as `magicaVoxelLighting(objects, { imageSky })` (the result's `imageSky.path` names it). Six default-lit scenes (diffuse, metal at roughness 0.2 and 0.8, glass, emitter, cloud) match
-MagicaVoxel's images within 3 of 255 levels on 99.2-99.97% of pixels; the measured mapping, the calibration procedure
-and the open items are in docs/magicavoxel-parity.md. Same scenes, same GPU (RTX A6000), 960 x 800 at 1024 samples:
-MagicaVoxel about 14-15 s, this tracer 1.7-1.85 s.
+MagicaVoxel's images within 3 of 255 levels on 99.2-99.97% of pixels; the calibration scripts are in `tests/magicavoxel/`. On the same scenes at 960 x 800 and 1024 samples this tracer takes
+1.7-1.85 s on an RTX A6000.
 
 ## Parity status and known gaps
 
@@ -585,7 +584,7 @@ Not done or not verified, stated plainly:
   7-16 levels off; subsurface is fitted at one density only;
   glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 98.7% of
   pixels and very dense air settings by 2-3 levels on average; with the ground off its sky below the horizon is
-  within 4.2 levels on average (2-degree blocks), not per pixel (docs/magicavoxel-parity.md).
+  within 4.2 levels on average (2-degree blocks), not per pixel.
 - **Denoiser:** a classical filter, not a learned one. While the camera moves, surfaces it uncovers are noisy for a
   few frames, and for a few frames after it stops the history makes diffuse and cloud scenes slightly worse than
   without it (numbers under "Viewport"). Averaged over four seeds against 131,072-sample references
