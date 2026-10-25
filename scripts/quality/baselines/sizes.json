@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3120952,
+  "total": 3126015,
   "history": [
     {
       "date": "2026-10-24",
@@ -92,6 +92,12 @@
       "commit": "18cede0a",
       "reason": "parity closing 2026-10-24: twelve three.js parity features in optional packages (new entries; Collada, arcball, clipping on lines/points, pointer opt-in, property tracks, USDZ textures, hit test, loader fetch options)",
       "grew": 20
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "2f7f9d34",
+      "reason": "parity follow-ups 2026-10-24: Collada lookat/skew, cameras and lights (loaders); clipIntersection (materials, lines)",
+      "grew": 3
     }
   ],
   "items": {
@@ -213,8 +219,8 @@
     "@margoengine/lightmap": 4053,
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/refracted": 7846,
-    "@margoengine/lines": 17950,
-    "@margoengine/loaders": 47865,
+    "@margoengine/lines": 18511,
+    "@margoengine/loaders": 50744,
     "@margoengine/loaders dist/workers/usd.js": 8035,
     "@margoengine/loaders/common": 2999,
     "@margoengine/loaders/font": 6590,
@@ -242,7 +248,7 @@
     "@margoengine/machinery/spatial": 16187,
     "@margoengine/machinery/surface": 13814,
     "@margoengine/machinery/telemetry": 13378,
-    "@margoengine/materials": 52539,
+    "@margoengine/materials": 54162,
     "@margoengine/materials/atlas": 1250,
     "@margoengine/materials/batched": 31160,
     "@margoengine/materials/transmission": 6815,
