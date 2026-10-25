@@ -5,13 +5,16 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { GPU_STEPS, PLAIN_STEPS, describe, planSteps } from '../scripts/check-merge.mjs';
+import { GPU_STEPS, PLAIN_STEPS, SCOPED_STEPS, describe, planSteps } from '../scripts/check-merge.mjs';
+import { MATRIX_DIRS, matrixClosure, packageScopes } from '../scripts/support/affected-packages.mjs';
+import { PARALLEL, SERIAL, TEST_CONCURRENCY } from '../scripts/verify.mjs';
 import { nightlyCommand, stamp } from '../scripts/nightly-full.mjs';
 import { plan, testId } from '../scripts/gpu-package-tests.mjs';
 import {
   analyse,
   buildFootprints,
   demoSources,
+  scan,
   dependents,
   loadWorkspaces,
   visualIds,
@@ -125,30 +128,142 @@ const workspaces = loadWorkspaces(root);
 const tests = plan();
 const real = buildFootprints({ root, workspaces, tests, scripts: manifest.scripts });
 const steps = manifest.scripts['check:merge:steps'].split(' && ');
+const browserFiles = scan(root, ['tests/modern.html'], workspaces).files;
+const closure = matrixClosure(root, workspaces);
 const planFor = (files) => {
   const decision = analyse({ files, workspaces, footprints: real });
-  return { decision, planned: planSteps({ steps, decision, tests, workspaces, testId }) };
+  const scope = packageScopes({ decision, files, workspaces, browserFiles, closure });
+  return { decision, scope, planned: planSteps({ steps, decision, tests, workspaces, testId, scope }) };
 };
 const stepName = (command) => /^npm run (\S+)/.exec(command)?.[1];
 
 test('every check:merge step is either narrowed GPU work or plain; a new step has to be classified', () => {
   const names = steps.map(stepName);
   for (const name of names)
-    assert.ok(GPU_STEPS.includes(name) || PLAIN_STEPS.includes(name), `classify ${name} in scripts/check-merge.mjs`);
-  for (const name of [...GPU_STEPS, ...PLAIN_STEPS])
+    assert.ok(
+      GPU_STEPS.includes(name) || PLAIN_STEPS.includes(name) || SCOPED_STEPS.includes(name),
+      `classify ${name} in scripts/check-merge.mjs`,
+    );
+  for (const name of [...GPU_STEPS, ...PLAIN_STEPS, ...SCOPED_STEPS])
     assert.ok(names.includes(name), `${name} is not a check:merge step`);
   assert.equal(manifest.scripts['check:merge'], 'node scripts/check-merge.mjs');
   assert.equal(manifest.scripts['check:merge:full'], 'node scripts/check-merge.mjs --full');
 });
 
-test('a documents-only change skips every GPU step and keeps the others', () => {
+test('a documents-only change skips every GPU step and the bundler matrix, and keeps the others', () => {
   const { decision, planned } = planFor(['docs/HANDOFF.md', 'AGENTS.md', 'packages/dof/README.md']);
   assert.equal(decision.mode, 'affected');
   for (const { command, skip } of planned) {
-    if (GPU_STEPS.includes(stepName(command))) assert.ok(skip, `${command} should be skipped`);
+    const name = stepName(command);
+    if (GPU_STEPS.includes(name) || name === 'modern:test:bundlers') assert.ok(skip, `${command} should be skipped`);
     else assert.equal(skip, undefined, `${command} should run`);
   }
   assert.equal(planned.length, steps.length);
+  // The README of dof is the only package whose examples are type-checked; the umbrella smoke test is added by the script.
+  assert.equal(
+    planned.find((p) => stepName(p.command) === 'modern:test:packages').command,
+    'npm run modern:test:packages -- --packages=dof',
+  );
+});
+
+test('a documents-only change outside any package still runs the packed smoke test, with no package examples', () => {
+  const { planned } = planFor(['docs/HANDOFF.md']);
+  assert.equal(
+    planned.find((p) => stepName(p.command) === 'modern:test:packages').command,
+    'npm run modern:test:packages -- --packages=',
+  );
+});
+
+test('a one-package change checks that package and its dependents, and leaves the bundler matrix alone', () => {
+  const { decision, scope, planned } = planFor(['packages/dof/src/index.ts']);
+  assert.ok(scope.packages.dirs.includes('dof'));
+  for (const dir of scope.packages.dirs)
+    assert.ok(decision.affected.includes(workspaces.find((w) => w.dir === `packages/${dir}`).name), dir);
+  assert.ok(!scope.packages.full);
+  assert.ok(scope.packages.dirs.includes('react'), 'react has dof as an optional peer, so its checks run');
+  assert.equal(scope.bundlers.run, false);
+  assert.ok(planned.find((p) => stepName(p.command) === 'modern:test:bundlers').skip);
+});
+
+test('every package is a dependent of the umbrella, which alone must not start the bundler matrix', () => {
+  const { decision, scope } = planFor(['packages/dof/src/index.ts']);
+  assert.ok(decision.affected.includes('margoengine'));
+  assert.equal(scope.bundlers.run, false);
+});
+
+test('a change to a package the matrix builds or imports, or one of their dependencies, runs the matrix', () => {
+  for (const name of ['@margoengine/react', '@margoengine/shadows', '@margoengine/controls', 'margoengine'])
+    assert.ok(closure.has(name), name);
+  for (const dir of MATRIX_DIRS) assert.ok(closure.has(workspaces.find((w) => w.dir === dir).name), dir);
+  // The umbrella lists every package; following it would put all of them in the closure.
+  assert.ok(!closure.has('@margoengine/dof'));
+  for (const name of closure)
+    if (name.startsWith('@margoengine/') && !['@margoengine/core', '@margoengine/stage'].includes(name)) {
+      const dir = workspaces.find((w) => w.name === name).dir;
+      const { scope } = planFor([`${dir}/src/index.ts`]);
+      if (scope.packages.full) continue; // shared and friends run everything anyway
+      assert.equal(scope.bundlers.run, true, `${name} is in the matrix closure`);
+    }
+});
+
+test('a package README, or a React document, selects that package for the README and React checks', () => {
+  assert.deepEqual(planFor(['packages/post/README.md']).scope.packages.dirs, ['post']);
+  assert.deepEqual(planFor(['docs/react-cookbook.md']).scope.packages.dirs, ['react']);
+  assert.deepEqual(planFor(['docs/react-r3f.md']).scope.packages.dirs, ['react']);
+  assert.deepEqual(planFor(['docs/limits.md']).scope.packages.dirs, []);
+});
+
+test('a file the packed browser test serves makes the packed test run whole', () => {
+  assert.ok(browserFiles.has('tests/modern.html'));
+  const { scope } = planFor(['tests/modern.html']);
+  assert.equal(scope.packages.full, true);
+  assert.match(scope.packages.reason, /packed browser test/);
+});
+
+test('full decisions keep the package test whole and the bundler matrix on', () => {
+  const decision = analyse({ files: [], workspaces, footprints: real, env: { MARGO_FULL: '1' } });
+  const scope = packageScopes({ decision, files: [], workspaces, browserFiles, closure });
+  assert.equal(scope.packages.full, true);
+  assert.equal(scope.bundlers.run, true);
+  const planned = planSteps({ steps, decision, tests, workspaces, testId, scope });
+  for (const name of SCOPED_STEPS)
+    assert.deepEqual(
+      planned.find((p) => stepName(p.command) === name),
+      { command: `npm run ${name}` },
+    );
+});
+
+test('the bundler matrix does not take the GPU lock, and a render in a browser is the only reason it would', () => {
+  assert.equal(manifest.scripts['modern:test:bundlers'], 'node scripts/bundler-matrix.mjs');
+  assert.doesNotMatch(
+    readFileSync(resolve(root, 'scripts/bundler-matrix.mjs'), 'utf8'),
+    /requestAdapter|getContext|screenshot/,
+  );
+});
+
+test('verify runs the same eleven checks as before, hygiene first, the build second, the rest after the build', () => {
+  assert.equal(manifest.scripts.verify, 'node scripts/verify.mjs');
+  assert.deepEqual(SERIAL, ['node scripts/hygiene.js --verify', 'npm run build:packages']);
+  assert.deepEqual(
+    PARALLEL.flat().sort(),
+    [
+      'npm run api:check',
+      'npm run quality',
+      'npm run build --workspace examples/gameplay-sandbox',
+      'npm run test --workspace examples/gameplay-sandbox',
+      'npm run build --workspace examples/voxel-sandbox',
+      'npm run test --workspace examples/voxel-sandbox',
+      `node --experimental-test-module-mocks --test --test-concurrency=${TEST_CONCURRENCY} tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js`,
+      'npm run measure:size',
+      'npm run proofs -- --current',
+    ].sort(),
+  );
+  // A sandbox is built before its tests run.
+  for (const chain of PARALLEL.filter((c) => c.length > 1)) assert.match(chain[0], /npm run build /);
+  for (const command of [...SERIAL, ...PARALLEL.flat()]) {
+    const script = /^npm run ([\w:-]+)/.exec(command)?.[1];
+    if (script) assert.ok(manifest.scripts[script], `${script} is a package.json script`);
+  }
 });
 
 test('MARGO_FULL=1 and core changes keep every step exactly as written', () => {

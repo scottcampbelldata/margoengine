@@ -71,7 +71,8 @@ brep-only features here, and never claim a CAD kernel on par with OpenCascade. M
 Several agents push to `main`. Each push must leave it at least as clean as it found it:
 
 - `npm run verify` passes. For changes to shaders, anything a demo draws, a package README or package exports, run `npm run check:merge` (adds the site build, the visual check and `modern:test:packages`, which packs every package,
-  installs the tarballs into a clean project and type-checks each README example; about 11 minutes).
+  installs the tarballs into a clean project and type-checks each README example; a few minutes for a one-package
+  change).
 - `check:merge` runs only the GPU work the change affects: the packages you changed plus everything that depends on
   them (their GPU tests, the visual demos and views that import them, the WGSL compile for their shaders). Core, stage,
   shared, the margoengine umbrella, build and check scripts, package.json or lock files, a file it cannot classify, or
@@ -79,6 +80,14 @@ Several agents push to `main`. Each push must leave it at least as clean as it f
   and it prints which mode ran and why. A nightly job runs the full one: `node scripts/nightly-full.mjs` (dated log in
   `test-results/nightly/`). A GPU step skipped as unaffected is not a failure; if you doubt the mapping, run
   `check:merge:full`.
+- The two package-level steps are narrowed the same way (`scripts/support/affected-packages.mjs`). `verify` builds every
+  package once, then runs its other checks side by side. `modern:test:packages` builds nothing again after `verify`
+  (check:merge hands it that build), packs all packages in one `npm pack`, reuses the consumer project's third-party
+  `node_modules` from `os.tmpdir()/margoengine-consumer-cache` (new key on a lock-file or dependency change, and weekly),
+  and type-checks README examples in parallel shards: only for the affected packages (plus the umbrella's smoke test,
+  always); the React docs, React unit tests and packed browser run when `react` is affected. `modern:test:bundlers`
+  (no GPU, no GPU lock) runs only when a changed package is one the matrix builds or imports (react, shadows, controls,
+  stage, core, the umbrella, the starters) or one they import. `check:merge:full` keeps all of it whole.
 - `npm run hygiene`: no gate gets worse for the packages you touched. New public exports carry TSDoc; new throws follow `docs/conventions.md` (`MargoError` with a code, `TypeError`, `RangeError`; the message names the fix). Run `npx biome format --write` on files you touched.
 - `npm run proofs -- --current` passes. If a deliberate change alters what a feature-off path emits, advance that proof's current reference to your commit and say why in `docs/whitepaper/claims.md`; never leave a proof failing.
 - Public numbers stay true: `site/index.html`, `README.md` and `docs/limits.md` must match `npm run measure:size`. When work affects a launch gate, update its status in `docs/HANDOFF.md`.

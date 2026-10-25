@@ -4,15 +4,18 @@
 //   npm run check:merge:full    everything, as before (the nightly job: scripts/nightly-full.mjs); MARGO_FULL=1 does the same
 //   node scripts/check-merge.mjs --plan [--files=a,b]    print the mode, the reason and the commands, run nothing
 //                               (--files pretends those files changed; --base=<ref> diffs against that ref, not origin/main)
-// The steps are the ones in package.json `check:merge:steps`. Non-GPU steps (verify, the site build, the package
-// tarball test, the bundler matrix) always run; each GPU step runs only when its footprint (scripts/support/
-// affected-gpu.mjs) meets the affected packages, or runs on a narrowed list (visual demos, GPU test ids, WGSL
-// package directories). The mode and the reason are printed first and written to test-results/check-merge.json.
+// The steps are the ones in package.json `check:merge:steps`. Verify and the site build always run; each GPU step runs
+// only when its footprint (scripts/support/affected-gpu.mjs) meets the affected packages, or runs on a narrowed list
+// (visual demos, GPU test ids, WGSL package directories). The package tarball test always runs, on the affected
+// packages' README examples (the umbrella smoke test every time), and the bundler matrix runs when a changed package is
+// one it builds or imports (scripts/support/affected-packages.mjs); the full run keeps both whole. The mode and the
+// reason are printed first and written to test-results/check-merge.json.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { analyse, buildFootprints, loadWorkspaces, visualIds, wgslPackages } from './support/affected-gpu.mjs';
+import { analyse, buildFootprints, loadWorkspaces, scan, visualIds, wgslPackages } from './support/affected-gpu.mjs';
+import { matrixClosure, packageScopes } from './support/affected-packages.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -26,7 +29,9 @@ export const GPU_STEPS = [
   'check:no-webgpu',
 ];
 /** Steps known to need no GPU narrowing; a step in neither list fails the unit test so someone decides. */
-export const PLAIN_STEPS = ['verify', 'build:site', 'modern:test:packages', 'modern:test:bundlers'];
+export const PLAIN_STEPS = ['verify', 'build:site'];
+/** Package-level steps (no GPU) that always run in some form and are narrowed by packageScopes. */
+export const SCOPED_STEPS = ['modern:test:packages', 'modern:test:bundlers'];
 
 const stepName = (command) => /^npm run (\S+)/.exec(command)?.[1];
 
@@ -44,7 +49,7 @@ export function changedFiles(cwd = root, base = 'origin/main') {
  * Commands to run, in order: [{ command, skip?: reason }]. `decision` is analyse()'s result; `mode: 'full'` keeps every
  * step as written. `tests` are gpu-package-tests plan() entries; `workspaces` the package graph.
  */
-export function planSteps({ steps, decision, tests, workspaces, testId }) {
+export function planSteps({ steps, decision, tests, workspaces, testId, scope }) {
   if (decision.mode === 'full') return steps.map((command) => ({ command }));
   const hit = new Set(decision.hits);
   return steps.flatMap((command) => {
@@ -70,6 +75,12 @@ export function planSteps({ steps, decision, tests, workspaces, testId }) {
         const dirs = wgslPackages(workspaces, decision.affected);
         return dirs.length ? [{ command: `${command} -- --packages=${dirs.join(',')}` }] : skip(none);
       }
+      case 'modern:test:packages':
+        return scope && !scope.packages.full
+          ? [{ command: `${command} -- --packages=${scope.packages.dirs.join(',')}` }]
+          : [{ command }];
+      case 'modern:test:bundlers':
+        return !scope || scope.bundlers.run ? [{ command }] : skip(scope.bundlers.reason);
       default:
         return [{ command }];
     }
@@ -93,7 +104,9 @@ async function main() {
     tests = plan(),
     footprints = buildFootprints({ root, workspaces, tests, scripts: manifest.scripts });
   const full = (reason) => ({ ...analyse({ files: [], workspaces, footprints, env: { MARGO_FULL: '1' } }), reason });
-  let decision, base;
+  let decision,
+    base,
+    files = [];
   if (args.includes('--full')) decision = full('--full (npm run check:merge:full)');
   else if (process.env.MARGO_FULL === '1') decision = full('MARGO_FULL=1');
   else {
@@ -103,26 +116,46 @@ async function main() {
         ? { files: given.slice(8).split(',').filter(Boolean) }
         : changedFiles(root, args.find((a) => a.startsWith('--base='))?.slice(7));
       base = diff.base;
+      files = diff.files;
       decision = analyse({ files: diff.files, workspaces, footprints, env: process.env });
     } catch (error) {
       decision = full(`cannot diff against origin/main (${String(error.message).split('\n')[0]})`);
     }
   }
-  const planned = planSteps({ steps, decision, tests, workspaces, testId });
+  const scope = packageScopes({
+    decision,
+    files,
+    workspaces,
+    browserFiles: scan(root, ['tests/modern.html'], workspaces).files,
+    closure: matrixClosure(root, workspaces),
+  });
+  const planned = planSteps({ steps, decision, tests, workspaces, testId, scope });
   console.log(describe(decision, base));
+  console.log(
+    `  packages: ${scope.packages.full ? 'whole' : 'scoped'} (${scope.packages.reason}); bundlers: ${scope.bundlers.run ? 'run' : 'skip'} (${scope.bundlers.reason})`,
+  );
   for (const { command, skip } of planned) console.log(`  ${skip ? `skip (${skip})` : 'run'}  ${command}`);
   if (args.includes('--plan')) return;
   const results = [],
     started = performance.now();
-  let failed;
+  let failed,
+    built = false;
   for (const { command, skip } of planned) {
     if (skip) {
       results.push({ command, skipped: skip });
       continue;
     }
     console.log(`\n=== ${command}`);
+    // verify builds every package; the tarball test then reuses that build instead of building again. The stale-file
+    // check still holds: verify plants marker files in two dist folders before its build, and no pack may contain them.
+    const name = stepName(command),
+      env = { ...process.env };
+    if (name === 'verify' && planned.some((p) => stepName(p.command) === 'modern:test:packages'))
+      env.MARGOENGINE_PLANT_STALE = '1';
+    if (name === 'modern:test:packages' && built) env.MARGOENGINE_PACKAGE_TEST_PREBUILT = '1';
     const t0 = performance.now(),
-      { status } = spawnSync(command, { cwd: root, shell: true, stdio: 'inherit' });
+      { status } = spawnSync(command, { cwd: root, shell: true, stdio: 'inherit', env });
+    if (name === 'verify' && status === 0) built = true;
     results.push({ command, ok: status === 0, seconds: Math.round((performance.now() - t0) / 100) / 10 });
     if (status !== 0) {
       failed = command;

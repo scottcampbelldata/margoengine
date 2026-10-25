@@ -1,8 +1,22 @@
+// The packed-package test (`npm run modern:test:packages`): builds every package once, packs them all, installs the
+// tarballs into a clean consumer project and checks them there: licence and notice files, the strict consumer
+// declarations and run, every README example, the React docs, the React unit tests and the packed browser lifecycle.
+//   npm run modern:test:packages                          everything
+//   npm run modern:test:packages -- --packages=dof,react  only those packages' README examples (check:merge passes the
+//                                                         affected ones); packing, install, licences and the umbrella
+//                                                         smoke test always run; `react` also switches on the React
+//                                                         docs, the React unit tests and the packed browser
+// MARGOENGINE_PACKAGE_TEST_PREBUILT=1 skips the build (check:merge: `verify` just built, and planted stale files).
+// The consumer project is kept between runs (os.tmpdir()/margoengine-consumer-cache/<key>) with its third-party
+// node_modules; only our tarballs are extracted again. The key covers the lock file, the dependency declarations of
+// every package, the Node version and the ISO week, so a new dependency or a new week installs afresh.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdir, mkdtemp, writeFile, readFile, copyFile, readdir, rm, realpath } from 'node:fs/promises';
+import { execFileSync, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, writeFile, readFile, copyFile, readdir, rm, realpath, stat } from 'node:fs/promises';
 import { resolve, join, dirname, basename } from 'node:path';
-import { tmpdir } from 'node:os';
+import { cpus, tmpdir } from 'node:os';
 import { openBrowser } from './browser.js';
 
 const names = [
@@ -39,12 +53,39 @@ const noticeFiles = new Map([
 const packageDocuments = new Map([...noticeFiles, ['blender', 'FORMAT.md']]);
 const packageName = (name) => (name === 'margoengine' ? 'margoengine' : `@margoengine/${name}`);
 assert.ok(npm, 'Run this check through npm run modern:test:packages');
+// --packages=a,b: only those packages' README examples (the umbrella's always); absent: every package.
+const packagesArg = process.argv.find((arg) => arg.startsWith('--packages='));
+const selected = packagesArg
+  ? new Set([...packagesArg.slice('--packages='.length).split(',').filter(Boolean), 'margoengine'])
+  : null;
+for (const name of selected ?? [])
+  assert.ok(
+    packedNames.includes(name),
+    `--packages names ${name}, which is not a package directory (${packedNames.join(', ')})`,
+  );
+const inScope = (name) => !selected || selected.has(name);
+// The React docs, the React unit tests and the packed browser lifecycle belong to the React package.
+const reactScope = inScope('react');
+// bsdtar ships with Windows; a GNU tar earlier on PATH would read `C:` as a host name.
+const tarBin =
+  process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+const seconds = (since) => `${Math.round((performance.now() - since) / 100) / 10} s`;
+const timings = [];
+const timed = async (label, work) => {
+  const since = performance.now();
+  try {
+    return await work();
+  } finally {
+    timings.push(`${label} ${seconds(since)}`);
+  }
+};
 // Reuse a verified archive set while concurrent source edits are in progress.
 // This mode never packs, rebuilds, or injects markers into shared dist.
 const reuseTarballs = process.env.MARGOENGINE_PACKAGE_TEST_REUSE_TARBALLS === '1';
 const archives = resolve(reuseTarballs ? 'test-results/margo-packages' : 'test-results/modern-packages');
 if (reuseTarballs) await realpath(archives);
 else await mkdir(archives, { recursive: true });
+const tarballs = [];
 const dependencies = {
   react: '18.3.1',
   'react-dom': '18.3.1',
@@ -56,19 +97,48 @@ const dependencies = {
   '@dimforge/rapier3d-compat': JSON.parse(await readFile('node_modules/@dimforge/rapier3d-compat/package.json', 'utf8'))
     .version,
 };
-// A local retry can reuse the coherent workspace build made by core's prepack.
-// The default still exercises every package's own prepack hook.
-const reuseBuild = process.env.MARGOENGINE_PACKAGE_TEST_REUSE_BUILDS === '1';
-if (!reuseTarballs)
-  for (const name of ['core', 'react'])
+// One build for all packages (every package's prepack is that same build, so packing with scripts ran it once per
+// package). A stale file planted in two dist folders must not survive the build into a tarball. When check:merge's
+// `verify` has just built, it planted the files before its build and this run packs that result.
+const prebuilt = process.env.MARGOENGINE_PACKAGE_TEST_PREBUILT === '1';
+if (!reuseTarballs && !prebuilt) {
+  for (const name of ['core', 'react']) {
+    await mkdir(`packages/${name}/dist`, { recursive: true });
     await writeFile(`packages/${name}/dist/__stale-package-test.js`, 'throw new Error("Stale build artifact");');
+  }
+  await timed('build', async () =>
+    execFileSync(process.execPath, [npm, 'run', 'build:packages'], { stdio: 'inherit' }),
+  );
+}
+// One npm process packs every workspace; the build already ran, so no prepack.
+const packs = new Map();
+if (!reuseTarballs) {
+  // npm pack prints the prepack scripts' output before its JSON, and a warning may precede it.
+  const fromArray = (text) => text.slice(Math.max(0, text.search(/^\[/m)));
+  const out = await timed('pack', async () =>
+    execFileSync(
+      process.execPath,
+      [
+        npm,
+        'pack',
+        ...packedNames.flatMap((name) => ['--workspace', packageName(name)]),
+        '--pack-destination',
+        archives,
+        '--json',
+        '--ignore-scripts',
+      ],
+      { encoding: 'utf8', maxBuffer: 1 << 28 },
+    ),
+  );
+  for (const pack of JSON.parse(fromArray(out))) packs.set(pack.name, pack);
+}
 for (const name of packedNames) {
   let pack, manifest;
   if (reuseTarballs) {
     const workspaceManifest = JSON.parse(await readFile(`packages/${name}/package.json`, 'utf8'));
     const filename = packageName(name).replace(/^@/, '').replace('/', '-') + '-' + workspaceManifest.version + '.tgz',
       archive = join(archives, filename);
-    const members = execFileSync('tar', ['-tf', archive], { encoding: 'utf8' }).split(/\r?\n/).filter(Boolean);
+    const members = execFileSync(tarBin, ['-tf', archive], { encoding: 'utf8' }).split(/\r?\n/).filter(Boolean);
     assert.ok(
       members.length && members.every((member) => member.startsWith('package/') && !member.split('/').includes('..')),
       `Invalid cached package archive: ${filename}`,
@@ -79,30 +149,12 @@ for (const name of packedNames) {
         .filter((member) => !member.endsWith('/'))
         .map((member) => ({ path: member.slice('package/'.length) })),
     };
-    manifest = JSON.parse(execFileSync('tar', ['-xOf', archive, 'package/package.json'], { encoding: 'utf8' }));
+    manifest = JSON.parse(execFileSync(tarBin, ['-xOf', archive, 'package/package.json'], { encoding: 'utf8' }));
     assert.equal(manifest.name, packageName(name), `Wrong cached package: ${filename}`);
     assert.equal(manifest.version, workspaceManifest.version, `Wrong cached version: ${filename}`);
   } else {
-    // npm pack prints the prepack scripts' output (core's build prints the catalog line) before its JSON.
-    const fromArray = (text) => text.slice(Math.max(0, text.search(/^\[/m)));
-    [pack] = JSON.parse(
-      fromArray(
-        execFileSync(
-          process.execPath,
-          [
-            npm,
-            'pack',
-            '--workspace',
-            packageName(name),
-            '--pack-destination',
-            archives,
-            '--json',
-            ...(reuseBuild && name !== 'core' ? ['--ignore-scripts'] : []),
-          ],
-          { encoding: 'utf8' },
-        ),
-      ),
-    );
+    pack = packs.get(packageName(name));
+    assert.ok(pack, `npm pack did not report ${packageName(name)}`);
     manifest = JSON.parse(await readFile(`packages/${name}/package.json`, 'utf8'));
   }
   const files = new Set(pack.files.map((file) => file.path));
@@ -141,15 +193,100 @@ for (const name of packedNames) {
     for (const target of Object.values(entry))
       assert.ok(files.has(target.slice(2)), `Missing packed export: ${manifest.name} ${target}`);
   dependencies[packageName(name)] = `file:${join(archives, pack.filename).replaceAll('\\', '/')}`;
+  tarballs.push({ name: packageName(name), file: join(archives, pack.filename) });
 }
-const fixture = await mkdtemp(join(tmpdir(), 'margoengine-consumer-'));
+// The consumer project. A warm one (same key) keeps its third-party node_modules and gets our tarballs extracted
+// again; a cold one, or one another run holds, is installed with npm as a fresh temporary project.
+const week = (() => {
+  const d = new Date();
+  const jan1 = Date.UTC(d.getUTCFullYear(), 0, 1);
+  return `${d.getUTCFullYear()}-w${Math.floor((Date.now() - jan1) / 604_800_000)}`;
+})();
+const key = createHash('sha256')
+  .update(
+    JSON.stringify({
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      week,
+      lock: createHash('sha256')
+        .update(await readFile('package-lock.json'))
+        .digest('hex'),
+      external: Object.entries(dependencies).filter(([, version]) => !version.startsWith('file:')),
+      packages: await Promise.all(
+        packedNames.map(async (name) => {
+          const { version, dependencies, peerDependencies, optionalDependencies, peerDependenciesMeta } = JSON.parse(
+            await readFile(`packages/${name}/package.json`, 'utf8'),
+          );
+          return [name, version, dependencies, peerDependencies, optionalDependencies, peerDependenciesMeta];
+        }),
+      ),
+    }),
+  )
+  .digest('hex')
+  .slice(0, 16);
+const cacheBase = join(tmpdir(), 'margoengine-consumer-cache'),
+  cacheDir = join(cacheBase, key),
+  lockDir = `${cacheDir}.lock`;
+let holdsLock = false;
+if (!process.env.MARGOENGINE_PACKAGE_TEST_NO_CACHE) {
+  await mkdir(cacheBase, { recursive: true });
+  for (let attempt = 0; attempt < 2 && !holdsLock; attempt++)
+    try {
+      await mkdir(lockDir);
+      holdsLock = true;
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      // A run that died holding the lock leaves it behind; nothing here takes more than twenty minutes.
+      if (Date.now() - (await stat(lockDir)).mtimeMs < 20 * 60_000) break;
+      await rm(lockDir, { recursive: true, force: true });
+    }
+}
+const fixture = holdsLock ? cacheDir : await mkdtemp(join(tmpdir(), 'margoengine-consumer-'));
+const ready = join(cacheDir, '.ready');
+const warm = holdsLock && existsSync(ready);
 let browser;
 const browserErrors = [];
 try {
-  await writeFile(join(fixture, 'package.json'), JSON.stringify({ private: true, type: 'module', dependencies }));
-  execFileSync(process.execPath, [npm, 'install', '--ignore-scripts', '--no-audit', '--no-fund'], {
-    cwd: fixture,
-    stdio: 'inherit',
+  await timed(warm ? 'fixture (warm cache)' : 'fixture (npm install)', async () => {
+    if (warm) {
+      // Everything of ours goes; the third-party packages stay.
+      for (const entry of await readdir(fixture))
+        if (entry !== 'node_modules' && entry !== '.ready')
+          await rm(join(fixture, entry), { recursive: true, force: true });
+      for (const entry of ['@margoengine', 'margoengine', 'docs'])
+        await rm(join(fixture, 'node_modules', entry), { recursive: true, force: true });
+      await writeFile(join(fixture, 'package.json'), JSON.stringify({ private: true, type: 'module', dependencies }));
+      let next = 0;
+      const extract = async () => {
+        while (next < tarballs.length) {
+          const { name, file } = tarballs[next++],
+            target = join(fixture, 'node_modules', name);
+          await mkdir(target, { recursive: true });
+          await new Promise((done, fail) =>
+            spawn(tarBin, ['-xzf', file, '-C', target, '--strip-components=1'], { stdio: 'inherit' })
+              .on('error', fail)
+              .on('close', (code) => (code === 0 ? done() : fail(new Error(`tar failed for ${file}`)))),
+          );
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(8, cpus().length) }, extract));
+      return;
+    }
+    if (holdsLock) {
+      await rm(cacheDir, { recursive: true, force: true });
+      await mkdir(cacheDir, { recursive: true });
+    }
+    await writeFile(join(fixture, 'package.json'), JSON.stringify({ private: true, type: 'module', dependencies }));
+    execFileSync(process.execPath, [npm, 'install', '--ignore-scripts', '--no-audit', '--no-fund'], {
+      cwd: fixture,
+      stdio: 'inherit',
+    });
+    // A package that npm nested inside ours cannot be restored by extracting the tarballs again.
+    const nested = [];
+    for (const { name } of tarballs)
+      if (existsSync(join(fixture, 'node_modules', name, 'node_modules'))) nested.push(name);
+    if (holdsLock && !nested.length) await writeFile(ready, new Date().toISOString());
   });
   for (const [name, file] of packageDocuments)
     assert.equal(
@@ -169,6 +306,7 @@ try {
       ),
       `${packageName(name)} must ship Margo's NOTICE`,
     );
+    if (!inScope(name)) continue;
     const markdown = await readFile(join(fixture, `node_modules/${packageName(name)}/README.md`), 'utf8');
     // Standalone examples have imports; continuation blocks retain the preceding setup.
     const examples = [];
@@ -181,7 +319,7 @@ try {
   }
   // The React cookbook and the react-three-fiber guide are checked like a README. A snippet whose first line is
   // `// path/file.tsx` is written to that path so a second snippet can import it.
-  for (const doc of ['react-cookbook', 'react-from-r3f']) {
+  for (const doc of reactScope ? ['react-cookbook', 'react-from-r3f'] : []) {
     const examples = [];
     for (const [, code] of (await readFile(`docs/${doc}.md`, 'utf8')).matchAll(/```tsx?\r?\n([\s\S]*?)```/g)) {
       if (!examples.length || /^\s*(?:\/\/ [\w/.-]+\.tsx\r?\n)?\s*import\s/m.test(code)) examples.push(code);
@@ -194,38 +332,47 @@ try {
       await writeFile(file, code);
     }
   }
-  await writeFile(
-    join(fixture, 'docs/tsconfig.json'),
-    JSON.stringify({
-      compilerOptions: {
-        strict: true,
-        target: 'ES2022',
-        module: 'ESNext',
-        moduleResolution: 'Bundler',
-        jsx: 'react-jsx',
-        types: [],
-        lib: ['ES2022', 'DOM'],
-        noEmit: true,
-      },
-      include: ['**/*.tsx'],
-    }),
-  );
+  if (reactScope)
+    await writeFile(
+      join(fixture, 'docs/tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          strict: true,
+          target: 'ES2022',
+          module: 'ESNext',
+          moduleResolution: 'Bundler',
+          jsx: 'react-jsx',
+          types: [],
+          lib: ['ES2022', 'DOM'],
+          noEmit: true,
+        },
+        include: ['**/*.tsx'],
+      }),
+    );
+  // The consumer program emits and runs; the README examples are only type-checked, in shards that run side by side.
+  const consumerOptions = {
+    strict: true,
+    target: 'ES2022',
+    module: 'NodeNext',
+    moduleResolution: 'NodeNext',
+    jsx: 'react-jsx',
+    types: [],
+    lib: ['ES2022', 'DOM'],
+  };
   await writeFile(
     join(fixture, 'tsconfig.json'),
-    JSON.stringify({
-      compilerOptions: {
-        strict: true,
-        target: 'ES2022',
-        module: 'NodeNext',
-        moduleResolution: 'NodeNext',
-        jsx: 'react-jsx',
-        types: [],
-        lib: ['ES2022', 'DOM'],
-        outDir: 'out',
-      },
-      include: ['consumer.tsx', '*-readme.tsx'],
-    }),
+    JSON.stringify({ compilerOptions: { ...consumerOptions, outDir: 'out' }, include: ['consumer.tsx'] }),
   );
+  const readmeFiles = (await readdir(fixture)).filter((file) => file.endsWith('-readme.tsx')).sort(),
+    shardCount = Math.max(1, Math.min(8, cpus().length >> 2, readmeFiles.length)),
+    shards = Array.from({ length: shardCount }, (_, shard) =>
+      readmeFiles.filter((_, index) => index % shardCount === shard),
+    );
+  for (const [shard, include] of shards.entries())
+    await writeFile(
+      join(fixture, `tsconfig.readme-${shard}.json`),
+      JSON.stringify({ compilerOptions: { ...consumerOptions, noEmit: true }, include }),
+    );
   await writeFile(
     join(fixture, 'consumer.tsx'),
     `import {TransformStore,type PassContext} from '@margoengine/core/extension';
@@ -283,119 +430,173 @@ mesh.matrix;
 console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 SSR pass');
 `,
   );
-  execFileSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '-p', join(fixture, 'tsconfig.json')], {
-    stdio: 'inherit',
-  });
-  execFileSync(
-    process.execPath,
-    [resolve('node_modules/typescript/bin/tsc'), '-p', join(fixture, 'docs/tsconfig.json')],
-    {
-      stdio: 'inherit',
-    },
-  );
-  execFileSync(process.execPath, [join(fixture, 'out/consumer.js')], { cwd: fixture, stdio: 'inherit' });
+  const tsc = resolve('node_modules/typescript/bin/tsc'),
+    failures = [];
+  // A child process in the fixture; its output is kept and printed when it ends.
+  const task = (label, args) =>
+    new Promise((done) => {
+      const started = performance.now(),
+        chunks = [],
+        child = spawn(process.execPath, args, { cwd: fixture, stdio: ['ignore', 'pipe', 'pipe'] });
+      child.stdout.on('data', (chunk) => chunks.push(chunk));
+      child.stderr.on('data', (chunk) => chunks.push(chunk));
+      const end = (code, extra = '') => {
+        const output = Buffer.concat(chunks).toString() + extra;
+        timings.push(`${label} ${seconds(started)}`);
+        if (output.trim()) console.log(`--- ${label}\n${output.trimEnd()}`);
+        if (code !== 0) failures.push(label);
+        done(code === 0);
+      };
+      child.on('error', (error) => end(-1, String(error)));
+      child.on('close', (code) => end(code));
+    });
   // Run against the installed tarball itself. Relative internal-module imports and
   // public package imports must share the same React contexts and asset caches.
   const reactRoot = join(fixture, 'node_modules/@margoengine/react'),
     supportRoot = join(fixture, 'node_modules'),
     reactTests = [];
-  for (const directory of ['test', 'tests']) {
-    await mkdir(join(reactRoot, directory), { recursive: true });
-    for (const file of await readdir('packages/react/' + directory, { withFileTypes: true })) {
-      // These packaging/bundler checks require the workspace and already run in
-      // the full Node gate; all component lifecycle tests also run on React 18.
-      if (!file.isFile() || !file.name.endsWith('.js') || file.name === 'subpaths.test.js') continue;
-      const relative = directory + '/' + file.name;
-      await copyFile('packages/react/' + relative, join(reactRoot, relative));
-      if (file.name.endsWith('.test.js')) reactTests.push(relative);
+  if (reactScope) {
+    for (const directory of ['test', 'tests']) {
+      await mkdir(join(reactRoot, directory), { recursive: true });
+      for (const file of await readdir('packages/react/' + directory, { withFileTypes: true })) {
+        // These packaging/bundler checks require the workspace and already run in
+        // the full Node gate; all component lifecycle tests also run on React 18.
+        if (!file.isFile() || !file.name.endsWith('.js') || file.name === 'subpaths.test.js') continue;
+        const relative = directory + '/' + file.name;
+        await copyFile('packages/react/' + relative, join(reactRoot, relative));
+        if (file.name.endsWith('.test.js')) reactTests.push(relative);
+      }
     }
+    reactTests.sort();
+    await mkdir(join(supportRoot, '@margoengine/gltf-pro/src'), { recursive: true });
+    await mkdir(join(supportRoot, 'docs'), { recursive: true });
+    await copyFile('packages/gltf-pro/src/shader.ts', join(supportRoot, '@margoengine/gltf-pro/src/shader.ts'));
+    await mkdir(join(supportRoot, '@margoengine/shared'), { recursive: true });
+    await copyFile('packages/shared/aces.js', join(supportRoot, '@margoengine/shared/aces.js'));
+    for (const file of ['react-integration.md', 'react-r3f.md'])
+      await copyFile('docs/' + file, join(supportRoot, 'docs', file));
   }
-  reactTests.sort();
-  await mkdir(join(supportRoot, '@margoengine/gltf-pro/src'), { recursive: true });
-  await mkdir(join(supportRoot, 'docs'), { recursive: true });
-  await copyFile('packages/gltf-pro/src/shader.ts', join(supportRoot, '@margoengine/gltf-pro/src/shader.ts'));
-  await mkdir(join(supportRoot, '@margoengine/shared'), { recursive: true });
-  await copyFile('packages/shared/aces.js', join(supportRoot, '@margoengine/shared/aces.js'));
-  for (const file of ['react-integration.md', 'react-r3f.md'])
-    await copyFile('docs/' + file, join(supportRoot, 'docs', file));
-  execFileSync(
-    process.execPath,
-    ['--experimental-test-module-mocks', '--test', ...reactTests.map((file) => join(reactRoot, file))],
-    { cwd: fixture, stdio: 'inherit' },
-  );
-  const aliases = [],
-    browserExport = (entry) =>
-      typeof entry === 'string' ? entry : browserExport(entry.browser ?? entry.import ?? entry.default);
-  for (const name of [...packedNames.map(packageName), 'react', 'react-dom']) {
-    const directory = join(fixture, 'node_modules', name),
-      manifest = JSON.parse(await readFile(join(directory, 'package.json'), 'utf8'));
-    for (const [subpath, entry] of Object.entries(manifest.exports)) {
-      const specifier = name + (subpath === '.' ? '' : subpath.slice(1));
-      aliases.push({
-        find: new RegExp('^' + specifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$'),
-        replacement: join(directory, browserExport(entry)),
-      });
+  const packedBrowser = async () => {
+    const aliases = [],
+      browserExport = (entry) =>
+        typeof entry === 'string' ? entry : browserExport(entry.browser ?? entry.import ?? entry.default);
+    for (const name of [...packedNames.map(packageName), 'react', 'react-dom']) {
+      const directory = join(fixture, 'node_modules', name),
+        manifest = JSON.parse(await readFile(join(directory, 'package.json'), 'utf8'));
+      for (const [subpath, entry] of Object.entries(manifest.exports)) {
+        const specifier = name + (subpath === '.' ? '' : subpath.slice(1));
+        aliases.push({
+          find: new RegExp('^' + specifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$'),
+          replacement: join(directory, browserExport(entry)),
+        });
+      }
     }
-  }
-  browser = await openBrowser({ startPath: '/tests/modern.html', aliases });
-  const { page } = browser,
-    errors = browserErrors;
-  page.on('pageerror', (error) => errors.push(error.message));
-  page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text());
-  });
-  await page.waitForFunction(() => window.modern);
-  await page.evaluate(() => window.modern.mount());
-  await page.waitForFunction(
-    () => window.modern.state.react?.meshes.size === 2 && window.modern.state.parent && window.modern.state.child,
-  );
-  assert.ok(
-    await page.evaluate(() => {
-      const s = window.modern.state;
-      return s.react.store.parents[s.child.id] === s.parent.id;
-    }),
-  );
-  const renders = await page.evaluate(() => window.modern.state.renders);
-  await page.waitForFunction(() => window.modern.state.frames >= 20);
-  assert.equal(await page.evaluate(() => window.modern.state.renders), renders);
-  await page.evaluate(() => window.modern.mount({ position: 2 }));
-  await page.waitForFunction(() => window.modern.state.parent?.position.x === 2);
-  await page.evaluate(() => window.modern.mount({ show: false }));
-  await page.waitForFunction(() => window.modern.state.react.meshes.size === 0);
-  await page.evaluate(() => window.modern.mount({ suspend: true }));
-  await page.waitForTimeout(100);
-  assert.equal(await page.evaluate(() => window.modern.state.react.meshes.size), 0);
-  await page.evaluate(() => window.modern.mount());
-  await page.waitForFunction(() => window.modern.state.react.meshes.size === 2);
-  await page.evaluate(() => window.modern.unmount());
-  assert.ok(await page.evaluate(() => window.modern.state.react.disposed));
-  assert.equal(await page.evaluate(() => window.modern.state.react.meshes.size), 0);
-  assert.deepEqual(await page.evaluate(() => window.modern.state.errors), []);
-  assert.deepEqual(errors, []);
+    const started = performance.now();
+    browser = await openBrowser({ startPath: '/tests/modern.html', aliases });
+    const { page } = browser,
+      errors = browserErrors;
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    await page.waitForFunction(() => window.modern);
+    await page.evaluate(() => window.modern.mount());
+    await page.waitForFunction(
+      () => window.modern.state.react?.meshes.size === 2 && window.modern.state.parent && window.modern.state.child,
+    );
+    assert.ok(
+      await page.evaluate(() => {
+        const s = window.modern.state;
+        return s.react.store.parents[s.child.id] === s.parent.id;
+      }),
+    );
+    const renders = await page.evaluate(() => window.modern.state.renders);
+    await page.waitForFunction(() => window.modern.state.frames >= 20);
+    assert.equal(await page.evaluate(() => window.modern.state.renders), renders);
+    await page.evaluate(() => window.modern.mount({ position: 2 }));
+    await page.waitForFunction(() => window.modern.state.parent?.position.x === 2);
+    await page.evaluate(() => window.modern.mount({ show: false }));
+    await page.waitForFunction(() => window.modern.state.react.meshes.size === 0);
+    await page.evaluate(() => window.modern.mount({ suspend: true }));
+    await page.waitForTimeout(100);
+    assert.equal(await page.evaluate(() => window.modern.state.react.meshes.size), 0);
+    await page.evaluate(() => window.modern.mount());
+    await page.waitForFunction(() => window.modern.state.react.meshes.size === 2);
+    await page.evaluate(() => window.modern.unmount());
+    assert.ok(await page.evaluate(() => window.modern.state.react.disposed));
+    assert.equal(await page.evaluate(() => window.modern.state.react.meshes.size), 0);
+    assert.deepEqual(await page.evaluate(() => window.modern.state.errors), []);
+    assert.deepEqual(errors, []);
+    timings.push(`packed browser ${seconds(started)}`);
+  };
+  // Everything that only reads the installed packages runs side by side: the consumer program, the README examples in
+  // shards, the React docs, the React unit tests and the packed browser.
+  const pipelines = [
+    (async () => {
+      if (await task('consumer tsc', [tsc, '-p', join(fixture, 'tsconfig.json')]))
+        await task('consumer run', [join(fixture, 'out/consumer.js')]);
+    })(),
+    ...shards.flatMap((include, shard) =>
+      include.length
+        ? [
+            task(`README tsc ${shard + 1}/${shards.length}`, [
+              tsc,
+              '-p',
+              join(fixture, `tsconfig.readme-${shard}.json`),
+            ]),
+          ]
+        : [],
+    ),
+  ];
+  if (reactScope)
+    pipelines.push(
+      task('React docs tsc', [tsc, '-p', join(fixture, 'docs/tsconfig.json')]),
+      task('React unit tests', [
+        '--experimental-test-module-mocks',
+        '--test',
+        ...reactTests.map((file) => join(reactRoot, file)),
+      ]),
+      packedBrowser(),
+    );
+  const settled = await Promise.allSettled(pipelines);
+  console.log(`package test timings: ${timings.join(', ')}`);
+  const rejected = settled.find((result) => result.status === 'rejected');
+  if (rejected) throw rejected.reason;
+  assert.deepEqual(failures, [], `Failed: ${failures.join(', ')}`);
   const react = JSON.parse(await readFile(join(fixture, 'node_modules/react/package.json'), 'utf8')).version;
   await writeFile(
     'test-results/modern-packages.json',
     JSON.stringify(
       {
-        hardware: browser.hardware,
+        hardware: browser?.hardware ?? null,
         packages: packedNames.map(packageName),
-        archiveSource: reuseTarballs ? 'cached-tarballs' : 'prepack',
+        scope: selected ? [...selected].sort() : 'all',
+        archiveSource: reuseTarballs ? 'cached-tarballs' : prebuilt ? 'verify build' : 'build',
         archiveDirectory: archives,
         react,
         reactTests,
+        timings,
         checks: [
           'standalone imports and Wasm',
           'strict consumer declarations without workspace ambient types',
           'React 18 SSR',
-          'React 18 declarative, kit, post, physics, XR and loader lifecycle unit tests',
-          'React 18 StrictMode, nested refs, props, RAF, Suspense and teardown',
+          ...(reactScope
+            ? [
+                'React 18 declarative, kit, post, physics, XR and loader lifecycle unit tests',
+                'React 18 StrictMode, nested refs, props, RAF, Suspense and teardown',
+              ]
+            : []),
         ],
       },
       null,
       2,
     ),
   );
-  console.log(`React ${react} packaged browser lifecycle passes`);
+  console.log(
+    reactScope
+      ? `React ${react} packaged browser lifecycle passes`
+      : `packed packages pass (${[...selected].join(', ')})`,
+  );
 } catch (error) {
   if (browser) {
     const state = await browser.page
@@ -418,8 +619,20 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   throw error;
 } finally {
   await browser?.close();
-  const target = await realpath(fixture);
-  assert.equal(dirname(target).toLowerCase(), (await realpath(tmpdir())).toLowerCase());
-  assert.ok(basename(target).startsWith('margoengine-consumer-'));
-  await rm(target, { recursive: true, force: true });
+  if (holdsLock) {
+    // The warm project stays for the next run. Projects of other keys that nobody has touched for three days go.
+    await rm(lockDir, { recursive: true, force: true });
+    for (const entry of await readdir(cacheBase))
+      if (entry !== key && !entry.endsWith('.lock'))
+        if (
+          Date.now() - (await stat(join(cacheBase, entry)).catch(() => ({ mtimeMs: Date.now() }))).mtimeMs >
+          3 * 86_400_000
+        )
+          await rm(join(cacheBase, entry), { recursive: true, force: true });
+  } else {
+    const target = await realpath(fixture);
+    assert.equal(dirname(target).toLowerCase(), (await realpath(tmpdir())).toLowerCase());
+    assert.ok(basename(target).startsWith('margoengine-consumer-'));
+    await rm(target, { recursive: true, force: true });
+  }
 }

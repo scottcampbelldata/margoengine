@@ -136,7 +136,7 @@
     "visual:check": "node scripts/visual-regression.js",
     "visual:update": "node scripts/visual-regression.js --update",
     "visual:device-loss": "node scripts/visual-regression.js --device-loss",
-    "verify": "node scripts/hygiene.js --verify && npm run build:packages && npm run api:check && npm run quality && npm run build --workspace examples/gameplay-sandbox && npm run test --workspace examples/gameplay-sandbox && npm run build --workspace examples/voxel-sandbox && npm run test --workspace examples/voxel-sandbox && node --experimental-test-module-mocks --test --test-concurrency=4 tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js && npm run measure:size && npm run proofs -- --current",
+    "verify": "node scripts/verify.mjs",
     "hygiene": "node scripts/hygiene.js",
     "quality": "node scripts/quality-gate.mjs",
     "format": "biome format --write",
@@ -220,7 +220,7 @@
     "modern:test:scene-helpers": "node scripts/scene-helper-tests.js",
     "test:kernel": "cargo test --locked --manifest-path packages/kernel/Cargo.toml",
     "fuzz": "node scripts/fuzz/run.js",
-    "modern:test:bundlers": "node scripts/gpu-lock.mjs run --owner=bundlers -- node scripts/bundler-matrix.mjs"
+    "modern:test:bundlers": "node scripts/bundler-matrix.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
