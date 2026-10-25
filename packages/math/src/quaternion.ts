@@ -43,24 +43,37 @@ export class Quaternion {
   }
   /** Intrinsic rotation in `euler.order`: for 'XYZ' the result is qX * qY * qZ, the convention of core. */
   setFromEuler(euler: EulerLike): this {
-    this.identity();
-    for (let i = 0; i < 3; i++) {
-      const axis = euler.order[i],
-        half = (axis === 'X' ? euler.x : axis === 'Y' ? euler.y : euler.z) / 2,
-        s = Math.sin(half),
-        c = Math.cos(half);
-      this.multiplyComponents(
-        this.x,
-        this.y,
-        this.z,
-        this.w,
-        axis === 'X' ? s : 0,
-        axis === 'Y' ? s : 0,
-        axis === 'Z' ? s : 0,
-        c,
-      );
+    // The product of the three half-angle axis quaternions written out per order (no per-axis loop: this runs once per
+    // object per frame in animation code). Cyclic orders (XYZ, YZX, ZXY) and the others differ only in signs.
+    const sx = Math.sin(euler.x / 2),
+      cx = Math.cos(euler.x / 2),
+      sy = Math.sin(euler.y / 2),
+      cy = Math.cos(euler.y / 2),
+      sz = Math.sin(euler.z / 2),
+      cz = Math.cos(euler.z / 2);
+    const a = sx * cy * cz,
+      b = cx * sy * sz,
+      c = cx * sy * cz,
+      d = sx * cy * sz,
+      e = cx * cy * sz,
+      f = sx * sy * cz,
+      g = cx * cy * cz,
+      h = sx * sy * sz;
+    switch (euler.order) {
+      case 'XYZ':
+        return this.set(a + b, c - d, e + f, g - h);
+      case 'YXZ':
+        return this.set(a + b, c - d, e - f, g + h);
+      case 'ZXY':
+        return this.set(a - b, c + d, e + f, g - h);
+      case 'ZYX':
+        return this.set(a - b, c + d, e - f, g + h);
+      case 'YZX':
+        return this.set(a + b, c + d, e - f, g - h);
+      case 'XZY':
+        return this.set(a - b, c - d, e + f, g + h);
     }
-    return this;
+    throw new RangeError(`Invalid Euler order ${euler.order}; use XYZ, XZY, YXZ, YZX, ZXY or ZYX`);
   }
   /** Reads the rotation from a pure-rotation 3x3 or 4x4 matrix (column-major; scale must be removed first). */
   setFromRotationMatrix(m: MatrixLike): this {
