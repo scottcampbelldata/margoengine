@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/ecs",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Typed-array packed sparse-set entity component storage.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "ecs"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/ecs"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -28,6 +44,5 @@
     "build": "node ../../scripts/build-optional.js ecs",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

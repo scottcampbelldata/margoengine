@@ -1,9 +1,26 @@
 {
   "name": "@margoengine/voxel-net",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "voxel",
+    "net"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/voxel-net"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -36,6 +53,5 @@
     "test": "npm run build && node --test tests/*.test.js",
     "bench": "node bench/run.mjs",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

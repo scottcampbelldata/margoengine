@@ -1,9 +1,26 @@
 {
   "name": "@margoengine/react",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "React 18/19 components and stable mesh refs for Margo Engine.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "react",
+    "react-three"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/react"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -139,6 +156,5 @@
     "@margoengine/cache": {
       "optional": true
     }
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

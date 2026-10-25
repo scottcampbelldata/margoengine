@@ -2,9 +2,27 @@
   "name": "margoengine",
   "version": "1.0.0",
   "description": "Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react).",
-  "type": "module",
-  "license": "MIT",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "renderer",
+    "game-engine",
+    "cad",
+    "wasm"
+  ],
   "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/margoengine"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },

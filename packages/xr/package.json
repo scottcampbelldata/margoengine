@@ -1,9 +1,27 @@
 {
   "name": "@margoengine/xr",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "webxr",
+    "vr",
+    "ar"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/xr"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -24,6 +42,5 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/stats",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "stats"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/stats"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -25,6 +41,5 @@
     "build": "node ../../scripts/build-optional.js stats",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

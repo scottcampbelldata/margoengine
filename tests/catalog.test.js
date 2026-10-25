@@ -36,8 +36,14 @@ test('catalog covers every public package with matching versions and imports, an
     assert.ok(entry.install.includes(`${manifest.name}@${manifest.version}`));
     const runtime = await import(new URL(`../packages/${id}/dist/index.js`, import.meta.url));
     assert.deepEqual(entry.exports, Object.keys(runtime).sort());
-    // The source repository is private: manifests link to no repository (main, 2026-10-18).
-    assert.equal(manifest.repository, undefined, `${manifest.name} names a repository`);
+    // Every published manifest links back to its folder in the source repository.
+    assert.deepEqual(
+      manifest.repository,
+      { type: 'git', url: 'git+https://github.com/scottcampbelldata/margoengine.git', directory: `packages/${id}` },
+      `${manifest.name} must name its repository folder`,
+    );
+    assert.equal(manifest.license, 'MIT', `${manifest.name} must be MIT licensed`);
+    assert.equal(manifest.author, 'Scott Campbell', `${manifest.name} must name its author`);
   }
   assert.equal(new Set(entries.map((entry) => entry.package)).size, entries.length);
 });

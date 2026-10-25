@@ -1,10 +1,18 @@
 {
   "name": "margoengine",
-  "homepage": "https://margoengine.com",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "engines": {
     "node": ">=22.12.0"
   },

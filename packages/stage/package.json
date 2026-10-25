@@ -1,10 +1,26 @@
 {
   "name": "@margoengine/stage",
-  "homepage": "https://margoengine.com",
   "version": "1.0.0",
   "description": "The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine.",
-  "type": "module",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "renderer",
+    "scene"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/stage"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },

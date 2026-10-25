@@ -1,9 +1,26 @@
 {
   "name": "@margoengine/physics",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "physics",
+    "rapier"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/physics"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -32,7 +49,6 @@
       "optional": true
     }
   },
-  "homepage": "https://margoengine.com",
   "devDependencies": {
     "@margoengine/math": "^1.0.0"
   }

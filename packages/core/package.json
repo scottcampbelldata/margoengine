@@ -2,8 +2,26 @@
   "name": "@margoengine/core",
   "version": "1.0.0",
   "description": "WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl package.",
-  "type": "module",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "wasm",
+    "rust",
+    "renderer"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/core"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -24,6 +42,5 @@
   },
   "files": [
     "dist"
-  ],
-  "homepage": "https://margoengine.com"
+  ]
 }

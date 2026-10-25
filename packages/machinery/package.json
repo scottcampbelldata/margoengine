@@ -1,9 +1,27 @@
 {
   "name": "@margoengine/machinery",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "cad",
+    "kinematics",
+    "step"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/machinery"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -84,7 +102,6 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com",
   "dependencies": {
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/lines": "^1.0.0",

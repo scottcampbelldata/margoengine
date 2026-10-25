@@ -1,9 +1,27 @@
 {
   "name": "create-margo",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Start a Margo Engine app: npm create margo@latest my-app (templates: web, game, cad, viz, react, next)",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "scaffold",
+    "starter",
+    "cli"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "tools/create-margo"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "bin": {
     "create-margo": "index.js"
   },
@@ -14,7 +32,6 @@
   "engines": {
     "node": ">=20.19"
   },
-  "homepage": "https://margoengine.com",
   "publishConfig": {
     "access": "public"
   }

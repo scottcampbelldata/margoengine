@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/oit",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Weighted blended order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: no popping between overlapping transparent parts.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "oit"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/oit"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -29,6 +45,5 @@
     "build": "node ../../scripts/build-optional.js oit",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/decoders",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG, TGA, TIFF, DDS and KTX reading, for Margo Engine.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "decoders"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/decoders"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
@@ -53,6 +69,5 @@
   },
   "files": [
     "dist"
-  ],
-  "homepage": "https://margoengine.com"
+  ]
 }

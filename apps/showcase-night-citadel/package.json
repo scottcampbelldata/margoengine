@@ -1,6 +1,25 @@
 {
   "name": "@margoengine/showcase-night-citadel",
   "version": "0.1.0",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "showcase",
+    "night",
+    "citadel"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "apps/showcase-night-citadel"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
   "private": true,
   "type": "module",
   "scripts": {

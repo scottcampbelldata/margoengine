@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/exporters",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "glTF/GLB, STL, OBJ, PLY, USDZ and COLLADA exporters for Margo Engine scenes and geometry data.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "exporters"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/exporters"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -132,7 +148,6 @@
       "optional": true
     }
   },
-  "homepage": "https://margoengine.com",
   "dependencies": {
     "@margoengine/math": "^1.0.0"
   }

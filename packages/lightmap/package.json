@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/lightmap",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "CPU lightmap atlases with native albedo, emission, normal and ORM textures; optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted).",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "lightmap"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/lightmap"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -39,6 +55,5 @@
     "build": "node ../../scripts/build-optional.js lightmap",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

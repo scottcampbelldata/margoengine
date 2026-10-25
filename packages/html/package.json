@@ -1,8 +1,25 @@
 {
   "name": "@margoengine/html",
   "version": "1.0.0",
-  "type": "module",
+  "description": "World-space DOM anchors, CSS3D placement and scene-depth occlusion.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "html"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/html"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -27,7 +44,5 @@
     "build": "node ../../scripts/build-optional.js html",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com",
-  "description": "World-space DOM anchors, CSS3D placement and scene-depth occlusion."
+  }
 }

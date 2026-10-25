@@ -1,9 +1,27 @@
 {
   "name": "@margoengine/gltf",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Lazy static glTF/GLB loading for Margo Engine.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "gltf",
+    "glb",
+    "loader"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/gltf"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -26,6 +44,5 @@
   },
   "devDependencies": {
     "@margoengine/math": "^1.0.0"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

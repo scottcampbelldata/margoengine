@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/viewcube",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "viewcube"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/viewcube"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -25,6 +41,5 @@
     "build": "node ../../scripts/build-optional.js viewcube",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

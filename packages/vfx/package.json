@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/vfx",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "GPU particle simulation and indirect billboards.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "vfx"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/vfx"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -47,6 +63,5 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

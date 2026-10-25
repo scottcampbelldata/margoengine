@@ -1,9 +1,30 @@
 {
   "name": "@margoengine/brep",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Margo's own CAD kernel: STEP (ISO 10303-21) reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "cad",
+    "b-rep",
+    "step",
+    "nurbs",
+    "tessellation",
+    "jt"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/brep"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -26,6 +47,5 @@
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/points",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Large point clouds (PointCloud, PointsMaterial) and instanced sprites (SpriteBatch, SpriteMaterial) for Margo Engine, WebGPU.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "points"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/points"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -28,6 +44,5 @@
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

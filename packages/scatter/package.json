@@ -1,8 +1,25 @@
 {
   "name": "@margoengine/scatter",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Seeded instancing, distance-based LOD and procedural wind.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "scatter"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/scatter"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -28,7 +45,5 @@
     "test": "npm run build && node --test test/*.test.js",
     "test:browser": "npm run build && node test/lod.browser.mjs",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com",
-  "description": "Seeded instancing, distance-based LOD and procedural wind."
+  }
 }

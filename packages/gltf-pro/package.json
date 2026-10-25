@@ -1,9 +1,26 @@
 {
   "name": "@margoengine/gltf-pro",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "gltf",
+    "pbr"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/gltf-pro"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -59,7 +76,6 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com",
   "devDependencies": {
     "@margoengine/math": "^1.0.0"
   }

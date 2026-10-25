@@ -1,8 +1,25 @@
 {
   "name": "@margoengine/road",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Arc-length spline road surfaces, raised curbs and tiled UVs.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "road"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/road"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -27,7 +44,5 @@
     "build": "node ../../scripts/build-optional.js road",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com",
-  "description": "Arc-length spline road surfaces, raised curbs and tiled UVs."
+  }
 }

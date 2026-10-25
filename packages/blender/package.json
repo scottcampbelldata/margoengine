@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/blender",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Optional offline Blender .margo assets using Margo's WebGPU PBR renderer.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "blender"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/blender"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "files": [
     "dist",
@@ -25,6 +41,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

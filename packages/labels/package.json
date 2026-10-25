@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/labels",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "HTML labels and CSS 3D objects positioned over a Margo Engine canvas.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "labels"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/labels"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -26,7 +42,6 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com",
   "devDependencies": {
     "@margoengine/math": "^1.0.0"
   }

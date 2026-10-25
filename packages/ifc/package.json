@@ -1,9 +1,26 @@
 {
   "name": "@margoengine/ifc",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "ifc",
+    "bim"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/ifc"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -30,7 +47,6 @@
     "@margoengine/loaders": "^1.0.0",
     "web-ifc": "^0.0.78"
   },
-  "homepage": "https://margoengine.com",
   "peerDependenciesMeta": {
     "web-ifc": {
       "optional": true

@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/net",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Hermite and quaternion snapshot interpolation with bounded prediction.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "net"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/net"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -25,6 +41,5 @@
     "build": "node ../../scripts/build-optional.js net",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/quality",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "quality"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/quality"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -29,6 +45,5 @@
     "build": "node ../../scripts/build-optional.js quality",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

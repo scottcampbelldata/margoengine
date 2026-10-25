@@ -1,18 +1,47 @@
 {
   "name": "@margoengine/mesh-edit",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "mesh",
+    "edit"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/mesh-edit"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "files": ["dist", "LICENSE"],
-  "publishConfig": { "access": "public" },
-  "dependencies": { "@margoengine/bvh": "^1.0.0", "@margoengine/math": "^1.0.0" },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/bvh": "^1.0.0",
+    "@margoengine/math": "^1.0.0"
+  },
   "scripts": {
     "build": "node ../../scripts/build-optional.js mesh-edit",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

@@ -1,8 +1,25 @@
 {
   "name": "@margoengine/toon",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Stepped diffuse shading and inverted-hull outlines.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "toon"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/toon"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -28,7 +45,5 @@
     "build": "node ../../scripts/build-optional.js toon",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com",
-  "description": "Stepped diffuse shading and inverted-hull outlines."
+  }
 }

@@ -1,8 +1,25 @@
 {
   "name": "@margoengine/video",
   "version": "1.0.0",
-  "type": "module",
+  "description": "WebGPU external video textures and optional Web Audio sampling.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "video"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/video"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -24,7 +41,5 @@
     "build": "node ../../scripts/build-optional.js video",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com",
-  "description": "WebGPU external video textures and optional Web Audio sampling."
+  }
 }

@@ -1,8 +1,25 @@
 {
   "name": "@margoengine/navmesh",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build).",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "navmesh"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/navmesh"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -31,7 +48,5 @@
     "build": "node ../../scripts/build-optional.js navmesh",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com",
-  "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build)."
+  }
 }

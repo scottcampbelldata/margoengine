@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/loaders",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "PLY, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "loaders"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/loaders"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -66,7 +82,6 @@
       "optional": true
     }
   },
-  "homepage": "https://margoengine.com",
   "dependencies": {
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/math": "^1.0.0"

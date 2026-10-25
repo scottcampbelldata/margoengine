@@ -1,9 +1,27 @@
 {
   "name": "@margoengine/math",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math, one module per type.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "vector",
+    "matrix",
+    "quaternion"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/math"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -117,6 +135,5 @@
     "build": "node scripts/build.js",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

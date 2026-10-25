@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/culling",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "culling"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/culling"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -28,6 +44,5 @@
     "build": "node ../../scripts/build-optional.js culling",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

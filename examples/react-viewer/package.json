@@ -1,6 +1,24 @@
 {
   "name": "@margoengine/react-viewer",
   "version": "0.1.0",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "react",
+    "viewer"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "examples/react-viewer"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
   "private": true,
   "type": "module",
   "scripts": {

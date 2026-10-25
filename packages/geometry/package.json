@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/geometry",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "geometry"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/geometry"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -51,6 +67,5 @@
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

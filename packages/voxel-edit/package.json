@@ -1,9 +1,26 @@
 {
   "name": "@margoengine/voxel-edit",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Editing voxel models for editors and tools: dense and sparse grids, modeling operations, brushes and selections, picking, export meshing, .vox scene editing and frame animation.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "voxel",
+    "edit"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/voxel-edit"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -66,6 +83,5 @@
     "build": "node ../../scripts/build-optional.js voxel-edit",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

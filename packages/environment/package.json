@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/environment",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "environment"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/environment"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -53,6 +69,5 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

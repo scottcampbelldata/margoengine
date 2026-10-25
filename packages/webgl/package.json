@@ -1,9 +1,27 @@
 {
   "name": "@margoengine/webgl",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}).",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "webgl",
+    "webgl2",
+    "fallback"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/webgl"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -28,6 +46,5 @@
     "build": "node ../../scripts/build-optional.js webgl",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

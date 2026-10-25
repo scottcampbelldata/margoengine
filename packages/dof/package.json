@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/dof",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Optional two-pass WebGPU depth of field with circular bokeh.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "dof"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/dof"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -30,6 +46,5 @@
     "test": "node --test tests/*.test.js",
     "dev": "vite --config vite.config.js --open /examples/index.html",
     "build:demo": "vite build --config vite.config.js"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

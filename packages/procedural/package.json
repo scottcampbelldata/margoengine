@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/procedural",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "procedural"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/procedural"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -45,6 +61,5 @@
     "build": "node ../../scripts/build-optional.js procedural",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

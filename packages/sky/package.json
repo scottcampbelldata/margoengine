@@ -1,8 +1,25 @@
 {
   "name": "@margoengine/sky",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Procedural atmospheric skies, clouds, sun, moon and stars.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "sky"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/sky"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -59,7 +76,5 @@
     "build": "node ../../scripts/build-optional.js sky",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com",
-  "description": "Procedural atmospheric skies, clouds, sun, moon and stars."
+  }
 }

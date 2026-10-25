@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/fsm",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Hierarchical state transitions with cross-fade progress.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "fsm"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/fsm"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -28,6 +44,5 @@
     "build": "node ../../scripts/build-optional.js fsm",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

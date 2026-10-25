@@ -1,8 +1,25 @@
 {
   "name": "@margoengine/selection",
   "version": "1.0.0",
-  "type": "module",
+  "description": "GPU picking and visible mesh selection outlines.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "selection"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/selection"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -25,7 +42,5 @@
     "test": "npm run build && node --test test/*.test.js",
     "test:browser": "node test/picking.browser.mjs && node test/models.browser.mjs && node test/xray.browser.mjs",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com",
-  "description": "GPU picking and visible mesh selection outlines."
+  }
 }

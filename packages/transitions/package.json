@@ -1,8 +1,25 @@
 {
   "name": "@margoengine/transitions",
   "version": "1.0.0",
-  "type": "module",
+  "description": "WebGPU scene wipes, noise dissolves and chromatic displacement.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "transitions"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/transitions"
+  },
   "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -27,7 +44,5 @@
     "build": "node ../../scripts/build-optional.js transitions",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com",
-  "description": "WebGPU scene wipes, noise dissolves and chromatic displacement."
+  }
 }

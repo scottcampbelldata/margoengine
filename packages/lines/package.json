@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/lines",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Fat lines (Line, LineMaterial) and debug helpers for Margo Engine, WebGPU.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "lines"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/lines"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -28,6 +44,5 @@
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

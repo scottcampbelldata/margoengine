@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/materials",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Optional glTF PBR material lobes, transmission, volume and typed node graphs through an isolated extension slot.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "materials"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/materials"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
@@ -40,6 +56,5 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }

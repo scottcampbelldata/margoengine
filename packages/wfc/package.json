@@ -1,9 +1,25 @@
 {
   "name": "@margoengine/wfc",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
   "description": "Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "wfc"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/wfc"
+  },
+  "license": "MIT",
+  "author": "Scott Campbell",
+  "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -32,6 +48,5 @@
     "build": "node ../../scripts/build-optional.js wfc",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
-  },
-  "homepage": "https://margoengine.com"
+  }
 }
