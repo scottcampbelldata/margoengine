@@ -4,6 +4,8 @@
 // this repository (docs/benchmarking.md "Comparing engines"). STANDARD lists the cases each browser suite runs, shared
 // by the CLI (bench/cli.mjs) and the in-browser runner (bench/web/), so both run the same scenes with the same code.
 
+import { parityScenes } from './parity.js';
+
 export const CANVAS = [1280, 720];
 // Margo core's default light (packages/core/src/engine.ts): direction toward the light, intensity, ambient.
 export const LIGHT = { direction: [3, 5, 4], intensity: 3, ambient: 0.15 };
@@ -59,7 +61,7 @@ export function boxes(n) {
 }
 
 /** n boxes on a flat grid at y = 0.25 standing on a floor slab whose top is y = 0 (lights and shadows scenes). */
-function yard(n) {
+export function yard(n) {
   const side = Math.ceil(Math.sqrt(n)),
     half = (side - 1) / 2,
     pick = random(7),
@@ -303,6 +305,9 @@ export const SCENES = {
     data: (p) => boxes(p.n),
   },
 };
+
+// The parity scenes (docs/whitepaper/perf-vs-threejs.md), built from the helpers above.
+Object.assign(SCENES, parityScenes({ PALETTE, boxes, orbit, random, yard }));
 
 /** The cases each browser suite runs (scene + parameters). */
 export const STANDARD = {

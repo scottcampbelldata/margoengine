@@ -20,6 +20,9 @@ export const options = {
   gpuFrames: passed.gpuFrames ?? 60,
   serialFrames: passed.serialFrames ?? 30,
   maxPhaseMs: passed.maxPhaseMs ?? 20_000,
+  // Task scenes: calls thrown away after the cold call, then measured calls (harness.js runTask).
+  taskWarmup: passed.taskWarmup ?? 3,
+  taskIterations: passed.taskIterations ?? 30,
   // The folder the scenes' models load from (the repository's examples/assets when the CLI serves the page).
   assets: String(passed.assets ?? '/examples/assets/'),
   dump: q.has('dump'),
@@ -46,6 +49,13 @@ const stat = (values) => {
   };
 };
 const raf = () => new Promise((r) => requestAnimationFrame(r));
+const resources = () =>
+  performance.getEntriesByType('resource').map((r) => ({
+    name: new URL(r.name).pathname,
+    bytes: r.encodedBodySize,
+    transfer: r.transferSize,
+    ms: +r.duration.toFixed(1),
+  }));
 
 // WebGPU: every device gets 'timestamp-query' when the adapter has it, and while `ts.on` every render/compute pass gets
 // begin/end timestamp writes. GPU time of a frame = sum of its pass durations. Live GPU memory = bytes of buffers and
@@ -187,6 +197,9 @@ async function webgpuTimes(app, frames, next) {
     ts.n = 0;
     ts.on = true;
     do {
+      // One browser frame per rendered frame, as in the throughput loop: some engines (three.js WebGPU node chains)
+      // advance their per-frame state only once per animation frame and would otherwise redraw a cached result.
+      await raf();
       const a = ts.n;
       app.render(next());
       batch.push([a, ts.n]);
@@ -255,6 +268,28 @@ async function webglTimes(app, frames, next) {
   return { method: 'EXT_disjoint_timer_query_webgl2 TIME_ELAPSED', gpuMs: disjoint ? null : stat(times), disjoint };
 }
 
+/**
+ * A task scene (kind: 'task' in the catalog): no frames, one job timed per call. `app.task(i)` does the job once (may
+ * return a promise); the first call is timed alone (coldMs), then taskWarmup calls are thrown away and up to
+ * taskIterations calls (within maxPhaseMs) are measured. `app.output?.()` describes what the job produced (counts,
+ * bounds), so engines can be checked for doing the same job.
+ */
+async function runTask(app, result) {
+  const call = async (i) => {
+    const a = performance.now();
+    await app.task(i);
+    return performance.now() - a;
+  };
+  result.task = { coldMs: +(await call(0)).toFixed(3) };
+  for (let i = 1; i <= options.taskWarmup; i++) await call(i);
+  const times = [],
+    start = performance.now();
+  for (let i = 0; i < options.taskIterations && performance.now() - start < options.maxPhaseMs; i++)
+    times.push(await call(options.taskWarmup + 1 + i));
+  result.task.ms = stat(times);
+  result.task.output = (await app.output?.()) ?? null;
+}
+
 /** Runs one measurement of `create` (an engine's scene builder) and leaves the result on window.result. */
 export async function run(create) {
   const result = {
@@ -274,6 +309,19 @@ export async function run(create) {
     const next = () => frame++ / 60;
     const data = await SCENES[options.scene].data(params, { assets: options.assets });
     const app = await create(canvas, { scene: options.scene, params, data }, marks);
+    if (SCENES[options.scene].kind === 'task') {
+      Object.assign(result, { createMs: marks.createMs, buildMs: marks.buildMs });
+      await runTask(app, result);
+      result.loadMs = +performance.now().toFixed(1);
+      if (globalThis.gc) gc();
+      result.jsHeapMB = performance.memory ? +(performance.memory.usedJSHeapSize / 2 ** 20).toFixed(2) : null;
+      result.info = app.info?.() ?? {};
+      result.resources = resources();
+      result.jsBytes = result.resources.filter((r) => r.name.endsWith('.js')).reduce((n, r) => n + r.bytes, 0);
+      window.result = result;
+      if (parent !== window) parent.postMessage({ type: 'margo-bench-result', result }, location.origin);
+      return;
+    }
     const s = performance.now();
     app.render(next());
     await app.idle();
@@ -344,12 +392,7 @@ export async function run(create) {
     result.gcExposed = !!globalThis.gc;
     result.info = app.info?.() ?? {};
     if (globalThis.dumped) result.dumped = globalThis.dumped;
-    result.resources = performance.getEntriesByType('resource').map((r) => ({
-      name: new URL(r.name).pathname,
-      bytes: r.encodedBodySize,
-      transfer: r.transferSize,
-      ms: +r.duration.toFixed(1),
-    }));
+    result.resources = resources();
     result.jsBytes = result.resources.filter((r) => r.name.endsWith('.js')).reduce((s, r) => s + r.bytes, 0);
     // Final still frame at t = 0 for a screenshot.
     app.render(0);

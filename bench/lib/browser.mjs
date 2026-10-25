@@ -22,6 +22,7 @@ const types = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.hdr': 'application/octet-stream',
+  '.webm': 'video/webm',
 };
 
 /**
@@ -87,6 +88,8 @@ export async function serve({ port, external }) {
   const roots = [
     ['/bench/', distDir],
     ...Object.entries(external).map(([name, e]) => [`/ext/${name}/`, join(e.dir, 'dist', name)]),
+    // engine-bench itself, for files an engine loads by path at run time (decoder and transcoder binaries).
+    ...(Object.values(external)[0] ? [['/engine-bench/', Object.values(external)[0].root]] : []),
     ['/', root],
   ];
   const server = createServer((req, res) => {
@@ -202,6 +205,9 @@ const METRICS = {
   jsHeapMB: { unit: 'MB', better: 'lower', read: (r) => r.jsHeapMB },
   gpuMB: { unit: 'MB', better: 'lower', read: (r) => r.gpuMemory?.liveMB },
   gpuPeakMB: { unit: 'MB', better: 'lower', read: (r) => r.gpuMemory?.peakMB },
+  // Task scenes (harness.js runTask): one job per call, then its first (cold) call alone.
+  taskMs: { unit: 'ms', better: 'lower', read: (r) => r.task?.ms?.median },
+  coldMs: { unit: 'ms', better: 'lower', read: (r) => r.task?.coldMs },
   jsBytes: { unit: 'B', better: 'lower', exact: true, read: (r) => r.jsBytes },
   drawCalls: { unit: '', better: 'lower', exact: true, read: (r) => r.info?.drawCalls },
 };
@@ -213,10 +219,11 @@ const METRICS = {
 export function sceneCases(suite, { primary, list = STANDARD[suite], keep } = {}) {
   return (ctx) =>
     ctx.engines.flatMap((engine) =>
-      list.map(({ scene, params }) => {
+      list.map(({ scene, params, primary: own, keep: kept }) => {
         const p = sceneParams(scene, params),
           id = `${caseId(scene, params)}${engine === 'margo' ? '' : `@${engine}`}`,
-          names = keep ?? Object.keys(METRICS);
+          names = kept ?? keep ?? Object.keys(METRICS),
+          main = own ?? primary;
         return {
           id,
           title: `${SCENES[scene].title} ${Object.entries(params ?? {})
@@ -228,7 +235,7 @@ export function sceneCases(suite, { primary, list = STANDARD[suite], keep } = {}
           // The same scene in every engine forms one group, which the CLI runs interleaved.
           group: ctx.engines.length > 1 ? `${suite}:${caseId(scene, params)}` : undefined,
           metrics: Object.fromEntries(
-            names.map((m) => [m, { ...METRICS[m], primary: primary.includes(m), read: undefined }]),
+            names.map((m) => [m, { ...METRICS[m], primary: main.includes(m), read: undefined }]),
           ),
           async run(runCtx) {
             const r = await ctx.browser().run({
@@ -251,6 +258,8 @@ export function sceneCases(suite, { primary, list = STANDARD[suite], keep } = {}
                 samples: r.samples,
                 gpuMethod: r.gpu?.method ?? 'none (no timestamp-query)',
                 passes: r.gpu?.passes,
+                ...(r.task ? { output: r.task.output } : {}),
+                scripts: r.resources?.filter((x) => x.name.endsWith('.js')).map((x) => x.name),
                 ...(errors.length ? { errors: errors.slice(0, 5) } : {}),
               },
             };

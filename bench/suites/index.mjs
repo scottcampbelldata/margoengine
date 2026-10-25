@@ -19,7 +19,7 @@ export const SUITES = [
 ];
 
 /** Suites that run only when named (`npm run bench -- features`). */
-export const OPT_IN = ['features', 'claims'];
+export const OPT_IN = ['features', 'claims', 'parity'];
 
 export async function loadSuite(name) {
   if (!SUITES.includes(name) && !OPT_IN.includes(name))

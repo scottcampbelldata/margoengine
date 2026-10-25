@@ -4,7 +4,7 @@
 // Every optional package is imported by the scene that uses it, so a scene's page loads only what that scene needs.
 import { Camera, Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
-import { CAD_MATERIALS, LIGHT, PALETTE } from './catalog.js';
+import { CAD_MATERIALS, LIGHT, PALETTE, SCENES } from './catalog.js';
 
 /** Scenes this engine implements (the page reports any other as unsupported). */
 export const scenes = [
@@ -19,13 +19,15 @@ export const scenes = [
   'gltf',
   'helmet',
   'react',
+  // Every parity scene (./parity.js); each is built in ./parity/margo-<area>.js.
+  ...Object.keys(SCENES).filter((id) => SCENES[id].area),
 ];
 export const meta = { name: 'margo', api: 'webgpu' };
 
-const single = { doubleSided: false };
-const sceneSamples = () => (/Mobi|Android/.test(navigator.userAgent) ? 1 : 4); // packages/core/src/quality.ts
+export const single = { doubleSided: false };
+export const sceneSamples = () => (/Mobi|Android/.test(navigator.userAgent) ? 1 : 4); // packages/core/src/quality.ts
 
-async function engineFor(canvas, camera, capacity, marks) {
+export async function engineFor(canvas, camera, capacity, marks) {
   const s = performance.now();
   const engine = await Engine.create(canvas, {
     backend: 'webgpu',
@@ -38,7 +40,7 @@ async function engineFor(canvas, camera, capacity, marks) {
   lighting.radiance.set([1, 1, 1, LIGHT.ambient]);
   return engine;
 }
-const app = (engine, update, extra) => ({
+export const app = (engine, update, extra) => ({
   samples: sceneSamples(),
   render(t) {
     update(t);
@@ -55,7 +57,7 @@ const app = (engine, update, extra) => ({
       : { drawCalls: engine.stats.drawCalls, note: extra.note ?? 'core batches (package passes not counted)' },
 });
 /** Four views, one per quarter of the canvas: the engine camera, then three more cameras on its orbit. */
-const quarters = (engine, camera) =>
+export const quarters = (engine, camera) =>
   [0, 1, 2, 3].map((k) => ({
     camera: k
       ? new Camera({
@@ -68,13 +70,13 @@ const quarters = (engine, camera) =>
       : engine.camera,
     viewport: [(k % 2) * 0.5, (k >> 1) * 0.5, 0.5, 0.5],
   }));
-const linear = (hex) =>
+export const linear = (hex) =>
   [1, 3, 5].map((i) => {
     const v = parseInt(hex.slice(i, i + 2), 16) / 255;
     return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
   });
 // Column-major world matrix from position + Euler XYZ (as core's setRotation), times the parent's.
-async function composer() {
+export async function composer() {
   const { Matrix4, Euler, Quaternion, Vector3 } = await import('@margoengine/math'),
     one = new Vector3(1, 1, 1),
     q = new Quaternion(),
@@ -86,7 +88,7 @@ async function composer() {
   };
 }
 /** Core meshes for a list of {position, rotation, color | material} items; returns the meshes. */
-function meshes(engine, def, materials) {
+export function meshes(engine, def, materials) {
   const geometry = box(def.size, def.size, def.size);
   return def.items.map((b) =>
     engine
@@ -97,8 +99,8 @@ function meshes(engine, def, materials) {
       .setRotation(b.rotation),
   );
 }
-const palette = (def) => PALETTE.map((color) => new PbrMaterial({ color, ...def.material, ...single }));
-const floor = (engine, f) =>
+export const palette = (def) => PALETTE.map((color) => new PbrMaterial({ color, ...def.material, ...single }));
+export const floor = (engine, f) =>
   engine
     .createMesh()
     .setGeometry(box(...f.size))
@@ -379,8 +381,10 @@ async function instancedBoxes(canvas, data, marks, { n, move }) {
 }
 
 /** Builds `scene` from the catalog's engine-neutral `data` (harness.js calls this). */
-export function create(canvas, { scene, params, data }, marks) {
-  const build = builders[scene];
+export async function create(canvas, { scene, params, data }, marks) {
+  // Parity scenes (./parity.js) are built in ./parity/margo-<area>.js, loaded only for the scene that runs.
+  const area = SCENES[scene]?.area,
+    build = builders[scene] ?? (area && (await import(`./parity/margo-${area}.js`)).builders[scene]);
   if (!build) throw new Error(`margo: no implementation of scene ${scene}`);
   return build(canvas, data, marks, params);
 }

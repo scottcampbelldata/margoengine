@@ -125,6 +125,7 @@
     "bench:viz": "node bench/cli.mjs viz",
     "bench:react": "node bench/cli.mjs react",
     "bench:features": "node bench/cli.mjs features",
+    "bench:parity": "node bench/cli.mjs parity --engines=margo,three-webgpu-parity,three-webgl-parity --no-fail && node bench/parity-report.mjs",
     "bench:claims": "node bench/cli.mjs claims --engines=all",
     "build:packages": "node scripts/build-modern.js --precompiled",
     "api:check": "node scripts/api-report.js",

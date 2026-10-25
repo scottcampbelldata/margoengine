@@ -13,6 +13,8 @@ an earlier run or commit and fails when something got slower. The same scenes ru
 - [Quiet-machine rules](#quiet-machine-rules)
 - [The browser runner](#the-browser-runner)
 - [Comparing engines](#comparing-engines)
+- [Task scenes](#task-scenes)
+- [The three.js parity matrix](#the-threejs-parity-matrix)
 - [Adding a suite](#adding-a-suite)
 - [Adding a scene](#adding-a-scene)
 - [What the tool replaced](#what-the-tool-replaced)
@@ -89,9 +91,10 @@ The tool takes the lock itself when it is not wrapped, so both forms are safe.
 | `viz` | | A stub. It fills in when the data track lands its charts and plots. |
 | `react` | browser | Mount 1,000 boxes declared with `@margoengine/react`, then re-render all of them every frame. |
 | `claims` | engine-bench | Opt-in: each other engine's own harness, recorded beside the shared scenes (see [Comparing engines](#comparing-engines)). |
+| `parity` | browser | Opt-in: one scene per row of `docs/threejs-parity.md` that three.js also has (`bench/scenes/parity.js`), run in Margo and in the three.js adapters in engine-bench (`three-webgpu-parity`, `three-webgl-parity`). `npm run bench:parity` runs it and `bench/parity-report.mjs` adds the results to [the speed matrix](whitepaper/perf-vs-threejs.md). |
 | `features` | Node and browser | Opt-in, about an hour: the per-feature scripts in `examples/package-benchmarks` (CAD scale, culling, post stack, loader memory, shadow shimmer, instancing, atlas + VAT, workers, every real-browser test). Each runs once under the run's gate and GPU lock. Its logs and result files go to `benchmarks/runs/<id>/features/`, and the committed results are restored. |
 
-`npm run bench` runs every suite except `features` and `claims`, which run only when named.
+`npm run bench` runs every suite except `features`, `claims` and `parity`, which run only when named.
 `npm run bench -- --list` prints every case id.
 
 ## Reading results
@@ -269,6 +272,32 @@ Comparisons are apples to apples by construction:
   Run it in the same session as the shared scenes, so both sets of numbers carry the same machine record. Case ids get an `@<engine>` suffix, such as
 `boxes-10000@three-webgpu`. The tool reads engine-bench and writes only to `engine-bench/margo-bench/dist/`. It never
 copies an engine's files into this repository. Each result records the version of every engine it ran.
+
+## Task scenes
+
+A scene with `kind: 'task'` in the catalog times one job per call instead of frames: a parse, an export, a geometry
+build, a raycast batch. The engine's `create()` returns `{task(i), output()}`. The harness (`runTask` in
+`bench/scenes/harness.js`) times the first call alone (`coldMs`), throws away `taskWarmup` calls (default 3), then
+measures up to `taskIterations` calls (default 30) within `maxPhaseMs`. `taskMs` is their median. `output()` returns
+counts such as vertices or hits, so engines can be checked for doing the same job. Inputs are fetched in `create()`,
+outside the timing.
+
+## The three.js parity matrix
+
+`npm run bench:parity` runs the `parity` suite for Margo and both three.js adapters, then
+`node bench/parity-report.mjs`. The report:
+
+- compares Margo with the faster three.js backend per scene;
+- diffs the two screenshots (SSIM of the luminance and mean delta E);
+- counts each engine's own scripts in gzip bytes;
+- adds the run to the ledger `docs/whitepaper/perf-vs-threejs.json`, then renders `perf-vs-threejs.md` from it.
+
+The ledger keeps each scene's first result and never overwrites it. Later runs are added next to it, so a fixed row
+shows its before and after numbers. Only a run with 3 or more runs per case and no `--cases` filter enters the
+ledger; `--partial` allows a chunk of cases. `node bench/parity-report.mjs --print` prints the newest run's verdicts
+without touching the ledger. Fixes and causes go in `bench/parity-causes.json`. Its keys are row ids; each value is a
+cause, or `{cause, knownBug, fixes: [{commit, tradeoff, rerun}]}`. The Margo side of every scene is in
+`bench/scenes/parity/`, and the three.js side in `engine-bench/margo-bench/parity/`.
 
 ## Adding a suite
 

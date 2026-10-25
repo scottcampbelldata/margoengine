@@ -24,3 +24,4 @@ packages/bvh/tests/fixtures/*.obj -text
 packages/gltf-pro/tests/fixtures/*.wgsl text eol=lf
 packages/decoders/vendor/draco/* -text
 packages/decoders/vendor/basis/* -text
+examples/assets/parity-clip.webm filter=lfs diff=lfs merge=lfs -text
