@@ -15,7 +15,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core and its own B-rep CAD k
 
 Live demos: [margoengine.com](https://margoengine.com)
 
-The core and the stage together are 22,768 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 22,737 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
 
 ## Quick start
@@ -161,11 +161,12 @@ meshes (no textures, effects or picking).
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 22,768 B | 57,596 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 22,737 B | 57,590 B |
 
-Measured with `npm run measure:size`, which bundles the entry with esbuild, minified, and gzips it at level 9. CI
-fails if core + stage reaches 25,000 B gzip. Per-package sizes are in
-[entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json).
+Recorded at commit `36ac9af6` in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
+the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
+the package build, gzips it at the default level and prints the figure for your checkout. The build fails if
+core + stage reaches 25,000 B gzip.
 
 `npm run bench` runs the render, load, CAD, physics and memory suites with medians, p95 and machine checks. See
 [docs/benchmarking.md](docs/benchmarking.md). No comparisons with other engines are published here yet.
