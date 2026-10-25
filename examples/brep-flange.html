@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>B-rep flange · Margo Engine</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #1b1f24; color: #d8dde3; font: 14px system-ui, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #status { position: fixed; left: 16px; bottom: 12px; margin: 0; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <canvas id="viewport" aria-label="A pipe flange modeled and meshed by the Margo B-rep kernel"></canvas>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./brep-flange.ts'));
+  </script>
+</body>
+</html>

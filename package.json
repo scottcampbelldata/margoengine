@@ -105,6 +105,7 @@
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",
+    "dev:examples": "vite --host 127.0.0.1",
     "dev:sandbox": "vite examples/gameplay-sandbox",
     "dev:voxel": "vite examples/voxel-sandbox",
     "bench": "node bench/cli.mjs",
