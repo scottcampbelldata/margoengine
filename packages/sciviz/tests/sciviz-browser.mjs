@@ -34,6 +34,15 @@ try {
   const drag = await page.evaluate(() => window.finishDragTest());
   assert.deepEqual(drag, { indices: [2, 3, 6, 7, 10, 11, 14, 15], mode: 'box' });
   report.checks.push('a real box drag selects the points under it');
+  // A real drag on a 2D chart pans it: 100 px right moves the window left by 100 px worth of data.
+  const pan = await page.evaluate(() => window.setupPanTest());
+  await page.mouse.move(pan.left + pan.width / 2, pan.top + pan.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(pan.left + pan.width / 2 + 100, pan.top + pan.height / 2, { steps: 5 });
+  await page.mouse.up();
+  const panned = await page.evaluate(() => window.finishPanTest());
+  assert.ok(Math.abs(panned.shift + 100 * panned.perPixel) < 1e-6, JSON.stringify(panned));
+  report.checks.push('a real drag pans a 2D chart');
   assert.deepEqual(errors, []);
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/sciviz-browser.json', JSON.stringify({ hardware, ...report }, null, 2));

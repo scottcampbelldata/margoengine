@@ -355,6 +355,144 @@ window.runSciVizTests = async () => {
     figure.dispose();
   });
 
+  // 2D charts: the plot area is the canvas inside the default margins (top 16, right 24, bottom 48, left 64 CSS px).
+  const chartOn = async (options = {}) => {
+    const figure = await Figure.create(canvas, { mode: '2d', ...options });
+    figure.engine.stop?.();
+    watch(figure);
+    return figure;
+  };
+  // Canvas pixel of data (x, y) in a 2D chart, from its bounds and the default margins.
+  const toPixel = (figure, image, x, y) => {
+    const [x0, x1, y0, y1] = figure.bounds,
+      sx = image.width / canvas.clientWidth,
+      w = canvas.clientWidth - 64 - 24,
+      h = canvas.clientHeight - 16 - 48;
+    return [(64 + ((x - x0) / (x1 - x0)) * w) * sx, (16 + ((y1 - y) / (y1 - y0)) * h) * sx];
+  };
+  const chartPixels = async (figure) => {
+    figure.render();
+    const bitmap = await createImageBitmap(figure.engine.canvas),
+      copy = new OffscreenCanvas(bitmap.width, bitmap.height),
+      g = copy.getContext('2d', { willReadFrequently: true });
+    g.drawImage(bitmap, 0, 0);
+    const image = g.getImageData(0, 0, bitmap.width, bitmap.height);
+    return {
+      width: image.width,
+      height: image.height,
+      at: (x, y) => {
+        const i = (Math.round(y) * image.width + Math.round(x)) * 4;
+        return [image.data[i], image.data[i + 1], image.data[i + 2]];
+      },
+    };
+  };
+
+  await check('a 2D bar chart draws each bar from 0 to its height, and clips to the plot area', async () => {
+    const figure = await chartOn({ axes: false });
+    const bars = await figure.bar({ x: [0, 1, 2], y: [1, 2, 3] }, { color: '#ffffff', name: 'counts' });
+    assert(bars.kind === 'bar' && bars.values.length === 3, 'a bar layer');
+    let image = await chartPixels(figure);
+    for (const [i, h] of [
+      [0, 1],
+      [1, 2],
+    ]) {
+      const inside = image.at(...toPixel(figure, image, i, h / 2)),
+        above = image.at(...toPixel(figure, image, i, h + 0.4));
+      assert(luminance(inside) > 200, `bar ${i} is drawn: ${inside}`);
+      assert(luminance(above) < 40, `above bar ${i} is empty: ${above}`);
+    }
+    // Zoomed onto the middle bar: the left bar lies outside the window and must not spill into the margin.
+    figure.setLimits([0.5, 1.5, 0, 1]);
+    image = await chartPixels(figure);
+    assert(luminance(image.at(20, image.height / 2)) < 40, 'nothing drawn in the left margin');
+    assert(luminance(image.at(image.width / 2, image.height / 2)) > 200, 'the middle bar fills the window');
+    // Picking a bar gives its height.
+    const hit = figure.pick(canvas.clientWidth / 2, canvas.clientHeight / 2);
+    assert(hit?.layer === bars && hit.index === 1 && hit.value === 2, `bar pick ${hit?.index} ${hit?.value}`);
+    figure.setLimits();
+    assert(figure.bounds[1] > 2.4, 'setLimits() goes back to the data');
+    let threw = false;
+    try {
+      figure.surface([0, 1, 2, 3], { nx: 2 });
+    } catch (error) {
+      threw = error.code === 'unsupported';
+    }
+    assert(threw, 'a surface needs a 3D figure');
+    figure.dispose();
+  });
+
+  await check('a histogram counts every value; a heatmap colours cells by value', async () => {
+    const figure = await chartOn({ axes: false });
+    const values = Array.from(
+      { length: 500 },
+      (_, i) => Math.sin(i * 12.9898) * 43758.5453 - Math.floor(Math.sin(i * 12.9898) * 43758.5453),
+    );
+    const hist = await figure.histogram(values, { bins: 10 });
+    assert(hist.values.reduce((a, b) => a + b, 0) === 500, 'every value counted once');
+    figure.remove(hist);
+    const heat = await figure.heatmap([0, 1, 2, 3], { nx: 2, colormap: 'gray' });
+    const image = await chartPixels(figure);
+    const low = luminance(image.at(...toPixel(figure, image, 0, 0))),
+      high = luminance(image.at(...toPixel(figure, image, 1, 1)));
+    assert(high > low + 100, `cell (1, 1) brighter than (0, 0): ${low} -> ${high}`);
+    const [px, py] = toPixel(figure, image, 1, 0);
+    const scale = canvas.clientWidth / image.width;
+    const hit = figure.pick(px * scale, py * scale);
+    assert(hit?.layer === heat && hit.value === 1 && hit.x === 1 && hit.y === 0, `cell pick ${hit?.value}`);
+    figure.dispose();
+  });
+
+  await check('a 2D chart zooms about the pointer with the wheel and resets on double-click', async () => {
+    const figure = await chartOn({ axes: false });
+    await figure.line({ x: [0, 10], y: [0, 10] });
+    const before = figure.bounds,
+      rect = canvas.getBoundingClientRect();
+    // At the plot centre, a 400 px wheel-up halves the span about the centre.
+    const cx = 64 + (canvas.clientWidth - 88) / 2,
+      cy = 16 + (canvas.clientHeight - 64) / 2;
+    canvas.dispatchEvent(
+      new WheelEvent('wheel', {
+        deltaY: -400,
+        clientX: rect.left + cx,
+        clientY: rect.top + cy,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    const after = figure.bounds;
+    const near = (a, b) => Math.abs(a - b) < 1e-6;
+    assert(near(after[1] - after[0], (before[1] - before[0]) / 2), `x span halves: ${before} -> ${after}`);
+    assert(near((after[0] + after[1]) / 2, (before[0] + before[1]) / 2), 'about the pointer');
+    canvas.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    assert(
+      figure.bounds.every((v, k) => near(v, before[k])),
+      'double-click resets',
+    );
+    figure.dispose();
+  });
+
+  await check('2D axes put tick labels and titles outside the plot area', async () => {
+    const figure = await chartOn({ titles: { x: 'Month', y: 'Sales' } });
+    await figure.bar({ x: [1, 2, 3, 4], y: [5, 7, 3, 9] });
+    await figure.ready();
+    figure.render();
+    // The innermost spans: the y title's text sits in a turned span inside its padded box.
+    const spans = [...document.querySelectorAll('span')].filter((e) => !e.firstElementChild);
+    const month = spans.find((s) => s.textContent === 'Month'),
+      sales = spans.find((s) => s.textContent === 'Sales');
+    assert(month && sales, 'both titles');
+    const r = canvas.getBoundingClientRect(),
+      m = month.getBoundingClientRect(),
+      s = sales.getBoundingClientRect();
+    assert(m.bottom > r.bottom - 48 + 20, `x title below the plot: ${m.bottom} vs ${r.bottom - 48}`);
+    assert(s.right < r.left + 64 - 20, `y title left of the plot: ${s.right} vs ${r.left + 64}`);
+    assert(
+      spans.some((e) => e.textContent === '8'),
+      'y tick labels',
+    );
+    figure.dispose();
+  });
+
   await check('colour maps the page can use as CSS', async () => {
     assert(colormap('aurora').css().startsWith('linear-gradient('), 'css');
   });
@@ -398,6 +536,25 @@ window.setupDragTest = async () => {
   dragFigure.addEventListener('selection', (e) => (dragSelection = e.detail));
   const rect = canvas.getBoundingClientRect();
   return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+};
+let panFigure, panBefore;
+window.setupPanTest = async () => {
+  const canvas = document.querySelector('#view');
+  panFigure = await Figure.create(canvas, { mode: '2d', axes: false });
+  panFigure.engine.stop?.();
+  await panFigure.line({ x: [0, 10], y: [0, 5] });
+  panFigure.render();
+  panBefore = panFigure.bounds;
+  const rect = canvas.getBoundingClientRect();
+  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+};
+window.finishPanTest = () => {
+  const after = panFigure.bounds,
+    canvas = document.querySelector('#view'),
+    perPixel = (panBefore[1] - panBefore[0]) / (canvas.clientWidth - 64 - 24),
+    result = { shift: after[0] - panBefore[0], perPixel, mode: panFigure.dragMode };
+  panFigure.dispose();
+  return result;
 };
 window.finishDragTest = () => {
   const indices = dragSelection ? [...dragSelection.points[0].indices] : null;

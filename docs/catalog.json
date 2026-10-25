@@ -2074,6 +2074,7 @@
       "Colormap",
       "Figure",
       "IsosurfaceLayer",
+      "RectsLayer",
       "SciRenderer",
       "SliceLayer",
       "SurfaceLayer",
@@ -2088,6 +2089,7 @@
       "diverging",
       "formatTick",
       "formatValue",
+      "histogram",
       "niceNumber",
       "ticks",
       "transferTable"

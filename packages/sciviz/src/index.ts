@@ -3,7 +3,11 @@
 // The points, lines, labels, controls and compute packages load with import() only when a figure uses them.
 export { Figure, createFigure } from './figure.js';
 export type {
+  BarLayerOptions,
   CreateFigureOptions,
+  HeatmapLayerOptions,
+  HistogramLayerOptions,
+  Margin,
   FigureEventMap,
   FigureOptions,
   Layer,
@@ -13,8 +17,11 @@ export type {
   ScatterData,
   ScatterLayer,
   ScatterLayerOptions,
-  Selection,
+  PointSelection,
 } from './figure.js';
+export { RectsLayer } from './rects.js';
+export { histogram } from './charts.js';
+export type { Bins, BinOptions } from './charts.js';
 export { SurfaceLayer } from './surface.js';
 export type { SurfaceLayerOptions } from './surface.js';
 export { VolumeLayer, SliceLayer, transferTable } from './volume.js';

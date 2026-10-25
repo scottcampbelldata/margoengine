@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3091968,
+  "total": 3096998,
   "history": [
     {
       "date": "2026-10-24",
@@ -200,6 +200,12 @@
       "commit": "2dfd5c2e",
       "reason": "compute CPU fallback: lazy cpu chunk loaded only without WebGPU (counted by the gate's all-chunks method)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "b752d7d4",
+      "reason": "sciviz: 2D charts (bar, histogram, heatmap) with 2D axes, pan and zoom",
+      "grew": 2
     }
   ],
   "items": {
@@ -426,9 +432,9 @@
     "@margoengine/scatter": 11893,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
-    "@margoengine/sciviz": 24222,
+    "@margoengine/sciviz": 28324,
     "@margoengine/sciviz/colormaps": 4433,
-    "@margoengine/sciviz/maths": 2801,
+    "@margoengine/sciviz/maths": 3729,
     "@margoengine/selection": 13905,
     "@margoengine/shader": 12517,
     "@margoengine/shader/effects": 8386,

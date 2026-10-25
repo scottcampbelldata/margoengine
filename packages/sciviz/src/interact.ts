@@ -1,11 +1,17 @@
-// Pointer interaction for a figure: hover picking with an HTML tooltip (one pick per animation frame), and box or
-// lasso selection drawn as an SVG outline over the canvas. The figure supplies the picking and selection; this file
-// owns only the DOM: listeners, the tooltip element and the outline.
+// Pointer interaction for a figure: hover picking with an HTML tooltip (one pick per animation frame), box or lasso
+// selection drawn as an SVG outline over the canvas, and for 2D charts drag to pan, wheel to zoom about the pointer
+// and double-click to reset. The figure supplies the picking, selection and navigation; this file owns only the DOM:
+// listeners, the tooltip element and the outline.
 import type { Theme } from './axes.js';
 import type { SelectRegion } from './pick.js';
 
-/** How a left-button drag on the canvas acts: orbit the camera (default), or select points in a box or a lasso. */
-export type DragMode = 'orbit' | 'box' | 'lasso';
+/**
+ * How a left-button drag on the canvas acts: move the view (`'orbit'` in 3D, `'pan'` in 2D; the two are the same
+ * setting), or select points in a box or a lasso.
+ */
+export type DragMode = 'orbit' | 'pan' | 'box' | 'lasso';
+
+const navigating = (mode: DragMode): boolean => mode === 'orbit' || mode === 'pan';
 
 /** @internal What the interaction asks of its figure. */
 interface InteractionHooks<Hit> {
@@ -19,6 +25,12 @@ interface InteractionHooks<Hit> {
   select(region: SelectRegion): void;
   /** Camera controls to pause while a selection drag mode is on. */
   controls(): { enabled: boolean } | undefined;
+  /** 2D navigation: pan by a pointer move in CSS pixels, zoom by a factor about a point, reset the view. */
+  readonly navigate?: {
+    pan(dx: number, dy: number): void;
+    zoom(factor: number, x: number, y: number): void;
+    reset(): void;
+  };
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -33,6 +45,7 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
   #outline: SVGSVGElement | undefined;
   #path: number[] = [];
   #dragging = false;
+  #panning: { x: number; y: number; id: number } | undefined;
   #frame = 0;
   #last: { x: number; y: number } | undefined;
   #hit: Hit | null = null;
@@ -49,6 +62,23 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
     canvas.addEventListener('pointerdown', (e) => this.#down(e), { signal });
     canvas.addEventListener('pointerup', (e) => this.#up(e), { signal });
     canvas.addEventListener('pointercancel', () => this.#cancel(), { signal });
+    if (hooks.navigate) {
+      const navigate = hooks.navigate;
+      this.#mode = 'pan';
+      canvas.addEventListener(
+        'wheel',
+        (e) => {
+          e.preventDefault();
+          // Lines and pages are about 16 and 400 pixels; 400 pixels of wheel halve or double the span.
+          const pixels = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1),
+            p = this.#local(e);
+          navigate.zoom(2 ** (pixels / 400), p.x, p.y);
+        },
+        { signal, passive: false },
+      );
+      canvas.addEventListener('dblclick', () => navigate.reset(), { signal });
+      canvas.style.touchAction = 'none';
+    }
   }
 
   get mode(): DragMode {
@@ -56,12 +86,13 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
   }
   set mode(mode: DragMode) {
     const controls = this.#hooks.controls();
-    if (this.#mode === 'orbit' && mode !== 'orbit' && controls) {
+    if (navigating(this.#mode) && !navigating(mode) && controls) {
       this.#controlsWere = controls.enabled;
       controls.enabled = false;
-    } else if (this.#mode !== 'orbit' && mode === 'orbit' && controls) controls.enabled = this.#controlsWere;
-    this.#mode = mode;
-    this.#canvas.style.cursor = mode === 'orbit' ? '' : 'crosshair';
+    } else if (!navigating(this.#mode) && navigating(mode) && controls) controls.enabled = this.#controlsWere;
+    // A 2D chart reports its navigation mode as 'pan', a 3D figure as 'orbit'.
+    this.#mode = navigating(mode) ? (this.#hooks.navigate ? 'pan' : 'orbit') : mode;
+    this.#canvas.style.cursor = navigating(mode) ? '' : 'crosshair';
   }
 
   /** The hit under the pointer, or null. */
@@ -69,7 +100,7 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
     return this.#hit;
   }
 
-  #local(e: PointerEvent): { x: number; y: number } {
+  #local(e: MouseEvent): { x: number; y: number } {
     const rect = this.#canvas.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
@@ -82,6 +113,11 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
 
   #move(e: PointerEvent): void {
     const p = this.#local(e);
+    if (this.#panning && e.pointerId === this.#panning.id) {
+      this.#hooks.navigate!.pan(p.x - this.#panning.x, p.y - this.#panning.y);
+      this.#panning = { ...this.#panning, x: p.x, y: p.y };
+      return;
+    }
     if (this.#dragging) {
       if (this.#mode === 'lasso') this.#path.push(p.x, p.y);
       else this.#path.splice(2, 2, p.x, p.y);
@@ -143,8 +179,16 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
   }
 
   #down(e: PointerEvent): void {
-    if (this.#mode === 'orbit' || e.button !== 0) return;
+    if (e.button !== 0) return;
     const p = this.#local(e);
+    if (navigating(this.#mode)) {
+      if (!this.#hooks.navigate) return;
+      this.#panning = { x: p.x, y: p.y, id: e.pointerId };
+      this.#canvas.setPointerCapture?.(e.pointerId);
+      this.#leave();
+      e.preventDefault();
+      return;
+    }
     this.#dragging = true;
     this.#path = [p.x, p.y, p.x, p.y];
     this.#canvas.setPointerCapture?.(e.pointerId);
@@ -154,6 +198,11 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
   }
 
   #up(e: PointerEvent): void {
+    if (this.#panning && e.pointerId === this.#panning.id) {
+      this.#panning = undefined;
+      this.#canvas.releasePointerCapture?.(e.pointerId);
+      return;
+    }
     if (!this.#dragging) return;
     this.#dragging = false;
     this.#canvas.releasePointerCapture?.(e.pointerId);
@@ -164,6 +213,7 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
   }
 
   #cancel(): void {
+    this.#panning = undefined;
     this.#dragging = false;
     this.#outline?.replaceChildren();
   }

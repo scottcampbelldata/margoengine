@@ -20,6 +20,26 @@ export interface AxesOptions {
     readonly grid?: boolean;
 }
 
+export interface BarLayerOptions {
+    readonly width?: number;
+    readonly base?: number;
+    readonly color?: string;
+    readonly colormap?: ColormapSource;
+    readonly range?: readonly [number, number];
+    readonly name?: string;
+}
+
+export interface BinOptions {
+    readonly bins?: number | 'auto';
+    readonly range?: readonly [number, number];
+    readonly density?: boolean;
+}
+
+export interface Bins {
+    readonly edges: Float64Array;
+    readonly counts: Float64Array;
+}
+
 export type Bounds = [number, number, number, number, number, number];
 
 export interface ClipPlane {
@@ -64,7 +84,7 @@ export interface CreateFigureOptions extends FigureOptions {
 
 export type DataSource = ArrayLike<number> | GpuArray;
 
-export type DragMode = 'orbit' | 'box' | 'lasso';
+export type DragMode = 'orbit' | 'pan' | 'box' | 'lasso';
 
 export interface Figure {
     addEventListener<K extends keyof FigureEventMap>(type: K, listener: (this: Figure, event: FigureEventMap[K]) => unknown, options?: boolean | AddEventListenerOptions): void;
@@ -79,14 +99,17 @@ export class Figure extends EventTarget {
     static attach(engine: EngineKernel, options?: FigureOptions): Figure;
     static create(canvas: HTMLCanvasElement, options?: CreateFigureOptions): Promise<Figure>;
     constructor(engine: EngineKernel, options?: FigureOptions);
+    get is2d(): boolean;
+    setLimits(limits?: Bounds | readonly [number, number, number, number]): void;
+    render(): void;
     get dragMode(): DragMode;
     set dragMode(mode: DragMode);
-    get selection(): Selection | undefined;
+    get selection(): PointSelection | undefined;
     get controls(): OrbitControls | undefined;
     pick(x: number, y: number, options?: {
         readonly radius?: number;
     }): PickResult | null;
-    select(region: SelectRegion): Selection;
+    select(region: SelectRegion): PointSelection;
     get bounds(): Bounds;
     get model(): Float32Array;
     ready(): Promise<void>;
@@ -101,6 +124,13 @@ export class Figure extends EventTarget {
     surface(z: DataSource, options?: SurfaceLayerOptions): SurfaceLayer;
     volume(data: DataSource, options?: VolumeLayerOptions): VolumeLayer;
     isosurface(data: DataSource, level: number, options?: IsosurfaceLayerOptions): Promise<IsosurfaceLayer>;
+    bar(data: {
+        readonly x: DataSource;
+        readonly y: DataSource;
+        readonly color?: DataSource;
+    }, options?: BarLayerOptions): Promise<RectsLayer>;
+    histogram(values: DataSource, options?: HistogramLayerOptions): Promise<RectsLayer>;
+    heatmap(values: DataSource, options?: HeatmapLayerOptions): Promise<RectsLayer>;
     colorbar(colormap: ColormapSource, range: readonly [number, number], options?: ColorBarOptions): ColorBar;
     remove(layer: Layer): void;
     dispose(): void;
@@ -109,16 +139,33 @@ export class Figure extends EventTarget {
 
 export interface FigureEventMap {
     hover: CustomEvent<PickResult | null>;
-    selection: CustomEvent<Selection>;
+    selection: CustomEvent<PointSelection>;
 }
 
 export interface FigureOptions extends AxesOptions {
+    readonly mode?: '2d' | '3d';
+    readonly margin?: Margin;
     readonly theme?: 'dark' | 'light';
     readonly axes?: boolean;
     readonly aspect?: readonly [number, number, number];
-    readonly limits?: Bounds;
+    readonly limits?: Bounds | readonly [number, number, number, number];
     readonly pointBudget?: number;
     readonly tooltips?: boolean | ((hit: PickResult) => string | null);
+}
+
+export interface HeatmapLayerOptions {
+    readonly nx?: number;
+    readonly ny?: number;
+    readonly x?: readonly [number, number];
+    readonly y?: readonly [number, number];
+    readonly colormap?: ColormapSource;
+    readonly range?: readonly [number, number];
+    readonly name?: string;
+}
+
+export interface HistogramLayerOptions extends BinOptions {
+    readonly color?: string;
+    readonly name?: string;
 }
 
 export class IsosurfaceLayer implements Drawable {
@@ -149,7 +196,7 @@ export interface IsosurfaceLayerOptions {
     readonly signal?: AbortSignal;
 }
 
-export type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer;
+export type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer | RectsLayer;
 
 export interface LineLayer {
     readonly kind: 'line';
@@ -168,13 +215,51 @@ export interface LineLayerOptions {
     readonly name?: string;
 }
 
+export interface Margin {
+    readonly top?: number;
+    readonly right?: number;
+    readonly bottom?: number;
+    readonly left?: number;
+}
+
 export interface PickResult {
-    readonly layer: ScatterLayer | LineLayer | SurfaceLayer;
+    readonly layer: ScatterLayer | LineLayer | SurfaceLayer | RectsLayer;
     readonly index: number;
     readonly x: number;
     readonly y: number;
     readonly z: number;
     readonly value?: number;
+}
+
+export interface PointSelection {
+    readonly region: SelectRegion;
+    readonly points: readonly {
+        readonly layer: ScatterLayer | LineLayer;
+        readonly indices: Uint32Array;
+    }[];
+}
+
+export class RectsLayer implements Drawable {
+    visible: boolean;
+    readonly transparent = false;
+    readonly kind: 'bar' | 'histogram' | 'heatmap';
+    readonly name: string | undefined;
+    readonly rects: Float32Array;
+    readonly values: Float32Array;
+    readonly swatch: string;
+    constructor(renderer: SciRenderer, kind: 'bar' | 'histogram' | 'heatmap', rects: Float32Array, values: Float32Array, colours: Uint32Array, options: {
+        readonly name?: string;
+        readonly swatch: string;
+    });
+    restore(): void;
+    get bounds(): Bounds;
+    indexAt(x: number, y: number): number;
+    setModel(model: Float32Array): void;
+    center(): readonly [number, number, number];
+    prepare(): void;
+    draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
+    dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 export type SRGB = readonly [number, number, number];
@@ -243,14 +328,6 @@ export type SelectRegion = {
 } | {
     readonly polygon: ArrayLike<number>;
 };
-
-export interface Selection {
-    readonly region: SelectRegion;
-    readonly points: readonly {
-        readonly layer: ScatterLayer | LineLayer;
-        readonly indices: Uint32Array;
-    }[];
-}
 
 export class SliceLayer implements Drawable {
     visible: boolean;
@@ -392,6 +469,8 @@ export function diverging(t: number, low: SRGB, high: SRGB): SRGB;
 export function formatTick(value: number, step: number): string;
 
 export function formatValue(value: number, digits?: number): string;
+
+export function histogram(values: ArrayLike<number>, options?: BinOptions): Bins;
 
 export function niceNumber(x: number, round: boolean): number;
 

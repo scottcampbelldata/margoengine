@@ -44,16 +44,18 @@ lines at the ticks and HTML tick labels.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
+| `mode` | `'3d'` | `'3d'` box you orbit, or `'2d'` chart (see 2D charts) |
+| `margin` | see 2D charts | space around a 2D chart's plot area, in CSS px |
 | `theme` | `'dark'` | `'dark'` or `'light'` chrome and background |
 | `axes` | `true` | box, grid and tick labels |
 | `titles` | `{ x: 'x', y: 'y', z: 'z' }` | axis titles |
 | `ticks` | `5` | about how many ticks per axis |
 | `grid` | `true` | grid lines on the floor and back walls |
 | `aspect` | `[1, 1, 0.75]` | relative size of the plot box |
-| `limits` | data bounds | fixed `[xmin, xmax, ymin, ymax, zmin, zmax]` |
+| `limits` | data bounds | fixed `[xmin, xmax, ymin, ymax, zmin, zmax]` (`[xmin, xmax, ymin, ymax]` in 2D) |
 | `pointBudget` | `2_000_000` | most scatter points drawn per frame |
 | `tooltips` | `true` | hover tooltips; `false`, or `(hit) => string \| null` for your own text |
-| `controls` (create only) | `true` | orbit controls |
+| `controls` (create only) | `true` | orbit controls (3D) |
 
 ## Layers
 
@@ -103,9 +105,45 @@ fig.colorbar('aurora', [-1, 1], { label: 'height' });
 await fig.line({ x: [0, 10, 20], y: [0, 15, 0], z: [1.2, 1.2, 1.2] }, { width: 3, color: '#ffd885' });
 ```
 
+## 2D charts
+
+`Figure.create(canvas, { mode: '2d' })` makes a chart: a flat plot area inside `margin` (default top 16, right 24,
+bottom 48, left 64 CSS px; right 96 once there is a colour bar), axes with tick labels on the left and bottom, and
+data fitted with 4% padding. Drag to pan, scroll to zoom about the pointer, double-click to reset. `fig.setLimits([x0,
+x1, y0, y1])` sets the window in code, and `fig.setLimits()` goes back to the data. Drawing is clipped to the plot area.
+
+| Call | Draws |
+| --- | --- |
+| `await fig.line({ x, y })`, `await fig.scatter({ x, y })` | as in 3D, flat |
+| `await fig.bar({ x, y, color? }, { width, base, color, colormap, range, name })` | bars from `base` (0) to y, 0.8 of the smallest x gap wide |
+| `await fig.histogram(values, { bins, range, density, color, name })` | equal bins; `bins: 'auto'` (default) uses Freedman-Diaconis, Sturges when the spread is 0 |
+| `await fig.heatmap(z, { nx, ny, x, y, colormap, range, name })` | a grid of cells; `x` and `y` are the first and last cells' centres; NaN cells are empty |
+
+Surfaces, volumes and isosurfaces need a 3D figure. `histogram(values, options)` from `@margoengine/sciviz/maths`
+gives the bins without drawing. `fig.render()` draws a frame now, for example before reading the canvas.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+
+const canvas = document.querySelector('canvas')!;
+const chart = await Figure.create(canvas, { mode: '2d', titles: { x: 'Month', y: 'Sales' } });
+await chart.bar({ x: [1, 2, 3, 4, 5, 6], y: [12, 18, 9, 22, 30, 26] }, { color: '#6aa9ff', name: 'Sales' });
+await chart.line({ x: [1, 2, 3, 4, 5, 6], y: [10, 14, 15, 19, 24, 28] }, { color: '#ffd885', name: 'Trend' });
+
+const samples = Float64Array.from({ length: 10_000 }, () => Math.random() + Math.random() + Math.random());
+const histogramChart = await Figure.create(document.createElement('canvas'), { mode: '2d' });
+const bins = await histogramChart.histogram(samples, { density: true });
+console.log(bins.values.length, bins.rects.slice(0, 4));
+
+const heat = await Figure.create(document.createElement('canvas'), { mode: '2d' });
+const z = Float32Array.from({ length: 64 * 48 }, (_, k) => Math.sin((k % 64) / 8) * Math.cos(Math.floor(k / 64) / 6));
+await heat.heatmap(z, { nx: 64, colormap: 'coolwarm' });
+heat.colorbar('coolwarm', [-1, 1]);
+```
+
 ## Picking, tooltips and selection
 
-Hovering shows a tooltip for the scatter point, line vertex or surface point under the pointer, with its x, y, z, its
+Hovering shows a tooltip for the scatter point, line vertex, surface point, bar or heatmap cell under the pointer, with its x, y, z, its
 `color` value and the layer's `name`. Each change sends a `hover` event. `fig.pick(x, y, { radius })` returns the same
 hit for any canvas position, in CSS pixels from the canvas's top-left (`event.offsetX`, `event.offsetY`). Points and
 vertices within `radius` (default 8 px) come before surfaces. Surfaces that read a GpuArray are not picked, since their

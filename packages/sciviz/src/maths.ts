@@ -13,3 +13,5 @@ export {
   selectPoints,
 } from './pick.js';
 export type { HeightGrid, SelectRegion } from './pick.js';
+export { barRects, heatmapRects, histogram, rectAt } from './charts.js';
+export type { Bins, BinOptions } from './charts.js';

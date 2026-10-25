@@ -48,8 +48,11 @@ export class Axes {
     readonly lines: () => Promise<Lines>,
   ) {}
 
-  /** Draws (or redraws) the axes for `bounds` under the figure transform `model`. */
-  async update(bounds: Bounds, model: Float32Array): Promise<void> {
+  /**
+   * Draws (or redraws) the axes for `bounds` under the figure transform `model`; `flat` draws 2D axes (a frame, grid
+   * lines and labels on the left and bottom, below everything at data z -1).
+   */
+  async update(bounds: Bounds, model: Float32Array, flat = false): Promise<void> {
     this.#loading ??= (async () => {
       const [lines, { LabelRenderer }] = await Promise.all([this.lines(), import('@margoengine/labels')]);
       if (this.#disposed) return;
@@ -66,6 +69,7 @@ export class Axes {
       tx = ticks(x0, x1, count),
       ty = ticks(y0, y1, count),
       tz = ticks(z0, z1, count);
+    if (flat) return this.#flat(Line, bounds, model, tx, ty);
     // The box: 12 edges.
     const box = [
       [x0, y0, z0, x1, y0, z0],
@@ -116,6 +120,59 @@ export class Axes {
     text(titles.x ?? 'x', [(x0 + x1) / 2, y0 - 3 * dy, z0], true);
     text(titles.y ?? 'y', [x1 + 3 * dx, (y0 + y1) / 2, z0], true);
     text(titles.z ?? 'z', [x0 - 3 * dx, y0 - 3 * dy, (z0 + z1) / 2 + dz], true);
+  }
+
+  #span(content: string, css = ''): HTMLSpanElement {
+    const element = document.createElement('span');
+    element.textContent = content;
+    element.style.cssText = `font: 12px system-ui, sans-serif; color: ${this.theme.text}; white-space: nowrap; font-variant-numeric: tabular-nums; ${css}`;
+    return element;
+  }
+
+  // 2D axes: the frame and grid at data z -1, tick labels outside the left and bottom edges (pixel padding, so they
+  // keep their distance at any zoom), and titles below and, turned, left of the plot.
+  #flat(
+    Line: typeof import('@margoengine/lines').Line,
+    bounds: Bounds,
+    model: Float32Array,
+    tx: { values: readonly number[]; labels: readonly string[] },
+    ty: { values: readonly number[]; labels: readonly string[] },
+  ): void {
+    const [x0, x1, y0, y1] = bounds,
+      z = -1;
+    const frame = [x0, y0, z, x1, y0, z, x1, y0, z, x1, y1, z, x1, y1, z, x0, y1, z, x0, y1, z, x0, y0, z];
+    if (this.options.grid ?? true) {
+      const grid: number[] = [];
+      for (const x of tx.values) grid.push(x, y0, z, x, y1, z);
+      for (const y of ty.values) grid.push(x0, y, z, x1, y, z);
+      if (grid.length)
+        this.#drawn.push(
+          this.#lines!.add(
+            new Line({ mode: 'segments', positions: grid, color: this.theme.grid, width: 1, matrix: model }),
+          ),
+        );
+    }
+    this.#drawn.push(
+      this.#lines!.add(
+        new Line({ mode: 'segments', positions: frame, color: this.theme.axis, width: 1.5, matrix: model }),
+      ),
+    );
+    const place = (element: HTMLElement, x: number, y: number, anchor: readonly [number, number]) =>
+      this.#texts.push(
+        this.#labels!.add(element, { position: toScene(model, x, y, 0), anchor, frustumCulling: false }),
+      );
+    tx.values.forEach((v, k) => place(this.#span(tx.labels[k], 'padding-top: 6px'), v, y0, [0.5, 0]));
+    ty.values.forEach((v, k) => place(this.#span(ty.labels[k], 'padding-right: 8px'), x0, v, [1, 0.5]));
+    const titles = this.options.titles ?? {};
+    place(this.#span(titles.x ?? 'x', 'font-weight: 600; padding-top: 24px'), (x0 + x1) / 2, y0, [0.5, 0]);
+    const yTitle = this.#span('', 'padding-right: 44px; display: inline-block');
+    yTitle.append(
+      this.#span(
+        titles.y ?? 'y',
+        'font-weight: 600; display: inline-block; writing-mode: vertical-rl; transform: rotate(180deg)',
+      ),
+    );
+    place(yTitle, x0, (y0 + y1) / 2, [1, 0.5]);
   }
 
   /** Removes the lines, the labels and both plugins. */
