@@ -1,6 +1,16 @@
 # Margo Engine handoff
 
-Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
+Last updated 2026-10-25. Read this first when starting a new session. Update it whenever work lands.
+
+## Landed 2026-10-25: provenance sweep and IGES reader
+
+Provenance sweep: FXAA rebuilt from Lottes' FXAA whitepaper (`post/fxaa`); the transmission blur footprint now comes
+from the median GGX facet tilt and Snell's law; voxel light levels 0-15 are equal CIE L* steps; Phong
+`refractionRatio` defaults to 1/1.5 and rgbShift to 0.002; citation comments at every lighting formula site and
+[clean-room.md](clean-room.md) with the full table; FBX Phong shininess maps to roughness like materials. New:
+`@margoengine/brep` reads IGES 5.3 (`parseIGES`, `readIGES`, `igesToSTEP`, `isIGES`; entity 114 refused until
+verified, [known-bugs.md](known-bugs.md)). Eight voxel views re-recorded (light curve); post-ssr and post-ssr-models
+advanced for the FXAA shader. Core + stage unchanged at 22,737 B; brep entry 104,982 -> 119,209 B gzip.
 
 ## Landed 2026-10-24: pixel-exact drawing (`exactSize`)
 
