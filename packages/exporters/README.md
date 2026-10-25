@@ -57,7 +57,7 @@ import {loadGLTF} from 'margoengine/gltf-pro';
 import {exportModel} from 'margoengine/exporters/model';
 
 const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
-const model = await loadGLTF(engine, '/DamagedHelmet.glb');
+const model = await loadGLTF(engine, '/SciFiHelmet.glb');
 const glb = await exportModel(model, {binary: true});
 const {text, bin} = await exportModel(model, {embed: false});
 ```

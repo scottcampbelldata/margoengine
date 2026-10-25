@@ -1,7 +1,7 @@
 // Post full-stack gate and the SSAO-with-IBL cost. Real GPU, serial, under the GPU lock, on AC power.
 // From the repository root after `npm run build:packages`:
 //   node examples/package-benchmarks/gates/post-stack.mjs [--rounds=8] [--frames=120]
-// Scene: DamagedHelmet (gltf-pro) + core boxes on a floor, environment IBL from a procedural HDR sky, 1280x720, DPR 1,
+// Scene: SciFiHelmet (gltf-pro) + core boxes on a floor, environment IBL from a procedural HDR sky, 1280x720, DPR 1,
 // core's default 4x MSAA. Every render/compute pass of a frame is timestamped; gpuMs is the sum of pass durations.
 // 1. Visuals: no post vs PostStack [SSAO, DOF, Bloom, Tonemap, FXAA] vs the stack minus each effect. Asserts no
 //    black/NaN frame and that removing any one effect changes the image. Screenshots: test-results/gates-post-*.png.
@@ -45,7 +45,7 @@ const report = {
   acPowerBefore: acPower(),
   rounds,
   frames,
-  scene: 'DamagedHelmet + 11 core boxes, 1280x720 DPR 1, core 4x MSAA',
+  scene: 'SciFiHelmet + 11 core boxes, 1280x720 DPR 1, core 4x MSAA',
   visuals: {},
   timing: {},
   effectCostMs: {},

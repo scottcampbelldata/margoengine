@@ -74,7 +74,7 @@ import {Shadows} from 'margoengine/shadows';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 await EnvironmentLighting.load(stage.engine, '/studio.hdr');
-const helmet = await loadGLTF(stage.engine, '/DamagedHelmet.glb');
+const helmet = await loadGLTF(stage.engine, '/SciFiHelmet.glb');
 const shadows = Shadows.attach(stage.engine, {resolution: 2048});
 shadows.add(helmet);
 ```

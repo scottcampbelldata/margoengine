@@ -33,7 +33,7 @@ async function scene({ profiling = false, close = false } = {}) {
           .setGeometry(box())
           .setPosition([x * 0.45, -1.2, z * 0.45])
           .setScale([0.35, 0.35, 0.35]);
-  model = await loadGLTF(engine, '/examples/assets/damaged-helmet.glb');
+  model = await loadGLTF(engine, '/examples/assets/scifi-helmet.glb');
   if (!close) engine.use(new FeatureEdges());
   if (profiling) {
     stats = new Stats({ profiling: true });

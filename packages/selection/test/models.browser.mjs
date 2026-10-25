@@ -47,7 +47,7 @@ try {
       gpuErrors = [];
     e.gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
     window.engine = e;
-    const helmet = await loadGLTF(e, '/examples/assets/damaged-helmet.glb');
+    const helmet = await loadGLTF(e, '/examples/assets/scifi-helmet.glb');
     helmet.root.setPosition([-1.3, 0, 0]);
     const robot = await loadGLTF(e, '/examples/assets/robot-expressive.glb');
     robot.root.setScale([0.35, 0.35, 0.35]).setPosition([1.4, -1.3, 0]);

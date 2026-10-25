@@ -4,7 +4,7 @@
 //     [--msaa=4,1] [--scenes=gate,near,far,wide] [--out=examples/package-benchmarks/results/gates-dof.json]
 // The baseline DOF is rebuilt from packages/dof/src at --baseline into test-results/dof-variants/<ref>/ and loaded in
 // the same page as the current packages/dof/dist, so both run on the same engine, scene and GPU clock.
-// Scene: dof.html (DamagedHelmet + boxes, env IBL), PostStack [DOF, Tonemap neutral]. Focus settings: gate (the
+// Scene: dof.html (SciFiHelmet + boxes, env IBL), PostStack [DOF, Tonemap neutral]. Focus settings: gate (the
 // post-stack gate's 3.4 m f/1.4 r16), near (1.6 m: helmet and background blurred), far (12 m: helmet and near box in
 // the near field), wide (2 m f/0.35 r32: 9-23 px background disks).
 // 1. Quality at 1280x720 4x MSAA: screenshot per focus setting, old vs new mean/max 8-bit difference.
@@ -106,7 +106,7 @@ const report = {
   rounds,
   frames,
   scenes,
-  scene: 'DamagedHelmet + 11 core boxes, env IBL, PostStack [DOF, Tonemap neutral], DPR 1',
+  scene: 'SciFiHelmet + 11 core boxes, env IBL, PostStack [DOF, Tonemap neutral], DPR 1',
   quality: {},
   flicker: {},
   timing: {},

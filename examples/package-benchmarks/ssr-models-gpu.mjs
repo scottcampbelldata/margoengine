@@ -8,9 +8,9 @@
 //    centre falls from the grey environment reflection to the red box's). Not added with ssr.add: the floor is unchanged.
 // 2. Roughness from a metallic-roughness map (factor 1): 0.3 blurs and weakens the reflection; 0.8 (> maxRoughness) leaves
 //    the frame unchanged.
-// 3. DamagedHelmet beside a red box: SSR changes the helmet's metal and visor pixels and some turn redder.
+// 3. SciFiHelmet beside a red box: SSR changes the helmet's metal and visor pixels and some turn redder.
 // No black (NaN) pixels anywhere. Timing: GPU time of the capture pass (models into SSR's targets) and of SSR's own passes
-// with a glossy glTF floor filling most of the view (12 boxes, worst case) and with DamagedHelmet, each added vs not
+// with a glossy glTF floor filling most of the view (12 boxes, worst case) and with SciFiHelmet, each added vs not
 // added, at 1280x720 and 1920x1080, 4x and 1x.
 // Run `node scripts/quiet-gate.mjs` first for publishable timings; --diagnostic labels them as taken on a busy machine.
 // Writes examples/package-benchmarks/results/ssr-models-gpu.json, frames to test-results/ssr-models-*.png.

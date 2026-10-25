@@ -27,7 +27,7 @@ function split(glb, bin) {
   json.buffers[0].uri = bin;
   return { json: JSON.stringify(json), bin: glb.slice(28 + length) };
 }
-const helmet = new Uint8Array(await asset('damaged-helmet.glb')),
+const helmet = new Uint8Array(await asset('scifi-helmet.glb')),
   robot = new Uint8Array(await asset('robot-expressive.glb'));
 const grids = bigGLB({ segments: 256, meshes: 3 }),
   parts = bigGLB({ segments: 6, meshes: 3, instances: 12 }),
@@ -310,7 +310,7 @@ test('progressive wireframe replacement releases both edge and replacement resou
   }));
 
 for (const [name, path, decoders] of [
-  ['DamagedHelmet (textured, tangents)', '/helmet.glb'],
+  ['SciFiHelmet (textured, tangents)', '/helmet.glb'],
   ['RobotExpressive (skins, morph targets, animations, many primitives)', '/robot.glb'],
   ['3 x 66k-vertex grids (one without normals; several range requests)', '/grids.glb'],
   ['grids drawn 12 times each through EXT_mesh_gpu_instancing', '/parts.glb', { instancing }],

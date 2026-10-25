@@ -1,5 +1,5 @@
 // exportModel cost and output: export time (median of 7 after 2 warm-ups), output size and Khronos glTF-Validator
-// counts for DamagedHelmet, RobotExpressive (14 clips) and a generated instanced GLB, next to the source files.
+// counts for SciFiHelmet, RobotExpressive (14 clips) and a generated instanced GLB, next to the source files.
 // Run after `npm run build:packages`: node examples/package-benchmarks/exporters-model.mjs  (writes results/exporters-model.json)
 import { readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -19,7 +19,7 @@ const summary = async (bytes) => {
 };
 const asset = (name) => readFile(new URL(`../assets/${name}`, import.meta.url)).then((b) => new Uint8Array(b));
 const cases = [
-  ['DamagedHelmet', () => asset('damaged-helmet.glb'), false, {}],
+  ['SciFiHelmet', () => asset('scifi-helmet.glb'), false, {}],
   ['RobotExpressive', () => asset('robot-expressive.glb'), true, {}],
   [
     'Instanced grids (2 x 33x33 vertices, 2 x 500 instances)',

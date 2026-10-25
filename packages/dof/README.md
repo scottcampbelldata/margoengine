@@ -21,7 +21,7 @@ Standalone output uses Margo's display curve (Khronos PBR Neutral, then sRGB), a
 
 ## Cost
 
-GPU time of the DOF passes (CoC, wide-disk 2x2-block gather, bokeh), Intel Arc 140V laptop iGPU, Edge 155, DamagedHelmet scene with environment light in a `PostStack` [DOF, Tonemap], median of 6 alternating old/new rounds x 90 frames (`examples/package-benchmarks/gates/dof.mjs`, `results/gates-dof.json`). "Before" is the 64-tap full-resolution gather of `5b9dbbd`.
+GPU time of the DOF passes (CoC, wide-disk 2x2-block gather, bokeh), Intel Arc 140V laptop iGPU, Edge 155, DamagedHelmet scene (the earlier test model) with environment light in a `PostStack` [DOF, Tonemap], median of 6 alternating old/new rounds x 90 frames (`examples/package-benchmarks/gates/dof.mjs`, `results/gates-dof.json`). "Before" is the 64-tap full-resolution gather of `5b9dbbd`.
 
 | Focus | 720p 4x MSAA | 720p 1x | 1080p 4x | 1080p 1x |
 | --- | --- | --- | --- | --- |

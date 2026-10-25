@@ -25,7 +25,7 @@ const done=queue=>queue.onSubmittedWorkDone();
 async function frame(engine){const t=performance.now();engine.render({delta:0});await done(engineRuntime(engine).gpu.queue);return performance.now()-t;}
 window.run=async({feature,warm})=>{
   const stage=await createStage('#viewport',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[3,2,5],target:[0,0,0],near:0.01,far:500}});
-  const engine=stage.engine,model=await loadGLTF(engine,'/examples/assets/damaged-helmet.glb'),floor=stage.box({size:[20,0.1,20],position:[0,-1.1,0],color:'#394b60',roughness:1});
+  const engine=stage.engine,model=await loadGLTF(engine,'/examples/assets/scifi-helmet.glb'),floor=stage.box({size:[20,0.1,20],position:[0,-1.1,0],color:'#394b60',roughness:1});
   const steady=[];for(let i=0;i<40;i++){const ms=await frame(engine);if(i>=10)steady.push(ms);}
   await features[feature](engine,model,floor);
   const result={feature,warm,steadyMedianMs:steady.sort((a,b)=>a-b)[steady.length>>1]};

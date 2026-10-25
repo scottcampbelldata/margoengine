@@ -109,7 +109,7 @@ function brute(model, origin, direction) {
 
 test('Raycaster finds attached gltf-pro models, honours node transforms and matches brute force on the helmet', async () => {
   const { engine, load } = await world(),
-    model = load(asset('damaged-helmet.glb')),
+    model = load(asset('scifi-helmet.glb')),
     raycaster = new Raycaster();
   model.root.setPosition([0.3, -0.2, 0.1]).setScale([1.5, 1.5, 1.5]).setRotation([0.3, 0.7, 0]);
   const core = engine.createMesh().setGeometry(box()).setPosition([0, 0, -5]);
@@ -287,7 +287,7 @@ test('skinned robot primitives are hit in their bind pose and materials meshes a
 
 test('worldTriangles merges models, instances and core meshes in world space; rays agree with the Raycaster', async () => {
   const { engine, load } = await world(),
-    helmet = load(asset('damaged-helmet.glb'));
+    helmet = load(asset('scifi-helmet.glb'));
   helmet.root.setPosition([0.3, -0.2, 0.1]).setScale([1.5, 1.5, 1.5]).setRotation([0.3, 0.7, 0]);
   const { doc, buffers } = quadDoc(),
     quad = new PBRModel(engine, new GLTFAsset(doc, buffers));

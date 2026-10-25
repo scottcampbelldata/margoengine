@@ -32,14 +32,14 @@ const median = (values) => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const files = {
-  '/damaged-helmet.glb': readFileSync('examples/assets/damaged-helmet.glb'),
+  '/scifi-helmet.glb': readFileSync('examples/assets/scifi-helmet.glb'),
   '/generated-40mb.glb': bigGLB({ segments: 400, meshes: 5 }), // 5 x 160,801 vertices, 960,000 indices each
   '/assembly-2000-parts.glb': bigGLB({ segments: 10, meshes: 2000, lattice: 13 }), // 2,000 nodes, each its own 121-vertex mesh
 };
 // Link profiles. Each applies to all requests together (one shared link), like a real connection.
 const profiles = { broadband: { mbps: 50, rttMs: 40 }, '4g': { mbps: 10, rttMs: 100 } };
 const plan = Object.fromEntries(
-  Object.entries({ broadband: Object.keys(files), '4g': ['/damaged-helmet.glb', '/assembly-2000-parts.glb'] }).filter(
+  Object.entries({ broadband: Object.keys(files), '4g': ['/scifi-helmet.glb', '/assembly-2000-parts.glb'] }).filter(
     ([p]) => arg('profiles', 'broadband,4g').split(',').includes(p),
   ),
 );

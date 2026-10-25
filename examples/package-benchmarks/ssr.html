@@ -6,7 +6,7 @@
 // planar mirror puts the box (projected corners of the box mirrored through y = 0). window.bench times every GPU pass.
 // floor: 'gltf' makes the floor a generated glTF plane (gltf-pro; roughMap: its roughness from a metallic-roughness
 // texture, factor 1) and 'materials' a @margoengine/materials mesh, both lit with lighting.add and reflecting with
-// ssr.add (add: false leaves them out). helmet: DamagedHelmet (gltf-pro, ssr.add) beside the red box over a rough floor.
+// ssr.add (add: false leaves them out). helmet: SciFiHelmet (gltf-pro, ssr.add) beside the red box over a rough floor.
 import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
 import {PostStack} from '/packages/post/dist/stack.js';
 import {SSR} from '/packages/post/dist/ssr.js';
@@ -56,7 +56,7 @@ window.check={
     if(camera==='ortho')CameraProjection.attach(engine,{height:6});
     const red=new PbrMaterial({color:'#ff0000',roughness:0.8}),models=[];
     if(helmet){engine.createMesh().setGeometry(box(40,0.02,40)).setPosition([0,-1.06,0]).setMaterial(new PbrMaterial({color:'#9a9488',roughness:0.85}));
-      engine.createMesh().setGeometry(box(1,2,1)).setPosition([1.7,0,0.2]).setMaterial(red);models.push(await loadGLTF(engine,'/examples/assets/damaged-helmet.glb'));}
+      engine.createMesh().setGeometry(box(1,2,1)).setPosition([1.7,0,0.2]).setMaterial(red);models.push(await loadGLTF(engine,'/examples/assets/scifi-helmet.glb'));}
     else {
       if(floor==='core')engine.createMesh().setGeometry(box(40,0.02,40)).setPosition([0,-0.01,0]).setMaterial(new PbrMaterial({color:'#ffffff',roughness,metalness:1}));
       else if(floor==='gltf')models.push(parseGLTF(engine,plane(roughness,roughMap),[plane.buffer],roughMap?[await createImageBitmap(new ImageData(new Uint8ClampedArray(Array(4).fill([0,Math.round(roughness*255),255,255]).flat()),2,2))]:[]));

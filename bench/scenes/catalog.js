@@ -122,16 +122,16 @@ function lights(n, count) {
   return def;
 }
 
-/** DamagedHelmet on a floor slab, lit by a procedural HDR sky (IBL) and the directional light with shadows. */
+/** SciFiHelmet on a floor slab, lit by a procedural HDR sky (IBL) and the directional light with shadows. */
 export const HELMET = {
-  file: 'damaged-helmet.glb',
+  file: 'scifi-helmet.glb',
   floor: { size: [6, 0.1, 6], position: [0, -1.05, 0], color: '#9a9488', roughness: 0.85, metalness: 0 },
   camera: orbit(3.3, 0.55, 100, 0.05),
   shadow: { resolution: 2048 },
 };
 /** Models the gltf scene opens, from the assets folder (examples/assets; sources in THIRD-PARTY-NOTICES.md). */
 export const MODELS = {
-  'damaged-helmet': { file: 'damaged-helmet.glb', radius: 1.2 },
+  'scifi-helmet': { file: 'scifi-helmet.glb', radius: 1.2 },
   'flight-helmet': { file: 'flight-helmet.glb', radius: 0.5, target: [0, 0.3, 0] },
   'robot-expressive': { file: 'robot-expressive.glb', radius: 6, target: [0, 2.5, 0] },
 };
@@ -275,7 +275,7 @@ export const SCENES = {
     title: 'glTF load',
     draws: 'Opens one GLB with the engine glTF loader (default light), then renders it with an orbiting camera.',
     measures: ['buildMs (load and parse to scene objects)', 'firstFrameMs', 'cpuMs', 'gpuMs'],
-    params: { model: 'damaged-helmet' },
+    params: { model: 'scifi-helmet' },
     data: (p, { assets }) => {
       const m = MODELS[p.model];
       if (!m) throw new Error(`unknown model ${p.model}; one of ${Object.keys(MODELS).join(', ')}`);
@@ -288,7 +288,7 @@ export const SCENES = {
   },
   helmet: {
     title: 'Lit glTF',
-    draws: 'DamagedHelmet on a floor with image-based lighting from a procedural sky and a 2048 shadow map.',
+    draws: 'SciFiHelmet on a floor with image-based lighting from a procedural sky and a 2048 shadow map.',
     measures: ['cpuMs', 'gpuMs', 'fps', 'buildMs'],
     params: {},
     data: (p, { assets }) => ({ ...HELMET, url: assets + HELMET.file, sky: sky() }),
@@ -331,7 +331,7 @@ export const STANDARD = {
     ...[1000, 10_000].flatMap((n) => ['mesh', 'batched'].map((mode) => ({ scene: 'shapes', params: { n, mode } }))),
   ],
   gltf: [
-    { scene: 'gltf', params: { model: 'damaged-helmet' } },
+    { scene: 'gltf', params: { model: 'scifi-helmet' } },
     { scene: 'gltf', params: { model: 'flight-helmet' } },
     { scene: 'gltf', params: { model: 'robot-expressive' } },
     { scene: 'helmet' },

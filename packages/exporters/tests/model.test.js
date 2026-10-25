@@ -125,7 +125,7 @@ function assertSamePose(a, b, clip, time) {
 }
 
 for (const [file, animated] of [
-  ['damaged-helmet.glb', false],
+  ['scifi-helmet.glb', false],
   ['robot-expressive.glb', true],
 ]) {
   test(`exportModel round trip: ${file}`, needsValidator, () =>
@@ -370,7 +370,7 @@ test(
       const image = 'textures/checker.png',
         { doc, buffers } = instancedGLTF([{ t: [0, 0, 0] }], { instanced: false, image });
       const model = parseGLTF(await headless(), doc, buffers, [{ width: 4, height: 4, close() {} }]);
-      const helmet = await parseGLTFAsync(await headless(), await asset('damaged-helmet.glb'));
+      const helmet = await parseGLTFAsync(await headless(), await asset('scifi-helmet.glb'));
       const result = await exportModel(helmet, { embed: false, binUri: 'helmet.bin' });
       assert.equal(result.binUri, 'helmet.bin');
       assert.ok(result.bin.length > 3_000_000);

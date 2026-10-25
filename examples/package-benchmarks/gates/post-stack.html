@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Post stack gate</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body><canvas></canvas>
 <script type="module">
-// Real scene for the post-stack gate (post-stack.mjs): DamagedHelmet (gltf-pro) on a floor with near and far boxes, optional
+// Real scene for the post-stack gate (post-stack.mjs): SciFiHelmet (gltf-pro) on a floor with near and far boxes, optional
 // environment IBL. window.bench.setup(config) builds a fresh engine; measure(frames) times every GPU pass of each frame.
 import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
 import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
@@ -12,7 +12,7 @@ import {DOF} from '/packages/dof/dist/index.js';
 import {Tonemap} from '/packages/tonemap/dist/index.js';
 import {Environment,EnvironmentLighting} from '/packages/environment/dist/index.js';
 
-const canvas=document.querySelector('canvas'),helmetUrl='/examples/assets/damaged-helmet.glb';
+const canvas=document.querySelector('canvas'),helmetUrl='/examples/assets/scifi-helmet.glb';
 // Smooth sky with a bright sun lobe: HDR values well above 1 so IBL specular and bloom have something to work with.
 function sky(width=256,height=128){
   const data=new Float32Array(width*height*4),sun=[0.5,0.6,-0.62];

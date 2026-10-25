@@ -153,5 +153,5 @@ budget and revalidation.
   works). `Expires` and `Age` are ignored; `no-cache` and missing `max-age` mean "revalidate".
 - A miss is read fully before the loader gets it (all Margo loaders read whole files anyway).
 - Eviction reads every entry's metadata (not the bytes) before each write: fine for thousands of files.
-- Measured in a real browser (DamagedHelmet and a 62 MB GLB, online, throttled and DevTools offline):
+- Measured in a real browser (DamagedHelmet, the earlier test model, and a 62 MB GLB, online, throttled and DevTools offline):
   `examples/package-benchmarks/cache/offline-gpu.mjs`, results in `examples/package-benchmarks/cache/results.json`.

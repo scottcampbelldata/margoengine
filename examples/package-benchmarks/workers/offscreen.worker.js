@@ -70,13 +70,13 @@ self.onmessage = async ({ data }) => {
     return { width: canvas.width, height: canvas.height };
   });
   await step('gltf-pro loadGLTF (fetch + createImageBitmap in a worker)', async () => {
-    const model = await loadGLTF(engine, '/examples/assets/damaged-helmet.glb');
+    const model = await loadGLTF(engine, '/examples/assets/scifi-helmet.glb');
     model.root.setPosition([0.4, 0.9, 0]);
     engine.render();
     return { primitives: model.primitives.length };
   });
   await step('gltf-pro loadGLTFInWorker (nested worker)', async () => {
-    const model = await loadGLTFInWorker(engine, '/examples/assets/damaged-helmet.glb');
+    const model = await loadGLTFInWorker(engine, '/examples/assets/scifi-helmet.glb');
     model.root.setPosition([2.2, 0.9, 0]).setScale([0.6, 0.6, 0.6]);
     engine.render();
     return { primitives: model.primitives.length };

@@ -57,7 +57,7 @@ const errors = [];
 engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
 const { doc, buffers } = quad(),
   model = gltf.parseGLTF(engine, doc, buffers);
-const helmet = await gltf.loadGLTF(engine, '/examples/assets/damaged-helmet.glb');
+const helmet = await gltf.loadGLTF(engine, '/examples/assets/scifi-helmet.glb');
 helmet.root.setPosition([0, 0, -3]).setScale([1.6, 1.6, 1.6]);
 const ssao = SSAO.attach(engine, { radius: 0.5 });
 ssao.add(model);

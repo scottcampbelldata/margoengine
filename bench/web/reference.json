@@ -220,16 +220,6 @@
    "gpuMB": 51.02,
    "drawCalls": 1
   },
-  "gltf/gltf-damaged-helmet": {
-   "buildMs": 135.5,
-   "firstFrameMs": 93,
-   "cpuMs": 0.09,
-   "gpuMs": 0.02,
-   "fps": 2359,
-   "jsHeapMB": 7.89,
-   "gpuMB": 136.08,
-   "drawCalls": 1
-  },
   "gltf/gltf-flight-helmet": {
    "buildMs": 121.5,
    "firstFrameMs": 147.1,

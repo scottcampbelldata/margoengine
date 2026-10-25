@@ -37,7 +37,7 @@ const meshes=async parsed=>{
 };
 const usd=async asset=>model(await asset.create(engine));
 const sources={
-  'gltf-pro:damaged-helmet':async()=>model(await loadGLTF(engine,'/examples/assets/damaged-helmet.glb')),
+  'gltf-pro:scifi-helmet':async()=>model(await loadGLTF(engine,'/examples/assets/scifi-helmet.glb')),
   'gltf-pro:robot-expressive':async()=>model(await loadGLTF(engine,'/examples/assets/robot-expressive.glb')),
   'gltf-pro:box-textured':async()=>model(await loadGLTF(engine,'/packages/exporters/tests/fixtures/BoxTextured.glb')),
   'fbx:triangle.fbx':async()=>model(await parseFBX(engine,await file('/examples/package-benchmarks/fixtures/triangle.fbx'))),

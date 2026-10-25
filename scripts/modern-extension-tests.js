@@ -8,13 +8,14 @@ import { readResponse } from '../packages/shared/loading.js';
 await mkdir('test-results', { recursive: true });
 
 const urls = {
-  helmet:
-    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb',
+  // Served from the repository copy (Khronos SciFiHelmet, CC0 1.0) through page.route below.
+  helmet: 'https://assets.test/scifi-helmet.glb',
   robot:
     'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
 };
-const assets = {};
+const assets = { helmet: await readFile('examples/assets/scifi-helmet.glb') };
 for (const [name, url] of Object.entries(urls)) {
+  if (assets[name]) continue;
   const path = 'test-results/' + name + '.glb';
   try {
     assets[name] = await readFile(path);

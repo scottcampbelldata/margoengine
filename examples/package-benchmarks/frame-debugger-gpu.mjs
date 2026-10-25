@@ -1,6 +1,6 @@
 // Real-GPU check of the frame debugger (run on AC power under the GPU lock, after npm run build:packages):
 //   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/frame-debugger-gpu.mjs
-// Captures one frame of DamagedHelmet + shadows + GPU-culled indirect boxes + PostStack(SSAO, Bloom, FXAA) with
+// Captures one frame of SciFiHelmet + shadows + GPU-culled indirect boxes + PostStack(SSAO, Bloom, FXAA) with
 // timestamp queries, checks the report, and writes test-results/frame-debugger-report.json and
 // test-results/frame-debugger-panel.png (the DOM panel over the scene).
 import assert from 'node:assert/strict';

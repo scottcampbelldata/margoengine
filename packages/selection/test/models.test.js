@@ -192,7 +192,7 @@ test('engine.pick returns gltf-pro model nodes from the culled micro pass, with 
 test('picking draws deformed (skinned) vertex buffers and many primitives of a real asset', async () => {
   const w = await world(),
     { engine, draws } = w,
-    { doc, binary } = readGLB(readFileSync(new URL('../../../examples/assets/damaged-helmet.glb', import.meta.url)));
+    { doc, binary } = readGLB(readFileSync(new URL('../../../examples/assets/scifi-helmet.glb', import.meta.url)));
   const model = new PBRModel(
     engine,
     new GLTFAsset(doc, [], binary),

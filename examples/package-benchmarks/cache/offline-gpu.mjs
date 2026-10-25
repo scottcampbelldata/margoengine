@@ -1,6 +1,6 @@
 // Real-browser check of @margoengine/cache (AC power, after npm run build:packages, under the GPU lock):
 //   node scripts/gpu-lock.mjs run --owner=<agent id> -- node examples/package-benchmarks/cache/offline-gpu.mjs [--reps=3] [--quiet-timeout=900]
-// For DamagedHelmet (3.6 MB) and a generated 6 x 160k-vertex GLB (about 48 MB; picked when the 62 MB conveyor GLB was not
+// For SciFiHelmet (5.1 MB) and a generated 6 x 160k-vertex GLB (about 48 MB; picked when the 62 MB conveyor GLB was not
 // loadable by gltf-pro, since fixed): loadGLTF with plain fetch (baseline), through an empty cache
 // (cold: download + store) and through a filled cache in a new AssetCache (warm: one conditional request, 304, bytes from
 // IndexedDB), on localhost and on a throttled "factory Wi-Fi" profile (CDP: 20 Mbit/s, 80 ms). Then DevTools offline
@@ -27,7 +27,7 @@ try {
 }
 const label = machine.busy ? 'busy (diagnostic timings)' : 'quiet';
 const assets = [
-  { name: 'DamagedHelmet', url: '/examples/assets/damaged-helmet.glb', file: 'examples/assets/damaged-helmet.glb' },
+  { name: 'SciFiHelmet', url: '/examples/assets/scifi-helmet.glb', file: 'examples/assets/scifi-helmet.glb' },
   { name: 'generated large GLB', url: '/test-results/cache-big.glb', file: 'test-results/cache-big.glb' },
 ];
 mkdirSync('test-results', { recursive: true });

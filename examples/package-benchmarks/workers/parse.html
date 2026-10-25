@@ -15,7 +15,7 @@ const canvas=document.querySelector('canvas'),errors=[];
 const engine=await Engine.create(canvas,{backend:'webgpu',capacity:4096,camera:{position:[0,3,8],target:[0,0,0],near:0.05,far:500}});
 engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const models={
-  'damaged-helmet.glb':{main:u=>loadGLTF(engine,u),worker:u=>loadGLTFInWorker(engine,u),url:'/examples/assets/damaged-helmet.glb'},
+  'scifi-helmet.glb':{main:u=>loadGLTF(engine,u),worker:u=>loadGLTFInWorker(engine,u),url:'/examples/assets/scifi-helmet.glb'},
   'generated-642k-vertices.glb':{main:u=>loadGLTF(engine,u),worker:u=>loadGLTFInWorker(engine,u),url:'/test-results/workers-big.glb'},
   'grid-160k-quads.fbx':{main:u=>loadFBX(engine,u),worker:u=>loadFBXInWorker(engine,u),url:'/test-results/workers-grid.fbx'},
   'knot-200k-triangles.usdz':{main:u=>loadUSDZ(engine,u),worker:u=>loadUSDZInWorker(engine,u),url:'/test-results/workers-knot.usdz'},

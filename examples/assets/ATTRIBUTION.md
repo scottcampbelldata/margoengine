@@ -20,9 +20,8 @@ Regenerate the desktop helmet GLB with `node scripts/optimize-demo-assets.js`. T
 the image tools already installed in this workspace and validates the GLB
 (Khronos glTF-Validator: 0 errors, 0 warnings). The phone GLB is not regenerated.
 
-## Internal tests and benchmarks only (not served on margoengine.com)
+## Tests and benchmarks
 
-- `damaged-helmet.glb`: [Damaged Helmet from Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DamagedHelmet).
-  Earlier model by theblueturtle_ (CC BY-NC 4.0), conversion by ctxwing (CC BY 4.0).
-  See `damaged-helmet-CREDITS.md` in the repository. Because of the non-commercial licence it is used only by
-  repository tests and benchmarks, never by a public demo, the site or the docs' runnable examples.
+- `scifi-helmet.glb`: [SciFiHelmet from Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SciFiHelmet).
+  Model by Michael Pavlovic, glTF conversion by Norbert Nopper, CC0 1.0. Packed from `khronos/SciFiHelmet/` with
+  1024-pixel JPEG maps by `node scripts/build-scifi-helmet.mjs`. See [its credits](scifi-helmet-CREDITS.md).

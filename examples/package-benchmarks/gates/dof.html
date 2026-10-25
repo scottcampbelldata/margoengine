@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>DOF gate</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body><canvas></canvas>
 <script type="module">
-// Real scene for the DOF benchmark (dof.mjs): the post-stack gate's DamagedHelmet + boxes with environment IBL, in a
+// Real scene for the DOF benchmark (dof.mjs): the post-stack gate's SciFiHelmet + boxes with environment IBL, in a
 // PostStack [DOF, Tonemap]. setup({variant,dof,msaa,size}) builds a fresh engine with the DOF class loaded from
 // `variant` (a module URL), so old and new builds run in the same page; measure(frames) times every GPU pass.
 import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
@@ -9,7 +9,7 @@ import {PostStack} from '/packages/post/dist/stack.js';
 import {Tonemap} from '/packages/tonemap/dist/index.js';
 import {Environment,EnvironmentLighting} from '/packages/environment/dist/index.js';
 
-const canvas=document.querySelector('canvas'),helmetUrl='/examples/assets/damaged-helmet.glb';
+const canvas=document.querySelector('canvas'),helmetUrl='/examples/assets/scifi-helmet.glb';
 function sky(width=256,height=128){
   const data=new Float32Array(width*height*4),sun=[0.5,0.6,-0.62];
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){

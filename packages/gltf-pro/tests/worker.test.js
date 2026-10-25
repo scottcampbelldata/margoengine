@@ -16,7 +16,7 @@ const worker = new URL('../dist/workers/gltf.js', import.meta.url);
 const asset = (name) => readFile(new URL(`../../../examples/assets/${name}`, import.meta.url));
 
 for (const [name, load] of [
-  ['DamagedHelmet (textured, tangents)', () => asset('damaged-helmet.glb')],
+  ['SciFiHelmet (textured, tangents)', () => asset('scifi-helmet.glb')],
   ['RobotExpressive (skins, morph targets, animations)', () => asset('robot-expressive.glb')],
   ['generated 2 x 66k-vertex grids (one without normals)', async () => bigGLB({ segments: 256, meshes: 2 })],
   [

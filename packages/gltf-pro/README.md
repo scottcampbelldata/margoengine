@@ -35,7 +35,7 @@ Core + stage must remain below **25,000 bytes gzip**; CI rejects 25,000 bytes an
 import {createStage} from 'margoengine';
 import {loadGLTF, type MaterialExtension} from 'margoengine/gltf-pro';
 const stage = await createStage('#viewport', {backend:'webgpu'});
-const model = await loadGLTF(stage.engine, '/DamagedHelmet.glb');
+const model = await loadGLTF(stage.engine, '/SciFiHelmet.glb');
 const b = model.bounds;
 stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
 // Call model.destroy() when unloading the model, or stage.dispose() on unmount.
@@ -188,7 +188,7 @@ import {loadGLTF, type MaterialExtension} from 'margoengine/gltf-pro';
 import {getSceneBounds, fitScene, gatherSceneBuffers} from 'margoengine/gltf-pro/scene';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-const model = await loadGLTF(stage.engine, '/DamagedHelmet.glb');
+const model = await loadGLTF(stage.engine, '/SciFiHelmet.glb');
 const coreMesh = stage.engine.createMesh().setGeometry(box());
 const roots = [model.root, coreMesh];
 fitScene(stage.engine, roots, {duration: 0.3, padding: 1.1});
@@ -320,4 +320,4 @@ parity, KTX2 mip upload and worker disposal in a production Vite build, complete
 Khronos assets, and eight-influence character deformation against a CPU reference.
 These checks are also part of `npm run modern:test:extensions`.
 
-The demo at `/examples/damaged-helmet.html` downloads the [Khronos Damaged Helmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DamagedHelmet). Its credits/licenses remain with the original asset.
+The demo at `/examples/flight-helmet.html` loads the [Khronos FlightHelmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet) (CC0 1.0). Asset credits are in [THIRD-PARTY-NOTICES.md](../../THIRD-PARTY-NOTICES.md).

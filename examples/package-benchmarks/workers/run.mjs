@@ -3,7 +3,7 @@
 // Takes the GPU lock (main checkout's test-results/gpu.lock, checked every 60 s), requires AC power before and after.
 // 1. offscreen.html in Edge and Chrome: core + packages on a transferred OffscreenCanvas in a worker, platform features
 //    (Float16Array, Symbol.dispose, `using`), canvas screenshot must show drawn pixels.
-// 2. parse.html in Edge: main-thread blocking while loading a large FBX, a USDZ, DamagedHelmet and a generated GLB, with
+// 2. parse.html in Edge: main-thread blocking while loading a large FBX, a USDZ, SciFiHelmet and a generated GLB, with
 //    the main-thread loaders vs the /worker entries; alternating order per round, round 0 discarded, medians reported.
 // Writes examples/package-benchmarks/results/workers.json (fixtures go to test-results/workers-*).
 import assert from 'node:assert/strict';

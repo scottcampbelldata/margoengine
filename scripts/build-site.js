@@ -128,7 +128,7 @@ await site({
     rollupOptions: { input: { index: resolve('bench/index.html'), page: resolve('bench/scenes/page.html') } },
   },
 });
-for (const name of ['damaged-helmet.glb', 'flight-helmet.glb', 'robot-expressive.glb', 'ATTRIBUTION.md'])
+for (const name of ['scifi-helmet.glb', 'flight-helmet.glb', 'robot-expressive.glb', 'ATTRIBUTION.md'])
   await cp(`examples/assets/${name}`, `${out}/bench/assets/${name}`);
 for (const name of ['ATTRIBUTION.md', 'robot-CREDITS.md', 'tokyo-diorama-CREDITS.md'])
   await cp(`examples/assets/${name}`, `${out}/demos/assets/${name}`);

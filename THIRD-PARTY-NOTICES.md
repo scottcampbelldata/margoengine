@@ -171,7 +171,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | [`examples/assets/kaykit/LICENSE-character-animations.txt`](examples/assets/kaykit/LICENSE-character-animations.txt) | KayKit Character Animations (Kay Lousberg, CC0) |
 | [`examples/assets/kaykit/LICENSE-dungeon.txt`](examples/assets/kaykit/LICENSE-dungeon.txt) | KayKit Dungeon (Kay Lousberg, CC0) |
 | [`packages/creative/examples/earth/assets/ATTRIBUTION.md`](packages/creative/examples/earth/assets/ATTRIBUTION.md) | Earth demo: NASA Blue Marble, Solar System Scope textures (CC BY 4.0) |
-| [`examples/assets/damaged-helmet-CREDITS.md`](examples/assets/damaged-helmet-CREDITS.md) | DamagedHelmet (CC BY-NC 4.0 / CC BY 4.0): internal tests and benchmarks only, never served |
+| [`examples/assets/scifi-helmet-CREDITS.md`](examples/assets/scifi-helmet-CREDITS.md) | SciFiHelmet test and benchmark model (Michael Pavlovic, Norbert Nopper, CC0 1.0) |
 | [`packages/environment/tests/fixtures/NOTICE.md`](packages/environment/tests/fixtures/NOTICE.md) | test fixtures: OpenEXR test images (BSD-3-Clause) |
 | [`packages/loaders/tests/fixtures/SOURCES.txt`](packages/loaders/tests/fixtures/SOURCES.txt) | test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan), libigl tutorial data cube.off and decimated-knight.off, PyVista vtk-data fran_cut.vtk and polyEx.vtk |
 | [`packages/points/tests/fixtures/NOTICE.md`](packages/points/tests/fixtures/NOTICE.md) | test fixture: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan) |

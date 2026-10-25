@@ -104,8 +104,8 @@ const ASSETS = [
     'Earth demo: NASA Blue Marble, Solar System Scope textures (CC BY 4.0)',
   ],
   [
-    'examples/assets/damaged-helmet-CREDITS.md',
-    'DamagedHelmet (CC BY-NC 4.0 / CC BY 4.0): internal tests and benchmarks only, never served',
+    'examples/assets/scifi-helmet-CREDITS.md',
+    'SciFiHelmet test and benchmark model (Michael Pavlovic, Norbert Nopper, CC0 1.0)',
   ],
   ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],
   [

@@ -79,7 +79,7 @@ test('bench scenes: every standard case names a scene, ids are stable, data is d
     assert.deepEqual(JSON.stringify(a), JSON.stringify(b), scene);
   }
   assert.equal((await SCENES.lights.data(sceneParams('lights'), env)).lights.length, 64);
-  assert.equal((await SCENES.gltf.data(sceneParams('gltf'), env)).url, '/a/damaged-helmet.glb');
+  assert.equal((await SCENES.gltf.data(sceneParams('gltf'), env)).url, '/a/scifi-helmet.glb');
 });
 
 test('bench suites: every suite loads and lists its cases', async () => {

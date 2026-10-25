@@ -79,7 +79,7 @@ The tool takes the lock itself when it is not wrapped, so both forms are safe.
 | `objects` | browser | 10,000 objects as static meshes, moving meshes, instances and moving instances. |
 | `scaling` | browser | 1, 100, 1,000, 10,000 and 100,000 meshes, then 100,000 and 250,000 instances, then 400, 5,000 and 10,000 shadow casters. |
 | `math` | Node | Kernel world matrices and frustum culling for 100,000 meshes, 100,000 matrix compositions, BVH build and rays on 500,000 triangles, rays against a 500-part assembly. |
-| `gltf` | browser | Load and draw DamagedHelmet, FlightHelmet and RobotExpressive, then the helmet with image-based lighting and shadows. |
+| `gltf` | browser | Load and draw SciFiHelmet, FlightHelmet and RobotExpressive, then the helmet with image-based lighting and shadows. |
 | `loaders` | Node | PLY, 3MF, OFF, VTK and PCD files from the loaders tests, and a generated 500,000-triangle OBJ. |
 | `cad` | Node and browser | Kernel tick for 10,017 to 89,883-part assemblies, 16 B-rep booleans and meshing, a STEP write, parse and tessellation, then 10,000 and 50,000-part assemblies drawn. |
 | `voxel` | Node and browser | Fill a 256 x 64 x 256 terrain, mesh its 128 chunks, 10,000 voxel raycasts, then the voxel sandbox at render distance 8. |
@@ -122,6 +122,10 @@ For each case and metric the result keeps the raw samples (one per run) and thei
 
 Primary metrics are bold in the report. If any primary metric is noisy, the run is invalid. Byte and count metrics
 (`exact`) never are.
+
+Results recorded before October 24, 2026 (in `results/`, `benchmarks/records/` and some package READMEs) used the
+Khronos DamagedHelmet model. Its earlier version is CC BY-NC 4.0, so the repository now uses SciFiHelmet (CC0 1.0,
+`examples/assets/scifi-helmet.glb`) in the same places. Rerun a benchmark before comparing against those numbers.
 
 Browser metrics, per case (each run's value is that run's median over its frames):
 
