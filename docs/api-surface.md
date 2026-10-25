@@ -64,7 +64,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/road | `.` 3 |  |  | 915 |
 | @margoengine/scatter | `.` 18 | 1 |  | 11,560 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
-| @margoengine/sciviz | `.` 48, `./colormaps` 11, `./maths` 19 | 2 |  | 20,137 |
+| @margoengine/sciviz | `.` 48, `./colormaps` 11, `./maths` 19 | 2 |  | 23,516 |
 | @margoengine/selection | `.` 10 | 1 |  | 13,593 |
 | @margoengine/shader | `.` 142, `./noise` 9, `./graph` 17, `./readback` 4, `./raw` 13, `./effects` 19 | 142 |  | 12,152 |
 | @margoengine/shadows | `.` 8 | 1 |  | 12,888 |
