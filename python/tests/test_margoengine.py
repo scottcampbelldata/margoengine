@@ -1,5 +1,5 @@
 """Tests for the margoengine Python package: binary encoding, the widget protocol (against a stand-in comm), the plot
-specification, and NumPy and pandas inputs (skipped when those are not installed). Run with
+specification, and NumPy, pandas, Polars and xarray inputs (skipped when those are not installed). Run with
 ``python -m unittest discover -s python/tests`` or ``pytest python/tests``.
 """
 
@@ -25,6 +25,14 @@ try:
     import pandas as pd
 except ImportError:  # pragma: no cover
     pd = None
+try:
+    import polars as pl
+except ImportError:  # pragma: no cover
+    pl = None
+try:
+    import xarray as xr
+except ImportError:  # pragma: no cover
+    xr = None
 
 
 class FakeComm:
@@ -256,6 +264,82 @@ class PandasInputs(unittest.TestCase):
         self.assertEqual(layer["range"], [5.0, 6.0])
         with self.assertRaises(KeyError):
             margo.scatter(df, x="nope", y="lat", comm_factory=FakeComm)
+
+
+@unittest.skipIf(pl is None, "Polars is not installed")
+class PolarsInputs(unittest.TestCase):
+    def test_scatter_takes_polars_dataframe_and_lazyframe_columns_with_nulls_as_nan(self):
+        df = pl.DataFrame({"lon": [1.0, 2.0, None], "lat": [3, 4, 5], "mag": [5.0, 6.0, 7.0]})
+        for data in (df, df.lazy()):
+            layer = margo.scatter(data, x="lon", y="lat", color="mag", comm_factory=FakeComm).spec["layers"][0]
+            x = floats(bytes(layer["x"]["buffer"]))
+            self.assertEqual(x[:2], [1.0, 2.0])
+            self.assertTrue(math.isnan(x[2]))
+            self.assertEqual(floats(bytes(layer["y"]["buffer"])), [3.0, 4.0, 5.0])
+            self.assertEqual(layer["range"], [5.0, 7.0])
+        with self.assertRaises(KeyError):
+            margo.scatter(df, x="nope", y="lat", comm_factory=FakeComm)
+        line = margo.line(df.lazy(), x="lat", y="mag", comm_factory=FakeComm).spec["layers"][0]
+        self.assertEqual(floats(bytes(line["x"]["buffer"])), [3.0, 4.0, 5.0])
+        with self.assertRaises(TypeError):
+            margo.scatter(pl.DataFrame({"s": ["a"], "y": [1]}), x="s", y="y", comm_factory=FakeComm)
+
+
+@unittest.skipIf(xr is None, "xarray is not installed")
+class XarrayInputs(unittest.TestCase):
+    def cube(self, lat=None):
+        values = np.arange(4 * 3 * 2, dtype=np.float32).reshape(2, 3, 4)
+        return xr.DataArray(
+            values,
+            dims=("depth", "lat", "lon"),
+            coords={
+                "depth": xr.DataArray([0.0, 10.0], dims="depth", attrs={"units": "m"}),
+                "lat": lat if lat is not None else [40.0, 41.0, 42.0],
+                "lon": xr.DataArray([-5.0, -4.5, -4.0, -3.5], dims="lon", attrs={"long_name": "longitude", "units": "degrees_east"}),
+            },
+            name="temperature",
+            attrs={"units": "K"},
+        )
+
+    def test_volume_takes_bounds_titles_and_colour_bar_label_from_the_data_array(self):
+        fig = margo.volume(self.cube(), comm_factory=FakeComm)
+        layer = fig.spec["layers"][0]
+        self.assertEqual(layer["dims"], [4, 3, 2])
+        self.assertEqual(layer["bounds"], [-5.0, -3.5, 40.0, 42.0, 0.0, 10.0])
+        self.assertEqual(fig.spec["titles"], {"x": "longitude (degrees_east)", "y": "lat", "z": "depth (m)"})
+        self.assertEqual(fig.spec["colorbars"][0]["label"], "temperature (K)")
+        # The caller's own titles and bounds win.
+        fig = margo.figure(titles={"z": "Depth"}, comm_factory=FakeComm).isosurface(self.cube(), 5.0, bounds=(0, 1, 0, 1, 0, 1))
+        self.assertEqual(fig.spec["layers"][0]["bounds"], [0.0, 1.0, 0.0, 1.0, 0.0, 1.0])
+        self.assertEqual(fig.spec["titles"]["z"], "Depth")
+
+    def test_a_decreasing_coordinate_is_flipped_so_values_run_from_its_minimum(self):
+        cube = self.cube(lat=[42.0, 41.0, 40.0])
+        layer = margo.volume(cube, comm_factory=FakeComm).spec["layers"][0]
+        self.assertEqual(layer["bounds"][2:4], [40.0, 42.0])
+        expected = np.flip(cube.to_numpy(), axis=1).astype("<f4").tobytes()
+        self.assertEqual(bytes(layer["values"]["buffer"]), expected)
+
+    def test_uneven_or_non_numeric_coordinates_are_refused_with_the_fix(self):
+        with self.assertRaises(ValueError) as caught:
+            margo.volume(self.cube(lat=[40.0, 41.0, 45.0]), comm_factory=FakeComm)
+        self.assertIn("interp", str(caught.exception))
+        times = xr.DataArray(np.zeros((2, 2)), dims=("t", "x"), coords={"t": np.array(["2026-01-01", "2026-01-02"], dtype="datetime64[ns]")})
+        with self.assertRaises(TypeError):
+            margo.surface(times, comm_factory=FakeComm)
+        self.assertEqual(margo.surface(times, y=(0, 1), x=(0, 1), comm_factory=FakeComm).spec["layers"][0]["y"], [0.0, 1.0])
+        with self.assertRaises(ValueError):
+            margo.volume(xr.DataArray(np.zeros((2, 2))), comm_factory=FakeComm)
+
+    def test_surface_ranges_from_the_coordinates_rows_first(self):
+        z = xr.DataArray(np.zeros((3, 4)), dims=("y", "x"), coords={"y": [0.0, 0.5, 1.0], "x": [10.0, 20.0, 30.0, 40.0]}, name="height")
+        fig = margo.surface(z, comm_factory=FakeComm)
+        layer = fig.spec["layers"][0]
+        self.assertEqual((layer["x"], layer["y"], layer["z"]["shape"]), ([10.0, 40.0], [0.0, 1.0], [3, 4]))
+        self.assertEqual(fig.spec["colorbars"][0]["label"], "height")
+        # A dimension without a coordinate keeps index units.
+        bare = margo.surface(xr.DataArray(np.zeros((2, 3)), dims=("r", "c")), comm_factory=FakeComm).spec["layers"][0]
+        self.assertEqual((bare["x"], bare["y"]), ([0.0, 2.0], [0.0, 1.0]))
 
 
 @unittest.skipIf(np is None or pd is None, "NumPy and pandas are not installed")

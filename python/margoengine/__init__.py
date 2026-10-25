@@ -1,4 +1,4 @@
-"""Margo Engine for notebooks: GPU plots of NumPy arrays and pandas DataFrames in Jupyter.
+"""Margo Engine for notebooks: GPU plots of NumPy arrays, pandas and Polars DataFrames and xarray DataArrays in Jupyter.
 
     import margoengine as margo
     margo.scatter(df, x="lon", y="lat", z="depth", color="magnitude")
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Optional, Sequence, Union
 
+from ._arrays import is_labeled, label
 from ._figure import COLORMAPS, Figure
 
 __all__ = ["Figure", "COLORMAPS", "figure", "scatter", "line", "surface", "volume", "isosurface", "__version__"]
@@ -45,14 +46,14 @@ def surface(z: Any, **options: Any) -> Figure:
     """A figure with one surface plot of the 2D array ``z`` and its colour bar."""
     layer_keys = {"x", "y", "colormap", "range", "contours"}
     layer = {k: options.pop(k) for k in list(options) if k in layer_keys}
-    return Figure(**options).surface(z, colorbar="z", **layer)
+    return Figure(**options).surface(z, colorbar=label(z, "z") if is_labeled(z) else "z", **layer)
 
 
 def volume(values: Any, **options: Any) -> Figure:
     """A figure with one volume rendering of the 3D array ``values`` and its colour bar."""
     layer_keys = {"bounds", "colormap", "range", "opacity", "density", "mode"}
     layer = {k: options.pop(k) for k in list(options) if k in layer_keys}
-    return Figure(**options).volume(values, colorbar="value", **layer)
+    return Figure(**options).volume(values, colorbar=label(values, "value") if is_labeled(values) else "value", **layer)
 
 
 def isosurface(values: Any, level: float, **options: Any) -> Figure:

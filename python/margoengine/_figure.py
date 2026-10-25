@@ -1,5 +1,5 @@
 """Margo figures for notebooks: scatter, line, surface, volume and isosurface layers drawn by Margo Engine in the
-browser (WebGPU), fed with NumPy arrays and pandas columns as binary buffers.
+browser (WebGPU), fed with NumPy arrays, pandas and Polars columns and xarray DataArrays as binary buffers.
 
 A figure is a widget. Its state is a plot specification: theme, axes and a list of layers, each array stored as
 float32 bytes plus its shape. The JavaScript side (``@margoengine/jupyter``) turns the specification into a
@@ -15,7 +15,7 @@ import math
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-from ._arrays import Encoded, column, encode, extent
+from ._arrays import Encoded, column, encode, extent, frame, is_labeled, label, labeled_grid
 from ._widget import WidgetModel, split_buffers
 
 __all__ = ["Figure", "COLORMAPS"]
@@ -138,12 +138,13 @@ class Figure:
         colorbar: Optional[str] = None,
     ) -> "Figure":
         """A scatter plot. ``x``, ``y``, ``z``, ``color`` and ``size`` are arrays or column names of ``data``
-        (a pandas DataFrame or a dict of arrays). Millions of points draw with level of detail.
+        (a pandas or Polars DataFrame or LazyFrame, an xarray Dataset, or a dict of arrays). Millions of points draw with level of detail.
 
         ``colorbar`` adds a colour bar with that title for the ``color`` values.
         """
         layer: Dict[str, Any] = {"type": "scatter", "colormap": _colormap(colormap), "edl": bool(edl)}
         columns = {"x": x, "y": y, "z": z, "color": color, "size": size}
+        data = frame(data, list(columns.values()))
         lengths = set()
         for key, value in columns.items():
             value = column(data, value, key)
@@ -182,7 +183,9 @@ class Figure:
     ) -> "Figure":
         """A line through the points (x, y, z), optionally coloured by ``color`` values."""
         layer: Dict[str, Any] = {"type": "line", "colormap": _colormap(colormap), "width": float(width)}
-        for key, value in {"x": x, "y": y, "z": z, "color": color}.items():
+        columns = {"x": x, "y": y, "z": z, "color": color}
+        data = frame(data, list(columns.values()))
+        for key, value in columns.items():
             value = column(data, value, key)
             if value is not None:
                 encoded = encode(value, name=key)
@@ -203,7 +206,14 @@ class Figure:
         colorbar: Optional[str] = None,
     ) -> "Figure":
         """A surface plot of a 2D array of heights ``z[row][column]`` over the ``x`` (columns) and ``y`` (rows) ranges.
-        NaN heights leave holes."""
+        NaN heights leave holes.
+
+        An xarray DataArray brings its own ranges (from the coordinates of its two dimensions, rows first) and axis
+        titles; ``x`` and ``y`` override the ranges."""
+        spans: List[Any] = [None, None]
+        if is_labeled(z):
+            z, spans, names = labeled_grid(z, "surface z", ranges=x is None or y is None)
+            self._default_titles(x=names[-1], y=names[0])
         encoded = encode(z, name="z")
         if len(encoded.shape) != 2 or min(encoded.shape) < 2:
             raise ValueError(f"surface z must be a 2D array of at least 2 x 2, got shape {encoded.shape}")
@@ -214,8 +224,8 @@ class Figure:
         layer = {
             "type": "surface",
             "z": {**encoded.descriptor(), "buffer": encoded.data},
-            "x": _range(x, "x") or [0.0, float(nx - 1)],
-            "y": _range(y, "y") or [0.0, float(ny - 1)],
+            "x": _range(x, "x") or _range(spans[-1], "x") or [0.0, float(nx - 1)],
+            "y": _range(y, "y") or _range(spans[0], "y") or [0.0, float(ny - 1)],
             "colormap": _colormap(colormap),
             "range": heights,
             "contours": int(contours),
@@ -240,8 +250,10 @@ class Figure:
         """A volume rendering of a 3D array ``values[z][y][x]``.
 
         ``opacity`` maps normalised values to opacity as ``[(t, alpha), ...]`` (default rising as t squared);
-        ``mode`` is ``"composite"`` or ``"mip"`` (maximum intensity).
+        ``mode`` is ``"composite"`` or ``"mip"`` (maximum intensity). An xarray DataArray with dimensions in
+        (z, y, x) order brings its bounds from its coordinates, and its axis titles; ``bounds`` overrides them.
         """
+        values, coord_bounds = self._grid(values, "volume values", bounds)
         encoded = encode(values, name="values")
         if len(encoded.shape) != 3 or min(encoded.shape) < 2:
             raise ValueError(f"volume values must be a 3D array of at least 2 x 2 x 2, got shape {encoded.shape}")
@@ -258,8 +270,8 @@ class Figure:
             "density": float(density),
             "mode": mode,
         }
-        if bounds is not None:
-            layer["bounds"] = self._bounds(bounds)
+        if bounds is not None or coord_bounds is not None:
+            layer["bounds"] = self._bounds(bounds if bounds is not None else coord_bounds)
         if opacity is not None:
             layer["opacity"] = [[float(t), float(a)] for t, a in opacity]
         self._push(layer)
@@ -275,7 +287,9 @@ class Figure:
         bounds: Optional[Sequence[float]] = None,
         color: Optional[str] = None,
     ) -> "Figure":
-        """An isosurface of a 3D array ``values[z][y][x]`` at ``level``, extracted by marching cubes on the GPU."""
+        """An isosurface of a 3D array ``values[z][y][x]`` at ``level``, extracted by marching cubes on the GPU.
+        An xarray DataArray brings its bounds and axis titles, as in :meth:`volume`."""
+        values, coord_bounds = self._grid(values, "isosurface values", bounds)
         encoded = encode(values, name="values")
         if len(encoded.shape) != 3 or min(encoded.shape) < 2:
             raise ValueError(f"isosurface values must be a 3D array, got shape {encoded.shape}")
@@ -288,8 +302,8 @@ class Figure:
             "dims": [nx, ny, nz],
             "level": float(level),
         }
-        if bounds is not None:
-            layer["bounds"] = self._bounds(bounds)
+        if bounds is not None or coord_bounds is not None:
+            layer["bounds"] = self._bounds(bounds if bounds is not None else coord_bounds)
         if color is not None:
             layer["color"] = str(color)
         return self._push(layer)
@@ -302,6 +316,26 @@ class Figure:
         self._spec["colorbars"].append(bar)
         self._sync()
         return self
+
+    def _grid(self, values: Any, name: str, bounds: Optional[Sequence[float]]) -> Tuple[Any, Optional[List[float]]]:
+        # A 3D DataArray (z, y, x): its values, its bounds from the coordinates (index units where one is missing)
+        # and its dimension titles for the axes the figure has not titled.
+        if not is_labeled(values):
+            return values, None
+        if len(values.dims) != 3:
+            raise ValueError(f"{name} must be a 3D DataArray, got dimensions {tuple(values.dims)}")
+        array, spans, names = labeled_grid(values, name, ranges=bounds is None)
+        self._default_titles(x=names[2], y=names[1], z=names[0])
+        if bounds is not None:
+            return array, None
+        nz, ny, nx = array.shape
+        sx, sy, sz = (s or (0.0, float(n - 1)) for s, n in zip(spans[::-1], (nx, ny, nz)))
+        return array, [*sx, *sy, *sz]
+
+    def _default_titles(self, **titles: str) -> None:
+        # Axis titles from labelled data fill in only the axes the caller left untitled.
+        for axis, title in titles.items():
+            self._spec["titles"].setdefault(axis, title)
 
     @staticmethod
     def _bounds(bounds: Sequence[float]) -> List[float]:

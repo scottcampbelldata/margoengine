@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "margoengine"
 version = "1.0.0"
-description = "GPU plots of NumPy arrays and pandas DataFrames in Jupyter, drawn by Margo Engine with WebGPU: millions of points, volumes, surfaces and isosurfaces."
+description = "GPU plots of NumPy arrays, pandas and Polars DataFrames and xarray DataArrays in Jupyter, drawn by Margo Engine with WebGPU: millions of points, volumes, surfaces and isosurfaces."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.9"
 authors = [{ name = "Scott Campbell" }]
-keywords = ["jupyter", "widget", "webgpu", "visualization", "scientific-visualization", "numpy", "pandas"]
+keywords = ["jupyter", "widget", "webgpu", "visualization", "scientific-visualization", "numpy", "pandas", "polars", "xarray"]
 classifiers = [
   "Framework :: Jupyter",
   "Framework :: Jupyter :: JupyterLab :: Extensions :: Prebuilt",
@@ -23,6 +23,8 @@ dependencies = ["comm>=0.1.3"]
 [project.optional-dependencies]
 numpy = ["numpy>=1.22"]
 pandas = ["pandas>=1.5"]
+polars = ["polars>=1.0", "numpy>=1.22"]
+xarray = ["xarray>=2023.1"]
 test = ["pytest>=7"]
 
 [project.urls]

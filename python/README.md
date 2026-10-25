@@ -1,6 +1,6 @@
 # margoengine (Python)
 
-GPU plots of NumPy arrays and pandas DataFrames in Jupyter. Margo Engine draws them in the browser with WebGPU:
+GPU plots of NumPy arrays, pandas and Polars DataFrames and xarray DataArrays in Jupyter. Margo Engine draws them in the browser with WebGPU:
 
 - millions of points;
 - volumes with transfer functions;
@@ -38,11 +38,39 @@ fig.line(x=path_lon, y=path_lat, z=path_depth, width=3)
 fig.save_html("quakes.html")
 ```
 
+Polars DataFrames and LazyFrames work like pandas ones (a LazyFrame reads only the columns you name; nulls draw as
+gaps). An xarray DataArray brings its own grid: a volume's bounds and a surface's ranges come from the coordinates,
+and the axis titles and colour bar label from the names and units:
+
+```python
+import polars as pl
+import xarray as xr
+
+stars = pl.DataFrame({"ra": np.random.rand(100_000), "dec": np.random.rand(100_000), "mag": np.random.rand(100_000)})
+margo.scatter(stars.lazy(), x="ra", y="dec", color="mag")
+
+lat = np.linspace(40, 50, 64)
+lon = np.linspace(-10, 0, 80)
+depth = np.linspace(0, 500, 32)
+temperature = xr.DataArray(
+    np.random.rand(32, 64, 80).astype(np.float32),
+    dims=("depth", "lat", "lon"),
+    coords={"depth": depth, "lat": lat, "lon": lon},
+    name="temperature",
+    attrs={"units": "degC"},
+)
+margo.volume(temperature)   # bounds (-10, 0, 40, 50, 0, 500); titles lon, lat, depth; colour bar "temperature (degC)"
+```
+
+A DataArray's dimensions are read in `(z, y, x)` order for volumes and `(y, x)` for surfaces. The coordinates must
+be evenly spaced; a decreasing one (latitude stored north to south, say) is flipped for you. Pass `bounds=` or
+`x=` / `y=` to override them.
+
 ## API
 
 | Function | What it does |
 | --- | --- |
-| `margo.scatter(data, x=, y=, z=, color=, size=, colormap=, range=, point_size=, edl=)` | scatter plot; columns may be names in a DataFrame or dict, or arrays |
+| `margo.scatter(data, x=, y=, z=, color=, size=, colormap=, range=, point_size=, edl=)` | scatter plot; columns may be names in a pandas or Polars DataFrame, an xarray Dataset or a dict, or arrays |
 | `margo.line(data, x=, y=, z=, color=, width=)` | a line through the points |
 | `margo.surface(z, x=(min, max), y=(min, max), colormap=, range=, contours=10)` | surface plot of a 2D array `z[row][column]`; NaN leaves holes |
 | `margo.volume(values, bounds=, colormap=, range=, opacity=[(t, a), ...], density=1, mode="composite" or "mip")` | volume rendering of `values[z][y][x]` |
@@ -71,7 +99,7 @@ node python/build-frontend.mjs
 pip install ./python
 ```
 
-The package needs only `comm` (already present in Jupyter kernels). NumPy and pandas inputs are used when installed.
+The package needs only `comm` (already present in Jupyter kernels). NumPy, pandas, Polars and xarray inputs are used when installed.
 Plain lists and `array.array` also work.
 
 ## How it works
