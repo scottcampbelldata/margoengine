@@ -9,7 +9,7 @@ import { ReactNode } from "react";
 
 export type AutomaticColliderMode = 'cuboid' | 'hull' | 'trimesh';
 
-export function BallCollider({ args, position, rotation, scale, onError, ...options }: BallColliderProps): import("react").JSX.Element;
+export function BallCollider({ args, ...props }: BallColliderProps): import("react").JSX.Element;
 
 export interface BallColliderProps extends ColliderBaseProps {
     args: readonly [radius: number];
@@ -17,17 +17,53 @@ export interface BallColliderProps extends ColliderBaseProps {
 
 export { BodyOptions } from "@margoengine/physics";
 
+export function CapsuleCollider({ args, ...props }: CapsuleColliderProps): import("react").JSX.Element;
+
+export interface CapsuleColliderProps extends ColliderBaseProps {
+    args: readonly [halfHeight: number, radius: number];
+}
+
 export { ColliderOptions } from "@margoengine/physics";
 
-export function CuboidCollider({ args, position, rotation, scale, onError, ...options }: CuboidColliderProps): import("react").JSX.Element;
+export { CollisionEvent } from "@margoengine/physics";
+
+export function ConeCollider({ args, ...props }: ConeColliderProps): import("react").JSX.Element;
+
+export interface ConeColliderProps extends ColliderBaseProps {
+    args: readonly [halfHeight: number, radius: number];
+}
+
+export function ConvexHullCollider({ args, ...props }: ConvexHullColliderProps): import("react").JSX.Element;
+
+export interface ConvexHullColliderProps extends ColliderBaseProps {
+    args: readonly [points: ArrayLike<number>];
+}
+
+export function CuboidCollider({ args, ...props }: CuboidColliderProps): import("react").JSX.Element;
 
 export interface CuboidColliderProps extends ColliderBaseProps {
     args: Triple;
 }
 
+export function CylinderCollider({ args, ...props }: CylinderColliderProps): import("react").JSX.Element;
+
+export interface CylinderColliderProps extends ColliderBaseProps {
+    args: readonly [halfHeight: number, radius: number];
+}
+
+export function HeightfieldCollider({ args, ...props }: HeightfieldColliderProps): import("react").JSX.Element;
+
+export interface HeightfieldColliderProps extends ColliderBaseProps {
+    args: readonly [rows: number, columns: number, heights: ArrayLike<number>, scale: Triple];
+}
+
+export { JointOptions } from "@margoengine/physics";
+
 export function Physics({ children, rapier, onReady, onError, gravity, paused, timeScale, ...options }: PhysicsProps): import("react").JSX.Element;
 
 export { PhysicsBody } from "@margoengine/physics";
+
+export { PhysicsJoint } from "@margoengine/physics";
 
 export { PhysicsOptions } from "@margoengine/physics";
 
@@ -46,9 +82,25 @@ export type RigidBodyColliders = ColliderOptions | readonly ColliderOptions[] | 
 
 export interface RigidBodyProps extends Omit<BodyOptions, 'position' | 'rotation' | 'colliders'>, MeshProps {
     colliders?: RigidBodyColliders;
+    onContactStart?: (event: CollisionEvent) => void;
+    onContactEnd?: (event: CollisionEvent) => void;
+    onIntersectionStart?: (event: CollisionEvent) => void;
+    onIntersectionEnd?: (event: CollisionEvent) => void;
     onReady?: (body: PhysicsBody) => void;
     onError?: (error: unknown) => void;
 }
+
+export function TrimeshCollider({ args, ...props }: TrimeshColliderProps): import("react").JSX.Element;
+
+export interface TrimeshColliderProps extends ColliderBaseProps {
+    args: readonly [vertices: ArrayLike<number>, indices: ArrayLike<number>];
+}
+
+export function useAfterPhysicsStep(callback: (delta: number) => void): void;
+
+export function useBeforePhysicsStep(callback: (delta: number) => void): void;
+
+export function useJoint(bodyA: PhysicsBody | null | undefined, bodyB: PhysicsBody | null | undefined, options: JointOptions): PhysicsJoint | null;
 
 export function usePhysics(): PhysicsWorld | null;
 

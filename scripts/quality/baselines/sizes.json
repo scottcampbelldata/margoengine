@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 2976430,
+  "total": 2977169,
   "history": [
     {
       "date": "2026-10-24",
@@ -151,6 +151,12 @@
       "date": "2026-10-25",
       "commit": "ed610956",
       "reason": "culling: back-culled pipeline per batch and bounding spheres in the cull pass (instanced parity with three.js InstancedMesh)",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "0cb97a2f",
+      "reason": "react/physics: seven more collider components, body collision callbacks, useJoint and physics step hooks",
       "grew": 1
     }
   ],
@@ -364,7 +370,7 @@
     "@margoengine/quality/warm": 1536,
     "@margoengine/react": 23007,
     "@margoengine/react/kit": 11111,
-    "@margoengine/react/physics": 5204,
+    "@margoengine/react/physics": 5943,
     "@margoengine/react/post": 3770,
     "@margoengine/react/xr": 3429,
     "@margoengine/road": 1171,

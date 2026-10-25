@@ -48,7 +48,22 @@ const expected = {
     'Glitch',
     'Afterimage',
   ],
-  './physics': ['Physics', 'RigidBody', 'CuboidCollider', 'BallCollider', 'usePhysics'],
+  './physics': [
+    'Physics',
+    'RigidBody',
+    'CuboidCollider',
+    'BallCollider',
+    'CapsuleCollider',
+    'CylinderCollider',
+    'ConeCollider',
+    'ConvexHullCollider',
+    'TrimeshCollider',
+    'HeightfieldCollider',
+    'usePhysics',
+    'useJoint',
+    'useBeforePhysicsStep',
+    'useAfterPhysicsStep',
+  ],
   './xr': ['XR', 'Controller', 'useXR'],
 };
 const optionalPeers = [

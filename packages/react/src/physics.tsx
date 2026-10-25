@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel } from '@margoengine/core';
 import type { Mesh as EngineMesh } from '@margoengine/core/extension';
 import type {
@@ -9,6 +9,9 @@ import type {
   BodyOptions,
   RapierModule,
   ColliderOptions,
+  CollisionEvent,
+  JointOptions,
+  PhysicsJoint,
 } from '@margoengine/physics';
 import { Mesh, type MeshProps } from './components.js';
 import { useScene, useCommit, useResourceEffect, type Scene, type Registry } from './internal.js';
@@ -128,6 +131,14 @@ export type RigidBodyColliders = ColliderOptions | readonly ColliderOptions[] | 
 export interface RigidBodyProps extends Omit<BodyOptions, 'position' | 'rotation' | 'colliders'>, MeshProps {
   /** Fit descendant geometry or loader bounds; false disables only automatic colliders. */
   colliders?: RigidBodyColliders;
+  /** A collider of this body began touching another body. */
+  onContactStart?: (event: CollisionEvent) => void;
+  /** A collider of this body stopped touching another body. */
+  onContactEnd?: (event: CollisionEvent) => void;
+  /** A sensor collider began overlapping (this body's sensor or another body's sensor). */
+  onIntersectionStart?: (event: CollisionEvent) => void;
+  /** A sensor overlap ended. */
+  onIntersectionEnd?: (event: CollisionEvent) => void;
   onReady?: (body: PhysicsBody) => void;
   onError?: (error: unknown) => void;
 }
@@ -301,28 +312,117 @@ export interface CuboidColliderProps extends ColliderBaseProps {
 export interface BallColliderProps extends ColliderBaseProps {
   args: readonly [radius: number];
 }
-/** Explicit collider children work before a visual asset finishes loading. */
-export function CuboidCollider({ args, position, rotation, scale, onError, ...options }: CuboidColliderProps) {
+/** Capsule along the local Y axis: `args` is `[halfHeight, radius]` of the straight section and caps. */
+export interface CapsuleColliderProps extends ColliderBaseProps {
+  args: readonly [halfHeight: number, radius: number];
+}
+/** Cylinder along the local Y axis: `args` is `[halfHeight, radius]`. */
+export interface CylinderColliderProps extends ColliderBaseProps {
+  args: readonly [halfHeight: number, radius: number];
+}
+/** Cone along the local Y axis: `args` is `[halfHeight, radius]`. */
+export interface ConeColliderProps extends ColliderBaseProps {
+  args: readonly [halfHeight: number, radius: number];
+}
+/** Props of `ConvexHullCollider`. */
+export interface ConvexHullColliderProps extends ColliderBaseProps {
+  /** Flat `x, y, z` points in local units; the collider is their convex hull. */
+  args: readonly [points: ArrayLike<number>];
+}
+/** Props of `TrimeshCollider`. */
+export interface TrimeshColliderProps extends ColliderBaseProps {
+  /** Flat `x, y, z` vertices and triangle indices in local units. Use it on fixed bodies. */
+  args: readonly [vertices: ArrayLike<number>, indices: ArrayLike<number>];
+}
+/** Props of `HeightfieldCollider`. */
+export interface HeightfieldColliderProps extends ColliderBaseProps {
+  /** `rows`, `columns`, `(rows + 1) * (columns + 1)` heights, and the `[x, y, z]` scale of the whole field. */
+  args: readonly [rows: number, columns: number, heights: ArrayLike<number>, scale: Triple];
+}
+function ShapeCollider({
+  shape,
+  position,
+  rotation,
+  scale,
+  onError,
+  ...options
+}: ColliderBaseProps & { shape: ColliderOptions }) {
   return (
     <Mesh position={position} rotation={rotation} scale={scale}>
       <ColliderBinding
-        options={{ ...options, shape: 'box', halfExtents: args }}
+        options={{ ...options, ...shape } as ColliderOptions}
         transform={{ position, rotation, scale }}
         onError={onError}
       />
     </Mesh>
   );
 }
-export function BallCollider({ args, position, rotation, scale, onError, ...options }: BallColliderProps) {
+/** Explicit collider children work before a visual asset finishes loading. */
+export function CuboidCollider({ args, ...props }: CuboidColliderProps) {
+  return <ShapeCollider {...props} shape={{ shape: 'box', halfExtents: args }} />;
+}
+export function BallCollider({ args, ...props }: BallColliderProps) {
+  return <ShapeCollider {...props} shape={{ shape: 'sphere', radius: args[0] }} />;
+}
+/** Capsule collider along the local Y axis; `args` is `[halfHeight, radius]`. */
+export function CapsuleCollider({ args, ...props }: CapsuleColliderProps) {
+  return <ShapeCollider {...props} shape={{ shape: 'capsule', halfHeight: args[0], radius: args[1] }} />;
+}
+/** Cylinder collider along the local Y axis; `args` is `[halfHeight, radius]`. */
+export function CylinderCollider({ args, ...props }: CylinderColliderProps) {
+  return <ShapeCollider {...props} shape={{ shape: 'cylinder', halfHeight: args[0], radius: args[1] }} />;
+}
+/** Cone collider along the local Y axis; `args` is `[halfHeight, radius]`. */
+export function ConeCollider({ args, ...props }: ConeColliderProps) {
+  return <ShapeCollider {...props} shape={{ shape: 'cone', halfHeight: args[0], radius: args[1] }} />;
+}
+/** Convex hull of flat `x, y, z` points; `args` is `[points]`. */
+export function ConvexHullCollider({ args, ...props }: ConvexHullColliderProps) {
+  return <ShapeCollider {...props} shape={{ shape: 'convexHull', points: args[0] }} />;
+}
+/** Exact triangle-mesh collider; `args` is `[vertices, indices]`. Use it on fixed bodies. */
+export function TrimeshCollider({ args, ...props }: TrimeshColliderProps) {
+  return <ShapeCollider {...props} shape={{ shape: 'trimesh', vertices: args[0], indices: args[1] }} />;
+}
+/** Regular-grid terrain collider; `args` is `[rows, columns, heights, scale]`. */
+export function HeightfieldCollider({ args, ...props }: HeightfieldColliderProps) {
   return (
-    <Mesh position={position} rotation={rotation} scale={scale}>
-      <ColliderBinding
-        options={{ ...options, shape: 'sphere', radius: args[0] }}
-        transform={{ position, rotation, scale }}
-        onError={onError}
-      />
-    </Mesh>
+    <ShapeCollider
+      {...props}
+      shape={{ shape: 'heightfield', rows: args[0], columns: args[1], heights: args[2], scale: args[3] }}
+    />
   );
+}
+function scalePoints(points: ArrayLike<number>, scale: Triple): number[] {
+  const out = new Array<number>(points.length);
+  for (let at = 0; at < points.length; at++) out[at] = points[at] * scale[at % 3];
+  return out;
+}
+/** Apply a collider child's world scale to its shape, the way a visual mesh would be scaled. */
+function scaleCollider(source: ColliderOptions, scale: Triple): ColliderOptions {
+  const abs = scale.map(Math.abs) as unknown as Triple,
+    radial = Math.max(abs[0], abs[2]);
+  switch (source.shape) {
+    case 'box':
+      return {
+        ...source,
+        halfExtents: source.halfExtents?.map((value, axis) => value * abs[axis]) as unknown as Triple,
+      };
+    case 'sphere':
+      return { ...source, radius: source.radius === undefined ? undefined : source.radius * Math.max(...abs) };
+    case 'capsule':
+    case 'cylinder':
+    case 'cone':
+      return { ...source, halfHeight: source.halfHeight * abs[1], radius: source.radius * radial };
+    case 'convexHull':
+      return source.points ? { ...source, points: scalePoints(source.points, scale) } : source;
+    case 'trimesh':
+      return source.vertices ? { ...source, vertices: scalePoints(source.vertices, scale) } : source;
+    case 'heightfield':
+      return { ...source, scale: source.scale.map((value, axis) => value * abs[axis]) as unknown as Triple };
+    default:
+      return source;
+  }
 }
 function releaseCollider(request: ColliderRequest): void {
   if (request.collider && request.body?.valid) request.body.removeCollider(request.collider);
@@ -393,6 +493,10 @@ function ColliderBinding({
 function BodyBinding({
   onReady,
   onError,
+  onContactStart,
+  onContactEnd,
+  onIntersectionStart,
+  onIntersectionEnd,
   transform,
   ...options
 }: Omit<RigidBodyProps, keyof MeshProps> & { transform: Pick<MeshProps, 'position' | 'rotation' | 'scale'> }) {
@@ -401,13 +505,14 @@ function BodyBinding({
   const binding = useContext(BodyContext)!,
     scene = useScene(),
     { engine, registry } = scene,
-    latest = useRef({ onReady, onError });
-  latest.current = { onReady, onError };
+    latest = useRef({ onReady, onError, onContactStart, onContactEnd, onIntersectionStart, onIntersectionEnd });
+  latest.current = { onReady, onError, onContactStart, onContactEnd, onIntersectionStart, onIntersectionEnd };
   useResourceEffect(
     (lease) => {
       const world = state.world;
       if (!world || world.isDisposed || !registry) return;
       let body: PhysicsBody | undefined,
+        unsubscribe: Array<() => void> = [],
         root: EngineMesh | undefined,
         automatic: ReturnType<PhysicsBody['addCollider']> | undefined,
         autoFailed = false;
@@ -457,20 +562,7 @@ function BodyBinding({
               pw * qz - px * qy + py * qx - pz * qw,
               pw * qw + px * qx + py * qy + pz * qz,
             ];
-            const collider =
-              source.shape === 'box'
-                ? {
-                    ...source,
-                    halfExtents: source.halfExtents?.map(
-                      (value, axis) => value * Math.abs(child.scale[axis]),
-                    ) as unknown as Triple,
-                  }
-                : {
-                    ...source,
-                    ...(source.shape === 'sphere'
-                      ? { radius: source.radius! * Math.max(...child.scale.map(Math.abs)) }
-                      : {}),
-                  };
+            const collider = scaleCollider(source, child.scale);
             request.collider = body.addCollider({ ...collider, offset, rotation });
             request.body = body;
             request.mesh = mesh;
@@ -521,9 +613,24 @@ function BodyBinding({
             rotation: pose.rotation,
             colliders: native,
           });
+          const own = body;
+          // Handlers are read at event time, so changing a callback never recreates the body.
+          for (const [type, key] of [
+            ['contactstart', 'onContactStart'],
+            ['contactend', 'onContactEnd'],
+            ['intersectionstart', 'onIntersectionStart'],
+            ['intersectionend', 'onIntersectionEnd'],
+          ] as const)
+            unsubscribe.push(
+              world.on(type, (event) => {
+                if (event.bodyA === own || event.bodyB === own) latest.current[key]?.(event);
+              }),
+            );
           refresh();
           latest.current.onReady?.(body);
         } catch (error) {
+          for (const off of unsubscribe) off();
+          unsubscribe = [];
           body?.remove();
           body = undefined;
           fail(error);
@@ -554,6 +661,7 @@ function BodyBinding({
         state.sync.delete(update);
         if (binding.refresh === refresh) binding.refresh = () => {};
         for (const request of binding.requests) if (request.body === body) releaseCollider(request);
+        for (const off of unsubscribe) off();
         if (!world.isDisposed) body?.remove();
       };
     },
@@ -592,4 +700,54 @@ function BodyBinding({
   );
   return null;
 }
-export type { PhysicsBody, BodyOptions, PhysicsOptions, RapierModule, ColliderOptions } from '@margoengine/physics';
+/**
+ * Connect two bodies with a fixed, spherical, revolute or prismatic joint. Pass the bodies from `RigidBody`
+ * `onReady` (kept in state or a ref callback); returns the joint once both exist, otherwise null. The joint is
+ * removed on unmount and rebuilt when the bodies or options change.
+ */
+export function useJoint(
+  bodyA: PhysicsBody | null | undefined,
+  bodyB: PhysicsBody | null | undefined,
+  options: JointOptions,
+): PhysicsJoint | null {
+  const world = usePhysics(),
+    [joint, setJoint] = useState<PhysicsJoint | null>(null),
+    key = JSON.stringify(options);
+  useEffect(() => {
+    if (!world || world.isDisposed || !bodyA?.valid || !bodyB?.valid) return;
+    const created = world.addJoint(bodyA, bodyB, JSON.parse(key) as JointOptions);
+    setJoint(created);
+    return () => {
+      setJoint(null);
+      if (created.valid && !world.isDisposed) created.remove();
+    };
+  }, [world, bodyA, bodyB, key]);
+  return joint;
+}
+function useStepEvent(type: 'beforestep' | 'afterstep', callback: (delta: number) => void): void {
+  const world = usePhysics(),
+    latest = useRef(callback);
+  latest.current = callback;
+  useEffect(() => {
+    if (!world || world.isDisposed) return;
+    return world.on(type, (delta) => latest.current(delta));
+  }, [world, type]);
+}
+/** Run `callback(delta)` before every fixed physics step; drive kinematic bodies and character controllers here. */
+export function useBeforePhysicsStep(callback: (delta: number) => void): void {
+  useStepEvent('beforestep', callback);
+}
+/** Run `callback(delta)` after every fixed physics step. */
+export function useAfterPhysicsStep(callback: (delta: number) => void): void {
+  useStepEvent('afterstep', callback);
+}
+export type {
+  PhysicsBody,
+  BodyOptions,
+  PhysicsOptions,
+  RapierModule,
+  ColliderOptions,
+  CollisionEvent,
+  JointOptions,
+  PhysicsJoint,
+} from '@margoengine/physics';

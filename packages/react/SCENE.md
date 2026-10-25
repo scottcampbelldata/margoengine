@@ -11,7 +11,7 @@ physics world, pointer lock or XR session. `sideEffects` remains `false`.
 | `@margoengine/react` | All bindings below, plus `MeshTransmissionMaterial` and `Animation` | Material uses `@margoengine/materials`/`gltf-pro`; animation uses `animation` and optionally `animator`; loaded-model events use `selection`. |
 | `@margoengine/react/kit` | `Gltf`, `Fbx`, `preload`, `Environment`, `Sky`, `ContactShadows`, `Center`, `OrbitControls`, `PointerLock`, `TransformControls`, `Html`, `Text`, `Box`, `Sphere`, `Plane` | Install the corresponding `@margoengine/gltf-pro`, `fbx`, `environment`, `sky`, `shadows`, `controls`, `gizmo`, `html`, `text` or `geometry` package. `Html` also uses `react-dom`. |
 | `@margoengine/react/post` | `EffectComposer`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `DepthOfField`, `Tonemap`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `TAA` | `@margoengine/post`, `dof`, `tonemap`, `taa`, according to the effects used |
-| `@margoengine/react/physics` | `Physics`, `RigidBody`, `CuboidCollider`, `BallCollider`, `usePhysics` | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
+| `@margoengine/react/physics` | `Physics`, `RigidBody`, the collider components (`CuboidCollider`, `BallCollider`, `CapsuleCollider`, `CylinderCollider`, `ConeCollider`, `ConvexHullCollider`, `TrimeshCollider`, `HeightfieldCollider`), `usePhysics`, `useJoint`, `useBeforePhysicsStep`, `useAfterPhysicsStep` | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
 | `@margoengine/react/xr` | `XR`, `Controller`, `useXR` | `@margoengine/xr` |
 
 These are Margo components and native plugins. There is no
@@ -203,6 +203,46 @@ other operations. Removing a body releases its colliders without disposing its
 siblings. Removing a collider child releases only that collider.
 Changing a collider child's position, rotation, scale or shape options replaces
 its collider while keeping the body alive.
+
+### More colliders, events, joints and step hooks
+
+`CapsuleCollider`, `CylinderCollider` and `ConeCollider` take `args={[halfHeight, radius]}` (Y axis),
+`ConvexHullCollider` takes `args={[points]}`, `TrimeshCollider` takes `args={[vertices, indices]}` and
+`HeightfieldCollider` takes `args={[rows, columns, heights, scale]}`. Every collider takes `position`, `rotation`,
+`scale`, `sensor`, `friction`, `restitution`, `density` and the other collider options; the body's scale is applied
+to the shape, so a scaled body gets a scaled collider.
+
+`RigidBody` takes `onContactStart`, `onContactEnd`, `onIntersectionStart` and `onIntersectionEnd`. Each receives
+the physics `CollisionEvent` (`bodyA`, `bodyB`, `colliderA`, `colliderB`, `sensor`) and fires only for pairs that
+include that body. Changing a handler never recreates the body.
+
+```tsx
+import {useState} from 'react';
+import {
+  Physics, RigidBody, BallCollider, CuboidCollider, useJoint, useBeforePhysicsStep, type PhysicsBody,
+} from '@margoengine/react/physics';
+
+function Pendulum() {
+  const [anchor, setAnchor] = useState<PhysicsBody | null>(null),
+    [bob, setBob] = useState<PhysicsBody | null>(null);
+  useJoint(anchor, bob, {type: 'spherical', anchorA: [0, 0, 0], anchorB: [0, 2, 0]});
+  useBeforePhysicsStep((dt) => { /* drive kinematic bodies here */ });
+  return <>
+    <RigidBody type="fixed" colliders={false} position={[0, 4, 0]} onReady={setAnchor}>
+      <CuboidCollider args={[0.1, 0.1, 0.1]}/>
+    </RigidBody>
+    <RigidBody colliders={false} position={[0, 2, 0]} onReady={setBob}
+      onContactStart={(event) => console.log(event.type, event.sensor)}>
+      <BallCollider args={[0.3]}/>
+    </RigidBody>
+  </>;
+}
+export const scene = <Physics><Pendulum/></Physics>;
+```
+
+`useJoint(bodyA, bodyB, options)` returns the joint once both bodies exist, rebuilds it when the options change and
+removes it on unmount. `useBeforePhysicsStep(callback)` and `useAfterPhysicsStep(callback)` run once per fixed step
+with the step length and always call your latest callback.
 
 ## XR
 
