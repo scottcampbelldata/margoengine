@@ -269,10 +269,119 @@ window.runSciVizTests = async () => {
     assert(!bar.element.isConnected, 'disposing the figure removes the bar');
   });
 
+  await check('picking finds the scatter point drawn under the pointer, and the tooltip shows its values', async () => {
+    const figure = await figureOn(canvas, { axes: false, titles: { x: 'Time' } });
+    // Three points; only the one at data (1, 0) is bright, so its drawn pixels can be found in the image.
+    await figure.scatter({ x: [0, 1, 1], y: [0, 1, 0], z: [0, 0, 0], color: [0, 0, 1] }, { colormap: 'gray', size: 8 });
+    const image = await pixels(figure);
+    let sx = 0,
+      sy = 0,
+      n = 0;
+    for (let y = 0; y < image.height; y++)
+      for (let x = 0; x < image.width; x++)
+        if (luminance(image.at(x, y)) > 200) {
+          sx += x;
+          sy += y;
+          n++;
+        }
+    assert(n > 10, `the bright point is drawn (${n} pixels)`);
+    const scale = canvas.clientWidth / image.width;
+    const hit = figure.pick((sx / n) * scale, (sy / n) * scale);
+    assert(
+      hit && hit.index === 2 && hit.x === 1 && hit.y === 0 && hit.value === 1,
+      `pick ${hit?.index} at ${hit?.x}, ${hit?.y} value ${hit?.value}`,
+    );
+    assert(figure.pick(2, 2) === null, 'nothing in the empty corner');
+    const hovered = new Promise((resolve) =>
+      figure.addEventListener('hover', (e) => resolve(e.detail), { once: true }),
+    );
+    const rect = canvas.getBoundingClientRect();
+    canvas.dispatchEvent(
+      new PointerEvent('pointermove', {
+        clientX: rect.left + (sx / n) * scale,
+        clientY: rect.top + (sy / n) * scale,
+        bubbles: true,
+      }),
+    );
+    const detail = await hovered;
+    assert(detail?.index === 2, 'a hover event with the hit');
+    const tip = document.querySelector('[data-sciviz-tooltip]');
+    assert(
+      tip && !tip.hidden && tip.textContent.includes('Time 1') && tip.textContent.includes('value 1'),
+      `tooltip: ${tip?.textContent}`,
+    );
+    figure.dispose();
+    assert(!tip.isConnected, 'disposing the figure removes the tooltip');
+  });
+
+  await check('picking a surface returns the point under the pointer and its height', async () => {
+    const figure = await figureOn(canvas, { axes: false });
+    const nx = 41,
+      z = new Float32Array(nx * nx);
+    for (let j = 0; j < nx; j++) for (let i = 0; i < nx; i++) z[j * nx + i] = i / (nx - 1);
+    const surface = figure.surface(z, { nx, x: [0, 10], y: [0, 10], name: 'ramp' });
+    figure.engine.render();
+    const hit = figure.pick(canvas.clientWidth / 2, canvas.clientHeight / 2);
+    assert(hit?.layer === surface, 'the surface is hit');
+    assert(Math.abs(hit.x - 5) < 0.2 && Math.abs(hit.y - 5) < 0.2, `centre of the grid: ${hit.x}, ${hit.y}`);
+    assert(Math.abs(hit.z - hit.x / 10) < 1e-3 && hit.value === hit.z, `height ${hit.z} at x ${hit.x}`);
+    figure.dispose();
+  });
+
+  await check('select() takes the points inside a box or a lasso and sends a selection event', async () => {
+    const figure = await figureOn(canvas, { axes: false });
+    const x = [],
+      y = [];
+    for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) x.push(i), y.push(j);
+    const layer = await figure.scatter({ x, y });
+    figure.engine.render();
+    let event;
+    figure.addEventListener('selection', (e) => (event = e.detail));
+    const w = canvas.clientWidth,
+      h = canvas.clientHeight;
+    const box = figure.select({ rect: [0, 0, w / 2, h] });
+    assert(event === box && box.points[0].layer === layer, 'the event carries the selection');
+    assert(
+      [...box.points[0].indices].every((k) => x[k] < 1.5) && box.points[0].indices.length === 8,
+      `left half: ${box.points[0].indices}`,
+    );
+    // A lasso around the top half of the screen (data y > 1.5).
+    const lasso = figure.select({ polygon: [0, 0, w, 0, w, h / 2, 0, h / 2] });
+    assert(
+      [...lasso.points[0].indices].every((k) => y[k] > 1.5) && lasso.points[0].indices.length === 8,
+      `top half: ${lasso.points[0].indices}`,
+    );
+    assert(figure.selection === lasso, 'figure.selection is the last one');
+    figure.dispose();
+  });
+
   await check('colour maps the page can use as CSS', async () => {
     assert(colormap('aurora').css().startsWith('linear-gradient('), 'css');
   });
 
   assert(errors.length === 0, `WebGPU errors: ${errors.join('; ')}`);
   return { checks };
+};
+
+// A box drag driven by the runner's real mouse (trusted pointer events, so pointer capture works): set up a grid of
+// points in box mode, then report what the drag selected.
+let dragFigure, dragSelection;
+window.setupDragTest = async () => {
+  const canvas = document.querySelector('#view');
+  dragFigure = await figureOn(canvas, { axes: false });
+  const x = [],
+    y = [];
+  for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) x.push(i), y.push(j);
+  await dragFigure.scatter({ x, y });
+  dragFigure.engine.render();
+  dragFigure.dragMode = 'box';
+  dragFigure.addEventListener('selection', (e) => (dragSelection = e.detail));
+  const rect = canvas.getBoundingClientRect();
+  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+};
+window.finishDragTest = () => {
+  const indices = dragSelection ? [...dragSelection.points[0].indices] : null;
+  const mode = dragFigure.dragMode;
+  dragFigure.dispose();
+  return { indices, mode };
 };

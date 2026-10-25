@@ -16,6 +16,7 @@ import {
 } from './layer.js';
 import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
 import type { Colormap } from './colormaps.js';
+import { rayHeightField } from './pick.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -40,6 +41,8 @@ export interface SurfaceLayerOptions {
   readonly grid?: number;
   /** Opacity, 0 to 1. Default 1 (opaque). */
   readonly opacity?: number;
+  /** Name shown in tooltips and legends. Default none. */
+  readonly name?: string;
 }
 
 /** WGSL of the surface pipeline. */
@@ -113,12 +116,16 @@ export class SurfaceLayer implements Drawable {
   readonly y: readonly [number, number];
   /** The colour map. */
   readonly colormap: Colormap;
+  /** Name shown in tooltips and legends. */
+  readonly name: string | undefined;
   #range: [number, number];
   #contours: number;
   #grid: number;
   #opacity: number;
   readonly #renderer: SciRenderer;
   readonly #data: DataSource;
+  // The heights on the CPU for picking (undefined for a GpuArray source).
+  #cpu: ArrayLike<number> | undefined;
   #heights: { buffer: GPUBuffer; owned: boolean } | undefined;
   #texture: GPUTexture | undefined;
   #uniform: GPUBuffer | undefined;
@@ -147,6 +154,8 @@ export class SurfaceLayer implements Drawable {
     this.x = rangeOption(options.x, 'Surface x') ?? [0, nx - 1];
     this.y = rangeOption(options.y, 'Surface y') ?? [0, ny - 1];
     this.colormap = resolveColormap(options.colormap);
+    this.name = options.name;
+    this.#cpu = isGpuArray(z) ? undefined : z;
     const given = rangeOption(options.range, 'Surface range');
     if (!given && isGpuArray(z))
       throw typeError('A GpuArray surface needs range: [min, max] (read it with z.min().item())', 'sciviz');
@@ -235,7 +244,35 @@ export class SurfaceLayer implements Drawable {
       throw rangeError(`setHeights needs ${this.nx * this.ny} values, got ${values.length}`, 'sciviz');
     if (!this.#heights?.owned)
       throw typeError('This surface reads a GpuArray; write to the GpuArray instead', 'sciviz');
-    this.#renderer.device!.queue.writeBuffer(this.#heights.buffer, 0, Float32Array.from(values));
+    const copy = Float32Array.from(values);
+    this.#cpu = copy;
+    this.#renderer.device!.queue.writeBuffer(this.#heights.buffer, 0, copy);
+  }
+
+  /**
+   * @internal The first point where a ray in data units meets the surface: data position, grid cell and height, or
+   * null (also for a GpuArray source, whose heights stay on the GPU).
+   */
+  raycast(
+    origin: readonly [number, number, number],
+    direction: readonly [number, number, number],
+  ): { x: number; y: number; z: number; t: number; index: number } | null {
+    if (!this.#cpu) return null;
+    const dx = (this.x[1] - this.x[0]) / (this.nx - 1),
+      dy = (this.y[1] - this.y[0]) / (this.ny - 1);
+    const hit = rayHeightField(origin, direction, {
+      heights: this.#cpu,
+      nx: this.nx,
+      ny: this.ny,
+      x0: this.x[0],
+      dx,
+      y0: this.y[0],
+      dy,
+    });
+    if (!hit) return null;
+    const i = Math.min(this.nx - 1, Math.max(0, Math.round((hit.x - this.x[0]) / dx))),
+      j = Math.min(this.ny - 1, Math.max(0, Math.round((hit.y - this.y[0]) / dy)));
+    return { ...hit, index: j * this.nx + i };
   }
 
   /** @internal */

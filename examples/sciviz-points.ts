@@ -51,11 +51,21 @@ async function build(): Promise<void> {
   fig.colorbar('aurora', [0, 3], { label: 'σ from centre' });
   gpu.dispose();
   window.pointsDemo = { count };
-  status.textContent = `${count.toLocaleString('en')} points (sampled on the GPU, plotted in ${(performance.now() - t0).toFixed(0)} ms), up to ${budget.toLocaleString('en')} drawn per frame.`;
+  const summary = `${count.toLocaleString('en')} points (sampled on the GPU, plotted in ${(performance.now() - t0).toFixed(0)} ms), up to ${budget.toLocaleString('en')} drawn per frame.`;
+  status.textContent = summary;
+  // Box or lasso drags select points; the status line counts them.
+  fig.dragMode = $<HTMLSelectElement>('drag').value as 'orbit' | 'box' | 'lasso';
+  fig.addEventListener('selection', (event) => {
+    const selected = event.detail.points.reduce((sum, p) => sum + p.indices.length, 0);
+    status.textContent = `${summary} Selected ${selected.toLocaleString('en')}.`;
+  });
   canvas.dataset.ready = 'true';
 }
 
 for (const id of ['count', 'budget', 'edl']) $(id).addEventListener('change', () => void build().catch(fail));
+$('drag').addEventListener('change', () => {
+  if (figure) figure.dragMode = $<HTMLSelectElement>('drag').value as 'orbit' | 'box' | 'lasso';
+});
 const fail = (error: Error) => (status.textContent = `Could not start: ${error.message}`);
 window.addEventListener('pagehide', () => figure?.dispose(), { once: true });
 build().catch(fail);

@@ -2087,6 +2087,7 @@
       "describeColormap",
       "diverging",
       "formatTick",
+      "formatValue",
       "niceNumber",
       "ticks",
       "transferTable"

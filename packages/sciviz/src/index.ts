@@ -4,13 +4,16 @@
 export { Figure, createFigure } from './figure.js';
 export type {
   CreateFigureOptions,
+  FigureEventMap,
   FigureOptions,
   Layer,
   LineLayer,
   LineLayerOptions,
+  PickResult,
   ScatterData,
   ScatterLayer,
   ScatterLayerOptions,
+  Selection,
 } from './figure.js';
 export { SurfaceLayer } from './surface.js';
 export type { SurfaceLayerOptions } from './surface.js';
@@ -27,5 +30,7 @@ export { dataToScene } from './layer.js';
 export type { Bounds, ColormapSource, DataSource } from './layer.js';
 export { Colormap, colormap, colormapNames, cubehelix, describeColormap, diverging } from './colormaps.js';
 export type { ColormapKind, ColormapName, SRGB } from './colormaps.js';
-export { ticks, formatTick, niceNumber } from './ticks.js';
+export { ticks, formatTick, formatValue, niceNumber } from './ticks.js';
+export type { DragMode } from './interact.js';
+export type { SelectRegion } from './pick.js';
 export type { Ticks } from './ticks.js';

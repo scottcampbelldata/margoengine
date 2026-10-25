@@ -63,13 +63,28 @@ export interface CreateFigureOptions extends FigureOptions {
 
 export type DataSource = ArrayLike<number> | GpuArray;
 
-export class Figure {
+export type DragMode = 'orbit' | 'box' | 'lasso';
+
+export interface Figure {
+    addEventListener<K extends keyof FigureEventMap>(type: K, listener: (this: Figure, event: FigureEventMap[K]) => unknown, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener<K extends keyof FigureEventMap>(type: K, listener: (this: Figure, event: FigureEventMap[K]) => unknown, options?: boolean | EventListenerOptions): void;
+    removeEventListener(type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | EventListenerOptions): void;
+}
+export class Figure extends EventTarget {
     readonly engine: EngineKernel;
     readonly renderer: SciRenderer;
     readonly theme: Theme;
     static attach(engine: EngineKernel, options?: FigureOptions): Figure;
     static create(canvas: HTMLCanvasElement, options?: CreateFigureOptions): Promise<Figure>;
     constructor(engine: EngineKernel, options?: FigureOptions);
+    get dragMode(): DragMode;
+    set dragMode(mode: DragMode);
+    get selection(): Selection | undefined;
+    pick(x: number, y: number, options?: {
+        readonly radius?: number;
+    }): PickResult | null;
+    select(region: SelectRegion): Selection;
     get bounds(): Bounds;
     get model(): Float32Array;
     ready(): Promise<void>;
@@ -90,12 +105,18 @@ export class Figure {
     [Symbol.dispose](): void;
 }
 
+export interface FigureEventMap {
+    hover: CustomEvent<PickResult | null>;
+    selection: CustomEvent<Selection>;
+}
+
 export interface FigureOptions extends AxesOptions {
     readonly theme?: 'dark' | 'light';
     readonly axes?: boolean;
     readonly aspect?: readonly [number, number, number];
     readonly limits?: Bounds;
     readonly pointBudget?: number;
+    readonly tooltips?: boolean | ((hit: PickResult) => string | null);
 }
 
 export class IsosurfaceLayer implements Drawable {
@@ -132,6 +153,9 @@ export interface LineLayer {
     readonly kind: 'line';
     readonly line: Line;
     readonly bounds: Bounds;
+    readonly positions: Float32Array;
+    readonly values: ArrayLike<number> | undefined;
+    readonly name: string | undefined;
 }
 
 export interface LineLayerOptions {
@@ -139,6 +163,16 @@ export interface LineLayerOptions {
     readonly color?: string;
     readonly colormap?: ColormapSource;
     readonly range?: readonly [number, number];
+    readonly name?: string;
+}
+
+export interface PickResult {
+    readonly layer: ScatterLayer | LineLayer | SurfaceLayer;
+    readonly index: number;
+    readonly x: number;
+    readonly y: number;
+    readonly z: number;
+    readonly value?: number;
 }
 
 export type SRGB = readonly [number, number, number];
@@ -160,6 +194,9 @@ export interface ScatterLayer {
     readonly cloud: PointCloud;
     readonly bounds: Bounds;
     readonly count: number;
+    readonly positions: Float32Array;
+    readonly values: ArrayLike<number> | undefined;
+    readonly name: string | undefined;
 }
 
 export interface ScatterLayerOptions {
@@ -169,6 +206,7 @@ export interface ScatterLayerOptions {
     readonly range?: readonly [number, number];
     readonly edl?: boolean;
     readonly shape?: 'round' | 'square';
+    readonly name?: string;
 }
 
 export class SciRenderer implements EnginePlugin {
@@ -198,6 +236,20 @@ export class SciRenderer implements EnginePlugin {
     [Symbol.dispose](): void;
 }
 
+export type SelectRegion = {
+    readonly rect: readonly [number, number, number, number];
+} | {
+    readonly polygon: ArrayLike<number>;
+};
+
+export interface Selection {
+    readonly region: SelectRegion;
+    readonly points: readonly {
+        readonly layer: ScatterLayer | LineLayer;
+        readonly indices: Uint32Array;
+    }[];
+}
+
 export class SliceLayer implements Drawable {
     visible: boolean;
     readonly axis: 'x' | 'y' | 'z';
@@ -221,6 +273,7 @@ export class SurfaceLayer implements Drawable {
     readonly x: readonly [number, number];
     readonly y: readonly [number, number];
     readonly colormap: Colormap;
+    readonly name: string | undefined;
     constructor(renderer: SciRenderer, z: DataSource, options?: SurfaceLayerOptions);
     restore(): void;
     get transparent(): boolean;
@@ -230,6 +283,13 @@ export class SurfaceLayer implements Drawable {
     setModel(model: Float32Array): void;
     center(): readonly [number, number, number];
     setHeights(values: ArrayLike<number>): void;
+    raycast(origin: readonly [number, number, number], direction: readonly [number, number, number]): {
+        x: number;
+        y: number;
+        z: number;
+        t: number;
+        index: number;
+    } | null;
     prepare(): void;
     draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
     dispose(): void;
@@ -246,6 +306,7 @@ export interface SurfaceLayerOptions {
     readonly contours?: number;
     readonly grid?: number;
     readonly opacity?: number;
+    readonly name?: string;
 }
 
 export const THEMES: Readonly<Record<'dark' | 'light', Theme>>;
@@ -327,6 +388,8 @@ export function describeColormap(name: ColormapName): {
 export function diverging(t: number, low: SRGB, high: SRGB): SRGB;
 
 export function formatTick(value: number, step: number): string;
+
+export function formatValue(value: number, digits?: number): string;
 
 export function niceNumber(x: number, round: boolean): number;
 

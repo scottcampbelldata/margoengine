@@ -7,7 +7,23 @@ export const CORNERS: readonly (readonly [number, number, number])[];
 
 export const EDGES: readonly (readonly [number, number])[];
 
+export interface HeightGrid {
+    readonly heights: ArrayLike<number>;
+    readonly nx: number;
+    readonly ny: number;
+    readonly x0: number;
+    readonly dx: number;
+    readonly y0: number;
+    readonly dy: number;
+}
+
 export const MAX_TRIANGLES: number;
+
+export type SelectRegion = {
+    readonly rect: readonly [number, number, number, number];
+} | {
+    readonly polygon: ArrayLike<number>;
+};
 
 export interface Ticks {
     readonly values: readonly number[];
@@ -25,7 +41,34 @@ export function cubeTables(): {
 
 export function formatTick(value: number, step: number): string;
 
+export function formatValue(value: number, digits?: number): string;
+
+export function heightAt(grid: HeightGrid, x: number, y: number): number;
+
+export function inRegion(x: number, y: number, region: SelectRegion): boolean;
+
+export function nearestPoint(matrix: ArrayLike<number>, positions: ArrayLike<number>, width: number, height: number, sx: number, sy: number, radius: number): {
+    index: number;
+    distance: number;
+} | null;
+
 export function niceNumber(x: number, round: boolean): number;
+
+export function pointInPolygon(x: number, y: number, polygon: ArrayLike<number>): boolean;
+
+export function rayHeightField(origin: readonly [number, number, number], direction: readonly [number, number, number], grid: HeightGrid): {
+    x: number;
+    y: number;
+    z: number;
+    t: number;
+} | null;
+
+export function screenRay(matrix: ArrayLike<number>, width: number, height: number, sx: number, sy: number): {
+    origin: [number, number, number];
+    direction: [number, number, number];
+} | null;
+
+export function selectPoints(matrix: ArrayLike<number>, positions: ArrayLike<number>, width: number, height: number, region: SelectRegion): Uint32Array;
 
 export function ticks(min: number, max: number, count?: number): Ticks;
 ```

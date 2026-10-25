@@ -24,6 +24,17 @@ try {
   await page.waitForFunction(() => typeof window.runSciVizTests === 'function');
   const report = await page.evaluate(() => window.runSciVizTests());
   assert.deepEqual(errors, []);
+  // A real mouse drag in box mode selects the points of the right half (data x > 1.5) and nothing else.
+  const rect = await page.evaluate(() => window.setupDragTest());
+  await page.mouse.move(rect.left + rect.width / 2, rect.top + 2);
+  await page.mouse.down();
+  await page.mouse.move(rect.left + rect.width * 0.75, rect.top + rect.height / 2, { steps: 4 });
+  await page.mouse.move(rect.left + rect.width - 2, rect.top + rect.height - 2, { steps: 4 });
+  await page.mouse.up();
+  const drag = await page.evaluate(() => window.finishDragTest());
+  assert.deepEqual(drag, { indices: [2, 3, 6, 7, 10, 11, 14, 15], mode: 'box' });
+  report.checks.push('a real box drag selects the points under it');
+  assert.deepEqual(errors, []);
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/sciviz-browser.json', JSON.stringify({ hardware, ...report }, null, 2));
   // The site demos built on this package start, finish their first result and log no errors.

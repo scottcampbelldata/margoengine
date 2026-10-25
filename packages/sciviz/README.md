@@ -52,6 +52,7 @@ lines at the ticks and HTML tick labels.
 | `aspect` | `[1, 1, 0.75]` | relative size of the plot box |
 | `limits` | data bounds | fixed `[xmin, xmax, ymin, ymax, zmin, zmax]` |
 | `pointBudget` | `2_000_000` | most scatter points drawn per frame |
+| `tooltips` | `true` | hover tooltips; `false`, or `(hit) => string \| null` for your own text |
 | `controls` (create only) | `true` | orbit controls |
 
 ## Layers
@@ -102,6 +103,37 @@ fig.colorbar('aurora', [-1, 1], { label: 'height' });
 await fig.line({ x: [0, 10, 20], y: [0, 15, 0], z: [1.2, 1.2, 1.2] }, { width: 3, color: '#ffd885' });
 ```
 
+## Picking, tooltips and selection
+
+Hovering shows a tooltip for the scatter point, line vertex or surface point under the pointer, with its x, y, z, its
+`color` value and the layer's `name`. Each change sends a `hover` event. `fig.pick(x, y, { radius })` returns the same
+hit for any canvas position, in CSS pixels from the canvas's top-left (`event.offsetX`, `event.offsetY`). Points and
+vertices within `radius` (default 8 px) come before surfaces. Surfaces that read a GpuArray are not picked, since their
+heights stay on the GPU.
+
+Set `fig.dragMode` to `'box'` or `'lasso'` to select with a left-button drag; `'orbit'` (the default) gives the drag
+back to the camera. When a drag ends, the figure stores the result in `fig.selection` and sends a `selection` event with
+the indices of the points inside the region, per scatter and line layer. `fig.select(region)` does the same in code.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+
+const canvas = document.querySelector('canvas')!;
+const fig = await Figure.create(canvas);
+const x = Float32Array.from({ length: 5000 }, () => Math.random());
+const y = x.map((v) => v * v + Math.random() * 0.1);
+await fig.scatter({ x, y, color: y }, { name: 'samples' });
+fig.addEventListener('hover', (event) => {
+  if (event.detail) console.log(event.detail.index, event.detail.x, event.detail.y);
+});
+fig.dragMode = 'lasso';
+fig.addEventListener('selection', (event) => {
+  for (const { layer, indices } of event.detail.points) console.log(layer.name, indices.length);
+});
+const left = fig.select({ rect: [0, 0, canvas.clientWidth / 2, canvas.clientHeight] });
+console.log(left.points[0].indices.length);
+```
+
 ## Colour maps
 
 Margo's own maps are computed from their published definitions:
@@ -143,5 +175,9 @@ console.log(ticks(0, 97).labels); // ['0', '20', '40', '60', '80']
   cell writes its triangles at its offset, with normals from the field's gradient. The vertices are drawn from the
   GPU buffer; only the triangle total is read back. The case table is derived from the cube's geometry with one
   face-consistent rule, so surfaces are closed (the Node tests check every case and random fields).
+- **Picking.** Points and vertices are projected with the last frame's camera, and the nearest within the radius
+  wins (the one nearer the eye on a tie). For surfaces, the pointer's ray is stepped across the grid at half a cell
+  and bisected to where it crosses the bilinear surface. Box and lasso selections test projected points (even-odd rule
+  for the lasso). All of this runs on the CPU and is exported from `@margoengine/sciviz/maths`.
 - **Errors.** Argument errors throw `TypeError` or `RangeError` naming the fix; every message links to
   [margoengine.com/errors](https://margoengine.com/errors#sciviz).

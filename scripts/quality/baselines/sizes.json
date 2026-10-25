@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3079764,
+  "total": 3084572,
   "history": [
     {
       "date": "2026-10-24",
@@ -187,6 +187,12 @@
       "date": "2026-10-25",
       "commit": "0a28c826",
       "reason": "sciviz: viridis, magma, inferno, plasma and cividis recorded tables (delta-encoded, about 0.8 KB gzip)",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "103d9eca",
+      "reason": "sciviz: hover picking, tooltips, box and lasso selection (pick maths in sciviz/maths)",
       "grew": 2
     }
   ],
@@ -414,9 +420,9 @@
     "@margoengine/scatter": 11893,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
-    "@margoengine/sciviz": 20742,
+    "@margoengine/sciviz": 24222,
     "@margoengine/sciviz/colormaps": 4433,
-    "@margoengine/sciviz/maths": 1473,
+    "@margoengine/sciviz/maths": 2801,
     "@margoengine/selection": 13905,
     "@margoengine/shader": 12517,
     "@margoengine/shader/effects": 8386,

@@ -314,6 +314,7 @@ export const entries = [
       'scatter positions must hold x, y, z per point',
       'scatter x, y and z must have one length',
       'line x, y and z must have one length of at least 2',
+      'select takes { rect: [x0, y0, x1, y1] } or { polygon: [x, y, ...] }',
       'Isosurface GpuArray must live on the engine device: createCompute({ engine })',
       'Isosurface disposed; create a new one',
       'sciviz needs the WebGPU backend; the engine runs WebGL2',

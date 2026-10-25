@@ -12,7 +12,10 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { Axes, THEMES, type AxesOptions, type Theme } from './axes.js';
 import { ColorBar, type ColorBarOptions } from './colorbar.js';
 import type { Colormap } from './colormaps.js';
+import { Interaction, type DragMode } from './interact.js';
 import { IsosurfaceLayer, levelColour, type IsosurfaceLayerOptions } from './isosurface.js';
+import { dataToClip, nearestPoint, screenRay, selectPoints, type SelectRegion } from './pick.js';
+import { formatValue } from './ticks.js';
 import {
   dataToScene,
   extent,
@@ -39,6 +42,32 @@ export interface FigureOptions extends AxesOptions {
   readonly limits?: Bounds;
   /** Most scatter points drawn per frame across the figure (level of detail beyond it). Default 2,000,000. */
   readonly pointBudget?: number;
+  /** Tooltips on hover: true (default), false, or your own text for a hit (null shows none). */
+  readonly tooltips?: boolean | ((hit: PickResult) => string | null);
+}
+
+/** What is under the pointer: a scatter point, a line vertex or a point on a surface, in data units. */
+export interface PickResult {
+  readonly layer: ScatterLayer | LineLayer | SurfaceLayer;
+  /** The point's or vertex's index; for a surface, the nearest grid sample (j * nx + i). */
+  readonly index: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  /** The point's `color` data value, or the surface height. */
+  readonly value?: number;
+}
+
+/** A finished selection: the indices of the points inside the region, per scatter and line layer. */
+export interface Selection {
+  readonly region: SelectRegion;
+  readonly points: readonly { readonly layer: ScatterLayer | LineLayer; readonly indices: Uint32Array }[];
+}
+
+/** The events a figure sends: `hover` when the picked item changes, `selection` when a box or lasso drag ends. */
+export interface FigureEventMap {
+  hover: CustomEvent<PickResult | null>;
+  selection: CustomEvent<Selection>;
 }
 
 /** Options for {@link Figure.create}: a figure on a new engine with orbit controls, ready to plot. */
@@ -74,6 +103,8 @@ export interface ScatterLayerOptions {
   readonly edl?: boolean;
   /** Round (default) or square points. */
   readonly shape?: 'round' | 'square';
+  /** Name shown in tooltips and legends. Default none. */
+  readonly name?: string;
 }
 
 /** Options for a line layer. */
@@ -86,6 +117,8 @@ export interface LineLayerOptions {
   readonly colormap?: ColormapSource;
   /** Data range of the colour map. Default the colour data's min and max. */
   readonly range?: readonly [number, number];
+  /** Name shown in tooltips and legends. Default none. */
+  readonly name?: string;
 }
 
 /** A scatter layer (a point cloud with level of detail). Create it with `await figure.scatter(data, options)`. */
@@ -95,6 +128,11 @@ export interface ScatterLayer {
   readonly cloud: PointCloud;
   readonly bounds: Bounds;
   readonly count: number;
+  /** Positions in data units (x, y, z per point), used for picking and selection. */
+  readonly positions: Float32Array;
+  /** The `color` data, if any. */
+  readonly values: ArrayLike<number> | undefined;
+  readonly name: string | undefined;
 }
 
 /** A line layer. Create it with `await figure.line(data, options)`. */
@@ -103,6 +141,11 @@ export interface LineLayer {
   /** The fat line. Positions are in data units. */
   readonly line: Line;
   readonly bounds: Bounds;
+  /** Vertex positions in data units (x, y, z per vertex), used for picking and selection. */
+  readonly positions: Float32Array;
+  /** The `color` data, if any. */
+  readonly values: ArrayLike<number> | undefined;
+  readonly name: string | undefined;
 }
 
 /** Any figure layer. */
@@ -147,7 +190,30 @@ const boundsOf = (x: ArrayLike<number>, y: ArrayLike<number>, z: ArrayLike<numbe
  * await fig.scatter({ x, y, z, color: temperature }, { colormap: 'ember' });
  * fig.colorbar('ember', [lo, hi], { label: 'Temperature' });
  */
-export class Figure {
+export interface Figure {
+  addEventListener<K extends keyof FigureEventMap>(
+    type: K,
+    listener: (this: Figure, event: FigureEventMap[K]) => unknown,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  addEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  removeEventListener<K extends keyof FigureEventMap>(
+    type: K,
+    listener: (this: Figure, event: FigureEventMap[K]) => unknown,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  removeEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | EventListenerOptions,
+  ): void;
+}
+
+export class Figure extends EventTarget {
   /** The engine the figure draws in. */
   readonly engine: EngineKernel;
   /** The renderer for sciviz's own layers. */
@@ -164,6 +230,9 @@ export class Figure {
   #model: Float32Array;
   #bounds: Bounds = [-1, 1, -1, 1, -1, 1];
   #ownsEngine = false;
+  #controls: { enabled: boolean } | undefined;
+  #interaction: Interaction<PickResult> | undefined;
+  #selection: Selection | undefined;
   // Axis updates run after one another; ready() waits for them and reports their errors.
   #pending: Promise<void> = Promise.resolve();
   #disposed = false;
@@ -197,6 +266,7 @@ export class Figure {
       orbit.enableDamping = true;
       orbit.minDistance = 0.5;
       orbit.maxDistance = 20;
+      figure.#controls = orbit;
     }
     engine.start();
     return figure;
@@ -204,6 +274,7 @@ export class Figure {
 
   /** @internal Use {@link Figure.attach} or {@link Figure.create}. */
   constructor(engine: EngineKernel, options: FigureOptions = {}) {
+    super();
     const theme = options.theme ?? 'dark';
     if (theme !== 'dark' && theme !== 'light')
       throw typeError(`Figure theme must be 'dark' or 'light', got ${String(theme)}`, 'sciviz');
@@ -217,6 +288,114 @@ export class Figure {
     this.renderer = SciRenderer.attach(engine);
     if (options.axes ?? true) this.#axes = new Axes(engine, this.theme, options, () => this.#linesPlugin());
     this.#model = dataToScene(this.#bounds, aspect);
+    const canvas = (engine as unknown as { canvas?: HTMLCanvasElement }).canvas;
+    if (typeof HTMLCanvasElement !== 'undefined' && canvas instanceof HTMLCanvasElement)
+      this.#interaction = new Interaction<PickResult>(canvas, this.theme, {
+        pick: (x, y) => (this.#layers.size ? this.pick(x, y) : null),
+        describe: (hit) => this.#describe(hit),
+        hover: (hit) => this.dispatchEvent(new CustomEvent('hover', { detail: hit })),
+        select: (region) => {
+          this.select(region);
+        },
+        controls: () => this.#controls,
+      });
+  }
+
+  #describe(hit: PickResult): string | null {
+    const tooltips = this.#options.tooltips ?? true;
+    if (typeof tooltips === 'function') return tooltips(hit);
+    if (!tooltips) return null;
+    const titles = this.#options.titles ?? {},
+      name = hit.layer.name,
+      lines = [
+        `${titles.x ?? 'x'} ${formatValue(hit.x)}`,
+        `${titles.y ?? 'y'} ${formatValue(hit.y)}`,
+        `${titles.z ?? 'z'} ${formatValue(hit.z)}`,
+      ];
+    if (hit.value !== undefined && !(hit.layer instanceof SurfaceLayer)) lines.push(`value ${formatValue(hit.value)}`);
+    return name ? `${name}\n${lines.join('\n')}` : lines.join('\n');
+  }
+
+  /** How a left-button drag on the canvas acts: `'orbit'` (default) moves the camera; `'box'` and `'lasso'` select. */
+  get dragMode(): DragMode {
+    return this.#interaction?.mode ?? 'orbit';
+  }
+  set dragMode(mode: DragMode) {
+    if (mode !== 'orbit' && mode !== 'box' && mode !== 'lasso')
+      throw typeError(`dragMode must be 'orbit', 'box' or 'lasso', got ${String(mode)}`, 'sciviz');
+    if (this.#interaction) this.#interaction.mode = mode;
+  }
+
+  /** The last selection, or undefined. */
+  get selection(): Selection | undefined {
+    return this.#selection;
+  }
+
+  // Camera clip times the data-to-scene transform, and the canvas size in CSS pixels.
+  #view(): { matrix: Float64Array; width: number; height: number } {
+    const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas;
+    return {
+      matrix: dataToClip(this.engine.camera.matrix, this.#model),
+      width: canvas.clientWidth || canvas.width,
+      height: canvas.clientHeight || canvas.height,
+    };
+  }
+
+  /**
+   * What is under (x, y), in CSS pixels from the canvas's top-left (`event.offsetX`, `event.offsetY`): the nearest
+   * scatter point or line vertex within `radius` pixels (default 8), else the nearest surface under the pointer.
+   * Uses the camera of the last frame. Surfaces that read a GpuArray are not picked (their heights stay on the GPU).
+   */
+  pick(x: number, y: number, options: { readonly radius?: number } = {}): PickResult | null {
+    this.#check();
+    const radius = options.radius ?? 8;
+    if (!(radius >= 0)) throw rangeError(`pick radius must be at least 0, got ${radius}`, 'sciviz');
+    const { matrix, width, height } = this.#view();
+    let best: PickResult | null = null,
+      bestDistance = Infinity;
+    for (const layer of this.#layers) {
+      if (!('kind' in layer) || (layer.kind !== 'scatter' && layer.kind !== 'line')) continue;
+      const near = nearestPoint(matrix, layer.positions, width, height, x, y, radius);
+      if (near && near.distance < bestDistance) {
+        const p = layer.positions,
+          i = near.index;
+        bestDistance = near.distance;
+        best = { layer, index: i, x: p[i * 3], y: p[i * 3 + 1], z: p[i * 3 + 2], value: layer.values?.[i] };
+      }
+    }
+    if (best) return best;
+    const ray = screenRay(matrix, width, height, x, y);
+    if (!ray) return null;
+    let nearest = Infinity;
+    for (const layer of this.#layers) {
+      if (!(layer instanceof SurfaceLayer)) continue;
+      const hit = layer.raycast(ray.origin, ray.direction);
+      if (hit && hit.t < nearest) {
+        nearest = hit.t;
+        best = { layer, index: hit.index, x: hit.x, y: hit.y, z: hit.z, value: hit.z };
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Selects the scatter points and line vertices whose screen positions fall in `region` (CSS pixels from the canvas's
+   * top-left: `{ rect: [x0, y0, x1, y1] }` or `{ polygon: [x, y, ...] }`), stores it as `selection` and sends a
+   * `selection` event. A box or lasso drag (see `dragMode`) calls this.
+   */
+  select(region: SelectRegion): Selection {
+    this.#check();
+    if (!region || (!('rect' in region) && !('polygon' in region)))
+      throw typeError('select takes { rect: [x0, y0, x1, y1] } or { polygon: [x, y, ...] }', 'sciviz');
+    const { matrix, width, height } = this.#view();
+    const points: { layer: ScatterLayer | LineLayer; indices: Uint32Array }[] = [];
+    for (const layer of this.#layers)
+      if ('kind' in layer && (layer.kind === 'scatter' || layer.kind === 'line'))
+        points.push({ layer, indices: selectPoints(matrix, layer.positions, width, height, region) });
+    const selection: Selection = { region, points };
+    this.#selection = selection;
+    this.dispatchEvent(new CustomEvent('selection', { detail: selection }));
+    return selection;
   }
 
   #check(): void {
@@ -354,7 +533,7 @@ export class Figure {
         },
       }),
     );
-    return this.#add({ kind: 'scatter', cloud, bounds, count });
+    return this.#add({ kind: 'scatter', cloud, bounds, count, positions, values: colourData, name: options.name });
   }
 
   /** A line plot through (x, y, z) (z omitted for a flat line), coloured by `color` data through a colour map. */
@@ -396,7 +575,7 @@ export class Figure {
         cap: 'round',
       }),
     );
-    return this.#add({ kind: 'line', line, bounds: boundsOf(x, y, z) });
+    return this.#add({ kind: 'line', line, bounds: boundsOf(x, y, z), positions, values: c, name: options.name });
   }
 
   /** A surface plot of heights `z` over a grid (`nx` columns; a GpuArray of shape [ny, nx] is read in place). */
@@ -464,6 +643,7 @@ export class Figure {
     this.#layers.clear();
     for (const bar of this.#bars) bar.dispose();
     this.#axes?.dispose();
+    this.#interaction?.dispose();
     void this.#compute?.then((gpu) => gpu.dispose());
     this.renderer.dispose();
     if (this.#ownsEngine) (this.engine as unknown as Engine).dispose();

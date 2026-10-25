@@ -71,3 +71,22 @@ export function formatTick(value: number, step: number): string {
   }
   return text.replace(/^-/, '−');
 }
+
+/**
+ * A value for a tooltip or readout: four significant digits, exponent notation beyond 1e6 or below 1e-4, and a true
+ * minus sign.
+ * @example formatValue(-0.0012346) // '−0.001235'
+ */
+export function formatValue(value: number, digits = 4): string {
+  if (value === 0 || Object.is(value, -0)) return '0';
+  if (!Number.isFinite(value)) return value !== value ? 'NaN' : value > 0 ? '∞' : '−∞';
+  const magnitude = Math.abs(value);
+  const text =
+    magnitude >= 1e6 || magnitude < 1e-4
+      ? value
+          .toExponential(digits - 1)
+          .replace(/\.?0+e/, 'e')
+          .replace('e+', 'e')
+      : String(Number(value.toPrecision(digits)));
+  return text.replace(/^-/, '−');
+}
