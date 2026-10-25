@@ -90,7 +90,9 @@ export async function attachMaterials(
       color: [diffuse[0] * factor, diffuse[1] * factor, diffuse[2] * factor, alpha],
       emissive: emission.map((v) => v * emissiveFactor),
       metalness: 0,
-      roughness: Math.max(0.045, Math.min(1, Math.sqrt(2 / (shininess + 2)))),
+      // Blinn-Phong exponent n to glTF roughness, the same mapping as @margoengine/materials and the exporters:
+      // Beckmann alpha = sqrt(2 / (n + 2)) (Walter et al. 2007, sec. 5.2), roughness = sqrt(alpha); floor 0.045.
+      roughness: Math.max(0.045, Math.min(1, (2 / (shininess + 2)) ** 0.25)),
       alphaMode: alpha < 1 ? 'BLEND' : 'OPAQUE',
     };
     for (const c of ctx.incoming.get(id(source.properties[0])) ?? []) {

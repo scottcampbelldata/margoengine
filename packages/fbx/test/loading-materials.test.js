@@ -100,7 +100,7 @@ test('native Phong properties become dielectric PBR with opacity taking preceden
   close(pbr.baseColorFactor, [0.4, 0.3, 0.2, 0.25]);
   close(material.emissiveFactor, [0.1, 0.15, 0.2]);
   assert.equal(pbr.metallicFactor, 0);
-  assert.ok(Math.abs(pbr.roughnessFactor - Math.sqrt(2 / 12)) < 1e-7);
+  assert.ok(Math.abs(pbr.roughnessFactor - (2 / 12) ** 0.25) < 1e-7);
   assert.equal(material.alphaMode, 'BLEND');
 });
 
@@ -114,6 +114,21 @@ test('TransparencyFactor supplies alpha and shininess respects roughness limits'
     assert.ok(Math.abs(material.pbrMetallicRoughness.baseColorFactor[3] - alpha) < 1e-7);
     assert.ok(Math.abs(material.pbrMetallicRoughness.roughnessFactor - roughness) < 1e-7);
     assert.equal(material.alphaMode ?? 'OPAQUE', alpha < 1 ? 'BLEND' : 'OPAQUE');
+  }
+});
+
+test('Phong shininess maps to roughness like @margoengine/materials ((2/(n+2))^(1/4))', async () => {
+  // Regression: the FBX importer once skipped the second square root, so imports came out smoother than the same
+  // exponent in materials (built-material margoFront) and the exporters. n = 30 is materials' default at roughness 0.5.
+  for (const [n, roughness] of [
+    [30, 0.5],
+    [6, 0.5 ** 0.5],
+    [10, (2 / 12) ** 0.25],
+    [510, (2 / 512) ** 0.25],
+  ]) {
+    const { doc } = readGLB(await convertFBX(fixture({ properties: scalar('Shininess', n) })));
+    const actual = doc.materials[0].pbrMetallicRoughness.roughnessFactor;
+    assert.ok(Math.abs(actual - roughness) < 1e-7, `shininess ${n}: ${actual} != ${roughness}`);
   }
 });
 
