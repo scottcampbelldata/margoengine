@@ -1,5 +1,5 @@
 {
-  "commit": "2f7f9d34",
+  "commit": "bd8e5a69",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -668,8 +668,8 @@
     },
     "margoengine": {
       ".": {
-        "raw": 7009,
-        "gzip": 2941
+        "raw": 32,
+        "gzip": 52
       }
     },
     "@margoengine/materials": {
@@ -936,24 +936,24 @@
     },
     "@margoengine/react": {
       ".": {
-        "raw": 60040,
+        "raw": 60047,
         "gzip": 20751
       },
       "./kit": {
-        "raw": 27588,
-        "gzip": 9743
+        "raw": 27595,
+        "gzip": 9746
       },
       "./post": {
         "raw": 7115,
         "gzip": 2869
       },
       "./physics": {
-        "raw": 11557,
-        "gzip": 4649
+        "raw": 11564,
+        "gzip": 4651
       },
       "./xr": {
-        "raw": 6583,
-        "gzip": 2879
+        "raw": 6590,
+        "gzip": 2881
       }
     },
     "@margoengine/road": {
@@ -1068,6 +1068,12 @@
       ".": {
         "raw": 3006,
         "gzip": 1299
+      }
+    },
+    "@margoengine/stage": {
+      ".": {
+        "raw": 7009,
+        "gzip": 2941
       }
     },
     "@margoengine/staging": {
