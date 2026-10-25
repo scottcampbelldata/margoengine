@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3135642,
+  "total": 3151735,
   "history": [
     {
       "date": "2026-10-24",
@@ -134,6 +134,12 @@
       "commit": "e166a074",
       "reason": "React stage 2b (item 17): <Scene>, <RenderView> and Mesh layers for multi-view (layers load lazily)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "06cfcbf4",
+      "reason": "IGES 5.3 reader in brep (+~11 KB), clean-room FXAA (+~80 B), CIE L* voxel light curve (+~200 B)",
+      "grew": 3
     }
   ],
   "items": {
@@ -145,7 +151,7 @@
     "@margoengine/animator": 11757,
     "@margoengine/audio": 7716,
     "@margoengine/blender": 3405,
-    "@margoengine/brep": 107907,
+    "@margoengine/brep": 122786,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/bake": 2583,
     "@margoengine/bvh/tree": 10524,
@@ -326,7 +332,7 @@
     "@margoengine/post/bloom": 6716,
     "@margoengine/post/decals": 4760,
     "@margoengine/post/depth": 3876,
-    "@margoengine/post/fxaa": 4398,
+    "@margoengine/post/fxaa": 4735,
     "@margoengine/post/glitch": 6269,
     "@margoengine/post/gtao": 11961,
     "@margoengine/post/image": 11905,
@@ -423,7 +429,7 @@
     "@margoengine/voxel/mesher": 8312,
     "@margoengine/voxel/physics": 10257,
     "@margoengine/voxel/query": 3821,
-    "@margoengine/voxel/render": 22428,
+    "@margoengine/voxel/render": 23305,
     "@margoengine/voxel/stream": 12985,
     "@margoengine/voxel/vox": 12969,
     "@margoengine/water": 18564,
