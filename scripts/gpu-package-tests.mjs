@@ -143,7 +143,8 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     for (const t of tests) console.log(`${t.label}: (${t.cwd}) ${t.command}`);
     process.exit(0);
   }
-  const env = { ...process.env, MARGO_GPU_LOCK_NESTED: process.env.MARGO_GPU_LOCK_NESTED ?? join(lockDir, 'nested') };
+  // Children taking this same lock run inside it; any other lock they take is still taken.
+  const env = { ...process.env, MARGO_GPU_LOCK_NESTED: join(lockDir, 'nested') };
   const run = (command, cwd) => {
     const t0 = performance.now();
     const { status } = spawnSync(command, { cwd: join(root, cwd), shell: true, stdio: 'inherit', env });

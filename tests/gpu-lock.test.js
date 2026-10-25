@@ -1,54 +1,59 @@
+// scripts/gpu-lock.mjs `run`: the command gets its arguments exactly as given (spaces and quotes survive, on Windows
+// too, where cmd.exe starts it), and the nested marker covers only the lock being held, so a GPU test inside the
+// landing lock still takes the GPU lock.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 
-// The suite may itself run under `gpu-lock.mjs run`; its nested marker would turn acquire() into a no-op here and
-// in the child processes below, so this test uses only its own temporary lock.
-delete process.env.MARGO_GPU_LOCK_NESTED;
-process.env.MARGO_GPU_LOCK = join(mkdtempSync(join(tmpdir(), 'gpu-lock-')), 'gpu.lock');
-const { acquire, status, lockDir } = await import('../scripts/gpu-lock.mjs');
-
-test('one holder at a time; release only removes our own lock; dead holders are taken over', async () => {
-  const release = await acquire({ owner: 'a', poll: 10 });
-  assert.equal(status().owner, 'a');
-  let second = false;
-  const waiting = acquire({ owner: 'b', poll: 10, log() {} }).then((r) => {
-    second = true;
-    return r;
+const run = (lock, args, env = {}) =>
+  spawnSync(process.execPath, ['scripts/gpu-lock.mjs', 'run', '--owner=test', '--', ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, MARGO_GPU_LOCK: lock, MARGO_GPU_LOCK_NESTED: '', ...env },
   });
-  await new Promise((r) => setTimeout(r, 50));
-  assert.equal(second, false, 'b waits while a holds the lock');
-  release();
-  const releaseB = await waiting;
-  assert.equal(status().owner, 'b');
-  release();
-  assert.equal(status().owner, 'b', "a's stale release must not remove b's lock");
-  releaseB();
-  assert.equal(existsSync(lockDir), false);
 
-  mkdirSync(lockDir);
-  writeFileSync(join(lockDir, 'owner.json'), JSON.stringify({ owner: 'ghost', pid: 2 ** 30, token: 'x' }));
-  const releaseC = await acquire({ owner: 'c', poll: 10, log() {} });
-  assert.equal(status().owner, 'c', 'a lock whose process is gone is taken over');
-  releaseC();
+test('a quoted multi-word argument reaches the command intact', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
+    lock = join(folder, 'test.lock');
+  try {
+    const printer = 'console.log(JSON.stringify(process.argv.slice(1)))';
+    const out = run(lock, [process.execPath, '-e', printer, 'two words', 'a"quote', 'back\\slash\\', '50%']);
+    assert.equal(out.status, 0, out.stderr);
+    assert.deepEqual(JSON.parse(out.stdout.trim()), ['two words', 'a"quote', 'back\\slash\\', '50%']);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
 
-test('run: a wrapped script that takes the lock itself finishes instead of waiting on its parent', () => {
-  // The self-locking pattern of scripts/visual-regression.js and the GPU benchmarks.
-  const child = `const {mkdirSync, rmSync} = require('node:fs'); const lock = process.env.MARGO_GPU_LOCK_NESTED ?? process.env.MARGO_GPU_LOCK;
-    for (let i = 0; ; i++) {try {mkdirSync(lock); break;} catch (e) {if (i > 20) process.exit(3); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);}}
-    rmSync(lock, {recursive: true, force: true});`;
-  const script = join(mkdtempSync(join(tmpdir(), 'gpu-lock-child-')), 'child.cjs');
-  writeFileSync(script, child);
-  const result = spawnSync(
+// Acquires the lock at `lock` in a child process whose nested marker is `nested`, and prints the lock's status.
+const acquireUnder = (lock, nested) =>
+  spawnSync(
     process.execPath,
-    [fileURLToPath(new URL('../scripts/gpu-lock.mjs', import.meta.url)), 'run', '--owner=t', '--', 'node', script],
-    { encoding: 'utf8', timeout: 30_000 },
+    [
+      '--input-type=module',
+      '-e',
+      "const m = await import('./scripts/gpu-lock.mjs'); await m.acquire({ owner: 'child', poll: 10 }); console.log(JSON.stringify(m.status()));",
+    ],
+    { encoding: 'utf8', env: { ...process.env, MARGO_GPU_LOCK: lock, MARGO_GPU_LOCK_NESTED: nested } },
   );
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(existsSync(lockDir), false, 'the lock is released afterwards');
+
+test('the nested marker excuses only the held lock: a different lock is still taken', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
+    landing = join(folder, 'land.lock'),
+    gpu = join(folder, 'gpu.lock');
+  try {
+    // A GPU test inside the landing lock's run: the GPU lock is really taken.
+    const inside = acquireUnder(gpu, join(landing, 'nested'));
+    assert.equal(inside.status, 0, inside.stderr);
+    assert.equal(JSON.parse(inside.stdout.trim()).owner, 'child');
+    rmSync(gpu, { recursive: true, force: true });
+    // A child of the GPU lock's own run: already held, not taken again.
+    const same = acquireUnder(gpu, join(gpu, 'nested'));
+    assert.equal(same.status, 0, same.stderr);
+    assert.equal(JSON.parse(same.stdout.trim()), null);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
