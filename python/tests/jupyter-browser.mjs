@@ -55,15 +55,17 @@ writeFileSync(
     metadata: { kernelspec: { name: 'python3', display_name: 'Python 3', language: 'python' } },
     cells: [
       code(
-        'import json, pathlib, numpy as np, pandas as pd, margoengine as margo\nrng = np.random.default_rng(1)\ndf = pd.DataFrame(rng.standard_normal((200000, 3)), columns=["x", "y", "z"])',
+        'import json, pathlib, numpy as np, pandas as pd, margoengine as margo\nrng = np.random.default_rng(1)\ndf = pd.DataFrame(rng.standard_normal((200000, 3)), columns=["x", "y", "z"])\ndef dump(name, value):\n    part = pathlib.Path(name + ".part")\n    part.write_text(json.dumps(value))\n    part.replace(name)',
       ),
       code(
-        `f1 = margo.scatter(df, x="x", y="y", z="z", color="z")\nf1.camera = {"position": ${JSON.stringify(start)}, "target": [0, 0, 0]}\nf1.observe(lambda change: pathlib.Path("camera.json").write_text(json.dumps(change["new"])), names="camera")\nf1`,
+        `f1 = margo.scatter(df, x="x", y="y", z="z", color="z")\nf1.camera = {"position": ${JSON.stringify(start)}, "target": [0, 0, 0]}\nf1.observe(lambda change: dump("camera.json", change["new"]), names="camera")\nf1.on_click(lambda event: dump("click.json", event))\nf1`,
       ),
       code(
         'g = np.linspace(-3, 3, 48, dtype=np.float32)\nX, Y, Z = np.meshgrid(g, g, g)\nmargo.volume(np.exp(-(X**2 + Y**2 + Z**2)), opacity=[(0, 0), (0.3, 0.2), (1, 1)])',
       ),
-      code('x = np.linspace(-3, 3, 64)\nmargo.surface(np.sin(x)[None, :] * np.cos(x)[:, None], x=(-3, 3), y=(-3, 3))'),
+      code(
+        'x = np.linspace(-3, 3, 64)\nf3 = margo.surface(np.sin(x)[None, :] * np.cos(x)[:, None], x=(-3, 3), y=(-3, 3))\npx, py = rng.uniform(-3, 3, (2, 400))\nf3.scatter(x=px, y=py, z=np.sin(px) * np.cos(py) + 0.05, point_size=4)\nf3.drag_mode = "box"\nf3.on_select(lambda s: dump("selection.json", {str(k): len(v) for k, v in s.items()}))\nf3',
+      ),
     ].map((cell, k) => ({ ...cell, id: `c${k}` })),
   }),
 );
@@ -109,8 +111,12 @@ const brightPixels = (png) => {
   for (let i = 0; i < png.data.length; i += 4) if (png.data[i] + png.data[i + 1] + png.data[i + 2] > 3 * 60) lit++;
   return lit;
 };
-const cameraFile = join(folder, 'camera.json');
-const readCamera = () => (existsSync(cameraFile) ? JSON.parse(readFileSync(cameraFile, 'utf8')) : undefined);
+// The kernel's handlers write what they get to JSON files in the notebook folder.
+const readJson = (name) => {
+  const file = join(folder, name);
+  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined;
+};
+const readCamera = () => readJson('camera.json');
 const waitFor = async (what, test, ms = 60_000) => {
   for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => setTimeout(r, 100))) {
     const value = test();
@@ -208,10 +214,26 @@ try {
     const now = readCamera();
     return now && Math.hypot(...now.position.map((v, k) => v - first.position[k])) > 0.1 ? now : undefined;
   });
+  // A click on the dense middle of the scatter reaches on_click with the point under the pointer.
+  await lab.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  const click = await waitFor('the click to reach on_click', () => readJson('click.json'));
+  assert.equal(click.button, 0);
+  assert.ok(click.hit && click.hit.layer === 0 && Number.isInteger(click.hit.index), `click hit ${JSON.stringify(click.hit)}`);
+  // A box drag over the third figure (drag_mode "box") selects scatter points there and reaches on_select.
+  const third = lab.page.locator('.jp-OutputArea canvas').nth(2);
+  await third.scrollIntoViewIfNeeded();
+  await lab.page.waitForTimeout(500);
+  const area = await third.boundingBox();
+  await lab.page.mouse.move(area.x + area.width * 0.2, area.y + area.height * 0.2);
+  await lab.page.mouse.down();
+  await lab.page.mouse.move(area.x + area.width * 0.8, area.y + area.height * 0.8, { steps: 10 });
+  await lab.page.mouse.up();
+  const selected = await waitFor('the selection to reach on_select', () => readJson('selection.json'));
+  assert.ok(selected['1'] > 0, `box selected ${JSON.stringify(selected)} (layer 1 is the scatter)`);
   await lab.page.screenshot({ path: join(root, 'test-results/jupyter-browser.png'), fullPage: true });
   await lab.page.close();
   console.log(
-    `jupyter: JupyterLab drew 3 figures (${lab.drawn.join(', ')} bright pixels); camera kernel -> view -> kernel, then drag to [${moved.position.map((v) => v.toFixed(2))}]`,
+    `jupyter: JupyterLab drew 3 figures (${lab.drawn.join(', ')} bright pixels); camera kernel -> view -> kernel, then drag to [${moved.position.map((v) => v.toFixed(2))}]; click hit point ${click.hit.index}; box selected ${selected['1']} points`,
   );
 
   // Notebook 7 (the notebook package's own interface, served by the same server).

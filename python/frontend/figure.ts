@@ -2,8 +2,7 @@
 // Figure: layers whose arrays arrive as binary buffers) into a @margoengine/sciviz figure. Used two ways:
 // - by the JupyterLab widget (see `extension`, loaded through remoteEntry.js), with buffers from the widget protocol;
 // - by `Figure.save_html`, with buffers base64-encoded in the page (see `renderPayload`).
-import { OrbitControls } from '@margoengine/controls/orbit';
-import { Figure, type ColormapSource, type Layer } from '@margoengine/sciviz';
+import { Figure, type ColormapSource, type Layer, type PickResult, type Selection } from '@margoengine/sciviz';
 
 type V3 = [number, number, number];
 
@@ -15,8 +14,36 @@ export interface CameraState {
   fov?: number;
 }
 
-// The orbit controls of each figure built here (Figure.create's own controls are not reachable, so they are made here).
-const orbits = new WeakMap<Figure, OrbitControls>();
+// The specification index of each layer of the figures built here.
+const layerIndices = new WeakMap<Figure, Map<object, number>>();
+
+/** The specification index of a sciviz layer of a figure from {@link buildFigure}, or -1. */
+export function layerIndex(figure: Figure, layer: object): number {
+  return layerIndices.get(figure)?.get(layer) ?? -1;
+}
+
+/** A pick as the kernel gets it: the layer's specification index, the point's index, data position and value. */
+export function pickMessage(figure: Figure, hit: PickResult | null) {
+  if (!hit) return null;
+  const message: { layer: number; index: number; point: V3; value?: number } = {
+    layer: layerIndex(figure, hit.layer),
+    index: hit.index,
+    point: [hit.x, hit.y, hit.z],
+  };
+  if (hit.value !== undefined) message.value = hit.value;
+  return message;
+}
+
+/** A selection as the kernel gets it: layer indices in the content, each layer's point indices as a binary buffer. */
+export function selectionMessage(figure: Figure, selection: Selection): { content: { event: 'selection'; layers: number[] }; buffers: ArrayBuffer[] } {
+  const layers: number[] = [],
+    buffers: ArrayBuffer[] = [];
+  for (const { layer, indices } of selection.points) {
+    layers.push(layerIndex(figure, layer));
+    buffers.push(indices.buffer.slice(indices.byteOffset, indices.byteOffset + indices.byteLength) as ArrayBuffer);
+  }
+  return { content: { event: 'selection', layers }, buffers };
+}
 
 /** The figure's camera now. */
 export function readCamera(figure: Figure): Required<CameraState> {
@@ -46,11 +73,6 @@ export function sameCamera(figure: Figure, state: CameraState | null | undefined
     (!state.up || close(state.up, now.up)) &&
     (state.fov === undefined || Math.abs(state.fov - now.fov) <= 1e-9)
   );
-}
-
-/** The orbit controls of a figure from {@link buildFigure}. */
-export function orbitOf(figure: Figure): OrbitControls | undefined {
-  return orbits.get(figure);
 }
 
 /** An array descriptor; `buffer` holds the float32 bytes once restored from the message or the page. */
@@ -110,16 +132,9 @@ export async function buildFigure(host: HTMLElement, spec: PlotSpec, camera?: Ca
     titles: spec.titles,
     axes: spec.axes,
     pointBudget: spec.pointBudget,
-    controls: false,
   });
-  // The same orbit controls Figure.create would attach, kept here so the widget can follow and set the camera.
-  const orbit = OrbitControls.attach(figure.engine);
-  orbit.enableDamping = true;
-  orbit.minDistance = 0.5;
-  orbit.maxDistance = 20;
-  orbits.set(figure, orbit);
   applyCamera(figure, camera);
-  const added: Promise<Layer | undefined>[] = spec.layers.map(async (layer) => {
+  const make = async (layer: LayerSpec): Promise<Layer | undefined> => {
     const a = (key: string) => floats(layer[key] as ArraySpec | undefined);
     switch (layer.type) {
       case 'scatter':
@@ -161,8 +176,16 @@ export async function buildFigure(host: HTMLElement, spec: PlotSpec, camera?: Ca
         console.warn(`margoengine: unknown layer type ${String(layer.type)}`);
         return undefined;
     }
-  });
-  await Promise.all(added);
+  };
+  // Each sciviz layer's position in the specification, which is how picks and selections name layers to Python.
+  const indices = new Map<object, number>();
+  await Promise.all(
+    spec.layers.map(async (layer, k) => {
+      const made = await make(layer);
+      if (made) indices.set(made, k);
+    }),
+  );
+  layerIndices.set(figure, indices);
   for (const bar of spec.colorbars) figure.colorbar(bar.colormap, bar.range, { label: bar.label });
   return figure;
 }
@@ -186,13 +209,13 @@ export function renderPayload(
   return buildFigure(host, restoreBuffers(payload.spec, payload.bufferPaths, buffers), payload.camera);
 }
 
-/** Disposes a figure from {@link buildFigure} with its orbit controls. */
+/** Disposes a figure from {@link buildFigure} (its engine and orbit controls go with it). */
 export function disposeFigure(figure: Figure | undefined): void {
-  if (!figure) return;
-  orbits.get(figure)?.dispose();
-  orbits.delete(figure);
-  figure.dispose();
+  figure?.dispose();
 }
+
+/** A pointer press and release this close (CSS pixels) is a click, not an orbit drag. */
+const CLICK_SLOP = 4;
 
 /** The minimal surface of `@jupyter-widgets/base` this widget uses (from the host's widget manager at runtime). */
 export interface WidgetsBase {
@@ -230,12 +253,14 @@ export function widgetClasses(base: WidgetsBase) {
         _view_module_version: '^1.0.0',
         spec: null,
         camera: null,
+        drag_mode: 'orbit',
       };
     }
   }
   const View = base.DOMWidgetView as unknown as new (...args: unknown[]) => {
     el: HTMLElement;
     model: ModelLike;
+    send(content: unknown, buffers?: ArrayBuffer[]): void;
     remove(): void;
   };
   class MargoFigureView extends View {
@@ -254,6 +279,39 @@ export function widgetClasses(base: WidgetsBase) {
           }),
         this,
       );
+      this.model.on('change:drag_mode', () => void this.#figure?.then((figure) => figure && this.#applyDragMode(figure)), this);
+    }
+    #applyDragMode(figure: Figure): void {
+      figure.dragMode = (this.model.get('drag_mode') as 'orbit' | 'box' | 'lasso') ?? 'orbit';
+    }
+    // Clicks (a press and release without dragging) go to the kernel with what was under the pointer; finished box
+    // and lasso selections go with their point indices as binary buffers.
+    #listen(figure: Figure): void {
+      const controls = figure.controls;
+      controls?.addEventListener('change', () => this.#schedule(figure));
+      controls?.addEventListener('end', () => this.#schedule(figure));
+      figure.addEventListener('selection', (event) => {
+        const { content, buffers } = selectionMessage(figure, (event as CustomEvent<Selection>).detail);
+        this.send(content, buffers);
+      });
+      const canvas = figure.engine.canvas as HTMLCanvasElement;
+      let down: { x: number; y: number; button: number } | undefined;
+      canvas.addEventListener('pointerdown', (e) => {
+        down = { x: e.offsetX, y: e.offsetY, button: e.button };
+      });
+      canvas.addEventListener('pointerup', (e) => {
+        if (!down || down.button !== e.button || Math.hypot(e.offsetX - down.x, e.offsetY - down.y) > CLICK_SLOP) return;
+        down = undefined;
+        const hit = pickMessage(figure, figure.pick(e.offsetX, e.offsetY));
+        this.send({
+          event: 'click',
+          x: e.offsetX,
+          y: e.offsetY,
+          button: e.button,
+          modifiers: { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey },
+          hit,
+        });
+      });
     }
     #draw(): void {
       const spec = this.model.get('spec') as PlotSpec;
@@ -268,9 +326,8 @@ export function widgetClasses(base: WidgetsBase) {
           return undefined;
         });
         if (figure) {
-          const orbit = orbitOf(figure)!;
-          orbit.addEventListener('change', () => this.#schedule(figure));
-          orbit.addEventListener('end', () => this.#schedule(figure));
+          this.#applyDragMode(figure);
+          this.#listen(figure);
           this.#schedule(figure);
         }
         return figure;

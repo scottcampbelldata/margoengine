@@ -114,6 +114,8 @@ heights stay on the GPU.
 Set `fig.dragMode` to `'box'` or `'lasso'` to select with a left-button drag; `'orbit'` (the default) gives the drag
 back to the camera. When a drag ends, the figure stores the result in `fig.selection` and sends a `selection` event with
 the indices of the points inside the region, per scatter and line layer. `fig.select(region)` does the same in code.
+`fig.controls` are the orbit controls `Figure.create` attached (undefined with `controls: false`); listen for their
+`change` event to follow the camera.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';

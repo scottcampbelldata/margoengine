@@ -359,6 +359,26 @@ window.runSciVizTests = async () => {
     assert(colormap('aurora').css().startsWith('linear-gradient('), 'css');
   });
 
+  await check('figure.controls are the orbit controls Figure.create attached, and a selecting drag mode turns them off', async () => {
+    const figure = await Figure.create(canvas, { axes: false });
+    figure.engine.stop?.();
+    const controls = figure.controls;
+    assert(controls && typeof controls.addEventListener === 'function' && controls.enabled, 'Figure.create attaches controls');
+    let changed = 0;
+    controls.addEventListener('change', () => changed++);
+    controls.rotateLeft(0.3);
+    controls.update(1 / 60);
+    assert(changed > 0, 'their change event follows the camera');
+    figure.dragMode = 'lasso';
+    assert(!controls.enabled, 'lasso mode turns orbiting off');
+    figure.dragMode = 'orbit';
+    assert(controls.enabled, 'orbit mode turns it back on');
+    figure.dispose();
+    const bare = await figureOn(canvas, { axes: false });
+    assert(bare.controls === undefined, 'controls: false leaves none');
+    bare.dispose();
+  });
+
   assert(errors.length === 0, `WebGPU errors: ${errors.join('; ')}`);
   return { checks };
 };

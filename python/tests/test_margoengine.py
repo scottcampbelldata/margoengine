@@ -284,6 +284,59 @@ class Camera(unittest.TestCase):
         self.assertEqual(payload["camera"], {"position": [1.0, 1.0, 1.0]})
 
 
+class ClicksAndSelections(unittest.TestCase):
+    def setUp(self):
+        FakeComm.opened.clear()
+
+    def test_clicks_reach_on_click_with_what_was_under_the_pointer(self):
+        fig = margo.scatter(x=[0, 1], y=[0, 1], comm_factory=FakeComm)
+        fig._repr_mimebundle_()
+        clicks = []
+        handler = clicks.append
+        self.assertIs(fig.on_click(handler), fig)
+        hit = {"layer": 0, "index": 1, "point": [1.0, 1.0, 0.0]}
+        FakeComm.opened[0].receive({"method": "custom", "content": {"event": "click", "x": 10, "y": 20, "button": 0, "modifiers": {"shift": True}, "hit": hit}})
+        self.assertEqual(clicks, [{"x": 10, "y": 20, "button": 0, "modifiers": {"shift": True}, "hit": hit}])
+        fig.on_click(handler, remove=True)
+        FakeComm.opened[0].receive({"method": "custom", "content": {"event": "click", "x": 1, "y": 1, "button": 0, "hit": None}})
+        self.assertEqual(len(clicks), 1)
+        with self.assertRaises(TypeError):
+            fig.on_click("not a function")
+
+    def test_selections_arrive_as_binary_indices_in_the_trait_and_on_select(self):
+        fig = margo.figure(comm_factory=FakeComm).scatter(x=[0, 1, 2], y=[0, 1, 2]).line(x=[0, 1], y=[1, 0])
+        fig._repr_mimebundle_()
+        got = []
+        fig.on_select(got.append)
+        seen = []
+        fig.observe(lambda change: seen.append(change["new"]), names="selection")
+        FakeComm.opened[0].receive(
+            {"method": "custom", "content": {"event": "selection", "layers": [0, 1]}},
+            [struct.pack("<2I", 0, 2), struct.pack("<0I")],
+        )
+        self.assertEqual(list(fig.selection[0]), [0, 2])
+        self.assertEqual(list(fig.selection[1]), [])
+        self.assertEqual(len(got), 1)
+        self.assertIs(got[0], fig.selection)
+        self.assertEqual(len(seen), 1)
+        if np is not None:
+            self.assertEqual(fig.selection[0].dtype, np.uint32)
+        with self.assertRaises(ValueError):
+            FakeComm.opened[0].receive({"method": "custom", "content": {"event": "selection", "layers": [0]}}, [])
+
+    def test_drag_mode_syncs_to_the_view(self):
+        from traitlets import TraitError
+
+        fig = margo.scatter(x=[0, 1], y=[0, 1], comm_factory=FakeComm)
+        fig._repr_mimebundle_()
+        comm = FakeComm.opened[0]
+        self.assertEqual(comm.open_args["data"]["state"]["drag_mode"], "orbit")
+        fig.drag_mode = "lasso"
+        self.assertEqual(comm.sent[-1]["data"]["state"], {"drag_mode": "lasso"})
+        with self.assertRaises(TraitError):
+            fig.drag_mode = "circle"
+
+
 class Colab(unittest.TestCase):
     def test_in_colab_the_figure_displays_as_an_inline_page_not_a_widget(self):
         import types

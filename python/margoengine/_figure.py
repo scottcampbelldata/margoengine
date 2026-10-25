@@ -8,6 +8,7 @@ float32 bytes plus its shape. The JavaScript side (``@margoengine/jupyter``) tur
 
 from __future__ import annotations
 
+import array
 import base64
 import html
 import json
@@ -17,7 +18,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from ._arrays import Encoded, column, encode, extent, frame, is_labeled, label, labeled_grid
-from traitlets import Dict as DictTrait, HasTraits, TraitError, observe, validate
+from traitlets import Any as AnyTrait, Dict as DictTrait, Enum, HasTraits, TraitError, observe, validate
 
 from ._widget import WidgetModel, split_buffers
 
@@ -114,8 +115,11 @@ class Figure(HasTraits):
         }
         super().__init__()
         self._receiving = False
-        self._model = WidgetModel({"spec": self._spec, "camera": None}, comm_factory=comm_factory)
+        self._model = WidgetModel({"spec": self._spec, "camera": None, "drag_mode": "orbit"}, comm_factory=comm_factory)
         self._model.on_update(self._from_frontend)
+        self._model.on_custom(self._event)
+        self._click_callbacks: List[Callable[[Dict[str, Any]], None]] = []
+        self._select_callbacks: List[Callable[[Dict[int, Any]], None]] = []
 
     # ----- camera -----
 
@@ -160,6 +164,69 @@ class Figure(HasTraits):
                 self.camera = changes["camera"]
             finally:
                 self._receiving = False
+
+    # ----- clicks and selections -----
+
+    drag_mode = Enum(
+        ("orbit", "box", "lasso"),
+        default_value="orbit",
+        help="What a left-button drag does: 'orbit' the camera (default), or select points in a 'box' or 'lasso'.",
+    )
+
+    selection = AnyTrait(
+        None,
+        allow_none=True,
+        help="The last box or lasso selection: {layer index: indices of its points inside the region} (NumPy uint32 "
+        "arrays when NumPy is installed), or None.",
+    )
+
+    @observe("drag_mode")
+    def _send_drag_mode(self, change: Any) -> None:
+        self._model.set(drag_mode=change["new"])
+
+    def on_click(self, callback: Callable[[Dict[str, Any]], None], remove: bool = False) -> "Figure":
+        """Calls ``callback(event)`` when the view is clicked (pressed and released without dragging).
+
+        ``event`` has ``x`` and ``y`` (CSS pixels from the view's top-left), ``button``, ``modifiers`` (``shift``,
+        ``ctrl``, ``alt``, ``meta``) and ``hit``: None, or the scatter point, line vertex or surface point under the
+        pointer as ``{"layer": layer index, "index": point index, "point": [x, y, z], "value": colour value}``.
+        ``remove=True`` unregisters ``callback``.
+        """
+        self._register(self._click_callbacks, callback, remove)
+        return self
+
+    def on_select(self, callback: Callable[[Dict[int, Any]], None], remove: bool = False) -> "Figure":
+        """Calls ``callback(selection)`` when a box or lasso selection ends (see :attr:`drag_mode`), with the same
+        value as :attr:`selection`. ``remove=True`` unregisters ``callback``."""
+        self._register(self._select_callbacks, callback, remove)
+        return self
+
+    @staticmethod
+    def _register(callbacks: List[Any], callback: Any, remove: bool) -> None:
+        if not callable(callback):
+            raise TypeError(f"callback must be callable, got {type(callback).__name__}")
+        if remove:
+            if callback in callbacks:
+                callbacks.remove(callback)
+        else:
+            callbacks.append(callback)
+
+    def _event(self, content: Any, buffers: List[Any]) -> None:
+        # Custom messages from the view: clicks, and selections with one uint32 buffer of point indices per layer.
+        if not isinstance(content, dict):
+            return
+        if content.get("event") == "click":
+            event = {key: content.get(key) for key in ("x", "y", "button", "modifiers", "hit")}
+            for callback in list(self._click_callbacks):
+                callback(event)
+        elif content.get("event") == "selection":
+            layers = content.get("layers", [])
+            if len(layers) != len(buffers):
+                raise ValueError(f"selection names {len(layers)} layers but carries {len(buffers)} buffers")
+            selection = {int(layer): _indices(buffer) for layer, buffer in zip(layers, buffers)}
+            self.selection = selection
+            for callback in list(self._select_callbacks):
+                callback(selection)
 
     # ----- layers -----
 
@@ -497,6 +564,19 @@ window.margoFigure = MargoFigure.renderPayload(document.getElementById('figure')
         target = Path(path)
         target.write_bytes(png)
         return target
+
+
+def _indices(buffer: Any) -> Any:
+    # Little-endian uint32 point indices: a NumPy array when NumPy is loaded, else an array.array('I').
+    raw = bytes(buffer)
+    np = sys.modules.get("numpy")
+    if np is not None:
+        return np.frombuffer(raw, dtype="<u4").copy()
+    out = array.array("I")
+    out.frombytes(raw)
+    if sys.byteorder == "big":
+        out.byteswap()
+    return out
 
 
 def _in_colab() -> bool:

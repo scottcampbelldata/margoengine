@@ -4,6 +4,7 @@
 
 ```ts
 import { ComputeContext, GpuArray } from "@margoengine/compute";
+import { OrbitControls } from "@margoengine/controls";
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { Line } from "@margoengine/lines";
@@ -81,6 +82,7 @@ export class Figure extends EventTarget {
     get dragMode(): DragMode;
     set dragMode(mode: DragMode);
     get selection(): Selection | undefined;
+    get controls(): OrbitControls | undefined;
     pick(x: number, y: number, options?: {
         readonly radius?: number;
     }): PickResult | null;

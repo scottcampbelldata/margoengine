@@ -71,7 +71,7 @@ A DataArray's dimensions are read in `(z, y, x)` order for volumes and `(y, x)` 
 be evenly spaced; a decreasing one (latitude stored north to south, say) is flipped for you. Pass `bounds=` or
 `x=` / `y=` to override them.
 
-## Camera events
+## Camera, clicks and selections
 
 A figure is a [traitlets](https://traitlets.readthedocs.io) object, like every ipywidget. Its `camera` trait follows the
 view as you orbit, pan and zoom (reported at most ten times a second), and setting it moves the view:
@@ -81,6 +81,18 @@ fig = margo.scatter(df, x="x", y="y", z="z", color="r")
 fig.camera = {"position": [0.5, 2.5, 1.5], "target": [0, 0, 0]}   # any of position, target, up, fov
 fig.observe(lambda change: print(change["new"]["position"]), names="camera")
 fig   # drag in the view: the new camera prints in the kernel
+```
+
+Clicks and box or lasso selections come back too. `on_click` gets the point under the pointer; set `drag_mode` to
+`"box"` or `"lasso"` and a drag selects points, which arrive in the `selection` trait and `on_select` as point indices
+per layer (sent as binary buffers, NumPy `uint32` arrays in Python):
+
+```python
+fig = margo.scatter(df, x="x", y="y", z="z", color="r")
+fig.on_click(lambda event: print(event["hit"]))   # {"layer": 0, "index": 4711, "point": [x, y, z], "value": r} or None
+fig.drag_mode = "lasso"
+fig.on_select(lambda selection: print(df.iloc[selection[0]].describe()))
+fig
 ```
 
 The camera is in scene units (the plot box spans about -1 to 1 on its longest side). `save_html` and `to_png` start
@@ -99,6 +111,10 @@ from it.
 | `fig.save_html(path)` / `fig.to_html()` | a self-contained page with the figure |
 | `fig.to_png(path, width=960, height=None, scale=1, browser=None, timeout=60)` | a PNG image, drawn in a headless Chrome, Edge or Chromium; `height` defaults to the figure's |
 | `fig.show()` | display the figure from anywhere in a cell |
+| `fig.camera` | trait: the view's camera (`position`, `target`, `up`, `fov`); follows the view, and setting it moves the view |
+| `fig.drag_mode` | trait: `"orbit"` (default), `"box"` or `"lasso"` |
+| `fig.selection` | trait: the last selection, `{layer index: point indices}`, or `None` |
+| `fig.on_click(callback, remove=False)` / `fig.on_select(callback, remove=False)` | call `callback(event)` on a click / `callback(selection)` when a selection ends |
 
 Colour maps: `aurora` (default), `ember`, `glacier`, `gray`, `cubehelix`, `coolwarm`, `phase`, `viridis`, `magma`,
 `inferno`, `plasma`, `cividis`, or a list of `"#rrggbb"` stops.

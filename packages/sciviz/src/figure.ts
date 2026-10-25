@@ -8,6 +8,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { ComputeContext } from '@margoengine/compute';
 import type { PointCloud, PointsPlugin } from '@margoengine/points';
 import type { Line, Lines } from '@margoengine/lines';
+import type { OrbitControls } from '@margoengine/controls/orbit';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { Axes, THEMES, type AxesOptions, type Theme } from './axes.js';
 import { ColorBar, type ColorBarOptions } from './colorbar.js';
@@ -230,7 +231,7 @@ export class Figure extends EventTarget {
   #model: Float32Array;
   #bounds: Bounds = [-1, 1, -1, 1, -1, 1];
   #ownsEngine = false;
-  #controls: { enabled: boolean } | undefined;
+  #controls: OrbitControls | undefined;
   #interaction: Interaction<PickResult> | undefined;
   #selection: Selection | undefined;
   // Axis updates run after one another; ready() waits for them and reports their errors.
@@ -329,6 +330,14 @@ export class Figure extends EventTarget {
   /** The last selection, or undefined. */
   get selection(): Selection | undefined {
     return this.#selection;
+  }
+
+  /**
+   * The orbit controls {@link Figure.create} attached (undefined with `controls: false` or {@link Figure.attach}).
+   * Listen for their `change` event to follow the camera.
+   */
+  get controls(): OrbitControls | undefined {
+    return this.#controls;
   }
 
   // Camera clip times the data-to-scene transform, and the canvas size in CSS pixels.
