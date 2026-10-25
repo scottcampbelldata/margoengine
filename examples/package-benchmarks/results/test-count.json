@@ -1,0 +1,16 @@
+{
+  "commit": "8cc9e939",
+  "date": "2026-10-24",
+  "command": "node --experimental-test-module-mocks --test --test-concurrency=4 tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js",
+  "about": "The Node test run of npm run verify, after npm run build:packages. verify also runs the gameplay and voxel sandbox workspace tests (counted separately below).",
+  "node": "v26.12.0",
+  "tests": 5059,
+  "pass": 5059,
+  "fail": 0,
+  "skipped": 0,
+  "todo": 0,
+  "workspaces": {
+    "examples/gameplay-sandbox": { "tests": 10, "pass": 10 },
+    "examples/voxel-sandbox": { "tests": 6, "pass": 6 }
+  }
+}

@@ -95,11 +95,19 @@ in the counts above yet; until they are, this table gives the status of each gro
 
 | Page | Figures | Evidence | Status |
 | --- | --- | --- | --- |
-| engine | Sizes (core, core + stage, packages, brep), the six-request basic page | `entry-sizes.json`, `basic-scene-network.json` at `2ac118cb` | PROVEN |
-| engine | three.js r186 size table | `threejs-size.json` at `80b4a1f`, Margo's side shown at both commits | PROVEN (dated) |
+| engine | Core 20,432 B, core + stage 22,737 B (57,590 raw), 2,263 B under the gate | `entry-sizes.json` at `454df8f3` (dirty: false; the same at `53159fa1`) | PROVEN |
+| engine | 79 packages; `npm i margoengine`; kit sizes (game 288,197, cad 199,438, viz 197,231, web 143,159 B) | `docs/catalog.json`; `docs/guides/kits.md` at `bd8e5a69`, re-measured by `tests/umbrella.test.js` (fails on a 3% move) | PROVEN |
+| engine | Starter first frames: cad 533, web 788, react 835, viz 968, game 1,308 ms (vite dev, packages linked, one run each, RTX A6000 PC) | `examples/package-benchmarks/results/starters-first-frame.json` at `8cc9e939` (`tools/create-margo/test/browser-check.mjs`) | PROVEN (dated, one run) |
+| engine | 5,059 tests | `examples/package-benchmarks/results/test-count.json` at `8cc9e939` | PROVEN |
+| engine | Parity 153 / 4 / 4 of 161 three.js rows | `docs/three-parity-matrix.md` at `bec8b597` | PROVEN |
+| engine | Views and scenes: +867 B gzip | `docs/multi-view-roadmap.md` size table (21,343 at `848555bc` -> 22,210) | PROVEN (dated) |
+| engine | Voxel multiplayer: 900 spread / 350 crowded at 20 ticks per second | `packages/voxel-net/bench/results.json`, `docs/voxel-net-capacity-2026-10-21.md` | PROVEN |
+| engine | 62 visual views, 4 captures each | `tests/visual/profiles/nvidia-ampere-msedge-156` (HANDOFF, 2026-10-24) | PROVEN |
+| engine | About 88% of browsers support WebGPU (85.8% full + 2.02% partial) | external: caniuse.com/webgpu, StatCounter data for September 2026, read 2026-10-24 | external source, dated |
+| engine | brep is MIT; IGES in brep landing; OpenCascade being removed | `packages/brep/package.json` (MIT since `d43ade4d`); the other two are stated as work in progress, with no number | PROVEN / no claim |
 | engine | Kernel scaling, CAD orbit before/after, culling, BVH picks, large coordinates, design-envelope rows | `cad/results-*.json`, `results-scale-node.json`, `large-coordinates-gpu.json`, LIM-001 to LIM-030, DOC-059 | PROVEN (dated) |
-| engine | 51 proofs, 20 ongoing | `proofs/*.proof.js`, the `ongoing` list in `proofs/run.mjs` (the Proofs paragraph below still says 46 and 15) | PROVEN (file counts) |
-| engine | Speed against three.js | none: the page makes no claim and quotes no diagnostic number, only the direction of the busy-machine runs in `boxes-vs-threejs.md` | no claim |
+| engine | 51 proofs, 20 ongoing | `proofs/*.proof.js`, the `ongoing` list in `proofs/run.mjs` | PROVEN (file counts) |
+| engine | Speed against three.js or any other engine | none: the page makes no claim and quotes no comparison number (2026-10-24 refresh dropped the busy-machine direction and the three.js size table) | no claim |
 | voxel | Tracer GPU timings, denoiser error ratios, correctness checks, limits | `packages/voxel-pathtracer/README.md` (measurements in its browser checks; no committed result file) | UNPROVEN |
 | voxel | Sandbox render distance, multiplayer capacity, package sizes | `voxel-sandbox-bench.json`, `packages/voxel-net/bench/results.json`, `entry-sizes.json` | PROVEN |
 | voxel | App tests, denoiser gates, Unity/Godot/Unreal runs, native 4K timing | the Margo Voxel Studio repository's `docs/verification.md` (2026-10-21); raw reports sit in its git-ignored `test-results/` | UNPROVEN |

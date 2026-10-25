@@ -1,0 +1,15 @@
+{
+  "commit": "8cc9e939",
+  "date": "2026-10-25",
+  "command": "node scripts/gpu-lock.mjs run --owner=<id> -- node tools/create-margo/test/browser-check.mjs",
+  "about": "Each Vite starter scaffolded by create-margo, served by vite dev with this checkout's built packages linked (no npm install), opened in headless Edge; times from create to the first drawn frame. One run per template, not a quiet-machine benchmark.",
+  "machine": "AMD Ryzen 9 9950X, NVIDIA RTX A6000, Windows 11, Edge",
+  "templates": {
+    "web": { "createMs": 68, "devServerMs": 50, "firstFrameAfterServerMs": 669, "totalMs": 788 },
+    "game": { "createMs": 101, "devServerMs": 11, "firstFrameAfterServerMs": 1196, "totalMs": 1308 },
+    "cad": { "createMs": 53, "devServerMs": 11, "firstFrameAfterServerMs": 469, "totalMs": 533 },
+    "viz": { "createMs": 54, "devServerMs": 11, "firstFrameAfterServerMs": 902, "totalMs": 968 },
+    "react": { "createMs": 55, "devServerMs": 12, "firstFrameAfterServerMs": 768, "totalMs": 835 }
+  },
+  "notMeasured": "next (type-checked by tests/create-margo.test.js, not opened in a browser by this check)"
+}

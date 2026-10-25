@@ -90,5 +90,23 @@ footer { border-top: 2px solid var(--text); margin-top: 16px; padding-block: 18p
 footer p { margin: 0 0 10px; }
 footer .links { display: flex; flex-wrap: wrap; gap: 6px 18px; }
 @media (max-width: 520px) { h2 { font-size: 1.35rem; } .kv { grid-template-columns: 1fr; } .kv dd { margin-bottom: 8px; } }
+/* Print and PDF (engine.pdf is printed from this): light palette, no site navigation, nothing split across pages. */
+@media print {
+  :root { color-scheme: light; --bg: #ffffff; --surface: #ffffff; --text: #141b2d; --muted: #4a556b; --line: #d5dae4; --accent: #7a4d00; --accent-soft: #f6eddc; --code-bg: #f3f4f7; --code-text: #141b2d; }
+  @page { size: A4; margin: 16mm 15mm; }
+  body { font-size: 10.5pt; }
+  .skip, .nav, .toc { display: none; }
+  .page, footer, .col { max-width: none; padding-inline: 0; }
+  .page { padding-block: 0; }
+  h2 { margin-top: 28px; break-after: avoid; }
+  h3 { break-after: avoid; }
+  .ledger { grid-template-columns: repeat(4, 1fr); }
+  .ledger b { font-size: 1.45rem; }
+  .table, figure, pre, .status, .ledger, li, .src { break-inside: avoid; }
+  pre { border: 1px solid var(--line); white-space: pre-wrap; }
+  .table, .diagram { overflow: visible; }
+  .diagram svg { min-width: 0; }
+  a { color: var(--text); }
+}
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

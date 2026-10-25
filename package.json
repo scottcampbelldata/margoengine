@@ -188,6 +188,7 @@
     "supply-chain": "node scripts/supply-chain.mjs",
     "catalog:build": "node scripts/build-catalog.js",
     "build:site": "npm run catalog:build && node examples/package-benchmarks/entry-sizes.mjs && node scripts/gpu-lock.mjs run --owner=build-site -- npm run test:basic-scene && node scripts/build-site.js",
+    "whitepaper:pdf": "node scripts/whitepaper-pdf.mjs",
     "test:basic-scene": "node scripts/basic-scene-network.mjs",
     "site:check": "node scripts/site-check.mjs",
     "dev:ik": "vite --host 127.0.0.1 --port 5191 --strictPort",
