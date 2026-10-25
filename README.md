@@ -15,7 +15,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core and its own B-rep CAD k
 
 Live demos: [margoengine.com](https://margoengine.com)
 
-The core and the stage together are 22,662 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 22,768 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
 
 ## Quick start
@@ -149,7 +149,7 @@ meshes (no textures, effects or picking).
 
 | Browser | Status |
 | --- | --- |
-| Chrome and Edge (desktop) | Tested. Automated suites run in Chromium, on real GPUs and on SwiftShader in CI. |
+| Chrome and Edge (desktop) | Tested. The browser suites run in Chromium on a real GPU (Intel Arc 140V) and on SwiftShader in the manual browser workflow. |
 | Safari on iPhone | Demos run, checked by hand only. |
 | Safari on macOS | Has WebGPU, not tested. |
 | Firefox | Not tested. |
@@ -161,7 +161,7 @@ meshes (no textures, effects or picking).
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 22,662 B | 57,349 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 22,768 B | 57,596 B |
 
 Measured with `npm run measure:size`, which bundles the entry with esbuild, minified, and gzips it at level 9. CI
 fails if core + stage reaches 25,000 B gzip. Per-package sizes are in
