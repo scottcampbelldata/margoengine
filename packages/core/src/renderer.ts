@@ -213,7 +213,11 @@ export class GPURenderer implements Renderer {
   private readonly culledGroup: GPUBindGroup;
   private disposed = false;
 
-  static async create(canvas: HTMLCanvasElement, features: GPUFeatureName[] = []): Promise<GPURenderer> {
+  static async create(
+    canvas: HTMLCanvasElement,
+    features: GPUFeatureName[] = [],
+    samples: number = sceneSamples(),
+  ): Promise<GPURenderer> {
     const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
     if (!adapter) throw fault('unsupported', 'WebGPU adapter unavailable', 'webgpu');
     const device = await adapter.requestDevice({
@@ -255,7 +259,7 @@ export class GPURenderer implements Renderer {
           depthWriteEnabled: true,
           depthCompare: 'greater-equal',
         },
-        multisample: { count: sceneSamples() },
+        multisample: { count: samples },
       };
       const pipeline = await device.createRenderPipelineAsync(descriptor),
         culled = await device.createRenderPipelineAsync({

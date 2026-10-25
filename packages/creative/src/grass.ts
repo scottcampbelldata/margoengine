@@ -301,7 +301,7 @@ export class GrassField implements EnginePlugin {
     this.pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [layout] });
     this.group = device.createBindGroup({ layout, entries });
     const depthFormat = device.features.has('depth32float-stencil8') ? 'depth32float-stencil8' : 'depth32float';
-    this.variant(this.canvasFormat, sceneSamples(), depthFormat);
+    this.variant(this.canvasFormat, sceneSamples(engine), depthFormat);
   }
 
   registerPasses(graph: FrameGraph): void {

@@ -2,6 +2,7 @@
 import type { EngineKernel, Vec3, VectorRef } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from '@margoengine/core/extension';
 import { readResponse } from '../../shared/loading.js';
+import { sceneSamples } from '../../shared/quality.js';
 import { finiteVector } from '@margoengine/math/validate';
 import { PlanetPass, type PlanetImages, type PlanetPassConfig } from './planet-pass.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -328,6 +329,7 @@ export class Planet implements EnginePlugin {
       navigator.gpu.getPreferredCanvasFormat(),
       device.features.has('depth32float-stencil8') ? 'depth32float-stencil8' : 'depth32float',
       this.config,
+      sceneSamples(this.engine),
     );
   }
 

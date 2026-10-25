@@ -93,6 +93,7 @@ export interface EngineOptions {
     camera?: CameraOptions;
     fallback?: (canvas: HTMLCanvasElement) => Renderer;
     features?: GPUFeatureName[];
+    exactSize?: boolean | readonly [number, number];
 }
 
 export interface EnginePlugin {

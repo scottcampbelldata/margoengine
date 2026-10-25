@@ -122,6 +122,12 @@
       <p><strong>Cause.</strong> <code>render({views})</code> needs a non-empty array of <code>{camera, viewport}</code>. A view target needs 1-sample colour and a depth of the same size. A pass drawing a partial rectangle with extra colour attachments cannot clear them. Draw rectangles are 4 integers inside the target. <code>pick</code> needs finite CSS pixel coordinates.</p>
       <p><strong>Fix.</strong> Pass <code>{camera, viewport}</code> objects; use 1-sample target textures; draw extra attachments with <code>clear: false</code>; keep rectangles inside the target; pass finite numbers to <code>pick</code>.</p>
     </section>
+    <section id="pixel-exact">
+      <h2><a href="#pixel-exact">Pixel-exact backbuffer size</a></h2>
+      <p class="messages"><code>Invalid exactSize</code></p>
+      <p><strong>Cause.</strong> <code>exactSize</code> was an array that is not two whole numbers from 1 to 8192.</p>
+      <p><strong>Fix.</strong> Pass <code>exactSize: [width, height]</code> in backbuffer pixels (for example <code>[320, 180]</code>), or <code>true</code> to keep the canvas <code>width</code> and <code>height</code> attributes. Zoom with CSS: set the canvas size to a whole multiple and <code>image-rendering: pixelated</code>.</p>
+    </section>
     <section id="limits">
       <h2><a href="#limits">Capacity and GPU limits</a></h2>
       <p class="messages"><code>Capacity: 1..8388608</code> <code>Capacity</code> <code>Transform allocation</code> <code>GPU buffer limit</code> <code>Shader limit: 64</code></p>

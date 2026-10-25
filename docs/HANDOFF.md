@@ -2,6 +2,18 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: pixel-exact drawing (`exactSize`)
+
+Core sized the backbuffer from CSS size x pixel ratio and always used 4x MSAA on desktop, so a pixel-art app could
+not draw at an exact size (Margo Pixel draws into a hidden canvas and copies back every frame). `Engine.create(canvas,
+{exactSize: [w, h] | true})` keeps the backbuffer at exactly that size (or the canvas attributes), skips the
+pixel-ratio resize and renders single-sampled; zoom with CSS and `image-rendering: pixelated` (core README, "Pixel-perfect
+rendering"). `sceneSamples(engine)` returns 1 for such an engine, and SceneFade, GrassField and Planet now pass their
+engine, so their pipelines match. An invalid size is a RangeError linked to margoengine.com/errors#pixel-exact.
+Tests: `tests/core-exact-size.test.js`, and `check:views`'s exact section (16 x 8 under a 64 x 32 CSS box, a 1-texel
+checker reads back exactly, a tilted box shows two colours: no MSAA). +101 B (core + stage 22,636 -> 22,737).
+Margo Pixel itself is unchanged (app work).
+
 ## Landed 2026-10-24: one install (`npm i margoengine`)
 
 `margoengine` is now the one-install package: its root is the stage, and every entry of every package is

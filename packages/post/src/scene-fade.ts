@@ -167,7 +167,7 @@ export class SceneFade implements EnginePlugin {
           },
         ],
       },
-      multisample: { count: sceneSamples() },
+      multisample: { count: sceneSamples(this.engine) },
     });
     if (this.disposed) throw margoError('disposed', 'SceneFade was disposed while warming; create a new SceneFade');
     this.pipeline = pipeline;

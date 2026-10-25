@@ -69,6 +69,28 @@ const hit = await engine.pick(400, 300);           // CSS pixel; picks through t
   drawn or set up, `engine.lighting`, `plugins`, `stats` and `createMesh` are that scene's. `scene.dispose()` removes it.
 - Which packages are view-aware: [multi-view-roadmap.md](../../docs/multi-view-roadmap.md).
 
+## Pixel-perfect rendering
+
+By default the backbuffer follows the canvas's CSS size times the device pixel ratio (at most 2, and at most 4096 per
+side) and desktop scenes use 4x MSAA. Pixel art and pixel-perfect 2D need the opposite, so `exactSize` turns both off:
+
+```ts
+import { Engine } from '@margoengine/core';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { exactSize: [320, 180] }); // or `true`: keep canvas.width / height
+canvas.style.width = `${320 * 4}px`; // integer zoom
+canvas.style.height = `${180 * 4}px`;
+canvas.style.imageRendering = 'pixelated'; // nearest-neighbour scaling, no blur
+```
+
+- The backbuffer is exactly the requested size, with no pixel-ratio scaling; change `canvas.width` and `canvas.height`
+  to resize it.
+- Scenes are single-sampled (no MSAA). Packages that build their own pipelines read `sceneSamples(engine)`, so they
+  match.
+- `engine.pick(x, y)` still takes CSS pixels and maps them to backbuffer pixels.
+- The WebGL2 fallback keeps its own context antialiasing; pass `exactSize` to WebGPU engines.
+
 ## Ambient RGB
 
 Extension users can tint core's diffuse ambient independently of the directional light:

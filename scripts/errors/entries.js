@@ -183,6 +183,14 @@ export const entries = [
     fix: 'Pass `{camera, viewport}` objects; use 1-sample target textures; draw extra attachments with `clear: false`; keep rectangles inside the target; pass finite numbers to `pick`.',
   },
   {
+    id: 'pixel-exact',
+    title: 'Pixel-exact backbuffer size',
+    kind: 'family',
+    messages: ['Invalid exactSize'],
+    cause: '`exactSize` was an array that is not two whole numbers from 1 to 8192.',
+    fix: 'Pass `exactSize: [width, height]` in backbuffer pixels (for example `[320, 180]`), or `true` to keep the canvas `width` and `height` attributes. Zoom with CSS: set the canvas size to a whole multiple and `image-rendering: pixelated`.',
+  },
+  {
     id: 'limits',
     title: 'Capacity and GPU limits',
     kind: 'family',

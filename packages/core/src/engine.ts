@@ -29,6 +29,13 @@ export interface EngineOptions {
   fallback?: (canvas: HTMLCanvasElement) => Renderer;
   /** Extra WebGPU features to request when the adapter offers them, e.g. ['timestamp-query'] for Stats GPU timing. */
   features?: GPUFeatureName[];
+  /**
+   * Pixel-exact drawing for pixel art and pixel-perfect 2D: the backbuffer stays exactly `[width, height]` (or, with
+   * `true`, the canvas's own `width` and `height` attributes), with no device-pixel-ratio scaling and no MSAA. Zoom by
+   * an integer with CSS (`width: 4 * w px; image-rendering: pixelated`); `engine.pick` still takes CSS pixels. Set
+   * `canvas.width`/`height` to resize. Default false: the backbuffer follows the CSS size times the pixel ratio.
+   */
+  exactSize?: boolean | readonly [number, number];
 }
 /** Called by the frame loop before each render with the seconds since the previous frame (0 on the first, at most 0.1). */
 export type FrameCallback = (engine: Engine, delta: number) => void;
@@ -414,6 +421,7 @@ export class Engine {
   /** Each scene's `claimed`/`redirect` state of a shared batch, swapped in when that scene draws. */
   private readonly claims = new WeakMap<Batch, Map<Scene, [boolean?, Batch['redirect']?]>>();
   /** @internal Features requested at creation, requested again when the device is restored. */ features?: GPUFeatureName[];
+  /** @internal 1 for `exactSize` (no MSAA, no resize), else undefined (the quality tier's samples). */ exact?: 1;
   get frameGraph(): FrameGraph {
     return this.active.frameGraph;
   }
@@ -432,13 +440,20 @@ export class Engine {
     if (!canvas || typeof canvas.getContext !== 'function') throw typeError('Expected canvas', 'arguments');
     const backend = options.backend ?? 'auto';
     if (!['auto', 'webgpu', 'webgl2'].includes(backend)) throw typeError('Unknown backend', 'arguments');
+    const size = options.exactSize,
+      exact = size ? 1 : undefined;
+    if (Array.isArray(size)) {
+      if (size.length !== 2 || !size.every((v) => Number.isInteger(v) && v > 0 && v <= 8192))
+        throw rangeError('Invalid exactSize', 'pixel-exact');
+      [canvas.width, canvas.height] = size;
+    }
     const store = await TransformStore.create(options.capacity ?? 1024);
     let renderer: Renderer | undefined,
       fallbackReason: string | null = null;
     try {
       if (backend !== 'webgl2')
         try {
-          renderer = await GPURenderer.create(canvas, options.features);
+          renderer = await GPURenderer.create(canvas, options.features, exact);
         } catch (error) {
           if (backend === 'webgpu') throw error;
           fallbackReason = String(error);
@@ -451,6 +466,7 @@ export class Engine {
       )(canvas);
       const engine = new Engine(canvas, store, renderer, options.camera, fallbackReason);
       engine.features = options.features;
+      engine.exact = exact;
       return engine;
     } catch (error) {
       renderer?.dispose();
@@ -482,7 +498,7 @@ export class Engine {
     if (this.recovery) return this.recovery;
     this.recovery = (async () => {
       const previous = this.renderer,
-        next = await GPURenderer.create(this.canvas, this.features);
+        next = await GPURenderer.create(this.canvas, this.features, this.exact);
       if (this.disposed || this.disposing) {
         next.dispose();
         return;
@@ -891,6 +907,7 @@ export class Engine {
     );
   }
   private resize(): void {
+    if (this.exact) return; // exactSize: the caller owns canvas.width and canvas.height
     // Avoid multiplying desktop 4x MSAA by another 4x in HiDPI backing pixels; the light tier caps DPR at margoLow.
     const dpr = Math.min(globalThis.devicePixelRatio ?? 1, globalThis.margoLow || 2, 4 / sceneSamples()),
       width = Math.max(1, Math.min(4096, Math.round(this.canvas.clientWidth * dpr) || this.canvas.width)),

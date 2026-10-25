@@ -720,6 +720,71 @@ try {
   );
   assert.ok(preview.centerDepth > 0 && preview.cornerDepth === 0, 'the caller depth holds the item and nothing else');
 
+  // exactSize (pixel-exact drawing): a 16 x 8 backbuffer under a 64 x 32 CSS box keeps exactly 16 x 8, draws a
+  // 1-texel checker of per-pixel views back exactly, and has no MSAA (a tilted box's edges show only two colours).
+  const exact = await page.evaluate(async () => {
+    const { EngineKernel, box } = await import('/packages/core/dist/index.js');
+    const { Camera } = await import('/packages/core/dist/extension.js');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width:64px;height:32px;image-rendering:pixelated';
+    document.body.append(canvas);
+    const engine = await EngineKernel.create(canvas, {
+        backend: 'webgpu',
+        exactSize: [16, 8],
+        camera: { position: [0, 0, 6], target: [0, 0, 0] },
+      }),
+      read = () => {
+        const copy = document.createElement('canvas');
+        copy.width = canvas.width;
+        copy.height = canvas.height;
+        const context = copy.getContext('2d');
+        context.drawImage(canvas, 0, 0);
+        return context.getImageData(0, 0, copy.width, copy.height).data;
+      };
+    try {
+      const camera = new Camera({ position: [0, 0, 6], target: [0, 0, 0] }),
+        views = [];
+      for (let y = 0; y < 8; y++)
+        for (let x = 0; x < 16; x++)
+          views.push({
+            camera,
+            viewport: [x, y, 1, 1],
+            pixels: true,
+            clear: { color: (x + y) % 2 ? '#0000ff' : '#ff0000' },
+          });
+      engine.render({ views });
+      const checker = read();
+      let wrong = 0;
+      for (let y = 0; y < 8; y++)
+        for (let x = 0; x < 16; x++) {
+          const i = (y * 16 + x) * 4,
+            blue = (x + y) % 2 === 1;
+          if (checker[i] !== (blue ? 0 : 255) || checker[i + 2] !== (blue ? 255 : 0) || checker[i + 1] !== 0) wrong++;
+        }
+      const mesh = engine
+        .createMesh()
+        .setGeometry(box(3, 3, 0.1))
+        .setRotation([0, 0, 0.5]);
+      mesh.material.set({ color: '#ffffff', roughness: 1 });
+      engine.scene.background = '#000000';
+      engine.render();
+      const colors = new Set(),
+        edge = read();
+      for (let i = 0; i < edge.length; i += 4) colors.add(`${edge[i]},${edge[i + 1]},${edge[i + 2]}`);
+      return { width: canvas.width, height: canvas.height, wrong, colors: colors.size };
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  });
+  assert.deepEqual(
+    [exact.width, exact.height],
+    [16, 8],
+    'exactSize keeps the backbuffer at 16 x 8 under a 64 x 32 CSS box',
+  );
+  assert.equal(exact.wrong, 0, 'the 1-texel checker reads back exactly');
+  assert.equal(exact.colors, 2, 'no MSAA: a tilted box shows only its face colour and the background');
+
   // The multi-view demos (examples/cad-views, split-screen, minimap) held still by reduced motion: picks through each
   // view hit what that view shows, a mesh on a layer a view leaves out is never picked through it, and the frame time
   // (median of 60 frames, each awaited on the GPU) is recorded.
@@ -789,7 +854,7 @@ try {
     assert.deepEqual(errors.slice(before), [], `${file}: no page errors`);
   }
 
-  const report = { hardware, scenes, postfx, temporal, water, preview, demos };
+  const report = { hardware, scenes, postfx, temporal, water, preview, exact, demos };
   await writeFile('test-results/views-browser.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {

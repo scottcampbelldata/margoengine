@@ -45,7 +45,6 @@ export class PlanetPass {
   private readonly surfaceDescriptor: GPURenderPassDescriptor;
   private readonly shellDescriptor: GPURenderPassDescriptor;
   private disposed = false;
-  private readonly samples = sceneSamples();
   private views: GPUTextureView[] = [];
   private sampler?: GPUSampler;
   private surfaceModule?: GPUShaderModule;
@@ -57,6 +56,7 @@ export class PlanetPass {
     private readonly format: GPUTextureFormat,
     private readonly depthFormat: GPUTextureFormat,
     config: PlanetPassConfig,
+    private readonly samples: number = sceneSamples(),
   ) {
     finiteVector(config.atmosphereColor, 3, 'Planet atmosphere color');
     if (
