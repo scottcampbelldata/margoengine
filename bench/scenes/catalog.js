@@ -305,7 +305,147 @@ export const SCENES = {
     params: { n: 1000 },
     data: (p) => boxes(p.n),
   },
+  ...computeScenes(),
+  ...vizScenes(),
 };
+
+/**
+ * GPU compute task scenes (bench/suites/compute.mjs). Each call queues the job on inputs already in GPU memory and
+ * waits until the GPU has finished it (no read-back). `work(params)` is the job's size in the unit its rate is quoted
+ * in, so every engine is judged on the same amount of work.
+ */
+function computeScenes() {
+  const floats = (n, seed) => {
+    const pick = random(seed),
+      out = new Float32Array(n);
+    for (let i = 0; i < n; i++) out[i] = pick() * 2 - 1;
+    return out;
+  };
+  const task = (title, draws, n, work, data) => ({
+    kind: 'task',
+    suite: 'data',
+    title,
+    draws,
+    measures: ['taskMs (queue + GPU finish, inputs on the GPU)', 'coldMs (first call: shader compile)'],
+    params: { n },
+    work,
+    data,
+  });
+  const bytes = (per) => (p) => ({ amount: p.n * per, unit: 'GB/s', scale: 1e9 });
+  return {
+    'compute-sort': task(
+      'Sort',
+      'One call sorts n f32 keys (uniform in [-1, 1)) ascending into a new array. Rate: keys per second.',
+      1 << 20,
+      (p) => ({ amount: p.n, unit: 'Mkeys/s', scale: 1e6 }),
+      (p) => ({ values: floats(p.n, 101) }),
+    ),
+    'compute-scan': task(
+      'Prefix sum',
+      'One call computes the inclusive prefix sum of n f32 values into a new array. Rate: 8n bytes (read + write).',
+      1 << 20,
+      bytes(8),
+      (p) => ({ values: floats(p.n, 102) }),
+    ),
+    'compute-reduce': task(
+      'Sum',
+      'One call sums n f32 values to one value. Rate: 4n bytes read.',
+      1 << 20,
+      bytes(4),
+      (p) => ({ values: floats(p.n, 103) }),
+    ),
+    'compute-histogram': task(
+      'Histogram',
+      'One call counts n f32 values into 256 equal bins over [-1, 1]. Rate: 4n bytes read.',
+      1 << 20,
+      bytes(4),
+      (p) => ({ values: floats(p.n, 104), bins: 256, range: [-1, 1] }),
+    ),
+    'compute-random': task(
+      'Random normals',
+      'One call draws n standard normal f32 samples (counter-based generator, fixed seed). Rate: 4n bytes written.',
+      1 << 20,
+      bytes(4),
+      () => ({ seed: 42 }),
+    ),
+    'compute-matmul': task(
+      'Matrix product',
+      'One call multiplies two n x n f32 matrices (entries uniform in [-1, 1)). Rate: 2n^3 floating-point operations.',
+      1024,
+      (p) => ({ amount: 2 * p.n ** 3, unit: 'GFLOP/s', scale: 1e9 }),
+      (p) => ({ a: floats(p.n * p.n, 105), b: floats(p.n * p.n, 106) }),
+    ),
+    'compute-fft': task(
+      'FFT',
+      'One call takes the complex FFT of n real f32 samples (n a power of two). Rate: the conventional 5 n log2(n) ' +
+        'operations of a complex FFT.',
+      1 << 20,
+      (p) => ({ amount: 5 * p.n * Math.log2(p.n), unit: 'GFLOP/s', scale: 1e9 }),
+      (p) => ({ values: floats(p.n, 107) }),
+    ),
+  };
+}
+
+/** Data visualisation frame scenes (bench/suites/viz.mjs): one figure, the camera circling it. */
+function vizScenes() {
+  const camera = orbit(3.9, 1.7, 100, 0.01);
+  const frame = (title, draws, n, data) => ({
+    suite: 'data',
+    title,
+    draws,
+    measures: ['buildMs (data to first figure)', 'cpuMs', 'gpuMs', 'fps'],
+    params: { n },
+    data: (p) => ({ ...data(p), camera }),
+  });
+  return {
+    'viz-scatter': frame(
+      'Scatter plot',
+      'n points in a 3D scatter plot coloured by a colour map (a noisy helix), with axes; level of detail off ' +
+        '(the point budget covers every point).',
+      1_000_000,
+      (p) => {
+        const pick = random(201),
+          x = new Float32Array(p.n),
+          y = new Float32Array(p.n),
+          z = new Float32Array(p.n);
+        for (let i = 0; i < p.n; i++) {
+          const t = (i / p.n) * 40;
+          x[i] = Math.cos(t) * (1 + 0.3 * pick());
+          y[i] = Math.sin(t) * (1 + 0.3 * pick());
+          z[i] = t / 40 + 0.05 * pick();
+        }
+        return { x, y, z };
+      },
+    ),
+    'viz-surface': frame(
+      'Surface plot',
+      'An n x n height field (sin x cos y ripples) coloured by height with 12 contour lines, with axes.',
+      1024,
+      (p) => {
+        const z = new Float32Array(p.n * p.n);
+        for (let j = 0; j < p.n; j++)
+          for (let i = 0; i < p.n; i++) z[j * p.n + i] = Math.sin(i / (p.n / 12)) * Math.cos(j / (p.n / 9));
+        return { z };
+      },
+    ),
+    'viz-volume': frame(
+      'Volume rendering',
+      'An n^3 scalar field (a Gaussian blob with ripples) ray-marched with a colour map and opacity ramp, with axes.',
+      128,
+      (p) => {
+        const v = new Float32Array(p.n ** 3),
+          h = p.n / 2;
+        for (let k = 0; k < p.n; k++)
+          for (let j = 0; j < p.n; j++)
+            for (let i = 0; i < p.n; i++) {
+              const r = Math.hypot(i - h, j - h, k - h) / h;
+              v[(k * p.n + j) * p.n + i] = Math.exp(-3 * r * r) * (0.75 + 0.25 * Math.cos(r * 12));
+            }
+        return { values: v };
+      },
+    ),
+  };
+}
 
 // The parity scenes (docs/whitepaper/perf-vs-threejs.md), built from the helpers above.
 Object.assign(SCENES, parityScenes({ PALETTE, boxes, orbit, random, yard }));
@@ -358,6 +498,22 @@ export const STANDARD = {
     { scene: 'helmet' },
   ],
   react: [{ scene: 'react', params: { n: 1000 } }],
+  compute: [
+    ...[1 << 16, 1 << 20, 1 << 22].map((n) => ({ scene: 'compute-sort', params: { n } })),
+    ...[1 << 20, 1 << 24].flatMap((n) =>
+      ['compute-scan', 'compute-reduce', 'compute-histogram', 'compute-random'].map((scene) => ({
+        scene,
+        params: { n },
+      })),
+    ),
+    ...[256, 1024, 2048].map((n) => ({ scene: 'compute-matmul', params: { n } })),
+    ...[1 << 16, 1 << 20, 1 << 22].map((n) => ({ scene: 'compute-fft', params: { n } })),
+  ],
+  viz: [
+    ...[100_000, 1_000_000, 4_000_000].map((n) => ({ scene: 'viz-scatter', params: { n } })),
+    ...[256, 1024].map((n) => ({ scene: 'viz-surface', params: { n } })),
+    ...[64, 128].map((n) => ({ scene: 'viz-volume', params: { n } })),
+  ],
 };
 
 /** Parameters with the scene defaults filled in. */

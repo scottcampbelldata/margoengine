@@ -14,6 +14,7 @@ an earlier run or commit and fails when something got slower. The same scenes ru
 - [The browser runner](#the-browser-runner)
 - [Comparing engines](#comparing-engines)
 - [Task scenes](#task-scenes)
+- [GPU compute](#gpu-compute)
 - [The three.js parity matrix](#the-threejs-parity-matrix)
 - [Adding a suite](#adding-a-suite)
 - [Adding a scene](#adding-a-scene)
@@ -88,8 +89,8 @@ The tool takes the lock itself when it is not wrapped, so both forms are safe.
 | `voxel` | Node and browser | Fill a 256 x 64 x 256 terrain, mesh its 128 chunks, 10,000 voxel raycasts, then the voxel sandbox at render distance 8. |
 | `physics` | Node | Rapier steps for 1,000 and 5,000 boxes, and the machinery conveyor solver for 500 parts. |
 | `memory` | Node and browser | Heap and kernel memory per 100,000 meshes, then JS heap and live GPU memory after the boxes, instances and helmet scenes. |
-| `compute` | | A stub. It fills in when the data track lands its compute kernels. |
-| `viz` | | A stub. It fills in when the data track lands its charts and plots. |
+| `compute` | browser | `@margoengine/compute`: sort (2^16 to 2^22 keys), prefix sum, sum, histogram and random normals (2^20 and 2^24 values), matrix products (256 to 2048) and FFTs (2^16 to 2^22 points), as task scenes. GPU time, wall time and throughput (see [GPU compute](#gpu-compute)). |
+| `viz` | browser | `@margoengine/sciviz` figures with axes: scatter plots of 100,000 to 4,000,000 points, surfaces of 256^2 and 1024^2, volumes of 64^3 and 128^3. |
 | `react` | browser | Mount 1,000 boxes declared with `@margoengine/react`, then re-render all of them every frame. |
 | `claims` | engine-bench | Opt-in: each other engine's own harness, recorded beside the shared scenes (see [Comparing engines](#comparing-engines)). |
 | `parity` | browser | Opt-in: one scene per row of `docs/threejs-parity.md` that three.js also has (`bench/scenes/parity.js`), run in Margo and in the three.js adapters in engine-bench (`three-webgpu-parity`, `three-webgl-parity`). `npm run bench:parity` runs it and `bench/parity-report.mjs` adds the results to [the speed matrix](whitepaper/perf-vs-threejs.md). |
@@ -283,7 +284,81 @@ build, a raycast batch. The engine's `create()` returns `{task(i), output()}`. T
 `bench/scenes/harness.js`) times the first call alone (`coldMs`), throws away `taskWarmup` calls (default 3), then
 measures up to `taskIterations` calls (default 30) within `maxPhaseMs`. `taskMs` is their median. `output()` returns
 counts such as vertices or hits, so engines can be checked for doing the same job. Inputs are fetched in `create()`,
-outside the timing.
+outside the timing. An engine that can time its own GPU work may also return `gpuTimes(calls)`, resolving the GPU
+milliseconds of that many further calls; the harness records their median as `taskGpuMs`, after the timed calls.
+
+## GPU compute
+
+The `compute` suite runs `@margoengine/compute` jobs as task scenes (`bench/scenes/catalog.js` `computeScenes`,
+Margo's code in `bench/scenes/margo-data.js`). Inputs are uploaded before timing. Each call queues one job and waits
+for the GPU to finish it, without reading the result back. Every case records:
+
+- `taskMs`: the wall-clock time of one call;
+- `taskGpuMs`: the sum of the job's GPU pass times, from timestamp queries (`gpu.profile`);
+- `rate`: the job's size over `taskGpuMs`, in GB/s (bytes the job must read and write), GFLOP/s (2n^3 for a matrix
+  product, the conventional 5 n log2 n for an FFT) or Mkeys/s (sorts);
+- `wallRate`: the same size over `taskMs`.
+
+Only `taskGpuMs` decides whether a run is valid. Chromium reports finished GPU work in one of two ways, which makes
+`taskMs` bimodal:
+
+- About 0.3 ms after the work ends, when the work finished before the error-scope round trip that Margo's waits make
+  first. Short jobs land here.
+- About 3 ms later otherwise. A plain page waiting with `onSubmittedWorkDone` or `mapAsync` always sees this delay.
+
+We found this with the first version of this suite and fixed what Margo controls: compute waits now ask for
+completion only after an error-scope round trip. Before the fix, every wait cost about 3 ms. A 256^3 matrix product
+took 3.0 ms of wall time for 0.04 ms on the GPU; it now takes 0.37 ms. Jobs that run longer than the round trip still
+see Chromium's later report, so their `wallRate` sits well below their `rate`. Both are published.
+
+Results on an NVIDIA RTX A6000 (headless Edge 156, Windows 11), run `20261025-220210-ce4d6f8f-official` (in
+`benchmarks/records/`), `--label=official`, 5 runs each, medians:
+
+| Case | GPU ms | Rate | Wall ms | Wall rate |
+| --- | --- | --- | --- | --- |
+| sort-65536 | 0.172 | 381 Mkeys/s | 4.03 | 16.3 Mkeys/s |
+| sort-1048576 | 0.912 | 1,150 Mkeys/s | 4.07 | 258 Mkeys/s |
+| sort-4194304 | 3.123 | 1,343 Mkeys/s | 7.47 | 561 Mkeys/s |
+| scan-1048576 | 0.043 | 195 GB/s | 0.54 | 15.7 GB/s |
+| reduce-1048576 | 0.011 | 381 GB/s | 0.39 | 10.9 GB/s |
+| histogram-1048576 | 0.036 | 117 GB/s | 0.46 | 9.1 GB/s |
+| random-1048576 | 0.042 | 99.9 GB/s | 0.41 | 10.4 GB/s |
+| scan-16777216 | 0.573 | 234 GB/s | 5.89 | 22.8 GB/s |
+| reduce-16777216 | 0.102 | 658 GB/s | 3.02 | 22.2 GB/s |
+| histogram-16777216 | 0.329 | 204 GB/s | 3.07 | 21.9 GB/s |
+| random-16777216 | 0.599 | 112 GB/s | 5.50 | 12.2 GB/s |
+| matmul-256 | 0.043 | 780 GFLOP/s | 0.45 | 74.6 GFLOP/s |
+| matmul-1024 | 0.328 | 6,547 GFLOP/s | 3.00 | 715 GFLOP/s |
+| matmul-2048 | 2.151 | 7,987 GFLOP/s | 4.06 | 4,231 GFLOP/s |
+| fft-65536 | 0.058 | 90.4 GFLOP/s | 0.69 | 7.5 GFLOP/s |
+| fft-1048576 | 0.642 | 163 GFLOP/s | 3.73 | 28.1 GFLOP/s |
+| fft-4194304 | 2.696 | 171 GFLOP/s | 10.20 | 45.2 GFLOP/s |
+
+What these numbers show, losses included:
+
+- Wall time is far above GPU time for every job here: from 0.4 ms for the smallest to 3 to 7 ms for anything that
+  outlasts the round trip. An application that waits for each result pays that; one that queues work and reads
+  results later does not.
+- The sum of 2^24 values reads at 658 GB/s, close to the A6000's 768 GB/s. The prefix sum of 2^24 values reaches
+  234 GB/s, a third of that: its three passes over the data each read and write it. The random generator writes at
+  112 GB/s, limited by the Philox arithmetic rather than memory.
+- The matrix product reaches 8.0 TFLOP/s at 2048^3, about a fifth of the card's 38.7 TFLOP/s f32 peak.
+- The FFT of 2^22 points runs at 171 GFLOP/s; each of its 22 radix-2 passes goes through memory.
+
+The `viz` suite on the same run (`@margoengine/sciviz` figures with axes, camera orbiting):
+
+| Case | Build ms | CPU ms per frame | GPU ms per frame | fps |
+| --- | --- | --- | --- | --- |
+| scatter-100000 | 31 | 0.120 | 0.079 | 1,869 |
+| scatter-1000000 | 118 | 0.115 | 0.743 | 1,116 |
+| scatter-4000000 | 482 | 0.155 | 3.389 | 291 |
+| surface-256 | 11 | 0.105 | 0.045 | 1,953 |
+| surface-1024 | 14 | 0.100 | 0.577 | 1,485 |
+| volume-64 | 75 | 0.105 | 0.388 | 1,845 |
+| volume-128 | 525 | 0.105 | 0.776 | 1,119 |
+
+Other compute libraries join through engine-bench as other engines do ([Comparing engines](#comparing-engines)).
+None is set up yet, so these numbers have no comparison yet.
 
 ## The three.js parity matrix
 

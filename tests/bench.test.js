@@ -79,6 +79,16 @@ test('bench scenes: every standard case names a scene, ids are stable, data is d
     assert.deepEqual(JSON.stringify(a), JSON.stringify(b), scene);
   }
   assert.equal((await SCENES.lights.data(sceneParams('lights'), env)).lights.length, 64);
+  // Data scenes: deterministic inputs, and a work size for every compute task (the throughput metric divides by it).
+  for (const scene of Object.keys(SCENES).filter((s) => SCENES[s].suite === 'data')) {
+    const p = sceneParams(scene, { n: scene === 'viz-volume' ? 4 : 16 });
+    assert.deepEqual(
+      JSON.stringify(await SCENES[scene].data(p, env)),
+      JSON.stringify(await SCENES[scene].data(p, env)),
+    );
+    if (SCENES[scene].kind === 'task') assert.ok(SCENES[scene].work(p).amount > 0, scene);
+  }
+  assert.deepEqual(SCENES['compute-matmul'].work({ n: 10 }), { amount: 2000, unit: 'GFLOP/s', scale: 1e9 });
   assert.equal((await SCENES.gltf.data(sceneParams('gltf'), env)).url, '/a/scifi-helmet.glb');
 });
 

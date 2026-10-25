@@ -272,7 +272,8 @@ async function webglTimes(app, frames, next) {
  * A task scene (kind: 'task' in the catalog): no frames, one job timed per call. `app.task(i)` does the job once (may
  * return a promise); the first call is timed alone (coldMs), then taskWarmup calls are thrown away and up to
  * taskIterations calls (within maxPhaseMs) are measured. `app.output?.()` describes what the job produced (counts,
- * bounds), so engines can be checked for doing the same job.
+ * bounds), so engines can be checked for doing the same job. `app.gpuTimes?.(calls)` may resolve the GPU milliseconds
+ * of that many further calls (timestamp queries), recorded as task.gpuMs.
  */
 async function runTask(app, result) {
   const call = async (i) => {
@@ -287,6 +288,9 @@ async function runTask(app, result) {
   for (let i = 0; i < options.taskIterations && performance.now() - start < options.maxPhaseMs; i++)
     times.push(await call(options.taskWarmup + 1 + i));
   result.task.ms = stat(times);
+  // GPU time per call, from the engine's own timestamp queries when it has them (compute tasks): measured after the
+  // wall-clock calls, so profiling never slows those down.
+  if (app.gpuTimes) result.task.gpuMs = stat(await app.gpuTimes(Math.max(5, times.length)));
   result.task.output = (await app.output?.()) ?? null;
 }
 

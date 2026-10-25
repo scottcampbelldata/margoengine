@@ -19,6 +19,8 @@ export const scenes = [
   'gltf',
   'helmet',
   'react',
+  // Data scenes (compute tasks and figures); each is built in ./margo-data.js.
+  ...Object.keys(SCENES).filter((id) => SCENES[id].suite === 'data'),
   // Every parity scene (./parity.js); each is built in ./parity/margo-<area>.js.
   ...Object.keys(SCENES).filter((id) => SCENES[id].area),
 ];
@@ -433,7 +435,10 @@ async function culledBoxes(canvas, data, marks, { n, move }) {
 export async function create(canvas, { scene, params, data }, marks) {
   // Parity scenes (./parity.js) are built in ./parity/margo-<area>.js, loaded only for the scene that runs.
   const area = SCENES[scene]?.area,
-    build = builders[scene] ?? (area && (await import(`./parity/margo-${area}.js`)).builders[scene]);
+    build =
+      builders[scene] ||
+      (SCENES[scene]?.suite === 'data' && (await import('./margo-data.js')).builders[scene]) ||
+      (area && (await import(`./parity/margo-${area}.js`)).builders[scene]);
   if (!build) throw new Error(`margo: no implementation of scene ${scene}`);
   return build(canvas, data, marks, params);
 }

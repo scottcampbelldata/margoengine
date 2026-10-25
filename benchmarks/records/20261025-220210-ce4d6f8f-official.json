@@ -1,0 +1,4569 @@
+{
+ "schema": "margo-bench/1",
+ "id": "20261025-220210-ce4d6f8f-official",
+ "label": "official",
+ "date": "2026-10-25T22:02:10.278Z",
+ "valid": true,
+ "invalid": [],
+ "options": {
+  "runs": 5,
+  "warmup": 1,
+  "frames": 300,
+  "noise": 0.1,
+  "threshold": 0.05,
+  "engines": [
+   "margo"
+  ],
+  "suites": [
+   "compute",
+   "viz"
+  ],
+  "cases": null
+ },
+ "env": {
+  "host": {
+   "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+   "cores": 32,
+   "memoryGB": 94,
+   "os": "win32",
+   "osRelease": "10.0.26300",
+   "osVersion": "Windows 11 Pro",
+   "node": "v26.12.0"
+  },
+  "gpu": [
+   {
+    "name": "NVIDIA RTX A6000",
+    "driver": "617.42",
+    "utilizationPercent": 0,
+    "source": "nvidia-smi"
+   }
+  ],
+  "machine": "e69318ab6f",
+  "engine": {
+   "name": "margo",
+   "version": "1.0.0",
+   "commit": "ce4d6f8f",
+   "commitFull": "ce4d6f8f7ec0ac19511eb6db4e9a6b525a582fa5",
+   "branch": "worktree-agent-a18647501a8c5d639",
+   "dirty": false
+  },
+  "browser": {
+   "browser": {
+    "name": "chromium",
+    "channel": "msedge",
+    "version": "156.0.4314.42"
+   },
+   "webgpu": {
+    "vendor": "nvidia",
+    "architecture": "ampere",
+    "device": "0x2230",
+    "description": "NVIDIA RTX A6000",
+    "fallback": false
+   },
+   "webgl": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0"
+  }
+ },
+ "gate": {
+  "ac": true,
+  "lock": {
+   "held": "by the wrapping gpu-lock run",
+   "dir": "<main checkout>/test-results/gpu.lock"
+  },
+  "quiet": {
+   "ac": true,
+   "cpuLoadPercent": 1,
+   "waitedSeconds": 30,
+   "checkedAt": "2026-10-25T22:02:41.609Z",
+   "topProcesses": [
+    {
+     "Name": "claude",
+     "Id": 104792,
+     "cpuSeconds": 141521
+    },
+    {
+     "Name": "chrome",
+     "Id": 13592,
+     "cpuSeconds": 16350
+    },
+    {
+     "Name": "blender",
+     "Id": 13964,
+     "cpuSeconds": 13251
+    },
+    {
+     "Name": "chrome",
+     "Id": 41212,
+     "cpuSeconds": 4867
+    },
+    {
+     "Name": "claude",
+     "Id": 93220,
+     "cpuSeconds": 4727
+    },
+    {
+     "Name": "chrome",
+     "Id": 31380,
+     "cpuSeconds": 3992
+    },
+    {
+     "Name": "expressvpn-client",
+     "Id": 33888,
+     "cpuSeconds": 3618
+    },
+    {
+     "Name": "OneDrive.Sync.Service",
+     "Id": 35272,
+     "cpuSeconds": 3584
+    }
+   ],
+   "gpu": {
+    "checked": true,
+    "utilizationPercent": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "rules": {
+   "quietMax": 20,
+   "quietHold": 20,
+   "gpuMax": 20,
+   "timeout": 1800
+  }
+ },
+ "suites": {
+  "compute": {
+   "title": "GPU compute: sort, scan, reduce, histogram, random, matmul, FFT",
+   "uses": "gpu",
+   "status": "ok",
+   "cases": {
+    "compute-sort-65536": {
+     "title": "Sort n=65536",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        4.025,
+        4.135,
+        4.15,
+        4.005,
+        4.015
+       ],
+       "n": 5,
+       "median": 4.025,
+       "p95": 4.15,
+       "min": 4.005,
+       "max": 4.15,
+       "mean": 4.066,
+       "spread": 0.036,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.172,
+        0.172,
+        0.171,
+        0.172,
+        0.173
+       ],
+       "n": 5,
+       "median": 0.172,
+       "p95": 0.173,
+       "min": 0.171,
+       "max": 0.173,
+       "mean": 0.172,
+       "spread": 0.0116,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        59.895,
+        54.63,
+        56,
+        57.255,
+        53.94
+       ],
+       "n": 5,
+       "median": 56,
+       "p95": 59.895,
+       "min": 53.94,
+       "max": 59.895,
+       "mean": 56.344,
+       "spread": 0.1063,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        26.9,
+        27.8,
+        27.4,
+        26.3,
+        26.7
+       ],
+       "n": 5,
+       "median": 26.9,
+       "p95": 27.8,
+       "min": 26.3,
+       "max": 27.8,
+       "mean": 27.02,
+       "spread": 0.0558,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        2,
+        2.1,
+        2.3,
+        2.1,
+        1.7
+       ],
+       "n": 5,
+       "median": 2.1,
+       "p95": 2.3,
+       "min": 1.7,
+       "max": 2.3,
+       "mean": 2.04,
+       "spread": 0.2857,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "Mkeys/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        381.02,
+        381.02,
+        383.25,
+        381.02,
+        378.82
+       ],
+       "n": 5,
+       "median": 381.02,
+       "p95": 383.25,
+       "min": 378.82,
+       "max": 383.25,
+       "mean": 381.026,
+       "spread": 0.0116,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "Mkeys/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        16.28,
+        15.85,
+        15.79,
+        16.36,
+        16.32
+       ],
+       "n": 5,
+       "median": 16.28,
+       "p95": 16.36,
+       "min": 15.79,
+       "max": 16.36,
+       "mean": 16.12,
+       "spread": 0.035,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 2,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 65536,
+       "check": {
+        "ordered": true,
+        "first": -0.999951,
+        "last": 0.999979
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js"
+      ]
+     }
+    },
+    "compute-sort-1048576": {
+     "title": "Sort n=1048576",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        4.06,
+        4.07,
+        4.075,
+        4.08,
+        4.04
+       ],
+       "n": 5,
+       "median": 4.07,
+       "p95": 4.08,
+       "min": 4.04,
+       "max": 4.08,
+       "mean": 4.065,
+       "spread": 0.0098,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.912,
+        0.912,
+        0.912,
+        0.912,
+        0.912
+       ],
+       "n": 5,
+       "median": 0.912,
+       "p95": 0.912,
+       "min": 0.912,
+       "max": 0.912,
+       "mean": 0.912,
+       "spread": 0,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        56.645,
+        57.03,
+        59.885,
+        55.83,
+        56.345
+       ],
+       "n": 5,
+       "median": 56.645,
+       "p95": 59.885,
+       "min": 55.83,
+       "max": 59.885,
+       "mean": 57.147,
+       "spread": 0.0716,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        27,
+        26.9,
+        27.2,
+        27.3,
+        25.8
+       ],
+       "n": 5,
+       "median": 27,
+       "p95": 27.3,
+       "min": 25.8,
+       "max": 27.3,
+       "mean": 26.84,
+       "spread": 0.0556,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.8,
+        3.6,
+        3.8,
+        3.5,
+        4.1
+       ],
+       "n": 5,
+       "median": 3.8,
+       "p95": 4.1,
+       "min": 3.5,
+       "max": 4.1,
+       "mean": 3.76,
+       "spread": 0.1579,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "Mkeys/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1149.75,
+        1149.75,
+        1149.75,
+        1149.75,
+        1149.75
+       ],
+       "n": 5,
+       "median": 1149.75,
+       "p95": 1149.75,
+       "min": 1149.75,
+       "max": 1149.75,
+       "mean": 1149.75,
+       "spread": 0,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "Mkeys/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        258.27,
+        257.64,
+        257.32,
+        257,
+        259.55
+       ],
+       "n": 5,
+       "median": 257.64,
+       "p95": 259.55,
+       "min": 257,
+       "max": 259.55,
+       "mean": 257.956,
+       "spread": 0.0099,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 4,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 1048576,
+       "check": {
+        "ordered": true,
+        "first": -0.999999,
+        "last": 1
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js"
+      ]
+     }
+    },
+    "compute-sort-4194304": {
+     "title": "Sort n=4194304",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        7.49,
+        7.395,
+        7.47,
+        7.575,
+        7.45
+       ],
+       "n": 5,
+       "median": 7.47,
+       "p95": 7.575,
+       "min": 7.395,
+       "max": 7.575,
+       "mean": 7.476,
+       "spread": 0.0241,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        3.116,
+        3.123,
+        3.124,
+        3.123,
+        3.124
+       ],
+       "n": 5,
+       "median": 3.123,
+       "p95": 3.124,
+       "min": 3.116,
+       "max": 3.124,
+       "mean": 3.122,
+       "spread": 0.0026,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        57.945,
+        56.57,
+        59.32,
+        56.945,
+        66.325
+       ],
+       "n": 5,
+       "median": 57.945,
+       "p95": 66.325,
+       "min": 56.57,
+       "max": 66.325,
+       "mean": 59.421,
+       "spread": 0.1683,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        27.8,
+        28.2,
+        31,
+        26.6,
+        28
+       ],
+       "n": 5,
+       "median": 28,
+       "p95": 31,
+       "min": 26.6,
+       "max": 31,
+       "mean": 28.32,
+       "spread": 0.1571,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        12.4,
+        12.2,
+        14.1,
+        12.1,
+        12.9
+       ],
+       "n": 5,
+       "median": 12.4,
+       "p95": 14.1,
+       "min": 12.1,
+       "max": 14.1,
+       "mean": 12.74,
+       "spread": 0.1613,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "Mkeys/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1346.05,
+        1343.04,
+        1342.61,
+        1343.04,
+        1342.61
+       ],
+       "n": 5,
+       "median": 1343.04,
+       "p95": 1346.05,
+       "min": 1342.61,
+       "max": 1346.05,
+       "mean": 1343.47,
+       "spread": 0.0026,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "Mkeys/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        559.99,
+        567.18,
+        561.49,
+        553.7,
+        562.99
+       ],
+       "n": 5,
+       "median": 561.49,
+       "p95": 567.18,
+       "min": 553.7,
+       "max": 567.18,
+       "mean": 561.07,
+       "spread": 0.024,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 1,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 4194304,
+       "check": {
+        "ordered": true,
+        "first": -1,
+        "last": 1
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js"
+      ]
+     }
+    },
+    "compute-scan-1048576": {
+     "title": "Prefix sum n=1048576",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        0.535,
+        0.54,
+        0.505,
+        0.515,
+        0.54
+       ],
+       "n": 5,
+       "median": 0.535,
+       "p95": 0.54,
+       "min": 0.505,
+       "max": 0.54,
+       "mean": 0.527,
+       "spread": 0.0654,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.042,
+        0.043,
+        0.043,
+        0.043,
+        0.043
+       ],
+       "n": 5,
+       "median": 0.043,
+       "p95": 0.043,
+       "min": 0.042,
+       "max": 0.043,
+       "mean": 0.0428,
+       "spread": 0.0233,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        28.86,
+        27.72,
+        28.835,
+        27.645,
+        32.265
+       ],
+       "n": 5,
+       "median": 28.835,
+       "p95": 32.265,
+       "min": 27.645,
+       "max": 32.265,
+       "mean": 29.065,
+       "spread": 0.1602,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        27.5,
+        30.9,
+        29,
+        28.8,
+        29.2
+       ],
+       "n": 5,
+       "median": 29,
+       "p95": 30.9,
+       "min": 27.5,
+       "max": 30.9,
+       "mean": 29.08,
+       "spread": 0.1172,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.9,
+        4.3,
+        4.4,
+        4.7,
+        4.6
+       ],
+       "n": 5,
+       "median": 4.4,
+       "p95": 4.7,
+       "min": 3.9,
+       "max": 4.7,
+       "mean": 4.38,
+       "spread": 0.1818,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        199.73,
+        195.08,
+        195.08,
+        195.08,
+        195.08
+       ],
+       "n": 5,
+       "median": 195.08,
+       "p95": 199.73,
+       "min": 195.08,
+       "max": 199.73,
+       "mean": 196.01,
+       "spread": 0.0238,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        15.68,
+        15.53,
+        16.61,
+        16.29,
+        15.53
+       ],
+       "n": 5,
+       "median": 15.68,
+       "p95": 16.61,
+       "min": 15.53,
+       "max": 16.61,
+       "mean": 15.928,
+       "spread": 0.0689,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 6,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 1048576,
+       "check": {
+        "last": -470.258
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js"
+      ]
+     }
+    },
+    "compute-reduce-1048576": {
+     "title": "Sum n=1048576",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        0.375,
+        0.39,
+        0.425,
+        0.38,
+        0.385
+       ],
+       "n": 5,
+       "median": 0.385,
+       "p95": 0.425,
+       "min": 0.375,
+       "max": 0.425,
+       "mean": 0.391,
+       "spread": 0.1299,
+       "noisy": true
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.011,
+        0.01,
+        0.011,
+        0.011,
+        0.011
+       ],
+       "n": 5,
+       "median": 0.011,
+       "p95": 0.011,
+       "min": 0.01,
+       "max": 0.011,
+       "mean": 0.0108,
+       "spread": 0.0909,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        16.71,
+        17.53,
+        17.455,
+        18.095,
+        17.61
+       ],
+       "n": 5,
+       "median": 17.53,
+       "p95": 18.095,
+       "min": 16.71,
+       "max": 18.095,
+       "mean": 17.48,
+       "spread": 0.079,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        30.8,
+        28.5,
+        28.9,
+        29.4,
+        29.7
+       ],
+       "n": 5,
+       "median": 29.4,
+       "p95": 30.8,
+       "min": 28.5,
+       "max": 30.8,
+       "mean": 29.46,
+       "spread": 0.0782,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.9,
+        4.6,
+        4.5,
+        5.2,
+        4.5
+       ],
+       "n": 5,
+       "median": 4.5,
+       "p95": 5.2,
+       "min": 3.9,
+       "max": 5.2,
+       "mean": 4.54,
+       "spread": 0.2889,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        381.3,
+        419.43,
+        381.3,
+        381.3,
+        381.3
+       ],
+       "n": 5,
+       "median": 381.3,
+       "p95": 419.43,
+       "min": 381.3,
+       "max": 419.43,
+       "mean": 388.926,
+       "spread": 0.1,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        11.18,
+        10.75,
+        9.87,
+        11.04,
+        10.89
+       ],
+       "n": 5,
+       "median": 10.89,
+       "p95": 11.18,
+       "min": 9.87,
+       "max": 11.18,
+       "mean": 10.746,
+       "spread": 0.1203,
+       "noisy": true
+      }
+     },
+     "cpuBefore": 15,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 1048576,
+       "check": {
+        "sum": -845.477
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js"
+      ]
+     }
+    },
+    "compute-histogram-1048576": {
+     "title": "Histogram n=1048576",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        0.435,
+        0.48,
+        0.44,
+        0.48,
+        0.46
+       ],
+       "n": 5,
+       "median": 0.46,
+       "p95": 0.48,
+       "min": 0.435,
+       "max": 0.48,
+       "mean": 0.459,
+       "spread": 0.0978,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.036,
+        0.037,
+        0.035,
+        0.036,
+        0.035
+       ],
+       "n": 5,
+       "median": 0.036,
+       "p95": 0.037,
+       "min": 0.035,
+       "max": 0.037,
+       "mean": 0.0358,
+       "spread": 0.0556,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        28.365,
+        26.91,
+        27.88,
+        30.51,
+        28.285
+       ],
+       "n": 5,
+       "median": 28.285,
+       "p95": 30.51,
+       "min": 26.91,
+       "max": 30.51,
+       "mean": 28.39,
+       "spread": 0.1273,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        30.2,
+        30.7,
+        38.4,
+        30.8,
+        31.3
+       ],
+       "n": 5,
+       "median": 30.8,
+       "p95": 38.4,
+       "min": 30.2,
+       "max": 38.4,
+       "mean": 32.28,
+       "spread": 0.2662,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.3,
+        5.1,
+        5.2,
+        4.8,
+        5.2
+       ],
+       "n": 5,
+       "median": 5.2,
+       "p95": 5.3,
+       "min": 4.8,
+       "max": 5.3,
+       "mean": 5.12,
+       "spread": 0.0962,
+       "noisy": false
+      },
+      "rate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        116.51,
+        113.36,
+        119.84,
+        116.51,
+        119.84
+       ],
+       "n": 5,
+       "median": 116.51,
+       "p95": 119.84,
+       "min": 113.36,
+       "max": 119.84,
+       "mean": 117.212,
+       "spread": 0.0556,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        9.64,
+        8.74,
+        9.53,
+        8.74,
+        9.12
+       ],
+       "n": 5,
+       "median": 9.12,
+       "p95": 9.64,
+       "min": 8.74,
+       "max": 9.64,
+       "mean": 9.154,
+       "spread": 0.0987,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 13,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 1048576,
+       "check": {
+        "counted": 1048576
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js"
+      ]
+     }
+    },
+    "compute-random-1048576": {
+     "title": "Random normals n=1048576",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        0.405,
+        0.495,
+        0.385,
+        0.435,
+        0.355
+       ],
+       "n": 5,
+       "median": 0.405,
+       "p95": 0.495,
+       "min": 0.355,
+       "max": 0.495,
+       "mean": 0.415,
+       "spread": 0.3457,
+       "noisy": true
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.042,
+        0.042,
+        0.042,
+        0.042,
+        0.042
+       ],
+       "n": 5,
+       "median": 0.042,
+       "p95": 0.042,
+       "min": 0.042,
+       "max": 0.042,
+       "mean": 0.042,
+       "spread": 0,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        21.88,
+        22.53,
+        98.885,
+        22.87,
+        23.425
+       ],
+       "n": 5,
+       "median": 22.87,
+       "p95": 98.885,
+       "min": 21.88,
+       "max": 98.885,
+       "mean": 37.918,
+       "spread": 3.3671,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        27.9,
+        28,
+        28.2,
+        35.2,
+        29.3
+       ],
+       "n": 5,
+       "median": 28.2,
+       "p95": 35.2,
+       "min": 27.9,
+       "max": 35.2,
+       "mean": 29.72,
+       "spread": 0.2589,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        2.6,
+        2.5,
+        2.5,
+        2.9,
+        2.9
+       ],
+       "n": 5,
+       "median": 2.6,
+       "p95": 2.9,
+       "min": 2.5,
+       "max": 2.9,
+       "mean": 2.68,
+       "spread": 0.1538,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        99.86,
+        99.86,
+        99.86,
+        99.86,
+        99.86
+       ],
+       "n": 5,
+       "median": 99.86,
+       "p95": 99.86,
+       "min": 99.86,
+       "max": 99.86,
+       "mean": 99.86,
+       "spread": 0,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        10.36,
+        8.47,
+        10.89,
+        9.64,
+        11.81
+       ],
+       "n": 5,
+       "median": 10.36,
+       "p95": 11.81,
+       "min": 8.47,
+       "max": 11.81,
+       "mean": 10.234,
+       "spread": 0.3224,
+       "noisy": true
+      }
+     },
+     "cpuBefore": 10,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 1048576,
+       "check": {
+        "mean": -0.000472383
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js",
+       "/bench/assets/random-hC6-roH_.js"
+      ]
+     }
+    },
+    "compute-scan-16777216": {
+     "title": "Prefix sum n=16777216",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.89,
+        6.05,
+        5.585,
+        5.945,
+        5.505
+       ],
+       "n": 5,
+       "median": 5.89,
+       "p95": 6.05,
+       "min": 5.505,
+       "max": 6.05,
+       "mean": 5.795,
+       "spread": 0.0925,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.573,
+        0.574,
+        0.573,
+        0.574,
+        0.573
+       ],
+       "n": 5,
+       "median": 0.573,
+       "p95": 0.574,
+       "min": 0.573,
+       "max": 0.574,
+       "mean": 0.5734,
+       "spread": 0.0017,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        30.66,
+        39.425,
+        33.57,
+        29.675,
+        33.06
+       ],
+       "n": 5,
+       "median": 33.06,
+       "p95": 39.425,
+       "min": 29.675,
+       "max": 39.425,
+       "mean": 33.278,
+       "spread": 0.2949,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        28,
+        29.3,
+        27.1,
+        28.2,
+        30.2
+       ],
+       "n": 5,
+       "median": 28.2,
+       "p95": 30.2,
+       "min": 27.1,
+       "max": 30.2,
+       "mean": 28.56,
+       "spread": 0.1099,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        50.7,
+        46.5,
+        47,
+        50.8,
+        44.8
+       ],
+       "n": 5,
+       "median": 47,
+       "p95": 50.8,
+       "min": 44.8,
+       "max": 50.8,
+       "mean": 47.96,
+       "spread": 0.1277,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        234.24,
+        233.83,
+        234.24,
+        233.83,
+        234.24
+       ],
+       "n": 5,
+       "median": 234.24,
+       "p95": 234.24,
+       "min": 233.83,
+       "max": 234.24,
+       "mean": 234.076,
+       "spread": 0.0018,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        22.79,
+        22.18,
+        24.03,
+        22.58,
+        24.38
+       ],
+       "n": 5,
+       "median": 22.79,
+       "p95": 24.38,
+       "min": 22.18,
+       "max": 24.38,
+       "mean": 23.192,
+       "spread": 0.0965,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 20,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 16777216,
+       "check": {
+        "last": -2766.13
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js"
+      ]
+     }
+    },
+    "compute-reduce-16777216": {
+     "title": "Sum n=16777216",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.28,
+        3.025,
+        3.025,
+        3.005,
+        3.41
+       ],
+       "n": 5,
+       "median": 3.025,
+       "p95": 3.41,
+       "min": 3.005,
+       "max": 3.41,
+       "mean": 3.149,
+       "spread": 0.1339,
+       "noisy": true
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.102,
+        0.102,
+        0.102,
+        0.102,
+        0.102
+       ],
+       "n": 5,
+       "median": 0.102,
+       "p95": 0.102,
+       "min": 0.102,
+       "max": 0.102,
+       "mean": 0.102,
+       "spread": 0,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        16.795,
+        15.665,
+        18.135,
+        17.465,
+        16.335
+       ],
+       "n": 5,
+       "median": 16.795,
+       "p95": 18.135,
+       "min": 15.665,
+       "max": 18.135,
+       "mean": 16.879,
+       "spread": 0.1471,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        29.7,
+        30.4,
+        30,
+        28.8,
+        29.6
+       ],
+       "n": 5,
+       "median": 29.7,
+       "p95": 30.4,
+       "min": 28.8,
+       "max": 30.4,
+       "mean": 29.7,
+       "spread": 0.0539,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        44.8,
+        46.3,
+        46.1,
+        44.6,
+        43.3
+       ],
+       "n": 5,
+       "median": 44.8,
+       "p95": 46.3,
+       "min": 43.3,
+       "max": 46.3,
+       "mean": 45.02,
+       "spread": 0.067,
+       "noisy": false
+      },
+      "rate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        657.93,
+        657.93,
+        657.93,
+        657.93,
+        657.93
+       ],
+       "n": 5,
+       "median": 657.93,
+       "p95": 657.93,
+       "min": 657.93,
+       "max": 657.93,
+       "mean": 657.93,
+       "spread": 0,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        20.46,
+        22.18,
+        22.18,
+        22.33,
+        19.68
+       ],
+       "n": 5,
+       "median": 22.18,
+       "p95": 22.33,
+       "min": 19.68,
+       "max": 22.33,
+       "mean": 21.366,
+       "spread": 0.1195,
+       "noisy": true
+      }
+     },
+     "cpuBefore": 7,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 16777216,
+       "check": {
+        "sum": -2517.63
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js"
+      ]
+     }
+    },
+    "compute-histogram-16777216": {
+     "title": "Histogram n=16777216",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.015,
+        3.315,
+        3.48,
+        3.06,
+        3.07
+       ],
+       "n": 5,
+       "median": 3.07,
+       "p95": 3.48,
+       "min": 3.015,
+       "max": 3.48,
+       "mean": 3.188,
+       "spread": 0.1515,
+       "noisy": true
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.329,
+        0.329,
+        0.329,
+        0.329,
+        0.329
+       ],
+       "n": 5,
+       "median": 0.329,
+       "p95": 0.329,
+       "min": 0.329,
+       "max": 0.329,
+       "mean": 0.329,
+       "spread": 0,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        27.44,
+        27.46,
+        29.265,
+        30.225,
+        25.44
+       ],
+       "n": 5,
+       "median": 27.46,
+       "p95": 30.225,
+       "min": 25.44,
+       "max": 30.225,
+       "mean": 27.966,
+       "spread": 0.1743,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        30.7,
+        33.1,
+        28.2,
+        32.3,
+        28.7
+       ],
+       "n": 5,
+       "median": 30.7,
+       "p95": 33.1,
+       "min": 28.2,
+       "max": 33.1,
+       "mean": 30.6,
+       "spread": 0.1596,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        46.4,
+        52.8,
+        51.9,
+        51.6,
+        45.1
+       ],
+       "n": 5,
+       "median": 51.6,
+       "p95": 52.8,
+       "min": 45.1,
+       "max": 52.8,
+       "mean": 49.56,
+       "spread": 0.1492,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        203.98,
+        203.98,
+        203.98,
+        203.98,
+        203.98
+       ],
+       "n": 5,
+       "median": 203.98,
+       "p95": 203.98,
+       "min": 203.98,
+       "max": 203.98,
+       "mean": 203.98,
+       "spread": 0,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        22.26,
+        20.24,
+        19.28,
+        21.93,
+        21.86
+       ],
+       "n": 5,
+       "median": 21.86,
+       "p95": 22.26,
+       "min": 19.28,
+       "max": 22.26,
+       "mean": 21.114,
+       "spread": 0.1363,
+       "noisy": true
+      }
+     },
+     "cpuBefore": 8,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 16777216,
+       "check": {
+        "counted": 16777216
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js"
+      ]
+     }
+    },
+    "compute-random-16777216": {
+     "title": "Random normals n=16777216",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.62,
+        5.51,
+        5.47,
+        5.495,
+        5.495
+       ],
+       "n": 5,
+       "median": 5.495,
+       "p95": 5.62,
+       "min": 5.47,
+       "max": 5.62,
+       "mean": 5.518,
+       "spread": 0.0273,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.599,
+        0.599,
+        0.599,
+        0.596,
+        0.596
+       ],
+       "n": 5,
+       "median": 0.599,
+       "p95": 0.599,
+       "min": 0.596,
+       "max": 0.599,
+       "mean": 0.5978,
+       "spread": 0.005,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        25.185,
+        23.18,
+        24.15,
+        24.765,
+        23.13
+       ],
+       "n": 5,
+       "median": 24.15,
+       "p95": 25.185,
+       "min": 23.13,
+       "max": 25.185,
+       "mean": 24.082,
+       "spread": 0.0851,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        31.6,
+        27.6,
+        29.9,
+        26.9,
+        27.8
+       ],
+       "n": 5,
+       "median": 27.8,
+       "p95": 31.6,
+       "min": 26.9,
+       "max": 31.6,
+       "mean": 28.76,
+       "spread": 0.1691,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        2.9,
+        2.1,
+        2.6,
+        3.1,
+        2.1
+       ],
+       "n": 5,
+       "median": 2.6,
+       "p95": 3.1,
+       "min": 2.1,
+       "max": 3.1,
+       "mean": 2.56,
+       "spread": 0.3846,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        112.03,
+        112.03,
+        112.03,
+        112.6,
+        112.6
+       ],
+       "n": 5,
+       "median": 112.03,
+       "p95": 112.6,
+       "min": 112.03,
+       "max": 112.6,
+       "mean": 112.258,
+       "spread": 0.0051,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GB/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        11.94,
+        12.18,
+        12.27,
+        12.21,
+        12.21
+       ],
+       "n": 5,
+       "median": 12.21,
+       "p95": 12.27,
+       "min": 11.94,
+       "max": 12.27,
+       "mean": 12.162,
+       "spread": 0.027,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 8,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 16777216,
+       "check": {
+        "mean": -0.0000527517
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js",
+       "/bench/assets/random-hC6-roH_.js"
+      ]
+     }
+    },
+    "compute-matmul-256": {
+     "title": "Matrix product n=256",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        0.42,
+        0.45,
+        0.38,
+        2.39,
+        0.525
+       ],
+       "n": 5,
+       "median": 0.45,
+       "p95": 2.39,
+       "min": 0.38,
+       "max": 2.39,
+       "mean": 0.833,
+       "spread": 4.4667,
+       "noisy": true
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.043,
+        0.043,
+        0.043,
+        0.043,
+        0.043
+       ],
+       "n": 5,
+       "median": 0.043,
+       "p95": 0.043,
+       "min": 0.043,
+       "max": 0.043,
+       "mean": 0.043,
+       "spread": 0,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        22.18,
+        23.04,
+        22.68,
+        21.84,
+        22.92
+       ],
+       "n": 5,
+       "median": 22.68,
+       "p95": 23.04,
+       "min": 21.84,
+       "max": 23.04,
+       "mean": 22.532,
+       "spread": 0.0529,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        29.5,
+        27.8,
+        26.8,
+        26.6,
+        27.7
+       ],
+       "n": 5,
+       "median": 27.7,
+       "p95": 29.5,
+       "min": 26.6,
+       "max": 29.5,
+       "mean": 27.68,
+       "spread": 0.1047,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        7,
+        4,
+        4.2,
+        4.5,
+        3.8
+       ],
+       "n": 5,
+       "median": 4.2,
+       "p95": 7,
+       "min": 3.8,
+       "max": 7,
+       "mean": 4.7,
+       "spread": 0.7619,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        780.34,
+        780.34,
+        780.34,
+        780.34,
+        780.34
+       ],
+       "n": 5,
+       "median": 780.34,
+       "p95": 780.34,
+       "min": 780.34,
+       "max": 780.34,
+       "mean": 780.34,
+       "spread": 0,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        79.89,
+        74.57,
+        88.3,
+        14.04,
+        63.91
+       ],
+       "n": 5,
+       "median": 74.57,
+       "p95": 88.3,
+       "min": 14.04,
+       "max": 88.3,
+       "mean": 64.142,
+       "spread": 0.9958,
+       "noisy": true
+      }
+     },
+     "cpuBefore": 10,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 256,
+       "check": {
+        "sum": -954.33
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js",
+       "/bench/assets/linalg-CtcoGT1O.js"
+      ]
+     }
+    },
+    "compute-matmul-1024": {
+     "title": "Matrix product n=1024",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.005,
+        3.04,
+        3,
+        2.845,
+        3.14
+       ],
+       "n": 5,
+       "median": 3.005,
+       "p95": 3.14,
+       "min": 2.845,
+       "max": 3.14,
+       "mean": 3.006,
+       "spread": 0.0982,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.328,
+        0.328,
+        0.328,
+        0.328,
+        0.328
+       ],
+       "n": 5,
+       "median": 0.328,
+       "p95": 0.328,
+       "min": 0.328,
+       "max": 0.328,
+       "mean": 0.328,
+       "spread": 0,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        28.09,
+        28.215,
+        26.07,
+        26.68,
+        25.945
+       ],
+       "n": 5,
+       "median": 26.68,
+       "p95": 28.215,
+       "min": 25.945,
+       "max": 28.215,
+       "mean": 27,
+       "spread": 0.0851,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        27.6,
+        27,
+        26.1,
+        27.1,
+        27.3
+       ],
+       "n": 5,
+       "median": 27.1,
+       "p95": 27.6,
+       "min": 26.1,
+       "max": 27.6,
+       "mean": 27.02,
+       "spread": 0.0554,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        9.6,
+        9.5,
+        9.2,
+        9.1,
+        8.7
+       ],
+       "n": 5,
+       "median": 9.2,
+       "p95": 9.6,
+       "min": 8.7,
+       "max": 9.6,
+       "mean": 9.22,
+       "spread": 0.0978,
+       "noisy": false
+      },
+      "rate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        6547.21,
+        6547.21,
+        6547.21,
+        6547.21,
+        6547.21
+       ],
+       "n": 5,
+       "median": 6547.21,
+       "p95": 6547.21,
+       "min": 6547.21,
+       "max": 6547.21,
+       "mean": 6547.21,
+       "spread": 0,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        714.64,
+        706.41,
+        715.83,
+        754.83,
+        683.91
+       ],
+       "n": 5,
+       "median": 714.64,
+       "p95": 754.83,
+       "min": 683.91,
+       "max": 754.83,
+       "mean": 715.124,
+       "spread": 0.0992,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 3,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 1024,
+       "check": {
+        "sum": -12885.2
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js",
+       "/bench/assets/linalg-CtcoGT1O.js"
+      ]
+     }
+    },
+    "compute-matmul-2048": {
+     "title": "Matrix product n=2048",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        4.06,
+        4.055,
+        4.095,
+        4.11,
+        3.985
+       ],
+       "n": 5,
+       "median": 4.06,
+       "p95": 4.11,
+       "min": 3.985,
+       "max": 4.11,
+       "mean": 4.061,
+       "spread": 0.0308,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        2.153,
+        2.151,
+        2.149,
+        2.152,
+        2.151
+       ],
+       "n": 5,
+       "median": 2.151,
+       "p95": 2.153,
+       "min": 2.149,
+       "max": 2.153,
+       "mean": 2.1512,
+       "spread": 0.0019,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        28.68,
+        26.975,
+        31.03,
+        28.125,
+        28.31
+       ],
+       "n": 5,
+       "median": 28.31,
+       "p95": 31.03,
+       "min": 26.975,
+       "max": 31.03,
+       "mean": 28.624,
+       "spread": 0.1432,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        29.6,
+        30,
+        30.6,
+        29.9,
+        29.9
+       ],
+       "n": 5,
+       "median": 29.9,
+       "p95": 30.6,
+       "min": 29.6,
+       "max": 30.6,
+       "mean": 30,
+       "spread": 0.0334,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        26.1,
+        28.1,
+        26.3,
+        29.8,
+        30.3
+       ],
+       "n": 5,
+       "median": 28.1,
+       "p95": 30.3,
+       "min": 26.1,
+       "max": 30.3,
+       "mean": 28.12,
+       "spread": 0.1495,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        7979.5,
+        7986.92,
+        7994.36,
+        7983.21,
+        7986.92
+       ],
+       "n": 5,
+       "median": 7986.92,
+       "p95": 7994.36,
+       "min": 7979.5,
+       "max": 7994.36,
+       "mean": 7986.182,
+       "spread": 0.0019,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        4231.49,
+        4236.71,
+        4195.33,
+        4180.02,
+        4311.13
+       ],
+       "n": 5,
+       "median": 4231.49,
+       "p95": 4311.13,
+       "min": 4180.02,
+       "max": 4311.13,
+       "mean": 4230.936,
+       "spread": 0.031,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 6,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 2048,
+       "check": {
+        "sum": 6571.31
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js",
+       "/bench/assets/linalg-CtcoGT1O.js"
+      ]
+     }
+    },
+    "compute-fft-65536": {
+     "title": "FFT n=65536",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        0.695,
+        0.71,
+        0.695,
+        0.66,
+        0.66
+       ],
+       "n": 5,
+       "median": 0.695,
+       "p95": 0.71,
+       "min": 0.66,
+       "max": 0.71,
+       "mean": 0.684,
+       "spread": 0.0719,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.055,
+        0.058,
+        0.058,
+        0.058,
+        0.058
+       ],
+       "n": 5,
+       "median": 0.058,
+       "p95": 0.058,
+       "min": 0.055,
+       "max": 0.058,
+       "mean": 0.0574,
+       "spread": 0.0517,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        24.91,
+        27.125,
+        24.81,
+        25.17,
+        24.815
+       ],
+       "n": 5,
+       "median": 24.91,
+       "p95": 27.125,
+       "min": 24.81,
+       "max": 27.125,
+       "mean": 25.366,
+       "spread": 0.0929,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        28.2,
+        27.6,
+        27.8,
+        31.9,
+        27.1
+       ],
+       "n": 5,
+       "median": 27.8,
+       "p95": 31.9,
+       "min": 27.1,
+       "max": 31.9,
+       "mean": 28.52,
+       "spread": 0.1727,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        4,
+        6.1,
+        4.4,
+        6.8,
+        4
+       ],
+       "n": 5,
+       "median": 4.4,
+       "p95": 6.8,
+       "min": 4,
+       "max": 6.8,
+       "mean": 5.06,
+       "spread": 0.6364,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        95.33,
+        90.39,
+        90.39,
+        90.39,
+        90.39
+       ],
+       "n": 5,
+       "median": 90.39,
+       "p95": 95.33,
+       "min": 90.39,
+       "max": 95.33,
+       "mean": 91.378,
+       "spread": 0.0547,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        7.54,
+        7.38,
+        7.54,
+        7.94,
+        7.94
+       ],
+       "n": 5,
+       "median": 7.54,
+       "p95": 7.94,
+       "min": 7.38,
+       "max": 7.94,
+       "mean": 7.668,
+       "spread": 0.0743,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 15,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 65536,
+       "check": {
+        "dc": 113.603
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js",
+       "/bench/assets/fft-ow8pfJr3.js"
+      ]
+     }
+    },
+    "compute-fft-1048576": {
+     "title": "FFT n=1048576",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.69,
+        4.03,
+        3.645,
+        3.725,
+        3.79
+       ],
+       "n": 5,
+       "median": 3.725,
+       "p95": 4.03,
+       "min": 3.645,
+       "max": 4.03,
+       "mean": 3.776,
+       "spread": 0.1034,
+       "noisy": true
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.642,
+        0.642,
+        0.641,
+        0.643,
+        0.642
+       ],
+       "n": 5,
+       "median": 0.642,
+       "p95": 0.643,
+       "min": 0.641,
+       "max": 0.643,
+       "mean": 0.642,
+       "spread": 0.0031,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        29.955,
+        30.81,
+        31.625,
+        28.955,
+        29.29
+       ],
+       "n": 5,
+       "median": 29.955,
+       "p95": 31.625,
+       "min": 28.955,
+       "max": 31.625,
+       "mean": 30.127,
+       "spread": 0.0891,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        30.5,
+        28.7,
+        29.4,
+        27.1,
+        30
+       ],
+       "n": 5,
+       "median": 29.4,
+       "p95": 30.5,
+       "min": 27.1,
+       "max": 30.5,
+       "mean": 29.14,
+       "spread": 0.1156,
+       "noisy": true
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        6.7,
+        6.6,
+        6.8,
+        5.8,
+        6.6
+       ],
+       "n": 5,
+       "median": 6.6,
+       "p95": 6.8,
+       "min": 5.8,
+       "max": 6.8,
+       "mean": 6.5,
+       "spread": 0.1515,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        163.33,
+        163.33,
+        163.58,
+        163.08,
+        163.33
+       ],
+       "n": 5,
+       "median": 163.33,
+       "p95": 163.58,
+       "min": 163.08,
+       "max": 163.58,
+       "mean": 163.33,
+       "spread": 0.0031,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        28.42,
+        26.02,
+        28.77,
+        28.15,
+        27.67
+       ],
+       "n": 5,
+       "median": 28.15,
+       "p95": 28.77,
+       "min": 26.02,
+       "max": 28.77,
+       "mean": 27.806,
+       "spread": 0.0977,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 3,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 1048576,
+       "check": {
+        "dc": -220.354
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js",
+       "/bench/assets/fft-ow8pfJr3.js"
+      ]
+     }
+    },
+    "compute-fft-4194304": {
+     "title": "FFT n=4194304",
+     "engine": "margo",
+     "metrics": {
+      "taskMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        10.325,
+        10.12,
+        10.475,
+        10.2,
+        10
+       ],
+       "n": 5,
+       "median": 10.2,
+       "p95": 10.475,
+       "min": 10,
+       "max": 10.475,
+       "mean": 10.224,
+       "spread": 0.0466,
+       "noisy": false
+      },
+      "taskGpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        2.696,
+        2.7,
+        2.698,
+        2.695,
+        2.692
+       ],
+       "n": 5,
+       "median": 2.696,
+       "p95": 2.7,
+       "min": 2.692,
+       "max": 2.7,
+       "mean": 2.6962,
+       "spread": 0.003,
+       "noisy": false
+      },
+      "coldMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        32.7,
+        33.91,
+        31.725,
+        34.915,
+        33.645
+       ],
+       "n": 5,
+       "median": 33.645,
+       "p95": 34.915,
+       "min": 31.725,
+       "max": 34.915,
+       "mean": 33.379,
+       "spread": 0.0948,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        27.4,
+        29.9,
+        27.3,
+        28.2,
+        29
+       ],
+       "n": 5,
+       "median": 28.2,
+       "p95": 29.9,
+       "min": 27.3,
+       "max": 29.9,
+       "mean": 28.36,
+       "spread": 0.0922,
+       "noisy": false
+      },
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        14,
+        16.4,
+        14.1,
+        15.1,
+        17
+       ],
+       "n": 5,
+       "median": 15.1,
+       "p95": 17,
+       "min": 14,
+       "max": 17,
+       "mean": 15.32,
+       "spread": 0.1987,
+       "noisy": true
+      },
+      "rate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        171.13,
+        170.88,
+        171.01,
+        171.2,
+        171.39
+       ],
+       "n": 5,
+       "median": 171.13,
+       "p95": 171.39,
+       "min": 170.88,
+       "max": 171.39,
+       "mean": 171.122,
+       "spread": 0.003,
+       "noisy": false
+      },
+      "wallRate": {
+       "unit": "GFLOP/s",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        44.69,
+        45.59,
+        44.05,
+        45.23,
+        46.14
+       ],
+       "n": 5,
+       "median": 45.23,
+       "p95": 46.14,
+       "min": 44.05,
+       "max": 46.14,
+       "mean": 45.14,
+       "spread": 0.0462,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 9,
+     "info": {
+      "note": "backend webgpu",
+      "gpuMethod": "none (no timestamp-query)",
+      "output": {
+       "n": 4194304,
+       "check": {
+        "dc": -361.417
+       }
+      },
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-Bk6BMcbg.js",
+       "/bench/assets/array-B-HbMJsz-C7HGx3jw.js",
+       "/bench/assets/fft-ow8pfJr3.js"
+      ]
+     }
+    }
+   },
+   "seconds": 74.3
+  },
+  "viz": {
+   "title": "Data visualisation: scatter, surface and volume figures",
+   "uses": "gpu",
+   "status": "ok",
+   "cases": {
+    "viz-scatter-100000": {
+     "title": "Scatter plot n=100000",
+     "engine": "margo",
+     "metrics": {
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        32.1,
+        32.7,
+        31.1,
+        30.8,
+        30.4
+       ],
+       "n": 5,
+       "median": 31.1,
+       "p95": 32.7,
+       "min": 30.4,
+       "max": 32.7,
+       "mean": 31.42,
+       "spread": 0.074,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        55,
+        57.3,
+        56.9,
+        57.2,
+        56.7
+       ],
+       "n": 5,
+       "median": 56.9,
+       "p95": 57.3,
+       "min": 55,
+       "max": 57.3,
+       "mean": 56.62,
+       "spread": 0.0404,
+       "noisy": false
+      },
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.115,
+        0.12,
+        0.12,
+        0.12,
+        0.12
+       ],
+       "n": 5,
+       "median": 0.12,
+       "p95": 0.12,
+       "min": 0.115,
+       "max": 0.12,
+       "mean": 0.119,
+       "spread": 0.0417,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.079,
+        0.079,
+        0.079,
+        0.079,
+        0.079
+       ],
+       "n": 5,
+       "median": 0.079,
+       "p95": 0.079,
+       "min": 0.079,
+       "max": 0.079,
+       "mean": 0.079,
+       "spread": 0,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1925.9,
+        1889.2,
+        1869.3,
+        1775.5,
+        1823.3
+       ],
+       "n": 5,
+       "median": 1869.3,
+       "p95": 1925.9,
+       "min": 1775.5,
+       "max": 1925.9,
+       "mean": 1856.64,
+       "spread": 0.0805,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.54,
+        3.545,
+        3.52,
+        3.58,
+        3.46
+       ],
+       "n": 5,
+       "median": 3.54,
+       "p95": 3.58,
+       "min": 3.46,
+       "max": 3.58,
+       "mean": 3.529,
+       "spread": 0.0339,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        6.49,
+        6.49,
+        6.49,
+        6.49,
+        6.49
+       ],
+       "n": 5,
+       "median": 6.49,
+       "p95": 6.49,
+       "min": 6.49,
+       "max": 6.49,
+       "mean": 6.49,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        30.03,
+        30.03,
+        30.03,
+        30.03,
+        30.03
+       ],
+       "n": 5,
+       "median": 30.03,
+       "p95": 30.03,
+       "min": 30.03,
+       "max": 30.03,
+       "mean": 30.03,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 13,
+     "info": {
+      "drawCalls": 0,
+      "note": "sciviz figure (layer passes not counted)",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ],
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-D54Sv5vj.js",
+       "/bench/assets/mat4-DcuuK0os.js",
+       "/bench/assets/color-_EhGDIMG.js",
+       "/bench/assets/dist-CWG0YBua.js",
+       "/bench/assets/dist-BFzx0ORu.js",
+       "/bench/assets/dist-Cl6GMI68.js",
+       "/bench/assets/dist-CoFWtLpm.js"
+      ]
+     }
+    },
+    "viz-scatter-1000000": {
+     "title": "Scatter plot n=1000000",
+     "engine": "margo",
+     "metrics": {
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        114.5,
+        118.4,
+        129.6,
+        116.2,
+        123.2
+       ],
+       "n": 5,
+       "median": 118.4,
+       "p95": 129.6,
+       "min": 114.5,
+       "max": 129.6,
+       "mean": 120.38,
+       "spread": 0.1275,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        55.5,
+        60.7,
+        61.4,
+        55.6,
+        55.1
+       ],
+       "n": 5,
+       "median": 55.6,
+       "p95": 61.4,
+       "min": 55.1,
+       "max": 61.4,
+       "mean": 57.66,
+       "spread": 0.1133,
+       "noisy": true
+      },
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.115,
+        0.12,
+        0.125,
+        0.115,
+        0.115
+       ],
+       "n": 5,
+       "median": 0.115,
+       "p95": 0.125,
+       "min": 0.115,
+       "max": 0.125,
+       "mean": 0.118,
+       "spread": 0.087,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.723,
+        0.743,
+        0.746,
+        0.751,
+        0.743
+       ],
+       "n": 5,
+       "median": 0.743,
+       "p95": 0.751,
+       "min": 0.723,
+       "max": 0.751,
+       "mean": 0.7412,
+       "spread": 0.0377,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1115.6,
+        1115.5,
+        1101.6,
+        1149.8,
+        1147.1
+       ],
+       "n": 5,
+       "median": 1115.6,
+       "p95": 1149.8,
+       "min": 1101.6,
+       "max": 1149.8,
+       "mean": 1125.92,
+       "spread": 0.0432,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.555,
+        3.535,
+        3.68,
+        3.515,
+        3.545
+       ],
+       "n": 5,
+       "median": 3.545,
+       "p95": 3.68,
+       "min": 3.515,
+       "max": 3.68,
+       "mean": 3.566,
+       "spread": 0.0465,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        37.39,
+        37.39,
+        37.4,
+        37.39,
+        37.39
+       ],
+       "n": 5,
+       "median": 37.39,
+       "p95": 37.4,
+       "min": 37.39,
+       "max": 37.4,
+       "mean": 37.392,
+       "spread": 0.0003,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        47.2,
+        47.2,
+        47.2,
+        47.2,
+        47.2
+       ],
+       "n": 5,
+       "median": 47.2,
+       "p95": 47.2,
+       "min": 47.2,
+       "max": 47.2,
+       "mean": 47.2,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 11,
+     "info": {
+      "drawCalls": 0,
+      "note": "sciviz figure (layer passes not counted)",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ],
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-D54Sv5vj.js",
+       "/bench/assets/mat4-DcuuK0os.js",
+       "/bench/assets/color-_EhGDIMG.js",
+       "/bench/assets/dist-CWG0YBua.js",
+       "/bench/assets/dist-BFzx0ORu.js",
+       "/bench/assets/dist-Cl6GMI68.js",
+       "/bench/assets/dist-CoFWtLpm.js"
+      ]
+     }
+    },
+    "viz-scatter-4000000": {
+     "title": "Scatter plot n=4000000",
+     "engine": "margo",
+     "metrics": {
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        479.8,
+        481.5,
+        476.6,
+        487.8,
+        487.1
+       ],
+       "n": 5,
+       "median": 481.5,
+       "p95": 487.8,
+       "min": 476.6,
+       "max": 487.8,
+       "mean": 482.56,
+       "spread": 0.0233,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        55.2,
+        54.6,
+        54.2,
+        54.2,
+        58.6
+       ],
+       "n": 5,
+       "median": 54.6,
+       "p95": 58.6,
+       "min": 54.2,
+       "max": 58.6,
+       "mean": 55.36,
+       "spread": 0.0806,
+       "noisy": false
+      },
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.16,
+        0.155,
+        0.155,
+        0.155,
+        0.15
+       ],
+       "n": 5,
+       "median": 0.155,
+       "p95": 0.16,
+       "min": 0.15,
+       "max": 0.16,
+       "mean": 0.155,
+       "spread": 0.0645,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        3.377,
+        3.395,
+        3.385,
+        3.389,
+        3.394
+       ],
+       "n": 5,
+       "median": 3.389,
+       "p95": 3.395,
+       "min": 3.377,
+       "max": 3.395,
+       "mean": 3.388,
+       "spread": 0.0053,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        290.5,
+        290.6,
+        289.9,
+        289.5,
+        290.5
+       ],
+       "n": 5,
+       "median": 290.5,
+       "p95": 290.6,
+       "min": 289.5,
+       "max": 290.6,
+       "mean": 290.2,
+       "spread": 0.0038,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        5.5,
+        5.51,
+        5.51,
+        5.42,
+        5.235
+       ],
+       "n": 5,
+       "median": 5.5,
+       "p95": 5.51,
+       "min": 5.235,
+       "max": 5.51,
+       "mean": 5.435,
+       "spread": 0.05,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        140.41,
+        140.41,
+        140.41,
+        140.41,
+        140.41
+       ],
+       "n": 5,
+       "median": 140.41,
+       "p95": 140.41,
+       "min": 140.41,
+       "max": 140.41,
+       "mean": 140.41,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        104.42,
+        104.42,
+        104.42,
+        104.42,
+        104.42
+       ],
+       "n": 5,
+       "median": 104.42,
+       "p95": 104.42,
+       "min": 104.42,
+       "max": 104.42,
+       "mean": 104.42,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 4,
+     "info": {
+      "drawCalls": 0,
+      "note": "sciviz figure (layer passes not counted)",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ],
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-D54Sv5vj.js",
+       "/bench/assets/mat4-DcuuK0os.js",
+       "/bench/assets/color-_EhGDIMG.js",
+       "/bench/assets/dist-CWG0YBua.js",
+       "/bench/assets/dist-BFzx0ORu.js",
+       "/bench/assets/dist-Cl6GMI68.js",
+       "/bench/assets/dist-CoFWtLpm.js"
+      ]
+     }
+    },
+    "viz-surface-256": {
+     "title": "Surface plot n=256",
+     "engine": "margo",
+     "metrics": {
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        11.4,
+        11.3,
+        11.7,
+        11.6,
+        11.2
+       ],
+       "n": 5,
+       "median": 11.4,
+       "p95": 11.7,
+       "min": 11.2,
+       "max": 11.7,
+       "mean": 11.44,
+       "spread": 0.0439,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        150.7,
+        55.9,
+        55.7,
+        55.6,
+        57.8
+       ],
+       "n": 5,
+       "median": 55.9,
+       "p95": 150.7,
+       "min": 55.6,
+       "max": 150.7,
+       "mean": 75.14,
+       "spread": 1.7013,
+       "noisy": true
+      },
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.105,
+        0.105,
+        0.1,
+        0.1,
+        0.105
+       ],
+       "n": 5,
+       "median": 0.105,
+       "p95": 0.105,
+       "min": 0.1,
+       "max": 0.105,
+       "mean": 0.103,
+       "spread": 0.0476,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.045,
+        0.045,
+        0.045,
+        0.045,
+        0.044
+       ],
+       "n": 5,
+       "median": 0.045,
+       "p95": 0.045,
+       "min": 0.044,
+       "max": 0.045,
+       "mean": 0.0448,
+       "spread": 0.0222,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1944.7,
+        1990.3,
+        1952.9,
+        1943.1,
+        1986.8
+       ],
+       "n": 5,
+       "median": 1952.9,
+       "p95": 1990.3,
+       "min": 1943.1,
+       "max": 1990.3,
+       "mean": 1963.56,
+       "spread": 0.0242,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.505,
+        3.53,
+        3.52,
+        3.38,
+        3.305
+       ],
+       "n": 5,
+       "median": 3.505,
+       "p95": 3.53,
+       "min": 3.305,
+       "max": 3.53,
+       "mean": 3.448,
+       "spread": 0.0642,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        2.95,
+        2.95,
+        2.95,
+        2.95,
+        2.95
+       ],
+       "n": 5,
+       "median": 2.95,
+       "p95": 2.95,
+       "min": 2.95,
+       "max": 2.95,
+       "mean": 2.95,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        28.38,
+        28.38,
+        28.38,
+        28.38,
+        28.38
+       ],
+       "n": 5,
+       "median": 28.38,
+       "p95": 28.38,
+       "min": 28.38,
+       "max": 28.38,
+       "mean": 28.38,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 0,
+     "info": {
+      "drawCalls": 0,
+      "note": "sciviz figure (layer passes not counted)",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ],
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-D54Sv5vj.js",
+       "/bench/assets/mat4-DcuuK0os.js",
+       "/bench/assets/color-_EhGDIMG.js",
+       "/bench/assets/dist-BFzx0ORu.js",
+       "/bench/assets/dist-Cl6GMI68.js",
+       "/bench/assets/dist-CoFWtLpm.js"
+      ]
+     }
+    },
+    "viz-surface-1024": {
+     "title": "Surface plot n=1024",
+     "engine": "margo",
+     "metrics": {
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        14,
+        15.5,
+        13.8,
+        12.7,
+        13.7
+       ],
+       "n": 5,
+       "median": 13.8,
+       "p95": 15.5,
+       "min": 12.7,
+       "max": 15.5,
+       "mean": 13.94,
+       "spread": 0.2029,
+       "noisy": true
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        58.3,
+        55.2,
+        55.3,
+        57.5,
+        56.4
+       ],
+       "n": 5,
+       "median": 56.4,
+       "p95": 58.3,
+       "min": 55.2,
+       "max": 58.3,
+       "mean": 56.54,
+       "spread": 0.055,
+       "noisy": false
+      },
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.105,
+        0.1,
+        0.1,
+        0.1,
+        0.1
+       ],
+       "n": 5,
+       "median": 0.1,
+       "p95": 0.105,
+       "min": 0.1,
+       "max": 0.105,
+       "mean": 0.101,
+       "spread": 0.05,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.578,
+        0.577,
+        0.577,
+        0.577,
+        0.578
+       ],
+       "n": 5,
+       "median": 0.577,
+       "p95": 0.578,
+       "min": 0.577,
+       "max": 0.578,
+       "mean": 0.5774,
+       "spread": 0.0017,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1470.9,
+        1386.4,
+        1486.7,
+        1484.6,
+        1493.3
+       ],
+       "n": 5,
+       "median": 1484.6,
+       "p95": 1493.3,
+       "min": 1386.4,
+       "max": 1493.3,
+       "mean": 1464.38,
+       "spread": 0.072,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.62,
+        3.52,
+        3.505,
+        3.53,
+        3.495
+       ],
+       "n": 5,
+       "median": 3.52,
+       "p95": 3.62,
+       "min": 3.495,
+       "max": 3.62,
+       "mean": 3.534,
+       "spread": 0.0355,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        6.7,
+        6.7,
+        6.7,
+        6.7,
+        6.7
+       ],
+       "n": 5,
+       "median": 6.7,
+       "p95": 6.7,
+       "min": 6.7,
+       "max": 6.7,
+       "mean": 6.7,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        32.13,
+        32.13,
+        32.13,
+        32.13,
+        32.13
+       ],
+       "n": 5,
+       "median": 32.13,
+       "p95": 32.13,
+       "min": 32.13,
+       "max": 32.13,
+       "mean": 32.13,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 3,
+     "info": {
+      "drawCalls": 0,
+      "note": "sciviz figure (layer passes not counted)",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ],
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-D54Sv5vj.js",
+       "/bench/assets/mat4-DcuuK0os.js",
+       "/bench/assets/color-_EhGDIMG.js",
+       "/bench/assets/dist-BFzx0ORu.js",
+       "/bench/assets/dist-Cl6GMI68.js",
+       "/bench/assets/dist-CoFWtLpm.js"
+      ]
+     }
+    },
+    "viz-volume-64": {
+     "title": "Volume rendering n=64",
+     "engine": "margo",
+     "metrics": {
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        75.7,
+        74.3,
+        73.2,
+        74.7,
+        75.2
+       ],
+       "n": 5,
+       "median": 74.7,
+       "p95": 75.7,
+       "min": 73.2,
+       "max": 75.7,
+       "mean": 74.62,
+       "spread": 0.0335,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        57.4,
+        56.6,
+        57,
+        56.8,
+        56.8
+       ],
+       "n": 5,
+       "median": 56.8,
+       "p95": 57.4,
+       "min": 56.6,
+       "max": 57.4,
+       "mean": 56.92,
+       "spread": 0.0141,
+       "noisy": false
+      },
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.105,
+        0.105,
+        0.11,
+        0.11,
+        0.105
+       ],
+       "n": 5,
+       "median": 0.105,
+       "p95": 0.11,
+       "min": 0.105,
+       "max": 0.11,
+       "mean": 0.107,
+       "spread": 0.0476,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.388,
+        0.39,
+        0.384,
+        0.388,
+        0.386
+       ],
+       "n": 5,
+       "median": 0.388,
+       "p95": 0.39,
+       "min": 0.384,
+       "max": 0.39,
+       "mean": 0.3872,
+       "spread": 0.0155,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1861.3,
+        1844.7,
+        1857,
+        1768,
+        1812.9
+       ],
+       "n": 5,
+       "median": 1844.7,
+       "p95": 1861.3,
+       "min": 1768,
+       "max": 1861.3,
+       "mean": 1828.78,
+       "spread": 0.0506,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.545,
+        3.525,
+        3.45,
+        3.465,
+        3.52
+       ],
+       "n": 5,
+       "median": 3.52,
+       "p95": 3.545,
+       "min": 3.45,
+       "max": 3.545,
+       "mean": 3.501,
+       "spread": 0.027,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.72,
+        3.72,
+        3.72,
+        3.72,
+        3.72
+       ],
+       "n": 5,
+       "median": 3.72,
+       "p95": 3.72,
+       "min": 3.72,
+       "max": 3.72,
+       "mean": 3.72,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        28.63,
+        28.63,
+        28.63,
+        28.63,
+        28.63
+       ],
+       "n": 5,
+       "median": 28.63,
+       "p95": 28.63,
+       "min": 28.63,
+       "max": 28.63,
+       "mean": 28.63,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 8,
+     "info": {
+      "drawCalls": 0,
+      "note": "sciviz figure (layer passes not counted)",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ],
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-D54Sv5vj.js",
+       "/bench/assets/mat4-DcuuK0os.js",
+       "/bench/assets/color-_EhGDIMG.js",
+       "/bench/assets/dist-BFzx0ORu.js",
+       "/bench/assets/dist-Cl6GMI68.js",
+       "/bench/assets/dist-CoFWtLpm.js"
+      ]
+     }
+    },
+    "viz-volume-128": {
+     "title": "Volume rendering n=128",
+     "engine": "margo",
+     "metrics": {
+      "buildMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        523.6,
+        530.9,
+        529.3,
+        522.4,
+        524.7
+       ],
+       "n": 5,
+       "median": 524.7,
+       "p95": 530.9,
+       "min": 522.4,
+       "max": 530.9,
+       "mean": 526.18,
+       "spread": 0.0162,
+       "noisy": false
+      },
+      "createMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        54.1,
+        55.8,
+        57.9,
+        57.2,
+        53.8
+       ],
+       "n": 5,
+       "median": 55.8,
+       "p95": 57.9,
+       "min": 53.8,
+       "max": 57.9,
+       "mean": 55.76,
+       "spread": 0.0735,
+       "noisy": false
+      },
+      "cpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.1,
+        0.105,
+        0.105,
+        0.1,
+        0.105
+       ],
+       "n": 5,
+       "median": 0.105,
+       "p95": 0.105,
+       "min": 0.1,
+       "max": 0.105,
+       "mean": 0.103,
+       "spread": 0.0476,
+       "noisy": false
+      },
+      "gpuMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": true,
+       "samples": [
+        0.776,
+        0.782,
+        0.785,
+        0.775,
+        0.774
+       ],
+       "n": 5,
+       "median": 0.776,
+       "p95": 0.785,
+       "min": 0.774,
+       "max": 0.785,
+       "mean": 0.7784,
+       "spread": 0.0142,
+       "noisy": false
+      },
+      "fps": {
+       "unit": "fps",
+       "better": "higher",
+       "primary": false,
+       "samples": [
+        1118.9,
+        1103,
+        1106.5,
+        1123.5,
+        1119.6
+       ],
+       "n": 5,
+       "median": 1118.9,
+       "p95": 1123.5,
+       "min": 1103,
+       "max": 1123.5,
+       "mean": 1114.3,
+       "spread": 0.0183,
+       "noisy": false
+      },
+      "serialFrameMs": {
+       "unit": "ms",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        3.545,
+        3.545,
+        3.525,
+        3.545,
+        3.5
+       ],
+       "n": 5,
+       "median": 3.545,
+       "p95": 3.545,
+       "min": 3.5,
+       "max": 3.545,
+       "mean": 3.532,
+       "spread": 0.0127,
+       "noisy": false
+      },
+      "jsHeapMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        10.72,
+        10.72,
+        10.72,
+        10.72,
+        10.72
+       ],
+       "n": 5,
+       "median": 10.72,
+       "p95": 10.72,
+       "min": 10.72,
+       "max": 10.72,
+       "mean": 10.72,
+       "spread": 0,
+       "noisy": false
+      },
+      "gpuMB": {
+       "unit": "MB",
+       "better": "lower",
+       "primary": false,
+       "samples": [
+        32.13,
+        32.13,
+        32.13,
+        32.13,
+        32.13
+       ],
+       "n": 5,
+       "median": 32.13,
+       "p95": 32.13,
+       "min": 32.13,
+       "max": 32.13,
+       "mean": 32.13,
+       "spread": 0,
+       "noisy": false
+      }
+     },
+     "cpuBefore": 4,
+     "info": {
+      "drawCalls": 0,
+      "note": "sciviz figure (layer passes not counted)",
+      "canvas": [
+       1280,
+       720
+      ],
+      "samples": 4,
+      "gpuMethod": "timestamp-query, sum of pass durations",
+      "passes": [
+       "Render  +depth +resolve clear/store",
+       "Render  +depth load/store",
+       "Render  +depth load/store",
+       "Render  +depth +resolve load/discard"
+      ],
+      "scripts": [
+       "/bench/assets/page-BxcPIcLN.js",
+       "/bench/assets/preload-helper-CVlzMO4C.js",
+       "/bench/assets/page-EhdG9F_4.js",
+       "/bench/assets/catalog-DuEgD2Cy.js",
+       "/bench/assets/margo-R-kCkdzx.js",
+       "/bench/assets/margo-hSdHqsh2.js",
+       "/bench/assets/rolldown-runtime-CbXtAM7H.js",
+       "/bench/assets/geometry-DT4GWWnY.js",
+       "/bench/assets/plugin-Dx4qVqPp.js",
+       "/bench/assets/api-C_-dySIM.js",
+       "/bench/assets/extension-DuYhGmhk.js",
+       "/bench/assets/margo-data-4A7BV3ud.js",
+       "/bench/assets/dist-D54Sv5vj.js",
+       "/bench/assets/mat4-DcuuK0os.js",
+       "/bench/assets/color-_EhGDIMG.js",
+       "/bench/assets/dist-BFzx0ORu.js",
+       "/bench/assets/dist-Cl6GMI68.js",
+       "/bench/assets/dist-CoFWtLpm.js"
+      ]
+     }
+    }
+   },
+   "seconds": 74.9
+  }
+ },
+ "settings": {
+  "browser": {
+   "name": "chromium",
+   "channel": "msedge",
+   "version": "156.0.4314.42"
+  },
+  "canvas": [
+   1280,
+   720
+  ],
+  "dpr": 1,
+  "flags": [
+   "--disable-gpu-vsync",
+   "--disable-frame-rate-limit",
+   "--enable-precise-memory-info",
+   "--js-flags=--expose-gc"
+  ],
+  "serving": "production bundles, no compression, no cache, cross-origin isolated",
+  "assets": "examples/assets (the same files for every engine)",
+  "frames": {
+   "frames": 300,
+   "warmup": 60,
+   "gpuFrames": 60,
+   "serialFrames": 30
+  },
+  "runs": 5,
+  "warmupRuns": 1,
+  "interleaved": false,
+  "engines": {
+   "margo": {
+    "version": "1.0.0",
+    "commit": "ce4d6f8f"
+   }
+  }
+ },
+ "seconds": 184.4
+}

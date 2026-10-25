@@ -208,6 +208,7 @@ const METRICS = {
   // Task scenes (harness.js runTask): one job per call, then its first (cold) call alone.
   taskMs: { unit: 'ms', better: 'lower', read: (r) => r.task?.ms?.median },
   coldMs: { unit: 'ms', better: 'lower', read: (r) => r.task?.coldMs },
+  taskGpuMs: { unit: 'ms', better: 'lower', read: (r) => r.task?.gpuMs?.median },
   jsBytes: { unit: 'B', better: 'lower', exact: true, read: (r) => r.jsBytes },
   drawCalls: { unit: '', better: 'lower', exact: true, read: (r) => r.info?.drawCalls },
 };
