@@ -12,8 +12,10 @@
 // error inside the text) fails the gate with the file, the export and the source line. Its modules are labelled
 // `check-wgsl:` so the page's own guard (scripts/support/wgsl-guard.js) leaves the fragments to this classification.
 //   node scripts/gpu-lock.mjs run --owner=<you> -- npm run check:wgsl
+// --packages=dof,post limits it to those package directories (check:merge passes the affected ones; shared WGSL is
+// compiled only by the full run).
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { parseAst } from 'rolldown/parseAst';
 import { openBrowser } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
@@ -84,7 +86,12 @@ function probe(code, id) {
   return `\nexport const __margoWgslProbe = [${items.join(',')}];\n`;
 }
 
-const files = sources(),
+const only = process.argv
+    .find((a) => a.startsWith('--packages='))
+    ?.slice(11)
+    .split(',')
+    .filter(Boolean),
+  files = sources().filter((f) => !only || only.some((dir) => f.startsWith(join(root, 'packages', dir) + sep))),
   wanted = new Set(files.map((f) => resolve(f).replaceAll('\\', '/'))),
   plugin = {
     name: 'margo-wgsl-probe',
@@ -95,6 +102,10 @@ const files = sources(),
     },
   };
 
+if (only && !files.length) {
+  console.log(`check:wgsl: no WGSL entry points in ${only.join(', ')}; nothing to compile`);
+  process.exit(0);
+}
 const release = await acquire({ owner: 'check-wgsl' }),
   started = performance.now();
 let browser;

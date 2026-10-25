@@ -4,7 +4,8 @@
 // Package scripts are found by name, so a new one runs with no edit here. A root script named like a browser or GPU
 // test must be in ROOT, run by check:merge itself, or repeat a command run here; otherwise this check fails before it
 // runs anything, naming the script.
-// Options: --no-build (dist is current), --only=<substring> (run matching tests), --list (print the plan).
+// Options: --no-build (dist is current), --only=<substring> (run matching tests), --select=<id>,<id> (run exactly these:
+// `<dir>/<script>` or `root/<script>`, see testId; check:merge passes the ones a change affects), --list (print the plan).
 // Holds the GPU lock (scripts/gpu-lock.mjs) for the whole run; each test's result and time go to
 // test-results/gpu-packages.json.
 import { spawnSync } from 'node:child_process';
@@ -43,6 +44,9 @@ const DRIVES_BROWSER = /\bopenBrowser\(|\bchromium\.launch\(|from '@playwright\/
 /** A package script this check runs: `test:browser`, `test:browser:walk`, `test:probes:browser`, `test:gpu`, ... */
 export const isGpuScript = (name) => /^test:/.test(name) && /(^|:)(browser|gpu)(:|$)/.test(name);
 
+/** A test's stable id: `dof/test:browser` for a package script, `root/modern:test:xr:browser` for a root suite. */
+export const testId = (test) => (test.name ? `root/${test.name}` : test.label.replace(' ', '/'));
+
 /** [{ label, cwd, command }] in run order: packages by directory, then ROOT. Throws on an unrun root script. */
 export function plan() {
   const tests = [];
@@ -58,7 +62,7 @@ export function plan() {
     }
   }
   const scripts = json('package.json').scripts;
-  const merge = scripts['check:merge'] ?? '';
+  const merge = scripts['check:merge:steps'] ?? '';
   const commands = new Set([...tests.map((t) => t.command), ...Object.keys(ROOT).map((n) => scripts[n])]);
   const unrun = Object.keys(scripts).filter(
     (name) =>
@@ -69,7 +73,7 @@ export function plan() {
   );
   if (unrun.length)
     throw new Error(
-      `root script(s) ${unrun.join(', ')} look like GPU tests but no check runs them; add each to ROOT in scripts/gpu-package-tests.mjs or to check:merge`,
+      `root script(s) ${unrun.join(', ')} look like GPU tests but no check runs them; add each to ROOT in scripts/gpu-package-tests.mjs or to check:merge:steps`,
     );
   for (const name of Object.keys(ROOT)) {
     if (!scripts[name]) throw new Error(`ROOT lists ${name}, which package.json no longer has; remove it from ROOT`);
@@ -138,7 +142,11 @@ function browserFiles() {
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
-  const tests = plan().filter((t) => !only || t.label.includes(only));
+  const select = process.argv.find((a) => a.startsWith('--select='))?.slice(9);
+  const chosen = select === undefined ? undefined : new Set(select.split(',').filter(Boolean));
+  const tests = plan().filter((t) => (!only || t.label.includes(only)) && (!chosen || chosen.has(testId(t))));
+  const unknown = chosen ? [...chosen].filter((id) => !tests.some((t) => testId(t) === id)) : [];
+  if (unknown.length) throw new Error(`--select names no GPU test: ${unknown.join(', ')}; list them with --list`);
   if (process.argv.includes('--list')) {
     for (const t of tests) console.log(`${t.label}: (${t.cwd}) ${t.command}`);
     process.exit(0);
