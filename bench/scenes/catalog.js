@@ -384,7 +384,53 @@ function computeScenes() {
       (p) => ({ amount: 5 * p.n * Math.log2(p.n), unit: 'GFLOP/s', scale: 1e9 }),
       (p) => ({ values: floats(p.n, 107) }),
     ),
+    'compute-spmv': task(
+      'Sparse matrix-vector product',
+      'One call multiplies the 2-D Laplacian of an n x n grid (5-point stencil, n^2 rows, CSR) by a vector. Rate: ' +
+        'the least traffic it needs (values and columns per entry; row offsets, x and y once per row).',
+      512,
+      (p) => {
+        const rows = p.n * p.n,
+          nnz = 5 * rows - 4 * p.n;
+        return { amount: nnz * 8 + rows * 12, unit: 'GB/s', scale: 1e9 };
+      },
+      (p) => laplacian(p.n),
+    ),
+    'compute-cg': task(
+      'Conjugate gradient',
+      'One call runs 100 Jacobi-preconditioned conjugate gradient iterations on the 2-D Laplacian of an n x n grid ' +
+        '(tolerance 0, one residual read-back). Rate: iterations per second.',
+      256,
+      () => ({ amount: 100, unit: 'iter/s', scale: 1 }),
+      (p) => laplacian(p.n),
+    ),
   };
+}
+
+/** The 2-D Laplacian of an n x n grid as coordinates (5-point stencil, Dirichlet boundary). */
+function laplacian(n) {
+  const rows = [],
+    cols = [],
+    values = [];
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++) {
+      const at = i * n + j;
+      rows.push(at);
+      cols.push(at);
+      values.push(4);
+      for (const [d, ok] of [
+        [-n, i > 0],
+        [n, i < n - 1],
+        [-1, j > 0],
+        [1, j < n - 1],
+      ])
+        if (ok) {
+          rows.push(at);
+          cols.push(at + d);
+          values.push(-1);
+        }
+    }
+  return { rows, cols, values, size: n * n };
 }
 
 /** Data visualisation frame scenes (bench/suites/viz.mjs): one figure, the camera circling it. */
@@ -514,6 +560,10 @@ export const STANDARD = {
       (scene) => ({ scene, params: { n: 1 << 20, backend: 'cpu' } }),
     ),
     ...[256, 512].map((n) => ({ scene: 'compute-matmul', params: { n, backend: 'cpu' } })),
+    ...[256, 1024].map((n) => ({ scene: 'compute-spmv', params: { n } })),
+    { scene: 'compute-cg', params: { n: 256 } },
+    { scene: 'compute-spmv', params: { n: 256, backend: 'cpu' } },
+    { scene: 'compute-cg', params: { n: 128, backend: 'cpu' } },
   ],
   viz: [
     ...[100_000, 1_000_000, 4_000_000].map((n) => ({ scene: 'viz-scatter', params: { n } })),

@@ -7,6 +7,7 @@ import { matmul } from '@margoengine/compute/linalg';
 import { fft } from '@margoengine/compute/fft';
 import { convolve, convolve2d } from '@margoengine/compute/signal';
 import { Random } from '@margoengine/compute/random';
+import { bicgstab, cg, coo, diags } from '@margoengine/compute/sparse';
 
 const checks = [];
 const timings = {};
@@ -115,6 +116,66 @@ window.runCpuParityTests = async () => {
   await parity('random uniform', (c) => new Random(c, { seed: 78 }).uniform(10_001, { low: -2, high: 3 }), 0);
   await parity('random integers', (c) => new Random(c, { seed: 79 }).integers(-50, 1000, 10_001), 0);
   await parity('random normal', (c) => new Random(c, { seed: 80 }).normal(10_001), 1e-5);
+
+  // Sparse: the 2-D Laplacian of an m x m grid (5-point stencil), symmetric positive definite.
+  const laplacian = (ctx, m) => {
+    const rows = [],
+      cols = [],
+      values = [];
+    for (let i = 0; i < m; i++)
+      for (let j = 0; j < m; j++) {
+        const at = i * m + j;
+        rows.push(at);
+        cols.push(at);
+        values.push(4);
+        if (i > 0) rows.push(at), cols.push(at - m), values.push(-1);
+        if (i < m - 1) rows.push(at), cols.push(at + m), values.push(-1);
+        if (j > 0) rows.push(at), cols.push(at - 1), values.push(-1);
+        if (j < m - 1) rows.push(at), cols.push(at + 1), values.push(-1);
+      }
+    return coo(ctx, { rows, cols, values, shape: [m * m, m * m] });
+  };
+  const sparseWant = floats(64 * 64, 21);
+  await parity(
+    'sparse spmv, transpose and diagonal',
+    (c) => {
+      const A = laplacian(c, 64),
+        T = A.transpose(),
+        x = c.array(sparseWant);
+      return A.matvec(x).add(T.matvec(x)).add(A.diagonal());
+    },
+    1e-6,
+  );
+  for (const [name, solve, A] of [
+    ['cg', cg, (c) => laplacian(c, 64)],
+    ['bicgstab', bicgstab, (c) => diags(c, [-1.3, 2.5, -0.7], [-1, 0, 1], [4096, 4096])],
+  ]) {
+    const results = await Promise.all(
+      both((c) => {
+        const M = A(c);
+        return solve(M, M.matvec(c.array(sparseWant)), { tol: 1e-6 });
+      }),
+    );
+    assert(
+      results.every((r) => r.converged),
+      `${name}: both backends converge (${results.map((r) => r.residual)})`,
+    );
+    const [xc, xg] = await Promise.all(results.map((r) => r.x.read()));
+    same(Array.from(xg), Array.from(sparseWant), 2e-3, `${name} solution (gpu)`);
+    same(Array.from(xc), Array.from(sparseWant), 2e-3, `${name} solution (cpu)`);
+    checks.push(
+      `sparse ${name} converges on both backends: ${results.map((r) => r.iterations).join(' and ')} iterations`,
+    );
+  }
+  {
+    const A = laplacian(gpu, 256),
+      b = gpu.ones(256 * 256);
+    await cg(A, b, { maxIterations: 32 });
+    const t0 = performance.now(),
+      r = await cg(A, b, { tol: 1e-5 });
+    timings['cg 256^2 Poisson on webgpu, ms'] = +(performance.now() - t0).toFixed(1);
+    timings['cg 256^2 Poisson on webgpu, iterations'] = r.iterations;
+  }
 
   // The same jobs timed on both backends (wall clock, inputs already in place, GPU results waited for).
   const time = async (label, ctx, run) => {

@@ -677,6 +677,35 @@ const KERNELS: Record<string, (r: Resources) => void> = {
       out.data[out.offset + t] = sum;
     }
   },
+  // sparse.ts spmvShader: y[r] = sum of values[k] * x[colIdx[k]] over row r's entries, in f32.
+  'sparse.spmv'(r) {
+    const rows = uniform(r.shape).getUint32(0, true),
+      ptr = bound(r.rowPtr),
+      col = bound(r.colIdx),
+      val = bound(r.values),
+      x = bound(r.x),
+      y = bound(r.y);
+    for (let row = 0; row < rows; row++) {
+      let sum = 0;
+      for (let k = ptr.data[ptr.offset + row]; k < ptr.data[ptr.offset + row + 1]; k++)
+        sum = Math.fround(sum + val.data[val.offset + k] * x.data[x.offset + col.data[col.offset + k]]);
+      y.data[y.offset + row] = sum;
+    }
+  },
+  // sparse.ts diagonalShader.
+  'sparse.diagonal'(r) {
+    const rows = uniform(r.shape).getUint32(0, true),
+      ptr = bound(r.rowPtr),
+      col = bound(r.colIdx),
+      val = bound(r.values),
+      d = bound(r.d);
+    for (let row = 0; row < rows; row++) {
+      let v = 0;
+      for (let k = ptr.data[ptr.offset + row]; k < ptr.data[ptr.offset + row + 1]; k++)
+        if (col.data[col.offset + k] === row) v = Math.fround(v + val.data[val.offset + k]);
+      d.data[d.offset + row] = v;
+    }
+  },
   // random.ts randomShader: element i takes word i % 4 of the Philox block of counter (offset + i / 4, ...).
   random(r) {
     const d = uniform(r.draw),

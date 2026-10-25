@@ -44,6 +44,10 @@
       "types": "./dist/random.d.ts",
       "import": "./dist/random.js"
     },
+    "./sparse": {
+      "types": "./dist/sparse.d.ts",
+      "import": "./dist/sparse.js"
+    },
     "./stream": {
       "types": "./dist/stream.d.ts",
       "import": "./dist/stream.js"

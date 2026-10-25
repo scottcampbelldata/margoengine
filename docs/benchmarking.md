@@ -363,6 +363,21 @@ runs, from garbage collection). `taskMs` is the whole job here, with the GPU's w
 The CPU backend is single-threaded JavaScript, there so code runs everywhere, not to compete. Its normal random
 numbers spend their time in Math.log, Math.sin and Math.cos, and its matrix product is a plain triple loop.
 
+Sparse matrices (`@margoengine/compute/sparse`, run `20261025-232209-abad599b-dev`, not official: the conjugate
+gradient cases varied by 14 to 16 percent between runs), on the 2-D Laplacian of an n x n grid:
+
+| Case | GPU ms | Rate | Wall ms | Wall rate |
+| --- | --- | --- | --- | --- |
+| spmv-256 (65,536 rows) | 0.007 | 486 GB/s | 0.32 | 10.8 GB/s |
+| spmv-1024 (1,048,576 rows) | 0.092 | 592 GB/s | 3.02 | 18.0 GB/s |
+| cg-256, 100 iterations | 8.14 | 12,282 iter/s | 61.5 | 1,627 iter/s |
+| spmv-256 on the CPU backend | - | 4.9 GB/s | 0.69 | 4.9 GB/s |
+| cg-128, 100 iterations, CPU backend | - | 630 iter/s | 159 | 630 iter/s |
+
+The sparse product runs near the card's memory bandwidth. The solver does not: an iteration takes 0.08 ms on the
+GPU but 0.6 ms of wall time, spent in JavaScript making a new array, bind group and submit for each of its ten or so
+fused expressions. Reusing buffers across iterations is the next speed-up there.
+
 The `viz` suite on the same run (`@margoengine/sciviz` figures with axes, camera orbiting):
 
 | Case | Build ms | CPU ms per frame | GPU ms per frame | fps |

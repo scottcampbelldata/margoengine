@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3099640,
+  "total": 3106923,
   "history": [
     {
       "date": "2026-10-24",
@@ -212,6 +212,12 @@
       "commit": "1ff80aff",
       "reason": "sciviz: figure.toPNG() and toSVG() export (export code loads on first use)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "abad599b",
+      "reason": "new @margoengine/compute/sparse entry (CSR, SpMV, CG, BiCGSTAB)",
+      "grew": 1
     }
   ],
   "items": {
@@ -245,6 +251,7 @@
     "@margoengine/compute/linalg": 5764,
     "@margoengine/compute/random": 2746,
     "@margoengine/compute/signal": 7496,
+    "@margoengine/compute/sparse": 7283,
     "@margoengine/compute/stream": 1422,
     "@margoengine/controls": 22891,
     "@margoengine/controls/arcball": 4582,

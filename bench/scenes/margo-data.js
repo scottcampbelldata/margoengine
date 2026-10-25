@@ -7,7 +7,7 @@ const compute = () => import('@margoengine/compute');
 
 /**
  * A compute task scene. `setup(gpu, data, params)` uploads the inputs and returns `{ run, check }`: `run()` queues one
- * job and returns what it made (disposed after the GPU finishes); `check(result)` reads a little of the last result
+ * job and returns (or resolves, for a solver) what it made, disposed after the GPU finishes; `check(result)` reads a little of the last result
  * back so engines can be compared on doing the same job.
  */
 const task = (setup) => async (_canvas, data, marks, params) => {
@@ -25,7 +25,7 @@ const task = (setup) => async (_canvas, data, marks, params) => {
   };
   return {
     async task() {
-      const result = job.run();
+      const result = await job.run();
       await gpu.done();
       free(last);
       last = result;
@@ -38,8 +38,8 @@ const task = (setup) => async (_canvas, data, marks, params) => {
             const times = [];
             for (let k = 0; k < calls; k++) {
               let result = null;
-              const passes = await gpu.profile(() => {
-                result = job.run();
+              const passes = await gpu.profile(async () => {
+                result = await job.run();
               });
               await gpu.done();
               free(result);
@@ -97,6 +97,21 @@ export const builders = {
     const { fft } = await import('@margoengine/compute/fft'),
       x = gpu.array(values);
     return { run: () => fft(x), check: async (r) => ({ dc: round((await r.re.read({ length: 1 }))[0]) }) };
+  }),
+  'compute-spmv': task(async (gpu, { rows, cols, values, size }) => {
+    const { coo } = await import('@margoengine/compute/sparse'),
+      A = coo(gpu, { rows, cols, values, shape: [size, size] }),
+      x = gpu.ones(size);
+    return { run: () => A.matvec(x), check: async (r) => ({ sum: round(await r.sum().item()) }) };
+  }),
+  'compute-cg': task(async (gpu, { rows, cols, values, size }) => {
+    const { coo, cg } = await import('@margoengine/compute/sparse'),
+      A = coo(gpu, { rows, cols, values, shape: [size, size] }),
+      b = gpu.ones(size);
+    return {
+      run: () => cg(A, b, { tol: 0, maxIterations: 100, checkEvery: 100 }),
+      check: async (r) => ({ iterations: r.iterations, residual: round(r.residual) }),
+    };
   }),
 
   'viz-scatter': figure(async (fig, { x, y, z }) => {

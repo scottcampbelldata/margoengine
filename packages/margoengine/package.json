@@ -155,6 +155,10 @@
       "types": "./dist/compute/random.d.ts",
       "import": "./dist/compute/random.js"
     },
+    "./compute/sparse": {
+      "types": "./dist/compute/sparse.d.ts",
+      "import": "./dist/compute/sparse.js"
+    },
     "./compute/stream": {
       "types": "./dist/compute/stream.d.ts",
       "import": "./dist/compute/stream.js"

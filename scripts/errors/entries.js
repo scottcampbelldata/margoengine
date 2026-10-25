@@ -295,6 +295,10 @@ export const entries = [
       'stream needs a function to run on each chunk',
       'histogramStream needs a fixed range so chunks share bins',
       'A custom operator needs WGSL strings combine (of a and b) and identity',
+      'CsrMatrix disposed; create a new one with csr() or coo()',
+      'matvec takes a GpuArray or an Expr',
+      'A sparse matrix needs shape: [rows, cols]',
+      'spmv takes a CsrMatrix; make one with csr() or coo()',
     ],
     cause:
       'A compute call got something it cannot use (an argument of the wrong type or shape, an array from another context or already disposed, a view where a contiguous array is needed, a WGSL kernel without an entry point, missing or unknown bindings), the device lacks a feature (WebGPU, shader-f16), or queued GPU work failed: a WGSL error in a kernel, map expression or custom operator, or out of memory. GPU failures are reported by the next wait (read, item, done, filter) as code failed with the GPU diagnostic in the message.',

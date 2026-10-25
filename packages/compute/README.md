@@ -7,8 +7,8 @@ GPU compute without the WebGPU boilerplate, for data science and for engine work
 typed arrays with views and broadcasting, element-wise expressions that fuse into a single kernel, reductions and
 statistics along axes, scans, sorting, selection and histograms. It also runs your own WGSL kernels, with bindings
 read from the source. Optional entries add matrix products (`/linalg`), Fourier transforms (`/fft`), convolution
-(`/signal`), reproducible random numbers (`/random`), data larger than GPU memory (`/stream`) and kernels inside an
-engine's frame (`/frame`).
+(`/signal`), reproducible random numbers (`/random`), sparse matrices and solvers (`/sparse`), data larger than GPU
+memory (`/stream`) and kernels inside an engine's frame (`/frame`).
 
 The package is optional and tree-shakable, adds nothing to core, and needs no engine: without one it opens a
 headless device of its own. Without WebGPU (Node, an older browser, a blocklisted GPU) the same code runs on the CPU.
@@ -203,6 +203,44 @@ const { re, im } = fft(rng.uniform(1000)); // any length
 const power = re.square().add(im.square());
 const smooth = convolve(rng.normal(10000), gpu.array([0.25, 0.5, 0.25]), { mode: 'same' });
 console.log(gram.shape, await power.max().item(), smooth.size);
+```
+
+## Sparse matrices and solvers
+
+`@margoengine/compute/sparse` holds sparse matrices in compressed sparse row (CSR) form on the GPU, as SciPy does:
+
+- `coo(gpu, { rows, cols, values, shape })` from coordinates in any order (duplicates are summed);
+- `csr(gpu, { rowPtr, colIdx, values, shape })` from CSR arrays;
+- `diags(gpu, values, offsets, shape)` for constant diagonals;
+- `A.matvec(x)` or `spmv(A, x)`, `A.transpose()`, `A.diagonal()`, `A.toDense()`.
+
+`cg(A, b)` (conjugate gradient, for symmetric positive definite A) and `bicgstab(A, b)` (any square A) solve A x = b
+on the GPU. Their scalars stay in GPU memory between iterations, so the only read-back is the residual every
+`checkEvery` iterations, so a converged solve reports a multiple of `checkEvery` iterations (or `maxIterations`).
+Both resolve `{ x, iterations, residual, converged }` and do not reject when they run out of iterations. Arithmetic
+is f32: a badly conditioned system may stop short of `tol` (`converged: false`), and a breakdown returns the last x
+whose residual was finite.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `tol` | `1e-5` | stop when the residual is at most `tol` times the norm of b (f32 arithmetic) |
+| `atol` | `0` | or at most `atol` |
+| `maxIterations` | 10 times the rows | most iterations |
+| `preconditioner` | `'jacobi'` | `'jacobi'` (divide by the diagonal) or `'none'` |
+| `checkEvery` | `32` | iterations between residual read-backs |
+| `x0` | zeros | starting guess |
+| `signal` | none | abandon the solve |
+
+```ts
+import { createCompute } from '@margoengine/compute';
+import { cg, diags } from '@margoengine/compute/sparse';
+
+using gpu = await createCompute();
+const n = 1000;
+using A = diags(gpu, [-1, 4, -1], [-1, 0, 1], [n, n]); // a diagonally dominant tridiagonal system
+const b = gpu.ones(n);
+const { x, iterations, converged } = await cg(A, b, { tol: 1e-6 });
+console.log(converged, iterations, await x.max().item());
 ```
 
 ## Streams and frames
