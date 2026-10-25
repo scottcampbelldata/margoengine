@@ -2,7 +2,7 @@ The separately loaded occt-import-js.js and occt-import-js.wasm assets come
 from occt-import-js 0.0.23 (Viktor Kovacs), which compiles OpenCascade
 Technology (Open Cascade SAS) to WebAssembly. Both are distributed under the
 GNU Lesser General Public License 2.1; the full text is OCCT-LICENSE.txt next
-to this file. Margo Engine's own source remains MIT licensed.
+to this file. Margo Engine's own source remains Apache-2.0 licensed.
 
 occt-import-js.wasm is unmodified. occt-import-js.js is modified by Margo
 Engine's build (scripts/static-embind.js in the Margo Engine repository; the

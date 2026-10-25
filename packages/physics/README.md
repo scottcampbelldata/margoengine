@@ -128,4 +128,4 @@ MARGOENGINE_RAPIER=/tmp/rapier/node_modules/@dimforge/rapier3d-compat npm run te
 
 Rapier is Apache-2.0 and is not redistributed by this package.
 
-MIT licensed.
+Apache-2.0 licensed.

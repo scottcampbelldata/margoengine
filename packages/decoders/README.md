@@ -166,4 +166,4 @@ KTX2 cube maps, texture arrays and HDR (UASTC HDR) files are rejected. Draco poi
 
 The Draco and Basis Universal binaries are Apache-2.0. See `vendor/NOTICE.md`.
 
-MIT licensed.
+Apache-2.0 licensed.

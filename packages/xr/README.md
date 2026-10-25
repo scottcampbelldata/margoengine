@@ -41,7 +41,7 @@ Run `npx vite --host 127.0.0.1` at the root and open `/examples/webxr-orbit/`. P
 
 `npm test` checks negotiation, inputs, eye buffers, reference-space failure, device loss and disposal races. Root `npm run modern:test:xr:browser` checks actual stereo pixels, GPU validation and teardown using simulated sessions with real WebGPU. Physical Meta Quest and Apple Vision Pro sessions remain untested. No Apple hardware is required for these checks.
 
-Build with root `npm run build:packages` or local `npm run build`. MIT licensed.
+Build with root `npm run build:packages` or local `npm run build`. Apache-2.0 licensed.
 
 ## AR hit testing
 

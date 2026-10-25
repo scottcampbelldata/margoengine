@@ -3,12 +3,13 @@ import { copyFile, readFile, writeFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
+import { copyLegal } from '../../../scripts/package-legal.js';
 
 // Plain TypeScript emit keeps one module per exporter, so a consumer bundler drops the formats it does not import.
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
 await rm(resolve(root, 'dist'), { recursive: true, force: true });
-await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
+await copyLegal(root);
 execFileSync(process.execPath, [resolve(root, 'scripts/generate-unity-support.js')], { stdio: 'inherit' });
 execFileSync(
   process.execPath,

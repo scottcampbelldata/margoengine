@@ -2,7 +2,7 @@
 
 Typography is rasterized with Blender in an isolated temporary scene. Only the
 existing case-back polygons receive a material/UV change; no lettering geometry
-is kept in the workshop or exported GLB. Copyright 2026 Scott Campbell. MIT.
+is kept in the workshop or exported GLB. Copyright 2026 Scott Campbell. Apache-2.0.
 """
 from pathlib import Path
 import bpy
@@ -181,6 +181,6 @@ def apply(scene=None, root=None):
               "font":font,"heart":"Original outline Bezier stroke, U+2661 appearance", "image":image.name,
               "imageSize":list(image.size),"imageSha256":hashlib.sha256(Path(image.filepath_raw).read_bytes()).hexdigest(),
               "geometry":"Existing case rear polygons only; material and UV changes; no added lettering geometry",
-              "copyright":"Copyright 2026 Scott Campbell. Original Margo Engine asset. MIT."}
+              "copyright":"Copyright 2026 Scott Campbell. Original Margo Engine asset. Apache-2.0."}
     (folder/"provenance.json").write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding="utf-8")
     return report

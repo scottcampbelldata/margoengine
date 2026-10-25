@@ -13,7 +13,7 @@ npm run test --workspace @margoengine/kinematics-constraints
 npm pack --workspace @margoengine/kinematics-constraints --pack-destination test-results
 ```
 
-Install the resulting tarball in another project with `npm install ./margoengine-kinematics-constraints-0.1.0.tgz`. No core peer dependency is required. The package is MIT licensed.
+Install the resulting tarball in another project with `npm install ./margoengine-kinematics-constraints-0.1.0.tgz`. No core peer dependency is required. The package is Apache-2.0 licensed.
 
 ## Interactive arm demo
 

@@ -84,7 +84,7 @@ for (const name of await readdir('packages')) {
   );
   const files = new Set(pack.files.map((file) => file.path));
   assert.ok(
-    files.has('dist/index.js') && files.has('dist/index.d.ts') && files.has('LICENSE'),
+    files.has('dist/index.js') && files.has('dist/index.d.ts') && files.has('LICENSE') && files.has('NOTICE'),
     name + ' missing distribution files',
   );
   const target = join(fixture, 'node_modules', ...manifest.name.split('/'));

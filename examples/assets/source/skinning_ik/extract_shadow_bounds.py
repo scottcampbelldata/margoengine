@@ -3,7 +3,7 @@
 The current saved Light Keeper scene supplies evaluated world geometry; a sampled
 sphere includes the interactive arm and held orb's reachable swept volume.
 Only temporary in-memory bmesh data and the generated TypeScript file change.
-Copyright (c) 2026 Scott Campbell. MIT license.
+Copyright (c) 2026 Scott Campbell. Apache License 2.0.
 """
 from pathlib import Path
 import bpy

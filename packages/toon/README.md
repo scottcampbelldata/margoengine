@@ -19,7 +19,7 @@ createMesh(engine, geometry, new ToonMaterial({color: '#e07040', steps: 3}));
 toonModel(character, {steps: 4});
 ```
 
-MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/toon
 

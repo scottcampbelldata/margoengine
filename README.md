@@ -4,7 +4,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core and its own B-rep CAD k
 
 [![CI](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml/badge.svg)](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/margoengine.svg)](https://www.npmjs.com/package/margoengine)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 ![Tokyo corner diorama rendered by Margo Engine](site/images/tokyo-diorama.jpg)
 
@@ -341,7 +341,7 @@ in [SECURITY.md](SECURITY.md).
 
 ## License
 
-[MIT](LICENSE), including the B-rep kernel. Third-party code and assets keep their own licenses; see
+[Apache-2.0](LICENSE) (see also [NOTICE](NOTICE)), including the B-rep kernel. Third-party code and assets keep their own licenses; see
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 Made by Scott Campbell. [margoengine.com](https://margoengine.com)

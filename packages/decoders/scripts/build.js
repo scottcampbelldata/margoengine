@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { build } from 'vite';
 import { staticEmbind } from '../../../scripts/static-embind.js';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
+import { copyLegal } from '../../../scripts/package-legal.js';
 
 // Plain TypeScript emit keeps every `new URL('./…', import.meta.url)` literal intact, so the consuming app's
 // bundler (Vite, webpack 5, Next.js) emits the worker and the Wasm decoders as its own assets.
@@ -12,7 +13,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
 const dist = resolve(root, 'dist');
 await rm(dist, { recursive: true, force: true });
-await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
+await copyLegal(root);
 execFileSync(
   process.execPath,
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],

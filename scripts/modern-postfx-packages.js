@@ -18,11 +18,12 @@ for (const name of ['core', 'dof', 'tonemap']) {
     ),
   );
   const files = new Set(pack.files.map((file) => file.path));
-  assert.ok(files.has('dist/index.js') && files.has('dist/index.d.ts') && files.has('LICENSE'));
+  assert.ok(files.has('dist/index.js') && files.has('dist/index.d.ts') && files.has('LICENSE') && files.has('NOTICE'));
   assert.ok(
     pack.files.every(
       (file) =>
-        ['package.json', 'README.md', 'LICENSE', 'NOTICE.md'].includes(file.path) || file.path.startsWith('dist/'),
+        ['package.json', 'README.md', 'LICENSE', 'NOTICE', 'NOTICE.md'].includes(file.path) ||
+        file.path.startsWith('dist/'),
     ),
   );
   const target = join(fixture, 'node_modules', '@margoengine', name);

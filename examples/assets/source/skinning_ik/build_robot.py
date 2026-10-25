@@ -371,7 +371,7 @@ def export(path,selected=False,animations=False):
             if not node["children"]:del node["children"]
     for scene in document["scenes"]:
         scene["nodes"]=list(dict.fromkeys(scene["nodes"]+sorted(skinned)))
-    document["asset"]["copyright"]="Copyright (c) 2026 Scott Campbell. MIT License."
+    document["asset"]["copyright"]="Copyright (c) 2026 Scott Campbell. Apache License 2.0."
     encoded=json.dumps(document,separators=(",",":"),ensure_ascii=False).encode("utf-8")
     encoded+=b" "*((-len(encoded))%4)
     remainder=blob[20+json_len:]
@@ -435,7 +435,7 @@ def build():
         if parent:bone.parent=data.edit_bones[parent]
     bpy.ops.object.mode_set(mode="OBJECT")
     arm.show_in_front=True
-    arm["copyright"]="Copyright 2026 Scott Campbell. Original Margo Engine Light Keeper robot and workshop. MIT."
+    arm["copyright"]="Copyright 2026 Scott Campbell. Original Margo Engine Light Keeper robot and workshop. Apache-2.0."
     arm["forward"]="glTF -Z"
     arm["ik_chain"]="UpperArm > Forearm > Hand"
 

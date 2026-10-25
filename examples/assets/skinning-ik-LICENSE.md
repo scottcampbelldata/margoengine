@@ -4,7 +4,7 @@ The robot and workshop geometry, armature, smooth skin weights, idle animation,
 silver interaction orb, asset generation code, and procedural paint, metal,
 rubber, ceramic, and fabric surfaces are original work created for Margo Engine.
 Copyright (c) 2026 Scott Campbell, under the repository's
-[MIT license](../../LICENSE).
+[Apache-2.0 license](../../LICENSE).
 
 The case-back dedication, **Margo Engine ♡ / Made for Margie**, is original gold
 ink artwork rasterized in Blender and baked onto the existing case surface.

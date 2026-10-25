@@ -2,10 +2,11 @@ import { buildWorkers } from './build-workers.js';
 import { packageDeclarations } from './package-declarations.js';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { copyFile, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
+import { copyLegal } from './package-legal.js';
 
 const name = process.argv[2];
 assert.ok(/^[a-z][a-z0-9-]*$/.test(name ?? ''), 'Expected an optional package name');
@@ -31,7 +32,7 @@ for (const entry of Object.values(manifest.exports)) {
   }
   entries[module] = source;
 }
-await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
+await copyLegal(root);
 await build({
   root,
   configFile: false,

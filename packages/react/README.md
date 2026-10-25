@@ -158,4 +158,4 @@ Run `npm run build:packages` followed by `npm run modern:test:react` for React T
 
 See the React API and lifecycle guide.
 
-MIT licensed.
+Apache-2.0 licensed.

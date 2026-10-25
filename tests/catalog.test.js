@@ -42,7 +42,7 @@ test('catalog covers every public package with matching versions and imports, an
       { type: 'git', url: 'git+https://github.com/scottcampbelldata/margoengine.git', directory: `packages/${id}` },
       `${manifest.name} must name its repository folder`,
     );
-    assert.equal(manifest.license, 'MIT', `${manifest.name} must be MIT licensed`);
+    assert.equal(manifest.license, 'Apache-2.0', `${manifest.name} must be Apache-2.0 licensed`);
     assert.equal(manifest.author, 'Scott Campbell', `${manifest.name} must name its author`);
   }
   assert.equal(new Set(entries.map((entry) => entry.package)).size, entries.length);

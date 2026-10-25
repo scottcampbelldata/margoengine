@@ -17,7 +17,7 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "examples/voxel-sandbox"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Scott Campbell",
   "private": true,
   "type": "module",

@@ -22,7 +22,7 @@ engine.start();
 // loaded.dispose() removes meshes; dispose the engine on application teardown.
 ```
 
-Install `web-ifc@0.0.78` with the matching core/loaders/IFC packages, or build the local workspaces. Geometry support follows [web-ifc](https://github.com/ThatOpen/engine_web-ifc); browser deployments must serve its Wasm assets separately. web-ifc is MPL-2.0 licensed; this adapter is MIT licensed.
+Install `web-ifc@0.0.78` with the matching core/loaders/IFC packages, or build the local workspaces. Geometry support follows [web-ifc](https://github.com/ThatOpen/engine_web-ifc); browser deployments must serve its Wasm assets separately. web-ifc is MPL-2.0 licensed; this adapter is Apache-2.0 licensed.
 
 For files from users, use the worker entry: web-ifc 0.0.78 can loop forever inside its Wasm on schema-invalid models (a string where a list belongs, a missing attribute), which no check in front of it can rule out, and `parseIFC` on the page would hang the tab. `parseIFCInWorker` runs it in a fresh worker that loads your web-ifc build and is terminated after `timeoutMs` (default 60,000 ms) with `LoaderError` code `limit`:
 

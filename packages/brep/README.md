@@ -139,4 +139,4 @@ still meshes. Tessellation options out of range throw a `RangeError` that names 
 
 ## Licence
 
-`@margoengine/brep` is MIT licensed, like the rest of Margo Engine (`LICENSE`).
+`@margoengine/brep` is Apache-2.0 licensed, like the rest of Margo Engine (`LICENSE`, `NOTICE`).

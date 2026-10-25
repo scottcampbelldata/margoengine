@@ -87,7 +87,7 @@ Measured with Node on one core of the development laptop (2026-10-19; `node --te
 packages/voxel/tests/benchmark.test.js` prints yours): chunk get about 120 M/s and set about 27 M/s; world getBlock
 about 7 M/s on random cells and 115 M/s along a column; pack + unpack of a 4-bit chunk 0.13 ms.
 
-MIT. Optional, tree-shakable package; core peer ^1.0.0. Build and unit tests: `npm test --workspace @margoengine/voxel`
+Apache-2.0. Optional, tree-shakable package; core peer ^1.0.0. Build and unit tests: `npm test --workspace @margoengine/voxel`
 
 ## Queries: `@margoengine/voxel/query`
 

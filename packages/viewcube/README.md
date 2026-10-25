@@ -60,6 +60,6 @@ out leaves controls' bundle and dependencies unchanged.
 Limits: no drag-to-orbit on the cube itself, no roll (the cube sets `camera.up` only on the poles), no "home" view of your own (use
 `camera.fitToBoundingBox`), and the colours are fixed light-grey (restyle `.mvc-face` and `.mvc-projection`).
 
-Size: 3.1 kB min + gzip (the test enforces under 3.5 kB). MIT. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
+Size: 3.1 kB min + gzip (the test enforces under 3.5 kB). Apache-2.0. Peer: `@margoengine/core` (^0.1.0 || ^1.0.0).
 
 Unit tests: `npm test --workspace @margoengine/viewcube`. Browser check with real clicks: `node packages/viewcube/test/browser-check.mjs`.

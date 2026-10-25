@@ -41,7 +41,7 @@ Run `npm test --workspace @margoengine/fbx`. The 53 tests include the original 5
 
 See the implementation plan and progress for completed checks and remaining compatibility work.
 
-MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/fbx
 

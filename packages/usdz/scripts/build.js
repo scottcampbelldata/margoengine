@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { copyFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
+import { copyLegal } from '../../../scripts/package-legal.js';
 const root = fileURLToPath(new URL('..', import.meta.url)),
   repository = resolve(root, '../..');
-await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
+await copyLegal(root);
 await build({
   root,
   configFile: false,

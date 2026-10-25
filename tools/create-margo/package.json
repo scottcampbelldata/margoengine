@@ -19,7 +19,7 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "tools/create-margo"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Scott Campbell",
   "type": "module",
   "bin": {
@@ -27,7 +27,8 @@
   },
   "files": [
     "index.js",
-    "templates"
+    "templates",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=20.19"

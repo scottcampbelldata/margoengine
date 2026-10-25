@@ -62,7 +62,7 @@ Security problems go to the address in [SECURITY.md](SECURITY.md), not a public 
 
 ## License
 
-By contributing you agree that your contributions are licensed under the [MIT License](LICENSE).
+By contributing you agree that your contributions are licensed under the [Apache License 2.0](LICENSE).
 
 ## Code of conduct
 

@@ -63,4 +63,4 @@ capacity bench: a server process, bots in several processes joining at 25 per se
 view, then 30 s of measured play; counts rise until the 20 Hz budget breaks. Options: see the top of
 [bench/run.mjs](bench/run.mjs).
 
-MIT. Build and tests: `npm test --workspace @margoengine/voxel-net`.
+Apache-2.0. Build and tests: `npm test --workspace @margoengine/voxel-net`.

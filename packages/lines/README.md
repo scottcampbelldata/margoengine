@@ -175,4 +175,4 @@ new pose, gone when removed).
 BROWSER_CHANNEL=bundled BROWSER_EXECUTABLE=/path/to/chrome BROWSER_ARGS='["--enable-unsafe-webgpu","--use-webgpu-adapter=swiftshader","--no-sandbox"]' npm run test:browser
 ```
 
-MIT licensed.
+Apache-2.0 licensed.

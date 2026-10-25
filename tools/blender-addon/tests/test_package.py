@@ -13,14 +13,14 @@ spec.loader.exec_module(packager)
 
 
 class PackageTests(unittest.TestCase):
-    def test_installable_archive_contains_only_runtime_and_license(self):
+    def test_installable_archive_contains_only_runtime_license_and_notice(self):
         with tempfile.TemporaryDirectory() as folder:
             destination = Path(folder) / "addon.zip"
             packager.package(destination)
             with ZipFile(destination) as archive:
                 prefix = packager.manifest["id"] + "/"
                 self.assertEqual(set(archive.namelist()), {prefix + name for name in (
-                    "blender_manifest.toml", "__init__.py", "exporter.py", "writer.py", "LICENSE")})
+                    "blender_manifest.toml", "__init__.py", "exporter.py", "writer.py", "LICENSE", "NOTICE")})
                 self.assertIsNone(archive.testzip())
                 manifest = tomllib.loads(archive.read(prefix + "blender_manifest.toml").decode())
                 tree = ast.parse(archive.read(prefix + "__init__.py"))
@@ -29,7 +29,8 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual(tuple(map(int, manifest["blender_version_min"].split("."))), legacy["blender"])
                 self.assertEqual(manifest["name"], legacy["name"])
                 self.assertLessEqual(len(manifest["tagline"]), 64)
-                self.assertEqual(archive.read(prefix + "LICENSE"), (root.parents[1] / "LICENSE").read_bytes())
+                for name in ("LICENSE", "NOTICE"):
+                    self.assertEqual(archive.read(prefix + name), (root.parents[1] / name).read_bytes())
                 for name in ("__init__.py", "exporter.py", "writer.py"):
                     compile(archive.read(prefix + name), name, "exec")
 

@@ -129,6 +129,6 @@ mirror.layers = layerMask(0);                     // Reflector, Refractor and Cu
   bvh's own `raycaster.layers`. Unit tests: `test/layers.test.js` (real core on a mock GPU); real-GPU layer checks run
   in `scripts/env-mirror-gpu-check.js`.
 
-MIT. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` and `/layers` are separate entries; core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` and `/layers` are separate entries; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras

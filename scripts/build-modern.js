@@ -11,6 +11,7 @@ import { buildWorkers, restoreWorkerUrls } from './build-workers.js';
 import { staticEmbind } from './static-embind.js';
 import { packageDeclarations, packageRuntime } from './package-declarations.js';
 import { importMap } from './umbrella.mjs';
+import { copyLegal } from './package-legal.js';
 const precompiled = process.argv.includes('--precompiled');
 // --only=post,lines rebuilds just those packages (their dependencies must already be built) and skips the size records.
 const only = process.argv
@@ -141,7 +142,7 @@ for (const name of packageOrder(manifests)) {
   const output = resolve(`packages/${name}/dist`);
   assert.equal(dirname(output), resolve(`packages/${name}`), 'Output escaped its package');
   await rm(output, { recursive: true, force: true });
-  await copyFile('LICENSE', `packages/${name}/LICENSE`);
+  await copyLegal(resolve(`packages/${name}`));
   if (name === 'core' || name === 'stage') {
     await tsc(name);
     await compactPackage(name);

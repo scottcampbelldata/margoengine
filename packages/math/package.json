@@ -19,7 +19,7 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/math"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Scott Campbell",
   "type": "module",
   "sideEffects": false,
@@ -123,7 +123,8 @@
   },
   "files": [
     "dist",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "publishConfig": {
     "access": "public"

@@ -41,7 +41,7 @@ or `@margoengine/bvh`'s Raycaster (`firstHitOnly`, `far = max`) over the level. 
 character from the query, and start it above the floor if the look-at point sits on it (the arm
 starts at the target, usually the character's feet).
 
-MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cinematic
 

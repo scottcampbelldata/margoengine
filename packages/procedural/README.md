@@ -195,7 +195,7 @@ Studio's tree walker (96 x 96 x 96 cells: sphere 162 ms, noise 177 ms, recolor 2
 
 `examples/lsystem.html` and `examples/voronoi.html` (Vite at the repository root after `npm run build:packages`).
 
-MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/procedural
 

@@ -145,4 +145,4 @@ The build and prepack commands write only this package's `dist` and license copy
 
 This ESM package includes TypeScript declarations, requires `@margoengine/core` 0.1.0 and depends on `@margoengine/vfx` for particles. See the effect options and limitations.
 
-MIT licensed.
+Apache-2.0 licensed.

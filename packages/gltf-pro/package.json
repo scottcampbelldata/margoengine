@@ -18,7 +18,7 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/gltf-pro"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Scott Campbell",
   "type": "module",
   "publishConfig": {
@@ -68,7 +68,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "dependencies": {
     "@margoengine/decoders": "^1.0.0"

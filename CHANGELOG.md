@@ -4,7 +4,7 @@
 
 ### Open source release
 
-- Every package, including the B-rep kernel (`@margoengine/brep`), is now under the MIT License.
+- Every package, including the B-rep kernel (`@margoengine/brep`), is now under the Apache License 2.0.
 - Every package.json has repository, homepage, bugs, keywords, license and author fields.
 - New B-rep examples: `examples/brep/model-to-step.mjs` models a plate and writes STEP, and
   `examples/brep-flange.html` models a flange and renders it in the browser.

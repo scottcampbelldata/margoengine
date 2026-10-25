@@ -139,7 +139,7 @@ export const UNITY_SUPPORT_PAYLOADS: readonly { name: string; text: string }[] =
   },
   {
     "name": "package.json",
-    "text": "{\n  \"name\": \"com.margo.mesh\",\n  \"version\": \"0.3.0\",\n  \"displayName\": \"Margo Mesh Unity Companion\",\n  \"description\": \"Strict, sidecar-scoped exact atlas and native glTFast target imports for public Margo Unity bundles.\",\n  \"unity\": \"6000.0\",\n  \"dependencies\": {\n    \"com.unity.cloud.gltfast\": \"6.20.0\"\n  },\n  \"license\": \"MIT\",\n  \"author\": {\n    \"name\": \"Scott Campbell\",\n    \"url\": \"https://margoengine.com\"\n  },\n  \"documentationUrl\": \"https://github.com/scottcampbelldata/margoengine/tree/main/packages/exporters/src/unity\"\n}\n"
+    "text": "{\n  \"name\": \"com.margo.mesh\",\n  \"version\": \"0.3.0\",\n  \"displayName\": \"Margo Mesh Unity Companion\",\n  \"description\": \"Strict, sidecar-scoped exact atlas and native glTFast target imports for public Margo Unity bundles.\",\n  \"unity\": \"6000.0\",\n  \"dependencies\": {\n    \"com.unity.cloud.gltfast\": \"6.20.0\"\n  },\n  \"license\": \"Apache-2.0\",\n  \"author\": {\n    \"name\": \"Scott Campbell\",\n    \"url\": \"https://margoengine.com\"\n  },\n  \"documentationUrl\": \"https://github.com/scottcampbelldata/margoengine/tree/main/packages/exporters/src/unity\"\n}\n"
   },
   {
     "name": "package.json.meta",

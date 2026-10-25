@@ -20,7 +20,7 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "tools/margo-convert"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Scott Campbell",
   "type": "module",
   "bin": {
@@ -32,7 +32,8 @@
   "sideEffects": false,
   "files": [
     "cli.js",
-    "convert.js"
+    "convert.js",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=22.12.0"

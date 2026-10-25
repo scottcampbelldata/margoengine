@@ -1,13 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { copyFile, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
+import { copyLegal } from '../../../scripts/package-legal.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
-await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
+await copyLegal(root);
 // One library entry per package export: "./dist/<name>.js" is built from "src/<name>.ts".
 const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
 const entry = Object.fromEntries(

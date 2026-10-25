@@ -47,6 +47,6 @@ Limits: Y-up ground only; the blur is uniform, so the shadow does not get softer
 like a real penumbra; `size` should cover the footprint plus the blur, or the shadow is cut at the plane edge; WebGPU
 only (nothing is drawn on the WebGL2 fallback); the plane is not in SSAO's G-buffer or picking.
 
-MIT. Optional, tree-shakable package, about 6.0 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package, about 6.0 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/staging. Real GPU: `node packages/staging/test/browser-check.mjs`.

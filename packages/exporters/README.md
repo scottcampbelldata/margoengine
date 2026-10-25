@@ -675,7 +675,7 @@ validator errors. GPU operations and PNG decoding use Node boundary shims; the l
 
 `npm run test:browser` builds a parented hierarchy with shared geometry, two materials and a hidden mesh in a real WebGPU engine (Playwright, honoring `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS`), exports it, re-imports the GLB into the same engine and compares canvas pixels, world matrices and vertex data, checks for zero WebGPU validation errors, and validates the browser-made GLB, glTF and flattened GLB with the Khronos validator.
 
-MIT licensed.
+Apache-2.0 licensed.
 
 ## USDZ for AR Quick Look
 

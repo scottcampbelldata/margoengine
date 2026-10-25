@@ -121,4 +121,4 @@ executes the built CAD worker in-process). It also checks instancing (18 parts, 
 units, the CLI's errors, and type-checks the tool (`tsc --checkJs --strict`). Measurements:
 `node examples/package-benchmarks/margo-convert.mjs` (results/margo-convert.json).
 
-MIT licensed (OCCT and occt-import-js: LGPL-2.1, installed as their own package).
+Apache-2.0 licensed (OCCT and occt-import-js: LGPL-2.1, installed as their own package).

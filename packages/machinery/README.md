@@ -81,4 +81,4 @@ Run `node scripts/section-loaded-asset-tests.js` from the repository root after 
 
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the API and supported geometry guide.
 
-Margo Engine code is MIT licensed. The separately loaded OCCT assets are LGPL-2.1; notices and the license ship in `dist/workers`. These assets add about 7.7 MB to the package, separate from the machinery runtime JavaScript.
+Margo Engine code is Apache-2.0 licensed. The separately loaded OCCT assets are LGPL-2.1; notices and the license ship in `dist/workers`. These assets add about 7.7 MB to the package, separate from the machinery runtime JavaScript.

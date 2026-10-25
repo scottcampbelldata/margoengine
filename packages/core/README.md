@@ -147,4 +147,4 @@ Wasm is embedded; no Rust toolchain or Wasm bundler plugin is required. The publ
 
 TypeScript 7+ with DOM types, Wasm SIMD and DecompressionStream gzip support are required. WebGPU requires HTTPS or localhost. See the API and lifecycle guide and committed measurements and how to reproduce them.
 
-MIT licensed.
+Apache-2.0 licensed.

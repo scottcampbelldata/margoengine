@@ -79,6 +79,7 @@ await copyFile(
   resolve(outDir, 'assets/skinning-ik-LICENSE.md'),
 );
 await copyFile(resolve(root, 'LICENSE'), resolve(outDir, 'LICENSE'));
+await copyFile(resolve(root, 'NOTICE'), resolve(outDir, 'NOTICE'));
 const bundles = (Array.isArray(output) ? output : [output]).flatMap((result) => result.output),
   javascript = bundles.filter((item) => item.type === 'chunk'),
   emittedFiles = (await readdir(outDir, { recursive: true })).map(normalize).sort(),
@@ -132,6 +133,7 @@ const report = {
     ...bundles.map((item) => (item.fileName === 'skinning-ik.html' ? 'index.html' : item.fileName)),
     'assets/skinning-ik-LICENSE.md',
     'LICENSE',
+    'NOTICE',
     'build-report.json',
   ].sort(),
 };

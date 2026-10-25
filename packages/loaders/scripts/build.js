@@ -1,16 +1,17 @@
 import { execFileSync } from 'node:child_process';
-import { copyFile, rm } from 'node:fs/promises';
+import { rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { buildWorkers } from '../../../scripts/build-workers.js';
 import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
+import { copyLegal } from '../../../scripts/package-legal.js';
 
 // Plain TypeScript emit: one ES module per loader, so a bundler keeps only the parsers an app imports.
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
 await rm(resolve(root, 'dist'), { recursive: true, force: true });
-await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
+await copyLegal(root);
 execFileSync(
   process.execPath,
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],

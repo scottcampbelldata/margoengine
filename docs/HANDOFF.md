@@ -2855,7 +2855,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    gate 11 a/b write-up. **Scott, before launch:** check the hello@margointeractive.com mailbox (SECURITY.md) receives mail;
    enable private vulnerability reporting in the GitHub repo settings; 2FA on npm and GitHub;
    create the `npm-publish` environment (Scott as reviewer, `main` only); after the first publish, configure
-   trusted publishing per package and revoke the bootstrap token. Blender add-on (Python, not on npm) declares MIT;
+   trusted publishing per package and revoke the bootstrap token. Blender add-on (Python, not on npm) declares Apache-2.0;
    extensions.blender.org listing would need its licence policy checked first.
    Status 2026-10-15 (b), attack-surface review: 0 open findings in (b). Threat model and guarantees: `docs/security.md`
    (trusted: the app's code, its URLs and options; untrusted: every byte of an asset file, URIs inside it, network data,

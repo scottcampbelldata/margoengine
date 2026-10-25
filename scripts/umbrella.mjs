@@ -201,6 +201,8 @@ export function umbrellaFiles(root = repository) {
   const sorted = (o) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
   const manifest = {
     ...current,
+    license: 'Apache-2.0',
+    files: [...new Set([...(current.files ?? ['dist']), 'NOTICE'])],
     sideEffects: false,
     exports,
     dependencies: sorted(dependencies),

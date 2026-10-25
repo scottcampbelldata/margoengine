@@ -2,7 +2,7 @@
 
 Run in a live Blender session with runpy.run_path(path, run_name="__main__").
 Uses temporary in-memory bmesh data; never changes the open Blender scene.
-Copyright (c) 2026 Scott Campbell. MIT license.
+Copyright (c) 2026 Scott Campbell. Apache License 2.0.
 """
 from pathlib import Path
 import bmesh

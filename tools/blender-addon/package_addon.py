@@ -12,7 +12,8 @@ def package(destination):
     with ZipFile(destination, "w", ZIP_DEFLATED) as archive:
         for name in ("blender_manifest.toml", "__init__.py", "exporter.py", "writer.py"):
             archive.write(root / name, manifest["id"] + "/" + name)
-        archive.write(root.parents[1] / "LICENSE", manifest["id"] + "/LICENSE")
+        for name in ("LICENSE", "NOTICE"):
+            archive.write(root.parents[1] / name, manifest["id"] + "/" + name)
 
 
 if __name__ == "__main__":

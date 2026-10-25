@@ -112,7 +112,7 @@ position; `screen` levels use the camera's projection, so they also follow ortho
 `@margoengine/cameras`). Object removal swaps with the last entry, so `lods.add` order is not kept. WebGPU
 for imposters; distance and screen selection also work on the WebGL2 backend.
 
-MIT. Optional, tree-shakable package, about 9.9 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); peers: core and gltf-pro
+Apache-2.0. Optional, tree-shakable package, about 9.9 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); peers: core and gltf-pro
 ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/lod. Browser check and benchmark on a real WebGPU adapter:

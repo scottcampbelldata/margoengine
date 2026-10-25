@@ -167,4 +167,4 @@ point), parametric spheres and tori (area, volume, Euler characteristic 2 and 0,
 vertex inside the box, UVs 0 to 1 matching the box coordinates, footprint area x * y on planes, turned and mirrored
 world matrices).
 
-MIT licensed.
+Apache-2.0 licensed.

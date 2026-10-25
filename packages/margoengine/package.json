@@ -20,7 +20,7 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/margoengine"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Scott Campbell",
   "type": "module",
   "publishConfig": {
@@ -30,7 +30,8 @@
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "sideEffects": false,
   "exports": {

@@ -38,7 +38,7 @@ for (const [name, model] of [
     const problems = report.issues.messages.filter((issue) => issue.severity < 2);
     assert.equal(report.issues.numErrors, 0, JSON.stringify(problems));
     assert.equal(report.issues.numWarnings, 0, JSON.stringify(problems));
-    assert.match(model.doc.asset.copyright, /Scott Campbell.*MIT License/);
+    assert.match(model.doc.asset.copyright, /Scott Campbell.*Apache License 2\.0/);
     assert.ok(!(model.doc.extensionsUsed ?? []).includes('KHR_draco_mesh_compression'));
   });
 

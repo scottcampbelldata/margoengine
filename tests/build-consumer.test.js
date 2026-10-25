@@ -26,7 +26,8 @@ async function fixture(t, { core = false } = {}) {
     JSON.stringify({ type: 'module', workspaces: names.map((name) => 'packages/' + name) }),
   );
   await writeFile(join(root, 'package-lock.json'), '{}');
-  await writeFile(join(root, 'LICENSE'), 'MIT');
+  await writeFile(join(root, 'LICENSE'), 'Apache-2.0');
+  await writeFile(join(root, 'NOTICE'), 'Margo Engine');
   await writeFile(join(root, 'packages/shared/kernel.ts'), 'export const shared=1;');
   for (const name of names) {
     await mkdir(join(root, 'packages', name, 'src'), { recursive: true });

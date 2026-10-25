@@ -161,7 +161,7 @@ once and packs flat transforms with an optional root-sinking Y offset.
 This quadratic CPU filter is for small initialization sets; use GPU `Scatter`
 for large distributed populations.
 
-MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/scatter
 

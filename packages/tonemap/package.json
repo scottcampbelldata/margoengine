@@ -17,7 +17,7 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/tonemap"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Scott Campbell",
   "type": "module",
   "sideEffects": false,
@@ -30,7 +30,8 @@
   "files": [
     "dist",
     "LICENSE",
-    "NOTICE.md"
+    "NOTICE.md",
+    "NOTICE"
   ],
   "publishConfig": {
     "access": "public"

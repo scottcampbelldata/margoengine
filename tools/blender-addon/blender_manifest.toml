@@ -6,7 +6,7 @@ tagline = "Export evaluated meshes and PBR materials to .margo"
 maintainer = "Margo Engine Team"
 type = "add-on"
 blender_version_min = "4.2.0"
-license = ["SPDX:MIT"]
+license = ["SPDX:Apache-2.0"]
 tags = ["Import-Export"]
 
 [permissions]

@@ -44,4 +44,4 @@ removed when the three sky implementations were merged into `@margoengine/sky`. 
 night skies, and Sky's `fog` (`falloff: 'exp'`, `height`, `color`) for the citadel's height haze.
 
 This ESM package includes strict TypeScript declarations, requires core 1.0.0 and `@margoengine/sky`, and supported
-WebGPU hardware on HTTPS or localhost. MIT licensed.
+WebGPU hardware on HTTPS or localhost. Apache-2.0 licensed.

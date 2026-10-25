@@ -23,4 +23,4 @@ engine.start();
 
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the supported glTF subset and lifecycle guide before importing assets.
 
-MIT licensed.
+Apache-2.0 licensed.

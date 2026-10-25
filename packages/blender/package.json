@@ -17,13 +17,14 @@
     "url": "git+https://github.com/scottcampbelldata/margoengine.git",
     "directory": "packages/blender"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Scott Campbell",
   "type": "module",
   "sideEffects": false,
   "files": [
     "dist",
-    "FORMAT.md"
+    "FORMAT.md",
+    "NOTICE"
   ],
   "exports": {
     ".": {

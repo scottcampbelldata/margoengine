@@ -19,7 +19,11 @@ for (const name of [...names, 'geometry', 'decoders', 'math']) {
   );
   const files = new Set(pack.files.map((f) => f.path));
   assert.ok(
-    files.has('README.md') && files.has('LICENSE') && files.has('dist/index.js') && files.has('dist/index.d.ts'),
+    files.has('README.md') &&
+      files.has('LICENSE') &&
+      files.has('NOTICE') &&
+      files.has('dist/index.js') &&
+      files.has('dist/index.d.ts'),
   );
   dependencies[scoped] = 'file:' + join(archives, pack.filename).replaceAll('\\', '/');
 }

@@ -113,6 +113,6 @@ redrawAfterRestore(engine, () => engine.render({delta: 0})); // only for apps th
 - First-use hitch per feature (`node examples/package-benchmarks/warm-up-gpu.mjs`, results
   `examples/package-benchmarks/results/warm-up-gpu.json`): see the table there.
 
-MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/quality

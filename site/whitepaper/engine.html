@@ -217,9 +217,9 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <p>Of three.js's feature list, 153 of 161 rows have a Margo package a three.js user would accept as equivalent, 4 are partial and 4 are missing. Margo is not a drop-in replacement for three.js: the API is its own, and <code>docs/from-threejs.md</code> maps one to the other.</p>
 <span class="src">docs/three-parity-matrix.md · bec8b597</span>
 <h3>The CAD kernel</h3>
-<p><code>@margoengine/brep</code> is a B-rep kernel written from the published standards (ISO 10303-21 and ISO 10303-42, the AP203, AP214 and AP242 schemas) and textbook geometry. It is MIT licensed like the rest of the engine. It reads STEP, ACIS SAT, Parasolid XT and JT 9.5 and later, evaluates analytic and NURBS geometry exactly, and meshes each body without cracks: every edge is discretized once and shared by both faces, with robust predicates. A first cut of modeling (Booleans, fillets and chamfers, exact mass properties) is in the package.</p>
+<p><code>@margoengine/brep</code> is a B-rep kernel written from the published standards (ISO 10303-21 and ISO 10303-42, the AP203, AP214 and AP242 schemas) and textbook geometry. It is Apache-2.0 licensed like the rest of the engine. It reads STEP, ACIS SAT, Parasolid XT and JT 9.5 and later, evaluates analytic and NURBS geometry exactly, and meshes each body without cracks: every edge is discretized once and shared by both faces, with robust predicates. A first cut of modeling (Booleans, fillets and chamfers, exact mass properties) is in the package.</p>
 <p>STEP and IGES load through OpenCascade (occt-import-js, LGPL-2.1) in a worker today. Reading IGES in our own kernel is landing now, and OpenCascade is being removed. Freeform (spline) Booleans and healing broken files are still behind OpenCascade; closing that gap is in progress, and corpus numbers will be published when they are committed. We make no speed or completeness claim for it until the comparison runs are committed.</p>
-<span class="src">packages/brep/package.json (MIT since d43ade4d) · docs/brep-occt-gaps.md</span>
+<span class="src">packages/brep/package.json · LICENSE · NOTICE · docs/brep-occt-gaps.md</span>
 
 <h2 id="perf"><span class="n">7</span>Internal measurements</h2>
 <p>These are measurements of Margo against earlier Margo, on named hardware. They are not comparisons with other engines. The method: headless Edge with vsync and the frame cap off, WebGPU timestamp queries on every pass, a GPU lock so only one GPU job runs at a time, and a quiet-machine gate. Our benchmark tool, <code>npm run bench</code>, now runs every such measurement this way.</p>
@@ -305,7 +305,7 @@ npm run check:merge           # verify + site, visual, views, WGSL and packed-pa
 </main>
 
 <footer>
-  <p>Margo Engine's own code, the B-rep kernel included, is MIT licensed. Third-party code that ships inside packages (Draco and Basis decoders, and OpenCascade for STEP and IGES until it is removed) is listed with its licence in <code>THIRD-PARTY-NOTICES.md</code>.</p>
+  <p>Margo Engine's own code, the B-rep kernel included, is Apache-2.0 licensed. Third-party code that ships inside packages (Draco and Basis decoders, and OpenCascade for STEP and IGES until it is removed) is listed with its licence in <code>THIRD-PARTY-NOTICES.md</code>.</p>
   <p class="links"><a href="./engine.pdf">This paper as a PDF</a> <a href="./voxel.html">Margo Voxel whitepaper</a> <a href="../sizes.html">Sizes</a> <a href="../catalog/">Catalog</a> <a href="../THIRD-PARTY-NOTICES.md">Third-party notices</a></p>
   <p>Built with precision, named with love. For Margie.</p>
 </footer>

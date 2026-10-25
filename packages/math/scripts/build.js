@@ -1,11 +1,12 @@
 // One entry per export (like packages/creative) so `@margoengine/math/vector3` ships only Vector3.
 import { execFileSync } from 'node:child_process';
-import { copyFile, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
+import { copyLegal } from '../../../scripts/package-legal.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
@@ -17,7 +18,7 @@ const entry = Object.fromEntries(
     return [module, resolve(root, 'src', module + '.ts')];
   }),
 );
-await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
+await copyLegal(root);
 await build({
   root,
   configFile: false,

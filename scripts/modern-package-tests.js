@@ -115,6 +115,7 @@ for (const name of packedNames) {
           'package.json',
           'README.md',
           'LICENSE',
+          'NOTICE',
           ...(packageDocuments.has(name) ? [packageDocuments.get(name)] : []),
         ].includes(file.path) && !file.path.startsWith('dist/'),
     )
@@ -124,7 +125,7 @@ for (const name of packedNames) {
     assert.ok(files.has(noticeFiles.get(name)), `${packageName(name)} must retain its third-party notices`);
   if (name === 'blender')
     assert.ok(files.has('FORMAT.md'), '@margoengine/blender must retain its format specification');
-  assert.ok(files.has('README.md') && files.has('LICENSE'));
+  assert.ok(files.has('README.md') && files.has('LICENSE') && files.has('NOTICE'));
   assert.ok(!files.has('dist/__stale-package-test.js'));
   if (name === 'machinery')
     for (const file of [
@@ -137,7 +138,7 @@ for (const name of packedNames) {
     ])
       assert.ok(files.has('dist/workers/' + file), `Missing CAD worker asset: ${file}`);
   assert.notEqual(manifest.private, true);
-  assert.equal(manifest.license, 'MIT');
+  assert.equal(manifest.license, 'Apache-2.0');
   assert.equal(manifest.publishConfig.access, 'public');
   for (const entry of Object.values(manifest.exports))
     for (const target of Object.values(entry))
@@ -163,6 +164,13 @@ try {
     assert.equal(
       await readFile(join(fixture, `node_modules/${packageName(name)}/LICENSE`), 'utf8'),
       await readFile('LICENSE', 'utf8'),
+    );
+    // Apache-2.0 s. 4(d): the NOTICE travels with every installed package (brep's adds the JT notice below it).
+    assert.ok(
+      (await readFile(join(fixture, `node_modules/${packageName(name)}/NOTICE`), 'utf8')).startsWith(
+        await readFile('NOTICE', 'utf8'),
+      ),
+      `${packageName(name)} must ship Margo's NOTICE`,
     );
     const markdown = await readFile(join(fixture, `node_modules/${packageName(name)}/README.md`), 'utf8');
     // Standalone examples have imports; continuation blocks retain the preceding setup.

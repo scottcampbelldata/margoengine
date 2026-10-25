@@ -36,7 +36,7 @@ Limits: at most 4096 patterns and `cells x patterns` <= 4,194,304 (memory: 18 by
 min-entropy scan is O(cells) per choice, fine to about 128 x 128; no ground/pinning constraints yet; CPU only.
 Example: `examples/overlapping.html`.
 
-MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/wfc
 

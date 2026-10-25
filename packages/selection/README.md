@@ -79,7 +79,7 @@ sources retain their existing MRT, culling and allocation paths.
 
 Width is viewport pixels, 1..32. The selection mask uses the matching core or registered PBR vertex transform and equal depth, so occluded selected surfaces do not appear. The composite excludes the mask interior. Morphology costs more for large widths; JFA uses logarithmic ping-pong steps. Invisible/disposed meshes are omitted. Dispose releases all targets and passes.
 
-MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/selection
 Real WebGPU checks: npm run test:browser --workspace @margoengine/selection

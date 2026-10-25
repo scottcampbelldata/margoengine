@@ -33,7 +33,7 @@ The returned model supports the existing shadows/SSAO/clustered-light hooks. Imp
 
 ## Blender installation and export
 
-Run `npm run package:blender` from the repository root (Python 3.11+). This creates `dist/margo-blender-addon-v1.0.0.zip` with the extension manifest, legacy `bl_info`, exporter, binary writer and MIT license. Packaging uses an explicit file list, excluding caches, tests and scratch files.
+Run `npm run package:blender` from the repository root (Python 3.11+). This creates `dist/margo-blender-addon-v1.0.0.zip` with the extension manifest, legacy `bl_info`, exporter, binary writer and Apache-2.0 license. Packaging uses an explicit file list, excluding caches, tests and scratch files.
 
 1. Download or build `margo-blender-addon-v1.0.0.zip`.
 2. Open Blender → **Edit → Preferences → Get Extensions** (or **Add-ons**).
@@ -83,4 +83,4 @@ The package checks compile packed consumers and the first README example under s
 
 Validate the archive with an installed Blender executable: `blender --factory-startup --command extension validate dist/margo-blender-addon-v1.0.0.zip`.
 
-The binary contract is documented in [FORMAT.md](FORMAT.md). MIT licensed.
+The binary contract is documented in [FORMAT.md](FORMAT.md). Apache-2.0 licensed.

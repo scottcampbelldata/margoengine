@@ -51,7 +51,7 @@ and commit.
 | engine | Voxel multiplayer: 900 spread / 350 crowded at 20 ticks per second | `packages/voxel-net/bench/results.json`, `docs/voxel-net-capacity-2026-10-21.md` | PROVEN |
 | engine | 62 visual views, 4 captures each | `tests/visual/profiles/nvidia-ampere-msedge-156` | PROVEN |
 | engine | About 88% of browsers support WebGPU (85.8% full + 2.02% partial) | external: caniuse.com/webgpu, StatCounter data for September 2026, read 2026-10-24 | external source, dated |
-| engine | The B-rep kernel is MIT; IGES in brep and the OpenCascade removal are in progress | `packages/brep/package.json`; the other two are stated as work in progress, with no number | PROVEN / no claim |
+| engine | The engine, the B-rep kernel included, is Apache-2.0; IGES in brep and the OpenCascade removal are in progress | `LICENSE`, `NOTICE`, `packages/brep/package.json`; the other two are stated as work in progress, with no number | PROVEN / no claim |
 | engine | Kernel scaling, CAD orbit before and after, culling, BVH picks, large coordinates, design envelope | `cad/results-*.json`, `results-scale-node.json`, `large-coordinates-gpu.json`, the LIM rows below | PROVEN (dated) |
 | engine | 51 proofs, 20 ongoing | `proofs/*.proof.js` and the `ongoing` list in `proofs/run.mjs` | PROVEN (file counts) |
 | engine | Speed against three.js or any other engine | None. The page makes no claim and quotes no comparison. | no claim |

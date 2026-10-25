@@ -1,5 +1,9 @@
-@margoengine/brep
-Copyright (c) 2026 Scott Campbell. MIT licence (LICENSE).
+Margo Engine
+Copyright 2026 Scott Campbell
+
+This product includes Margo Engine (https://margoengine.com) by Scott Campbell.
+
+@margoengine/brep is licensed under the Apache License, Version 2.0 (LICENSE).
 
 JT reader (src/jt):
 This software reads the JT Data Format as described in the Siemens JT File Format Reference and ISO 14306.
