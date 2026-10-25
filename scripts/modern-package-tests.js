@@ -179,6 +179,37 @@ try {
     }
     for (const [index, code] of examples.entries()) await writeFile(join(fixture, `${name}-${index}-readme.tsx`), code);
   }
+  // The React cookbook and the react-three-fiber guide are checked like a README. A snippet whose first line is
+  // `// path/file.tsx` is written to that path so a second snippet can import it.
+  for (const doc of ['react-cookbook', 'react-from-r3f']) {
+    const examples = [];
+    for (const [, code] of (await readFile(`docs/${doc}.md`, 'utf8')).matchAll(/```tsx?\r?\n([\s\S]*?)```/g)) {
+      if (!examples.length || /^\s*(?:\/\/ [\w/.-]+\.tsx\r?\n)?\s*import\s/m.test(code)) examples.push(code);
+      else examples[examples.length - 1] += '\n' + code;
+    }
+    for (const [index, code] of examples.entries()) {
+      const path = /^\/\/ ([\w/.-]+\.tsx)\r?\n/.exec(code)?.[1],
+        file = join(fixture, 'docs', doc, path ?? `${index}.tsx`);
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(file, code);
+    }
+  }
+  await writeFile(
+    join(fixture, 'docs/tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: 'ES2022',
+        module: 'ESNext',
+        moduleResolution: 'Bundler',
+        jsx: 'react-jsx',
+        types: [],
+        lib: ['ES2022', 'DOM'],
+        noEmit: true,
+      },
+      include: ['**/*.tsx'],
+    }),
+  );
   await writeFile(
     join(fixture, 'tsconfig.json'),
     JSON.stringify({
@@ -255,6 +286,13 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
   execFileSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '-p', join(fixture, 'tsconfig.json')], {
     stdio: 'inherit',
   });
+  execFileSync(
+    process.execPath,
+    [resolve('node_modules/typescript/bin/tsc'), '-p', join(fixture, 'docs/tsconfig.json')],
+    {
+      stdio: 'inherit',
+    },
+  );
   execFileSync(process.execPath, [join(fixture, 'out/consumer.js')], { cwd: fixture, stdio: 'inherit' });
   // Run against the installed tarball itself. Relative internal-module imports and
   // public package imports must share the same React contexts and asset caches.

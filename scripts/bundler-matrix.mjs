@@ -1,12 +1,12 @@
 // The bundler matrix: installs the packed packages (test-results/modern-packages, from `npm run modern:test:packages`)
-// into a clean project and builds the same tiny app with Vite, webpack, esbuild and Rollup, a Next.js page with
+// into a clean project and builds the same tiny app with Vite, webpack, esbuild and Rollup, a Next.js App Router page (server component, client Scene, Suspense) and a Pages Router page, no transpilePackages, with
 // webpack and Turbopack, and loads it in a browser from a plain import map (margoengine's dist/importmap.json, the CDN
 // base pointed at a local server). Each build must contain the stage, core, shadows and orbit controls the app imports
 // and none of the packages it does not import.
 //   npm run modern:test:bundlers      (after modern:test:packages; installs the bundlers from npm)
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, realpathSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -35,7 +35,8 @@ for (const dir of (await readdir(join(root, 'packages'))).filter((d) =>
 const version = (name) =>
   JSON.parse(execFileSync(process.execPath, [npm, 'view', name, 'version', '--json'], { encoding: 'utf8' }));
 
-const fixture = await mkdtemp(join(tmpdir(), 'margoengine-bundlers-'));
+// The real path, not a Windows 8.3 short one (): Turbopack loads React twice under two spellings of one folder.
+const fixture = await mkdtemp(join(realpathSync.native(tmpdir()), 'margoengine-bundlers-'));
 const results = [];
 const check = (bundler, modules) => {
   const packages = new Set(
@@ -195,17 +196,26 @@ try {
     const app = join(fixture, 'next');
     await mkdir(join(app, 'app'), { recursive: true });
     await writeFile(join(app, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
-    await writeFile(
-      join(app, 'next.config.mjs'),
-      "export default { transpilePackages: ['margoengine', '@margoengine/core', '@margoengine/stage', '@margoengine/react'] };\n",
-    );
+    await mkdir(join(app, 'pages'), { recursive: true });
+    // No transpilePackages: the packages ship compiled ESM with 'use client' on the React entry.
+    await writeFile(join(app, 'next.config.mjs'), 'export default {};\n');
     await writeFile(
       join(app, 'app/layout.jsx'),
       'export default function Layout({ children }) { return <html lang="en"><body>{children}</body></html>; }\n',
     );
     await writeFile(
+      join(app, 'app/scene.jsx'),
+      '\'use client\';\nimport { Canvas, Mesh, BoxGeometry, PbrMaterial } from \'margoengine/react\';\nexport function Scene() { return <Canvas label="cube"><Mesh><BoxGeometry /><PbrMaterial color="#84d6bd" /></Mesh></Canvas>; }\n',
+    );
+    // App Router: a server component page with the client Scene behind Suspense.
+    await writeFile(
       join(app, 'app/page.jsx'),
-      '\'use client\';\nimport { Canvas, Mesh, BoxGeometry, PbrMaterial } from \'margoengine/react\';\nexport default function Page() { return <Canvas label="cube"><Mesh><BoxGeometry /><PbrMaterial color="#84d6bd" /></Mesh></Canvas>; }\n',
+      "import { Suspense } from 'react';\nimport { Scene } from './scene';\nexport default function Page() { return <main><h1>Margo</h1><Suspense fallback={<p>Loading</p>}><Scene /></Suspense></main>; }\n",
+    );
+    // Pages Router: the same Scene.
+    await writeFile(
+      join(app, 'pages/pages-router.jsx'),
+      "import { Scene } from '../app/scene';\nexport default function Page() { return <Scene />; }\n",
     );
     for (const flag of ['--webpack', '--turbopack']) {
       await rm(join(app, '.next'), { recursive: true, force: true });
@@ -215,7 +225,12 @@ try {
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
       });
       assert.ok(existsSync(join(app, '.next/BUILD_ID')), `next build ${flag}`);
-      results.push(`next ${flag}: built`);
+      assert.ok(
+        readFileSync(join(app, '.next/server/app/index.html'), 'utf8').includes('<h1>Margo</h1>'),
+        `next ${flag}: the server page renders its heading`,
+      );
+      assert.ok(existsSync(join(app, '.next/server/pages/pages-router.html')), `next ${flag}: Pages Router page`);
+      results.push(`next ${flag}: App Router + Pages Router built`);
     }
   }
   // A plain browser import map: margoengine's dist/importmap.json with its CDN base pointed at this server.

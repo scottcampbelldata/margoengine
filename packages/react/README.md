@@ -241,6 +241,30 @@ export function Game() {
 
 `useFrame((engine, deltaSeconds) => ...)` updates meshes without React renders or re-subscribing when the callback changes. The canvas serializes initialization, disposes superseded engines, and disconnects ResizeObserver during cleanup. It handles StrictMode, HMR effect replacement, late initialization after unmount, and `capacity`/`backend` changes. Camera changes update the existing engine. Errors reach `onError` and an accessible alert.
 
+## Next.js
+
+Both the App Router and the Pages Router work, with webpack and with Turbopack, and need no `transpilePackages`. Keep the
+page a server component and put the `Canvas` in a small client component:
+
+```tsx
+// app/scene.tsx
+'use client';
+import { Canvas, Box, OrbitControls } from '@margoengine/react';
+
+export function Scene() {
+  return (
+    <Canvas style={{ height: '70vh' }} label="Product viewer">
+      <Box color="#84d6bd" />
+      <OrbitControls enableDamping />
+    </Canvas>
+  );
+}
+```
+
+Import `Scene` from a server `page.tsx` behind `<Suspense fallback={...}>`. Next.js example: `examples/next`. More recipes are
+in the [React cookbook](../../docs/react-cookbook.md); moving from react-three-fiber is in
+[Coming from react-three-fiber](../../docs/react-from-r3f.md).
+
 SSR emits an accessible canvas without accessing GPU APIs. The ESM output preserves `use client` and includes TypeScript declarations. Peer ranges accept the current core 0.1.x workspace and the requested core 1.x release, plus React 18/19.
 
 Run `npm run build:packages` followed by `npm run modern:test:react` for React Testing Library/JSDOM lifecycle tests, including the canonical target snippet, StrictMode events, Suspense, cancellation, cache reuse and demand rendering. `npm run typecheck`, `npm run test:modules:packages`, and `npm run measure:size` verify package types, imports, and the core + stage ceiling of 25,000 bytes gzip; the current measurement is 21,107 bytes gzip. Run `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example. The adapter uses standard hooks, never `react-reconciler`. Frame dispatch forwards `(engine, deltaSeconds)` without building per-frame state objects or callback arrays.
