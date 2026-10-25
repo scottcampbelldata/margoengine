@@ -137,5 +137,4 @@ still meshes. Tessellation options out of range throw a `RangeError` that names 
 
 ## Licence
 
-`@margoengine/brep` is dual licensed: GNU AGPLv3 (`LICENSE`) or a commercial proprietary licence for enterprise
-integrations (`LICENSE-COMMERCIAL.md`). The rest of Margo Engine is MIT licensed.
+`@margoengine/brep` is MIT licensed, like the rest of Margo Engine (`LICENSE`).

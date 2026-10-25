@@ -7,7 +7,6 @@ import { gzipSync, deflateRawSync, inflateRawSync } from 'node:zlib';
 import { compactPackage } from './compact-package.js';
 import { compactOutput, external, measureCoreStage } from './measure-size.js';
 import { packageOrder } from './package-order.js';
-import { ownLicenses } from './package-licenses.js';
 import { buildWorkers, restoreWorkerUrls } from './build-workers.js';
 import { staticEmbind } from './static-embind.js';
 import { packageDeclarations, packageRuntime } from './package-declarations.js';
@@ -141,7 +140,7 @@ for (const name of packageOrder(manifests)) {
   const output = resolve(`packages/${name}/dist`);
   assert.equal(dirname(output), resolve(`packages/${name}`), 'Output escaped its package');
   await rm(output, { recursive: true, force: true });
-  if (!ownLicenses.has(name)) await copyFile('LICENSE', `packages/${name}/LICENSE`);
+  await copyFile('LICENSE', `packages/${name}/LICENSE`);
   if (name === 'core' || name === 'stage') {
     await tsc(name);
     await compactPackage(name);
