@@ -19,7 +19,32 @@ export interface AtlasOptions {
     maxSize?: number;
 }
 
+export interface TileGridAtlas extends Atlas {
+    columns: number;
+    rows: number;
+    tileWidth: number;
+    tileHeight: number;
+    padding: number;
+}
+
+export interface TileGridOptions {
+    tileWidth: number;
+    tileHeight: number;
+    padding?: number;
+    margin?: number;
+    spacing?: number;
+}
+
 export function packAtlas(images: readonly (Pixels | CanvasImageSource)[], { padding, maxSize }?: AtlasOptions): Atlas;
+
+export function padTileGrid(image: Pixels | CanvasImageSource, options: TileGridOptions): TileGridAtlas;
+
+export function remapTileUVs(uvs: ArrayLike<number>, tiles: ArrayLike<number>, grid: TileGridAtlas, source: {
+    width: number;
+    height: number;
+    margin?: number;
+    spacing?: number;
+}): Float32Array;
 
 export function transformUVs(uvs: ArrayLike<number>, { offset, scale, rotation }: TextureTransform): Float32Array;
 

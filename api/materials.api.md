@@ -734,6 +734,22 @@ export interface TileFrame {
     uvs: ArrayLike<number>;
 }
 
+export interface TileGridAtlas extends Atlas {
+    columns: number;
+    rows: number;
+    tileWidth: number;
+    tileHeight: number;
+    padding: number;
+}
+
+export interface TileGridOptions {
+    tileWidth: number;
+    tileHeight: number;
+    padding?: number;
+    margin?: number;
+    spacing?: number;
+}
+
 export class ToonMaterial extends Material {
     constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'steps' | 'gradientMap'> | MetalKeys | EnvKeys>);
 }
@@ -864,6 +880,15 @@ export function nodeMaterial(graph: MaterialGraph, options?: NodeMaterialOptions
 export function packAtlas(images: readonly (Pixels | CanvasImageSource)[], { padding, maxSize }?: AtlasOptions): Atlas;
 
 export function packGeometry(g: MeshGeometry): PreparedGeometry;
+
+export function padTileGrid(image: Pixels | CanvasImageSource, options: TileGridOptions): TileGridAtlas;
+
+export function remapTileUVs(uvs: ArrayLike<number>, tiles: ArrayLike<number>, grid: TileGridAtlas, source: {
+    width: number;
+    height: number;
+    margin?: number;
+    spacing?: number;
+}): Float32Array;
 
 export function sheen(options?: SheenOptions, base?: MaterialExtension): MaterialExtension;
 

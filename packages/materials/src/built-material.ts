@@ -46,7 +46,16 @@ import {
 import { generateMipmaps } from '../../shared/mipmaps.js';
 import { clipStatement, sectionShader } from '../../shared/section.js';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
-export { packAtlas, transformUVs, type Atlas, type AtlasOptions } from './atlas.js';
+export {
+  packAtlas,
+  padTileGrid,
+  remapTileUVs,
+  transformUVs,
+  type Atlas,
+  type AtlasOptions,
+  type TileGridAtlas,
+  type TileGridOptions,
+} from './atlas.js';
 export type { EnvCombine, EnvironmentMap } from './env-map.js';
 export type {
   CubeTarget,

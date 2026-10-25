@@ -147,6 +147,23 @@ GPU resources and extension reassignment or reinstallation after device restorat
 `packAtlas` and `transformUVs` (also on the root) without the material classes or gltf-pro, for bakers that only pack
 images (`@margoengine/lightmap` does).
 
+`padTileGrid(image, {tileWidth, tileHeight, padding = 2, margin = 0, spacing = 0})` pads a texture that is already a
+grid of equal tiles (a tileset): each tile is laid out again with `padding` copies of its own border pixels around it,
+so linear filtering and the first mip levels sample the tile's own edge instead of its neighbour, with no seams and
+no bleeding. `margin` and `spacing` are the source's gutters (as Tiled names them) and are dropped. Tile pixels are
+kept exactly; `regions[row * columns + column]` maps a tile's 0-1 UVs onto it, counted from the top-left tile.
+`remapTileUVs(uvs, tiles, grid, source)` moves UVs written for the source grid onto the padded one, given each
+vertex's tile index.
+
+```ts
+import {padTileGrid, remapTileUVs} from 'margoengine/materials/atlas';
+
+declare const tileset: {data: Uint8Array; width: number; height: number};
+declare const uvs: Float32Array, tileOfVertex: Uint32Array;
+const grid = padTileGrid(tileset, {tileWidth: 16, tileHeight: 16, padding: 2});
+const padded = remapTileUVs(uvs, tileOfVertex, grid, {width: tileset.width, height: tileset.height});
+```
+
 ## Node materials
 
 `nodeMaterial(graph, options?)` compiles a small TypeScript object graph into one `MaterialExtension`. Connect nodes by object reference, list at least the output in `graph.nodes`, then assign the result to a primitive or material's extension slot:

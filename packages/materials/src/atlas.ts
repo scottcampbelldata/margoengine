@@ -106,6 +106,109 @@ export function packAtlas(
     })),
   };
 }
+/** Options for {@link padTileGrid}: the source grid's cells and the padding to add around each. */
+export interface TileGridOptions {
+  /** Tile width and height in pixels, positive integers. */
+  tileWidth: number;
+  tileHeight: number;
+  /** Border pixels repeated around every tile in the output, so filtering and mip levels do not bleed. Default 2. */
+  padding?: number;
+  /** Pixels around the whole source grid (Tiled's tileset margin). Default 0. */
+  margin?: number;
+  /** Pixels between source tiles (Tiled's tileset spacing). Default 0. */
+  spacing?: number;
+}
+/** {@link padTileGrid}'s result: the padded image, one region per tile (row-major, top row first) and the grid's size. */
+export interface TileGridAtlas extends Atlas {
+  columns: number;
+  rows: number;
+  tileWidth: number;
+  tileHeight: number;
+  padding: number;
+}
+/**
+ * Re-lays an atlas that is already a grid of equal tiles (a tileset) with `padding` copies of each tile's own border
+ * pixels around it, so linear filtering and the first mip levels sample the tile's edge instead of its neighbour (no
+ * seams, no bleeding). Tile (column, row), counted from the top-left of the source image, keeps its pixels exactly;
+ * `regions[row * columns + column]` maps its 0-1 UVs onto it, and {@link remapTileUVs} moves UVs written for the
+ * source grid. Raw data and ImageData keep their row order; images, bitmaps and canvases are read through a 2D canvas
+ * as `packAtlas` does. Throws RangeError for a grid that does not fit the image or options out of range.
+ */
+export function padTileGrid(image: Pixels | CanvasImageSource, options: TileGridOptions): TileGridAtlas {
+  const [s, flip] = pixels(image),
+    { tileWidth: tw, tileHeight: th, padding: p = 2, margin = 0, spacing = 0 } = options ?? ({} as TileGridOptions);
+  if (![tw, th].every((v) => Number.isInteger(v) && v > 0))
+    throw new RangeError('Tile grid tileWidth and tileHeight must be positive integers; pass the tile size in pixels');
+  if (![p, margin, spacing].every((v) => Number.isInteger(v) && v >= 0))
+    throw new RangeError('Tile grid padding, margin and spacing must be integers >= 0');
+  if (!(Number.isInteger(s.width) && Number.isInteger(s.height) && s.data.length >= s.width * s.height * 4))
+    throw new RangeError('Tile grid image needs width*height RGBA8 pixels');
+  const columns = Math.floor((s.width - 2 * margin + spacing) / (tw + spacing)),
+    rows = Math.floor((s.height - 2 * margin + spacing) / (th + spacing));
+  if (columns < 1 || rows < 1)
+    throw new RangeError('Tile grid tiles do not fit the image; check tileWidth, tileHeight, margin and spacing');
+  const pw = tw + 2 * p,
+    ph = th + 2 * p,
+    width = columns * pw,
+    height = rows * ph;
+  if (width * height > 16_777_216) throw new RangeError('Tile grid output exceeds 4096x4096 pixels; use less padding');
+  // Source pixel (x, y), rows top first as decoded; drawable images are written bottom row first (see pixels()).
+  const source = (x: number, y: number) => (y * s.width + x) * 4;
+  const data = new Uint8Array(width * height * 4);
+  for (let row = 0; row < rows; row++)
+    for (let column = 0; column < columns; column++) {
+      const sx = margin + column * (tw + spacing),
+        sy = margin + row * (th + spacing);
+      for (let y = -p; y < th + p; y++)
+        for (let x = -p; x < tw + p; x++) {
+          const from = source(sx + Math.min(tw - 1, Math.max(0, x)), sy + Math.min(th - 1, Math.max(0, y))),
+            oy = row * ph + p + y,
+            to = ((flip ? height - 1 - oy : oy) * width + column * pw + p + x) * 4;
+          for (let c = 0; c < 4; c++) data[to + c] = s.data[from + c];
+        }
+    }
+  const regions: TextureTransform[] = [];
+  for (let row = 0; row < rows; row++)
+    for (let column = 0; column < columns; column++) {
+      const top = row * ph + p;
+      regions.push({
+        offset: [(column * pw + p) / width, (flip ? height - top - th : top) / height],
+        scale: [tw / width, th / height],
+      });
+    }
+  return { image: { data, width, height }, regions, columns, rows, tileWidth: tw, tileHeight: th, padding: p };
+}
+/**
+ * Moves UV pairs written for the source grid onto `grid`'s padded atlas. `tiles` names each vertex's tile as an index
+ * `row * columns + column` (UVs on a shared tile edge are ambiguous, so the caller says which tile a vertex belongs
+ * to); a UV outside its tile is kept at the same offset from it. `sourceWidth`/`sourceHeight` and `margin`/`spacing`
+ * describe the source image as passed to {@link padTileGrid}.
+ */
+export function remapTileUVs(
+  uvs: ArrayLike<number>,
+  tiles: ArrayLike<number>,
+  grid: TileGridAtlas,
+  source: { width: number; height: number; margin?: number; spacing?: number },
+): Float32Array {
+  if (tiles.length * 2 !== uvs.length)
+    throw new RangeError('remapTileUVs needs one tile index per UV pair; pass tiles of length uvs.length / 2');
+  const { width, height, margin = 0, spacing = 0 } = source,
+    out = new Float32Array(uvs.length);
+  for (let i = 0; i < tiles.length; i++) {
+    const tile = tiles[i];
+    if (!Number.isInteger(tile) || tile < 0 || tile >= grid.regions.length)
+      throw new RangeError(`remapTileUVs tile ${tile} is not in the grid; use 0 to ${grid.regions.length - 1}`);
+    const column = tile % grid.columns,
+      row = Math.floor(tile / grid.columns),
+      // Position inside the tile, in tile units, from the source tile's own corner (v counted like the image rows).
+      u = (uvs[i * 2] * width - (margin + column * (grid.tileWidth + spacing))) / grid.tileWidth,
+      v = (uvs[i * 2 + 1] * height - (margin + row * (grid.tileHeight + spacing))) / grid.tileHeight,
+      r = grid.regions[tile];
+    out[i * 2] = r.offset![0] + u * r.scale![0];
+    out[i * 2 + 1] = r.offset![1] + v * r.scale![1];
+  }
+  return out;
+}
 /** Applies a texture transform to packed UV pairs (bake an atlas region into geometry before merging meshes). */
 export function transformUVs(
   uvs: ArrayLike<number>,
