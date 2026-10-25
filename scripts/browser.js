@@ -129,6 +129,8 @@ export async function openBrowser({
         if (wgsl.modules.size)
           console.log(`WGSL: ${wgsl.modules.size} distinct shader modules compiled, ${wgsl.errors.length} errors`);
         if (wgsl.errors.length) throw new Error(`WGSL compile errors:\n${wgsl.errors.slice(0, 20).join('\n')}`);
+        if (wgsl.unexpected.length)
+          throw new Error(`WGSL modules labelled expect-error compiled cleanly: ${wgsl.unexpected.join(', ')}`);
       },
     };
   } catch (error) {

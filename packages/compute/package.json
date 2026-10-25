@@ -1,0 +1,78 @@
+{
+  "name": "@margoengine/compute",
+  "version": "1.0.0",
+  "description": "GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection, histograms, matmul, FFT, convolution, random numbers, streaming, and WGSL kernels bound by name.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "gpgpu",
+    "compute",
+    "wgsl",
+    "data-science"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/compute"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./linalg": {
+      "types": "./dist/linalg.d.ts",
+      "import": "./dist/linalg.js"
+    },
+    "./fft": {
+      "types": "./dist/fft.d.ts",
+      "import": "./dist/fft.js"
+    },
+    "./signal": {
+      "types": "./dist/signal.d.ts",
+      "import": "./dist/signal.js"
+    },
+    "./random": {
+      "types": "./dist/random.d.ts",
+      "import": "./dist/random.js"
+    },
+    "./stream": {
+      "types": "./dist/stream.d.ts",
+      "import": "./dist/stream.js"
+    },
+    "./frame": {
+      "types": "./dist/frame.d.ts",
+      "import": "./dist/frame.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/core": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js compute",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:browser": "npm run build && node tests/compute-browser.mjs",
+    "prepack": "npm run build"
+  }
+}

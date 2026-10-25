@@ -480,6 +480,7 @@ try {
           }
           result.captures.push(await capture());
           for (const e of wgsl.errors) result.errors.push(`wgsl: ${e}`);
+          for (const label of wgsl.unexpected) result.errors.push(`wgsl: ${label} was expected to fail and compiled`);
           for (const k of wgsl.modules) wgslModules.add(k);
         } catch (error) {
           if (error.name === 'MargoError' && error.code === 'state') throw error;

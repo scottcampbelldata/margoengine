@@ -140,7 +140,9 @@ if (!quick) {
         if (!text || text.startsWith('import ') || /^export \{[^}]*\}( from |;)/.test(text)) continue;
         if (!counted.has(dir + '\0' + text)) {
           counted.add(dir + '\0' + text);
-          const anys = (text.match(/\bany\b/g) ?? []).length;
+          // The `any` type only: not the word in doc comments, nor a member named any (NumPy's any()).
+          const code = text.replace(/\/\*[\s\S]*?\*\//g, '');
+          const anys = (code.match(/\bany\b(?!\??\s*\()/g) ?? []).length;
           add(dir, 'any', 1, anys ? 1 : 0, { publicAny: anys });
         }
         const m =

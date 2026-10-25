@@ -25,10 +25,11 @@
     },
     "dot": {
       "packages": [
+        "compute",
         "math",
         "shader"
       ],
-      "reason": "Same vocabulary, two domains (CPU arrays in math/vec3, WGSL built-in node in shader). Decision in docs/conventions.md."
+      "reason": "Same vocabulary, three domains (CPU arrays in math/vec3, WGSL built-in node in shader, GPU arrays in compute/linalg as NumPy's dot). Decision in docs/conventions.md."
     },
     "length": {
       "packages": [

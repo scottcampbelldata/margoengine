@@ -135,6 +135,34 @@
       "types": "./dist/clustered/units.d.ts",
       "import": "./dist/clustered/units.js"
     },
+    "./compute": {
+      "types": "./dist/compute.d.ts",
+      "import": "./dist/compute.js"
+    },
+    "./compute/linalg": {
+      "types": "./dist/compute/linalg.d.ts",
+      "import": "./dist/compute/linalg.js"
+    },
+    "./compute/fft": {
+      "types": "./dist/compute/fft.d.ts",
+      "import": "./dist/compute/fft.js"
+    },
+    "./compute/signal": {
+      "types": "./dist/compute/signal.d.ts",
+      "import": "./dist/compute/signal.js"
+    },
+    "./compute/random": {
+      "types": "./dist/compute/random.d.ts",
+      "import": "./dist/compute/random.js"
+    },
+    "./compute/stream": {
+      "types": "./dist/compute/stream.d.ts",
+      "import": "./dist/compute/stream.js"
+    },
+    "./compute/frame": {
+      "types": "./dist/compute/frame.d.ts",
+      "import": "./dist/compute/frame.js"
+    },
     "./controls": {
       "types": "./dist/controls.d.ts",
       "import": "./dist/controls.js"
@@ -1194,6 +1222,7 @@
     "@margoengine/cameras": "^1.0.0",
     "@margoengine/cinematic": "^1.0.0",
     "@margoengine/clustered": "^1.0.0",
+    "@margoengine/compute": "^1.0.0",
     "@margoengine/controls": "^1.0.0",
     "@margoengine/core": "^1.0.0",
     "@margoengine/creative": "^1.0.0",

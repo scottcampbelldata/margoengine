@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPU data lab · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+  <style>
+    .controls{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;margin:0 0 16px}
+    .controls label{display:flex;gap:8px;align-items:center;color:#d8e4f5}
+    .controls output{min-width:7ch;font-variant-numeric:tabular-nums}
+    button{font:inherit;padding:6px 14px;border-radius:6px;border:1px solid #62718b;background:#263449;color:#edf2fa;cursor:pointer}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0 0;padding:0;list-style:none}
+    .stats li{background:#182131;border-radius:8px;padding:8px 12px;font-variant-numeric:tabular-nums}
+    .stats b{display:block;font-size:12px;color:#93a4bd;font-weight:500}
+  </style>
+</head>
+<body>
+  <h1>GPU data lab</h1>
+  <p><code>@margoengine/compute</code> · Millions of samples drawn on the GPU (Philox, seeded), then a histogram, a sort for the CDF and quantiles, and the moments, all fused GPU kernels with no WebGPU code in the demo. Change the mix and watch it recompute.</p>
+  <div class="controls">
+    <label>Samples <input id="count" type="range" min="16" max="24" value="22" step="1"><output id="countOut"></output></label>
+    <label>Second peak <input id="mix" type="range" min="0" max="100" value="35"><output id="mixOut"></output></label>
+    <label>Seed <input id="seed" type="number" value="42" min="0" style="width:7ch"></label>
+    <button id="run" type="button">Recompute</button>
+  </div>
+  <div class="views">
+    <canvas id="viewport" aria-label="Histogram of the samples with the cumulative distribution drawn over it"></canvas>
+  </div>
+  <ul class="stats" id="stats" aria-live="polite"></ul>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./compute-lab.ts'));
+  </script>
+</body>
+</html>

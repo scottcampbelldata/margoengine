@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 2978445,
+  "total": 3052587,
   "history": [
     {
       "date": "2026-10-24",
@@ -164,6 +164,12 @@
       "commit": "f207bc42",
       "reason": "react Animation: speed, time, onFinished, blend trees, parameters, layers and a ref handle",
       "grew": 1
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "5130e135",
+      "reason": "New optional @margoengine/compute (data track, queue item 22): NumPy-style GPU arrays and primitives; linalg, fft, signal, random, stream and frame entries",
+      "grew": 7
     }
   ],
   "items": {
@@ -191,6 +197,13 @@
     "@margoengine/clustered/projector": 2874,
     "@margoengine/clustered/shadows": 10577,
     "@margoengine/clustered/units": 1089,
+    "@margoengine/compute": 25153,
+    "@margoengine/compute/fft": 6082,
+    "@margoengine/compute/frame": 25383,
+    "@margoengine/compute/linalg": 5812,
+    "@margoengine/compute/random": 2746,
+    "@margoengine/compute/signal": 7544,
+    "@margoengine/compute/stream": 1422,
     "@margoengine/controls": 22891,
     "@margoengine/controls/arcball": 4582,
     "@margoengine/controls/drag": 2633,

@@ -524,3 +524,25 @@ carry the same citation as a one-line comment in the code.
 | W11 | integer hash for spray | water/src/spray.ts | xxHash32 avalanche (Collet, xxHash specification): public, but uncited (already listed in hashes.md) |
 | W12 | spray seeding and ballistics | water/src/spray.ts | Teschner et al. 2003 (spatial-hash primes), uncited |
 | W13 | fog tail on water (Neutral + fog mix + sRGB) | water/src/index.ts | Khronos PBR Neutral; IEC 61966-2-1 |
+
+## Data track: `@margoengine/compute`
+
+Written clean room in October 2026 from the specifications, papers and API documentation below. No source code of
+another GPU, array or data library (NumPy, CuPy, TensorFlow.js, GPU.js, taichi.js, Random123, cuFFT/VkFFT and the like)
+was read. API names and semantics follow the libraries' public documentation so data scientists find what they
+expect; the documentation describes behaviour, not code.
+
+| Area | Source |
+| --- | --- |
+| WGSL reflection, host-shareable layout, f16 | W3C WebGPU Shading Language (resource interface; alignment and size table); W3C WebGPU (bind group layouts, timestamp queries, indirect dispatch); IEEE 754-2019 binary16 |
+| Broadcasting, type promotion, `take`, `histogram`, `quantile` (linear), `argsort`, `mod`/`floorDiv`, `unique`, `bincount`, `convolve` modes | NumPy reference documentation (broadcasting rules; NEP 50 "Promotion rules for Python scalars") |
+| `convolve2d` modes with zero fill | SciPy `scipy.signal.convolve2d` documentation |
+| Reduce tree, scan | W. D. Hillis and G. L. Steele, "Data parallel algorithms", CACM 29(12), 1986; G. E. Blelloch, "Prefix sums and their applications", CMU-CS-90-190, 1990 |
+| Segmented scan operator | J. T. Schwartz, "Ultracomputers", ACM TOPLAS 2(4), 1980; Blelloch 1990, section 1.5 |
+| Radix sort | N. Satish, M. Harris and M. Garland, "Designing efficient sorting algorithms for manycore GPUs", IPDPS 2009 |
+| Matrix product tiling | V. Volkov and J. W. Demmel, "Benchmarking GPUs to tune dense linear algebra", SC08 |
+| FFT, Stockham radix-2 | N. K. Govindaraju, B. Lloyd, Y. Dotsenko, B. Smith and J. Manferdelli, "High performance discrete Fourier transforms on graphics processors", SC08; C. Van Loan, "Computational Frameworks for the Fast Fourier Transform", SIAM 1992 |
+| FFT of any length | L. I. Bluestein, "A linear filtering approach to the computation of the discrete Fourier transform", IEEE Trans. Audio Electroacoustics 18(4), 1970 |
+| Random numbers | J. K. Salmon, M. A. Moraes, R. O. Dror and D. E. Shaw, "Parallel random numbers: as easy as 1, 2, 3", SC11 (Philox4x32-10 constants and the published known-answer vectors, used as test data); G. E. P. Box and M. E. Muller, Ann. Math. Statist. 29(2), 1958; D. Lemire, "Fast random integer generation in an interval", ACM TOMACS 29(1), 2019 |
+| `log1p`, `expm1` | D. Goldberg, "What every computer scientist should know about floating-point arithmetic", ACM Computing Surveys 23(1), 1991 |
+| Streaming mean and variance | T. F. Chan, G. H. Golub and R. J. LeVeque, "Algorithms for computing the sample variance", Amer. Statistician 37(3), 1983 |

@@ -85,6 +85,7 @@ const pages = [
   'depth-texture',
   'animation-formats',
   'texture-formats',
+  'compute-lab',
 ];
 await site({
   configFile: false,

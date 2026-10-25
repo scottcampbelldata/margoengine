@@ -100,7 +100,8 @@
     "apps/showcase-night-citadel",
     "packages/voxel-edit",
     "packages/lightmap",
-    "packages/mesh-edit"
+    "packages/mesh-edit",
+    "packages/compute"
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",

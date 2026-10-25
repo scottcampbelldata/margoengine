@@ -41,7 +41,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-78 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
+79 packages in 11 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -164,6 +164,12 @@ node --test tests/catalog.test.js
 | [`@margoengine/bvh`](../packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
 | [`@margoengine/geometry`](../packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 | [`@margoengine/mesh-edit`](../packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |
+
+### Data and science (1)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/compute`](../packages/compute/README.md) | GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection, histograms, matmul, FFT, convolution, random numbers, streaming, and WGSL kernels bound by name. |
 
 ### Frameworks (1)
 
