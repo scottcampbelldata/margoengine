@@ -41,7 +41,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-80 packages in 11 layers, the same as the [catalog](https://margoengine.com/catalog/).
+81 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -171,6 +171,12 @@ node --test tests/catalog.test.js
 | --- | --- |
 | [`@margoengine/compute`](../packages/compute/README.md) | GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection, histograms, matmul, FFT, convolution, random numbers, streaming, and WGSL kernels bound by name. |
 | [`@margoengine/sciviz`](../packages/sciviz/README.md) | Scientific visualisation for Margo Engine: volume rendering with transfer functions, slices and GPU isosurfaces, million-point scatter plots, surface and line plots with axes, ticks, labels and colour bars, and perceptual colour maps. |
+
+### AI tools (1)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/mcp`](../packages/mcp/README.md) | A Model Context Protocol server for Margo Engine: AI coding tools (Claude, Cursor, Copilot) search the docs and API, read a package, list the examples and type-check a snippet against the real package types. Plain stdio JSON-RPC, no dependencies. |
 
 ### Frameworks (1)
 

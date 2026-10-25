@@ -9,6 +9,7 @@ import { cp, rm, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { readSizesInputs, sizesPage } from './build-sizes.js';
+import { writeSitePages } from './build-llms.mjs';
 
 const out = resolve('site/dist');
 // Ten-character hashes renamed every asset once: without site/404.html, Pages answered a request that reached a
@@ -52,6 +53,8 @@ await mkdir(out, { recursive: true });
 for (const name of await readdir('site'))
   if (name !== 'dist') await cp(`site/${name}`, `${out}/${name}`, { recursive: true });
 await cp('docs', `${out}/catalog`, { recursive: true, filter: (source) => !source.endsWith('.md') });
+// The pages that site/llms.txt links to: one README and one API page per package, the docs and the example list.
+writeSitePages(out);
 // Sizes come only from measurements of this commit. `npm run build:site` measures first (entry sizes, then the basic
 // scene's network log); a direct run (visual:check) with older records leaves the page out rather than publish another
 // commit's numbers.

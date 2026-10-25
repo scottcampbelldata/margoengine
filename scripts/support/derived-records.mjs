@@ -10,6 +10,8 @@ import { execFileSync } from 'node:child_process';
 export const DERIVED = [
   'api/*.api.md',
   'docs/api-surface.md',
+  'site/llms.txt',
+  'site/llms-full.txt',
   'examples/package-benchmarks/results/entry-sizes.json',
   'examples/package-benchmarks/results/basic-scene-network.json',
 ];

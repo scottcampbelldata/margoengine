@@ -2096,6 +2096,36 @@
     ]
   },
   {
+    "id": "mcp",
+    "title": "MCP server",
+    "category": "AI tools",
+    "package": "@margoengine/mcp",
+    "version": "1.0.0",
+    "published": false,
+    "description": "A Model Context Protocol server for Margo Engine: AI coding tools (Claude, Cursor, Copilot) search the docs and API, read a package, list the examples and type-check a snippet against the real package types. Plain stdio JSON-RPC, no dependencies.",
+    "requirements": "See the package guide for requirements",
+    "keywords": "mcp model context protocol ai claude cursor copilot llms",
+    "install": "npm install @margoengine/mcp@1.0.0",
+    "imports": "import { createMargoServer } from '@margoengine/mcp';",
+    "exports": [
+      "INSTRUCTIONS",
+      "PROTOCOL_VERSIONS",
+      "RPC",
+      "VERSION",
+      "checkSnippet",
+      "createIndex",
+      "createMargoServer",
+      "createMcpServer",
+      "createTools",
+      "formatReport",
+      "loadCorpus",
+      "packageId",
+      "runCli",
+      "searchCorpus",
+      "serveStdio"
+    ]
+  },
+  {
     "id": "react",
     "title": "React components",
     "package": "@margoengine/react",

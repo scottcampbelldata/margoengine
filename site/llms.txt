@@ -1,0 +1,254 @@
+# Margo Engine
+
+> Margo Engine is a WebGPU 3D engine for the web, written in TypeScript with a small Wasm kernel. `@margoengine/core` plus the stage facade (`margoengine`) stay under 25,000 bytes gzip; everything else (glTF PBR, animation, post-processing, physics, CAD, voxels, GPU compute, scientific visualisation) is a separate, optional, tree-shakable package. ESM only, full types, glTF and real-world units by default, `AbortSignal` on anything that loads, coded errors with a help link.
+
+Import the stage for a canvas, camera, controls and loading in a few lines (`import { createStage } from "margoengine"`), or the engine for full control (`import { Engine } from "@margoengine/core"`). Add a feature by importing its package; `margoengine/<name>` and `@margoengine/<name>` are the same module. Everything needs a browser with WebGPU, except `@margoengine/webgl`, which previews a basic scene on WebGL2. Margo is written clean room: it does not copy or adapt code from other engines. The `@margoengine/mcp` package is a Model Context Protocol server that gives AI tools these docs, a type-check for snippets and the example list.
+
+## Start here
+
+- [Full documentation as one file](https://margoengine.com/llms-full.txt): guides in full and each package README (long ones cut), for tools that take a single text
+- [Package index](https://margoengine.com/catalog/): searchable list of every package, its imports and runtime exports
+- [Error help](https://margoengine.com/errors): cause and fix for every coded error message
+- [Examples](https://margoengine.com/llms/examples.md): runnable example pages and projects
+
+## Guides
+
+- [API overview](https://margoengine.com/llms/docs/api-overview.md): A short tour of the three levels (stage, engine, packages) with the code for each
+- [Package conventions](https://margoengine.com/llms/docs/conventions.md): Naming, errors, units and the rules every package follows
+- [A mobile-first architectural walkthrough in ~50 lines](https://margoengine.com/llms/docs/guides/walkthrough.md): Step-by-step first scene to a loaded model
+- [Which import do I need?](https://margoengine.com/llms/docs/guides/imports.md): Which import to use: margoengine/<name> versus @margoengine/<name>
+- [Quality tiers: one app that runs at 60 FPS on a laptop and looks its best on a fast PC](https://margoengine.com/llms/docs/guides/quality-tiers.md): High and low quality tiers and how a page picks one
+- [Kits](https://margoengine.com/llms/docs/guides/kits.md): Kits: one import for a whole domain (CAD, games, viz, web)
+- [Coming from three.js](https://margoengine.com/llms/docs/from-threejs.md): Moving from three.js: the same task in Margo, name by name
+- [Design envelope](https://margoengine.com/llms/docs/limits.md): Measured limits and sizes, with the commands that measure them
+- [Known bugs and unverified features](https://margoengine.com/llms/docs/known-bugs.md): Open bugs with repro and cause
+- [Using Margo with AI tools](https://margoengine.com/llms/docs/ai-tools.md): Using Margo with Claude, Cursor, Copilot and the @margoengine/mcp server
+
+## Packages: Start here
+
+- [margoengine](https://margoengine.com/llms/packages/margoengine.md): Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react).
+- [@margoengine/stage](https://margoengine.com/llms/packages/stage.md): The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine.
+- [@margoengine/core](https://margoengine.com/llms/packages/core.md): WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl package.
+
+## Packages: Setup and diagnostics
+
+- [@margoengine/math](https://margoengine.com/llms/packages/math.md): Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math, one module per type.
+- [@margoengine/quality](https://margoengine.com/llms/packages/quality.md): Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom.
+- [@margoengine/webgl](https://margoengine.com/llms/packages/webgl.md): WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}).
+- [@margoengine/stats](https://margoengine.com/llms/packages/stats.md): Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling.
+- [@margoengine/inspector](https://margoengine.com/llms/packages/inspector.md): Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger.
+
+## Packages: Loading and formats
+
+- [@margoengine/gltf](https://margoengine.com/llms/packages/gltf.md): Lazy static glTF/GLB loading for Margo Engine.
+- [@margoengine/gltf-pro](https://margoengine.com/llms/packages/gltf-pro.md): Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU.
+- [@margoengine/loaders](https://margoengine.com/llms/packages/loaders.md): PLY, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.
+- [@margoengine/decoders](https://margoengine.com/llms/packages/decoders.md): Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG, TGA, TIFF, DDS and KTX reading, for Margo Engine.
+- [@margoengine/fbx](https://margoengine.com/llms/packages/fbx.md): Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline.
+- [@margoengine/usdz](https://margoengine.com/llms/packages/usdz.md): Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR.
+- [@margoengine/exporters](https://margoengine.com/llms/packages/exporters.md): glTF/GLB, STL, OBJ, PLY, USDZ and COLLADA exporters for Margo Engine scenes and geometry data.
+- [@margoengine/ifc](https://margoengine.com/llms/packages/ifc.md): IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime.
+- [@margoengine/blender](https://margoengine.com/llms/packages/blender.md): Optional offline Blender .margo assets using Margo's WebGPU PBR renderer.
+- [@margoengine/cache](https://margoengine.com/llms/packages/cache.md): Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin, textures and STEP files with ETag/Last-Modified revalidation, app versioning, range…
+- [@margoengine/splats](https://margoengine.com/llms/packages/splats.md): Optional Gaussian splats with GPU covariance projection and stable compute radix sorting.
+
+## Packages: Rendering and lighting
+
+- [@margoengine/materials](https://margoengine.com/llms/packages/materials.md): Optional glTF PBR material lobes, transmission, volume and typed node graphs through an isolated extension slot.
+- [@margoengine/shader](https://margoengine.com/llms/packages/shader.md): Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes.
+- [@margoengine/environment](https://margoengine.com/llms/packages/environment.md): HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on…
+- [@margoengine/clustered](https://margoengine.com/llms/packages/clustered.md): WebGPU clustered forward point and spot lighting with optional local shadows.
+- [@margoengine/shadows](https://margoengine.com/llms/packages/shadows.md): Four-cascade cached directional shadows with PCSS.
+- [@margoengine/lightmap](https://margoengine.com/llms/packages/lightmap.md): CPU lightmap atlases with native albedo, emission, normal and ORM textures; optional area lights, emissive surfaces, bounces and glass (./global) and caustics…
+- [@margoengine/sky](https://margoengine.com/llms/packages/sky.md): Procedural atmospheric skies, clouds, sun, moon and stars.
+- [@margoengine/toon](https://margoengine.com/llms/packages/toon.md): Stepped diffuse shading and inverted-hull outlines.
+- [@margoengine/oit](https://margoengine.com/llms/packages/oit.md): Weighted blended order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: no popping between overlapping transparent parts.
+- [@margoengine/lod](https://margoengine.com/llms/packages/lod.md): Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas.
+- [@margoengine/culling](https://margoengine.com/llms/packages/culling.md): GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame.
+- [@margoengine/points](https://margoengine.com/llms/packages/points.md): Large point clouds (PointCloud, PointsMaterial) and instanced sprites (SpriteBatch, SpriteMaterial) for Margo Engine, WebGPU.
+- [@margoengine/lines](https://margoengine.com/llms/packages/lines.md): Fat lines (Line, LineMaterial) and debug helpers for Margo Engine, WebGPU.
+- [@margoengine/text](https://margoengine.com/llms/packages/text.md): GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU.
+- [@margoengine/labels](https://margoengine.com/llms/packages/labels.md): HTML labels and CSS 3D objects positioned over a Margo Engine canvas.
+- [@margoengine/html](https://margoengine.com/llms/packages/html.md): World-space DOM anchors, CSS3D placement and scene-depth occlusion.
+- [@margoengine/video](https://margoengine.com/llms/packages/video.md): WebGPU external video textures and optional Web Audio sampling.
+- [@margoengine/xr](https://margoengine.com/llms/packages/xr.md): Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine.
+- [@margoengine/staging](https://margoengine.com/llms/packages/staging.md): Product-shot staging: soft ground contact shadows (shadow-catcher plane) for core meshes and glTF models.
+
+## Packages: Post-processing
+
+- [@margoengine/post](https://margoengine.com/llms/packages/post.md): HDR bloom, frame-graph SSAO, GTAO, SSGI and SSR, motion blur, lens flare, SMAA and FXAA, glitch and afterimage, and post-effect stacks for Margo Engine WebGPU.
+- [@margoengine/tonemap](https://margoengine.com/llms/packages/tonemap.md): Optional color grading: Khronos PBR Neutral (the engine default), AgX and ACES fitted curves, 2-65 cube LUTs.
+- [@margoengine/dof](https://margoengine.com/llms/packages/dof.md): Optional two-pass WebGPU depth of field with circular bokeh.
+- [@margoengine/taa](https://margoengine.com/llms/packages/taa.md): Optional temporal anti-aliasing with motion vectors and YCoCg history clamping.
+- [@margoengine/transitions](https://margoengine.com/llms/packages/transitions.md): WebGPU scene wipes, noise dissolves and chromatic displacement.
+
+## Packages: World and effects
+
+- [@margoengine/terrain](https://margoengine.com/llms/packages/terrain.md): Geometry clipmaps and triplanar terrain layers.
+- [@margoengine/voxel](https://margoengine.com/llms/packages/voxel.md): Voxel worlds: a block-type registry, 32-cubed palette chunks with light bytes, and a chunked world with dirty tracking and change events.
+- [@margoengine/voxel-pathtracer](https://margoengine.com/llms/packages/voxel-pathtracer.md): Progressive WebGPU path tracer for instanced voxel models: diffuse, plastic, metal, glass, emissive, blended and volumetric materials, sun, sky, HDR environment and…
+- [@margoengine/voxel-edit](https://margoengine.com/llms/packages/voxel-edit.md): Editing voxel models for editors and tools: dense and sparse grids, modeling operations, brushes and selections, picking, export meshing, .vox scene editing and frame…
+- [@margoengine/water](https://margoengine.com/llms/packages/water.md): Gerstner water surfaces, terrain-coupled shallow-water flow, foam and spray.
+- [@margoengine/scenery](https://margoengine.com/llms/packages/scenery.md): Procedural moonlit skies and scenery passes for Margo Engine.
+- [@margoengine/scatter](https://margoengine.com/llms/packages/scatter.md): Seeded instancing, distance-based LOD and procedural wind.
+- [@margoengine/road](https://margoengine.com/llms/packages/road.md): Arc-length spline road surfaces, raised curbs and tiled UVs.
+- [@margoengine/vfx](https://margoengine.com/llms/packages/vfx.md): GPU particle simulation and indirect billboards.
+- [@margoengine/creative](https://margoengine.com/llms/packages/creative.md): WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine.
+- [@margoengine/procedural](https://margoengine.com/llms/packages/procedural.md): Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.
+- [@margoengine/wfc](https://margoengine.com/llms/packages/wfc.md): Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking.
+- [@margoengine/splines](https://margoengine.com/llms/packages/splines.md): 3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup.
+
+## Packages: Animation and interaction
+
+- [@margoengine/animation](https://margoengine.com/llms/packages/animation.md): Storage-buffer skinning and compute morph targets for Margo Engine.
+- [@margoengine/animator](https://margoengine.com/llms/packages/animator.md): Blend trees, additive layers, animation states, foot IK and CCD IK chains.
+- [@margoengine/kinematics-constraints](https://margoengine.com/llms/packages/kinematics-constraints.md): Standalone analytical capsule and sphere constraints for IK target and arm clearance.
+- [@margoengine/tween](https://margoengine.com/llms/packages/tween.md): Allocation-free numeric tween updates and easing timelines.
+- [@margoengine/cinematic](https://margoengine.com/llms/packages/cinematic.md): Critically damped camera follow, look-at and screen shake.
+- [@margoengine/controls](https://margoengine.com/llms/packages/controls.md): Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo…
+- [@margoengine/cameras](https://margoengine.com/llms/packages/cameras.md): Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking.
+- [@margoengine/input](https://margoengine.com/llms/packages/input.md): Semantic keyboard, pointer, gamepad and touch actions with haptics.
+- [@margoengine/viewcube](https://margoengine.com/llms/packages/viewcube.md): CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle.
+- [@margoengine/selection](https://margoengine.com/llms/packages/selection.md): GPU picking and visible mesh selection outlines.
+- [@margoengine/audio](https://margoengine.com/llms/packages/audio.md): Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine.
+
+## Packages: Simulation and games
+
+- [@margoengine/physics](https://margoengine.com/llms/packages/physics.md): Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller.
+- [@margoengine/navmesh](https://margoengine.com/llms/packages/navmesh.md): Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build).
+- [@margoengine/ecs](https://margoengine.com/llms/packages/ecs.md): Typed-array packed sparse-set entity component storage.
+- [@margoengine/fsm](https://margoengine.com/llms/packages/fsm.md): Hierarchical state transitions with cross-fade progress.
+- [@margoengine/net](https://margoengine.com/llms/packages/net.md): Hermite and quaternion snapshot interpolation with bounded prediction.
+- [@margoengine/voxel-net](https://margoengine.com/llms/packages/voxel-net.md): Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests.
+
+## Packages: CAD and engineering
+
+- [@margoengine/machinery](https://margoengine.com/llms/packages/machinery.md): Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine.
+- [@margoengine/bvh](https://margoengine.com/llms/packages/bvh.md): Triangle BVH, spatial queries and an engine Raycaster for Margo Engine.
+- [@margoengine/geometry](https://margoengine.com/llms/packages/geometry.md): Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities.
+- [@margoengine/mesh-edit](https://margoengine.com/llms/packages/mesh-edit.md): Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup.
+
+## Packages: Data and science
+
+- [@margoengine/compute](https://margoengine.com/llms/packages/compute.md): GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection…
+- [@margoengine/sciviz](https://margoengine.com/llms/packages/sciviz.md): Scientific visualisation for Margo Engine: volume rendering with transfer functions, slices and GPU isosurfaces, million-point scatter plots, surface and line plots…
+
+## Packages: AI tools
+
+- [@margoengine/mcp](https://margoengine.com/llms/packages/mcp.md): A Model Context Protocol server for Margo Engine: AI coding tools (Claude, Cursor, Copilot) search the docs and API, read a package, list the examples and type-check a…
+
+## Packages: Frameworks
+
+- [@margoengine/react](https://margoengine.com/llms/packages/react.md): React 18/19 components and stable mesh refs for Margo Engine.
+
+## API reference
+
+One page per package: every exported name with its declaration, generated from the compiled types (`npm run api:check` fails when it changes by accident).
+
+- [margoengine API](https://margoengine.com/llms/api/margoengine.md): 5 entry points
+- [@margoengine/stage API](https://margoengine.com/llms/api/stage.md): 1 entry point
+- [@margoengine/core API](https://margoengine.com/llms/api/core.md): 2 entry points
+- [@margoengine/math API](https://margoengine.com/llms/api/math.md): 24 entry points
+- [@margoengine/quality API](https://margoengine.com/llms/api/quality.md): 2 entry points
+- [@margoengine/webgl API](https://margoengine.com/llms/api/webgl.md): 1 entry point
+- [@margoengine/stats API](https://margoengine.com/llms/api/stats.md): 1 entry point
+- [@margoengine/inspector API](https://margoengine.com/llms/api/inspector.md): 2 entry points
+- [@margoengine/gltf API](https://margoengine.com/llms/api/gltf.md): 1 entry point
+- [@margoengine/gltf-pro API](https://margoengine.com/llms/api/gltf-pro.md): 9 entry points
+- [@margoengine/loaders API](https://margoengine.com/llms/api/loaders.md): 8 entry points
+- [@margoengine/decoders API](https://margoengine.com/llms/api/decoders.md): 8 entry points
+- [@margoengine/fbx API](https://margoengine.com/llms/api/fbx.md): 2 entry points
+- [@margoengine/usdz API](https://margoengine.com/llms/api/usdz.md): 2 entry points
+- [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 25 entry points
+- [@margoengine/ifc API](https://margoengine.com/llms/api/ifc.md): 2 entry points
+- [@margoengine/blender API](https://margoengine.com/llms/api/blender.md): 1 entry point
+- [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 2 entry points
+- [@margoengine/splats API](https://margoengine.com/llms/api/splats.md): 2 entry points
+- [@margoengine/materials API](https://margoengine.com/llms/api/materials.md): 4 entry points
+- [@margoengine/shader API](https://margoengine.com/llms/api/shader.md): 6 entry points
+- [@margoengine/environment API](https://margoengine.com/llms/api/environment.md): 7 entry points
+- [@margoengine/clustered API](https://margoengine.com/llms/api/clustered.md): 7 entry points
+- [@margoengine/shadows API](https://margoengine.com/llms/api/shadows.md): 1 entry point
+- [@margoengine/lightmap API](https://margoengine.com/llms/api/lightmap.md): 3 entry points
+- [@margoengine/sky API](https://margoengine.com/llms/api/sky.md): 9 entry points
+- [@margoengine/toon API](https://margoengine.com/llms/api/toon.md): 1 entry point
+- [@margoengine/oit API](https://margoengine.com/llms/api/oit.md): 1 entry point
+- [@margoengine/lod API](https://margoengine.com/llms/api/lod.md): 1 entry point
+- [@margoengine/culling API](https://margoengine.com/llms/api/culling.md): 1 entry point
+- [@margoengine/points API](https://margoengine.com/llms/api/points.md): 1 entry point
+- [@margoengine/lines API](https://margoengine.com/llms/api/lines.md): 1 entry point
+- [@margoengine/text API](https://margoengine.com/llms/api/text.md): 1 entry point
+- [@margoengine/labels API](https://margoengine.com/llms/api/labels.md): 1 entry point
+- [@margoengine/html API](https://margoengine.com/llms/api/html.md): 1 entry point
+- [@margoengine/video API](https://margoengine.com/llms/api/video.md): 1 entry point
+- [@margoengine/xr API](https://margoengine.com/llms/api/xr.md): 1 entry point
+- [@margoengine/staging API](https://margoengine.com/llms/api/staging.md): 1 entry point
+- [@margoengine/post API](https://margoengine.com/llms/api/post.md): 18 entry points
+- [@margoengine/tonemap API](https://margoengine.com/llms/api/tonemap.md): 1 entry point
+- [@margoengine/dof API](https://margoengine.com/llms/api/dof.md): 1 entry point
+- [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 1 entry point
+- [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 1 entry point
+- [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 1 entry point
+- [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 12 entry points
+- [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 2 entry points
+- [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 11 entry points
+- [@margoengine/water API](https://margoengine.com/llms/api/water.md): 1 entry point
+- [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 2 entry points
+- [@margoengine/scatter API](https://margoengine.com/llms/api/scatter.md): 1 entry point
+- [@margoengine/road API](https://margoengine.com/llms/api/road.md): 1 entry point
+- [@margoengine/vfx API](https://margoengine.com/llms/api/vfx.md): 6 entry points
+- [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 8 entry points
+- [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 5 entry points
+- [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 2 entry points
+- [@margoengine/splines API](https://margoengine.com/llms/api/splines.md): 1 entry point
+- [@margoengine/animation API](https://margoengine.com/llms/api/animation.md): 5 entry points
+- [@margoengine/animator API](https://margoengine.com/llms/api/animator.md): 1 entry point
+- [@margoengine/kinematics-constraints API](https://margoengine.com/llms/api/kinematics-constraints.md): 1 entry point
+- [@margoengine/tween API](https://margoengine.com/llms/api/tween.md): 1 entry point
+- [@margoengine/cinematic API](https://margoengine.com/llms/api/cinematic.md): 1 entry point
+- [@margoengine/controls API](https://margoengine.com/llms/api/controls.md): 7 entry points
+- [@margoengine/cameras API](https://margoengine.com/llms/api/cameras.md): 3 entry points
+- [@margoengine/input API](https://margoengine.com/llms/api/input.md): 1 entry point
+- [@margoengine/viewcube API](https://margoengine.com/llms/api/viewcube.md): 1 entry point
+- [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 1 entry point
+- [@margoengine/audio API](https://margoengine.com/llms/api/audio.md): 1 entry point
+- [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 1 entry point
+- [@margoengine/navmesh API](https://margoengine.com/llms/api/navmesh.md): 2 entry points
+- [@margoengine/ecs API](https://margoengine.com/llms/api/ecs.md): 1 entry point
+- [@margoengine/fsm API](https://margoengine.com/llms/api/fsm.md): 1 entry point
+- [@margoengine/net API](https://margoengine.com/llms/api/net.md): 1 entry point
+- [@margoengine/voxel-net API](https://margoengine.com/llms/api/voxel-net.md): 3 entry points
+- [@margoengine/machinery API](https://margoengine.com/llms/api/machinery.md): 16 entry points
+- [@margoengine/bvh API](https://margoengine.com/llms/api/bvh.md): 3 entry points
+- [@margoengine/geometry API](https://margoengine.com/llms/api/geometry.md): 7 entry points
+- [@margoengine/mesh-edit API](https://margoengine.com/llms/api/mesh-edit.md): 1 entry point
+- [@margoengine/compute API](https://margoengine.com/llms/api/compute.md): 7 entry points
+- [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 3 entry points
+- [@margoengine/mcp API](https://margoengine.com/llms/api/mcp.md): 1 entry point
+- [@margoengine/react API](https://margoengine.com/llms/api/react.md): 5 entry points
+
+## Optional
+
+- [Public API surface](https://margoengine.com/llms/docs/api-surface.md): Generated by `npm run api:update` from the reports in `api/` (one per package `exports` entry; `npm run api:check`, part of `npm run…
+- [Benchmarking](https://margoengine.com/llms/docs/benchmarking.md): Margo has one benchmark tool: `npm run bench`. It measures bytes, startup, rendering, objects, kernel maths, glTF, loaders, CAD, voxels…
+- [CAD performance (machinery at assembly scale)](https://margoengine.com/llms/docs/cad-performance.md): Headline numbers: the quiet-machine before/after table (merged core fast paths, one Intel Arc 140V laptop iGPU): 50,004 parts orbit at 92…
+- [Clean room](https://margoengine.com/llms/docs/clean-room.md): Margo is written clean room. This page says what that means, how the 2026-10-24 rewrites were done, and where every lighting and…
+- [Demo cold-load measurements](https://margoengine.com/llms/docs/demo-loading.md): Scope: all seven pages shipped by `scripts/build-site.js`, including both robot entry points. The phased startup and 180 ms effect…
+- [Deploying a Margo app](https://margoengine.com/llms/docs/deploying.md): A Margo app is static files: HTML, JavaScript, CSS, a few `.wasm` files and your assets. Any static host works. Three things decide…
+- [Desktop frame-rate investigation](https://margoengine.com/llms/docs/desktop-frame-rate.md): The earlier sections record successive historical checks. Current results are in Second deep package pass; the shared…
+- [Build a small interactive game with Blender and Margo](https://margoengine.com/llms/docs/guides/blender-game.md): A how-to for a small third-person game: you model the level and the character in Blender, export glTF, and write the game in TypeScript…
+- [Large coordinates: precision far from the origin](https://margoengine.com/llms/docs/large-coordinates.md): Plant layouts, BIM and GIS scenes put parts kilometres (or, in Earth-centred coordinates, 6,000 km) from the world origin. Core and its…
+- [Clearcoat, transmission, volume, and node materials](https://margoengine.com/llms/docs/materials-extensions.md): Add the four material features that the Three.js comparison asks for. Core and the stage facade stay frozen. None of this enters the…
+- [Native FBX loader and glTF skin export](https://margoengine.com/llms/docs/native-fbx.md): Updated after the first native importer landed. Core and the stage facade stay frozen. No new package name was added.
+- [Capture performance from an affected browser](https://margoengine.com/llms/docs/performance-capture.md): Open a slow demo at https://margoengine.com in the affected browser. Open DevTools with Ctrl+Shift+J, paste the contents of…
+- [React cookbook](https://margoengine.com/llms/docs/react-cookbook.md): Short recipes for `@margoengine/react`, each a complete file you can paste. Every snippet is type-checked against the packed package by…
+- [Coming from react-three-fiber](https://margoengine.com/llms/docs/react-from-r3f.md): This maps the react-three-fiber (R3F) and drei names found in their public documentation to `@margoengine/react`. The tree has the same…
+- [React integration without touching the frozen engine](https://margoengine.com/llms/docs/react-integration.md): Shipped in `@margoengine/react`. Core and the stage facade were not edited. Core plus stage measured 19,999 bytes gzip. The React suite…
+- [Tighter React integration for the R3F audience](https://margoengine.com/llms/docs/react-r3f.md): This follows the shipped `<Canvas>`, `<Stage>`, and `<Mesh>` work in `docs/react-integration.md`. Everything here stays in…
+- [A complete Margo React scene layer](https://margoengine.com/llms/docs/react-scene.md): This is Margo's own version of the React Three Fiber surface: the canvas, the helpers, post, physics, and XR. It does not wrap Fiber, and…
+- [Releasing to npm](https://margoengine.com/llms/docs/releasing.md): Nothing is published without the maintainer's go-ahead for that release. The only publish path is the manual…
+- [Security model](https://margoengine.com/llms/docs/security.md): What Margo trusts, what it does not, what it guarantees and what your app still has to do. Parser fuzzing and its regression tests are…
+- [Shader contracts between packages](https://margoengine.com/llms/docs/shader-contracts.md): Packages extend each other's WGSL in three ways. Prefer them in this order.
+- [Reading the three.js parity counts](https://margoengine.com/llms/docs/three-parity-matrix.md): The table in threejs-parity.md was recounted after the parity-closing work: 161 features, 153 COVERED, 4 PARTIAL, 4 MISSING (142 / 13 / 6…
+- [three.js r186 parity matrix](https://margoengine.com/llms/docs/threejs-parity.md): What Margo Engine covers compared with three.js r186 and its common add-ons (`three/addons`). It is meant for roadmap planning and as the…
+- [Workspace setup: the engine and the Margo apps](https://margoengine.com/llms/docs/workspace-setup.md): Every Margo app builds against the engine checkout beside it, always at the latest `origin/main`. There is one engine folder per machine…

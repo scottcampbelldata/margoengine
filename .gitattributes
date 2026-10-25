@@ -30,6 +30,8 @@ examples/assets/parity-clip.webm filter=lfs diff=lfs merge=lfs -text
 # (scripts/merge-driver.mjs, registered by scripts/setup-merge-drivers.mjs)
 api/*.api.md merge=margo-derived
 docs/api-surface.md merge=margo-derived
+site/llms.txt merge=margo-derived
+site/llms-full.txt merge=margo-derived
 examples/package-benchmarks/results/entry-sizes.json merge=margo-derived
 examples/package-benchmarks/results/basic-scene-network.json merge=margo-derived
 scripts/quality/baselines/*.json merge=margo-ratchet

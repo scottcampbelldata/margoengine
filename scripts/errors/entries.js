@@ -342,4 +342,23 @@ export const entries = [
       'A figure or layer got something it cannot draw: data of the wrong size for its grid (surface nx and ny, volume dims), a range that is not finite or has min >= max, an unknown colour map or theme, a GpuArray that is not contiguous f32 or lives on another device, a GpuArray without the range option (its min and max are not read back for you), or an engine without WebGPU.',
     fix: "Read the message: it names the fix. Pass grid sizes that match the data, ranges as [min, max] with min < max, colour map names from colormapNames (or your own stops), GpuArrays made with createCompute({ engine: figure.engine }) and converted with astype('f32').eval(), and a range read with array.min().item() and array.max().item().",
   },
+  {
+    id: 'mcp',
+    title: '@margoengine/mcp: the AI tools server',
+    kind: 'family',
+    messages: [
+      'search needs a non-empty query string',
+      'check_snippet needs a non-empty code string',
+      'The snippet is over 200000 characters; check one file at a time',
+      'language is ts, tsx or js',
+      'kind is all, readme, api, doc or example',
+      'part is readme, api or both',
+      'strict must be true or false',
+      'The type check took longer than the time limit; check a shorter snippet or raise timeoutMs',
+      'The server was disposed',
+    ],
+    cause:
+      'A tool call got an argument it cannot use (a missing or empty string, a value outside the allowed list, a package or entry that does not exist), TypeScript is not installed in the project that check_snippet reads, the compiler did not run or ran out of time, or the server was disposed while a request was running. The server reports a tool failure as a result with isError set and the error code, so the model can read it and retry.',
+    fix: 'Read the message: it names the fix. Pass the arguments the tool lists (call tools/list), use list_packages for package names, and start the server with --root <folder> where the folder has typescript and the @margoengine packages in node_modules (npm install typescript margoengine). Branch on error.code: argument and range are for the caller to fix, unsupported means install TypeScript, failed means retry with a shorter snippet.',
+  },
 ];

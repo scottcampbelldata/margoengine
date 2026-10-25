@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3112788,
+  "total": 3121452,
   "history": [
     {
       "date": "2026-10-24",
@@ -224,6 +224,12 @@
       "commit": "5eb0e8a1",
       "reason": "new @margoengine/compute/autodiff entry (reverse-mode gradients of fused expressions)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "1ff80aff",
+      "reason": "New optional @margoengine/mcp (queue item 33, AI-native tools): stdio MCP server, search, package, example and snippet-check tools",
+      "grew": 1
     }
   ],
   "items": {
@@ -411,6 +417,7 @@
     "@margoengine/math/vector2": 947,
     "@margoengine/math/vector3": 1547,
     "@margoengine/math/vector4": 925,
+    "@margoengine/mcp": 8664,
     "@margoengine/mesh-edit": 30203,
     "@margoengine/navmesh": 3396,
     "@margoengine/navmesh/build": 10491,

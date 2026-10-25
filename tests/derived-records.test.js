@@ -86,7 +86,7 @@ test('.gitattributes routes every derived and ratcheting path to a registered dr
 test('land-records regenerates API reports and baselines before the size records, GPU step last', () => {
   assert.deepEqual(
     STEPS.map((step) => step.name),
-    ['build', 'api reports', 'quality baselines', 'entry sizes', 'basic-scene network'],
+    ['build', 'api reports', 'llms files', 'quality baselines', 'entry sizes', 'basic-scene network'],
   );
   assert.deepEqual(
     STEPS.filter((step) => step.gpu).map((step) => step.name),

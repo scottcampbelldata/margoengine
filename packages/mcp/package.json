@@ -1,0 +1,51 @@
+{
+  "name": "@margoengine/mcp",
+  "version": "1.0.0",
+  "description": "A Model Context Protocol server for Margo Engine: AI coding tools (Claude, Cursor, Copilot) search the docs and API, read a package, list the examples and type-check a snippet against the real package types. Plain stdio JSON-RPC, no dependencies.",
+  "keywords": [
+    "margoengine",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "llms"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/mcp"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "bin": {
+    "margoengine-mcp": "./bin/margoengine-mcp.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "bin",
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js mcp && node scripts/build-corpus.mjs",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  }
+}

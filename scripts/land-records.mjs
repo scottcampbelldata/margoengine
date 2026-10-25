@@ -2,7 +2,8 @@
 // Run it inside the landing lock, after `git pull --rebase`, from a clean worktree:
 //   node scripts/land-records.mjs [--no-build] [--no-commit]
 // 1. build every package (skipped with --no-build when verify just built them)
-// 2. API reports and docs/api-surface.md (api-report.js --update)
+// 2. API reports and docs/api-surface.md (api-report.js --update), then site/llms.txt and site/llms-full.txt, which
+//    are made from the READMEs, those reports and docs/ (build-llms.mjs)
 // 3. quality baselines, shrink only (quality-gate.mjs --update; a baseline that would grow stops here and asks for a
 //    reason, exactly as `npm run quality -- --update` does, so a landing never widens a limit by accident)
 // 4. entry sizes, then the basic-scene network record (it takes the GPU lock only around its browser)
@@ -22,6 +23,7 @@ const RESULTS = 'examples/package-benchmarks/results';
 export const STEPS = [
   { name: 'build', command: ['npm', 'run', 'build:packages'], skippable: true },
   { name: 'api reports', command: ['node', 'scripts/api-report.js', '--update'] },
+  { name: 'llms files', command: ['node', 'scripts/build-llms.mjs'] },
   { name: 'quality baselines', command: ['node', 'scripts/quality-gate.mjs', '--update'] },
   { name: 'entry sizes', command: ['node', 'examples/package-benchmarks/entry-sizes.mjs'] },
   { name: 'basic-scene network', command: ['node', 'scripts/basic-scene-network.mjs'], gpu: true },

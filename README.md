@@ -159,13 +159,15 @@ changing the base, so the base stays small and an app only pays for what it impo
 `packages/kernel`; the compiled Wasm is checked in, so building the JavaScript never needs Rust.
 
 [MODERN-ENGINE.md](MODERN-ENGINE.md) covers the architecture, lifecycle rules and limits in detail.
-[docs/api-overview.md](docs/api-overview.md) is a short tour of the API.
+[docs/api-overview.md](docs/api-overview.md) is a short tour of the API. AI coding tools can read
+[margoengine.com/llms.txt](https://margoengine.com/llms.txt) or run the `@margoengine/mcp` server
+([docs/ai-tools.md](docs/ai-tools.md)).
 
 ## Packages
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-80 packages in 11 layers, the same as the [catalog](https://margoengine.com/catalog/).
+81 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -295,6 +297,12 @@ changing the base, so the base stays small and an app only pays for what it impo
 | --- | --- |
 | [`@margoengine/compute`](packages/compute/README.md) | GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection, histograms, matmul, FFT, convolution, random numbers, streaming, and WGSL kernels bound by name. |
 | [`@margoengine/sciviz`](packages/sciviz/README.md) | Scientific visualisation for Margo Engine: volume rendering with transfer functions, slices and GPU isosurfaces, million-point scatter plots, surface and line plots with axes, ticks, labels and colour bars, and perceptual colour maps. |
+
+### AI tools (1)
+
+| Package | What it is |
+| --- | --- |
+| [`@margoengine/mcp`](packages/mcp/README.md) | A Model Context Protocol server for Margo Engine: AI coding tools (Claude, Cursor, Copilot) search the docs and API, read a package, list the examples and type-check a snippet against the real package types. Plain stdio JSON-RPC, no dependencies. |
 
 ### Frameworks (1)
 

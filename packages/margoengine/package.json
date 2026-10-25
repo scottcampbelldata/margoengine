@@ -751,6 +751,10 @@
       "types": "./dist/math/affine.d.ts",
       "import": "./dist/math/affine.js"
     },
+    "./mcp": {
+      "types": "./dist/mcp.d.ts",
+      "import": "./dist/mcp.js"
+    },
     "./mesh-edit": {
       "types": "./dist/mesh-edit.d.ts",
       "import": "./dist/mesh-edit.js"
@@ -1270,6 +1274,7 @@
     "@margoengine/machinery": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
     "@margoengine/math": "^1.0.0",
+    "@margoengine/mcp": "^1.0.0",
     "@margoengine/mesh-edit": "^1.0.0",
     "@margoengine/navmesh": "^1.0.0",
     "@margoengine/net": "^1.0.0",

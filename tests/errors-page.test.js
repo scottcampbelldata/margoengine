@@ -8,11 +8,16 @@ import { errorsPage } from '../scripts/errors/page.mjs';
 // them from drifting apart.
 // Core, the stage, compute and sciviz (whose messages link to their #compute and #sciviz entries) go through the same
 // checks.
-const sources = ['packages/core/src', 'packages/stage/src', 'packages/compute/src', 'packages/sciviz/src'].flatMap(
-    (dir) =>
-      readdirSync(dir)
-        .filter((f) => f.endsWith('.ts'))
-        .map((f) => ({ file: `${dir}/${f}`, text: readFileSync(`${dir}/${f}`, 'utf8') })),
+const sources = [
+    'packages/core/src',
+    'packages/stage/src',
+    'packages/compute/src',
+    'packages/sciviz/src',
+    'packages/mcp/src',
+  ].flatMap((dir) =>
+    readdirSync(dir)
+      .filter((f) => f.endsWith('.ts'))
+      .map((f) => ({ file: `${dir}/${f}`, text: readFileSync(`${dir}/${f}`, 'utf8') })),
   ),
   ids = new Map(entries.map((e) => [e.id, e])),
   // fault('code', message[, 'anchor']), typeError(message, 'anchor'), rangeError(message, 'anchor').
