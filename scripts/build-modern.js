@@ -10,6 +10,7 @@ import { packageOrder } from './package-order.js';
 import { buildWorkers, restoreWorkerUrls } from './build-workers.js';
 import { staticEmbind } from './static-embind.js';
 import { packageDeclarations, packageRuntime } from './package-declarations.js';
+import { importMap } from './umbrella.mjs';
 const precompiled = process.argv.includes('--precompiled');
 // --only=post,lines rebuilds just those packages (their dependencies must already be built) and skips the size records.
 const only = process.argv
@@ -149,6 +150,8 @@ for (const name of packageOrder(manifests)) {
   // margoengine is the one-install package: generated re-exports of every package (scripts/umbrella.mjs).
   if (name === 'margoengine') {
     await tsc(name);
+    // For pages without a bundler: every entry of every package on a CDN (docs/guides/imports.md).
+    await writeFile(`packages/${name}/dist/importmap.json`, `${JSON.stringify(importMap(), null, 2)}\n`);
     continue;
   }
   if (name === 'react') {

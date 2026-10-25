@@ -145,6 +145,23 @@ export function umbrellaEntries(root = repository) {
   return entries;
 }
 
+/**
+ * A browser import map for every entry of margoengine and every @margoengine/* package, from `base` (a CDN serving npm
+ * packages as files, `<base><name>@<version>/<path>`). The build writes it to margoengine's dist/importmap.json, so a
+ * page without a bundler can copy it from the CDN; see docs/guides/imports.md.
+ */
+export function importMap(root = repository, base = 'https://cdn.jsdelivr.net/npm/') {
+  const imports = {};
+  const all = [
+    ...manifests(root).map(({ manifest }) => manifest),
+    JSON.parse(readFileSync(join(root, 'packages', UMBRELLA, 'package.json'), 'utf8')),
+  ];
+  for (const manifest of all)
+    for (const [key, target] of Object.entries(manifest.exports ?? {}))
+      imports[manifest.name + key.slice(1)] = `${base}${manifest.name}@${manifest.version}/${target.import.slice(2)}`;
+  return { imports };
+}
+
 /** The files and package.json the generator writes, as {path: text}. */
 export function umbrellaFiles(root = repository) {
   const files = {},

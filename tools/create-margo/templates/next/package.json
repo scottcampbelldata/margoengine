@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
     "margoengine": "^1.0.0",
     "next": "^16.4.1",
     "react": "^19.0.0",

@@ -204,7 +204,8 @@
     "modern:test:pbr-box": "node scripts/pbr-box-tests.js",
     "modern:test:scene-helpers": "node scripts/scene-helper-tests.js",
     "test:kernel": "cargo test --locked --manifest-path packages/kernel/Cargo.toml",
-    "fuzz": "node scripts/fuzz/run.js"
+    "fuzz": "node scripts/fuzz/run.js",
+    "modern:test:bundlers": "node scripts/gpu-lock.mjs run --owner=bundlers -- node scripts/bundler-matrix.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

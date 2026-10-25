@@ -3,6 +3,7 @@ import { cylinderGeometry, sphereGeometry, torusKnotGeometry } from 'margoengine
 import { toGeometry } from 'margoengine/geometry/utils';
 import { Environment, EnvironmentBackground, EnvironmentLighting } from 'margoengine/environment';
 import { OrbitControls } from 'margoengine/controls/orbit';
+import { Shadows } from 'margoengine/shadows';
 import { Stats } from 'margoengine/stats';
 import { applyQualityTier, paceEngine, watchQuality } from 'margoengine/quality';
 
@@ -39,24 +40,29 @@ async function start() {
     .setGeometry(toGeometry(torusKnotGeometry(0.55, 0.18, 160, 24)))
     .setMaterial(new PbrMaterial({ color: '#e8b04a', metalness: 1, roughness: 0.25 }));
   knot.position.set(0, 0.9, 0);
-  engine
+  const sphere = engine
     .createMesh()
     .setGeometry(toGeometry(sphereGeometry(0.6, 48, 24)))
-    .setMaterial(new PbrMaterial({ color: '#84d6bd', roughness: 0.35 }))
-    .position.set(-2, 0.6, 0);
-  engine
+    .setMaterial(new PbrMaterial({ color: '#84d6bd', roughness: 0.35 }));
+  sphere.position.set(-2, 0.6, 0);
+  const cube = engine
     .createMesh()
     .setGeometry(box(1, 1, 1))
-    .setMaterial(new PbrMaterial({ color: '#f2f2f2', roughness: 0.6 }))
-    .position.set(2, 0.5, 0);
-  engine
+    .setMaterial(new PbrMaterial({ color: '#f2f2f2', roughness: 0.6 }));
+  cube.position.set(2, 0.5, 0);
+  const stand = engine
     .createMesh()
     .setGeometry(toGeometry(cylinderGeometry(3, 3, 0.1, 96)))
-    .setMaterial(new PbrMaterial({ color: '#2a303a', roughness: 0.8 }))
-    .position.set(0, -0.05, 0);
+    .setMaterial(new PbrMaterial({ color: '#2a303a', roughness: 0.8 }));
+  stand.position.set(0, -0.05, 0);
+  // Soft sun shadows on the stand.
+  const shadows = Shadows.attach(engine, { resolution: 2048, distance: 12, lightSize: 0.02 });
+  for (const mesh of [knot, sphere, cube, stand]) shadows.add(mesh);
 
   const orbit = OrbitControls.attach(engine); // left drag orbits, right drag pans, wheel zooms
   orbit.enableDamping = true;
+  orbit.autoRotate = true; // a slow turntable until you drag
+  orbit.autoRotateSpeed = 0.5;
   Stats.attach(engine); // FPS and frame-time overlay; remove for production
 
   engine.onFrame((_, delta) => {

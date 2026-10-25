@@ -138,3 +138,14 @@ test('a kit costs only what the app uses, and its full size is what docs/guides/
     );
   }
 });
+
+test('dist/importmap.json maps every margoengine and @margoengine entry to its file on the CDN', () => {
+  const { imports } = JSON.parse(readFileSync(join(root, 'packages/margoengine/dist/importmap.json'), 'utf8'));
+  for (const subpath of Object.keys(manifest.exports))
+    assert.equal(
+      imports[`margoengine${subpath.slice(1)}`],
+      `https://cdn.jsdelivr.net/npm/margoengine@${manifest.version}/${manifest.exports[subpath].import.slice(2)}`,
+    );
+  for (const name of Object.keys(manifest.dependencies))
+    assert.match(imports[name], /^https:\/\/cdn\.jsdelivr\.net\/npm\/@margoengine\//);
+});

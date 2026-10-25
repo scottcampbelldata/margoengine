@@ -1,14 +1,18 @@
-# Margo app
+# Margo Next.js app
 
-A Next.js app: a rotating cube in a client component with `margoengine/react`. Needs a browser with WebGPU.
+Three shapes in afternoon sun with soft shadows, bloom and an orbit turntable, written as JSX with `margoengine/react`. Needs a browser with WebGPU.
 
 ```sh
 npm install
 npm run dev        # http://localhost:3000
 npm run build      # production build in .next/
-npm start          # serve the build
 ```
 
-The app is `app/page.tsx`. `margoengine` is the only engine dependency: every package is a subpath
-(`margoengine/shadows`, `margoengine/controls/orbit`), and the build keeps only what you import. The engine's imports guide
-(`docs/guides/imports.md`) lists which import does what.
+The app is `app/page.tsx`. `margoengine` is the only engine dependency: every package is a subpath, and the build keeps
+only what you import.
+
+## Three things to try next
+
+1. **A model.** `<Model src="/model.glb" />` from `margoengine/react`; put the file in `public/`.
+2. **Studio light.** `<Environment src="/studio.hdr" background />` for image-based lighting.
+3. **Physics.** `<Physics>` and `<RigidBody>` from `margoengine/react` with `npm i @dimforge/rapier3d-compat`.

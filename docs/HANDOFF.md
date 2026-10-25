@@ -28,8 +28,20 @@ Kits: `margoengine/game`, `/cad`, `/viz`, `/web`, named re-exports listed in `sc
 full sizes in [guides/kits.md](guides/kits.md); an unused name costs nothing, checked per kit). Starters:
 `npm create margo@latest my-game -- --template game` (templates web, game, cad, viz, react, next), each depending on
 `margoengine` alone; `tests/create-margo.test.js` builds every Vite template and type-checks the Next one. The
-"which import do I need" page is [guides/imports.md](guides/imports.md). Next landing: the bundler matrix (Vite,
-webpack, esbuild, Rollup, Next webpack/Turbopack, import maps) and `margoengine/...` imports in every README.
+"which import do I need" page is [guides/imports.md](guides/imports.md).
+
+Second landing: every template opens to a lit, animated scene with a README of three things to try (game: Prototype
+Pete walks and runs in a sunny field with physics crates and six orbs to collect; cad: a bracket modeled in code with
+`margoengine/brep`, exact volume and mass, live dimensions, click-to-measure, section, view cube; viz: a 300,000-point
+galaxy; web: the studio scene with shadows and a turntable; react/next: shapes in sun with soft shadows and bloom).
+`tools/create-margo/test/browser-check.mjs` runs each under `vite` dev in Edge and times create to first frame
+(0.5 to 1.3 s, packages linked, no install). Every package README shows `margoengine/...` imports;
+`margoengine/dist/importmap.json` maps every entry to jsDelivr for pages without a bundler.
+`npm run modern:test:bundlers` (`scripts/bundler-matrix.mjs`) installs the packed packages and builds one app with
+Vite, webpack, esbuild and Rollup (passing), Next webpack/Turbopack and an import map. Open: `@margoengine/react`'s
+root reaches `import('@dimforge/rapier3d-compat')`, so webpack/Turbopack builds fail without Rapier installed; the
+React session is splitting it out. Until then the react and next templates list Rapier, and the matrix is not yet in
+`check:merge`.
 
 ## Landed 2026-10-24: parity closing follow-ups (Collada scene, clipIntersection, DepthTexture checks)
 

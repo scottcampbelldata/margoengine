@@ -61,8 +61,8 @@ stage.onTick((delta) => {
 | React components | `margoengine/react`, and `npm i react react-dom` |
 | A WebGL2 fallback for browsers without WebGPU | `margoengine/webgl` |
 
-Every package and entry is in the [package catalog](../README.md). A package's README shows its entries; each
-`@margoengine/<name>/<entry>` there is `margoengine/<name>/<entry>` here.
+Every package and entry is in the [package catalog](../README.md); each package's README shows its entries as
+`margoengine/<name>/<entry>` imports.
 
 ## Several packages together
 
@@ -94,6 +94,34 @@ const meshes: M.Mesh[] = [stage.sphere({color: '#ffcc66'})];
 Post.PostStack.attach(stage.engine, [new Bloom.Bloom({strength: 0.6})]);
 console.log(meshes.length);
 ```
+
+## No bundler: an import map from a CDN
+
+Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (568 of them) to jsDelivr;
+copy it into the page, or only the lines your imports reach:
+
+```html
+<script type="importmap">
+  {
+    "imports": {
+      "margoengine": "https://cdn.jsdelivr.net/npm/margoengine@1.0.0/dist/index.js",
+      "@margoengine/stage": "https://cdn.jsdelivr.net/npm/@margoengine/stage@1.0.0/dist/index.js",
+      "@margoengine/core": "https://cdn.jsdelivr.net/npm/@margoengine/core@1.0.0/dist/index.js",
+      "@margoengine/core/extension": "https://cdn.jsdelivr.net/npm/@margoengine/core@1.0.0/dist/extension.js"
+    }
+  }
+</script>
+<div id="viewport" style="height: 100vh"></div>
+<script type="module">
+  import {createStage} from 'margoengine';
+  const stage = await createStage('#viewport');
+  stage.box({color: '#84d6bd'});
+</script>
+```
+
+`scripts/bundler-matrix.mjs` loads the packed packages this way in a browser, and builds the same app with Vite,
+webpack, esbuild, Rollup and Next.js (webpack and Turbopack), checking each bundle holds only the packages it imports.
 
 ## Rules
 

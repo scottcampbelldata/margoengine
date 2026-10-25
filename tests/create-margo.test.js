@@ -87,7 +87,7 @@ const templates = {
   game: { main: 'src/main.ts', imports: "from 'margoengine/game'" },
   cad: { main: 'src/main.ts', imports: "from 'margoengine/cad'" },
   viz: { main: 'src/main.ts', imports: "from 'margoengine/viz'" },
-  react: { main: 'src/main.tsx', imports: "from 'margoengine/react'" },
+  react: { main: 'src/scene.tsx', imports: "from 'margoengine/react'" },
 };
 
 for (const [template, { main, imports }] of Object.entries(templates))
