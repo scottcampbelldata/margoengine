@@ -1,5 +1,5 @@
 {
-  "commit": "bd8e5a69",
+  "commit": "36ac9af6",
   "dirty": false,
   "browser": "msedge 156.0.4314.42 headless",
   "adapter": "nvidia ampere",
@@ -11,17 +11,8 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 371,
+      "gzip": 370,
       "brotli": 228
-    },
-    {
-      "path": "assets/index-DZ52Kac0.js",
-      "role": "Entry: core + stage + app",
-      "encoding": "gzip",
-      "transferred": 23561,
-      "raw": 57803,
-      "gzip": 23180,
-      "brotli": 20475
     },
     {
       "path": "assets/geometry-DT4GWWnY.js",
@@ -31,6 +22,15 @@
       "raw": 2289,
       "gzip": 1165,
       "brotli": 1049
+    },
+    {
+      "path": "assets/index-B-fKUtOq.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 23670,
+      "raw": 58050,
+      "gzip": 23289,
+      "brotli": 20551
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 33550,
-    "raw": 74865,
-    "gzip": 30534,
-    "brotli": 26929
+    "transferred": 33659,
+    "raw": 75112,
+    "gzip": 30642,
+    "brotli": 27005
   },
   "notFetched": [
     {
@@ -93,16 +93,16 @@
       "raw": 44
     },
     {
-      "path": "assets/dist-CVLR-kq4.js",
-      "raw": 41482
-    },
-    {
       "path": "assets/dist-CYatMQ_Z.js",
       "raw": 61049
     },
     {
       "path": "assets/dist-F1kCSmCG.js",
       "raw": 36022
+    },
+    {
+      "path": "assets/dist-uRmEtslf.js",
+      "raw": 41515
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",
@@ -121,11 +121,11 @@
       "raw": 28502
     },
     {
-      "path": "assets/post-BE_ETdJ4.js",
-      "raw": 18721
+      "path": "assets/post-BtnO3x34.js",
+      "raw": 18734
     },
     {
-      "path": "assets/post-Bi5xSX8B.js",
+      "path": "assets/post-Caycyumt.js",
       "raw": 52
     },
     {

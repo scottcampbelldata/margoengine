@@ -1,10 +1,10 @@
 {
-  "commit": "bd8e5a69",
+  "commit": "36ac9af6",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 57343,
-    "gzip": 22636,
+    "raw": 57590,
+    "gzip": 22737,
     "limit": 25000
   },
   "packages": {
@@ -160,42 +160,42 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 50451,
-        "gzip": 20322
+        "raw": 50698,
+        "gzip": 20432
       },
       "./extension": {
-        "raw": 47298,
-        "gzip": 19412
+        "raw": 47545,
+        "gzip": 19520
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 61076,
-        "gzip": 18618
+        "raw": 61122,
+        "gzip": 18633
       },
       "./particles": {
         "raw": 717,
         "gzip": 503
       },
       "./targets": {
-        "raw": 7401,
-        "gzip": 2574
+        "raw": 7414,
+        "gzip": 2578
       },
       "./toon": {
         "raw": 1675,
         "gzip": 932
       },
       "./post": {
-        "raw": 18820,
-        "gzip": 6791
+        "raw": 18833,
+        "gzip": 6794
       },
       "./grass": {
-        "raw": 16227,
-        "gzip": 5904
+        "raw": 16241,
+        "gzip": 5911
       },
       "./planet": {
-        "raw": 20749,
-        "gzip": 6998
+        "raw": 20794,
+        "gzip": 7017
       },
       "./stars": {
         "raw": 6132,
@@ -830,8 +830,8 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 140412,
-        "gzip": 38605
+        "raw": 140436,
+        "gzip": 38613
       },
       "./bloom": {
         "raw": 19549,
@@ -842,8 +842,8 @@
         "gzip": 9330
       },
       "./scene-fade": {
-        "raw": 6571,
-        "gzip": 2843
+        "raw": 6595,
+        "gzip": 2849
       },
       "./stack": {
         "raw": 10611,
@@ -926,8 +926,8 @@
     },
     "@margoengine/quality": {
       ".": {
-        "raw": 3114,
-        "gzip": 1623
+        "raw": 3127,
+        "gzip": 1634
       },
       "./warm": {
         "raw": 2636,
@@ -936,24 +936,24 @@
     },
     "@margoengine/react": {
       ".": {
-        "raw": 60047,
-        "gzip": 20751
+        "raw": 60057,
+        "gzip": 20752
       },
       "./kit": {
-        "raw": 27595,
-        "gzip": 9746
+        "raw": 27605,
+        "gzip": 9745
       },
       "./post": {
         "raw": 7115,
         "gzip": 2869
       },
       "./physics": {
-        "raw": 11564,
-        "gzip": 4651
+        "raw": 11574,
+        "gzip": 4652
       },
       "./xr": {
-        "raw": 6590,
-        "gzip": 2881
+        "raw": 6600,
+        "gzip": 2882
       }
     },
     "@margoengine/road": {
@@ -1318,8 +1318,8 @@
     },
     "@margoengine/webgl": {
       ".": {
-        "raw": 6867,
-        "gzip": 3074
+        "raw": 6880,
+        "gzip": 3082
       }
     },
     "@margoengine/wfc": {
@@ -1361,9 +1361,9 @@
       "brotli": 9543
     },
     "packages/creative/dist/post.js": {
-      "raw": 18820,
-      "gzip": 6791,
-      "brotli": 6152
+      "raw": 18833,
+      "gzip": 6794,
+      "brotli": 6128
     },
     "packages/environment/dist/index.js": {
       "raw": 88617,
