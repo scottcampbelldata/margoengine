@@ -114,7 +114,7 @@ export function vignette(options: VignetteOptions = {}): ScreenEffect<{
 
 /** Options for {@link rgbShift}. */
 export interface RGBShiftOptions extends NodePassOptions {
-  /** Offset of the red and blue images in UV units. Default 0.005. */
+  /** Offset of the red and blue images in UV units. Default 0.002: one five-hundredth of the screen, a fringe of about 4 px at 1920 wide (2 px at 960), visible as lens fringe without doubling edges. */
   amount?: number;
   /** Direction of the offset in radians; 0 moves red right and blue left, positive turns towards screen-down. Default 0. */
   angle?: number;
@@ -129,7 +129,7 @@ export function rgbShift(options: RGBShiftOptions = {}): ScreenEffect<{
   amount: UniformNode<'f32'>;
   angle: UniformNode<'f32'>;
 }> {
-  const amount = param(options, 'amount', 0.005),
+  const amount = param(options, 'amount', 0.002),
     angle = param(options, 'angle', 0),
     offset = vec2(angle.cos(), angle.sin()).mul(amount),
     rgb = vec3(inputColor(screenUV.sub(offset)).r, inputColor().g, inputColor(screenUV.add(offset)).b);

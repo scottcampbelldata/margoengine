@@ -157,9 +157,16 @@ const SHADE = /* wgsl */ `
  let nLayer=maps.x&2047u;if(nLayer!=0u){s.n=voxelNormal(normal,tangent,textureSampleGrad(voxelTextures,voxelSampler,uv,nLayer,dx,dy).rgb*2.0-1.0);}
  let rLayer=(maps.x>>11u)&2047u;if(rLayer!=0u){s.roughness=clamp(textureSampleGrad(voxelTextures,voxelSampler,uv,rLayer,dx,dy).r,0.045,1.0);}
  let eLayer=maps.z&2047u;var eMap=1.0;if(eLayer!=0u){eMap=textureSampleGrad(voxelTextures,voxelSampler,uv,eLayer,dx,dy).r;}
- let sky=lit.y/15.0;let block=lit.z/15.0;let skyLight=sky/(4.0-3.0*sky);let ao=0.4+0.2*lit.x;
+ // Light level 0-15 to brightness: each level is an equal step in CIE L* lightness (CIE 15:2004), 0 at level 0
+ // and 100 at level 15, turned back into relative luminance Y with the CIE inverse (((L+16)/116)^3 above L* 8,
+ // L/(24389/27) below). Equal steps look evenly spaced on screen while the low levels stay dark (level 1 is 0.7%,
+ // level 7 is 16%), so caves and night read dark. Sky and block light share the curve.
+ let sky=clamp(lit.y,0.0,15.0);let block=clamp(lit.z,0.0,15.0);
+ let lightness=vec2f(sky,block)*100.0/15.0;let cube=(lightness+16.0)/116.0;
+ let brightness=select(lightness*(27.0/24389.0),cube*cube*cube,lightness>vec2f(8.0));let skyLight=brightness.x;
+ let ao=0.4+0.2*lit.x;
  s.occlusion=ao*(0.03+skyLight*f.ambient.w);
- s.emissive=s.base.rgb*(bitcast<f32>(m.w)*eMap+block/(4.0-3.0*block)*ao*f.glow.rgb);
+ s.emissive=s.base.rgb*(bitcast<f32>(m.w)*eMap+brightness.y*ao*f.glow.rgb);
  let v=normalize(f.eye.xyz-i.position);let lightDirection=normalize(f.light.xyz);
  let direct=direct_light(s,v,lightDirection)*voxelSun(i.position,skyLight);
  var color=direct+ambient(s)+s.emissive;

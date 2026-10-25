@@ -26,8 +26,20 @@ export interface TransmissionPassOptions {
 // Group-2 bindings, clear of shadows (1-3), clustered (10-16), IBL/fog (20-25), materials (32-43) and OIT (120).
 const BINDING = 124;
 // Hook WGSL: margoTransmission is the light arriving through the surface (linear HDR), added under clearcoat and sheen.
-// The blur level is a footprint estimate: a lobe about roughness^2 wide, scaled by how strongly the IOR bends light
-// (none at IOR 1, full from IOR 1.5), spans that share of the screen; the level is log2 of its size in texels.
+// Blur level: the mip whose box width matches the screen footprint of the transmitted GGX lobe.
+// - Microfacet tilt: the GGX slope distribution (Walter et al. 2007, eq. 33) has radial CDF r^2/(alpha^2+r^2), so
+//   half the facets are tilted less than delta with tan(delta) = alpha (alpha = roughness^2). That median tilt
+//   stands for the lobe's half-width.
+// - Bend: a ray along the surface normal meets a facet tilted by delta at incidence delta and, by Snell's law
+//   (n1 sin i = n2 sin t, with n1 = 1 outside and n2 = ior), leaves at t = asin(sin(delta)/ior) from the facet normal,
+//   so it turns away from the straight-through direction by delta - t. For small tilts dt/di = n1 cos i/(n2 cos t)
+//   -> n1/n2, giving delta (1 - 1/ior): zero at IOR 1 (a rough IOR-1 slab stays see-through), rising with roughness
+//   and IOR without saturating. The shader evaluates the exact normal-incidence angle (no linearisation).
+// - Footprint: with a perspective view the background is taken as distant, so the lobe's angular radius tan(delta-t)
+//   covers tan(delta-t) * cot(fov/2) of the half-height in NDC; cot(fov/2) is the length of the camera matrix's
+//   y row (projection y scale times a unit view axis). An orthographic view has no angular footprint, so the lateral
+//   spread over the volume path, path * tan(delta-t), is scaled by the same row instead. The lobe diameter in
+//   texels is that NDC radius times the capture height; mip L averages 2^L texels, so level = log2(diameter).
 const declarations = (group: number): string => /* wgsl */ `
 @group(${group}) @binding(${BINDING}) var margoScene:texture_2d<f32>;
 @group(${group}) @binding(${BINDING + 1}) var margoSceneSampler:sampler;
@@ -43,9 +55,17 @@ fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
   let scale=(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3.0;
   let path=max(margoVolume.x*s.th*scale,0.0);
   let size=vec2f(textureDimensions(margoScene,0));
-  let bend=clamp(2.0*(ior-1.0),0.0,1.0);
-  let footprint=max(size.x,size.y)*s.roughness*s.roughness*bend;
-  let level=clamp(log2(max(footprint,1.0)),0.0,f32(textureNumLevels(margoScene))-1.0);
+  // Blur level from the transmitted lobe width (derivation above declarations).
+  let alpha=s.roughness*s.roughness;
+  let sinTilt=alpha*inverseSqrt(1.0+alpha*alpha);
+  let sinOut=sinTilt/ior;
+  let tanOut=sinOut*inverseSqrt(1.0-sinOut*sinOut);
+  let deviation=max((alpha-tanOut)/(1.0+alpha*tanOut),0.0);
+  let wRow=vec3f(f.camera[0].w,f.camera[1].w,f.camera[2].w);
+  let yRow=vec3f(f.camera[0].y,f.camera[1].y,f.camera[2].y);
+  let reach=select(path,1.0,dot(wRow,wRow)>0.0);
+  let texels=deviation*reach*length(yRow)*size.y;
+  let level=clamp(log2(max(texels,1.0)),0.0,f32(textureNumLevels(margoScene)-1u));
   var behind=margoTransmissionBehind(i,s.n,v,ior,path,level);
   if(f.ext.w>0.0&&path>0.0){
     // KHR_materials_dispersion: IOR spread (IOR-1)*0.025*dispersion; red and blue each read on their own ray.

@@ -78,7 +78,7 @@ test('envMap takes cube sources on standard, basic, Lambert and Phong shading, w
   const m = new Material({ envMap: cube, envMapIntensity: 2, combine: 'mix' });
   assert.deepEqual(
     [m.envMapIntensity, m.envMapRotation, m.envMapMode, m.refractionRatio, m.combine, m.reflectivity],
-    [2, 0, 'reflection', 0.98, 'mix', 1],
+    [2, 0, 'reflection', 1 / 1.5, 'mix', 1],
   );
   const copy = m.clone();
   copy.envMapIntensity = 3;
@@ -127,7 +127,7 @@ test('standard envMap replaces the ambient light, also over a scene IBL, and bin
   };
   const v = envUniform(s.frame());
   assert.ok(Math.abs(v[0] + 1) < 1e-6, 'rotations add');
-  assert.deepEqual(v.slice(2, 8), [5, 2, 1, 3, 0.9800000190734863, 1], 'mips, intensity, SH on, ratio');
+  assert.deepEqual(v.slice(2, 8), [5, 2, 1, 3, Math.fround(1 / 1.5), 1], 'mips, intensity, SH on, ratio');
   assert.deepEqual(v.slice(12, 15), [0, 1, 2]);
   assert.deepEqual(v.slice(44, 47), [24, 25, 26]);
   material.envMap = null;

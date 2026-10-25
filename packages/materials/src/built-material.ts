@@ -1188,7 +1188,7 @@ export interface MaterialOptions extends PhysicalOptions {
   envMapRotation?: number;
   /** `'reflection'` (default) samples along the mirrored view ray, `'refraction'` along the ray bent by `refractionRatio`. Live. */
   envMapMode?: 'reflection' | 'refraction';
-  /** Refraction only: the ratio of the indices of refraction, finite and > 0 (default 0.98). Live. */
+  /** Refraction only: the ratio of the indices of refraction, finite and > 0 (default 1/1.5, about 0.667: from air, index 1, into crown glass, index about 1.5). Live. */
   refractionRatio?: number;
   /** Basic, Lambert and Phong: how the reflection meets the colour (default 'multiply'). Live. */
   combine?: EnvCombine;
@@ -1813,7 +1813,15 @@ export class Material {
     ratio: number;
     combine: EnvCombine;
     reflectivity: number;
-  } = { map: null, intensity: 1, rotation: 0, mode: 'reflection', ratio: 0.98, combine: 'multiply', reflectivity: 1 };
+  } = {
+    map: null,
+    intensity: 1,
+    rotation: 0,
+    mode: 'reflection',
+    ratio: 1 / 1.5,
+    combine: 'multiply',
+    reflectivity: 1,
+  };
   private glowScale = 1;
   /** On/off features (features.ts letters f...). */
   private readonly switches = { flatShading: false, vertexColors: true, fog: true, toneMapped: true };
@@ -2618,13 +2626,15 @@ export class Material {
       | 'reflection'
       | 'refraction';
   }
-  /** The ratio of indices of refraction for `envMapMode: 'refraction'`, finite and > 0 (default 0.98). */
+  /** The ratio of indices of refraction for `envMapMode: 'refraction'`, finite and > 0 (default 1/1.5: air into crown glass). */
   get refractionRatio(): number {
     return this.env.ratio;
   }
   set refractionRatio(v: number) {
     if (typeof v !== 'number' || !(v > 0 && Number.isFinite(Math.fround(v))))
-      throw new RangeError('Material refractionRatio must be a finite number > 0; set one (default 0.98)');
+      throw new RangeError(
+        'Material refractionRatio must be a finite number > 0; set one (default 1/1.5, air into glass)',
+      );
     this.env.ratio = v;
   }
   /** Basic, Lambert and Phong: how the reflection meets the colour (default 'multiply'). */

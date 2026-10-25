@@ -224,7 +224,7 @@ look.uniforms.darkness.value = 0.9;                   // live
 | Preset | Parameters (default) |
 | --- | --- |
 | `vignette` | `darkness` 0.8, `radius` 0.4 (0 centre, 1 corner), `softness` 0.6 |
-| `rgbShift` | `amount` 0.005 (UV units), `angle` 0 (radians; red moves right, blue left) |
+| `rgbShift` | `amount` 0.002 (UV units, about 4 px at 1920 wide), `angle` 0 (radians; red moves right, blue left) |
 | `chromaticAberration` | `strength` 0.01 (red and blue scaled about the centre by 1 -/+ strength) |
 | `pixelate` | `size` 8 pixels; each block is the input pixel at its centre |
 | `halftone` | `size` 8 pixels, `angle` 0.26; `greyscale` (construction only) |

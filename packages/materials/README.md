@@ -714,7 +714,7 @@ out of the toon primitives. `selectVariant` replaces the toon copies (call `toon
 `envMap` gives one material its own cube of surroundings: a `CubeTexture`, an `@margoengine/environment`
 `Environment`, a cube render target `{texture, view}` (the shape of environment's `CubeCamera`) or a six-layer
 GPUTexture. Live, with `envMapIntensity` (default 1), `envMapRotation` (radians about +Y, added to an Environment's own
-rotation) and `envMapMode: 'refraction'` with `refractionRatio` (default 0.98) to sample along the bent view ray
+rotation) and `envMapMode: 'refraction'` with `refractionRatio` (default 1/1.5, air into crown glass) to sample along the bent view ray
 instead of the mirrored one.
 
 - **Standard shading** lights itself with the map in place of its ambient light: specular radiance from the mip level
