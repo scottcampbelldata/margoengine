@@ -286,6 +286,27 @@ mock.module('@margoengine/environment', {
     },
     IBL_WGSL: '',
     iblBindGroupEntries: () => [],
+    EnvironmentLighting: class {
+      constructor(environment) {
+        this.name = 'environment:lighting';
+        this.environment = environment;
+        this.disposed = false;
+      }
+      setup(engine) {
+        this.engine = engine;
+      }
+      bindings() {
+        return [];
+      }
+      shader(source) {
+        return source;
+      }
+      dispose() {
+        if (this.disposed) return;
+        this.disposed = true;
+        if (this.engine?.hasPlugin(this.name)) this.engine.removePlugin(this.name);
+      }
+    },
   },
 });
 mock.module('@margoengine/html', {

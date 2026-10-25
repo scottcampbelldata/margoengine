@@ -1,6 +1,5 @@
 import test, { mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 import React, { StrictMode } from 'react';
 import { renderToString } from 'react-dom/server';
@@ -236,6 +235,40 @@ mock.module('@margoengine/environment', {
     IBL_WGSL: 'fn iblShade() {}',
     iblBindGroupEntries: (environment) =>
       [4, 5, 6, 7, 8].map((binding) => ({ binding, resource: { version: environment.version } })),
+    // EnvironmentLighting's contract: a plugin and a gltf-pro lighting effect whose bindings follow the environment's
+    // version, whose shader() patches the PBR source, and whose dispose() detaches it.
+    EnvironmentLighting: class {
+      constructor(environment) {
+        this.name = 'environment:lighting';
+        this.environment = environment;
+        this.disposed = false;
+        this.version = -1;
+        this.disposals = 0;
+      }
+      setup(engine) {
+        this.engine = engine;
+      }
+      bindings() {
+        if (this.disposed) return [];
+        if (this.version !== this.environment.version) {
+          this.cached = [4, 5, 6, 7, 8].map((binding) => ({
+            binding,
+            resource: { version: this.environment.version },
+          }));
+          this.version = this.environment.version;
+        }
+        return this.cached;
+      }
+      shader(source) {
+        return 'fn iblShade() {}\n' + source.replace('+s.emissive;', '+s.emissive+iblShade();');
+      }
+      dispose() {
+        if (this.disposed) return;
+        this.disposed = true;
+        this.disposals++;
+        if (this.engine?.plugins.has(this.name)) this.engine.removePlugin(this.name);
+      }
+    },
   },
 });
 // The real controls' shape: defaults (a prop removed again restores them), events, profiles and key listening.
@@ -682,35 +715,13 @@ test('shadow flags update registration independently and HDR composes with the s
   assert.equal(effect.sources.size, 1);
   assert.equal(model.lighting.size, 2);
   assert.ok(model.lighting.has(effect));
-  // gltf-pro's base PBR shader as built: its template literal with the shared lighting terms spliced in.
-  const chunks = (await readFile(new URL('../../gltf-pro/src/shader.ts', import.meta.url), 'utf8'))
-      .replaceAll('\r\n', '\n')
-      .split('`'),
-    source = chunks.find((chunk) => chunk.includes('direct+ambient(s)')).replace('${lightingTerms}', chunks[1]);
-  const ibl = [...model.lighting].find((value) => value !== effect);
-  const replace = String.prototype.replace;
-  let rewrites = 0;
-  try {
-    String.prototype.replace = function (...args) {
-      rewrites++;
-      return replace.apply(this, args);
-    };
-    const shader = ibl.shader(source, 2);
-    for (let i = 0; i < 100; i++) assert.equal(ibl.shader(source, 2), shader);
-    assert.equal(rewrites, 2, 'steady frames must reuse the transformed shader');
-  } finally {
-    String.prototype.replace = replace;
-  }
-  for (const order of [
-    [ibl, effect],
-    [effect, ibl],
-  ]) {
-    let code = source;
-    for (const lighting of order) code = lighting.shader(code, 2);
-    assert.match(code, /shadowVisibility/);
-    assert.match(code, /iblShade\(iblSpecular/);
-    assert.match(code, /@binding\(8\)/);
-  }
+  // The IBL beside the shadows is the environment package's own EnvironmentLighting (its shader patching, binding
+  // layout and caching are tested there), attached as a plugin so core meshes are lit too.
+  const ibl = [...model.lighting].find((value) => value !== effect),
+    engine = engines.at(-1);
+  assert.equal(ibl.constructor.name, 'EnvironmentLighting');
+  assert.equal(ibl.environment, environments.at(-1));
+  assert.equal(engine.plugins.get('environment:lighting'), ibl);
   view.rerender(tree(children(false, true), { shadows: true }));
   assert.equal(effect.sources.size, 0);
   assert.ok(model.lighting.has(effect));

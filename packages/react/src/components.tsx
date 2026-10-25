@@ -778,44 +778,20 @@ export function Environment({ src, exposure = 1, background = true, onError }: E
   );
   useCommit(() => {
     if (!environment || environment.disposed || !module) return;
-    // Bindings 1..3 belong to Shadows; keep the ambient marker for its shader adapter.
-    let entries = module.iblBindGroupEntries(environment, 4);
-    const change = environment.onChange(() => {
-      entries = module.iblBindGroupEntries(environment, 4);
-    });
-    const shaders = new Map<number, Map<string, string>>();
-    const effect: LightingEffect = {
-      owner: engine,
-      bindings: () => entries,
-      shader: (source, group) => {
-        let cache = shaders.get(group);
-        const cached = cache?.get(source);
-        if (cached !== undefined) return cached;
-        const replaced = source
-          .replace(/fn ambient\(s:Surface\)->vec3f \{[^}]*\}/, 'fn ambient(s:Surface)->vec3f {return vec3f(0);}')
-          .replace(
-            '+s.emissive;',
-            '+s.emissive+iblShade(iblSpecular,iblSampler,iblBrdf,iblSh,iblParams,s.n,v,s.base.rgb,s.metal,s.roughness)*s.occlusion;',
-          );
-        if (replaced === source) throw new Error('Environment requires the standard PBR lighting shader');
-        const code = `@group(${group}) @binding(4) var iblSpecular:texture_cube<f32>;
-@group(${group}) @binding(5) var iblSampler:sampler;
-@group(${group}) @binding(6) var iblBrdf:texture_2d<f32>;
-@group(${group}) @binding(7) var<uniform> iblSh:array<vec4f,9>;
-@group(${group}) @binding(8) var<uniform> iblParams:vec4f;
-${module.IBL_WGSL}\n${replaced}`;
-        if (!cache) shaders.set(group, (cache = new Map()));
-        cache.set(source, code);
-        return code;
-      },
-    };
+    // The environment package's own lighting: it lights core meshes as a plugin and every PBR model it is added to,
+    // with the bindings and WGSL that package keeps current (a copy here went stale when its BRDF table moved to a
+    // storage buffer and `<Environment>` stopped compiling on gltf-pro models).
+    const lighting = new module.EnvironmentLighting(environment),
+      effect = lighting as unknown as LightingEffect;
+    engine.use(lighting);
     const models = new Map<PBRModel, () => void>();
     resources.lighting.set(effect, models);
     const release = () => {
-      change();
       resources.lighting.delete(effect);
       for (const remove of models.values()) remove();
       models.clear();
+      if (!engine.disposed && engine.hasPlugin(lighting.name)) engine.removePlugin(lighting.name);
+      lighting.dispose();
     };
     try {
       for (const model of resources.models) models.set(model, model.addLighting(effect));
