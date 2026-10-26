@@ -20,13 +20,19 @@ const engine=await Engine.create(canvas,{backend:'webgpu',features:['timestamp-q
 watch(runtime().gpu);
 // Naive meshes: every merged quad of a mesher reply becomes its w x h unit quads (same words, cell moved, size 1).
 let naive=false;
+// Reversed replies: while set (with one worker per chunk of the 4-chunk world), the mesher workers' replies are held
+// until all 4 are in, then delivered last first, 50 ms apart, so each chunk arrives in its own frame in the reverse of
+// the order the workers answered.
+let reversed=false,replies=0;const held=[];
+const deliver=(listener,event)=>{if(!reversed||!event.data?.result)return listener(event);replies++;held.push(()=>listener(event));
+ if(held.length===4)held.splice(0).reverse().forEach((f,i)=>setTimeout(f,50*i));};
 const Native=globalThis.Worker,AT_U=[10,10,0,0,0,0],AT_V=[5,5,10,10,5,5];
 const expand=(words)=>{const out=[];for(let i=0;i<words.length;i+=3){const w0=words[i],face=(w0>>>15)&7,w=((w0>>>18)&31)+1,h=((w0>>>23)&31)+1;
  if(face>5){out.push(w0,words[i+1],words[i+2]);continue;}const base=(w0&~(0x3ff<<18))>>>0;
  for(let v=0;v<h;v++)for(let u=0;u<w;u++)out.push((base+(u<<AT_U[face])+(v<<AT_V[face]))>>>0,words[i+1],words[i+2]);}return Uint32Array.from(out);};
 const naiveMesh=(m)=>({...m,opaque:expand(m.opaque),cutout:expand(m.cutout),translucent:expand(m.translucent)});
 globalThis.Worker=class extends Native{#naive=naive;
- set onmessage(listener){super.onmessage=listener&&((event)=>listener(this.#naive&&event.data?.result?{data:{result:naiveMesh(event.data.result)}}:event));}
+ set onmessage(listener){super.onmessage=listener&&((event)=>deliver(listener,this.#naive&&event.data?.result?{data:{result:naiveMesh(event.data.result)}}:event));}
  get onmessage(){return super.onmessage;}};
 // Textures: 16 x 16 seeded patterns, raw RGBA8.
 let seed=3;const random=()=>((seed=(Math.imul(seed,1103515245)+12345)>>>0)>>>8)/16777216;
@@ -120,18 +126,19 @@ async function ready(r,w,ks,mode){
   stable=r.stats.quads===quads&&r.stats.draws&&!w.dirty.size?stable+1:0;await new Promise((resolve)=>setTimeout(resolve,1));}
  if(stable<3)throw new Error(`${mode} renderer not ready: ${r.stats.quads} of ${quads} quads`);
 }
-function attach(w,ks,mode){
+function attach(w,ks,mode,workers=2){
  naive=mode==='naive';for(const k of ks)w.dirty.add(k);
- return VoxelRenderer.attach(engine,{world:w,textures,workers:2});
+ return VoxelRenderer.attach(engine,{world:w,textures,workers});
 }
 const look=(v)=>{engine.camera.position=v.position;engine.camera.target=v.target;};
 // Pixels that differ at all, the largest channel difference, pixels drawn (not background) and 2 x 2 blocks of
 // differing pixels: a shading difference covers areas, a sample owned by the quad across an edge does not.
-function compare(a,b,bg){let differing=0,lit=0,max=0,blocks=0;const W=canvas.width,n=a.length/4,diff=new Uint8Array(n);
+// `at`: the first 8 differing pixels as [x, y, a's RGBA, b's RGBA], so a failure says where to look.
+function compare(a,b,bg){let differing=0,lit=0,max=0,blocks=0;const W=canvas.width,n=a.length/4,diff=new Uint8Array(n),at=[];
  const far=(p,img)=>Math.abs(img[p]-bg[0])+Math.abs(img[p+1]-bg[1])+Math.abs(img[p+2]-bg[2]);
- for(let p=0;p<a.length;p+=4){let d=0;for(let c=0;c<4;c++)d=Math.max(d,Math.abs(a[p+c]-b[p+c]));if(d>0||!Object.is(a[p],b[p])){differing++;diff[p/4]=1;}max=Math.max(max,d);if(far(p,b)>0)lit++;}
+ for(let p=0;p<a.length;p+=4){let d=0;for(let c=0;c<4;c++)d=Math.max(d,Math.abs(a[p+c]-b[p+c]));if(d>0||!Object.is(a[p],b[p])){differing++;diff[p/4]=1;if(at.length<8)at.push([p/4%W,Math.floor(p/4/W),[...a.slice(p,p+4)],[...b.slice(p,p+4)]]);}max=Math.max(max,d);if(far(p,b)>0)lit++;}
  for(let i=0;i<n-W-1;i++)if(diff[i]&&diff[i+1]&&diff[i+W]&&diff[i+W+1]&&(i+1)%W)blocks++;
- return {differing,lit,pixels:n,max,blocks};}
+ return {differing,lit,pixels:n,max,blocks,at};}
 window.check={
  samples:sceneSamples,
  async greedyVsNaive(hdr){
@@ -146,6 +153,18 @@ window.check={
   const results=Object.fromEntries(views.map((v,i)=>[v.name,compare(images.greedy[i],images.naive[i],bg)]));
   post?.dispose();post=undefined;
   return {results,stats,format:hdr?'rgba16float':navigator.gpu.getPreferredCanvasFormat(),size:[canvas.width,canvas.height],errors:errors.splice(0)};
+ },
+ // The same world and views with the meshes arriving in send order and then reversed: the same pixels.
+ async arrivalOrder(){
+  const images=[],arrivals=[];
+  for(const reverse of [false,true]){
+   reversed=reverse;replies=0;look(views[0]);renderer=attach(world,keys,'greedy',4);await ready(renderer,world,keys,'greedy');
+   arrivals.push(replies);images.push([]);
+   for(const v of views){look(v);images.at(-1).push(await shot());}
+   renderer.dispose();
+  }
+  reversed=false;
+  return {results:Object.fromEntries(views.map((v,i)=>[v.name,compare(images[1][i],images[0][i],[0,0,0])])),arrivals,errors:errors.splice(0)};
  },
  // T-junction cracks: pixels of the slab where the naive image is the slab colour and the greedy one is not.
  async cracks(){

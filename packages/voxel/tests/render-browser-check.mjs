@@ -6,6 +6,8 @@
 //   format and on an rgba16float HDR target: the only differing pixels are samples within a fraction of a pixel of a
 //   quad edge, owned by the quad across it (T-junctions and the crack fix's overlap), so under 1% of the drawn pixels
 //   and never a 2 x 2 block;
+// - the same world and views with the meshes arriving in the reverse order draw the same pixels (chunks draw in
+//   position order, so equal-depth samples where chunks overlap never follow the workers' timing);
 // - a cutout square and translucent glass composite to their exact linear numbers;
 // - a block edit is drawn within two 60 Hz frames (best of five); engine.rebootDevice() draws the same image again;
 // - the worst case, 196,608 quads in one chunk layer (cutout and translucent), draws;
@@ -72,6 +74,13 @@ try {
         `ok ${label} ${r.size.join('x')}: greedy ${greedy.quads} quads, naive ${naive.quads}; edge-sample pixels per view ${edge.join(' ')}`,
       );
     }
+    const o = await page.evaluate(() => window.check.arrivalOrder());
+    report.results[`${samples}x arrival order`] = o;
+    assert.deepEqual(o.errors, []);
+    assert.equal(o.arrivals[1], 4, `reversed run: ${o.arrivals[1]} of 4 meshes held back`);
+    for (const [view, result] of Object.entries(o.results))
+      assert.equal(result.differing, 0, `${samples}x ${view}: meshes in another order drew ${JSON.stringify(result)}`);
+    console.log(`ok ${samples}x mesh arrival order: same pixels in ${Object.keys(o.results).length} views`);
     const c = await page.evaluate(() => window.check.composites());
     report.results[`${samples}x composites`] = c;
     assert.deepEqual(c.errors, []);

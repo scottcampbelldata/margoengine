@@ -370,6 +370,46 @@ test('frustum cull per chunk sets instance counts; the bundle draws each chunk l
   }
 });
 
+// Regression: chunks were drawn in the order the workers' meshes arrived, so the equal-depth samples where two chunks'
+// quads overlap (the crack fix) went to whichever came last and one world drew different pixels run to run (the GPU
+// check's greedy vs naive and device restore comparisons failed at random).
+test('chunks draw in position order, whatever order their meshes arrive in', async () => {
+  const keys = [
+      [1, 0, 0],
+      [0, 0, 1],
+      [0, 1, 0],
+      [0, 0, 0],
+      [-1, 0, 1],
+    ],
+    drawn = async (order) => {
+      const { world, renderer, frame, device, STONE, LEAVES } = setup();
+      try {
+        // One chunk at a time, each meshed and uploaded before the next is added: the arrival order is `order`.
+        for (const [i, [cx, cy, cz]] of order.entries()) {
+          world.addChunk(cx, cy, cz, cubes(cz === 1 ? LEAVES : STONE, 3));
+          await settle(frame, () => renderer.stats.chunks === i + 1);
+        }
+        frame();
+        const { origins } = bound(device),
+          key = (offset) => {
+            const slot = Math.floor(offset / 40);
+            return chunkKey(origins[slot * 4] / 32, origins[slot * 4 + 1] / 32, origins[slot * 4 + 2] / 32);
+          };
+        return device.bundles
+          .at(-1)
+          .commands.filter(([name]) => name === 'drawIndexedIndirect')
+          .map(([, , offset]) => key(offset));
+      } finally {
+        renderer.dispose();
+      }
+    };
+  const forward = await drawn(keys),
+    backward = await drawn([...keys].reverse());
+  // Opaque chunks, then cutout ones, each by y, z, x.
+  assert.deepEqual(forward, ['0,0,0', '1,0,0', '0,1,0', '-1,0,1', '0,0,1']);
+  assert.deepEqual(backward, forward);
+});
+
 test('translucent chunks draw back to front; near ones re-sort after the camera moves 4 blocks', async () => {
   const { world, renderer, frame, device, camera, passes, GLASS } = setup();
   try {

@@ -531,6 +531,10 @@ export class VoxelRenderer implements EnginePlugin {
   #gpu?: Gpu;
   #pages = new Pages();
   #chunks = new Map<string, Chunk>();
+  // The resident chunks in draw order, by position (y, z, x), rebuilt after a chunk arrives or leaves. Equal-depth
+  // samples (the crack fix's edge overlap between chunks) go to the chunk drawn last, so the order must not follow the
+  // workers' reply order: the same world and camera always draw the same image.
+  #ordered?: Chunk[];
   #known = new Set<string>();
   #finished = new Map<string, Finished>();
   #full = false;
@@ -782,7 +786,7 @@ export class VoxelRenderer implements EnginePlugin {
       pass.setBindGroup(0, p.groups![layer]);
       if (p.lights) pass.setBindGroup(1, p.lights[layer]);
       pass.setIndexBuffer(gpu.index, 'uint32');
-      for (const chunk of this.#chunks.values())
+      for (const chunk of this.#drawOrder())
         if (chunk.quads[layer]) pass.drawIndexedIndirect(gpu.args, chunk.slot * 40 + layer * 20);
       this.#drawBevel(pass, p, layer);
     }
@@ -898,13 +902,13 @@ export class VoxelRenderer implements EnginePlugin {
       pass.setPipeline(s.ready[l]);
       pass.setBindGroup(0, s.groups![l][cascade]);
       pass.setIndexBuffer(gpu.index, 'uint32');
-      for (const chunk of this.#chunks.values())
+      for (const chunk of this.#drawOrder())
         if (chunk.quads[l] && frustum.intersectsBox(this.#chunkBox(chunk)))
           pass.drawIndexed(chunk.quads[l] * 6, 1, 0, chunk.start[l] * PAGE * 4, 0);
       if (!s.bevel) continue;
       pass.setPipeline(s.bevel[l]);
       pass.setBindGroup(0, s.bevelGroups![l][cascade]);
-      for (const chunk of this.#chunks.values()) {
+      for (const chunk of this.#drawOrder()) {
         const mesh = chunk.bevel?.[l];
         if (mesh && frustum.intersectsBox(this.#chunkBox(chunk))) this.#drawMesh(pass, mesh);
       }
@@ -951,6 +955,7 @@ export class VoxelRenderer implements EnginePlugin {
     this.#mesher.dispose();
     this.#release();
     this.#chunks.clear();
+    this.#ordered = undefined;
     this.#finished.clear();
     this.#known.clear();
     this.#effects.clear();
@@ -1008,6 +1013,7 @@ export class VoxelRenderer implements EnginePlugin {
     this.#release();
     for (const key of this.#known) this.world.dirty.add(key);
     this.#chunks.clear();
+    this.#ordered = undefined;
     this.#finished.clear();
     this.#generation++;
   }
@@ -1207,6 +1213,7 @@ export class VoxelRenderer implements EnginePlugin {
         sortedAt: eye,
       };
       this.#chunks.set(key, chunk);
+      this.#ordered = undefined;
     }
     if (chunk.slot < 0) chunk.slot = this.#slot(gpu, chunk);
     if (chunk.quads[0] || chunk.quads[1] || chunk.bevel || mesh.opaque.length || mesh.cutout.length)
@@ -1389,6 +1396,7 @@ export class VoxelRenderer implements EnginePlugin {
     const chunk = this.#chunks.get(key);
     if (!chunk) return;
     this.#chunks.delete(key);
+    this.#ordered = undefined;
     for (let l = 0; l < 3; l++) this.#pages.release(chunk.start[l], chunk.pages[l]);
     if (chunk.slot >= 0) {
       this.#slots.push(chunk.slot);
@@ -1398,6 +1406,11 @@ export class VoxelRenderer implements EnginePlugin {
     if (chunk.quads[0] || chunk.quads[1] || chunk.bevel) this.#shadowChanged(chunk);
     this.#releaseBevel(chunk);
     this.#full = false;
+  }
+
+  // The resident chunks in draw order (see #ordered).
+  #drawOrder(): Chunk[] {
+    return (this.#ordered ??= [...this.#chunks.values()].sort((a, b) => a.y - b.y || a.z - b.z || a.x - b.x));
   }
 
   #chunkBox(chunk: Chunk): { min: Vec3Like; max: Vec3Like } {
@@ -1495,7 +1508,7 @@ export class VoxelRenderer implements EnginePlugin {
       stats = this.#stats,
       distance = (k: Chunk) => (k.x + 16 - eye[0]) ** 2 + (k.y + 16 - eye[1]) ** 2 + (k.z + 16 - eye[2]) ** 2;
     list.length = stats.chunks = stats.visible = stats.quads = stats.triangles = stats.draws = 0;
-    for (const chunk of this.#chunks.values()) {
+    for (const chunk of this.#drawOrder()) {
       const seen = frustum.intersectsBox(this.#chunkBox(chunk)),
         a = chunk.slot * 10;
       chunk.visible = seen;
@@ -1688,7 +1701,7 @@ export class VoxelRenderer implements EnginePlugin {
       encoder.setPipeline(p.layers[l]);
       encoder.setBindGroup(0, p.groups![l]);
       if (p.lights) encoder.setBindGroup(1, p.lights[l]);
-      for (const chunk of this.#chunks.values())
+      for (const chunk of this.#drawOrder())
         if (chunk.quads[l]) encoder.drawIndexedIndirect(gpu.args, chunk.slot * 40 + l * 20);
     }
     p.bundle = encoder.finish();
@@ -1716,7 +1729,7 @@ export class VoxelRenderer implements EnginePlugin {
     pass.setPipeline(p.bevel[layer]);
     pass.setBindGroup(0, p.bevelGroups![layer]);
     if (p.bevelLights) pass.setBindGroup(1, p.bevelLights[layer]);
-    for (const chunk of this.#chunks.values()) {
+    for (const chunk of this.#drawOrder()) {
       const mesh = chunk.bevel?.[layer];
       if (chunk.visible && mesh) this.#drawMesh(pass, mesh);
     }
