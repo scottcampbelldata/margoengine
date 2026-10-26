@@ -58,6 +58,19 @@ export interface NavigationOptions {
   detailSampleMaxError?: number;
   /** Build a spatial index for endpoint snapping (otherwise every polygon is scanned). Default true. */
   buildBvTree?: boolean;
+  /**
+   * Boxes carved out of the walkable area (crates, parked cars, a closed gate), world units: floor cells under a box
+   * are removed before erosion, so the mesh keeps `walkableRadius` clear of them. Rebuild to move one. Default none.
+   */
+  obstacles?: readonly NavObstacle[];
+}
+
+/** An axis-aligned box carved out of the walkable area ({@link NavigationOptions.obstacles}), world units. */
+export interface NavObstacle {
+  /** Lowest corner [x, y, z]. */
+  min: readonly [number, number, number];
+  /** Highest corner [x, y, z]. */
+  max: readonly [number, number, number];
 }
 
 const DEFAULTS: Required<NavigationOptions> = {
@@ -76,6 +89,7 @@ const DEFAULTS: Required<NavigationOptions> = {
   detailSampleDist: 6,
   detailSampleMaxError: 1,
   buildBvTree: true,
+  obstacles: [],
 };
 const VOXEL_BUDGET = 16_000_000;
 const FIX = 'check the geometry is walkable at these settings (cs, walkableSlopeAngle)';
@@ -137,7 +151,16 @@ function validate(positions: ArrayLike<number>, indices: ArrayLike<number>, opti
         `Unsupported Recast config "${key}": use only the NavigationOptions keys (tiled meshes are not supported)`,
       );
   const config = { ...DEFAULTS, ...given } as Required<NavigationOptions>;
+  if (!Array.isArray(config.obstacles))
+    throw new RangeError('Invalid navigation obstacles: give an array of {min: [x, y, z], max: [x, y, z]} boxes');
+  for (const box of config.obstacles) {
+    const corner = (v: unknown) =>
+      Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number' && Number.isFinite(c));
+    if (!box || !corner(box.min) || !corner(box.max) || box.min.some((c: number, i: number) => c > box.max[i]))
+      throw new RangeError('Invalid navigation obstacle: give {min: [x, y, z], max: [x, y, z]} with min <= max');
+  }
   for (const key of Object.keys(DEFAULTS) as (keyof NavigationOptions)[]) {
+    if (key === 'obstacles') continue;
     const value = config[key];
     if (
       key === 'buildBvTree'
@@ -600,6 +623,19 @@ function generate(positions: ArrayLike<number>, indices: ArrayLike<number>, opti
         }
         if (!ledge) open[s] = 1;
       }
+  // Carve obstacles: a floor cell whose centre is under a box (within a step below its bottom) is not walkable.
+  for (const box of config.obstacles) {
+    const x0 = Math.max(0, Math.ceil((box.min[0] - ox) / cs - 0.5)),
+      x1 = Math.min(width - 1, Math.floor((box.max[0] - ox) / cs - 0.5)),
+      z0 = Math.max(0, Math.ceil((box.min[2] - oz) / cs - 0.5)),
+      z1 = Math.min(depth - 1, Math.floor((box.max[2] - oz) / cs - 0.5));
+    for (let z = z0; z <= z1; z++)
+      for (let x = x0; x <= x1; x++)
+        for (let s = head[z * width + x]; s >= 0; s = next[s]) {
+          const floor = oy + top[s] * ch;
+          if (floor >= box.min[1] - climb * ch && floor <= box.max[1]) open[s] = 0;
+        }
+  }
 
   // Links between open spans of neighbouring cells: tops within a step (plus the slope's own rise) and room to
   // pass. Only mutual links are kept, so region borders look the same from both sides.

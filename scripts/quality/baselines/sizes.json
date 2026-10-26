@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3358083,
+  "total": 3363218,
   "history": [
     {
       "date": "2026-10-24",
@@ -440,6 +440,12 @@
       "commit": "9724c2f9",
       "reason": "animation: Animations of a frame graph deform in one compute pass (p-morph GPU 1.57 -> 1.32 ms, CPU 1.06 -> 0.51 with gltf-pro's shared model run) (item 47)",
       "grew": 3
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "7f50d239",
+      "reason": "package depth (item 21.5): navmesh Crowd manager (tree-shakable), area costs, off-mesh links, closest point, one-sided ORCA neighbours, carved build obstacles",
+      "grew": 2
     }
   ],
   "items": {
@@ -632,8 +638,8 @@
     "@margoengine/math/vector4": 925,
     "@margoengine/mcp": 8664,
     "@margoengine/mesh-edit": 30203,
-    "@margoengine/navmesh": 3396,
-    "@margoengine/navmesh/build": 10491,
+    "@margoengine/navmesh": 7228,
+    "@margoengine/navmesh/build": 11794,
     "@margoengine/net": 1371,
     "@margoengine/oit": 3199,
     "@margoengine/physics": 16247,

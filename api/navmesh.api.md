@@ -10,13 +10,117 @@ export interface Agent {
     preferred: readonly [number, number];
     radius: number;
     maxSpeed: number;
+    reciprocal?: boolean;
+}
+
+export class Crowd {
+    readonly navMesh: NavMesh;
+    readonly agents: CrowdAgent[];
+    constructor(navMesh: NavMesh, options?: CrowdOptions);
+    place(position: Vec3): {
+        point: Vec3;
+        polygon: number;
+    };
+    addAgent(options: CrowdAgentOptions): CrowdAgent;
+    removeAgent(agent: CrowdAgent): void;
+    addObstacle(obstacle: CrowdObstacle): () => void;
+    on<K extends keyof CrowdEventMap>(type: K, listener: (event: CrowdEventMap[K]) => void): () => void;
+    update(dt: number): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export class CrowdAgent {
+    readonly id: number;
+    readonly position: [number, number, number];
+    readonly velocity: [number, number, number];
+    state: CrowdAgentState;
+    target: Vec3 | null;
+    path: Vec3[];
+    userData: unknown;
+    readonly radius: number;
+    maxSpeed: number;
+    maxAcceleration: number;
+    arrivalDistance: number;
+    slowDownDistance: number;
+    corner: number;
+    links: number[];
+    polygon: number;
+    planned: number;
+    readonly disc: {
+        id: number;
+        position: [number, number];
+        velocity: [number, number];
+        preferred: [number, number];
+        radius: number;
+        maxSpeed: number;
+    };
+    constructor(crowd: Crowd, id: number, options: CrowdAgentOptions, position: Vec3, polygon: number);
+    get valid(): boolean;
+    setTarget(target: Vec3): this;
+    stop(): this;
+    teleport(position: Vec3): this;
+    remove(): void;
+    markRemoved(): void;
+}
+
+export interface CrowdAgentOptions {
+    position: Vec3;
+    radius?: number;
+    maxSpeed?: number;
+    maxAcceleration?: number;
+    arrivalDistance?: number;
+    slowDownDistance?: number;
+    userData?: unknown;
+}
+
+export type CrowdAgentState = 'idle' | 'moving' | 'offmesh' | 'arrived' | 'unreachable';
+
+export interface CrowdEventMap {
+    arrive: CrowdAgent;
+    unreachable: CrowdAgent;
+}
+
+export interface CrowdObstacle {
+    position: Vec3;
+    radius: number;
+    velocity?: Vec3;
+}
+
+export interface CrowdOptions {
+    neighborDistance?: number;
+    maxNeighbors?: number;
+    timeHorizon?: number;
 }
 
 export class NavMesh {
     readonly vertices: readonly Vec3[];
     constructor(vertices: readonly Vec3[], polygons: readonly (readonly number[])[]);
+    get polygonCount(): number;
+    get version(): number;
+    polygonCenter(index: number): Vec3;
+    setAreaCost(index: number, cost: number): this;
+    areaCost(index: number): number;
+    heightAt(index: number, x: number, z: number): number;
+    closestPoint(position: Vec3): {
+        point: Vec3;
+        polygon: number;
+    } | null;
+    addOffMeshLink(start: Vec3, end: Vec3, options?: OffMeshLinkOptions): number;
+    removeOffMeshLink(id: number): boolean;
     locate(position: Vec3): number;
     path(start: Vec3, end: Vec3): Vec3[] | null;
+    route(start: Vec3, end: Vec3): NavRoute | null;
+}
+
+export interface NavRoute {
+    points: Vec3[];
+    offMesh: number[];
+}
+
+export interface OffMeshLinkOptions {
+    bidirectional?: boolean;
+    cost?: number;
 }
 
 export { Vec3 } from "@margoengine/core";

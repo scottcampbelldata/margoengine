@@ -6,6 +6,11 @@
 import { Vec3 } from "@margoengine/core";
 import { Vec3Like } from "@margoengine/math";
 
+export interface NavObstacle {
+    min: readonly [number, number, number];
+    max: readonly [number, number, number];
+}
+
 export class Navigation {
     private constructor();
     static create(positions: ArrayLike<number>, indices: ArrayLike<number>, options?: NavigationOptions): Promise<Navigation>;
@@ -30,6 +35,7 @@ export interface NavigationOptions {
     detailSampleDist?: number;
     detailSampleMaxError?: number;
     buildBvTree?: boolean;
+    obstacles?: readonly NavObstacle[];
 }
 
 export function buildNavMesh(positions: ArrayLike<number>, indices: ArrayLike<number>, options?: NavigationOptions): NavMesh;
@@ -39,7 +45,30 @@ export function buildNavMesh(positions: ArrayLike<number>, indices: ArrayLike<nu
 class NavMesh {
     readonly vertices: readonly Vec3[];
     constructor(vertices: readonly Vec3[], polygons: readonly (readonly number[])[]);
+    get polygonCount(): number;
+    get version(): number;
+    polygonCenter(index: number): Vec3;
+    setAreaCost(index: number, cost: number): this;
+    areaCost(index: number): number;
+    heightAt(index: number, x: number, z: number): number;
+    closestPoint(position: Vec3): {
+        point: Vec3;
+        polygon: number;
+    } | null;
+    addOffMeshLink(start: Vec3, end: Vec3, options?: OffMeshLinkOptions): number;
+    removeOffMeshLink(id: number): boolean;
     locate(position: Vec3): number;
     path(start: Vec3, end: Vec3): Vec3[] | null;
+    route(start: Vec3, end: Vec3): NavRoute | null;
+}
+
+interface NavRoute {
+    points: Vec3[];
+    offMesh: number[];
+}
+
+interface OffMeshLinkOptions {
+    bidirectional?: boolean;
+    cost?: number;
 }
 ```

@@ -24,6 +24,11 @@ export interface Agent {
   radius: number;
   /** Speed limit in world units per second, non-negative. */
   maxSpeed: number;
+  /**
+   * As a neighbour: false when it does not avoid back (a static or scripted obstacle, a player-driven character), so
+   * the agent takes all of the avoidance instead of half. Default true.
+   */
+  reciprocal?: boolean;
 }
 
 /** Below this |sin| between two boundary lines they count as parallel (our own floor, unit normals). */
@@ -57,7 +62,8 @@ function check(agent: Agent): void {
     !Number.isFinite(agent.radius) ||
     typeof agent.maxSpeed !== 'number' ||
     !(agent.maxSpeed >= 0) ||
-    !Number.isFinite(agent.maxSpeed)
+    !Number.isFinite(agent.maxSpeed) ||
+    (agent.reciprocal !== undefined && typeof agent.reciprocal !== 'boolean')
   )
     throw new RangeError(
       'Invalid ORCA agent: give a safe-integer id, two finite components for position, velocity and preferred, and a finite radius and maxSpeed >= 0',
@@ -258,10 +264,12 @@ export function avoid(
       ux = nx * push;
       uz = nz * push;
     }
-    // Half the responsibility (paper eq. 5): the boundary passes through v + u/2 with normal n.
+    // Half the responsibility (paper eq. 5): the boundary passes through v + u/2 with normal n. A neighbour that does
+    // not avoid back leaves all of it to the agent: v + u, as the paper does for static obstacles.
+    const share = other.reciprocal === false ? 1 : 0.5;
     lines[3 * count] = nx;
     lines[3 * count + 1] = nz;
-    lines[3 * count + 2] = nx * (vx + ux / 2) + nz * (vz + uz / 2);
+    lines[3 * count + 2] = nx * (vx + ux * share) + nz * (vz + uz * share);
     count++;
   }
   const speed = agent.maxSpeed,
