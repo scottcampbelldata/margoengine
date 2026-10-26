@@ -486,6 +486,11 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
     for (const file of ['react-integration.md', 'react-r3f.md'])
       await copyFile('docs/' + file, join(supportRoot, 'docs', file));
   }
+  // The packed browser's first page load (a cold dev server transforming every package) is the slowest, most CPU-hungry
+  // part. Started together with the type-check shards it missed the 30 s navigation limit twice in a row on a busy
+  // machine, so it goes first and everything else starts once the page has loaded (or failed to).
+  let pageLoaded;
+  const loaded = new Promise((done) => (pageLoaded = done));
   const packedBrowser = async () => {
     const aliases = [],
       browserExport = (entry) =>
@@ -502,7 +507,11 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
       }
     }
     const started = performance.now();
-    browser = await openBrowser({ startPath: '/tests/modern.html', aliases });
+    try {
+      browser = await openBrowser({ startPath: '/tests/modern.html', aliases });
+    } finally {
+      pageLoaded();
+    }
     const { page } = browser,
       errors = browserErrors;
     page.on('pageerror', (error) => errors.push(error.message));
@@ -540,7 +549,10 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
     timings.push(`packed browser ${seconds(started)}`);
   };
   // Everything that only reads the installed packages runs side by side: the consumer program, the README examples in
-  // shards, the React docs, the React unit tests and the packed browser.
+  // shards, the React docs, the React unit tests and the packed browser (started first, see above).
+  const browserRun = reactScope ? packedBrowser() : undefined;
+  browserRun?.then(pageLoaded, pageLoaded); // a failure before the page opens must not leave the rest waiting
+  if (reactScope) await loaded;
   const pipelines = [
     (async () => {
       if (await task('consumer tsc', [tsc, '-p', join(fixture, 'tsconfig.json')]))
@@ -566,7 +578,7 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
         '--test',
         ...reactTests.map((file) => join(reactRoot, file)),
       ]),
-      packedBrowser(),
+      browserRun,
     );
   const settled = await Promise.allSettled(pipelines);
   console.log(`package test timings: ${timings.join(', ')}`);
