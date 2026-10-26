@@ -12,8 +12,18 @@ import {
   waterlogState,
 } from '@margoengine/voxel';
 
+// The cells groundY searches by default, top to bottom.
+const GROUND_TOP = 96,
+  GROUND_BOTTOM = -64;
+
 /** Highest solid block of column (x, z) at or below `from`, or undefined while that part of the world is not loaded. */
-export function groundY(world: VoxelWorld, x: number, z: number, from = 96, to = -64): number | undefined {
+export function groundY(
+  world: VoxelWorld,
+  x: number,
+  z: number,
+  from = GROUND_TOP,
+  to = GROUND_BOTTOM,
+): number | undefined {
   const { blocks } = world;
   for (let y = from; y >= to; y--) {
     if (!world.getChunk(x >> 5, y >> 5, z >> 5)) return undefined;
@@ -23,11 +33,14 @@ export function groundY(world: VoxelWorld, x: number, z: number, from = 96, to =
   return undefined;
 }
 
-/** True once every chunk the hut at (x, z) can touch is loaded. */
+/**
+ * True once every chunk the hut at (x, z) can touch is loaded, including every chunk `groundY` reads under its yard
+ * (cells GROUND_BOTTOM..GROUND_TOP), so the build never runs on ground that is still missing.
+ */
 export function showcaseReady(world: VoxelWorld, x: number, z: number): boolean {
   for (let cz = (z - 3) >> 5; cz <= (z + 9) >> 5; cz++)
     for (let cx = (x - 3) >> 5; cx <= (x + 9) >> 5; cx++)
-      for (let cy = -1; cy <= 1; cy++) if (!world.getChunk(cx, cy, cz)) return false;
+      for (let cy = GROUND_BOTTOM >> 5; cy <= GROUND_TOP >> 5; cy++) if (!world.getChunk(cx, cy, cz)) return false;
   return true;
 }
 
@@ -38,6 +51,10 @@ function yard(world: VoxelWorld, blocks: BlockTypes, x: number, z: number, put: 
   let base = -Infinity;
   for (let dz = -2; dz <= 8; dz++)
     for (let dx = -2; dx <= 8; dx++) base = Math.max(base, groundY(world, x + dx, z + dz) ?? -Infinity);
+  if (base === -Infinity)
+    throw new RangeError(
+      `No ground under the showcase yard at (${x}, ${z}) in y ${GROUND_BOTTOM}..${GROUND_TOP}; wait for showcaseReady() and build it over land`,
+    );
   base += 1;
   for (let dz = -2; dz <= 8; dz++)
     for (let dx = -2; dx <= 8; dx++) {
