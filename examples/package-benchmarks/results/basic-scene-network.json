@@ -1,5 +1,5 @@
 {
-  "commit": "8da5d36b",
+  "commit": "525808b0",
   "dirty": false,
   "browser": "msedge 156.0.4314.42 headless",
   "adapter": "nvidia ampere",
@@ -15,6 +15,15 @@
       "brotli": 228
     },
     {
+      "path": "assets/index-B1T4meL-.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 23702,
+      "raw": 58102,
+      "gzip": 23321,
+      "brotli": 20541
+    },
+    {
       "path": "assets/geometry-DT4GWWnY.js",
       "role": "Shared chunk",
       "encoding": "gzip",
@@ -24,13 +33,13 @@
       "brotli": 1049
     },
     {
-      "path": "assets/index-Bk1Rs0-D.js",
-      "role": "Entry: core + stage + app",
+      "path": "assets/dist-BjyhoMuY.js",
+      "role": "@margoengine/gltf (app.load)",
       "encoding": "gzip",
-      "transferred": 23699,
-      "raw": 58102,
-      "gzip": 23318,
-      "brotli": 20570
+      "transferred": 6078,
+      "raw": 14756,
+      "gzip": 5706,
+      "brotli": 5122
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -40,15 +49,6 @@
       "raw": 40,
       "gzip": 54,
       "brotli": 44
-    },
-    {
-      "path": "assets/dist-Bq1HRPrA.js",
-      "role": "@margoengine/gltf (app.load)",
-      "encoding": "gzip",
-      "transferred": 5682,
-      "raw": 12843,
-      "gzip": 5310,
-      "brotli": 4774
     },
     {
       "path": "model.glb",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 33688,
-    "raw": 75164,
-    "gzip": 30671,
-    "brotli": 27024
+    "transferred": 34087,
+    "raw": 77077,
+    "gzip": 31070,
+    "brotli": 27343
   },
   "notFetched": [
     {
@@ -81,16 +81,16 @@
       "raw": 19095
     },
     {
-      "path": "assets/dist-BEUo_LQ7.js",
-      "raw": 87886
+      "path": "assets/dist-BZI9GhG9.js",
+      "raw": 88742
+    },
+    {
+      "path": "assets/dist-C4ZcmGmh.js",
+      "raw": 41974
     },
     {
       "path": "assets/dist-ChSAaR39.js",
       "raw": 66834
-    },
-    {
-      "path": "assets/dist-CqkOg2TY.js",
-      "raw": 41515
     },
     {
       "path": "assets/dist-DFDfWT29.js",
@@ -109,20 +109,20 @@
       "raw": 97856
     },
     {
-      "path": "assets/particles-C-ZxNXRm.js",
-      "raw": 29218
-    },
-    {
-      "path": "assets/particles-C310_Kgr.js",
+      "path": "assets/particles-DBczjcAR.js",
       "raw": 55
     },
     {
-      "path": "assets/post-BtnO3x34.js",
-      "raw": 18734
+      "path": "assets/particles-DNfn5HWh.js",
+      "raw": 29278
     },
     {
-      "path": "assets/post-Caycyumt.js",
+      "path": "assets/post-D0RpWh9P.js",
       "raw": 52
+    },
+    {
+      "path": "assets/post-XWoq7C3Z.js",
+      "raw": 18940
     },
     {
       "path": "assets/sky-B0AP5oFk.js",
