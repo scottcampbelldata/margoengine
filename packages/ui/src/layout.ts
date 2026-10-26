@@ -1,0 +1,464 @@
+import { rangeError, typeError } from '../../shared/errors.js';
+
+/** A rectangle in UI units: `x` right, `y` down from the top left of the screen. */
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * A size: a number of UI units, `'auto'` (fit the content), `'fill'` (take the free space along the parent's main
+ * axis, or the whole cross axis) or a percentage of the parent's content box such as `'50%'`.
+ */
+export type Size = number | 'auto' | 'fill' | `${number}%`;
+/** Spacing around or inside a box: one number, `[vertical, horizontal]` or `[top, right, bottom, left]`. */
+export type Edges = number | readonly [number, number] | readonly [number, number, number, number];
+/** Placement on the cross axis. `'stretch'` fills the cross axis when the size is `'auto'`. */
+export type Align = 'start' | 'center' | 'end' | 'stretch';
+/** Placement of the children along the main axis. */
+export type Justify = 'start' | 'center' | 'end' | 'space-between' | 'space-around' | 'space-evenly';
+/** Where an anchored child sits in its parent's content box. `'stretch'` fills both axes. */
+export type Anchor =
+  | 'stretch'
+  | 'top-left'
+  | 'top'
+  | 'top-right'
+  | 'left'
+  | 'center'
+  | 'right'
+  | 'bottom-left'
+  | 'bottom'
+  | 'bottom-right';
+
+/** How a box lays out and is laid out. Every field is optional; defaults are noted per field. */
+export interface LayoutStyle {
+  /** How children are placed: `'column'` (default), `'row'`, `'stack'` (all anchored over each other) or `'grid'`. */
+  direction?: 'row' | 'column' | 'stack' | 'grid';
+  /** Space between children in `row`, `column` and `grid`: one number or `[column gap, row gap]`. Default 0. */
+  gap?: number | readonly [number, number];
+  /** Cross-axis placement of the children. Default `'stretch'` in a column and `'center'` in a row. */
+  align?: Align;
+  /** Main-axis placement of the children when none of them grows. Default `'start'`. */
+  justify?: Justify;
+  /** Space inside the box. Default 0. */
+  padding?: Edges;
+  /** Space outside the box. In a stack it is the distance from the anchored edges. Default 0. */
+  margin?: Edges;
+  /** Default `'auto'`. */
+  width?: Size;
+  /** Default `'auto'`. */
+  height?: Size;
+  /** Lower bound of the width in UI units. Default 0. */
+  minWidth?: number;
+  /** Upper bound of the width. Default unbounded. */
+  maxWidth?: number;
+  /** Lower bound of the height. Default 0. */
+  minHeight?: number;
+  /** Upper bound of the height. Default unbounded. */
+  maxHeight?: number;
+  /** Share of the free main-axis space this child takes. Default 0 (1 for `'fill'` on the main axis). */
+  grow?: number;
+  /** How readily this child gives up its size when the parent is too small. Default 1. */
+  shrink?: number;
+  /** Cross-axis placement of this child, overriding the parent's `align`. Default `'auto'` (the parent's). */
+  alignSelf?: Align | 'auto';
+  /** Anchor in the parent's content box. Children of a `'stack'` default to `'stretch'`; set it elsewhere with `position: 'absolute'`. */
+  anchor?: Anchor;
+  /** Take the child out of the flow and place it with `anchor` (and `margin`). Default `'flow'`. */
+  position?: 'flow' | 'absolute';
+  /** Extra shift in UI units after layout; does not affect other boxes. Default `[0, 0]`. */
+  offset?: readonly [number, number];
+  /** In a stack, ignore the parent's padding (and the safe area), so the child can fill the whole screen. Default false. */
+  bleed?: boolean;
+  /** Columns of a `'grid'`. Default 1. */
+  columns?: number;
+  /** Cell width of a `'grid'`. Default the widest child. */
+  cellWidth?: number;
+  /** Cell height of a `'grid'`. Default the tallest child. */
+  cellHeight?: number;
+  /** `'scroll'` lets the children exceed the box along the main axis and scroll; `'hidden'` clips. Default `'visible'`. */
+  overflow?: 'visible' | 'hidden' | 'scroll';
+}
+
+/** What {@link arrange} needs from a box. {@link Widget} implements it; tests can use plain objects. */
+export interface LayoutNode {
+  readonly style: LayoutStyle;
+  readonly children: readonly LayoutNode[];
+  /** False takes the box out of the layout entirely. Default true. */
+  readonly visible?: boolean;
+  /** Content size (without padding) of a leaf box wrapped to at most `maxWidth`. */
+  measure?(maxWidth: number): { width: number; height: number };
+  /** Written by {@link arrange}. */
+  rect: Rect;
+  /** Scroll offset in UI units, clamped by {@link arrange}. */
+  scrollX?: number;
+  /** Scroll offset in UI units, clamped by {@link arrange}. */
+  scrollY?: number;
+  /** Written by {@link arrange}: the size of the children's extent along the scrolling axis. */
+  contentWidth?: number;
+  /** Written by {@link arrange}. */
+  contentHeight?: number;
+}
+
+type Insets = readonly [number, number, number, number];
+const ZERO: Insets = [0, 0, 0, 0];
+
+/** Expand {@link Edges} to `[top, right, bottom, left]`. Throws a TypeError or RangeError for anything else. */
+export function edges(value: Edges | undefined): Insets {
+  if (value === undefined) return ZERO;
+  const list = typeof value === 'number' ? [value] : value;
+  if (!Array.isArray(list) || ![1, 2, 4].includes(list.length) || list.some((n) => typeof n !== 'number'))
+    throw typeError('Edges are a number, [vertical, horizontal] or [top, right, bottom, left]', 'ui');
+  if (list.some((n) => !Number.isFinite(n) || n < -1e6 || n > 1e6))
+    throw rangeError('Edges must be finite numbers within 1e6 UI units', 'ui');
+  if (list.length === 1) return [list[0], list[0], list[0], list[0]];
+  if (list.length === 2) return [list[0], list[1], list[0], list[1]];
+  return list as unknown as Insets;
+}
+
+/** Check a style, throwing a TypeError or RangeError that names the field. Returns it unchanged. */
+export function validateStyle(style: LayoutStyle): LayoutStyle {
+  const size = (name: string, value: unknown) => {
+    if (value === undefined || value === 'auto' || value === 'fill') return;
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value) || value < 0) throw rangeError(`${name} must be finite and not negative`, 'ui');
+      return;
+    }
+    if (typeof value === 'string' && /^\d+(\.\d+)?%$/.test(value)) return;
+    throw typeError(`${name} is a number, 'auto', 'fill' or a percentage such as '50%'`, 'ui');
+  };
+  size('width', style.width);
+  size('height', style.height);
+  for (const key of ['minWidth', 'maxWidth', 'minHeight', 'maxHeight', 'cellWidth', 'cellHeight'] as const) {
+    const value = style[key];
+    if (value !== undefined && (typeof value !== 'number' || !(value >= 0)))
+      throw rangeError(`${key} must be a number of at least 0`, 'ui');
+  }
+  for (const key of ['grow', 'shrink'] as const) {
+    const value = style[key];
+    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0))
+      throw rangeError(`${key} must be a finite number of at least 0`, 'ui');
+  }
+  if (style.columns !== undefined && (!Number.isInteger(style.columns) || style.columns < 1))
+    throw rangeError('columns must be an integer of at least 1', 'ui');
+  const gap = style.gap;
+  if (gap !== undefined) {
+    const parts = typeof gap === 'number' ? [gap] : gap;
+    if (!Array.isArray(parts) || parts.length > 2 || parts.some((n) => !Number.isFinite(n) || n < 0))
+      throw rangeError('gap is a number of at least 0 or [column gap, row gap]', 'ui');
+  }
+  if (style.offset !== undefined && (style.offset.length !== 2 || style.offset.some((n) => !Number.isFinite(n))))
+    throw rangeError('offset is [x, y] in finite UI units', 'ui');
+  edges(style.padding);
+  edges(style.margin);
+  return style;
+}
+
+const isRow = (node: LayoutNode) => node.style.direction === 'row';
+const percent = (size: Size | undefined): number | undefined =>
+  typeof size === 'string' && size.endsWith('%') ? Number.parseFloat(size) / 100 : undefined;
+const explicit = (size: Size | undefined, avail: number): number | undefined =>
+  typeof size === 'number'
+    ? size
+    : percent(size) !== undefined && Number.isFinite(avail)
+      ? percent(size)! * avail
+      : undefined;
+const clamp = (value: number, min: number | undefined, max: number | undefined) =>
+  Math.max(min ?? 0, Math.min(max ?? Infinity, value));
+const gaps = (style: LayoutStyle): [number, number] =>
+  typeof style.gap === 'number' ? [style.gap, style.gap] : [style.gap?.[0] ?? 0, style.gap?.[1] ?? style.gap?.[0] ?? 0];
+const flowChildren = (node: LayoutNode): LayoutNode[] =>
+  node.children.filter(
+    (c) => c.visible !== false && c.style.position !== 'absolute' && node.style.direction !== 'stack',
+  );
+const floating = (node: LayoutNode): LayoutNode[] =>
+  node.children.filter(
+    (c) => c.visible !== false && (c.style.position === 'absolute' || node.style.direction === 'stack'),
+  );
+const horizontal = (m: Insets) => m[1] + m[3];
+const vertical = (m: Insets) => m[0] + m[2];
+
+interface Size2 {
+  width: number;
+  height: number;
+}
+
+/** Width of `node` (border box) when `avail` is the most it may take: explicit, or its content plus padding. */
+function contentOf(node: LayoutNode, innerWidth: number): Size2 {
+  const style = node.style,
+    flow = flowChildren(node),
+    over = floating(node);
+  if (!flow.length && !over.length) {
+    const size = node.measure?.(innerWidth);
+    return { width: size?.width ?? 0, height: size?.height ?? 0 };
+  }
+  const [gx, gy] = gaps(style);
+  if (style.direction === 'stack' || (!flow.length && over.length)) {
+    let width = 0,
+      height = 0;
+    for (const child of over) {
+      const m = edges(child.style.margin),
+        size = sizeOf(child, innerWidth - horizontal(m));
+      width = Math.max(width, size.width + horizontal(m));
+      height = Math.max(height, size.height + vertical(m));
+    }
+    return { width, height };
+  }
+  if (style.direction === 'grid') {
+    const cols = style.columns ?? 1,
+      sizes = flow.map((c) => {
+        const m = edges(c.style.margin),
+          size = sizeOf(c, innerWidth);
+        return { width: size.width + horizontal(m), height: size.height + vertical(m) };
+      }),
+      cellW = style.cellWidth ?? Math.max(0, ...sizes.map((s) => s.width)),
+      cellH = style.cellHeight ?? Math.max(0, ...sizes.map((s) => s.height)),
+      rows = Math.ceil(flow.length / cols);
+    return { width: cols * cellW + (cols - 1) * gx, height: rows * cellH + Math.max(0, rows - 1) * gy };
+  }
+  const row = isRow(node);
+  let main = 0,
+    cross = 0;
+  for (const child of flow) {
+    const m = edges(child.style.margin),
+      size = sizeOf(child, innerWidth - (row ? 0 : horizontal(m)));
+    main += (row ? size.width + horizontal(m) : size.height + vertical(m)) + (row ? gx : gy);
+    cross = Math.max(cross, row ? size.height + vertical(m) : size.width + horizontal(m));
+  }
+  main -= row ? gx : gy;
+  return row ? { width: main, height: cross } : { width: cross, height: main };
+}
+
+/** The border-box size of `node` when at most `availWidth` is available (Infinity when unbounded). */
+function sizeOf(node: LayoutNode, availWidth: number, forcedWidth?: number): Size2 {
+  const s = node.style,
+    p = edges(s.padding);
+  let width = forcedWidth ?? explicit(s.width, availWidth);
+  const fixedWidth = width !== undefined;
+  const innerWidth = Math.max(0, (width ?? availWidth) - horizontal(p));
+  const content = contentOf(node, innerWidth);
+  width = clamp(fixedWidth ? width! : content.width + horizontal(p), s.minWidth, s.maxWidth);
+  let height = explicit(s.height, Infinity);
+  height = clamp(height ?? content.height + vertical(p), s.minHeight, s.maxHeight);
+  return { width, height };
+}
+
+/** Height of `node` when laid out `width` wide. */
+function heightAt(node: LayoutNode, width: number): number {
+  return sizeOf(node, width, width).height;
+}
+
+/**
+ * Lay out the tree below `root` into `box` and write every node's `rect` (absolute UI units, y down). The algorithm
+ * is a small flexbox: children of a row or column take their base size, then free space is shared by `grow` and
+ * a shortage by `shrink`, then `justify` and `align` place them. A stack anchors its children, and a grid fills cells
+ * row by row.
+ */
+export function arrange(root: LayoutNode, box: Rect): void {
+  place(root, box.x, box.y, box.width, box.height);
+}
+
+function place(node: LayoutNode, x: number, y: number, width: number, height: number): void {
+  node.rect = { x, y, width, height };
+  const s = node.style,
+    p = edges(s.padding),
+    inner: Rect = {
+      x: x + p[3],
+      y: y + p[0],
+      width: Math.max(0, width - horizontal(p)),
+      height: Math.max(0, height - vertical(p)),
+    };
+  node.contentWidth = inner.width;
+  node.contentHeight = inner.height;
+  const flow = flowChildren(node);
+  if (s.direction === 'grid') placeGrid(node, flow, inner);
+  else if (flow.length) placeFlex(node, flow, inner);
+  for (const child of floating(node)) placeAnchored(node, child, inner, { x, y, width, height });
+  for (const child of node.children) {
+    if (child.visible === false) child.rect = { x, y, width: 0, height: 0 };
+    const o = child.style.offset;
+    if (o && child.visible !== false) translate(child, o[0], o[1]);
+  }
+}
+
+/** Move a laid-out subtree by (dx, dy) UI units, for placing a box after the layout. */
+export function translate(node: LayoutNode, dx: number, dy: number): void {
+  if (!dx && !dy) return;
+  node.rect = { ...node.rect, x: node.rect.x + dx, y: node.rect.y + dy };
+  for (const child of node.children) translate(child, dx, dy);
+}
+
+function placeGrid(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
+  const s = node.style,
+    [gx, gy] = gaps(s),
+    cols = s.columns ?? 1,
+    sizes = flow.map((c) => {
+      const m = edges(c.style.margin),
+        size = sizeOf(c, inner.width);
+      return { width: size.width + horizontal(m), height: size.height + vertical(m) };
+    }),
+    cellW = s.cellWidth ?? Math.max(0, ...sizes.map((z) => z.width)),
+    cellH = s.cellHeight ?? Math.max(0, ...sizes.map((z) => z.height)),
+    rows = Math.ceil(flow.length / cols),
+    total = rows * cellH + Math.max(0, rows - 1) * gy;
+  const scroll = scrollOf(node, total, inner.height, 'y');
+  node.contentHeight = total;
+  flow.forEach((child, i) => {
+    const m = edges(child.style.margin),
+      cx = inner.x + (i % cols) * (cellW + gx),
+      cy = inner.y + Math.floor(i / cols) * (cellH + gy) - scroll;
+    const w = cellW - horizontal(m),
+      h = cellH - vertical(m);
+    place(child, cx + m[3], cy + m[0], Math.max(0, w), Math.max(0, h));
+  });
+}
+
+function scrollOf(node: LayoutNode, content: number, view: number, axis: 'x' | 'y'): number {
+  if (node.style.overflow !== 'scroll') return 0;
+  const key = axis === 'x' ? 'scrollX' : 'scrollY',
+    max = Math.max(0, content - view),
+    value = Math.max(0, Math.min(max, node[key] ?? 0));
+  node[key] = value;
+  return value;
+}
+
+interface Item {
+  child: LayoutNode;
+  m: Insets;
+  base: number;
+  min: number;
+  max: number;
+  grow: number;
+  shrink: number;
+  size: number;
+}
+
+function placeFlex(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
+  const s = node.style,
+    row = isRow(node),
+    [gx, gy] = gaps(s),
+    gap = row ? gx : gy,
+    innerMain = row ? inner.width : inner.height,
+    innerCross = row ? inner.height : inner.width,
+    parentAlign: Align = s.align ?? (row ? 'center' : 'stretch');
+  const items: Item[] = flow.map((child) => {
+    const cs = child.style,
+      m = edges(cs.margin),
+      mainStyle = row ? cs.width : cs.height,
+      mainMargin = row ? horizontal(m) : vertical(m),
+      crossMargin = row ? vertical(m) : horizontal(m);
+    let base: number;
+    const px = explicit(mainStyle, innerMain);
+    if (px !== undefined) base = px;
+    else if (mainStyle === 'fill') base = 0;
+    else if (row) base = sizeOf(child, Math.max(0, innerMain - mainMargin)).width;
+    else {
+      const align = cs.alignSelf && cs.alignSelf !== 'auto' ? cs.alignSelf : parentAlign;
+      const cw =
+        explicit(cs.width, innerCross) ??
+        (align === 'stretch' || cs.width === 'fill' ? innerCross - crossMargin : undefined);
+      base =
+        cw === undefined
+          ? sizeOf(child, innerCross - crossMargin).height
+          : heightAt(child, clamp(cw, cs.minWidth, cs.maxWidth));
+    }
+    return {
+      child,
+      m,
+      base: clamp(base, row ? cs.minWidth : cs.minHeight, row ? cs.maxWidth : cs.maxHeight),
+      min: (row ? cs.minWidth : cs.minHeight) ?? 0,
+      max: (row ? cs.maxWidth : cs.maxHeight) ?? Infinity,
+      grow: cs.grow ?? (mainStyle === 'fill' ? 1 : 0),
+      shrink: cs.shrink ?? 1,
+      size: 0,
+    };
+  });
+  const margins = (it: Item) => (row ? horizontal(it.m) : vertical(it.m));
+  const gapTotal = gap * (items.length - 1);
+  const natural = items.reduce((sum, it) => sum + it.base + margins(it), 0) + gapTotal;
+  const scrolling = s.overflow === 'scroll';
+  let free = scrolling ? Math.max(0, innerMain - natural) : innerMain - natural;
+  for (const it of items) it.size = it.base;
+  if (free > 0) {
+    const grow = items.reduce((sum, it) => sum + it.grow, 0);
+    if (grow > 0) for (const it of items) it.size = Math.min(it.max, it.base + (free * it.grow) / grow);
+  } else if (free < 0) {
+    const weight = items.reduce((sum, it) => sum + it.shrink * it.base, 0);
+    if (weight > 0) for (const it of items) it.size = Math.max(it.min, it.base + (free * it.shrink * it.base) / weight);
+  }
+  const used = items.reduce((sum, it) => sum + it.size + margins(it), 0) + gapTotal;
+  free = Math.max(0, innerMain - used);
+  let start = 0,
+    between = gap;
+  const n = items.length;
+  switch (s.justify ?? 'start') {
+    case 'center':
+      start = free / 2;
+      break;
+    case 'end':
+      start = free;
+      break;
+    case 'space-between':
+      if (n > 1) between = gap + free / (n - 1);
+      break;
+    case 'space-around':
+      start = free / n / 2;
+      between = gap + free / n;
+      break;
+    case 'space-evenly':
+      start = free / (n + 1);
+      between = gap + free / (n + 1);
+      break;
+  }
+  const scroll = scrollOf(node, used, innerMain, row ? 'x' : 'y');
+  if (row) node.contentWidth = used;
+  else node.contentHeight = used;
+  let cursor = start - scroll;
+  for (const it of items) {
+    const cs = it.child.style,
+      align = cs.alignSelf && cs.alignSelf !== 'auto' ? cs.alignSelf : parentAlign,
+      crossMargin = row ? vertical(it.m) : horizontal(it.m),
+      crossStyle = row ? cs.height : cs.width,
+      crossMin = row ? cs.minHeight : cs.minWidth,
+      crossMax = row ? cs.maxHeight : cs.maxWidth,
+      space = Math.max(0, innerCross - crossMargin);
+    let cross: number;
+    const fixed = explicit(crossStyle, innerCross);
+    if (fixed !== undefined) cross = fixed;
+    else if (crossStyle === 'fill' || align === 'stretch') cross = space;
+    else cross = row ? heightAt(it.child, it.size) : sizeOf(it.child, space).width;
+    if (row && fixed === undefined && crossStyle !== 'fill' && align !== 'stretch') cross = heightAt(it.child, it.size);
+    cross = clamp(cross, crossMin, crossMax);
+    const crossPos = align === 'center' ? (space - cross) / 2 : align === 'end' ? space - cross : 0;
+    const mainStart = (row ? inner.x : inner.y) + cursor + (row ? it.m[3] : it.m[0]),
+      crossStart = (row ? inner.y : inner.x) + crossPos + (row ? it.m[0] : it.m[3]);
+    if (row) place(it.child, mainStart, crossStart, it.size, cross);
+    else place(it.child, crossStart, mainStart, cross, it.size);
+    cursor += it.size + margins(it) + between;
+  }
+}
+
+function placeAnchored(parent: LayoutNode, child: LayoutNode, inner: Rect, outer: Rect): void {
+  const cs = child.style,
+    m = edges(cs.margin),
+    anchor: Anchor = cs.anchor ?? 'stretch',
+    box = cs.bleed && parent.style.direction === 'stack' ? outer : inner,
+    availW = Math.max(0, box.width - horizontal(m)),
+    availH = Math.max(0, box.height - vertical(m));
+  const stretch = anchor === 'stretch';
+  const fillW = cs.width === 'fill' || (stretch && (cs.width === undefined || cs.width === 'auto'));
+  const fillH = cs.height === 'fill' || (stretch && (cs.height === undefined || cs.height === 'auto'));
+  let width = fillW ? availW : (explicit(cs.width, box.width) ?? sizeOf(child, availW).width);
+  width = clamp(width, cs.minWidth, cs.maxWidth);
+  let height = fillH ? availH : explicit(cs.height, box.height);
+  height = clamp(height ?? heightAt(child, width), cs.minHeight, cs.maxHeight);
+  const left = anchor.includes('left'),
+    right = anchor.includes('right'),
+    top = anchor.includes('top'),
+    bottom = anchor.includes('bottom');
+  const px = left ? 0 : right ? availW - width : stretch ? 0 : (availW - width) / 2,
+    py = top ? 0 : bottom ? availH - height : stretch ? 0 : (availH - height) / 2;
+  place(child, box.x + m[3] + px, box.y + m[0] + py, width, height);
+}

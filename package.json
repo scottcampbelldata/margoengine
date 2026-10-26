@@ -103,6 +103,7 @@
     "packages/mesh-edit",
     "packages/compute",
     "packages/sciviz",
+    "packages/ui",
     "packages/mcp",
     "packages/rigging"
   ],

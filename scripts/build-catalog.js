@@ -94,6 +94,7 @@ const layers = {
     'controls',
     'cameras',
     'input',
+    'ui',
     'viewcube',
     'selection',
     'audio',

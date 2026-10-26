@@ -1,0 +1,54 @@
+{
+  "name": "@margoengine/ui",
+  "version": "1.0.0",
+  "description": "Game UI drawn in the engine: menus, HUDs, health bars, inventories, dialogs and toasts with flex layout, anchors, safe areas, resolution scaling and theming.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "ui",
+    "hud",
+    "game-ui",
+    "accessibility"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/ui"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/text": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js ui",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:browser": "npm run build && node tests/ui-browser.mjs",
+    "prepack": "npm run build"
+  }
+}

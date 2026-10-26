@@ -1051,6 +1051,10 @@
       "types": "./dist/tween.d.ts",
       "import": "./dist/tween.js"
     },
+    "./ui": {
+      "types": "./dist/ui.d.ts",
+      "import": "./dist/ui.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"
@@ -1310,6 +1314,7 @@
     "@margoengine/toon": "^1.0.0",
     "@margoengine/transitions": "^1.0.0",
     "@margoengine/tween": "^1.0.0",
+    "@margoengine/ui": "^1.0.0",
     "@margoengine/usdz": "^1.0.0",
     "@margoengine/vfx": "^1.0.0",
     "@margoengine/video": "^1.0.0",

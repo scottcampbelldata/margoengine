@@ -13,6 +13,7 @@ const sources = [
     'packages/stage/src',
     'packages/compute/src',
     'packages/sciviz/src',
+    'packages/ui/src',
     'packages/mcp/src',
   ].flatMap((dir) =>
     readdirSync(dir)
