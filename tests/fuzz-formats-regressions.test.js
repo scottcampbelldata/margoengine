@@ -356,7 +356,10 @@ test('KTX2: a level whose declared uncompressed size exceeds its blocks is refus
     ]);
   let basis = await wasm('basis');
   await named(() => transcodeKTX2(basis, warmup, 'rgba8'), /^(Margo)?Error: KTX2: could not transcode level 0(;.*)?$/);
-  await named(() => transcodeKTX2(basis, trap.slice(), 'bc7'), /^TypeError: KTX2: invalid file \(level 0 size\)(;.*)?$/);
+  await named(
+    () => transcodeKTX2(basis, trap.slice(), 'bc7'),
+    /^TypeError: KTX2: invalid file \(level 0 size\)(;.*)?$/,
+  );
   // The same calls transcodeKTX2 made before the check, on the same module state: the transcoder itself traps.
   const file = new basis.KTX2File(trap);
   assert.ok(file.isValid() && file.startTranscoding());

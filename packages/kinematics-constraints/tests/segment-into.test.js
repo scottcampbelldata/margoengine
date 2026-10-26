@@ -135,7 +135,10 @@ test('nonfinite custom lower clearance preserves the upper callback before rejec
     const solver = new AvoidanceSolver([farVolume(CapsuleVolume), custom, farVolume(SphereVolume)], {
       upperArmRadius: 0.07,
     });
-    assert.throws(() => solve(solver), { name: 'RangeError', message: 'Non-finite segment clearance; check the collider for NaN or infinite values' });
+    assert.throws(() => solve(solver), {
+      name: 'RangeError',
+      message: 'Non-finite segment clearance; check the collider for NaN or infinite values',
+    });
     assert.deepEqual(calls, [0.05, 0.07]);
   }
 });

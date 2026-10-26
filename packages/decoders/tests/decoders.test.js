@@ -834,7 +834,11 @@ test('KTX2 header and level index are bounds-checked before the transcoder sees 
     ],
   ];
   for (const [what, bytes] of cases)
-    assert.throws(() => transcodeKTX2(basis, bytes, 'rgba8'), { message: `KTX2: invalid file (${what}); pass an unmodified .ktx2 file` }, what);
+    assert.throws(
+      () => transcodeKTX2(basis, bytes, 'rgba8'),
+      { message: `KTX2: invalid file (${what}); pass an unmodified .ktx2 file` },
+      what,
+    );
   assert.equal(constructed, 0);
 });
 

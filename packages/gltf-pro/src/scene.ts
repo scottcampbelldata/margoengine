@@ -114,8 +114,7 @@ export function getSceneBounds(
     else if (triangles?.kind === 'pbr')
       for (const primitive of triangles.source.primitives) include(primitive.vertices, 20, mesh.matrix);
   }
-  if (!Number.isFinite(bounds[0]))
-    throw margoError('state', 'No geometry; select meshes with triangles');
+  if (!Number.isFinite(bounds[0])) throw margoError('state', 'No geometry; select meshes with triangles');
   return Float32Array.from(bounds);
 }
 

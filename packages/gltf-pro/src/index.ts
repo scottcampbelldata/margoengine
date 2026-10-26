@@ -1235,8 +1235,7 @@ export class PBRModel implements EnginePlugin {
           out[axis + 3] = Math.max(out[axis + 3], n);
         }
     }
-    if (!Number.isFinite(out[0]))
-      throw margoError('state', 'No geometry; load a model with triangle meshes first');
+    if (!Number.isFinite(out[0])) throw margoError('state', 'No geometry; load a model with triangle meshes first');
     return out;
   }
   /** Borrowed GPU buffers, preserving one record per primitive and current deformation. */
