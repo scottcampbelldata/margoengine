@@ -103,7 +103,7 @@ export class TextRenderer implements EnginePlugin {
       maxPages: options.maxPages ?? 64,
     };
     if (!this.name || typeof this.name !== 'string' || !Number.isFinite(this.order))
-      throw new TypeError('Invalid TextRenderer options');
+      throw new TypeError('Invalid TextRenderer options; give name a non-empty string and order a finite number.');
     for (const value of Object.values(this.options))
       if (!Number.isInteger(value) || value < 1)
         throw new RangeError('Atlas sizes and page limits must be positive integers');

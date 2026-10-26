@@ -36,7 +36,9 @@ export class Toon implements EnginePlugin {
       color.length !== 3 ||
       color.some((v) => !Number.isFinite(v) || v < 0 || v > 1)
     )
-      throw new RangeError('Invalid toon outline');
+      throw new RangeError(
+        'Toon outline must be between 0 and 10 and color three channels between 0 and 1; pass finite values in range.',
+      );
     this.shading = new ToonShading(options);
     this.values = new Float32Array([...color, outline]);
   }

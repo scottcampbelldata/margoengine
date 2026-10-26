@@ -8,7 +8,7 @@ export type GroundCircle = readonly [x: number, z: number, radius: number];
 export type Placement = readonly [x: number, y: number, z: number, scale: number, yaw: number];
 
 export function validateExclusions(exclusions: readonly GroundBounds[]): void {
-  if (exclusions.length > 1_000_000) throw new RangeError('Too many scatter exclusions');
+  if (exclusions.length > 1_000_000) throw new RangeError('Too many scatter exclusions; pass at most 1000000.');
   for (const bounds of exclusions) {
     const [minX, minZ, maxX, maxZ] = bounds;
     if (
@@ -17,12 +17,15 @@ export function validateExclusions(exclusions: readonly GroundBounds[]): void {
       Math.fround(minX) >= Math.fround(maxX) ||
       Math.fround(minZ) >= Math.fround(maxZ)
     )
-      throw new RangeError('Invalid scatter exclusion bounds');
+      throw new RangeError(
+        'Invalid scatter exclusion bounds; pass [minX, minZ, maxX, maxZ] as finite numbers with min below max.',
+      );
   }
 }
 
 function validatePlacements(candidates: readonly GroundPlacement[], radius: number): void {
-  if (!Number.isFinite(radius) || radius <= 0) throw new RangeError('Invalid placement radius');
+  if (!Number.isFinite(radius) || radius <= 0)
+    throw new RangeError('Invalid placement radius; pass a finite radius above 0.');
   for (const candidate of candidates) {
     const [x, z, scale, yaw] = candidate;
     if (
@@ -34,7 +37,7 @@ function validatePlacements(candidates: readonly GroundPlacement[], radius: numb
       scale <= 0 ||
       !Number.isFinite(radius * scale)
     )
-      throw new RangeError('Invalid ground placement');
+      throw new RangeError('Invalid ground placement; pass [x, z, scale, yaw] as finite numbers with scale above 0.');
   }
 }
 
@@ -60,12 +63,16 @@ export function clearPlacements(
 ): GroundPlacement[] {
   validatePlacements(candidates, radius);
   if (!Number.isFinite(gap) || gap < 0 || exclusions.length > 1_000_000)
-    throw new RangeError('Invalid placement gap or exclusions');
+    throw new RangeError(
+      'Invalid placement gap or exclusions; pass a finite gap of 0 or more and at most 1000000 exclusions.',
+    );
   for (const e of exclusions) {
     if (e.length === 3) {
       const [x, z, radius] = e;
       if (![x, z, radius].every((v) => Number.isFinite(Math.fround(v))) || radius < 0)
-        throw new RangeError('Invalid scatter exclusion circle');
+        throw new RangeError(
+          'Invalid scatter exclusion circle; pass [x, z, radius] as finite numbers with radius of 0 or more.',
+        );
     } else validateExclusions([e as GroundBounds]);
   }
   return candidates.filter(([x, z, scale]) =>
@@ -82,7 +89,7 @@ export function clearPlacements(
 /** Initialization-only footprint filtering; preserves candidate order and leaves inputs unchanged. */
 export function spacePlacements(candidates: readonly GroundPlacement[], radius: number, gap = 0.3): GroundPlacement[] {
   validatePlacements(candidates, radius);
-  if (!Number.isFinite(gap) || gap < 0) throw new RangeError('Invalid placement gap');
+  if (!Number.isFinite(gap) || gap < 0) throw new RangeError('Invalid placement gap; pass a finite gap of 0 or more.');
   const placements: GroundPlacement[] = [];
   // shortcut: quadratic filtering suits small initialization sets; use a spatial grid for large scatters.
   for (const candidate of candidates) {
@@ -128,10 +135,14 @@ export function instanceTransforms(placements: readonly Placement[]): Float32Arr
   const transforms = new Float32Array(placements.length * 16);
   for (let i = 0; i < placements.length; i++) {
     const p = placements[i];
-    if (p.length !== 5 || !p.every(Number.isFinite) || p[3] <= 0) throw new RangeError('Invalid instance placement');
+    if (p.length !== 5 || !p.every(Number.isFinite) || p[3] <= 0)
+      throw new RangeError(
+        'Invalid instance placement; pass [x, y, z, scale, yaw] as finite numbers with scale above 0.',
+      );
     writeTransform(transforms, i, p[0], p[1], p[2], p[3], p[4]);
   }
-  if (!transforms.every(Number.isFinite)) throw new RangeError('Instance transform exceeds float range');
+  if (!transforms.every(Number.isFinite))
+    throw new RangeError('Instance transform exceeds float range; use smaller positions or scales.');
   return transforms;
 }
 
@@ -142,16 +153,18 @@ export function groundTransforms(
   offsetY = 0,
 ): Float32Array {
   if (typeof height !== 'function' || !Number.isFinite(offsetY))
-    throw new RangeError('Invalid ground placement height');
+    throw new RangeError('Invalid ground placement height; pass a height function and a finite offsetY.');
   const transforms = new Float32Array(placements.length * 16);
   for (let i = 0; i < placements.length; i++) {
     const p = placements[i];
-    if (p.length !== 4 || !p.every(Number.isFinite) || p[2] <= 0) throw new RangeError('Invalid ground placement');
+    if (p.length !== 4 || !p.every(Number.isFinite) || p[2] <= 0)
+      throw new RangeError('Invalid ground placement; pass [x, z, scale, yaw] as finite numbers with scale above 0.');
     const y = height(p[0], p[1]) + offsetY;
     if (!Number.isFinite(y)) throw new RangeError('Ground placement height must be finite');
     writeTransform(transforms, i, p[0], y, p[1], p[2], p[3]);
   }
-  if (!transforms.every(Number.isFinite)) throw new RangeError('Instance transform exceeds float range');
+  if (!transforms.every(Number.isFinite))
+    throw new RangeError('Instance transform exceeds float range; use smaller positions or scales.');
   return transforms;
 }
 

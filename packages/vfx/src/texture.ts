@@ -51,7 +51,9 @@ export const textureFeature: NonNullable<VFXFeatures['texture']> = {
       !(t.data instanceof Uint8Array || t.data instanceof Uint8ClampedArray) ||
       t.data.length !== t.width * t.height * 4
     )
-      throw new RangeError('Invalid RGBA particle texture');
+      throw new RangeError(
+        'Particle texture needs whole-number width and height from 1 to 4096 and RGBA data of width x height x 4 bytes; pass a Uint8Array of that length.',
+      );
     const copy: VFXTexture = { width: t.width, height: t.height, data: Uint8Array.from(t.data) },
       a = t.atlas;
     if (a !== undefined) {

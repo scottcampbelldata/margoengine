@@ -91,6 +91,9 @@ Message text changed: branch on `error.code` or the class, not the text. Changed
 - physics: bare `Error` became `MargoError` (`disposed`, `attached`, `state`).
 - react: bare `Error` became `MargoError` (`state`, `disposed`, `attached`, `unsupported`).
 - quality: `warmUp` accepts a `signal` (AbortSignal) and rejects with its reason.
+- selection: bare `Error` became `MargoError` (`disposed`, `attached`, `state`, `unsupported`); `pick` on a Picking that is not attached is `state` (it said the Picking was disposed).
+- stats, video: bare `Error` became `MargoError` (`disposed`, `attached`, `unsupported`, `failed`); both now list `@margoengine/math` under dependencies.
+- usdz: malformed USD files throw `LoaderError` (format `USD`, code `syntax`, `unsupported` or `limit`) instead of a bare `Error`; the message text is unchanged.
 
 ### USDZ dependency cleanup
 

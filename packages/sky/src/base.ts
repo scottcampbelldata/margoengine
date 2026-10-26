@@ -134,7 +134,8 @@ export const skyEnvironmentFloor: { readonly day: Vec3; readonly night: Vec3 } =
  * @throws RangeError when `hours` is not finite or `out` does not have 3 elements.
  */
 export function sunDirection(hours: number, out = new Float32Array(3)): Float32Array {
-  if (!Number.isFinite(hours) || out.length !== 3) throw new RangeError('Invalid sun clock');
+  if (!Number.isFinite(hours) || out.length !== 3)
+    throw new RangeError('Invalid sun clock; pass finite hours and an out array of 3 elements.');
   // Margo clock model (not astronomical): the sun moves on a circle through east and the zenith.
   const angle = (((hours % 24) - 6) * Math.PI) / 12;
   out[0] = Math.cos(angle);
@@ -395,7 +396,9 @@ export class Sky implements EnginePlugin {
       !Number.isFinite(o.exposure ?? 0) ||
       Math.abs(o.exposure ?? 0) > 16
     )
-      throw new RangeError('Invalid sky options');
+      throw new RangeError(
+        'Invalid sky options; keep timeScale within ±24, turbidity from 1 to 10, exposure within ±16 and hours finite, and use model "preetham" or "bruneton".',
+      );
     if ((o.model !== undefined || f.preetham || f.bruneton) && !f[model])
       throw new TypeError(`Sky model '${model}' needs ${model} from @margoengine/sky/${model}`);
     if (o.environment !== undefined && typeof o.environment !== 'boolean')
@@ -489,7 +492,8 @@ export class Sky implements EnginePlugin {
   }
   onPreUpdate(delta: number): void {
     this.validate();
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid sky delta');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('Invalid sky delta; pass a finite delta of 0 or more seconds.');
     this.cloudTime += delta * (this.options.clouds?.speed ?? 8);
     this.time += delta;
     this.options.hours = ((((this.options.hours ?? 12) + delta * (this.options.timeScale ?? 1 / 3600)) % 24) + 24) % 24;

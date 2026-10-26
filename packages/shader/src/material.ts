@@ -76,7 +76,8 @@ const fragment: ShaderStage = {
       c = b.program.canon(x);
     let i = list.findIndex((y) => b.program.canon(y) === c);
     if (i < 0) {
-      if (list.length >= maxVaryings) throw new RangeError(`NodeMaterial supports ${maxVaryings} varyings`);
+      if (list.length >= maxVaryings)
+        throw new RangeError(`NodeMaterial supports at most ${maxVaryings} varyings; use fewer varying nodes.`);
       i = list.push(x) - 1;
     }
     return b.local('i.ndv' + i);

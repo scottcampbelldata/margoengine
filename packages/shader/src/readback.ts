@@ -72,7 +72,7 @@ export async function computeReadback<T extends StorageType>(
     bytes = output.data.byteLength;
   if (bytes > device.limits.maxBufferSize)
     throw new RangeError(
-      `computeReadback output of ${bytes} bytes exceeds the device's ${device.limits.maxBufferSize}`,
+      `computeReadback output of ${bytes} bytes exceeds the device's ${device.limits.maxBufferSize}; read back a smaller output.`,
     );
   return new Promise<ComputeReadback<T>>((resolve, reject) => {
     let readback: GPUBuffer | undefined,

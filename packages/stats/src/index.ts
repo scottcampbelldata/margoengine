@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import { GPUProfiler } from './profiler.js';
 import { PassPrototypes } from './pass-prototypes.js';
 export { GPUProfiler };
@@ -77,6 +78,7 @@ export interface StatsOptions {
   lowAllocationPasses?: boolean;
 }
 
+/** Frame-time, draw-call and (optionally) GPU-time readout. Add it with `Stats.attach(engine)`; `using` or `dispose()` removes it. */
 export class Stats implements EnginePlugin {
   readonly name = 'stats';
   readonly samples: Float64Array;
@@ -178,7 +180,7 @@ export class Stats implements EnginePlugin {
 
   /** Numeric sampling only: no DOM writes, arrays, strings or callbacks are created here. */
   tick(milliseconds: number, drawCalls = this.drawCalls, dispatches = this.dispatches): void {
-    if (this.disposed) throw new Error('Stats is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Stats is disposed; create a new Stats to sample frames.');
     if (
       !Number.isFinite(milliseconds) ||
       milliseconds <= 0 ||
@@ -187,7 +189,9 @@ export class Stats implements EnginePlugin {
       !Number.isSafeInteger(dispatches) ||
       dispatches < 0
     )
-      throw new RangeError('Invalid frame sample or counters');
+      throw new RangeError(
+        'Invalid frame sample or counters; pass milliseconds above 0 and non-negative integer drawCalls and dispatches.',
+      );
     const index = this.sampleIndex;
     this.total += milliseconds - this.samples[index];
     this.samples[index] = milliseconds;
@@ -200,7 +204,8 @@ export class Stats implements EnginePlugin {
   }
 
   enableGPUProfiling(device: GPUDevice): boolean {
-    if (this.disposed) throw new Error('Stats is disposed');
+    if (this.disposed)
+      throw new MargoError('disposed', 'Stats is disposed; create a new Stats to enable GPU profiling.');
     this.profiler?.dispose();
     this.profiler = new GPUProfiler(device);
     this.gpuTime = null;
@@ -211,7 +216,7 @@ export class Stats implements EnginePlugin {
 
   /** Counts direct/indirect commands on this encoder; pass wrappers are separate from tick(). */
   track(encoder: GPUCommandEncoder): void {
-    if (this.disposed) throw new Error('Stats is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Stats is disposed; create a new Stats to track encoders.');
     if (this.tracked.has(encoder)) return;
     this.tracked.add(encoder);
     this.drawCalls = this.dispatches = 0;
@@ -342,7 +347,10 @@ export class Stats implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
-    if (this.disposed || this.engine) throw new Error('Stats is disposed or attached');
+    if (this.disposed)
+      throw new MargoError('disposed', 'Stats is disposed; create a new Stats and add it to the engine.');
+    if (this.engine)
+      throw new MargoError('attached', 'Stats is already attached to an engine; create one Stats per engine.');
     this.engine = engine;
     // Only the animation loop can identify a genuine restart. Probe captures
     // render zero-delta frames too, and must not move the frame-time baseline.

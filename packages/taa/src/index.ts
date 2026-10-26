@@ -199,11 +199,15 @@ export class TAA implements EnginePlugin {
       (o.depthThreshold ?? 0.01) > 1 ||
       (o.depth !== undefined && typeof o.depth !== 'function')
     )
-      throw new RangeError('Invalid TAA options');
+      throw new RangeError(
+        'Invalid TAA options; historyWeight must be in [0, 1), depthThreshold in [0, 1] and depth a function.',
+      );
   }
   add(source: VelocitySource): () => void {
     if (this.disposed || !source || source.disposed || !Array.isArray(source.shadowPrimitives))
-      throw new TypeError('Invalid TAA velocity source');
+      throw new TypeError(
+        'Invalid TAA velocity source; pass a live object with a shadowPrimitives array to a TAA that is not disposed.',
+      );
     if (source.shadowPrimitives.some((p) => p.node.engine !== this.engine))
       throw new MargoError('attached', 'TAA source belongs to another engine; use objects created by the same engine');
     if (this.sources.has(source)) throw new MargoError('attached', 'Duplicate TAA source; add each source once');
@@ -548,7 +552,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         transform.some((value) => !Number.isFinite(value)) ||
         p.stride !== 80)
     )
-      throw new TypeError('Invalid TAA alpha transform');
+      throw new TypeError(
+        'Invalid TAA alpha transform; set it to a Float32Array of 8 finite numbers on a primitive with stride 80.',
+      );
     const pbr = p.stride === 80,
       key =
         p.stride + ':' + !!transform + ':' + c.descriptor.depthStencil!.format + ':' + c.descriptor.multisample?.count;

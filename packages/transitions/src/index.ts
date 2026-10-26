@@ -77,7 +77,9 @@ export class Transitions implements EnginePlugin {
       displacement < 0 ||
       displacement > 0.25
     )
-      throw new RangeError('Invalid transition');
+      throw new RangeError(
+        'Transition needs a known kind, seconds up to 60 and displacement up to 0.25; check the arguments.',
+      );
     this.duration = seconds;
     this.elapsed = 0;
     this.values[1] = kinds.indexOf(kind);

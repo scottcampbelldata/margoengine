@@ -5,7 +5,9 @@
  */
 export function halton(index: number, base: number): number {
   if (!Number.isSafeInteger(index) || index < 0 || !Number.isSafeInteger(base) || base < 2)
-    throw new RangeError('Invalid Halton sequence');
+    throw new RangeError(
+      'Invalid Halton sequence; pass a non-negative integer index and an integer base of at least 2.',
+    );
   let value = 0,
     scale = 1;
   while (index) {
@@ -38,8 +40,14 @@ export function jitterProjection(
     !Number.isSafeInteger(height) ||
     height <= 0
   )
-    throw new RangeError('Invalid jitter projection');
-  for (let i = 0; i < 16; i++) if (!Number.isFinite(matrix[i])) throw new RangeError('Invalid jitter projection');
+    throw new RangeError(
+      'Invalid jitter projection; pass 16-element matrices with finite values, a non-negative integer frame and positive integer width and height.',
+    );
+  for (let i = 0; i < 16; i++)
+    if (!Number.isFinite(matrix[i]))
+      throw new RangeError(
+        'Invalid jitter projection; pass 16-element matrices with finite values, a non-negative integer frame and positive integer width and height.',
+      );
   const x = (2 * (halton((frame % 8) + 1, 2) - 0.5)) / width,
     y = (-2 * (halton((frame % 8) + 1, 3) - 0.5)) / height;
   for (let i = 0; i < 16; i++) out[i] = matrix[i];

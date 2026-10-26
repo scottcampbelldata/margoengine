@@ -210,14 +210,15 @@ export class VFX implements EnginePlugin {
   private validate(): void {
     const o = this.options;
     if (!Number.isInteger(o.initialCount ?? 0) || (o.initialCount ?? 0) < 0 || (o.initialCount ?? 0) > this.capacity)
-      throw new RangeError('Invalid initial particle count');
+      throw new RangeError('initialCount must be a whole number up to capacity; pass a smaller count.');
     if (o.emissionExtent) {
       finiteVector(o.emissionExtent, 3, 'Emission extent');
       for (let i = 0; i < 3; i++)
-        if (o.emissionExtent[i] < 0) throw new RangeError('Emission extent must be nonnegative');
+        if (o.emissionExtent[i] < 0)
+          throw new RangeError('Emission extent must be nonnegative; pass half-sizes of 0 or more.');
     }
     if (!Number.isFinite(o.intensity ?? 1) || (o.intensity ?? 1) < 0 || (o.intensity ?? 1) > 16)
-      throw new RangeError('Invalid particle intensity');
+      throw new RangeError('Particle intensity must be between 0 and 16; pass a value in range.');
     if (
       !Number.isInteger(this.capacity) ||
       this.capacity < 1 ||
@@ -233,26 +234,30 @@ export class VFX implements EnginePlugin {
       !Number.isFinite(Math.fround(o.size ?? 0.1)) ||
       (o.size ?? 0.1) <= 0
     )
-      throw new RangeError('Invalid VFX options');
+      throw new RangeError('VFX capacity, rate, bounce, size or ground is out of range; check the options.');
     for (let i = 0; i < 3; i++) {
       const v = i === 0 ? (o.spread ?? 1) : i === 1 ? (o.turbulence ?? 0.5) : (o.frequency ?? 1);
-      if (!Number.isFinite(Math.fround(v)) || v < 0) throw new RangeError('Invalid VFX options');
+      if (!Number.isFinite(Math.fround(v)) || v < 0)
+        throw new RangeError('VFX spread, turbulence and frequency must be 0 or more; check the options.');
     }
     finiteVector(o.position ?? defaultPosition, 3, 'Emitter position');
     finiteVector(o.velocity ?? defaultVelocity, 3, 'Emitter velocity');
     finiteVector(o.gravity ?? defaultGravity, 3, 'Particle gravity');
     finiteVector(o.color ?? defaultColor, 4, 'Particle color');
     const color = o.color ?? defaultColor;
-    for (let i = 0; i < 4; i++) if (color[i] < 0 || color[i] > 1) throw new RangeError('Invalid particle color');
+    for (let i = 0; i < 4; i++)
+      if (color[i] < 0 || color[i] > 1)
+        throw new RangeError('Particle color channels must be between 0 and 1; pass [r, g, b, a].');
     const life = o.lifetime ?? defaultLife;
     finiteVector(life, 2, 'Particle lifetime');
-    if (life[0] <= 0 || life[1] < life[0]) throw new RangeError('Invalid particle lifetime');
+    if (life[0] <= 0 || life[1] < life[0])
+      throw new RangeError('Particle lifetime must be [min, max] seconds, 0 < min <= max; pass both.');
     if (
       (o.sort !== undefined && typeof o.sort !== 'boolean') ||
       (o.wrap !== undefined && typeof o.wrap !== 'boolean') ||
       (o.wrap && !o.emissionExtent?.every((v) => v > 0))
     )
-      throw new RangeError('Invalid VFX sort or wrap');
+      throw new RangeError('VFX sort and wrap must be booleans; wrap needs emissionExtent above 0.');
     for (const key of ['obstacles', 'wrap', 'sort'] as const)
       if (o[key] && !this.features[key]) throw new TypeError(`VFX ${key} needs ${key} from @margoengine/vfx/${key}`);
     if (o.obstacles) this.features.obstacles!.write(o.obstacles, this.extraValues);
@@ -275,7 +280,7 @@ export class VFX implements EnginePlugin {
   }
   burst(count: number): this {
     if (this.disposed || !Number.isInteger(count) || count < 0 || count > this.capacity)
-      throw new RangeError('Invalid particle burst');
+      throw new RangeError('Particle burst must be a whole number up to capacity; pass a smaller count.');
     this.burstCount = Math.min(this.capacity, this.burstCount + count);
     return this;
   }
@@ -293,7 +298,7 @@ export class VFX implements EnginePlugin {
       this.device.limits.maxComputeInvocationsPerWorkgroup < 256 ||
       this.device.limits.maxComputeWorkgroupSizeX < 256
     )
-      throw new RangeError('VFX capacity exceeds device limits');
+      throw new RangeError('VFX capacity exceeds the device limits; reduce capacity.');
     const buffer = (size: number, usage: number) =>
         this.device!.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST }),
       o = this.options,

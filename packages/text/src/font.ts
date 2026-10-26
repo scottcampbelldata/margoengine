@@ -87,8 +87,9 @@ export class Font implements TextMeasurer {
     );
     this.style = options.style ?? (face?.style === 'italic' || face?.style === 'oblique' ? face.style : 'normal');
     if (!/^(normal|bold|bolder|lighter|[1-9]00|\d{1,4}(\.\d+)?)$/.test(this.weight))
-      throw new TypeError('Invalid font weight');
-    if (!['normal', 'italic', 'oblique'].includes(this.style)) throw new TypeError('Invalid font style');
+      throw new TypeError('Invalid font weight; use normal, bold, bolder, lighter or a number such as 400.');
+    if (!['normal', 'italic', 'oblique'].includes(this.style))
+      throw new TypeError('Invalid font style; use normal, italic or oblique.');
   }
 
   /** CSS font shorthand at the base size. */

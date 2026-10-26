@@ -310,7 +310,9 @@ export class Shadows implements EnginePlugin {
         !o.bounds.max.every(Number.isFinite) ||
         o.bounds.min.some((value, axis) => value >= o.bounds!.max[axis]))
     )
-      throw new RangeError('Invalid shadow bounds: finite world-space min < max required');
+      throw new RangeError(
+        'Invalid shadow bounds; pass finite world-space min and max with min below max on every axis.',
+      );
     const points = o.bounds?.points;
     let validPoints = true;
     if (points !== undefined) {
@@ -345,7 +347,9 @@ export class Shadows implements EnginePlugin {
         bottom >= top ||
         near >= far
       )
-        throw new RangeError('Invalid shadow frustum: finite left < right, bottom < top and near < far required');
+        throw new RangeError(
+          'Invalid shadow frustum; pass finite values with left < right, bottom < top and near < far.',
+        );
     }
     const cascades = o.cascades ?? 4;
     if (!Number.isInteger(cascades) || cascades < 1 || cascades > 4)
@@ -374,7 +378,9 @@ export class Shadows implements EnginePlugin {
       (o.lambda ?? 0.5) < 0 ||
       (o.lambda ?? 0.5) > 1
     )
-      throw new RangeError('Invalid shadow options');
+      throw new RangeError(
+        'Invalid shadow options; distance must be above 0, lambda between 0 and 1, and the resolution an integer of 16 or more.',
+      );
     for (let i = 0; i < 4; i++) {
       const v =
         i === 0
@@ -384,7 +390,10 @@ export class Shadows implements EnginePlugin {
             : i === 2
               ? (o.normalBias ?? 0.02)
               : (o.casterMargin ?? 100);
-      if (!Number.isFinite(Math.fround(v)) || v < 0) throw new RangeError('Invalid shadow options');
+      if (!Number.isFinite(Math.fround(v)) || v < 0)
+        throw new RangeError(
+          'Invalid shadow options; lightSize, bias, normalBias and casterMargin must be finite and 0 or more.',
+        );
     }
     this.width = width;
     this.height = height;
@@ -415,14 +424,14 @@ export class Shadows implements EnginePlugin {
       typeof castShadow !== 'boolean' ||
       typeof receiveShadow !== 'boolean'
     )
-      throw new TypeError('Invalid shadow source');
+      throw new TypeError('Invalid shadow source; pass a live mesh, group or shadow source and boolean options.');
     const runtime = casterRuntime<object, ReturnType<typeof meshRuntime> | ShadowSource>(
       source,
       this.engine,
       'Shadow source',
     );
     if (!('id' in runtime) && !('shadowPrimitives' in runtime) && typeof runtime.drawShadow !== 'function')
-      throw new TypeError('Invalid shadow source');
+      throw new TypeError('Invalid shadow source; pass a mesh, group or object with drawShadow().');
     if (
       this.engine &&
       'shadowPrimitives' in runtime &&
@@ -787,7 +796,10 @@ export class Shadows implements EnginePlugin {
     const { bounds, frustum } = this.options,
       points = bounds?.points,
       length = Math.hypot(this.light[0], this.light[1], this.light[2]);
-    if (!length) throw new RangeError('Zero shadow direction');
+    if (!length)
+      throw new RangeError(
+        'Shadow light direction has zero length; set engine.lighting.direction to a nonzero vector.',
+      );
     const zx = -this.light[0] / length,
       zy = -this.light[1] / length,
       zz = -this.light[2] / length,
@@ -866,7 +878,8 @@ export class Shadows implements EnginePlugin {
       py = frustum ? centerY : Math.round(centerY / ty) * ty,
       pz = centerZ,
       m = this.matrices;
-    if (!(radius > 0) || !(depth > 0)) throw new RangeError('Shadow bounds points have no light-space extent');
+    if (!(radius > 0) || !(depth > 0))
+      throw new RangeError('Shadow bounds points have no light-space extent; give points that span some volume.');
     m.fill(0);
     m[0] = xx / rx;
     m[4] = xy / rx;
@@ -882,7 +895,9 @@ export class Shadows implements EnginePlugin {
     m[14] = 0.5 - pz / depth;
     m[15] = 1;
     this.ranges.fill(depth);
-    for (let i = 0; i < 16; i++) if (!Number.isFinite(m[i])) throw new RangeError('Shadow bounds matrix overflow');
+    for (let i = 0; i < 16; i++)
+      if (!Number.isFinite(m[i]))
+        throw new RangeError('Shadow bounds matrix is not finite; check the bounds for extreme values.');
   }
   private identity(object: object): number {
     let id = this.objectIds.get(object);
@@ -1121,7 +1136,8 @@ export class Shadows implements EnginePlugin {
     cascade: number,
     scene?: GPUBufferBinding,
   ): void {
-    if (p.stride !== 24 && p.stride !== 80) throw new RangeError('Unsupported shadow vertex stride');
+    if (p.stride !== 24 && p.stride !== 80)
+      throw new RangeError('Unsupported shadow vertex stride; use 24-byte or 80-byte vertices.');
     // A scene's SectionPlanes win; a material's planes (union or intersection, settings.y) bind under their own name.
     const section = scene ?? p.clip,
       material = !scene && !!p.clip;

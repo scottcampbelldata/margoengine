@@ -1,4 +1,5 @@
 import type { Engine, Mesh, PassContext } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import type { Mesh as MeshHandle } from '@margoengine/core';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
@@ -8,6 +9,7 @@ import { casterBuffers } from '../../shared/caster.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** One indexed triangle draw of a `PickingSource`: GPU vertex and index buffers (80-byte vertices) for one engine mesh node, with optional alpha-test data. */
 export interface PickingPrimitive {
   node: Mesh;
   vertex: GPUBuffer;
@@ -23,6 +25,7 @@ export interface PickingPrimitive {
   doubleSided?: boolean;
   side?: 'front' | 'back' | 'double';
 }
+/** Optional geometry (a model loader) that `Picking` and `Selection` draw besides core meshes; register it with `add(source)`. `disposed` sources are skipped. */
 export interface PickingSource {
   readonly pickingPrimitives: readonly PickingPrimitive[];
   readonly disposed?: boolean;
@@ -68,7 +71,8 @@ export class PickingPrimitives {
   }
   /** Discover loader-owned nodes without requiring callers to register their model separately. */
   discover(meshes: Iterable<MeshHandle>): void {
-    if (this.disposed) throw new Error('Picking is disposed');
+    if (this.disposed)
+      throw new MargoError('disposed', 'Picking is disposed; create a new Picking to register sources.');
     const next = new Set<PickingSource>();
     let count = this.sources.size;
     for (const mesh of meshes) {
@@ -76,7 +80,8 @@ export class PickingPrimitives {
       if (triangles?.kind !== 'pbr') continue;
       const source = triangles.source.model as PickingSource;
       if (source.disposed || next.has(source)) continue;
-      if (!this.sources.has(source) && ++count > 4096) throw new RangeError('Picking source budget exceeded');
+      if (!this.sources.has(source) && ++count > 4096)
+        throw new RangeError('Picking source budget exceeded; register at most 4096 sources.');
       next.add(source);
     }
     if (next.size !== this.discovered.size || [...next].some((source) => !this.discovered.has(source)))
@@ -88,18 +93,24 @@ export class PickingPrimitives {
     return new Set([...this.sources, ...this.discovered]);
   }
   add(source: PickingSource): () => void {
-    if (this.disposed) throw new Error('Picking is disposed');
+    if (this.disposed)
+      throw new MargoError('disposed', 'Picking is disposed; create a new Picking to register sources.');
     this.validateSource(source);
-    if (this.sources.has(source)) throw new Error('Duplicate picking source');
+    if (this.sources.has(source))
+      throw new MargoError(
+        'state',
+        'Duplicate picking source; add each source once, or call its remove function first.',
+      );
     if (!this.discovered.has(source) && this.allSources().size >= 4096)
-      throw new RangeError('Picking source budget exceeded');
+      throw new RangeError('Picking source budget exceeded; register at most 4096 sources.');
     this.sources.add(source);
     return () => {
       if (this.sources.delete(source)) this.clearDraws();
     };
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Picking requires WebGPU');
+    if (this.disposed) throw new MargoError('disposed', 'Picking is disposed; create a new Picking to attach.');
+    if (!engine.gpu) throw new MargoError('unsupported', 'Picking requires WebGPU; use a browser with WebGPU enabled.');
     for (const source of this.allSources()) {
       if (source.disposed || (source.root?.engine === engine && engine.meshes.get(source.root.id) !== source.root)) {
         this.sources.delete(source);
@@ -112,24 +123,33 @@ export class PickingPrimitives {
     this.device = engine.gpu;
   }
   private validateSource(source: PickingSource, engine = this.engine): void {
-    if (!source || typeof source !== 'object') throw new TypeError('Picking requires pickingPrimitives');
+    if (!source || typeof source !== 'object')
+      throw new TypeError('Picking source needs a pickingPrimitives array; pass an object with pickingPrimitives.');
     const primitives = source.pickingPrimitives;
-    if (!Array.isArray(primitives)) throw new TypeError('Picking requires pickingPrimitives');
-    if (source.disposed) throw new Error('Picking source is disposed');
+    if (!Array.isArray(primitives))
+      throw new TypeError('Picking source needs a pickingPrimitives array; pass an object with pickingPrimitives.');
+    if (source.disposed) throw new MargoError('disposed', 'Picking source is disposed; add a live source.');
     if (source.prepareDeformation !== undefined && typeof source.prepareDeformation !== 'function')
-      throw new TypeError('Invalid picking deformation callback');
+      throw new TypeError('Invalid picking deformation callback; pass a function as prepareDeformation or omit it.');
     if (source.root) this.validateNode(source.root, engine);
-    if (primitives.length > budget) throw new RangeError('Picking primitive budget exceeded');
+    if (primitives.length > budget)
+      throw new RangeError('Picking primitive budget exceeded; split the model into sources of fewer primitives.');
     for (const primitive of primitives) {
-      if (!primitive || typeof primitive !== 'object') throw new TypeError('Invalid picking primitive');
+      if (!primitive || typeof primitive !== 'object')
+        throw new TypeError('Invalid picking primitive; each pickingPrimitives entry must be an object with a node.');
       this.validateNode(primitive.node, engine);
       this.validatePrimitive(primitive);
     }
   }
   private validateNode(node: Mesh, engine = this.engine): void {
-    if (!node || typeof node.check !== 'function') throw new TypeError('Invalid picking node');
+    if (!node || typeof node.check !== 'function')
+      throw new TypeError('Invalid picking node; pass a live mesh of this engine as root.');
     node.check();
-    if (engine && node.engine !== engine) throw new Error('Picking source belongs to another engine');
+    if (engine && node.engine !== engine)
+      throw new MargoError(
+        'attached',
+        'Picking source belongs to another engine; add only sources made on this engine.',
+      );
   }
   private validatePrimitive(p: PickingPrimitive): void {
     if (
@@ -148,14 +168,18 @@ export class PickingPrimitives {
       (p.doubleSided !== undefined && typeof p.doubleSided !== 'boolean') ||
       (p.side !== undefined && !['front', 'back', 'double'].includes(p.side))
     )
-      throw new RangeError('Invalid picking primitive');
+      throw new RangeError(
+        'Invalid picking primitive; use stride 80, vertex and index buffers, a count divisible by 3, finite alpha and cutoff of 0 or more, and side front, back or double.',
+      );
     if (
       p.alphaTransform !== undefined &&
       (!(p.alphaTransform instanceof Float32Array) ||
         p.alphaTransform.length !== 8 ||
         p.alphaTransform.some((value) => !Number.isFinite(value)))
     )
-      throw new TypeError('Picking alpha transform requires finite affine rows');
+      throw new TypeError(
+        'Picking alpha transform requires finite affine rows; pass a Float32Array of 8 finite numbers.',
+      );
   }
   private live(source: PickingSource): boolean {
     return !source.disposed && (!source.root || this.engine!.meshes.get(source.root.id) === source.root);
@@ -163,7 +187,10 @@ export class PickingPrimitives {
   /** Encode current-pose deformation before opening any picking render pass. */
   prepare(c: { backend: 'webgpu'; device: GPUDevice; encoder: GPUCommandEncoder }): void {
     if (this.disposed || !this.device || c.device !== this.device)
-      throw new Error('Picking is not attached to this device');
+      throw new MargoError(
+        'state',
+        'Picking is not attached to this device; attach it with engine.use before drawing.',
+      );
     for (const source of this.allSources()) {
       if (!this.live(source)) {
         this.sources.delete(source);
@@ -184,7 +211,10 @@ export class PickingPrimitives {
   /** Load existing depth so optional primitives compete with core meshes at the same pixel. */
   draw(c: Context, matrix: Float32Array, options: DrawOptions): Map<Mesh, PickingSource[]> {
     if (this.disposed || !this.device || c.device !== this.device)
-      throw new Error('Picking is not attached to this device');
+      throw new MargoError(
+        'state',
+        'Picking is not attached to this device; attach it with engine.use before drawing.',
+      );
     const candidates = new Map<Mesh, PickingSource[]>(),
       primitives: PickingPrimitive[] = [],
       ids: number[] = [];
@@ -195,12 +225,18 @@ export class PickingPrimitives {
         continue;
       }
       const values = source.pickingPrimitives;
-      if (!Array.isArray(values)) throw new TypeError('Picking requires pickingPrimitives');
+      if (!Array.isArray(values))
+        throw new TypeError('Picking source needs a pickingPrimitives array; pass an object with pickingPrimitives.');
       for (let sourceIndex = 0; sourceIndex < values.length; sourceIndex++) {
         const p = values[sourceIndex];
-        if (!p?.node) throw new TypeError('Invalid picking primitive');
+        if (!p?.node)
+          throw new TypeError('Invalid picking primitive; each pickingPrimitives entry must be an object with a node.');
         const node = p.node;
-        if (node.engine !== this.engine) throw new Error('Picking source belongs to another engine');
+        if (node.engine !== this.engine)
+          throw new MargoError(
+            'attached',
+            'Picking source belongs to another engine; add only sources made on this engine.',
+          );
         if (this.engine!.meshes.get(node.id) !== node) continue;
         this.validatePrimitive(p);
         if (
@@ -210,7 +246,8 @@ export class PickingPrimitives {
           !p.count
         )
           continue;
-        if (primitives.length >= budget) throw new RangeError('Picking primitive budget exceeded');
+        if (primitives.length >= budget)
+          throw new RangeError('Picking primitive budget exceeded; split the model into sources of fewer primitives.');
         primitives.push(p);
         ids.push(options.id?.(node, source, sourceIndex) ?? node.id + 1);
         let owners = candidates.get(node);
@@ -235,7 +272,10 @@ export class PickingPrimitives {
       ].join(':');
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      if (this.pipelines.size >= 64) throw new RangeError('Too many picking primitive variants');
+      if (this.pipelines.size >= 64)
+        throw new RangeError(
+          'Too many picking primitive variants; reduce distinct formats, sample counts and mask modes to 64 or fewer.',
+        );
       const module = this.device.createShaderModule({ code: shader(mask) });
       pipeline = this.device.createRenderPipeline({
         layout: 'auto',

@@ -782,7 +782,7 @@ test('Overlay projection follows world hierarchy; GPU extension boundaries valid
     assert.throws(() => engine.use(new SectionPlanes({ planes: [[0, 0, 1, 0]] })), /WebGPU/);
     assert.throws(
       () => new GPUParticles({ obstacles: [{ kind: 'sphere', center: [0, 0, 0], radius: -1 }] }),
-      /obstacle/,
+      /Obstacle/,
     );
     assert.throws(() => new GPUParticles({ texture: { width: 1, height: 1, data: new Uint8Array(3) } }), /texture/);
     assert.throws(() => new ToonShading({ bands: 1 }), /toon/);

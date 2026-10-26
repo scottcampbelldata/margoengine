@@ -145,7 +145,10 @@ export class ScatterInstances implements EnginePlugin {
     this.engine = engine;
     const d = engine.gpu;
     const upload = (data: Float32Array | Uint32Array, usage: number): GPUBuffer => {
-      if (data.byteLength > d.limits.maxBufferSize) throw new RangeError('Instances exceed GPU buffer limit');
+      if (data.byteLength > d.limits.maxBufferSize)
+        throw new RangeError(
+          'Instances exceed GPU buffer limit; split the batch into smaller batches or reduce the instance count.',
+        );
       const buffer = d.createBuffer({ size: data.byteLength, usage: usage | GPUBufferUsage.COPY_DST });
       try {
         d.queue.writeBuffer(buffer, 0, data as Float32Array<ArrayBuffer>);
@@ -177,13 +180,15 @@ export class ScatterInstances implements EnginePlugin {
           b.vertices.some((v) => !Number.isFinite(v)) ||
           b.transforms.some((v) => !Number.isFinite(v))
         )
-          throw new RangeError('Invalid PBR scatter batch');
+          throw new RangeError(
+            'Invalid PBR scatter batch; pass finite Float32Array vertices (20 floats each), Uint32Array triangle indices within range, 16-float transforms (1 to 1000000) and a PbrMaterial.',
+          );
         if (
           b.emissive !== undefined &&
           (b.emissive.length !== 3 ||
             [0, 1, 2].some((i) => !Number.isFinite(Math.fround(b.emissive![i])) || b.emissive![i] < 0))
         )
-          throw new RangeError('Invalid scatter emission');
+          throw new RangeError('Invalid scatter emission; pass emissive as three finite numbers of 0 or more.');
         if (
           b.translucency !== undefined &&
           (!Number.isFinite(b.translucency) || b.translucency < 0 || b.translucency > 1)
@@ -195,7 +200,7 @@ export class ScatterInstances implements EnginePlugin {
           b.windDetail !== undefined &&
           (!b.wind || !Number.isFinite(b.windDetail) || b.windDetail < 0 || b.windDetail > 1)
         )
-          throw new RangeError('Invalid scatter wind detail');
+          throw new RangeError('Invalid scatter wind detail; set a wind on the batch and windDetail between 0 and 1.');
         const wind = b.wind ? [b.wind[0] / windLength, b.wind[1] / windLength, b.wind[2]] : undefined;
         const packed = new Float32Array(instances * 32);
         for (let i = 0; i < instances; i++) {
@@ -258,13 +263,14 @@ export class ScatterInstances implements EnginePlugin {
     });
   }
   onPreUpdate(delta: number): void {
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid scatter delta');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('Invalid scatter delta; pass a finite frame time of 0 or more.');
     this.time = this.time + delta;
   }
   private draw(c: ScatterPassContext): void {
     const intensity = typeof this.emissiveIntensity === 'function' ? this.emissiveIntensity() : this.emissiveIntensity;
     if (typeof intensity !== 'number' || !Number.isFinite(Math.fround(intensity)) || intensity < 0)
-      throw new RangeError('Invalid scatter emissive intensity');
+      throw new RangeError('Invalid scatter emissive intensity; return a finite number of 0 or more.');
     const changed = !sameBindings(this.bindings, c.bindings);
     const format = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil!.format;
     if (this.shader !== c.shader || this.format !== format) {

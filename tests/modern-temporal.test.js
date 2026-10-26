@@ -46,7 +46,7 @@ test('binary splats honor view bounds, quaternion rotation, sRGB and covariance 
   assert.equal(data.colors[0], 1);
   assert.ok(Math.abs(data.colors[1] - 0.21586) < 0.00001);
   assert.ok(Math.abs(data.colors[3] - 128 / 255) < 1e-7);
-  assert.throws(() => parseSplat(bytes.subarray(1)), /length/);
+  assert.throws(() => parseSplat(bytes.subarray(1)), /.splat file must hold/);
   bytes.fill(128, 28);
   assert.throws(() => parseSplat(bytes), /quaternion/);
   for (const change of [

@@ -35,7 +35,7 @@ function permutation(seed: number): Uint8Array {
   return p;
 }
 const seedOf = (seed: number): number => {
-  if (!Number.isSafeInteger(seed)) throw new RangeError('Invalid noise seed');
+  if (!Number.isSafeInteger(seed)) throw new RangeError('Noise seed must be a safe integer; pass a whole number.');
   return seed >>> 0 || 1;
 };
 const tableCode = (state: number): string => {
@@ -147,7 +147,8 @@ export const simplex3 = (p: NodeInput<'vec3f'>, seed = 1): Node<'f32'> =>
   seeded(seed, SIMPLEX3, simplex3Code, 'Simplex3', cast(p, 'vec3f', 'simplex3 position'));
 /** 3D gradient noise; `new Noise(seed).perlin(x, y, z)` on the CPU. `seed` may be a u32 node (a uniform reseeds without recompiling). */
 export function perlin3(p: NodeInput<'vec3f'>, seed: number | Node<'u32'> = 1): Node<'f32'> {
-  if (typeof seed === 'number' && !Number.isSafeInteger(seed)) throw new RangeError('Invalid noise seed');
+  if (typeof seed === 'number' && !Number.isSafeInteger(seed))
+    throw new RangeError('Noise seed must be a safe integer; pass a whole number.');
   return call(
     'noisePerlin3',
     [cast(p, 'vec3f', 'perlin3 position'), typeof seed === 'number' ? cast((seed | 0) >>> 0, 'u32') : seed],
@@ -197,7 +198,8 @@ export function domainWarp<T extends 'vec2f' | 'vec3f'>(
   p: Node<T>,
   { warp = noise, strength = 1 }: NoiseWarpOptions<T> = {},
 ): Node<'f32'> {
-  if (!Number.isFinite(strength)) throw new RangeError('Invalid warp options');
+  if (!Number.isFinite(strength))
+    throw new RangeError('Domain warp strength must be a finite number; pass a number such as 0.5.');
   const at = (o: number) => warp(p.add(o)).mul(strength),
     offset =
       p.type === 'vec2f' ? vec2(at(OFFSETS[0]), at(OFFSETS[1])) : vec3(at(OFFSETS[0]), at(OFFSETS[1]), at(OFFSETS[2]));

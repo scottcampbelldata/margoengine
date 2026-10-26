@@ -92,7 +92,8 @@ export class NodePass implements EnginePlugin {
   ) {
     if (!(node instanceof Node) || (node.type !== 'vec3f' && node.type !== 'vec4f'))
       throw new TypeError('NodePass needs a vec3f or vec4f node');
-    if (kind !== 'hdr' && kind !== 'ldr') throw new TypeError('NodePass kind is hdr or ldr');
+    if (kind !== 'hdr' && kind !== 'ldr')
+      throw new TypeError("NodePass kind must be 'hdr' or 'ldr'; pass one of them.");
     this.name = name;
     this.kind = kind;
     const s = this.program.stage(post, [node]);

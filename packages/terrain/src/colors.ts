@@ -109,7 +109,7 @@ export class TerrainColors implements EnginePlugin {
     if (options.meadow.length !== 2) throw new RangeError('Expected two meadow colors');
     for (const color of [options.sand, ...options.meadow, options.stone])
       if (color.length !== 3 || color.some((v) => !Number.isFinite(v) || v < 0 || v > 1))
-        throw new RangeError('Invalid terrain color');
+        throw new RangeError('Invalid terrain color; use [r, g, b] with each channel between 0 and 1.');
     for (const range of [
       options.shore,
       options.meadowHeight,
@@ -118,7 +118,7 @@ export class TerrainColors implements EnginePlugin {
       options.wetHeight,
     ])
       if (range.length !== 2 || !range.every((v) => Number.isFinite(Math.fround(v))) || range[0] >= range[1])
-        throw new RangeError('Invalid terrain color range');
+        throw new RangeError('Invalid terrain color range; use [min, max] with finite numbers and min below max.');
     if (
       options.stoneNormal[0] < 0 ||
       options.stoneNormal[1] > 1 ||
@@ -129,7 +129,9 @@ export class TerrainColors implements EnginePlugin {
       (options.variation ?? 0) < 0 ||
       (options.variation ?? 0) > 1
     )
-      throw new RangeError('Invalid terrain wetness or variation');
+      throw new RangeError(
+        'Invalid terrain wetness or variation; stoneNormal must stay within 0..1, wetDarkening and variation must be between 0 and 1.',
+      );
     const detail = options.detail ?? 1;
     if (typeof detail !== 'number' || !(detail >= 0 && detail <= 1))
       throw new RangeError('Terrain detail must be a number in 0..1');
@@ -145,7 +147,9 @@ export class TerrainColors implements EnginePlugin {
         !wetness.origin.every((v) => Number.isFinite(Math.fround(v))) ||
         !wetness.size.every((v) => Number.isFinite(Math.fround(v)) && v > 0))
     )
-      throw new RangeError('Invalid terrain wetness map');
+      throw new RangeError(
+        'Invalid terrain wetness map; give a texture function, a finite [x, z] origin and a positive finite [width, depth] size.',
+      );
     this.wetness = wetness;
     const rgb = (color: Vec3) => `vec3f(${color.join(',')})`;
     const variation = options.variation ?? 0,

@@ -35,7 +35,9 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
       !Number.isFinite(Math.fround(fog.start ?? 40)) ||
       (fog.start ?? 40) < 0
     )
-      throw new RangeError('Invalid sky fog');
+      throw new RangeError(
+        'Invalid sky fog; give a depth function, falloff "exp" or "exp2", height and start of 0 or more, and density from 0 to 1.',
+      );
   },
   create(code) {
     const shader = code + fragment,

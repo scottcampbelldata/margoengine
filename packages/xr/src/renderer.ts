@@ -1,4 +1,5 @@
 import type { Engine, Geometry, PassContext } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import type { XRBinding, XRProjectionLayer, XRViewerPose } from './types.js';
 import { meshTriangles, type MeshSourceOwner } from '../../shared/mesh-source.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number };
@@ -83,7 +84,8 @@ export class StereoRenderer {
         if (!resource) {
           const allocated: GPUBuffer[] = [];
           const upload = (data: Float32Array | Uint32Array, usage: number) => {
-            if (data.byteLength > device.limits.maxBufferSize) throw new RangeError('XR buffer exceeds device limit');
+            if (data.byteLength > device.limits.maxBufferSize)
+              throw new RangeError('XR buffer exceeds device limit; use a smaller geometry or split it');
             const buffer = device.createBuffer({ size: data.byteLength, usage: usage | GPUBufferUsage.COPY_DST });
             allocated.push(buffer);
             device.queue.writeBuffer(buffer, 0, data as Float32Array<ArrayBuffer>);
@@ -106,7 +108,8 @@ export class StereoRenderer {
         }
         if (resource.data.length < engine.store.capacity * 24) {
           const data = new Float32Array(engine.store.capacity * 24);
-          if (data.byteLength > device.limits.maxBufferSize) throw new RangeError('XR buffer exceeds device limit');
+          if (data.byteLength > device.limits.maxBufferSize)
+            throw new RangeError('XR buffer exceeds device limit; lower the engine store capacity');
           const instance = device.createBuffer({
             size: data.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -174,7 +177,11 @@ export class StereoRenderer {
       data.fill(1, 28, 31);
       if (engine.lighting.ambient) data.set(engine.lighting.ambient, 28);
       device.queue.writeBuffer(frame.uniform, 0, data as Float32Array<ArrayBuffer>);
-      if (!image.depthStencilTexture) throw new Error('XR projection layer has no depth texture');
+      if (!image.depthStencilTexture)
+        throw new MargoError(
+          'unsupported',
+          'XR projection layer has no depth texture; use a runtime that provides a depth buffer for the layer',
+        );
       if (
         frame.color?.width !== image.colorTexture.width ||
         frame.color?.height !== image.colorTexture.height ||

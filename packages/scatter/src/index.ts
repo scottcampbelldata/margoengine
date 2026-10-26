@@ -311,10 +311,13 @@ export class Scatter implements EnginePlugin {
       color.some((v) => !Number.isFinite(v) || v < 0 || v > 1) ||
       (options.heightmap !== undefined && typeof options.heightmap !== 'function')
     )
-      throw new RangeError('Invalid scatter rules');
+      throw new RangeError(
+        'Invalid scatter rules; check density 0-1, minHeight <= maxHeight, maxSlope 0-90, scale [min, max] up to 100, three increasing lod distances, an integer seed, color 0-1 and a heightmap function.',
+      );
     if (options.material !== undefined && !(options.material instanceof PbrMaterial))
       throw new TypeError('Expected a PBR scatter material');
-    if (!Number.isFinite(lodFade) || lodFade < 0 || lodFade > 100000) throw new RangeError('Invalid scatter LOD fade');
+    if (!Number.isFinite(lodFade) || lodFade < 0 || lodFade > 100000)
+      throw new RangeError('Invalid scatter LOD fade; set lodFade to a finite number from 0 to 100000.');
     if (
       ![alignToGround, sink].every(Number.isFinite) ||
       alignToGround < 0 ||
@@ -405,7 +408,7 @@ export class Scatter implements EnginePlugin {
         Math.min(d.limits.maxStorageBufferBindingSize, d.limits.maxBufferSize) ||
       Math.ceil(this.count / 64) > d.limits.maxComputeWorkgroupsPerDimension
     )
-      throw new RangeError('Scatter exceeds GPU limits');
+      throw new RangeError('Scatter exceeds GPU limits; reduce the instance count or the number of exclusions.');
     this.uniform = d.createBuffer({
       size: this.values.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -449,7 +452,8 @@ export class Scatter implements EnginePlugin {
     this.compute = compute(d, cull);
   }
   onPreUpdate(delta: number): void {
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid scatter delta');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('Invalid scatter delta; pass a finite frame time of 0 or more.');
     this.time += delta;
   }
   registerPasses(graph: FrameGraph): void {

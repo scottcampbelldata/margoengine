@@ -51,8 +51,14 @@ test('video imports external frames without uploads and reuses frequency bins', 
     assert.equal(disconnections, 2);
     assert.ok(h.resources.every((r) => r.destroyed));
     assert.equal(source.paused, true);
-    assert.throws(() => video.import(h.engine.gpu), /disposed/);
-    assert.throws(() => new Video(source, { fftSize: 17 }), /FFT/);
+    assert.throws(
+      () => video.import(h.engine.gpu),
+      (e) => e.name === 'MargoError' && e.code === 'disposed' && /disposed/.test(e.message),
+    );
+    assert.throws(
+      () => new Video(source, { fftSize: 17 }),
+      (e) => e instanceof RangeError && /fftSize/.test(e.message),
+    );
   } finally {
     globalThis.HTMLVideoElement = old;
     dom.window.close();
@@ -127,7 +133,10 @@ test('multiple overlays share one audible media route and release only their own
       second = new Video(source, { audio });
     assert.equal(created, 1);
     assert.equal(connections.filter((v) => v === destination).length, 1);
-    assert.throws(() => new Video(source, { audio: { ...audio } }), /different AudioContext/);
+    assert.throws(
+      () => new Video(source, { audio: { ...audio } }),
+      (e) => e.code === 'attached' && /different AudioContext/.test(e.message),
+    );
     first.dispose();
     assert.equal(disconnections.includes(destination), false);
     second.dispose();

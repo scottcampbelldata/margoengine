@@ -1,7 +1,7 @@
 {
   "gate": "tests",
   "about": "packages with no test in verify; public entries no test imports",
-  "total": 11,
+  "total": 4,
   "history": [
     {
       "date": "2026-10-24",
@@ -14,13 +14,6 @@
     "unimported @margoengine/creative/grass": 1,
     "unimported @margoengine/creative/planet": 1,
     "unimported @margoengine/creative/stars": 1,
-    "unimported @margoengine/creative/targets": 1,
-    "unimported @margoengine/sky/bruneton": 1,
-    "unimported @margoengine/sky/fog": 1,
-    "unimported @margoengine/sky/preetham": 1,
-    "unimported @margoengine/sky/reflection": 1,
-    "unimported @margoengine/vfx/obstacles": 1,
-    "unimported @margoengine/vfx/sort": 1,
-    "unimported @margoengine/vfx/wrap": 1
+    "unimported @margoengine/creative/targets": 1
   }
 }

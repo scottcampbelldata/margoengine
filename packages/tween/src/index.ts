@@ -58,7 +58,9 @@ export class Tween {
       typeof easing !== 'function' ||
       (onComplete !== undefined && typeof onComplete !== 'function')
     )
-      throw new RangeError('Invalid tween');
+      throw new RangeError(
+        'Tween needs a finite numeric target property, finite to value, duration and delay of 0 or more, and function easing and onComplete; check the arguments.',
+      );
     for (const track of this.tracks)
       if (track.active && track.target === target && track.key === key) track.active = false;
     const track: Track = {
@@ -84,7 +86,8 @@ export class Tween {
    * @throws MargoError `'state'` when called from inside a tween callback.
    */
   update(delta: number): void {
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid tween delta');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('Tween update delta must be a finite number of 0 or more; pass elapsed seconds.');
     if (this.updating)
       throw new MargoError('state', 'Recursive tween update; do not call update() from a tween callback');
     this.updating = true;

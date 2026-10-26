@@ -164,3 +164,20 @@ test('malformed streams, unsupported USD features and Crate table bounds fail ex
   assert.throws(() => parseUSDC(count), /sections/);
   assert.throws(() => parseUSDC(bytes.subarray(0, 20)), /truncated/);
 });
+
+test('malformed layers throw a LoaderError for format USD with a code to branch on', () => {
+  const caught = (run) => {
+    try {
+      run();
+    } catch (error) {
+      return error;
+    }
+    return assert.fail('expected an error');
+  };
+  const truncated = caught(() => parseUSDC(new Uint8Array(20)));
+  assert.equal(truncated.name, 'LoaderError');
+  assert.equal(truncated.format, 'USD');
+  assert.equal(truncated.code, 'syntax');
+  assert.match(truncated.message, /^USD: /);
+  assert.equal(caught(() => parseUSDA(source, { maxBytes: 8 })).code, 'limit');
+});

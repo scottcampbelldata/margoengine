@@ -104,7 +104,7 @@ const finite = (v: unknown): v is number =>
 const vec = (v: unknown): v is [number, number, number] =>
   Array.isArray(v) && v.length === 3 && finite(v[0]) && finite(v[1]) && finite(v[2]);
 const fail = (message: string): never => {
-  throw new TypeError(`Surface graph: ${message}`);
+  throw new TypeError(`Surface graph is invalid; ${message}`);
 };
 const idValid = (id: unknown): id is string => typeof id === 'string' && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id);
 
@@ -135,19 +135,19 @@ function structure(value: unknown): { graph: SurfaceGraph; order: SurfaceGraphNo
   for (const node of graph.nodes) {
     if (!object(node) || !idValid(node.id) || byId.has(node.id)) fail('use unique node ids beginning with a letter');
     if (typeof node.op !== 'string' || !Object.hasOwn(SURFACE_OPERATIONS, node.op))
-      fail(`unknown operation on ${node.id}`);
+      fail(`use a supported operation on ${node.id}`);
     if (
       !Array.isArray(node.inputs) ||
       node.inputs.length !== SURFACE_OPERATIONS[node.op] ||
       !node.inputs.every(idValid)
     )
-      fail(`${node.id} has invalid input arity or ids`);
+      fail(`${node.id} needs the right number of inputs and valid node ids`);
     if (node.op === 'float' && !finite(node.value)) fail(`${node.id} needs a finite float value within ±1000000`);
     if (node.op === 'vec3' && !vec(node.value)) fail(`${node.id} needs three finite values within ±1000000`);
     if (node.op === 'component' && (!Number.isInteger(node.value) || Number(node.value) < 0 || Number(node.value) > 2))
       fail(`${node.id} component must be 0, 1 or 2`);
     if (!['float', 'vec3', 'component'].includes(node.op) && node.value !== undefined)
-      fail(`${node.id} does not accept a parameter value`);
+      fail(`remove the parameter value from ${node.id}`);
     work += ['sin', 'cos', 'pow', 'normalize'].includes(node.op) ? 16 : 1;
     byId.set(node.id, node);
   }
@@ -158,7 +158,7 @@ function structure(value: unknown): { graph: SurfaceGraph; order: SurfaceGraphNo
     order: SurfaceGraphNode[] = [];
   const visit = (id: string): number => {
     const node = byId.get(id);
-    if (!node) return fail(`missing input node ${id}`);
+    if (!node) return fail(`add the missing input node ${id}`);
     if (state.get(id) === 1) return fail(`cycle at ${id}; remove the connection`);
     if (state.get(id) === 2) return depth.get(id)!;
     state.set(id, 1);
@@ -173,7 +173,7 @@ function structure(value: unknown): { graph: SurfaceGraph; order: SurfaceGraphNo
   graph.nodes.forEach((node) => visit(node.id));
   for (const slot of slots)
     if (graph.outputs[slot] !== undefined && (!idValid(graph.outputs[slot]) || !byId.has(graph.outputs[slot]!)))
-      fail(`missing ${slot} output node`);
+      fail(`add the missing ${slot} output node`);
   return { graph, order };
 }
 

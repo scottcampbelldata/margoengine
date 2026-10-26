@@ -13,12 +13,14 @@ function random(seed: number, scale: readonly [number, number]): () => number {
     scale[0] <= 0 ||
     scale[0] > scale[1]
   )
-    throw new RangeError('Invalid placement seed or scale');
+    throw new RangeError(
+      'Invalid placement seed or scale; use an integer seed from 0 to 4294967295 and scale as [min, max] with 0 < min <= max.',
+    );
   return createLcgRandom(seed);
 }
 function count(value: number): void {
   if (!Number.isInteger(value) || value < 0 || value > 1000000)
-    throw new RangeError('Invalid placement candidate count');
+    throw new RangeError('Invalid placement candidate count; pass an integer from 0 to 1000000.');
 }
 
 /** Seeded rectangle candidates; submit the result to PlacementLayout to reserve clear footprints. */
@@ -59,12 +61,12 @@ export function radialPlacements(
     distance[0] < 0 ||
     distance[0] > distance[1]
   )
-    throw new RangeError('Invalid radial placement distance');
+    throw new RangeError('Invalid radial placement distance; pass [min, max] as finite numbers with 0 <= min <= max.');
   const next = random(seed, scale),
     placements: GroundPlacement[] = [];
   for (const center of centers) {
     if (center.length !== 2 || !Number.isFinite(Math.fround(center[0])) || !Number.isFinite(Math.fround(center[1])))
-      throw new RangeError('Invalid placement center');
+      throw new RangeError('Invalid placement center; pass each center as finite [x, z] numbers.');
     for (let i = 0; i < perCenter; i++) {
       const angle = next() * Math.PI * 2,
         radius = distance[0] + next() * (distance[1] - distance[0]);

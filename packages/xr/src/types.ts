@@ -1,6 +1,9 @@
 // Structural browser types keep consumers independent of ambient WebXR declaration packages.
+/** Session kind: a windowed tracking-only session, or an immersive headset session. */
 export type XRMode = 'inline' | 'immersive-vr' | 'immersive-ar';
+/** An opaque WebXR reference or pose space. */
 export type XRSpace = object;
+/** A tracked pose: a matrix, its inverse, and position and orientation. */
 export interface XRPose {
   transform: {
     matrix: Float32Array;
@@ -10,14 +13,17 @@ export interface XRPose {
   };
   emulatedPosition: boolean;
 }
+/** One eye of a viewer pose. */
 export interface XRView {
   eye: 'left' | 'right' | 'none';
   projectionMatrix: Float32Array;
   transform: XRPose['transform'];
 }
+/** The viewer pose, with one view per eye. */
 export interface XRViewerPose extends XRPose {
   views: readonly XRView[];
 }
+/** A controller, hand, gaze or screen input. */
 export interface XRInputSource {
   handedness: 'left' | 'right' | 'none';
   targetRayMode: 'gaze' | 'tracked-pointer' | 'screen' | 'transient-pointer';
@@ -27,6 +33,7 @@ export interface XRInputSource {
   profiles: readonly string[];
   hand?: ReadonlyMap<string, XRSpace>;
 }
+/** One XR animation frame, as the browser provides it. */
 export interface XRNativeFrame {
   session: XRNativeSession;
   getViewerPose(space: XRSpace): XRViewerPose | null;
@@ -68,6 +75,7 @@ export interface XRAnchor {
   readonly anchorSpace: XRSpace;
   delete(): void;
 }
+/** The browser XRSession, as far as Margo uses it. */
 export interface XRNativeSession extends EventTarget {
   inputSources: readonly XRInputSource[];
   enabledFeatures?: readonly string[];
@@ -89,6 +97,7 @@ export interface XRNativeSession extends EventTarget {
   cancelAnimationFrame(handle: number): void;
   end(): Promise<void>;
 }
+/** The browser `navigator.xr`, as far as Margo uses it. */
 export interface XRSystem {
   isSessionSupported(mode: XRMode): Promise<boolean>;
   requestSession(
@@ -96,15 +105,18 @@ export interface XRSystem {
     init: { requiredFeatures: string[]; optionalFeatures: string[] },
   ): Promise<XRNativeSession>;
 }
+/** A WebGPU projection layer; destroy it when the session ends. */
 export interface XRProjectionLayer {
   destroy(): void;
 }
+/** The texture and viewport of one eye in a projection layer. */
 export interface XRSubImage {
   colorTexture: GPUTexture;
   depthStencilTexture: GPUTexture | null;
   viewport: { x: number; y: number; width: number; height: number };
   getViewDescriptor(): GPUTextureViewDescriptor;
 }
+/** The WebGPU XR binding (`XRGPUBinding`) that creates layers and sub-images. */
 export interface XRBinding {
   getPreferredColorFormat(): GPUTextureFormat;
   createProjectionLayer(init: {
@@ -113,11 +125,13 @@ export interface XRBinding {
   }): XRProjectionLayer;
   getViewSubImage(layer: XRProjectionLayer, view: XRView): XRSubImage;
 }
+/** One input source with its target-ray and grip poses. */
 export interface XRInputPose {
   source: XRInputSource;
   targetRay: XRPose | null;
   grip: XRPose | null;
 }
+/** State passed to `onFrame`; the object is reused, so copy what you keep. */
 export interface XRFrameState {
   time: number;
   delta: number;

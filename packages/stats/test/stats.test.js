@@ -137,7 +137,7 @@ test('rolling samples wrap, reject bad input atomically and tick never touches t
   assert.match(stats.element.textContent, /GPU timing 2\.50 ms/);
   stats.dispose();
   assert.equal(stats.element.isConnected, false);
-  assert.throws(() => stats.tick(1), /disposed/);
+  assert.throws(() => stats.tick(1), { code: 'disposed' });
 });
 
 test('encoder instrumentation preserves arguments and receivers, counts all direct and indirect variants once', (t) => {
@@ -346,7 +346,7 @@ test('timestamp queries sum pass nanoseconds, skip frames during readback and re
   profiler.dispose();
   profiler.dispose();
   assert.ok(resources.every((r) => r.destroyed));
-  assert.throws(() => profiler.beginFrame(), /disposed/);
+  assert.throws(() => profiler.beginFrame(), { code: 'disposed' });
 });
 
 test('timestamp limbs exactly match unsigned 64-bit BigInt differences and sums', async (t) => {

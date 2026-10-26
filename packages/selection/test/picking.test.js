@@ -145,7 +145,7 @@ test('Picking culls individual instances in the micro frustum and invalidates ca
       finish = resolve;
     });
   const pending = h.effect.onPick(64, 48);
-  await assert.rejects(h.effect.onPick(64, 48), /pending/);
+  await assert.rejects(h.effect.onPick(64, 48), { code: 'state', message: /pending/ });
   h.engine.meshes.set(0, { ...h.mesh });
   finish();
   assert.equal(await pending, null);

@@ -109,7 +109,7 @@ test('optional obstacles, wrap, sort and texture patch shaders only when enabled
   h.frame();
   assert.equal(new Float32Array(extra.data)[13], 5, 'obstacles are read every frame');
   obstacles.push({ kind: 'cone', center: [0, 0, 0], radius: 1 });
-  assert.throws(() => h.frame(), /Invalid obstacle/);
+  assert.throws(() => h.frame(), /Obstacle kind is cone/);
   obstacles.pop();
   vfx.onDeviceRestored(h.engine);
   h.frame();

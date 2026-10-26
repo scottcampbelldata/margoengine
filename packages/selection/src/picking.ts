@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
@@ -198,11 +199,13 @@ export class Picking implements EnginePlugin {
   }
   /** Register an optional model's GPU vertices, including its current skin and morph deformation. */
   add(source: PickingSource): () => void {
-    if (this.disposed) throw new Error('Picking is disposed');
+    if (this.disposed)
+      throw new MargoError('disposed', 'Picking is disposed; create a new Picking to register sources.');
     return this.primitives.add(source);
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Picking requires WebGPU');
+    if (this.disposed) throw new MargoError('disposed', 'Picking is disposed; create a new Picking to attach.');
+    if (!engine.gpu) throw new MargoError('unsupported', 'Picking requires WebGPU; use a browser with WebGPU enabled.');
     this.engine = engine;
     this.device = engine.gpu;
     this.primitives.setup(engine);
@@ -245,7 +248,8 @@ export class Picking implements EnginePlugin {
     const key = code + ':' + mrt + ':' + c.format + ':' + c.descriptor.depthStencil!.format;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      if (this.pipelines.size >= 64) throw new RangeError('Too many picking shader variants');
+      if (this.pipelines.size >= 64)
+        throw new RangeError('Too many picking shader variants; reduce distinct materials and formats to 64 or fewer.');
       const module = c.device.createShaderModule({ code });
       pipeline = c.device.createRenderPipeline({
         ...c.descriptor,
@@ -362,7 +366,9 @@ export class Picking implements EnginePlugin {
    * picks inside that view with its camera, scene and layers.
    */
   async pick(x: number, y: number, view?: RenderView): Promise<PickHit | null> {
-    if (this.disposed || !this.engine) throw new Error('Picking is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Picking is disposed; create a new Picking to pick.');
+    if (!this.engine)
+      throw new MargoError('state', 'Picking is not attached; call Picking.attach(engine) before picking.');
     this.last = null;
     const mesh = await this.engine.pick(x, y, view),
       hit = this.last as PickHit | null;
@@ -370,9 +376,13 @@ export class Picking implements EnginePlugin {
     return mesh && hit?.mesh === mesh ? hit : null;
   }
   private async resolve(x: number, y: number, view?: PickView): Promise<PickHit | null> {
-    if (this.disposed || !this.engine) throw new Error('Picking is disposed');
-    if (this.pending) throw new Error('A pick is already pending');
-    if (![x, y].every(Number.isFinite)) throw new RangeError('Invalid pick coordinates');
+    if (this.disposed) throw new MargoError('disposed', 'Picking is disposed; create a new Picking to pick.');
+    if (!this.engine)
+      throw new MargoError('state', 'Picking is not attached; call Picking.attach(engine) before picking.');
+    if (this.pending)
+      throw new MargoError('state', 'A pick is already pending; await the previous pick before starting another.');
+    if (![x, y].every(Number.isFinite))
+      throw new RangeError('Invalid pick coordinates; pass finite x and y in canvas pixels.');
     // CSS pixels; an OffscreenCanvas (worker) has no client size, so its coordinates are canvas pixels.
     const canvas = this.engine.canvas,
       cssWidth = canvas.clientWidth || canvas.width,

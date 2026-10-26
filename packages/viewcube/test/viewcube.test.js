@@ -385,7 +385,7 @@ test('the projection toggle drives @margoengine/cameras and reports its state', 
   assert.equal(found.getProjection(), 'perspective', 'finds the attached CameraProjection');
   found.setProjection('orthographic');
   assert.equal(projection.mode, 'orthographic');
-  assert.throws(() => new ViewCube(setup().engine).setProjection('orthographic'), /without a projection/);
+  assert.throws(() => new ViewCube(setup().engine).setProjection('orthographic'), { code: 'state' });
 });
 
 test('navigation profiles: flip turns a repeated click to the opposite view; a profile key toggling the projection updates the label', () => {
@@ -451,7 +451,7 @@ test('dispose removes the widget and its plugin; engine removal disposes it', ()
   engine.removePlugin(again.name);
   assert.ok(!container.children.includes(again.element));
   assert.throws(() => new ViewCube({ ...engine, canvas: { parentElement: null } }), /needs a container/);
-  assert.throws(() => new ViewCube(engine, { size: 0 }), /Invalid ViewCube size/);
+  assert.throws(() => new ViewCube(engine, { size: 0 }), /Invalid size or duration; use/);
 });
 
 test('a view option turns that view camera and places the cube in the corner of its rectangle', () => {

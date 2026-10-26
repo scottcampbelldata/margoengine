@@ -347,14 +347,23 @@ test('XR negotiates webgpu and reference space, reads input poses, and renders d
 test('XR rejects duplicates and tears down failed initialization without losing the original error', async (t) => {
   const f = await fixture(t),
     xr = await XR.create(f.engine);
-  await assert.rejects(XR.create(f.engine), /without an XR plugin/);
+  await assert.rejects(XR.create(f.engine), { code: 'state', message: /without an XR plugin/ });
   f.rejectSpace();
   await assert.rejects(xr.requestSession(), /reference space failure/);
   assert.equal(xr.session, null);
   assert.equal(f.session.ended, 1);
   assert.equal(f.session.state.layers[0].destroyed, 1);
   xr.dispose();
-  await assert.rejects(xr.requestSession(), /disposed/);
+  await assert.rejects(xr.requestSession(), { code: 'disposed' });
+});
+test('XR.create and requestSession reject with an aborted signal before any work', async (t) => {
+  const f = await fixture(t),
+    signal = AbortSignal.abort(new Error('stop'));
+  await assert.rejects(XR.create(f.engine, { signal }), /stop/);
+  const xr = await XR.create(f.engine);
+  await assert.rejects(xr.requestSession('immersive-vr', { signal }), /stop/);
+  assert.equal(xr.session, null);
+  xr.dispose();
 });
 test('XR cleanup handles pending session disposal, frame failures and device loss', async (t) => {
   const f = await fixture(t),

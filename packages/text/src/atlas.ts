@@ -106,7 +106,10 @@ export class GlyphAtlas {
     let slot = this.slots.get(glyph);
     if (slot) return slot;
     const packed = this.packer.pack(glyph.width, glyph.height);
-    if (!packed) throw new RangeError(`Glyph atlas is full (${this.packer.maxPages} pages of ${this.size}px)`);
+    if (!packed)
+      throw new RangeError(
+        `Glyph atlas is full (${this.packer.maxPages} pages of ${this.size}px); raise maxPages or atlasSize, or use fewer glyphs and sizes.`,
+      );
     slot = packed;
     if (slot.page >= this.layers)
       this.allocate(Math.min(this.packer.maxPages, Math.max(slot.page + 1, this.layers * 2)));

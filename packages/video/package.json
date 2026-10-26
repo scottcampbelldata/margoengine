@@ -35,6 +35,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },

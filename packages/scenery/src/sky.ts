@@ -2,6 +2,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { Sky } from '@margoengine/sky/base';
 import { night } from '@margoengine/sky/night';
 import type { SkyNightOptions, SkyOptions } from '@margoengine/sky/base';
+/** Options for `SkyMoon`: the night-sky options of `@margoengine/sky` (stars, moon phase and size). All optional. */
 export type SkyMoonConfig = SkyNightOptions;
 /** Moonlit night sky with stars and a phased moon: a `Sky` from `@margoengine/sky` held at midnight, loading only its stylized-night feature. `config` is read every frame. */
 export class SkyMoon extends Sky {

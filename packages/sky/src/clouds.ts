@@ -74,6 +74,8 @@ fn cloudSky(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {
       (c.height ?? 1500) < 100 ||
       (c.height ?? 1500) > 10000
     )
-      throw new RangeError('Invalid sky clouds');
+      throw new RangeError(
+        'Invalid sky clouds; keep coverage from 0 to 1, speed within ±100 and height from 100 to 10000.',
+      );
   },
 };

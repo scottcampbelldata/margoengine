@@ -160,10 +160,13 @@ export class Terrain implements EnginePlugin {
       o.layers.length < 4 ||
       o.layers.length > 8
     )
-      throw new RangeError('Invalid terrain options');
+      throw new RangeError(
+        'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), cellSize above 0, finite heightScale and heightOffset, and 4 to 8 layers.',
+      );
     finiteVector(o.origin ?? [0, 0], 2, 'Terrain origin');
     finiteVector(o.size, 2, 'Terrain size');
-    if (o.size.some((v) => v <= 0)) throw new RangeError('Invalid terrain size');
+    if (o.size.some((v) => v <= 0))
+      throw new RangeError('Invalid terrain size; give a [width, depth] with both above 0.');
     for (const layer of o.layers) {
       finiteVector(layer.height, 2, 'Layer height');
       finiteVector(layer.slope, 2, 'Layer slope');
@@ -175,12 +178,16 @@ export class Terrain implements EnginePlugin {
         !Number.isFinite(Math.fround(layer.scale)) ||
         layer.scale <= 0
       )
-        throw new RangeError('Invalid terrain layer');
+        throw new RangeError(
+          'Invalid terrain layer; height must rise, slope must rise within 0..1 and scale must be above 0.',
+        );
     }
   }
   addLighting(effect: TerrainLighting): () => void {
     if (this.disposed || !effect || typeof effect.shader !== 'function' || typeof effect.bindings !== 'function')
-      throw new TypeError('Invalid terrain lighting');
+      throw new TypeError(
+        'Invalid terrain lighting; pass a live Terrain an effect with shader() and bindings() functions.',
+      );
     if (effect.owner && this.engine && effect.owner !== this.engine)
       throw new MargoError(
         'attached',
@@ -213,11 +220,13 @@ export class Terrain implements EnginePlugin {
       !['r32float', 'rgba16float', 'rgba8unorm'].includes(t.heightmap.format) ||
       (t.normalmap && !['rgba8unorm', 'rgba16float'].includes(t.normalmap.format))
     )
-      throw new TypeError('Invalid terrain texture format or layer count');
+      throw new TypeError(
+        'Invalid terrain texture format or layer count; use a layers array texture with one layer per terrain layer and a supported heightmap format.',
+      );
     const geometry = clipmapGrid(this.options.resolution ?? 64),
       upload = (data: Float32Array | Uint32Array, usage: number) => {
         if (data.byteLength > this.device!.limits.maxBufferSize)
-          throw new RangeError('Terrain grid exceeds device limits');
+          throw new RangeError('Terrain grid exceeds the device maxBufferSize; reduce resolution.');
         const buffer = this.device!.createBuffer({ size: data.byteLength, usage: usage | GPUBufferUsage.COPY_DST });
         try {
           this.device!.queue.writeBuffer(buffer, 0, data as Float32Array<ArrayBuffer>);
@@ -474,7 +483,9 @@ export class Terrain implements EnginePlugin {
       typeof hook.begin !== 'function' ||
       !Array.isArray(hook.targets)
     )
-      throw new TypeError('Invalid terrain capture hook');
+      throw new TypeError(
+        'Invalid terrain capture hook; pass an object with declarations() and begin() functions and a targets array to a live Terrain.',
+      );
     this.capture = hook;
     return () => {
       if (this.capture === hook) this.capture = undefined;

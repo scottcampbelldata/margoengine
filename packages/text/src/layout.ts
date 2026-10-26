@@ -219,9 +219,9 @@ export function validateLayoutOptions(options: LayoutOptions): Required<LayoutOp
   if (typeof o.maxWidth !== 'number' || Number.isNaN(o.maxWidth) || o.maxWidth <= 0)
     throw new RangeError('maxWidth must be positive (Infinity for no wrapping)');
   if (!ALIGNS.includes(o.textAlign) || !ANCHORS_X.includes(o.anchorX) || !ANCHORS_Y.includes(o.anchorY))
-    throw new TypeError('Unknown textAlign or anchor');
+    throw new TypeError('Unknown textAlign or anchor; use a documented value for textAlign, anchorX and anchorY.');
   if (!DIRECTIONS.includes(o.direction) || !WHITE_SPACES.includes(o.whiteSpace) || !WRAPS.includes(o.overflowWrap))
-    throw new TypeError('Unknown direction, whiteSpace or overflowWrap');
+    throw new TypeError('Unknown direction, whiteSpace or overflowWrap; use a documented value for each.');
   return o;
 }
 

@@ -899,7 +899,9 @@ export class RawMesh {
     if (step !== 'vertex' && step !== 'instance')
       throw new TypeError(`RawMesh attribute ${name} step must be vertex or instance`);
     if (!this.map.has(name) && this.map.size >= 16)
-      throw new RangeError('RawMesh supports 16 attributes (the WebGPU vertex attribute limit)');
+      throw new RangeError(
+        'RawMesh supports at most 16 attributes (the WebGPU vertex attribute limit); remove an attribute or pack them together.',
+      );
     const data = typed(a.data, a.type, name),
       size = components(a.type);
     const attribute: Attribute = { name, type: a.type, step, size, data, count: data.length / size, offset: 0 };

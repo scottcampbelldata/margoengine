@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import type { EngineKernel, Mesh } from '@margoengine/core';
 export { Picking, type PickHit } from './picking.js';
@@ -53,9 +54,13 @@ export interface XRayOptions {
   color?: readonly [number, number, number];
   width?: number;
 }
+/** Options for `Selection`. Every option is optional and read every frame. */
 export interface SelectionOptions {
+  /** Outline method: jump flooding (`'jfa'`, smooth at any width) or circular dilation (`'morphological'`). Default `'jfa'`. */
   algorithm?: 'jfa' | 'morphological';
+  /** Outline width in pixels, 1 to 32. Default 3. */
   width?: number;
+  /** Outline colour as linear red, green and blue from 0 to 1. Default `[1, 0.5, 0]` (orange). */
   color?: readonly [number, number, number];
   /** Plugin name, unique per engine: attach one Selection per selection set (default 'selection'). */
   name?: string;
@@ -106,6 +111,14 @@ const xrayComposite =
  return vec4f(settings[1].rgb,settings[0].w);
 }`;
 const blend = alphaBlend;
+/**
+ * Outlines the selected meshes and glTF nodes, only where they are visible (and dashed where hidden with `xray`).
+ * Attach with `Selection.attach(engine)`, then call `set([...])` with meshes or models; `set([])` clears it.
+ *
+ * @example
+ * const selection = Selection.attach(engine, { width: 3 });
+ * selection.set([mesh]);
+ */
 export class Selection implements EnginePlugin {
   private readonly sources = new PickingPrimitives();
   readonly name: string;
@@ -156,7 +169,8 @@ export class Selection implements EnginePlugin {
   private disposed = false;
   constructor(readonly options: SelectionOptions = {}) {
     this.name = options.name ?? 'selection';
-    if (!this.name || typeof this.name !== 'string') throw new TypeError('Invalid selection name');
+    if (!this.name || typeof this.name !== 'string')
+      throw new TypeError('Selection name must be a non-empty string; pass options.name as text or omit it.');
     this.validate();
   }
   static attach(engine: EngineKernel, options: SelectionOptions = {}): Selection {
@@ -166,19 +180,23 @@ export class Selection implements EnginePlugin {
   }
   /** Register custom optional buffers. Loader-owned PBR nodes are discovered by set(). */
   add(source: PickingSource): () => void {
-    if (this.disposed) throw new Error('Selection is disposed');
+    if (this.disposed)
+      throw new MargoError('disposed', 'Selection is disposed; create a new Selection to keep selecting.');
     return this.sources.add(source);
   }
   /** Core meshes, gltf-pro models, or glTF nodes (from `engine.pick`); a node outlines its own and its descendants' primitives. */
   set(meshes: Iterable<Mesh | ModelLike>): void {
-    if (this.disposed) throw new Error('Selection is disposed');
+    if (this.disposed)
+      throw new MargoError('disposed', 'Selection is disposed; create a new Selection to keep selecting.');
     const values = new Set(meshes);
-    if (values.size > 4096) throw new RangeError('Selection budget exceeded');
+    if (values.size > 4096) throw new RangeError('Selection budget exceeded; select at most 4096 meshes at once.');
     if (this.engine)
       for (const value of values) {
         const mesh = isModel(value) ? value.root : value;
         if ((isModel(value) && value.disposed) || this.engine.meshes.get(meshRuntime(mesh).id) !== mesh)
-          throw new TypeError('Foreign or disposed selection mesh');
+          throw new TypeError(
+            'Foreign or disposed selection mesh; select only live meshes of the engine this Selection is attached to.',
+          );
       }
     this.selected = values;
     this.revision++;
@@ -211,7 +229,9 @@ export class Selection implements EnginePlugin {
       (o.color ?? [1, 0.5, 0]).length !== 3 ||
       (o.color ?? []).some((v) => !Number.isFinite(v) || v < 0 || v > 1)
     )
-      throw new RangeError('Invalid selection options');
+      throw new RangeError(
+        'Invalid selection options; use algorithm "jfa" or "morphological", width 1-32 and color as three numbers 0-1.',
+      );
     const x = o.xray;
     if (x === undefined || typeof x === 'boolean') return;
     const color = x?.color ?? [0, 0, 0],
@@ -227,10 +247,14 @@ export class Selection implements EnginePlugin {
       color.length !== 3 ||
       color.some((v) => !Number.isFinite(v) || v < 0 || v > 1)
     )
-      throw new RangeError('Invalid selection x-ray options');
+      throw new RangeError(
+        'Invalid selection x-ray options; use dash 0-256, opacity 0-1, width 1-32 and color as three numbers 0-1.',
+      );
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Selection requires WebGPU');
+    if (this.disposed) throw new MargoError('disposed', 'Selection is disposed; create a new Selection to attach.');
+    if (!engine.gpu)
+      throw new MargoError('unsupported', 'Selection requires WebGPU; use a browser with WebGPU enabled.');
     this.engine = engine;
     this.device = engine.gpu;
     this.set(this.selected);

@@ -18,7 +18,7 @@ test('transition freezes previous scene once, advances progress, resizes and tea
     h.frame();
     assert.equal(effect.progress, 1);
   }
-  assert.throws(() => effect.start('bad'), /Invalid/);
+  assert.throws(() => effect.start('bad'), /Transition needs/);
   h.context.width = 64;
   h.frame();
   effect.onDeviceRestored(h.engine);

@@ -27,7 +27,9 @@ export function cascadeSplits(
     count < 1 ||
     count > 4
   )
-    throw new RangeError('Invalid cascade splits');
+    throw new RangeError(
+      'Cascade splits need near > 0, far > near, lambda from 0 to 1 and a count from 1 to 4; pass finite values in range.',
+    );
   for (let i = 0; i < 4; i++) {
     const t = Math.min(1, (i + 1) / count);
     out[i] = lambda * near * (far / near) ** t + (1 - lambda) * (near + (far - near) * t);
@@ -67,9 +69,11 @@ export function fitCascades(
     count < 1 ||
     count > 4
   )
-    throw new RangeError('Invalid cascade fit');
+    throw new RangeError(
+      'Cascade fit needs a positive aspect, an integer resolution of at least 1, a margin of 0 or more and a count from 1 to 4; pass valid values.',
+    );
   const length = Math.hypot(direction[0], direction[1], direction[2]);
-  if (!length) throw new RangeError('Zero shadow direction');
+  if (!length) throw new RangeError('Shadow light direction has zero length; pass a nonzero direction vector.');
   const zx = -direction[0] / length,
     zy = -direction[1] / length,
     zz = -direction[2] / length,
@@ -88,14 +92,18 @@ export function fitCascades(
     fy = camera.target[1] - camera.position[1],
     fz = camera.target[2] - camera.position[2],
     fl = Math.hypot(fx, fy, fz);
-  if (!fl) throw new RangeError('Invalid shadow camera');
+  if (!fl)
+    throw new RangeError(
+      'Shadow camera position and target are the same point; move the target away from the position.',
+    );
   const tan = Math.tan((camera.fov * Math.PI) / 360);
   let start = camera.near;
   matrices.fill(0, count * 16);
   ranges.fill(0, count);
   for (let i = 0; i < count; i++) {
     const end = splits[i];
-    if (!Number.isFinite(end) || end <= start) throw new RangeError('Unordered cascade splits');
+    if (!Number.isFinite(end) || end <= start)
+      throw new RangeError('Cascade split ends must be finite and increase; check near, far and lambda.');
     const mid = (start + end) / 2,
       px = camera.position[0] + (fx / fl) * mid,
       py = camera.position[1] + (fy / fl) * mid,
@@ -126,7 +134,10 @@ export function fitCascades(
     start = end;
   }
   for (let i = 0; i < matrices.length; i++)
-    if (!Number.isFinite(matrices[i])) throw new RangeError('Shadow matrix overflow');
+    if (!Number.isFinite(matrices[i]))
+      throw new RangeError(
+        'Shadow cascade matrix is not finite; check the camera, light direction and bounds for extreme values.',
+      );
   if (result) {
     result.matrices = matrices;
     result.ranges = ranges;

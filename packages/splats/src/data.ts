@@ -34,7 +34,9 @@ export function validateSplats(data: SplatData): number {
     data.colors.length !== count * 4 ||
     (sh !== undefined && (!(sh instanceof Float32Array) || ![4, 9, 16].includes(sh.length / count / 3)))
   )
-    throw new RangeError('Invalid splat count or attribute lengths');
+    throw new RangeError(
+      'Splat data needs 1 to 3,000,000 splats, covariances of 6 and colors of 4 per splat, and spherical harmonics of 4, 9 or 16 coefficients per channel; fix the array lengths.',
+    );
   for (const array of [data.positions, data.covariances, data.colors, ...(sh ? [sh] : [])])
     for (const value of array) if (!Number.isFinite(value)) throw new RangeError('Splat attributes must be finite');
   for (let i = 0; i < count; i++) {
@@ -66,7 +68,10 @@ export function parseSplat(input: ArrayBuffer | ArrayBufferView): SplatData {
         ? new Uint8Array(input)
         : new Uint8Array(input.buffer, input.byteOffset, input.byteLength),
     count = bytes.length / 32;
-  if (!Number.isInteger(count) || count < 1 || count > 3_000_000) throw new RangeError('Invalid .splat byte length');
+  if (!Number.isInteger(count) || count < 1 || count > 3_000_000)
+    throw new RangeError(
+      'A .splat file must hold 1 to 3,000,000 splats of 32 bytes each; check that the file is complete.',
+    );
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
     positions = new Float32Array(count * 3),
     covariances = new Float32Array(count * 6),
@@ -77,13 +82,17 @@ export function parseSplat(input: ArrayBuffer | ArrayBufferView): SplatData {
     const sx = view.getFloat32(at + 12, true),
       sy = view.getFloat32(at + 16, true),
       sz = view.getFloat32(at + 20, true);
-    if (![sx, sy, sz].every((v) => Number.isFinite(v) && v > 0)) throw new RangeError('Invalid .splat scale');
+    if (![sx, sy, sz].every((v) => Number.isFinite(v) && v > 0))
+      throw new RangeError('A .splat scale must be finite and above 0; check that the file is a valid .splat.');
     let w = (bytes[at + 28] - 128) / 128,
       x = (bytes[at + 29] - 128) / 128,
       y = (bytes[at + 30] - 128) / 128,
       z = (bytes[at + 31] - 128) / 128;
     const length = Math.hypot(w, x, y, z);
-    if (!length) throw new RangeError('Invalid .splat quaternion');
+    if (!length)
+      throw new RangeError(
+        'A .splat rotation is the zero quaternion (all four bytes are 128); check that the file is a valid .splat.',
+      );
     w /= length;
     x /= length;
     y /= length;

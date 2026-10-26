@@ -34,17 +34,20 @@ export const obstacles: NonNullable<VFXFeatures['obstacles']> = {
   ` + settle,
       ),
   write(list, e) {
-    if (list.length > 64) throw new RangeError('Obstacle limit is 64');
+    if (list.length > 64)
+      throw new RangeError('VFX supports at most 64 obstacles; remove some from the obstacles list.');
     new Uint32Array(e.buffer)[8] = list.length;
     for (let i = 0; i < list.length; i++) {
       const b = list[i],
         at = 12 + i * 8,
         box = b.kind === 'box';
-      if (!box && b.kind !== 'sphere') throw new RangeError('Invalid obstacle');
+      if (!box && b.kind !== 'sphere')
+        throw new RangeError(`Obstacle kind is ${String((b as { kind?: unknown }).kind)}; use 'sphere' or 'box'.`);
       finiteVector(b.center, 3, 'Obstacle center');
       const extent = box ? b.halfSize : ([b.radius, b.radius, b.radius] as const);
       finiteVector(extent, 3, 'Obstacle extent');
-      if (!extent.every((v) => v > 0)) throw new RangeError('Invalid obstacle extent');
+      if (!extent.every((v) => v > 0))
+        throw new RangeError('Obstacle radius or halfSize must be above 0; pass positive sizes in world units.');
       e.set(b.center, at);
       e[at + 3] = +box;
       e.set(extent, at + 4);

@@ -39,7 +39,9 @@ export class ShelfPacker {
       !Number.isInteger(padding) ||
       padding < 0
     )
-      throw new RangeError('Invalid atlas packer options');
+      throw new RangeError(
+        'Invalid atlas packer options; use an integer size of at least 8, an integer maxPages of at least 1 and an integer padding of 0 or more.',
+      );
   }
 
   /** Pages in use. */

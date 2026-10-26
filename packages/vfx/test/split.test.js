@@ -34,5 +34,5 @@ test('options that need a missing feature throw instead of drawing something els
     /VFX texture needs texture/,
   );
   assert.doesNotThrow(() => new Base({ wrap: false, sort: false }));
-  assert.throws(() => new Base({ sort: 1 }, { sort: entries.sort }), /sort or wrap/, 'Shared validation still runs');
+  assert.throws(() => new Base({ sort: 1 }, { sort: entries.sort }), /sort and wrap/, 'Shared validation still runs');
 });

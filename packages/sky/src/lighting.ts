@@ -77,7 +77,9 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       !Number.isFinite(Math.fround(l.minimum ?? 0)) ||
       (l.minimum ?? 0) < 0
     )
-      throw new RangeError('Invalid sky options');
+      throw new RangeError(
+        'Invalid sky lighting options; set intensity and minimum to finite numbers of 0 or more, or leave them out.',
+      );
     if (
       (l.moon !== undefined &&
         (typeof l.moon !== 'object' ||
@@ -86,13 +88,16 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
           (l.moon.intensity ?? 0) < 0)) ||
       (l.ambient !== undefined && (typeof l.ambient !== 'object' || l.ambient === null))
     )
-      throw new RangeError('Invalid sky night options');
+      throw new RangeError(
+        'Invalid sky night options; give moon and ambient as objects, with a finite moon intensity of 0 or more.',
+      );
     for (const color of [l.color, l.sunset, l.moon?.color, l.ambient?.day, l.ambient?.night])
       if (color !== undefined) {
         finiteVector(color, 3, 'Sky color');
-        if (color.some((v) => v < 0)) throw new RangeError('Invalid sky color');
+        if (color.some((v) => v < 0)) throw new RangeError('Invalid sky color; use non-negative RGB components.');
       }
-    if (l.ambient && (!l.ambient.day || !l.ambient.night)) throw new RangeError('Invalid sky ambient colors');
+    if (l.ambient && (!l.ambient.day || !l.ambient.night))
+      throw new RangeError('Invalid sky ambient colors; give both ambient.day and ambient.night.');
   },
   create(d, code, entries, owned) {
     const floor = new Float32Array(4),

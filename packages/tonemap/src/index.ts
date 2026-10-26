@@ -117,7 +117,9 @@ export class Tonemap implements EnginePlugin {
       o.source !== this.source ||
       (o.source !== undefined && typeof o.source !== 'function')
     )
-      throw new RangeError('Invalid Tonemap options');
+      throw new RangeError(
+        'Invalid Tonemap options; use curve agx, acescg or neutral, exposure within -16..16, contrast within 0..4, and keep source unchanged after attach.',
+      );
     if (!this.source && o.inputColorSpace === 'acescg')
       throw new MargoError('state', 'ACEScg input requires an external ACEScg source; pass options.source');
   }

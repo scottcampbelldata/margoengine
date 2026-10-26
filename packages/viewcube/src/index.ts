@@ -1,11 +1,15 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Camera, EngineKernel, RenderView } from '@margoengine/core';
 import type { FrameGraph } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 
+/** One of the six cube faces. */
 export type Face = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right';
 /** A named view (`iso` is top-front-right), or a direction from the target toward the camera such as `[1, 1, 0]`. */
 export type View = Face | 'iso' | readonly [number, number, number];
+/** Camera projection the toggle switches between. */
 export type Projection = 'orthographic' | 'perspective';
+/** Options for {@link ViewCube}; every field has a default. */
 export interface ViewCubeOptions {
   /** Element the cube is placed in. Default: the canvas's parent. */
   container?: HTMLElement;
@@ -14,6 +18,7 @@ export interface ViewCubeOptions {
    * container must cover the canvas). Default the engine camera and the whole canvas.
    */
   view?: Pick<RenderView, 'camera' | 'viewport' | 'pixels'>;
+  /** Corner of the view the cube sits in. Default 'top-right'. */
   corner?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
   /** Cube edge in CSS pixels. Default 80. */
   size?: number;
@@ -143,8 +148,8 @@ export class ViewCube {
       view,
     }: ViewCubeOptions = {},
   ) {
-    if (!container) throw new TypeError('ViewCube needs a container (the canvas has no parent)');
-    if (!(size > 0) || !(duration >= 0)) throw new RangeError('Invalid ViewCube size or duration');
+    if (!container) throw new TypeError('ViewCube needs a container; pass options.container');
+    if (!(size > 0) || !(duration >= 0)) throw new RangeError('Invalid size or duration; use size > 0, duration >= 0');
     // A CameraProjection already attached to the engine is found by its plugin name.
     const found = (engine as unknown as { plugins?: ReadonlyMap<string, { mode?: Projection }> }).plugins?.get(
       'cameras',
@@ -237,7 +242,8 @@ export class ViewCube {
   /** Animates to a view (`duration` 0 jumps). The target and distance stay; vertical views keep -Z (top) or +Z (bottom) up. */
   view(view: View, duration = this.duration): void {
     const d = typeof view === 'string' ? (view === 'iso' ? [1, 1, 1] : FACES[view]?.[0]) : view;
-    if (!d || d.length !== 3 || !d.every(Number.isFinite) || !Math.hypot(...d)) throw new RangeError('Invalid view');
+    if (!d || d.length !== 3 || !d.every(Number.isFinite) || !Math.hypot(...d))
+      throw new RangeError("Invalid view; use a face, 'iso' or [x, y, z]");
     this.orbit(...angles(d), duration);
   }
   /** Current projection mode, or undefined without a projection. */
@@ -245,8 +251,9 @@ export class ViewCube {
     return this.projection?.mode;
   }
   setProjection(mode: Projection): void {
-    if (!this.projection) throw new Error('ViewCube was created without a projection');
-    if (mode !== 'orthographic' && mode !== 'perspective') throw new RangeError('Invalid projection');
+    if (!this.projection) throw new MargoError('state', 'ViewCube has no projection; pass options.projection');
+    if (mode !== 'orthographic' && mode !== 'perspective')
+      throw new RangeError("Invalid projection; use 'orthographic' or 'perspective'");
     this.projection.mode = mode;
     this.showProjection();
   }

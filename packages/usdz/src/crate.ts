@@ -1,8 +1,15 @@
 // Native reader for USD Crate (.usdc) layers 0.4-0.12: TOC, tokens, strings, fields, field sets, paths and specs,
 // with TfFastCompression (chunked LZ4 blocks) and Usd integer coding. Output matches the USDA spec map shape.
+import { LoaderError } from '@margoengine/loaders/common';
 export type Specs = Record<string, { specType: number; fields: Record<string, unknown> }>;
 function fail(message: string): never {
-  throw new Error('USD: ' + message);
+  // Malformed input is a LoaderError, like every other loader; the code is taken from the wording.
+  const code = /unsupported|reset transform|non-affine/.test(message)
+    ? 'unsupported'
+    : /limit|budget|exceeds|too many/.test(message)
+      ? 'limit'
+      : 'syntax';
+  throw new LoaderError('USD', code, message);
 }
 /**
  * Decodes one raw LZ4 block (LZ4 Block Format Description) from `src` into `out`, writing from offset `at`, and returns

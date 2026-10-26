@@ -6,26 +6,41 @@ import {
   fetchBytes,
   computeVertexNormals,
   type BinaryInput,
+  LoaderError,
 } from '@margoengine/loaders/common';
 import { readUSDA, type USDPrim, type USDValue } from '@margoengine/loaders/usd';
 import { parseCrate, type Specs } from './crate.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 
+/** Parse limits and loading hooks for the USD readers. Every limit is checked while parsing; a breach throws a `LoaderError` with code `limit`. */
 export interface USDOptions {
+  /** `fetch` used by `loadUSDZ`. Default: the global `fetch`. */
   fetch?: typeof fetch;
+  /** Largest layer or archive, in bytes, before and after expansion. Default 64 MiB. */
   maxBytes?: number;
+  /** Most vertices after face expansion. Default 1,000,000. */
   maxVertices?: number;
+  /** Most triangles after triangulation. Default 1,000,000. */
   maxTriangles?: number;
+  /** Deepest prim hierarchy, 1 to 64. Default 32. */
   maxDepth?: number;
+  /** Aborts parsing, fetching and texture decoding. */
   signal?: AbortSignal;
 }
+/** One triangulated mesh from the layer, in the stage's units and up axis (glTF: metres, Y up). */
 export interface USDMesh {
+  /** Prim path in the layer, e.g. `/Root/Chair`. */
   path: string;
+  /** Vertex positions, three floats each. */
   positions: Float32Array;
+  /** Vertex normals, three floats each; authored, or computed when the layer has none. */
   normals: Float32Array;
+  /** Texture coordinates, two floats per vertex, when authored. */
   uvs?: Float32Array;
+  /** Triangle corner indices into the vertex streams. */
   indices: Uint32Array;
+  /** Index into `document.materials`; a mesh with no binding gets a neutral grey one. */
   material: number;
 }
 type ImageSource = {
@@ -53,7 +68,13 @@ type USDDocument = Required<
 >;
 const identity = () => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 function fail(message: string): never {
-  throw new Error('USD: ' + message);
+  // Malformed input is a LoaderError, like every other loader; the code is taken from the wording.
+  const code = /unsupported|reset transform|non-affine/.test(message)
+    ? 'unsupported'
+    : /limit|budget|exceeds|too many/.test(message)
+      ? 'limit'
+      : 'syntax';
+  throw new LoaderError('USD', code, message);
 }
 function budget(options: USDOptions) {
   const values = {
@@ -217,6 +238,7 @@ function compose(path: string, specs: Specs): number[] {
   }
   return out;
 }
+/** A parsed USD scene: typed mesh streams plus a glTF document ready for `create()`. Parse with `parseUSDA`, `parseUSDC` or `parseUSDZ`. */
 export class USDAsset {
   constructor(
     readonly document: GLTFDocument,
@@ -225,6 +247,7 @@ export class USDAsset {
     private readonly sources: ImageSource[],
     private readonly entries: Map<string, Uint8Array>,
   ) {}
+  /** Attaches the scene to `engine` as a PBR model; texture ownership passes to the model. Pass `signal` to cancel texture decoding. */
   async create(engine: EngineKernel, { signal }: { signal?: AbortSignal } = {}): Promise<PBRModel> {
     const images = await this.images({ signal });
     try {
@@ -235,6 +258,7 @@ export class USDAsset {
       throw error;
     }
   }
+  /** Decodes the scene's textures to `ImageBitmap`s in document order. The caller closes them unless they are passed to `create`. */
   async images({ signal }: { signal?: AbortSignal } = {}): Promise<ImageBitmap[]> {
     const images: ImageBitmap[] = [];
     const decode = async (path: string) => {
@@ -597,14 +621,17 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
       if (name && !entries.has(name)) fail('missing texture ' + name);
   return new USDAsset(doc, buffers, meshes, sources, entries);
 }
+/** Parses a USDA (text) layer, as a string or UTF-8 bytes. Throws `LoaderError` (format `USD`) for malformed or unsupported input. */
 export function parseUSDA(input: string | BinaryInput, options: USDOptions = {}): USDAsset {
   return asset(parseLayer(input, options), new Map(), 'scene.usda', options);
 }
+/** Parses a binary USDC (Crate 0.4 to 0.12) layer. Throws `LoaderError` (format `USD`) for malformed or unsupported input. */
 export function parseUSDC(input: BinaryInput, options: USDOptions = {}): USDAsset {
   const data = bytes(input);
   if (new TextDecoder().decode(data.subarray(0, 8)) !== 'PXR-USDC') fail('expected Crate magic');
   return asset(parseLayer(data, options), new Map(), 'scene.usdc', options);
 }
+/** Parses a USDZ archive: the first entry is the root layer and its textures are read from the archive. Throws `LoaderError` (format `USD`) for malformed input. */
 export async function parseUSDZ(input: BinaryInput, options: USDOptions = {}): Promise<USDAsset> {
   const limits = budget(options),
     data = bytes(input);
@@ -634,6 +661,7 @@ export async function parseUSDZ(input: BinaryInput, options: USDOptions = {}): P
   const name = pathName(root.name);
   return asset(parseLayer(entries.get(name)!, options), entries, name, options);
 }
+/** Fetches a `.usdz` with a streaming byte limit, parses it and attaches it to `engine`. Pass `signal` to cancel. Returns the PBR model; call `destroy()` to free it. */
 export async function loadUSDZ(engine: EngineKernel, url: string | URL, options: USDOptions = {}): Promise<PBRModel> {
   const limits = budget(options),
     data = await fetchBytes(url, {

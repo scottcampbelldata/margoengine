@@ -89,7 +89,8 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
     const kind = { f32: Float32Array, i32: Int32Array, u32: Uint32Array }[scalarOf(type) as 'f32'];
     if (!kind || sizeOf(type) === 3 || !(data instanceof kind))
       throw new TypeError(`Storage ${type} needs a ${kind?.name ?? 'f32, i32 or u32 typed array'}`);
-    if (atomic && type !== 'u32' && type !== 'i32') throw new TypeError('Atomic storage is u32 or i32');
+    if (atomic && type !== 'u32' && type !== 'i32')
+      throw new TypeError('Atomic storage must be u32 or i32; pass one of those types or drop {atomic: true}.');
     this.count = data.length / sizeOf(type);
     if (!Number.isInteger(this.count) || this.count < 1)
       throw new RangeError('Storage data length must be a positive multiple of the element size');
@@ -249,7 +250,9 @@ export class ComputePass implements EnginePlugin {
       Math.ceil(count / workgroupSize) > 65535 ||
       !Number.isFinite(order)
     )
-      throw new RangeError('Invalid compute count, workgroup size or order');
+      throw new RangeError(
+        'ComputePass needs an integer count of at least 1, a workgroup size from 1 to 256 that dispatches at most 65535 groups, and a finite order; adjust count or workgroupSize.',
+      );
     const outer = effects.list,
       made: Node[] = (effects.list = []);
     let result: ComputeBody;
@@ -261,7 +264,9 @@ export class ComputePass implements EnginePlugin {
     const out = [result ?? []].flat(),
       stores = out.filter((s) => !(s instanceof Node)) as Store[];
     if ((!out.length && !made.length) || stores.some((s) => !(s?.buffer instanceof StorageBuffer)))
-      throw new TypeError('A ComputePass body returns storage.store(...) writes or makes atomic operations');
+      throw new TypeError(
+        'A ComputePass body must return storage.store(...) writes or make atomic operations; return the writes or call an atomic method.',
+      );
     const first = [...made, ...out.filter((n) => n instanceof Node)],
       p = this.program;
     const s = this.program.stage(stage, [...first, ...stores.flatMap((w) => [w.index, w.value])]),

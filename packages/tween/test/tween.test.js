@@ -49,8 +49,8 @@ test('delay, easing, overwrite, cancellation and completion produce bounded nume
   cancel();
   timeline.update(1);
   assert.equal(target.x, 20);
-  assert.throws(() => timeline.to(target, 'missing', 1, { duration: 1 }), /Invalid/);
-  assert.throws(() => timeline.update(-1), /Invalid/);
+  assert.throws(() => timeline.to(target, 'missing', 1, { duration: 1 }), /Tween needs/);
+  assert.throws(() => timeline.update(-1), /update delta/);
 });
 test('callbacks may add and clear tracks without skipping or recursively evaluating them', () => {
   const timeline = new Tween(),

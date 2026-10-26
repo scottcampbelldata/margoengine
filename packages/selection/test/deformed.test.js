@@ -113,9 +113,12 @@ test('Picking.add validates ownership, disposal and bounded PBR metadata before 
       },
     };
   foreignEngine.meshes.set(foreignNode.id, foreignNode);
-  assert.throws(() => h.picking.add(source), /Duplicate/);
-  assert.throws(() => h.picking.add({ pickingPrimitives: [{ ...p, node: foreignNode }] }), /another engine/);
-  assert.throws(() => h.picking.add({ pickingPrimitives: [p], disposed: true }), /disposed/);
+  assert.throws(() => h.picking.add(source), { code: 'state', message: /Duplicate/ });
+  assert.throws(() => h.picking.add({ pickingPrimitives: [{ ...p, node: foreignNode }] }), {
+    code: 'attached',
+    message: /another engine/,
+  });
+  assert.throws(() => h.picking.add({ pickingPrimitives: [p], disposed: true }), { code: 'disposed' });
   for (const field of [
     { stride: 24 },
     { count: -3 },

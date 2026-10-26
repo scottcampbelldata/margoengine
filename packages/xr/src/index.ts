@@ -7,6 +7,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
+import { MargoError } from '@margoengine/math/errors';
 import { StereoRenderer } from './renderer.js';
 import { XRController } from './controller.js';
 export { XRController } from './controller.js';
@@ -44,18 +45,28 @@ export type {
   XRTransientInputHitTestResult,
   XRTransientInputHitTestSource,
 } from './types.js';
+/** Options for {@link XR.requestSession}. */
 export interface XRSessionOptions {
+  /** Space of frame poses. Default 'local' (immersive) or 'viewer' (inline). */
   referenceSpace?: 'viewer' | 'local' | 'local-floor' | 'bounded-floor' | 'unbounded';
+  /** Features the session must have, such as 'hand-tracking'; the request fails without them. */
   requiredFeatures?: string[];
+  /** Features used when granted, such as 'hit-test'. */
   optionalFeatures?: string[];
+  /** Abort while the browser negotiates the session or the layer is set up: the session is ended and the request rejects with the reason. */
+  signal?: AbortSignal;
+  /** Called once per XR frame with reused state; copy anything you keep. */
   onFrame?: (state: XRFrameState) => void;
 }
 const platform = () =>
   globalThis as typeof globalThis & { XRGPUBinding?: new (session: XRNativeSession, device: GPUDevice) => XRBinding };
 const system = (): XRSystem | undefined => (globalThis.navigator as (Navigator & { xr?: XRSystem }) | undefined)?.xr;
 
+/** WebGPU WebXR plugin: negotiates a session, tracks inputs and draws the scene in stereo. `using` or `dispose()` detaches it. */
 export class XR implements EnginePlugin {
+  /** Plugin name, 'xr'. */
   readonly name = 'xr';
+  /** The active native session, or null. */
   session: XRNativeSession | null = null;
   private engine!: Engine;
   private readonly renderer: StereoRenderer;
@@ -70,34 +81,48 @@ export class XR implements EnginePlugin {
   private last: number | null = null;
   private mode: XRMode = 'immersive-vr';
   private callback?: XRSessionOptions['onFrame'];
+  /** One controller per current input source; updated each XR frame and kept in step with the session's inputs. */
   readonly controllers: XRController[] = [];
   private readonly state: XRFrameState = { time: 0, delta: 0, frame: null!, viewer: null, inputs: this.controllers };
   private readonly renderOptions = { culling: false, delta: 0 };
   private resume = false;
 
+  /** True when the browser can start `mode`: WebXR (and for immersive modes WebGPU bindings) is present and supports it. */
   static async isSupported(mode: XRMode = 'immersive-vr'): Promise<boolean> {
     if (!system() || (mode !== 'inline' && (!platform().XRGPUBinding || !globalThis.navigator?.gpu))) return false;
     return system()!.isSessionSupported(mode);
   }
   /** Prepare before the click handler so requestSession preserves the browser's user activation. */
-  static attach(engine: EngineKernel): Promise<XR> {
-    return XR.create(engine);
+  static attach(engine: EngineKernel, options: { signal?: AbortSignal } = {}): Promise<XR> {
+    return XR.create(engine, options);
   }
-  static async create(engine: EngineKernel): Promise<XR> {
+  /** Creates the XR-compatible GPU device and adds the plugin to `engine`. `signal` abandons the wait and releases the device. */
+  static async create(engine: EngineKernel, { signal }: { signal?: AbortSignal } = {}): Promise<XR> {
+    signal?.throwIfAborted();
     const runtime = engineRuntime(engine);
     if (runtime.disposed || runtime.backend !== 'webgpu' || runtime.hasPlugin('xr'))
-      throw new Error('XR requires a live WebGPU engine without an XR plugin');
-    if (!system()) throw new Error('WebXR is unavailable');
+      throw new MargoError(
+        'state',
+        "XR requires a live WebGPU engine without an XR plugin; create the engine with backend 'webgpu' and call XR.create once.",
+      );
+    if (!system())
+      throw new MargoError('unsupported', 'WebXR is unavailable; use a WebXR browser over HTTPS or localhost.');
     const adapter = await navigator.gpu.requestAdapter({
       xrCompatible: !!platform().XRGPUBinding,
     } as GPURequestAdapterOptions);
-    if (!adapter) throw new Error('XR-compatible WebGPU adapter unavailable');
+    if (!adapter)
+      throw new MargoError(
+        'unsupported',
+        'XR-compatible WebGPU adapter unavailable; use a headset browser with WebGPU XR support.',
+      );
+    signal?.throwIfAborted();
     const requiredFeatures = runtime.gpu
       ? ([...runtime.gpu.features].filter((feature) => adapter.features?.has(feature)) as GPUFeatureName[])
       : [];
     const device = await adapter.requestDevice({ requiredFeatures }),
       xr = new XR(device);
     try {
+      signal?.throwIfAborted();
       runtime.use(xr);
       return xr;
     } catch (error) {
@@ -110,7 +135,7 @@ export class XR implements EnginePlugin {
     device.lost.then((info) => {
       if (!this.disposed) {
         this.lost = true;
-        this.fail(new Error(`XR GPU device lost: ${info.message}`));
+        this.fail(new MargoError('failed', `XR GPU device lost: ${info.message}; create a new XR with XR.create.`));
       }
     });
     device.addEventListener('uncapturederror', this.uncaptured);
@@ -123,7 +148,7 @@ export class XR implements EnginePlugin {
     return this.space;
   }
   private readonly uncaptured = (event: GPUUncapturedErrorEvent): void => {
-    if (!this.disposed) this.fail(new Error(event.error.message));
+    if (!this.disposed) this.fail(new MargoError('failed', `XR GPU error: ${event.error.message}`));
   };
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -134,15 +159,28 @@ export class XR implements EnginePlugin {
       },
     });
   }
+  /** Starts a session (call from a user gesture). Rejects if one is active or pending; `options.signal` cancels it. */
   async requestSession(mode: XRMode = 'immersive-vr', options: XRSessionOptions = {}): Promise<XRNativeSession> {
-    if (this.disposed || this.lost) throw new Error('XR is disposed or its device was lost');
-    if (this.session || this.pending) throw new Error('An XR session is already active or pending');
-    if (!['inline', 'immersive-vr', 'immersive-ar'].includes(mode)) throw new TypeError('Unknown XR mode');
+    if (this.disposed || this.lost)
+      throw new MargoError('disposed', 'XR is disposed or its device was lost; create a new XR with XR.create.');
+    if (this.session || this.pending)
+      throw new MargoError(
+        'state',
+        'An XR session is already active or pending; await xr.end() before requesting another.',
+      );
+    if (!['inline', 'immersive-vr', 'immersive-ar'].includes(mode))
+      throw new TypeError("Unknown XR mode; use 'inline', 'immersive-vr' or 'immersive-ar'");
     if (mode !== 'inline' && !platform().XRGPUBinding)
-      throw new Error('Native WebGPU XR bindings are unavailable; desktop rendering remains active');
+      throw new MargoError(
+        'unsupported',
+        'Native WebGPU XR bindings are unavailable; desktop rendering remains active. Use a browser with XRGPUBinding or request an inline session.',
+      );
+    options.signal?.throwIfAborted();
     const referenceSpace = options.referenceSpace ?? (mode === 'inline' ? 'viewer' : 'local');
     if (!['viewer', 'local', 'local-floor', 'bounded-floor', 'unbounded'].includes(referenceSpace))
-      throw new TypeError('Unknown XR reference space');
+      throw new TypeError(
+        "Unknown XR reference space; use 'viewer', 'local', 'local-floor', 'bounded-floor' or 'unbounded'",
+      );
     this.pending = true;
     let session: XRNativeSession | undefined;
     try {
@@ -150,7 +188,9 @@ export class XR implements EnginePlugin {
         mode === 'inline' &&
         [...(options.requiredFeatures ?? []), ...(options.optionalFeatures ?? [])].includes('webgpu')
       )
-        throw new TypeError('WebGPU XR bindings do not support inline sessions');
+        throw new TypeError(
+          "WebGPU XR bindings do not support inline sessions; remove 'webgpu' from the features or request an immersive mode",
+        );
       session = await system()!.requestSession(mode, {
         requiredFeatures: [
           ...new Set([
@@ -161,7 +201,12 @@ export class XR implements EnginePlugin {
         ],
         optionalFeatures: options.optionalFeatures ?? [],
       });
-      if (this.disposed || this.lost) throw new Error('XR was disposed during session negotiation');
+      if (this.disposed || this.lost)
+        throw new MargoError(
+          'disposed',
+          'XR was disposed during session negotiation; keep the XR alive until requestSession settles.',
+        );
+      options.signal?.throwIfAborted();
       this.session = session;
       session.addEventListener('end', this.ended, { once: true });
       this.mode = mode;
@@ -171,7 +216,9 @@ export class XR implements EnginePlugin {
       // shortcut: inline sessions expose poses with a desktop canvas, upgrade if WebGPU XR permits inline layers.
       if (mode === 'inline') {
         this.space = await session.requestReferenceSpace(referenceSpace);
-        if (this.disposed || this.session !== session) throw new Error('XR session ended during initialization');
+        if (this.disposed || this.session !== session)
+          throw new MargoError('state', 'XR session ended during initialization; request a new session.');
+        options.signal?.throwIfAborted();
         this.last = null;
         this.handle = session.requestAnimationFrame(this.frame);
         return session;
@@ -185,9 +232,15 @@ export class XR implements EnginePlugin {
         depthFar: this.engine.camera.far,
       });
       this.space = await session.requestReferenceSpace(referenceSpace);
-      if (this.disposed || this.session !== session) throw new Error('XR session ended during initialization');
+      if (this.disposed || this.session !== session)
+        throw new MargoError('state', 'XR session ended during initialization; request a new session.');
+      options.signal?.throwIfAborted();
       this.engine.render({ culling: false });
-      if (!this.context) throw new Error('WebGPU scene descriptor unavailable');
+      if (!this.context)
+        throw new MargoError(
+          'state',
+          'WebGPU scene descriptor unavailable; add the XR plugin before the first frame renders.',
+        );
       this.renderer.configure(this.context, colorFormat);
       this.engine.stop();
       this.resume = true;
@@ -266,6 +319,7 @@ export class XR implements EnginePlugin {
       if (!this.disposed && !this.engine.disposed) this.engine.start();
     }
   };
+  /** Ends the active session (no-op without one) and restarts the window render loop. */
   async end(): Promise<void> {
     const session = this.session;
     if (session) {
@@ -276,6 +330,7 @@ export class XR implements EnginePlugin {
       }
     }
   }
+  /** Ends any session, destroys the XR GPU device and removes the plugin. Safe to call twice. */
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -286,6 +341,7 @@ export class XR implements EnginePlugin {
     if (session) void session.end().catch((error) => this.engine.onError(error));
     if (this.engine?.hasPlugin(this.name)) this.engine.removePlugin(this.name);
   }
+  /** Same as {@link XR.dispose}, for `using`. */
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
     this.dispose();

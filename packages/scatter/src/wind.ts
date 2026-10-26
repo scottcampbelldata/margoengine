@@ -2,8 +2,14 @@
 export type ScatterWind = readonly [number, number, number];
 export function validateWind(wind: ScatterWind): number {
   if (wind.length !== 3 || wind[2] < 0 || wind[2] > 1 || !Math.hypot(Math.fround(wind[0]), Math.fround(wind[1])))
-    throw new RangeError('Invalid scatter wind');
-  for (let i = 0; i < 3; i++) if (!Number.isFinite(Math.fround(wind[i]))) throw new RangeError('Invalid scatter wind');
+    throw new RangeError(
+      'Invalid scatter wind; pass [x, z, strength] as finite numbers, a non-zero direction and strength from 0 to 1.',
+    );
+  for (let i = 0; i < 3; i++)
+    if (!Number.isFinite(Math.fround(wind[i])))
+      throw new RangeError(
+        'Invalid scatter wind; pass [x, z, strength] as finite numbers, a non-zero direction and strength from 0 to 1.',
+      );
   return Math.hypot(wind[0], wind[1]);
 }
 export const windShader = /* wgsl */ `

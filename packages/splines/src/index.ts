@@ -40,7 +40,9 @@ export class Spline {
       points.length < 2 ||
       points.length > 1_000_000
     )
-      throw new RangeError('Invalid spline options');
+      throw new RangeError(
+        'Invalid spline options; give 2 to 1,000,000 finite points, 2 to 1,000,000 divisions and a boolean closed.',
+      );
     if (kind === 'bezier' && (points.length < 4 || (points.length - 1) % 3 || closed))
       throw new RangeError('Bezier needs 3n+1 points and an open curve');
     if (kind === 'hermite' && (!tangents || tangents.length !== points.length))
@@ -120,7 +122,8 @@ export class Spline {
   tangent(t: number, output: Float64Array | Float32Array = this.output): typeof output {
     this.at(Math.max(0, t - 1e-5), this.previous);
     this.at(Math.min(1, t + 1e-5), this.next);
-    if (output.length !== 3 || !Number.isFinite(t) || t < 0 || t > 1) throw new RangeError('Invalid tangent parameter');
+    if (output.length !== 3 || !Number.isFinite(t) || t < 0 || t > 1)
+      throw new RangeError('Invalid tangent parameter; pass t from 0 to 1 and an output array of 3 elements.');
     const x = this.next[0] - this.previous[0],
       y = this.next[1] - this.previous[1],
       z = this.next[2] - this.previous[2],
@@ -147,7 +150,7 @@ export class Spline {
   }
   atDistance(distance: number, output: Float64Array | Float32Array = this.output): typeof output {
     if (!Number.isFinite(distance) || distance < 0 || distance > this.length)
-      throw new RangeError('Distance exceeds spline length');
+      throw new RangeError('Distance must be from 0 to the spline length; pass a finite distance within the length.');
     if (!this.length) return this.at(0, output);
     const lengths = this.arcLengths;
     let low = 0,

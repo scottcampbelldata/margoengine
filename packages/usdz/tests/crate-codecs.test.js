@@ -9,7 +9,8 @@ import { lz4 } from './crate-writer.js';
 
 const repo = new URL('../../../', import.meta.url),
   source = readFileSync(new URL('../src/crate.ts', import.meta.url), 'utf8'),
-  js = `${stripTypeScriptTypes(source)}\nexport { decompressFast, lz4Block, decodeInts };\n`,
+  loaders = new URL('../../loaders/dist/common.js', import.meta.url).href,
+  js = `${stripTypeScriptTypes(source.replace("'@margoengine/loaders/common'", JSON.stringify(loaders)))}\nexport { decompressFast, lz4Block, decodeInts };\n`,
   { decompressFast, decodeInts } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
 const vectors = (name) => JSON.parse(readFileSync(new URL(`fixtures/${name}`, import.meta.url), 'utf8')),
   lz = vectors('lz4-usd.json'),

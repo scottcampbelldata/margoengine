@@ -124,7 +124,9 @@ export class Splats implements EnginePlugin {
       d.limits.maxComputeWorkgroupSizeX < 256 ||
       d.limits.maxStorageBuffersPerShaderStage < 7
     )
-      throw new RangeError('Splat compute exceeds device limits');
+      throw new RangeError(
+        'Splat compute exceeds device limits; use fewer splats or a device with larger compute limits.',
+      );
     for (const size of [
       this.positions.byteLength,
       this.covariances.byteLength,
@@ -136,7 +138,7 @@ export class Splats implements EnginePlugin {
       groups * 16 * 4,
     ])
       if (size > d.limits.maxBufferSize || size > d.limits.maxStorageBufferBindingSize)
-        throw new RangeError('Splat attributes exceed device storage limits');
+        throw new RangeError('Splat attributes exceed device storage limits; use fewer splats.');
     const buffer = (size: number, usage: number, data?: Float32Array | Uint32Array) => {
       const b = d.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST });
       this.buffers.push(b);

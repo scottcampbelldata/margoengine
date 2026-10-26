@@ -313,7 +313,7 @@
   {
    "path": "tests/fixtures/fuzz/usdc-count-128mib.usdc",
    "parse": {
-    "name": "Error",
+    "name": "LoaderError",
     "message": "USD: token index outside table"
    },
    "streams": [
@@ -625,7 +625,7 @@
   {
    "path": "tests/fixtures/fuzz/usdc-count-109mib.usdc",
    "parse": {
-    "name": "Error",
+    "name": "LoaderError",
     "message": "USD: Crate read outside layer"
    },
    "streams": [
@@ -1045,7 +1045,7 @@
    "count": 3,
    "input": "01000000",
    "result": {
-    "name": "Error",
+    "name": "LoaderError",
     "message": "USD: truncated integer codes"
    }
   },
@@ -1055,7 +1055,7 @@
    "count": 1,
    "input": "01000000",
    "result": {
-    "name": "Error",
+    "name": "LoaderError",
     "message": "USD: truncated integer codes"
    }
   },
@@ -1065,7 +1065,7 @@
    "count": 3,
    "input": "0100000039020300040000",
    "result": {
-    "name": "Error",
+    "name": "LoaderError",
     "message": "USD: truncated integer values"
    }
   },

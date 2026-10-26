@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { QUERY_RESOLVE: number; COPY_SRC: number; COPY_DST: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
 // Match BigUint64Array's native byte order without creating BigInts per query.
@@ -47,7 +48,8 @@ export class GPUProfiler {
   }
 
   beginFrame(): boolean {
-    if (this.state === 'disposed') throw new Error('GPU profiler is disposed');
+    if (this.state === 'disposed')
+      throw new MargoError('disposed', 'GPU profiler is disposed; create a new GPUProfiler to time GPU passes.');
     if (!this.supported || this.state !== 'idle') return false;
     this.count = 0;
     this.overflow = false;
@@ -101,7 +103,10 @@ export class GPUProfiler {
           (endHigh === startHigh && endLow < startLow) ||
           (i > 0 && (startHigh < previousHigh || (startHigh === previousHigh && startLow < previousLow)))
         )
-          throw new Error('Invalid GPU timestamps');
+          throw new MargoError(
+            'failed',
+            'Invalid GPU timestamps (end before start or time went backwards); the sample is discarded, check the device timestamp support.',
+          );
         let low = endLow - startLow,
           high = endHigh - startHigh;
         if (low < 0) {

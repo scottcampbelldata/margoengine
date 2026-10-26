@@ -2,11 +2,17 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import { group, render } from '../../shared/gpu.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+/** Options for `Video`. */
 export interface VideoOptions {
+  /** Where the video is drawn, as `[x, y, width, height]` in 0 to 1 screen fractions. Default `[0, 0, 1, 1]` (full screen). */
   rect?: readonly [number, number, number, number];
+  /** Routes a `<video>` element's sound through this context and enables `sampleFrequency()`. Default: no analysis. */
   audio?: AudioContext;
+  /** Analyser size: a power of two from 32 to 32768; `frequencies` holds half as many bins. Default 2048. */
   fftSize?: number;
+  /** Called with the bins each time `sampleFrequency()` runs. */
   onFrequency?: (bins: Uint8Array) => void;
 }
 const sources = new WeakMap<
@@ -61,14 +67,19 @@ export class Video implements EnginePlugin {
       (options.onFrequency !== undefined && typeof options.onFrequency !== 'function') ||
       (options.audio && !isVideo)
     )
-      throw new RangeError('Invalid video source, rectangle or FFT size');
+      throw new RangeError(
+        'Video needs an HTMLVideoElement or VideoFrame, a rect inside 0 to 1, a power of two fftSize from 32 to 32768 and audio only with a video element; check the options.',
+      );
     this.rectangle = new Float32Array(rect);
     this.frequencies = new Uint8Array(options.audio ? fft / 2 : 0);
     if (options.audio) {
       const element = source as HTMLVideoElement,
         existing = sources.get(element);
       if (existing && existing.context !== options.audio)
-        throw new Error('Video is already connected to a different AudioContext');
+        throw new MargoError(
+          'attached',
+          'Video element is already connected to a different AudioContext; pass the same audio context for every Video of this element.',
+        );
       const shared = existing ?? {
         context: options.audio,
         node: options.audio.createMediaElementSource(element),
@@ -108,19 +119,24 @@ export class Video implements EnginePlugin {
     }
   }
   import(device: GPUDevice): GPUExternalTexture | null {
-    if (this.disposed) throw new Error('Video is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Video is disposed; create a new Video before import().');
     if ('readyState' in this.source && (!this.source.videoWidth || this.source.readyState < 2)) return null;
     if ('displayWidth' in this.source && !this.source.displayWidth) return null;
     return device.importExternalTexture({ source: this.source, colorSpace: 'srgb' });
   }
   sampleFrequency(): Uint8Array {
-    if (this.disposed) throw new Error('Video is disposed');
+    if (this.disposed)
+      throw new MargoError('disposed', 'Video is disposed; create a new Video before sampleFrequency().');
     this.analyser?.getByteFrequencyData(this.frequencies);
     this.options.onFrequency?.(this.frequencies);
     return this.frequencies;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Video requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Video requires WebGPU and a live effect; attach a new Video to a WebGPU engine.',
+      );
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     engine.gpu.queue.writeBuffer(this.uniform, 0, this.rectangle as Float32Array<ArrayBuffer>);

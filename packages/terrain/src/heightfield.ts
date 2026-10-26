@@ -40,7 +40,9 @@ function validate(
     resolution < 1 ||
     resolution > 1024
   )
-    throw new RangeError('Invalid terrain heightfield');
+    throw new RangeError(
+      'Invalid terrain heightfield; pass a height function, a size of 1..100000 per axis, a finite origin and an integer resolution from 1 to 1024.',
+    );
 }
 function sample(height: HeightField, x: number, z: number): number {
   const value = height(x, z);
@@ -91,7 +93,10 @@ export class TerrainHeightmap implements EnginePlugin {
       );
     const device = engine.gpu,
       { size, resolution = 256, origin = [-size[0] / 2, -size[1] / 2] } = this.options;
-    if (resolution > device.limits.maxTextureDimension2D) throw new RangeError('Heightmap exceeds GPU texture limit');
+    if (resolution > device.limits.maxTextureDimension2D)
+      throw new RangeError(
+        'Heightmap resolution exceeds the GPU texture limit; reduce resolution to the device maxTextureDimension2D or less.',
+      );
     const heights = new Float32Array(resolution * resolution);
     for (let z = 0; z < resolution; z++)
       for (let x = 0; x < resolution; x++)
