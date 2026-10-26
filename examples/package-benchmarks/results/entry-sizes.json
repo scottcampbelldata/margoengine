@@ -1,5 +1,5 @@
 {
-  "commit": "43d95c8f",
+  "commit": "f99b49d7",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -822,6 +822,12 @@
       "./affine": {
         "raw": 9320,
         "gzip": 3871
+      }
+    },
+    "@margoengine/mcp": {
+      ".": {
+        "raw": 21834,
+        "gzip": 8408
       }
     },
     "@margoengine/mesh-edit": {

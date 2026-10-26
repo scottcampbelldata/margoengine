@@ -905,7 +905,7 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | --- | --- | --- |
 | `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 288,197 B |
 | `margoengine/cad` | CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export | 199,438 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 257,065 B |
+| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 258,933 B |
 | `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 143,159 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
@@ -6616,8 +6616,8 @@ GPU compute without the WebGPU boilerplate, for data science and for engine work
 typed arrays with views and broadcasting, element-wise expressions that fuse into a single kernel, reductions and
 statistics along axes, scans, sorting, selection and histograms. It also runs your own WGSL kernels, with bindings
 read from the source. Optional entries add matrix products (`/linalg`), Fourier transforms (`/fft`), convolution
-(`/signal`), reproducible random numbers (`/random`), data larger than GPU memory (`/stream`) and kernels inside an
-engine's frame (`/frame`).
+(`/signal`), reproducible random numbers (`/random`), sparse matrices and solvers (`/sparse`), gradients
+(`/autodiff`), data larger than GPU memory (`/stream`) and kernels inside an engine's frame (`/frame`).
 
 The package is optional and tree-shakable, adds nothing to core, and needs no engine: without one it opens a
 headless device of its own. Without WebGPU (Node, an older browser, a blocklisted GPU) the same code runs on the CPU.
@@ -6699,8 +6699,6 @@ const table = gpu.arange(1, 4, 1, 'f32').reshape(3, 1).mul(gpu.arange(1, 4, 1, '
 const custom = gpu.map(x, 'x * x * sign(x)');
 console.log(await relu.read(), await table.read(), await custom.read());
 ```
-
-## Reductions and statistics
 
 [README continues: https://margoengine.com/llms/packages/compute.md]
 
