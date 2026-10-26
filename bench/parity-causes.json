@@ -58,5 +58,25 @@
         "rerun": "node bench/cli.mjs parity --cases=p-export-usdz --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
       }
     ]
+  },
+  "12.6": {
+    "cause": "Skeleton.index was a linear name search run per track per call (quadratic in bones); every setPose built its error labels and every track a pose object and a sample array",
+    "fixes": [
+      {
+        "commit": "4be0e7d2",
+        "tradeoff": "none; a clip keeps one bone binding per skeleton it has posed (weakly held)",
+        "rerun": "npm run bench -- parity --cases=p-keyframes --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      }
+    ]
+  },
+  "17.11": {
+    "cause": "the scene's density function summed every ball at every grid point (4.2 M terms a frame; three writes each ball only near it), and marchingCubes allocated its grids and a 1.8 M-slot vertex table every call",
+    "fixes": [
+      {
+        "commit": "4be0e7d2",
+        "tradeoff": "marchingCubes takes a sampled grid (normals from the grid gradient instead of the function's); 816 more gzip bytes in procedural",
+        "rerun": "npm run bench -- parity --cases=p-marching-cubes --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      }
+    ]
   }
 }

@@ -439,6 +439,47 @@ The video and canvas texture rows (6.5, 6.6, run `20261025-144617`: 10.7 and 15.
 and 3.26) were the per-mesh cost of entries 21-24, not texture upload: run `20261026-165034` has them at 0.46 and 0.34
 ms against 0.75 and 1.98, faster, with no change of their own.
 
+### 27. Marching cubes and code-authored keyframes
+
+- **Loss:** `p-marching-cubes` (16 metaballs on a 64^3 grid every frame) took 15.96 ms of CPU a frame against three.js
+  WebGL's 3.33 (and 1.48 ms of GPU against 0.007: the 212x of the matrix); `p-keyframes` (1,000 code-authored tracks on
+  1,000 bones at 600 times) took 420 ms against 32.8.
+- **Causes, measured** (Node CPU profiles of the same work):
+  1. marching cubes: the scene's density function summed all 16 balls at each of the 262,144 grid points (4.2 M terms;
+     6.4 ms alone), where three.js's add-on writes each ball only into the cells it reaches. The extractor also
+     allocated its sample and position grids and a 1.8 M-slot shared-vertex table (filled with -1) on every call, read
+     eight corners per cube and looked the edge direction up with `indexOf`;
+  2. keyframes: `Skeleton.index` was `names.indexOf`, run per track per call: quadratic in bones (about 390 of the
+     420 ms). Then every `setPose` built its error label strings, and every track a pose object and a sample array.
+- **Fixes:** `marchingCubes(field, options)` also takes the samples (`resolution[0] * [1] * [2]` numbers, x fastest),
+  with normals from the grid's central-difference gradient mixed along each vertex's edge; it reads four new corners
+  per cube (the other four are the previous cube's), skips cube rows whose four grid rows all lie on one side, and keeps
+  its buffers between calls (the vertex table is reset slot by slot, in a `finally`; a call made from inside a density
+  function gets its own). A density function's output is unchanged, bit for bit. The scene writes each ball into the
+  samples within its reach. `Skeleton.index` is a `Map`; `applyKeyframeClip` binds a clip's tracks to a skeleton's
+  bones once (per tracks array and skeleton, weakly held) and reuses one sample and pose object per path; a model target
+  finds nodes in one name map per call instead of a search per track; `setPose` builds error text only when it throws,
+  and its quaternion scratch is typed like the samples. No core or stage bytes; procedural grows 816 gzip bytes
+  (baseline reason recorded).
+- **Image:** `p-marching-cubes` 0.996 / 0.15 against three.js (0.996 / 0.14 before); `p-keyframes` gives the same
+  checksum as three.js (1696.368), as before.
+- **After** (diagnostic, busy machine, RTX A6000; run `20261026-165655` (5 runs; marked invalid for three.js's spread);
+  rows in [perf-vs-threejs.md](perf-vs-threejs.md)):
+
+  | Scene | Before | After | three.js |
+  | --- | --- | --- | --- |
+  | `p-marching-cubes`, CPU / GPU ms a frame | 15.96 / 1.48 | 2.87 / 0.006 | 3.08 / 0.007 (WebGL), equal |
+  | `p-keyframes`, ms a call | 420 | 30.3 | 32.4 (WebGL), equal |
+
+  The GPU time of `p-marching-cubes` fell with the CPU time although nothing on the GPU side changed (each frame
+  still uploads a new geometry of about the same size); what the first run's 1.48 ms measured was not isolated.
+- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity
+  --cases=p-marching-cubes,p-keyframes --runs=5`, then `node bench/parity-report.mjs <run.json> --partial`.
+- **Guard:** `packages/procedural/test/procedural.test.js` (a sampled grid gives the function's surface, its normals
+  within 14 degrees, and checks its length and values; the scratch is clean after a throw and inside a nested call),
+  `packages/animation/tests/keyframes.test.js` (tracks bind to bones once per clip and skeleton, a new skeleton or clip
+  binds again; `Skeleton.index` for prototype names; `setPose` error text).
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks
