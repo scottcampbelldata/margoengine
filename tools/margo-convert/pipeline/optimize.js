@@ -2,6 +2,7 @@
 // The model optimiser: read a GLB or .gltf, run the passes a preset asks for, write a GLB.
 import { readModel, writeModel, Unsupported } from './gltf-io.js';
 import { dedupe, measure, mergeMeshes, newStats, prune, quantize, weld } from './passes.js';
+import { processModelTextures } from './textures.js';
 
 /** @typedef {import('./passes.js').ModelStats} ModelStats */
 /** @typedef {import('./passes.js').QuantizeOptions} QuantizeOptions */
@@ -36,11 +37,12 @@ const isGLB = (bytes) =>
  * `skipped` saying why.
  * @param {Uint8Array} bytes GLB or glTF JSON
  * @param {ModelOptions} options
- * @param {{resolve?: (uri: string) => Uint8Array, process?: (model: import('./gltf-io.js').Model, stats: ModelStats) => void}} [io]
- *   `resolve` reads the external files of a .gltf; `process` runs between the geometry passes and writing (textures)
- * @returns {ModelResult}
+ * @param {{resolve?: (uri: string) => Uint8Array, textures?: {preset: import('./presets.js').TexturePreset, sharp: any}}} [io]
+ *   `resolve` reads the external files of a .gltf; `textures` resizes and re-encodes the model's images (`sharp` is the
+ *   sharp module, or null for PNG only); without it images are kept as they are
+ * @returns {Promise<ModelResult>}
  */
-export function optimizeModel(bytes, options, io = {}) {
+export async function optimizeModel(bytes, options, io = {}) {
   const stats = newStats();
   /** @type {import('./gltf-io.js').Model} */ let model;
   try {
@@ -59,7 +61,7 @@ export function optimizeModel(bytes, options, io = {}) {
   if (options.prune !== false) prune(model, stats, { emptyNodes: options.pruneEmptyNodes });
   if (options.dedupe !== false) dedupe(model, stats);
   if (options.quantize) quantize(model, options.quantize, stats);
-  io.process?.(model, stats);
+  if (io.textures) await processModelTextures(model, io.textures.preset, io.textures.sharp, stats);
   const after = measure(model);
   stats.verticesAfter = after.vertices;
   stats.trianglesAfter = after.triangles;

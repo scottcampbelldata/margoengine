@@ -1,7 +1,7 @@
 # margo-convert
 
 The asset pipeline for [Margo Engine](https://margoengine.com): one command that imports, optimises, compresses and
-packages models for the web and for each export target, plus an offline
+packages models, textures and audio for the web and for each export target, plus an offline
 STEP / IGES / BREP to GLB converter.
 
 ```sh
@@ -16,17 +16,14 @@ npx margo-convert part.step part.glb                        # CAD to GLB (below)
 `build` takes a folder (or one file) and writes optimised copies, a manifest and a size report to `--out` (default
 `dist`). `optimize` does the same for one model. Both take `--preset`:
 
-| Preset | Models |
-| --- | --- |
-| `web` (default) | quantised, meshopt-compressed GLB; static meshes merged; empty nodes removed |
-| `mobile` | as `web` |
-| `unity` | plain GLB, hierarchy and empty nodes kept, no required extensions |
-| `unreal` | as `unity` |
-| `godot` | as `unity` |
-| `roblox` | as `unity` |
-
-Textures and audio files are copied to the output unchanged for now; the presets already carry their texture sizes and
-audio settings, which later versions apply.
+| Preset | Models | Textures | Audio |
+| --- | --- | --- | --- |
+| `web` (default) | quantised, meshopt-compressed GLB; static meshes merged; empty nodes removed | up to 2048 px, WebP (lossless for normal and data maps) | WAV and FLAC to Ogg Vorbis if ffmpeg is installed |
+| `mobile` | as `web` | up to 1024 px at power-of-two sizes, WebP quality 72 | as `web`, mono, at most 22.05 kHz |
+| `unity` | plain GLB, hierarchy and empty nodes kept, no required extensions | PNG/JPEG up to 4096 px, multiples of 4 | kept |
+| `unreal` | as `unity` | PNG/JPEG at power-of-two sizes up to 4096 px | kept |
+| `godot` | as `unity` | PNG/JPEG up to 4096 px | kept |
+| `roblox` | as `unity` | PNG/JPEG up to 1024 px | Ogg Vorbis if ffmpeg is installed, otherwise WAV is reported (Roblox takes mp3 and ogg) |
 
 See [docs/guides/asset-pipeline.md](../../docs/guides/asset-pipeline.md) for examples of each.
 
@@ -53,13 +50,47 @@ What happens to a model (`.glb`, `.gltf` with its external files, or STEP/IGES/B
   (Draco, `KHR_animation_pointer`, EXT_structural_metadata and similar) is copied unchanged with the reason in the
   manifest.
 
+### Textures
+
+Images inside models and standalone `.png` / `.jpg` files are scaled down to the preset's limit (never enlarged),
+rounded down to a power of two or a multiple of 4 where the preset asks, and re-encoded:
+
+- **Colour maps** (base colour, emissive, sheen and specular colour) are lossy WebP at the preset's quality. **Normal
+  maps and every other data map** (metal/roughness, occlusion, clearcoat and so on) are lossless. Inside a model the
+  role comes from the material slot that uses the image; a standalone file's from its name (`_normal`, `_n`, `rough`,
+  `metal`, `orm`, `ao`, `mask`, and similar are data).
+- WebP images are referenced through `EXT_texture_webp` (listed as required: there is no PNG copy). An image whose
+  WebP is not smaller keeps its PNG. The game presets keep PNG and JPEG and write no texture extension; a JPEG is
+  re-encoded only when it has to be resized.
+- An image is never written larger than it came in unless it had to be made smaller in pixels.
+- **Encoders.** Node has no WebP, AVIF or JPEG encoder. If [sharp](https://sharp.pixelplumbing.com) is already
+  installed in the project, margo-convert uses it for resizing (Lanczos) and for WebP, AVIF and JPEG; it is not a
+  dependency and nothing is downloaded. Without it PNG textures are still resized (area filter, colour averaged in
+  linear light and weighted by alpha) and rewritten by margo-convert's own PNG writer, which picks the narrowest colour
+  type and the best filter for every row; WebP, AVIF and JPEG images are left as they are and the manifest says so.
+- `--max-texture 1024`, `--texture-format webp|avif|png|jpeg|keep` and `--texture-quality 80` override the preset.
+  `--no-sharp` ignores an installed sharp.
+- `--mipmaps` also writes `name.dds`, an uncompressed RGBA8 file with the full mip chain, for each standalone texture
+  (`@margoengine/decoders/dds` reads it). WebP, PNG and JPEG hold one level, and Margo builds the others on the GPU, so
+  this is off by default. KTX2 with Basis Universal compression needs an encoder, and none is installed.
+
+### Audio
+
+- **WAV** (8, 16, 24 and 32-bit PCM, 32 and 64-bit float) is mixed to mono and resampled when the preset asks
+  (`mobile`: mono, at most 22.05 kHz) with a Hann-windowed sinc low-pass at 95% of the new Nyquist frequency, and
+  written as 16-bit PCM. Other WAV encodings are left as they are.
+- **Ogg Vorbis.** Node has no audio encoder. If an `ffmpeg` with `libvorbis` is on the PATH, `web`, `mobile` and
+  `roblox` convert WAV and FLAC to Ogg Vorbis (quality 4, with the preset's mono and rate); without it the files pass
+  through and the manifest says why. MP3, AAC, Opus and Ogg are web formats already and are never re-encoded.
+  `--no-ffmpeg` ignores an installed ffmpeg.
+
 ### Manifest, size report, incremental builds
 
 `build` writes `margo-manifest.json` and `margo-size-report.txt` to the output folder. The manifest has one entry per
 input with its relative path, size and SHA-256, the status (`built`, `cached`, `copied`, `skipped`, `failed`), every
 output with its path, size and SHA-256, what was done or could not be done, and counts from the model passes. It
 names no times, so the same inputs and settings give the same manifest. `--hash-names` puts the first eight digits
-of the content hash in output names (`Fox.85828f49.glb`) for long-lived caching; the manifest maps each source to its
+of the content hash in output names (`Fox.fbdf9e94.glb`) for long-lived caching; the manifest maps each source to its
 file.
 
 An input is skipped when its content hash, the preset and the tool version match the previous manifest and every output
@@ -73,9 +104,11 @@ From code: `import {build} from 'margo-convert/build'`, `import {optimizeModel} 
 ### Not done, and why
 
 - **Draco encoding.** No Draco encoder is installed (the repository ships only the decoder), so Draco is not written.
-  Meshopt covers the same job and is smaller to decode.
+  Meshopt covers the same job and is smaller to decode. A Draco-compressed input is copied unchanged.
 - **Level of detail.** The repository has no mesh simplifier, so no LODs are generated.
-- **KTX2 / Basis Universal textures.** No encoder is installed.
+- **KTX2 / Basis Universal textures.** No encoder is installed; WebP (or PNG without sharp) is written instead.
+- **Audio codecs.** Without an ffmpeg that has `libvorbis`, no Ogg, MP3 or Opus is written; MP3, AAC and Opus inputs
+  are never decoded, so only WAV is mixed down and resampled.
 
 ## CAD to GLB
 

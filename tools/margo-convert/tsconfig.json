@@ -21,6 +21,8 @@
     "pipeline/presets.js",
     "pipeline/gltf-io.js",
     "pipeline/passes.js",
+    "pipeline/textures.js",
+    "pipeline/audio.js",
     "pipeline/meshopt-encode.js"
   ]
 }

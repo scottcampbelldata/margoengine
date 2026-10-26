@@ -132,7 +132,7 @@ for (const [path, minimum] of SAMPLES) {
       timeout: 120_000,
     }, async () => {
       const input = read(path),
-        result = optimizeModel(input, preset(name).model);
+        result = await optimizeModel(input, preset(name).model);
       assert.equal(result.skipped, null);
       const report = await validator.validateBytes(result.glb, { maxIssues: 50 });
       // The input may carry errors of its own (robot-expressive has unnormalised skin weights); never more than it had.
@@ -172,23 +172,23 @@ for (const [path, minimum] of SAMPLES) {
   }
 }
 
-test('web preset makes the sample models much smaller overall', { timeout: 300_000 }, () => {
+test('web preset makes the sample models much smaller overall', { timeout: 300_000 }, async () => {
   let before = 0,
     after = 0;
   for (const [path] of SAMPLES) {
     const input = read(path);
     before += input.length;
-    after += optimizeModel(input, preset('web').model).glb.length;
+    after += (await optimizeModel(input, preset('web').model)).glb.length;
   }
   assert.ok(after < before * 0.7, `${before} -> ${after}`);
 });
 
-test('a .gltf with external files becomes one GLB with the same triangles', { timeout: 60_000 }, () => {
+test('a .gltf with external files becomes one GLB with the same triangles', { timeout: 60_000 }, async () => {
   const dir = at('examples/assets/kaykit/adventurers/props'),
     file = join(dir, 'dagger.gltf');
   const resolveUri = (uri) => new Uint8Array(readFileSync(join(dir, uri)));
   const input = new Uint8Array(readFileSync(file)),
-    result = optimizeModel(input, preset('web').model, { resolve: resolveUri });
+    result = await optimizeModel(input, preset('web').model, { resolve: resolveUri });
   assert.equal(result.skipped, null);
   const json = JSON.parse(
     new TextDecoder().decode(
@@ -207,12 +207,12 @@ test('a .gltf with external files becomes one GLB with the same triangles', { ti
     after = worldTriangles(result.glb),
     b = boundsOf(before);
   matchTriangles(before, after, Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) * 3e-5);
-  assert.match(optimizeModel(input, preset('web').model).skipped ?? '', /external file .* needs a folder/);
+  assert.match((await optimizeModel(input, preset('web').model)).skipped ?? '', /external file .* needs a folder/);
 });
 
-test('a Draco model is passed through untouched with the reason', { timeout: 30_000 }, () => {
+test('a Draco model is passed through untouched with the reason', { timeout: 30_000 }, async () => {
   const input = read('examples/assets/tokyo-diorama.glb'),
-    result = optimizeModel(input, preset('web').model);
+    result = await optimizeModel(input, preset('web').model);
   assert.match(result.skipped ?? '', /KHR_draco_mesh_compression/);
   assert.equal(result.glb, input);
 });

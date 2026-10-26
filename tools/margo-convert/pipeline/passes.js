@@ -28,6 +28,9 @@ import { countOf, withoutDegenerate } from './gltf-io.js';
  * @property {number} dedupedMeshes
  * @property {number} mergedPrimitives
  * @property {number} quantizedAttributes
+ * @property {number} imageBytesBefore
+ * @property {number} imageBytesAfter
+ * @property {number} imagesProcessed
  * @property {string[]} notes
  */
 
@@ -50,6 +53,9 @@ export function newStats() {
     dedupedMeshes: 0,
     mergedPrimitives: 0,
     quantizedAttributes: 0,
+    imageBytesBefore: 0,
+    imageBytesAfter: 0,
+    imagesProcessed: 0,
     notes: [],
   };
 }
@@ -77,11 +83,11 @@ export function measure(model) {
 // ------------------------------------------------------------------------------------------------ references
 
 /**
- * Calls `visit(textureInfo)` for every texture reference of a material, extensions included: any `*Texture` member
- * that holds an integer `index`.
- * @param {any} material @param {(info: any) => void} visit
+ * Calls `visit(textureInfo, slot)` for every texture reference of a material, extensions included: any `*Texture`
+ * member that holds an integer `index`; `slot` is its member name (`baseColorTexture`).
+ * @param {any} material @param {(info: any, slot: string) => void} visit
  */
-function eachTextureInfo(material, visit) {
+export function eachTextureInfo(material, visit) {
   const walk = (/** @type {any} */ value) => {
     if (!value || typeof value !== 'object') return;
     for (const [key, child] of Object.entries(value)) {
@@ -91,7 +97,7 @@ function eachTextureInfo(material, visit) {
         /Texture$/.test(key) &&
         Number.isInteger(/** @type {any} */ (child).index)
       )
-        visit(child);
+        visit(child, key);
       else if (key !== 'extras') walk(child);
     }
   };
@@ -131,7 +137,7 @@ function remapMaterials(model, map, extra) {
 }
 
 /** @param {any} texture @returns {number[]} every image a texture can show (core source and extension sources) */
-function imagesOf(texture) {
+export function imagesOf(texture) {
   const list = texture.source === undefined ? [] : [texture.source];
   for (const ext of Object.values(texture.extensions ?? {}))
     if (Number.isInteger(/** @type {any} */ (ext)?.source)) list.push(/** @type {any} */ (ext).source);

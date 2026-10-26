@@ -4,11 +4,13 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
+import { findFfmpeg, processAudio } from './audio.js';
 import { optimizeModel } from './optimize.js';
 import { preset as presetFor } from './presets.js';
+import { decodeRgba, encodeDDS, loadSharp, mipChain, processImage, roleOfName } from './textures.js';
 
 /** Bumped when the pipeline's output for the same input and preset changes, so cached results are rebuilt. */
-export const PIPELINE_VERSION = 1;
+export const PIPELINE_VERSION = 2;
 /** Name of the manifest, written to the output folder. */
 export const MANIFEST_NAME = 'margo-manifest.json';
 /** Name of the human-readable size report, written next to the manifest. */
@@ -18,6 +20,11 @@ const MODEL = new Set(['.glb', '.gltf']);
 const CAD = new Set(['.step', '.stp', '.iges', '.igs', '.brep']);
 const TEXTURE = new Set(['.png', '.jpg', '.jpeg']);
 const AUDIO = new Set(['.wav', '.mp3', '.ogg', '.opus', '.flac', '.m4a', '.aac']);
+const IMAGE_EXTENSION = /** @type {Record<string, string>} */ ({
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/avif': '.avif',
+});
 
 /** @param {Uint8Array|string} data @returns {string} */
 export const sha256 = (data) => createHash('sha256').update(data).digest('hex');
@@ -64,8 +71,13 @@ const posix = (p) => p.split(sep).join('/');
  * @property {string} input File or folder to build.
  * @property {string} outDir Output folder; created if missing.
  * @property {string} [preset] Preset name. Default `web`.
+ * @property {{texture?: Partial<import('./presets.js').TexturePreset>, audio?: Partial<import('./presets.js').AudioPreset>}} [overrides]
+ *   Replace single settings of the preset.
+ * @property {boolean} [mipmaps] Also write a DDS file with a full mip chain for every standalone texture.
  * @property {boolean} [force] Ignore the previous manifest and rebuild everything.
  * @property {boolean} [hashNames] Put the first 8 hex digits of the content hash in output names, for long-lived caching.
+ * @property {boolean} [sharp] `false` ignores an installed sharp (PNG textures only), to see what a machine without it gets.
+ * @property {boolean} [ffmpeg] `false` ignores an installed ffmpeg.
  * @property {(line: string) => void} [log] Receives one progress line per input.
  * @property {AbortSignal} [signal] Stops the build between files.
  */
@@ -98,13 +110,26 @@ function gltfDependencies(file) {
 }
 
 /**
+ * A preset with single settings replaced.
+ * @param {import('./presets.js').Preset} base @param {BuildOptions['overrides']} overrides @param {boolean} [mipmaps]
+ * @returns {import('./presets.js').Preset}
+ */
+export function withOverrides(base, overrides, mipmaps) {
+  return {
+    ...base,
+    texture: { ...base.texture, ...overrides?.texture, ...(mipmaps ? { mipmaps: true } : {}) },
+    audio: { ...base.audio, ...overrides?.audio },
+  };
+}
+
+/**
  * Builds a file or folder for a preset.
  * @param {BuildOptions} options
  * @returns {Promise<{manifest: Manifest, report: string}>}
  */
 export async function build(options) {
-  const preset = presetFor(options.preset ?? 'web');
   const presetName = options.preset ?? 'web';
+  const preset = withOverrides(presetFor(presetName), options.overrides, options.mipmaps);
   const input = resolve(options.input),
     outDir = resolve(options.outDir);
   if (!existsSync(input)) throw new Error(`input ${options.input} does not exist`);
@@ -119,7 +144,12 @@ export async function build(options) {
   /** @type {Set<string>} */ const consumed = new Set();
   for (const f of files) if (extname(f).toLowerCase() === '.gltf') for (const d of gltfDependencies(f)) consumed.add(d);
 
-  const encoders = await probeEncoders();
+  const sharp = options.sharp === false ? null : await loadSharp();
+  const ffmpeg = options.ffmpeg === false ? null : findFfmpeg();
+  const encoders = {
+    sharp: sharp ? (sharp.versions?.sharp ?? 'unknown') : null,
+    ffmpeg: ffmpeg ? ffmpeg.version : null,
+  };
   const settingsSha256 = sha256(
     JSON.stringify({ pipeline: PIPELINE_VERSION, preset: presetName, body: preset, encoders }),
   );
@@ -135,6 +165,7 @@ export async function build(options) {
 
   /** @type {ManifestEntry[]} */ const entries = [];
   const ignored = [];
+  const tools = { sharp, ffmpeg };
   for (const file of files) {
     options.signal?.throwIfAborted();
     if (consumed.has(resolve(file))) continue;
@@ -181,9 +212,10 @@ export async function build(options) {
       notes: [],
     };
     try {
-      await buildOne(entry, file, data, preset, outDir, options.hashNames === true);
+      await buildOne(entry, file, data, preset, outDir, options.hashNames === true, tools);
     } catch (error) {
       entry.status = 'failed';
+      entry.outputs = [];
       entry.notes.push(error instanceof Error ? error.message : String(error));
     }
     entries.push(entry);
@@ -216,6 +248,7 @@ export async function build(options) {
     totals.inputBytes += e.sourceBytes;
     totals.outputBytes += e.outputs.reduce((n, o) => n + o.bytes, 0);
   }
+  /** @type {Manifest} */
   const manifest = {
     tool: 'margo-convert',
     pipeline: PIPELINE_VERSION,
@@ -237,19 +270,6 @@ function outputsIntact(outDir, entry) {
     const path = join(outDir, o.path);
     return existsSync(path) && statSync(path).size === o.bytes && sha256(readFileSync(path)) === o.sha256;
   });
-}
-
-/** Optional local encoders. @returns {Promise<Record<string, string|null>>} */
-export async function probeEncoders() {
-  /** @type {Record<string, string|null>} */ const found = { sharp: null };
-  try {
-    const { loadSharp } = await import('./textures.js');
-    const sharp = await loadSharp();
-    found.sharp = sharp ? (sharp.versions?.sharp ?? 'unknown') : null;
-  } catch {
-    // textures.js is optional until the texture pipeline is present
-  }
-  return found;
 }
 
 /**
@@ -274,9 +294,10 @@ function emit(outDir, rel, data, hashNames) {
  * @param {string} file path, used to find the external files of a .gltf and to tell CAD formats apart
  * @param {Uint8Array} data the file's bytes
  * @param {import('./presets.js').Preset} preset
+ * @param {{sharp?: any}} [tools] `sharp`: the sharp module for texture encoding (omit for PNG only)
  * @returns {Promise<import('./optimize.js').ModelResult>}
  */
-export async function optimizeModelFile(file, data, preset) {
+export async function optimizeModelFile(file, data, preset, tools = {}) {
   let bytes = data;
   if (CAD.has(extname(file).toLowerCase())) {
     const { convert, formatOf } = await import('../convert.js');
@@ -284,14 +305,18 @@ export async function optimizeModelFile(file, data, preset) {
   }
   return optimizeModel(bytes, preset.model, {
     resolve: (uri) => new Uint8Array(readFileSync(resolve(dirname(file), uri))),
+    textures: { preset: preset.texture, sharp: tools.sharp ?? null },
   });
 }
 
-/** @param {ManifestEntry} entry @param {string} file @param {Uint8Array} data @param {import('./presets.js').Preset} preset @param {string} outDir @param {boolean} hashNames */
-async function buildOne(entry, file, data, preset, outDir, hashNames) {
+/**
+ * @param {ManifestEntry} entry @param {string} file @param {Uint8Array} data @param {import('./presets.js').Preset} preset
+ * @param {string} outDir @param {boolean} hashNames @param {{sharp: any, ffmpeg: {version: string}|null}} tools
+ */
+async function buildOne(entry, file, data, preset, outDir, hashNames, tools) {
   const stem = entry.source.replace(/\.[^./]+$/, '');
   if (entry.kind === 'model' || entry.kind === 'cad') {
-    const result = await optimizeModelFile(file, data, preset);
+    const result = await optimizeModelFile(file, data, preset, tools);
     if (entry.kind === 'cad') entry.notes.push('converted from CAD with OCCT');
     if (result.skipped) {
       entry.status = entry.kind === 'model' && extname(file).toLowerCase() === '.glb' ? 'copied' : 'skipped';
@@ -320,19 +345,44 @@ async function buildOne(entry, file, data, preset, outDir, hashNames) {
       mergedPrimitives: s.mergedPrimitives,
       quantizedAttributes: s.quantizedAttributes,
       meshoptViews: result.compressedViews,
+      imageBytesBefore: s.imageBytesBefore,
+      imageBytesAfter: s.imageBytesAfter,
     };
     return;
   }
-  // Textures and audio are copied unchanged until their pipelines exist.
-  entry.status = 'copied';
-  entry.outputs.push(emit(outDir, entry.source, data, hashNames));
+  if (entry.kind === 'texture') {
+    const ext = extname(file).toLowerCase();
+    const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+    const role = roleOfName(basename(file));
+    const result = await processImage(data, mime, role, preset.texture, tools.sharp);
+    if (result.note) entry.notes.push(result.note);
+    const outExt = IMAGE_EXTENSION[result.mimeType] ?? ext;
+    const changed = result.bytes !== data;
+    entry.status = changed ? 'built' : 'copied';
+    entry.outputs.push(emit(outDir, `${stem}${outExt}`, result.bytes, hashNames));
+    if (preset.texture.mipmaps) {
+      const pixels = await decodeRgba(result.bytes, result.mimeType, tools.sharp);
+      if (!pixels) entry.notes.push('no mip chain: this image needs sharp to be read');
+      else {
+        const levels = mipChain(pixels.data, pixels.width, pixels.height, role === 'color');
+        entry.outputs.push(emit(outDir, `${stem}.dds`, encodeDDS(levels), hashNames));
+        entry.notes.push(`${levels.length} mip levels in ${stem.split('/').at(-1)}.dds (uncompressed RGBA8)`);
+        entry.status = 'built';
+      }
+    }
+    return;
+  }
+  const result = processAudio(data, extname(file).toLowerCase(), preset.audio, { ffmpeg: tools.ffmpeg });
+  if (result.note) entry.notes.push(result.note);
+  entry.status = result.status;
+  entry.outputs.push(emit(outDir, `${stem}${result.extension}`, result.bytes, hashNames));
 }
 
 /** @param {number} n @returns {string} */
 const kB = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)} MB` : `${(n / 1e3).toFixed(1)} kB`);
 
 /**
- * The size report: one line per input, then totals.
+ * The size report: one line per input, a summary per kind, then totals.
  * @param {Manifest} manifest @param {string[]} ignored @returns {string}
  */
 export function sizeReport(manifest, ignored = []) {
@@ -354,12 +404,29 @@ export function sizeReport(manifest, ignored = []) {
   const line = (/** @type {string[]} */ r) =>
     r.map((c, i) => (i >= 3 ? c.padStart(widths[i]) : c.padEnd(widths[i]))).join('  ');
   const t = manifest.totals;
-  const saved = t.inputBytes ? `${(((t.inputBytes - t.outputBytes) / t.inputBytes) * 100).toFixed(1)}%` : '0%';
-  const lines = [`margo-convert ${manifest.preset} preset`, '', line(head), ...rows.map(line), ''];
+  const pct = (/** @type {number} */ before, /** @type {number} */ after) =>
+    before ? `${(((before - after) / before) * 100).toFixed(1)}%` : '0%';
+  const tool = (/** @type {string} */ name) => `${name} ${manifest.encoders[name] ?? 'not found'}`;
+  const lines = [
+    `margo-convert ${manifest.preset} preset (${tool('sharp')}, ${tool('ffmpeg')})`,
+    '',
+    line(head),
+    ...rows.map(line),
+    '',
+  ];
   lines.push(
     `${t.inputs} inputs: ${t.built} built, ${t.cached} cached, ${t.copied} copied, ${t.skipped} skipped, ${t.failed} failed`,
   );
-  lines.push(`total ${kB(t.inputBytes)} -> ${kB(t.outputBytes)} (${saved} saved)`);
+  for (const kind of ['model', 'cad', 'texture', 'audio']) {
+    const of = manifest.files.filter((e) => e.kind === kind);
+    if (!of.length) continue;
+    const before = of.reduce((n, e) => n + e.sourceBytes, 0),
+      after = of.reduce((n, e) => n + e.outputs.reduce((m, o) => m + o.bytes, 0), 0);
+    lines.push(
+      `  ${kind.padEnd(8)} ${String(of.length).padStart(3)} files  ${kB(before)} -> ${kB(after)} (${pct(before, after)} saved)`,
+    );
+  }
+  lines.push(`total ${kB(t.inputBytes)} -> ${kB(t.outputBytes)} (${pct(t.inputBytes, t.outputBytes)} saved)`);
   const notes = manifest.files.filter((e) => e.notes.length || e.status === 'failed');
   if (notes.length) {
     lines.push('', 'notes');

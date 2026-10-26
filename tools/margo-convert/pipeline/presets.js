@@ -6,14 +6,15 @@
  * Texture settings of a preset.
  * @typedef {object} TexturePreset
  * @property {number} maxSize Largest width or height in pixels; larger images are scaled down (never up).
- * @property {false|'down'|'nearest'} powerOfTwo `'down'` resizes to the power of two at or below the size,
- *   `'nearest'` to the closest one; `false` leaves sizes alone (apart from `multipleOf`).
+ * @property {false|'down'} powerOfTwo `'down'` resizes to the power of two at or below the size (never up);
+ *   `false` leaves sizes alone (apart from `multipleOf`).
  * @property {number} multipleOf Round sizes down to a multiple of this (4 for GPU block compression).
  * @property {'webp'|'avif'|'png'|'jpeg'|'keep'} format Output format for colour maps. `keep` writes PNG for PNG and
  *   JPEG for JPEG. WebP and AVIF need `sharp`; without it textures keep their format (PNG is recompressed).
  * @property {number} quality Lossy quality, 1 to 100.
  * @property {boolean} losslessData Encode normal, occlusion/roughness/metalness and other data maps losslessly.
- * @property {boolean} mipmaps Also write a KTX2 file with a full mip chain for each texture (standalone textures).
+ * @property {boolean} mipmaps Also write a DDS file with a full mip chain (uncompressed RGBA8) for each standalone texture.
+ *   Off in every preset: WebP, PNG and JPEG hold one level and Margo builds the others on the GPU.
  */
 
 /**
@@ -21,6 +22,8 @@
  * @typedef {object} AudioPreset
  * @property {number} maxSampleRate WAV files above this rate are resampled down (Hz); 0 keeps the rate.
  * @property {boolean} mono Mix WAV files down to one channel.
+ * @property {'keep'|'ogg'} format `ogg` converts WAV and FLAC to Ogg Vorbis when an ffmpeg with libvorbis is installed.
+ *   MP3, AAC, Opus and Ogg files are web formats already and are never re-encoded.
  * @property {boolean} requireCompressed The target wants a compressed format (ogg or mp3); WAV files are reported.
  */
 
@@ -54,7 +57,7 @@ export const PRESETS = {
   web: {
     title: 'Web',
     summary:
-      'Smallest download for a browser: quantised, meshopt-compressed GLB, textures up to 2048 px as WebP, static meshes merged.',
+      'Smallest download for a browser: quantised, meshopt-compressed GLB, textures up to 2048 px as WebP, static meshes merged, WAV to Ogg Vorbis.',
     model: {
       prune: true,
       pruneEmptyNodes: true,
@@ -73,12 +76,12 @@ export const PRESETS = {
       losslessData: true,
       mipmaps: false,
     },
-    audio: { maxSampleRate: 0, mono: false, requireCompressed: false },
+    audio: { maxSampleRate: 0, mono: false, format: 'ogg', requireCompressed: false },
   },
   mobile: {
     title: 'Mobile web',
     summary:
-      'Web, tuned for phones: textures up to 1024 px at power-of-two sizes, lower WebP quality, WAV audio mixed to mono at 22.05 kHz.',
+      'Web, tuned for phones: textures up to 1024 px at power-of-two sizes, lower WebP quality, audio mixed to mono at 22.05 kHz.',
     model: {
       prune: true,
       pruneEmptyNodes: true,
@@ -97,7 +100,7 @@ export const PRESETS = {
       losslessData: true,
       mipmaps: false,
     },
-    audio: { maxSampleRate: 22050, mono: true, requireCompressed: false },
+    audio: { maxSampleRate: 22050, mono: true, format: 'ogg', requireCompressed: false },
   },
   unity: {
     title: 'Unity',
@@ -113,7 +116,7 @@ export const PRESETS = {
       losslessData: true,
       mipmaps: false,
     },
-    audio: { maxSampleRate: 0, mono: false, requireCompressed: false },
+    audio: { maxSampleRate: 0, mono: false, format: 'keep', requireCompressed: false },
   },
   unreal: {
     title: 'Unreal Engine',
@@ -129,7 +132,7 @@ export const PRESETS = {
       losslessData: true,
       mipmaps: false,
     },
-    audio: { maxSampleRate: 0, mono: false, requireCompressed: false },
+    audio: { maxSampleRate: 0, mono: false, format: 'keep', requireCompressed: false },
   },
   godot: {
     title: 'Godot',
@@ -145,12 +148,12 @@ export const PRESETS = {
       losslessData: true,
       mipmaps: false,
     },
-    audio: { maxSampleRate: 0, mono: false, requireCompressed: false },
+    audio: { maxSampleRate: 0, mono: false, format: 'keep', requireCompressed: false },
   },
   roblox: {
     title: 'Roblox',
     summary:
-      'Plain GLB for the Roblox importer: PNG/JPEG textures up to 1024 px (Roblox scales larger images down); audio must be mp3 or ogg, so WAV files are reported.',
+      'Plain GLB for the Roblox importer: PNG/JPEG textures up to 1024 px (Roblox scales larger images down); audio must be mp3 or ogg, so WAV files become Ogg Vorbis (with ffmpeg) or are reported.',
     model: PLAIN_MODEL,
     texture: {
       maxSize: 1024,
@@ -161,7 +164,7 @@ export const PRESETS = {
       losslessData: true,
       mipmaps: false,
     },
-    audio: { maxSampleRate: 0, mono: false, requireCompressed: true },
+    audio: { maxSampleRate: 0, mono: false, format: 'ogg', requireCompressed: true },
   },
 };
 
