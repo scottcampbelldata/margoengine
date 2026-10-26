@@ -408,6 +408,10 @@ export const entries = [
       'A widget cannot contain itself or its ancestor',
       'index must be an integer',
       'on(type, handler) takes an event name and a function',
+      'useUi must be used inside <UiRoot>; wrap the interface in <UiRoot engine={engine}>',
+      'A widget must be inside <UiRoot>; wrap the interface in <UiRoot engine={engine}>',
+      'announce(message) takes a non-empty string',
+      'bindInput takes an Input from @margoengine/input made with uiActions()',
     ],
     cause:
       'A widget, layout style, theme, colour or Ui option got a value it cannot use: a size that is not a number, auto, fill or a percentage; spacing that is not one, two or four numbers; a colour that is not #rrggbb or #rrggbbaa; a theme field or colour role that does not exist; a slider or progress bar with a range that is empty or not finite; a list entry without a label; an index outside the widgets there are; a text scale outside 0.5 to 3; or a Ui used after it was disposed.',

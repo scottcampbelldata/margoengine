@@ -21,6 +21,7 @@ export { alphaToSdf, squaredDistanceTransform, sdfDistance, SDF_DEFAULTS } from 
 export type { SdfParams } from './sdf.js';
 export { ShelfPacker } from './packer.js';
 export type { AtlasSlot } from './packer.js';
-export { GlyphAtlas } from './atlas.js';
+export { GlyphAtlas, glyphAtlases } from './atlas.js';
+export type { GlyphAtlasSizes } from './atlas.js';
 export { parseColor } from './color.js';
 export type { ColorInput } from './color.js';

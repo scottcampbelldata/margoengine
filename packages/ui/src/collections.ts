@@ -160,7 +160,7 @@ class Slot extends Widget {
     readonly index: number,
   ) {
     super({});
-    this.role = 'gridcell';
+    this.role = 'button';
     this.focusable = true;
     this.pointerEvents = 'auto';
   }
@@ -280,7 +280,7 @@ export class Inventory extends Widget {
     if (!Number.isInteger(count) || count < 0 || count > 4096)
       throw rangeError('Inventory slots must be an integer from 0 to 4096', 'ui');
     super({ direction: 'grid', columns, cellWidth: slotSize, cellHeight: slotSize, gap: slotGap, ...rest });
-    this.role = 'grid';
+    this.role = 'group';
     for (let i = 0; i < count; i++) {
       const slot = new Slot(this, i);
       this.slotWidgets.push(slot);

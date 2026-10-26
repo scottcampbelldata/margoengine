@@ -68,6 +68,12 @@ export class GlyphAtlas {
     destroy(): void;
 }
 
+export interface GlyphAtlasSizes {
+    atlasSize: number;
+    colorAtlasSize: number;
+    maxPages: number;
+}
+
 export interface GlyphBitmap {
     readonly cluster: string;
     readonly width: number;
@@ -290,6 +296,14 @@ export function caretRect(layout: TextLayout, index: number): {
     top: number;
     bottom: number;
     line: number;
+};
+
+export function glyphAtlases(device: GPUDevice, sizes: GlyphAtlasSizes, previous?: {
+    sdf: GlyphAtlas;
+    color: GlyphAtlas;
+}): {
+    sdf: GlyphAtlas;
+    color: GlyphAtlas;
 };
 
 export function graphemes(text: string): Array<{

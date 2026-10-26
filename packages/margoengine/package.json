@@ -1055,6 +1055,10 @@
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"
     },
+    "./ui/react": {
+      "types": "./dist/ui/react.d.ts",
+      "import": "./dist/ui/react.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/ui",
   "version": "1.0.0",
-  "description": "Game UI drawn in the engine: menus, HUDs, health bars, inventories, dialogs and toasts with flex layout, anchors, safe areas, resolution scaling and theming.",
+  "description": "Game UI drawn in the engine: menus, HUDs, health bars, inventories, dialogs and toasts with flex layout, theming, keyboard, gamepad and touch navigation, screen reader support and React components.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -28,6 +28,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
     }
   },
   "files": [
@@ -39,9 +43,16 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "dependencies": {
+    "@margoengine/input": "^1.0.0",
     "@margoengine/math": "^1.0.0",
     "@margoengine/text": "^1.0.0"
   },

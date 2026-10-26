@@ -124,10 +124,6 @@ test('colours parse from short, long and alpha hex and reject anything else', ()
     parseRgba('#00000080').map((v) => Math.round(v * 255)),
     [0, 0, 0, 128],
   );
-  assert.deepEqual(
-    parseRgba('#f008').map((v) => Math.round(v * 255)),
-    [255, 0, 0, 136],
-  );
   assert.throws(() => parseRgba('red'), TypeError);
   assert.throws(() => parseRgba([2, 0, 0, 1]), RangeError);
   assert.deepEqual(mixColors([0, 0, 0, 1], [1, 1, 1, 1], 0.5), [0.5, 0.5, 0.5, 1]);

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3150984,
+  "total": 3208316,
   "history": [
     {
       "date": "2026-10-24",
@@ -266,6 +266,12 @@
       "commit": "804d2dea",
       "reason": "DX pass A-L batch 1: throw messages now name their fix (animation, animator, blender), a few hundred gzip bytes of message text",
       "grew": 4
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "9cc8170b",
+      "reason": "New optional @margoengine/ui (queue item 20): widgets, layout, themes, input and the accessibility mirror. The text package is a required dependency (every widget draws text with it), so ui and ui/react count as leaks of it; ui/react also lists react as an optional peer.",
+      "grew": 4
     }
   ],
   "items": {
@@ -529,6 +535,8 @@
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4042,
     "@margoengine/tween": 1056,
+    "@margoengine/ui": 28622,
+    "@margoengine/ui/react": 28708,
     "@margoengine/usdz": 8240,
     "@margoengine/usdz dist/workers/usdz.js": 51796,
     "@margoengine/usdz/worker": 9113,
@@ -602,6 +610,8 @@
     "leak @margoengine/shader -> @margoengine/materials": 1,
     "leak @margoengine/shader/graph -> @margoengine/gltf-pro": 1,
     "leak @margoengine/shader/graph -> @margoengine/materials": 1,
+    "leak @margoengine/ui -> @margoengine/text": 1,
+    "leak @margoengine/ui/react -> @margoengine/text": 1,
     "leak @margoengine/usdz -> @margoengine/gltf-pro": 1,
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
     "margoengine": 308,

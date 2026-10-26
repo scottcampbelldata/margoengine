@@ -1,13 +1,19 @@
 {
   "gate": "clean-room",
   "about": "three.js / Babylon / graphics-library mentions per file in packages/**; third-party runtime dependencies",
-  "total": 7,
+  "total": 8,
   "history": [
     {
       "date": "2026-10-24",
       "commit": "5c34c002",
       "reason": "Initial baseline: what main held at 5c34c002 when the quality gate landed",
       "grew": 18
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "9cc8170b",
+      "reason": "New optional @margoengine/ui (queue item 20): widgets, layout, themes, input and the accessibility mirror. The text package is a required dependency (every widget draws text with it), so ui and ui/react count as leaks of it; ui/react also lists react as an optional peer.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16,6 +22,7 @@
     "dependency @margoengine/react @dimforge/rapier3d-compat": 1,
     "dependency @margoengine/react react": 1,
     "dependency @margoengine/react react-dom": 1,
+    "dependency @margoengine/ui react": 1,
     "mention packages/physics/README.md": 1,
     "mention packages/react/tests/subpaths.test.js": 1
   }

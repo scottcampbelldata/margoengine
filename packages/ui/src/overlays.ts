@@ -243,7 +243,15 @@ export class Toast extends Panel {
 export class Tooltip extends Panel {
   private readonly body: Label;
   constructor() {
-    super({ background: 'raised', border: true, shadow: true, padding: [8, 12], maxWidth: 320, visible: false });
+    super({
+      background: 'raised',
+      border: true,
+      shadow: true,
+      padding: [8, 12],
+      maxWidth: 320,
+      anchor: 'top-left',
+      visible: false,
+    });
     this.role = 'tooltip';
     this.body = new Label({ text: '', size: 'small' });
     this.add(this.body);

@@ -201,6 +201,139 @@ UI units become CSS pixels by the resolution scale and device pixels by the pixe
 units and drawn as signed distance fields at the final pixel size, so it stays sharp. `UiRenderer` calls `resize` from
 the canvas every frame. `textScale` multiplies every text size and reflows the layout.
 
+## Mouse, touch, keyboard and gamepad
+
+`UiRenderer.attach(engine, ui)` connects the engine's canvas for you (`{ input: false }` turns that off). Everything works
+with every device:
+
+| Input | What it does |
+| --- | --- |
+| Mouse, pen | hover, click, drag sliders and inventory items, wheel scrolls lists |
+| Touch | tap, drag, scroll; touch never hovers |
+| Arrow keys, d-pad, left stick | move focus to the nearest widget in that direction (holding repeats); a focused slider takes left and right |
+| Tab, Shift+Tab, bumpers | step through the widgets; Tab past the last one hands the keyboard back to the page |
+| Enter, Space, gamepad A | press the focused widget |
+| Escape, gamepad B | close the tooltip, then the dialog |
+
+The focus ring shows for the keyboard and gamepad and hides for the mouse and touch. A dialog traps focus, puts it on its
+first button and gives it back when it closes. A press that lands on a widget never reaches other listeners on the canvas
+(it will not also orbit the camera) and `ui.wantsPointer(x, y)` tells your own code when the pointer is over the UI. Keys
+go to the UI only while a widget has focus or a dialog is open; set `ui.captureKeys = true` while a full-screen menu shows
+so the arrows work from the first press.
+
+```ts
+import { Input } from '@margoengine/input';
+import { Ui, uiActions } from '@margoengine/ui';
+
+const ui = new Ui();
+// Gamepad (and, with { keyboard: true }, keys) as Input actions; merge your own actions in the same object.
+const input = new Input({ ...uiActions(), jump: [{ type: 'key', code: 'Space' }] });
+ui.bindInput(input); // reads the ui.* actions each ui.update(); call input.update() before it
+
+ui.captureKeys = true; // a full-screen menu is open
+ui.navigate('down'); // the same thing the arrow keys, the d-pad and the stick do
+ui.accept(); // Enter, Space, gamepad A
+ui.cancel(); // Escape, gamepad B: returns false when there was nothing to close
+console.log(ui.focused?.label, ui.inputMode); // 'keyboard'
+```
+
+To handle the events yourself, call `ui.pointerMove`, `ui.pointerDown`, `ui.pointerUp`, `ui.wheel`, `ui.navigate`,
+`ui.tab`, `ui.accept` and `ui.cancel` (or `ui.execute(command)`) from your own listeners, or attach a different element with
+`attachInput(ui, element, { signal })`, which returns a function that detaches it and is also disposable.
+
+```ts
+import { Ui, Panel, Button, attachInput } from '@margoengine/ui';
+
+const ui = new Ui();
+ui.add(new Panel({ children: [new Button({ text: 'Play', tooltip: 'Start a new game' })] }));
+const controller = new AbortController();
+attachInput(ui, document.querySelector('canvas')!, { signal: controller.signal });
+// controller.abort() removes every listener again.
+```
+
+A widget with a `tooltip` shows it after half a second of hovering, or a moment after the keyboard focuses it; Escape
+hides it. Tooltips sit below the widget and flip above it at the bottom of the screen.
+
+## Accessibility
+
+The interface is usable without a mouse, without sight and without colour vision, and nothing needs configuring:
+
+- **Keyboard and gamepad:** every control can be reached and operated, the focus ring is always visible when the keyboard
+  or gamepad moves focus, and a dialog traps focus. Tab never traps the keyboard: past the last widget it returns to the page.
+- **Screen readers:** `UiRenderer` also attaches a hidden DOM mirror (`attachMirror`) next to the canvas. It holds real
+  buttons, switches, range inputs, progress bars, listboxes, dialogs and text, laid over the widgets so touch exploration
+  works, and it shares focus with the canvas: Tab or a screen reader moving to an element focuses its widget, and moving focus
+  in the UI moves DOM focus so the reader announces it. Everything behind an open dialog is `inert`.
+- **Announcements:** toasts go to polite (assertive for errors) live regions, and `ui.announce(message)` says anything else.
+  A widget's `tooltip` and `description` become `aria-describedby`.
+- **Colour:** the themes keep success, warning and danger apart for protan, deutan and tritan viewers, bars and toasts
+  carry words and symbols as well as colour, and `themes.highContrast` is black, white, yellow and cyan with 7:1 text.
+  `themeForPreferences()` picks high contrast for `prefers-contrast: more` and forced colours.
+- **Text size:** `ui.textScale` from 0.5 to 3 reflows the whole interface, and `new Ui({ textScale: 'auto' })` follows the font
+  size the user set in the browser (`browserTextScale()`).
+- **Motion:** `prefers-reduced-motion` turns transitions, easing and fades off (`ui.motion`).
+- **Targets:** buttons, toggles, sliders and list rows are at least 44 units tall.
+
+```ts
+import { Ui, UiRenderer, attachMirror, themeForPreferences } from '@margoengine/ui';
+import type { EngineKernel } from '@margoengine/core';
+
+export function accessibleUi(engine: EngineKernel): Ui {
+  const ui = new Ui({ theme: themeForPreferences(), textScale: 'auto' });
+  // The renderer attaches input and the mirror itself; to attach them by hand, turn them off and call:
+  UiRenderer.attach(engine, ui, { input: false, mirror: false });
+  const detach = attachMirror(ui, engine.canvas, { label: 'Menu and heads-up display' });
+  ui.announce('Level 3. Your health is full.');
+  void detach; // call it to remove the mirror; it is also disposable: using detach = attachMirror(...)
+  return ui;
+}
+```
+
+Keep these working in your own widgets: give a `Widget` a `label` (its accessible name; text widgets use their text), a `description`,
+and `focusable = true` with an `activate()` method for anything that reacts to accept.
+
+## React
+
+`@margoengine/ui/react` has thin components for the same widgets. They render no DOM: nest them inside `UiRoot` and they
+become widgets of one `Ui`, drawn on the engine's canvas. Props update the widgets in place, `onClick`, `onChange`,
+`onSelect`, `onMove` and `onUse` are the widgets' events, and `checked`, `value`, `items` and `selected` are controlled, so
+state lives in React. `react` is an optional peer dependency of this package.
+
+```tsx
+import { useState } from 'react';
+import type { EngineKernel } from '@margoengine/core';
+import { themes, type InventoryItem } from '@margoengine/ui';
+import { UiRoot, Panel, Label, HealthBar, Inventory, Toggle, Button, useUi } from '@margoengine/ui/react';
+
+export function Hud({ engine, hp }: { engine: EngineKernel; hp: number }) {
+  const [contrast, setContrast] = useState(false);
+  const [bag, setBag] = useState<(InventoryItem | null)[]>([{ id: 'potion', name: 'Potion', icon: '🧪', count: 2 }, null, null, null]);
+  return (
+    <UiRoot engine={engine} theme={contrast ? themes.highContrast : themes.dark}>
+      <Panel background="scrim" padding={12} gap={8} anchor="top-left" margin={16}>
+        <Label text="Camp" size="large" />
+        <HealthBar value={hp} max={100} width={240} />
+        <Toggle text="High contrast" checked={contrast} onChange={(e) => setContrast(e.value as boolean)} />
+      </Panel>
+      <Panel anchor="bottom-right" margin={16}>
+        <Inventory columns={2} slots={4} items={bag} onMove={() => setBag([...bag])} />
+      </Panel>
+      <Respawn />
+    </UiRoot>
+  );
+}
+
+function Respawn() {
+  const ui = useUi(); // toast(), dialog(), confirm(), announce() for event handlers
+  return <Button text="Respawn" anchor="bottom" margin={16} onClick={() => ui.toast('Respawned', { kind: 'success' })} />;
+}
+```
+
+Create `UiRoot` where the engine is known (in a child of `@margoengine/react`'s `<Canvas>`, call `useEngine()` and pass it as
+`engine`). Pass `ui={yourUi}` to share one `Ui` with plain code. Widgets join their parent in mount order, so show and hide a
+widget with `visible` rather than by mounting it conditionally if its place in the order matters. Props only a constructor
+reads (a slider's `min` and `max`, an inventory's `columns` and `slots`) recreate the widget when they change.
+
 ## Options
 
 | `new Ui({...})` option | Default |

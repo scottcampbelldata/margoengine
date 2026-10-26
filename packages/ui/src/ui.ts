@@ -4,10 +4,13 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { Panel, type TextSize } from './basic.js';
 import { parseRgba, type Rgba } from './color.js';
 import { DrawList } from './draw.js';
+import type { Direction } from './focus.js';
+import { Interaction, type InputSource, type PointerInfo } from './interaction.js';
 import { arrange, edges } from './layout.js';
 import { Dialog, Toast, Tooltip, type DialogOptions, type ToastOptions } from './overlays.js';
 import { themeForPreferences, type Theme, type ThemeColors } from './theme.js';
-import type { ColorRef, DrawContext, Widget } from './widget.js';
+import type { ColorRef, DrawContext, UiCommand, Widget } from './widget.js';
+import type { Input } from '@margoengine/input';
 
 /** Scale the UI with the window so a layout made for one resolution fills any other. */
 export interface ScaleOptions {
@@ -22,9 +25,9 @@ export interface ScaleOptions {
 }
 
 /**
- * The factor that turns window CSS pixels into UI units for a window of `width` by `height`: 1 for a plain number
- * scale of 1 (the default), the number itself, or for a reference size `(w / rw) ** (1 - match) * (h / rh) ** match`
- * between `min` and `max`.
+ * How many CSS pixels one UI unit is for a window of `width` by `height`: 1 by default (UI units are CSS pixels), the
+ * number itself for a number scale, or for a reference size `(w / rw) ** (1 - match) * (h / rh) ** match` between `min`
+ * and `max` (a window 1.5 times the reference gives 1.5: the UI fills it at 1.5 times the size).
  * @throws RangeError for a non-positive size or an invalid reference.
  */
 export function resolutionScale(width: number, height: number, scale: number | ScaleOptions = 1): number {
@@ -42,6 +45,18 @@ export function resolutionScale(width: number, height: number, scale: number | S
   return Math.max(scale.min ?? 0.5, Math.min(scale.max ?? 4, value));
 }
 
+/**
+ * The user's text size preference as a multiplier: the browser's root font size over the 16 px default (a user who set
+ * "large" fonts gets 1.25, say), between 0.5 and 3. 1 where there is no document.
+ */
+export function browserTextScale(document: Document | undefined = globalThis.document): number {
+  const root = document?.documentElement,
+    view = document?.defaultView;
+  if (!root || !view) return 1;
+  const size = Number.parseFloat(view.getComputedStyle(root).fontSize);
+  return Number.isFinite(size) && size > 0 ? Math.max(0.5, Math.min(3, size / 16)) : 1;
+}
+
 /** Insets in CSS pixels: `[top, right, bottom, left]`. */
 export type SafeArea = readonly [number, number, number, number];
 
@@ -55,7 +70,7 @@ export function readSafeArea(document: Document | undefined = globalThis.documen
   probe.style.cssText =
     'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
   document.body.append(probe);
-  const style = getComputedStyle(probe),
+  const style = document.defaultView!.getComputedStyle(probe),
     px = (value: string) => Number.parseFloat(value) || 0,
     result: SafeArea = [px(style.paddingTop), px(style.paddingRight), px(style.paddingBottom), px(style.paddingLeft)];
   probe.remove();
@@ -70,7 +85,7 @@ export interface UiOptions {
   height?: number;
   /** Device pixels per CSS pixel. Default 1. */
   pixelRatio?: number;
-  /** Resolution scaling: a number of UI units per CSS pixel, or a reference size. Default 1 (UI units are CSS pixels). */
+  /** Resolution scaling: CSS pixels per UI unit, or a reference size. Default 1 (UI units are CSS pixels). */
   scale?: number | ScaleOptions;
   /** The look. Default {@link themeForPreferences}: dark, or light / high contrast when the user asks for them. */
   theme?: Theme;
@@ -78,8 +93,11 @@ export interface UiOptions {
   font?: Font | FontOptions;
   /** Measures text instead of the font; for tests and server rendering. */
   measurer?: TextMeasurer;
-  /** The user's text size preference, 0.5 to 3. Default 1. */
-  textScale?: number;
+  /**
+   * The user's text size preference, 0.5 to 3, or `'auto'` to follow the browser's default font size (a user who raised
+   * it in the browser settings gets bigger text). Default 1.
+   */
+  textScale?: number | 'auto';
   /** Safe area in CSS pixels (`[top, right, bottom, left]`), or `'auto'` to read the device's. Default `'auto'`. */
   safeArea?: SafeArea | 'auto';
   /** Turn transitions off. Default the user's `prefers-reduced-motion`. */
@@ -134,7 +152,10 @@ export class Ui {
   private drawDirty = true;
   private fontRevision = 0;
   private disposed = false;
+  private readonly interaction: Interaction;
   private readonly changeListeners = new Set<() => void>();
+  private readonly focusListeners = new Set<() => void>();
+  private readonly announcers = new Set<(message: string, politeness: 'polite' | 'assertive') => void>();
   /** Increases whenever any widget's text, state or position changed; the accessibility mirror syncs on it. */
   mirrorRevision = 0;
 
@@ -170,7 +191,7 @@ export class Ui {
     this._width = width;
     this._height = height;
     this._pixelRatio = pixelRatio;
-    this.setTextScale(textScale);
+    this.setTextScale(textScale === 'auto' ? browserTextScale() : textScale);
     this.root = new Panel({ id: 'ui-root', direction: 'stack', radius: 0 });
     this.modalLayer = new Panel({ id: 'ui-modal', direction: 'stack', radius: 0 });
     this.toastLayer = new Panel({ id: 'ui-toasts', direction: 'stack', radius: 0 });
@@ -181,6 +202,7 @@ export class Ui {
     this.tooltipLayer.add(this.tooltip);
     this.layers = [this.root, this.modalLayer, this.toastLayer, this.tooltipLayer];
     for (const layer of this.layers) layer.attachTo(this);
+    this.interaction = new Interaction(this);
     this.context = { list: this.list, ui: this, theme: this._theme };
     this.resolved = resolutionScale(width, height, scale);
     this.ready = this.measurer === this.font ? this.font.load() : Promise.resolve();
@@ -302,6 +324,134 @@ export class Ui {
     for (const layer of this.layers) layer.walk(visit);
   }
 
+  // --- Focus, keyboard, gamepad and pointer ------------------------------------------------------------------------
+
+  /** The widget with input focus, or null. */
+  get focused(): Widget | null {
+    return this.interaction.focused;
+  }
+  /** Where the latest input came from; the focus ring shows for `'keyboard'` and `'gamepad'`. */
+  get inputMode(): InputSource {
+    return this.interaction.inputMode;
+  }
+  /**
+   * When true, arrow keys, Enter, Space and Escape always go to the UI: set it while a full-screen menu shows. When
+   * false (default) they go to the UI only once a widget has focus or while a dialog is open, so the game keeps its keys.
+   */
+  get captureKeys(): boolean {
+    return this.interaction.captureKeys;
+  }
+  set captureKeys(value: boolean) {
+    this.interaction.captureKeys = !!value;
+  }
+  /** Whether moving past the first or last widget in a direction wraps to the other end. Default true. */
+  get wrapFocus(): boolean {
+    return this.interaction.wrapFocus;
+  }
+  set wrapFocus(value: boolean) {
+    this.interaction.wrapFocus = !!value;
+  }
+  /** The widgets keyboard and gamepad navigation can reach now: inside the top dialog, or on the screen and in toasts. */
+  focusables(): Widget[] {
+    this.layout();
+    return this.interaction.focusables();
+  }
+  /** Give `widget` (or nothing, with null) input focus. Returns false if it cannot take focus. */
+  focus(widget: Widget | null, source: InputSource = this.inputMode): boolean {
+    this.live();
+    return this.interaction.focus(widget, source);
+  }
+  /** Move focus to the nearest focusable widget in a direction; a focused slider takes left and right itself. */
+  navigate(direction: Direction, source: InputSource = 'keyboard'): boolean {
+    this.live();
+    this.layout();
+    return this.interaction.navigate(direction, source);
+  }
+  /** Tab order: the next (or with `false`, the previous) widget. Returns false when focus leaves the UI. */
+  tab(forward = true, source: InputSource = 'keyboard'): boolean {
+    this.live();
+    this.layout();
+    return this.interaction.step(forward ? 1 : -1, source);
+  }
+  /** Activate the focused widget; with no focus, focus the first one. */
+  accept(source: InputSource = 'keyboard'): boolean {
+    this.live();
+    this.layout();
+    return this.interaction.accept(source);
+  }
+  /** Close a tooltip, then let the focused widget, then the open dialog take Escape. Returns false when none did. */
+  cancel(source: InputSource = 'keyboard'): boolean {
+    this.live();
+    return this.interaction.cancel(source);
+  }
+  /** Run a command from any source: `'up'`, `'down'`, `'left'`, `'right'`, `'accept'`, `'cancel'`, `'next'`, `'previous'`. */
+  execute(command: UiCommand, source: InputSource = 'keyboard'): boolean {
+    this.live();
+    this.layout();
+    return this.interaction.execute(command, source);
+  }
+  /** True when a key press belongs to the UI (see {@link Ui.captureKeys}). */
+  wantsKeys(): boolean {
+    return this.interaction.wantsKeys();
+  }
+  /** A pointer moved to (x, y) CSS pixels from the canvas's top left. Returns true over a widget that takes the pointer. */
+  pointerMove(x: number, y: number, info?: PointerInfo): boolean {
+    this.live();
+    this.layout();
+    return this.interaction.pointerMove(x, y, info);
+  }
+  /** A pointer pressed at (x, y) CSS pixels. Returns true when the UI used it; otherwise the game should. */
+  pointerDown(x: number, y: number, info?: PointerInfo): boolean {
+    this.live();
+    this.layout();
+    return this.interaction.pointerDown(x, y, info);
+  }
+  /** A pointer was released at (x, y) CSS pixels. Returns true when it ends a press that began on the UI. */
+  pointerUp(x: number, y: number, info?: PointerInfo): boolean {
+    this.live();
+    return this.interaction.pointerUp(x, y, info);
+  }
+  /** The system cancelled the pointer (a touch became a scroll, the window lost focus). */
+  pointerCancel(): void {
+    this.interaction.pointerCancel();
+  }
+  /** The pointer left the canvas. */
+  pointerLeave(): void {
+    this.interaction.leave();
+  }
+  /** The wheel turned at (x, y) CSS pixels by `dy` CSS pixels (positive scrolls down). Returns true when a widget scrolled. */
+  wheel(x: number, y: number, dy: number): boolean {
+    this.live();
+    this.layout();
+    return this.interaction.wheel(x, y, dy);
+  }
+  /** True when a pointer at (x, y) CSS pixels is over the UI, so the game should ignore it. */
+  wantsPointer(x: number, y: number): boolean {
+    this.layout();
+    return this.interaction.wantsPointer(x, y);
+  }
+  /** The widget under (x, y) CSS pixels that takes pointer events, or null. */
+  hitTest(x: number, y: number): Widget | null {
+    this.layout();
+    return this.interaction.hitTest(x / this.cssScale, y / this.cssScale);
+  }
+  /**
+   * Drive the UI from an `Input` of `@margoengine/input` created with {@link uiActions}: d-pad and left stick move
+   * focus (holding repeats), A accepts, B cancels, the bumpers tab. `input.update()` must run before `ui.update()` each
+   * frame, as it does when your game loop calls it before `engine.render()`.
+   * @throws TypeError when the Input lacks the `ui.*` actions.
+   */
+  bindInput(input: Pick<Input, 'state'>): this {
+    this.live();
+    this.interaction.bindInput(input);
+    return this;
+  }
+  /** Stop reading the bound Input. */
+  unbindInput(): this {
+    this.interaction.unbindInput();
+    return this;
+  }
+
   /** The colour of a theme role or `#rrggbb[aa]` string as straight sRGB. */
   color(ref: ColorRef): Rgba {
     const hex = (this._theme.colors as unknown as Record<string, string>)[ref as keyof ThemeColors] ?? ref;
@@ -377,25 +527,56 @@ export class Ui {
   touchMirror(): void {
     this.mirrorRevision++;
     this.drawDirty = true;
+    for (const listener of this.changeListeners) listener();
   }
   /** Run `listener` whenever the UI changed; returns a function that stops it. */
   onChange(listener: () => void): () => void {
     this.changeListeners.add(listener);
     return () => this.changeListeners.delete(listener);
   }
+  /** Run `listener` whenever input focus moves; returns a function that stops it. */
+  onFocus(listener: () => void): () => void {
+    this.focusListeners.add(listener);
+    return () => this.focusListeners.delete(listener);
+  }
+  /** @internal */
+  focusChanged(): void {
+    for (const listener of this.focusListeners) listener();
+  }
+  /**
+   * Say something to screen reader users (a polite announcement waits for the reader to finish; an assertive one
+   * interrupts). Toasts are announced for you. Does nothing without an accessibility mirror
+   * (see {@link attachMirror}; {@link UiRenderer} attaches one by default).
+   */
+  announce(message: string, politeness: 'polite' | 'assertive' = 'polite'): void {
+    if (typeof message !== 'string' || !message) throw typeError('announce(message) takes a non-empty string', 'ui');
+    for (const announcer of this.announcers) announcer(message, politeness);
+  }
+  /** Receive the messages of {@link Ui.announce}; the accessibility mirror uses it. Returns a function that stops it. */
+  onAnnounce(listener: (message: string, politeness: 'polite' | 'assertive') => void): () => void {
+    this.announcers.add(listener);
+    return () => this.announcers.delete(listener);
+  }
   /** @internal */
   widgetAdded(_widget: Widget): void {}
   /** @internal */
-  widgetRemoved(_widget: Widget): void {}
+  widgetRemoved(widget: Widget): void {
+    this.interaction.widgetGone(widget);
+  }
   /** @internal */
-  widgetHidden(_widget: Widget): void {}
+  widgetHidden(widget: Widget): void {
+    this.interaction.widgetGone(widget);
+  }
   /** @internal */
-  cancelTooltip(): void {}
+  cancelTooltip(): void {
+    this.interaction.cancelTip();
+  }
   /** @internal */
   dialogClosed(_dialog: Dialog): void {
     const open = this.modalLayer.children.length > 0;
     this.modalLayer.background = open ? 'scrim' : 'none';
     this.modalLayer.pointerEvents = open ? 'auto' : 'none';
+    this.interaction.dialogClosed();
   }
 
   /** Lay out the layers now, if anything changed. {@link Ui.update} and {@link Ui.draw} do this for you. */
@@ -409,6 +590,7 @@ export class Ui {
       layer.setStyleQuiet({ padding: safe });
       arrange(layer, { x: 0, y: 0, width: w, height: h });
     }
+    this.interaction.placeTip();
     this.drawDirty = true;
   }
 
@@ -424,8 +606,9 @@ export class Ui {
       this.cache.clear();
       this.layoutDirty = true;
     }
-    this.layout();
     dt = Math.min(dt, 0.1);
+    this.interaction.tick(dt);
+    this.layout();
     let moving = false;
     for (const layer of this.layers) layer.walk((w) => (moving = w.tick(dt) || moving));
     if (moving) this.drawDirty = true;
@@ -468,9 +651,10 @@ export class Ui {
     return dialog.result;
   }
   /** @internal */
-  dialogOpened(_dialog: Dialog): void {
+  dialogOpened(dialog: Dialog): void {
     this.modalLayer.background = 'scrim';
     this.modalLayer.pointerEvents = 'auto';
+    this.interaction.dialogOpened(dialog);
   }
   /** Ask a yes or no question; resolves true for the confirm button and false otherwise. */
   async confirm(
@@ -502,6 +686,7 @@ export class Ui {
     if (typeof message !== 'string' || !message) throw typeError('toast(message) takes a non-empty string', 'ui');
     const toast = new Toast(message, options);
     this.toastStack.add(toast);
+    this.announce(toast.label, toast.kind === 'danger' ? 'assertive' : 'polite');
     const live = this.toastStack.children.filter((t) => t instanceof Toast && !t.dismissed);
     for (const old of live.slice(0, Math.max(0, live.length - MAX_TOASTS))) (old as Toast).dismiss();
     return toast;
@@ -519,6 +704,8 @@ export class Ui {
     this.disposed = true;
     for (const layer of this.layers) layer.dispose();
     this.changeListeners.clear();
+    this.focusListeners.clear();
+    this.announcers.clear();
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol.for('Symbol.dispose')) as symbol](): void {

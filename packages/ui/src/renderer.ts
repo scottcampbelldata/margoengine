@@ -1,17 +1,27 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
-import { GlyphAtlas, SDF_DEFAULTS } from '@margoengine/text';
+import { type GlyphAtlas, SDF_DEFAULTS, glyphAtlases } from '@margoengine/text';
 import { rangeError, typeError } from '../../shared/errors.js';
 import { overlayPass } from '../../shared/pass.js';
 import type { DrawList, TextCommand } from './draw.js';
 import { uiShader } from './shader.js';
+import { attachInput, type AttachOptions, type Detach } from './dom.js';
+import { attachMirror, type MirrorOptions } from './mirror.js';
 import type { Ui } from './ui.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
 type GpuContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** Premultiplied alpha: colour and alpha both blend as source + destination * (1 - source alpha). */
+const PREMULTIPLIED: GPUBlendState = {
+  color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+};
+const ATLAS: GPUTextureBindingLayout = { sampleType: 'float', viewDimension: '2d-array' };
+/** Two triangles per instance, both faces drawn. */
+const OVERLAY = { primitive: { topology: 'triangle-list', cullMode: 'none' } } as const;
 const RECT_FLOATS = 16,
   GLYPH_FLOATS = 16;
 
@@ -27,6 +37,16 @@ export interface UiRendererOptions {
   colorAtlasSize?: number;
   /** Page limit per atlas. Default 16. */
   maxPages?: number;
+  /**
+   * Connect the engine's canvas to the UI (pointer, touch, wheel and keyboard; see {@link attachInput}). Pass false to
+   * do it yourself, or options for `attachInput`. Default true.
+   */
+  input?: boolean | AttachOptions;
+  /**
+   * Mirror the UI into the DOM for screen readers (see {@link attachMirror}). Pass false to leave it out, or options. Default
+   * true: the interface is accessible with no setup.
+   */
+  mirror?: boolean | MirrorOptions;
 }
 
 interface Run {
@@ -76,7 +96,11 @@ export class UiRenderer implements EnginePlugin {
   private runs: Run[] = [];
   private uploaded = -1;
   private uploadedAtlas = '';
-  private readonly options: Required<Omit<UiRendererOptions, 'name' | 'order'>>;
+  private readonly options: Required<Omit<UiRendererOptions, 'name' | 'order' | 'input' | 'mirror'>>;
+  private readonly inputOptions: AttachOptions | false;
+  private readonly mirrorOptions: MirrorOptions | false;
+  private detach?: Detach;
+  private detachMirror?: Detach;
   private disposed = false;
 
   /** Same as `engine.use(new UiRenderer(ui, options))`; returns the renderer. */
@@ -99,6 +123,9 @@ export class UiRenderer implements EnginePlugin {
     this.order = options.order ?? 1000;
     if (!this.name || typeof this.name !== 'string' || !Number.isFinite(this.order))
       throw typeError('Invalid UiRenderer options', 'ui');
+    this.inputOptions = options.input === false ? false : options.input === true || !options.input ? {} : options.input;
+    this.mirrorOptions =
+      options.mirror === false ? false : options.mirror === true || !options.mirror ? {} : options.mirror;
     this.options = {
       atlasSize: options.atlasSize ?? 1024,
       colorAtlasSize: options.colorAtlasSize ?? 512,
@@ -113,6 +140,10 @@ export class UiRenderer implements EnginePlugin {
 
   setup(engine: Engine): void {
     this.engine = engine;
+    const canvas = (engine as unknown as { canvas?: HTMLElement }).canvas;
+    if (this.inputOptions && canvas && !this.detach) this.detach = attachInput(this.ui, canvas, this.inputOptions);
+    if (this.mirrorOptions && canvas && !this.detachMirror)
+      this.detachMirror = attachMirror(this.ui, canvas, this.mirrorOptions);
     if (engine.backend !== 'webgpu' || !engine.gpu) {
       if (!warned) {
         warned = true;
@@ -128,18 +159,13 @@ export class UiRenderer implements EnginePlugin {
       entries: [
         { binding: 0, visibility: both, buffer: { type: 'uniform', minBindingSize: 32 } },
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float', viewDimension: '2d-array' },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float', viewDimension: '2d-array' },
-        },
-        { binding: 4, visibility: both, buffer: { type: 'read-only-storage' } },
-        { binding: 5, visibility: both, buffer: { type: 'read-only-storage' } },
+        // The SDF atlas and the colour atlas, then the rectangle and glyph instance buffers.
+        ...[2, 3].map(
+          (binding): GPUBindGroupLayoutEntry => ({ binding, visibility: GPUShaderStage.FRAGMENT, texture: ATLAS }),
+        ),
+        ...[4, 5].map(
+          (binding): GPUBindGroupLayoutEntry => ({ binding, visibility: both, buffer: { type: 'read-only-storage' } }),
+        ),
       ],
     });
     this.pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [this.layout] });
@@ -151,15 +177,13 @@ export class UiRenderer implements EnginePlugin {
       addressModeV: 'clamp-to-edge',
     });
     this.frameBuffer = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    const maxPages = Math.min(this.options.maxPages, device.limits.maxTextureArrayLayers),
-      limit = device.limits.maxTextureDimension2D;
-    if (this.sdfAtlas && this.colorAtlas) {
-      this.sdfAtlas.restore(device);
-      this.colorAtlas.restore(device);
-    } else {
-      this.sdfAtlas = new GlyphAtlas(device, 'r8unorm', Math.min(this.options.atlasSize, limit), maxPages);
-      this.colorAtlas = new GlyphAtlas(device, 'rgba8unorm', Math.min(this.options.colorAtlasSize, limit), maxPages);
-    }
+    const atlases = glyphAtlases(
+      device,
+      { ...this.options, maxPages: Math.min(this.options.maxPages, device.limits.maxTextureArrayLayers) },
+      this.sdfAtlas && this.colorAtlas ? { sdf: this.sdfAtlas, color: this.colorAtlas } : undefined,
+    );
+    this.sdfAtlas = atlases.sdf;
+    this.colorAtlas = atlases.color;
     this.group = undefined;
     this.groupKey = '';
     this.uploaded = -1;
@@ -183,16 +207,12 @@ export class UiRenderer implements EnginePlugin {
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const module = this.module!,
-        blend: GPUBlendComponent = { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' };
+        stage = glyphs ? 'glyph' : 'rect';
       pipeline = this.device!.createRenderPipeline({
+        ...OVERLAY,
         layout: this.pipelineLayout!,
-        vertex: { module, entryPoint: glyphs ? 'glyphVertex' : 'rectVertex' },
-        fragment: {
-          module,
-          entryPoint: glyphs ? 'glyphFragment' : 'rectFragment',
-          targets: [{ format, blend: { color: blend, alpha: blend } }],
-        },
-        primitive: { topology: 'triangle-list', cullMode: 'none' },
+        vertex: { module, entryPoint: `${stage}Vertex` },
+        fragment: { module, entryPoint: `${stage}Fragment`, targets: [{ format, blend: PREMULTIPLIED }] },
         multisample: { count },
         depthStencil: { format: depthFormat, depthWriteEnabled: false, depthCompare: 'always' },
       });
@@ -444,6 +464,10 @@ export class UiRenderer implements EnginePlugin {
   /** Release every GPU resource, atlases included. The `Ui` is not disposed. */
   dispose(): void {
     this.disposed = true;
+    this.detach?.();
+    this.detach = undefined;
+    this.detachMirror?.();
+    this.detachMirror = undefined;
     this.releaseGpu(true);
     this.engine = undefined;
   }

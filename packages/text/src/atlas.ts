@@ -4,6 +4,37 @@ import { ShelfPacker, type AtlasSlot } from './packer.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; COPY_SRC: number };
 
+/** Sizes for {@link glyphAtlases}. */
+export interface GlyphAtlasSizes {
+  /** SDF page size in texels. */
+  atlasSize: number;
+  /** Colour (emoji) page size in texels. */
+  colorAtlasSize: number;
+  /** Page limit of each atlas. */
+  maxPages: number;
+}
+
+/**
+ * The two atlases a glyph renderer draws from on `device`: single-channel SDF glyphs and RGBA colour glyphs, each page
+ * limited by the device's texture size. Pass the pair a previous device used as `previous` to restore its glyphs on this one.
+ */
+export function glyphAtlases(
+  device: GPUDevice,
+  sizes: GlyphAtlasSizes,
+  previous?: { sdf: GlyphAtlas; color: GlyphAtlas },
+): { sdf: GlyphAtlas; color: GlyphAtlas } {
+  if (previous) {
+    previous.sdf.restore(device);
+    previous.color.restore(device);
+    return previous;
+  }
+  const limit = device.limits.maxTextureDimension2D;
+  return {
+    sdf: new GlyphAtlas(device, 'r8unorm', Math.min(sizes.atlasSize, limit), sizes.maxPages),
+    color: new GlyphAtlas(device, 'rgba8unorm', Math.min(sizes.colorAtlasSize, limit), sizes.maxPages),
+  };
+}
+
 /**
  * A growable texture-array glyph atlas. Glyphs are shelf-packed on demand and uploaded one by one with
  * writeTexture. When the pages run out the array grows (doubling its layers, copying the old ones on the

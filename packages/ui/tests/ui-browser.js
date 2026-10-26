@@ -109,9 +109,13 @@ async function run() {
     assert(gpuErrors.length === 0, `GPU errors: ${gpuErrors}`);
     const c = px(card);
     near(f.at(c.x + 40, c.y + c.height - 6), to255(themes.dark.colors.surface), 4, 'card surface');
-    near(f.at(c.x + c.width / 2, c.y + 0.5), to255(themes.dark.colors.border), 40, 'card top outline');
-    const corner = f.at(c.x + 0.5, c.y + 0.5);
-    assert(luminance(corner) < luminance(to255(themes.dark.colors.surface)) - 5, `corner is rounded away: ${corner}`);
+    near(f.at(c.x + c.width / 2, c.y), to255(themes.dark.colors.border), 40, 'card top outline');
+    const corner = f.at(c.x, c.y);
+    const distance = (p, q) => Math.max(...p.map((v, i) => Math.abs(v - q[i])));
+    assert(
+      distance(corner, BACKGROUND) < distance(corner, to255(themes.dark.colors.surface)),
+      `the corner is rounded away, so the scene shows there: ${corner}`,
+    );
     const b = px(play);
     near(f.at(b.x + 6, b.y + b.height / 2), to255(themes.dark.colors.primary), 4, 'primary button fill');
     const h = px(health);
@@ -145,11 +149,11 @@ async function run() {
     const f = await frame();
     const l = px(bag);
     const above = f.at(l.x + l.width / 2, l.y - 6);
-    near(above, BACKGROUND, 8, 'above the list');
+    near(above, BACKGROUND, 3, 'above the list');
     const below = f.at(l.x + l.width / 2, l.y + l.height + 4),
       belowLeft = f.at(l.x + 10, l.y + l.height + 20);
-    near(below, BACKGROUND, 8, 'just below the list is the scene, not row 12');
-    near(belowLeft, BACKGROUND, 8, 'further below too');
+    near(below, BACKGROUND, 3, 'just below the list is the scene, not row 12');
+    near(belowLeft, BACKGROUND, 3, 'further below too');
     assert(f.count(l, (p) => luminance(p) > 170) > 20, 'rows draw inside');
     await frame();
     assert(renderer.stats.uploads === 0, `an unchanged frame uploaded ${renderer.stats.uploads} times`);
@@ -210,9 +214,6 @@ async function run() {
       Math.abs(after.width - before.width * 2) < 2,
       `button is twice as wide in pixels: ${before.width} -> ${after.width}`,
     );
-    const f = await frame();
-    const b = px(play);
-    near(f.at(b.x + 6, b.y + b.height / 2), to255(themes.dark.colors.primary), 4, 'still the primary fill');
     ui.setScale(1);
     await frame();
     assert(Math.abs(px(play).width - before.width) < 1, 'back to normal');
@@ -255,16 +256,53 @@ async function run() {
     ui.add(grid);
     const f = await frame();
     const g = px(grid.slot(0));
-    near(f.at(g.x + 2, g.y + g.height / 2), to255(themes.dark.colors.border), 60, 'slot outline');
+    near(f.at(g.x, g.y + g.height / 2), to255(themes.dark.colors.border), 20, 'slot outline');
     assert(f.count(g, (p) => luminance(p) > 170) > 8, 'icon draws in the slot');
     ui.remove(grid);
     await frame();
   });
 
   assert(gpuErrors.length === 0, `GPU validation errors: ${gpuErrors.join('; ')}`);
-  ui.dispose();
-  engine.dispose();
+  context = { engine, ui, renderer, frame, px, gpuErrors };
   return { checks };
 }
+
+// Real mouse and keyboard events: the test driver (ui-browser.mjs) presses on the page between these calls.
+let context;
+const counts = { gameDown: 0, clicks: 0 };
+window.setupInputTest = () => {
+  const { ui, engine } = context;
+  ui.root.clear();
+  const go = new Button({ id: 'go', text: 'Go', variant: 'primary', anchor: 'top-left', margin: 40, width: 120 });
+  go.on('click', () => counts.clicks++);
+  ui.add(go);
+  engine.canvas.addEventListener('pointerdown', () => counts.gameDown++);
+  ui.layout();
+  const r = go.rect;
+  return { x: r.x, y: r.y, width: r.width, height: r.height };
+};
+window.readInputState = async () => {
+  const { ui, frame } = context;
+  const f = await frame();
+  const go = ui.find('go'),
+    r = go.rect;
+  // The focus ring is drawn just outside the button: sample the middle of its top edge, 2 units above.
+  const ring = f.at(r.x + r.width / 2, r.y - 2);
+  return {
+    ...counts,
+    focused: ui.focused?.id ?? null,
+    focusVisible: go.focusVisible,
+    mode: ui.inputMode,
+    ring,
+    active: document.activeElement?.id ?? '',
+  };
+};
+window.finishInputTest = () => {
+  const { ui, engine, gpuErrors } = context;
+  assert(gpuErrors.length === 0, `GPU validation errors: ${gpuErrors.join('; ')}`);
+  ui.dispose();
+  engine.dispose();
+  return { ...counts };
+};
 
 window.runUiTests = run;

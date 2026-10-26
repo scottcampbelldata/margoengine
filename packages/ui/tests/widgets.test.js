@@ -218,7 +218,7 @@ test('a list selects rows, scrolls and reports the chosen entry', () => {
   const ui = makeUi(),
     chosen = [],
     list = new List({
-      items: ['One', { label: 'Two', value: 22, detail: '$2' }, { label: 'Three', disabled: true }],
+      items: ['One', { label: 'Two', value: 22, detail: '$2' }, { label: 'Third', disabled: true }],
       height: 120,
       anchor: 'top-left',
       width: 200,
@@ -231,7 +231,7 @@ test('a list selects rows, scrolls and reports the chosen entry', () => {
   rows[2].activate();
   assert.deepEqual(chosen, [[1, 22]]);
   assert.equal(list.selected, 1);
-  assert.deepEqual(texts(ui), ['One', 'Two', '$2', 'Three']);
+  assert.deepEqual(texts(ui), ['One', 'Two', '$2', 'Third']);
   assert.throws(() => list.select(9), RangeError);
   assert.throws(() => (list.items = [5]), TypeError);
   list.items = ['A'];

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game UI · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+  <style>.views canvas{touch-action:none}.views canvas:focus-visible{outline:3px solid #ffd885;outline-offset:-3px}</style>
+</head>
+<body>
+  <h1>Game UI drawn in the engine</h1>
+  <p><code>@margoengine/ui</code> · A title menu, a HUD with a health bar and an inventory, a pause menu, settings and dialogs, all drawn on the canvas, so they work in fullscreen and in an exported game. Use the mouse or touch, the arrow keys with <kbd>Enter</kbd> and <kbd>Esc</kbd>, or a gamepad. Settings change the theme (including high contrast) and the text size; screen readers read the same interface from a hidden DOM mirror.</p>
+  <div class="views">
+    <canvas id="viewport" aria-label="A game scene with a title menu, health bar and inventory drawn on top"></canvas>
+  </div>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <p><kbd>D</kbd> take damage · <kbd>F</kbd> find an item · <kbd>Esc</kbd> pause · arrows, <kbd>Tab</kbd>, <kbd>Enter</kbd> and the d-pad move through the interface.</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./ui-game.ts'));
+  </script>
+</body>
+</html>

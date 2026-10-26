@@ -1,6 +1,14 @@
-export { Ui, resolutionScale, readSafeArea } from './ui.js';
+export { Ui, resolutionScale, readSafeArea, browserTextScale } from './ui.js';
 export type { UiOptions, ScaleOptions, SafeArea } from './ui.js';
 export { UiRenderer } from './renderer.js';
+export { attachInput } from './dom.js';
+export { attachMirror } from './mirror.js';
+export type { MirrorOptions } from './mirror.js';
+export type { AttachOptions, Detach } from './dom.js';
+export { uiActions, UI_ACTIONS } from './interaction.js';
+export type { InputSource, PointerInfo, UiActionOptions } from './interaction.js';
+export { moveFocus } from './focus.js';
+export type { Direction } from './focus.js';
 export type { UiRendererOptions } from './renderer.js';
 export { DrawList } from './draw.js';
 export type { DrawCommand, RectCommand, TextCommand, ClipCommand, UnclipCommand, RectStyle } from './draw.js';

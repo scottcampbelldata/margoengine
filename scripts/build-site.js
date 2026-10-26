@@ -92,6 +92,7 @@ const pages = [
   'sciviz-volume',
   'sciviz-points',
   'sciviz-surface',
+  'ui-game',
 ];
 await site({
   configFile: false,

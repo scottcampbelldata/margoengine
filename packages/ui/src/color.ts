@@ -1,10 +1,11 @@
+import { hexColor } from '@margoengine/math/color';
 import { rangeError, typeError } from '../../shared/errors.js';
 
 /** Straight (non-premultiplied) sRGB colour, each channel in 0..1. */
 export type Rgba = readonly [number, number, number, number];
 
 /**
- * Parse `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa` into sRGB channels in 0..1. An {@link Rgba} passes through after a
+ * Parse `#rgb`, `#rrggbb` or `#rrggbbaa` into sRGB channels in 0..1. An {@link Rgba} passes through after a
  * range check. Throws a TypeError for any other string and a RangeError for a channel outside 0..1.
  */
 export function parseRgba(value: string | Rgba): Rgba {
@@ -15,11 +16,9 @@ export function parseRgba(value: string | Rgba): Rgba {
       throw rangeError('Colour channels must be numbers from 0 to 1', 'ui');
     return value;
   }
-  const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(value.trim())?.[1];
-  if (!hex) throw typeError(`Unsupported colour '${value}'; use #rgb, #rgba, #rrggbb or #rrggbbaa`, 'ui');
-  const full = hex.length <= 4 ? [...hex].map((c) => c + c).join('') : hex;
-  const channel = (i: number) => Number.parseInt(full.slice(i * 2, i * 2 + 2), 16) / 255;
-  return [channel(0), channel(1), channel(2), full.length === 8 ? channel(3) : 1];
+  const color = hexColor(value.trim());
+  if (!color) throw typeError(`Unsupported colour '${value}'; use #rgb, #rrggbb or #rrggbbaa`, 'ui');
+  return color;
 }
 
 /** `color` with its alpha multiplied by `alpha` (0..1). */

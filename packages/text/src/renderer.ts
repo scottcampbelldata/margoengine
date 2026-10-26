@@ -3,7 +3,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { viewMatrix } from '../../shared/view.js';
-import { GlyphAtlas } from './atlas.js';
+import { type GlyphAtlas, glyphAtlases } from './atlas.js';
 import { LinearToSRGB as encodeSrgb } from '@margoengine/math/color';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { textShader } from './shader.js';
@@ -191,14 +191,13 @@ export class TextRenderer implements EnginePlugin {
     });
     this.frameBuffer = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const maxPages = Math.min(this.options.maxPages, device.limits.maxTextureArrayLayers, 2048),
-      limit = device.limits.maxTextureDimension2D;
-    if (this.sdfAtlas && this.colorAtlas) {
-      this.sdfAtlas.restore(device);
-      this.colorAtlas.restore(device);
-    } else {
-      this.sdfAtlas = new GlyphAtlas(device, 'r8unorm', Math.min(this.options.atlasSize, limit), maxPages);
-      this.colorAtlas = new GlyphAtlas(device, 'rgba8unorm', Math.min(this.options.colorAtlasSize, limit), maxPages);
-    }
+      atlases = glyphAtlases(
+        device,
+        { ...this.options, maxPages },
+        this.sdfAtlas && this.colorAtlas ? { sdf: this.sdfAtlas, color: this.colorAtlas } : undefined,
+      );
+    this.sdfAtlas = atlases.sdf;
+    this.colorAtlas = atlases.color;
     this.frameGroup = undefined;
     this.frameGroupKey = '';
   }
