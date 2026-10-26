@@ -1,5 +1,5 @@
 {
-  "commit": "249e5208",
+  "commit": "ad7d531d",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -10,8 +10,8 @@
   "packages": {
     "@margoengine/animation": {
       ".": {
-        "raw": 59058,
-        "gzip": 18977
+        "raw": 59643,
+        "gzip": 19175
       },
       "./vat": {
         "raw": 20062,
@@ -98,8 +98,8 @@
         "gzip": 13177
       },
       "./shadows": {
-        "raw": 28026,
-        "gzip": 10504
+        "raw": 28978,
+        "gzip": 10915
       },
       "./area": {
         "raw": 18794,
@@ -476,8 +476,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 171218,
-        "gzip": 53433
+        "raw": 172328,
+        "gzip": 53782
       },
       "./asset": {
         "raw": 17246,
@@ -500,16 +500,16 @@
         "gzip": 16523
       },
       "./progressive": {
-        "raw": 188230,
-        "gzip": 59845
+        "raw": 190182,
+        "gzip": 60451
       },
       "./coordinates": {
         "raw": 1380,
         "gzip": 563
       },
       "./worker": {
-        "raw": 172145,
-        "gzip": 53684
+        "raw": 174097,
+        "gzip": 54269
       },
       "dist/workers/gltf.js": {
         "raw": 60427,
@@ -1180,8 +1180,8 @@
     },
     "@margoengine/taa": {
       ".": {
-        "raw": 32431,
-        "gzip": 9819
+        "raw": 33239,
+        "gzip": 10087
       }
     },
     "@margoengine/terrain": {
@@ -1240,8 +1240,8 @@
         "gzip": 9110
       },
       "dist/workers/usdz.js": {
-        "raw": 191128,
-        "gzip": 62227
+        "raw": 193084,
+        "gzip": 62823
       }
     },
     "@margoengine/vfx": {
@@ -1539,9 +1539,9 @@
       "brotli": 43890
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 189073,
-      "gzip": 62078,
-      "brotli": 53647
+      "raw": 190869,
+      "gzip": 62655,
+      "brotli": 54113
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 20098,
