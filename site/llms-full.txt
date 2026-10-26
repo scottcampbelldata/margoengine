@@ -5963,6 +5963,19 @@ rig.shake(0.2, 0.4);
 
 follow accepts a live mesh from the attached engine or a world-position tuple. Mesh targets use world transforms. Shake amplitude is in world units and duration is seconds; it does not alter the settled spring position. The frame plugin owns camera position/target while attached, so disable competing camera controls. dispose detaches it.
 
+Scope the rig with `using` (it calls `dispose()` and returns the camera to your controls):
+
+```ts
+import {Cinematic} from 'margoengine/cinematic';
+{
+  using rig = Cinematic.attach(engine, {offset: [0, 3, 6]});
+  rig.follow([0, 1.6, 0]);
+  rig.update(1 / 60);
+}
+```
+
+Errors name their fix: a bad argument throws `RangeError` or `TypeError` (for example `Invalid camera delta; pass a finite delta of 0 or more seconds`), and attaching a rig twice throws `MargoError` with code `attached`.
+
 Set `ground: (x,z) => height` to keep the camera arm above a CPU heightfield.
 `clearance` defaults to 0.65 world units. The rig checks both its desired arm and
 the resulting damped/shaken camera, without changing your requested `offset`.
@@ -6006,6 +6019,18 @@ and `runSpeed` (7). Bounds and minimum height are omitted by default. Look value
 are angular deltas; pitch stays between -1.4 (look up) and 0.9 radians (look down).
 Use `Cinematic` ground clearance to keep upward-looking cameras above terrain. Height samples must
 be finite. The caller owns input bindings, character meshes and gait animation.
+
+```ts
+import {stepLocomotion} from 'margoengine/controls';
+
+const state = new Float32Array(8);                    // x, y, z, heading, cameraYaw, cameraPitch, gaitPhase, speed
+const actions = new Float32Array([0, 1, 0, 0, 0]);    // strafe, forward, lookX, lookY, sprint: walk forward
+const ground = (x: number, z: number) => 0.1 * Math.sin(x) * Math.cos(z); // any finite height sampler
+for (let frame = 0; frame < 60; frame++) stepLocomotion(state, actions, 1 / 60, ground, {bounds: [-50, 50, -50, 50]});
+console.log(state[0], state[2]);                      // where the walker is after one second
+```
+
+Bad inputs throw a `RangeError` that says what to pass (finite numbers, bounds with min below max).
 
 Orbit, map, trackball, arcball, fly, first-person and pointer-lock camera controls plus an interactive transform gizmo and drag controls for Margo Engine, each tree-shakable on its own. `DragControls` uses `@margoengine/bvh` (a peer dependency) for its hits.
 
@@ -6064,13 +6089,6 @@ so it costs nothing unless you import its entry. A whole recipe: [docs/guides/wa
 import {Engine} from 'margoengine/core';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {WalkControls} from 'margoengine/controls/walk';
-
-const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 1.65, 0], target: [0, 1.65, 1]}});
-const house = await loadGLTF(engine, '/house.glb');
-const walk = WalkControls.attach(engine, {colliders: [house]}); // default colliders: every visible mesh and model
-walk.eyeHeight = 1.7; walk.jumpSpeed = 4;                        // games: Space jumps (off by default)
-document.querySelector('#view')!.addEventListener('click', () => walk.toggleDollhouse());
-engine.start();
 ```
 
 [README continues: https://margoengine.com/llms/packages/controls.md]
@@ -6127,15 +6145,7 @@ projection.fit(model.bounds);                // frame a box: [minX, minY, minZ, 
 - `attach(camera)` drives a camera without an engine; `dispose()` (or `engine.removePlugin('cameras')`) restores core's
   `project` (unset) and a plain `up` field. Attaching to a camera whose `project` is already set throws.
 
-Orthographic-aware (they read `camera.matrix`): SSAO, points, labels, clustered, DOF, splats and lines' world-space
-widths. Shadow cascades are fitted to the perspective frustum, which covers
-the default ortho view; a fixed small `height` far from the target wastes shadow resolution. Cascades stay texel-locked under orthographic pan and
-zoom, with no visible shimmer: an ortho zoom leaves the shadow matrices unchanged, and a slow pan changes about 0.6 of
-14k shadow-edge pixels per frame, against 194 for a 0.01° light turn (Intel Arc 140V laptop iGPU, Edge 155;
-`examples/package-benchmarks/shadow-shimmer.mjs`, [shadow-shimmer.json](../../examples/package-benchmarks/results/shadow-shimmer.json)). Specular uses the camera
-position, not a parallel view direction.
-
-## Large coordinates: `@margoengine/cameras/origin`
+Errors name their fix. Argument problems throw `RangeError` or `TypeError` (for example `Invalid fit; pass min <= max, aspect > 0, duration >= 0 and padding >= 1, all finite`). Branch on `error.code` for the rest: `attached` (a projection or camera already in use) and `state` (a `FloatingOrigin` used before `engine.use(origin)`).
 
 [README continues: https://margoengine.com/llms/packages/cameras.md]
 
