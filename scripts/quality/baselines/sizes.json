@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3398235,
+  "total": 3398002,
   "history": [
     {
       "date": "2026-10-24",
@@ -591,7 +591,7 @@
     "@margoengine/gltf-pro/coordinates": 755,
     "@margoengine/gltf-pro/extended": 6502,
     "@margoengine/gltf-pro/instancing": 3380,
-    "@margoengine/gltf-pro/prepare": 17135,
+    "@margoengine/gltf-pro/prepare": 17019,
     "@margoengine/gltf-pro/progressive": 61641,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/worker": 55295,
@@ -624,7 +624,7 @@
     "@margoengine/machinery": 44630,
     "@margoengine/machinery dist/workers/cad-runtime.js": 8347,
     "@margoengine/machinery/assembly": 977,
-    "@margoengine/machinery/cad": 13334,
+    "@margoengine/machinery/cad": 13217,
     "@margoengine/machinery/cad-async": 1775,
     "@margoengine/machinery/clearance": 1571,
     "@margoengine/machinery/dimensions": 4631,
