@@ -61,9 +61,18 @@ does not own. Each entry says exactly what is needed to close it.
   at partly covered pixels. Mesh arrival order is not involved: 168 permutations of the mesh replies drew the same
   pixels on a quiet machine. Another vendor's GPU was not available to compare (the AMD iGPU offers no WebGPU
   adapter).
+- **What the checks do about it (Scott, 2026-10-26):** the voxel GPU checks allow a difference of at most 1 in 8 bits
+  (1 half-float ulp on the rgba16float HDR scene) on views that blend a translucent layer at 4x MSAA, and nowhere else:
+  1x views, views with no translucent layer, every other check and every other package stay exact. The rule is the named
+  constant `BLENDED_4X_MAX_CHANNEL_DIFF` in `packages/voxel/tests/blend-tolerance.js`, unit-tested
+  (`blend-tolerance.test.js`: 1 passes, 2 fails). The GPU check shows it cannot hide an ordering bug: the same two
+  translucent panes in the other order differ by up to 132 of 255 (`swapped layer order` step), and the mesh arrival
+  order step stays a pixel comparison with that tolerance only. The check's output prints the exact count next to the
+  tolerant one, and `--repeat` reports both (it still fails on any exact difference: it is the repro).
+- **Report:** a factual report with the repro for NVIDIA is drafted in `private/handoffs/nvidia-report.md` (not sent).
 - **Needed to close:** the same repro on another GPU (AMD, Intel, another NVIDIA driver) to confirm it is this driver,
-  then a report to NVIDIA with the repro; and a decision on how the exact-pixel GPU checks treat blended 4x views on a
-  GPU that does not repeat them (the comparison itself must stay exact).
+  and the report sent to NVIDIA. The entry stays until a driver or GPU that repeats 4x blending exactly is found, or the
+  vendor explains the behaviour; then the tolerance can go.
 
 ## Performance losses still open
 

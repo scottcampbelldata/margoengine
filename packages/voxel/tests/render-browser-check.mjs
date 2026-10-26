@@ -2,6 +2,8 @@
 // time: node scripts/gpu-lock.mjs run --owner=voxel-render -- node packages/voxel/tests/render-browser-check.mjs):
 // - T-junction cracks: a closed slab of two block types that never merge, every face the same colour, from grazing
 //   views: no background pixel inside the surface in the greedy image (nor in the naive one), at 4x and 1x MSAA;
+// - (tolerance: views that blend a translucent layer at 4x MSAA may differ by 1 ulp, nowhere else: blend-tolerance.js,
+//   docs/known-bugs.md "4x MSAA blending is not repeatable"; a swapped layer order must still differ by far more)
 // - greedy meshes and the same meshes as one quad per block face shade identically, at 4x and 1x MSAA, on the canvas
 //   format and on an rgba16float HDR target: the only differing pixels are samples within a fraction of a pixel of a
 //   quad edge, owned by the quad across it (T-junctions and the crack fix's overlap), so under 1% of the drawn pixels
@@ -15,7 +17,8 @@
 // `--timing` adds a 16-chunk-radius synthetic world: spawn time, GPU time of the voxel passes (timestamp queries,
 // rough unless run behind scripts/quiet-gate.mjs) and the render bundle record cost. `--repeat=<frames>` runs only
 // this: one still 4x view drawn frame after frame under CPU load, failing on any frame that differs from the first
-// (docs/known-bugs.md, "4x MSAA blending is not repeatable").
+// (docs/known-bugs.md, "4x MSAA blending is not repeatable"); it reports the frames that differ exactly and those that
+// differ by more than the blended-4x tolerance.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { availableParallelism } from 'node:os';
@@ -74,7 +77,9 @@ try {
         assert.ok(s.bytes >= s.quads * 12 && s.bytes <= s.quads * 12 + s.chunks * 3 * 768, JSON.stringify(s));
         assert.ok(s.visible <= s.chunks && s.draws >= s.visible, JSON.stringify(s));
       }
-      const edge = Object.values(r.results).map((x) => `${x.differing}/${x.lit}`);
+      const edge = Object.values(r.results).map(
+        (x) => `${x.differing}/${x.lit}${x.strictDiffering === x.differing ? '' : ` (exact ${x.strictDiffering})`}`,
+      );
       console.log(
         `ok ${label} ${r.size.join('x')}: greedy ${greedy.quads} quads, naive ${naive.quads}; edge-sample pixels per view ${edge.join(' ')}`,
       );
@@ -85,7 +90,25 @@ try {
     assert.equal(o.arrivals[1], 4, `reversed run: ${o.arrivals[1]} of 4 meshes held back`);
     for (const [view, result] of Object.entries(o.results))
       assert.equal(result.differing, 0, `${samples}x ${view}: meshes in another order drew ${JSON.stringify(result)}`);
-    console.log(`ok ${samples}x mesh arrival order: same pixels in ${Object.keys(o.results).length} views`);
+    const exactly = Object.values(o.results).filter((x) => x.strictDiffering === 0).length;
+    console.log(
+      `ok ${samples}x mesh arrival order: same pixels in ${Object.keys(o.results).length} views (${exactly} bit for bit, tolerance ${Object.values(
+        o.results,
+      )
+        .map((x) => x.tolerance)
+        .join(' ')})`,
+    );
+    // The tolerance cannot hide a draw-order bug: two translucent layers in the other order differ by far more than it.
+    const so = await page.evaluate(() => window.check.orderSensitivity());
+    report.results[`${samples}x order sensitivity`] = so;
+    assert.deepEqual(so.errors, []);
+    assert.ok(
+      so.result.max > 8 && so.result.differing > 100,
+      `${samples}x swapped translucent layers drew almost the same pixels: ${JSON.stringify(so.result)}`,
+    );
+    console.log(
+      `ok ${samples}x swapped layer order: ${so.result.differing} pixels differ, up to ${so.result.max} of 255`,
+    );
     const c = await page.evaluate(() => window.check.composites());
     report.results[`${samples}x composites`] = c;
     assert.deepEqual(c.errors, []);
@@ -137,7 +160,20 @@ try {
       const r = await page.evaluate((n) => window.check.repeat(n, 'tree and overhang'), repeat);
       assert.deepEqual(r.errors, []);
       for (const d of r.differ.slice(0, 5)) console.log(`frame ${d.frame}: ${JSON.stringify(d)}`);
-      assert.equal(r.differ.length, 0, `4x tree and overhang: ${r.differ.length} of ${repeat} still frames differ`);
+      const beyond = r.differ.filter((d) => d.differing > 0);
+      console.log(
+        `4x tree and overhang, ${repeat} still frames: ${r.differ.length} differ exactly (max ${Math.max(0, ...r.differ.map((d) => d.max))} of 255), ${beyond.length} differ by more than the blended-4x tolerance of ${r.tolerance}`,
+      );
+      assert.equal(
+        beyond.length,
+        0,
+        `4x tree and overhang: ${beyond.length} of ${repeat} still frames differ by more than ${r.tolerance}`,
+      );
+      assert.equal(
+        r.differ.length,
+        0,
+        `4x tree and overhang: ${r.differ.length} of ${repeat} still frames differ exactly (hardware issue, docs/known-bugs.md)`,
+      );
       console.log(`ok 4x tree and overhang: ${repeat} still frames under CPU load drew the same pixels`);
     } finally {
       await Promise.all(burners.map((w) => w.terminate()));

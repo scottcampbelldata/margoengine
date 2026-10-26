@@ -13,6 +13,7 @@ import {BlockTypes,VoxelChunk,VoxelWorld,blockState} from '/packages/voxel/dist/
 import {VoxelLighting} from '/packages/voxel/dist/light.js';
 import {meshChunk,meshInput} from '/packages/voxel/dist/mesher.js';
 import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
+import {compareImages,toleranceFor} from '/packages/voxel/tests/blend-tolerance.js';
 if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
 const canvas=document.querySelector('canvas'),errors=[],runtime=()=>engineRuntime(engine);
 const watch=(device)=>device.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
@@ -62,7 +63,8 @@ const blocks=new BlockTypes(),STONE=blocks.define('stone',{textures:0}),DIRT=blo
  GOLD=blocks.define('gold',{textures:9,color:[1,0.7,0.1],emissive:2}),
  RED=blocks.define('red',{textures:9,color:[1,0,0],emissive:1}),GREEN=blocks.define('cutout test',{layer:'cutout',textures:10,color:[0,1,0],emissive:1}),
  BLUE=blocks.define('glass test',{layer:'translucent',textures:11,color:[0,0,1],emissive:1}),
- WHITE=blocks.define('white',{textures:9,emissive:1}),WHITE2=blocks.define('white 2',{textures:9,emissive:1});
+ WHITE=blocks.define('white',{textures:9,emissive:1}),WHITE2=blocks.define('white 2',{textures:9,emissive:1}),
+ AMBER=blocks.define('glass amber',{layer:'translucent',textures:11,color:[1,0.6,0],emissive:1});
 // The fixed world: 2 x 2 chunks of seeded hills, a flat stone floor with dirt patches (T-junctions), a pool of lowered
 // water, a glass wall, a tree, flowers, a torch and an overhang.
 const world=new VoxelWorld({blocks}),keys=[];
@@ -131,14 +133,26 @@ function attach(w,ks,mode,workers=2){
  return VoxelRenderer.attach(engine,{world:w,textures,workers});
 }
 const look=(v)=>{engine.camera.position=v.position;engine.camera.target=v.target;};
-// Pixels that differ at all, the largest channel difference, pixels drawn (not background) and 2 x 2 blocks of
-// differing pixels: a shading difference covers areas, a sample owned by the quad across an edge does not.
-// `at`: the first 8 differing pixels as [x, y, a's RGBA, b's RGBA], so a failure says where to look.
-function compare(a,b,bg){let differing=0,lit=0,max=0,blocks=0;const W=canvas.width,n=a.length/4,diff=new Uint8Array(n),at=[];
- const far=(p,img)=>Math.abs(img[p]-bg[0])+Math.abs(img[p+1]-bg[1])+Math.abs(img[p+2]-bg[2]);
- for(let p=0;p<a.length;p+=4){let d=0;for(let c=0;c<4;c++)d=Math.max(d,Math.abs(a[p+c]-b[p+c]));if(d>0||!Object.is(a[p],b[p])){differing++;diff[p/4]=1;if(at.length<8)at.push([p/4%W,Math.floor(p/4/W),[...a.slice(p,p+4)],[...b.slice(p,p+4)]]);}max=Math.max(max,d);if(far(p,b)>0)lit++;}
- for(let i=0;i<n-W-1;i++)if(diff[i]&&diff[i+1]&&diff[i+W]&&diff[i+W+1]&&(i+1)%W)blocks++;
- return {differing,lit,pixels:n,max,blocks,at};}
+// Pixels that differ, the largest channel difference, pixels drawn (not background) and 2 x 2 blocks of differing
+// pixels: a shading difference covers areas, a sample owned by the quad across an edge does not. `at`: the first 8
+// differing pixels as [x, y, a's RGBA, b's RGBA]. Exact unless a tolerance is passed (blend-tolerance.js: 1 ulp, for
+// blended 4x views only; the strict counts are always reported too).
+const compare=(a,b,bg,tolerance=0)=>compareImages(a,b,bg,canvas.width,tolerance);
+// Does the view see a translucent block (the pool or the glass wall)? A view that does blends. A generous test (the
+// frustum against a grid of points in each box; occlusion ignored), so an unblended view never gets the tolerance.
+const TRANSLUCENT_BOXES=[[44,6,4,56,15,16],[20,14,10,25,17,11]];
+function seesTranslucent(v){
+ const sub=(a,b)=>a.map((x,k)=>x-b[k]),dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],unit=(a)=>{const l=Math.hypot(...a);return a.map((x)=>x/l);},
+  cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+ const f=unit(sub(v.target,v.position)),right=unit(cross(f,[0,1,0])),up=cross(right,f),t=Math.tan(Math.PI/6),aspect=canvas.width/canvas.height;
+ for(const b of TRANSLUCENT_BOXES)for(let i=0;i<=6;i++)for(let j=0;j<=6;j++)for(let k=0;k<=6;k++){
+  const d=sub([b[0]+(b[3]-b[0])*i/6,b[1]+(b[4]-b[1])*j/6,b[2]+(b[5]-b[2])*k/6],v.position),z=dot(d,f);
+  if(z>0.1&&Math.abs(dot(d,right)/z)<=t*aspect&&Math.abs(dot(d,up)/z)<=t)return true;}
+ return false;
+}
+for(const v of views)v.blended=seesTranslucent(v);
+// The comparison tolerance of a view: 1 ulp when it blends at 4x MSAA, exact otherwise (docs/known-bugs.md).
+const tolerance=(v)=>toleranceFor({samples:sceneSamples(),blended:v.blended});
 window.check={
  samples:sceneSamples,
  async greedyVsNaive(hdr){
@@ -150,9 +164,9 @@ window.check={
    for(const v of views){look(v);images[mode].push(await shot());}
    stats[mode]={...renderer.stats};renderer.dispose();
   }
-  const results=Object.fromEntries(views.map((v,i)=>[v.name,compare(images.greedy[i],images.naive[i],bg)]));
+  const results=Object.fromEntries(views.map((v,i)=>[v.name,compare(images.greedy[i],images.naive[i],bg,tolerance(v))]));
   post?.dispose();post=undefined;
-  return {results,stats,format:hdr?'rgba16float':navigator.gpu.getPreferredCanvasFormat(),size:[canvas.width,canvas.height],errors:errors.splice(0)};
+  return {results,blended:views.map((v)=>v.blended),stats,format:hdr?'rgba16float':navigator.gpu.getPreferredCanvasFormat(),size:[canvas.width,canvas.height],errors:errors.splice(0)};
  },
  // The same world and views with the meshes arriving in send order and then reversed: the same pixels.
  async arrivalOrder(){
@@ -164,15 +178,25 @@ window.check={
    renderer.dispose();
   }
   reversed=false;
-  return {results:Object.fromEntries(views.map((v,i)=>[v.name,compare(images[1][i],images[0][i],[0,0,0])])),arrivals,errors:errors.splice(0)};
+  return {results:Object.fromEntries(views.map((v,i)=>[v.name,compare(images[1][i],images[0][i],[0,0,0],tolerance(v))])),arrivals,blended:views.map((v)=>v.blended),errors:errors.splice(0)};
  },
  // One renderer, one still view, n frames: the frames that differ from the first (docs/known-bugs.md, "4x MSAA
  // blending is not repeatable"). Nothing changes between the frames: no upload, no re-sort, the same uniforms.
  async repeat(n,view){
   look(views[0]);renderer=attach(world,keys,'greedy',4);await ready(renderer,world,keys,'greedy');
-  look(views.find((v)=>v.name===view));const first=await shot(),differ=[];
-  for(let i=0;i<n;i++){const c=compare(await shot(),first,[0,0,0]);if(c.differing)differ.push({frame:i,...c});}
-  renderer.dispose();return {differ,errors:errors.splice(0)};
+  const v=views.find((x)=>x.name===view),tol=toleranceFor({samples:4,blended:v.blended});look(v);const first=await shot(),differ=[];
+  for(let i=0;i<n;i++){const img=await shot(),c=compare(img,first,[0,0,0],tol);if(c.strictDiffering)differ.push({frame:i,...c});}
+  renderer.dispose();return {differ,tolerance:tol,errors:errors.splice(0)};
+ },
+ // Draw-order sensitivity of the tolerance: two panes of translucent glass, one in each of two chunks, one behind the
+ // other seen along +x; the same panes with the two colours swapped between the chunks. The images differ only by the
+ // order the layers blend in, which must stay far above the 1 ulp the blended-4x tolerance allows (blend-tolerance.js).
+ async orderSensitivity(){
+  const make=(first,second)=>{const w=new VoxelWorld({blocks}),e=[];w.addChunk(0,0,0);w.addChunk(1,0,0);
+   for(let y=2;y<8;y++)for(let z=2;z<8;z++){e.push(10,y,z,first,40,y,z,second);}w.setBlocks(e);return w;};
+  const keys2=['0,0,0','1,0,0'],view={position:[-6,4.5,4.5],target:[60,4.5,4.5]},images=[];
+  for(const [a,b] of [[BLUE,AMBER],[AMBER,BLUE]]){const w=make(a,b);renderer=attach(w,keys2,'greedy');await ready(renderer,w,keys2,'greedy');look(view);images.push(await shot());renderer.dispose();}
+  return {result:compare(images[0],images[1],[0,0,0],toleranceFor({samples:4,blended:true})),errors:errors.splice(0)};
  },
  // T-junction cracks: pixels of the slab where the naive image is the slab colour and the greedy one is not.
  async cracks(){
@@ -227,7 +251,7 @@ window.check={
  async restore(){
   look(views[0]);const before=await shot(),old=device();await engine.rebootDevice();watch(device());
   await ready(renderer,world,keys,'greedy');const after=await shot();const stats={...renderer.stats};renderer.dispose();
-  return {result:compare(after,before,[0,0,0]),newDevice:device()!==old,stats,errors:errors.splice(0)};
+  return {result:compare(after,before,[0,0,0],tolerance(views[0])),newDevice:device()!==old,stats,errors:errors.splice(0)};
  },
  // The most quads one chunk layer can hold: a 3D checkerboard of two cutout cube types (chunk 0,0,0) and one of two
  // glasses (chunk 2,0,0) show every face of every cell, 196,608 quads each. An indirect draw past the index buffer is
