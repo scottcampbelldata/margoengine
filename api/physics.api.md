@@ -108,6 +108,32 @@ export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionst
 
 export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
 
+export type CompoundPart = ({
+    shape: 'box';
+    halfExtents: Vec3;
+} | {
+    shape: 'sphere';
+    radius: number;
+} | {
+    shape: 'capsule';
+    halfHeight: number;
+    radius: number;
+} | {
+    shape: 'cylinder';
+    halfHeight: number;
+    radius: number;
+} | {
+    shape: 'cone';
+    halfHeight: number;
+    radius: number;
+} | {
+    shape: 'convexHull';
+    points: ArrayLike<number>;
+}) & {
+    offset?: Vec3;
+    rotation?: Quat;
+};
+
 export interface Hit {
     body: PhysicsBody;
     mesh: Mesh | null;
@@ -120,6 +146,16 @@ export type JointOptions = (JointBase & {
     frameB?: Quat;
 }) | (JointBase & {
     type: 'spherical';
+})
+ | (JointBase & {
+    type: 'rope';
+    length: number;
+})
+ | (JointBase & {
+    type: 'spring';
+    restLength: number;
+    stiffness: number;
+    damping?: number;
 }) | (JointBase & {
     type: 'revolute' | 'prismatic';
     axis: Vec3;
@@ -130,7 +166,7 @@ export type JointOptions = (JointBase & {
 export type JointType = JointOptions['type'];
 
 export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'position' | 'rotation'> {
-    shape?: 'trimesh' | 'convexHull';
+    shape?: 'trimesh' | 'convexHull' | 'convexDecomposition';
     perNode?: boolean;
     filter?: (primitive: ModelPrimitiveLike) => boolean;
     collider?: Omit<ColliderSettings, 'offset' | 'rotation'>;
@@ -196,6 +232,9 @@ export class Physics implements EnginePlugin, BodyOwner {
     removeJoint(joint: PhysicsJoint): void;
     createCharacterController(body: PhysicsBody, options?: CharacterControllerOptions): CharacterController;
     removeController(controller: CharacterController): void;
+    owns(body: PhysicsBody): boolean;
+    attach(attachment: PhysicsAttachment): void;
+    detach(attachment: PhysicsAttachment): boolean;
     on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void;
     raycast(origin: Vec3, direction: Vec3, options?: PhysicsRaycastOptions): RaycastHit | null;
     raycastAll(origin: Vec3, direction: Vec3, options?: PhysicsRaycastOptions): RaycastHit[];
@@ -343,6 +382,8 @@ export interface RapierModule {
         convexHull(points: Float32Array): ColliderDesc | null;
         trimesh(vertices: Float32Array, indices: Uint32Array): ColliderDesc;
         heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector): ColliderDesc;
+        compound?(shapes: Shape[], positions: Vector[], rotations: Rotation[]): ColliderDesc;
+        convexDecomposition?(vertices: Float32Array, indices: Uint32Array): ColliderDesc | null;
     };
     RigidBodyDesc: {
         dynamic(): RigidBodyDesc;
@@ -355,6 +396,8 @@ export interface RapierModule {
         spherical(anchorA: Vector, anchorB: Vector): JointData;
         revolute(anchorA: Vector, anchorB: Vector, axis: Vector): JointData;
         prismatic(anchorA: Vector, anchorB: Vector, axis: Vector): JointData;
+        rope?(length: number, anchorA: Vector, anchorB: Vector): JointData;
+        spring?(restLength: number, stiffness: number, damping: number, anchorA: Vector, anchorB: Vector): JointData;
     };
     QueryFilterFlags: Record<'EXCLUDE_SENSORS' | 'EXCLUDE_FIXED' | 'EXCLUDE_KINEMATIC' | 'EXCLUDE_DYNAMIC', number>;
     SolverFlags: {
@@ -375,6 +418,31 @@ export interface RaycastHit extends Hit {
     distance: number;
     point: [number, number, number];
     normal: [number, number, number];
+}
+
+export class Rope implements PhysicsAttachment {
+    readonly segments: PhysicsBody[];
+    readonly joints: PhysicsJoint[];
+    readonly segmentLength: number;
+    constructor(owner: Physics, options: RopeOptions);
+    get valid(): boolean;
+    points(out?: Float32Array): Float32Array;
+    remove(): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface RopeOptions {
+    start: Vec3;
+    end: Vec3;
+    segments?: number;
+    radius?: number;
+    attachStart?: PhysicsBody | 'fixed';
+    attachEnd?: PhysicsBody | 'fixed';
+    damping?: number;
+    angularDamping?: number;
+    collider?: Omit<ColliderSettings, 'offset' | 'rotation'>;
+    body?: Omit<BodyOptions, 'type' | 'position' | 'rotation' | 'colliders'>;
 }
 
 export interface ShapeCastHit extends Hit {
@@ -418,11 +486,91 @@ export type ShapeOptions = {
     scale: Vec3;
 }
  | {
+    shape: 'compound';
+    parts: readonly CompoundPart[];
+}
+ | {
+    shape: 'convexDecomposition';
+    geometry?: ColliderGeometry;
+    vertices?: ArrayLike<number>;
+    indices?: ArrayLike<number>;
+}
+ | {
     shape: 'custom';
     desc: ColliderDesc;
 };
 
 export type Vec3 = readonly [number, number, number];
+
+export class Vehicle implements PhysicsAttachment {
+    readonly chassis: PhysicsBody;
+    readonly raw: DynamicRayCastVehicleController;
+    engineForce: number;
+    steering: number;
+    brake: number;
+    maxEngineForce: number;
+    maxBrakeForce: number;
+    maxSteeringAngle: number;
+    constructor(physics: Physics, chassis: PhysicsBody, options: VehicleOptions);
+    get wheelCount(): number;
+    get valid(): boolean;
+    setInput(input: VehicleInput): this;
+    get speed(): number;
+    wheel(index: number): WheelState;
+    wheelLocalPose(index: number, position?: number[], quaternion?: number[]): {
+        position: number[];
+        quaternion: number[];
+    };
+    beforeStep(dt: number): void;
+    bodyRemoved(body: PhysicsBody): void;
+    afterSync(): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface VehicleInput {
+    throttle?: number;
+    steer?: number;
+    brake?: number;
+}
+
+export interface VehicleOptions {
+    wheels: readonly WheelOptions[];
+    maxEngineForce?: number;
+    maxBrakeForce?: number;
+    maxSteeringAngle?: number;
+    groups?: number;
+    predicate?: (collider: Collider) => boolean;
+}
+
+export interface WheelOptions {
+    position: Vec3;
+    radius: number;
+    direction?: Vec3;
+    axle?: Vec3;
+    suspensionRestLength?: number;
+    suspensionStiffness?: number;
+    suspensionCompression?: number;
+    suspensionRelaxation?: number;
+    maxSuspensionTravel?: number;
+    maxSuspensionForce?: number;
+    frictionSlip?: number;
+    sideFrictionStiffness?: number;
+    steer?: boolean;
+    drive?: boolean;
+    brake?: boolean;
+    mesh?: Mesh;
+}
+
+export interface WheelState {
+    inContact: boolean;
+    suspensionLength: number;
+    suspensionForce: number;
+    rotation: number;
+    steering: number;
+    contactPoint: [number, number, number] | null;
+    contactNormal: [number, number, number] | null;
+}
 
 export function collisionGroups(memberships: number | readonly number[], filter?: number | readonly number[]): number;
 
@@ -497,6 +645,30 @@ interface ColliderShapeCastHit {
     normal1: Vector;
 }
 
+interface DynamicRayCastVehicleController {
+    updateVehicle(dt: number, flags?: number, groups?: number, predicate?: (collider: Collider) => boolean): void;
+    currentVehicleSpeed(): number;
+    addWheel(connection: Vector, direction: Vector, axle: Vector, suspensionRestLength: number, radius: number): void;
+    numWheels(): number;
+    setWheelSuspensionStiffness(i: number, value: number): void;
+    setWheelSuspensionCompression(i: number, value: number): void;
+    setWheelSuspensionRelaxation(i: number, value: number): void;
+    setWheelMaxSuspensionTravel(i: number, value: number): void;
+    setWheelMaxSuspensionForce(i: number, value: number): void;
+    setWheelFrictionSlip(i: number, value: number): void;
+    setWheelSideFrictionStiffness(i: number, value: number): void;
+    setWheelEngineForce(i: number, value: number): void;
+    setWheelSteering(i: number, value: number): void;
+    setWheelBrake(i: number, value: number): void;
+    wheelSteering(i: number): number | null;
+    wheelRotation(i: number): number | null;
+    wheelSuspensionLength(i: number): number | null;
+    wheelIsInContact(i: number): boolean;
+    wheelContactPoint(i: number): Vector | null;
+    wheelContactNormal(i: number): Vector | null;
+    wheelSuspensionForce(i: number): number | null;
+}
+
 interface EventQueue {
     drainCollisionEvents(callback: (colliderA: number, colliderB: number, started: boolean) => void): void;
     free(): void;
@@ -532,6 +704,13 @@ interface KinematicCharacterController {
     computedMovement(): Vector;
     computedGrounded(): boolean;
     numComputedCollisions(): number;
+}
+
+interface PhysicsAttachment {
+    beforeStep?(dt: number): void;
+    afterSync?(): void;
+    bodyRemoved?(body: PhysicsBody): void;
+    dispose(): void;
 }
 
 interface PhysicsHooks {
@@ -655,6 +834,8 @@ interface World {
     createImpulseJoint(desc: JointData, bodyA: RigidBody, bodyB: RigidBody, wakeUp: boolean): ImpulseJoint;
     removeImpulseJoint(joint: ImpulseJoint, wakeUp: boolean): void;
     createCharacterController(offset: number): KinematicCharacterController;
+    createVehicleController?(chassis: RigidBody): DynamicRayCastVehicleController;
+    removeVehicleController?(controller: DynamicRayCastVehicleController): void;
     removeCharacterController(controller: KinematicCharacterController): void;
     castRayAndGetNormal(ray: Ray, maxDistance: number, solid: boolean, ...filter: QueryArgs): RayColliderIntersection | null;
     intersectionsWithRay(ray: Ray, maxDistance: number, solid: boolean, callback: (result: RayColliderIntersection) => boolean, ...filter: QueryArgs): void;

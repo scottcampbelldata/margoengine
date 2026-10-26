@@ -30,6 +30,10 @@ interface JointBase {
 export type JointOptions =
   | (JointBase & { type: 'fixed'; frameA?: Quat; frameB?: Quat })
   | (JointBase & { type: 'spherical' })
+  /** Keeps the anchors at most `length` apart and lets them come closer (a slack rope or chain link). */
+  | (JointBase & { type: 'rope'; length: number })
+  /** Pulls the anchors toward `restLength` apart like a damped spring (`stiffness` N/m, `damping` N*s/m). */
+  | (JointBase & { type: 'spring'; restLength: number; stiffness: number; damping?: number })
   | (JointBase & {
       type: 'revolute' | 'prismatic';
       axis: Vec3;
@@ -133,9 +137,32 @@ export function createJointData(R: RapierModule, options: JointOptions): JointDa
         ? R.JointData.revolute(vec(anchorA), vec(anchorB), axis)
         : R.JointData.prismatic(vec(anchorA), vec(anchorB), axis);
     }
+    case 'rope': {
+      if (!(options.length > 0) || !Number.isFinite(options.length))
+        throw new RangeError('Rope joint length must be a positive finite number; pass the longest anchor distance.');
+      if (!R.JointData.rope)
+        throw new MargoError(
+          'unsupported',
+          'Rope joints need Rapier 0.12 or later; upgrade @dimforge/rapier3d-compat.',
+        );
+      return R.JointData.rope(options.length, vec(anchorA), vec(anchorB));
+    }
+    case 'spring': {
+      const { restLength, stiffness, damping = 0 } = options;
+      if (!(restLength >= 0) || !Number.isFinite(restLength))
+        throw new RangeError('Spring restLength must be a finite number of at least 0; pass the relaxed distance.');
+      if (!(stiffness >= 0) || !Number.isFinite(stiffness) || !(damping >= 0) || !Number.isFinite(damping))
+        throw new RangeError('Spring stiffness and damping must be finite numbers of at least 0; pass N/m and N*s/m.');
+      if (!R.JointData.spring)
+        throw new MargoError(
+          'unsupported',
+          'Spring joints need Rapier 0.12 or later; upgrade @dimforge/rapier3d-compat.',
+        );
+      return R.JointData.spring(restLength, stiffness, damping, vec(anchorA), vec(anchorB));
+    }
     default:
       throw new TypeError(
-        `Unknown joint type ${(options as { type: string }).type}; use fixed, spherical, revolute or prismatic.`,
+        `Unknown joint type ${(options as { type: string }).type}; use fixed, spherical, revolute, prismatic, rope or spring.`,
       );
   }
 }

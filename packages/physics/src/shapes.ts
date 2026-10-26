@@ -1,4 +1,5 @@
-import type { ColliderDesc, RapierModule } from './rapier-types.js';
+import { MargoError } from '@margoengine/math/errors';
+import type { ColliderDesc, RapierModule, Rotation, Shape, Vector } from './rapier-types.js';
 export type { RapierModule } from './rapier-types.js';
 import type { Geometry } from '@margoengine/core';
 import { checkVec, quat, vec, type Quat, type Vec3 } from './math.js';
@@ -19,10 +20,42 @@ export type ShapeOptions =
   | { shape: 'trimesh'; geometry?: ColliderGeometry; vertices?: ArrayLike<number>; indices?: ArrayLike<number> }
   | { shape: 'heightfield'; rows: number; columns: number; heights: ArrayLike<number>; scale: Vec3 }
   /**
+   * Several convex parts welded into one collider (one handle, one set of events), each with its own offset and
+   * rotation in the collider's frame: a chair from boxes, a dumbbell from two spheres and a cylinder.
+   */
+  | { shape: 'compound'; parts: readonly CompoundPart[] }
+  /**
+   * A concave mesh split into convex pieces (V-HACD), so dynamic bodies get a hollow cup or a torus right. Takes
+   * `geometry` or `vertices` and `indices`, like a trimesh; without them it uses the mesh geometry.
+   */
+  | {
+      shape: 'convexDecomposition';
+      geometry?: ColliderGeometry;
+      vertices?: ArrayLike<number>;
+      indices?: ArrayLike<number>;
+    }
+  /**
    * A Rapier `ColliderDesc` you built yourself, for shapes and flags this wrapper does not cover (voxels,
    * triangle-mesh flags). The other options apply on top; its own translation is kept unless `offset` is given.
    */
   | { shape: 'custom'; desc: ColliderDesc };
+
+/** One part of a `compound` collider: a convex primitive or hull placed in the collider's frame. */
+export type CompoundPart = (
+  | { shape: 'box'; halfExtents: Vec3 }
+  | { shape: 'sphere'; radius: number }
+  | { shape: 'capsule'; halfHeight: number; radius: number }
+  | { shape: 'cylinder'; halfHeight: number; radius: number }
+  | { shape: 'cone'; halfHeight: number; radius: number }
+  | { shape: 'convexHull'; points: ArrayLike<number> }
+) & {
+  /** Part position in the collider's frame (default origin). */
+  offset?: Vec3;
+  /** Part rotation quaternion [x, y, z, w] in the collider's frame (default identity). */
+  rotation?: Quat;
+};
+
+const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull'];
 
 /** How two colliders combine their friction or restitution values. */
 export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
@@ -203,13 +236,7 @@ export function createColliderDesc(
           : fitted();
       const indexSource = options.indices ?? source?.indices;
       if (!indexSource) throw new TypeError('A trimesh needs indices');
-      if (!indexSource.length || indexSource.length % 3 || vertices.length % 3)
-        throw new RangeError('A trimesh needs whole triangles');
-      for (let i = 0; i < indexSource.length; i++)
-        if (!Number.isInteger(indexSource[i]) || indexSource[i] < 0 || indexSource[i] >= vertices.length / 3)
-          throw new RangeError('Trimesh index is out of range; keep every index below the vertex count.');
-      finite(vertices, 'Trimesh vertices');
-      const indices = Uint32Array.from(indexSource);
+      const indices = triangleIndices(indexSource, vertices, 'Trimesh');
       desc = R.ColliderDesc.trimesh(vertices, indices);
       break;
     }
@@ -225,6 +252,64 @@ export function createColliderDesc(
       desc = R.ColliderDesc.heightfield(rows, columns, values, vec(scale));
       break;
     }
+    case 'compound': {
+      if (!R.ColliderDesc.compound)
+        throw new MargoError(
+          'unsupported',
+          'Compound colliders need Rapier 0.19 or later; upgrade @dimforge/rapier3d-compat or add one collider per part.',
+        );
+      const parts = options.parts;
+      if (!Array.isArray(parts) || !parts.length)
+        throw new RangeError(
+          "A compound collider needs at least one part: {shape: 'compound', parts: [{shape: 'box', halfExtents: [1, 1, 1]}]}",
+        );
+      const shapes: Shape[] = [],
+        positions: Vector[] = [],
+        rotations: Rotation[] = [];
+      for (const part of parts as readonly CompoundPart[]) {
+        if (!CONVEX_PARTS.includes(part?.shape))
+          throw new TypeError(
+            `Compound part shape ${String(part?.shape)} is not convex; use box, sphere, capsule, cylinder, cone or convexHull parts.`,
+          );
+        if (part.shape === 'box' && !part.halfExtents)
+          throw new TypeError('A compound box part needs halfExtents; parts are never fitted to the mesh.');
+        if (part.shape === 'sphere' && part.radius === undefined)
+          throw new TypeError('A compound sphere part needs a radius; parts are never fitted to the mesh.');
+        if (part.shape === 'convexHull' && !part.points)
+          throw new TypeError('A compound convexHull part needs points; parts are never fitted to the mesh.');
+        const offset = part.offset ?? [0, 0, 0];
+        checkVec(offset, 'Compound part offset');
+        shapes.push(createColliderDesc(R, part).desc.shape);
+        positions.push(vec(offset));
+        rotations.push(quat(part.rotation));
+      }
+      desc = R.ColliderDesc.compound(shapes, positions, rotations);
+      break;
+    }
+    case 'convexDecomposition': {
+      if (!R.ColliderDesc.convexDecomposition)
+        throw new MargoError(
+          'unsupported',
+          'Convex decomposition needs Rapier 0.19 or later; upgrade @dimforge/rapier3d-compat or use a convexHull.',
+        );
+      const source = options.geometry ?? (options.vertices ? null : fit?.geometry);
+      const vertices = options.vertices
+        ? Float32Array.from(options.vertices)
+        : source
+          ? geometryPositions(source, fit?.scale)
+          : fitted();
+      const indexSource = options.indices ?? source?.indices;
+      if (!indexSource)
+        throw new TypeError('A convexDecomposition collider needs indices; pass indices or an indexed geometry.');
+      const indices = triangleIndices(indexSource, vertices, 'Convex decomposition');
+      desc = R.ColliderDesc.convexDecomposition(vertices, indices);
+      if (!desc)
+        throw new MargoError(
+          'failed',
+          'Convex decomposition produced no pieces because the mesh is degenerate; pass a closed mesh that spans a volume.',
+        );
+      break;
+    }
     case 'custom':
       if (typeof options.desc?.setActiveEvents !== 'function')
         throw new TypeError(
@@ -234,10 +319,23 @@ export function createColliderDesc(
       break;
     default:
       throw new TypeError(
-        `Unknown collider shape ${(options as { shape: string }).shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield or custom.`,
+        `Unknown collider shape ${(options as { shape: string }).shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition or custom.`,
       );
   }
   return { desc, center };
+}
+
+/** Validated triangle indices (whole triangles, every index in range) and finite vertices, for trimesh-like shapes. */
+function triangleIndices(source: ArrayLike<number>, vertices: Float32Array, label: string): Uint32Array {
+  if (!source.length || source.length % 3 || vertices.length % 3)
+    throw new RangeError(
+      `A ${label === 'Trimesh' ? 'trimesh' : 'convex decomposition'} needs whole triangles; pass three indices per triangle.`,
+    );
+  for (let i = 0; i < source.length; i++)
+    if (!Number.isInteger(source[i]) || source[i] < 0 || source[i] >= vertices.length / 3)
+      throw new RangeError(`${label} index is out of range; keep every index below the vertex count.`);
+  finite(vertices, `${label} vertices`);
+  return Uint32Array.from(source);
 }
 
 /** Rapier takes NaN and infinite coordinates silently (a convex hull of them fails inside Rapier with an internal error, a trimesh poisons the simulation): refuse them by name first. */

@@ -127,14 +127,23 @@ export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'posit
   /**
    * Collider per primitive (and per instance of an instanced primitive). Default 'trimesh' for fixed and kinematic
    * bodies, 'convexHull' for dynamic ones (a Rapier trimesh has no volume, so it gives a dynamic body no mass).
+   * 'convexDecomposition' splits each concave primitive into convex pieces, for dynamic bodies that must keep holes.
    */
-  shape?: 'trimesh' | 'convexHull';
+  shape?: 'trimesh' | 'convexHull' | 'convexDecomposition';
   /** One body per glTF node that has primitives (true), or one body on `model.root` holding every collider (false, default). */
   perNode?: boolean;
   /** Return false to leave a primitive out, for example Blender objects tagged `collider = 0`. */
   filter?: (primitive: ModelPrimitiveLike) => boolean;
   /** Material, mass, sensor, group and event settings for every collider. */
   collider?: Omit<ColliderSettings, 'offset' | 'rotation'>;
+}
+
+/** @internal A helper that steps, syncs and is disposed with a world: `Vehicle`, `Rope`. */
+export interface PhysicsAttachment {
+  beforeStep?(dt: number): void;
+  afterSync?(): void;
+  bodyRemoved?(body: PhysicsBody): void;
+  dispose(): void;
 }
 
 const noop = (): void => {};
@@ -170,6 +179,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   private readonly byCollider = new Map<number, PhysicsBody>();
   private readonly joints = new Set<PhysicsJoint>();
   private readonly controllers = new Set<CharacterController>();
+  private readonly attachments = new Set<PhysicsAttachment>();
   private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: never) => void>>();
   private readonly scratch = [0, 0, 0, 0];
   private readonly positionScratch: [number, number, number] = [0, 0, 0];
@@ -267,7 +277,12 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   set gravity(value: Vec3) {
     checkVec(value, 'Gravity');
-    this.world.gravity = vec(value);
+    const world = this.world,
+      old = world.gravity;
+    world.gravity = vec(value);
+    // Rapier leaves sleeping bodies asleep when gravity changes, so they would float in the old field: wake them.
+    if (old.x !== value[0] || old.y !== value[1] || old.z !== value[2])
+      for (const body of this.bodies) if (body.type === 'dynamic' && body.raw.isSleeping()) body.raw.wakeUp();
   }
   /** Interpolation factor used by the last `update`: leftover accumulator time over the step length, 0..1. */
   get alpha(): number {
@@ -324,6 +339,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.emit('beforestep', dt);
     if (this.disposed) return;
     world.timestep = dt;
+    this.attachments.forEach(this.attachmentStep);
     world.step(this.queue!, this.hooks!);
     this.stepCount++;
     this.bodies.forEach(this.snapshotBody);
@@ -339,6 +355,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     }
     this.emit('afterstep', dt);
   }
+  private readonly attachmentStep = (attachment: PhysicsAttachment): void =>
+    attachment.beforeStep?.(this.fixedTimestep);
   private readonly snapshotBody = (body: PhysicsBody): void => {
     if (body.type === 'fixed') return;
     const p = body.pose;
@@ -362,6 +380,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
     this.syncAlpha = this.interpolate ? Math.min(1, Math.max(0, alpha)) : 1;
     this.bodies.forEach(this.syncBody);
+    this.attachments.forEach(attachmentSync);
   }
   // A stable callback avoids creating a Set iterator during every synchronization.
   private readonly syncBody = (body: PhysicsBody): void => {
@@ -599,9 +618,9 @@ export class Physics implements EnginePlugin, BodyOwner {
     const { shape: requested, perNode = false, filter, collider = {}, ...bodyOptions } = options;
     const type: BodyType = bodyOptions.type ?? 'dynamic',
       shape = requested ?? (type === 'dynamic' ? 'convexHull' : 'trimesh');
-    if (shape !== 'trimesh' && shape !== 'convexHull')
+    if (shape !== 'trimesh' && shape !== 'convexHull' && shape !== 'convexDecomposition')
       throw new TypeError(
-        `Model colliders must be 'trimesh' or 'convexHull', not ${String(shape)}; choose one of them.`,
+        `Model colliders must be 'trimesh', 'convexHull' or 'convexDecomposition', not ${String(shape)}; choose one of them.`,
       );
     if (!model?.root || !Array.isArray(model.primitives))
       throw new TypeError('addModel needs a gltf-pro model (root and primitives)');
@@ -665,9 +684,9 @@ export class Physics implements EnginePlugin, BodyOwner {
               points[i * 3 + 2] = r02 * wx + r12 * wy + r22 * wz;
             }
             colliders.push(
-              shape === 'trimesh'
-                ? { ...collider, shape, vertices: points, indices: primitive.indices }
-                : { ...collider, shape, points },
+              shape === 'convexHull'
+                ? { ...collider, shape, points }
+                : { ...collider, shape, vertices: points, indices: primitive.indices },
             );
           }
         }
@@ -704,7 +723,8 @@ export class Physics implements EnginePlugin, BodyOwner {
       (options.shape === 'box' && !options.halfExtents) ||
       (options.shape === 'sphere' && options.radius === undefined) ||
       (options.shape === 'convexHull' && !options.points && !options.geometry) ||
-      (options.shape === 'trimesh' && !options.vertices && !options.geometry);
+      (options.shape === 'trimesh' && !options.vertices && !options.geometry) ||
+      (options.shape === 'convexDecomposition' && !options.vertices && !options.geometry);
     const fit =
       mesh && needsGeometry
         ? colliderGeometry(mesh)
@@ -735,6 +755,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (!this.bodies.has(body)) return;
     for (const joint of this.joints) if (joint.bodyA === body || joint.bodyB === body) this.removeJoint(joint);
     for (const controller of this.controllers) if (controller.body === body) controller.dispose();
+    for (const attachment of [...this.attachments]) attachment.bodyRemoved?.(body);
     for (const collider of body.colliders) this.byCollider.delete(collider.handle);
     this.bodies.delete(body);
     if (body.mesh) this.byMesh.delete(body.mesh);
@@ -742,7 +763,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     body.markRemoved();
   }
 
-  /** Connects two bodies with a fixed, spherical, revolute or prismatic joint. Anchors are in each body's local frame. */
+  /** Connects two bodies with a fixed, spherical, revolute, prismatic, rope or spring joint. Anchors are in each body's local frame. */
   addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint {
     if (!this.bodies.has(bodyA) || !this.bodies.has(bodyB))
       throw new MargoError(
@@ -780,6 +801,23 @@ export class Physics implements EnginePlugin, BodyOwner {
   removeController(controller: CharacterController): void {
     if (!this.controllers.delete(controller)) return;
     if (!this.disposed) this.worldRef!.removeCharacterController(controller.raw);
+  }
+
+  /** True when `body` belongs to this world. */
+  owns(body: PhysicsBody): boolean {
+    return this.bodies.has(body);
+  }
+  /**
+   * @internal Registers a helper that steps and syncs with the world (vehicles, ropes): `beforeStep` runs before each
+   * Rapier step, `afterSync` after the meshes are written, `bodyRemoved` when a body goes and `dispose` with the world.
+   */
+  attach(attachment: PhysicsAttachment): void {
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+    this.attachments.add(attachment);
+  }
+  /** @internal Unregisters a helper; returns false when it was not attached. */
+  detach(attachment: PhysicsAttachment): boolean {
+    return this.attachments.delete(attachment);
   }
 
   /** Subscribes to collision or step events. Returns an unsubscribe function. */
@@ -1026,6 +1064,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       }
     }
     for (const controller of [...this.controllers]) controller.dispose();
+    for (const attachment of [...this.attachments]) attachment.dispose();
     for (const joint of [...this.joints]) this.removeJoint(joint);
     for (const body of [...this.bodies]) this.removeBody(body);
     this.listeners.clear();
@@ -1040,6 +1079,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.dispose();
   }
 }
+
+const attachmentSync = (attachment: PhysicsAttachment): void => attachment.afterSync?.();
 
 function parentOf(mesh: Mesh): number {
   const runtime = meshRuntime(mesh) as unknown as { id?: number; engine?: { store?: { parents?: ArrayLike<number> } } };

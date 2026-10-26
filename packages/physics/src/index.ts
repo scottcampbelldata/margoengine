@@ -28,6 +28,11 @@ export type {
   ColliderSettings,
   CombineRule,
   ColliderGeometry,
+  CompoundPart,
 } from './shapes.js';
+export { Vehicle } from './vehicle.js';
+export type { VehicleOptions, VehicleInput, WheelOptions, WheelState } from './vehicle.js';
+export { Rope } from './rope.js';
+export type { RopeOptions } from './rope.js';
 export { eulerToQuat } from './math.js';
 export type { Vec3, Quat } from './math.js';

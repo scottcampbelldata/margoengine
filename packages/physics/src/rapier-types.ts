@@ -157,6 +157,30 @@ export interface KinematicCharacterController {
   computedGrounded(): boolean;
   numComputedCollisions(): number;
 }
+/** Rapier's ray-cast vehicle controller (`world.createVehicleController`, Rapier 0.12 and later). */
+export interface DynamicRayCastVehicleController {
+  updateVehicle(dt: number, flags?: number, groups?: number, predicate?: (collider: Collider) => boolean): void;
+  currentVehicleSpeed(): number;
+  addWheel(connection: Vector, direction: Vector, axle: Vector, suspensionRestLength: number, radius: number): void;
+  numWheels(): number;
+  setWheelSuspensionStiffness(i: number, value: number): void;
+  setWheelSuspensionCompression(i: number, value: number): void;
+  setWheelSuspensionRelaxation(i: number, value: number): void;
+  setWheelMaxSuspensionTravel(i: number, value: number): void;
+  setWheelMaxSuspensionForce(i: number, value: number): void;
+  setWheelFrictionSlip(i: number, value: number): void;
+  setWheelSideFrictionStiffness(i: number, value: number): void;
+  setWheelEngineForce(i: number, value: number): void;
+  setWheelSteering(i: number, value: number): void;
+  setWheelBrake(i: number, value: number): void;
+  wheelSteering(i: number): number | null;
+  wheelRotation(i: number): number | null;
+  wheelSuspensionLength(i: number): number | null;
+  wheelIsInContact(i: number): boolean;
+  wheelContactPoint(i: number): Vector | null;
+  wheelContactNormal(i: number): Vector | null;
+  wheelSuspensionForce(i: number): number | null;
+}
 export interface EventQueue {
   drainCollisionEvents(callback: (colliderA: number, colliderB: number, started: boolean) => void): void;
   free(): void;
@@ -205,6 +229,8 @@ export interface World {
   createImpulseJoint(desc: JointData, bodyA: RigidBody, bodyB: RigidBody, wakeUp: boolean): ImpulseJoint;
   removeImpulseJoint(joint: ImpulseJoint, wakeUp: boolean): void;
   createCharacterController(offset: number): KinematicCharacterController;
+  createVehicleController?(chassis: RigidBody): DynamicRayCastVehicleController;
+  removeVehicleController?(controller: DynamicRayCastVehicleController): void;
   removeCharacterController(controller: KinematicCharacterController): void;
   castRayAndGetNormal(
     ray: Ray,
@@ -260,6 +286,10 @@ export interface RapierModule {
     convexHull(points: Float32Array): ColliderDesc | null;
     trimesh(vertices: Float32Array, indices: Uint32Array): ColliderDesc;
     heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector): ColliderDesc;
+    /** Rapier 0.19 and later. */
+    compound?(shapes: Shape[], positions: Vector[], rotations: Rotation[]): ColliderDesc;
+    /** Rapier 0.19 and later (V-HACD). */
+    convexDecomposition?(vertices: Float32Array, indices: Uint32Array): ColliderDesc | null;
   };
   RigidBodyDesc: {
     dynamic(): RigidBodyDesc;
@@ -272,6 +302,10 @@ export interface RapierModule {
     spherical(anchorA: Vector, anchorB: Vector): JointData;
     revolute(anchorA: Vector, anchorB: Vector, axis: Vector): JointData;
     prismatic(anchorA: Vector, anchorB: Vector, axis: Vector): JointData;
+    /** Rapier 0.12 and later. */
+    rope?(length: number, anchorA: Vector, anchorB: Vector): JointData;
+    /** Rapier 0.12 and later. */
+    spring?(restLength: number, stiffness: number, damping: number, anchorA: Vector, anchorB: Vector): JointData;
   };
   QueryFilterFlags: Record<'EXCLUDE_SENSORS' | 'EXCLUDE_FIXED' | 'EXCLUDE_KINEMATIC' | 'EXCLUDE_DYNAMIC', number>;
   SolverFlags: { COMPUTE_IMPULSE: number };

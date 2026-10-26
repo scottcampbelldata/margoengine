@@ -1851,6 +1851,8 @@
       "Physics",
       "PhysicsBody",
       "PhysicsJoint",
+      "Rope",
+      "Vehicle",
       "collisionGroups",
       "eulerToQuat",
       "geometryPositions"

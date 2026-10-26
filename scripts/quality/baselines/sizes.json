@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3279743,
+  "total": 3283437,
   "history": [
     {
       "date": "2026-10-24",
@@ -362,6 +362,12 @@
       "commit": "d13e440d",
       "reason": "package depth: tween easings, springs, timelines, array/path tweens; quality dynamic resolution",
       "grew": 2
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "b91aeaf9",
+      "reason": "package depth (item 21.5): physics ropes, rope and spring joints, compound and convex-decomposition colliders, ray-cast vehicles; Rope and Vehicle tree-shake out of a Physics-only bundle",
+      "grew": 1
     }
   ],
   "items": {
@@ -555,7 +561,7 @@
     "@margoengine/navmesh/build": 10491,
     "@margoengine/net": 1371,
     "@margoengine/oit": 3199,
-    "@margoengine/physics": 12553,
+    "@margoengine/physics": 16247,
     "@margoengine/points": 19649,
     "@margoengine/post": 40343,
     "@margoengine/post/afterimage": 5661,
