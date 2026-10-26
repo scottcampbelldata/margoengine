@@ -4,7 +4,8 @@
 // @margoengine/materials + @margoengine/gltf-pro built from `ref` and from the candidate.
 // Run: node examples/package-benchmarks/proofs/materials-uv-transform.proof.js [ref] [pin] [--current]
 // Pinned: 1970fda (before the transforms) against 700838e, the commit that added them and made this claim. --current:
-// 1fafaf6a against the working tree (materials meshes draw in one render pass; c640305c before it: a material without
+// b953071e against the working tree (the materials draw work: uniform arena, view block, shared pipelines, blended draws
+// in the run's pass; 1fafaf6a before it: one render pass; c640305c before that: a material without
 // maps reads no textures, 57250a49 before that), including the
 // approved cotangent frame (and 44592a3's +b on normal-mapped materials meshes), compact discard guards, PBR Neutral
 // output and the earlier normal-frame, topology, uniform and batching changes (claims.md).
@@ -21,7 +22,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/'),
-  { ref, pin } = refs('1970fda', '700838e', '1fafaf6a');
+  { ref, pin } = refs('1970fda', '700838e', 'b953071e');
 const sources = ['materials/src', 'gltf-pro/src', 'shared'].map((name) => slash(resolve(root, 'packages', name)) + '/');
 const show = (from, file) => {
   try {

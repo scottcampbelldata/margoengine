@@ -149,8 +149,8 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 | animation-vat (measurement, no baseline) | gltf-pro + animation at `700838e` | - |
 | materials-atlas (measurement, no baseline) | geometry + materials at `700838e` | - |
 | binding-limit | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | - |
-| gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `57250a49`: 4,476 calls |
-| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `1fafaf6a`: 1,224 calls |
+| gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `b953071e`: 4,180 calls |
+| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `b953071e`: 1,117 calls |
 | lines-perspective | `96edc75` -> `6da7f7e`: 946 calls | `2d192a71` (per-line clipping planes at `86063c47`: the style uniform grew from 128 to 224 bytes and the shader gained a world-position varying and a zero-count plane loop; then `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose both times) |
 | math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
 | post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `57250a49` |
@@ -162,7 +162,7 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 | color-output | `7dcc958` -> `225b1d6`: 6,174 calls | `57250a49` |
 | deformed-shadows | `38d448e` -> `282e751` | `2cd81c1` |
 | environment-volumetric | `7c47a09` -> `366ebff` | `2cd81c1`: 70 root calls; 344/533 isolated calls |
-| oit-detached | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until a later change replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `57250a49`: 2,732 calls |
+| oit-detached | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until a later change replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `b953071e`: 2,500 calls |
 | post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `151aa744`: 12,431 calls (AgX normalised for older refs, see below) |
 | post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `151aa744`: 37,182 calls |
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `d41cdafd` |
@@ -263,6 +263,18 @@ materials queue now gives every mesh's `draw()` one `PBRDrawRun`, so consecutive
 instead of each beginning and ending its own. Against `c640305c`, 1,296 -> 1,224 calls: 36 fewer `beginRenderPass`
 and `pass.end` pairs; the 84 draws, 11 shader modules and 110 uniform writes are the same, in the same order, and every
 shader module is unchanged. The full trace matches `1fafaf6a` at 1,224 calls.
+
+**gltf-pro-lighting-hooks, oit-detached and materials-uv-transform, advanced to `b953071e` on 2026-10-26 (the materials
+draw work, perf-history entry 22):** gltf-pro now writes every draw's uniform into one per-device arena uploaded once a
+frame, shares a 192-byte view block between the draws of a view, shares pipelines device-wide and sets a pipeline,
+bind group or buffer only when it changes, and a run's blended draws continue its render pass. Each proof passes
+unchanged against the commit before this work on main (`c7a20964`, pinned run); against it the working tree differs
+only in those calls, with the same draws and shader modules (first sample count of each story):
+gltf-pro-lighting-hooks 2,238 -> 2,090 calls (buffers 18 -> 15, `writeBuffer` 177 -> 23, bind groups 258 -> 285,
+`setPipeline` 168 -> 126, destroys 26 -> 23); oit-detached 1,366 -> 1,250 (buffers 18 -> 13, `writeBuffer` 114 -> 18,
+bind groups 138 -> 141, `setPipeline` 102 -> 86, destroys 23 -> 18); materials-uv-transform 1,224 -> 1,117 (buffers
+22 -> 16, `writeBuffer` 110 -> 39, render passes 52 -> 40, destroys 49 -> 43). The images are checked by the visual
+check. The full traces match `b953071e`.
 
 **taa-velocity, advanced to `d41cdafd` on 2026-10-21:** a hygiene pass converted TAA's bare Errors.
 The story records each thrown error as a `throw` entry (class and message), and exactly three per run changed: the
