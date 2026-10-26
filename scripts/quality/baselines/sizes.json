@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3231029,
+  "total": 3244551,
   "history": [
     {
       "date": "2026-10-24",
@@ -281,6 +281,12 @@
     },
     {
       "date": "2026-10-26",
+      "commit": "743f0635",
+      "reason": "DX pass A-L batch 2: throw messages now name their fix (clustered, creative/post), a few hundred gzip bytes of message text",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-26",
       "commit": "f7963d9f",
       "reason": "queue item 23 milestone 2: animator gains addRootMotion, addLookAt and addAimConstraint (tree-shaken when unused); new entry @margoengine/rigging/ik (FABRIK chains with poles)",
       "grew": 2
@@ -323,9 +329,9 @@
     },
     {
       "date": "2026-10-26",
-      "commit": "743f0635",
-      "reason": "DX pass A-L batch 2: throw messages now name their fix (clustered, creative/post), a few hundred gzip bytes of message text",
-      "grew": 2
+      "commit": "caad6873",
+      "reason": "DX pass A-L: error messages name their fix and bare Error throws became coded MargoError, so bundles carry longer strings",
+      "grew": 12
     }
   ],
   "items": {
@@ -408,7 +414,7 @@
     "@margoengine/exporters/godot-precision-addon": 5995,
     "@margoengine/exporters/hash": 1717,
     "@margoengine/exporters/import-names": 1038,
-    "@margoengine/exporters/model": 9232,
+    "@margoengine/exporters/model": 9536,
     "@margoengine/exporters/roblox": 18377,
     "@margoengine/exporters/roblox-chunks": 9679,
     "@margoengine/exporters/roblox-runtime": 21053,
@@ -422,9 +428,9 @@
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,
     "@margoengine/exporters/usdz": 10841,
-    "@margoengine/fbx": 17394,
-    "@margoengine/fbx dist/workers/fbx.js": 49755,
-    "@margoengine/fbx/worker": 18215,
+    "@margoengine/fbx": 17917,
+    "@margoengine/fbx dist/workers/fbx.js": 51819,
+    "@margoengine/fbx/worker": 18806,
     "@margoengine/fsm": 1131,
     "@margoengine/geometry": 20731,
     "@margoengine/geometry/extras": 5843,
@@ -433,18 +439,18 @@
     "@margoengine/geometry/shapes": 3840,
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 5406,
-    "@margoengine/gltf": 5412,
-    "@margoengine/gltf-pro": 42929,
+    "@margoengine/gltf": 5976,
+    "@margoengine/gltf-pro": 44962,
     "@margoengine/gltf-pro dist/workers/gltf.js": 20085,
-    "@margoengine/gltf-pro dist/workers/progressive.js": 14475,
-    "@margoengine/gltf-pro/asset": 5228,
+    "@margoengine/gltf-pro dist/workers/progressive.js": 14944,
+    "@margoengine/gltf-pro/asset": 5501,
     "@margoengine/gltf-pro/coordinates": 755,
     "@margoengine/gltf-pro/extended": 6502,
-    "@margoengine/gltf-pro/instancing": 2721,
+    "@margoengine/gltf-pro/instancing": 3101,
     "@margoengine/gltf-pro/prepare": 16587,
-    "@margoengine/gltf-pro/progressive": 49365,
+    "@margoengine/gltf-pro/progressive": 51573,
     "@margoengine/gltf-pro/scene": 1471,
-    "@margoengine/gltf-pro/worker": 43484,
+    "@margoengine/gltf-pro/worker": 45486,
     "@margoengine/html": 5013,
     "@margoengine/ifc": 2819,
     "@margoengine/ifc dist/workers/ifc.js": 3443,
@@ -594,7 +600,7 @@
     "@margoengine/ui": 28622,
     "@margoengine/ui/react": 28708,
     "@margoengine/usdz": 8240,
-    "@margoengine/usdz dist/workers/usdz.js": 51796,
+    "@margoengine/usdz dist/workers/usdz.js": 53907,
     "@margoengine/usdz/worker": 9113,
     "@margoengine/vfx": 9703,
     "@margoengine/vfx/base": 7080,
