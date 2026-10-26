@@ -1630,7 +1630,8 @@ export const ROWS = {
   '8.3': { scenes: ['p-spot-shadows'] },
   '9.1': { scenes: ['p-hdr-load'] },
   '9.2': { scenes: ['p-exr-load'] },
-  '9.3': { scenes: ['p-pmrem', 'helmet'] },
+  // helmet with Margo's default shadows (4 PCSS cascades), and with the setup closest to three's one PCFSoftShadowMap.
+  '9.3': { scenes: ['p-pmrem', 'helmet', { scene: 'helmet', params: { filter: 'pcf', cascades: 1 } }] },
   '9.4': { scenes: ['p-fog'] },
   '9.5': { scenes: ['p-volumetric'] },
   '9.6': { scenes: ['p-sky'] },

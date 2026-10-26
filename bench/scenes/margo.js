@@ -299,9 +299,17 @@ const builders = {
     const ibl = new EnvironmentLighting(environment);
     engine.use(ibl);
     ibl.applyTo(model);
-    Shadows.attach(engine, { resolution: data.shadow.resolution, distance: 10 }).add(model);
+    Shadows.attach(engine, {
+      resolution: data.shadow.resolution,
+      distance: 10,
+      filter: data.filter,
+      cascades: data.cascades,
+    }).add(model);
     marks.buildMs = +(performance.now() - s).toFixed(1);
-    return app(engine, () => {}, { camera: data.camera });
+    return app(engine, () => {}, {
+      camera: data.camera,
+      note: `core batches (package passes not counted); shadows: ${data.cascades} cascade(s) of 2048, ${data.filter === 'pcf' ? "'pcf' filter (4 comparison taps)" : "the default 'soft' PCSS filter (16 blocker reads, 32 taps)"}`,
+    });
   },
 
   async react(canvas, data, marks, { n }) {

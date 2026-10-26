@@ -558,6 +558,32 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   the 65th variant throws), `tests/core-remove-children.test.js` (removal unparents only current children, after
   reparenting and slot reuse; 30,000 removals at capacity 524,288 take under a second, about 3 s before).
 
+### 30. SciFiHelmet's GPU time is its soft shadows
+
+- **Loss:** `helmet` (SciFiHelmet on a floor, image-based lighting, a 2048 shadow map) 0.77 ms GPU a frame against
+  three.js WebGL's 0.08 (run `20261025-170145`).
+- **Cause, measured** (timestamps per pass, each feature switched off in turn; RTX A6000, diagnostic): the four
+  shadow cascades take 0.05 ms, the core pass 0.28 and the model's pass 0.46. Without image-based lighting the passes
+  are unchanged (0.28, 0.44); with `Shadows`' `'pcf'` filter they drop to 0.03 and 0.05; without shadows to 0.02 and
+  0.04. So the cost is the default `'soft'` filter (PCSS: 16 blocker reads and 32 comparison taps per lit pixel),
+  where three's side draws one PCFSoftShadowMap. Trade-off: PCSS penumbrae widen with blocker distance; PCF edges do
+  not.
+- **Fix:** none in the engine yet (plan in [known-bugs.md](../known-bugs.md#scifihelmet-default-soft-shadows-cost-the-gpu-time)).
+  The `helmet` scene takes `filter` and `cascades` parameters (defaults unchanged: `'soft'`, 4), and row 9.3 also
+  runs `helmet-filterpcf-cascades1`, Margo's setup closest to three's.
+- **After** (diagnostic, busy machine; run `20261026-194330` (5 runs; marked invalid for the CPU spread of three's
+  WebGL side); rows in [perf-vs-threejs.md](perf-vs-threejs.md)):
+
+  | Scene | Margo CPU / GPU ms | three.js WebGL | three.js WebGPU |
+  | --- | --- | --- | --- |
+  | `helmet` (4 PCSS cascades) | 0.11 / 0.78 | 0.07 / 0.09 | 0.16 / 0.07 |
+  | `helmet-filterpcf-cascades1` | 0.11 / 0.08 | 0.07 / 0.09 | 0.16 / 0.07 |
+
+  Image against three.js WebGL: SSIM 0.981 / delta E 0.58 (default), 0.984 / 0.54 (matched).
+- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity
+  --cases=helmet,helmet-filterpcf-cascades1 --runs=5`, then `node bench/parity-report.mjs <run.json> --partial`.
+- **Guard:** `tests/bench.test.js` (the scene catalog and parity rows stay consistent).
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks

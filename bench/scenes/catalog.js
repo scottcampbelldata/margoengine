@@ -293,8 +293,16 @@ export const SCENES = {
     title: 'Lit glTF',
     draws: 'SciFiHelmet on a floor with image-based lighting from a procedural sky and a 2048 shadow map.',
     measures: ['cpuMs', 'gpuMs', 'fps', 'buildMs'],
-    params: {},
-    data: (p, { assets }) => ({ ...HELMET, url: assets + HELMET.file, sky: sky() }),
+    // Margo's shadow setup (defaults: its own, 4 cascades with the PCSS 'soft' filter). filter 'pcf' with 1 cascade is
+    // the closest to three's side, which always draws one PCFSoftShadowMap.
+    params: { filter: 'soft', cascades: 4 },
+    data: (p, { assets }) => ({
+      ...HELMET,
+      url: assets + HELMET.file,
+      sky: sky(),
+      filter: p.filter,
+      cascades: Number(p.cascades),
+    }),
   },
   react: {
     title: 'React',
