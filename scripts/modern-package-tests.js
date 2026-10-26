@@ -175,6 +175,8 @@ for (const name of packedNames) {
           'LICENSE',
           'NOTICE',
           ...(packageDocuments.has(name) ? [packageDocuments.get(name)] : []),
+          // A command the package installs (bin in its manifest), such as margoengine-mcp.
+          ...Object.values(manifest.bin ?? {}).map((path) => path.replace(/^\.\//, '')),
         ].includes(file.path) && !file.path.startsWith('dist/'),
     )
     .map((file) => file.path);
