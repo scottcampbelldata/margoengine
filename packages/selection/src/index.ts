@@ -2,6 +2,19 @@
 import { meshTriangles } from '../../shared/mesh-source.js';
 import type { EngineKernel, Mesh } from '@margoengine/core';
 export { Picking, type PickHit } from './picking.js';
+export { selectInRect, selectInPolygon, pickElement, SelectionTool, HoverHighlight } from './tools.js';
+export type {
+  ScreenRect,
+  SelectMode,
+  ScreenSelectOptions,
+  ElementHit,
+  SelectionToolOptions,
+  SelectOperation,
+  SelectionElement,
+  HoverHighlightOptions,
+  HoverPicker,
+  HoverOutline,
+} from './tools.js';
 export type { ModelLike, ModelPrimitiveLike, PickProxy } from './models.js';
 
 export type { PickingSource, PickingPrimitive } from './picking.js';

@@ -6,6 +6,43 @@
 import { EngineKernel, Mesh, RenderView } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
 
+export interface ElementHit {
+    mesh: Mesh;
+    face: number;
+    point: [number, number, number];
+    distance: number;
+    vertices: [number, number, number];
+    vertex: number;
+    edge: [number, number];
+}
+
+export class HoverHighlight {
+    mesh: Mesh | null;
+    enabled: boolean;
+    static attach(engine: EngineKernel, options: HoverHighlightOptions): HoverHighlight;
+    constructor(engine: EngineKernel, options: HoverHighlightOptions);
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface HoverHighlightOptions {
+    picking: HoverPicker;
+    outline: HoverOutline;
+    element?: SelectionElement;
+    onHover?: (mesh: Mesh | null) => void;
+    signal?: AbortSignal;
+}
+
+export interface HoverOutline {
+    set(meshes: Iterable<Mesh>): void;
+}
+
+export interface HoverPicker {
+    pick(x: number, y: number): Promise<{
+        mesh: Mesh;
+    } | null>;
+}
+
 export interface ModelLike {
   readonly root: Mesh;
   readonly primitives: readonly ModelPrimitiveLike[];
@@ -87,6 +124,27 @@ export interface PickingSource {
     }): void;
 }
 
+export interface ScreenRect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface ScreenSelectOptions {
+    meshes?: Iterable<Mesh>;
+    mode?: SelectMode;
+    width?: number;
+    height?: number;
+}
+
+export type SelectMode =
+'center'
+ | 'overlap'
+ | 'contain';
+
+export type SelectOperation = 'replace' | 'add' | 'subtract';
+
 export class Selection implements EnginePlugin {
     readonly options: SelectionOptions;
     readonly name: string;
@@ -101,12 +159,53 @@ export class Selection implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
+export interface SelectionElement {
+    addEventListener(type: string, listener: (event: never) => void): void;
+    removeEventListener(type: string, listener: (event: never) => void): void;
+    getBoundingClientRect?(): {
+        left: number;
+        top: number;
+    };
+    setPointerCapture?(id: number): void;
+    releasePointerCapture?(id: number): void;
+    clientWidth: number;
+    clientHeight: number;
+    ownerDocument?: {
+        createElement(tag: string): unknown;
+    };
+    parentElement?: {
+        appendChild(node: unknown): unknown;
+        removeChild(node: unknown): unknown;
+    } | null;
+}
+
 export interface SelectionOptions {
     algorithm?: 'jfa' | 'morphological';
     width?: number;
     color?: readonly [number, number, number];
     name?: string;
     xray?: boolean | XRayOptions;
+}
+
+export class SelectionTool extends EventTarget {
+    selected: Mesh[];
+    enabled: boolean;
+    readonly shape: 'marquee' | 'lasso';
+    static attach(engine: EngineKernel, options?: SelectionToolOptions): SelectionTool;
+    constructor(engine: EngineKernel, options?: SelectionToolOptions);
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface SelectionToolOptions extends Omit<ScreenSelectOptions, 'meshes'> {
+    shape?: 'marquee' | 'lasso';
+    meshes?: () => Iterable<Mesh>;
+    trigger?: (event: PointerLike) => boolean;
+    threshold?: number;
+    element?: SelectionElement;
+    overlay?: boolean;
+    onSelect?: (meshes: Mesh[], operation: SelectOperation) => void;
+    signal?: AbortSignal;
 }
 
 export interface XRayOptions {
@@ -116,9 +215,29 @@ export interface XRayOptions {
     width?: number;
 }
 
+export function pickElement(engine: EngineKernel, x: number, y: number, options?: ScreenSelectOptions): ElementHit | null;
+
+export function selectInPolygon(engine: EngineKernel, polygon: readonly (readonly [number, number])[], options?: ScreenSelectOptions): Mesh[];
+
+export function selectInRect(engine: EngineKernel, rect: ScreenRect, options?: ScreenSelectOptions): Mesh[];
+
 // Not exported from this entry, but used by the exports above:
 
 type PickView = RenderView & {
     pixels: true;
+};
+
+type PointerLike = {
+    clientX: number;
+    clientY: number;
+    pointerId: number;
+    button: number;
+    shiftKey?: boolean;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    altKey?: boolean;
+    pointerType?: string;
+    stopImmediatePropagation?: () => void;
+    preventDefault?: () => void;
 };
 ```

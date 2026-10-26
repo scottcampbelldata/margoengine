@@ -7,6 +7,7 @@ import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
+import { checkTools } from './tools-check.mjs';
 
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 const browser = await openBrowser({ port: 5241 }),
@@ -137,6 +138,7 @@ try {
   await writeFile('test-results/selection-xray.json', JSON.stringify({ hardware, results }, null, 2));
   console.log(JSON.stringify({ hardware: hardware.webgpu, results }, null, 2));
   console.log('selection x-ray browser check passed');
+  await checkTools({ page, hardware });
 } finally {
   await browser.close();
 }

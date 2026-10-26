@@ -24,6 +24,44 @@ The center wins. For an empty center, orthogonal neighbors win before diagonals,
 
 `Picking.attach(engine, {capture: false})` leaves the frame untouched (no second color target, no per-frame mesh snapshot) and renders the culled 3x3 pass for every pick; use it when picks are rare and frame rate matters more. Custom scene pipelines fall back to the micro pass; sections also use that pass so mutable core clipping uniforms stay current. Other mutable custom shader effects should render their changed state before picking. The cached ID texture costs four bytes per viewport pixel; the package remains optional and tree-shakable.
 
+## Marquee, lasso, hover and face/edge/vertex picking
+
+`SelectionTool` drags a rubber band (or, with `shape: 'lasso'`, a free-form outline) over the canvas: Shift + drag replaces
+the selection, Shift + Ctrl adds, Shift + Alt removes. It stops a matching press from reaching later listeners, so create it
+before the camera controls. `HoverHighlight` outlines the mesh under the mouse with its own `Selection`. `selectInRect` and
+`selectInPolygon` are the same tests as plain functions, and `pickElement` returns the face, nearest vertex and nearest edge
+under a pixel. Both selection modes test each mesh's projected bounding sphere: `mode: 'center'` (default), `'overlap'` (a
+crossing window) or `'contain'` (a window).
+
+```ts
+import {Picking, Selection, SelectionTool, HoverHighlight, pickElement} from 'margoengine/selection';
+import type {EngineKernel} from 'margoengine/core';
+
+function selectionTools(engine: EngineKernel, canvas: HTMLCanvasElement) {
+  const picking = Picking.attach(engine);
+  const chosen = Selection.attach(engine, {color: [1, 0.5, 0]});
+  const hover = HoverHighlight.attach(engine, {
+    picking,
+    outline: Selection.attach(engine, {name: 'hover', color: [1, 0.9, 0.3], width: 2}),
+  });
+  const tool = SelectionTool.attach(engine, {
+    shape: 'marquee',      // or 'lasso'
+    mode: 'overlap',       // touch any part of a mesh to select it
+    onSelect: meshes => chosen.set(meshes),
+  });
+  canvas.addEventListener('dblclick', event => {
+    const hit = pickElement(engine, event.offsetX, event.offsetY); // core meshes; walks their triangles
+    if (hit) console.log('face', hit.face, 'vertex', hit.vertex, 'edge', hit.edge, 'at', hit.point);
+  });
+  return () => { tool.dispose(); hover.dispose(); picking.dispose(); chosen.dispose(); };
+}
+```
+
+`tool.selected` holds the current set, and the tool emits `select` (`meshes`, `operation`), `start` and `cancel`. Pass `signal`
+to detach every one of these when an `AbortSignal` aborts, or use `using`. `pickElement` lists the triangles of core meshes whose
+bounding sphere the ray crosses (back faces count), so use it for editing-sized models; loaded glTF models are picked with
+`Picking` instead.
+
 ## Skinned, morphed and static PBR models
 
 Loader-owned PBR nodes are discovered automatically. Explicit `add(model)` registration remains available for custom providers and is deduplicated with discovered sources:

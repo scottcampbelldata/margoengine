@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3210968,
+  "total": 3214710,
   "history": [
     {
       "date": "2026-10-24",
@@ -278,6 +278,12 @@
       "commit": "55e2f7c4",
       "reason": "DX pass B2: error messages name their fix and bare Errors became MargoError (physics, post, procedural, react/kit); the extra text grows these entries",
       "grew": 4
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "2cf1a4ac",
+      "reason": "selection: marquee/lasso select, hover highlight and face/edge/vertex picking (item 21.5); all tree-shakable",
+      "grew": 1
     }
   ],
   "items": {
@@ -511,7 +517,7 @@
     "@margoengine/sciviz": 35513,
     "@margoengine/sciviz/colormaps": 4433,
     "@margoengine/sciviz/maths": 5638,
-    "@margoengine/selection": 13905,
+    "@margoengine/selection": 17647,
     "@margoengine/shader": 12517,
     "@margoengine/shader/effects": 8386,
     "@margoengine/shader/graph": 11137,
