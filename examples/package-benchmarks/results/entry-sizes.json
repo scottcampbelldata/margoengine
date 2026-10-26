@@ -1,5 +1,5 @@
 {
-  "commit": "2d9b43dc",
+  "commit": "26771d66",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1036,8 +1036,8 @@
     },
     "@margoengine/sciviz": {
       ".": {
-        "raw": 101998,
-        "gzip": 34478
+        "raw": 106328,
+        "gzip": 35730
       },
       "./colormaps": {
         "raw": 10526,
