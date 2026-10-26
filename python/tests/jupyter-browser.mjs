@@ -3,7 +3,8 @@
 // JupyterLab 4 and in Notebook 7 in headless Edge, runs it, and checks that each figure's widget view appears and draws
 // (non-background pixels in its canvas) with no errors in the page. In JupyterLab it also checks the camera both ways:
 // the camera the kernel sets is where the view starts, and dragging in the view reaches the kernel's `camera` trait.
-// Last, fig.to_png draws a figure in its own headless browser. The kernel imports this checkout's python/ package and
+// Last, fig.to_png draws a figure in its own headless browser. Every step has a hard time limit (jupyter-steps.mjs): a
+// step that hangs is named, and the Jupyter server, its kernels and the browser are all ended. The kernel imports this checkout's python/ package and
 // the server loads this checkout's built extension (PYTHONPATH and JUPYTER_PATH), whatever the venv has installed.
 // One GPU job at a time, from the repository root (npm run test:python:browser builds the extension first):
 //   node scripts/gpu-lock.mjs run --owner=<you> -- npm run test:python:browser
@@ -13,6 +14,32 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { decodePNG } from '../../tests/support/png.js';
+import { killTree, pageConnected, startKernel, step } from './jupyter-steps.mjs';
+
+// Run by a supervisor: this file starts itself as a child under a hard time limit and, on timeout, ends the child and
+// everything it started (the server, kernels, browser) and says so. The child does the work below.
+if (!process.env.MARGO_JUPYTER_CHILD) {
+  const limit = 10 * 60_000;
+  const child = spawn(process.execPath, [import.meta.filename], {
+    stdio: 'inherit',
+    env: { ...process.env, MARGO_JUPYTER_CHILD: '1' },
+  });
+  const timer = setTimeout(() => {
+    console.error(`jupyter: the whole check passed ${limit / 1000} s; ending its process tree`);
+    killTree(child.pid);
+  }, limit);
+  child.on('exit', (code, signal) => {
+    clearTimeout(timer);
+    process.exit(code ?? (signal ? 1 : 0));
+  });
+  await new Promise(() => {});
+}
+// A hung step ends the whole tree (this process, the server, kernels and browser), not just throws.
+process.on('uncaughtException', (error) => {
+  console.error(error?.step ? `jupyter: ${error.message}` : error);
+  killTree(process.pid);
+  process.exit(1);
+});
 
 const root = resolve(import.meta.dirname, '../..'),
   main = root.replace(/[\\/]\.[\w-]+[\\/]worktrees[\\/][^\\/]+$/, ''),
@@ -117,13 +144,15 @@ const readJson = (name) => {
   return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined;
 };
 const readCamera = () => readJson('camera.json');
-const waitFor = async (what, test, ms = 60_000) => {
-  for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => setTimeout(r, 100))) {
-    const value = test();
-    if (value) return value;
-  }
-  assert.fail(`timed out waiting for ${what}`);
-};
+const waitFor = (what, test, ms = 60_000) =>
+  step(what, ms, async () => {
+    for (;;) {
+      const value = test();
+      if (value) return value;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  });
+const base = `http://127.0.0.1:${port}`;
 
 // The page errors an app shows by itself: a notebook without Margo, opened and run the same way. (Notebook 7.6.3
 // throws "Cannot read properties of undefined (reading 'schema')" from its own settings loading on every notebook.)
@@ -131,13 +160,31 @@ async function ownErrors(browser, path) {
   const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
   const errors = new Set();
   page.on('pageerror', (e) => errors.add(e.message));
-  await page.goto(`http://127.0.0.1:${port}${path}`);
-  await page.waitForSelector('.jp-NotebookPanel .jp-Cell');
-  await page.locator('.lm-MenuBar-itemLabel', { hasText: /^Run$/ }).click();
-  await page.locator('.lm-Menu-itemLabel', { hasText: /^Run All Cells$/ }).click();
-  await page.waitForTimeout(5000);
+  await open(page, path, 'plain.ipynb', 'plain notebook');
+  await step('run the plain notebook', 60_000, async () => {
+    await page.locator('.lm-MenuBar-itemLabel', { hasText: /^Run$/ }).click();
+    await page.locator('.lm-Menu-itemLabel', { hasText: /^Run All Cells$/ }).click();
+    await page.waitForTimeout(5000);
+  });
   await page.close();
   return errors;
+}
+
+// Starts the notebook's kernel through the server and opens the notebook in `page`. The page must hold its kernel
+// connection before cells run: Run All sent earlier makes the app ask "Select Kernel" and run nothing, which under
+// load left the check waiting for figures that never came.
+async function open(page, path, notebook, label) {
+  const abort = new AbortController();
+  try {
+    const kernel = await step(`${label}: start the kernel`, 90_000, () => startKernel(base, notebook, abort.signal));
+    await step(`${label}: load the page`, 90_000, async () => {
+      await page.goto(`${base}${path}`);
+      await page.waitForSelector('.jp-NotebookPanel .jp-Cell');
+    });
+    await step(`${label}: connect the page to the kernel`, 60_000, () => pageConnected(base, kernel, abort.signal));
+  } finally {
+    abort.abort();
+  }
 }
 
 // Opens the notebook at `path`, runs every cell from the Run menu (the same in both apps) and returns the bright
@@ -149,21 +196,22 @@ async function runNotebook(browser, path, app, own = new Set()) {
   page.on('console', (m) => {
     if (m.type() === 'error' && /margo|widget/i.test(m.text())) errors.push(m.text());
   });
-  page.setDefaultTimeout(120_000);
+  page.setDefaultTimeout(60_000);
   try {
-    await page.goto(`http://127.0.0.1:${port}${path}`);
-    await page.waitForSelector('.jp-NotebookPanel .jp-Cell');
+    await open(page, path, 'check.ipynb', app);
     await page.locator('.lm-MenuBar-itemLabel', { hasText: /^Run$/ }).click();
     await page.locator('.lm-Menu-itemLabel', { hasText: /^Run All Cells$/ }).click();
     // Three figures, or an error output (which the check below reports).
-    await page.waitForFunction(
+    await step(`${app}: run the cells`, 190_000, () =>
+      page.waitForFunction(
       () => {
         const canvases = [...document.querySelectorAll('.jp-OutputArea canvas')];
         const failed = [...document.querySelectorAll('.jp-OutputArea-output')].some((o) => /Traceback|failed/.test(o.textContent));
         return failed || (canvases.length >= 3 && canvases.every((c) => c.width > 0 && c.height > 0));
       },
-      null,
-      { timeout: 180_000 },
+        null,
+        { timeout: 180_000 },
+      ),
     );
     const failures = await page.evaluate(() =>
       [...document.querySelectorAll('.jp-OutputArea-output')].map((o) => o.textContent).filter((t) => /Error|failed|Traceback/.test(t)),
@@ -172,30 +220,38 @@ async function runNotebook(browser, path, app, own = new Set()) {
     await page.waitForTimeout(3000);
     // Each figure's canvas as the browser shows it (a screenshot: reading a WebGPU canvas from the page after the
     // frame was presented returns nothing).
-    const drawn = [];
-    for (const canvas of await page.locator('.jp-OutputArea canvas').all()) {
-      await canvas.scrollIntoViewIfNeeded({ timeout: 30_000 });
-      await page.waitForTimeout(500);
-      drawn.push(brightPixels(await decodePNG(new Uint8Array(await canvas.screenshot({ timeout: 30_000, animations: 'allow' })))));
-    }
+    const drawn = await step(`${app}: capture the figures`, 120_000, async () => {
+      const lit = [];
+      for (const canvas of await page.locator('.jp-OutputArea canvas').all()) {
+        await canvas.scrollIntoViewIfNeeded({ timeout: 30_000 });
+        await page.waitForTimeout(500);
+        lit.push(brightPixels(await decodePNG(new Uint8Array(await canvas.screenshot({ timeout: 30_000, animations: 'allow' })))));
+      }
+      return lit;
+    });
     assert.deepEqual(errors, [], `${app}: page errors`);
     assert.equal(drawn.length, 3, `${app}: ${drawn.length} figures`);
     for (const [k, lit] of drawn.entries()) assert.ok(lit > 500, `${app}: figure ${k} drew ${lit} bright pixels`);
     return { page, drawn };
   } catch (error) {
-    // The page as it was when the check failed, for diagnosis.
-    await page.screenshot({ path: join(root, 'test-results/jupyter-browser.png'), fullPage: true });
+    // The page as it was when the check failed, for diagnosis (with the server's log).
+    await page.screenshot({ path: join(root, 'test-results/jupyter-browser.png'), fullPage: true, timeout: 10_000 }).catch(() => {});
+    writeFileSync(join(root, 'test-results/jupyter-server.log'), log);
     throw error;
   }
 }
 
 let browser;
 try {
-  for (let t = 0; !log.includes(`127.0.0.1:${port}`); t++) {
-    assert.ok(t < 600, `jupyter did not start:\n${log}`);
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true });
+  await step('start the Jupyter server', 60_000, async () => {
+    while (!log.includes(`127.0.0.1:${port}`)) await new Promise((r) => setTimeout(r, 100));
+  }).catch((error) => {
+    error.message += `\n${log}`;
+    throw error;
+  });
+  browser = await step('launch the browser', 60_000, () =>
+    chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true }),
+  );
 
   // JupyterLab, with the camera both ways.
   const lab = await runNotebook(browser, '/lab/tree/check.ipynb', 'JupyterLab');
@@ -244,11 +300,10 @@ try {
     `jupyter: Notebook 7 drew 3 figures (${notebook.drawn.join(', ')} bright pixels); its own page errors without Margo: ${[...own].join(' | ') || 'none'}`,
   );
 } finally {
-  await browser?.close();
+  await Promise.race([browser?.close(), new Promise((r) => setTimeout(r, 15_000))]);
   // The jupyter launcher starts the server and its kernels as child processes; on Windows kill() stops only the
-  // launcher, so the whole tree is ended there.
-  if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(server.pid), '/T', '/F'], { stdio: 'ignore' });
-  else server.kill();
+  // launcher, so the whole tree is ended.
+  killTree(server.pid);
 }
 
 // fig.to_png: the package draws a surface in its own headless browser (Edge, as above) and writes a PNG, which must
@@ -261,7 +316,13 @@ const script = [
   'fig = margo.surface(np.sin(x)[None, :] * np.cos(x)[:, None], x=(-3, 3), y=(-3, 3))',
   `fig.to_png(${JSON.stringify(png)}, width=500, height=300, scale=2, browser=${JSON.stringify(process.env.MARGO_BROWSER ?? 'msedge')})`,
 ].join('\n');
-const run = spawnSync(python, ['-c', script], { encoding: 'utf8', env: { ...process.env, PYTHONPATH: join(root, 'python') } });
+const run = spawnSync(python, ['-c', script], {
+  encoding: 'utf8',
+  timeout: 120_000,
+  killSignal: 'SIGKILL',
+  env: { ...process.env, PYTHONPATH: join(root, 'python') },
+});
+assert.ok(!run.error, `step "fig.to_png" hung or failed to start: ${run.error}`);
 assert.equal(run.status, 0, `to_png failed:\n${run.stdout}\n${run.stderr}`);
 const image = await decodePNG(new Uint8Array(readFileSync(png)));
 assert.deepEqual([image.width, image.height], [1000, 600], 'to_png size at scale 2');
