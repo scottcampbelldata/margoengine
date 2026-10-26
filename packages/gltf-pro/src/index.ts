@@ -853,6 +853,19 @@ export class PBRDrawRun {
     }
   }
 }
+/**
+ * The models drawing through one frame graph, in segments: models whose passes were added one right after another
+ * (nothing else added or removed in the graph in between), so their passes sit next to each other in its order.
+ */
+interface ModelGraph {
+  /** The graph revision just after the last model's pass was added. */
+  revision: number;
+  segment: PBRModel[];
+  segments: WeakMap<PBRModel, PBRModel[]>;
+  run: PBRDrawRun;
+}
+const modelGraphs = new WeakMap<FrameGraph, ModelGraph>();
+const modelGraph = (): ModelGraph => ({ revision: -1, segment: [], segments: new WeakMap(), run: new PBRDrawRun() });
 // A symbol keeps separately bundled optional consumers interoperable without
 // importing the loader or attaching a second drawable core Geometry.
 const cpuSource = Symbol.for('margoengine.pbr-source.v1');
@@ -1563,6 +1576,8 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
     volume: transmission ? [thickness, ...attenuation.map((c) => attenuationPower(c, 1 / distance))] : undefined,
   };
 }
+/** Main-thread packings per asset and primitive definition, kept as long as the asset is. */
+const assetPacks = new WeakMap<GLTFAsset, WeakMap<object, PreparedGeometry>>();
 function primitive(
   asset: GLTFAsset,
   p: GLTFPrimitive,
@@ -1573,8 +1588,15 @@ function primitive(
   packs: Map<object, PreparedGeometry>,
 ): PBRPrimitive {
   // Packing depends only on the primitive definition, so nodes sharing a mesh share its arrays (and GPU buffers, keyed by array).
-  let g = packed.get(p) ?? packs.get(p);
-  if (!g) packs.set(p, (g = packPrimitive(asset, p)));
+  // Models of one asset (cloneModel copies) share the arrays too: packing is a pure function of the definition.
+  let shared = assetPacks.get(asset);
+  if (!shared) assetPacks.set(asset, (shared = new WeakMap()));
+  let g = packed.get(p) ?? packs.get(p) ?? shared.get(p);
+  if (!g) {
+    g = packPrimitive(asset, p);
+    shared.set(p, g);
+  }
+  packs.set(p, g);
   const { vertices, indices } = g;
   const m = fit(
     asset,
@@ -2392,13 +2414,42 @@ export class PBRModel implements EnginePlugin {
     }
   }
   registerPasses(graph: FrameGraph): void {
+    let models = modelGraphs.get(graph);
+    if (!models) modelGraphs.set(graph, (models = modelGraph()));
+    // Next to the previous model's pass only if nothing else entered or left the graph since it was added.
+    if (models.revision !== graph.revision) models.segment = [];
+    const own = models;
     graph.add({
       name: this.name,
       order: 1,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c, 'beauty', c.color, c.depth);
+        if (c.backend === 'webgpu') this.drawSegment(c, own);
       },
     });
+    models.segment.push(this);
+    models.segments.set(this, models.segment);
+    models.revision = graph.revision;
+  }
+  /**
+   * Models whose passes follow one another in the frame graph draw as one run (one render pass, shared batches), in
+   * graph order, at the first one's pass; the others' passes then draw nothing. A model whose neighbours are other
+   * passes draws on its own, as before. (A render pass per model stored and reloaded the multisampled colour and depth
+   * each time: 100 models, 100 passes and 1.2 ms of GPU time.)
+   */
+  private drawSegment(c: Context, models: ModelGraph): void {
+    const segment = models.segments.get(this);
+    let live = 0,
+      head: PBRModel | undefined;
+    if (segment) for (const model of segment) if (!model.disposed && live++ === 0) head = model;
+    if (live < 2) return this.draw(c, 'beauty', c.color, c.depth);
+    if (head !== this) return;
+    const run = models.run;
+    try {
+      for (const model of segment!)
+        if (!model.disposed) model.draw(c, 'beauty', c.color, c.depth, 'all', undefined, run);
+    } finally {
+      run.end();
+    }
   }
   /** Borrow a decoded image for optional material packages; the model owns its lifetime. */
   image(index: number): Exclude<GLTFImage, undefined> {
@@ -4366,7 +4417,7 @@ export class PBRModel implements EnginePlugin {
       throw error;
     }
   }
-  /** World-space visible point and spot lights for `clustered.setLights()`. Hidden ancestors hide their lights. Directional lights are left to engine lighting; an unset range ends where intensity/dÂ² reaches 1/256. */
+  /** World-space visible point and spot lights for `clustered.setLights()`. Hidden ancestors hide their lights. Directional lights are left to engine lighting; an unset range ends where intensity/dÃ‚Â² reaches 1/256. */
   clusteredLights(): GLTFClusteredLight[] {
     this.engine.store.tick(false);
     return this.lights

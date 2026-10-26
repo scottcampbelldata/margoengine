@@ -123,6 +123,26 @@ export function coordinateExtension(
 }
 
 export function coordinateShader(code: string, coordinates?: CoordinateExtension, normalUV1 = false): string {
+  // The text depends only on these; memoised so each draw's per-frame derivation gets the same string object back.
+  let mask = 0;
+  for (let i = 0; i < 5; i++) if (coordinates?.transforms[i]) mask |= 1 << i;
+  const signature = coordinates
+    ? `${coordinates.length}:${mask}:${+!!coordinates.source?.declarations?.includes('fn materialUV(')}:${+normalUV1}`
+    : `-:${+normalUV1}`;
+  let byCode = shaded.get(code);
+  if (!byCode) {
+    if (shaded.size >= 64) shaded.clear();
+    shaded.set(code, (byCode = new Map()));
+  }
+  let out = byCode.get(signature);
+  if (out === undefined) {
+    if (byCode.size >= 64) byCode.clear();
+    byCode.set(signature, (out = composeCoordinates(code, coordinates, normalUV1)));
+  }
+  return out;
+}
+const shaded = new Map<string, Map<string, string>>();
+function composeCoordinates(code: string, coordinates: CoordinateExtension | undefined, normalUV1: boolean): string {
   if (coordinates) {
     let at = coordinates.length / 4;
     for (let i = 0; i < 5; i++)

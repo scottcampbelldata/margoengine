@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3356382,
+  "total": 3358083,
   "history": [
     {
       "date": "2026-10-24",
@@ -434,14 +434,20 @@
       "commit": "3a2c2412",
       "reason": "clustered/shadows: casters cull per shadow map by bounding sphere and write their blocks only when moved (p-point-shadows 15.4 -> ~1.1 ms CPU); taa: one velocity pass with a shared camera block (p-taa 5.41 -> ~0.56 ms CPU) (item 47)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "9724c2f9",
+      "reason": "animation: Animations of a frame graph deform in one compute pass (p-morph GPU 1.57 -> 1.32 ms, CPU 1.06 -> 0.51 with gltf-pro's shared model run) (item 47)",
+      "grew": 3
     }
   ],
   "items": {
-    "@margoengine/animation": 19099,
+    "@margoengine/animation": 19751,
     "@margoengine/animation/pointer": 6858,
     "@margoengine/animation/sampling": 1177,
-    "@margoengine/animation/skeleton-utils": 8332,
-    "@margoengine/animation/vat": 7715,
+    "@margoengine/animation/skeleton-utils": 8966,
+    "@margoengine/animation/vat": 8130,
     "@margoengine/animator": 17372,
     "@margoengine/audio": 7716,
     "@margoengine/blender": 4000,

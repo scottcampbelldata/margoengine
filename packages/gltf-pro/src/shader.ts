@@ -238,16 +238,24 @@ export interface PBRTransparency {
  * both false compiles without a discard and keeps early depth testing. Every compact-path pipeline sets them.
  */
 export function compactTests(code: string): string {
-  return (
-    'override margoFaceTest:bool=true;\noverride margoAlphaTest:bool=true;\n' +
-    code
-      .replace('if(!facing&&f.settings.z<0.5)', 'if(margoFaceTest&&!facing&&f.settings.z<0.5)')
-      .replace(
-        'if(f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y)',
-        'if(margoAlphaTest&&f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y)',
-      )
-  );
+  // Memoised: draws derive every frame, and later steps key caches by the code string, so the same input must give the
+  // same string object (a new one would be rebuilt and hashed again per draw per frame).
+  let out = compacted.get(code);
+  if (out === undefined) {
+    if (compacted.size >= 64) compacted.clear();
+    out =
+      'override margoFaceTest:bool=true;\noverride margoAlphaTest:bool=true;\n' +
+      code
+        .replace('if(!facing&&f.settings.z<0.5)', 'if(margoFaceTest&&!facing&&f.settings.z<0.5)')
+        .replace(
+          'if(f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y)',
+          'if(margoAlphaTest&&f.settings.x>0.5&&f.settings.x<1.5&&s.base.a<f.settings.y)',
+        );
+    compacted.set(code, out);
+  }
+  return out;
 }
+const compacted = new Map<string, string>();
 const head = '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {',
   through = new Map<string, Map<string, string>>();
 /** `code` (the lit PBR shader) with a `transparent` entry point returning `margoTransparent(<beauty colour>, i)`. */

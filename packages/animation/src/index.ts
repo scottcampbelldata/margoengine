@@ -186,6 +186,12 @@ function writeInput(
     args[2] = undefined!;
   }
 }
+/** The Animations whose passes share a frame graph, and how many of those passes ran in the current execution. */
+interface DeformGroup {
+  members: Set<Animation>;
+  ran: number;
+}
+const deformGroups = new WeakMap<FrameGraph, DeformGroup>();
 /**
  * Plays a glTF model's animation clips on the GPU: node translation, rotation and scale, skinning and morph targets. Add it to the engine with {@link Animation.attach}; it advances each frame and removes itself when the model is disposed.
  *
@@ -221,6 +227,8 @@ export class Animation implements EnginePlugin {
   private disposed = false;
   private unsubscribe?: () => void;
   private readonly prepareDeformation = (context: PBRDeformationContext) => this.deform(context);
+  /** The deformation group of the frame graph this Animation's pass is in. */
+  private group?: DeformGroup;
   private readonly createDeformationRenderer = (model: PBRModel, device: GPUDevice) => {
     const renderer = new Animation(model, this.options);
     renderer.playing = false;
@@ -631,10 +639,63 @@ export class Animation implements EnginePlugin {
     }
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({ name: this.name, order: -10, execute: (c) => this.deform(c) });
+    let group = deformGroups.get(graph);
+    if (!group) deformGroups.set(graph, (group = { members: new Set(), ran: 0 }));
+    group.members.add(this);
+    this.group = group;
+    graph.add({ name: this.name, order: -10, execute: (c) => this.deformAll(c) });
+  }
+  /**
+   * Every Animation of a frame graph deforms in one compute pass: the first of their passes in each graph execution
+   * uploads each one's weights and bones and encodes all their dispatches; the rest of that execution's passes skip. (A
+   * compute pass per model cost about 10 us of GPU time each, 100 models 1.3 ms.)
+   */
+  private deformAll(context: PassContext): void {
+    const group = this.group;
+    if (!group || context.backend !== 'webgpu') return this.deform(context);
+    // The group's passes run back to back in each graph execution; the first does the work, the last resets.
+    const first = group.ran === 0;
+    group.ran = group.ran + 1 >= group.members.size ? 0 : group.ran + 1;
+    if (!first) return;
+    try {
+      const members: Animation[] = [];
+      for (const a of group.members) if (a.upload(context)) members.push(a);
+      if (!members.length) return;
+      const pass = context.encoder.beginComputePass();
+      try {
+        for (const a of members) a.encode(pass);
+      } finally {
+        pass.end();
+      }
+    } catch (error) {
+      // The graph stops here, so the other passes of this execution never run: the next one starts afresh.
+      group.ran = 0;
+      throw error;
+    }
   }
   private deform(context: PassContext | PBRDeformationContext): void {
-    if (context.backend !== 'webgpu' || this.model.disposed) return;
+    if (!this.upload(context)) return;
+    // One pass for every skinned or morphed primitive. Each dispatch writes its own output buffer.
+    const pass = context.encoder.beginComputePass();
+    try {
+      this.encode(pass);
+    } finally {
+      pass.end();
+    }
+  }
+  /** Records one dispatch per deformed primitive into pass. */
+  private encode(pass: GPUComputePassEncoder): void {
+    for (const r of this.resources) {
+      pass.setPipeline(r.pipeline);
+      pass.setBindGroup(0, r.group);
+      pass.dispatchWorkgroups(Math.ceil(r.primitive.vertices.length / 20 / 64));
+    }
+  }
+  /** Checks and uploads this frame's weights and bone palettes; false when there is nothing to dispatch. */
+  private upload(
+    context: PassContext | PBRDeformationContext,
+  ): context is Extract<PassContext, { backend: 'webgpu' }> | PBRDeformationContext {
+    if (context.backend !== 'webgpu' || this.model.disposed) return false;
     for (const r of this.resources) {
       const weights = r.primitive.weights;
       for (let i = 0; i < weights.length; i++)
@@ -708,18 +769,7 @@ export class Animation implements EnginePlugin {
         }
       }
     }
-    if (!this.resources.length) return;
-    // One pass for every skinned or morphed primitive. Each dispatch writes its own output buffer.
-    const pass = context.encoder.beginComputePass();
-    try {
-      for (const r of this.resources) {
-        pass.setPipeline(r.pipeline);
-        pass.setBindGroup(0, r.group);
-        pass.dispatchWorkgroups(Math.ceil(r.primitive.vertices.length / 20 / 64));
-      }
-    } finally {
-      pass.end();
-    }
+    return this.resources.length > 0;
   }
   private release(): void {
     if (this.model.createDeformationRenderer === this.createDeformationRenderer)
@@ -743,6 +793,8 @@ export class Animation implements EnginePlugin {
     this.model.root.engine.removePlugin(this.name);
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.group?.members.delete(this);
+    this.group = undefined;
     this.release();
     this.device = undefined;
   }

@@ -98,3 +98,76 @@ test('animation retains inverse bind views through 120 moving frames and recreat
   assert.equal(primitive.deformed, undefined);
   assert.ok(h.resources.every((r) => r.destroyed));
 });
+
+test('Animations of one engine deform in one compute pass a frame, before and after one of them is disposed', () => {
+  const h = optionalGPU(),
+    fixture = animatedTriangle(),
+    identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  h.engine.store.transforms = Object.fromEntries(
+    ['x', 'y', 'z', 'qx', 'qy', 'qz', 'qw', 'sx', 'sy', 'sz'].map((name) => [
+      name,
+      new Float32Array(2).fill(['qw', 'sx', 'sy', 'sz'].includes(name) ? 1 : 0),
+    ]),
+  );
+  const make = (k) => {
+    const nodes = [0, 1].map((id) => ({
+      id,
+      engine: h.engine,
+      matrix: identity.slice(),
+      check() {},
+      setPosition() {
+        return this;
+      },
+      setScale() {
+        return this;
+      },
+      setQuaternion() {
+        return this;
+      },
+    }));
+    return new Animation({
+      name: 'model ' + k,
+      root: nodes[0],
+      nodes,
+      primitives: [
+        {
+          definition: fixture.doc.meshes[0].primitives[0],
+          nodeIndex: 0,
+          node: nodes[0],
+          vertices: new Float32Array(60),
+          weights: new Float32Array([0]),
+        },
+      ],
+      asset: new GLTFAsset(fixture.doc, fixture.buffers),
+      onDispose() {
+        return () => {};
+      },
+    });
+  };
+  const animations = [0, 1, 2].map(make);
+  for (const a of animations) h.engine.use(a);
+  const dispatches = [],
+    begin = h.context.encoder.beginComputePass;
+  h.context.encoder.beginComputePass = (...args) => {
+    const pass = begin.apply(h.context.encoder, args),
+      dispatch = pass.dispatchWorkgroups;
+    dispatches.push(0);
+    pass.dispatchWorkgroups = (...n) => {
+      dispatches[dispatches.length - 1]++;
+      return dispatch.apply(pass, n);
+    };
+    return pass;
+  };
+  try {
+    for (let i = 0; i < 3; i++) h.frame();
+    assert.deepEqual(dispatches, [3, 3, 3], 'one pass a frame with every model in it');
+    dispatches.length = 0;
+    animations[1].dispose();
+    h.frame();
+    h.frame();
+    assert.deepEqual(dispatches, [2, 2]);
+  } finally {
+    h.context.encoder.beginComputePass = begin;
+    for (const a of animations) a.dispose();
+  }
+});
