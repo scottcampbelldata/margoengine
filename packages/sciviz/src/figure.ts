@@ -14,6 +14,7 @@ import type { OrbitControls } from '@margoengine/controls/orbit';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { Axes, THEMES, type AxesOptions, type Theme } from './axes.js';
 import { barRects, heatmapRects, histogram, type BinOptions } from './charts.js';
+import { arrowSegments, streamline, type StreamlineOptions, type VectorGrid } from './fields.js';
 import { ColorBar, type ColorBarOptions } from './colorbar.js';
 import type { Colormap } from './colormaps.js';
 import { Interaction, type DragMode } from './interact.js';
@@ -205,6 +206,46 @@ export interface HistogramLayerOptions extends BinOptions {
   readonly color?: string;
   /** Name shown in tooltips and legends. Default none. */
   readonly name?: string;
+}
+
+/** Vector-field styling shared by quiver and streamline layers. */
+export interface FieldStyleOptions {
+  /** Colour map for the speed. Default `'aurora'`. */
+  readonly colormap?: ColormapSource;
+  /** Speed range of the colour map. Default the speeds' min and max. */
+  readonly range?: readonly [number, number];
+  /** One colour (`#rrggbb`) instead of colouring by speed. */
+  readonly color?: string;
+  /** Line width in CSS pixels. Default 1.5. */
+  readonly width?: number;
+  /** Name shown in tooltips and legends. Default none. */
+  readonly name?: string;
+}
+
+/** Options for a quiver plot. */
+export interface QuiverLayerOptions extends FieldStyleOptions {
+  /** Arrow length per unit of vector length, in data units. Default: the longest arrow is 6% of the data's extent. */
+  readonly scale?: number;
+  /** Head strokes as a fraction of the arrow's length. Default 0.3. */
+  readonly head?: number;
+}
+
+/** Options for streamlines. */
+export interface StreamlinesLayerOptions extends FieldStyleOptions, StreamlineOptions {
+  /** Seed points [x, y, z], or how many per axis on an even grid inside the bounds. Default 8 (2D) or 4 (3D). */
+  readonly seeds?: number | readonly (readonly [number, number, number])[];
+}
+
+/** A gridded vector field for streamlines: components on nx x ny (x nz) samples, x fastest. */
+export interface FieldData {
+  readonly u: DataSource;
+  readonly v: DataSource;
+  /** Third component; omit for a 2D field. */
+  readonly w?: DataSource;
+  /** Samples along x, y (and z). */
+  readonly dims: readonly [number, number] | readonly [number, number, number];
+  /** Data bounds of the first and last samples. Default [0, nx - 1, 0, ny - 1, 0, nz - 1]. */
+  readonly bounds?: readonly [number, number, number, number] | Bounds;
 }
 
 /** Options for a heatmap. */
@@ -998,6 +1039,135 @@ export class Figure extends EventTarget {
         name: options.name,
       },
     );
+  }
+
+  // A line layer of separate segments (pairs of points in data units) coloured by a value per point.
+  async #segments(
+    points: Float64Array,
+    values: Float64Array,
+    options: FieldStyleOptions,
+    what: string,
+  ): Promise<LineLayer> {
+    const positions = new Float32Array(points.length);
+    for (let i = 0; i < points.length; i += 3) {
+      positions[i] = points[i];
+      positions[i + 1] = points[i + 1];
+      positions[i + 2] = this.#flat ? 0 : points[i + 2];
+    }
+    const map = resolveColormap(options.colormap),
+      colours = options.color
+        ? undefined
+        : mapColours(values, map, rangeOption(options.range, `${what} range`) ?? extent(values));
+    const lines = await this.#linesPlugin();
+    const { Line } = await import('@margoengine/lines');
+    this.#check();
+    const colour = options.color ?? toHex(map.sample(0.6)),
+      width = options.width ?? 1.5;
+    const line = lines.add(
+      new Line({ mode: 'segments', positions, colors: colours, color: colours ? '#ffffff' : colour, width }),
+    );
+    return this.#style(
+      { color: colour, colors: colours, width },
+      { kind: 'line', line, bounds: positionBounds(positions), positions, values, name: options.name },
+    );
+  }
+
+  /**
+   * A quiver plot: an arrow at each (x, y, z) along (u, v, w) (z and w omitted for 2D), coloured by speed through a
+   * colour map. The default scale makes the longest arrow 6% of the data's extent. Needs linear axes.
+   */
+  async quiver(
+    data: {
+      readonly x: DataSource;
+      readonly y: DataSource;
+      readonly z?: DataSource;
+      readonly u: DataSource;
+      readonly v: DataSource;
+      readonly w?: DataSource;
+    },
+    options: QuiverLayerOptions = {},
+  ): Promise<LineLayer> {
+    this.#check();
+    this.#linear('A quiver plot');
+    const [x, y, z, u, v, w] = await Promise.all([data.x, data.y, data.z, data.u, data.v, data.w].map(read));
+    const n = x?.length ?? 0;
+    if (!x || !y || !u || !v || [y, u, v, z ?? x, w ?? x].some((a) => a.length !== n) || n < 1)
+      throw rangeError('quiver x, y, z, u, v and w must have one length of at least 1', 'sciviz');
+    let scaleBy = options.scale;
+    if (scaleBy === undefined) {
+      let longest = 0;
+      for (let i = 0; i < n; i++) longest = Math.max(longest, Math.hypot(u[i], v[i], w ? w[i] : 0) || 0);
+      const [x0, x1] = extent(x),
+        [y0, y1] = extent(y),
+        [z0, z1] = z ? extent(z) : [0, 0],
+        size = Math.hypot(x1 - x0, y1 - y0, z1 - z0) || 1;
+      scaleBy = longest > 0 ? (0.06 * size) / longest : 1;
+    }
+    if (!(scaleBy > 0) || !Number.isFinite(scaleBy))
+      throw rangeError(`quiver scale must be a positive number, got ${scaleBy}`, 'sciviz');
+    const { segments, sample } = arrowSegments(x, y, z, u, v, w, scaleBy, options.head ?? 0.3);
+    // Every point of an arrow carries that sample's speed.
+    const speeds = new Float64Array(segments.length / 3);
+    for (let k = 0; k < sample.length; k++) {
+      const i = sample[k],
+        s = Math.hypot(u[i], v[i], w ? w[i] : 0);
+      speeds[k * 2] = s;
+      speeds[k * 2 + 1] = s;
+    }
+    return this.#segments(segments, speeds, options, 'quiver');
+  }
+
+  /**
+   * Streamlines of a gridded vector field, traced with fourth-order Runge-Kutta steps from seed points (an even grid
+   * of them by default), coloured by speed. Needs linear axes.
+   */
+  async streamlines(field: FieldData, options: StreamlinesLayerOptions = {}): Promise<LineLayer> {
+    this.#check();
+    this.#linear('Streamlines');
+    const [u, v, w] = await Promise.all([field.u, field.v, field.w].map(read));
+    const dims = field.dims,
+      nx = dims[0],
+      ny = dims[1],
+      nz = dims[2] ?? 1;
+    if (![nx, ny, nz].every((d) => Number.isInteger(d) && d >= 1) || nx * ny < 2)
+      throw rangeError(`streamlines dims must be whole numbers, at least 2 samples, got [${dims}]`, 'sciviz');
+    if (!u || !v || u.length !== nx * ny * nz || v.length !== u.length || (w && w.length !== u.length))
+      throw rangeError(`streamlines u, v and w need ${nx * ny * nz} values each (dims [${dims}])`, 'sciviz');
+    const b = field.bounds,
+      bounds: Bounds = b
+        ? b.length === 4
+          ? [b[0], b[1], b[2], b[3], 0, 0]
+          : [...b]
+        : [0, nx - 1, 0, ny - 1, 0, nz - 1];
+    const grid: VectorGrid = { u, v, w, dims: [nx, ny, nz], bounds };
+    let seeds = options.seeds ?? (nz > 1 ? 4 : 8);
+    if (typeof seeds === 'number') {
+      if (!Number.isInteger(seeds) || seeds < 1)
+        throw rangeError(`streamlines seeds must be a whole number of at least 1 or points, got ${seeds}`, 'sciviz');
+      const count = seeds,
+        at = (lo: number, hi: number, k: number) => lo + ((k + 0.5) / count) * (hi - lo),
+        list: [number, number, number][] = [];
+      for (let k = 0; k < (nz > 1 ? count : 1); k++)
+        for (let j = 0; j < count; j++)
+          for (let i = 0; i < count; i++)
+            list.push([
+              at(bounds[0], bounds[1], i),
+              at(bounds[2], bounds[3], j),
+              nz > 1 ? at(bounds[4], bounds[5], k) : bounds[4],
+            ]);
+      seeds = list;
+    }
+    const points: number[] = [],
+      speeds: number[] = [];
+    for (const seed of seeds) {
+      const line = streamline(grid, seed, options);
+      for (let i = 0; i + 1 < line.speeds.length; i++) {
+        for (let c = 0; c < 6; c++) points.push(line.positions[i * 3 + c]);
+        speeds.push(line.speeds[i], line.speeds[i + 1]);
+      }
+    }
+    if (!points.length) throw rangeError('streamlines found no flow at the seeds; check bounds and seeds', 'sciviz');
+    return this.#segments(Float64Array.from(points), Float64Array.from(speeds), options, 'streamlines');
   }
 
   /** A surface plot of heights `z` over a grid (`nx` columns; a GpuArray of shape [ny, nx] is read in place). */

@@ -12,7 +12,7 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | --- | --- | --- |
 | `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 288,197 B |
 | `margoengine/cad` | CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export | 199,438 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 261,573 B |
+| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 263,660 B |
 | `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 143,159 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses

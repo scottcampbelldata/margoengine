@@ -45,11 +45,31 @@ export type SelectRegion = {
     readonly polygon: ArrayLike<number>;
 };
 
+export interface StreamlineOptions {
+    readonly step?: number;
+    readonly maxSteps?: number;
+    readonly minSpeed?: number;
+    readonly direction?: 'forward' | 'backward' | 'both';
+}
+
 export interface Ticks {
     readonly values: readonly number[];
     readonly step: number;
     readonly labels: readonly string[];
 }
+
+export interface VectorGrid {
+    readonly u: ArrayLike<number>;
+    readonly v: ArrayLike<number>;
+    readonly w?: ArrayLike<number>;
+    readonly dims: readonly [number, number, number];
+    readonly bounds: readonly [number, number, number, number, number, number];
+}
+
+export function arrowSegments(x: ArrayLike<number>, y: ArrayLike<number>, z: ArrayLike<number> | undefined, u: ArrayLike<number>, v: ArrayLike<number>, w: ArrayLike<number> | undefined, scale: number, head?: number): {
+    segments: Float64Array;
+    sample: Uint32Array;
+};
 
 export function axisScale(type?: ScaleType, origin?: number): Scale;
 
@@ -73,6 +93,8 @@ export function formatDate(ms: number, step: number, months?: number): string;
 export function formatTick(value: number, step: number): string;
 
 export function formatValue(value: number, digits?: number): string;
+
+export function gridSpacing(grid: VectorGrid): number;
 
 export function heatmapRects(values: ArrayLike<number>, nx: number, ny: number, x: readonly [number, number], y: readonly [number, number]): Float32Array;
 
@@ -102,12 +124,19 @@ export function rayHeightField(origin: readonly [number, number, number], direct
 
 export function rectAt(rects: ArrayLike<number>, x: number, y: number): number;
 
+export function sampleField(grid: VectorGrid, x: number, y: number, z: number): [number, number, number] | null;
+
 export function screenRay(matrix: ArrayLike<number>, width: number, height: number, sx: number, sy: number): {
     origin: [number, number, number];
     direction: [number, number, number];
 } | null;
 
 export function selectPoints(matrix: ArrayLike<number>, positions: ArrayLike<number>, width: number, height: number, region: SelectRegion): Uint32Array;
+
+export function streamline(grid: VectorGrid, seed: readonly [number, number, number], options?: StreamlineOptions): {
+    positions: Float64Array;
+    speeds: Float64Array;
+};
 
 export function ticks(min: number, max: number, count?: number): Ticks;
 ```

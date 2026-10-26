@@ -327,6 +327,8 @@ export const entries = [
       'bar x and y must have one length of at least 1',
       'histogram takes an array of numbers or a TypedArray',
       'Heatmap x and y must be above 0 on a log axis',
+      'quiver x, y, z, u, v and w must have one length of at least 1',
+      'streamlines found no flow at the seeds; check bounds and seeds',
       'Isosurface GpuArray must live on the engine device: createCompute({ engine })',
       'Isosurface disposed; create a new one',
       'sciviz needs the WebGPU backend; the engine runs WebGL2',

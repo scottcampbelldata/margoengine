@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3136341,
+  "total": 3139297,
   "history": [
     {
       "date": "2026-10-24",
@@ -242,6 +242,12 @@
       "commit": "804d2dea",
       "reason": "DX pass B1: error messages now name their fix and bare Errors became MargoError (machinery, materials); the extra text and bundled MargoError class grow these entries",
       "grew": 13
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "82da467e",
+      "reason": "sciviz: vector fields: quiver arrows and RK4 streamlines",
+      "grew": 2
     }
   ],
   "items": {
@@ -471,9 +477,9 @@
     "@margoengine/scatter": 11893,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
-    "@margoengine/sciviz": 33603,
+    "@margoengine/sciviz": 35513,
     "@margoengine/sciviz/colormaps": 4433,
-    "@margoengine/sciviz/maths": 4592,
+    "@margoengine/sciviz/maths": 5638,
     "@margoengine/selection": 13905,
     "@margoengine/shader": 12517,
     "@margoengine/shader/effects": 8386,

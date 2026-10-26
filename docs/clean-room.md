@@ -563,6 +563,7 @@ under the AGENTS.md exception for standard files (THIRD-PARTY-NOTICES.md, `packa
 | Volume ray marching | J. Kruger and R. Westermann, "Acceleration techniques for GPU-based volume rendering", IEEE Visualization 2003 (front-to-back compositing, early ray termination); opacity correction for the step length from the emission-absorption model (N. Max, "Optical models for direct volume rendering", IEEE TVCG 1(2), 1995) |
 | Marching cubes table (derived, not copied) | W. E. Lorensen and H. E. Cline, "Marching cubes", SIGGRAPH 1987; face-consistent disambiguation as required by G. M. Nielson and B. Hamann, "The asymptotic decider", IEEE Visualization 1991 |
 | Tick spacing | P. S. Heckbert, "Nice numbers for graph labels", Graphics Gems, 1990 |
+| Streamlines and quiver glyphs | Classical fourth-order Runge-Kutta (W. Kutta, 1901), as in E. Hairer, S. P. Norsett and G. Wanner, *Solving Ordinary Differential Equations I*, section II.1; trilinear interpolation of the gridded field |
 | Series colours | M. Okabe and K. Ito, "Color Universal Design (CUD): how to make figures and presentations that are friendly to colorblind people", 2008 (the published palette values) |
 | Date ticks | Calendar arithmetic in UTC from ECMAScript's `Date.UTC` (ECMA-262, section 21.4); log ticks at decades (Heckbert 1990's nice numbers in log space) |
 | Histogram bins | D. Freedman and P. Diaconis, "On the histogram as a density estimator: L2 theory", Z. Wahrscheinlichkeitstheorie verw. Gebiete 57, 1981; H. A. Sturges, "The choice of a class interval", JASA 21(153), 1926 |

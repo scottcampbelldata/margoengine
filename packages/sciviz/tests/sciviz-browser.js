@@ -629,6 +629,76 @@ window.runSciVizTests = async () => {
     assert(!legend.isConnected, 'disposing the figure removes the legend');
   });
 
+  await check('a quiver plot draws an arrow per sample, scaled so the longest is 6% of the extent', async () => {
+    const figure = await Figure.create(canvas, { mode: '2d', axes: false });
+    figure.engine.stop?.();
+    watch(figure);
+    const x = [],
+      y = [],
+      u = [],
+      v = [];
+    for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) x.push(i), y.push(j), u.push(1 + i), v.push(0);
+    const arrows = await figure.quiver({ x, y, u, v }, { color: '#ffffff' });
+    assert(arrows.positions.length === 25 * 3 * 2 * 3, `three segments per arrow: ${arrows.positions.length / 6}`);
+    // The longest vector (5) is 6% of the extent (hypot(4, 4)).
+    const p = arrows.positions,
+      last = 24 * 18;
+    const length = Math.hypot(p[last + 3] - p[last], p[last + 4] - p[last + 1]);
+    assert(Math.abs(length - 0.06 * Math.hypot(4, 4)) < 1e-5, `longest arrow ${length}`);
+    const image = await chartPixels(figure);
+    let lit = 0;
+    for (let yy = 0; yy < image.height; yy += 2)
+      for (let xx = 0; xx < image.width; xx += 2) if (luminance(image.at(xx, yy)) > 150) lit++;
+    assert(lit > 20, `arrows are drawn (${lit})`);
+    figure.dispose();
+  });
+
+  await check('streamlines of a rotating field circle the centre, coloured by speed', async () => {
+    const figure = await Figure.create(canvas, { mode: '2d', axes: false });
+    figure.engine.stop?.();
+    watch(figure);
+    const n = 21,
+      u = new Float32Array(n * n),
+      v = new Float32Array(n * n);
+    for (let j = 0; j < n; j++)
+      for (let i = 0; i < n; i++) {
+        u[j * n + i] = -(j - 10) / 10;
+        v[j * n + i] = (i - 10) / 10;
+      }
+    const lines = await figure.streamlines(
+      { u, v, dims: [n, n], bounds: [-1, 1, -1, 1] },
+      {
+        seeds: [
+          [0.5, 0, 0],
+          [0.25, 0, 0],
+        ],
+        step: 0.02,
+        maxSteps: 400,
+      },
+    );
+    const p = lines.positions;
+    let worst = 0;
+    for (let i = 0; i < p.length; i += 3) {
+      const r = Math.hypot(p[i], p[i + 1]);
+      worst = Math.max(worst, Math.min(Math.abs(r - 0.5), Math.abs(r - 0.25)));
+    }
+    assert(p.length > 600 && worst < 1e-3, `on their circles: ${p.length / 3} points, drift ${worst}`);
+    assert(Math.abs(Math.max(...lines.values) - 0.5) < 1e-3, 'speed is the radius');
+    const image = await chartPixels(figure);
+    let lit = 0;
+    for (let yy = 0; yy < image.height; yy += 2)
+      for (let xx = 0; xx < image.width; xx += 2) if (luminance(image.at(xx, yy)) > 60) lit++;
+    assert(lit > 50, `streamlines are drawn (${lit})`);
+    let threw = false;
+    try {
+      await figure.streamlines({ u, v, dims: [n, n] }, { seeds: [[99, 99, 0]] });
+    } catch (error) {
+      threw = error instanceof RangeError;
+    }
+    assert(threw, 'seeds outside the field are an error');
+    figure.dispose();
+  });
+
   await check('colour maps the page can use as CSS', async () => {
     assert(colormap('aurora').css().startsWith('linear-gradient('), 'css');
   });

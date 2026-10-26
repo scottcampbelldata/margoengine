@@ -5,6 +5,10 @@ export { Figure, createFigure } from './figure.js';
 export type {
   BarLayerOptions,
   CreateFigureOptions,
+  FieldData,
+  FieldStyleOptions,
+  QuiverLayerOptions,
+  StreamlinesLayerOptions,
   HeatmapLayerOptions,
   HistogramLayerOptions,
   Margin,

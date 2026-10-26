@@ -172,6 +172,46 @@ await chart.line({ x: days, y: days.map((_, i) => 40 * 1.1 ** i) }, { name: 'web
 console.log(chart.legend?.element.textContent); // 'apiweb'
 ```
 
+## Vector fields
+
+`await fig.quiver({ x, y, z?, u, v, w? }, options)` draws an arrow at each point along its vector, coloured by
+speed. By default the longest arrow is 6% of the data's extent; `scale` sets the arrow length per unit of vector
+length instead, and `head` sets the head size as a fraction of the arrow (default 0.3).
+
+`await fig.streamlines({ u, v, w?, dims, bounds? }, options)` traces a gridded field (x fastest) with fourth-order
+Runge-Kutta steps of even length on trilinearly interpolated velocities, coloured by speed:
+
+- `seeds`: points `[x, y, z]`, or a count per axis on an even grid (default 8 in 2D, 4 in 3D);
+- `step`: step length (default a fifth of the grid spacing);
+- `maxSteps`: steps each way (default 2000);
+- `direction`: `'forward'`, `'backward'` or `'both'` (default).
+
+A line stops at the grid's edge, where the flow stops, or at a NaN sample. Both layers also take `colormap`, `range`,
+`color`, `width` and `name`, and need linear axes. `streamline`, `sampleField` and `arrowSegments` from
+`@margoengine/sciviz/maths` do the same work without drawing.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+
+const canvas = document.querySelector('canvas')!;
+const fig = await Figure.create(canvas, { mode: '2d' });
+const n = 32,
+  u = new Float32Array(n * n),
+  v = new Float32Array(n * n);
+for (let j = 0; j < n; j++)
+  for (let i = 0; i < n; i++) {
+    const x = i / (n - 1) - 0.5,
+      y = j / (n - 1) - 0.5;
+    u[j * n + i] = -y + 0.3 * x; // a spiral
+    v[j * n + i] = x + 0.3 * y;
+  }
+await fig.streamlines({ u, v, dims: [n, n], bounds: [-0.5, 0.5, -0.5, 0.5] }, { colormap: 'viridis' });
+const x: number[] = [],
+  y: number[] = [];
+for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) x.push(i / 7 - 0.5), y.push(j / 7 - 0.5);
+await fig.quiver({ x, y, u: x.map((xi, k) => -y[k] + 0.3 * xi), v: x.map((xi, k) => xi + 0.3 * y[k]) }, { color: '#ffffff' });
+```
+
 ## Picking, tooltips and selection
 
 Hovering shows a tooltip for the scatter point, line vertex, surface point, bar or heatmap cell under the pointer, with its x, y, z, its

@@ -88,6 +88,22 @@ export type DataSource = ArrayLike<number> | GpuArray;
 
 export type DragMode = 'orbit' | 'pan' | 'box' | 'lasso';
 
+export interface FieldData {
+    readonly u: DataSource;
+    readonly v: DataSource;
+    readonly w?: DataSource;
+    readonly dims: readonly [number, number] | readonly [number, number, number];
+    readonly bounds?: readonly [number, number, number, number] | Bounds;
+}
+
+export interface FieldStyleOptions {
+    readonly colormap?: ColormapSource;
+    readonly range?: readonly [number, number];
+    readonly color?: string;
+    readonly width?: number;
+    readonly name?: string;
+}
+
 export interface Figure {
     addEventListener<K extends keyof FigureEventMap>(type: K, listener: (this: Figure, event: FigureEventMap[K]) => unknown, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions): void;
@@ -124,6 +140,15 @@ export class Figure extends EventTarget {
         readonly z?: DataSource;
         readonly color?: DataSource;
     }, options?: LineLayerOptions): Promise<LineLayer>;
+    quiver(data: {
+        readonly x: DataSource;
+        readonly y: DataSource;
+        readonly z?: DataSource;
+        readonly u: DataSource;
+        readonly v: DataSource;
+        readonly w?: DataSource;
+    }, options?: QuiverLayerOptions): Promise<LineLayer>;
+    streamlines(field: FieldData, options?: StreamlinesLayerOptions): Promise<LineLayer>;
     surface(z: DataSource, options?: SurfaceLayerOptions): SurfaceLayer;
     volume(data: DataSource, options?: VolumeLayerOptions): VolumeLayer;
     isosurface(data: DataSource, level: number, options?: IsosurfaceLayerOptions): Promise<IsosurfaceLayer>;
@@ -277,6 +302,11 @@ export interface PointSelection {
     }[];
 }
 
+export interface QuiverLayerOptions extends FieldStyleOptions {
+    readonly scale?: number;
+    readonly head?: number;
+}
+
 export class RectsLayer implements Drawable {
     visible: boolean;
     readonly transparent = false;
@@ -388,6 +418,10 @@ export class SliceLayer implements Drawable {
     draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void;
     dispose(): void;
     [Symbol.dispose](): void;
+}
+
+export interface StreamlinesLayerOptions extends FieldStyleOptions, StreamlineOptions {
+    readonly seeds?: number | readonly (readonly [number, number, number])[];
 }
 
 export class SurfaceLayer implements Drawable {
@@ -537,4 +571,11 @@ interface Drawable {
 type GpuContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+interface StreamlineOptions {
+    readonly step?: number;
+    readonly maxSteps?: number;
+    readonly minSpeed?: number;
+    readonly direction?: 'forward' | 'backward' | 'both';
+}
 ```
