@@ -161,8 +161,8 @@ calls in 62 frames, each storing and reloading the multisampled targets). **Fix:
 all meshes. **After** (profile script, not the bench tool): about 91-97 ms CPU per frame; history in
 [perf-history.md](perf-history.md) entry 21. **Then** (entry 22: one uniform upload per frame, shared derivations and
 pipelines, one view block, instanced batches): 4.94 ms CPU against three.js WebGL's 6.52 ms (run
-`20261026-080031-fd52ab3b-dev`, bench tool, 3 runs). Materials scenes still slower are in
-[known-bugs.md](../known-bugs.md#materials-scenes-still-slower-than-threejs).
+`20261026-080031-fd52ab3b-dev`, bench tool, 3 runs). The one materials scene still slower
+(`p-uv-transform`) is in [known-bugs.md](../known-bugs.md#p-uv-transform-4096-materials-meshes-one-material-each-still-slower-than-threejs).
 
 ## Answer
 

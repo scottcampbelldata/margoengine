@@ -55,24 +55,26 @@ The entries below were measured with `npm run bench -- instanced --engines=margo
 machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md),
 "Instanced: fixes and what is left"). Each cause was measured, not guessed.
 
-### Materials scenes still slower than three.js
+### p-uv-transform: 4,096 materials meshes, one material each, still slower than three.js
 
-- **What:** after [perf-history.md](whitepaper/perf-history.md) entry 22, 15 of the 19 materials scenes of the speed
-  matrix are at or below three.js CPU (`p-unlit`, 10,000 meshes: 4.94 ms against 6.52). Four are still slower
-  (diagnostic, busy machine, RTX A6000, CPU ms per frame against the faster three.js backend):
-  - `p-uv-transform`, 4,096 boxes each with its own textured material: 63.6 against 6.31;
-  - `p-blending`, 2,000 additive quads: 5.75 against 1.33;
-  - `p-transparency`, 2,000 blended boxes: 4.08 against 1.70;
-  - `p-wireframe`: 1.48 against 0.66.
-- **Cause (measured, mock-device profile):** `p-uv-transform` derives each of its 4,096 materials every frame (38% of
-  the frame in gltf-pro's `derive`: the uniform rows through the materials getters, the feature key and shader text,
-  and the pipeline lookup); a derivation is only reused within a frame. Blended meshes cannot join an instanced batch
-  (they draw back to front), so each is a draw of its own: about 2 us of JavaScript per mesh (the run's checks, the
-  uniform rows, the normal matrix inverse, bind and draw calls). Wireframe meshes never batch either; not profiled.
-- **Plan:** keep a material record's derivation across frames while its shader key is unchanged and refresh only its
-  rows; draw consecutive blended meshes of one derivation as one instanced draw (their order is kept within it).
-- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity
-  --cases=p-uv-transform,p-blending,p-transparency,p-wireframe --runs=3`.
+- **What:** after [perf-history.md](whitepaper/perf-history.md) entry 23, 18 of the 19 materials scenes of the speed
+  matrix are at or below three.js. `p-uv-transform` (4,096 boxes, each with its own textured material and UV
+  transform) is not: 36.2-41.7 ms of CPU per frame against three.js WebGL's 5.9-6.0 (diagnostic, busy machine, RTX
+  A6000; runs `20261026-104231` and `20261026-105135`). It was 63.6 before entry 23.
+- **Cause (measured, mock-device profile, 4,096 meshes):** every mesh is still its own draw, and every material still
+  does about 1.5 us of per-frame work in gltf-pro's derivation even when nothing changed: the uniform rows read through
+  the record's getters, the shader-revision and structure checks, the render state, and the materials `bindings()`
+  (five texture lookups, a fresh entries list) with its group 2 comparison. The rest is the per-mesh draw path (the
+  run's short path that misses, `draw()`, a batch of one, `drawOwn`, the uniform comparison, bind groups): about
+  7.5 us per mesh in all against three.js's 1.5. Materials that differ in more than the base colour cannot share an
+  instanced draw (a batch carries one uniform block), and a material has no change counter, so its bindings must run
+  every frame to keep live edits and texture uploads exact.
+- **Plan:** a change counter on `Material` and `Texture` (every setter, map assignment and `update()`), so a steady
+  material skips its bindings; and instanced draws whose instances read their own uniform block (an array indexed by
+  instance), so meshes whose materials share a pipeline and bindings draw together whatever their rows.
+- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity --cases=p-uv-transform
+  --runs=3`; mock profile: a 4,096-mesh scene of `PbrMaterial({ map, uvTransform })` on the mock device of
+  `packages/materials/tests/steady-batches.test.js`.
 
 ### createInstancedMesh reads vertex attributes its material does not use
 

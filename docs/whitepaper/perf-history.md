@@ -218,7 +218,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
 - **After (diagnostic):** 166 -> about 80-97 ms per frame (profile script, busy machine, 3 runs 93.6, 91.2, 97.3 ms;
   the bench tool could not take the GPU lock for hours). Still 13-15 times three.js: the cost left is per-mesh work
   (one `queue.writeBuffer`, three `setBindGroup`, `setPipeline` and two buffer binds per mesh, plus about 3 us of
-  JavaScript per mesh), listed in [known-bugs.md](../known-bugs.md#materials-scenes-still-slower-than-threejs); entry 22 has what came next.
+  JavaScript per mesh), then listed in known-bugs.md; entries 22 and 23 have what came next.
 - **Rerun:** `npm run bench -- parity --cases=p-unlit --engines=margo,three-webgl-parity --runs=3`.
 - **Guard:** `packages/materials/tests/shared-pass.test.js` (10 meshes, one pass; a blended mesh keeps its own).
 
@@ -275,7 +275,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
   | `p-blending` (2,000) | 5.75 (was 16.7) | 1.33 (slower) |
   | `p-uv-transform` (4,096 materials) | 63.6 | 6.31 (slower) |
 
-  The four slower scenes are open losses in [known-bugs.md](../known-bugs.md#materials-scenes-still-slower-than-threejs).
+  Entry 23 fixed three of the four slower scenes; `p-uv-transform` is still open.
 - **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity
   --cases=p-unlit,p-lambert,p-phong,p-toon,p-matcap,p-normal-material,p-depth-material,p-double-sided,p-alpha-test,p-physical,p-clipping,p-attributes,p-maps,p-transmission,p-shadow-catcher,p-wireframe,p-transparency,p-blending,p-uv-transform
   --runs=3`, then `node bench/parity-report.mjs <run.json> --partial`.
@@ -284,6 +284,54 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
   blended meshes included; a phase change draws each mesh once, in its new phase), `physical-maps-cache.test.js`,
   `tests/gltf-pro-uniform-writers.test.js`, `packages/gltf-pro/tests/views.test.js` (two views keep their cameras at
   submit).
+
+### 23. Materials meshes: wireframe, blended and one-material-each scenes
+
+- **Loss:** after entry 22, four materials scenes of the speed matrix were still slower than three.js (CPU ms per
+  frame against the faster three.js backend): `p-uv-transform` 63.6 against 6.31, `p-blending` 5.75 against 1.33,
+  `p-transparency` 4.08 against 1.70, `p-wireframe` 1.48 against 0.66.
+- **Causes, measured** (mock-device CPU profiles of each scene, an unminified build for line ticks; GPU runs):
+  1. wireframe meshes never joined an instanced batch: 512 spheres were 512 draws;
+  2. blended meshes never batched (they draw back to front), so 2,000 transparent boxes or additive quads were 2,000
+     draws of about 2 us of JavaScript each;
+  3. a derivation was reused only within a frame: each of the 4,096 `p-uv-transform` materials composed its shader,
+     feature key and pipeline key again every frame, and derived twice per mesh (a batch-only pass, then its own draw);
+  4. materials records (one per Material) redefined gltf-pro's data properties as accessors with new closures each, so
+     every record had a dictionary shape of its own and gltf-pro's reads of 4,096 records missed every inline cache;
+  5. every draw inverted its node matrix again, moved or not;
+  6. batching wireframes cost GPU time (0.73 to 0.85 ms): a closed mesh listed every shared edge twice (a b, b c, c a
+     per triangle), twice the vertex and line work for the same picture.
+- **Fixes:** wireframe meshes batch as line-list instanced draws; a blended draw joins the batch drawn last (so a batch
+  is a run of consecutive draws, which rasterize in order), and draws of materials that differ only in base colour fold
+  into it with their colours as instance tints, after a check that the pipelines and group 2 bindings are the same and
+  that the shader reads the base colour only as the vertex colour's factor; a derivation keeps its shader and pipeline
+  across frames while the record's `shading.shaderRevision` (new, from materials: the inputs of `shader()` and
+  `lit()`), structure, shading object and render state are unchanged and no lighting effect patches the shader (rows
+  and bindings are still read every frame), and a kept pipeline makes the first derivation of a frame complete;
+  records are made in one `defineProperties` call from shared getters; the normal rows are kept per draw while its
+  matrix is the same; the edge list holds each edge once; the blended sort compares squared distances.
+- **Image:** the same SSIM and delta E against three.js as before: `p-transparency` 0.983 / 2.44, `p-blending` 1 / 0,
+  `p-wireframe` 0.988 / 0.9, `p-uv-transform` 0.994 / 1.09.
+- **After (diagnostic, busy machine, RTX A6000; runs `20261026-105135` (5 runs) and, for `p-wireframe` after the
+  edge fix, `20261026-110621` (5 runs); rows in [perf-vs-threejs.md](perf-vs-threejs.md)):** Margo against the faster
+  three.js backend, CPU / GPU ms per frame.
+
+  | Scene | Before | After | three.js |
+  | --- | --- | --- | --- |
+  | `p-transparency` (2,000) | 4.08 / 0.11 | 0.90 / 0.05 | 1.65 / 0.62 (WebGPU) |
+  | `p-blending` (2,000) | 5.75 / 0.94 | 1.30 / 0.07 | 1.38 / 0.57 (WebGL) |
+  | `p-wireframe` (512) | 1.48 / 0.73 | 0.33 / 0.51 | 0.66 / 0.71 (WebGL) |
+  | `p-uv-transform` (4,096 materials) | 63.6 / 4.60 | 41.7 / 4.64 (36.2 in run `20261026-104231`) | 6.00 / 6.41 (WebGL), slower |
+
+  `p-blending`'s CPU is within the run's spread of three.js (the run is marked invalid for spread); its GPU time is an
+  eighth. `p-uv-transform` is still about 7 times three.js: [known-bugs.md](../known-bugs.md#p-uv-transform-4096-materials-meshes-one-material-each-still-slower-than-threejs).
+- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity
+  --cases=p-uv-transform,p-blending,p-transparency,p-wireframe --runs=5`, then
+  `node bench/parity-report.mjs <run.json> --partial`.
+- **Guard:** `packages/materials/tests/steady-batches.test.js` (wireframe meshes as one line-list instanced draw;
+  consecutive blended meshes as one draw, back to front; colour-only materials folded with their tints in sort order and
+  live edits; another blending ends the batch; a steady material composes no shader while its bindings run and a flat
+  shading edit composes one; record copies), `packages/gltf-pro/tests/wireframe.test.js` (each edge once).
 
 ## Size of the frozen core
 
@@ -482,9 +530,8 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   - Still open: `createInstancedMesh` vertex fetch at 10k-50k, the 1k GPU cost of a package pass, and CPU for moving
     instances. Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
   - [claims.md](claims.md) records that there is no publishable result yet.
-- **Four materials scenes of the speed matrix** (entry 22): `p-uv-transform` 63.6 against 6.31 ms CPU, `p-blending`
-  5.75 against 1.33, `p-transparency` 4.08 against 1.70, `p-wireframe` 1.48 against 0.66 (diagnostic). Causes and plan:
-  [known-bugs.md](../known-bugs.md#materials-scenes-still-slower-than-threejs).
+- **`p-uv-transform`** (entry 23): 4,096 materials meshes, one material each, 36.2-41.7 ms of CPU per frame against
+  three.js WebGL's 5.9-6.0 (diagnostic). Cause and plan: [known-bugs.md](../known-bugs.md#p-uv-transform-4096-materials-meshes-one-material-each-still-slower-than-threejs).
 - **Galaxy S23 Ultra island demo.** A report of 3–5 FPS on that phone, with particles off making no difference.
   - Partial fixes: `909e384a`, and `1c627cdc` (scatter compiles the fade `discard` only when instances can fade).
   - No after number is recorded. The project has no S23 to test on.

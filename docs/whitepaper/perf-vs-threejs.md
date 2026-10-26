@@ -8,7 +8,7 @@ is fixed later, its after numbers appear next to the before, with the cause, the
 rerun command. Rows still slower stay listed and link to their known-bugs entry. `bench/parity-report.mjs` renders
 this page from the ledger `perf-vs-threejs.json` next to it, which every run adds to.
 
-First run: `20261025-132015-d3fec42e-dev`. Latest run added: `20261026-080031-fd52ab3b-dev` (invalid: parity/p-unlit gpuMs spread 15.0%; parity/p-unlit@three-webgl-parity gpuMs spread 31.9%; parity/p-blending@three-webgpu-parity cpuMs spread 15.1%). Engines: `margo` 1.0.0, `three-webgpu-parity` 0.186.1, `three-webgl-parity` 0.186.1. Machine: , ; browser 156.0.4314.42. 3 runs per case (1 warm-up), 300 frames, interleaved per scene. This run's matrix took 2.6 min.
+First run: `20261025-132015-d3fec42e-dev`. Latest run added: `20261026-110621-fbc01bdc-dev` (valid). Engines: `margo` 1.0.0, `three-webgpu-parity` 0.186.1, `three-webgl-parity` 0.186.1. Machine: , ; browser 156.0.4314.42. 5 runs per case (1 warm-up), 300 frames, interleaved per scene. This run's matrix took 0.5 min.
 
 Rerun:
 
@@ -29,9 +29,9 @@ fetched for the scene.
 
 | Verdict | First run | Now |
 | --- | --- | --- |
-| faster | 61 | 70 |
+| faster | 61 | 73 |
 | no workload | 9 | 9 |
-| slower | 73 | 63 |
+| slower | 73 | 60 |
 | Margo missing | 8 | 8 |
 | no three.js equivalent | 3 | 3 |
 | equal | 3 | 4 |
@@ -52,10 +52,10 @@ fetched for the scene.
 | `p-keyframes` | 12.6 | 12.80x | not diagnosed yet |
 | `p-morph` | 12.5 | 10.86x | not diagnosed yet |
 | `p-skeleton-clone` | 12.7 | 10.41x | not diagnosed yet |
-| `p-uv-transform` | 6.7 | 10.08x | not diagnosed yet |
 | `helmet` | 9.3 | 9.46x | not diagnosed yet |
 | `p-exr-load` | 9.2 | 8.14x | not diagnosed yet |
 | `p-hdr-load` | 9.1 | 7.15x | not diagnosed yet |
+| `p-uv-transform` | 6.7 | 6.95x | not diagnosed yet |
 | `p-gpu-pick` | 16.2 | 6.24x | not diagnosed yet |
 | `p-taa` | 13.7 | 5.78x | not diagnosed yet |
 | `p-point-shadows` | 8.2 | 5.70x | not diagnosed yet |
@@ -108,12 +108,12 @@ fetched for the scene.
 | 5.9 | ShadowMaterial (shadow catcher) | faster | faster | `p-shadow-catcher` |  |
 | 5.10 | PointsMaterial, SpriteMaterial | slower | slower | `p-points-1000000` `p-sprites` |  |
 | 5.11 | LineBasicMaterial, LineDashedMaterial, Line2's LineMaterial | slower | slower | `p-lines` |  |
-| 5.12 | Transparency, alpha blending, alphaTest | slower | slower | `p-transparency` `p-alpha-test` |  |
+| 5.12 | Transparency, alpha blending, alphaTest | slower | faster | `p-transparency` `p-alpha-test` |  |
 | 5.13 | Order-independent transparency (three.js has none built in; its examples sort pe | no three.js equivalent | no three.js equivalent |  | no three.js equivalent (three.js has no built-in order-independent transparency) |
 | 5.14 | Vertex colors | slower | faster | `p-attributes` |  |
 | 5.15 | `side` (Front, Back, Double) | slower | faster | `p-double-sided` |  |
-| 5.16 | Wireframe | slower | slower | `p-wireframe` |  |
-| 5.17 | Per-material blending modes, depthTest, depthWrite, polygonOffset, renderOrder,  | slower | slower | `p-blending` |  |
+| 5.16 | Wireframe | slower | faster | `p-wireframe` |  |
+| 5.17 | Per-material blending modes, depthTest, depthWrite, polygonOffset, renderOrder,  | slower | faster | `p-blending` |  |
 | 6.1 | Texture, TextureLoader on arbitrary meshes | slower | slower | `p-texture-decode` `p-maps` |  |
 | 6.2 | CubeTexture, CubeTextureLoader | faster | faster | `p-background` |  |
 | 6.3 | DataTexture, Data3DTexture, DataArrayTexture | slower | slower | `p-data-texture` |  |
@@ -249,7 +249,7 @@ is the newest run after the first, when there is one.
 | `p-attributes` | margo 167 / 3.97 / 6 / 4120; three-webgl-parity 7.56 / 4.96 / 124 / 34 (`20261025-134730-d3fec42e-dev`) | slower | margo 4.70 / 1.09 / 195 / 78; three-webgl-parity 8.20 / 8.70 / 111 / 32 (`20261026-073905-14354737-dev`) | faster | 0.994, 1.03 | 73,489 / 1,607 |
 | `p-audio` | margo 246 / 261; three-webgl-parity 107 / 125 (`20261025-170007-d3fec42e-dev`) | slower |  |  |  | 32,995 / 1,607 |
 | `p-background` | margo 0.09 / 0.05 / 2875 / 32; three-webgl-parity 0.66 / 0.05 / 1069 / 50 (`20261025-132015-d3fec42e-dev`) | faster |  |  | 0.993, 0.65 | 57,211 / 1,607 |
-| `p-blending` | margo 24.61 / 5.68 / 35 / 1024; three-webgl-parity 1.33 / 0.52 / 615 / 18 (`20261025-135606-d3fec42e-dev`) | slower | margo 5.75 / 0.94 / 139 / 192; three-webgl-parity 1.33 / 0.54 / 635 / 17 (`20261026-080031-fd52ab3b-dev`) | slower | 1, 0 | 169,017 / 1,607 |
+| `p-blending` | margo 24.61 / 5.68 / 35 / 1024; three-webgl-parity 1.33 / 0.52 / 615 / 18 (`20261025-135606-d3fec42e-dev`) | slower | margo 1.30 / 0.07 / 637 / 184; three-webgl-parity 1.38 / 0.57 / 600 / 18 (`20261026-105135-fbc01bdc-dev`) | faster | 1, 0 | 74,255 / 1,607 |
 | `p-bloom` | margo 0.10 / 0.21 / 2703 / 124; three-webgl-parity 0.85 / 0.39 / 892 / 31 (`20261025-162530-d3fec42e-dev`) | faster |  |  | 0.993, 0.64 | 48,599 / 1,607 |
 | `p-canvas-texture` | margo 15.19 / 2.24 / 58 / 643; three-webgpu-parity 3.25 / 0.14 / 261 / 217 (`20261025-144617-d3fec42e-dev`) | slower |  |  | 0.996, 0.61 | 162,939 / 1,607 |
 | `p-clipping` | margo 180 / 4.71 / 6 / 4419; three-webgl-parity 7.76 / 5.12 / 121 / 35 (`20261025-133001-d3fec42e-dev`) | slower | margo 6.60 / 1.14 / 137 / 90; three-webgl-parity 8.99 / 9.42 / 101 / 36 (`20261026-073905-14354737-dev`) | equal | 0.998, 0.29 | 73,489 / 1,607 |
@@ -364,16 +364,16 @@ is the newest run after the first, when there is one.
 | `p-toon` | margo 180 / 4.09 / 6 / 3921; three-webgl-parity 7.78 / 5.26 / 121 / 30 (`20261025-135606-d3fec42e-dev`) | slower | margo 4.59 / 1.09 / 187 / 113; three-webgl-parity 7.53 / 6.25 / 125 / 30 (`20261026-071108-14354737-dev`) | faster | 0.995, 0.74 | 73,557 / 1,607 |
 | `p-transform-controls` | margo 0.14 / 0.05 / 2342 / 24; three-webgl-parity 0.88 / 0.18 / 823 / 24 (`20261025-163700-d3fec42e-dev`) | faster |  |  | 0.985, 1.11 | 38,601 / 1,607 |
 | `p-transmission` | margo 0.50 / 0.21 / 1254 / 194; three-webgpu-parity 1.02 / 0.27 / 753 / 222 (`20261025-135606-d3fec42e-dev`) | faster | margo 0.46 / 0.21 / 1394 / 216; three-webgpu-parity 0.98 / 0.28 / 759 / 275 (`20261026-073905-14354737-dev`) | faster | 0.819, 5.38 (differs) | 87,173 / 1,607 |
-| `p-transparency` | margo 24.08 / 4.74 / 36 / 935; three-webgpu-parity 1.78 / 0.81 / 452 / 173 (`20261025-135606-d3fec42e-dev`) | slower | margo 4.08 / 0.11 / 223 / 71; three-webgpu-parity 1.70 / 0.62 / 485 / 179 (`20261026-080031-fd52ab3b-dev`) | slower | 0.983, 2.44 | 169,017 / 1,607 |
+| `p-transparency` | margo 24.08 / 4.74 / 36 / 935; three-webgpu-parity 1.78 / 0.81 / 452 / 173 (`20261025-135606-d3fec42e-dev`) | slower | margo 0.90 / 0.05 / 843 / 61; three-webgpu-parity 1.65 / 0.62 / 484 / 172 (`20261026-105135-fbc01bdc-dev`) | faster | 0.983, 2.44 | 74,255 / 1,607 |
 | `p-unlit` | margo 168 / 3.85 / 6 / 4234; three-webgl-parity 6.46 / 3.87 / 144 / 24 (`20261025-135606-d3fec42e-dev`) | slower | margo 4.94 / 1.16 / 183 / 111; three-webgl-parity 6.52 / 3.81 / 146 / 21 (`20261026-080031-fd52ab3b-dev`) | faster | 0.997, 0.34 | 169,017 / 1,607 |
 | `p-usdz` | margo 0.09 / 1.69; three n/a (`20261025-161120-d3fec42e-dev`) | not run |  |  |  |  |
-| `p-uv-transform` | margo 64.55 / 4.25 / 15 / 1757; three-webgl-parity 6.71 / 5.13 / 140 / 99 (`20261025-144617-d3fec42e-dev`) | slower | margo 63.60 / 4.60 / 16 / 231; three-webgl-parity 6.31 / 5.23 / 148 / 97 (`20261026-073905-14354737-dev`) | slower | 0.994, 1.09 | 73,489 / 1,607 |
+| `p-uv-transform` | margo 64.55 / 4.25 / 15 / 1757; three-webgl-parity 6.71 / 5.13 / 140 / 99 (`20261025-144617-d3fec42e-dev`) | slower | margo 41.72 / 4.64 / 24 / 289; three-webgl-parity 6.00 / 6.41 / 142 / 98 (`20261026-105135-fbc01bdc-dev`) | slower | 0.994, 1.09 | 74,187 / 1,607 |
 | `p-video` | margo 10.70 / 1.82 / 68 / 626; three-webgl-parity 0.83 / 0.11 / 900 / 26 (`20261025-144617-d3fec42e-dev`) | slower |  |  | 0.889, 6.88 (differs) | 162,939 / 1,607 |
 | `p-view-helper` | margo 0.17 / 0.10 / 1794 / 17; three-webgl-parity 9.49 / 6.68 / 99 / 38 (`20261025-163815-d3fec42e-dev`) | faster |  |  | 0.973, 2.51 | 33,942 / 1,607 |
 | `p-volumetric` | margo 0.23 / 0.22 / 1879 / 177; three-webgpu-parity 2.23 / 0.18 / 375 / 217 (`20261025-155040-d3fec42e-dev`) | slower |  |  | 0.441, 31.88 (differs) | 57,881 / 1,607 |
 | `p-vox` | margo 0.42 / 7.06; three-webgl-parity 0.49 / 4.33 (`20261025-161120-d3fec42e-dev`) | faster |  |  |  | 56,608 / 1,607 |
 | `p-water` | margo 0.10 / 0.26 / 2391 / 141; three-webgpu-parity 1.68 / 0.18 / 492 / 192 (`20261025-165203-d3fec42e-dev`) | slower |  |  | 0.956, 3.89 | 51,082 / 1,607 |
 | `p-webgl2` | margo 0.15 / 0.10 / 2503 / 8; three-webgl-parity 7.56 / 4.92 / 124 / 28 (`20261025-133001-d3fec42e-dev`) | faster |  |  | 1, 0.3 | 32,886 / 1,607 |
-| `p-wireframe` | margo 8.30 / 3.18 / 93 / 512; three-webgl-parity 0.64 / 0.70 / 1125 / 21 (`20261025-135606-d3fec42e-dev`) | slower | margo 1.48 / 0.73 / 493 / 66; three-webgl-parity 0.66 / 0.71 / 1146 / 20 (`20261026-073905-14354737-dev`) | slower | 0.988, 0.9 | 73,557 / 1,607 |
+| `p-wireframe` | margo 8.30 / 3.18 / 93 / 512; three-webgl-parity 0.64 / 0.70 / 1125 / 21 (`20261025-135606-d3fec42e-dev`) | slower | margo 0.33 / 0.51 / 1584 / 92; three-webgl-parity 0.66 / 0.71 / 1147 / 21 (`20261026-110621-fbc01bdc-dev`) | faster | 0.988, 0.9 | 172,084 / 1,607 |
 | `shadows-1000` | margo 0.86 / 0.69 / 872 / 76; three-webgl-parity 2.35 / 1.69 / 375 / 28 (`20261025-170145-d3fec42e-dev`) | faster |  |  | 0.97, 1.46 | 38,833 / 1,607 |
 | `shapes-10000-batched` | margo 0.12 / 0.08 / 2775 / 81; three-webgl-parity 1.16 / 0.46 / 681 / 40 (`20261025-170145-d3fec42e-dev`) | faster |  |  | 0.977, 1.34 | 173,652 / 1,607 |
