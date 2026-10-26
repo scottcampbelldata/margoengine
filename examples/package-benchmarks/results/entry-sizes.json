@@ -1,5 +1,5 @@
 {
-  "commit": "00d18f4f",
+  "commit": "2d9b43dc",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -32,8 +32,8 @@
     },
     "@margoengine/animator": {
       ".": {
-        "raw": 33015,
-        "gzip": 11984
+        "raw": 41055,
+        "gzip": 14789
       }
     },
     "@margoengine/audio": {
@@ -347,7 +347,7 @@
       },
       "./skin": {
         "raw": 4895,
-        "gzip": 2203
+        "gzip": 2205
       },
       "./godot": {
         "raw": 29317,
@@ -1002,6 +1002,14 @@
       ".": {
         "raw": 20687,
         "gzip": 7623
+      },
+      "./ik": {
+        "raw": 7781,
+        "gzip": 3484
+      },
+      "./retarget": {
+        "raw": 6181,
+        "gzip": 2606
       }
     },
     "@margoengine/road": {
