@@ -343,8 +343,21 @@ function joinBatch(
 ): void {
   const view = c.view ?? c,
     p = r.primitive;
-  let list = run.batches.get(d),
-    batch: PendingBatch | undefined;
+  // Most draws join the batch the previous draw of their derivation joined.
+  let batch = run.last.get(d);
+  if (
+    batch &&
+    batch.view === view &&
+    batch.viewAt === viewAt &&
+    batch.owner.primitive.vertices === p.vertices &&
+    batch.owner.primitive.indices === p.indices
+  ) {
+    batch.members.push(r);
+    batch.models.push(model);
+    return;
+  }
+  batch = undefined;
+  let list = run.batches.get(d);
   if (list)
     for (let i = 0; i < list.length; i++) {
       const value = list[i],
@@ -369,6 +382,7 @@ function joinBatch(
     list.push(batch);
     run.pending.push(batch);
   }
+  run.last.set(d, batch);
   batch.members.push(r);
   batch.models.push(model);
 }
@@ -391,6 +405,7 @@ function flushBatches(run: PBRDrawRun): void {
     pending.length = 0;
     for (const list of run.batches.values()) list.length = 0;
     run.batches.clear();
+    run.last.clear();
   }
 }
 /**
@@ -551,6 +566,8 @@ export class PBRDrawRun {
   readonly pending: PendingBatch[] = [];
   /** @internal Drawn batch records, emptied, for the run's next batches. */
   readonly spare: PendingBatch[] = [];
+  /** @internal The batch each derivation's last draw joined. */
+  readonly last = new Map<DrawDerivation, PendingBatch>();
   readonly batches = new Map<DrawDerivation, PendingBatch[]>();
   /** @internal What `draw` checked once for the run's context: its section binding and device caches. */
   private quick?: QuickRun;
@@ -2558,7 +2575,6 @@ export class PBRModel implements EnginePlugin {
             runView!.data.set(viewData);
           }
           joinBatch(run, this, r, d, c, viewAt);
-          this.engine.stats.visible++;
           continue;
         }
         // Batches recorded so far draw before this draw, which may end the pass or depend on what they drew.
@@ -2833,7 +2849,6 @@ export class PBRModel implements EnginePlugin {
       d = findDerivation(quick.draws.derivations.get(m), frame, p.extension, undefined, undefined, Math.sign(det));
     if (!d || !batchable(d, r, det)) return false;
     joinBatch(run, this, r, d, c, viewAt);
-    this.engine.stats.visible++;
     return true;
   }
   /**
@@ -2852,6 +2867,8 @@ export class PBRModel implements EnginePlugin {
       frame = d.frame,
       section = frame.section;
     if (bound.pass !== pass) resetBindings(bound, pass);
+    // Every member counts as drawn, as a draw of its own did (counted here rather than once per member).
+    this.engine.stats.visible += members.length;
     beginDraw(device, view);
     const scratch = (scratchStack[scratchDepth] ??= createDrawScratch(c.color, c.depth));
     scratchDepth++;

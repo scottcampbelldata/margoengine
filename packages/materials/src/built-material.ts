@@ -3070,6 +3070,8 @@ interface Entry {
 }
 interface Phase {
   entry: Entry;
+  /** The entry's model, read once per draw without going through the entry. */
+  model: PBRModel;
   blend: boolean;
   phase: 'all' | 'opaque' | 'blend';
 }
@@ -3121,8 +3123,8 @@ function queue(runtime: Engine): MaterialDraws {
         blend = (flags & 2) !== 0;
       entry.opaque = opaque;
       entry.blend = blend;
-      if (opaque) phases.push({ entry, blend: false, phase: blend ? 'opaque' : 'all' });
-      if (blend) phases.push({ entry, blend: true, phase: opaque ? 'blend' : 'all' });
+      if (opaque) phases.push({ entry, model: entry.model, blend: false, phase: blend ? 'opaque' : 'all' });
+      if (blend) phases.push({ entry, model: entry.model, blend: true, phase: opaque ? 'blend' : 'all' });
     }
     phases.sort((a, b) => +a.blend - +b.blend || a.entry.order - b.entry.order);
     opaqueEnd = 0;
@@ -3170,12 +3172,14 @@ function queue(runtime: Engine): MaterialDraws {
           // One render pass for every mesh: a pass per mesh stores and reloads the multisampled colour and depth each
           // time and costs a begin, an end and a command-buffer flush (10,000 meshes: 168 ms of CPU a frame).
           // A frame drawn inside this one (a draw callback rendering a probe) takes a run of its own.
-          const own = running ? new PBRDrawRun() : run;
+          const own = running ? new PBRDrawRun() : run,
+            color = c.color,
+            depth = c.depth;
           running = true;
           try {
             for (let i = 0; i < phases.length; i++) {
               const item = phases[i];
-              item.entry.model.draw(c, 'beauty', c.color, c.depth, item.phase, undefined, own);
+              item.model.draw(c, 'beauty', color, depth, item.phase, undefined, own);
             }
           } finally {
             if (own === run) running = false;
