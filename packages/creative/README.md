@@ -40,8 +40,8 @@ const {Planet} = await import('margoengine/creative/planet'); // loaded only whe
 ```
 
 `GPUParticles({count, gravity, wind, size, curl, obstacles, sort, texture})` keeps `count` particles drifting
-inside a 6 m cube centred on the origin, re-entering on the opposite face. It is a `VFX` from `@margoengine/vfx`
-(`instanceof VFX`, plugin name `gpu-particles`): `wind` is added to `gravity`, `curl` is VFX `turbulence`, and
+inside a 6 m cube centred on the origin, re-entering on the opposite face. It is a `VFX` from `@margoengine/vfx/base`
+(`instanceof VFX` of that entry, with the obstacles, wrap, sort and texture features only; plugin name `gpu-particles`): `wind` is added to `gravity`, `curl` is VFX `turbulence`, and
 `size` is the sprite half-width. Use `VFX` directly for emitters, lifetimes, bursts or up to 1,000,000 particles.
 
 `PostProcessing` grades the HDR scene: exponential height fog, screen-space god rays, a depth-of-field focus

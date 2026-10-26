@@ -1,6 +1,10 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/core/extension';
-import { VFX, type VFXObstacle, type VFXTexture } from '@margoengine/vfx';
+import { VFX, type VFXObstacle, type VFXTexture } from '@margoengine/vfx/base';
+import { obstacles } from '@margoengine/vfx/obstacles';
+import { wrap } from '@margoengine/vfx/wrap';
+import { sort } from '@margoengine/vfx/sort';
+import { textureFeature } from '@margoengine/vfx/texture';
 /** A sphere or box the leaves flow around and bounce off: `@margoengine/vfx`'s `VFXObstacle`. */
 export type WindObstacle = VFXObstacle;
 /** A leaf sprite (RGBA8 sRGB, up to 4096 px per side, optionally an atlas): `@margoengine/vfx`'s `VFXTexture`. */
@@ -37,27 +41,30 @@ export class GPUParticles extends VFX {
     const { count = 5000, gravity = [0, -0.5, 0], wind = [0.4, 0, 0], size = 0.035, curl = 0 } = options;
     if (!Number.isFinite(size) || !(curl >= 0 && curl <= 10) || gravity.length !== 3 || wind.length !== 3)
       throw new RangeError('Invalid particle options; use a finite size, curl 0..10 and 3-value gravity and wind');
-    super({
-      capacity: count,
-      initialCount: count,
-      rate: 0,
-      position: [0, 0, 0],
-      emissionExtent: [3, 3, 3],
-      wrap: true,
-      velocity: [0, 0, 0],
-      spread: 0,
-      gravity: [gravity[0] + wind[0], gravity[1] + wind[1], gravity[2] + wind[2]],
-      turbulence: curl,
-      size: size * 2,
-      lifetime: [1e6, 1e6],
-      ground: -1e30,
-      bounce: 0.5,
-      angularVelocity: 1,
-      color: [0.93, 0.53, 0.17, 0.85],
-      obstacles: options.obstacles,
-      sort: options.sort,
-      texture: options.texture,
-    });
+    super(
+      {
+        capacity: count,
+        initialCount: count,
+        rate: 0,
+        position: [0, 0, 0],
+        emissionExtent: [3, 3, 3],
+        wrap: true,
+        velocity: [0, 0, 0],
+        spread: 0,
+        gravity: [gravity[0] + wind[0], gravity[1] + wind[1], gravity[2] + wind[2]],
+        turbulence: curl,
+        size: size * 2,
+        lifetime: [1e6, 1e6],
+        ground: -1e30,
+        bounce: 0.5,
+        angularVelocity: 1,
+        color: [0.93, 0.53, 0.17, 0.85],
+        obstacles: options.obstacles,
+        sort: options.sort,
+        texture: options.texture,
+      },
+      { obstacles, wrap, sort, texture: textureFeature },
+    );
   }
   get count(): number {
     return this.capacity;

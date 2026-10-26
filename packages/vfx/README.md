@@ -26,7 +26,7 @@ around `position` (default zero). `intensity` multiplies RGB for HDR emission,
 One million particles use 64 MB for state plus 4 MB for the draw list, regardless of the live count. Per-frame CPU work is bounded uniform updates and pass submission; there is no JavaScript object/array per particle. GPU performance still depends on capacity, fill rate and hardware.
 
 This is Margo's one particle system; `GPUParticles` in `@margoengine/creative/particles` is a leaf-field preset
-over it. Four optional features patch the shaders only when set, so effects without them compile the same WGSL
+over it. Six optional features patch the shaders only when set, so effects without them compile the same WGSL
 and make the same GPU calls:
 
 - `obstacles: [{kind:'sphere', center, radius}, {kind:'box', center, halfSize}]` (up to 64): the flow bends
@@ -63,7 +63,60 @@ debris.burst(24);
 particles with a 2 x 2 atlas at 1x and 4x MSAA and checks each one's centre and four points near its corners against
 the frame it must show (the shader's hash of its birth angle for `'random'`, its age quarter for `'lifetime'`).
 
-`obstacles`, `wrap`, `sort` and `texture` are read when the effect attaches.
+`curves: {size, alpha, color}` shapes each particle over its life (birth 0, death 1):
+
+- `size: [0, 1, 0.5]`: 2 to 32 multipliers of `size` (each 0..1), evenly spaced over the life and interpolated
+  linearly. The curve can only shrink a particle, never grow it past `size`, so culling stays exact.
+- `alpha: [0, 1, 1, 0]`: 2 to 32 opacities (each 0..1); replaces the default fade-out, so end with 0 to fade away.
+- `color: [{at: 0, color: [1, 1, 1]}, {at: 1, color: [1, 0.2, 0]}]`: 2 to 8 stops ascending by `at`, linear RGB 0..16,
+  multiplying the particle `color` (use `color: [1, 1, 1, 1]` to draw the gradient as it is).
+
+Set at least one; a curve left out keeps the stock size or fade. Which curves are set is read at attach, their numbers
+every frame. The shader samples them in the billboard stage only (one 400-byte uniform), so the simulation is unchanged.
+
+`emitter` says where births start and which way they fly; `speed` (world units per second, -1000..1000, default 0,
+negative flies inward) pushes along the shape's direction, on top of `velocity` and `spread`; `position` and
+`emissionExtent` still apply:
+
+- `{shape: 'sphere', radius = 1, shell = false}`: uniform through the ball, or on its surface with `shell: true`;
+  births fly radially.
+- `{shape: 'cone', radius = 0, angle = PI / 6, axis = [0, 1, 0]}`: from a disc of `radius` at the apex, directions
+  uniform in solid angle within the half `angle` (0..PI/2) of `axis`.
+- `{shape: 'mesh', positions, indices?, scale = 1}`: uniform over the surface of a triangle mesh (area-weighted,
+  at most 262,144 triangles, zero-area triangles ignored), flying along each face's normal (counter-clockwise faces
+  point out). Positions are in world units around `position`.
+
+The shape (and a mesh's triangles) is read when the effect attaches, and again after device restoration; radius, angle,
+axis, `speed` and `scale`-free numbers can change every frame. Changing `shape` afterwards throws a `TypeError`.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+// Embers rising from a cone: swell then shrink, fade in and out, cool from white to orange to dark red.
+const embers = VFX.attach(engine, {
+  capacity: 20_000, rate: 4_000, position: [0, 0.5, 0], velocity: [0, 0, 0], spread: 0.2, size: 0.12,
+  lifetime: [1, 2], color: [1, 1, 1, 1], intensity: 3,
+  emitter: {shape: 'cone', radius: 0.3, angle: 0.35, speed: 2.5},
+  curves: {
+    size: [0.3, 1, 0.6, 0],
+    alpha: [0, 1, 1, 0],
+    color: [{at: 0, color: [1, 1, 1]}, {at: 0.3, color: [1, 0.55, 0.1]}, {at: 1, color: [0.3, 0.02, 0.01]}],
+  },
+});
+// Sparks from the surface of a mesh (here two triangles of a roof), pushed out along the faces.
+const roof = new Float32Array([0, 0, 0, 4, 0, 0, 0, 1, 3, 4, 1, 3]);
+const shower = VFX.attach(engine, {
+  capacity: 5_000, rate: 800, position: [0, 3, 0], size: 0.05, velocity: [0, 0, 0], spread: 0.1,
+  emitter: {shape: 'mesh', positions: roof, indices: [0, 1, 2, 1, 3, 2], speed: 1.5},
+});
+```
+
+`node packages/vfx/test/browser-check.mjs` also reads back, on the real GPU, 320 curve probes (colour, alpha and falloff
+against curves evaluated in the test, at 1x and 4x MSAA) and 4,096 births of each shape: a ball's volume (mean r^3 / R^3
+is 1/2), a shell's radius, a cone's solid-angle and disc statistics, and a two-triangle mesh's area share, bounds and normals.
+
+`obstacles`, `wrap`, `sort`, `texture`, `curves` and `emitter` are read when the effect attaches.
 
 ### Fog
 
@@ -104,12 +157,12 @@ span from 15.7 to 13.5 ms. Same particle state and pixels within the old rendere
 
 ### Load only what you use
 
-`VFX` from `@margoengine/vfx` (about 8.1 kB min+gzip) carries all four features. An effect that uses none of them can
-import the same class from `@margoengine/vfx/base` (about 5.8 kB); add features as a second argument from their own
-entries: `/obstacles` (1.2 kB alone), `/wrap` (0.4 kB), `/sort` (1.1 kB), `/texture` (1.3 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`). Sizes are vite library builds with bare imports external,
+`VFX` from `@margoengine/vfx` (about 12.4 kB min+gzip) carries all six features. An effect that uses none of them can
+import the same class from `@margoengine/vfx/base` (about 7.3 kB); add features as a second argument from their own
+entries: `/obstacles` (1.4 kB alone), `/wrap` (0.7 kB), `/sort` (1.4 kB), `/texture` (1.5 kB; it exports
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB) and `/emitter` (2.4 kB). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
-bundle that combines them adds less: the whole root is 8.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
+bundle that combines them adds less: the whole root is 12.4 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
 
 ```ts
@@ -118,6 +171,19 @@ import {VFX} from 'margoengine/vfx/base';
 import {sort} from 'margoengine/vfx/sort';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const smoke = VFX.attach(engine, {capacity: 4096, sort: true}, {sort});
+```
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {curves} from 'margoengine/vfx/curves';
+import {emitter} from 'margoengine/vfx/emitter';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const fountain = VFX.attach(
+  engine,
+  {capacity: 8192, emitter: {shape: 'sphere', radius: 0.2, shell: true, speed: 2}, curves: {alpha: [0, 1, 0]}},
+  {curves, emitter},
+);
 ```
 
 Either way the WGSL, uploads and GPU calls are byte-identical for every feature combination (`test/split.test.js`;

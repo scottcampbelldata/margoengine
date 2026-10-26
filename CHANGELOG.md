@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- `@margoengine/vfx`: two optional features. `curves: {size, alpha, color}` (`@margoengine/vfx/curves`) shapes each
+  particle's size, opacity and colour over its life; `emitter` (`@margoengine/vfx/emitter`) starts births on a sphere
+  (volume or shell), a cone or the area-weighted surface of a triangle mesh and pushes them along the shape's direction
+  with `speed`. Both are on the root `VFX`; `VFX` from `/base` takes them as `{curves}`, `{emitter}`. Effects that set
+  neither compile the same WGSL and make the same GPU calls as before. `GPUParticles` in `@margoengine/creative` now
+  extends `VFX` from `@margoengine/vfx/base` with the obstacles, wrap, sort and texture features (it no longer loads
+  the larger root; `instanceof` the root `VFX` is false).
+
 ### Error messages and classes (developer-experience pass, packages animation to lod)
 
 Every throw message now names its fix after a `; ` clause, so match on `error.code` or the error class, not on the

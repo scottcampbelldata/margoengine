@@ -1,6 +1,7 @@
-<!doctype html><html><head><meta charset="utf-8"/><title>VFX atlas browser check</title></head><body>
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX browser check</title></head><body>
 <script type="module">
-// Draws 64 particles with an atlas texture on the real GPU and reads back the pixels. The particle records are written
+// Real-GPU checks. checkCurves and checkEmitter come after the atlas check (window.check). The atlas check:
+// draws 64 particles with an atlas texture on the real GPU and reads back the pixels. The particle records are written
 // directly (an 8 x 8 grid facing the camera, known birth angles and ages), so every particle's frame is known: for
 // 'random' the same hash of the birth angle the shader uses, for 'lifetime' the age bucket.
 import {VFX} from '/packages/vfx/dist/index.js';
@@ -56,6 +57,112 @@ window.check=async(frames,samples)=>{
  const error=await device.popErrorScope();
  effect.dispose();for(const t of [color,resolved,depth])t.destroy();pixels.destroy();drawn.destroy();
  return {error:error?.message??null,errors:errors.splice(0),visible,checked,largest,histogram,mismatches:mismatches.slice(0,8)};
+};
+// Curves: 64 particles of known ages at known places, each with a size, alpha and colour curve evaluated here (not in
+// the shader). Probes at the centre and at 0.5 and 0.7 of the unit radius, along +x and rotated, compare the pixel with
+// colour * alpha * (1 - r^2)^2, r = distance / (curved size / 2): the soft disc of the stock billboard.
+const lerp=(curve,t)=>{const x=Math.min(Math.max(t,0),1)*(curve.length-1),i=Math.min(Math.floor(x),curve.length-2);return curve[i]+(curve[i+1]-curve[i])*(x-i);};
+const stops=[{at:0,color:[1,0.2,0.1]},{at:0.4,color:[0.1,1,0.2]},{at:1,color:[0.2,0.3,1]}];
+const gradient=t=>{if(t<=stops[0].at)return stops[0].color;for(let k=1;k<stops.length;k++){const a=stops[k-1],b=stops[k];if(t<=b.at){const u=(t-a.at)/(b.at-a.at);return a.color.map((c,j)=>c+(b.color[j]-c)*u);}}return stops[stops.length-1].color;};
+const unproject=(px,py)=>{const m=camera.matrix,w=m[15];return[((px+0.5)/size*2-1)*w/m[0]-m[12]/m[0],(1-(py+0.5)/size*2)*w/m[5]-m[13]/m[5]];};
+window.checkCurves=async samples=>{
+ const sizeCurve=[1,0.3,0.8,0.5],alphaCurve=[0.3,1,0.6],effect=new VFX({capacity:n,rate:0,gravity:[0,0,0],velocity:[0,0,0],spread:0,turbulence:0,ground:-100,size:sprite,color:[1,1,1,1],curves:{size:sizeCurve,alpha:alphaCurve,color:stops}});
+ const records=new Float32Array(n*16),particles=[];
+ for(let i=0;i<n;i++){
+  const x=((i%grid)-3.5)*spacing,y=(3.5-Math.floor(i/grid))*spacing,age=(i+0.5)/n;
+  records.set([x,y,0,4*(1-age),0,0,0,sprite],i*8);records.set([1,1,1,1,0,0,4,0],n*8+i*8);particles.push({x,y,age});
+ }
+ device.pushErrorScope('validation');
+ effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+ device.queue.writeBuffer(effect.gpuState.particles,0,records);
+ const target=(format,count,usage)=>device.createTexture({size:[size,size],format,sampleCount:count,usage});
+ const color=target('rgba8unorm',samples,GPUTextureUsage.RENDER_ATTACHMENT|(samples===1?GPUTextureUsage.COPY_SRC:0)),
+  resolved=samples>1?target('rgba8unorm',1,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC):color,
+  depth=target('depth32float',samples,GPUTextureUsage.RENDER_ATTACHMENT),
+  pixels=device.createBuffer({size:size*size*4,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),
+  drawn=device.createBuffer({size:20,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),
+  encoder=device.createCommandEncoder();
+ encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]}],depthStencilAttachment:{view:depth.createView(),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:0}}).end();
+ const context={backend:'webgpu',device,delta:0,camera,width:size,height:size,format:'rgba8unorm',color:color.createView(),depth:depth.createView(),descriptor:{multisample:{count:samples},depthStencil:{format:'depth32float'}},encoder};
+ effect.simulate(context);effect.draw(context);
+ if(samples>1)encoder.beginRenderPass({colorAttachments:[{view:color.createView(),resolveTarget:resolved.createView(),loadOp:'load',storeOp:'store'}]}).end();
+ encoder.copyTextureToBuffer({texture:resolved},{buffer:pixels,bytesPerRow:size*4},[size,size]);
+ encoder.copyBufferToBuffer(effect.gpuState.visible,0,drawn,0,20);
+ device.queue.submit([encoder.finish()]);
+ await Promise.all([pixels.mapAsync(GPUMapMode.READ),drawn.mapAsync(GPUMapMode.READ)]);
+ const image=new Uint8Array(pixels.getMappedRange().slice(0)),visible=new Uint32Array(drawn.getMappedRange().slice(0))[1];
+ const mismatches=[];let checked=0,largest=0,smallest=1,biggest=0;
+ for(const [i,p] of particles.entries()){
+  const factor=lerp(sizeCurve,p.age),alpha=lerp(alphaCurve,p.age),rgb=gradient(p.age);smallest=Math.min(smallest,factor);biggest=Math.max(biggest,factor);
+  for(const [u,v] of [[0,0],[0.5,0],[-0.5,0],[0,0.7],[0,-0.7]]){
+   const [px,py]=project(p.x+u*sprite*0.5*factor,p.y+v*sprite*0.5*factor),[wx,wy]=unproject(px,py),
+    r=Math.hypot(wx-p.x,wy-p.y)/(sprite*0.5*factor),fall=r>=1?0:(1-r*r)**2,at=(py*size+px)*4,got=[...image.subarray(at,at+4)],
+    want=[...rgb.map(c=>c*alpha*fall*255),alpha*fall*255];
+   const difference=Math.max(...got.map((c,k)=>Math.abs(c-want[k])));checked++;largest=Math.max(largest,difference);
+   if(difference>4)mismatches.push({particle:i,age:p.age,u,v,want:want.map(Math.round),got});
+  }
+ }
+ const error=await device.popErrorScope();
+ effect.dispose();for(const t of [color,resolved,depth])t.destroy();pixels.destroy();drawn.destroy();
+ return {error:error?.message??null,errors:errors.splice(0),visible,checked,largest,smallest,biggest,mismatches:mismatches.slice(0,8)};
+};
+// Emitter: births of one frame are read back from the particle buffer and tested against the shape's own maths: the
+// ball's volume and shell, the cone's angle and apex disc, the mesh's area weights, normals and bounds.
+const births=4096,dt=0.001,at=[1,2,3];
+const stat=(values)=>values.reduce((s,v)=>s+v,0)/values.length;
+window.checkEmitter=async kind=>{
+ const speed=5,shapes={
+  ball:{shape:'sphere',radius:2,speed},
+  shell:{shape:'sphere',radius:2,shell:true,speed},
+  cone:{shape:'cone',radius:0.5,angle:0.6,axis:[0,0,2],speed},
+  mesh:{shape:'mesh',positions:new Float32Array([0,0,0,2,0,0,0,0,2,10,0,0,11,0,0,10,0,1]),speed},
+ },
+ effect=new VFX({capacity:births,initialCount:births,rate:0,position:at,gravity:[0,0,0],velocity:[0,0,0],spread:0,turbulence:0,ground:-100,size:0.05,lifetime:[10,10],emitter:shapes[kind]});
+ device.pushErrorScope('validation');
+ effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+ const readback=device.createBuffer({size:births*32,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder(),
+  context={backend:'webgpu',device,delta:dt,camera,width:size,height:size,format:'rgba8unorm',encoder};
+ effect.simulate(context);
+ encoder.copyBufferToBuffer(effect.gpuState.particles,0,readback,0,births*32);
+ device.queue.submit([encoder.finish()]);
+ await readback.mapAsync(GPUMapMode.READ);
+ const f=new Float32Array(readback.getMappedRange().slice(0)),out=[],failures=[];
+ for(let i=0;i<births;i++){
+  const v=[f[i*8+4],f[i*8+5],f[i*8+6]],o=[f[i*8]-at[0]-v[0]*dt,f[i*8+1]-at[1]-v[1]*dt,f[i*8+2]-at[2]-v[2]*dt];
+  out.push({life:f[i*8+3],v,o,speed:Math.hypot(...v),offset:Math.hypot(...o)});
+ }
+ const must=(ok,message)=>{if(!ok)failures.push(message);};
+ const summary={};
+ must(out.every(b=>b.life>9.9&&b.life<=10),'every slot was born with its life');
+ must(out.every(b=>Math.abs(b.speed-speed)<1e-3),'speed is the shape direction times speed');
+ const dirs=out.map(b=>b.v.map(c=>c/b.speed));
+ if(kind==='ball'||kind==='shell'){
+  summary.meanDirection=[0,1,2].map(k=>stat(dirs.map(d=>d[k])));
+  must(summary.meanDirection.every(c=>Math.abs(c)<0.05),'directions cover the sphere evenly');
+  summary.meanCubedRadius=stat(out.map(b=>(b.offset/2)**3));
+  if(kind==='ball'){
+   must(out.every(b=>b.offset<=2+1e-3),'inside the radius');
+   must(Math.abs(summary.meanCubedRadius-0.5)<0.03,'uniform through the volume (mean r^3 / R^3 is 1/2)');
+  }else must(out.every(b=>Math.abs(b.offset-2)<2e-3),'on the surface only');
+  must(out.every(b=>b.offset<1e-6||b.o.reduce((s,c,k)=>s+c*dirs[out.indexOf(b)][k],0)/b.offset>0.999),'pushed along the outward radius');
+ }else if(kind==='cone'){
+  const axis=[0,0,1],cosines=dirs.map(d=>d[2]),cut=Math.cos(0.6);
+  summary.meanCosine=stat(cosines);summary.meanDiscSquared=stat(out.map(b=>b.offset**2));
+  must(cosines.every(c=>c>=cut-1e-4),'inside the half angle');
+  must(Math.abs(summary.meanCosine-(1+cut)/2)<0.01,'uniform in solid angle (mean cosine is (1 + cos angle) / 2)');
+  must(out.every(b=>Math.abs(b.o[2])<1e-3&&b.offset<=0.5+1e-3),'births on the apex disc, perpendicular to the axis');
+  must(Math.abs(summary.meanDiscSquared-0.125)<0.01,'uniform over the disc (mean r^2 is radius^2 / 2)');
+ }else{
+  const inFirst=out.filter(b=>b.o[0]<5);summary.firstShare=inFirst.length/births;
+  must(Math.abs(summary.firstShare-0.8)<0.03,'triangles chosen by area (2 of 2.5)');
+  must(out.every(b=>Math.abs(b.o[1])<1e-3),'on the surface');
+  must(inFirst.every(b=>b.o[0]>=-1e-3&&b.o[2]>=-1e-3&&b.o[0]+b.o[2]<=2+1e-3),'inside the first triangle');
+  must(out.filter(b=>b.o[0]>=5).every(b=>b.o[0]>=10-1e-3&&b.o[2]>=-1e-3&&b.o[0]+b.o[2]<=11+1e-3&&b.o[2]<=1+1e-3),'inside the second triangle');
+  must(dirs.every(d=>Math.abs(d[1]+1)<1e-3),'pushed along the face normal (winding gives -y)');
+ }
+ const error=await device.popErrorScope();
+ effect.dispose();readback.destroy();
+ return {error:error?.message??null,errors:errors.splice(0),failures,summary};
 };
 window.ready=true;
 </script></body></html>

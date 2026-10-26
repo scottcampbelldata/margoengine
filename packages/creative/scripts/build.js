@@ -28,7 +28,17 @@ await build({
     emptyOutDir: true,
     target: 'es2022',
     lib: { entry, formats: ['es'], fileName: (_, name) => name + '.js' },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/vfx'] },
+    rollupOptions: {
+      external: [
+        '@margoengine/core',
+        '@margoengine/core/extension',
+        '@margoengine/vfx/base',
+        '@margoengine/vfx/obstacles',
+        '@margoengine/vfx/wrap',
+        '@margoengine/vfx/sort',
+        '@margoengine/vfx/texture',
+      ],
+    },
   },
 });
 execFileSync(

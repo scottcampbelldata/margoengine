@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/vfx",
   "version": "1.0.0",
-  "description": "GPU particle simulation and indirect billboards.",
+  "description": "GPU particle simulation and indirect billboards, with curves over life and sphere, cone and mesh-surface emitters.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -57,6 +57,14 @@
     "./texture": {
       "types": "./dist/texture.d.ts",
       "import": "./dist/texture.js"
+    },
+    "./curves": {
+      "types": "./dist/curves.d.ts",
+      "import": "./dist/curves.js"
+    },
+    "./emitter": {
+      "types": "./dist/emitter.d.ts",
+      "import": "./dist/emitter.js"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GPUParticles } from '../dist/particles.js';
-import { VFX } from '@margoengine/vfx';
+import { VFX } from '@margoengine/vfx/base';
 
 test('GPUParticles is a VFX preset: a wrapping 6 m leaf field with the old option names', () => {
   const obstacles = [{ kind: 'sphere', center: [0, 0, 0], radius: 1 }];

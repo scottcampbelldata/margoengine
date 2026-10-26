@@ -66,6 +66,38 @@ export const configs = {
   },
   sort: { features: ['sort'], options: () => ({ capacity: 300, initialCount: 300, sort: true }) },
   texture: { features: ['texture'], options: () => ({ capacity: 64, texture: texture() }) },
+  curves: {
+    features: ['curves'],
+    options: () => ({
+      capacity: 64,
+      initialCount: 64,
+      curves: {
+        size: [0, 1, 0.5],
+        alpha: [0, 1, 1, 0],
+        color: [
+          { at: 0, color: [1, 1, 1] },
+          { at: 1, color: [1, 0.2, 0] },
+        ],
+      },
+    }),
+  },
+  'emitter-cone': {
+    features: ['emitter'],
+    options: () => ({ capacity: 64, initialCount: 64, emitter: { shape: 'cone', radius: 0.5, angle: 0.5, speed: 2 } }),
+  },
+  'emitter-mesh': {
+    features: ['emitter'],
+    options: () => ({
+      capacity: 64,
+      initialCount: 64,
+      emitter: {
+        shape: 'mesh',
+        positions: new Float32Array([0, 0, 0, 2, 0, 0, 0, 0, 2, 2, 0, 2]),
+        indices: [0, 1, 2, 1, 3, 2],
+        speed: 1,
+      },
+    }),
+  },
   'leaf-field': {
     features: ['obstacles', 'wrap', 'sort', 'texture'],
     options: () => ({

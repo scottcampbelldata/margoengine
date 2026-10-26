@@ -29,6 +29,21 @@
   "created": 22,
   "commands": 62
  },
+ "curves": {
+  "digest": "fa9105d28bac8201",
+  "created": 22,
+  "commands": 64
+ },
+ "emitter-cone": {
+  "digest": "6f6bb27e165dc35a",
+  "created": 22,
+  "commands": 64
+ },
+ "emitter-mesh": {
+  "digest": "156b19e1f9d62fca",
+  "created": 24,
+  "commands": 66
+ },
  "leaf-field": {
   "digest": "43789fad9aa66ef8",
   "created": 394,

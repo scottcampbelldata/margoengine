@@ -6,7 +6,7 @@ import { VFX as Base } from '../dist/base.js';
 import { trace, configs } from './traces.js';
 const entries = Object.fromEntries(
   await Promise.all(
-    ['obstacles', 'wrap', 'sort', 'texture'].map(async (name) => [
+    ['obstacles', 'wrap', 'sort', 'texture', 'curves', 'emitter'].map(async (name) => [
       name,
       (await import(`../dist/${name}.js`))[name === 'texture' ? 'textureFeature' : name],
     ]),
@@ -33,6 +33,8 @@ test('options that need a missing feature throw instead of drawing something els
     () => new Base({ texture: { width: 1, height: 1, data: new Uint8Array(4) } }),
     /VFX texture needs texture/,
   );
+  assert.throws(() => new Base({ curves: { size: [0, 1] } }), /VFX curves needs curves from @margoengine\/vfx\/curves/);
+  assert.throws(() => new Base({ emitter: { shape: 'sphere' } }), /VFX emitter needs emitter/);
   assert.doesNotThrow(() => new Base({ wrap: false, sort: false }));
   assert.throws(() => new Base({ sort: 1 }, { sort: entries.sort }), /sort and wrap/, 'Shared validation still runs');
 });

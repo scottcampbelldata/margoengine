@@ -1374,7 +1374,7 @@
     "package": "@margoengine/vfx",
     "version": "1.0.0",
     "published": false,
-    "description": "GPU particle simulation and indirect billboards.",
+    "description": "GPU particle simulation and indirect billboards, with curves over life and sphere, cone and mesh-surface emitters.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "vfx",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/vfx@1.0.0",

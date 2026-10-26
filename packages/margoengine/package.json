@@ -1115,6 +1115,14 @@
       "types": "./dist/vfx/texture.d.ts",
       "import": "./dist/vfx/texture.js"
     },
+    "./vfx/curves": {
+      "types": "./dist/vfx/curves.d.ts",
+      "import": "./dist/vfx/curves.js"
+    },
+    "./vfx/emitter": {
+      "types": "./dist/vfx/emitter.d.ts",
+      "import": "./dist/vfx/emitter.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

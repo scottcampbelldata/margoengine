@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3298964,
+  "total": 3306946,
   "history": [
     {
       "date": "2026-10-24",
@@ -386,6 +386,12 @@
       "commit": "d336ca13",
       "reason": "inspector: undo/redo history, search, colour and double-sided editing, canvas picking, scene snapshots, resources and shader view (panel +3.9 kB gzip); new optional entries inspector/history, inspector/snapshot, inspector/resources",
       "grew": 4
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "9bce9eb3",
+      "reason": "vfx item 21.5: curves (size, opacity, colour over life) and emitter (sphere, cone, mesh surface) features; both root VFX and base grow with their validation and wiring, the two new entries are optional, tree-shakable subpaths; creative/particles now uses vfx/base plus four feature entries so it does not load the larger root",
+      "grew": 4
     }
   ],
   "items": {
@@ -660,8 +666,10 @@
     "@margoengine/usdz": 8240,
     "@margoengine/usdz dist/workers/usdz.js": 60214,
     "@margoengine/usdz/worker": 9113,
-    "@margoengine/vfx": 9703,
-    "@margoengine/vfx/base": 7080,
+    "@margoengine/vfx": 12721,
+    "@margoengine/vfx/base": 7572,
+    "@margoengine/vfx/curves": 1816,
+    "@margoengine/vfx/emitter": 2656,
     "@margoengine/vfx/obstacles": 1401,
     "@margoengine/vfx/sort": 1401,
     "@margoengine/vfx/texture": 1527,

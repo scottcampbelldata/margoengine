@@ -249,7 +249,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/scenery`](packages/scenery/README.md) | Procedural moonlit skies and scenery passes for Margo Engine. |
 | [`@margoengine/scatter`](packages/scatter/README.md) | Seeded instancing, distance-based LOD and procedural wind. |
 | [`@margoengine/road`](packages/road/README.md) | Arc-length spline road surfaces, raised curbs and tiled UVs. |
-| [`@margoengine/vfx`](packages/vfx/README.md) | GPU particle simulation and indirect billboards. |
+| [`@margoengine/vfx`](packages/vfx/README.md) | GPU particle simulation and indirect billboards, with curves over life and sphere, cone and mesh-surface emitters. |
 | [`@margoengine/creative`](packages/creative/README.md) | WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine. |
 | [`@margoengine/procedural`](packages/procedural/README.md) | Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language. |
 | [`@margoengine/wfc`](packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |

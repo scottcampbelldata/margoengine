@@ -77,7 +77,57 @@ export interface VFXOptions {
   sort?: boolean;
   /** RGBA8 sRGB sprite (or atlas of frames) multiplied by the particle colour, instead of the soft disc. Read at construction. */
   texture?: VFXTexture;
+  /** Size, opacity and colour over each particle's life. Which curves are set is read at attach; their values are read each frame. Needs the `curves` feature. */
+  curves?: VFXCurves;
+  /** Where births start and which way `speed` pushes them: a sphere, a cone or the surface of a triangle mesh. The shape (and a mesh) is read at attach; the numbers each frame. Needs the `emitter` feature. */
+  emitter?: VFXEmitter;
 }
+/**
+ * Size, opacity and colour over a particle's life, from birth (0) to death (1). Needs the `curves` feature; set at
+ * least one of the three.
+ */
+export interface VFXCurves {
+  /** 2 to 32 multipliers of `size`, each 0..1, evenly spaced over the life and linearly interpolated: `[0, 1, 0]` swells then shrinks. */
+  size?: readonly number[];
+  /** 2 to 32 opacities, each 0..1, evenly spaced over the life; replaces the default fade-out: `[0, 1, 1, 0]` fades in and out. */
+  alpha?: readonly number[];
+  /** 2 to 8 stops ascending by `at` (0..1) with a linear RGB `color` (each 0..16) that multiplies the particle `color`: pass `color: [1, 1, 1, 1]` to draw the gradient as it is. */
+  color?: readonly { at: number; color: readonly [number, number, number] }[];
+}
+/**
+ * An emitter shape. Births start at `position` (plus `emissionExtent`) offset by the shape and move along the shape's
+ * direction times `speed` (world units per second, -1000..1000, default 0; negative flies inward) on top of `velocity`
+ * and `spread`. Needs the `emitter` feature.
+ */
+export type VFXEmitter =
+  | {
+      shape: 'sphere';
+      /** Radius in world units, 0..1,000,000. Default 1. */
+      radius?: number;
+      /** Births on the surface only, not through the volume. Default false. */
+      shell?: boolean;
+      speed?: number;
+    }
+  | {
+      shape: 'cone';
+      /** Radius of the disc at the apex that births start on, world units, 0..1,000,000. Default 0 (a point). */
+      radius?: number;
+      /** Half angle off the axis in radians, 0..PI/2. Default PI/6. */
+      angle?: number;
+      /** Direction the cone opens along; need not be unit length, not zero. Default [0, 1, 0]. */
+      axis?: Vec3;
+      speed?: number;
+    }
+  | {
+      shape: 'mesh';
+      /** Vertex positions as xyz triples (world units around `position`), finite, at least one triangle. */
+      positions: ArrayLike<number>;
+      /** Triangle corner indices, a multiple of 3 (up to 262,144 triangles); omit when `positions` is a triangle list. */
+      indices?: ArrayLike<number>;
+      /** Multiplies `positions`, 1e-6..1e6. Default 1. */
+      scale?: number;
+      speed?: number;
+    };
 /**
  * A sphere or axis-aligned box (world units) the curl flow bends around within one unit and particles bounce off with
  * `bounce`. Up to 64 per effect; needs the `obstacles` feature.
@@ -133,6 +183,23 @@ export interface VFXFeatures {
     patch(billboard: string, texture: VFXTexture): string;
     create(device: GPUDevice, texture: VFXTexture, owned: OwnedResources): GPUBindGroupEntry[];
   };
+  curves?: {
+    validate(curves: VFXCurves): void;
+    patch(billboard: string, curves: VFXCurves): string;
+    create(
+      device: GPUDevice,
+      owned: OwnedResources,
+    ): { entries: GPUBindGroupEntry[]; write(queue: GPUQueue, curves: VFXCurves): void };
+  };
+  emitter?: {
+    validate(emitter: VFXEmitter, mesh?: boolean): void;
+    patch(simulation: string, emitter: VFXEmitter): string;
+    create(
+      device: GPUDevice,
+      emitter: VFXEmitter,
+      owned: OwnedResources,
+    ): { entries: GPUBindGroupEntry[]; write(queue: GPUQueue, emitter: VFXEmitter): void };
+  };
 }
 let nextId = 0;
 /**
@@ -171,6 +238,9 @@ export class VFX implements EnginePlugin {
   private readonly extraValues = new Float32Array(524);
   private sprite?: VFXTexture;
   private spriteEntries: GPUBindGroupEntry[] = [];
+  private curveRuntime?: ReturnType<NonNullable<VFXFeatures['curves']>['create']>;
+  private emitterRuntime?: ReturnType<NonNullable<VFXFeatures['emitter']>['create']>;
+  private emitterShape?: string;
   private sorter?: ReturnType<NonNullable<VFXFeatures['sort']>['create']>;
   private owned: OwnedResources = [];
   private fogSource: FogLike | null = null;
@@ -258,8 +328,22 @@ export class VFX implements EnginePlugin {
       (o.wrap && !o.emissionExtent?.every((v) => v > 0))
     )
       throw new RangeError('VFX sort and wrap must be booleans; wrap needs emissionExtent above 0.');
-    for (const key of ['obstacles', 'wrap', 'sort'] as const)
+    for (const key of ['obstacles', 'wrap', 'sort', 'curves', 'emitter'] as const)
       if (o[key] && !this.features[key]) throw new TypeError(`VFX ${key} needs ${key} from @margoengine/vfx/${key}`);
+    if (o.curves) {
+      this.features.curves!.validate(o.curves);
+      if (!o.curves.size && !o.curves.alpha && !o.curves.color)
+        throw new TypeError('VFX curves needs at least one of size, alpha or color; pass e.g. {size: [0, 1, 0]}');
+    }
+    if (o.emitter) {
+      // The mesh is read once at attach; only the cheap numbers are checked again every frame.
+      this.features.emitter!.validate(o.emitter, !this.emitterShape);
+      if (this.emitterShape && o.emitter.shape !== this.emitterShape)
+        throw new TypeError(
+          `VFX emitter shape is fixed at attach (${this.emitterShape}); attach a new VFX to change it`,
+        );
+    } else if (this.emitterShape)
+      throw new TypeError('VFX emitter was set at attach and cannot be removed; attach a new VFX to drop it');
     if (o.obstacles) this.features.obstacles!.write(o.obstacles, this.extraValues);
   }
   /** The fog the particles are drawn in (see `setFog`), or null. */
@@ -311,7 +395,16 @@ export class VFX implements EnginePlugin {
     let simulation = simulationShader;
     if (o.obstacles) simulation = f.obstacles!.patch(simulation);
     if (o.wrap) simulation = f.wrap!.patch(simulation);
+    if (o.emitter) {
+      simulation = f.emitter!.patch(simulation, o.emitter);
+      this.emitterRuntime = f.emitter!.create(this.device, o.emitter, this.owned);
+      this.emitterShape = o.emitter.shape;
+    }
     this.billboard = this.sprite ? f.texture!.patch(billboardShader, this.sprite) : billboardShader;
+    if (o.curves) {
+      this.billboard = f.curves!.patch(this.billboard, o.curves);
+      this.curveRuntime = f.curves!.create(this.device, this.owned);
+    }
     this.alive = buffer(size * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.indirect = buffer(20, GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
     this.respawn = buffer(4, GPUBufferUsage.STORAGE);
@@ -325,12 +418,17 @@ export class VFX implements EnginePlugin {
     });
     this.computeGroup = this.device.createBindGroup({
       layout: this.simulation.getBindGroupLayout(0),
-      entries: [this.uniform!, this.particles!, this.alive!, this.indirect!, this.respawn!]
-        .map((buffer, binding) => ({ binding: binding < 2 ? binding : binding + 1, resource: { buffer } }))
-        .concat(
-          { binding: 2, resource: { buffer: this.visible } },
-          o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : [],
+      entries: [
+        ...[this.uniform!, this.particles!, this.alive!, this.indirect!, this.respawn!].map(
+          (buffer, binding): GPUBindGroupEntry => ({
+            binding: binding < 2 ? binding : binding + 1,
+            resource: { buffer },
+          }),
         ),
+        { binding: 2, resource: { buffer: this.visible } },
+        ...(o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : []),
+        ...(this.emitterRuntime?.entries ?? []),
+      ],
     });
     if (o.sort)
       this.sorter = f.sort!.create(
@@ -409,6 +507,8 @@ export class VFX implements EnginePlugin {
       for (let i = 0; i < 3; i++) e[4 + i] = -this.view[i * 4 + 2];
       c.device.queue.writeBuffer(this.extra, 0, e as Float32Array<ArrayBuffer>);
     }
+    if (o.curves) this.curveRuntime!.write(c.device.queue, o.curves);
+    if (o.emitter) this.emitterRuntime!.write(c.device.queue, o.emitter);
     c.encoder.clearBuffer(this.indirect!, 4, 4);
     c.encoder.clearBuffer(this.visible!, 4, 4);
     c.encoder.clearBuffer(this.respawn!, 0, 4);
@@ -478,6 +578,7 @@ export class VFX implements EnginePlugin {
             resource: { buffer },
           })),
           ...this.spriteEntries,
+          ...(this.curveRuntime?.entries ?? []),
           ...(fog ? [{ binding: 5, resource: { buffer: this.fogBuffer! } }] : []),
         ],
       });
@@ -515,6 +616,7 @@ export class VFX implements EnginePlugin {
     this.fogBuffer = undefined;
     this.owned = [];
     this.spriteEntries = [];
+    this.curveRuntime = this.emitterRuntime = undefined;
     this.extra = this.sorter = undefined;
     this.uniform = this.particles = this.alive = this.indirect = this.visible = this.respawn = undefined;
     this.computeGroup = undefined;
