@@ -78,12 +78,12 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/stats | `.` 3 |  |  | 4,678 |
 | @margoengine/taa | `.` 7 |  |  | 9,645 |
 | @margoengine/terrain | `.` 13 | 2 |  | 9,904 |
-| @margoengine/text | `.` 35 | 2 |  | 15,434 |
+| @margoengine/text | `.` 35 | 2 |  | 15,498 |
 | @margoengine/tonemap | `.` 5 |  |  | 8,333 |
 | @margoengine/toon | `.` 2 |  |  | 1,445 |
 | @margoengine/transitions | `.` 2 |  |  | 4,035 |
 | @margoengine/tween | `.` 6 |  |  | 800 |
-| @margoengine/ui | `.` 97, `./react` 23 | 62 |  |  |
+| @margoengine/ui | `.` 97, `./react` 23 | 62 |  | 27,788 |
 | @margoengine/usdz | `.` 7, `./worker` 2 | 24 |  | 8,020 |
 | @margoengine/vfx | `.` 7, `./base` 7, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1 | 23 |  | 9,121 |
 | @margoengine/video | `.` 2 |  |  | 1,943 |

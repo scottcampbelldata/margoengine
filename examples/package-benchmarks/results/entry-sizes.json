@@ -1,5 +1,5 @@
 {
-  "commit": "375f5083",
+  "commit": "bf18eb88",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -838,18 +838,18 @@
     },
     "@margoengine/navmesh": {
       ".": {
-        "raw": 7715,
-        "gzip": 3326
+        "raw": 7836,
+        "gzip": 3391
       },
       "./build": {
-        "raw": 25464,
-        "gzip": 10185
+        "raw": 25585,
+        "gzip": 10246
       }
     },
     "@margoengine/net": {
       ".": {
-        "raw": 2633,
-        "gzip": 1115
+        "raw": 3049,
+        "gzip": 1272
       }
     },
     "@margoengine/oit": {
@@ -860,80 +860,80 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 32447,
-        "gzip": 11568
+        "raw": 34136,
+        "gzip": 12187
       }
     },
     "@margoengine/points": {
       ".": {
-        "raw": 56612,
-        "gzip": 19272
+        "raw": 57239,
+        "gzip": 19516
       }
     },
     "@margoengine/post": {
       ".": {
-        "raw": 141218,
-        "gzip": 38957
+        "raw": 141758,
+        "gzip": 39167
       },
       "./bloom": {
-        "raw": 19549,
-        "gzip": 6501
+        "raw": 19632,
+        "gzip": 6540
       },
       "./ssao": {
-        "raw": 29264,
-        "gzip": 9330
+        "raw": 29366,
+        "gzip": 9384
       },
       "./scene-fade": {
-        "raw": 6595,
-        "gzip": 2849
+        "raw": 6649,
+        "gzip": 2882
       },
       "./stack": {
-        "raw": 10611,
-        "gzip": 3778
+        "raw": 10632,
+        "gzip": 3785
       },
       "./fxaa": {
         "raw": 12572,
         "gzip": 4479
       },
       "./decals": {
-        "raw": 10752,
-        "gzip": 4506
+        "raw": 10847,
+        "gzip": 4565
       },
       "./ssr": {
-        "raw": 31775,
-        "gzip": 10868
+        "raw": 31882,
+        "gzip": 10921
       },
       "./gtao": {
-        "raw": 37220,
-        "gzip": 11633
+        "raw": 37377,
+        "gzip": 11692
       },
       "./ssgi": {
-        "raw": 34273,
-        "gzip": 11552
+        "raw": 34352,
+        "gzip": 11583
       },
       "./motion-blur": {
-        "raw": 22023,
-        "gzip": 7537
+        "raw": 22080,
+        "gzip": 7556
       },
       "./lens-flare": {
-        "raw": 17801,
-        "gzip": 6345
+        "raw": 17831,
+        "gzip": 6355
       },
       "./image": {
-        "raw": 35519,
-        "gzip": 11590
+        "raw": 35660,
+        "gzip": 11653
       },
       "./smaa": {
-        "raw": 17501,
-        "gzip": 6063
+        "raw": 17521,
+        "gzip": 6068
       },
       "./glitch": {
-        "raw": 16722,
-        "gzip": 6013
+        "raw": 16743,
+        "gzip": 6019
       },
       "./afterimage": {
-        "raw": 16045,
-        "gzip": 5405
+        "raw": 16066,
+        "gzip": 5411
       },
       "./mrt": {
         "raw": 9402,
@@ -946,24 +946,24 @@
     },
     "@margoengine/procedural": {
       ".": {
-        "raw": 17058,
-        "gzip": 7307
+        "raw": 17640,
+        "gzip": 7577
       },
       "./noise": {
-        "raw": 4401,
-        "gzip": 2110
+        "raw": 4524,
+        "gzip": 2171
       },
       "./lsystem": {
-        "raw": 4585,
-        "gzip": 2198
+        "raw": 4934,
+        "gzip": 2339
       },
       "./voronoi": {
-        "raw": 11368,
-        "gzip": 4773
+        "raw": 11487,
+        "gzip": 4838
       },
       "./expression": {
-        "raw": 11129,
-        "gzip": 4464
+        "raw": 11157,
+        "gzip": 4473
       }
     },
     "@margoengine/quality": {
@@ -972,30 +972,30 @@
         "gzip": 1634
       },
       "./warm": {
-        "raw": 2636,
-        "gzip": 1280
+        "raw": 2705,
+        "gzip": 1308
       }
     },
     "@margoengine/react": {
       ".": {
-        "raw": 69896,
-        "gzip": 23696
+        "raw": 71100,
+        "gzip": 24050
       },
       "./kit": {
-        "raw": 30734,
-        "gzip": 10902
+        "raw": 31429,
+        "gzip": 11183
       },
       "./post": {
-        "raw": 9818,
-        "gzip": 3514
+        "raw": 10071,
+        "gzip": 3615
       },
       "./physics": {
-        "raw": 14819,
-        "gzip": 5687
+        "raw": 15123,
+        "gzip": 5758
       },
       "./xr": {
-        "raw": 7742,
-        "gzip": 3292
+        "raw": 7922,
+        "gzip": 3346
       }
     },
     "@margoengine/rigging": {
@@ -1006,8 +1006,8 @@
     },
     "@margoengine/road": {
       ".": {
-        "raw": 1729,
-        "gzip": 915
+        "raw": 1977,
+        "gzip": 1027
       }
     },
     "@margoengine/scatter": {
@@ -1269,7 +1269,7 @@
       },
       "./stream": {
         "raw": 36163,
-        "gzip": 12778
+        "gzip": 12779
       },
       "./generate": {
         "raw": 10271,
@@ -1308,8 +1308,8 @@
         "gzip": 5906
       },
       "dist/workers/terrain.js": {
-        "raw": 13770,
-        "gzip": 5744
+        "raw": 13842,
+        "gzip": 5778
       }
     },
     "@margoengine/voxel-edit": {
@@ -1523,9 +1523,9 @@
       "brotli": 5203
     },
     "packages/voxel/dist/workers/terrain.js": {
-      "raw": 13594,
-      "gzip": 5711,
-      "brotli": 5101
+      "raw": 13666,
+      "gzip": 5746,
+      "brotli": 5137
     },
     "node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs": {
       "raw": 4335248,

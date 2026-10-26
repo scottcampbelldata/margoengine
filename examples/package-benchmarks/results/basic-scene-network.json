@@ -1,5 +1,5 @@
 {
-  "commit": "375f5083",
+  "commit": "bf18eb88",
   "dirty": false,
   "browser": "msedge 156.0.4314.42 headless",
   "adapter": "nvidia ampere",
@@ -33,15 +33,6 @@
       "brotli": 1049
     },
     {
-      "path": "assets/extension-DuYhGmhk.js",
-      "role": "Shared chunk",
-      "encoding": "identity",
-      "transferred": 359,
-      "raw": 40,
-      "gzip": 54,
-      "brotli": 44
-    },
-    {
       "path": "assets/dist-Bq1HRPrA.js",
       "role": "@margoengine/gltf (app.load)",
       "encoding": "gzip",
@@ -49,6 +40,15 @@
       "raw": 12843,
       "gzip": 5310,
       "brotli": 4774
+    },
+    {
+      "path": "assets/extension-DuYhGmhk.js",
+      "role": "Shared chunk",
+      "encoding": "identity",
+      "transferred": 359,
+      "raw": 40,
+      "gzip": 54,
+      "brotli": 44
     },
     {
       "path": "model.glb",
