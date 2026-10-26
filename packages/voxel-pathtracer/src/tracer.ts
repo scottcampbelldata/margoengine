@@ -467,10 +467,12 @@ export class VoxelPathTracer implements EnginePlugin {
   invalidateModels(ids?: Iterable<string>): void {
     this.#alive();
     if (ids !== undefined && (ids === null || typeof ids !== 'object' || !(Symbol.iterator in ids)))
-      throw new TypeError('VoxelPathTracer invalidateModels takes a list of model ids, or nothing for all of them');
+      throw new TypeError(
+        'VoxelPathTracer invalidateModels takes a list of model ids, or nothing for all of them; pass an array of ids',
+      );
     const list = ids === undefined ? undefined : [...ids];
     if (list?.some((id) => typeof id !== 'string'))
-      throw new TypeError('VoxelPathTracer invalidateModels takes model ids (strings)');
+      throw new TypeError('VoxelPathTracer invalidateModels takes model ids (strings); pass ids from your models');
     const cache = this.#cache;
     if (!list) {
       cache.models.clear();
@@ -525,7 +527,8 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#alive();
     const o = checkVec3(origin, 'raycast origin', false, 'pass a world point'),
       d = checkVec3(direction, 'raycast direction', false, 'pass a direction');
-    if (!(Math.hypot(d[0], d[1], d[2]) > 0)) throw new RangeError('VoxelPathTracer raycast direction is zero');
+    if (!(Math.hypot(d[0], d[1], d[2]) > 0))
+      throw new RangeError('VoxelPathTracer raycast direction is zero; pass a non-zero direction');
     checkNumber(maxDistance, 'raycast maxDistance', 0, Infinity, 'pass a distance, 0 or more');
     const s = this.#snapshot,
       found = raycastSnapshot(s, o, d, maxDistance);

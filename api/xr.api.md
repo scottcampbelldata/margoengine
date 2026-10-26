@@ -45,8 +45,12 @@ export class XR implements EnginePlugin {
     session: XRNativeSession | null;
     readonly controllers: XRController[];
     static isSupported(mode?: XRMode): Promise<boolean>;
-    static attach(engine: EngineKernel): Promise<XR>;
-    static create(engine: EngineKernel): Promise<XR>;
+    static attach(engine: EngineKernel, options?: {
+        signal?: AbortSignal;
+    }): Promise<XR>;
+    static create(engine: EngineKernel, { signal }?: {
+        signal?: AbortSignal;
+    }): Promise<XR>;
     private constructor();
     setup(engine: Engine): void;
     get referenceSpace(): XRSpace | undefined;
@@ -128,8 +132,12 @@ class XR implements EnginePlugin {
     session: XRNativeSession | null;
     readonly controllers: XRController[];
     static isSupported(mode?: XRMode): Promise<boolean>;
-    static attach(engine: EngineKernel): Promise<XR>;
-    static create(engine: EngineKernel): Promise<XR>;
+    static attach(engine: EngineKernel, options?: {
+        signal?: AbortSignal;
+    }): Promise<XR>;
+    static create(engine: EngineKernel, { signal }?: {
+        signal?: AbortSignal;
+    }): Promise<XR>;
     private constructor();
     setup(engine: Engine): void;
     get referenceSpace(): XRSpace | undefined;
@@ -220,6 +228,7 @@ export interface XRSessionOptions {
     referenceSpace?: 'viewer' | 'local' | 'local-floor' | 'bounded-floor' | 'unbounded';
     requiredFeatures?: string[];
     optionalFeatures?: string[];
+    signal?: AbortSignal;
     onFrame?: (state: XRFrameState) => void;
 }
 

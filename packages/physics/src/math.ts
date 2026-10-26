@@ -1,6 +1,8 @@
 import { eulerToQuaternion } from '@margoengine/math/quat';
 
+/** A 3-component vector [x, y, z]. */
 export type Vec3 = readonly [number, number, number];
+/** A quaternion [x, y, z, w]. */
 export type Quat = readonly [number, number, number, number];
 
 export const vec = (v: Vec3 | undefined, fallback: Vec3 = [0, 0, 0]): { x: number; y: number; z: number } => {

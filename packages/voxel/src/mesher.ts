@@ -797,7 +797,9 @@ export function meshChunk(input: MeshInput): ChunkMesh {
           const bit = (i + x) * bits,
             slot = (words[bit >>> 5] >>> (bit & 31)) & mask;
           if (slot >= palette.length)
-            throw new RangeError(`MeshInput chunk cell ${i + x} uses palette entry ${slot} of ${palette.length}`);
+            throw new RangeError(
+              `MeshInput chunk cell ${i + x} uses palette entry ${slot} of ${palette.length}; keep every cell index below the palette length`,
+            );
           states[p + x] = palette[slot];
         }
     }
@@ -858,7 +860,9 @@ export function decodeQuad(words: Uint32Array, i: number): DecodedQuad {
   if (!(words instanceof Uint32Array))
     throw new TypeError('decodeQuad expects a Uint32Array of quad words, such as mesh.opaque');
   if (!Number.isInteger(i) || i < 0 || (i + 1) * QUAD_WORDS > words.length)
-    throw new RangeError(`Quad ${i} is not in this array of ${Math.floor(words.length / QUAD_WORDS)} quads`);
+    throw new RangeError(
+      `Quad ${i} is not in this array of ${Math.floor(words.length / QUAD_WORDS)} quads; pass an index below the quad count`,
+    );
   const w0 = words[i * 3],
     w1 = words[i * 3 + 1],
     w2 = words[i * 3 + 2],

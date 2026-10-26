@@ -65,9 +65,11 @@ export async function fetchLibrary(indexUrl: string, options: LibraryFetchOption
   const loaded = await readJson(indexUrl, options);
   const json = loaded.json as LibraryIndex;
   if (!json || typeof json !== 'object' || !Array.isArray(json.assets))
-    throw new TypeError('Library index has no assets array');
-  if (json.version !== 1) throw new RangeError(`Library index version ${String(json.version)} is not 1`);
-  if (json.assets.length > MAX_ASSETS) throw new RangeError(`Library index lists more than ${MAX_ASSETS} assets`);
+    throw new TypeError('Library index has no assets array; the index must be {version: 1, assets: [...]}');
+  if (json.version !== 1)
+    throw new RangeError(`Library index version ${String(json.version)} is not 1; use a version 1 index`);
+  if (json.assets.length > MAX_ASSETS)
+    throw new RangeError(`Library index lists more than ${MAX_ASSETS} assets; split the library into several indexes`);
   return {
     version: 1,
     assets: json.assets.map((asset, index) => checkAsset(asset, index, loaded.base)),
@@ -86,7 +88,8 @@ export async function fetchAsset(entry: LibraryEntry, options: LibraryFetchOptio
 }
 
 function checkAsset(value: unknown, index: number, indexUrl: string): LibraryEntry {
-  if (!value || typeof value !== 'object') throw new TypeError(`Library asset ${index} is not an object`);
+  if (!value || typeof value !== 'object')
+    throw new TypeError(`Library asset ${index} is not an object; list each asset as {id, ...}`);
   const asset = value as LibraryEntry;
   if (typeof asset.id !== 'string' || !asset.id) throw new TypeError(`Library asset ${index} needs a string id`);
   if (typeof asset.name !== 'string' || !asset.name) throw new TypeError(`Library asset ${index} needs a string name`);
@@ -112,11 +115,15 @@ async function readJson(url: string, options: LibraryFetchOptions): Promise<{ js
 async function limitedBuffer(res: Response, maxBytes: number, url: string): Promise<ArrayBuffer> {
   const declared = Number(res.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes)
-    throw new RangeError(`Library response ${url} is ${declared} bytes, over ${maxBytes}`);
+    throw new RangeError(
+      `Library response ${url} is ${declared} bytes, over ${maxBytes}; raise maxBytes or serve a smaller file`,
+    );
   // Without Content-Length the body is buffered, then rejected. That is not a streaming allocation ceiling.
   const bytes = await res.arrayBuffer();
   if (bytes.byteLength > maxBytes)
-    throw new RangeError(`Library response ${url} is ${bytes.byteLength} bytes, over ${maxBytes}`);
+    throw new RangeError(
+      `Library response ${url} is ${bytes.byteLength} bytes, over ${maxBytes}; raise maxBytes or serve a smaller file`,
+    );
   return bytes;
 }
 

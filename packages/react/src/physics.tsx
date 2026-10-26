@@ -25,6 +25,7 @@ interface PhysicsState {
   sync: Set<() => void>;
 }
 const Context = createContext<PhysicsState | null>(null);
+/** Props of the Physics component; every prop is optional unless noted. */
 export interface PhysicsProps extends Omit<PhysicsOptions, 'rapier'> {
   children?: ReactNode;
   /** Supply initialized Rapier, or let the optional Rapier peer initialize lazily. */
@@ -122,13 +123,17 @@ export function Physics({
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
+/** Returns the Physics world of the nearest Physics component (null until it is ready); throws a MargoError (`state`) outside one. */
 export function usePhysics(): PhysicsWorld | null {
   const state = useContext(Context);
   if (!state) throw new MargoError('state', 'usePhysics requires <Physics>; call it inside one.');
   return state.world;
 }
+/** Collider fitted to the mesh geometry: 'cuboid', 'hull' or 'trimesh'. */
 export type AutomaticColliderMode = 'cuboid' | 'hull' | 'trimesh';
+/** Colliders for a RigidBody: explicit options, a generation mode, or false for none. */
 export type RigidBodyColliders = ColliderOptions | readonly ColliderOptions[] | AutomaticColliderMode | false;
+/** Props of the RigidBody component; every prop is optional unless noted. */
 export interface RigidBodyProps extends Omit<BodyOptions, 'position' | 'rotation' | 'colliders'>, MeshProps {
   /** Fit descendant geometry or loader bounds; false disables only automatic colliders. */
   colliders?: RigidBodyColliders;
@@ -309,9 +314,11 @@ type ColliderBaseProps = Omit<
   'shape' | 'halfExtents' | 'offset' | 'rotation'
 > &
   Pick<MeshProps, 'position' | 'rotation' | 'scale'> & { onError?: (error: unknown) => void };
+/** Props of the CuboidCollider component; every prop is optional unless noted. */
 export interface CuboidColliderProps extends ColliderBaseProps {
   /** Half extents in local units. */ args: Triple;
 }
+/** Props of the BallCollider component; every prop is optional unless noted. */
 export interface BallColliderProps extends ColliderBaseProps {
   args: readonly [radius: number];
 }
@@ -364,6 +371,7 @@ function ShapeCollider({
 export function CuboidCollider({ args, ...props }: CuboidColliderProps) {
   return <ShapeCollider {...props} shape={{ shape: 'box', halfExtents: args }} />;
 }
+/** The ball collider component. */
 export function BallCollider({ args, ...props }: BallColliderProps) {
   return <ShapeCollider {...props} shape={{ shape: 'sphere', radius: args[0] }} />;
 }

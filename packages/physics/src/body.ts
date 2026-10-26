@@ -4,8 +4,10 @@ import type { Mesh } from '@margoengine/core';
 import { checkVec, quat, tuple, tuple4, vec, type Quat, type Vec3 } from './math.js';
 import type { ColliderOptions, RapierModule } from './shapes.js';
 
+/** How a body moves: `dynamic` (simulated), `fixed`, or kinematic (driven by position or by velocity). */
 export type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
 
+/** Options for adding a rigid body; every field has a default. */
 export interface BodyOptions {
   /** Default 'dynamic'. */
   type?: BodyType;

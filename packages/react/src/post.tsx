@@ -57,17 +57,23 @@ interface Callbacks<T> {
   onReady?: (effect: T) => void;
   onError?: (error: unknown) => void;
 }
+/** Props of the EffectComposer component; every prop is optional unless noted. */
 export interface EffectComposerProps {
   children?: ReactNode;
   enabled?: boolean;
   onError?: (error: unknown) => void;
 }
+/** Props of the Bloom component; every prop is optional unless noted. */
 export interface BloomProps extends BloomOptions, Callbacks<BloomEffect> {}
+/** Props of the SSAO component; every prop is optional unless noted. */
 export interface SSAOProps extends SSAOOptions, Callbacks<SSAOEffect> {}
+/** Props of the DepthOfField component; every prop is optional unless noted. */
 export interface DepthOfFieldProps extends DOFOptions, Callbacks<DepthOfFieldEffect> {}
+/** Props of the Tonemap component; every prop is optional unless noted. */
 export interface TonemapProps extends TonemapOptions, Callbacks<TonemapEffect> {
   lut?: CubeLUT | string | null;
 }
+/** Props of the TAA component; every prop is optional unless noted. */
 export interface TAAProps extends TAAOptions, Callbacks<TAAEffect> {}
 /** Props of `<GTAO>`: ground-truth ambient occlusion, SSAO's options plus GTAO's own. */
 export interface GTAOProps extends GTAOOptions, Callbacks<GTAOEffect> {}
@@ -512,6 +518,7 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
 
 type Composer = ReturnType<typeof composer>;
 const Context = createContext<Composer | null>(null);
+/** The effect composer component. */
 export function EffectComposer({ children, enabled = true, onError }: EffectComposerProps) {
   const scene = useScene(),
     errors = useRef(onError);
@@ -545,22 +552,27 @@ function usePass<T extends Effect>(
     manager.schedule();
   });
 }
+/** The bloom component. */
 export function Bloom({ onReady, onError, ...options }: BloomProps) {
   usePass('bloom', options, { onReady, onError });
   return null;
 }
+/** The ssao component. */
 export function SSAO({ onReady, onError, ...options }: SSAOProps) {
   usePass('ssao', options, { onReady, onError });
   return null;
 }
+/** The depth of field component. */
 export function DepthOfField({ onReady, onError, ...options }: DepthOfFieldProps) {
   usePass('dof', options, { onReady, onError });
   return null;
 }
+/** The tonemap component. */
 export function Tonemap({ onReady, onError, lut, ...options }: TonemapProps) {
   usePass('tonemap', options, { onReady, onError }, lut);
   return null;
 }
+/** The taa component. */
 export function TAA({ onReady, onError, ...options }: TAAProps) {
   usePass('taa', options, { onReady, onError });
   return null;

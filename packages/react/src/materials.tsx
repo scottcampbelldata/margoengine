@@ -9,6 +9,7 @@ import { live, useMesh, useResourceEffect, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { MargoError } from '@margoengine/math/errors';
 
+/** Props of the MeshTransmissionMaterial component; every prop is optional unless noted. */
 export interface MeshTransmissionMaterialProps extends PbrMaterialProps, Omit<TransmissionOptions, 'opaqueColor'> {
   onError?: (error: unknown) => void;
 }

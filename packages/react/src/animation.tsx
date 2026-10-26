@@ -9,6 +9,7 @@ import { ModelContext } from './model.js';
 import { optionalPeer } from './optional.js';
 import { MargoError } from '@margoengine/math/errors';
 
+/** Props of the Animation component; every prop is optional unless noted. */
 export interface AnimationProps {
   /** A glTF animation name, or a key of `blendTrees`. */
   clip: string;

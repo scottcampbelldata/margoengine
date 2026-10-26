@@ -374,7 +374,9 @@ export class SparseGrid {
       if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || !Number.isSafeInteger(z))
         throw new RangeError('SparseGrid edit cell is not whole; pass integer coordinates');
       if (!this.#inside(x, y, z))
-        throw new RangeError(`SparseGrid edit cell ${x}, ${y}, ${z} is outside the grid bounds`);
+        throw new RangeError(
+          `SparseGrid edit cell ${x}, ${y}, ${z} is outside the grid bounds; edit cells inside the grid or grow it first`,
+        );
       checkPalette(value, 'SparseGrid edit index', 0);
       const address = chunkKey(chunkOf(x), chunkOf(y), chunkOf(z)),
         original = this.#chunks.get(address);

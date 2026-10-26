@@ -19,6 +19,7 @@ export interface Resources {
   models: Set<PBRModel>;
   lighting: Map<LightingEffect, Map<PBRModel, () => void>>;
 }
+/** Pointer event passed to React handlers, with the hit point and mesh. */
 export interface MargoPointerEvent {
   nativeEvent: PointerEvent;
   object: MeshHandle;
@@ -29,6 +30,7 @@ export interface MargoPointerEvent {
   x: number;
   y: number;
 }
+/** Pointer event props accepted by mesh components. */
 export interface PointerHandlers {
   onClick?: (event: MargoPointerEvent) => void;
   onPointerOver?: (event: MargoPointerEvent) => void;

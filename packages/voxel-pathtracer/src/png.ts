@@ -77,7 +77,8 @@ export class PngWriter {
 
   /** Finishes the stream; every row must have been written. */
   async finish(): Promise<Blob> {
-    if (this.#rows !== this.height) throw new RangeError(`PNG has ${this.#rows} of ${this.height} rows`);
+    if (this.#rows !== this.height)
+      throw new RangeError(`PNG has ${this.#rows} of ${this.height} rows; write every row before finish`);
     await this.#writer.close();
     const parts = await this.#output;
     let length = 0;

@@ -919,7 +919,9 @@ export class VoxelRenderer implements EnginePlugin {
       throw new MargoError('unsupported', 'VoxelRenderer needs the WebGPU backend; create the engine with WebGPU');
     const limit = device.limits.maxStorageBufferBindingSize;
     if (this.#maxPages * PAGE_BYTES > limit)
-      throw new RangeError(`VoxelRenderer maxQuadBytes is over this device's ${limit}-byte storage binding limit`);
+      throw new RangeError(
+        `VoxelRenderer maxQuadBytes is over this device's ${limit}-byte storage binding limit; lower maxQuadBytes`,
+      );
     this.#engine = engine;
   }
 

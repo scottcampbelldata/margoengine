@@ -374,7 +374,9 @@ export function validateTraceOptions(options: unknown): TraceValidation {
 export function resetSettings(s: Settings, names: unknown): Settings {
   if (names === undefined) return { ...DEFAULTS };
   if (names === null || typeof names !== 'object' || !(Symbol.iterator in names))
-    throw new TypeError('VoxelPathTracer resetOptions takes a list of option names, or nothing for all of them');
+    throw new TypeError(
+      'VoxelPathTracer resetOptions takes a list of option names, or nothing for all of them; pass an array of names',
+    );
   const next = { ...s } as Record<string, unknown>;
   for (const name of names as Iterable<unknown>) {
     if (typeof name !== 'string' || !(OPTION_NAMES as readonly string[]).includes(name))

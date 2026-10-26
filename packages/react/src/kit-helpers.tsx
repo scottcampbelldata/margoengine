@@ -84,15 +84,19 @@ function ShapeGeometry({
 interface ShapeProps extends MeshProps, ErrorProps, PbrMaterialProps {
   castShadow?: boolean;
 }
+/** Props of the Box component; every prop is optional unless noted. */
 export interface BoxProps extends ShapeProps {
   args?: Parameters<GeometryApi['boxGeometry']>;
 }
+/** Props of the Sphere component; every prop is optional unless noted. */
 export interface SphereProps extends ShapeProps {
   args?: Parameters<GeometryApi['sphereGeometry']>;
 }
+/** Props of the Plane component; every prop is optional unless noted. */
 export interface PlaneProps extends ShapeProps {
   args?: Parameters<GeometryApi['planeGeometry']>;
 }
+/** The box component. */
 export const Box = forwardRef<MeshRef, BoxProps>(function Box(
   { args = [], castShadow = false, onError, color, roughness, metalness, children, ...props },
   ref,
@@ -106,6 +110,7 @@ export const Box = forwardRef<MeshRef, BoxProps>(function Box(
     </Mesh>
   );
 });
+/** The sphere component. */
 export const Sphere = forwardRef<MeshRef, SphereProps>(function Sphere(
   { args = [], castShadow = false, onError, color, roughness, metalness, children, ...props },
   ref,
@@ -119,6 +124,7 @@ export const Sphere = forwardRef<MeshRef, SphereProps>(function Sphere(
     </Mesh>
   );
 });
+/** The plane component. */
 export const Plane = forwardRef<MeshRef, PlaneProps>(function Plane(
   { args = [], castShadow = false, onError, color, roughness, metalness, children, ...props },
   ref,
@@ -133,7 +139,9 @@ export const Plane = forwardRef<MeshRef, PlaneProps>(function Plane(
   );
 });
 
+/** Props of the Sky component; every prop is optional unless noted. */
 export interface SkyProps extends SkyOptions, ErrorProps {}
+/** The sky component. */
 export const Sky = forwardRef<SkyPlugin, SkyProps>(function Sky({ onError, ...props }, ref) {
   // The sky is the only light of many scenes, so it supplies the fallback environment (metals are black without one).
   const options: SkyOptions = { environment: true, ...props },
@@ -177,6 +185,7 @@ export const Sky = forwardRef<SkyPlugin, SkyProps>(function Sky({ onError, ...pr
   return null;
 });
 
+/** Props of the ContactShadows component; every prop is optional unless noted. */
 export interface ContactShadowsProps extends MeshProps, ErrorProps, ContactGroundOptions {}
 function ContactBinding({ onError, ...options }: ContactGroundOptions & ErrorProps) {
   const scene = useScene(),
@@ -246,6 +255,7 @@ export function sceneWorldBounds(scene: Scene, root: EngineMesh, output = new Fl
     }
   return Number.isFinite(output[0]) ? output : null;
 }
+/** Props of the Center component; every prop is optional unless noted. */
 export interface CenterProps extends MeshProps {
   disableX?: boolean;
   disableY?: boolean;
@@ -324,6 +334,7 @@ export const Center = forwardRef<MeshRef, CenterProps>(function Center(
   );
 });
 
+/** Props of the PointerLock component; every prop is optional unless noted. */
 export interface PointerLockProps extends ErrorProps {
   enabled?: boolean;
   pointerSpeed?: number;
@@ -336,6 +347,7 @@ export interface PointerLockProps extends ErrorProps {
   onUnlock?: (event: ControlEvent) => void;
   onChange?: (event: ControlEvent) => void;
 }
+/** The pointer lock component. */
 export const PointerLock = forwardRef<PointerControls, PointerLockProps>(function PointerLock(props, ref) {
   const scene = useScene(),
     latest = useRef(props),
@@ -428,6 +440,7 @@ export const PointerLock = forwardRef<PointerControls, PointerLockProps>(functio
 });
 
 type ObjectTarget = MeshHandle | RefObject<MeshHandle | null> | null;
+/** Props of the TransformControls component; every prop is optional unless noted. */
 export interface TransformControlsProps extends Omit<TransformControlsOptions, 'element'>, MeshProps, ErrorProps {
   object?: ObjectTarget;
   enabled?: boolean;
@@ -548,6 +561,7 @@ function TransformBinding({
   useLiveRef(controlRef, controls);
   return null;
 }
+/** The transform controls component. */
 export const TransformControls = forwardRef<GizmoControls, TransformControlsProps>(function TransformControls(
   { children, ...options },
   ref,
@@ -606,6 +620,7 @@ function releaseTextRenderer(scene: Scene, entry: TextRendererLease): void {
     );
   });
 }
+/** Props of the Text component; every prop is optional unless noted. */
 export interface TextProps extends Omit<TextOptions, 'mesh' | 'text'>, ErrorProps {
   text?: string;
   children?: string | number;
@@ -632,6 +647,7 @@ const textDefaults = {
   billboard: false,
   onTop: false,
 } as const;
+/** The text component. */
 export const Text = forwardRef<TextBlock, TextProps>(function Text(props, ref) {
   const scene = useScene(),
     latest = useRef(props),

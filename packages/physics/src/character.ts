@@ -4,6 +4,7 @@ import type { Collider, KinematicCharacterController, World } from './rapier-typ
 import type { PhysicsBody } from './body.js';
 import { checkVec, tuple, vec, type Vec3 } from './math.js';
 
+/** Options for a kinematic character controller; every field has a default. */
 export interface CharacterControllerOptions {
   /** Gap kept between the character and obstacles (default 0.01). */
   offset?: number;
@@ -25,6 +26,7 @@ export interface CharacterControllerOptions {
   characterMass?: number;
 }
 
+/** Where a character controller ended up, and whether it is grounded. */
 export interface CharacterMoveResult {
   /** The movement actually allowed this step. */
   movement: [number, number, number];

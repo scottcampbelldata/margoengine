@@ -22,6 +22,7 @@ import { matrixRotation, matrixScale, worldMatrix, type TransformStoreLike } fro
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import type { ModelLike, ModelPrimitiveLike } from '../../shared/model.js';
 
+/** Options for creating a Physics world; every field has a default. */
 export interface PhysicsOptions {
   /** The initialized `@dimforge/rapier3d-compat` module. */
   rapier: RapierModule;
@@ -45,7 +46,9 @@ export interface PhysicsOptions {
   name?: string;
 }
 
+/** Kind of collision event: `contactstart` and `contactend` for solid contacts, `intersectionstart` and `intersectionend` for sensors. */
 export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
+/** Two colliders began or stopped touching. */
 export interface CollisionEvent {
   type: CollisionEventType;
   bodyA: PhysicsBody;
@@ -57,6 +60,7 @@ export interface CollisionEvent {
   /** True when either collider is a sensor (intersection events). */
   sensor: boolean;
 }
+/** Events a Physics world emits, keyed by event name. */
 export interface PhysicsEventMap {
   contactstart: CollisionEvent;
   contactend: CollisionEvent;
@@ -67,6 +71,7 @@ export interface PhysicsEventMap {
   afterstep: number;
 }
 
+/** Limits which colliders a scene query can hit. */
 export interface QueryFilter {
   /** Packed interaction groups of the query, see `collisionGroups`. */
   groups?: number;
@@ -86,16 +91,19 @@ export interface PhysicsRaycastOptions extends QueryFilter {
   /** Solid shapes report a hit at distance 0 when the ray starts inside (default true). */
   solid?: boolean;
 }
+/** A query hit: the body and collider, and how far along the ray or cast it was. */
 export interface Hit {
   body: PhysicsBody;
   mesh: Mesh | null;
   collider: Collider;
 }
+/** A ray hit with its point and surface normal. */
 export interface RaycastHit extends Hit {
   distance: number;
   point: [number, number, number];
   normal: [number, number, number];
 }
+/** A shape-cast hit with its witness point, normal and time of impact. */
 export interface ShapeCastHit extends Hit {
   /** Distance travelled along the normalized direction before impact. */
   distance: number;
@@ -104,6 +112,7 @@ export interface ShapeCastHit extends Hit {
   /** Outward normal of the hit collider at the contact, world space. */
   normal: [number, number, number];
 }
+/** The closest point on a collider to a query point, and whether the point is inside it. */
 export interface PointProjection extends Hit {
   point: [number, number, number];
   inside: boolean;

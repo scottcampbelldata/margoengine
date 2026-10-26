@@ -10,6 +10,7 @@ interface Loading {
   pending: boolean;
   promise: Promise<void>;
 }
+/** Replaces or adjusts a model material by name. */
 export interface MaterialOverride {
   baseColor?: Vec3 | readonly [number, number, number, number];
   roughness?: number;
@@ -20,6 +21,7 @@ export interface MaterialOverride {
   alphaCutoff?: number;
   doubleSided?: boolean;
 }
+/** Props of the Model component; every prop is optional unless noted. */
 export interface ModelProps extends PointerHandlers {
   src: string;
   position?: Vec3;
@@ -247,6 +249,7 @@ export function ModelResource({
   );
 }
 
+/** The model component. */
 export function Model(props: ModelProps) {
   return <ModelResource {...props} />;
 }

@@ -52,6 +52,7 @@ import {
 } from './internal.js';
 export type { MargoPointerEvent, PointerHandlers } from './internal.js';
 
+/** What {@link useMargo} returns: the stage, canvas, camera, size and engine, plus `invalidate()`. */
 export interface MargoContextValue {
   stage: StageFacade | null;
   ready: boolean;
@@ -62,12 +63,15 @@ export interface MargoContextValue {
   readonly clock: number;
   invalidate(): void;
 }
+/** React context holding the engine; read it with {@link useMargo}. */
 export const MargoContext = createContext<MargoContextValue | null>(null);
+/** Returns the context (stage, canvas, camera, size) of the nearest MargoCanvas; throws a MargoError (`state`) outside one. */
 export function useMargo(): MargoContextValue {
   const value = useContext(MargoContext);
   if (!value) throw new MargoError('state', 'useMargo requires <MargoCanvas>; call it inside one.');
   return value;
 }
+/** Props of the Canvas component; every prop is optional unless noted. */
 export interface CanvasProps extends EngineOptions {
   children?: ReactNode;
   style?: CSSProperties;
@@ -78,7 +82,9 @@ export interface CanvasProps extends EngineOptions {
   onError?: (error: unknown) => void;
   frameloop?: 'always' | 'demand';
 }
+/** Props of the MargoCanvas component; every prop is optional unless noted. */
 export type MargoCanvasProps = CanvasProps;
+/** The margo canvas component. */
 export function MargoCanvas({
   children,
   style,
@@ -447,16 +453,20 @@ export function MargoCanvas({
     </MargoContext.Provider>
   );
 }
+/** The canvas component. */
 export const Canvas = MargoCanvas;
+/** Returns the engine of the nearest Stage or Canvas. */
 export function useMargoStage(): EngineKernel {
   return useScene().engine as unknown as EngineKernel;
 }
 
+/** Props of the Stage component; every prop is optional unless noted. */
 export interface StageProps {
   camera?: EngineOptions['camera'];
   shadows?: boolean;
   children?: ReactNode;
 }
+/** The stage component. */
 export function Stage({ camera, shadows = false, children }: StageProps) {
   const { stage, ready } = useMargo(),
     scene = useContext(Context);
@@ -494,7 +504,9 @@ export function Stage({ camera, shadows = false, children }: StageProps) {
   return active ? <>{children}</> : null;
 }
 
+/** A ref to a Mesh component: the engine mesh it creates. */
 export type MeshRef = MeshHandle;
+/** Props of the Mesh component; every prop is optional unless noted. */
 export interface MeshProps extends PointerHandlers {
   position?: Vec3;
   rotation?: Vec3;
@@ -510,6 +522,7 @@ export interface MeshProps extends PointerHandlers {
   layers?: number;
   children?: ReactNode;
 }
+/** The mesh component. */
 export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
   {
     position = zero,
@@ -634,6 +647,7 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
   );
 });
 
+/** Declarative box geometry; place it inside a Mesh. */
 export function BoxGeometry({ args = one }: { args?: Vec3 }) {
   const registry = useMesh();
   useCommit(() => {
@@ -656,6 +670,7 @@ export function BoxGeometry({ args = one }: { args?: Vec3 }) {
   }, [registry, args[0], args[1], args[2]]);
   return null;
 }
+/** A geometry a component created and disposes on unmount. */
 export function GeometryResource({ geometry }: { geometry: Geometry }) {
   const registry = useMesh();
   useCommit(() => {
@@ -677,11 +692,13 @@ export function GeometryResource({ geometry }: { geometry: Geometry }) {
   }, [registry, geometry]);
   return null;
 }
+/** Props of the PbrMaterial component; every prop is optional unless noted. */
 export interface PbrMaterialProps {
   color?: string | readonly number[];
   roughness?: number;
   metalness?: number;
 }
+/** The pbr material component. */
 export function PbrMaterial({ color = '#4f46e5', roughness = 0.5, metalness = 0 }: PbrMaterialProps) {
   const registry = useMesh();
   useCommit(() => {
@@ -699,8 +716,10 @@ export function PbrMaterial({ color = '#4f46e5', roughness = 0.5, metalness = 0 
   }, [registry, color, roughness, metalness]);
   return null;
 }
+/** Props of the Group component; every prop is optional unless noted. */
 export type GroupProps = MeshProps;
 export { Mesh as mesh, Mesh as Group, Mesh as group, BoxGeometry as boxGeometry, PbrMaterial as meshStandardMaterial };
+/** Calls `callback` every frame with the frame time; unsubscribes on unmount. */
 export function useFrame(callback: FrameCallback): void {
   const { frames } = useScene(),
     latest = useRef(callback);
@@ -732,6 +751,7 @@ function values(value: readonly number[], size: number, label: string, min = 0, 
     throw new RangeError(`Invalid ${label}: pass an array of ${size} finite number(s) between ${min} and ${max}.`);
 }
 
+/** Props of the Environment component; every prop is optional unless noted. */
 export interface EnvironmentProps {
   src?: string;
   exposure?: number;
@@ -742,6 +762,7 @@ export interface EnvironmentProps {
   blur?: number;
   onError?: (error: unknown) => void;
 }
+/** The environment component. */
 export function Environment({
   src,
   exposure = 1,
@@ -912,6 +933,7 @@ function releaseOverlay(engine: Engine, entry: OverlayEntry): void {
     );
   });
 }
+/** Props of the Html component; every prop is optional unless noted. */
 export interface HtmlProps {
   children?: ReactNode;
   /** World position, or the offset from the enclosing `<Mesh>`. Default [0, 0, 0]. */

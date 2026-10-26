@@ -61,7 +61,9 @@ export class WFC {
       tiles.length < 1 ||
       tiles.length > 32
     )
-      throw new RangeError('Invalid WFC dimensions or tile count');
+      throw new RangeError(
+        'Invalid WFC dimensions or tile count; use integer dimensions with at most 1,000,000 cells and 1 to 32 tiles',
+      );
     this.dimensions = [...dimensions];
     this.full = tiles.length === 32 ? 0xffffffff : (1 << tiles.length) - 1;
     this.cells = new Uint32Array(dimensions[0] * dimensions[1] * dimensions[2]);
@@ -77,7 +79,9 @@ export class WFC {
       const def = tiles[tile],
         weight = def.weight ?? 1;
       if (!Number.isFinite(weight) || weight <= 0 || def.neighbors.length !== 6)
-        throw new TypeError('Tile needs positive weight and six neighbor lists');
+        throw new TypeError(
+          'Tile needs positive weight and six neighbor lists; give each tile a weight above 0 and a neighbors array of six lists',
+        );
       this.weights[tile] = weight;
       this.weightedLogs[tile] = weight * Math.log(weight);
       for (let direction = 0; direction < 6; direction++)
@@ -88,7 +92,9 @@ export class WFC {
             neighbor >= tiles.length ||
             !tiles[neighbor].neighbors[direction ^ 1]?.includes(tile)
           )
-            throw new TypeError('WFC adjacency must be valid and reciprocal');
+            throw new TypeError(
+              'WFC adjacency must be valid and reciprocal; list only existing tiles, and make tile B a neighbor of A in the opposite direction',
+            );
           this.allowed[tile * 6 + direction] |= 1 << neighbor;
         }
     }
@@ -157,7 +163,7 @@ export class WFC {
    */
   solve(seed = 1, pins: readonly Pin[] = [], attempts = 16): Uint8Array {
     if (!Number.isInteger(seed) || !Number.isInteger(attempts) || attempts < 1 || attempts > 1024)
-      throw new RangeError('Invalid WFC seed or retry budget');
+      throw new RangeError('Invalid WFC seed or retry budget; use an integer seed and attempts from 1 to 1024');
     const [w, h] = this.dimensions,
       cells = this.cells,
       weights = this.weights,
@@ -173,7 +179,7 @@ export class WFC {
         pin.tile < 0 ||
         pin.tile >= this.tiles.length
       )
-        throw new RangeError('Invalid WFC pin');
+        throw new RangeError('Invalid WFC pin; pass a cell inside the grid and a tile index below the tile count');
     this.randomState = seed >>> 0 || 1;
     for (let attempt = 0; attempt < attempts; attempt++) {
       this.cells.fill(this.full);

@@ -227,7 +227,8 @@ export function pasteCells(
     clipped = 0;
   for (const cell of clip) {
     if (++count > limit) throw new RangeError(`pasteCells clip holds over ${limit} cells; raise maxCells`);
-    if (!Array.isArray(cell) || cell.length !== 4) throw new TypeError('pasteCells clip cell is not [x, y, z, index]');
+    if (!Array.isArray(cell) || cell.length !== 4)
+      throw new TypeError('pasteCells clip cell is not [x, y, z, index]; pass cells as four-number arrays');
     checkCell(cell.slice(0, 3), 'pasteCells clip cell');
     checkPalette(cell[3], 'pasteCells clip index');
     const x = cell[0] + ox,

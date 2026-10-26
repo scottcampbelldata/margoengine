@@ -8,6 +8,7 @@ export type ColliderGeometry =
   | Geometry
   | { readonly vertices: ArrayLike<number>; readonly indices?: ArrayLike<number>; readonly stride?: number };
 
+/** Collider shape description: a primitive, mesh or heightfield with its size. */
 export type ShapeOptions =
   | { shape: 'box'; halfExtents?: Vec3 }
   | { shape: 'sphere'; radius?: number }
@@ -23,6 +24,7 @@ export type ShapeOptions =
    */
   | { shape: 'custom'; desc: ColliderDesc };
 
+/** How two colliders combine their friction or restitution values. */
 export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
 
 /** Everything about a collider except its shape. */
@@ -50,6 +52,7 @@ export interface ColliderSettings {
   enabled?: boolean;
 }
 
+/** Options for a collider: shape, material, sensor and filtering. */
 export type ColliderOptions = ShapeOptions & ColliderSettings;
 
 /** Packs Rapier interaction groups. Each side is a list of group indices 0..15 or a 16-bit mask. */

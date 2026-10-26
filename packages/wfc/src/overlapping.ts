@@ -62,14 +62,17 @@ export class OverlappingModel {
       W * H > 1 << 20 ||
       data.length !== W * H
     )
-      throw new RangeError('Invalid WFC sample or pattern options');
+      throw new RangeError(
+        'Invalid WFC sample or pattern options; use integer width, height and N, and a data array of width times height values',
+      );
     const index = new Map<number, number>(),
       image = Uint16Array.from(data, (v) => {
-        if (!Number.isFinite(v)) throw new RangeError('Sample values must be finite');
+        if (!Number.isFinite(v))
+          throw new RangeError('Sample values must be finite; replace NaN and Infinity in the sample');
         let k = index.get(v);
         if (k === undefined) {
           k = index.size;
-          if (k > 65535) throw new RangeError('Too many sample colors');
+          if (k > 65535) throw new RangeError('Too many sample colors; use at most 65,536 distinct values');
           index.set(v, k);
         }
         return k;
@@ -142,7 +145,9 @@ export class OverlappingModel {
       attempts < 1 ||
       attempts > 64
     )
-      throw new RangeError('Invalid WFC output size or solve options');
+      throw new RangeError(
+        'Invalid WFC output size or solve options; use an integer output size and attempts from 1 to 64',
+      );
     const { weights, weightLogs, propagator } = this,
       wave = new Uint8Array(cells * T),
       compatible = new Int32Array(cells * T * 4),

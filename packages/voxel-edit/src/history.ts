@@ -118,7 +118,9 @@ export class VoxelHistory {
    */
   go(index: number): VoxelGrid {
     if (!Number.isInteger(index) || index < 0 || index >= this.#entries.length)
-      throw new RangeError(`History index ${index} is out of range 0 to ${this.#entries.length - 1}`);
+      throw new RangeError(
+        `History index ${index} is out of range 0 to ${this.#entries.length - 1}; pass an index of an existing entry`,
+      );
     this.#index = index;
     return this.current;
   }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3214418,
+  "total": 3219306,
   "history": [
     {
       "date": "2026-10-24",
@@ -281,15 +281,27 @@
     },
     {
       "date": "2026-10-26",
+      "commit": "c36c298b",
+      "reason": "DX pass B3: error messages name their fix and bare Errors became MargoError (selection, scatter, shadows, sky, terrain, transitions, vfx); the extra text grows these entries",
+      "grew": 7
+    },
+    {
+      "date": "2026-10-26",
       "commit": "2cf1a4ac",
       "reason": "selection: marquee/lasso select, hover highlight and face/edge/vertex picking (item 21.5); all tree-shakable",
       "grew": 1
     },
     {
       "date": "2026-10-26",
-      "commit": "c36c298b",
-      "reason": "DX pass B3: error messages name their fix and bare Errors became MargoError (selection, scatter, shadows, sky, terrain, transitions, vfx); the extra text grows these entries",
-      "grew": 7
+      "commit": "fefc0c92",
+      "reason": "DX pass: coded errors that name their fix (and AbortSignal on XR waits) add message text to water and xr",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "8e01503b",
+      "reason": "DX pass: selection error messages name their fix and bare Errors became MargoError (+220 B over the feature baseline)",
+      "grew": 1
     }
   ],
   "items": {
@@ -523,7 +535,7 @@
     "@margoengine/sciviz": 35513,
     "@margoengine/sciviz/colormaps": 4433,
     "@margoengine/sciviz/maths": 5638,
-    "@margoengine/selection": 14682,
+    "@margoengine/selection": 18404,
     "@margoengine/shader": 12517,
     "@margoengine/shader/effects": 8386,
     "@margoengine/shader/graph": 11137,
@@ -596,11 +608,11 @@
     "@margoengine/voxel/render": 23305,
     "@margoengine/voxel/stream": 12985,
     "@margoengine/voxel/vox": 12969,
-    "@margoengine/water": 18564,
+    "@margoengine/water": 19258,
     "@margoengine/webgl": 3277,
     "@margoengine/wfc": 1878,
     "@margoengine/wfc/overlapping": 2259,
-    "@margoengine/xr": 6285,
+    "@margoengine/xr": 6757,
     "leak @margoengine/animation -> @margoengine/gltf-pro": 1,
     "leak @margoengine/animation/pointer -> @margoengine/gltf-pro": 1,
     "leak @margoengine/animation/skeleton-utils -> @margoengine/gltf-pro": 1,

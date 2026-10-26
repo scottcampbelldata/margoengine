@@ -146,12 +146,12 @@ class Reader extends ByteReader {
 const integer = (what: string, v: unknown, min: number, max: number): number => {
   if (typeof v !== 'number') throw new TypeError(`${what} must be a number`);
   if (!Number.isInteger(v) || v < min || v > max)
-    throw new RangeError(`${what} ${v} is not an integer in ${min}..${max}`);
+    throw new RangeError(`${what} ${v} is not an integer in ${min}..${max}; pass a whole number in that range`);
   return v;
 };
 const finite = (what: string, v: unknown): number => {
   if (typeof v !== 'number') throw new TypeError(`${what} must be a number`);
-  if (!Number.isFinite(v)) throw new RangeError(`${what} ${v} is not finite`);
+  if (!Number.isFinite(v)) throw new RangeError(`${what} ${v} is not finite; pass a finite number`);
   return v;
 };
 const vector = (what: string, v: unknown): Vec3 => {
@@ -212,7 +212,9 @@ export function encodeClientMessage(message: ClientMessage): Uint8Array {
       w.varint(integer('edit state', message.state, 0, 2 ** 32 - 1));
       break;
     default:
-      throw new TypeError(`Unknown client message type ${String((message as { type?: unknown })?.type)}`);
+      throw new TypeError(
+        `Unknown client message type ${String((message as { type?: unknown })?.type)}; use one of the ClientMessage types`,
+      );
   }
   return w.done();
 }
@@ -316,7 +318,9 @@ export function encodeServerMessage(message: ServerMessage): Uint8Array {
       w.u8(LOADED);
       break;
     default:
-      throw new TypeError(`Unknown server message type ${String((message as { type?: unknown })?.type)}`);
+      throw new TypeError(
+        `Unknown server message type ${String((message as { type?: unknown })?.type)}; use one of the ServerMessage types`,
+      );
   }
   return w.done();
 }

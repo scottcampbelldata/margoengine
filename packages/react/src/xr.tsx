@@ -15,6 +15,7 @@ import { useScene, useResourceEffect } from './internal.js';
 import { setWorldPose } from './scene-transform.js';
 import { MargoError } from '@margoengine/math/errors';
 
+/** The xrcontext value component. */
 export interface XRContextValue {
   readonly manager: XRManager | null;
   readonly ready: boolean;
@@ -27,6 +28,7 @@ interface XRState extends XRContextValue {
   frames: Set<(state: XRFrameState) => void>;
 }
 const Context = createContext<XRState | null>(null);
+/** Props of the XR component; every prop is optional unless noted. */
 export interface XRProps {
   children?: ReactNode;
   mode?: XRMode;
@@ -153,15 +155,18 @@ export function XR({ children, ...props }: XRProps) {
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
+/** Returns the XR session controls of the nearest XR component; throws a MargoError (`state`) outside one. */
 export function useXR(): XRContextValue {
   const value = useContext(Context);
   if (!value) throw new MargoError('state', 'useXR requires <XR>; call it inside one.');
   return value;
 }
+/** The controller event component. */
 export interface ControllerEvent {
   nativeEvent: Event;
   controller: XRInputPose;
 }
+/** Props of the Controller component; every prop is optional unless noted. */
 export interface ControllerProps extends MeshProps {
   handedness?: 'left' | 'right' | 'none';
   index?: number;
@@ -176,6 +181,7 @@ export interface ControllerProps extends MeshProps {
   onSqueezeStart?: (event: ControllerEvent) => void;
   onSqueezeEnd?: (event: ControllerEvent) => void;
 }
+/** The controller component. */
 export function Controller({
   children,
   position,

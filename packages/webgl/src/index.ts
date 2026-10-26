@@ -78,12 +78,12 @@ export class GLRenderer implements Renderer {
         gl.shaderSource(shader, code);
         gl.compileShader(shader);
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-          throw new MargoError('failed', gl.getShaderInfoLog(shader) ?? 'GL compile');
+          throw new MargoError('failed', gl.getShaderInfoLog(shader) ?? 'GL compile failed; check the shader source');
         gl.attachShader(program, shader);
       }
       gl.linkProgram(program);
       if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-        throw new MargoError('failed', gl.getProgramInfoLog(program) ?? 'GL link');
+        throw new MargoError('failed', gl.getProgramInfoLog(program) ?? 'GL link failed; check the shader outputs');
     } catch (error) {
       gl.deleteProgram(program);
       throw error;
@@ -126,7 +126,11 @@ export class GLRenderer implements Renderer {
         gl.vertexAttribDivisor(i + 2, 1);
       }
       const error = gl.getError();
-      if (error !== gl.NO_ERROR) throw new MargoError('failed', `GL buffer (${error})`);
+      if (error !== gl.NO_ERROR)
+        throw new MargoError(
+          'failed',
+          `GL buffer failed (error ${error}); use a smaller geometry or check the context`,
+        );
       this.resources.set(geometry, { vao, buffers, instance });
     } catch (error) {
       for (const buffer of buffers) gl.deleteBuffer(buffer);

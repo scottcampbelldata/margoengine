@@ -439,7 +439,9 @@ export class Water implements EnginePlugin {
       waves.length > 8 ||
       (options.depth !== undefined && typeof options.depth !== 'function')
     )
-      throw new RangeError('Invalid water options');
+      throw new RangeError(
+        'Invalid water options; use size and segments above 0, finite color and height, 1 to 8 waves and a depth function',
+      );
     this.values.set([0, height, foamDistance, waves.length], 20);
     this.values.set(color, 24);
     this.values.set([0.6, 0.8, 0, 3, 1, 0.9, 0.75, 0], 104);
@@ -450,7 +452,9 @@ export class Water implements EnginePlugin {
       (options.spray && !options.terrain) ||
       (options.horizon !== undefined && typeof options.horizon !== 'boolean')
     )
-      throw new TypeError('Invalid water optics or spray options');
+      throw new TypeError(
+        'Invalid water optics or spray options; reflection, sceneColor and horizon take functions or booleans, and spray needs options.terrain',
+      );
     if (
       options.shadows !== undefined &&
       (typeof options.shadows?.pbr !== 'function' || typeof options.shadows?.bindings !== 'function')
@@ -468,7 +472,9 @@ export class Water implements EnginePlugin {
         terrain.size.length !== 2 ||
         terrain.size.some((v) => !Number.isFinite(Math.fround(v)) || v <= 0 || v > 100000)
       )
-        throw new RangeError('Invalid water terrain');
+        throw new RangeError(
+          'Invalid water terrain; pass a heightmap function, a finite origin [x, z] and a size [x, z] from 0 to 100000',
+        );
       this.values.set(terrain.origin, 96);
       this.values.set(terrain.size, 98);
       this.values[103] = 1;
@@ -493,9 +499,14 @@ export class Water implements EnginePlugin {
         q > 1 ||
         !Number.isFinite(w.phase ?? 0)
       )
-        throw new RangeError('Invalid Gerstner wave');
+        throw new RangeError(
+          'Invalid Gerstner wave; use a non-zero [x, z] direction, amplitude 0-100, wavelength above 0 up to 100000, steepness 0-1',
+        );
       const k = (2 * Math.PI) / w.wavelength;
-      if (q * w.amplitude * k > 1 / waves.length) throw new RangeError('Wave steepness would fold the surface');
+      if (q * w.amplitude * k > 1 / waves.length)
+        throw new RangeError(
+          'Wave steepness would fold the surface; lower the amplitude or steepness, or lengthen the wavelength',
+        );
       // Fade waves shorter than four triangle edges to prevent mesh sampling artifacts.
       const t = Math.max(0, Math.min(1, (w.wavelength / edge - 2) / 2));
       this.values.set(
@@ -575,12 +586,16 @@ export class Water implements EnginePlugin {
   /** Scales the wave spectrum so its largest configured train has this amplitude in meters. */
   setWaveHeight(height: number): this {
     if (this.disposed || !Number.isFinite(height) || height < 0 || height > 100 || (!this.maxWaveHeight && height > 0))
-      throw new RangeError('Invalid water wave height');
+      throw new RangeError(
+        'Invalid water wave height; use 0 to 100 meters, and a wave train with an amplitude above 0 to scale',
+      );
     for (let i = 0; i < this.values[23]; i++) {
       const o = 32 + i * 8,
         amplitude = this.maxWaveHeight ? (height * this.waveHeights[i]) / this.maxWaveHeight : 0;
       if (this.values[o + 4] * amplitude * this.values[o + 3] > 1 / this.values[23])
-        throw new RangeError('Wave steepness would fold the surface');
+        throw new RangeError(
+          'Wave steepness would fold the surface; lower the amplitude or steepness, or lengthen the wavelength',
+        );
     }
     for (let i = 0; i < this.values[23]; i++)
       this.values[34 + i * 8] = this.maxWaveHeight ? (height * this.waveHeights[i]) / this.maxWaveHeight : 0;
@@ -629,21 +644,28 @@ export class Water implements EnginePlugin {
   private validateLights(): void {
     const lights = this.options.lights;
     if (lights === undefined) return;
-    if (!Array.isArray(lights) || lights.length > 2) throw new RangeError('Water accepts up to two directional lights');
+    if (!Array.isArray(lights) || lights.length > 2)
+      throw new RangeError('Water accepts up to two directional lights; pass options.lights with at most two entries');
     for (const light of lights) {
       if (!light || light.direction?.length !== 4 || light.radiance?.length !== 3)
-        throw new RangeError('Invalid water light');
+        throw new RangeError(
+          'Invalid water light; use a finite direction [x, y, z, w >= 0] that is not zero and a finite radiance [r, g, b] of 0 or more',
+        );
       for (let i = 0; i < 4; i++)
         if (
           !Number.isFinite(Math.fround(light.direction[i])) ||
           (i < 3 && (!Number.isFinite(Math.fround(light.radiance[i])) || light.radiance[i] < 0))
         )
-          throw new RangeError('Invalid water light');
+          throw new RangeError(
+            'Invalid water light; use a finite direction [x, y, z, w >= 0] that is not zero and a finite radiance [r, g, b] of 0 or more',
+          );
       if (
         light.direction[3] < 0 ||
         !Math.hypot(Math.fround(light.direction[0]), Math.fround(light.direction[1]), Math.fround(light.direction[2]))
       )
-        throw new RangeError('Invalid water light');
+        throw new RangeError(
+          'Invalid water light; use a finite direction [x, y, z, w >= 0] that is not zero and a finite radiance [r, g, b] of 0 or more',
+        );
     }
   }
   private drawSurface(c: Context): void {
@@ -983,7 +1005,9 @@ export class Water implements EnginePlugin {
       typeof hook.begin !== 'function' ||
       !Array.isArray(hook.targets)
     )
-      throw new TypeError('Invalid water capture hook');
+      throw new TypeError(
+        'Invalid water capture hook; pass an object with a targets array and the callbacks it documents',
+      );
     this.capture = hook;
     return () => {
       if (this.capture === hook) this.capture = undefined;
@@ -991,7 +1015,8 @@ export class Water implements EnginePlugin {
   }
   /** Calls `callback` once when the water is disposed; returns a remover. */
   onDispose(callback: () => void): () => void {
-    if (typeof callback !== 'function') throw new TypeError('Water onDispose needs a function');
+    if (typeof callback !== 'function')
+      throw new TypeError('Water onDispose needs a function; pass the callback to run on dispose');
     this.disposers.add(callback);
     return () => this.disposers.delete(callback);
   }

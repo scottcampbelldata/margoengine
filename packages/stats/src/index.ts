@@ -68,7 +68,9 @@ type Encoder = GPUCommandEncoder & {
   [frameProfiler]?: GPUProfiler;
 };
 
+/** Options for {@link Stats}. */
 export interface StatsOptions {
+  /** Element the readout is added to. Default document.body. */
   parent?: HTMLElement;
   /** Number of rolling frame samples, 2..4096. Default 120. */
   samples?: number;

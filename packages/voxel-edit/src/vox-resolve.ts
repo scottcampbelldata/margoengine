@@ -112,7 +112,9 @@ function graphOf(scene: VoxScene): { nodes: Map<number, VoxNode>; roots: VoxNode
         checkRotation(key.rotation);
         const t = key.translation;
         if (t && (!Array.isArray(t) || t.length !== 3 || t.some((v) => !Number.isSafeInteger(v))))
-          throw new RangeError(`.vox transform ${node.id} has a translation that is not three whole numbers`);
+          throw new RangeError(
+            `.vox transform ${node.id} has a translation that is not three whole numbers; export the model with whole-voxel translations`,
+          );
       }
     } else if (node.type === 'shape') {
       if (!Array.isArray(node.models) || !node.models.length)

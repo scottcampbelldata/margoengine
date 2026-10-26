@@ -16,7 +16,7 @@ export function noiseFill(
   if (!Number.isInteger(sx) || !Number.isInteger(sy) || !Number.isInteger(sz) || sx < 1 || sy < 1 || sz < 1)
     throw new RangeError('noiseFill size must be positive integers');
   const cells = sx * sy * sz;
-  if (cells > 16_777_216) throw new RangeError('noiseFill size exceeds 16,777,216 cells');
+  if (cells > 16_777_216) throw new RangeError('noiseFill size exceeds 16,777,216 cells; use a smaller size');
   const { threshold = 0.5, seed = 1, palette = 1 } = options;
   if (!(threshold >= 0 && threshold <= 1)) throw new RangeError('noiseFill threshold must be from 0 to 1');
   if (!Number.isInteger(seed)) throw new RangeError('noiseFill seed must be an integer');

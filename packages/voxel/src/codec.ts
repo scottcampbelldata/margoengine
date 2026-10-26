@@ -531,12 +531,12 @@ export class EntityCodec<const S extends Readonly<Record<string, EntityField>>> 
     if (typeof v !== 'number') throw new TypeError(`${subject} must be a number`);
     if (type === 'f32') {
       const f = Math.fround(v);
-      if (!Number.isFinite(f)) throw new RangeError(`${subject} ${v} is not a finite float32`);
+      if (!Number.isFinite(f)) throw new RangeError(`${subject} ${v} is not a finite float32; pass a finite number`);
       return f;
     }
     const max = type === 'u8' ? 255 : 65535;
     if (!Number.isInteger(v) || v < 0 || v > max)
-      throw new RangeError(`${subject} ${v} is not an integer in 0..${max}`);
+      throw new RangeError(`${subject} ${v} is not an integer in 0..${max}; pass a whole number in that range`);
     return v;
   }
 }

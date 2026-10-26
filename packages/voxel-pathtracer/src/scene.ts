@@ -572,7 +572,8 @@ function packTextures(list: unknown): { width: number; height: number; texels: U
     for (const k of ['width', 'height'] as const) {
       if (typeof t[k] !== 'number' || !Number.isInteger(t[k]))
         throw new TypeError(`${where} ${name}.${k} must be an integer number of texels`);
-      if (t[k] < 1 || t[k] > 1024) throw new RangeError(`${where} ${name}.${k} ${t[k]} is outside 1 to 1024`);
+      if (t[k] < 1 || t[k] > 1024)
+        throw new RangeError(`${where} ${name}.${k} ${t[k]} is outside 1 to 1024; use a size from 1 to 1024`);
     }
     if (!(t.data instanceof Uint8Array || t.data instanceof Uint8ClampedArray))
       throw new TypeError(`${where} ${name}.data must be a Uint8Array of RGBA bytes`);
@@ -596,7 +597,8 @@ export function resolveMaterial(m: TraceMaterial, name: string, textures?: numbe
   if (!isObject(m)) throw new TypeError(`${where} ${name} must be an object {id, color, type}`);
   if (typeof m.id !== 'number' || !Number.isInteger(m.id))
     throw new TypeError(`${where} ${name}.id must be an integer palette index 1 to 255`);
-  if (m.id < 1 || m.id > 255) throw new RangeError(`${where} ${name}.id ${m.id} is outside 1 to 255 (0 is empty)`);
+  if (m.id < 1 || m.id > 255)
+    throw new RangeError(`${where} ${name}.id ${m.id} is outside 1 to 255 (0 is empty); use an id from 1 to 255`);
   if (!TYPES.includes(m.type as TraceMaterialType))
     throw new TypeError(`${where} ${name}.type ${String(m.type)} is unknown; pass one of ${TYPES.join(', ')}`);
   const color = checkVec3(m.color, `${name}.color`, true, 'pass linear RGB, 0 or more'),
@@ -648,7 +650,7 @@ export function resolveMaterial(m: TraceMaterial, name: string, textures?: numbe
     for (const v of faces)
       if (v < 0 || (textures !== undefined && v >= textures))
         throw new RangeError(
-          `${where} ${name}.texture ${v} is not an index into scene.textures${textures === undefined ? '' : ` (${textures})`}`,
+          `${where} ${name}.texture ${v} is not an index into scene.textures; use an index below the texture count${textures === undefined ? '' : ` (${textures})`}`,
         );
   }
   if (abbe > 0 && abbe < 5)
@@ -1296,7 +1298,8 @@ function packTable(list: readonly TraceMaterial[], name: string, textures: numbe
     if (!isObject(m)) throw new TypeError(`${where} ${at} must be an object {id, color, type}`);
     if (typeof m.id !== 'number' || !Number.isInteger(m.id))
       throw new TypeError(`${where} ${at}.id must be an integer palette index 1 to 255`);
-    if (m.id < 1 || m.id > 255) throw new RangeError(`${where} ${at}.id ${m.id} is outside 1 to 255 (0 is empty)`);
+    if (m.id < 1 || m.id > 255)
+      throw new RangeError(`${where} ${at}.id ${m.id} is outside 1 to 255 (0 is empty); use an id from 1 to 255`);
     if (table[m.id * MATERIAL_FLOATS + 15])
       throw new TypeError(`${where} ${at}.id ${m.id} is used twice; give each palette index one material`);
     packMaterial(m, at, table, textures);

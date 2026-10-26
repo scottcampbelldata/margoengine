@@ -4,6 +4,7 @@ import type { RapierModule } from './shapes.js';
 import type { PhysicsBody } from './body.js';
 import { checkVec, quat, vec, type Quat, type Vec3 } from './math.js';
 
+/** Drives a joint axis toward a target velocity or, as a spring, a target position. */
 export interface MotorOptions {
   /** Target velocity in radians (revolute) or units (prismatic) per second. */
   targetVelocity?: number;
@@ -25,6 +26,7 @@ interface JointBase {
   /** Let the two bodies collide with each other (default false, as in Rapier). */
   contactsEnabled?: boolean;
 }
+/** Options for adding a joint between two bodies. */
 export type JointOptions =
   | (JointBase & { type: 'fixed'; frameA?: Quat; frameB?: Quat })
   | (JointBase & { type: 'spherical' })
@@ -35,6 +37,7 @@ export type JointOptions =
       motor?: MotorOptions;
     });
 
+/** Kind of joint, the `type` of {@link JointOptions}. */
 export type JointType = JointOptions['type'];
 
 /** An impulse joint between two bodies. */
