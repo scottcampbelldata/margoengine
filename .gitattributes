@@ -14,6 +14,10 @@ packages/exporters/scripts/generate-unity-support.js text eol=lf
 examples/assets/kaykit/**/*.bin filter=lfs diff=lfs merge=lfs -text
 examples/assets/kaykit/**/*.png filter=lfs diff=lfs merge=lfs -text
 
+# Package bin scripts: npm rewrites a bin's CRLF shebang line to LF on install, which left a CRLF checkout modified
+# (mixed endings) after every npm ci on Windows and stopped scripts/land-records.mjs; tests/package-bins.test.js
+packages/*/bin/** text eol=lf
+
 # Margo-made fixtures whose CRLF line endings are part of what the tests exercise
 packages/loaders/tests/fixtures/*.ply -text
 packages/loaders/tests/fixtures/*.pcd -text
