@@ -584,6 +584,35 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   --cases=helmet,helmet-filterpcf-cascades1 --runs=5`, then `node bench/parity-report.mjs <run.json> --partial`.
 - **Guard:** `tests/bench.test.js` (the scene catalog and parity rows stay consistent).
 
+### 31. STL import: a plain `parseSTL` for the like-for-like comparison
+
+- **Loss:** `p-stl` (204,800-triangle binary STL) timed `parseCAD` at 28.7 ms against three.js's `STLLoader` at 2.6
+  (entry 26). The cause left after entry 26 was different work, not a slow loop: `parseCAD` welds corners (205,440
+  vertices), computes face normals, builds parts and creates GPU meshes, which CAD sections, edges and dedup need.
+- **Change:** `parseSTL` in `@margoengine/loaders` (`997d0abf`), a plain reader like three's: binary and ASCII STL to
+  typed arrays (3 vertices per triangle, the file's facet normals or flat normals where the file stores zero,
+  VisCAM/SolidView colors if present), no weld unless `weld: true`, `AbortSignal`, coded errors. `p-stl` now times
+  `parseSTL`; the old `parseCAD` path stays as the Margo-only scene `p-stl-cad` (three.js has no CAD path), so the CAD
+  cost stays measured. `parseCAD` itself is unchanged.
+- **After** (diagnostic, busy machine, RTX A6000; run `20261026-201722`, 3 runs): ms per call.
+
+  | Scene | Before | After | three.js |
+  | --- | --- | --- | --- |
+  | `p-stl` (`parseSTL`, plain) | 28.7 (`parseCAD`) | 4.9 | 2.8, still 1.7x slower |
+  | `p-stl-cad` (`parseCAD`) | 28.7 | 29.4 | no equivalent |
+
+- **What is left in `p-stl`:** `parseSTL` computes the flat normal of every facet whose stored normal is zero (this
+  file's writer leaves them zero, as most do), about 1.3 ms in Node (the profile shows `flatNormal` as the largest
+  share), where three copies the zeros; it also writes an identity index array and zero-fills a third array. It is
+  not a loop to fix: returning usable normals is the behavior a user wants. See
+  [known-bugs.md](../known-bugs.md#stl-import-still-computes-normals-threes-stlloader-leaves-zero).
+- **Trade-off:** +1.9 KB gzip on the loaders root entry (a separate module; apps that do not import it pay nothing).
+- **Rerun:** `node bench/cli.mjs parity --cases=p-stl,p-stl-cad --engines=margo,three-webgpu-parity,three-webgl-parity
+  --runs=3 --warmup=1 --no-compare --no-fail`, then `node bench/parity-report.mjs <run.json> --partial`.
+- **Guard:** `packages/loaders/tests/stl.test.js` (binary and ASCII give the same geometry, stored and computed
+  normals, colors, weld, truncated and malformed input, limits, abort); the loaders `npm test` script now passes
+  `--experimental-test-module-mocks` like `verify`, which `mtl-vectors.test.js` needs.
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks
@@ -781,11 +810,12 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   - Still open: `createInstancedMesh` vertex fetch at 10k-50k, the 1k GPU cost of a package pass, and CPU for moving
     instances. Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
   - [claims.md](claims.md) records that there is no publishable result yet.
-- **STL import and USDZ export against three.js: partly closed (entry 26).** `p-stl` 28.7 ms against 2.6 and
-  `p-export-usdz` 16.0 ms against 2.5 (run `20261026-165034`, diagnostic). What is left is different work: `parseCAD`
-  welds corners, computes normals and creates GPU meshes where three copies floats; `exportUSDZ` writes every mesh in
-  world space (2.46 MB) where three's archive is 444 KB. Causes and plans:
-  [known-bugs.md](../known-bugs.md#stl-import-does-more-work-than-threes-stloader) and
+- **STL import and USDZ export against three.js: partly closed (entries 26 and 31).** `p-stl` (the plain `parseSTL`)
+  4.9 ms against 2.8: it computes the flat normals the file leaves zero, where three copies the zeros. The CAD path
+  `p-stl-cad` (`parseCAD`, which welds, builds parts and creates GPU meshes) is 29.4 ms with no three.js equivalent.
+  `p-export-usdz` 16.0 ms against 2.5 (run `20261026-165034`, diagnostic): `exportUSDZ` writes every mesh in world
+  space (2.46 MB) where three's archive is 444 KB. Causes and plans:
+  [known-bugs.md](../known-bugs.md#stl-import-still-computes-normals-threes-stlloader-leaves-zero) and
   [the USDZ entry](../known-bugs.md#usdz-export-writes-every-mesh-in-world-space).
 - **Galaxy S23 Ultra island demo.** A report of 3–5 FPS on that phone, with particles off making no difference.
   - Partial fixes: `909e384a`, and `1c627cdc` (scatter compiles the fade `discard` only when instances can fade).
