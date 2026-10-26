@@ -7,9 +7,9 @@ export async function readBytes(stream, { maxBytes, signal, label = 'Asset', out
     maxBytes < 0 ||
     (output !== null && (!(output instanceof Uint8Array) || output.length !== maxBytes))
   )
-    throw new RangeError('Invalid asset byte budget');
+    throw new RangeError('Invalid asset byte budget; pass maxBytes as an integer');
   signal?.throwIfAborted();
-  if (!stream) throw new TypeError(`Empty ${label} response`);
+  if (!stream) throw new TypeError(`Empty ${label} response; check the URL`);
   const reader = stream.getReader(),
     chunks = [];
   let size = 0,
@@ -28,7 +28,7 @@ export async function readBytes(stream, { maxBytes, signal, label = 'Asset', out
       signal?.throwIfAborted();
       if (done) break;
       if (!(value instanceof Uint8Array)) throw new TypeError(`${label} stream requires byte chunks`);
-      if (value.byteLength > maxBytes - size) throw new RangeError(`${label} byte budget exceeded`);
+      if (value.byteLength > maxBytes - size) throw new RangeError(`${label} byte budget exceeded; raise maxBytes`);
       if (output) output.set(value, size);
       else chunks.push(new Uint8Array(value));
       size += value.byteLength;
@@ -61,7 +61,7 @@ export async function readResponse(response, options) {
       );
     const declared = Number(response.headers.get('content-length'));
     if (Number.isFinite(declared) && declared > options.maxBytes)
-      throw new RangeError(`${options.label ?? 'Asset'} byte budget exceeded`);
+      throw new RangeError(`${options.label ?? 'Asset'} byte budget exceeded; raise maxBytes`);
   } catch (error) {
     try {
       Promise.resolve(response.body?.cancel(error)).catch(() => {});

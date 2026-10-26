@@ -28,7 +28,7 @@ function signedArea(ring) {
 function chargeContourWork(counter, amount = 1) {
   if (counter) {
     counter.used += amount;
-    if (counter.used > counter.limit) throw new RangeError('Text total work budget exceeded');
+    if (counter.used > counter.limit) throw new RangeError('Text total work budget exceeded; use less text');
   }
 }
 function containsPoint(ring, p, workCounter) {
@@ -57,7 +57,8 @@ function intersects(a, b, c, d) {
   );
 }
 function polygonRings(contour, holes = [], { allowTouch = false, workCounter } = {}) {
-  if (!Array.isArray(holes) || holes.length > 4096) throw new TypeError('Invalid polygon holes');
+  if (!Array.isArray(holes) || holes.length > 4096)
+    throw new TypeError('Invalid polygon holes; pass at most 4096 holes');
   let count = 0;
   const rings = [contour, ...holes].map((ring) => {
     if (!Array.isArray(ring) || ring.length < 3 || (count += ring.length) > 4096)
@@ -72,7 +73,7 @@ function polygonRings(contour, holes = [], { allowTouch = false, workCounter } =
       const q = p[(i + 1) % p.length];
       if (p[i][0] === q[0] && p[i][1] === q[1]) p.splice(i, 1);
     }
-    if (p.length < 3) throw new RangeError('Degenerate polygon contour');
+    if (p.length < 3) throw new RangeError('Degenerate polygon contour; use 3 or more points');
     return p;
   });
   const edges = rings.flatMap((ring, ri) =>
@@ -80,7 +81,7 @@ function polygonRings(contour, holes = [], { allowTouch = false, workCounter } =
   );
   for (const ring of rings) {
     const { area, error } = measure(ring);
-    if (Math.abs(area) <= error) throw new RangeError('Polygon contour has zero area');
+    if (Math.abs(area) <= error) throw new RangeError('Polygon contour has zero area; move the points apart');
   }
   for (let i = 0; i < edges.length; i++)
     for (let j = i + 1; j < edges.length; j++) {
@@ -95,7 +96,7 @@ function polygonRings(contour, holes = [], { allowTouch = false, workCounter } =
             (common[0][1] - common[1][1]) * (common[2][1] - common[1][1]) >
             0
         )
-          throw new RangeError('Polygon doubles back along an edge');
+          throw new RangeError('Polygon doubles back along an edge; remove repeated points');
         continue;
       }
       if (intersects(a.a, a.b, b.a, b.b)) {
@@ -106,7 +107,8 @@ function polygonRings(contour, holes = [], { allowTouch = false, workCounter } =
           collinear &&
           Math.min(Math.max(a.a[axis], a.b[axis]), Math.max(b.a[axis], b.b[axis])) >
             Math.max(Math.min(a.a[axis], a.b[axis]), Math.min(b.a[axis], b.b[axis]));
-        if (!allowTouch || !endpoint || overlap) throw new RangeError('Polygon contours cross or touch');
+        if (!allowTouch || !endpoint || overlap)
+          throw new RangeError('Polygon contours cross or touch; move them apart');
       }
     }
   for (let i = 1; i < rings.length; i++) {
@@ -115,10 +117,10 @@ function polygonRings(contour, holes = [], { allowTouch = false, workCounter } =
         ? rings[i].some((p) => containsPoint(rings[0], p, workCounter))
         : containsPoint(rings[0], rings[i][0], workCounter))
     )
-      throw new RangeError('Polygon hole lies outside the contour');
+      throw new RangeError('Polygon hole lies outside the contour; move it inside');
     for (let j = 1; j < i; j++)
       if (containsPoint(rings[j], rings[i][0], workCounter) || containsPoint(rings[i], rings[j][0], workCounter))
-        throw new RangeError('Polygon holes overlap or nest');
+        throw new RangeError('Polygon holes overlap or nest; move the holes apart');
   }
   return rings.map((ring, i) => (signedArea(ring) > 0 === (i === 0) ? ring : ring.reverse()));
 }
@@ -129,7 +131,7 @@ export function triangulatePolygon(
   { maxVertices = 1000000, allowTouch = false, workCounter } = {},
 ) {
   if (!Number.isSafeInteger(maxVertices) || maxVertices < 3)
-    throw new RangeError('Invalid triangulation vertex budget');
+    throw new RangeError('Invalid triangulation vertex budget; pass a positive integer');
   const rings = polygonRings(contour, holes, { allowTouch, workCounter }),
     edges = rings.flatMap((r) => r.map((a, i) => [a, r[(i + 1) % r.length]]));
   chargeContourWork(workCounter, edges.length * (3 + Math.ceil(Math.log2(Math.max(1, edges.length)))));
@@ -139,7 +141,8 @@ export function triangulatePolygon(
   function triangle(a, b, c) {
     chargeContourWork(workCounter, 3);
     if (orientation(a, b, c) <= 0) return;
-    if (positions.length / 2 + 3 > maxVertices) throw new RangeError('Triangulation vertex budget exceeded');
+    if (positions.length / 2 + 3 > maxVertices)
+      throw new RangeError('Triangulation vertex budget exceeded; simplify the polygon');
     const base = positions.length / 2;
     positions.push(...a, ...b, ...c);
     indices.push(base, base + 1, base + 2);
@@ -157,7 +160,7 @@ export function triangulatePolygon(
         y: (x) => (x === a[0] ? a[1] : x === b[0] ? b[1] : a[1] + ((x - a[0]) * (b[1] - a[1])) / (b[0] - a[0])),
       }))
       .sort((a, b) => a.y(left) / 2 + a.y(right) / 2 - (b.y(left) / 2 + b.y(right) / 2));
-    if (crossing.length % 2) throw new RangeError('Polygon precision prevents triangulation');
+    if (crossing.length % 2) throw new RangeError('Polygon precision prevents triangulation; simplify the polygon');
     for (let j = 0; j < crossing.length; j += 2) {
       const bottom = crossing[j],
         top = crossing[j + 1],
@@ -189,6 +192,6 @@ export function triangulatePolygon(
     Math.abs(actual - expected) >
       Math.max(rings.reduce((sum, ring) => sum + measure(ring).error, 0) * edges.length * 8, Math.abs(expected) * 1e-10)
   )
-    throw new RangeError('Triangulation does not preserve polygon area');
+    throw new RangeError('Triangulation does not preserve polygon area; simplify the polygon');
   return { positions, indices, rings, area: expected };
 }

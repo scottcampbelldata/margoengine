@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3397224,
+  "total": 3398235,
   "history": [
     {
       "date": "2026-10-24",
@@ -470,6 +470,12 @@
       "commit": "cfeafb1b",
       "reason": "package depth (item 29.5) splats reads SPZ version 4 through a built-in clean-room Zstandard decoder (RFC 8878 with xxHash64 checksums) loaded by import() only when a version 4 file is read",
       "grew": 2
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "7425cfd6",
+      "reason": "Error messages now name their fix (item 19): +48 B gzip gltf-pro/prepare, +74 B machinery/cad from the shared validation messages",
+      "grew": 2
     }
   ],
   "items": {
@@ -585,7 +591,7 @@
     "@margoengine/gltf-pro/coordinates": 755,
     "@margoengine/gltf-pro/extended": 6502,
     "@margoengine/gltf-pro/instancing": 3380,
-    "@margoengine/gltf-pro/prepare": 16587,
+    "@margoengine/gltf-pro/prepare": 17135,
     "@margoengine/gltf-pro/progressive": 61641,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/worker": 55295,
@@ -618,7 +624,7 @@
     "@margoengine/machinery": 44630,
     "@margoengine/machinery dist/workers/cad-runtime.js": 8347,
     "@margoengine/machinery/assembly": 977,
-    "@margoengine/machinery/cad": 12871,
+    "@margoengine/machinery/cad": 13334,
     "@margoengine/machinery/cad-async": 1775,
     "@margoengine/machinery/clearance": 1571,
     "@margoengine/machinery/dimensions": 4631,

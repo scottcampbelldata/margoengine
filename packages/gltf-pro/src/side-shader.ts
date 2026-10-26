@@ -1,3 +1,4 @@
+import { margoError } from '../../shared/errors.js';
 // Keep front/double shader sources unchanged; only back-only draws need a reversed surface guard.
 const cache = new Map<string, string>();
 export function backSideShader(code: string): string {
@@ -15,11 +16,19 @@ export function backSideShader(code: string): string {
       return `if(${test ?? ''}facing)`;
     },
   );
-  if (matches !== 1) throw new Error('Back-side material requires one PBR surface face guard');
+  if (matches !== 1)
+    throw margoError(
+      'failed',
+      'Back-side material requires one PBR surface face guard; use the default PBR shader or side: "front"',
+    );
   // Factor-only transmission tint never calls surface(). Mirrored instances disable raster culling,
   // so this frame-only entry needs its own guard without pulling texture bindings into its layout.
   const facing = scoped.match(/let facing=(front==[^;]+);/)?.[1];
-  if (!facing) throw new Error('Back-side material requires the PBR logical facing expression');
+  if (!facing)
+    throw margoError(
+      'failed',
+      'Back-side material requires the PBR logical facing expression; use the default PBR shader or side: "front"',
+    );
   result = result.replace(
     '@fragment fn margoTint(i:Out)->@location(0) vec4f {return vec4f(f.coordsB.zw,f.ext.z,1);}',
     `@fragment fn margoTint(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {if(${facing}){discard;}return vec4f(f.coordsB.zw,f.ext.z,1);}`,

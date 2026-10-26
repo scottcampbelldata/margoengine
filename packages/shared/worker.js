@@ -83,7 +83,7 @@ export function runWorker(url, message, signal, revive) {
 export function serve(job) {
   self.onmessage = async ({ data }) => {
     try {
-      if (!data || typeof data !== 'object') throw new TypeError('Invalid parser worker job');
+      if (!data || typeof data !== 'object') throw new TypeError('Invalid parser worker job; post an object');
       const result = await job(data);
       self.postMessage({ result }, [...transferables(result)]);
     } catch (error) {

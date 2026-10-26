@@ -63,7 +63,7 @@ test('OBJ faces with five or more corners still spend the 10,000,000 contour wor
   try {
     assert.throws(() => parseCAD(engine, [...ring, ...Array.from({ length: 200 }, () => face)].join('\n'), 'obj'), {
       name: 'RangeError',
-      message: 'Text total work budget exceeded',
+      message: /^Text total work budget exceeded; use less text/,
     });
     // A pentagon still goes through contour triangulation and covers its whole area (shoelace area 5).
     const { vertices, indices } = parseCAD(engine, 'v 0 0 0\nv 2 0 0\nv 3 1 0\nv 1 2 0\nv -1 1 0\nf 1 2 3 4 5\n', 'obj')

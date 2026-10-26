@@ -512,7 +512,7 @@ export class LightProbes extends ShaderEffect {
         blend < 0
       )
         throw new RangeError(
-          'Invalid irradiance volume: min < max, 1-64 probes per axis (4,096 in total), sh 1 or 2, blend >= 0',
+          'Invalid irradiance volume; pass min < max, 1-64 probes per axis (4,096 in total), sh 1 or 2, blend >= 0',
         );
       powerOfTwo(volume.resolution, 16, 8, 64, 'volume resolution');
       this.volume = {
@@ -540,7 +540,7 @@ export class LightProbes extends ShaderEffect {
         probe.position.some((v, i) => v < probe.min[i] || v > probe.max[i]) ||
         (probe.blend !== undefined && (!finite(probe.blend) || probe.blend < 0))
       )
-        throw new RangeError('Invalid reflection probe: min < max, position inside the box, blend >= 0');
+        throw new RangeError('Invalid reflection probe; pass min < max, position inside the box, blend >= 0');
       if (probe.dynamic !== undefined && typeof probe.dynamic !== 'boolean')
         throw new TypeError('Reflection probe dynamic must be a boolean; pass true, false or omit it');
       const blend = probe.blend ?? 0.1 * Math.min(...probe.max.map((v, i) => v - probe.min[i])),
@@ -826,7 +826,11 @@ export class LightProbes extends ShaderEffect {
           throw error;
         }
         const error = await device.popErrorScope();
-        if (error) throw new MargoError('failed', `Light probe bake failed: ${error.message}`);
+        if (error)
+          throw new MargoError(
+            'failed',
+            `Light probe bake failed: ${error.message}; check the probe size and GPU memory, then bake again`,
+          );
         if (this.pending) throw new MargoError('failed', 'Light probe capture did not run (the engine did not render)');
         if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
         this.writeHeader(true);

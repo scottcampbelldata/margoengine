@@ -58,7 +58,7 @@ export function acquireDepth(engine) {
   if (!engine.gpu)
     throw margoError('unsupported', 'Scene depth requires WebGPU; it does not run on the WebGL2 fallback');
   if (engine.hasPlugin('ssao') || engine.hasPlugin('dof'))
-    throw margoError('state', 'Supply the depth texture of the effect that owns scene capture');
+    throw margoError('state', 'Another effect owns scene capture; use its depth texture');
   let value = engine[key];
   if (!value) {
     value = {
@@ -76,7 +76,7 @@ export function acquireDepth(engine) {
           execute: (c) => {
             if (c.backend !== 'webgpu') return;
             if (engine.hasPlugin('ssao') || engine.hasPlugin('dof'))
-              throw margoError('state', 'Supply the depth texture of the effect that owns scene capture');
+              throw margoError('state', 'Another effect owns scene capture; use its depth texture');
             const existing = sceneTarget(c);
             this.borrowed = !!existing;
             if (existing) {

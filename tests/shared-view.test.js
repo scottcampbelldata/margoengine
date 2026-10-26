@@ -17,7 +17,7 @@ function reference(out, camera) {
     xy = up[2] * x - up[0] * z,
     xz = up[0] * y - up[1] * x;
   const side = Math.hypot(xx, xy, xz);
-  if (!length || !side) throw new RangeError('Invalid camera view');
+  if (!length || !side) throw new RangeError('Invalid camera view; pass distinct eye and target and another up vector');
   xx /= side;
   xy /= side;
   xz /= side;

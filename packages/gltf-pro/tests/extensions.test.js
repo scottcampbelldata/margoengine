@@ -169,10 +169,12 @@ test('only required extensions that are still unsupported are rejected, each lis
   );
   // KHR_animation_pointer is supported (played by @margoengine/animation); unknown extensions still throw.
   assert.throws(() => new GLTFAsset(doc, buffers), {
-    message: 'Required glTF extensions are unsupported: EXT_unknown_test',
+    code: 'unsupported',
+    message: /^Required glTF extensions are unsupported: EXT_unknown_test; pass the listed decoders or re-export/,
   });
   assert.throws(() => new GLTFAsset(doc, buffers, undefined, { draco: {}, meshopt: {}, ktx2: {} }), {
-    message: 'Required glTF extensions are unsupported: EXT_unknown_test',
+    code: 'unsupported',
+    message: /^Required glTF extensions are unsupported: EXT_unknown_test; pass the listed decoders or re-export/,
   });
 });
 
@@ -318,7 +320,10 @@ test('KHR_draco_mesh_compression decodes the Khronos Box and Avocado through the
       const doc = JSON.parse(await fixture(`${name}.gltf`)),
         bin = await fixture(`${name}.bin`),
         p = doc.meshes[0].primitives[0];
-      assert.throws(() => new PBRModel(engine, new GLTFAsset(doc, [bin])), /requires parseGLTFAsync or loadGLTF/);
+      assert.throws(() => new PBRModel(engine, new GLTFAsset(doc, [bin])), {
+        code: 'state',
+        message: /requires parseGLTFAsync or loadGLTF/,
+      });
       const asset = new GLTFAsset(doc, [bin], undefined, { draco: hook });
       await asset.decode();
       assert.deepEqual(requests.at(-1).attributeIds, p.extensions.KHR_draco_mesh_compression.attributes);

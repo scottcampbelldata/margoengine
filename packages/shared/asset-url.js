@@ -6,12 +6,13 @@
 
 /** Resolve a model-file URI against base (the model's URL), or throw a TypeError naming the refused URL. */
 export function assetURL(uri, base, allowedURLs = [], label = 'Asset') {
-  if (typeof uri !== 'string' || !uri || uri.length > 8192) throw new TypeError(`Invalid ${label} URI`);
+  if (typeof uri !== 'string' || !uri || uri.length > 8192)
+    throw new TypeError(`Invalid ${label} URI; pass a shorter string`);
   let url;
   try {
     url = new URL(uri, base);
   } catch {
-    throw new TypeError(`Invalid ${label} URI`);
+    throw new TypeError(`Invalid ${label} URI; pass a valid URL`);
   }
   if (url.protocol === 'http:' || url.protocol === 'https:') {
     for (const prefix of allowedURLs) if (url.href.startsWith(new URL(prefix).href)) return url;

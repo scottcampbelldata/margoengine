@@ -8,7 +8,7 @@ export function rectFrame(direction, up, label) {
     r = [hint[1] * n[2] - hint[2] * n[1], hint[2] * n[0] - hint[0] * n[2], hint[0] * n[1] - hint[1] * n[0]],
     rl = Math.hypot(r[0], r[1], r[2]);
   if (!(rl > 1e-6 * Math.hypot(hint[0], hint[1], hint[2])))
-    throw new RangeError(`${label} up is parallel to its direction`);
+    throw new RangeError(`${label} up is parallel to its direction; pass another up vector`);
   const right = [r[0] / rl, r[1] / rl, r[2] / rl];
   return {
     normal: n,

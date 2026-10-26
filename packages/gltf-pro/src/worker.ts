@@ -1,3 +1,4 @@
+import { margoError } from '../../shared/errors.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
@@ -24,7 +25,11 @@ export function modelFromPrepared(
   let model: PBRModel | undefined;
   try {
     signal?.throwIfAborted();
-    if (prepared.deferred) throw new Error('Compressed PreparedGLTF requires the asynchronous worker loader');
+    if (prepared.deferred)
+      throw margoError(
+        'state',
+        'Compressed PreparedGLTF requires the asynchronous worker loader; call loadGLTF or parseGLTFAsync',
+      );
     const asset = new GLTFAsset(
       prepared.doc,
       prepared.buffers,

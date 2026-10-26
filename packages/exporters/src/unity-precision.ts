@@ -297,7 +297,7 @@ export async function createUnityPrecisionBundle(input: UnityPrecisionBundleInpu
 }
 
 function fail(label: string): never {
-  throw new RangeError('UNITY_PRECISION_PACKAGE_INVALID: ' + label);
+  throw new RangeError('UNITY_PRECISION_PACKAGE_INVALID: ' + label + '; export the package again');
 }
 const same = (a: unknown, b: unknown, label: string) => {
   if (canonicalJSON(a) !== canonicalJSON(b)) fail(label);

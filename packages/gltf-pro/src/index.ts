@@ -1683,7 +1683,10 @@ function fit(asset: GLTFAsset, p: GLTFPrimitive, m: PBRMaterial, pointsOrLines: 
     if (map) {
       const set = integer(map.texCoord ?? 0, 'texture coordinate');
       if (set > 1 || a[set === 0 ? 'TEXCOORD_0' : 'TEXCOORD_1'] === undefined)
-        throw new Error('Material requires available TEXCOORD_0 or TEXCOORD_1');
+        throw margoError(
+          'failed',
+          'Material requires available TEXCOORD_0 or TEXCOORD_1; add the attribute or remove the texture',
+        );
       entry(asset.doc.textures, map.index, 'texture');
     }
   return pointsOrLines && a.NORMAL === undefined
@@ -1894,7 +1897,8 @@ export class PBRModel implements EnginePlugin {
         reader = asset.hooks.instancing;
       // Like a missing draco/ktx2 decoder: a required extension without its reader fails, a used-only one falls back (each mesh once).
       if (!reader && doc.extensionsRequired?.includes('EXT_mesh_gpu_instancing'))
-        throw new Error(
+        throw margoError(
+          'unsupported',
           'Required glTF extensions are unsupported: EXT_mesh_gpu_instancing (pass decoders.instancing from @margoengine/gltf-pro/instancing)',
         );
       for (const i of active)

@@ -352,7 +352,8 @@ export class GLTFAsset {
         'Required glTF extensions are unsupported: ' +
           missing
             .map((name: string) => (hookFor[name] ? name + ' (pass a ' + hookFor[name] + ' decoder)' : name))
-            .join(', '),
+            .join(', ') +
+          '; pass the listed decoders or re-export the model without them',
       );
     checkCount('Too many glTF nodes', doc.nodes?.length ?? 0, maxNodes, 'maxNodes');
     let total = 0;
@@ -586,7 +587,7 @@ export class GLTFAsset {
           ),
         )
       )
-        throw new Error('Draco geometry requires parseGLTFAsync or loadGLTF');
+        throw margoError('state', 'Draco geometry requires parseGLTFAsync or loadGLTF');
       throw new TypeError(
         'Accessor has no data or invalid offset; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
       );
@@ -788,7 +789,7 @@ export async function decodeKTX2Images(
           : typeof def.uri === 'string' && def.uri.startsWith('data:')
             ? embedded(def.uri, asset.maxBytes)
             : undefined;
-      if (!data) throw new Error('External KTX2 images require loadGLTF');
+      if (!data) throw margoError('state', 'External KTX2 images require loadGLTF');
       decoded[source] = await decoder.decode(data);
     }
     return decoded;

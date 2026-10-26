@@ -46,7 +46,10 @@ export const index = (value: unknown, length: number, label: string): number => 
 export const unsupportedFor =
   (target: string) =>
   (message: string): never => {
-    throw new MargoError('unsupported', `${target} import profile ${message}`);
+    throw new MargoError(
+      'unsupported',
+      `${target} import profile ${message}; change the scene or choose another target`,
+    );
   };
 /**
  * @internal A bundle folder: `/`-separated ASCII letters, digits, `_` and `-`, starting with `root` when given, with no

@@ -421,7 +421,11 @@ test('without @margoengine/gltf-pro/extended the three extensions are ignored, a
       plain: true,
       doc: { extensionsRequired: ['KHR_materials_iridescence', 'KHR_materials_variants'] },
     }),
-    { message: 'Required glTF extensions are unsupported: KHR_materials_iridescence (pass a materials decoder)' },
+    {
+      code: 'unsupported',
+      message:
+        /^Required glTF extensions are unsupported: KHR_materials_iridescence \(pass a materials decoder\); pass the listed decoders/,
+    },
   );
   engine.dispose();
 });

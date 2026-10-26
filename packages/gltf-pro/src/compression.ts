@@ -1,3 +1,4 @@
+import { margoError } from '../../shared/errors.js';
 import type { GLTFPrimitive } from '../../shared/gltf.js';
 import type { DracoDecoder, KTX2Decoder } from '@margoengine/decoders';
 import { type GLTFAsset, entry, integer, assetLimit } from './asset.js';
@@ -27,7 +28,7 @@ const scales: Record<number, number> = { 5120: 127, 5121: 255, 5122: 32767, 5123
 export function compressedIndices(asset: GLTFAsset, primitive: GLTFPrimitive): Float32Array | undefined {
   if (!primitive.extensions?.KHR_draco_mesh_compression) return;
   const indices = decoded.get(asset)?.get(primitive);
-  if (!indices) throw new Error('Draco geometry requires parseGLTFAsync or loadGLTF');
+  if (!indices) throw margoError('state', 'Draco geometry requires parseGLTFAsync or loadGLTF');
   return indices;
 }
 
@@ -41,7 +42,11 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
       for (const p of mesh.primitives ?? []) {
         const ext = p.extensions?.KHR_draco_mesh_compression;
         if (!ext || ready.has(p)) continue;
-        if ((p.mode ?? 4) !== 4) throw new Error('PBR requires triangle primitives');
+        if ((p.mode ?? 4) !== 4)
+          throw margoError(
+            'unsupported',
+            'PBR requires triangle primitives; re-export the mesh with mode 4 (TRIANGLES)',
+          );
         if (!ext.attributes || typeof ext.attributes !== 'object' || Array.isArray(ext.attributes))
           throw new TypeError(
             'Invalid glTF Draco attributes; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
@@ -145,7 +150,11 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
             values.length !== count * widths[def.type] ||
             (!field && (extra?.itemSize !== widths[def.type] || extra.componentType !== def.componentType))
           )
-            throw new RangeError('Mismatched glTF Draco attribute ' + semantic);
+            throw new RangeError(
+              'Mismatched glTF Draco attribute ' +
+                semantic +
+                '; the accessor must match the Draco stream, re-export the model',
+            );
           // The decoder already normalizes COLOR_0; integer UVs and extra channels retain their encoded values.
           const normalized = Float32Array.from(values);
           if (def.normalized && semantic !== 'COLOR_0') {

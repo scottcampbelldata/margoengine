@@ -442,7 +442,7 @@ test('maxDownloadBytes bounds loadGLTF and progressive loads (main thread and wo
     const { engine } = await gpuEngine();
     await assert.rejects(loadGLTF(engine, base + '/helmet.glb', { maxDownloadBytes: helmet.length - 1 }), {
       name: 'RangeError',
-      message: 'glTF download byte budget exceeded' + suffix,
+      message: 'glTF download byte budget exceeded; raise maxBytes' + suffix,
     });
     (await loadGLTF(engine, base + '/helmet.glb', { maxDownloadBytes: helmet.length })).dispose();
     await assert.rejects(loadGLTFProgressive(engine, base + '/helmet.glb', { maxDownloadBytes: 0 }).ready, {

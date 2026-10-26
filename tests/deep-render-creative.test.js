@@ -197,7 +197,7 @@ test('Creative option bounds, unknown finite fields and Toon shader variants sta
       RangeError,
       'Invalid post or atmosphere options; keep each value inside its documented range',
     ],
-    [{ atmosphere: { sky: false } }, TypeError, 'PostProcessing draws no sky: attach Sky from @margoengine/sky'],
+    [{ atmosphere: { sky: false } }, TypeError, 'PostProcessing draws no sky; attach Sky from @margoengine/sky'],
     [
       { lift: [0, -5, 0] },
       RangeError,

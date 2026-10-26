@@ -1,7 +1,7 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 53,
+  "total": 0,
   "history": [
     {
       "date": "2026-10-24",
@@ -16,30 +16,5 @@
       "grew": 4
     }
   ],
-  "items": {
-    "bare-error packages/gltf-pro/src/asset.ts": 2,
-    "bare-error packages/gltf-pro/src/compression.ts": 2,
-    "bare-error packages/gltf-pro/src/index.ts": 2,
-    "bare-error packages/gltf-pro/src/side-shader.ts": 2,
-    "bare-error packages/gltf-pro/src/worker.ts": 1,
-    "no-fix packages/creative/src/post.ts": 1,
-    "no-fix packages/environment/src/environment.ts": 1,
-    "no-fix packages/environment/src/probes.ts": 3,
-    "no-fix packages/exporters/src/godot-precision.ts": 1,
-    "no-fix packages/exporters/src/import-data.ts": 1,
-    "no-fix packages/exporters/src/roblox-runtime.ts": 3,
-    "no-fix packages/exporters/src/unity-precision.ts": 1,
-    "no-fix packages/exporters/src/unreal-precision.ts": 1,
-    "no-fix packages/fbx/src/reader.ts": 1,
-    "no-fix packages/gltf-pro/src/asset.ts": 1,
-    "no-fix packages/gltf-pro/src/compression.ts": 1,
-    "no-fix packages/shared/asset-url.js": 2,
-    "no-fix packages/shared/gpu.js": 2,
-    "no-fix packages/shared/loading.js": 4,
-    "no-fix packages/shared/polygon.js": 12,
-    "no-fix packages/shared/prepared-geometry.js": 6,
-    "no-fix packages/shared/rect-frame.js": 1,
-    "no-fix packages/shared/view.js": 1,
-    "no-fix packages/shared/worker.js": 1
-  }
+  "items": {}
 }

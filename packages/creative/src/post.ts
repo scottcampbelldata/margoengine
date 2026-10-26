@@ -155,7 +155,7 @@ export class PostProcessing implements EnginePlugin {
         'PostProcessing has no bloom: put Bloom from @margoengine/post/bloom before it in a PostStack',
       );
     if ('sky' in a || 'scattering' in a || 'anisotropy' in a)
-      throw new TypeError('PostProcessing draws no sky: attach Sky from @margoengine/sky');
+      throw new TypeError('PostProcessing draws no sky; attach Sky from @margoengine/sky');
     for (const key in o)
       if (Object.hasOwn(o, key)) {
         const value = o[key as keyof PostOptions];

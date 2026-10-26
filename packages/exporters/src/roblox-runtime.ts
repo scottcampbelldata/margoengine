@@ -681,7 +681,9 @@ export async function createRobloxRuntimeBundle(input: RobloxRuntimeBundleInput)
       }
       for (let channel = 0; channel < 4; channel++) tuple.push(Math.fround(p.colors[i * 4 + channel]!));
       if (!tuple.every(Number.isFinite))
-        throw new RangeError('ROBLOX_RUNTIME_FLOAT32: Associated source attributes exceed finite Float32 capacity.');
+        throw new RangeError(
+          'ROBLOX_RUNTIME_FLOAT32: Associated source attributes exceed finite Float32 capacity; scale the values down.',
+        );
       tuple.forEach((value, at) => view.setFloat32(i * 48 + at * 4, value, true));
     }
     p.indices.forEach((index, at) => view.setUint32(count * 48 + at * 4, index, true));
@@ -700,7 +702,10 @@ export async function createRobloxRuntimeBundle(input: RobloxRuntimeBundleInput)
       doubleSided: material?.doubleSided ?? false,
     });
   }
-  if (!chunks.length) throw new RangeError('ROBLOX_RUNTIME_EMPTY_GEOMETRY: Capture a scope containing triangles.');
+  if (!chunks.length)
+    throw new RangeError(
+      'ROBLOX_RUNTIME_EMPTY_GEOMETRY: The scope has no triangles; capture a scope containing triangles.',
+    );
   const pngs = await input.images(),
     images: RobloxRuntimeImage[] = [];
   for (const [index, imageId] of [...pngs.keys()].sort().entries()) {
@@ -778,7 +783,7 @@ type XmlNode = {
   end: number;
 };
 function fail(message: string): never {
-  throw new RangeError(`ROBLOX_RUNTIME_VERIFY: ${message}.`);
+  throw new RangeError(`ROBLOX_RUNTIME_VERIFY: ${message}; capture and export the runtime again.`);
 }
 function utf8(bytes: Uint8Array): string {
   try {

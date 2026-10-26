@@ -390,7 +390,7 @@ export async function createGodotPrecisionBundle(input: GodotPrecisionBundleInpu
 }
 
 function fail(label: string): never {
-  throw new RangeError('GODOT_PRECISION_PACKAGE_INVALID: ' + label);
+  throw new RangeError('GODOT_PRECISION_PACKAGE_INVALID: ' + label + '; export the package again');
 }
 const same = (a: unknown, b: unknown, label: string) => {
   if (!canonicalEqual(a, b)) fail(label);

@@ -246,7 +246,11 @@ async function guarded(device: GPUDevice, encode: () => void): Promise<void> {
     memory = device.popErrorScope();
   const failure = (await validation.catch(() => null)) ?? (await memory.catch(() => null));
   if (thrown) throw thrown;
-  if (failure) throw new MargoError('failed', `Environment processing failed: ${failure.message}`);
+  if (failure)
+    throw new MargoError(
+      'failed',
+      `Environment processing failed: ${failure.message}; check the source texture size and format, or use a smaller size`,
+    );
 }
 
 // `reuse`: process into these resources (same settings) instead of new ones; the BRDF LUT is kept.

@@ -8,7 +8,7 @@ export interface FBXNode {
 const MAGIC = 'Kaydara FBX Binary  \0',
   maxDecoded = 256 * 1024 * 1024;
 function fail(message: string): never {
-  throw new RangeError('FBX: ' + message);
+  throw new RangeError('FBX: ' + message + '; re-export the file from your 3D tool');
 }
 /** Binary strings store `Name\0\x01Class`; ASCII stores `Class::Name`. Both become `Class::Name`. */
 const text = (s: string) => {

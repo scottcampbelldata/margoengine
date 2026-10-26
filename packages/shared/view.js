@@ -43,7 +43,7 @@ export function viewMatrix(out, camera) {
       third = (sideZ / sideMax) * (sideZ / sideMax) - correction;
     side = Math.sqrt(first + second + third) * sideMax;
   }
-  if (!length || !side) throw new RangeError('Invalid camera view');
+  if (!length || !side) throw new RangeError('Invalid camera view; pass distinct eye and target and another up vector');
   xx /= side;
   xy /= side;
   xz /= side;
