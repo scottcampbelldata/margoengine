@@ -25,7 +25,7 @@ test('an OBJ past 1,000,000 vertices names the vertex cap; a malformed vertex is
       name: 'RangeError',
       message: `OBJ vertex limit (over 1000000); ${glb}`,
     });
-    assert.throws(() => parseCAD(engine, 'v 0 0\n', 'obj'), { name: 'RangeError', message: 'Invalid OBJ vertex' });
+    assert.throws(() => parseCAD(engine, 'v 0 0\n', 'obj'), { name: 'RangeError', message: /^Invalid OBJ vertex/ });
   } finally {
     engine.dispose();
   }
@@ -56,7 +56,7 @@ test('a STEP over 64 MiB names the size cap and margo-convert; an empty buffer i
     });
     assert.throws(() => parseCADAsync(engine, new ArrayBuffer(0), 'step'), {
       name: 'TypeError',
-      message: 'Invalid CAD input',
+      message: /^CAD input must be a non-empty ArrayBuffer/,
     });
   } finally {
     engine.dispose();

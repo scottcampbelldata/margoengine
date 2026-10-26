@@ -1,12 +1,22 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
 import type { Kinematics } from './kinematics.js';
 import { machineryMemory } from './runtime.js';
+/** Options for {@link TelemetryChannel}: `delay` is the playback delay in milliseconds (default 100) that smooths network jitter, and `onError` receives errors from WebSocket frames (default: rethrow). */
 export interface TelemetryOptions {
   delay?: number;
   onError?: (error: unknown) => void;
 }
+/**
+ * Drives {@link Kinematics} joints from binary frames (u32 time in ms, u16 count, then a u16 joint id and f32 value per joint, little endian), for example from a PLC bridge.
+ * Frames are interpolated with a playback delay. `push(frame)` feeds one frame, `connect(socket)` reads a WebSocket, and `dispose()` returns control to the Kinematics.
+ *
+ * @example
+ * const channel = await TelemetryChannel.attach(engine, kinematics, { delay: 100 });
+ * channel.connect(new WebSocket('wss://plant.example/joints'));
+ */
 export class TelemetryChannel implements EnginePlugin {
   readonly name = 'telemetry-channel';
   private engine?: Engine;
@@ -41,7 +51,9 @@ export class TelemetryChannel implements EnginePlugin {
   }
   static async create(kinematics: Kinematics, options: TelemetryOptions = {}): Promise<TelemetryChannel> {
     if (!kinematics.jointCount || !Number.isFinite(options.delay ?? 100) || (options.delay ?? 100) < 0)
-      throw new RangeError('Invalid telemetry options');
+      throw new RangeError(
+        'Telemetry needs a Kinematics with at least one joint and a finite delay of 0 or more; pass a valid Kinematics and delay.',
+      );
     const memory = await machineryMemory(kinematics.jointCount * 20);
     return new TelemetryChannel(
       kinematics,
@@ -52,29 +64,41 @@ export class TelemetryChannel implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (!engine.hasPlugin(this.kinematics.name) || !this.kinematics.attachedTo(engine))
-      throw new Error('Attach Kinematics before telemetry');
+      throw new MargoError('state', 'Kinematics is not attached; add it to the engine before the telemetry channel.');
     for (let i = 0; i < this.kinematics.jointCount; i++) this.kinematics.value(i);
     this.kinematics.setExternalControl(engine);
     this.engine = engine;
   }
   push(input: ArrayBuffer | ArrayBufferView, receivedAt = performance.now()): boolean {
-    if (!this.engine || !this.kinematics.attachedTo(this.engine)) throw new Error('Telemetry is not attached');
-    if (!Number.isFinite(receivedAt)) throw new RangeError('Invalid receive time');
+    if (!this.engine || !this.kinematics.attachedTo(this.engine))
+      throw new MargoError(
+        'state',
+        'Telemetry is not attached; add the channel to an engine, after its Kinematics, before push().',
+      );
+    if (!Number.isFinite(receivedAt))
+      throw new RangeError('Receive time must be a finite number of milliseconds; pass performance.now() or omit it.');
     const view =
       input instanceof ArrayBuffer
         ? new DataView(input)
         : new DataView(input.buffer, input.byteOffset, input.byteLength);
-    if (view.byteLength < 6) throw new RangeError('Truncated telemetry frame');
+    if (view.byteLength < 6)
+      throw new RangeError('Telemetry frame is shorter than its 6-byte header; send the complete frame.');
     const time = view.getUint32(0, true),
       count = view.getUint16(4, true),
       n = this.kinematics.jointCount;
-    if (count > n || view.byteLength !== 6 + count * 6) throw new RangeError('Invalid telemetry frame length');
+    if (count > n || view.byteLength !== 6 + count * 6)
+      throw new RangeError(
+        'Telemetry frame length must be 6 plus 6 bytes per joint, with at most one entry per joint; send a well-formed frame.',
+      );
     this.seen.fill(0);
     for (let i = 0; i < n; i++) this.incoming[i] = this.frames ? this.ring[n + i] : this.kinematics.value(i);
     for (let i = 0; i < count; i++) {
       const id = view.getUint16(6 + i * 6, true),
         value = view.getFloat32(8 + i * 6, true);
-      if (id >= n || this.seen[id]) throw new RangeError('Invalid or duplicate telemetry joint');
+      if (id >= n || this.seen[id])
+        throw new RangeError(
+          'Telemetry joint id is out of range or repeated; send each joint index below jointCount once per frame.',
+        );
       this.kinematics.checkValue(id, value);
       this.seen[id] = 1;
       this.incoming[id] = value;
@@ -108,7 +132,9 @@ export class TelemetryChannel implements EnginePlugin {
   }
   sample(now = performance.now()): void {
     if (!this.engine || !this.kinematics.attachedTo(this.engine) || !Number.isFinite(now))
-      throw new RangeError('Invalid telemetry sample');
+      throw new RangeError(
+        'Telemetry sample needs an attached channel and a finite time; add the channel to an engine and pass performance.now().',
+      );
     if (!this.frames) return;
     const t =
       this.frames === 1

@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { PBRModel } from '@margoengine/gltf-pro';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { SceneTarget, sceneTarget } from '../../shared/msaa.js';
@@ -60,7 +61,10 @@ class OpaqueColor implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (this.disposed || engine !== this.engine || !engine.gpu)
-      throw new Error('Opaque color capture requires its WebGPU engine');
+      throw new MargoError(
+        'state',
+        'Opaque color capture requires its WebGPU engine; attach it to the engine it was created for, with a WebGPU device.',
+      );
     this.device = engine.gpu;
     // A valid borrowed view lets callers install a bind-group description before the first frame.
     this.placeholder = this.device.createTexture({

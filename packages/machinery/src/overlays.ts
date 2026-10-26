@@ -4,17 +4,20 @@ import { meshRuntime } from '@margoengine/core/extension';
 import type { Engine, EnginePlugin, FrameGraph, Vec3, Camera } from '@margoengine/core/extension';
 import { worldAnchor, type Anchor } from './anchors.js';
 export { worldAnchor, type Anchor } from './anchors.js';
+/** A measured dimension line between anchors `a` and `b`, with an optional pixel `offset` and `label` (default: the distance and unit). */
 export interface Dimension {
   a: Anchor;
   b: Anchor;
   offset?: readonly [number, number];
   label?: string;
 }
+/** A text label with a leader line from `anchor`, with an optional pixel `offset`. */
 export interface Callout {
   anchor: Anchor;
   label: string;
   offset?: readonly [number, number];
 }
+/** Options for {@link EngineeringAnnotations}: `unit` (default 'm'), `scale` from scene units to `unit` (default 1) and `decimals` shown (0 to 6, default 2). */
 export interface AnnotationOptions {
   dimensions?: readonly Dimension[];
   callouts?: readonly Callout[];
@@ -23,6 +26,7 @@ export interface AnnotationOptions {
   decimals?: number;
 }
 const ns = 'http://www.w3.org/2000/svg';
+/** Projects a world point to canvas pixels with the camera matrix, or returns null when it is behind the camera or outside the depth range. `gpu` (default true) uses WebGPU clip depth 0 to 1; pass false for WebGL depth -1 to 1. */
 export function projectAnnotation(
   camera: Camera,
   point: Vec3,
@@ -39,6 +43,12 @@ export function projectAnnotation(
     ((1 - (m[1] * point[0] + m[5] * point[1] + m[9] * point[2] + m[13]) / w) * height) / 2,
   ];
 }
+/**
+ * SVG dimensions and callouts drawn over the canvas and anchored to mesh vertices, edges and faces.
+ *
+ * @example
+ * EngineeringAnnotations.attach(engine, { unit: 'mm', scale: 1000, dimensions: [{ a: vertexAnchor(part, 0), b: vertexAnchor(part, 1) }] });
+ */
 export class EngineeringAnnotations implements EnginePlugin {
   readonly name = 'engineering-annotations';
   private engine?: Engine;
@@ -59,7 +69,9 @@ export class EngineeringAnnotations implements EnginePlugin {
       (options.decimals ?? 2) < 0 ||
       (options.decimals ?? 2) > 6
     )
-      throw new RangeError('Invalid annotations');
+      throw new RangeError(
+        'Annotation options are out of range: at most 1000 dimensions and callouts, a finite scale above 0 and decimals from 0 to 6; reduce or fix them.',
+      );
   }
   setup(engine: Engine): void {
     this.engine = engine;
@@ -67,10 +79,12 @@ export class EngineeringAnnotations implements EnginePlugin {
       for (const anchor of 'anchor' in item ? [item.anchor] : [item.a, item.b]) {
         worldAnchor(anchor);
         if (anchor.node && meshRuntime(anchor.node).engine !== engine)
-          throw new TypeError('Annotation node belongs to another engine');
+          throw new TypeError(
+            'Annotation node belongs to another engine; pass nodes created by the engine this overlay is added to.',
+          );
       }
       if (item.offset && (item.offset.length !== 2 || !item.offset.every(Number.isFinite)))
-        throw new TypeError('Invalid annotation offset');
+        throw new TypeError('Annotation offset must be two finite numbers; pass [x, y] in pixels.');
     }
     const svg = document.createElementNS(ns, 'svg');
     this.svg = svg;

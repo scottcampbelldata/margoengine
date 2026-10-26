@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { machineryWasm } from './wasm.js';
 export interface MachineryExports extends WebAssembly.Exports {
   memory: WebAssembly.Memory;
@@ -23,7 +24,9 @@ export async function machineryMemory(
   bytes: number,
 ): Promise<{ api: MachineryExports; ptr: number; buffer: ArrayBuffer }> {
   if (!Number.isSafeInteger(bytes) || bytes < 1 || bytes > 256 * 1024 * 1024)
-    throw new RangeError('Machinery memory limit');
+    throw new RangeError(
+      'Machinery memory must be a whole number of bytes between 1 and 256 MiB; reduce the part or joint count.',
+    );
   compiled ??= (async () => {
     const data = Uint8Array.from(atob(machineryWasm), (c) => c.charCodeAt(0));
     return WebAssembly.compile(
@@ -35,6 +38,10 @@ export async function machineryMemory(
   });
   const api = (await WebAssembly.instantiate(await compiled)).exports as MachineryExports,
     ptr = api.allocate(bytes);
-  if (!ptr) throw new Error('Could not allocate machinery storage');
+  if (!ptr)
+    throw new MargoError(
+      'failed',
+      'Could not allocate machinery storage; reduce the part or joint count and try again.',
+    );
   return { api, ptr, buffer: api.memory.buffer as ArrayBuffer };
 }

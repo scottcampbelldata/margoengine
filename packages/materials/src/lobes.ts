@@ -4,23 +4,27 @@ import type { ClearcoatTexture } from './index.js';
 import { coordinateSlot, coordinateWGSL } from './coordinates.js';
 import { lobeShader, type LobeShaderConfig } from './lobe-shader.js';
 
+/** KHR_materials_sheen: `colorFactor` linear RGB (default [0, 0, 0]) and `roughnessFactor` from 0 to 1 (default 0), with optional maps. */
 export interface SheenOptions {
   colorFactor?: readonly [number, number, number];
   roughnessFactor?: number;
   sheenColorTexture?: ClearcoatTexture;
   sheenRoughnessTexture?: ClearcoatTexture;
 }
+/** KHR_materials_specular: `factor` from 0 to 1 (default 1) and `colorFactor` linear RGB (default [1, 1, 1]), with optional maps. */
 export interface SpecularOptions {
   factor?: number;
   colorFactor?: readonly [number, number, number];
   specularTexture?: ClearcoatTexture;
   specularColorTexture?: ClearcoatTexture;
 }
+/** KHR_materials_anisotropy: `strength` from 0 to 1 (default 0) and `rotation` in radians (default 0), with an optional map. */
 export interface AnisotropyOptions {
   strength?: number;
   rotation?: number;
   anisotropyTexture?: ClearcoatTexture;
 }
+/** KHR_materials_iridescence: `factor` from 0 to 1 (default 0), film `ior` (default 1.3) and thickness range in nanometres (defaults 100 to 400), with optional maps. */
 export interface IridescenceOptions {
   factor?: number;
   ior?: number;
@@ -29,6 +33,7 @@ export interface IridescenceOptions {
   iridescenceTexture?: ClearcoatTexture;
   iridescenceThicknessTexture?: ClearcoatTexture;
 }
+/** The lobes `materialLobes()` adds on top of a base material, plus the shared `ior` (default 1.5, at least 1). */
 export interface MaterialLobeOptions {
   ior?: number;
   sheen?: SheenOptions;
@@ -44,12 +49,15 @@ export const lobeMaps = {
 } as const;
 const compiled = new WeakMap<MaterialExtension, { options: MaterialLobeOptions; base?: MaterialExtension }>();
 function record(value: unknown, label: string): void {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Invalid material ' + label);
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new TypeError(`Invalid material ${label}; pass an object.`);
 }
 function scalar(value: unknown, fallback: number, label: string, min = 0, max = 1): number {
   const number = value === undefined ? fallback : value;
   if (typeof number !== 'number' || !Number.isFinite(Math.fround(number)) || number < min || number > max)
-    throw new RangeError('Invalid material ' + label);
+    throw new RangeError(
+      `Invalid material ${label}; pass a finite number${min > -Infinity ? ` of at least ${min}` : ''}${max < Infinity ? ` and at most ${max}` : ''}.`,
+    );
   return number;
 }
 function color(
@@ -64,7 +72,7 @@ function color(
     value.length !== 3 ||
     Array.from(value).some((n) => typeof n !== 'number' || !Number.isFinite(Math.fround(n)) || n < 0 || n > max)
   )
-    throw new RangeError('Invalid material ' + label);
+    throw new RangeError(`Invalid material ${label}; pass [r, g, b] with each component from 0 to ${max}.`);
   return value as [number, number, number];
 }
 export function validateLobes(options: MaterialLobeOptions): MaterialLobeOptions {
@@ -79,7 +87,9 @@ export function validateLobes(options: MaterialLobeOptions): MaterialLobeOptions
         if (map === undefined) continue;
         record(map, field);
         if (!map.view || (map.sampler !== undefined && !map.sampler))
-          throw new TypeError('Invalid material ' + field + ' texture');
+          throw new TypeError(
+            `Invalid material ${field} texture; pass { view: GPUTextureView, sampler?: GPUSampler }.`,
+          );
         textureCoordinates({ texCoord: map.texCoord, extensions: { KHR_texture_transform: map.transform } });
       }
     }
@@ -194,15 +204,19 @@ export function materialLobes(options: MaterialLobeOptions = {}, base?: Material
   compiled.set(extension, { options: values, base });
   return extension;
 }
+/** A material extension with only the sheen lobe. Shorthand for `materialLobes({ sheen: options }, base)`. */
 export function sheen(options: SheenOptions = {}, base?: MaterialExtension): MaterialExtension {
   return materialLobes({ sheen: options }, base);
 }
+/** A material extension with only the specular lobe. Shorthand for `materialLobes({ specular: options }, base)`. */
 export function specular(options: SpecularOptions = {}, base?: MaterialExtension): MaterialExtension {
   return materialLobes({ specular: options }, base);
 }
+/** A material extension with only the anisotropy lobe. Shorthand for `materialLobes({ anisotropy: options }, base)`. */
 export function anisotropy(options: AnisotropyOptions = {}, base?: MaterialExtension): MaterialExtension {
   return materialLobes({ anisotropy: options }, base);
 }
+/** A material extension with only the iridescence lobe. Shorthand for `materialLobes({ iridescence: options }, base)`. */
 export function iridescence(options: IridescenceOptions = {}, base?: MaterialExtension): MaterialExtension {
   return materialLobes({ iridescence: options }, base);
 }

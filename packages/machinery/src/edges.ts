@@ -9,6 +9,7 @@ import {
   type Geometry,
 } from '@margoengine/core/extension';
 import { edgesGeometry } from '@margoengine/geometry/utils';
+import { MargoError } from '@margoengine/math/errors';
 import { declaration } from './section-uniform.js';
 import { alphaBlend } from '../../shared/pass.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; INDIRECT: number };
@@ -110,7 +111,8 @@ interface Shape {
 
 /** CAD feature lines of one geometry: index pairs of the edges whose faces meet above `angle` degrees, plus open boundaries. */
 export function featureEdges(geometry: Geometry, angle = 30): Uint32Array {
-  if (!Number.isFinite(angle) || angle < 0 || angle > 180) throw new RangeError('Invalid feature angle');
+  if (!Number.isFinite(angle) || angle < 0 || angle > 180)
+    throw new RangeError('Feature angle must be a number of degrees from 0 to 180; pass a value in that range.');
   const v = geometry.vertices,
     positions = new Float32Array(v.length / 2);
   for (let i = 0, j = 0; i < v.length; i += 6, j += 3) {
@@ -206,7 +208,9 @@ export class FeatureEdges implements EnginePlugin {
       !(minRadius >= 0 && minRadius < 1e6) ||
       !Number.isFinite(order)
     )
-      throw new RangeError('Invalid feature edge options');
+      throw new RangeError(
+        'Invalid feature edge options: angle must be 0 to 180, width above 0 up to 64, depthBias a non-negative integer, minRadius from 0 below 1e6 and order finite.',
+      );
     this.angle = angle;
     this.width = width;
     this.bias = depthBias;
@@ -215,7 +219,11 @@ export class FeatureEdges implements EnginePlugin {
     this.color = new PbrMaterial({ color }).data.slice(0, 4);
   }
   setup(engine: Engine): void {
-    if (!engine.gpu) throw new Error('FeatureEdges requires WebGPU');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'FeatureEdges requires WebGPU; use a browser with WebGPU, or check engine.gpu before attaching.',
+      );
     this.engine = engine;
     const device = engine.gpu,
       storage = (binding: number, hasDynamicOffset = false): GPUBindGroupLayoutEntry => ({

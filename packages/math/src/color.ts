@@ -126,7 +126,7 @@ function cssColor(text: string): { rgb: number[]; space: ColorSpace } | null {
       .trim()
       .split(/[\s,]+/);
   if (!space)
-    throw new TypeError(`Color space '${match[1]}' is not srgb, srgb-linear, display-p3 or display-p3-linear`);
+    throw new TypeError(`Color space '${match[1]}' is unknown; use srgb, srgb-linear, display-p3 or display-p3-linear`);
   const rgb = parts.map((part) => (part.endsWith('%') ? parseFloat(part) / 100 : Number(part)));
   if (rgb.length !== 3 || !rgb.every(Number.isFinite))
     throw new TypeError(`Color '${text}' needs three numbers: color(${space} r g b)`);
@@ -272,7 +272,7 @@ export class Color {
         return this.setHSL(numbers[0] / 360, numbers[1] / 100, numbers[2] / 100, colorSpace);
       }
     }
-    throw new TypeError(`Invalid color: ${style}`);
+    throw new TypeError(`Invalid color '${style}'; use hex, rgb() or hsl()`);
   }
   copy(c: ColorLike): this {
     this.r = c.r;

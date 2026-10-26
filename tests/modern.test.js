@@ -232,8 +232,8 @@ test('CAD grouping rejects unsupported empty inputs and skips transform-only nod
   const { engine } = await headlessEngine();
   try {
     const root = engine.createMesh();
-    assert.throws(() => deduplicateParts([root]), /no supported geometry/);
-    assert.throws(() => deduplicateParts([]), /no supported geometry/);
+    assert.throws(() => deduplicateParts([root]), /found no supported geometry/);
+    assert.throws(() => deduplicateParts([]), /found no supported geometry/);
     engine.createMesh(root).setGeometry(box());
     assert.deepEqual(deduplicateParts(engine.meshes.values()), { parts: 1, unique: 1 });
   } finally {

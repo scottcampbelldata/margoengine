@@ -318,9 +318,9 @@ test('Box model.bounds, facade worldBounds and Stage.fit enclose the actual PBR 
 test('Box CAD and static AssemblyBVH consume only explicitly passed primitive nodes', async () => {
   await withBox(async ({ engine, model, mesh, primitive }) => {
     assert.deepEqual(deduplicateParts(model.nodes), { parts: 1, unique: 1 });
-    assert.throws(() => deduplicateParts([model.root]), { message: 'CAD grouping contains no supported geometry' });
+    assert.throws(() => deduplicateParts([model.root]), { message: /^CAD grouping found no supported geometry/ });
     assert.throws(() => deduplicateParts([engine.createMesh()]), {
-      message: 'CAD grouping contains no supported geometry',
+      message: /^CAD grouping found no supported geometry/,
     });
     const assembly = await AssemblyBVH.create(model.nodes);
     try {

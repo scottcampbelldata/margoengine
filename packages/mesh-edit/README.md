@@ -11,6 +11,16 @@ const edit = extrudeMeshFace(mesh, 'box-face-0', 0.25);
 const geometry = compilePolygonMesh(edit.mesh);
 ```
 
+Inset a face (default `amount` 0.24, a centroid fraction from 0.001 to 0.95), then bevel the whole closed mesh (default `amount` 0.12, from 0.001 to 0.45):
+
+```ts
+import { createPrimitiveMesh, insetMeshFace, bevelPolygonMesh } from 'margoengine/mesh-edit';
+const cube = createPrimitiveMesh('cube', 'box');
+const inset = insetMeshFace(cube, 'box-face-0', 0.3);
+const beveled = bevelPolygonMesh(cube, 0.1);
+console.log(inset.mesh.faces.length, beveled.mesh.faces.length);
+```
+
 Callers own selection intent, locks, visibility, motion/opacity policy, IDs, undo and texture storage. Margo owns component transform geometry and the UV/paint algorithms below. No engine instance, DOM or GPU is needed. Supply `createId` for deterministic face IDs; otherwise commands call `crypto.randomUUID()` only when creating faces. Empty and duplicate generated IDs reject before exposing output.
 
 The original parity commands retain existing behavior: extrusion acts along the local face normal, inset and whole-mesh bevel use centroid fractions, and `cutMeshFace` bisects one face at opposite-edge midpoints. Cut vertices propagate through neighboring incident edges; each face interpolates its own UVs. Bevel requires closed two-manifold geometry and returns an unchanged owned mesh with a diagnostic for unsupported open/nonmanifold inputs. Supported faces are simple planar convex polygons with 3-64 corners; collinear boundary corners remain valid. Compile produces flat normals and fan triangles, preserving source face and corner-vertex identity. Arbitrary drawn knife paths, equal-width bevel/inset and concave n-gons remain unsupported.

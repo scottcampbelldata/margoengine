@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import { meshRuntime } from '@margoengine/core/extension';
 import type { Mesh, Vec3 } from '@margoengine/core';
 import { meshTriangles } from '../../shared/mesh-source.js';
@@ -6,16 +7,14 @@ import { machineryMemory } from './runtime.js';
 import { holeAnchor, snapFeature, vertexAnchor, edgeAnchor } from './metrology.js';
 import { worldAnchor, type Anchor } from './anchors.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+/** A raycast hit: the mesh, its triangle index, the distance along the ray and the world-space point. */
 export interface RayHit {
   node: Mesh;
   triangle: number;
   distance: number;
   point: Vec3;
 }
-/**
- * Two-level picking: one local-space Wasm triangle BVH per distinct geometry, shared by all its instances, under a per-part bounding-sphere
- * pass over world transforms. rebuild() is O(parts) and memory follows distinct triangles, so assemblies with millions of instanced triangles fit.
- */
+/** The triangles of one distinct geometry: packed vertices with their `stride` (6 for core meshes, 20 for PBR primitives) and indices. */
 interface TriangleRecord {
   vertices: Float32Array;
   indices: Uint32Array;
@@ -27,8 +26,9 @@ function records(node: Mesh): TriangleRecord[] {
   if (triangles.kind === 'core')
     return [{ vertices: triangles.geometry.vertices, indices: triangles.geometry.indices, stride: 6 }];
   if (triangles.source.primitives.some((primitive) => primitive.deformed))
-    throw new Error(
-      'Deformed PBR mesh requires async Raycaster.intersectModel(model); AssemblyBVH accepts static triangles only',
+    throw new MargoError(
+      'unsupported',
+      'Deformed PBR mesh requires async Raycaster.intersectModel(model); AssemblyBVH accepts static triangles only.',
     );
   return triangles.source.primitives.map((primitive) => ({
     vertices: primitive.vertices,
@@ -37,6 +37,11 @@ function records(node: Mesh): TriangleRecord[] {
   }));
 }
 
+/**
+ * Two-level picking for assemblies: one local-space Wasm triangle BVH per distinct geometry, shared by all its instances, under a per-part
+ * bounding-sphere pass over world transforms. `rebuild()` is O(parts) and memory follows distinct triangles, so assemblies with millions of
+ * instanced triangles fit. Create it with `await AssemblyBVH.create(nodes)`, call `rebuild()` after parts move, then `raycast(origin, direction)`.
+ */
 export class AssemblyBVH {
   private disposed = false;
   private valid = false;
@@ -130,7 +135,10 @@ export class AssemblyBVH {
         triangles[i * 3 + 1] = v[p + 1];
         triangles[i * 3 + 2] = v[p + 2];
       }
-      if (!memory.api.bvh_build(at, count)) throw new RangeError('Invalid BVH coordinates');
+      if (!memory.api.bvh_build(at, count))
+        throw new RangeError(
+          'BVH coordinates must be finite; fix the NaN or Infinity in the geometry or node transform.',
+        );
       shapes.push({ ptr: at, count });
       at += count * 104;
     }
@@ -152,10 +160,10 @@ export class AssemblyBVH {
           value.stride !== previous[at].stride,
       )
     )
-      throw new Error('Geometry changed; recreate assembly BVH');
+      throw new MargoError('state', 'Geometry changed since the BVH was built; create a new AssemblyBVH.');
   }
   rebuild(): void {
-    if (this.disposed) throw new Error('BVH is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'BVH is disposed; create a new AssemblyBVH.');
     this.valid = false;
     const s = this.spheres;
     for (let n = 0; n < this.nodes.length; n++) {
@@ -167,7 +175,10 @@ export class AssemblyBVH {
       if (hiddenInTree(runtime.engine.store, runtime.id)) continue;
       const m = runtime.matrix,
         b = this.bounds.subarray(n * 4, n * 4 + 4);
-      if (!m.every(Number.isFinite)) throw new RangeError('Invalid BVH coordinates'); // Affine inverse: rows of the 3x3 inverse are the cross products of the columns over the determinant.
+      if (!m.every(Number.isFinite))
+        throw new RangeError(
+          'BVH coordinates must be finite; fix the NaN or Infinity in the geometry or node transform.',
+        ); // Affine inverse: rows of the 3x3 inverse are the cross products of the columns over the determinant.
       const k = n * 12,
         v = this.inverses,
         x0 = m[0],
@@ -208,8 +219,8 @@ export class AssemblyBVH {
     this.valid = true;
   }
   raycast(origin: Vec3, direction: Vec3, maxDistance = Infinity): RayHit | null {
-    if (this.disposed) throw new Error('BVH is disposed');
-    if (!this.valid) throw new Error('Rebuild the BVH before raycasting');
+    if (this.disposed) throw new MargoError('disposed', 'BVH is disposed; create a new AssemblyBVH.');
+    if (!this.valid) throw new MargoError('state', 'BVH is stale; call rebuild() before raycasting.');
     if (
       origin.length !== 3 ||
       direction.length !== 3 ||
@@ -217,7 +228,9 @@ export class AssemblyBVH {
       !direction.every(Number.isFinite) ||
       !(maxDistance >= 0)
     )
-      throw new RangeError('Invalid ray');
+      throw new RangeError(
+        'Ray origin and direction must be three finite numbers each and maxDistance 0 or more; check the ray.',
+      );
     const length = Math.hypot(...direction);
     if (!length || !Number.isFinite(length)) throw new RangeError('Ray direction must be finite and nonzero');
     const [ox, oy, oz] = origin,
@@ -304,7 +317,9 @@ export class AssemblyBVH {
       !Number.isSafeInteger(hit.triangle) ||
       hit.triangle < 0
     )
-      throw new RangeError('Invalid BVH snap');
+      throw new RangeError(
+        'Snap needs a live hit from this BVH, kind vertex, edge or centerline, and a maxDistance of 0 or more; pass a hit from raycast().',
+      );
     const nodeIndex = this.nodes.indexOf(hit.node);
     this.checkSource(nodeIndex);
     let face = hit.triangle,
@@ -316,7 +331,10 @@ export class AssemblyBVH {
       }
       face -= part.indices.length / 3;
     }
-    if (!geometry) throw new RangeError('Invalid hit triangle');
+    if (!geometry)
+      throw new RangeError(
+        'Hit triangle is outside the hit node geometry; pass a hit returned by raycast() on the current geometry.',
+      );
     worldAnchor({ point: hit.point });
     let best: Anchor | null = null,
       distance = maxDistance;
@@ -324,7 +342,10 @@ export class AssemblyBVH {
     const ids = geometry.indices.subarray(face * 3, face * 3 + 3),
       count = kind === 'centerline' ? rings.length : 3;
     if (geometry.stride === 20 && kind === 'centerline')
-      throw new Error('PBR centerline snapping requires an explicit local anchor');
+      throw new MargoError(
+        'unsupported',
+        'PBR centerline snapping requires an explicit local anchor; pass rings for a core mesh or use kind vertex or edge.',
+      );
     const local = (id: number): Vec3 =>
       Array.from(geometry!.vertices.subarray(id * geometry!.stride, id * geometry!.stride + 3)) as unknown as Vec3;
     for (let i = 0; i < count; i++) {

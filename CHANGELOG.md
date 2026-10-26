@@ -63,6 +63,16 @@ The scenery `sky-moon` implementation was deliberately replaced by the
 than restoring `SkyMoonPass`. The consolidation record
 lists all 74 public packages, preserved optional entries and audit decisions.
 
+### Errors name their fix (packages machinery to xr)
+
+Every thrown message in these packages now says what to do about the problem. A former bare `Error` is now a
+`MargoError` with a `code` (`disposed`, `attached`, `state`, `unsupported`, `failed`) or a `TypeError` / `RangeError`.
+Message text changed: branch on `error.code` or the class, not the text. Changed error types:
+
+- machinery: bare `Error` became `MargoError` (codes `state`, `attached`, `disposed`, `unsupported`, `failed`).
+- materials: bare `Error` became `MargoError` (`state`, `disposed`, `attached`); a node-graph cycle and a graph
+  without exactly one emit are now `TypeError`.
+
 ### USDZ dependency cleanup
 
 - `@margoengine/usdz` reads USDA and USDC with its own parsers (`src/crate.ts` and

@@ -60,9 +60,9 @@ test('Surface drive uses omega cross r, bounded friction, persistent Wasm memory
     assert.equal(memory, s.data.buffer);
     const saved = part.position.x;
     s.data[9] = NaN;
-    assert.throws(() => s.onPreUpdate(0.1), /Invalid surface/);
+    assert.throws(() => s.onPreUpdate(0.1), /Surface state is not finite/);
     assert.equal(part.position.x, saved);
-    assert.throws(() => s.onPreUpdate(-1), /Invalid surface/);
+    assert.throws(() => s.onPreUpdate(-1), /Surface state is not finite/);
   } finally {
     e.dispose();
   }

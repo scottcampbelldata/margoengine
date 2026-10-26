@@ -30,11 +30,13 @@ export type { MaterialGraphOutput } from './nodes.js';
 export type * from './node-types.js';
 export { StencilBuffer } from './stencil-buffer.js';
 
+/** A caller-owned GPU texture view for a clearcoat or lobe map: `texCoord` is 0 or 1 (default 0), `scale` scales a normal map (default 1) and `transform` is a KHR_texture_transform. */
 export interface ClearcoatTexture extends MaterialExtensionTexture {
   texCoord?: 0 | 1;
   scale?: number;
   transform?: TextureTransform;
 }
+/** Options for `clearcoat()`: `factor` and `roughnessFactor` from 0 to 1 (both default 0) plus optional texture maps. */
 export interface ClearcoatOptions {
   factor?: number;
   roughnessFactor?: number;
@@ -46,7 +48,9 @@ export interface ClearcoatOptions {
 function scalar(value: unknown, fallback: number, label: string, min = -Infinity, max = Infinity): number {
   const n = value === undefined ? fallback : value;
   if (typeof n !== 'number' || !Number.isFinite(Math.fround(n)) || n < min || n > max)
-    throw new RangeError('Invalid clearcoat ' + label);
+    throw new RangeError(
+      `Invalid clearcoat ${label}; pass a finite number${min > -Infinity ? ` of at least ${min}` : ''}${max < Infinity ? ` and at most ${max}` : ''}.`,
+    );
   return n;
 }
 function texture(value: ClearcoatTexture): ClearcoatTexture {
@@ -56,8 +60,11 @@ function texture(value: ClearcoatTexture): ClearcoatTexture {
     !value.view ||
     (value.texCoord !== undefined && value.texCoord !== 0 && value.texCoord !== 1)
   )
-    throw new TypeError('Invalid clearcoat texture or UV set');
-  if (value.sampler !== undefined && !value.sampler) throw new TypeError('Invalid clearcoat sampler');
+    throw new TypeError(
+      'Invalid clearcoat texture or UV set; pass a texture with a GPUTextureView in view and texCoord 0 or 1.',
+    );
+  if (value.sampler !== undefined && !value.sampler)
+    throw new TypeError('Invalid clearcoat sampler; pass a GPUSampler or omit it.');
   textureCoordinates({ texCoord: value.texCoord, extensions: { KHR_texture_transform: value.transform } });
   scalar(value.scale, 1, 'normal scale');
   return value;
@@ -66,7 +73,7 @@ function texture(value: ClearcoatTexture): ClearcoatTexture {
 /** Build a clearcoat extension from caller-owned GPU texture views. No GPU allocation. */
 export function clearcoat(options: ClearcoatOptions = {}): MaterialExtension {
   if (!options || typeof options !== 'object' || Array.isArray(options))
-    throw new TypeError('Invalid clearcoat options');
+    throw new TypeError('Invalid clearcoat options; pass an options object such as { factor: 1 }.');
   const factor = scalar(options.factor, 0, 'factor', 0, 1),
     roughness = scalar(options.roughnessFactor, 0, 'roughness', 0, 1);
   const textures: MaterialExtensionTexture[] = [],
@@ -132,7 +139,7 @@ interface Plan {
 const mapFields: readonly CoatMap[] = ['clearcoatTexture', 'clearcoatRoughnessTexture', 'clearcoatNormalTexture'];
 function definition(value: unknown, label: string): MaterialDefinition | undefined {
   if (value !== undefined && (!value || typeof value !== 'object' || Array.isArray(value)))
-    throw new TypeError('Invalid ' + label);
+    throw new TypeError(`Invalid ${label}; pass an object or omit it.`);
   return value as MaterialDefinition | undefined;
 }
 
@@ -153,7 +160,8 @@ export class MaterialInstallation implements EnginePlugin {
   private capture?: ReturnType<typeof acquireOpaqueColor>;
   constructor(readonly model: PBRModel) {
     this.name = 'materials:' + model.name;
-    if (model.disposed) throw new Error('Cannot install materials on a disposed model');
+    if (model.disposed)
+      throw margoError('disposed', 'Cannot install materials on a disposed model; install them on a live model.');
     for (const material of new Set(model.primitives.map((p) => p.material))) {
       const normalized = material.clearcoat !== undefined,
         def = definition(
@@ -218,7 +226,10 @@ export class MaterialInstallation implements EnginePlugin {
           material.extensions?.KHR_materials_unlit !== undefined ||
           material.extensions?.KHR_materials_pbrSpecularGlossiness !== undefined
         )
-          throw new Error('Material lobes require metallic-roughness lighting');
+          throw margoError(
+            'state',
+            'Material lobes require metallic-roughness lighting; remove KHR_materials_unlit and pbrSpecularGlossiness from the material.',
+          );
         lobeOptions.ior = transmit?.ior ?? (material.ior as number | undefined) ?? iorDef?.ior;
         validateLobes(lobeOptions);
       }
@@ -277,7 +288,10 @@ export class MaterialInstallation implements EnginePlugin {
                 !p.extension && p.definition.attributes && p.definition.attributes['TEXCOORD_' + coord] === undefined,
             )
           )
-            throw new Error('Material texture requires available TEXCOORD_' + coord);
+            throw margoError(
+              'state',
+              `Material texture requires available TEXCOORD_${coord}; add that UV set to the primitive or point the texture at another texCoord.`,
+            );
           plan.maps[field] = map;
         }
       this.plans.push(plan);
@@ -285,7 +299,10 @@ export class MaterialInstallation implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (this.disposed || this.model.disposed || engine !== this.model.root.engine)
-      throw new Error('Materials model is disposed or belongs to another engine');
+      throw margoError(
+        this.disposed || this.model.disposed ? 'disposed' : 'attached',
+        'Materials model is disposed or belongs to another engine; install materials on a live model of the engine you attach to.',
+      );
     if (!engine.gpu)
       throw margoError('unsupported', 'Materials require WebGPU: create the engine with a WebGPU device');
     const textures = new MaterialTextures(this.model, engine.gpu);

@@ -2,6 +2,7 @@ import { Geometry } from '@margoengine/core';
 import { triangulatePolygon } from '../../shared/polygon.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import { crc32 } from '../../shared/crc32.js';
+import { MargoError } from '@margoengine/math/errors';
 export const maxBytes = 64 * 1024 * 1024,
   maxVertices = 1_000_000,
   maxIndices = 3_000_000;
@@ -110,7 +111,7 @@ function utf8(data: Uint8Array, format: string): string {
   try {
     return new TextDecoder('utf8', { fatal: true }).decode(data);
   } catch {
-    throw new TypeError(`Invalid ${format}: not UTF-8 text`);
+    throw new TypeError(`Invalid ${format}: the file is not UTF-8 text; save it as UTF-8 and load it again.`);
   }
 }
 function stl(
@@ -123,7 +124,7 @@ function stl(
       count = view.getUint32(80, true);
     if (84 + count * 50 === input.length) {
       if (count * 3 > maxIndices) throw capError(`STL triangle limit (${count} > ${maxIndices / 3})`, 'stl');
-      if (!count) throw new RangeError('STL triangle limit');
+      if (!count) throw new RangeError('STL contains no triangles; check that the file has at least one facet.');
       for (let face = 0; face < count; face++) {
         for (let i = 0; i < 9; i++) positions.push(view.getFloat32(84 + face * 50 + 12 + i * 4, true));
         if (face % 10_000 === 0) progress?.((0.5 * face) / count);
@@ -132,7 +133,10 @@ function stl(
     }
   }
   const text = typeof input === 'string' ? input : utf8(input, 'STL');
-  if (!/^\s*solid\b/.test(text) || !/\bendsolid\b/.test(text)) throw new TypeError('Invalid STL');
+  if (!/^\s*solid\b/.test(text) || !/\bendsolid\b/.test(text))
+    throw new TypeError(
+      'Invalid STL: text must start with "solid" and end with "endsolid"; export the file again as binary or ASCII STL.',
+    );
   const number = '[-+]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][-+]?\\d+)?',
     vertex = new RegExp(`vertex\\s+(${number})\\s+(${number})\\s+(${number})`, 'g');
   // Same facets as /facet\s+normal[\s\S]*?endfacet/g, in linear time: that regex rescans to the end of the text for
@@ -147,13 +151,15 @@ function stl(
   }
   if (facets.length * 3 > maxIndices)
     throw capError(`STL triangle limit (${facets.length} > ${maxIndices / 3})`, 'stl');
-  if (!facets.length) throw new RangeError('STL triangle limit');
+  if (!facets.length) throw new RangeError('STL contains no triangles; check that the file has at least one facet.');
   let face = 0;
   for (const facet of facets) {
     if (face++ % 10_000 === 0) progress?.((0.5 * face) / facets.length);
     const matches = [...facet.matchAll(vertex)];
     if (matches.length !== 3 || !/outer\s+loop/.test(facet) || !/endloop/.test(facet))
-      throw new TypeError('Invalid STL facet');
+      throw new TypeError(
+        'Invalid STL facet: each facet needs an outer loop with three vertex lines; check or export the file again.',
+      );
     for (const match of matches) positions.push(...match.slice(1).map(Number));
   }
   return [{ name: text.match(/solid\s+([^\r\n]*)/)?.[1] || 'STL body', geometry: flat(positions, progress) }];
@@ -179,7 +185,9 @@ function obj(
     if (tag === 'v') {
       const p = fields.map(Number);
       if (p.length !== 3 || !p.every((v) => Number.isFinite(Math.fround(v))))
-        throw new RangeError('Invalid OBJ vertex');
+        throw new RangeError(
+          'Invalid OBJ vertex: "v" needs three finite numbers in float32 range; fix the line or export the file again.',
+        );
       // A well-formed vertex past the cap is a file too large, not an invalid one.
       if (vertices.length >= maxVertices) throw capError(`OBJ vertex limit (over ${maxVertices})`, 'obj');
       vertices.push(p);
@@ -188,12 +196,21 @@ function obj(
       current = { name: fields.join(' ') || 'OBJ body', positions: [] };
       parts.push(current);
     } else if (tag === 'f') {
-      if (fields.length < 3 || fields.length > 4096) throw new RangeError('OBJ face vertex limit');
+      if (fields.length < 3 || fields.length > 4096)
+        throw new RangeError(
+          'OBJ face needs between 3 and 4096 vertices; split larger faces or export the file again.',
+        );
       const face = fields.map((field) => {
-        if (!/^-?\d+(?:\/(?:-?\d*)?(?:\/-?\d+)?)?$/.test(field)) throw new TypeError('Invalid OBJ face');
+        if (!/^-?\d+(?:\/(?:-?\d*)?(?:\/-?\d+)?)?$/.test(field))
+          throw new TypeError(
+            'Invalid OBJ face: each entry must look like v, v/vt, v//vn or v/vt/vn; export the file again.',
+          );
         const index = Number(field.split('/')[0]),
           point = vertices[index > 0 ? index - 1 : vertices.length + index];
-        if (!index || !point) throw new RangeError('OBJ index exceeds vertices');
+        if (!index || !point)
+          throw new RangeError(
+            'OBJ face index is zero or past the vertices read so far; use 1 to the vertex count, or negative relative indices.',
+          );
         return point;
       });
       const a = face[0],
@@ -205,12 +222,12 @@ function obj(
           (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]),
         ],
         length = Math.hypot(...normal);
-      if (!length) throw new RangeError('Degenerate OBJ face');
+      if (!length) throw new RangeError('Degenerate OBJ face has no area; remove the face or export the file again.');
       const axis = normal.map(Math.abs).indexOf(Math.max(...normal.map(Math.abs))),
         u = (axis + 1) % 3,
         v = (axis + 2) % 3;
       if (face.some((p) => Math.abs(normal.reduce((sum, n, i) => sum + n * (p[i] - a[i]), 0)) / length > 1e-5))
-        throw new RangeError('Nonplanar OBJ face');
+        throw new RangeError('Nonplanar OBJ face: its vertices must lie in one plane; split it into triangles.');
       // Triangles and quads keep their own corners and winding without contour triangulation, so they spend none of
       // its work budget. A quad splits along the diagonal inside it; a zero-area half (a straight corner) is dropped.
       if (face.length < 5) {
@@ -257,7 +274,9 @@ function obj(
         }
       }
     } else if (!['vn', 'vt', 's', 'usemtl', 'mtllib'].includes(tag))
-      throw new TypeError(`Unsupported OBJ record ${tag.slice(0, 32)}`);
+      throw new TypeError(
+        `Unsupported OBJ record ${tag.slice(0, 32)}; use only v, vn, vt, f, o, g, s, usemtl and mtllib lines.`,
+      );
   }
   return parts
     .filter((part) => part.positions.length)
@@ -272,7 +291,8 @@ export function parseCADGeometry(
   maxParts?: number,
 ): Array<{ name: string; geometry: Geometry }> {
   countLimit('maxParts', maxParts);
-  if (!['stl', 'obj'].includes(format)) throw new TypeError('CAD supports STL and OBJ');
+  if (!['stl', 'obj'].includes(format))
+    throw new TypeError("parseCADGeometry reads STL and OBJ only; pass format 'stl' or 'obj'.");
   const data =
     typeof input === 'string'
       ? input
@@ -285,12 +305,19 @@ export function parseCADGeometry(
     format === 'stl'
       ? stl(data, progress)
       : obj(typeof data === 'string' ? data : utf8(data, 'OBJ'), progress, maxParts);
-  if (!definitions.length) throw new Error('CAD contains no geometry');
+  if (!definitions.length)
+    throw new MargoError(
+      'failed',
+      'CAD file contains no geometry; check that the file holds at least one solid or mesh.',
+    );
   return definitions;
 }
 
 export function fingerprint(geometry: Pick<Geometry, 'vertices' | 'indices'>): Float32Array {
-  if (geometry.indices.length > maxIndices) throw new RangeError('Deduplication triangle limit');
+  if (geometry.indices.length > maxIndices)
+    throw new RangeError(
+      `Deduplication supports at most ${maxIndices / 3} triangles per part; split the part or skip deduplication.`,
+    );
   const data = new Float32Array(geometry.indices.length * 6),
     order: number[] = [];
   const indices = geometry.indices,

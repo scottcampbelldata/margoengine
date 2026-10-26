@@ -6,6 +6,7 @@ import { clearcoatShader } from './shader.js';
 import { transmissionShader } from './transmission-shader.js';
 import { acquireOpaqueColor } from './opaque-color.js';
 import { Cleanup } from '../../shared/cleanup.js';
+import { MargoError } from '@margoengine/math/errors';
 
 type Kind = 1 | 3 | 4 | 'metalRough' | 'clearcoat' | 'transmission' | 'emit';
 interface Value {
@@ -30,16 +31,17 @@ const fields: Record<string, readonly string[]> = {
   emit: ['color', 'normal', 'metalRough', 'clearcoat', 'transmission'],
 };
 function object(value: unknown, label: string): asserts value is Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Invalid node ' + label);
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new TypeError(`Invalid node ${label}; pass an object.`);
 }
 function keys(value: unknown, allowed: readonly string[], label: string): void {
   object(value, label);
   for (const key of Object.keys(value))
-    if (!allowed.includes(key)) throw new TypeError('Unsupported node ' + label + ' field: ' + key);
+    if (!allowed.includes(key)) throw new TypeError(`Unsupported node ${label} field: ${key}; remove it.`);
 }
 function number(value: unknown, label: string): number {
   if (typeof value !== 'number' || !Number.isFinite(Math.fround(value)))
-    throw new TypeError('Non-finite node ' + label);
+    throw new TypeError(`Non-finite node ${label}; pass a finite number that fits float32.`);
   return Math.fround(value);
 }
 function uv(value: unknown): 0 | 1 {
@@ -47,11 +49,14 @@ function uv(value: unknown): 0 | 1 {
   return value ?? 0;
 }
 function numeric(value: Value, label: string): void {
-  if (value.kind !== 1 && value.kind !== 4) throw new TypeError('Node ' + label + ' requires scalar or vec4');
+  if (value.kind !== 1 && value.kind !== 4)
+    throw new TypeError(`Node ${label} requires scalar or vec4; connect a scalar or vec4 node.`);
 }
 function width(value: Value, kind: Kind, label: string): void {
   if (value.kind !== kind)
-    throw new TypeError('Node ' + label + ' requires ' + (kind === 1 ? 'scalar' : kind === 4 ? 'vec4' : kind));
+    throw new TypeError(
+      `Node ${label} requires ${kind === 1 ? 'scalar' : kind === 4 ? 'vec4' : kind}; connect a node of that kind.`,
+    );
 }
 function component(value: Value | undefined, channel: string, fallback: string): string {
   return value ? value.name + (value.kind === 4 ? '.' + channel : '') : fallback;
@@ -104,19 +109,21 @@ function compile(
     emits: Value[] = [];
   const visit = (node: MaterialNode, depth = 0): Value => {
     object(node, 'reference');
-    if (active.has(node)) throw new Error('Node graph cycle');
+    if (active.has(node))
+      throw new TypeError('Node graph cycle; remove the reference that points back to an earlier node.');
     const ready = values.get(node);
     if (ready) return ready;
-    if (depth > 128 || values.size + active.size >= 256) throw new RangeError('Node graph exceeds size or depth limit');
+    if (depth > 128 || values.size + active.size >= 256)
+      throw new RangeError('Node graph exceeds size or depth limit; use at most 256 nodes and a depth of at most 128.');
     if (typeof node.type !== 'string' || !Object.hasOwn(fields, node.type))
-      throw new TypeError('Unsupported node type or attribute: ' + String(node.type));
+      throw new TypeError(`Unsupported node type or attribute: ${String(node.type)}; use a documented node type.`);
     keys(node, ['type', ...fields[node.type]], node.type);
     active.add(node);
     const deps: Value[] = [],
       ref = (key: string, required = false): Value | undefined => {
         const reference = (node as unknown as Record<string, MaterialNode | undefined>)[key];
         if (reference === undefined) {
-          if (required) throw new TypeError('Node ' + node.type + ' requires ' + key);
+          if (required) throw new TypeError(`Node ${node.type} requires ${key}; set that input.`);
           return undefined;
         }
         const value = visit(reference, depth + 1);
@@ -151,7 +158,10 @@ function compile(
         const factor = node.type === 'mix' ? ref('factor', true) : undefined;
         if (factor) {
           numeric(factor, 'mix factor');
-          if (factor.kind !== 1 && factor.kind !== value.kind) throw new TypeError('Node mix factor width mismatch');
+          if (factor.kind !== 1 && factor.kind !== value.kind)
+            throw new TypeError(
+              'Node mix factor width mismatch; use a scalar factor or one with the same width as the mixed values.',
+            );
         }
         if (a.coord !== undefined && a.coord === b.coord) value.coord = a.coord;
         else value.coord = a.coord ?? b.coord;
@@ -206,7 +216,11 @@ function compile(
         }
         if (node.volume !== undefined) {
           keys(node.volume, ['thickness', 'attenuationColor', 'attenuationDistance'], 'volume');
-          if ((constantChannel(factor) ?? 1) <= 0) throw new Error('KHR_materials_volume requires transmission');
+          if ((constantChannel(factor) ?? 1) <= 0)
+            throw new MargoError(
+              'state',
+              'KHR_materials_volume requires transmission; set a transmission factor above 0.',
+            );
           for (const field of ['thickness', 'attenuationColor'] as const)
             if (node.volume[field] !== undefined) {
               const v = visit(node.volume[field], depth + 1);
@@ -222,7 +236,9 @@ function compile(
               Number.isNaN(distance) ||
               !Number.isFinite(Math.fround(1 / distance)))
           )
-            throw new RangeError('Invalid node attenuation distance');
+            throw new RangeError(
+              'Invalid node attenuation distance; pass a number above 0 (Infinity for none) that is not too small for float32.',
+            );
         }
         value.kind = 'transmission';
         break;
@@ -249,7 +265,8 @@ function compile(
     return value;
   };
   for (const node of graph.nodes) visit(node);
-  if (emits.length !== 1) throw new Error('Node graph requires exactly one emit');
+  if (emits.length !== 1)
+    throw new TypeError('Node graph requires exactly one emit; keep one emit node and remove the others.');
   const emit = emits[0],
     reachable = new Set<Value>(),
     mark = (value: Value) => {
@@ -436,19 +453,26 @@ export class NodeMaterialInstallation implements EnginePlugin {
     readonly model: PBRModel,
     readonly graph: MaterialGraph,
   ) {
-    if (model.disposed) throw new Error('Node material model is disposed');
+    if (model.disposed)
+      throw new MargoError('disposed', 'Node material model is disposed; create the node material from a live model.');
     this.name = 'node-material:' + model.name;
     this.compiled = compile(graph, {}, true);
     for (const p of model.primitives) {
       for (const coord of this.compiled.uvSets)
         if (p.definition.attributes && p.definition.attributes['TEXCOORD_' + coord] === undefined)
-          throw new Error('Node material requires available TEXCOORD_' + coord);
+          throw new MargoError(
+            'state',
+            `Node material requires available TEXCOORD_${coord}; add that UV set to every primitive or use a different uv input.`,
+          );
       this.previous.set(p, p.extension);
     }
   }
   setup(engine: Engine): void {
     if (this.disposed || this.model.disposed || engine !== this.model.root.engine || !engine.gpu)
-      throw new Error('Node material requires its WebGPU model');
+      throw new MargoError(
+        'state',
+        'Node material requires its WebGPU model; attach it to the engine that created the model, with a WebGPU device.',
+      );
     if (this.compiled.transmits && !this.capture)
       this.capture = acquireOpaqueColor(engine, (view) => {
         this.compiled.extension.textures![this.compiled.opaqueIndex!].view = view;
@@ -480,6 +504,7 @@ export class NodeMaterialInstallation implements EnginePlugin {
     this.dispose();
   }
 }
+/** Compile `graph` and install it on every primitive of `model`. Dispose the returned installation (or use `using`) to restore the previous materials. */
 export function installNodeMaterial(model: PBRModel, graph: MaterialGraph): NodeMaterialInstallation {
   const installation = new NodeMaterialInstallation(model, graph);
   model.root.engine.use(installation);

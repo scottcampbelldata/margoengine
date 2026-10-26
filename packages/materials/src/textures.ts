@@ -3,6 +3,7 @@ import { textureCoordinates, type TextureTransform } from '@margoengine/gltf-pro
 import type { ClearcoatTexture } from './index.js';
 import type { GLTFTexture, GLTFSampler, GLTFTextureInfo } from '../../shared/gltf.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 
@@ -15,16 +16,18 @@ export interface TextureInfo {
 
 function integer(value: unknown, label: string): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
-    throw new TypeError('Invalid clearcoat ' + label);
+    throw new TypeError(`Invalid clearcoat ${label}; pass a whole number of 0 or more.`);
   return value;
 }
 function record<T extends object>(value: unknown, label: string): T {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Invalid clearcoat ' + label);
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new TypeError(`Invalid clearcoat ${label}; pass an object.`);
   return value as T;
 }
 function entry<T extends object>(values: readonly T[] | undefined, index: unknown, label: string): T {
   const id = integer(index, label);
-  if (!Array.isArray(values)) throw new TypeError('Missing clearcoat ' + label);
+  if (!Array.isArray(values))
+    throw new TypeError(`Missing clearcoat ${label}; add it to the glTF document or remove the reference.`);
   return record<T>(values[id], label);
 }
 function samplerDefinition(model: PBRModel, texture: GLTFTexture): GLTFSampler {
@@ -34,10 +37,12 @@ function samplerDefinition(model: PBRModel, texture: GLTFTexture): GLTFSampler {
     (sampler.magFilter !== undefined && ![9728, 9729].includes(sampler.magFilter)) ||
     (sampler.minFilter !== undefined && ![9728, 9729, 9984, 9985, 9986, 9987].includes(sampler.minFilter))
   )
-    throw new TypeError('Invalid clearcoat texture filter');
+    throw new TypeError(
+      'Invalid clearcoat texture filter; use a glTF magFilter of 9728 or 9729 and a minFilter of 9728, 9729 or 9984 to 9987.',
+    );
   for (const value of [sampler.wrapS, sampler.wrapT])
     if (value !== undefined && ![10497, 33071, 33648].includes(value))
-      throw new TypeError('Invalid clearcoat texture wrapping');
+      throw new TypeError('Invalid clearcoat texture wrapping; use a glTF wrap mode of 10497, 33071 or 33648.');
   return sampler;
 }
 
@@ -51,7 +56,7 @@ export function validateTextureInfo(value: unknown, model: PBRModel): TextureInf
     extensions: { KHR_texture_transform: transform },
   });
   if (info.scale !== undefined && (typeof info.scale !== 'number' || !Number.isFinite(Math.fround(info.scale))))
-    throw new TypeError('Invalid clearcoat normal scale');
+    throw new TypeError('Invalid clearcoat normal scale; pass a finite number that fits float32.');
   const texture = entry<GLTFTexture>(model.asset.doc.textures, index, 'texture');
   model.image(integer(texture.extensions?.KHR_texture_basisu?.source ?? texture.source, 'image source'));
   samplerDefinition(model, texture);
@@ -84,7 +89,8 @@ export class MaterialTextures {
   ) {}
 
   resolve(value: TextureInfo, srgb = false): ClearcoatTexture {
-    if (this.disposed) throw new Error('Material textures are disposed');
+    if (this.disposed)
+      throw new MargoError('disposed', 'Material textures are disposed; create new MaterialTextures for a live model.');
     const info = validateTextureInfo(value, this.model),
       definition = entry<GLTFTexture>(this.model.asset.doc.textures, info.index, 'texture');
     const source = integer(definition.extensions?.KHR_texture_basisu?.source ?? definition.source, 'image source'),
@@ -97,7 +103,9 @@ export class MaterialTextures {
       const image = this.model.image(source),
         size = [image.width, image.height];
       if (size.some((n) => !Number.isSafeInteger(n) || n < 1 || n > this.device.limits.maxTextureDimension2D))
-        throw new RangeError('Clearcoat image exceeds device limit');
+        throw new RangeError(
+          'Clearcoat image exceeds device limit; resize the image to the GPU maxTextureDimension2D or less.',
+        );
       // Reserve all levels so different samplers can share one image without replacing its view.
       const compressed = 'ktx2' in image || 'mipmaps' in image,
         levels =

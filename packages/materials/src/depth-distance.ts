@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 /** Private data-output specialization; beauty data bypasses lighting and colour transfer. */
 export function depthDistanceShader(source: string, group: number, shading: 'depth' | 'distance'): string {
   const declarations = /* wgsl */ `
@@ -38,6 +39,10 @@ fn margoPackDepth(value:f32)->vec4f {
       // G-buffer and ambient entries retain the same local bind-group layout.
       return head + '\n  _=&margoDepthDistance;';
     });
-  if (hooks !== 2) throw new Error('Depth and distance materials require the gltf-pro PBR shader');
+  if (hooks !== 2)
+    throw new MargoError(
+      'state',
+      'Depth and distance materials require the gltf-pro PBR shader; update @margoengine/gltf-pro to a version that matches this package.',
+    );
   return declarations + code;
 }

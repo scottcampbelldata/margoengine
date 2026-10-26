@@ -30,7 +30,8 @@ export function lobeShader(
 ): Pick<MaterialExtension, 'wgsl' | 'declarations' | 'direct' | 'ambient'> {
   const { sheen, specular, anisotropy, iridescence } = config,
     ior = config.ior ?? 1.5;
-  if (!Number.isFinite(Math.fround(ior)) || ior < 1) throw new RangeError('Invalid lobe IOR');
+  if (!Number.isFinite(Math.fround(ior)) || ior < 1)
+    throw new RangeError('Invalid lobe IOR; pass a finite index of refraction of at least 1.');
   const dielectricF0 =
     ior === 1.5
       ? '0.04'

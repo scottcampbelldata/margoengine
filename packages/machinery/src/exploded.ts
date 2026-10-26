@@ -3,13 +3,17 @@ import { meshRuntime } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type { Engine, EnginePlugin, Vec3 } from '@margoengine/core/extension';
 
+/** One part of an {@link ExplodedView}. */
 export interface ExplodedPart {
+  /** The mesh to move; it must belong to the engine the view is attached to. */
   node: MeshHandle;
+  /** Where the part ends up at `amount` 1, as [x, y, z] from its setup position, in scene units. */
   offset: Vec3;
 }
 /** Moves parts from their setup positions along their offsets by `amount` (0..1). Positions are written only when `amount` changes, so a view at rest costs nothing per frame. */
 export class ExplodedView implements EnginePlugin {
   readonly name = 'exploded-view';
+  /** How far the parts are exploded, from 0 (assembled, the default) to 1 (full offsets). Anything else throws on the next frame. */
   amount = 0;
   private origins: number[][] = [];
   private applied = NaN;
@@ -28,7 +32,9 @@ export class ExplodedView implements EnginePlugin {
         offset.length !== 3 ||
         offset.some((v) => !Number.isFinite(Math.fround(v)))
       )
-        throw new TypeError('Invalid exploded part');
+        throw new TypeError(
+          'Invalid exploded part: node must belong to this engine and offset be three finite numbers; pass [x, y, z] in scene units.',
+        );
       return [node.position.x, node.position.y, node.position.z];
     });
     this.applied = NaN;
@@ -46,7 +52,7 @@ export class ExplodedView implements EnginePlugin {
         z = p[2] + offset[2] * this.amount;
       node.check();
       if (!Number.isFinite(Math.fround(x)) || !Number.isFinite(Math.fround(y)) || !Number.isFinite(Math.fround(z)))
-        throw new RangeError('Invalid exploded position');
+        throw new RangeError('Exploded position is not finite in float32; reduce the offset or the amount.');
       const t = node.engine.store.transforms;
       t.x[node.id] = x;
       t.y[node.id] = y;

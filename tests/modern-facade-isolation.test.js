@@ -16,20 +16,20 @@ const featureMarkers = {
   shadows: 'Invalid shadow options',
   environment: 'environment:lighting',
   cad: 'part-instancer',
-  cadAsync: 'Invalid CAD input',
-  kinematics: 'Invalid solver limits',
+  cadAsync: 'CAD input must be a non-empty ArrayBuffer',
+  kinematics: 'breaks the solver limits',
   surface: 'surface-physics',
   telemetry: 'telemetry-channel',
   section: 'section-planes',
-  assembly: 'Invalid assembly tag',
-  metrology: 'Invalid metrology vertex',
+  assembly: 'Assembly tag must be a non-empty string',
+  metrology: 'Vertex index is out of range',
   spatial: 'BVH requires 1..1000000 triangles',
   clearance: 'Clearance requires geometry',
-  materials: 'Unknown industrial material',
+  materials: 'Unknown industrial material name',
   overlays: 'engineering-annotations',
   exploded: 'exploded-view',
   // worldAnchor is a shared helper; retaining it must not pull in SVG annotations.
-  worldAnchor: 'Invalid annotation anchor',
+  worldAnchor: 'Anchor point must be three finite numbers',
 };
 const cases = [
   // Wrappers load the one implementation they wrap: creative particles over vfx, scenery's SkyMoon over sky.

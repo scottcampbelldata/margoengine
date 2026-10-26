@@ -68,6 +68,7 @@ export type {
 } from './texture-kinds.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+/** Raw pixels for `new Texture({ data, width, height })`: tightly packed RGBA8 rows, top row first. */
 export type RawImage = { data: Uint8Array | Uint8ClampedArray; width: number; height: number };
 /** What `Material.envMap` takes: a cube Texture (CubeTexture), an Environment, a cube render target or a six-layer GPUTexture. */
 export type EnvMapSource = Texture | EnvironmentMap | CubeTarget | GPUTexture;
@@ -102,8 +103,11 @@ export type TextureSource =
   | CubeTarget
   | TranscodedTexture
   | CubeSource;
+/** Texture wrap mode on one axis: `'repeat'` (default), `'clamp'` or `'mirror'`. */
 export type Wrap = 'repeat' | 'clamp' | 'mirror';
+/** Texture sampling filter: `'linear'` (default) or `'nearest'`. */
 export type Filter = 'linear' | 'nearest';
+/** Options for `new Texture(source, options)`; every field is optional and documented with its default. */
 export interface TextureOptions {
   /**
    * How colour values are stored: `'srgb'` (decoded on sampling), `'linear'`, or `'display-p3'` (8-bit Display P3
@@ -379,7 +383,9 @@ export class Texture {
       typeof source !== 'object' ||
       !(Object.keys(textureOptions) as (keyof TextureOptions)[]).every((k) => textureOptions[k][0](o[k]))
     )
-      throw new TypeError('Invalid texture source or options');
+      throw new TypeError(
+        'Texture needs an image, canvas, video or {data, width, height} source and valid options; check TextureOptions.',
+      );
     this.options = { ...o };
     this.kind = kindOf(source, o);
     for (const key of Object.keys(o) as (keyof TextureOptions)[]) {
@@ -706,7 +712,7 @@ export class Texture {
       dimension: TextureDimension = k.type === 'faces' ? 'cube' : k.dimension,
       limit = dimension === '3d' ? device.limits.maxTextureDimension3D : device.limits.maxTextureDimension2D;
     if (w > limit || h > limit || (dimension === '3d' ? d > limit : d > device.limits.maxTextureArrayLayers))
-      throw new RangeError('Texture exceeds device limit');
+      throw new RangeError('Texture exceeds device limit; resize it to maxTextureDimension2D or less.');
     let t = slot.texture;
     const pending = slot.version !== this.version;
     if (
@@ -813,7 +819,7 @@ export class Texture {
     if (!w || !h || ('readyState' in s && s.readyState < 2))
       return slot.texture ? [this.view(slot, srgb), slot.sampler] : undefined;
     if (w > device.limits.maxTextureDimension2D || h > device.limits.maxTextureDimension2D)
-      throw new RangeError('Texture exceeds device limit');
+      throw new RangeError('Texture exceeds device limit; resize it to maxTextureDimension2D or less.');
     let t = slot.texture;
     const pending = slot.version !== this.version;
     // A new colour space or mip setting needs a new GPU copy; it is made on the upload after `update()`. Display P3
@@ -951,7 +957,8 @@ async function fetchBitmap(url: string | URL, signal?: AbortSignal, get?: typeof
   });
   try {
     signal?.throwIfAborted();
-    if (bitmap.width * bitmap.height > maxPixels) throw new RangeError('Texture exceeds decoded size limit');
+    if (bitmap.width * bitmap.height > maxPixels)
+      throw new RangeError('Texture exceeds decoded size limit; use an image of 4096x4096 pixels or fewer.');
     return bitmap;
   } catch (error) {
     bitmap.close();
@@ -1074,7 +1081,9 @@ export async function loadCubeTexture(
  * light through a ramp (`gradientMap` or `steps`); `basic` is unlit.
  */
 export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance' | 'lambert' | 'phong' | 'toon';
+/** How depth and distance materials store their value: `'basic'` (grayscale, default for depth) or `'rgba'` (24-bit fixed point, default for distance). */
 export type DepthPacking = 'basic' | 'rgba';
+/** How a material combines with what is behind it: `'normal'` (default), `'additive'`, `'multiply'` or `'none'` (opaque write). */
 export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 /** A live linear colour array (what gltf-pro reads every frame) whose `set` takes any colour input, like the option. */
 type LiveColor = number[] & { set(value: ColorInput): number[] };
@@ -1130,6 +1139,7 @@ export interface PhysicalOptions {
   attenuationColor?: ColorInput;
   attenuationDistance?: number;
 }
+/** Options for `new Material(options)`. Every field is optional; the default is a white `'standard'` PBR material. Invalid values throw a `TypeError` or `RangeError` that names the fix. */
 export interface MaterialOptions extends PhysicalOptions {
   shading?: Shading;
   /** Depth/distance output: grayscale or RGBA-packed normalized depth. Defaults to basic for depth, rgba for distance. */
@@ -1277,24 +1287,25 @@ const mapSlots = [
   'anisotropyMap',
   'thicknessMap',
 ] as const;
+/** Names of the texture maps a material can hold, such as `'map'`, `'normalMap'` or `'aoMap'`. */
 export type MapSlot = (typeof mapSlots)[number];
 const slots = ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'matcap'] as const,
   names = ['baseMap', 'mrMap', 'normalMap', 'aoMap', 'emissiveMap', 'matcap'];
 const unit = (v: unknown, label: string) => {
-  if (typeof v !== 'number' || !(v >= 0 && v <= 1)) throw new RangeError('Material ' + label + ' must be in [0, 1]');
+  if (typeof v !== 'number' || !(v >= 0 && v <= 1))
+    throw new RangeError(`Material ${label} must be in [0, 1]; set a number from 0 to 1.`);
   return v;
 };
 const rasterMask = (v: number, label: string): number => {
-  if (typeof v !== 'number')
-    throw new TypeError('Material ' + label + ' must be a number; set an unsigned 32-bit integer');
+  if (typeof v !== 'number') throw new TypeError(`Material ${label} must be a number; set an unsigned 32-bit integer`);
   if (!Number.isInteger(v) || v < 0 || v > 0xffffffff)
-    throw new RangeError('Material ' + label + ' is out of range; set an integer from 0 through 4294967295');
+    throw new RangeError(`Material ${label} is out of range; set an integer from 0 through 4294967295`);
   return v;
 };
 const rasterFloat = (v: number, label: string): number => {
-  if (typeof v !== 'number') throw new TypeError('Material ' + label + ' must be a number; set a finite float32 value');
+  if (typeof v !== 'number') throw new TypeError(`Material ${label} must be a number; set a finite float32 value`);
   if (!Number.isFinite(Math.fround(v)))
-    throw new RangeError('Material ' + label + ' is not finite as float32; set a finite float32 value');
+    throw new RangeError(`Material ${label} is not finite as float32; set a finite float32 value`);
   return v;
 };
 const stencilFunctions: readonly string[] = [
@@ -1321,7 +1332,7 @@ const stencilOperations: readonly string[] = [
 const finiteFloat = (v: unknown, label: string, min = -Infinity): number => {
   if (typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || !(v >= min))
     throw new RangeError(
-      'Material ' + label + ' must be finite as float32' + (min > -Infinity ? ' and >= ' + min : ''),
+      `Material ${label} must be finite as float32${min > -Infinity ? ` and >= ${min}` : ''}; set a number in that range.`,
     );
   return v;
 };
@@ -1365,11 +1376,11 @@ const rasterDefaults: Raster = {
   wireframe: false,
 };
 const flag = (v: unknown, label: string): boolean => {
-  if (typeof v !== 'boolean') throw new TypeError('Material ' + label + ' must be a boolean; set true or false');
+  if (typeof v !== 'boolean') throw new TypeError(`Material ${label} must be a boolean; set true or false`);
   return v;
 };
 const oneOf = (list: readonly string[], kind: string) => (v: unknown, label: string) => {
-  if (!list.includes(v as string)) throw new TypeError('Material ' + label + ' is invalid; set ' + kind);
+  if (!list.includes(v as string)) throw new TypeError(`Material ${label} is invalid; set ${kind}`);
   return v;
 };
 const rasterChecks: Record<keyof Raster, (v: never, label: string) => unknown> = {
@@ -1443,7 +1454,7 @@ const extensions: Record<keyof PhysicalOptions, string> = {
 // '#rrggbb', '#rgb' and 0xrrggbb are sRGB (math's parseColor); arrays are linear [r, g, b] or [r, g, b, a], each 0-1.
 const linear = (c: ColorInput, label: string): number[] => {
   if (typeof c === 'number' && !(Number.isInteger(c) && c >= 0 && c <= 0xffffff))
-    throw new RangeError('Material ' + label + ' number must be a 0xrrggbb sRGB colour; set 0x000000 through 0xffffff');
+    throw new RangeError(`Material ${label} number must be a 0xrrggbb sRGB colour; set 0x000000 through 0xffffff`);
   const v =
     typeof c === 'number' || (typeof c === 'string' && hexColor(c))
       ? (parseColor(c) as number[])
@@ -1452,7 +1463,7 @@ const linear = (c: ColorInput, label: string): number[] => {
         : [];
   if (v.length < 3 || v.length > 4)
     throw new TypeError(
-      'Invalid material ' + label + "; set '#rrggbb', '#rgb', 0xrrggbb or linear [r, g, b] with components 0-1",
+      `Invalid material ${label}; set '#rrggbb', '#rgb', 0xrrggbb or linear [r, g, b] with components 0-1`,
     );
   v.forEach((x) => unit(x, label));
   return v;
@@ -1691,7 +1702,7 @@ function mapPlan(m: Material) {
   const slots = mapSlots.map((k, i): readonly [number, number] | null => {
     const texture = m[k];
     if (!texture) return null;
-    if (!(texture instanceof Texture)) throw new TypeError('Material ' + k + ' must be a Texture');
+    if (!(texture instanceof Texture)) throw new TypeError(`Material ${k} must be a Texture; pass a Texture instance.`);
     const srgb = texture.options.colorSpace ? texture.options.colorSpace === 'srgb' : [0, 4, 9, 12].includes(i);
     const fallback = i === 2 || i === 7 ? 1 : i === 15 ? 2 : 0,
       pending = !texture.width || !texture.height || ('readyState' in texture.source && texture.source.readyState < 2);
@@ -1799,7 +1810,10 @@ export function materialShader(source: string, group: number, shading: Shading):
     // Auxiliary entries call surface() but not the beauty fragment. Retain the same bind group layout there.
     code = code.replace('fn surface(i:Out,front:bool)->Surface {', '$&\n  _=mat_matcap;_=mat_matcapS;');
   if (count !== (shading === 'standard' ? 5 : lit ? 5 + edits.length : 6))
-    throw new Error('Materials require the standard gltf-pro PBR shader');
+    throw new MargoError(
+      'state',
+      'Materials require the standard gltf-pro PBR shader; update @margoengine/gltf-pro to a version that matches this package.',
+    );
   const declarations = names
     .slice(0, shading === 'matcap' ? 6 : 5)
     .map(
@@ -2028,7 +2042,8 @@ export class Material {
   private setMap(i: number, value: Texture | null): void {
     const key = mapSlots[i + 5] as keyof PhysicalOptions;
     if (value != null) {
-      if (!(value instanceof Texture)) throw new TypeError('Material ' + key + ' must be a Texture');
+      if (!(value instanceof Texture))
+        throw new TypeError(`Material ${key} must be a Texture; pass a Texture instance.`);
       this.enable(key);
       while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
     }
@@ -2130,10 +2145,10 @@ export class Material {
       (o.normalScale !== undefined &&
         (typeof o.normalScale !== 'number' || !Number.isFinite(Math.fround(o.normalScale))))
     )
-      throw new TypeError('Invalid material options');
+      throw new TypeError('Invalid material options; check shading, side, transparent, doubleSided and normalScale.');
     for (const slot of [...mapSlots, 'matcap'] as const)
       if (o[slot] != null && !(o[slot] instanceof Texture))
-        throw new TypeError('Material ' + slot + ' must be a Texture');
+        throw new TypeError(`Material ${slot} must be a Texture; pass a Texture instance.`);
     this.shading = shading;
     this.switches.toneMapped = lit.includes(shading);
     this.depthPacking = o.depthPacking === undefined ? (shading === 'distance' ? 'rgba' : 'basic') : o.depthPacking;
@@ -2389,7 +2404,7 @@ export class Material {
     return this.packing;
   }
   set depthPacking(v: DepthPacking) {
-    if (v !== 'basic' && v !== 'rgba') throw new TypeError('Invalid material depthPacking');
+    if (v !== 'basic' && v !== 'rgba') throw new TypeError("Invalid material depthPacking; use 'basic' or 'rgba'.");
     this.packing = v;
   }
   get referencePosition(): readonly [number, number, number] {
@@ -2495,7 +2510,7 @@ export class Material {
     return this.rotation;
   }
   set anisotropyRotation(v: number) {
-    if (!Number.isFinite(v)) throw new RangeError('Invalid anisotropyRotation');
+    if (!Number.isFinite(v)) throw new RangeError('Invalid anisotropyRotation; set a finite angle in radians.');
     const p = this.enable('anisotropyRotation');
     this.rotation = v;
     p[17] = Math.cos(v);
@@ -2736,7 +2751,8 @@ export class Material {
     return this.settings[2] === 1 ? 'double' : this.settings[2] === 2 ? 'back' : 'front';
   }
   set side(v: MaterialSide) {
-    if (!['front', 'back', 'double'].includes(v)) throw new TypeError('Invalid material side');
+    if (!['front', 'back', 'double'].includes(v))
+      throw new TypeError("Invalid material side; use 'front', 'back' or 'double'.");
     this.settings[2] = v === 'double' ? 1 : v === 'back' ? 2 : 0;
   }
   get doubleSided(): boolean {
@@ -2755,7 +2771,8 @@ export class Material {
   ): this {
     const f = featureMaps.indexOf(slot as (typeof featureMaps)[number]),
       i = slot === undefined || f >= 0 ? -1 : mapSlots.indexOf(slot as MapSlot);
-    if (slot !== undefined && f < 0 && i < 0) throw new TypeError('Invalid UV transform slot');
+    if (slot !== undefined && f < 0 && i < 0)
+      throw new TypeError('Invalid UV transform slot; pass a map name such as map or normalMap, or omit it.');
     const transform: TextureTransform = f === 3 ? { texCoord: 1, ...t } : (t ?? {}),
       { texCoord } = textureCoordinates({ extensions: { KHR_texture_transform: transform } }),
       rows = textureTransform(transform, texCoord);
@@ -2952,7 +2969,9 @@ function vertexCount(g: MeshGeometry): number {
     (t && t.length !== count * 4) ||
     (c && width !== 3 && width !== 4)
   )
-    throw new RangeError('Mismatched mesh geometry attributes');
+    throw new RangeError(
+      'Mesh geometry attributes do not match; give 3 to 1,000,000 vertices, each with a normal, and size the other attributes to match.',
+    );
   return count;
 }
 /** Packed vertices `from` to `to` (exclusive) of validated geometry, in a new array. */
@@ -2983,7 +3002,8 @@ function packVertices(g: MeshGeometry, from: number, to: number): Float32Array {
     }
     for (let k = 0; k < 4; k++) v[o + 16 + k] = c && k < width ? c[i * width + k] * scale : 1;
   }
-  if (v.some((value) => !Number.isFinite(value))) throw new RangeError('Non-finite mesh geometry attribute');
+  if (v.some((value) => !Number.isFinite(value)))
+    throw new RangeError('Mesh geometry attributes must be finite; remove NaN and Infinity values.');
   return v;
 }
 function pack(g: MeshGeometry): PreparedGeometry {
@@ -2995,7 +3015,9 @@ function pack(g: MeshGeometry): PreparedGeometry {
   if (g.indices)
     for (let i = 0; i < indexCount; i++)
       if (!Number.isSafeInteger(g.indices[i]) || g.indices[i] < 0 || g.indices[i] >= count)
-        throw new RangeError('Invalid mesh geometry index');
+        throw new RangeError(
+          'Mesh geometry index is out of range; use whole numbers from 0 to the vertex count minus 1.',
+        );
   return {
     vertices: v,
     indices: g.indices ? Uint32Array.from(g.indices) : Uint32Array.from({ length: count }, (_, i) => i),
@@ -3022,7 +3044,9 @@ function meshGroups(geometry: MeshGeometry, indexCount: number, materials: reado
       g.materialIndex < 0 ||
       g.materialIndex >= materials.length
     )
-      throw new RangeError('Invalid mesh geometry group');
+      throw new RangeError(
+        'Mesh geometry group is invalid; use a start and count that are multiples of 3 within the indices, and an existing materialIndex.',
+      );
   const ranges = [...groups].sort((a, b) => a.start - b.start);
   for (let i = 1; i < ranges.length; i++)
     if (ranges[i].start < ranges[i - 1].start + ranges[i - 1].count)
@@ -3445,7 +3469,9 @@ export function createMesh<M extends Material | readonly Material[]>(
     // The current material of each slot (`groups[i].materialIndex`); a swap replaces the contents.
     assigned: Material[] = array ? [...(material as readonly Material[])] : [material as Material];
   if (!assigned.length || assigned.some((m) => !(m instanceof Material)) || !Number.isFinite(renderOrder))
-    throw new TypeError('Invalid material mesh');
+    throw new TypeError(
+      'Material mesh needs a Material or a non-empty array of them and a finite renderOrder; pass those.',
+    );
   assigned.forEach(usable);
   const data = packGeometry(geometry),
     groups = meshGroups(geometry, data.indices.length, assigned, array);

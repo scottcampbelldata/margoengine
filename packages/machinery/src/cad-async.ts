@@ -1,8 +1,10 @@
 import { engineRuntime, Geometry, PbrMaterial } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import type { Mesh } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import type { CADModel } from './cad.js';
 import { capError, maxBytes } from './cad-parser.js';
+/** A file format `parseCADAsync` and `loadCAD` read. */
 export type CADFormat = 'stl' | 'obj' | 'step' | 'iges';
 /**
  * Reads a STEP or IGES file in place of the bundled OpenCascade worker. It gets the same arguments as
@@ -15,8 +17,11 @@ export type CADImporter = (
   format: 'step' | 'iges',
   options: CADImportOptions,
 ) => Promise<CADModel>;
+/** Options for `parseCADAsync` and `loadCAD`; each one lists its default. */
 export interface CADImportOptions {
+  /** Cancels the import (and the download in `loadCAD`); the worker is terminated and the parts created so far are disposed. Default none. */
   signal?: AbortSignal;
+  /** Called with 0 to 100 while the file is read. Default none. */
   onProgress?: (percent: number) => void;
   /**
    * Shading normals (default true). STEP/IGES: OpenCascade's own surface normals, smooth across each curved face and
@@ -57,6 +62,15 @@ export interface CADImportOptions {
    */
   importer?: CADImporter;
 }
+/**
+ * Imports STL, OBJ, STEP or IGES bytes in a worker and resolves with the model. The buffer is transferred and detaches.
+ * Rejects on `signal` abort, after `timeoutMs`, or if the file is invalid; nothing is left in the engine then.
+ *
+ * @example
+ * ```ts
+ * const model = await parseCADAsync(engine, bytes, 'step', { onProgress: (percent) => console.log(percent) });
+ * ```
+ */
 export function parseCADAsync(
   instance: EngineKernel,
   buffer: ArrayBuffer,
@@ -65,7 +79,9 @@ export function parseCADAsync(
 ): Promise<CADModel> {
   options.signal?.throwIfAborted();
   if (!(buffer instanceof ArrayBuffer) || !buffer.byteLength || !['stl', 'obj', 'step', 'iges'].includes(format))
-    throw new TypeError('Invalid CAD input');
+    throw new TypeError(
+      'CAD input must be a non-empty ArrayBuffer with format stl, obj, step or iges; pass the file bytes and one of those formats.',
+    );
   if (buffer.byteLength > maxBytes)
     throw capError(`CAD exceeds 64 MiB (${buffer.byteLength} > ${maxBytes} bytes)`, format);
   const timeoutMs = options.timeoutMs ?? 120_000;
@@ -80,7 +96,7 @@ export function parseCADAsync(
   if (!(typeof creaseAngle === 'number' && creaseAngle >= 0 && creaseAngle <= 180))
     throw new RangeError('creaseAngle must be a number of degrees from 0 to 180');
   const engine = engineRuntime(instance);
-  if (engine.disposed) throw new Error('Engine is disposed');
+  if (engine.disposed) throw new MargoError('disposed', 'Engine is disposed; create a new Engine before loading CAD.');
   const { importer } = options;
   if (importer !== undefined && typeof importer !== 'function') throw new TypeError('importer must be a function');
   if (importer && (format === 'step' || format === 'iges')) return importer(instance, buffer, format, options);
@@ -116,9 +132,12 @@ export function parseCADAsync(
     // A worker that died (out of memory, an uncaught error) is reported by name; the next load starts a new one.
     worker.onerror = (event) => {
       event.preventDefault?.();
-      fail(new Error(`CAD worker failed: ${event.message || 'unknown error'}`));
+      fail(
+        new MargoError('failed', `CAD worker failed: ${event.message || 'unknown error'}; try loading the file again.`),
+      );
     };
-    worker.onmessageerror = () => fail(new Error('CAD worker message failed'));
+    worker.onmessageerror = () =>
+      fail(new MargoError('failed', 'CAD worker message failed; try loading the file again.'));
     worker.onmessage = (event) => {
       const message = event.data;
       if (!message || typeof message !== 'object') {
@@ -143,9 +162,14 @@ export function parseCADAsync(
       }
       try {
         options.signal?.throwIfAborted();
-        if (engine.disposed) throw new Error('Engine is disposed');
+        if (engine.disposed)
+          throw new MargoError('disposed', 'Engine is disposed; create a new Engine before loading CAD.');
         if (message.done) {
-          if (!root || !meshes.length) throw new Error('CAD contains no geometry');
+          if (!root || !meshes.length)
+            throw new MargoError(
+              'failed',
+              'CAD file contains no geometry; check that the file holds at least one solid or mesh.',
+            );
           root.visible = true;
           cleanup();
           resolve({ root, meshes, dispose });
@@ -172,7 +196,8 @@ export function parseCADAsync(
                 bounds: part.bounds,
               })
             : meshes[part.reuse]?.geometry;
-        if (!geometry) throw new Error('Invalid CAD part reference');
+        if (!geometry)
+          throw new MargoError('failed', 'CAD worker reused a part that does not exist; try loading the file again.');
         const mesh = engine.createMesh(root);
         created.push(mesh);
         mesh.name = part.name;

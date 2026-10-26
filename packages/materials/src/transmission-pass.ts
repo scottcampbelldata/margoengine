@@ -19,6 +19,7 @@ import { groupCode, alphaBlend } from '../../shared/pass.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
+/** Options for `Transmission.attach()`: the frame graph `order` (default 3). */
 export interface TransmissionPassOptions {
   /** Frame graph order of the copy and the transmissive draws: after the opaque scene (1) and sky (2), before water (4), fog (5) and OIT (8). Default 3. */
   order?: number;
@@ -150,8 +151,11 @@ export class Transmission implements EnginePlugin, PBRTransmission {
   /** Refracts the scene through the model's transmissive primitives (gltf-pro model or materials mesh). Returns a remover. */
   add(model: PBRModel): () => void {
     if (this.disposed || !this.engine)
-      throw new Error(
-        this.disposed ? 'Transmission is disposed' : 'Transmission.add needs Transmission.attach(engine) first',
+      throw margoError(
+        this.disposed ? 'disposed' : 'state',
+        this.disposed
+          ? 'Transmission is disposed; create a new Transmission.'
+          : 'Transmission.add needs Transmission.attach(engine) first',
       );
     let release = this.models.get(model);
     if (!release) {
@@ -169,7 +173,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
     return release;
   }
   setup(engine: Engine): void {
-    if (this.disposed) throw new Error('Transmission is disposed');
+    if (this.disposed) throw margoError('disposed', 'Transmission is disposed; create a new Transmission.');
     if (!engine.gpu)
       throw margoError('unsupported', 'Transmission requires WebGPU: create the engine with a WebGPU device');
     this.engine = engine;
@@ -235,7 +239,8 @@ export class Transmission implements EnginePlugin, PBRTransmission {
     const target = sceneTarget(c),
       device = c.device;
     if (target?.resolvedColor.format !== 'rgba16float')
-      throw new Error(
+      throw margoError(
+        'state',
         'Transmission needs an HDR scene capture: attach a PostStack with an HDR or display effect (such as Tonemap or Bloom) first',
       );
     if (!this.pipelines) {

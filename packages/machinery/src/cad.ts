@@ -9,6 +9,7 @@ import {
   type EnginePlugin,
   type FrameGraph,
 } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import { readResponse } from '../../shared/loading.js';
 import { meshTriangles, mergePrimitives } from '../../shared/mesh-source.js';
 import type { PBRSourcePrimitive } from '../../shared/pbr-source.js';
@@ -17,11 +18,24 @@ import { maxBytes, maxIndices, parseCADGeometry, fingerprint, hash } from './cad
 import { parseCADAsync, type CADFormat, type CADImportOptions } from './cad-async.js';
 import { PartPacks, type PackShadowPrimitive } from './pack.js';
 export type { PackShadowPrimitive } from './pack.js';
+/** A loaded CAD file: one `root` mesh over one child mesh per part. `dispose()` removes all of them (also via `using`). */
 export interface CADModel {
+  /** Parent of every part; hidden until the whole file has loaded. */
   root: MeshHandle;
+  /** One mesh per part, in file order. */
   meshes: readonly MeshHandle[];
+  /** Disposes the root and every part. */
   dispose(): void;
 }
+/**
+ * Makes meshes with identical triangles share one geometry, so they upload and draw from one buffer pair. Returns how many
+ * parts it saw and how many were unique. Meshes without geometry are skipped; an input with none at all throws.
+ *
+ * @example
+ * ```ts
+ * const { parts, unique } = deduplicateParts(model.meshes);
+ * ```
+ */
 export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number; unique: number } {
   const seen = new Map<string, Array<{ data: Float32Array; geometry: Geometry }>>(),
     known = new Map<Geometry, Geometry>(),
@@ -78,7 +92,8 @@ export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number;
     }
     if (geometry !== canonical) mesh.setGeometry(canonical);
   }
-  if (!parts) throw new TypeError('CAD grouping contains no supported geometry');
+  if (!parts)
+    throw new TypeError('CAD grouping found no supported geometry; pass meshes that have geometry or PBR primitives.');
   return { parts, unique };
 }
 
@@ -114,10 +129,22 @@ function shareBuffers(
 function primitiveFingerprint(primitives: readonly PBRSourcePrimitive[]): Float32Array {
   const { vertices, indices } = mergePrimitives(primitives, true, (vertexCount, indexCount) => {
     if (!vertexCount || !indexCount || indexCount % 3) throw new RangeError('PBR geometry needs whole triangles');
-    if (indexCount > maxIndices) throw new RangeError('Deduplication triangle limit');
+    if (indexCount > maxIndices)
+      throw new RangeError(
+        `Deduplication supports at most ${maxIndices / 3} triangles per part; split the part or skip deduplication.`,
+      );
   });
   return fingerprint({ vertices, indices });
 }
+/**
+ * Reads STL or OBJ text or bytes into meshes under one root, synchronously. Units stay as in the file. For STEP and IGES,
+ * or to keep the main thread free, use {@link loadCAD} or `parseCADAsync`.
+ *
+ * @example
+ * ```ts
+ * const model = parseCAD(engine, await (await fetch('/part.stl')).arrayBuffer(), 'stl');
+ * ```
+ */
 export function parseCAD(
   instance: EngineKernel,
   input: string | ArrayBuffer | ArrayBufferView,
@@ -151,6 +178,16 @@ export function parseCAD(
     throw error;
   }
 }
+/**
+ * Downloads a CAD file and imports it: STL, OBJ, STEP or IGES, chosen by the `format` option or the file extension. Pass
+ * `signal` to cancel the download and the import. STEP and IGES run in a worker (meters); see {@link CADImportOptions} for
+ * every option and its default.
+ *
+ * @example
+ * ```ts
+ * const model = await loadCAD(engine, '/part.step', { signal: AbortSignal.timeout(30_000) });
+ * ```
+ */
 export async function loadCAD(
   engine: EngineKernel,
   url: string | URL,
@@ -168,11 +205,15 @@ export async function loadCAD(
     extension = target.pathname.toLowerCase().split('.').at(-1),
     kind = format ?? (extension === 'stp' ? 'step' : extension === 'igs' ? 'iges' : extension);
   if (kind !== 'stl' && kind !== 'obj' && kind !== 'step' && kind !== 'iges')
-    throw new TypeError('Specify STL, OBJ, STEP or IGES format');
+    throw new TypeError('Cannot tell the CAD format from the URL; pass the format option: stl, obj, step or iges.');
   signal?.throwIfAborted();
   const stepOrIges = kind === 'step' || kind === 'iges';
   if (typeof Worker === 'undefined' && !(stepOrIges && options.importer)) {
-    if (stepOrIges) throw new Error('STEP and IGES import requires Web Workers or an importer');
+    if (stepOrIges)
+      throw new MargoError(
+        'unsupported',
+        'STEP and IGES import requires Web Workers; pass an importer option to read them without one.',
+      );
     return parseCAD(engine, data, kind, options);
   }
   const buffer =

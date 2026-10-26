@@ -5,13 +5,16 @@ import { textureCoordinates } from '@margoengine/gltf-pro/coordinates';
 import { coordinateSlot, coordinateWGSL } from './coordinates.js';
 import type { ClearcoatTexture } from './index.js';
 import { transmissionShader } from './transmission-shader.js';
+import { MargoError } from '@margoengine/math/errors';
 
+/** KHR_materials_volume: `thicknessFactor` in mesh units (default 0), `attenuationColor` linear RGB (default [1, 1, 1]) and `attenuationDistance` in world units (default Infinity). Needs a transmission factor above 0. */
 export interface VolumeOptions {
   thicknessFactor?: number;
   thicknessTexture?: ClearcoatTexture;
   attenuationColor?: readonly [number, number, number];
   attenuationDistance?: number;
 }
+/** Options for `transmission()`: `factor` from 0 to 1 (default 0), `ior` (default 1.5), `dispersion` (default 0), an `opaqueColor` view and optional `transmissionTexture` and `volume`. */
 export interface TransmissionOptions extends TransmissionPassOptions {
   factor?: number;
   ior?: number;
@@ -21,12 +24,16 @@ export interface TransmissionOptions extends TransmissionPassOptions {
   transmissionTexture?: ClearcoatTexture;
   volume?: VolumeOptions;
 }
+/** Check that `value` (or `fallback` when undefined) is a finite float32 number from `min` to `max`; returns it or throws a `RangeError` naming `label`. */
 export function transmissionScalar(value: unknown, fallback: number, label: string, min = 0, max = Infinity): number {
   const n = value === undefined ? fallback : value;
   if (typeof n !== 'number' || !Number.isFinite(Math.fround(n)) || n < min || n > max)
-    throw new RangeError('Invalid transmission ' + label);
+    throw new RangeError(
+      `Invalid transmission ${label}; pass a finite number${min > 0 ? ` of at least ${min}` : ''}${max < Infinity ? ` and at most ${max}` : ''}.`,
+    );
   return n;
 }
+/** Check transmission options and return the resolved factor, ior, dispersion, thickness, inverse attenuation distance and colour. Throws before anything is allocated. */
 export function validateTransmission(options: TransmissionOptions): {
   factor: number;
   ior: number;
@@ -36,14 +43,15 @@ export function validateTransmission(options: TransmissionOptions): {
   color: readonly number[];
 } {
   if (!options || typeof options !== 'object' || Array.isArray(options))
-    throw new TypeError('Invalid transmission options');
+    throw new TypeError('Invalid transmission options; pass an options object such as { factor: 1 }.');
   const factor = transmissionScalar(options.factor, 0, 'factor', 0, 1),
     ior = transmissionScalar(options.ior, 1.5, 'IOR', 1),
     dispersion = transmissionScalar(options.dispersion, 0, 'dispersion');
   const volume = options.volume;
   if (volume !== undefined && (!volume || typeof volume !== 'object' || Array.isArray(volume)))
-    throw new TypeError('Invalid KHR_materials_volume');
-  if (volume && factor === 0) throw new Error('KHR_materials_volume requires transmission');
+    throw new TypeError('Invalid KHR_materials_volume; pass an object such as { thicknessFactor: 1 }.');
+  if (volume && factor === 0)
+    throw new MargoError('state', 'KHR_materials_volume requires transmission; set a transmission factor above 0.');
   const thickness = transmissionScalar(volume?.thicknessFactor, 0, 'thickness');
   const color = volume?.attenuationColor === undefined ? [1, 1, 1] : volume.attenuationColor;
   if (
@@ -51,12 +59,13 @@ export function validateTransmission(options: TransmissionOptions): {
     color.length !== 3 ||
     color.some((c) => typeof c !== 'number' || !Number.isFinite(c) || c < 0 || c > 1)
   )
-    throw new RangeError('Invalid volume attenuation color');
+    throw new RangeError('Invalid volume attenuation color; pass [r, g, b] with each component from 0 to 1.');
   const distance = volume?.attenuationDistance === undefined ? Infinity : volume.attenuationDistance;
   if (typeof distance !== 'number' || distance <= 0 || Number.isNaN(distance))
-    throw new RangeError('Invalid volume attenuation distance');
+    throw new RangeError('Invalid volume attenuation distance; pass a number above 0, or Infinity for none.');
   const inverseDistance = distance === Infinity ? 0 : 1 / distance;
-  if (!Number.isFinite(Math.fround(inverseDistance))) throw new RangeError('Volume attenuation distance is too small');
+  if (!Number.isFinite(Math.fround(inverseDistance)))
+    throw new RangeError('Volume attenuation distance is too small for float32; pass a larger distance.');
   return { factor, ior, dispersion, thickness, inverseDistance, color };
 }
 function validateMap(map: ClearcoatTexture): void {

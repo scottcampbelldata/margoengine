@@ -42,16 +42,23 @@ export interface RadiusDimension {
   diameter?: boolean;
   label?: string;
 }
+/** A dimension to draw: linear (the default `kind`), angle or radius. */
 export type DimensionSpec = LinearDimension | AngleDimension | RadiusDimension;
+/** Options for {@link Dimensions}; every field is optional and shows its default. */
 export interface DimensionOptions {
   /** Plugin name, unique per engine; its Lines and TextRenderer are `<name>:lines` and `<name>:text`. Default 'dimensions'. */
   name?: string;
   /** Lengths as `measureDistance` reports them. Default 'mm' with 1 scene unit = 1 m. */
   unit?: 'mm' | 'in' | 'm';
+  /** Meters per scene unit. Default 1. */
   sceneToMeters?: number;
+  /** Digits after the decimal point in labels, 0 to 6. Default 2. */
   decimals?: number;
+  /** Line and label colour. Default '#ffa76c'. */
   color?: ColorInput;
+  /** Label outline colour. Default '#101720'. */
   outlineColor?: ColorInput;
+  /** Label font. Default the text package's built-in font. */
   font?: Font | FontOptions;
   /** CSS pixels: label em size (14), line width (1.5), arrowhead length (10). */
   fontSize?: number;
@@ -99,7 +106,9 @@ export class Dimensions implements EnginePlugin {
       (o.decimals ?? 2) > 6 ||
       [o.fontSize ?? 14, o.lineWidth ?? 1.5, o.arrowSize ?? 10].some((v) => !Number.isFinite(v) || v <= 0)
     )
-      throw new RangeError('Invalid dimension options');
+      throw new RangeError(
+        'Invalid dimension options: unit must be mm, in or m, sceneToMeters above 0, decimals an integer from 0 to 6, and fontSize, lineWidth and arrowSize above 0.',
+      );
     this.lines = new Lines({ name: this.name + ':lines' });
     this.text = new TextRenderer({ name: this.name + ':text' });
     this.line = this.lines.add(
@@ -127,7 +136,8 @@ export class Dimensions implements EnginePlugin {
           : kind === 'radius'
             ? [(spec as RadiusDimension).center, spec.a]
             : [spec.a, (spec as LinearDimension).b];
-    if (!['linear', 'angle', 'radius'].includes(kind)) throw new TypeError('Unknown dimension kind');
+    if (!['linear', 'angle', 'radius'].includes(kind))
+      throw new TypeError("Unknown dimension kind; use 'linear', 'angle' or 'radius'.");
     for (const anchor of anchors) worldAnchor(anchor);
     const offset = (spec as LinearDimension).offset,
       radius = (spec as AngleDimension).radius;
@@ -139,7 +149,9 @@ export class Dimensions implements EnginePlugin {
           : offset.length === 2 && offset.every(Number.isFinite))) ||
       (kind === 'angle' && radius !== undefined && !(radius > 0 && Number.isFinite(radius)))
     )
-      throw new RangeError('Invalid dimension offset or radius');
+      throw new RangeError(
+        'Invalid dimension offset or radius: offset must be a finite number or [x, y], and radius a finite number above 0.',
+      );
     if (!this.items.has(spec)) {
       const o = this.options;
       this.items.set(

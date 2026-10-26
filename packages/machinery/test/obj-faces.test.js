@@ -123,8 +123,8 @@ test('an OBJ triangle keeps its corners; a quad splits along its inside diagonal
     assert.throws(() => load('v 0 0 0\nv 1 1 0\nv 1 0 0\nv 0 1 0\nf 1 2 3 4\n'), {
       message: 'OBJ quad crosses itself; split it into two triangles',
     });
-    assert.throws(() => load('v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 1\nf 1 2 3 4\n'), { message: 'Nonplanar OBJ face' });
-    assert.throws(() => load('v 0 0 0\nv 1 0 0\nv 2 0 0\nf 1 2 3\n'), { message: 'Degenerate OBJ face' });
+    assert.throws(() => load('v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 1\nf 1 2 3 4\n'), { message: /^Nonplanar OBJ face/ });
+    assert.throws(() => load('v 0 0 0\nv 1 0 0\nv 2 0 0\nf 1 2 3\n'), { message: /^Degenerate OBJ face/ });
   } finally {
     engine.dispose();
   }

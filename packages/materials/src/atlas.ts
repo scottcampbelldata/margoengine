@@ -1,5 +1,6 @@
 import type { TextureTransform } from '@margoengine/gltf-pro';
 type Pixels = { data: ArrayLike<number>; width: number; height: number };
+/** Options for `packAtlas`: edge padding (default 2) and the largest atlas edge (default 4096). */
 export interface AtlasOptions {
   /** Edge texels repeated around each image so filtering and the first mip levels do not bleed. Default 2. */ padding?: number;
   /** Largest width or height. Default 4096. */
@@ -39,7 +40,9 @@ export function packAtlas(
     maxSize < 1 ||
     maxSize * maxSize > 16_777_216
   )
-    throw new RangeError('Invalid atlas images or options');
+    throw new RangeError(
+      'Atlas needs images, an integer padding of 0 or more and an integer maxSize up to 4096; pass valid values.',
+    );
   const list = images.map(pixels),
     p = padding,
     order = list.map((_, i) => i).sort((a, b) => list[b][0].height - list[a][0].height),
@@ -71,7 +74,8 @@ export function packAtlas(
     let x = 0,
       y = 0,
       shelf = 0;
-    if (width > maxSize) throw new RangeError('Atlas images exceed maxSize');
+    if (width > maxSize)
+      throw new RangeError('Atlas images exceed maxSize; raise maxSize (4096 at most) or pass fewer images.');
     for (const i of order) {
       const w = list[i][0].width + 2 * p,
         h = list[i][0].height + 2 * p;

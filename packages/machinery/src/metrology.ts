@@ -6,7 +6,9 @@ import { featureEdges } from './edges.js';
 function vertex(node: Mesh, index: number): Vec3 {
   node.check();
   if (!node.geometry || !Number.isSafeInteger(index) || index < 0 || index >= node.geometry.vertices.length / 6)
-    throw new RangeError('Invalid metrology vertex');
+    throw new RangeError(
+      'Vertex index is out of range or the node has no geometry; pass an integer index below the vertex count.',
+    );
   return Array.from(node.geometry.vertices.subarray(index * 6, index * 6 + 3)) as unknown as Vec3;
 }
 /** A mesh vertex, in the node's local space. */
@@ -25,14 +27,18 @@ export function faceAnchor(node: Mesh, triangle: number): Anchor {
   node.check();
   const indices = node.geometry?.indices;
   if (!indices || !Number.isSafeInteger(triangle) || triangle < 0 || triangle >= indices.length / 3)
-    throw new RangeError('Invalid metrology face');
+    throw new RangeError(
+      'Triangle index is out of range or the node has no indices; pass an integer index below the triangle count.',
+    );
   const points = [0, 1, 2].map((i) => vertex(node, indices[triangle * 3 + i]));
   return { node, point: [0, 1, 2].map((a) => (points[0][a] + points[1][a] + points[2][a]) / 3) as unknown as Vec3 };
 }
 /** The centre of a circular, planar ring of mesh vertices (a hole rim); throws if the ring is not circular within `tolerance`. */
 export function holeAnchor(node: Mesh, ring: readonly number[], tolerance = 1e-5): Anchor {
   if (ring.length < 3 || ring.length > 4096 || !Number.isFinite(tolerance) || tolerance <= 0)
-    throw new RangeError('Invalid circular hole ring');
+    throw new RangeError(
+      'Hole ring needs between 3 and 4096 vertex indices and a tolerance above 0; check the ring and tolerance.',
+    );
   const points = ring.map((i) => vertex(node, i)),
     a = points[0],
     u = sub(points[1], a);
@@ -44,7 +50,7 @@ export function holeAnchor(node: Mesh, ring: readonly number[], tolerance = 1e-5
     if (dot(n, n) > 1e-20) break;
   }
   const denominator = 2 * dot(n, n);
-  if (denominator <= 1e-20) throw new RangeError('Hole ring is collinear');
+  if (denominator <= 1e-20) throw new RangeError('Hole ring points are collinear; pass a ring that encloses an area.');
   const x = cross(v, n),
     y = cross(n, u),
     center: Vec3 = [0, 1, 2].map((i) => a[i] + (dot(u, u) * x[i] + dot(v, v) * y[i]) / denominator) as unknown as Vec3,
@@ -57,7 +63,9 @@ export function holeAnchor(node: Mesh, ring: readonly number[], tolerance = 1e-5
         Math.abs(dot(sub(p, a), n)) / normal > tolerance,
     )
   )
-    throw new RangeError('Hole ring is not circular and planar');
+    throw new RangeError(
+      'Hole ring is not circular and planar within the tolerance; pass a circular ring or raise the tolerance.',
+    );
   return { node, point: center };
 }
 
@@ -109,7 +117,9 @@ export function snapFeature(
   worldAnchor({ point: worldPoint });
   node.check();
   if (!node.geometry || !(maxDistance >= 0) || (kind !== 'vertex' && kind !== 'edge'))
-    throw new RangeError('Invalid snap');
+    throw new RangeError(
+      'Snap needs a node with geometry, a supported feature kind and a maxDistance of 0 or more; check the arguments.',
+    );
   const { pairs, corners } = topology(node.geometry);
   let best: Anchor | null = null,
     distance = maxDistance;
@@ -165,7 +175,9 @@ export function snapAnchor(
     Number.isNaN(maxDistance) ||
     !['vertex', 'edge', 'face', 'hole'].includes(kind)
   )
-    throw new RangeError('Invalid snap');
+    throw new RangeError(
+      'Snap needs a node with geometry, a supported feature kind and a maxDistance of 0 or more; check the arguments.',
+    );
   if (kind === 'vertex' || kind === 'edge') return snapFeature(node, worldPoint, kind, maxDistance);
   let best: Anchor | null = null,
     distance = maxDistance;
@@ -187,6 +199,8 @@ export function snapAnchor(
  */
 export function measureDistance(a: Anchor, b: Anchor, unit: 'mm' | 'in' | 'm' = 'mm', sceneToMeters = 1): number {
   if (!['mm', 'in', 'm'].includes(unit) || !Number.isFinite(sceneToMeters) || sceneToMeters <= 0)
-    throw new RangeError('Invalid measurement unit scale');
+    throw new RangeError(
+      "Measurement unit must be 'mm', 'in' or 'm' and sceneToMeters a finite number above 0; pass valid values.",
+    );
   return Math.hypot(...anchorDelta(a, b)) * sceneToMeters * (unit === 'mm' ? 1000 : unit === 'in' ? 1 / 0.0254 : 1);
 }

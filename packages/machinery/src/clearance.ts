@@ -25,7 +25,10 @@ function bounds(node: Mesh, kind: 'aabb' | 'obb'): Bounds {
     half = min.map((v, a) => ((max[a] - v) / 2) * Math.hypot(...axes[a]));
   for (const axis of axes) {
     const length = Math.hypot(...axis);
-    if (!length || !Number.isFinite(length)) throw new RangeError('Invalid clearance transform');
+    if (!length || !Number.isFinite(length))
+      throw new RangeError(
+        'Mesh transform has a zero or non-finite axis scale; give the mesh a non-zero finite scale before measuring clearance.',
+      );
     for (let a = 0; a < 3; a++) axis[a] /= length;
   }
   if (
@@ -82,14 +85,30 @@ function segment(a: number[], b: number[], c: number[], d: number[]): [number[],
   }
   return [a.map((x, i) => x + u[i] * s), c.map((x, i) => x + v[i] * t)];
 }
+/** The result of {@link measureClearance}, in world units. */
 export interface Clearance {
+  /** Shortest distance between the two bounding boxes; 0 when they touch or overlap. */
   distance: number;
+  /** True when the boxes overlap (touching faces do not interfere). */
   interfering: boolean;
+  /** Closest point on the first mesh's box. */
   pointA: Vec3;
+  /** Closest point on the second mesh's box. */
   pointB: Vec3;
 }
+/**
+ * Gap between the bounding boxes of two meshes with geometry: `'obb'` (default) follows each mesh's rotation, `'aabb'` uses
+ * axis-aligned boxes. It measures boxes, not exact solids. Render once first so world matrices are current. `'obb'` rejects
+ * sheared transforms; use `'aabb'` for those.
+ *
+ * @example
+ * ```ts
+ * const { distance, interfering } = measureClearance(shaft, housing);
+ * ```
+ */
 export function measureClearance(a: Mesh, b: Mesh, kind: 'aabb' | 'obb' = 'obb'): Clearance {
-  if (!['aabb', 'obb'].includes(kind)) throw new TypeError('Invalid clearance bounds');
+  if (!['aabb', 'obb'].includes(kind))
+    throw new TypeError("Clearance bounds must be 'aabb' or 'obb'; pass one of them.");
   const x = bounds(a, kind),
     y = bounds(b, kind),
     delta = sub(y.center, x.center),

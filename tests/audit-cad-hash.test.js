@@ -8,6 +8,7 @@ import { transformWithOxc } from 'vite';
 const url = new URL('../packages/machinery/src/cad-parser.ts', import.meta.url);
 let source = await readFile(url, 'utf8');
 source = source.replace("'@margoengine/core'", JSON.stringify(import.meta.resolve('@margoengine/core')));
+source = source.replace("'@margoengine/math/errors'", JSON.stringify(import.meta.resolve('@margoengine/math/errors')));
 source = source.replace(/'(\.\.\/\.\.\/shared\/[^']+)'/g, (_, path) => JSON.stringify(new URL(path, url).href));
 const { code } = await transformWithOxc(source, 'cad-parser.ts', { loader: 'ts', target: 'es2022' });
 const { hash } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));

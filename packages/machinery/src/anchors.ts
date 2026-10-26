@@ -1,5 +1,6 @@
 import { meshRuntime } from '@margoengine/core/extension';
 import type { Mesh as MeshHandle, Vec3 } from '@margoengine/core';
+import { MargoError } from '@margoengine/math/errors';
 
 /** A point: in world space, or in `node`'s local space (it then follows the node). */
 export interface Anchor {
@@ -10,7 +11,9 @@ export interface Anchor {
 export function worldAnchor(anchor: Anchor): Vec3 {
   const p = anchor.point;
   if (p.length !== 3 || !p.every((v) => typeof v === 'number' && Number.isFinite(Math.fround(v))))
-    throw new TypeError('Invalid annotation anchor');
+    throw new TypeError(
+      'Anchor point must be three finite numbers in float32 range; pass [x, y, z] in world or node-local units.',
+    );
   if (!anchor.node) return p;
   anchor.node.check();
   const m = meshRuntime(anchor.node).matrix;
@@ -31,7 +34,11 @@ function lift(anchor: Anchor, stop: number): number[] {
   if (!store) return [...worldAnchor(anchor)];
   const t = store.transforms;
   for (let id = mesh.id, depth = 0; id !== stop && id >= 0; id = store.parents[id], depth++) {
-    if (depth >= 64) throw new Error('Invalid anchor hierarchy');
+    if (depth >= 64)
+      throw new MargoError(
+        'state',
+        'Anchor node hierarchy is deeper than 64 levels or loops; flatten the parent chain of the anchor node.',
+      );
     const l = Math.hypot(t.qx[id], t.qy[id], t.qz[id], t.qw[id]),
       qx = t.qx[id] / l,
       qy = t.qy[id] / l,

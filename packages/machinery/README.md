@@ -75,6 +75,81 @@ Import individual systems from these subpaths to keep unrelated code out of dire
 | `/overlays` | `EngineeringAnnotations`, `worldAnchor`, `projectAnnotation` |
 | `/exploded` | `ExplodedView` |
 
+Find parts by name or tag, measure the gap between two parts, and explode an assembly (zero configuration; `amount` starts at 0, `measureClearance` defaults to `'obb'`):
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { AssemblyIndex } from 'margoengine/machinery/assembly';
+import { measureClearance } from 'margoengine/machinery/clearance';
+import { ExplodedView } from 'margoengine/machinery/exploded';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const base = engine.createMesh().setGeometry(box());
+base.name = 'Base plate';
+const lid = engine.createMesh().setGeometry(box()).setPosition([0, 2, 0]);
+lid.name = 'Base lid';
+
+const index = new AssemblyIndex(engine); // call index.refresh() after renaming or adding meshes
+index.tag(lid, 'cover');
+const plates = index.findChildrenByName('Base*'); // '*' is the only wildcard
+const covers = index.findByTag('cover');
+index.setSubtreeVisible(covers[0], true);
+
+engine.render();
+const { distance, interfering } = measureClearance(base, lid); // 'obb' (default) or 'aabb'
+console.log(plates.length, distance, interfering);
+
+const exploded = ExplodedView.attach(engine, [{ node: lid, offset: [0, 3, 0] }]);
+exploded.amount = 1; // 0 = assembled, 1 = fully exploded
+```
+
+One short example per system (every option has a default; `engine.render()` first so world transforms are current):
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { Kinematics } from 'margoengine/machinery/kinematics';
+import { SurfacePhysics } from 'margoengine/machinery/surface';
+import { TelemetryChannel } from 'margoengine/machinery/telemetry';
+import { SectionPlanes, boxSection } from 'margoengine/machinery/section';
+import { vertexAnchor, measureDistance } from 'margoengine/machinery/metrology';
+import { EngineeringAnnotations } from 'margoengine/machinery/overlays';
+import { AssemblyBVH } from 'margoengine/machinery/spatial';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const belt = engine.createMesh().setGeometry(box()).setScale([4, 0.1, 1]);
+const crate = engine.createMesh().setGeometry(box()).setScale([0.4, 0.4, 0.4]).setPosition([-1, 0.25, 0]);
+
+// Surface transport: a belt moving at 0.5 units per second carries the crate along +x (friction 0.5 by default).
+await SurfacePhysics.attach(
+  engine,
+  [{ node: crate, carrier: 0, lane: 0, axis: [1, 0, 0], halfLength: 0.2 }],
+  [{ node: belt, velocity: [0.5, 0, 0] }],
+);
+
+// Telemetry: drive a joint from binary frames over a WebSocket, played back 100 ms late by default.
+const joint = Kinematics.attach(engine, [{ node: belt, axis: 'z', min: -1, max: 1 }]);
+const telemetry = await TelemetryChannel.attach(engine, joint, { delay: 100 });
+telemetry.connect(new WebSocket('wss://plant.example/joints'));
+
+// Sections: cut the scene to the inside of a box; closed solids get hatched caps (cap: false turns them off).
+SectionPlanes.attach(engine, { planes: boxSection([-3, -1, -1], [3, 1, 1]), hatch: 8 });
+
+// Metrology and annotations: measure between two vertices and draw the dimension over the canvas.
+engine.render();
+const a = vertexAnchor(crate, 0);
+const b = vertexAnchor(crate, 1);
+console.log(measureDistance(a, b, 'mm')); // 'mm' (default), 'in' or 'm'
+EngineeringAnnotations.attach(engine, { unit: 'mm', scale: 1000, dimensions: [{ a, b }] });
+
+// Picking: a Wasm BVH over the assembly; call rebuild() after parts move.
+const bvh = await AssemblyBVH.create([belt, crate]);
+bvh.rebuild();
+console.log(bvh.raycast([0, 5, 0], [0, -1, 0])?.distance);
+bvh.dispose();
+```
+
+Errors follow the engine convention: `TypeError` and `RangeError` for bad arguments, and a `MargoError` with a `code` (`'state'` for an unattached plugin or a stale BVH, `'disposed'`, `'attached'`, `'unsupported'` for missing WebGPU, `'failed'`) for everything else; branch on `error.code`, not on the message.
+
 Required dependencies remain shared: telemetry uses kinematics, and BVH picking uses its Wasm spatial kernel. Importing materials or exploded views does not load those systems. Retain the JavaScript and shared chunks in the package's `dist` directory when serving these entry points directly.
 
 `SurfacePhysics.create(parts, carriers)` and `TelemetryChannel.create(kinematics)` asynchronously prepare fixed Wasm storage before `engine.use`. Surface transport uses world-space carrier velocity or angular velocity × contact offset, friction bounded by μg, and lanes with fixed unit axes and supplied part half lengths. It supports reverse travel, stopped parts and carrier transfer. Parts must be root meshes without prismatic joints. This is supported surface transport with 1D accumulation, not general rigid-body physics.

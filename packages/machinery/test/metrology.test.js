@@ -69,7 +69,7 @@ test('snapAnchor snaps to CAD corners and feature edges, never to triangulation 
         Math.abs(Math.hypot(worldAnchor(rim)[0], worldAnchor(rim)[2]) - 0.5) < 0.01,
       'on the top rim',
     );
-    assert.throws(() => snapAnchor(cube, [0, 0, 0], { kind: 'corner' }), /Invalid snap/);
+    assert.throws(() => snapAnchor(cube, [0, 0, 0], { kind: 'corner' }), /Snap needs a node with geometry/);
   } finally {
     e.dispose();
   }

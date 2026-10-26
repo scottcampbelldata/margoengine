@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel } from '@margoengine/core';
 import {
   PbrMaterial,
@@ -62,9 +63,12 @@ export interface SectionOptions {
   /** Hatch lines per world unit on the caps (0: none). Default 8. */
   hatch?: number;
 }
+/** Six section planes that keep the inside of the box from `min` to `max`, for `new SectionPlanes({ planes: boxSection(min, max) })`. Throws a RangeError when a min is not below its max. */
 export function boxSection(min: readonly [number, number, number], max: readonly [number, number, number]): number[][] {
   if (![...min, ...max].every(Number.isFinite) || min.some((v, i) => v >= max[i]))
-    throw new RangeError('Invalid section box');
+    throw new RangeError(
+      'Section box needs finite min and max with every min below its max; pass a box with positive size.',
+    );
   return [
     [1, 0, 0, -min[0]],
     [-1, 0, 0, max[0]],
@@ -74,6 +78,12 @@ export function boxSection(min: readonly [number, number, number], max: readonly
     [0, 0, -1, max[2]],
   ];
 }
+/**
+ * Clips the scene with up to six planes and caps the cut faces of closed solids with a hatched colour. Needs WebGPU (and `depth32float-stencil8` for caps).
+ *
+ * @example
+ * SectionPlanes.attach(engine, { planes: [[1, 0, 0, 0]], hatch: 8 });
+ */
 export class SectionPlanes implements EnginePlugin {
   readonly name = 'section-planes';
   private engine?: Engine;
@@ -127,19 +137,27 @@ export class SectionPlanes implements EnginePlugin {
       !Number.isFinite(this.hatch) ||
       this.hatch < 0
     )
-      throw new RangeError('Invalid section options or changed plane count');
+      throw new RangeError(
+        'Section options need 1 to 6 planes, a plane count that stays the same after creation and a finite hatch of 0 or more; check the options.',
+      );
     for (const p of this.options.planes)
       if (
         p.length !== 4 ||
         !p.every((v) => typeof v === 'number' && Number.isFinite(Math.fround(v))) ||
         !Math.hypot(p[0], p[1], p[2])
       )
-        throw new TypeError('Invalid section plane');
+        throw new TypeError(
+          'Section plane must be four finite numbers [a, b, c, d] with a non-zero normal; pass a valid plane.',
+        );
   }
   setup(engine: Engine): void {
-    if (!engine.gpu) throw new Error('SectionPlanes requires WebGPU');
+    if (!engine.gpu)
+      throw new MargoError('unsupported', 'SectionPlanes requires WebGPU; use a browser with WebGPU enabled.');
     if (this.cap && !engine.gpu.features.has('depth32float-stencil8'))
-      throw new Error('Solid caps require depth32float-stencil8');
+      throw new MargoError(
+        'unsupported',
+        'Solid caps require the depth32float-stencil8 GPU feature; use a device that has it, or set cap: false.',
+      );
     this.engine = engine;
     for (let i = 0; i <= this.options.planes.length; i++) {
       const buffer = engine.gpu.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -178,7 +196,10 @@ export class SectionPlanes implements EnginePlugin {
   private upload(context: GPUContext): void {
     const inverse = this.inverse;
     if (!invertMatrixStable(context.camera.matrix, inverse, this.inverseWorkspace))
-      throw new Error('Invalid cap camera');
+      throw new MargoError(
+        'state',
+        'Cap camera matrix cannot be inverted; use a camera with a finite, non-singular matrix.',
+      );
     for (let i = 0; i < this.rows.length; i++) {
       const row = this.rows[i];
       for (let p = 0; p < this.options.planes.length; p++) {

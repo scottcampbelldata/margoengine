@@ -213,7 +213,7 @@ test('STL text with unterminated facets is rejected in linear time (was quadrati
   const engine = await headless(),
     text = 'solid x\n' + 'facet normal 0 0 1\n'.repeat(200_000) + 'endsolid x\n',
     started = performance.now();
-  assert.throws(() => parseCAD(engine, text, 'stl'), /STL triangle limit/);
+  assert.throws(() => parseCAD(engine, text, 'stl'), /STL contains no triangles/);
   assert.ok(performance.now() - started < 2000, `took ${performance.now() - started} ms`);
 });
 

@@ -213,7 +213,9 @@ self.onmessage = async (event: MessageEvent) => {
       buffer.byteLength > maxBytes ||
       !['stl', 'obj', 'step', 'iges'].includes(format)
     )
-      throw new TypeError('Invalid CAD worker input');
+      throw new TypeError(
+        'Invalid CAD worker input: expected a non-empty ArrayBuffer within the size limit and format stl, obj, step or iges.',
+      );
     let last = -1;
     const progress = (percent: number) => {
       const value = Math.floor(percent);
@@ -248,24 +250,28 @@ self.onmessage = async (event: MessageEvent) => {
         // A Wasm trap (unreachable, out-of-bounds access, abort) on a malformed file: report it by name. This
         // worker is never reused (one per load), so the next file starts a fresh OpenCascade.
         throw new RangeError(
-          `B-Rep import failed: OpenCascade ${error instanceof WebAssembly.RuntimeError ? 'trapped' : 'threw'} on this ${format.toUpperCase()} file`,
+          `B-Rep import failed: OpenCascade ${error instanceof WebAssembly.RuntimeError ? 'trapped' : 'threw'} on this ${format.toUpperCase()} file; check the file or try exporting it again.`,
         );
       }
       if (!result?.success || !Array.isArray(result.meshes) || !result.meshes.length)
-        throw new RangeError('B-Rep import failed');
+        throw new RangeError(
+          'B-Rep import failed: OpenCascade read no meshes; check that the file is valid STEP or IGES.',
+        );
       checkCount('Too many CAD parts', result.meshes.length, countLimit('maxParts', maxParts), 'maxParts');
       let total = 0;
       parts = result.meshes.map((mesh) => {
         const positions = mesh.attributes?.position?.array,
           index = mesh.index?.array;
         if (!positions || !index || positions.length % 3 || index.length % 3)
-          throw new RangeError('B-Rep import returned an invalid mesh');
+          throw new RangeError('B-Rep import returned an invalid mesh; check the file or try exporting it again.');
         total += index.length;
         if (total > maxIndices) throw capError(`CAD triangle limit (over ${maxIndices / 3})`, format);
         const vertexCount = positions.length / 3;
         for (const i of index)
           if (!(Number.isInteger(i) && i >= 0 && i < vertexCount))
-            throw new RangeError('B-Rep import returned an index outside its mesh');
+            throw new RangeError(
+              'B-Rep import returned an index outside its mesh; check the file or try exporting it again.',
+            );
         const p = positions,
           normals = new Float32Array(p.length),
           // Area-weighted triangle normals per vertex. OpenCascade gives every B-rep face its own vertices, so this is a

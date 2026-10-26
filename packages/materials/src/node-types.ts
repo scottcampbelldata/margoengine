@@ -35,6 +35,7 @@ export interface MixNode {
   b: ValueNode;
   factor: ValueNode;
 }
+/** A node that produces a colour, scalar or texture sample, or combines others with add, mul or mix. */
 export type ValueNode = ColorNode | ScalarNode | TextureNode | AddNode | MulNode | MixNode;
 
 /** Decode a vec4 input as a tangent-space normal in the existing vertex frame. */
@@ -62,6 +63,7 @@ export interface ClearcoatNode {
   roughness?: ValueNode;
   normal?: NormalMapNode;
 }
+/** Volume inputs of a transmission node: `thickness`, `attenuationColor` and `attenuationDistance` (world units, default Infinity). */
 export interface NodeVolume {
   /** A vec4 thickness input uses G. Missing thickness means 0. */
   thickness?: ValueNode;
@@ -88,6 +90,7 @@ export interface EmitNode {
   clearcoat?: ClearcoatNode;
   transmission?: TransmissionNode;
 }
+/** Any node a `MaterialGraph` can hold; a graph needs exactly one `emit` node. */
 export type MaterialNode = ValueNode | NormalMapNode | MetalRoughNode | ClearcoatNode | TransmissionNode | EmitNode;
 
 /** Object references connect nodes; nested nodes need not also appear in nodes. */

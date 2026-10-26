@@ -188,7 +188,10 @@ test('angle and radius dimensions, hidden parts and lifecycle', () => {
     [false, true],
     'a hidden part hides its dimension',
   );
-  assert.throws(() => dims.add({ a: { point: [0, 0, 0] }, b: { point: [NaN, 0, 0] } }), /anchor/);
+  assert.throws(
+    () => dims.add({ a: { point: [0, 0, 0] }, b: { point: [NaN, 0, 0] } }),
+    /Anchor point must be three finite numbers/,
+  );
   assert.throws(
     () =>
       dims.add({

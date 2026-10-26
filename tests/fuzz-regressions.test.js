@@ -129,11 +129,11 @@ test('STL and OBJ (machinery): no quadratic STL scan, non-UTF-8 text is a named 
   const engine = await headless();
   // Found: hang. "facet normal" without "endfacet" made the lazy regex rescan to the end of the file each time.
   const stl = `solid x\n${'facet normal 0 0 1\n'.repeat(200_000)}endsolid x\n`;
-  await quick('ASCII STL', () => assert.throws(() => parseCAD(engine, stl, 'stl'), /STL triangle limit/));
+  await quick('ASCII STL', () => assert.throws(() => parseCAD(engine, stl, 'stl'), /STL contains no triangles/));
   // Found: TextDecoder's own TypeError ("The encoded data was not valid for encoding utf-8").
   const bad = new Uint8Array([0x76, 0x20, 0xff, 0xfe, 0x0a]);
-  assert.throws(() => parseCAD(engine, bad, 'obj'), /^TypeError: Invalid OBJ: not UTF-8 text$/);
-  assert.throws(() => parseCAD(engine, bad, 'stl'), /^TypeError: Invalid STL: not UTF-8 text$/);
+  assert.throws(() => parseCAD(engine, bad, 'obj'), /^TypeError: Invalid OBJ: the file is not UTF-8 text; /);
+  assert.throws(() => parseCAD(engine, bad, 'stl'), /^TypeError: Invalid STL: the file is not UTF-8 text; /);
   const ok = parseCAD(
     engine,
     'solid t\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid t\n',
@@ -213,7 +213,7 @@ test('SurfacePhysics: malformed parts, carriers and vectors are TypeErrors that 
       (e) => e instanceof TypeError && message.test(e.message),
     );
   }
-  await assert.rejects(SurfacePhysics.create('parts', []), /Invalid surface parts or carriers/);
+  await assert.rejects(SurfacePhysics.create('parts', []), /Surface parts and carriers must be arrays/);
   engine.dispose();
 });
 

@@ -1,7 +1,9 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import { meshRuntime } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type { Engine, EnginePlugin, Mesh, Vec3 } from '@margoengine/core/extension';
+/** One joint of a {@link Kinematics} chain: a node that rotates or slides along one local axis. */
 export interface Joint {
   node: MeshHandle;
   axis: 'x' | 'y' | 'z';
@@ -10,12 +12,14 @@ export interface Joint {
   max: number;
   velocity?: number;
 }
+/** A gear: the target joint follows `source * ratio + offset`. The target is driven, so it cannot be set directly. */
 export interface GearCoupling {
   source: number;
   target: number;
   ratio: number;
   offset?: number;
 }
+/** A slider-crank: a revolute `source` drives a prismatic `target` through a crank of `radius` and a rod of `rodLength` (above `radius`), plus `phase` radians and `offset`. */
 export interface PistonCoupling {
   source: number;
   target: number;
@@ -24,11 +28,13 @@ export interface PistonCoupling {
   phase?: number;
   offset?: number;
 }
+/** An inverse-kinematics goal: bring `point` (node-local, default the node origin) of `node` to the world position `target`. */
 export interface IKTarget {
   node: MeshHandle;
   target: Vec3;
   point?: Vec3;
 }
+/** Keeps `pointA` of node `a` and `pointB` of node `b` (node-local, default their origins) `length` scene units apart. */
 export interface DistanceConstraint {
   a: MeshHandle;
   b: MeshHandle;
@@ -36,6 +42,7 @@ export interface DistanceConstraint {
   pointA?: Vec3;
   pointB?: Vec3;
 }
+/** Options for {@link Kinematics}: couplings, solver goals and solver limits. */
 export interface KinematicOptions {
   gears?: readonly GearCoupling[];
   pistons?: readonly PistonCoupling[];
@@ -48,7 +55,8 @@ export interface KinematicOptions {
 const zero: Vec3 = [0, 0, 0];
 const finite = (value: number) => typeof value === 'number' && Number.isFinite(Math.fround(value));
 function vector(value: Vec3): void {
-  if (value.length !== 3 || !value.every(finite)) throw new TypeError('Invalid constraint point');
+  if (value.length !== 3 || !value.every(finite))
+    throw new TypeError('Constraint point must be three finite numbers; pass [x, y, z] in node-local units.');
 }
 function point(node: MeshHandle, p: Vec3): number[] {
   node.check();
@@ -61,6 +69,15 @@ function point(node: MeshHandle, p: Vec3): number[] {
   ];
 }
 
+/**
+ * Joint limits, gears, pistons and a damped least-squares solver for CAD mechanisms. Add it with `Kinematics.attach(engine, joints, options)`,
+ * move joints with `setValue(index, value)` (radians for revolute, scene units for prismatic joints) or set a `velocity` on a joint to animate it,
+ * and call `solve()` to satisfy IK targets and distance constraints. Dispose it to release the joint locks.
+ *
+ * @example
+ * const arm = Kinematics.attach(engine, [{ node: shoulder, axis: 'z', min: -1, max: 1 }]);
+ * arm.setValue(0, 0.5);
+ */
 export class Kinematics implements EnginePlugin {
   readonly name = 'kinematics';
   readonly result = { converged: true, error: 0, iterations: 0 };
@@ -104,7 +121,9 @@ export class Kinematics implements EnginePlugin {
       this.damping <= 0 ||
       (options.targets?.length ?? 0) + (options.distances?.length ?? 0) > 64
     )
-      throw new RangeError('Invalid solver limits');
+      throw new RangeError(
+        'Kinematics breaks the solver limits: at most 1024 joints (32 with targets or distances), 64 targets and distances in total, iterations from 1 to 100, tolerance and damping above 0; reduce them.',
+      );
   }
   setup(engine: Engine): void {
     const seen = new Map<Mesh, Set<string>>();
@@ -119,7 +138,9 @@ export class Kinematics implements EnginePlugin {
         joint.min > joint.max ||
         axes.has((joint.kind ?? 'revolute') + joint.axis)
       )
-        throw new TypeError('Invalid joint');
+        throw new TypeError(
+          "Joint needs a node from this engine, axis 'x', 'y' or 'z', kind 'revolute' or 'prismatic', finite min not above max, and no repeated kind and axis on one node; check the joint list.",
+        );
       axes.add((joint.kind ?? 'revolute') + joint.axis);
       seen.set(joint.node, axes);
     }
@@ -136,9 +157,12 @@ export class Kinematics implements EnginePlugin {
         this.driven.has(c.target) ||
         !finite(c.offset ?? 0)
       )
-        throw new TypeError('Invalid coupling');
+        throw new TypeError(
+          'Coupling needs different source and target joint indices, a target no other coupling drives and a finite offset; check the gears and pistons.',
+        );
       if ('ratio' in c) {
-        if (!finite(c.ratio) || c.ratio === 0) throw new TypeError('Invalid gear ratio');
+        if (!finite(c.ratio) || c.ratio === 0)
+          throw new TypeError('Gear ratio must be a finite non-zero number; set a ratio such as 2 or -0.5.');
       } else if (
         !finite(c.radius) ||
         !finite(c.rodLength) ||
@@ -148,19 +172,28 @@ export class Kinematics implements EnginePlugin {
         this.joints[c.source].kind === 'prismatic' ||
         this.joints[c.target].kind !== 'prismatic'
       )
-        throw new TypeError('Invalid slider-crank linkage');
+        throw new TypeError(
+          'Slider-crank needs a revolute source, a prismatic target, radius above 0 and rodLength above the radius; check the piston.',
+        );
       this.driven.add(c.target);
     }
     while (pending.length) {
       const at = pending.findIndex(
         (c) => !this.driven.has(c.source) || this.order.some((previous) => previous.target === c.source),
       );
-      if (at === -1) throw new Error('Coupling cycle');
+      if (at === -1)
+        throw new MargoError(
+          'state',
+          'Couplings form a cycle; remove one coupling so every driven joint has a driver outside the cycle.',
+        );
       this.order.push(pending.splice(at, 1)[0]);
     }
     const check = (node: MeshHandle) => {
       node.check();
-      if (meshRuntime(node).engine !== engine) throw new TypeError('Constraint node belongs to another engine');
+      if (meshRuntime(node).engine !== engine)
+        throw new TypeError(
+          'Constraint node belongs to another engine; pass nodes created by the engine this Kinematics is attached to.',
+        );
     };
     for (const target of this.options.targets ?? []) {
       check(target.node);
@@ -172,7 +205,10 @@ export class Kinematics implements EnginePlugin {
       check(distance.b);
       vector(distance.pointA ?? zero);
       vector(distance.pointB ?? zero);
-      if (!finite(distance.length) || distance.length < 0) throw new TypeError('Invalid distance constraint');
+      if (!finite(distance.length) || distance.length < 0)
+        throw new TypeError(
+          'Distance constraint length must be a finite number of 0 or more; pass a non-negative length.',
+        );
     }
     this.origins = this.joints.map((joint) => joint.node.position[joint.axis]);
     this.values = this.joints.map((joint, i) => {
@@ -190,7 +226,11 @@ export class Kinematics implements EnginePlugin {
   }
   value(index: number): number {
     const joint = this.joints[index];
-    if (!joint || !this.engine) throw new Error('Joint is not attached');
+    if (!joint || !this.engine)
+      throw new MargoError(
+        'state',
+        'Joint is not attached; add the Kinematics to an engine and pass a joint index below jointCount.',
+      );
     joint.node.check();
     return this.values[index][this.offsets[index]] - (joint.kind === 'prismatic' ? this.origins[index] : 0);
   }
@@ -201,7 +241,8 @@ export class Kinematics implements EnginePlugin {
     return this.engine === engine;
   }
   setExternalControl(engine: Engine | null): void {
-    if (engine && this.engine !== engine) throw new Error('Kinematics belongs to another engine');
+    if (engine && this.engine !== engine)
+      throw new MargoError('attached', 'Kinematics is attached to another engine; create one Kinematics per engine.');
     this.external = engine !== null;
   }
   isDriven(index: number): boolean {
@@ -218,11 +259,14 @@ export class Kinematics implements EnginePlugin {
       value > joint.max ||
       this.driven.has(index)
     )
-      throw new RangeError('Joint value exceeds limits or is coupled');
+      throw new RangeError(
+        'Joint value must be finite and within the joint limits (min and max), and the joint must not be coupled (driven by a gear or piston); set a free joint to a value in range.',
+      );
     joint.node.check();
   }
   setValues(values: ArrayLike<number>): void {
-    if (values.length !== this.joints.length) throw new RangeError('Joint count mismatch');
+    if (values.length !== this.joints.length)
+      throw new RangeError('Joint value count differs from the joint count; pass exactly one value per joint.');
     for (let i = 0; i < values.length; i++) if (!this.driven.has(i)) this.checkValue(i, values[i]);
     this.snapshot();
     try {
@@ -241,7 +285,7 @@ export class Kinematics implements EnginePlugin {
     const joint = this.joints[index];
     joint.node.check();
     const stored = value + (joint.kind === 'prismatic' ? this.origins[index] : 0);
-    if (!finite(stored)) throw new RangeError('Invalid joint value');
+    if (!finite(stored)) throw new RangeError('Joint value is not finite; set a finite number.');
     this.values[index][this.offsets[index]] = stored;
   }
   private write(index: number, value: number): void {
@@ -286,7 +330,9 @@ export class Kinematics implements EnginePlugin {
               Math.sqrt(c.rodLength ** 2 - c.radius ** 2 * Math.sin(source + (c.phase ?? 0)) ** 2) +
               (c.offset ?? 0);
       if (value < this.joints[c.target].min - 1e-6 || value > this.joints[c.target].max + 1e-6)
-        throw new RangeError('Coupling exceeds target joint limits');
+        throw new RangeError(
+          'Coupling drives its target joint outside its limits; widen the target limits or change the ratio and offset.',
+        );
       this.write(c.target, value);
     }
   }
@@ -306,7 +352,11 @@ export class Kinematics implements EnginePlugin {
     return values;
   }
   solve(): typeof this.result {
-    if (!this.engine) throw new Error('Kinematics is not attached');
+    if (!this.engine)
+      throw new MargoError(
+        'state',
+        'Kinematics is not attached; add it to an engine with engine.use(kinematics) before solving.',
+      );
     const variables = this.joints.map((_, i) => i).filter((i) => !this.driven.has(i)),
       n = variables.length;
     this.snapshot();

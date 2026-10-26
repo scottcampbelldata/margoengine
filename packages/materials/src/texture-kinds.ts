@@ -209,7 +209,9 @@ export function validateTranscoded(s: TranscodedTexture): string {
       height = Math.max(1, s.height >> level),
       size = Math.ceil(width / info.block) * info.bytes * Math.ceil(height / info.block);
     if (m?.width !== width || m.height !== height || !(m.data instanceof Uint8Array) || m.data.byteLength !== size)
-      throw new RangeError(`Texture KTX2 mip ${level} does not match a ${width}x${height} ${base} level`);
+      throw new RangeError(
+        `Texture KTX2 mip ${level} does not match a ${width}x${height} ${base} level; pass KTX2Decoder.transcode output unchanged.`,
+      );
   });
   return base;
 }
@@ -222,7 +224,7 @@ export function uploadTranscoded(device: GPUDevice, s: TranscodedTexture, base: 
       `Texture KTX2 format ${base} needs the device feature ${info.feature}; transcode with a KTX2Decoder created for this device`,
     );
   if (Math.max(s.width, s.height) > device.limits.maxTextureDimension2D)
-    throw new RangeError('Texture exceeds device limit');
+    throw new RangeError('Texture exceeds device limit; resize the image to the GPU maxTextureDimension2D or less.');
   const texture = device.createTexture({
     size: [s.width, s.height],
     format: base as GPUTextureFormat,
