@@ -325,6 +325,8 @@ interface PendingBatch {
   members: DrawResource[];
   /** Each member's model. */
   models: PBRModel[];
+  /** Each member's node, read for its matrix when the batch draws (not through its resource and primitive again). */
+  nodes: Mesh[];
 }
 /** True when `a` and `b` hold the same values. */
 function sameValues(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
@@ -343,8 +345,9 @@ function joinBatch(
 ): void {
   const view = c.view ?? c,
     p = r.primitive;
-  // Most draws join the batch the previous draw of their derivation joined.
-  let batch = run.last.get(d);
+  // Most draws join the batch the previous draw of their derivation joined in this run (kept on the derivation: a map
+  // lookup per draw cost more than the rest of the join).
+  let batch = d.joinedRun === run ? (d.joined as PendingBatch | undefined) : undefined;
   if (
     batch &&
     batch.view === view &&
@@ -354,6 +357,7 @@ function joinBatch(
   ) {
     batch.members.push(r);
     batch.models.push(model);
+    batch.nodes.push(p.node);
     return;
   }
   batch = undefined;
@@ -377,14 +381,16 @@ function joinBatch(
       batch.c = c;
       batch.view = view;
       batch.viewAt = viewAt;
-    } else batch = { model, owner: r, d, c, view, viewAt, members: [], models: [] };
+    } else batch = { model, owner: r, d, c, view, viewAt, members: [], models: [], nodes: [] };
     if (!list) run.batches.set(d, (list = []));
     list.push(batch);
     run.pending.push(batch);
   }
-  run.last.set(d, batch);
+  d.joined = batch;
+  d.joinedRun = run;
   batch.members.push(r);
   batch.models.push(model);
+  batch.nodes.push(p.node);
 }
 /** Draws `run`'s pending batches into its pass, in first-draw order. */
 function flushBatches(run: PBRDrawRun): void {
@@ -398,14 +404,14 @@ function flushBatches(run: PBRDrawRun): void {
   } finally {
     for (let i = 0; i < pending.length; i++) {
       const batch = pending[i];
-      batch.members.length = batch.models.length = 0;
+      if (batch.d.joined === batch) batch.d.joined = batch.d.joinedRun = undefined;
+      batch.members.length = batch.models.length = batch.nodes.length = 0;
       batch.model = batch.c = batch.view = batch.viewAt = batch.owner = batch.d = undefined!;
       run.spare.push(batch);
     }
     pending.length = 0;
     for (const list of run.batches.values()) list.length = 0;
     run.batches.clear();
-    run.last.clear();
   }
 }
 /**
@@ -566,8 +572,6 @@ export class PBRDrawRun {
   readonly pending: PendingBatch[] = [];
   /** @internal Drawn batch records, emptied, for the run's next batches. */
   readonly spare: PendingBatch[] = [];
-  /** @internal The batch each derivation's last draw joined. */
-  readonly last = new Map<DrawDerivation, PendingBatch>();
   readonly batches = new Map<DrawDerivation, PendingBatch[]>();
   /** @internal What `draw` checked once for the run's context: its section binding and device caches. */
   private quick?: QuickRun;
@@ -2945,8 +2949,9 @@ export class PBRModel implements EnginePlugin {
         v.fill(0, 16, 48);
         v[16] = v[21] = v[26] = v[31] = v[32] = v[37] = v[42] = v[47] = 1;
         v[97] = 1;
-        const matrices = scratch.matrices;
-        for (let i = 0; i < members.length; i++) matrices[i] = members[i].primitive.node.matrix;
+        const matrices = scratch.matrices,
+          nodes = batch.nodes;
+        for (let i = 0; i < nodes.length; i++) matrices[i] = nodes[i].matrix;
         matrices.length = members.length;
         // Which state: this view's own; else, in a frame another view already drew this batch in, that view's state
         // when it holds the same rows and uniform (nothing to keep apart); else one no view drew this frame; else a new one.

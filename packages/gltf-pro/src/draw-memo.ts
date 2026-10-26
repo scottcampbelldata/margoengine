@@ -56,6 +56,9 @@ export interface DrawDerivation {
   mappedTint: boolean;
   /** False when the finished shader reads the model rows itself, so instanced batches cannot draw it. */
   modelFree: boolean;
+  /** @internal The batch (draw-batch.ts) this derivation's last draw joined in run `joinedRun`, until that run draws it. */
+  joined?: object;
+  joinedRun?: object;
   /** The whole uniform as derived; draws copy it and write their own node rows (16-47) and determinant (97). */
   block: Float32Array;
 }
