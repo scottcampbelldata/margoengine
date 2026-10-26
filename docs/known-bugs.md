@@ -155,27 +155,29 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   weights, writing into one output buffer that the draws bind at their copy's offset. It needs gltf-pro to draw a
   deformed primitive from a buffer offset. The CPU half is the 100 Animations' per-frame checks and uploads.
 
-### cloneModel uploads every copy and core frees meshes in quadratic time
+### cloneModel uploads every copy
 
 - **What:** `p-skeleton-clone`, 50 `cloneModel` copies of RobotExpressive per call (the call also destroys the
-  previous 50): 63.6 ms against three's `SkeletonUtils.clone` 7.9 ms (84.5 before entry 28).
-- **Cause (measured, CPU profile of the call):** about 17 ms is core `Engine.remove`, which unparents a removed mesh's
-  children by scanning the whole parents array (`indexOf` from 0 again for every child) for each of the 3,700 meshes
-  destroyed; about 13 ms creates and fills each copy's GPU vertex buffers, 12 ms its textures and bind groups, and
-  13 ms re-merges its static parts in world space. three's clone shares geometry and textures and touches no GPU.
-  Entry 28 removed the repacking of every copy's vertices (about 13 ms).
-- **Plan:** in core (a bug fix, needs the coordinator's go-ahead under the freeze): unparent in one pass over the
-  children of the removed mesh. In gltf-pro: copies of one asset share its GPU vertex buffers, textures and merged
-  static parts, counted by reference, so `cloneModel` creates only nodes, skeleton and uniforms.
+  previous 50): 47.9 ms against three's `SkeletonUtils.clone` 8.0 ms (84.5 before entry 28, 63.6 before entry 29).
+- **Cause (measured, CPU profile of the call):** creating and filling each copy's GPU vertex buffers, its textures and
+  bind groups, and re-merging its static parts in world space, about 11, 10 and 13 ms a call. three's clone shares
+  geometry and textures and touches no GPU. Fixed so far: the repacking of every copy's vertices (entry 28) and core
+  `Engine.remove` scanning the whole parent column for every removed mesh, about 17 ms (entry 29).
+- **Plan:** in gltf-pro, copies of one asset share its GPU vertex buffers, textures and merged static parts, counted by
+  reference, so `cloneModel` creates only nodes, skeleton and uniforms.
 
-### GPU picking builds its pipeline on every pick
+### GPU picking waits for one readback per pick
 
-- **What:** `p-gpu-pick`, 100 `engine.pick` calls: 407 ms against three's 65 ms.
-- **Cause (read, not yet profiled):** core `GPURenderer.pick` compiles a shader module and creates a render pipeline
-  for every call (and a 1x1 colour and depth texture and two buffers), then waits for its own readback; picks run one
-  at a time.
-- **Plan:** in core (needs the coordinator's go-ahead under the freeze): keep the pick pipeline per pick shader text and
-  the 1x1 targets, so a pick costs one pass and one readback.
+- **What:** `p-gpu-pick`, 100 `engine.pick` calls: 325 ms against three's WebGL 61 ms (407 before entry 29; three's
+  WebGPU backend takes 423 ms).
+- **Cause (measured, CPU profile):** 0.15 ms of JavaScript a pick; the main thread is idle the rest of the 3.25 ms,
+  waiting for the pick's GPU pass and its `mapAsync` readback. `engine.pick` answers overlapping calls one at a time by
+  contract, each reading the scene as it is when its turn comes, so 100 picks wait for 100 round trips. three's WebGL
+  `readRenderTargetPixels` is a synchronous `readPixels`. Entry 29 removed the per-pick shader compile and pipeline
+  and the full instance upload.
+- **Plan:** a batch query that answers many points from one ID pass and one readback (an optional package, or a core
+  change once core has bytes for it: core is at 20,479 of its 20,480 B cap). Changing `engine.pick` to start queued
+  picks before the previous readback would break its documented turn order.
 
 ### SciFiHelmet with image-based lighting: GPU time
 

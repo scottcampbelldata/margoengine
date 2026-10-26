@@ -526,6 +526,38 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   `packages/gltf-pro/tests/model-runs.test.js` (back-to-back models share one pass, a pass between splits them; copies
   share packed arrays), `tests/deep-interaction-animation-resources.test.js` (three Animations, one compute pass).
 
+### 29. Core picking and removing meshes
+
+- **Loss:** `p-gpu-pick` (100 `engine.pick` calls on the 10,000-box frame) 412 ms against three.js WebGL's 65;
+  `p-skeleton-clone` 63.6 ms against 7.9 (entry 28).
+- **Causes, measured** (browser CPU profiles of each scene):
+  1. core `GPURenderer.pick` compiled a shader module and a render pipeline on every call, and rewrote every batch's
+     whole instance buffer (960 KB for 10,000 boxes), then made the next frame upload it all again;
+  2. core `Engine.remove` found a removed mesh's children by scanning the whole parent column (its capacity, 16,384
+     slots in the scene) once per removed mesh: about 17 ms for the 3,700 meshes a call destroys.
+- **Fixes:** pick pipelines share core's draw-variant cache (keyed by shader text; they count toward its 64
+  variants), and a pick uploads only the range a frame would. Each mesh keeps the ids of its children, so a removal
+  unparents only them. Both are core bug fixes: core grows 25 B gzip to 20,479 B (cap 20,480), core + stage to
+  22,781 B.
+- **Image:** unchanged (picking draws no image; the clone scene draws none either).
+- **After** (diagnostic, busy machine, RTX A6000; run `20261026-190630` (5 runs; marked invalid for the spread of
+  three's WebGPU clone); rows in [perf-vs-threejs.md](perf-vs-threejs.md)):
+
+  | Scene | Before | After | three.js |
+  | --- | --- | --- | --- |
+  | `p-gpu-pick`, ms a call | 412 | 325 | 61 (WebGL), 423 (WebGPU), slower |
+  | `p-skeleton-clone`, ms a call | 63.6 | 47.9 | 8.0 (WebGL), slower |
+
+  Still open, in [known-bugs.md](../known-bugs.md#performance-losses-still-open): each pick waits for its own GPU
+  round trip (0.15 ms of JavaScript, about 3.1 ms waiting), one at a time by `engine.pick`'s contract, where three's
+  WebGL readback is a synchronous `readPixels`; each clone still uploads its own GPU buffers and textures and merges
+  its static parts.
+- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity
+  --cases=p-gpu-pick,p-skeleton-clone --runs=5`, then `node bench/parity-report.mjs <run.json> --partial`.
+- **Guard:** `tests/deep-core-resources.test.js` (five picks compile one pipeline; a new pick shader text adds one and
+  the 65th variant throws), `tests/core-remove-children.test.js` (removal unparents only current children, after
+  reparenting and slot reuse; 30,000 removals at capacity 524,288 take under a second, about 3 s before).
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks

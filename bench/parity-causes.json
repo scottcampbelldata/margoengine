@@ -91,12 +91,17 @@
     ]
   },
   "12.7": {
-    "cause": "every cloneModel copy repacked its vertices (now shared per asset). Still slower, different work: each copy creates its own GPU buffers, textures and merged static parts, and core Engine.remove unparents in quadratic time; three clones on the CPU only",
-    "knownBug": "clonemodel-uploads-every-copy-and-core-frees-meshes-in-quadratic-time",
+    "cause": "every cloneModel copy repacked its vertices (now shared per asset), and core Engine.remove scanned every slot of the parent column for each removed mesh (now each mesh keeps its children). Still slower, different work: each copy creates its own GPU buffers, textures and merged static parts; three clones on the CPU only",
+    "knownBug": "clonemodel-uploads-every-copy",
     "fixes": [
       {
         "commit": "63a7edec",
         "tradeoff": "packed arrays live as long as the asset",
+        "rerun": "npm run bench -- parity --cases=p-skeleton-clone --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      },
+      {
+        "commit": "2d541368",
+        "tradeoff": "a Set of child ids per mesh with children",
         "rerun": "npm run bench -- parity --cases=p-skeleton-clone --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
       }
     ]
@@ -112,8 +117,15 @@
     ]
   },
   "16.2": {
-    "cause": "core GPURenderer.pick builds a shader module, pipeline, textures and buffers on every call; a core fix waits for the go-ahead under the freeze",
-    "knownBug": "gpu-picking-builds-its-pipeline-on-every-pick"
+    "cause": "core GPURenderer.pick compiled a shader module and pipeline on every call and rewrote every instance (960 KB for 10,000 boxes); both fixed. Still slower, measured (CPU profile: 0.15 ms of JS a pick, the main thread idle the rest): each pick waits for its own GPU pass and mapAsync readback, about 3.1 ms here, and engine.pick answers overlapping calls one at a time by contract (each reads the scene when its turn comes). three's WebGL readRenderTargetPixels is a synchronous readPixels; three's WebGPU readback is slower than Margo's (423 ms)",
+    "knownBug": "gpu-picking-waits-for-one-readback-per-pick",
+    "fixes": [
+      {
+        "commit": "2d541368",
+        "tradeoff": "pick pipelines count toward the 64 cached shader variants",
+        "rerun": "npm run bench -- parity --cases=p-gpu-pick --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      }
+    ]
   },
   "17.11": {
     "cause": "the scene's density function summed every ball at every grid point (4.2 M terms a frame; three writes each ball only near it), and marchingCubes allocated its grids and a 1.8 M-slot vertex table every call",
