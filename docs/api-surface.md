@@ -40,7 +40,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/html | `.` 7 |  |  | 4,851 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,568 |
 | @margoengine/input | `.` 12 |  |  | 4,912 |
-| @margoengine/inspector | `.` 12, `./frame` 16, `./history` 2, `./snapshot` 6, `./resources` 2 | 1 |  | 5,074 |
+| @margoengine/inspector | `.` 12, `./frame` 16, `./history` 2, `./snapshot` 6, `./resources` 2 | 1 |  | 9,066 |
 | @margoengine/kinematics-constraints | `.` 18 |  |  | 6,732 |
 | @margoengine/labels | `.` 19 | 2 |  | 4,581 |
 | @margoengine/lightmap | `.` 9, `./global` 4, `./refracted` 6 | 12 |  | 3,801 |
