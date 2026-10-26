@@ -150,7 +150,7 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 | materials-atlas (measurement, no baseline) | geometry + materials at `700838e` | - |
 | binding-limit | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | - |
 | gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `b953071e`: 4,180 calls |
-| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `b953071e`: 1,117 calls |
+| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `e2cb3815`: 1,117 calls |
 | lines-perspective | `96edc75` -> `6da7f7e`: 946 calls | `2d192a71` (per-line clipping planes at `86063c47`: the style uniform grew from 128 to 224 bytes and the shader gained a world-position varying and a zero-count plane loop; then `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose both times) |
 | math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
 | post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `57250a49` |
@@ -275,6 +275,15 @@ gltf-pro-lighting-hooks 2,238 -> 2,090 calls (buffers 18 -> 15, `writeBuffer` 17
 bind groups 138 -> 141, `setPipeline` 102 -> 86, destroys 23 -> 18); materials-uv-transform 1,224 -> 1,117 (buffers
 22 -> 16, `writeBuffer` 110 -> 39, render passes 52 -> 40, destroys 49 -> 43). The images are checked by the visual
 check. The full traces match `b953071e`.
+
+**materials-uv-transform, advanced to `e2cb3815` on 2026-10-26 (steady materials keep their shader, perf-history entry
+23):** a draw whose material is unchanged keeps last frame's shader and pipeline, and that kept pipeline makes the
+first derivation of a frame complete, so it runs the material's `bindings()` before the render pass begins rather
+than inside it. Against `b953071e` the working tree makes the same 1,117 calls with the same arguments (the same 100
+draws and shader modules, byte for byte); only 30 calls of frame 9 move: the texture `update()` upload and its mip
+chain (`writeTexture`, views, the mip bind groups, passes and draws) now come before the beauty pass's
+`beginRenderPass` instead of after it. Both orders upload before the frame's commands run. The full trace matches
+`e2cb3815`.
 
 **taa-velocity, advanced to `d41cdafd` on 2026-10-21:** a hygiene pass converted TAA's bare Errors.
 The story records each thrown error as a `throw` entry (class and message), and exactly three per run changed: the
