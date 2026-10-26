@@ -358,6 +358,32 @@ mesh.setGeometry({positions: more, normals: moreNormals, uvs: moreUvs, indices: 
 remain caller-owned. Device restoration rebuilds the model and texture bindings. Constructed material shading cannot
 be copied to another GPU device without rebuilding its material resources. Core and the stage facade are unchanged.
 
+## Many meshes and instances
+
+Meshes made with `createMesh` that share a material and a geometry object draw together: each frame the queue draws
+all of them in one render pass, derives the material's shader and pipeline once, and draws the opaque ones as one
+instanced draw whose rows are the meshes' world matrices (a moved mesh uploads its own 96-byte row; a camera move
+uploads 192 bytes). Nothing changes in how you create, move, hide, swap or dispose them, and each mesh stays its own
+object for picking, shadows and export. A mesh with a material extension, transmission, wireframe or instances of its
+own draws on its own. Opaque meshes may draw in another order than they were created (as other engines sort opaque
+draws by material); transparent ones keep their back-to-front order.
+
+For many copies under one node, `createInstancedMesh` keeps them in one `instances` object; `setMatrices` writes many
+rows at once:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Material, createInstancedMesh } from 'margoengine/materials';
+import { boxGeometry } from 'margoengine/geometry';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const boxes = createInstancedMesh(engine, boxGeometry(1, 1, 1), new Material({ color: '#4080c0' }), 1000);
+const matrices = new Float32Array(1000 * 16);
+for (let i = 0; i < 1000; i++) matrices.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 40) * 2, 0, Math.floor(i / 40) * 2, 1], i * 16);
+boxes.instances.setMatrices(0, matrices);
+```
+
 ## Animated tiles
 
 A tile animation (Crocotile 3D's per-tileset UV animation) is a looping list of frames, each with a duration in

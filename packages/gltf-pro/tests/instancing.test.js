@@ -358,3 +358,33 @@ test('mirrored follows each setMatrixAt, count and direct data writes without re
   inst.setColorAt(2, [1, 1, 1]);
   assert.equal(inst.mirrored, false);
 });
+
+test('PBRInstances.setMatrices writes many rows as setMatrixAt does, with one upload range', () => {
+  const gpu = mockGPU(),
+    bulk = new PBRInstances(8),
+    rows = new PBRInstances(8),
+    matrices = new Float32Array(3 * 16);
+  for (let r = 0; r < 3; r++) {
+    const m = [2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, r, r * 2, r * 3, 1];
+    if (r === 1) m[0] = -2; // mirrored
+    matrices.set(m, r * 16);
+    rows.setMatrixAt(2 + r, m);
+  }
+  bulk.upload(gpu.device);
+  bulk.setMatrices(2, matrices);
+  assert.deepEqual([...bulk.data], [...rows.data]);
+  assert.equal(bulk.mirrored, true);
+  const log = gpu.record(() => bulk.upload(gpu.device)),
+    writes = log.filter((e) => e[0] === 'writeBuffer');
+  assert.deepEqual(
+    writes.map((e) => [e[2], e[3].length / 2]),
+    [[2 * 96, 3 * 96]],
+    'rows 2-4 in one write',
+  );
+  bulk.setMatrices(3, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  assert.equal(bulk.mirrored, false, 'the mirrored row is replaced');
+  assert.throws(() => bulk.setMatrices(7, matrices), RangeError);
+  assert.throws(() => bulk.setMatrices(0, [1, 2, 3]), TypeError);
+  assert.throws(() => bulk.setMatrices(0, [...matrices.slice(0, 15), 2]), TypeError);
+  assert.throws(() => bulk.setMatrices(0, [NaN, ...matrices.slice(1, 16)]), RangeError);
+});

@@ -117,6 +117,52 @@ export class PBRInstances {
       throw new TypeError('Invalid instance matrix; pass 16 finite numbers, column-major');
     return this.row(i, 0, m, 16);
   }
+  /**
+   * Writes `matrices.length / 16` instance matrices (column-major, each with last row 0, 0, 0, 1) from row `start`: the
+   * bulk form of `setMatrixAt` for many moving instances, one range check and one upload range for all of them.
+   */
+  setMatrices(start: number, matrices: ArrayLike<number>): this {
+    if (this.source) {
+      this.source.setMatrices(start, matrices);
+      return this;
+    }
+    const n = matrices?.length;
+    if (!Number.isInteger(n) || n % 16) throw new TypeError('Instance matrices: pass 16 numbers per instance');
+    const count = n / 16;
+    if (!Number.isInteger(start) || start < 0 || start + count > this.capacity)
+      throw new RangeError('Instance index out of range');
+    if (!count) return this;
+    // One finiteness test for every value, as setMatrixAt does per row; plain arrays are also checked for non-numbers.
+    let sum = 0;
+    for (let k = 0; k < n; k++) sum += Math.fround(matrices[k]);
+    if (!Number.isFinite(sum)) throw new RangeError('Invalid instance value: pass finite float32 numbers');
+    const plain = !ArrayBuffer.isView(matrices);
+    for (let r = 0; r < count; r++) {
+      const m = r * 16;
+      if (matrices[m + 3] || matrices[m + 7] || matrices[m + 11] || matrices[m + 15] !== 1)
+        throw new TypeError('Invalid instance matrix');
+      if (plain)
+        for (let k = 0; k < 16; k++)
+          if (typeof matrices[m + k] !== 'number') throw new TypeError('Invalid instance matrix');
+    }
+    const data = this.data,
+      flips = this.stale ? undefined : this.flips!;
+    for (let r = 0; r < count; r++) {
+      const i = start + r,
+        o = i * 24,
+        m = r * 16;
+      for (let k = 0; k < 16; k++) data[o + k] = matrices[m + k];
+      if (flips) {
+        const flip = +(this.determinant(o) < 0);
+        if (i < this.drawn) this.flipCount += flip - flips[i];
+        flips[i] = flip;
+      }
+    }
+    if (start < this.low) this.low = start;
+    if (start + count > this.high) this.high = start + count;
+    this.revision++;
+    return this;
+  }
   getMatrixAt<T extends { [k: number]: number } = Float32Array>(
     i: number,
     out: T = new Float32Array(16) as unknown as T,
