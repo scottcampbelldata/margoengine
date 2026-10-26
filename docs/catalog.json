@@ -191,7 +191,12 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/inspector@1.0.0",
     "imports": "import { Inspector } from '@margoengine/inspector';",
     "exports": [
-      "Inspector"
+      "EditHistory",
+      "Inspector",
+      "describeEngine",
+      "parseSnapshot",
+      "restoreSnapshot",
+      "snapshotMeshes"
     ],
     "category": "Setup and diagnostics"
   },

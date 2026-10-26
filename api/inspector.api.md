@@ -4,7 +4,44 @@
 
 ```ts
 import { EngineKernel, Mesh } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+
+export interface Edit {
+    label: string;
+    undo(): void;
+    redo(): void;
+    key?: string;
+}
+
+export class EditHistory {
+    readonly limit: number;
+    readonly coalesceMs: number;
+    constructor(limit?: number, coalesceMs?: number, now?: () => number);
+    get undoCount(): number;
+    get redoCount(): number;
+    get nextUndo(): string | undefined;
+    get nextRedo(): string | undefined;
+    record(edit: Edit): void;
+    undo(): boolean;
+    redo(): boolean;
+    clear(): void;
+    onChange(listener: () => void): () => void;
+}
+
+export interface EngineResources {
+    backend: string;
+    meshes: number;
+    visibleMeshes: number;
+    geometries: number;
+    materials: number;
+    vertices: number;
+    triangles: number;
+    plugins: string[];
+    canvas: {
+        width: number;
+        height: number;
+    };
+}
 
 export class Inspector implements EnginePlugin {
     readonly name = "inspector";
@@ -16,10 +53,17 @@ export class Inspector implements EnginePlugin {
         bounds: boolean;
         lights: boolean;
     };
-    constructor({ parent, effects }?: InspectorOptions);
+    readonly history: EditHistory;
+    constructor({ parent, effects, pick, historyLimit }?: InspectorOptions);
     static attach(engine: EngineKernel, options?: InspectorOptions): Inspector;
     get selected(): MeshHandle | null;
     select(handle: MeshHandle | null): void;
+    undo(): boolean;
+    redo(): boolean;
+    snapshot(): SceneSnapshot;
+    restore(snapshot: unknown): RestoreResult;
+    resources(): EngineResources;
+    get shaderSource(): string;
     setDebug(mode: Mode, enabled: boolean): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -35,7 +79,44 @@ export interface InspectorOptions {
         exposure?: number;
         bloom?: number;
     };
+    pick?: boolean;
+    historyLimit?: number;
 }
+
+export interface MeshSnapshot {
+    id: number;
+    name: string;
+    parent: number;
+    visible: boolean;
+    position: [number, number, number];
+    rotation: [number, number, number];
+    scale: [number, number, number];
+    material: {
+        color: [number, number, number];
+        roughness: number;
+        metalness: number;
+        doubleSided: boolean;
+    } | null;
+}
+
+export interface RestoreResult {
+    applied: number;
+    missing: number[];
+}
+
+export interface SceneSnapshot {
+    format: 'margoengine.scene-snapshot';
+    version: 1;
+    meshes: MeshSnapshot[];
+}
+
+export function describeEngine(engine: Engine, meshes?: Iterable<Mesh>): EngineResources;
+
+export function parseSnapshot(data: unknown): SceneSnapshot;
+
+export function restoreSnapshot(engine: Engine, snapshot: unknown): RestoreResult;
+
+export function snapshotMeshes(engine: Engine, meshes: Iterable<Mesh>): SceneSnapshot;
 
 // Not exported from this entry, but used by the exports above:
 

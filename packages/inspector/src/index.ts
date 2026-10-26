@@ -14,12 +14,32 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { margoError } from '../../shared/errors.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { inView } from '../../shared/view-rect.js';
+import { EditHistory } from './history.js';
+import { restoreSnapshot, snapshotMeshes, type RestoreResult, type SceneSnapshot } from './snapshot.js';
+import { describeEngine, type EngineResources } from './resources.js';
+export { EditHistory, type Edit } from './history.js';
+export {
+  snapshotMeshes,
+  restoreSnapshot,
+  parseSnapshot,
+  type MeshSnapshot,
+  type SceneSnapshot,
+  type RestoreResult,
+} from './snapshot.js';
+export { describeEngine, type EngineResources } from './resources.js';
 
 /** Options of the Inspector: the parent element for its panel and the effect options it edits. */
 export interface InspectorOptions {
   parent?: HTMLElement;
   /** Mutable options of an attached PostProcessing/Tonemap effect. */
   effects?: { exposure?: number; bloom?: number };
+  /**
+   * Click an object in the canvas to select it (a click, not a drag: a move of more than 4 px is left to the camera
+   * controls). Default true.
+   */
+  pick?: boolean;
+  /** Most edits the undo history keeps, 1 to 100,000. Default 200. */
+  historyLimit?: number;
 }
 type Mode = 'wireframe' | 'normals' | 'bounds' | 'lights';
 interface DebugLines {
@@ -95,6 +115,19 @@ function wireframe(mesh: Mesh): Line {
   return new Line({ mesh, positions, mode: 'segments', color: '#72e8cc', onTop: true, cap: 'butt', join: 'miter' });
 }
 
+/** `#rrggbb` (sRGB) of a core material's linear colour, for a colour input. */
+function hexOf(data: Float32Array): string {
+  let out = '#';
+  for (let i = 0; i < 3; i++) {
+    const v = Math.max(0, Math.min(1, data[i])),
+      s = v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055;
+    out += Math.round(s * 255)
+      .toString(16)
+      .padStart(2, '0');
+  }
+  return out;
+}
+
 const css = `
 :host{position:fixed;right:12px;top:12px;width:280px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);z-index:10001;display:block;color:#202226;font:12px/1.4 system-ui;letter-spacing:0}
 @media(max-width:560px){:host{top:150px;max-height:calc(100dvh - 162px)}section{max-height:calc(100dvh - 162px)!important}}
@@ -104,6 +137,7 @@ label{display:flex;align-items:center;justify-content:space-between;gap:8px;min-
 button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}button:focus-visible,[role=treeitem]:focus-visible{outline:2px solid #087e67;outline-offset:-2px}
 [role=tree]{max-height:220px;overflow:auto;padding:6px 0}.row{display:flex;align-items:center;min-height:28px;padding-right:8px}.row button{flex:none;width:24px;height:24px;padding:0}.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 [aria-selected=true]>.row{background:#d6eee7;color:#084f40}.muted{opacity:.55}[role=group]{padding-left:12px}.axes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.axes label{display:block}.axes input{width:100%}input:disabled{opacity:.5}
+fieldset.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}fieldset.bar button{border:1px solid #b9bec7;border-radius:3px;padding:3px 9px;background:#fff}button:disabled{opacity:.45;cursor:default}input[type=color]{width:48px;height:24px;padding:0}input[data-search]{flex:1 1 100%;width:auto}.status{flex:1 1 100%;min-height:1.4em;color:#555}details{border-bottom:1px solid #d5d9df;padding:6px 12px}summary{cursor:pointer;font-weight:600}pre{margin:6px 0 0;max-height:240px;overflow:auto;white-space:pre-wrap;font:11px/1.35 ui-monospace,monospace;user-select:text}
 `;
 
 /**
@@ -130,8 +164,21 @@ export class Inspector implements EnginePlugin {
   private signature = '';
   private disposed = false;
   private readonly timer: ReturnType<typeof setInterval>;
+  /** Every edit made in the panel, undoable with `undo()` / Ctrl+Z. */
+  readonly history: EditHistory;
+  private readonly pickEnabled: boolean;
+  private query = '';
+  private shader = '';
+  private pickCount = 0;
+  private stopPicking?: () => void;
+  private readonly buttons = new Map<string, HTMLButtonElement>();
+  private readonly details = new Map<string, HTMLDetailsElement>();
+  private readonly outputs = new Map<string, HTMLElement>();
 
-  constructor({ parent = document.body, effects }: InspectorOptions = {}) {
+  constructor({ parent = document.body, effects, pick = true, historyLimit = 200 }: InspectorOptions = {}) {
+    if (typeof pick !== 'boolean') throw new TypeError('Inspector pick must be true or false; pass a boolean');
+    this.history = new EditHistory(historyLimit);
+    this.pickEnabled = pick;
     this.effects = effects;
     const doc = parent.ownerDocument;
     this.element = doc.createElement('div');
@@ -144,6 +191,54 @@ export class Inspector implements EnginePlugin {
     title.textContent = 'Inspector';
     panel.append(title);
     this.root.append(style, panel);
+    const bar = doc.createElement('fieldset'),
+      file = doc.createElement('input'),
+      search = doc.createElement('input'),
+      status = doc.createElement('div');
+    bar.className = 'bar';
+    file.type = 'file';
+    file.accept = 'application/json,.json';
+    file.hidden = true;
+    file.setAttribute('aria-label', 'Load scene file');
+    file.addEventListener('change', () => {
+      const chosen = file.files?.[0];
+      file.value = '';
+      if (chosen)
+        chosen
+          .text()
+          .then((text) => this.report(() => this.restore(JSON.parse(text))))
+          .catch((error) => this.say(String(error)));
+    });
+    for (const [id, text, run] of [
+      ['undo', 'Undo', () => this.undo()],
+      ['redo', 'Redo', () => this.redo()],
+      ['save', 'Save', () => this.download()],
+      ['load', 'Load', () => file.click()],
+    ] as const) {
+      const button = doc.createElement('button');
+      button.type = 'button';
+      button.textContent = text;
+      button.dataset.action = id;
+      button.addEventListener('click', () => this.report(run));
+      this.buttons.set(id, button);
+      bar.append(button);
+    }
+    search.type = 'text';
+    search.placeholder = 'Search entities';
+    search.setAttribute('aria-label', 'Search entities');
+    search.dataset.search = '';
+    search.addEventListener('input', () => {
+      this.query = search.value.trim().toLowerCase();
+      this.signature = '';
+      this.refresh();
+    });
+    status.setAttribute('role', 'status');
+    status.className = 'status';
+    this.outputs.set('status', status);
+    bar.append(file, search, status);
+    panel.append(bar);
+    this.element.addEventListener('keydown', (event) => this.shortcut(event));
+    this.history.onChange(() => this.refresh());
     const modes = doc.createElement('fieldset');
     for (const [key, text] of [
       ['wireframe', 'Wireframe'],
@@ -167,13 +262,26 @@ export class Inspector implements EnginePlugin {
     const name = this.input(properties, 'name', 'Name', 'text');
     name.addEventListener('change', () => {
       if (this.liveSelection()) {
-        this.selection!.name = name.value;
+        this.commit(
+          'Rename',
+          'name',
+          (m) => m.name,
+          (m, v) => (m.name = v),
+          name.value,
+        );
         this.refresh();
       }
     });
     const visible = this.input(properties, 'visible', 'Visible', 'checkbox');
     visible.addEventListener('change', () => {
-      if (this.liveSelection()) this.selection!.visible = visible.checked;
+      if (this.liveSelection())
+        this.commit(
+          'Set visible',
+          'visible',
+          (m) => m.visible,
+          (m, v) => (m.visible = v),
+          visible.checked,
+        );
     });
     for (const kind of ['position', 'rotation', 'scale'] as const) {
       const label = doc.createElement('div');
@@ -188,7 +296,14 @@ export class Inspector implements EnginePlugin {
         input.setAttribute('aria-label', `${kind} ${axis}`);
         input.addEventListener('change', () =>
           this.edit(input, () => {
-            if (this.liveSelection()) this.selection![kind][axis] = input.valueAsNumber;
+            if (this.liveSelection())
+              this.commit(
+                `Set ${kind} ${axis}`,
+                `${kind}.${axis}`,
+                (m) => m[kind][axis],
+                (m, v) => (m[kind][axis] = v),
+                input.valueAsNumber,
+              );
           }),
         );
       }
@@ -206,10 +321,43 @@ export class Inspector implements EnginePlugin {
           const value = input.valueAsNumber;
           if (!Number.isFinite(value) || value < min || value > 1)
             throw new RangeError('Invalid material value; pass a finite number in the control range');
-          if (this.liveSelection()) this.selection!.material.data[slot] = value;
+          if (this.liveSelection())
+            this.commit(
+              `Set ${key}`,
+              key,
+              (m) => m.material.data[slot],
+              (m, v) => (m.material.data[slot] = v),
+              value,
+            );
         }),
       );
     }
+    const color = this.input(properties, 'color', 'Colour', 'color');
+    color.addEventListener('input', () =>
+      this.edit(color, () => {
+        if (this.liveSelection())
+          this.commit(
+            'Set colour',
+            'color',
+            (m) => hexOf(m.material.data),
+            (m, v) => m.material.set({ color: v }),
+            color.value,
+          );
+      }),
+    );
+    const sided = this.input(properties, 'doubleSided', 'Double sided', 'checkbox');
+    sided.addEventListener('change', () =>
+      this.edit(sided, () => {
+        if (this.liveSelection())
+          this.commit(
+            'Set double sided',
+            'doubleSided',
+            (m) => !!m.material.data[6],
+            (m, v) => m.material.set({ doubleSided: v }),
+            sided.checked,
+          );
+      }),
+    );
     panel.append(properties);
     const grading = doc.createElement('fieldset'),
       gradeTitle = doc.createElement('legend');
@@ -228,11 +376,37 @@ export class Inspector implements EnginePlugin {
           const value = input.valueAsNumber;
           if (!Number.isFinite(value) || value < min || value > max)
             throw new RangeError('Invalid effect value; pass a finite, non-negative number');
-          if (this.effects) this.effects[key] = value;
+          const effects = this.effects;
+          if (effects) {
+            const old = effects[key] ?? 0;
+            effects[key] = value;
+            this.history.record({
+              label: `Set ${key}`,
+              key: `effect.${key}`,
+              undo: () => (effects[key] = old),
+              redo: () => (effects[key] = value),
+            });
+          }
         }),
       );
     }
     panel.append(grading);
+    for (const [id, title] of [
+      ['resources', 'Resources'],
+      ['shader', 'Scene shader (WGSL)'],
+    ] as const) {
+      const details = doc.createElement('details'),
+        summary = doc.createElement('summary'),
+        output = doc.createElement('pre');
+      details.dataset.section = id;
+      summary.textContent = title;
+      output.dataset.output = id;
+      details.append(summary, output);
+      details.addEventListener('toggle', () => this.refresh());
+      this.details.set(id, details);
+      this.outputs.set(id, output);
+      panel.append(details);
+    }
     parent.append(this.element);
     this.refresh();
     this.timer = setInterval(() => this.refresh(), 250);
@@ -261,12 +435,164 @@ export class Inspector implements EnginePlugin {
       if (mesh.engine !== this.engine)
         throw new TypeError('Mesh belongs to another engine; select a mesh created by this engine');
     }
+    this.choose(mesh);
+  }
+
+  private choose(mesh: Mesh | null): void {
     this.selection = mesh;
     if (mesh)
-      for (let id = this.engine.store.parents[mesh.id]; id !== -1; id = this.engine.store.parents[id])
-        this.collapsed.delete(this.engine.meshes.get(id)!);
+      for (let id = this.engine!.store.parents[mesh.id]; id !== -1; id = this.engine!.store.parents[id])
+        this.collapsed.delete(this.engine!.meshes.get(id)!);
     this.signature = '';
     this.refresh();
+  }
+
+  /**
+   * Applies a change to the selected mesh and records it for undo. Changes with one `key` made within 800 ms of each
+   * other (a slider drag) undo as one step. A value the engine rejects throws before anything is recorded.
+   */
+  private commit<T>(
+    label: string,
+    key: string,
+    get: (mesh: Mesh) => T,
+    set: (mesh: Mesh, value: T) => void,
+    value: T,
+  ): void {
+    const mesh = this.selection!,
+      old = get(mesh),
+      engine = this.engine!;
+    set(mesh, value);
+    const live = () => engine.meshes.get(mesh.id) === mesh;
+    this.history.record({
+      label,
+      key: `${mesh.id}.${key}`,
+      undo: () => live() && set(mesh, old),
+      redo: () => live() && set(mesh, value),
+    });
+  }
+
+  /** Takes back the latest edit made in the panel; false when there is none. */
+  undo(): boolean {
+    this.alive();
+    return this.history.undo();
+  }
+  /** Does the latest undone edit again; false when there is none. */
+  redo(): boolean {
+    this.alive();
+    return this.history.redo();
+  }
+  private alive(): void {
+    if (this.disposed) throw margoError('disposed', 'Inspector is disposed; create a new Inspector');
+  }
+
+  /**
+   * The scene as plain JSON (names, visibility, transforms, core PBR material values) for the inspector's scene. Save
+   * it with `JSON.stringify` and give it to `restore` later; the panel's Save button downloads it.
+   * @throws MargoError `'state'` when the inspector is not attached, `'disposed'` after `dispose()`.
+   */
+  snapshot(): SceneSnapshot {
+    this.alive();
+    if (!this.engine) throw margoError('state', 'Inspector is not attached; install it on an engine first');
+    return snapshotMeshes(this.engine, this.meshes());
+  }
+  /**
+   * Puts a snapshot's values back on the meshes with the same ids, as one undoable edit. The snapshot is checked first,
+   * so a bad one changes nothing.
+   * @throws TypeError / RangeError for a malformed snapshot, MargoError `'state'` when not attached.
+   */
+  restore(snapshot: unknown): RestoreResult {
+    this.alive();
+    const engine = this.engine;
+    if (!engine) throw margoError('state', 'Inspector is not attached; install it on an engine first');
+    const before = snapshotMeshes(engine, this.meshes()),
+      result = restoreSnapshot(engine, snapshot),
+      after = snapshotMeshes(engine, this.meshes());
+    this.history.record({
+      label: 'Load scene',
+      undo: () => void restoreSnapshot(engine, before),
+      redo: () => void restoreSnapshot(engine, after),
+    });
+    this.signature = '';
+    this.say(
+      `Loaded ${result.applied} entities` +
+        (result.missing.length ? `, ${result.missing.length} not in this scene` : ''),
+    );
+    return result;
+  }
+  /** Counts of what the engine draws (meshes, geometries, materials, triangles) and its plugins. */
+  resources(): EngineResources {
+    this.alive();
+    if (!this.engine) throw margoError('state', 'Inspector is not attached; install it on an engine first');
+    return describeEngine(this.engine, this.meshes());
+  }
+  /** The scene's WGSL from the latest WebGPU frame, or an empty string before one has drawn. */
+  get shaderSource(): string {
+    return this.shader;
+  }
+  private download(): void {
+    const doc = this.element.ownerDocument,
+      url = URL.createObjectURL(new Blob([JSON.stringify(this.snapshot(), null, 2)], { type: 'application/json' })),
+      link = doc.createElement('a');
+    link.href = url;
+    link.download = 'scene.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+  private say(text: string): void {
+    const out = this.outputs.get('status');
+    if (out) out.textContent = text;
+  }
+  /** Runs a panel action; a failure shows in the status line instead of escaping from an event handler. */
+  private report(run: () => unknown): void {
+    try {
+      run();
+    } catch (error) {
+      this.say(error instanceof Error ? error.message : String(error));
+    }
+  }
+  private shortcut(event: KeyboardEvent): void {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const target = event.target as HTMLElement,
+      typing = target.tagName === 'INPUT' && ['text', 'number', 'search'].includes((target as HTMLInputElement).type);
+    const key = event.key.toLowerCase();
+    // In a text field the browser's own undo edits the text; elsewhere the shortcut undoes panel edits.
+    if (typing || this.disposed) return;
+    if (key === 'z' && !event.shiftKey) this.report(() => this.undo());
+    else if ((key === 'z' && event.shiftKey) || key === 'y') this.report(() => this.redo());
+    else return;
+    event.preventDefault();
+  }
+  // A click, not a drag: orbit and fly controls move the pointer, so only a near-still press selects.
+  private watchPicks(engine: Engine): () => void {
+    const canvas = engine.canvas;
+    // An OffscreenCanvas or a stand-in has no pointer events or element rectangle: nothing to click, so no picking.
+    if (typeof canvas?.addEventListener !== 'function' || typeof canvas.getBoundingClientRect !== 'function')
+      return () => {};
+    let down: { x: number; y: number } | undefined;
+    const press = (event: PointerEvent) => {
+      down = event.button === 0 ? { x: event.clientX, y: event.clientY } : undefined;
+    };
+    const release = (event: PointerEvent) => {
+      const start = down;
+      down = undefined;
+      if (!start || event.defaultPrevented || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 4) return;
+      const box = canvas.getBoundingClientRect(),
+        ticket = ++this.pickCount;
+      engine
+        .pick(event.clientX - box.left, event.clientY - box.top)
+        .then((mesh) => {
+          if (ticket === this.pickCount && !this.disposed && this.engine === engine) this.choose(mesh);
+        })
+        .catch((error) => {
+          if (!this.disposed && !engine.disposed) reportError(error);
+        });
+    };
+    canvas.addEventListener('pointerdown', press);
+    canvas.addEventListener('pointerup', release);
+    return () => {
+      canvas.removeEventListener('pointerdown', press);
+      canvas.removeEventListener('pointerup', release);
+    };
   }
 
   setDebug(mode: Mode, enabled: boolean): void {
@@ -283,11 +609,19 @@ export class Inspector implements EnginePlugin {
     if (this.disposed || this.engine)
       throw margoError('attached', 'Inspector is disposed or already attached; create a new Inspector for this engine');
     this.engine = engine;
+    if (this.pickEnabled) this.stopPicking = this.watchPicks(engine);
     if (engine.backend === 'webgpu') this.lines.setup(engine);
     this.refresh();
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({ name: 'inspector:sync', order: 19, execute: (c) => this.syncDebug(c) });
+    graph.add({
+      name: 'inspector:sync',
+      order: 19,
+      execute: (c) => {
+        if (c.backend === 'webgpu' && typeof c.shader === 'string') this.shader = c.shader;
+        this.syncDebug(c);
+      },
+    });
     this.lines.registerPasses(graph);
   }
 
@@ -459,7 +793,15 @@ export class Inspector implements EnginePlugin {
             item.firstElementChild!.prepend(button);
           }
         }
-        const first = this.tree.querySelector<HTMLElement>('[role=treeitem]');
+        if (this.query) {
+          const show = new Set<Mesh>();
+          for (const mesh of this.items.keys())
+            if ((mesh.name || `Entity ${mesh.id}`).toLowerCase().includes(this.query))
+              for (let m: Mesh | undefined = mesh; m && !show.has(m); m = engine.meshes.get(engine.store.parents[m.id]))
+                show.add(m);
+          for (const [mesh, item] of this.items) item.hidden = !show.has(mesh);
+        }
+        const first = this.tree.querySelector<HTMLElement>('[role=treeitem]:not([hidden])');
         if (first && !this.selection) first.tabIndex = 0;
       }
       if (focused)
@@ -479,12 +821,34 @@ export class Inspector implements EnginePlugin {
       if (effect) input.value = String(this.effects![key as 'exposure' | 'bloom'] ?? 0);
       else if (key === 'name') input.value = this.selection!.name;
       else if (key === 'visible') input.checked = this.selection!.visible;
+      else if (key === 'color') input.value = hexOf(this.selection!.material.data);
+      else if (key === 'doubleSided') input.checked = !!this.selection!.material.data[6];
       else if (key === 'roughness' || key === 'metallic')
         input.value = String(this.selection!.material.data[key === 'roughness' ? 4 : 5]);
       else {
         const [kind, axis] = key.split('.') as ['position' | 'rotation' | 'scale', 'x' | 'y' | 'z'];
         input.value = String(this.selection![kind][axis]);
       }
+    }
+    const undo = this.buttons.get('undo')!,
+      redo = this.buttons.get('redo')!;
+    undo.disabled = !this.history.undoCount;
+    redo.disabled = !this.history.redoCount;
+    undo.title = this.history.nextUndo ? `Undo: ${this.history.nextUndo}` : 'Nothing to undo';
+    redo.title = this.history.nextRedo ? `Redo: ${this.history.nextRedo}` : 'Nothing to redo';
+    this.buttons.get('save')!.disabled = this.buttons.get('load')!.disabled = !engine || engine.disposed;
+    // The two sections are text built only while open, so a closed panel costs nothing.
+    if (engine && !engine.disposed) {
+      if (this.details.get('resources')!.open) {
+        const r = describeEngine(engine, this.meshes());
+        this.outputs.get('resources')!.textContent =
+          `${r.backend}  ${r.canvas.width} x ${r.canvas.height}\n` +
+          `${r.meshes} meshes (${r.visibleMeshes} visible)\n${r.geometries} geometries, ${r.vertices} vertices\n` +
+          `${r.materials} materials, ${r.triangles} triangles drawn\nPlugins: ${r.plugins.join(', ') || 'none'}`;
+      }
+      if (this.details.get('shader')!.open)
+        this.outputs.get('shader')!.textContent =
+          this.shader || (engine.backend === 'webgpu' ? 'Waiting for the first frame.' : 'WGSL shows on WebGPU only.');
     }
   }
 
@@ -549,6 +913,10 @@ export class Inspector implements EnginePlugin {
     this.engine?.removePlugin(this.name);
     this.engine = undefined;
     clearInterval(this.timer);
+    this.stopPicking?.();
+    this.stopPicking = undefined;
+    this.history.clear();
+    this.shader = '';
     this.lines.clear();
     this.lines.dispose();
     this.helpers.clear();

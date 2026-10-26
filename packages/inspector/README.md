@@ -19,6 +19,41 @@ function attach(engine: EngineKernel, effects: {exposure: number; bloom: number}
 Pass the mutable options object of your attached post-processing effect to
 `effects`; exposure/bloom controls bind directly to it. Unbound controls are disabled.
 
+## Edit, undo, search, pick, save
+
+Every change made in the panel (name, visibility, position, rotation, scale, colour, double sided, roughness, metallic,
+bound effects) is recorded and can be undone with the Undo and Redo buttons, `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` or
+`Ctrl/Cmd+Y` (inside a text field the browser keeps its own undo). A slider drag is one step. The Search box keeps the
+entities whose name contains the text, and their parents. A click on the canvas selects the object under the pointer
+(`pick: false` turns it off; a pointer that moves more than 4 px is a camera drag, not a click). Colour edits the core
+material's base colour (sRGB in the panel, linear in the material).
+
+```ts
+import {Inspector} from 'margoengine/inspector';
+import type {EngineKernel} from 'margoengine/core';
+async function tour(engine: EngineKernel) {
+  const inspector = Inspector.attach(engine, {historyLimit: 500});
+  const saved = JSON.stringify(inspector.snapshot());   // names, visibility, transforms, material values
+  // ...edit in the panel or in code...
+  inspector.restore(JSON.parse(saved));                 // one undoable step; checks the file first
+  inspector.undo();
+  inspector.redo();
+  console.log(inspector.resources());                   // meshes, geometries, materials, triangles, plugins
+  console.log(inspector.shaderSource.length);           // the scene WGSL of the latest WebGPU frame
+  inspector.history.onChange(() => console.log(inspector.history.nextUndo));
+}
+```
+
+The panel's Save button downloads the snapshot as `scene.json` and Load restores one. `restore` matches meshes by id,
+reports the ones that are gone (`missing`), changes nothing when the file is malformed or the engine rejects a value
+(a scale of 0), and does not recreate or reparent meshes. The Resources section counts what the engine draws, and Scene
+shader shows the WGSL of the latest WebGPU frame; both build their text only while open. Without the panel, import
+`EditHistory` from `margoengine/inspector/history`, `snapshotMeshes`/`restoreSnapshot`/`parseSnapshot` from
+`margoengine/inspector/snapshot` and `describeEngine` from `margoengine/inspector/resources`.
+
+Not included: creating or deleting entities, reparenting, shader editing, a GPU memory view (WebGPU does not report
+resource sizes) and editing materials other than core's PBR values.
+
 WebGPU wireframe edges, world-space vertex normals and AABB boxes use the existing
 `@margoengine/lines` helpers. These overlays apply to core meshes and loaded glTF/FBX
 PBR nodes, including every primitive on a node, and honor inherited visibility.

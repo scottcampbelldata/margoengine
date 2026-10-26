@@ -29,6 +29,18 @@
     "./frame": {
       "types": "./dist/frame.d.ts",
       "import": "./dist/frame.js"
+    },
+    "./history": {
+      "types": "./dist/history.d.ts",
+      "import": "./dist/history.js"
+    },
+    "./snapshot": {
+      "types": "./dist/snapshot.d.ts",
+      "import": "./dist/snapshot.js"
+    },
+    "./resources": {
+      "types": "./dist/resources.d.ts",
+      "import": "./dist/resources.js"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3291455,
+  "total": 3298964,
   "history": [
     {
       "date": "2026-10-24",
@@ -380,6 +380,12 @@
       "commit": "27c083c1",
       "reason": "package depth (item 21.5): animator triggers, exit-time and any-state transitions, timed and state-change events, override layers, foot placement with pelvis drop (tree-shakable)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "d336ca13",
+      "reason": "inspector: undo/redo history, search, colour and double-sided editing, canvas picking, scene snapshots, resources and shader view (panel +3.9 kB gzip); new optional entries inspector/history, inspector/snapshot, inspector/resources",
+      "grew": 4
     }
   ],
   "items": {
@@ -504,8 +510,11 @@
     "@margoengine/ifc dist/workers/ifc.js": 3443,
     "@margoengine/ifc/worker": 1470,
     "@margoengine/input": 5168,
-    "@margoengine/inspector": 5140,
+    "@margoengine/inspector": 9314,
     "@margoengine/inspector/frame": 8897,
+    "@margoengine/inspector/history": 1113,
+    "@margoengine/inspector/resources": 902,
+    "@margoengine/inspector/snapshot": 1320,
     "@margoengine/kinematics-constraints": 6800,
     "@margoengine/labels": 4756,
     "@margoengine/lightmap": 4053,
