@@ -2904,6 +2904,25 @@ watchQuality();
 - `capFrameRate(engine, rate = 60)` sets the same pacing on any engine regardless of tier.
 - The light-tier measurement skips the first two seconds and gives up after ten, at any refresh rate.
 
+## Dynamic resolution
+
+```ts
+import {applyQualityTier, watchResolution} from 'margoengine/quality';
+import {Engine} from 'margoengine/core';
+declare const canvas: HTMLCanvasElement;
+applyQualityTier(); // light or phone tier
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+using resolution = watchResolution({budget: 12, min: 0.6}); // restores full resolution when disposed
+console.log(resolution.scale);
+```
+
+`watchResolution` times each frame's GPU work (submit to finished) and, when the average passes `budget` milliseconds
+(default 12), lowers the canvas pixel ratio in 5% steps sized to land under the budget; with room to spare (under 70% of
+it) it rises 5% at a time, and backs off after a rise it had to undo. It moves `globalThis.margoLow`, which core reads every
+frame, so it works on the light and phone tiers. On the full 4x MSAA tier it does nothing (changing the cap there would
+also switch off multisampling); pass your own `apply(scale)` to scale some other way. `ResolutionScaler` is the same
+decision logic without timers: `push(frameMs)` returns the new scale when it changes.
+
 ## Tier presets
 
 The tier also scales optional features. `applyQualityTier()` publishes the tier's `QualityPreset` as
@@ -2911,30 +2930,6 @@ The tier also scales optional features. `applyQualityTier()` publishes the tier'
 `new X`) and uses a preset value only for an option the app left undefined. **Explicit options always win.** Feature
 packages never import this package: the global is the whole contract, so an app that does not use
 `@margoengine/quality` gets every package's own defaults, unchanged.
-
-| Key | Package, class | Option | Full tier (package default) | Light tier | Phone tier |
-| --- | --- | --- | --- | --- | --- |
-| `shadows` | `@margoengine/shadows` `Shadows` | `resolution`, `filter`, `cascades` | 2048 (two 4-layer maps, 128 MiB), `'soft'` (PCSS), 4 | 1024 (32 MiB), `'pcf'`, 4 | 1024 (16 MiB), `'pcf'`, 2 |
-| `ssao` | `@margoengine/post/ssao` `SSAO` | `enabled`, `samples` | on, 32 | on, 16 | off |
-| `ssr` | `@margoengine/post/ssr` `SSR` | `enabled`, `steps` | on, 64 | off, 32 | off, 32 |
-| `volumetric` | `@margoengine/environment/volumetric` `VolumetricFog` | `enabled`, `grid` | on, [160, 90, 64] | on, [80, 45, 32] | off |
-| `localShadows` | `@margoengine/clustered/shadows` `LocalShadows` | `resolution` | 512 | 256 | 256 |
-| `vfx` | `@margoengine/vfx` `VFX` | `capacity` | 1,000,000 | 100,000 | 100,000 |
-| `scatter` | `@margoengine/scatter` `Scatter` | `lodFade` | 2 | 2 | 0 |
-
-The phone preset publishes `ssao: { enabled: false }` and `volumetric: { enabled: false }`. Disabled `VolumetricFog`
-registers no passes; omitting `enabled` keeps it on. Explicit feature options still win over preset defaults.
-
-Shadows on the light and phone tiers use `filter: 'pcf'`: four hardware comparison taps per lit pixel instead of PCSS's
-16 blocker reads and 32 taps (a fixed edge about three texels wide instead of contact-hardening penumbrae). Phones also
-render two cascades instead of four (half the depth passes) and set scatter's `lodFade: 0`, which compiles its shaders
-without `discard`: tile-based phone GPUs then keep early depth rejection under dense grass. Pass `filter: 'soft'`,
-`cascades: 4` or `lodFade: 2` to keep those on every tier.
-
-```ts
-import {applyQualityTier, qualityPreset} from 'margoengine/quality';
-import {Shadows} from 'margoengine/shadows';
-```
 
 [README continues: https://margoengine.com/llms/packages/quality.md]
 
@@ -5959,7 +5954,37 @@ const cancel = timeline.to(object, 'opacity', 1, {duration: 0.5, easing: easeInO
 timeline.update(1 / 60);
 ```
 
-Times are seconds. delay, onComplete, zero-duration tracks and cancellation are supported. A new track for the same object/property cancels the old one. Callback-created tracks begin next update; clear cancels all tracks. Completed/cancelled tracks compact in place. Track creation and callbacks can allocate; the in-place stepping above does not cover them. Targets are numeric writable properties; colors, strings and CSS parsing are not included.
+Times are seconds. delay, onComplete, zero-duration tracks and cancellation are supported. A new track for the same object/property cancels the old one. Callback-created tracks begin next update; clear cancels all tracks. Completed/cancelled tracks compact in place. Track creation and callbacks can allocate; the in-place stepping above does not cover them. Targets are numeric writable properties; for colours, quaternions and paths use `array`, `path` or `custom` (below). CSS strings are not parsed.
+
+## Repeat, yoyo, easings, springs, timelines, colours, paths
+
+```ts
+import {Tween, Timeline, Spring, easeOutBack, cubicBezier, parseHexColor, toHexColor, slerpArray, catmullRomPath} from 'margoengine/tween';
+declare const light: {intensity: number}, door: {angle: number}, camera: {position: number[]}, node: {rotation: number[]};
+const tween = new Tween();
+tween.to(light, 'intensity', 3, {duration: 1, repeat: Infinity, yoyo: true, easing: cubicBezier(0.25, 0.1, 0.25, 1)});
+const colour = parseHexColor('#ff0000');
+tween.array(colour, parseHexColor('#0000ff'), {duration: 2}); // toHexColor(colour) while it runs
+tween.array(node.rotation, [0, 0.7071, 0, 0.7071], {duration: 1, interpolate: slerpArray}); // quaternions
+tween.path(camera.position, catmullRomPath([[0, 0, 0], [1, 2, 0], [3, 2, 1]]), {duration: 3});
+tween.custom((progress) => console.log(progress), {duration: 1, easing: easeOutBack});
+
+const timeline = new Timeline({repeat: 1})
+  .to(door, 'angle', 1.5, {duration: 0.6})
+  .label('open')
+  .to(light, 'intensity', 3, {duration: 0.4, at: 'open'})
+  .call(() => console.log('opened'))
+  .play();
+
+const spring = new Spring({stiffness: 120, damping: 12});
+spring.target = 1;
+const frame = (dt: number) => { tween.update(dt); timeline.update(dt); return spring.update(dt); };
+```
+
+- `repeat` (integer or `Infinity`), `yoyo` and `onRepeat` work on every tween kind.
+- Easings: `ease{In,Out,InOut}` of `Quad`, `Cubic`, `Quart`, `Quint`, `Sine`, `Expo`, `Circ`, `Back`, `Elastic`, `Bounce`, plus `cubicBezier(x1, y1, x2, y2)` (CSS timing function) and `steps(n)`.
+- `Spring` steps the exact damped-oscillator solution, so any frame time is stable and a new `target` keeps the velocity.
+- `Timeline` chains tweens and callbacks with labels (`at: 'open+0.2'`), `seek`, `pause`, `reverse`, `speed`, `repeat` and `yoyo`. A property's start value is read when the playhead first reaches its entry; seeking back restores values. Callbacks run on `update`, never on `seek`.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
