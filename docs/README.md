@@ -41,7 +41,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-82 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+83 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -129,7 +129,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/wfc`](../packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |
 | [`@margoengine/splines`](../packages/splines/README.md) | 3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup. |
 
-### Animation and interaction (12)
+### Animation and interaction (13)
 
 | Package | What it is |
 | --- | --- |

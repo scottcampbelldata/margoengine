@@ -1754,8 +1754,13 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/selection@1.0.0",
     "imports": "import { Picking } from '@margoengine/selection';",
     "exports": [
+      "HoverHighlight",
       "Picking",
-      "Selection"
+      "Selection",
+      "SelectionTool",
+      "pickElement",
+      "selectInPolygon",
+      "selectInRect"
     ],
     "category": "Animation and interaction"
   },
