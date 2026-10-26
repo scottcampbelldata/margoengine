@@ -905,7 +905,7 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 307,012 B |
+| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 318,765 B |
 | `margoengine/cad` | CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export | 201,527 B |
 | `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 277,396 B |
 | `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 155,058 B |
@@ -2559,27 +2559,6 @@ Measured but not fixed. Their history, sources and rerun commands are in
 The entries below were measured with `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu` (busy
 machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md),
 "Instanced: fixes and what is left"). Each cause was measured, not guessed.
-
-### p-uv-transform: 4,096 materials meshes, one material each, still slower than three.js
-
-- **What:** after [perf-history.md](whitepaper/perf-history.md) entry 23, 18 of the 19 materials scenes of the speed
-  matrix are at or below three.js. `p-uv-transform` (4,096 boxes, each with its own textured material and UV
-  transform) is not: 36.2-41.7 ms of CPU per frame against three.js WebGL's 5.9-6.0 (diagnostic, busy machine, RTX
-  A6000; runs `20261026-104231` and `20261026-105135`). It was 63.6 before entry 23.
-- **Cause (measured, mock-device profile, 4,096 meshes):** every mesh is still its own draw, and every material still
-  does about 1.5 us of per-frame work in gltf-pro's derivation even when nothing changed: the uniform rows read through
-  the record's getters, the shader-revision and structure checks, the render state, and the materials `bindings()`
-  (five texture lookups, a fresh entries list) with its group 2 comparison. The rest is the per-mesh draw path (the
-  run's short path that misses, `draw()`, a batch of one, `drawOwn`, the uniform comparison, bind groups): about
-  7.5 us per mesh in all against three.js's 1.5. Materials that differ in more than the base colour cannot share an
-  instanced draw (a batch carries one uniform block), and a material has no change counter, so its bindings must run
-  every frame to keep live edits and texture uploads exact.
-- **Plan:** a change counter on `Material` and `Texture` (every setter, map assignment and `update()`), so a steady
-  material skips its bindings; and instanced draws whose instances read their own uniform block (an array indexed by
-  instance), so meshes whose materials share a pipeline and bindings draw together whatever their rows.
-- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity --cases=p-uv-transform
-  --runs=3`; mock profile: a 4,096-mesh scene of `PbrMaterial({ map, uvTransform })` on the mock device of
-  `packages/materials/tests/steady-batches.test.js`.
 
 ### createInstancedMesh reads vertex attributes its material does not use
 
