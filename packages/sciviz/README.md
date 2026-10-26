@@ -54,6 +54,8 @@ lines at the ticks and HTML tick labels.
 | `aspect` | `[1, 1, 0.75]` | relative size of the plot box |
 | `limits` | data bounds | fixed `[xmin, xmax, ymin, ymax, zmin, zmax]` (`[xmin, xmax, ymin, ymax]` in 2D) |
 | `pointBudget` | `2_000_000` | most scatter points drawn per frame |
+| `scale` | linear | `{ x, y, z }`: `'linear'`, `'log'` or `'date'` per axis |
+| `legend` | shown for 2+ named layers | `false`, `true`, or a corner such as `'top-left'` |
 | `tooltips` | `true` | hover tooltips; `false`, or `(hit) => string \| null` for your own text |
 | `controls` (create only) | `true` | orbit controls (3D) |
 
@@ -139,6 +141,35 @@ const heat = await Figure.create(document.createElement('canvas'), { mode: '2d' 
 const z = Float32Array.from({ length: 64 * 48 }, (_, k) => Math.sin((k % 64) / 8) * Math.cos(Math.floor(k / 64) / 6));
 await heat.heatmap(z, { nx: 64, colormap: 'coolwarm' });
 heat.colorbar('coolwarm', [-1, 1]);
+```
+
+## Log and date axes, legends
+
+`scale: { x, y, z }` maps an axis `'linear'` (default), `'log'` (base 10) or `'date'`:
+
+- **Log.** Ticks at decades, with 2 and 5 between them over short ranges. Values at or below 0 are not drawn. Bars
+  start at 1 instead of 0. Histogram bins are equal ratios.
+- **Date.** Values are milliseconds since 1970, as from `Date.now()` or `date.getTime()`. Ticks fall on whole UTC
+  seconds, minutes, hours, days, weeks, months or years, and tooltips show UTC dates.
+
+Picks, tooltips and selections report data values. Surfaces, volumes and isosurfaces need linear axes.
+`axisScale(type)`, `logTicks` and `dateTicks` from `@margoengine/sciviz/maths` give the same mappings and ticks.
+
+Series without colour data or a `color` take the next colour of the Okabe-Ito palette, which stays distinct under
+colour vision deficiency. Once two layers have a `name`, a legend lists them in the plot's top-right corner. The
+`legend` option picks another corner, `true` shows it for a single named layer and `false` hides it. Exports include
+it.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+
+const canvas = document.querySelector('canvas')!;
+const chart = await Figure.create(canvas, { mode: '2d', scale: { x: 'date', y: 'log' }, titles: { y: 'Requests' } });
+const start = Date.UTC(2026, 9, 1);
+const days = Array.from({ length: 30 }, (_, i) => start + i * 86_400_000);
+await chart.line({ x: days, y: days.map((_, i) => 10 * 1.25 ** i) }, { name: 'api' });
+await chart.line({ x: days, y: days.map((_, i) => 40 * 1.1 ** i) }, { name: 'web' });
+console.log(chart.legend?.element.textContent); // 'apiweb'
 ```
 
 ## Picking, tooltips and selection

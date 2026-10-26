@@ -15,3 +15,5 @@ export {
 export type { HeightGrid, SelectRegion } from './pick.js';
 export { barRects, heatmapRects, histogram, rectAt } from './charts.js';
 export type { Bins, BinOptions } from './charts.js';
+export { axisScale, dateTicks, formatDate, logTicks } from './scales.js';
+export type { Scale, ScaleType } from './scales.js';

@@ -116,6 +116,7 @@ export class Figure extends EventTarget {
     get model(): Float32Array;
     ready(): Promise<void>;
     get layers(): readonly Layer[];
+    get legend(): Legend | undefined;
     scatter(data: ScatterData, options?: ScatterLayerOptions): Promise<ScatterLayer>;
     line(data: {
         readonly x: DataSource;
@@ -154,6 +155,12 @@ export interface FigureOptions extends AxesOptions {
     readonly aspect?: readonly [number, number, number];
     readonly limits?: Bounds | readonly [number, number, number, number];
     readonly pointBudget?: number;
+    readonly scale?: {
+        readonly x?: ScaleType;
+        readonly y?: ScaleType;
+        readonly z?: ScaleType;
+    };
+    readonly legend?: boolean | LegendPosition;
     readonly tooltips?: boolean | ((hit: PickResult) => string | null);
 }
 
@@ -201,6 +208,29 @@ export interface IsosurfaceLayerOptions {
 }
 
 export type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer | RectsLayer;
+
+export class Legend {
+    readonly canvas: HTMLCanvasElement;
+    readonly theme: Theme;
+    readonly element: HTMLDivElement;
+    constructor(canvas: HTMLCanvasElement, theme: Theme);
+    update(entries: readonly LegendEntry[], position: LegendPosition, inset: {
+        top: number;
+        right: number;
+        bottom: number;
+        left: number;
+    }): void;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface LegendEntry {
+    readonly name: string;
+    readonly color: string;
+    readonly shape: 'line' | 'dot' | 'square';
+}
+
+export type LegendPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
 
 export interface LineLayer {
     readonly kind: 'line';
@@ -276,6 +306,8 @@ export type SRGB = readonly [number, number, number];
 export interface SVGOptions {
     readonly vector?: boolean;
 }
+
+export type ScaleType = 'linear' | 'log' | 'date';
 
 export type ScatterData = {
     readonly x: DataSource;

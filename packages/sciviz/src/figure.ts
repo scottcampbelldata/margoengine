@@ -21,6 +21,8 @@ import { IsosurfaceLayer, levelColour, type IsosurfaceLayerOptions } from './iso
 import { dataToClip, nearestPoint, screenRay, selectPoints, type SelectRegion } from './pick.js';
 import { packColour, RectsLayer } from './rects.js';
 import { formatValue } from './ticks.js';
+import { Legend, type LegendEntry, type LegendPosition } from './legend.js';
+import { axisScale, type Scale, type ScaleType } from './scales.js';
 import type { PNGOptions, SVGOptions } from './export.js';
 import { projectPoint } from '@margoengine/math/mat4';
 import {
@@ -61,11 +63,25 @@ export interface FigureOptions extends AxesOptions {
   readonly limits?: Bounds | readonly [number, number, number, number];
   /** Most scatter points drawn per frame across the figure (level of detail beyond it). Default 2,000,000. */
   readonly pointBudget?: number;
+  /**
+   * How each axis maps data: `'linear'` (default), `'log'` (base 10; values at or below 0 are not drawn) or `'date'`
+   * (milliseconds since 1970, as from `Date.now()` or `date.getTime()`, ticked in UTC). Surfaces, volumes and
+   * isosurfaces need linear axes.
+   */
+  readonly scale?: { readonly x?: ScaleType; readonly y?: ScaleType; readonly z?: ScaleType };
+  /**
+   * The legend of named layers: shown in the top-right corner once two layers have a `name` (default), in another
+   * corner (`'top-left'`, `'bottom-right'`, `'bottom-left'`), whenever one layer has a name (`true`), or never (`false`).
+   */
+  readonly legend?: boolean | LegendPosition;
   /** Tooltips on hover: true (default), false, or your own text for a hit (null shows none). */
   readonly tooltips?: boolean | ((hit: PickResult) => string | null);
 }
 
-/** What is under the pointer: a scatter point, a line vertex, a point on a surface, a bar or a heatmap cell, in data units. */
+/**
+ * What is under the pointer: a scatter point, a line vertex, a point on a surface, a bar or a heatmap cell, in data
+ * units (milliseconds on a date axis).
+ */
 export interface PickResult {
   readonly layer: ScatterLayer | LineLayer | SurfaceLayer | RectsLayer;
   /** The point's or vertex's index; for a surface, the nearest grid sample (j * nx + i); a bar's or cell's index. */
@@ -147,7 +163,7 @@ export interface ScatterLayer {
   readonly cloud: PointCloud;
   readonly bounds: Bounds;
   readonly count: number;
-  /** Positions in data units (x, y, z per point), used for picking and selection. */
+  /** Positions in plot coordinates (x, y, z per point; data units on linear axes), used for picking and selection. */
   readonly positions: Float32Array;
   /** The `color` data, if any. */
   readonly values: ArrayLike<number> | undefined;
@@ -160,7 +176,7 @@ export interface LineLayer {
   /** The fat line. Positions are in data units. */
   readonly line: Line;
   readonly bounds: Bounds;
-  /** Vertex positions in data units (x, y, z per vertex), used for picking and selection. */
+  /** Vertex positions in plot coordinates (data units on linear axes), used for picking and selection. */
   readonly positions: Float32Array;
   /** The `color` data, if any. */
   readonly values: ArrayLike<number> | undefined;
@@ -227,6 +243,24 @@ const toHex = (rgb: readonly number[]): string =>
 
 const MARGIN = { top: 16, right: 24, bottom: 48, left: 64 } as const;
 
+// Series colours: the Okabe-Ito palette for colour vision deficiency (M. Okabe and K. Ito, "Color universal design",
+// 2008), without its black, which disappears on the dark theme.
+const PALETTE = ['#56b4e9', '#e69f00', '#009e73', '#f0e442', '#0072b2', '#d55e00', '#cc79a7'];
+const DAY = 86_400_000;
+
+// Extents of each coordinate of interleaved xyz positions, skipping NaN.
+const positionBounds = (p: Float32Array): Bounds => {
+  const b: Bounds = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
+  for (let i = 0; i < p.length; i += 3)
+    for (let k = 0; k < 3; k++) {
+      const v = p[i + k];
+      if (v < b[k * 2]) b[k * 2] = v;
+      if (v > b[k * 2 + 1]) b[k * 2 + 1] = v;
+    }
+  for (let k = 0; k < 3; k++) if (!(b[k * 2] <= b[k * 2 + 1])) [b[k * 2], b[k * 2 + 1]] = [0, 1];
+  return b;
+};
+
 const hexRGB = (hex: string, what: string): [number, number, number] => {
   const rgba = hexColor(hex);
   if (!rgba) throw typeError(`${what} ${hex} is not #rrggbb`, 'sciviz');
@@ -247,13 +281,6 @@ function mapColours(values: ArrayLike<number>, map: Colormap, range: readonly [n
   }
   return out;
 }
-
-const boundsOf = (x: ArrayLike<number>, y: ArrayLike<number>, z: ArrayLike<number> | undefined): Bounds => {
-  const [x0, x1] = extent(x),
-    [y0, y1] = extent(y),
-    [z0, z1] = z ? extent(z) : [0, 0];
-  return [x0, x1, y0, y1, z0, z1];
-};
 
 /**
  * A 3D figure in an engine: scatter, line, surface, volume and isosurface layers sharing one data frame, with axes,
@@ -318,6 +345,11 @@ export class Figure extends EventTarget {
   #margin: Required<Margin>;
   #offFrame: (() => void) | undefined;
   #axesQueued = false;
+  // Axis scales (a date axis takes its origin from the first data it sees), the legend and the next series colour.
+  readonly #scales: [Scale, Scale, Scale];
+  readonly #dated = [false, false, false];
+  #legend: Legend | undefined;
+  #series = 0;
   // Colours and widths of scatter and line layers, for SVG export.
   readonly #styles = new WeakMap<Layer, { color: string; colors?: Float32Array; width: number }>();
   // Axis updates run after one another; ready() waits for them and reports their errors.
@@ -376,6 +408,8 @@ export class Figure extends EventTarget {
     this.#flat = mode === '2d';
     if (options.limits) this.#checkBounds(options.limits, 'Figure limits');
     this.#margin = this.#checkMargin(options.margin);
+    const types = options.scale ?? {};
+    this.#scales = [axisScale(types.x), axisScale(types.y), axisScale(types.z)];
     this.engine = engine;
     this.theme = THEMES[theme];
     this.#options = options;
@@ -532,11 +566,13 @@ export class Figure extends EventTarget {
     if (!tooltips) return null;
     const titles = this.#options.titles ?? {},
       name = hit.layer.name,
-      lines = [
-        `${titles.x ?? 'x'} ${formatValue(hit.x)}`,
-        `${titles.y ?? 'y'} ${formatValue(hit.y)}`,
-        `${titles.z ?? 'z'} ${formatValue(hit.z)}`,
-      ];
+      // Dates read as UTC date and time.
+      show = (axis: number, v: number) =>
+        this.#scales[axis].type === 'date' && Number.isFinite(v)
+          ? new Date(v).toISOString().slice(0, 19).replace('T', ' ')
+          : formatValue(v),
+      lines = [`${titles.x ?? 'x'} ${show(0, hit.x)}`, `${titles.y ?? 'y'} ${show(1, hit.y)}`];
+    if (!this.#flat) lines.push(`${titles.z ?? 'z'} ${show(2, hit.z)}`);
     if (hit.value !== undefined && !(hit.layer instanceof SurfaceLayer)) lines.push(`value ${formatValue(hit.value)}`);
     return name ? `${name}\n${lines.join('\n')}` : lines.join('\n');
   }
@@ -596,7 +632,14 @@ export class Figure extends EventTarget {
         const p = layer.positions,
           i = near.index;
         bestDistance = near.distance;
-        best = { layer, index: i, x: p[i * 3], y: p[i * 3 + 1], z: p[i * 3 + 2], value: layer.values?.[i] };
+        best = {
+          layer,
+          index: i,
+          x: this.#inverse(0, p[i * 3]),
+          y: this.#inverse(1, p[i * 3 + 1]),
+          z: this.#inverse(2, p[i * 3 + 2]),
+          value: layer.values?.[i],
+        };
       }
     }
     if (best) return best;
@@ -611,8 +654,8 @@ export class Figure extends EventTarget {
       return {
         layer,
         index: k,
-        x: (r[k * 4] + r[k * 4 + 2]) / 2,
-        y: layer.kind === 'heatmap' ? (r[k * 4 + 1] + r[k * 4 + 3]) / 2 : layer.values[k],
+        x: this.#inverse(0, (r[k * 4] + r[k * 4 + 2]) / 2),
+        y: layer.kind === 'heatmap' ? this.#inverse(1, (r[k * 4 + 1] + r[k * 4 + 3]) / 2) : layer.values[k],
         z: 0,
         value: layer.values[k],
       };
@@ -740,7 +783,7 @@ export class Figure extends EventTarget {
       this.#axesQueued = true;
       this.#pending = this.#pending.then(() => {
         this.#axesQueued = false;
-        return this.#axes!.update(this.#bounds, this.#model, this.#flat);
+        return this.#axes!.update(this.#bounds, this.#model, this.#flat, this.#scales);
       });
     }
   }
@@ -748,7 +791,71 @@ export class Figure extends EventTarget {
   #add<L extends Layer>(layer: L): L {
     this.#layers.add(layer);
     this.#refit();
+    this.#updateLegend();
     return layer;
+  }
+
+  // The plot coordinate function of an axis. A date axis takes its origin, the first finite value's UTC midnight,
+  // from the first data it maps, so 32-bit positions keep millisecond-scale precision across years.
+  #forward(axis: number, values?: ArrayLike<number>): (v: number) => number {
+    const s = this.#scales[axis];
+    if (s.type === 'date' && !this.#dated[axis] && values) {
+      for (let i = 0; i < values.length; i++)
+        if (Number.isFinite(values[i])) {
+          this.#scales[axis] = axisScale('date', Math.floor(values[i] / DAY) * DAY);
+          this.#dated[axis] = true;
+          break;
+        }
+    }
+    return this.#scales[axis].forward;
+  }
+
+  #inverse(axis: number, v: number): number {
+    return this.#scales[axis].inverse(v);
+  }
+
+  #linear(what: string): void {
+    if (this.#scales.some((s) => s.type !== 'linear'))
+      throw fault('unsupported', `${what} needs linear axes; create the figure without scale`, 'sciviz');
+  }
+
+  // The next colour of the series palette, as sRGB.
+  #nextColour(): [number, number, number] {
+    return hexRGB(PALETTE[this.#series++ % PALETTE.length], 'palette colour');
+  }
+
+  #updateLegend(): void {
+    const option = this.#options.legend;
+    if (option === false) return;
+    const entries: LegendEntry[] = [];
+    for (const layer of this.#layers) {
+      const name = 'name' in layer ? layer.name : undefined;
+      if (!name) continue;
+      if (layer instanceof RectsLayer) entries.push({ name, color: layer.swatch, shape: 'square' });
+      else if (layer instanceof SurfaceLayer)
+        entries.push({ name, color: toHex(layer.colormap.sample(0.6)), shape: 'square' });
+      else if ('kind' in layer && (layer.kind === 'scatter' || layer.kind === 'line'))
+        entries.push({
+          name,
+          color: this.#styles.get(layer)?.color ?? '#ffffff',
+          shape: layer.kind === 'line' ? 'line' : 'dot',
+        });
+    }
+    const show = entries.length >= (option === true ? 1 : 2);
+    if (!show) {
+      if (this.#legend) this.#legend.element.hidden = true;
+      return;
+    }
+    const canvas = (this.engine as unknown as { canvas?: HTMLCanvasElement }).canvas;
+    if (!canvas || typeof document === 'undefined') return;
+    this.#legend ??= new Legend(canvas, this.theme);
+    const inset = this.#flat ? this.#margin : { top: 0, right: 0, bottom: 0, left: 0 };
+    this.#legend.update(entries, typeof option === 'string' ? option : 'top-right', inset);
+  }
+
+  /** The legend, once shown. */
+  get legend(): Legend | undefined {
+    return this.#legend;
   }
 
   /**
@@ -765,23 +872,37 @@ export class Figure extends EventTarget {
     if ('positions' in data) {
       const p = await read(data.positions);
       if (!p || p.length % 3) throw rangeError('scatter positions must hold x, y, z per point', 'sciviz');
-      positions = p instanceof Float32Array ? p : Float32Array.from(p);
-      const xs = new Float32Array(p.length / 3),
-        ys = new Float32Array(p.length / 3),
-        zs = new Float32Array(p.length / 3);
-      for (let i = 0; i < xs.length; i++) [xs[i], ys[i], zs[i]] = [p[i * 3], p[i * 3 + 1], p[i * 3 + 2]];
-      bounds = boundsOf(xs, ys, zs);
+      if (this.#scales.every((s) => s.type === 'linear') && !this.#flat)
+        positions = p instanceof Float32Array ? p : Float32Array.from(p);
+      else {
+        // Each coordinate through its axis scale (in double precision) before rounding to 32 bits.
+        const n = p.length / 3,
+          first = (k: number) => Float64Array.from({ length: Math.min(n, 1) }, () => p[k]),
+          fx = this.#forward(0, first(0)),
+          fy = this.#forward(1, first(1)),
+          fz = this.#forward(2, first(2));
+        positions = new Float32Array(p.length);
+        for (let i = 0; i < n; i++) {
+          positions[i * 3] = fx(p[i * 3]);
+          positions[i * 3 + 1] = fy(p[i * 3 + 1]);
+          positions[i * 3 + 2] = this.#flat ? 0 : fz(p[i * 3 + 2]);
+        }
+      }
+      bounds = positionBounds(positions);
     } else {
       const [x, y, z] = await Promise.all([read(data.x), read(data.y), read(data.z)]);
       if (!x || !y || x.length !== y.length || (z && z.length !== x.length))
         throw rangeError('scatter x, y and z must have one length', 'sciviz');
+      const fx = this.#forward(0, x),
+        fy = this.#forward(1, y),
+        fz = this.#forward(2, z);
       positions = new Float32Array(x.length * 3);
       for (let i = 0; i < x.length; i++) {
-        positions[i * 3] = x[i];
-        positions[i * 3 + 1] = y[i];
-        positions[i * 3 + 2] = z && !this.#flat ? z[i] : 0;
+        positions[i * 3] = fx(x[i]);
+        positions[i * 3 + 1] = fy(y[i]);
+        positions[i * 3 + 2] = z && !this.#flat ? fz(z[i]) : 0;
       }
-      bounds = boundsOf(x, y, z);
+      bounds = positionBounds(positions);
     }
     const count = positions.length / 3,
       map = resolveColormap(options.colormap);
@@ -794,7 +915,11 @@ export class Figure extends EventTarget {
     const colours = colourData
       ? mapColours(colourData, map, rangeOption(options.range, 'scatter range') ?? extent(colourData))
       : undefined;
-    const uniform = options.color ? hexRGB(options.color, 'scatter color') : map.sample(0.6);
+    const uniform = options.color
+      ? hexRGB(options.color, 'scatter color')
+      : colourData || options.colormap
+        ? map.sample(0.6)
+        : this.#nextColour();
     const plugin = await (this.#points ??= import('@margoengine/points').then(({ PointsPlugin }) =>
       PointsPlugin.attach(this.engine, { pointBudget: this.#options.pointBudget ?? 2_000_000 }),
     ));
@@ -834,9 +959,16 @@ export class Figure extends EventTarget {
     const [x, y, z, c] = await Promise.all([read(data.x), read(data.y), read(data.z), read(data.color)]);
     if (!x || !y || x.length !== y.length || (z && z.length !== x.length) || x.length < 2)
       throw rangeError('line x, y and z must have one length of at least 2', 'sciviz');
-    const positions = new Float32Array(x.length * 3);
+    const positions = new Float32Array(x.length * 3),
+      fx = this.#forward(0, x),
+      fy = this.#forward(1, y),
+      fz = this.#forward(2, z);
     for (let i = 0; i < x.length; i++)
-      [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]] = [x[i], y[i], z && !this.#flat ? z[i] : 0];
+      [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]] = [
+        fx(x[i]),
+        fy(y[i]),
+        z && !this.#flat ? fz(z[i]) : 0,
+      ];
     const map = resolveColormap(options.colormap);
     if (c && c.length !== x.length)
       throw rangeError(`line color has ${c.length} values for ${x.length} points`, 'sciviz');
@@ -844,16 +976,7 @@ export class Figure extends EventTarget {
     const lines = await this.#linesPlugin();
     const { Line } = await import('@margoengine/lines');
     this.#check();
-    const colour =
-      options.color ??
-      `#${map
-        .sample(0.6)
-        .map((v) =>
-          Math.round(v * 255)
-            .toString(16)
-            .padStart(2, '0'),
-        )
-        .join('')}`;
+    const colour = options.color ?? toHex(c || options.colormap ? map.sample(0.6) : this.#nextColour());
     const line = lines.add(
       new Line({
         positions,
@@ -869,7 +992,7 @@ export class Figure extends EventTarget {
       {
         kind: 'line',
         line,
-        bounds: boundsOf(x, y, z),
+        bounds: positionBounds(positions),
         positions,
         values: c,
         name: options.name,
@@ -881,6 +1004,7 @@ export class Figure extends EventTarget {
   surface(z: DataSource, options: SurfaceLayerOptions = {}): SurfaceLayer {
     this.#check();
     this.#need3d('A surface');
+    this.#linear('A surface');
     const layer = new SurfaceLayer(this.renderer, z, options);
     this.renderer.add(layer);
     return this.#add(layer);
@@ -890,6 +1014,7 @@ export class Figure extends EventTarget {
   volume(data: DataSource, options: VolumeLayerOptions = {}): VolumeLayer {
     this.#check();
     this.#need3d('A volume');
+    this.#linear('A volume');
     const layer = new VolumeLayer(this.renderer, data, options);
     this.renderer.add(layer);
     return this.#add(layer);
@@ -902,6 +1027,7 @@ export class Figure extends EventTarget {
   async isosurface(data: DataSource, level: number, options: IsosurfaceLayerOptions = {}): Promise<IsosurfaceLayer> {
     this.#check();
     this.#need3d('An isosurface');
+    this.#linear('An isosurface');
     const gpu = await (this.#compute ??= import('@margoengine/compute').then(({ createCompute }) =>
       createCompute({ engine: this.engine }),
     ));
@@ -950,7 +1076,11 @@ export class Figure extends EventTarget {
       for (let i = 0; i < count; i++) colours[i] = packColour(rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]);
       return { colours, swatch: toHex(map.sample(0.6)) };
     }
-    const one = options.color ? hexRGB(options.color, `${what} color`) : map.sample(0.6);
+    const one = options.color
+      ? hexRGB(options.color, `${what} color`)
+      : options.colormap
+        ? map.sample(0.6)
+        : this.#nextColour();
     colours.fill(packColour(one[0], one[1], one[2]));
     return { colours, swatch: toHex(one) };
   }
@@ -970,7 +1100,11 @@ export class Figure extends EventTarget {
       throw rangeError('bar x and y must have one length of at least 1', 'sciviz');
     if (c && c.length !== x.length) throw rangeError(`bar color has ${c.length} values for ${x.length} bars`, 'sciviz');
     this.#check();
-    const rects = barRects(x, y, options),
+    // Bars start at 0, or at 1 on a log axis (where 0 has no place).
+    const fx = this.#forward(0, x),
+      fy = this.#forward(1, y),
+      base = fy(options.base ?? (this.#scales[1].type === 'log' ? 1 : 0));
+    const rects = barRects(Float64Array.from(x, fx), Float64Array.from(y, fy), { width: options.width, base }),
       { colours, swatch } = this.#colours(x.length, c, options, 'bar');
     return this.#rects('bar', rects, Float32Array.from(y), colours, options.name, swatch);
   }
@@ -981,9 +1115,23 @@ export class Figure extends EventTarget {
     this.#need2d('A histogram');
     const v = await read(values);
     this.#check();
-    const { edges, counts } = histogram(v!, options),
-      rects = new Float32Array(counts.length * 4);
-    for (let k = 0; k < counts.length; k++) rects.set([edges[k], 0, edges[k + 1], counts[k]], k * 4);
+    // Bins are equal in plot coordinates: on a log x axis, equal ratios.
+    const fx = this.#forward(0, v),
+      fy = this.#forward(1),
+      range = options.range && ([fx(options.range[0]), fx(options.range[1])] as const);
+    const { edges, counts } = histogram(Float64Array.from(v!, fx), { ...options, range }),
+      rects = new Float32Array(counts.length * 4),
+      base = fy(this.#scales[1].type === 'log' ? 1 : 0);
+    for (let k = 0; k < counts.length; k++) {
+      const top = fy(counts[k]);
+      // An empty bin on a log axis has no bar.
+      rects.set(
+        top === top
+          ? [edges[k], Math.min(base, top), edges[k + 1], Math.max(base, top)]
+          : [edges[k], base, edges[k], base],
+        k * 4,
+      );
+    }
     const { colours, swatch } = this.#colours(counts.length, undefined, options, 'histogram');
     return this.#rects('histogram', rects, Float32Array.from(counts), colours, options.name, swatch);
   }
@@ -1002,8 +1150,14 @@ export class Figure extends EventTarget {
         `Heatmap needs nx x ny cells matching ${v.length} values; pass nx and ny (got ${nx} x ${ny})`,
         'sciviz',
       );
-    const x = rangeOption(options.x, 'Heatmap x') ?? [0, nx - 1],
-      y = rangeOption(options.y, 'Heatmap y') ?? [0, ny - 1];
+    const dx = rangeOption(options.x, 'Heatmap x') ?? [0, nx - 1],
+      dy = rangeOption(options.y, 'Heatmap y') ?? [0, ny - 1],
+      fx = this.#forward(0, dx),
+      fy = this.#forward(1, dy),
+      x: [number, number] = [fx(dx[0]), fx(dx[1])],
+      y: [number, number] = [fy(dy[0]), fy(dy[1])];
+    if (!x.every(Number.isFinite) || !y.every(Number.isFinite))
+      throw rangeError('Heatmap x and y must be above 0 on a log axis', 'sciviz');
     const rects = heatmapRects(v, nx, ny, x, y),
       { colours, swatch } = this.#colours(v.length, v, options, 'heatmap');
     return this.#rects('heatmap', rects, Float32Array.from(v), colours, options.name, swatch);
@@ -1019,7 +1173,11 @@ export class Figure extends EventTarget {
 
   // The elements whose text export paints: tick labels, titles and colour bars.
   #overlayRoots(): Element[] {
-    return [...(this.#axes?.elements() ?? []), ...[...this.#bars].map((b) => b.element)];
+    return [
+      ...(this.#axes?.elements() ?? []),
+      ...[...this.#bars].map((b) => b.element),
+      ...(this.#legend && !this.#legend.element.hidden ? [this.#legend.element] : []),
+    ];
   }
 
   /**
@@ -1028,7 +1186,7 @@ export class Figure extends EventTarget {
    */
   async toPNG(options: PNGOptions = {}): Promise<Blob> {
     // Export code loads on first use.
-    const { paintOverlays, textRuns } = await import('./export.js');
+    const { paintOverlays, swatches, textRuns } = await import('./export.js');
     await this.#pending;
     this.#check();
     const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas;
@@ -1046,6 +1204,7 @@ export class Figure extends EventTarget {
         bars,
         origin,
         bitmap.width / (origin.width || bitmap.width),
+        swatches(this.#overlayRoots(), origin),
       );
     }
     bitmap.close();
@@ -1059,7 +1218,7 @@ export class Figure extends EventTarget {
    */
   async toSVG(options: SVGOptions = {}): Promise<string> {
     const ex = await import('./export.js'),
-      { base64, svgBars, svgText, textRuns } = ex;
+      { base64, svgBars, svgSwatches, svgText, swatches, textRuns } = ex;
     await this.#pending;
     this.#check();
     const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas,
@@ -1089,8 +1248,9 @@ export class Figure extends EventTarget {
         [...this.#bars].map((b) => ({ bar: b.bar, map: b.colormap })),
         origin,
       ),
-      text = svgText(textRuns(this.#overlayRoots(), origin));
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${body}\n${bars}\n${text}\n</svg>\n`;
+      text = svgText(textRuns(this.#overlayRoots(), origin)),
+      boxes = svgSwatches(swatches(this.#overlayRoots(), origin));
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${body}\n${bars}\n${boxes}\n${text}\n</svg>\n`;
   }
 
   // A 2D chart as SVG shapes: background, grid and frame, then rectangles, points and lines in drawing order, clipped
@@ -1187,6 +1347,7 @@ export class Figure extends EventTarget {
     // Make room for the bar beside a 2D chart unless the margin was chosen.
     if (this.#flat && this.#options.margin?.right === undefined && this.#margin.right < 96)
       this.#margin = { ...this.#margin, right: 96 };
+    this.#updateLegend();
     return bar;
   }
 
@@ -1197,6 +1358,7 @@ export class Figure extends EventTarget {
     else if ('kind' in layer && layer.kind === 'line') void this.#lines?.then((l) => l.remove(layer.line));
     else layer.dispose();
     this.#refit();
+    this.#updateLegend();
   }
 
   /** Frees every layer, the axes and colour bars, and the engine when the figure created it. */
@@ -1207,6 +1369,7 @@ export class Figure extends EventTarget {
     this.#layers.clear();
     for (const bar of this.#bars) bar.dispose();
     this.#axes?.dispose();
+    this.#legend?.dispose();
     this.#offFrame?.();
     if (this.#flat) {
       const engine = this.engine as unknown as { views?: unknown; camera: { project?: unknown } };

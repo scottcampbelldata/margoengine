@@ -20,6 +20,9 @@ export type {
   PointSelection,
 } from './figure.js';
 export { RectsLayer } from './rects.js';
+export { Legend } from './legend.js';
+export type { LegendEntry, LegendPosition } from './legend.js';
+export type { ScaleType } from './scales.js';
 export type { PNGOptions, SVGOptions } from './export.js';
 export { histogram } from './charts.js';
 export type { Bins, BinOptions } from './charts.js';

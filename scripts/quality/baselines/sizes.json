@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3121452,
+  "total": 3124952,
   "history": [
     {
       "date": "2026-10-24",
@@ -209,14 +209,14 @@
     },
     {
       "date": "2026-10-25",
-      "commit": "abad599b",
-      "reason": "new @margoengine/compute/sparse entry (CSR, SpMV, CG, BiCGSTAB)",
+      "commit": "1ff80aff",
+      "reason": "sciviz: figure.toPNG() and toSVG() export (export code loads on first use)",
       "grew": 1
     },
     {
       "date": "2026-10-25",
-      "commit": "1ff80aff",
-      "reason": "sciviz: figure.toPNG() and toSVG() export (export code loads on first use)",
+      "commit": "abad599b",
+      "reason": "new @margoengine/compute/sparse entry (CSR, SpMV, CG, BiCGSTAB)",
       "grew": 1
     },
     {
@@ -230,6 +230,12 @@
       "commit": "1ff80aff",
       "reason": "New optional @margoengine/mcp (queue item 33, AI-native tools): stdio MCP server, search, package, example and snippet-check tools",
       "grew": 1
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "8960c47e",
+      "reason": "sciviz: log and date axes, series palette and legends",
+      "grew": 2
     }
   ],
   "items": {
@@ -459,9 +465,9 @@
     "@margoengine/scatter": 11893,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
-    "@margoengine/sciviz": 30966,
+    "@margoengine/sciviz": 33603,
     "@margoengine/sciviz/colormaps": 4433,
-    "@margoengine/sciviz/maths": 3729,
+    "@margoengine/sciviz/maths": 4592,
     "@margoengine/selection": 13905,
     "@margoengine/shader": 12517,
     "@margoengine/shader/effects": 8386,

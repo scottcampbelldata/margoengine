@@ -550,6 +550,85 @@ window.runSciVizTests = async () => {
     figure.dispose();
   });
 
+  await check('a log axis ticks decades and picks report data values', async () => {
+    const figure = await Figure.create(canvas, { mode: '2d', scale: { y: 'log' } });
+    figure.engine.stop?.();
+    watch(figure);
+    const layer = await figure.scatter({ x: [1, 2, 3, 4], y: [1, 10, 100, 1000] }, { size: 6 });
+    await figure.ready();
+    figure.render();
+    const texts = [...document.querySelectorAll('span')].map((s) => s.textContent);
+    assert(
+      ['10', '100', '1000'].every((t) => texts.includes(t)),
+      `decade labels in ${texts.slice(0, 16)}`,
+    );
+    // On a log axis the points lie on a straight line: equal steps on screen.
+    const near = (a, b, tol) => Math.abs(a - b) <= tol;
+    const p = layer.positions;
+    assert(near(p[4] - p[1], p[7] - p[4], 1e-6), 'equal plot steps per decade');
+    const w = canvas.clientWidth - 88,
+      h = canvas.clientHeight - 64,
+      [x0, x1, y0, y1] = figure.bounds;
+    const sx = 64 + ((3 - x0) / (x1 - x0)) * w,
+      sy = 16 + ((y1 - Math.log10(100)) / (y1 - y0)) * h;
+    const hit = figure.pick(sx, sy);
+    assert(hit?.index === 2 && near(hit.y, 100, 1e-3) && hit.x === 3, `pick ${hit?.index} ${hit?.y}`);
+    let threw = false;
+    figure.dispose();
+    const flat = await Figure.create(canvas, { scale: { z: 'log' }, controls: false });
+    try {
+      flat.surface([1, 2, 3, 4], { nx: 2 });
+    } catch (error) {
+      threw = error.code === 'unsupported';
+    }
+    flat.dispose();
+    assert(threw, 'a surface needs linear axes');
+  });
+
+  await check('a date axis ticks whole hours and keeps millisecond-scale precision', async () => {
+    const figure = await Figure.create(canvas, { mode: '2d', scale: { x: 'date' } });
+    figure.engine.stop?.();
+    watch(figure);
+    const start = Date.UTC(2026, 9, 25, 0, 30);
+    const x = Array.from({ length: 7 }, (_, i) => start + i * 3_600_000 + 123);
+    await figure.line({ x, y: [1, 3, 2, 5, 4, 6, 5] });
+    await figure.ready();
+    figure.render();
+    const texts = [...document.querySelectorAll('span')].map((s) => s.textContent);
+    assert(texts.includes('02:00') && texts.includes('04:00'), `hour labels in ${texts.slice(0, 16)}`);
+    const w = canvas.clientWidth - 88,
+      h = canvas.clientHeight - 64,
+      [x0, x1, y0, y1] = figure.bounds;
+    // Plot x is milliseconds from the first data's UTC midnight.
+    const px = x[3] - Date.UTC(2026, 9, 25);
+    const hit = figure.pick(64 + ((px - x0) / (x1 - x0)) * w, 16 + ((y1 - 5) / (y1 - y0)) * h);
+    assert(hit?.index === 3 && Math.abs(hit.x - x[3]) < 8, `date pick ${hit?.index} ${hit?.x - x[3]} ms`);
+    figure.dispose();
+  });
+
+  await check('named series get distinct palette colours and a legend', async () => {
+    const figure = await Figure.create(canvas, { mode: '2d' });
+    figure.engine.stop?.();
+    watch(figure);
+    const a = await figure.line({ x: [0, 1], y: [0, 1] }, { name: 'Alpha' });
+    assert(!figure.legend || figure.legend.element.hidden, 'no legend for one named series');
+    await figure.line({ x: [0, 1], y: [1, 0] }, { name: 'Beta' });
+    const legend = figure.legend?.element;
+    assert(legend && !legend.hidden && legend.textContent === 'AlphaBeta', `legend: ${legend?.textContent}`);
+    const colours = [...legend.querySelectorAll('[data-sciviz-swatch]')].map(
+      (s) => getComputedStyle(s).backgroundColor,
+    );
+    assert(colours.length === 2 && colours[0] !== colours[1], `distinct colours ${colours}`);
+    // The legend sits inside the plot area's top-right corner.
+    const r = legend.getBoundingClientRect(),
+      c = canvas.getBoundingClientRect();
+    assert(r.right <= c.right - 24 && r.top >= c.top + 16, 'inside the plot area');
+    figure.remove(a);
+    assert(legend.hidden, 'one named series left: the legend hides');
+    figure.dispose();
+    assert(!legend.isConnected, 'disposing the figure removes the legend');
+  });
+
   await check('colour maps the page can use as CSS', async () => {
     assert(colormap('aurora').css().startsWith('linear-gradient('), 'css');
   });

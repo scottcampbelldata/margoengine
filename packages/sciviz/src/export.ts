@@ -70,6 +70,36 @@ export function textRuns(roots: readonly Element[], origin: DOMRect): TextRun[] 
   return runs;
 }
 
+/** @internal A legend swatch on screen: its box (CSS pixels from the canvas's top-left), colour and roundness. */
+export interface Swatch {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly color: string;
+  readonly round: boolean;
+}
+
+/** @internal The visible legend swatches under `roots`, relative to `origin`. */
+export function swatches(roots: readonly Element[], origin: DOMRect): Swatch[] {
+  const out: Swatch[] = [];
+  for (const root of roots)
+    for (const element of root.querySelectorAll<HTMLElement>('[data-sciviz-swatch]')) {
+      const r = element.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      const style = getComputedStyle(element);
+      out.push({
+        x: r.left - origin.left,
+        y: r.top - origin.top,
+        width: r.width,
+        height: r.height,
+        color: style.backgroundColor,
+        round: style.borderTopLeftRadius === '50%' || Number.parseFloat(style.borderTopLeftRadius) >= r.width / 2,
+      });
+    }
+  return out;
+}
+
 /** @internal Paints text runs and colour bars onto a 2D context whose pixels are `scale` times CSS pixels. */
 export function paintOverlays(
   g: OffscreenCanvasRenderingContext2D,
@@ -77,9 +107,18 @@ export function paintOverlays(
   bars: readonly PaintedBar[],
   origin: DOMRect,
   scale: number,
+  boxes: readonly Swatch[] = [],
 ): void {
   g.save();
   g.scale(scale, scale);
+  for (const box of boxes) {
+    g.fillStyle = box.color;
+    if (box.round) {
+      g.beginPath();
+      g.arc(box.x + box.width / 2, box.y + box.height / 2, box.width / 2, 0, Math.PI * 2);
+      g.fill();
+    } else g.fillRect(box.x, box.y, box.width, box.height);
+  }
   for (const { bar, map } of bars) {
     if (!bar.isConnected) continue;
     const r = bar.getBoundingClientRect(),
@@ -132,6 +171,17 @@ export function svgText(runs: readonly TextRun[]): string {
       }
       return `<text x="${run.x}" y="${run.y + run.height / 2}" ${style} dominant-baseline="central">${escape(run.text)}</text>`;
     })
+    .join('\n');
+}
+
+/** @internal SVG for legend swatches. */
+export function svgSwatches(boxes: readonly Swatch[]): string {
+  return boxes
+    .map((b) =>
+      b.round
+        ? `<circle cx="${b.x + b.width / 2}" cy="${b.y + b.height / 2}" r="${b.width / 2}" fill="${escape(b.color)}"/>`
+        : `<rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" fill="${escape(b.color)}"/>`,
+    )
     .join('\n');
 }
 

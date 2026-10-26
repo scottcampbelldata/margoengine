@@ -30,6 +30,15 @@ export interface HeightGrid {
 
 export const MAX_TRIANGLES: number;
 
+export interface Scale {
+    readonly type: ScaleType;
+    forward(value: number): number;
+    inverse(value: number): number;
+    ticks(min: number, max: number, count?: number): Ticks;
+}
+
+export type ScaleType = 'linear' | 'log' | 'date';
+
 export type SelectRegion = {
     readonly rect: readonly [number, number, number, number];
 } | {
@@ -41,6 +50,8 @@ export interface Ticks {
     readonly step: number;
     readonly labels: readonly string[];
 }
+
+export function axisScale(type?: ScaleType, origin?: number): Scale;
 
 export function barRects(x: ArrayLike<number>, y: ArrayLike<number>, options?: {
     readonly width?: number;
@@ -55,6 +66,10 @@ export function cubeTables(): {
     stride: number;
 };
 
+export function dateTicks(min: number, max: number, count?: number): Ticks;
+
+export function formatDate(ms: number, step: number, months?: number): string;
+
 export function formatTick(value: number, step: number): string;
 
 export function formatValue(value: number, digits?: number): string;
@@ -66,6 +81,8 @@ export function heightAt(grid: HeightGrid, x: number, y: number): number;
 export function histogram(values: ArrayLike<number>, options?: BinOptions): Bins;
 
 export function inRegion(x: number, y: number, region: SelectRegion): boolean;
+
+export function logTicks(min: number, max: number, count?: number): Ticks;
 
 export function nearestPoint(matrix: ArrayLike<number>, positions: ArrayLike<number>, width: number, height: number, sx: number, sy: number, radius: number): {
     index: number;

@@ -326,6 +326,7 @@ export const entries = [
       'select takes { rect: [x0, y0, x1, y1] } or { polygon: [x, y, ...] }',
       'bar x and y must have one length of at least 1',
       'histogram takes an array of numbers or a TypedArray',
+      'Heatmap x and y must be above 0 on a log axis',
       'Isosurface GpuArray must live on the engine device: createCompute({ engine })',
       'Isosurface disposed; create a new one',
       'sciviz needs the WebGPU backend; the engine runs WebGL2',

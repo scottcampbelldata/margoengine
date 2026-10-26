@@ -4,7 +4,7 @@
 import type { Line, Lines } from '@margoengine/lines';
 import type { Label, LabelRenderer } from '@margoengine/labels';
 import type { EngineKernel } from '@margoengine/core';
-import { ticks } from './ticks.js';
+import { axisScale, type Scale } from './scales.js';
 import { toScene, type Bounds } from './layer.js';
 
 /** Colours of a figure's chrome. */
@@ -54,7 +54,12 @@ export class Axes {
    * Draws (or redraws) the axes for `bounds` under the figure transform `model`; `flat` draws 2D axes (a frame, grid
    * lines and labels on the left and bottom, below everything at data z -1).
    */
-  async update(bounds: Bounds, model: Float32Array, flat = false): Promise<void> {
+  async update(
+    bounds: Bounds,
+    model: Float32Array,
+    flat = false,
+    scales: readonly [Scale, Scale, Scale] = [axisScale(), axisScale(), axisScale()],
+  ): Promise<void> {
     this.#loading ??= (async () => {
       const [lines, { LabelRenderer }] = await Promise.all([this.lines(), import('@margoengine/labels')]);
       if (this.#disposed) return;
@@ -68,9 +73,15 @@ export class Axes {
     for (const label of this.#texts.splice(0)) label.remove();
     const [x0, x1, y0, y1, z0, z1] = bounds,
       count = this.options.ticks ?? 5,
-      tx = ticks(x0, x1, count),
-      ty = ticks(y0, y1, count),
-      tz = ticks(z0, z1, count);
+      // Ticks are chosen in data units and placed at their plot coordinates.
+      at = (axis: number, lo: number, hi: number) => {
+        const s = scales[axis],
+          t = s.ticks(s.inverse(lo), s.inverse(hi), count);
+        return { values: t.values.map((v) => s.forward(v)), labels: t.labels };
+      },
+      tx = at(0, x0, x1),
+      ty = at(1, y0, y1),
+      tz = at(2, z0, z1);
     this.drawnTicks = { x: tx.values, y: ty.values };
     if (flat) return this.#flat(Line, bounds, model, tx, ty);
     // The box: 12 edges.
