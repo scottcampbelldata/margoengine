@@ -38,8 +38,10 @@ async function world() {
           setBindGroup() {},
           setVertexBuffer() {},
           setIndexBuffer() {},
-          drawIndexed() {
-            log.push('draw' + id);
+          // One entry per mesh drawn: an instanced draw (draw-batch.ts) draws several meshes.
+          drawIndexed(count, instances = 1) {
+            for (let k = 0; k < instances; k++) log.push('draw' + id);
+            log.push('call');
           },
           end() {
             log.push('end');
@@ -61,6 +63,7 @@ test('ten opaque materials meshes draw in one render pass', async () => {
     w.engine.frameGraph.execute(w.context);
     assert.equal(w.log.filter((e) => e === 'begin').length, 1, 'one pass for all meshes');
     assert.equal(w.log.filter((e) => e.startsWith('draw')).length, 10);
+    assert.equal(w.log.filter((e) => e === 'call').length, 1, 'one material and geometry: one instanced draw');
     assert.deepEqual(w.log.slice(-1), ['end'], 'the pass is ended before the frame is submitted');
     assert.equal(w.log.filter((e) => e === 'end').length, 1);
     // A second frame begins a new pass: nothing is carried across frames.
@@ -82,8 +85,8 @@ test('a blended mesh keeps its own pass between opaque meshes, in render order',
     createMesh(w.engine, triangle, opaque);
     w.store.tick(false);
     w.engine.frameGraph.execute(w.context);
-    // Both opaque meshes share the first pass; the blended mesh follows in a pass of its own.
-    assert.deepEqual(w.log, ['begin', 'draw0', 'draw0', 'end', 'begin', 'draw1', 'end']);
+    // Both opaque meshes share the first pass (one instanced draw); the blended mesh follows in a pass of its own.
+    assert.deepEqual(w.log, ['begin', 'draw0', 'draw0', 'call', 'end', 'begin', 'draw1', 'call', 'end']);
   } finally {
     w.destroy();
   }
@@ -101,10 +104,11 @@ test('a PBRDrawRun shares one pass across models and a draw without one keeps it
     const run = new PBRDrawRun();
     for (const model of models)
       model.draw(w.context, 'beauty', w.context.color, w.context.depth, 'all', undefined, run);
-    assert.deepEqual(w.log, ['begin', 'draw0', 'draw0', 'draw0'], 'the run leaves its pass open');
+    // The run's opaque draws wait for its end (they may join instanced batches); the pass stays open until then.
+    assert.deepEqual(w.log, ['begin'], 'the run began its pass');
     run.end();
     run.end();
-    assert.deepEqual(w.log.slice(-1), ['end']);
+    assert.deepEqual(w.log, ['begin', 'draw0', 'call', 'draw0', 'call', 'draw0', 'call', 'end']);
     assert.equal(w.log.filter((e) => e === 'end').length, 1, 'ending a run twice ends the pass once');
     w.log.length = 0;
     for (const model of models) model.draw(w.context, 'beauty', w.context.color, w.context.depth);

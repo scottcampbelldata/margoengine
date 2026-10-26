@@ -72,7 +72,10 @@ test('mesh.material = other draws the new material next frame and moves per-engi
     frames.some((v) => v.join() === '1,0,0,1'),
     'the other mesh keeps the old one',
   );
-  assert.equal(of(log, 'renderPipeline').length, 0, 'the same shading reuses its pipeline');
+  // The two meshes drew as one instanced batch; after the swap each draws on its own, which compiles the single-mesh
+  // variant of the shading once (draw-batch.ts). Blue is the same shading as red: nothing else compiles, now or later.
+  assert.equal(of(log, 'renderPipeline').length, 1, 'only the single-mesh variant of the same shading');
+  assert.equal(of(s.frame(), 'renderPipeline').length, 0, 'the same shading reuses its pipelines');
   log = s.record(() => {
     other.material = new UnlitMaterial({ color: [0, 1, 0] });
   });

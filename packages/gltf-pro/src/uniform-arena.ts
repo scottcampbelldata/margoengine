@@ -28,9 +28,9 @@ class Arena {
   readonly unit: number;
   readonly chunks: Chunk[] = [];
   dirty = false;
-  /** Slots held by draws (not shared view blocks); when the last goes, `idle` runs (view blocks let go). */
+  /** Slots held by draws (not shared view blocks); when the last goes, `idle` runs (shared resources let go). */
   draws = 0;
-  idle?: () => void;
+  readonly idle: (() => void)[] = [];
   constructor(readonly device: GPUDevice) {
     this.unit = Math.max(MIN_UNIT, device.limits?.minUniformBufferOffsetAlignment ?? MIN_UNIT);
   }
@@ -79,7 +79,7 @@ class Arena {
       if (!free) chunk.free.set(slot.units, (free = []));
       free.push(slot.offset);
     }
-    if (!slot.shared && --this.draws === 0) this.idle?.();
+    if (!slot.shared && --this.draws === 0) for (const release of this.idle.splice(0)) release();
   }
 }
 
@@ -188,7 +188,7 @@ export function acquireUniform(device: GPUDevice, floats: number, shared = false
  * Runs `release` when the last draw slot on `device` goes (the device's shared blocks are then unused).
  */
 export function onUniformsIdle(device: GPUDevice, release: () => void): void {
-  arenaOf(device).idle = release;
+  arenaOf(device).idle.push(release);
 }
 
 /**

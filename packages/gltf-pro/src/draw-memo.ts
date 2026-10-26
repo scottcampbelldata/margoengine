@@ -7,6 +7,7 @@
 // groups whose inputs compare equal), so every live material, light and hook edit still shows on the next frame.
 import type { LightingEffect, PBRRenderState } from './index.js';
 import type { PBRInstances } from './instancing.js';
+import type { BatchKind } from './draw-batch.js';
 import type { MaterialExtension } from './material-extension.js';
 import type { GLTFExtendedMaterials } from './asset.js';
 
@@ -23,17 +24,19 @@ export interface DrawFrame {
   hook: object | undefined;
   hooks: GLTFExtendedMaterials | undefined;
   /** The model's lighting effects in order. */
-  lighting: LightingEffect[];
+  lighting: readonly LightingEffect[];
 }
 
 /** A derivation, valid for draws under `frame` (identity: the same call or run); see the file comment. */
 export interface DrawDerivation {
   frame: DrawFrame;
   source: MaterialExtension | undefined;
-  instances: PBRInstances | undefined;
+  instances: PBRInstances | BatchKind | undefined;
   topology: GPUPrimitiveTopology | undefined;
   /** Sign of the node matrix determinant: mirrored nodes cull the other face. */
   sign: number;
+  /** False when derived for a batch member: no pipeline built and no lighting group (draw-batch.ts). */
+  complete: boolean;
   compact: boolean;
   floatCount: number;
   replacesTextures: boolean;
@@ -42,6 +45,8 @@ export interface DrawDerivation {
   pipeline: GPURenderPipeline;
   /** Transmission's tint pipeline (multiplies what is behind) when the draw is tinted. */
   tint: GPURenderPipeline | undefined;
+  /** True when the draw first multiplies what is behind by its tint (transmission). */
+  tinted: boolean;
   blend: boolean;
   state: PBRRenderState | undefined;
   /** True when group 2 (shading, lighting and transparency bindings) is bound. */
@@ -49,6 +54,8 @@ export interface DrawDerivation {
   effect: { entries: GPUBindGroupEntry[]; group: GPUBindGroup } | undefined;
   tintEffect: { entries: GPUBindGroupEntry[]; group: GPUBindGroup } | undefined;
   mappedTint: boolean;
+  /** False when the finished shader reads the model rows itself, so instanced batches cannot draw it. */
+  modelFree: boolean;
   /** The whole uniform as derived; draws copy it and write their own node rows (16-47) and determinant (97). */
   block: Float32Array;
 }
@@ -97,11 +104,11 @@ export function sameFrame(a: DrawFrame, b: DrawFrame): boolean {
   return true;
 }
 
-/** True when `lighting` (a model's effect set) holds exactly `list`, in order. Allocation-free. */
-export function sameLighting(list: readonly LightingEffect[], lighting: ReadonlySet<LightingEffect>): boolean {
-  if (list.length !== lighting.size) return false;
-  let i = 0;
-  for (const effect of lighting) if (list[i++] !== effect) return false;
+/** True when two models' lighting lists hold the same effects in order. */
+export function sameLighting(a: readonly LightingEffect[], b: readonly LightingEffect[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
 }
 

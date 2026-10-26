@@ -14,7 +14,7 @@ import { splitTRS } from '@margoengine/math/quat';
 import { viewMatrix } from '../../shared/view.js';
 import { applyView, inView } from '../../shared/view-rect.js';
 import { attenuationPower } from '../../shared/attenuation.js';
-import { beginDraw, endDraw, recording, retire } from '../../shared/frame-resources.js';
+import { beginDraw, currentFrame, endDraw, recording, retire } from '../../shared/frame-resources.js';
 import { acquireUniform, flushUniforms, type UniformSlot } from './uniform-arena.js';
 import {
   deviceDraws,
@@ -27,6 +27,7 @@ import {
   type DrawFrame,
 } from './draw-memo.js';
 import { viewBinding, viewFloats, viewPipelines } from './view-uniform.js';
+import { BatchInstances, batchKind, type BatchKind, type BatchState } from './draw-batch.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/mesh-source.js';
@@ -240,6 +241,111 @@ export interface PBRPickingGeometry {
   nodeIndex?: number;
 }
 const opaquePasses = new WeakMap<Context, Set<PBRModel>>();
+/** The derivation of this call or run for `m` with these primitive inputs, if one was derived (draw-memo.ts). */
+function findDerivation(
+  list: DrawDerivation[] | undefined,
+  frame: DrawFrame,
+  source: MaterialExtension | undefined,
+  inst: object | undefined,
+  topology: GPUPrimitiveTopology | undefined,
+  sign: number,
+): DrawDerivation | undefined {
+  if (list)
+    for (let i = 0; i < list.length; i++) {
+      const value = list[i];
+      if (
+        value.frame === frame &&
+        value.source === source &&
+        value.instances === inst &&
+        value.topology === topology &&
+        value.sign === sign &&
+        value.extension === undefined
+      )
+        return value;
+    }
+  return undefined;
+}
+/** A run's last view block (see `PBRDrawRun.view`). */
+interface RunView {
+  data: Float32Array;
+  format: GPUTextureFormat | undefined;
+  at: GPUBufferBinding | undefined;
+}
+const noLighting: readonly LightingEffect[] = Object.freeze([]);
+// Global, not per model: draws nest (a callback may draw), and one stack serves every model.
+const scratchStack: DrawScratch[] = [];
+let scratchDepth = 0;
+/** True when view block `data` holds `camera`'s matrix and position and `lighting`'s rows (the view rows match too). */
+function sameView(
+  data: Float32Array,
+  camera: Context['camera'],
+  lighting: { direction: ArrayLike<number>; radiance: ArrayLike<number> },
+): boolean {
+  const matrix = camera.matrix,
+    position = camera.position,
+    direction = lighting.direction,
+    radiance = lighting.radiance;
+  for (let i = 0; i < 16; i++) if (data[i] !== Math.fround(matrix[i])) return false;
+  for (let i = 0; i < 3; i++) if (data[32 + i] !== Math.fround(position[i])) return false;
+  for (let i = 0; i < 4; i++)
+    if (data[36 + i] !== Math.fround(direction[i]) || data[40 + i] !== Math.fround(radiance[i])) return false;
+  return true;
+}
+/** Draws of a run gathered into one instanced draw (draw-batch.ts). */
+interface PendingBatch {
+  model: PBRModel;
+  /** The first draw's resource: its buffers, groups and batch state serve the batch. */
+  owner: DrawResource;
+  d: DrawDerivation;
+  c: Context;
+  view: object;
+  viewAt: GPUBufferBinding;
+  members: DrawResource[];
+  /** Each member's model. */
+  models: PBRModel[];
+}
+/** True when `a` and `b` hold the same values. */
+function sameValues(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+/** Draws `run`'s pending batches into its pass, in first-draw order. */
+function flushBatches(run: PBRDrawRun): void {
+  const pending = run.pending;
+  if (!pending.length) return;
+  try {
+    for (let i = 0; i < pending.length; i++) {
+      const batch = pending[i];
+      if (!batch.model.disposed) batch.model.drawBatch(batch, run);
+    }
+  } finally {
+    pending.length = 0;
+    run.batches.clear();
+  }
+}
+/**
+ * True when `r` can join an instanced batch of its run: an opaque triangle draw without its own instances, deformation,
+ * extension, tint or wireframe, an invertible node, and no texture of its own in group 1 (the batch binds the first
+ * draw's group 1, so only default or replaced textures, which every such draw holds alike).
+ */
+function batchable(d: DrawDerivation, r: DrawResource, det: number): boolean {
+  const p = r.primitive;
+  return (
+    !p.instances &&
+    !p.deformed &&
+    !p.topology &&
+    !r.batch &&
+    !r.mergedInto &&
+    !d.blend &&
+    !d.tinted &&
+    d.extension === undefined &&
+    det !== 0 &&
+    Number.isFinite(det) &&
+    !p.material.wireframe &&
+    (d.replacesTextures || !p.material.maps.some(Boolean))
+  );
+}
 /** What a pass has bound: draws on it set a pipeline, group or buffer only when it differs. */
 interface PassBindings {
   pass: GPURenderPassEncoder | undefined;
@@ -279,13 +385,14 @@ function drawFrame(
   oit: object | undefined,
   hook: object | undefined,
   hooks: GLTFExtendedMaterials | false | undefined,
-  lighting: ReadonlySet<LightingEffect>,
+  lighting: readonly LightingEffect[],
 ): DrawFrame {
   const samples = c.descriptor.multisample?.count,
     depthFormat = c.descriptor.depthStencil!.format,
     extended = hooks || undefined;
   if (run)
-    for (const frame of run.frames)
+    for (let i = 0; i < run.frames.length; i++) {
+      const frame = run.frames[i];
       if (
         frame.mode === mode &&
         frame.depthCompare === depthCompare &&
@@ -299,6 +406,7 @@ function drawFrame(
         sameLighting(frame.lighting, lighting)
       )
         return frame;
+    }
   const frame: DrawFrame = {
     mode,
     depthCompare,
@@ -309,7 +417,7 @@ function drawFrame(
     oit,
     hook,
     hooks: extended,
-    lighting: [...lighting],
+    lighting,
   };
   if (run && run.frames.length < 16) run.frames.push(frame);
   return frame;
@@ -327,19 +435,31 @@ export class PBRDrawRun {
   readonly bindings: PassBindings = { pass: undefined, groups: [undefined, undefined, undefined, undefined] };
   /** @internal The device the run's draws record on; `end()` uploads their uniform changes there. */
   device?: GPUDevice;
+  /** @internal The view block the run's draws bound last and the camera, lights and target it holds. */
+  readonly view: RunView = { data: new Float32Array(viewFloats), format: undefined, at: undefined };
+  /** @internal Draws waiting to draw as instanced batches (draw-batch.ts), in first-draw order, and by derivation. */
+  readonly pending: PendingBatch[] = [];
+  readonly batches = new Map<DrawDerivation, PendingBatch[]>();
   /**
    * Ends the shared pass and uploads the draws' uniform changes. Safe to call twice; the run can then carry the next
    * frame's draws (nothing derived for this frame carries over).
    */
   end(): void {
     const pass = this.pass;
-    this.pass = undefined;
-    this.frames.length = 0;
-    resetBindings(this.bindings, undefined);
     try {
-      pass?.end();
+      flushBatches(this);
     } finally {
-      if (this.device) flushUniforms(this.device);
+      this.pass = undefined;
+      this.frames.length = 0;
+      this.pending.length = 0;
+      this.batches.clear();
+      this.view.at = this.view.format = undefined;
+      resetBindings(this.bindings, undefined);
+      try {
+        pass?.end();
+      } finally {
+        if (this.device) flushUniforms(this.device);
+      }
     }
   }
 }
@@ -506,6 +626,8 @@ interface DrawResource {
   batch?: StaticBatch;
   /** Set once `writeGeometry` rewrote this primitive: shadows then redraw it every frame instead of caching it. */
   edited?: boolean;
+  /** Instanced batches this resource leads (draw-batch.ts), by derivation and view. */
+  batchStates?: Map<DrawDerivation, BatchState[]>;
 }
 interface ShadowCasterRecord {
   primitive: PBRPrimitive;
@@ -703,6 +825,9 @@ function createDrawGroups(
 }
 interface DrawScratch {
   context?: Context;
+  /** A batch's member matrices and uniform values (draw-batch.ts). */
+  matrices: ArrayLike<number>[];
+  batchValues: Float32Array;
   /** This call's view block (view-uniform.ts). */
   viewData: Float32Array;
   /** What this call bound on its pass (a call without a run). */
@@ -732,6 +857,8 @@ function createDrawScratch(color: GPUTextureView, depth: GPUTextureView): DrawSc
     depthStoreOp: 'store',
   };
   const scratch: DrawScratch = {
+    matrices: [],
+    batchValues: new Float32Array(0),
     viewData: new Float32Array(viewFloats),
     bound: { pass: undefined, groups: [undefined, undefined, undefined, undefined] },
     projection: new Float32Array(16),
@@ -1101,10 +1228,10 @@ export class PBRModel implements EnginePlugin {
   private engine: Engine;
   private readonly cleanupCallbacks = new Set<() => void>();
   private readonly lighting = new Set<LightingEffect>();
+  /** `lighting` in order, a new array on every change (draw-memo.ts compares derivation contexts by it). */
+  private lightingList: readonly LightingEffect[] = noLighting;
   private readonly replays = new Map<string, string>();
   private gpuRevision = 0;
-  private readonly drawScratch: DrawScratch[] = [];
-  private drawDepth = 0;
   /** Pose answers for one shadow-primitive write. Draw calls keep their own map on the scratch. */
   private shadowBatchLive?: Map<StaticBatch, boolean>;
   private transparency?: PBRTransparency;
@@ -1839,7 +1966,11 @@ export class PBRModel implements EnginePlugin {
     if (effect.owner && effect.owner !== this.engine)
       throw margoError('attached', 'PBR lighting belongs to another engine; create it with this engine');
     this.lighting.add(effect);
-    return () => this.lighting.delete(effect);
+    this.lightingList = [...this.lighting];
+    return () => {
+      this.lighting.delete(effect);
+      this.lightingList = this.lighting.size ? [...this.lighting] : noLighting;
+    };
   }
   /** Hands this model's BLEND primitives to a transparency hook (README "Transparency hook"); returns a remover that restores sorted blending. */
   setTransparency(hook: PBRTransparency): () => void {
@@ -2112,22 +2243,28 @@ export class PBRModel implements EnginePlugin {
       if (phase === 'blend') return;
       phase = 'opaque';
     }
-    const scratch = (this.drawScratch[this.drawDepth] ??= createDrawScratch(color, depth));
-    scratch.projection.set(c.camera.matrix);
-    scratch.eye.set(c.camera.position);
-    if (external) scratch.view.set(external.view);
-    else viewMatrix(scratch.view, c.camera);
-    // The view block every draw of this call binds (view-uniform.ts): camera, view, eye, light, radiance, HDR flag.
-    const viewData = scratch.viewData;
-    viewData.set(scratch.projection);
-    viewData.set(scratch.view, 16);
-    viewData.set(scratch.eye, 32);
-    viewData.set(this.engine.lighting.direction, 36);
-    viewData.set(this.engine.lighting.radiance, 40);
-    viewData[44] = +(c.format === 'rgba16float');
-    // Bound on the call's first draw, so a call that draws nothing holds no view block.
+    const scratch = (scratchStack[scratchDepth] ??= createDrawScratch(color, depth)),
+      camera = c.camera,
+      lighting = this.engine.lighting;
+    scratch.eye.set(camera.position);
+    // The view block every draw of this call binds (view-uniform.ts): camera, view, eye, light, radiance, HDR flag;
+    // bound on the call's first draw, so a call that draws nothing holds no view block. A run's later calls under the
+    // same camera, lights and target reuse the run's block.
+    const viewData = scratch.viewData,
+      runView = carry && !external ? carry.view : undefined;
     let viewAt: GPUBufferBinding | undefined;
-    this.drawDepth++;
+    if (runView?.at && runView.format === c.format && sameView(runView.data, camera, lighting)) viewAt = runView.at;
+    else {
+      viewData.set(camera.matrix);
+      if (external) viewData.set(external.view, 16);
+      else viewMatrix(scratch.view, camera), viewData.set(scratch.view, 16);
+      viewData.set(scratch.eye, 32);
+      viewData[35] = 0;
+      viewData.set(lighting.direction, 36);
+      viewData.set(lighting.radiance, 40);
+      viewData[44] = +(c.format === 'rgba16float');
+    }
+    scratchDepth++;
     // Resources a callback releases during this draw stay valid until the frame is submitted.
     beginDraw(c.device, c.view ?? c);
     scratch.context = c;
@@ -2144,7 +2281,7 @@ export class PBRModel implements EnginePlugin {
       oit,
       hook,
       this.asset.hooks.materials,
-      this.lighting,
+      this.lightingList,
     );
     if (!run) resetBindings(bound, undefined);
     if (carry) carry.device = c.device;
@@ -2181,7 +2318,7 @@ export class PBRModel implements EnginePlugin {
         }
       }
       const liveBatches = scratch.liveBatches;
-      liveBatches.clear();
+      if (liveBatches.size) liveBatches.clear();
       const batchLive = (batch: StaticBatch) => {
         let value = liveBatches.get(batch);
         if (value === undefined)
@@ -2221,14 +2358,14 @@ export class PBRModel implements EnginePlugin {
           count = wireframe?.count ?? p.indices.length;
         const instances = inst?.upload(c.device);
         const a = node.matrix,
-          sign = Math.sign(
+          det =
             a[0] * (a[5] * a[10] - a[6] * a[9]) -
-              a[4] * (a[1] * a[10] - a[2] * a[9]) +
-              a[8] * (a[1] * a[6] - a[2] * a[5]),
-          ),
+            a[4] * (a[1] * a[10] - a[2] * a[9]) +
+            a[8] * (a[1] * a[6] - a[2] * a[5]),
+          sign = Math.sign(det),
           source = p.extension;
         // A callback of an earlier primitive may have added or removed a lighting effect.
-        if (!sameLighting(frame.lighting, this.lighting))
+        if (!sameLighting(frame.lighting, this.lightingList))
           frame = drawFrame(
             run,
             mode,
@@ -2238,28 +2375,84 @@ export class PBRModel implements EnginePlugin {
             oit,
             hook,
             this.asset.hooks.materials,
-            this.lighting,
+            this.lightingList,
           );
         // Another primitive with this material record already derived the shader, pipeline and uniform rows for this
         // call or run: reuse them (draw-memo.ts). Material extensions keep per-resource state and derive their own.
-        let list = draws.derivations.get(m),
-          d: DrawDerivation | undefined;
-        if (list)
-          for (let i = 0; i < list.length; i++) {
-            const value = list[i];
-            if (
-              value.frame === frame &&
-              value.source === source &&
-              value.instances === inst &&
-              value.topology === topology &&
-              value.sign === sign &&
-              value.extension === undefined
-            ) {
-              d = value;
-              break;
-            }
+        let d = findDerivation(draws.derivations.get(m), frame, source, inst, topology, sign);
+        const hit = d !== undefined;
+        const batching = !!run && mode === 'beauty';
+        if (!d)
+          d = this.derivation(
+            draws,
+            m,
+            frame,
+            source,
+            topology,
+            sign,
+            c,
+            mode,
+            scratch,
+            r,
+            wireframe,
+            external,
+            inst,
+            !batching,
+          );
+        // A run draws meshes that differ only in their node matrix as one instanced draw (draw-batch.ts).
+        if (batching && batchable(d, r, det)) {
+          if (!pass) {
+            scratch.color.view = color;
+            scratch.depth.view = depth;
+            const stencil = c.descriptor.depthStencil!.format.includes('stencil');
+            scratch.depth.stencilLoadOp = stencil ? 'load' : undefined;
+            scratch.depth.stencilStoreOp = stencil ? 'store' : undefined;
+            run.pass = pass = c.encoder.beginRenderPass(scratch.descriptor);
+            applyView(pass, c);
           }
-        if (d) {
+          if (!viewAt) {
+            viewAt = viewBinding(c.device, viewData, c.view ?? c, undefined);
+            runView!.at = viewAt;
+            runView!.format = c.format;
+            runView!.data.set(viewData);
+          }
+          const view = c.view ?? c;
+          let list = run.batches.get(d),
+            batch: PendingBatch | undefined;
+          if (list)
+            for (let i = 0; i < list.length; i++) {
+              const value = list[i],
+                q = value.owner.primitive;
+              if (
+                value.view === view &&
+                value.viewAt === viewAt &&
+                q.vertices === p.vertices &&
+                q.indices === p.indices
+              ) {
+                batch = value;
+                break;
+              }
+            }
+          if (!batch) {
+            batch = { model: this, owner: r, d, c, view, viewAt, members: [], models: [] };
+            if (!list) run.batches.set(d, (list = []));
+            list.push(batch);
+            run.pending.push(batch);
+          }
+          batch.members.push(r);
+          batch.models.push(this);
+          this.engine.stats.visible++;
+          continue;
+        }
+        // Batches recorded so far draw before this draw, which may end the pass or depend on what they drew.
+        if (run?.pending.length) {
+          if (pass) run.pass = pass;
+          flushBatches(run);
+        }
+        // A derivation made for a batch lacks the pipeline and lighting group of a draw of its own.
+        if (!d.complete)
+          d = this.derivation(draws, m, frame, source, topology, sign, c, mode, scratch, r, wireframe, external, inst);
+        else if (hit) {
           if (r.values.length !== d.floatCount || r.replacesTextures !== d.replacesTextures)
             this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
           r.coordinates = undefined;
@@ -2273,43 +2466,6 @@ export class PBRModel implements EnginePlugin {
           if (!invertMatrixStable(a, this.inverse, this.workspace)) throw new RangeError('Singular PBR transform; give the node a transform with a non-zero scale');
           for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
           v[97] = sign;
-        } else {
-          // The entry of the same context from an earlier call or frame, if any: derive into it, reusing its GPU objects.
-          let at = -1;
-          if (list)
-            for (let i = 0; i < list.length; i++) {
-              const value = list[i];
-              if (
-                value.source === source &&
-                value.instances === inst &&
-                value.topology === topology &&
-                value.sign === sign &&
-                sameFrame(value.frame, frame)
-              ) {
-                at = i;
-                break;
-              }
-            }
-          d = this.derive(
-            at >= 0 ? list![at] : undefined,
-            frame,
-            draws,
-            c,
-            mode,
-            scratch,
-            r,
-            topology,
-            wireframe,
-            sign,
-            external,
-          );
-          if (!list) draws.derivations.set(m, (list = []));
-          if (at < 0) {
-            if (list.length < derivationLimit) list.length++;
-            at = list.length - 1;
-          }
-          for (let i = at; i > 0; i--) list[i] = list[i - 1];
-          list[0] = d;
         }
         const { pipeline, blend, state, extension, effectBindings } = d;
         const uniform = r.uniform.write(r.values, c.view ?? c);
@@ -2318,7 +2474,14 @@ export class PBRModel implements EnginePlugin {
           r.copies?.clear();
           r.sectionBuffer = section;
         }
-        viewAt ??= viewBinding(c.device, viewData, c.view ?? c, external && this);
+        if (!viewAt) {
+          viewAt = viewBinding(c.device, viewData, c.view ?? c, external && this);
+          if (runView) {
+            runView.at = viewAt;
+            runView.format = c.format;
+            runView.data.set(viewData);
+          }
+        }
         let groups = r.groups.get(pipeline);
         if (!groups) {
           groups = createDrawGroups(c.device, pipeline, r, m, transmission, frame.hooks, section, viewAt);
@@ -2429,19 +2592,305 @@ export class PBRModel implements EnginePlugin {
       throw error;
     } finally {
       endDraw(c.device);
-      this.drawDepth--;
+      scratchDepth--;
       scratch.context = undefined;
       scratch.code = '';
       // Release callback-owned references while retaining array capacity.
       for (let i = 0; i < scratch.effects.length; i++) scratch.effects[i] = undefined!;
       for (let i = 0; i < scratch.entries.length; i++) scratch.entries[i] = undefined!;
       scratch.color.view = scratch.depth.view = undefined!;
-      scratch.liveBatches.clear();
-      scratch.blendDistance.clear();
+      if (scratch.liveBatches.size) scratch.liveBatches.clear();
+      if (scratch.blendDistance.size) scratch.blendDistance.clear();
     }
     if (carry && !external) carry.pass = pass;
     else if (!external) pass?.end();
     if (!carry) flushUniforms(c.device);
+  }
+  /**
+   * The derivation of `r`'s draw under `frame`, derived now (draw-memo.ts) into the entry of the same context from an
+   * earlier call or frame, if any, so its GPU objects are reused; it fills `r.values` completely.
+   */
+  private derivation(
+    draws: DeviceDraws,
+    m: PBRMaterial,
+    frame: DrawFrame,
+    source: MaterialExtension | undefined,
+    topology: GPUPrimitiveTopology | undefined,
+    sign: number,
+    c: Context,
+    mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture' | 'occlusion',
+    scratch: DrawScratch,
+    r: DrawResource,
+    wireframe: DrawResource['wireframe'],
+    external: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction } | undefined,
+    inst: PBRInstances | BatchKind | undefined,
+    build = true,
+  ): DrawDerivation {
+    let list = draws.derivations.get(m),
+      at = -1;
+    if (list)
+      for (let i = 0; i < list.length; i++) {
+        const value = list[i];
+        if (
+          value.source === source &&
+          value.instances === inst &&
+          value.topology === topology &&
+          value.sign === sign &&
+          sameFrame(value.frame, frame)
+        ) {
+          at = i;
+          break;
+        }
+      }
+    const d = this.derive(
+      at >= 0 ? list![at] : undefined,
+      frame,
+      draws,
+      c,
+      mode,
+      scratch,
+      r,
+      topology,
+      wireframe,
+      sign,
+      external,
+      inst,
+      build,
+    );
+    if (!list) draws.derivations.set(m, (list = []));
+    if (at < 0) {
+      if (list.length < derivationLimit) list.length++;
+      at = list.length - 1;
+    }
+    for (let i = at; i > 0; i--) list[i] = list[i - 1];
+    list[0] = d;
+    return d;
+  }
+  /**
+   * @internal Draws `batch` (draw-batch.ts) into `run`'s pass: one mesh as its own draw, exactly as without a run;
+   * several as one instanced draw of the instanced variant of their derivation, with a batch uniform (identity model
+   * rows) and their world matrices as instance rows.
+   */
+  drawBatch(batch: PendingBatch, run: PBRDrawRun): void {
+    const { owner: r, d, c, members, viewAt, view } = batch,
+      pass = run.pass!,
+      bound = run.bindings,
+      device = c.device,
+      p = r.primitive,
+      m = p.material,
+      count = p.indices.length,
+      frame = d.frame,
+      section = frame.section;
+    if (bound.pass !== pass) resetBindings(bound, pass);
+    beginDraw(device, view);
+    const scratch = (scratchStack[scratchDepth] ??= createDrawScratch(c.color, c.depth));
+    scratchDepth++;
+    try {
+      if (members.length === 1) {
+        this.drawOwn(r, batch, run, scratch);
+        return;
+      }
+      if (r.values.length !== d.floatCount || r.replacesTextures !== d.replacesTextures)
+        this.bindMaterial(r, device, device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
+      // The instanced variant: one per material, context and handedness, shared by every batch of the material.
+      const kind = batchKind(d.sign < 0),
+        draws = deviceDraws(device),
+        derived =
+          findDerivation(draws.derivations.get(m), frame, p.extension, kind, undefined, 1) ??
+          this.derivation(
+            draws,
+            m,
+            frame,
+            p.extension,
+            undefined,
+            1,
+            c,
+            'beauty',
+            scratch,
+            r,
+            undefined,
+            undefined,
+            kind,
+          ),
+        pipeline = derived.pipeline;
+      if (!derived.modelFree) {
+        // The shader reads the model rows itself: each mesh draws on its own, as without a run.
+        for (let i = 0; i < members.length; i++)
+          if (!batch.models[i].disposed) batch.models[i].drawOwn(members[i], batch, run, scratch);
+        return;
+      }
+      if (r.sectionBuffer !== section) {
+        r.groups.clear();
+        r.copies?.clear();
+        r.sectionBuffer = section;
+      }
+      let groups = r.groups.get(pipeline);
+      if (!groups) {
+        groups = createDrawGroups(device, pipeline, r, m, false, frame.hooks, section, viewAt);
+        r.groups.set(pipeline, groups);
+      }
+      let frameBindings: GPUBindGroup, instances: GPUBuffer;
+      {
+        // The batch's GPU state, as a draw's own uniform: a later draw from the same view replaces its rows; another view
+        // of the same frame (a viewport, a probe face) takes another state, so the earlier draws keep theirs until
+        // submit. A view keeps its state frame after frame.
+        const states = (r.batchStates ??= new Map());
+        let list = states.get(d);
+        if (!list) {
+          // Derivations come and go with contexts: keep the states of the last few.
+          if (states.size >= 8)
+            for (const [key, old] of states) {
+              for (const value of old) {
+                retire(device, value.uniform);
+                value.instances.destroy(device);
+              }
+              states.delete(key);
+              break;
+            }
+          states.set(d, (list = []));
+        }
+        // The batch's uniform: the material rows with identity model rows (world = instance row).
+        const v =
+          scratch.batchValues.length === derived.floatCount
+            ? scratch.batchValues
+            : (scratch.batchValues = new Float32Array(derived.floatCount));
+        v.set(derived.block);
+        v.fill(0, 16, 48);
+        v[16] = v[21] = v[26] = v[31] = v[32] = v[37] = v[42] = v[47] = 1;
+        v[97] = 1;
+        const matrices = scratch.matrices;
+        for (let i = 0; i < members.length; i++) matrices[i] = members[i].primitive.node.matrix;
+        matrices.length = members.length;
+        // Which state: this view's own; else, in a frame another view already drew this batch in, that view's state
+        // when it holds the same rows and uniform (nothing to keep apart); else one no view drew this frame; else a new one.
+        const now = currentFrame(device, view);
+        let state: BatchState | undefined,
+          mine: BatchState | undefined,
+          equal: BatchState | undefined,
+          free: BatchState | undefined;
+        for (const value of list) {
+          if (value.view === view) mine = value;
+          else if (value.frame === now) {
+            if (
+              !equal &&
+              value.uniform.floats === v.length &&
+              value.instances.holds(matrices) &&
+              sameValues(value.uniform.contents, v)
+            )
+              equal = value;
+          } else free ??= value;
+        }
+        state = mine ?? equal ?? free;
+        if (!state)
+          list.push(
+            (state = {
+              instances: new BatchInstances(),
+              uniform: acquireUniform(device, derived.floatCount),
+              groups: new Map(),
+              frame: now,
+              view,
+            }),
+          );
+        if (state !== equal) {
+          state.frame = now;
+          state.view = view;
+        }
+        instances = state.instances.write(device, matrices);
+        for (let i = 0; i < matrices.length; i++) matrices[i] = undefined!;
+        if (state.uniform.floats !== derived.floatCount) {
+          retire(device, state.uniform);
+          state.uniform = acquireUniform(device, derived.floatCount);
+          state.groups.clear();
+        }
+        const uniform = state.uniform.write(v, view) ?? state.uniform.binding;
+        let byPipeline = state.groups.get(pipeline);
+        if (!byPipeline) state.groups.set(pipeline, (byPipeline = new Map()));
+        let group = byPipeline.get(uniform);
+        if (!group) byPipeline.set(uniform, (group = frameGroup(device, pipeline, r, false, section, viewAt, uniform)));
+        frameBindings = group;
+      }
+      setPipeline(bound, pipeline);
+      setGroup(bound, 0, frameBindings);
+      setGroup(bound, 1, groups[1]);
+      if (derived.effect) setGroup(bound, 2, derived.effect.group);
+      setBuffers(bound, r.vertex, instances, r.index);
+      applyStencilReference(pass, derived.state);
+      pass.drawIndexed(count, members.length);
+      this.engine.stats.drawCalls++;
+    } finally {
+      endDraw(device);
+      scratchDepth--;
+      scratch.code = '';
+      for (let i = 0; i < scratch.effects.length; i++) scratch.effects[i] = undefined!;
+      for (let i = 0; i < scratch.entries.length; i++) scratch.entries[i] = undefined!;
+    }
+  }
+  /** @internal Draws batch member `r` as its own draw (its material's shader reads the model rows; see `drawBatch`). */
+  drawOwn(r: DrawResource, batch: PendingBatch, run: PBRDrawRun, scratch: DrawScratch): void {
+    const { c, viewAt, view } = batch,
+      frame = batch.d.frame,
+      device = c.device,
+      p = r.primitive,
+      m = p.material,
+      a = p.node.matrix,
+      section = frame.section,
+      bound = run.bindings,
+      pass = run.pass!,
+      sign = Math.sign(
+        a[0] * (a[5] * a[10] - a[6] * a[9]) - a[4] * (a[1] * a[10] - a[2] * a[9]) + a[8] * (a[1] * a[6] - a[2] * a[5]),
+      ),
+      draws = deviceDraws(device);
+    let d = findDerivation(draws.derivations.get(m), frame, p.extension, undefined, undefined, sign);
+    if (!d?.complete)
+      d = this.derivation(
+        draws,
+        m,
+        frame,
+        p.extension,
+        undefined,
+        sign,
+        c,
+        'beauty',
+        scratch,
+        r,
+        undefined,
+        undefined,
+        undefined,
+      );
+    else if (r.values.length !== d.floatCount || r.replacesTextures !== d.replacesTextures)
+      this.bindMaterial(r, device, device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
+    const v = r.values;
+    v.set(d.block);
+    v.set(a, 16);
+    if (!invertMatrixStable(a, this.inverse, this.workspace)) throw new Error('Singular PBR transform');
+    for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
+    v[97] = sign;
+    const uniform = r.uniform.write(v, view),
+      pipeline = d.pipeline;
+    if (r.sectionBuffer !== section) {
+      r.groups.clear();
+      r.copies?.clear();
+      r.sectionBuffer = section;
+    }
+    let groups = r.groups.get(pipeline);
+    if (!groups) {
+      groups = createDrawGroups(device, pipeline, r, m, false, frame.hooks, section, viewAt);
+      r.groups.set(pipeline, groups);
+    }
+    setPipeline(bound, pipeline);
+    setGroup(
+      bound,
+      0,
+      uniform || groups.view !== viewAt
+        ? copyGroup(device, pipeline, r, false, section, uniform ?? r.uniform.binding, viewAt)
+        : groups[0],
+    );
+    setGroup(bound, 1, groups[1]);
+    if (d.effect) setGroup(bound, 2, d.effect.group);
+    setBuffers(bound, r.vertex, undefined, r.index);
+    applyStencilReference(pass, d.state);
+    pass.drawIndexed(p.indices.length);
+    this.engine.stats.drawCalls++;
   }
   /**
    * Derives what draws of `r`'s material record share under `frame` (draw-memo.ts): the shader, pipeline, lighting
@@ -2460,11 +2909,12 @@ export class PBRModel implements EnginePlugin {
     wireframe: DrawResource['wireframe'],
     sign: number,
     external: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction } | undefined,
+    inst: PBRInstances | BatchKind | undefined = r.primitive.instances,
+    build = true,
   ): DrawDerivation {
     const p = r.primitive,
       m = p.material,
       node = p.node,
-      inst = p.instances,
       transmission = mode === 'transmission',
       oit = transmission ? this.transmission : this.transparency,
       through = mode === 'transparent' || transmission,
@@ -2559,6 +3009,29 @@ export class PBRModel implements EnginePlugin {
       retire(r.device, r.extension.uniform);
       r.extension = undefined;
     }
+    if (!build) {
+      // A draw that may join an instanced batch needs only what decides its batch; the batch derives the rest. GPU
+      // objects of an earlier full derivation stay for reuse.
+      const transmit = !compact && !!m.tint,
+        state = mode === 'beauty' ? m.renderState : undefined,
+        out: DrawDerivation = d ?? ({} as DrawDerivation);
+      out.frame = frame;
+      out.source = p.extension;
+      out.instances = inst;
+      out.topology = topology;
+      out.sign = sign;
+      out.compact = compact;
+      out.floatCount = floatCount;
+      out.replacesTextures = r.replacesTextures!;
+      out.extension = extension;
+      out.complete = false;
+      out.blend = m.settings[0] === 2 || transmit;
+      out.tinted = transmit && state?.blend === undefined;
+      out.state = state;
+      if (out.block?.length !== v.length) out.block = new Float32Array(v.length);
+      out.block.set(v);
+      return out;
+    }
     const lighting = extension?.lighting !== false,
       shading = m.shading;
     if (shading || (mode !== 'gbuffer' && lighting && this.lighting.size)) {
@@ -2610,6 +3083,9 @@ export class PBRModel implements EnginePlugin {
     if (section) code = sectionShader(code, 0, 2);
     // Camera, light and target rows come from the shared view block (view-uniform.ts).
     code = viewShader(code);
+    // An instanced batch sets the model rows to identity: a shader that reads them itself (beyond the instanced vertex
+    // stage) needs each mesh's own draw.
+    const modelFree = !/\bf\.(model|normalMatrix)\b/.test(code.replaceAll('let margoI=f.model*', ''));
     // Keep the shader's original front-facing convention, including mirrored transforms.
     // Mirrored instances flip winding per instance: no culling, the shader's face test discards back faces instead.
     const face = +(!topology && !!inst?.mirrored && flag !== 1),
@@ -2656,7 +3132,9 @@ export class PBRModel implements EnginePlugin {
       (through || capture ? ':o' + objectId((through ? oit! : hook!).targets) : '') +
       (tinted && shading?.texturedTint ? ':t' : '');
     let pipeline = draws.pipelines.get(key);
-    if (!pipeline) {
+    // A draw that may join an instanced batch derives without building its own pipeline or calling the lighting
+    // bindings: the batch draws with its instanced variant (see `build`).
+    if (!pipeline && build) {
       checkDrawLimits(c.device, code, m, transmission, this.lighting);
       const module = c.device.createShaderModule({ code }),
         format = mode === 'beauty' ? c.format : 'rgba16float';
@@ -2770,7 +3248,7 @@ export class PBRModel implements EnginePlugin {
     }
     let effect: DrawDerivation['effect'];
     const effectBindings = !!shading || (lit && ((lighting && this.lighting.size > 0) || through));
-    if (effectBindings) {
+    if (effectBindings && build) {
       const entries = scratch.entries,
         effects = scratch.effects;
       let entryCount = 0;
@@ -2811,14 +3289,14 @@ export class PBRModel implements EnginePlugin {
           resource:
             'buffer' in resource ? { buffer: resource.buffer, offset: resource.offset, size: resource.size } : resource,
         }));
-        const group = c.device.createBindGroup({ layout: pipeline.getBindGroupLayout(2), entries: snapshot });
+        const group = c.device.createBindGroup({ layout: pipeline!.getBindGroupLayout(2), entries: snapshot });
         cached = { entries: snapshot, group };
       }
       effect = cached;
     }
     // Transmission's tint group 2 holds the same entries for the tint pipeline's layout.
     let tintEffect: DrawDerivation['tintEffect'];
-    const tint = tinted ? draws.pipelines.get(key + ':tint')! : undefined,
+    const tint = tinted && build ? draws.pipelines.get(key + ':tint')! : undefined,
       mappedTint = !!shading?.texturedTint;
     if (tint && mappedTint && effect) {
       tintEffect = d?.tintEffect;
@@ -2838,14 +3316,17 @@ export class PBRModel implements EnginePlugin {
     out.floatCount = floatCount;
     out.replacesTextures = r.replacesTextures!;
     out.extension = extension;
-    out.pipeline = pipeline;
+    out.pipeline = pipeline!;
+    out.complete = build;
     out.tint = tint;
+    out.tinted = tinted;
     out.blend = blend;
     out.state = state;
     out.effectBindings = effectBindings;
     out.effect = effect;
     out.tintEffect = tintEffect;
     out.mappedTint = mappedTint;
+    out.modelFree = modelFree;
     if (out.block?.length !== v.length) out.block = new Float32Array(v.length);
     out.block.set(v);
     return out;
@@ -2882,10 +3363,9 @@ export class PBRModel implements EnginePlugin {
       engine: this.engine,
       cleanupCallbacks: new Set(),
       lighting: new Set(),
+      lightingList: noLighting,
       gpuRevision: 0,
       gpuCache: new Map(),
-      drawScratch: [],
-      drawDepth: 0,
       replays: new Map(),
       pointsAndLines: this.pointsAndLines.map((primitive) => ({
         ...primitive,
@@ -3059,9 +3539,17 @@ export class PBRModel implements EnginePlugin {
     const cleanup = new Cleanup(),
       buffers = new Map<{ destroy(): void }, GPUDevice>(),
       device = this.resources[0]?.device ?? this.engine.gpu;
-    for (const r of this.resources)
+    for (const r of this.resources) {
+      if (r.batchStates)
+        for (const list of r.batchStates.values())
+          for (const state of list) {
+            buffers.set(state.uniform, r.device);
+            if (state.instances.buffer) buffers.set(state.instances.buffer, r.device);
+          }
+      r.batchStates = undefined;
       for (const b of [r.vertex, r.index, r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume])
         if (b) buffers.set(b, r.device);
+    }
     for (const [b, owner] of buffers) cleanup.run(() => retire(owner, b));
     if (device) for (const t of this.textures) cleanup.run(() => retire(device, t));
     for (const p of [...this.primitives, ...this.pointsAndLines]) {
@@ -3071,7 +3559,6 @@ export class PBRModel implements EnginePlugin {
     this.resources = [];
     this.textures = [];
     this.gpuCache.clear();
-    this.drawScratch.length = 0;
     cleanup.finish();
   }
   onDeviceRestored(engine: Engine): void {
@@ -3088,6 +3575,7 @@ export class PBRModel implements EnginePlugin {
       Reflect.deleteProperty(node, cpuSource);
     }
     this.lighting.clear();
+    this.lightingList = noLighting;
     cleanup.run(() => this.engine.removePlugin(this.name)).run(() => this.engine.frameGraph.removeOwner(this.name));
     for (const callback of this.cleanupCallbacks) cleanup.run(callback);
     this.cleanupCallbacks.clear();

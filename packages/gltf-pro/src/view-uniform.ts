@@ -20,8 +20,6 @@ interface ViewBlock {
   frame: number;
 }
 const pools = new WeakMap<GPUDevice, ViewBlock[]>();
-/** Views that keep a block of their own; more than this many recycle the least recently drawn view's block. */
-const viewLimit = 64;
 
 /**
  * The binding of the view block that `view`'s draws bind this frame on `device`, holding `data` (`viewFloats` floats).
@@ -44,25 +42,29 @@ export function viewBinding(device: GPUDevice, data: Float32Array, view: object,
     });
   }
   const now = currentFrame(device, view);
-  let block: ViewBlock | undefined;
-  for (let i = 0; i < blocks.length; i++)
-    if (blocks[i].view === view && blocks[i].owner === owner) {
-      block = blocks[i];
+  // This view's block; else, a block another view drew this frame with the same values (shared); else one no view drew
+  // this frame (views made fresh every frame reuse blocks instead of growing the pool); else a new one.
+  let block: ViewBlock | undefined, free: ViewBlock | undefined;
+  for (let i = 0; i < blocks.length; i++) {
+    const value = blocks[i];
+    if (value.view === view && value.owner === owner) {
+      block = value;
       break;
     }
-  if (!block) {
-    if (blocks.length < viewLimit)
-      blocks.push((block = { slot: acquireUniform(device, viewFloats, true), view, owner, frame: now }));
-    else {
-      // Views made fresh every frame (a new context object each time) must not grow the pool: past the limit, the
-      // least recently drawn view's block (not drawn this frame) takes the new view.
-      let oldest: ViewBlock | undefined;
-      for (const value of blocks) if (value.frame < now && (!oldest || value.frame < oldest.frame)) oldest = value;
-      if (!oldest) blocks.push((oldest = { slot: acquireUniform(device, viewFloats, true), view, owner, frame: now }));
-      block = oldest;
-      block.view = view;
-      block.owner = owner;
+    if (value.frame !== now) free ??= value;
+    else if (!block) {
+      const held = value.slot.contents;
+      let same = true;
+      for (let k = 0; same && k < viewFloats; k++) same = held[k] === data[k];
+      if (same) block = value;
     }
+  }
+  if (block && (block.view !== view || block.owner !== owner)) return block.slot.binding;
+  if (!block) {
+    block = free ?? { slot: acquireUniform(device, viewFloats, true), view, owner, frame: now };
+    if (!free) blocks.push(block);
+    block.view = view;
+    block.owner = owner;
   }
   block.frame = now;
   block.slot.write(data, view);

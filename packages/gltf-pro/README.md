@@ -305,7 +305,19 @@ opaque capture, but keeps its authored alpha mode, blending and depth writes; su
 A package that draws many models itself passes a `PBRDrawRun` as the last argument of `draw()`. Every `draw()` of the
 run continues one render pass instead of beginning its own, which saves a store and a reload of the multisampled colour
 and depth per model (10,000 meshes of `@margoengine/materials` cost 168 ms of CPU a frame with a pass each). A blended
-primitive still ends the pass around itself. Call `run.end()` after the last draw:
+primitive still ends the pass around itself. Within a run:
+
+- draws of one material record derive its shader, pipeline and lighting bind group once per frame, not once per draw;
+- the run sets a pipeline, bind group or buffer only when it changes;
+- opaque draws that differ only in their node matrix (same material record, same geometry arrays, no instances,
+  deformation, material extension, transmission or wireframe) draw as one instanced draw at `run.end()` or before the
+  run's next other draw, with their world matrices as instance rows; a moved mesh uploads its own 96-byte row. Opaque
+  draws may therefore reorder between such batches (as engines sort opaque draws by material); each batch keeps its
+  meshes in draw order, and a mesh alone draws exactly as without a run.
+
+Every draw's camera, light and target rows come from one 192-byte view block that the draws of a view share, so a
+moving camera uploads 192 bytes, not every draw's uniform. Call `run.end()` after the last draw; a run can carry the
+next frame's draws after that:
 
 ```ts
 import {PBRDrawRun, type PBRModel} from '@margoengine/gltf-pro';
