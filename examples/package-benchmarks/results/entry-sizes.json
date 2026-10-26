@@ -1,5 +1,5 @@
 {
-  "commit": "8bb9f905",
+  "commit": "477629f8",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -10,52 +10,52 @@
   "packages": {
     "@margoengine/animation": {
       ".": {
-        "raw": 56017,
-        "gzip": 17924
+        "raw": 58267,
+        "gzip": 18710
       },
       "./vat": {
-        "raw": 19283,
-        "gzip": 7562
+        "raw": 20062,
+        "gzip": 7874
       },
       "./sampling": {
-        "raw": 1824,
-        "gzip": 921
+        "raw": 2161,
+        "gzip": 1074
       },
       "./pointer": {
-        "raw": 18627,
-        "gzip": 6626
+        "raw": 18732,
+        "gzip": 6666
       },
       "./skeleton-utils": {
-        "raw": 24703,
-        "gzip": 8553
+        "raw": 24836,
+        "gzip": 8589
       }
     },
     "@margoengine/animator": {
       ".": {
-        "raw": 31415,
-        "gzip": 11425
+        "raw": 33015,
+        "gzip": 11984
       }
     },
     "@margoengine/audio": {
       ".": {
-        "raw": 24409,
-        "gzip": 7460
+        "raw": 24777,
+        "gzip": 7625
       }
     },
     "@margoengine/blender": {
       ".": {
-        "raw": 7679,
-        "gzip": 3158
+        "raw": 9287,
+        "gzip": 3744
       }
     },
     "@margoengine/bvh": {
       ".": {
-        "raw": 64381,
-        "gzip": 22722
+        "raw": 65582,
+        "gzip": 23125
       },
       "./tree": {
-        "raw": 26033,
-        "gzip": 10246
+        "raw": 26667,
+        "gzip": 10449
       },
       "./bake": {
         "raw": 4994,
@@ -1503,9 +1503,9 @@
       "brotli": 6979
     },
     "packages/bvh/dist/bvh.worker.js": {
-      "raw": 7157,
-      "gzip": 3147,
-      "brotli": 2717
+      "raw": 7198,
+      "gzip": 3171,
+      "brotli": 2727
     },
     "packages/voxel/dist/workers/mesher.js": {
       "raw": 13017,
