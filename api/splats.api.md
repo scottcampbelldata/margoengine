@@ -17,6 +17,16 @@ export interface FogLike {
   readonly enabled?: boolean;
 }
 
+export interface ParseSogOptions {
+    signal?: AbortSignal;
+}
+
+export interface ParseSpzOptions {
+    signal?: AbortSignal;
+}
+
+export type SogFiles = Record<string, ArrayBuffer | ArrayBufferView>;
+
 export interface SplatData {
     positions: Float32Array;
     covariances: Float32Array;
@@ -77,7 +87,11 @@ export function mergeSplats(...clouds: SplatData[]): SplatData;
 
 export function parsePly(input: ArrayBuffer | ArrayBufferView): SplatData;
 
+export function parseSog(input: ArrayBuffer | ArrayBufferView | SogFiles, options?: ParseSogOptions): Promise<SplatData>;
+
 export function parseSplat(input: ArrayBuffer | ArrayBufferView): SplatData;
+
+export function parseSpz(input: ArrayBuffer | ArrayBufferView, options?: ParseSpzOptions): Promise<SplatData>;
 
 export function transformSplats(data: SplatData, matrix: ArrayLike<number>): SplatData;
 
