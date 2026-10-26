@@ -45,7 +45,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/labels | `.` 19 | 2 |  | 4,581 |
 | @margoengine/lightmap | `.` 9, `./global` 4, `./refracted` 6 | 12 |  | 3,801 |
 | @margoengine/lines | `.` 50 | 3 |  | 18,046 |
-| @margoengine/loaders | `.` 141, `./worker` 2, `./common` 17, `./usd` 8, `./font` 10, `./svg` 7, `./mtl` 10, `./render` 2 | 31 |  | 49,433 |
+| @margoengine/loaders | `.` 141, `./worker` 2, `./common` 17, `./usd` 8, `./font` 10, `./svg` 7, `./mtl` 10, `./render` 2 | 31 |  | 51,069 |
 | @margoengine/lod | `.` 17 |  |  | 10,512 |
 | @margoengine/machinery | `.` 49, `./cad` 7, `./cad-async` 4, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 43,628 |
 | margoengine | `.` 24, `./game` 43, `./cad` 41, `./viz` 33, `./web` 15 |  |  | 52 |

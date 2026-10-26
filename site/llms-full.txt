@@ -2627,6 +2627,12 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   identity index array and zero-fills a third array. `parseCAD` additionally welds corners (205,440 vertices), builds
   parts and creates GPU meshes with a `PbrMaterial`; the weld is what CAD sections, edges and part deduplication rely
   on, so it keeps it.
+- **Status: accepted difference in work (Scott, 2026-10-26).** `parseSTL` computes flat face normals on ingestion so the
+  mesh is render-ready; three's `STLLoader` copies the file's zero normals, which light wrongly until the user calls
+  `computeVertexNormals()`. The full job is measured as `p-stl-normals` (run `20261026-211213`, diagnostic): three
+  `STLLoader.parse` + `computeVertexNormals()` 8.7 ms, `parseSTL` 4.7 ms, so Margo is faster when both produce a
+  lit mesh. The plain-copy `p-stl` gap (4.7 against 2.7 ms, 1.7x) stays listed. The entry stays because `p-stl-cad`
+  (the CAD path, 32 ms) is a different job with no three.js equivalent.
 - **Plan:** none for the CAD path (different job). For `parseSTL`, the remaining gap is the computed normals, which are
   the behavior a user needs; an opt-out only to win a benchmark would measure less work, so it is not planned.
 
