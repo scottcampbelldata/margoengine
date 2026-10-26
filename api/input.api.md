@@ -13,6 +13,7 @@ export interface ActionState {
 export type Binding = {
     type: 'key';
     code: string;
+    modifiers?: readonly Modifier[];
     scale?: number;
 } | {
     type: 'mouse';
@@ -34,14 +35,56 @@ export type Binding = {
     scale?: number;
 };
 
+export type BindingMap = Record<string, Binding[]>;
+
+export interface GestureEvent {
+    type: GestureType;
+    x: number;
+    y: number;
+    direction?: 'left' | 'right' | 'up' | 'down';
+    velocity?: number;
+    scale?: number;
+    rotation?: number;
+}
+
+export interface GestureOptions {
+    swipeDistance?: number;
+    swipeVelocity?: number;
+    tapTime?: number;
+    tapSlop?: number;
+    doubleTapTime?: number;
+    now?: () => number;
+}
+
+export type GestureType = 'tap' | 'doubletap' | 'swipe' | 'pinch' | 'rotate';
+
+export class Gestures {
+    readonly element: EventTarget;
+    constructor(element: EventTarget, options?: GestureOptions);
+    on(type: GestureType, handler: (event: GestureEvent) => void): () => void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export type GlyphLayout = 'xbox' | 'playstation' | 'generic';
+
 export class Input {
-    readonly actions: Readonly<Record<string, readonly Binding[]>>;
-    constructor(actions: Readonly<Record<string, readonly Binding[]>>, { target, gamepads, deadzone }?: InputOptions);
+    get actions(): Readonly<Record<string, readonly Binding[]>>;
+    constructor(actions: Readonly<Record<string, readonly Binding[]>>, { target, gamepads, deadzone, contexts }?: InputOptions);
     state(action: string): Readonly<ActionState>;
     update(): void;
     createStick(parent: HTMLElement, id: string): HTMLDivElement;
     bindTouchButton(element: HTMLElement, id: string): void;
     rumble(duration: number, strength?: number, gamepad?: number): Promise<boolean>;
+    setContext(context: string, enabled: boolean): void;
+    hasContext(context: string): boolean;
+    rebind(action: string, bindings: readonly Binding[]): void;
+    exportBindings(): BindingMap;
+    importBindings(data: BindingMap | string): void;
+    resetBindings(): void;
+    captureBinding({ signal }?: {
+        signal?: AbortSignal;
+    }): Promise<Binding>;
     reset(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -51,5 +94,10 @@ export interface InputOptions {
     target?: EventTarget;
     gamepads?: () => readonly (Gamepad | null)[];
     deadzone?: number;
+    contexts?: Readonly<Record<string, readonly string[]>>;
 }
+
+export type Modifier = 'shift' | 'ctrl' | 'alt' | 'meta';
+
+export function bindingLabel(binding: Binding, layout?: GlyphLayout): string;
 ```

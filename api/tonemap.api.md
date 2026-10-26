@@ -6,6 +6,13 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export interface AutoExposure {
+    min?: number;
+    max?: number;
+    speed?: number;
+    compensation?: number;
+}
+
 export interface CubeLUT {
     size?: number;
     data: Float32Array;
@@ -34,8 +41,18 @@ export interface TonemapOptions {
     exposure?: number;
     contrast?: number;
     inputColorSpace?: 'linear-srgb' | 'acescg';
+    temperature?: number;
+    tint?: number;
+    vignette?: number;
+    vignetteRadius?: number;
+    vignetteSoftness?: number;
+    grain?: number;
+    chromaticAberration?: number;
+    autoExposure?: boolean | AutoExposure;
     source?: () => GPUTexture | undefined;
 }
 
 export function parseCube(text: string): CubeLUT;
+
+export function whiteBalanceGain(temperature?: number, tint?: number): [number, number, number];
 ```

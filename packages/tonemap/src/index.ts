@@ -12,12 +12,21 @@ import { parseCube, validateLUT, type CubeLUT } from './cube.js';
 import { outputShader, tonemapShader, sizedLUTShader } from './shaders.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
 import { MargoError } from '@margoengine/math/errors';
-import { applyView, viewLoadOp } from '../../shared/view-rect.js';
+import { applyView, viewLoadOp, viewRect } from '../../shared/view-rect.js';
+import {
+  effectsShader,
+  meterShader,
+  usesEffects,
+  whiteBalanceGain,
+  NEUTRAL_TEMPERATURE,
+  type AutoExposure,
+} from './effects.js';
 import { coreShaderRequired, linearShader } from '../../shared/display.js';
 export { parseCube };
+export { whiteBalanceGain, type AutoExposure };
 export type { CubeLUT };
 
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 // Set on the pass context by @margoengine/environment's ColorOutput while a P3 or HDR canvas is active.
@@ -41,8 +50,44 @@ export interface TonemapOptions {
   contrast?: number;
   /** Core produces linear-sRGB. Use acescg only for an external AP1/D60 source. */
   inputColorSpace?: 'linear-srgb' | 'acescg';
+  /**
+   * White balance as the colour temperature of the scene's light in Kelvin, 1667-25000; default 6500 (no change). A low
+   * value cools the picture to cancel warm light (3200 for tungsten), a high one warms it.
+   */
+  temperature?: number;
+  /** White-balance tint, -1 (green) to 1 (magenta); default 0. */
+  tint?: number;
+  /** Corner darkening, 0-1; default 0 (off). */
+  vignette?: number;
+  /** Where the vignette starts, as a fraction of the corner distance, 0-1; default 0.5. */
+  vignetteRadius?: number;
+  /** Width of the vignette fall-off, as a fraction of the corner distance, 0-1; default 0.5. */
+  vignetteSoftness?: number;
+  /** Animated film grain, 0-1; default 0 (off). Strongest in the mid-tones. */
+  grain?: number;
+  /** Radial red/blue fringing, 0-1 (1 shifts the channels by 2% of the view at its edge); default 0 (off). */
+  chromaticAberration?: number;
+  /**
+   * Eye adaptation: meters the scene's log-average luminance each frame and adapts exposure toward 18% grey, on top of
+   * `exposure`. `true` uses the defaults of {@link AutoExposure}. Default off.
+   */
+  autoExposure?: boolean | AutoExposure;
   /** Optional HDR source, e.g. () => dof.outputTexture. Fixed at attachment. */
   source?: () => GPUTexture | undefined;
+}
+
+const inRange = (v: number | undefined, lo: number, hi: number) =>
+  v === undefined || (Number.isFinite(v) && v >= lo && v <= hi);
+function validAuto(a: boolean | AutoExposure | undefined): boolean {
+  if (a === undefined || typeof a === 'boolean') return true;
+  const { min = -4, max = 4, speed = 1.5, compensation = 0 } = a;
+  return (
+    inRange(min, -16, 16) &&
+    inRange(max, -16, 16) &&
+    min <= max &&
+    inRange(speed, 0.01, 100) &&
+    inRange(compensation, -8, 8)
+  );
 }
 
 /**
@@ -75,6 +120,14 @@ export class Tonemap implements EnginePlugin {
   private readonly presentation: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
   private disposed = false;
   private stacked = false;
+  private fxBuffer?: GPUBuffer;
+  private aeBuffer?: GPUBuffer;
+  private meterPipeline?: GPUComputePipeline;
+  private meterGroup?: GPUBindGroup;
+  private meterBuffer?: GPUBuffer;
+  private frameCount = 0;
+  private readonly fxValues = new Float32Array(16);
+  private readonly meterValues = new Float32Array(8);
 
   constructor(readonly options: TonemapOptions = {}) {
     this.source = options.source;
@@ -106,6 +159,14 @@ export class Tonemap implements EnginePlugin {
       e = o.exposure ?? 0,
       k = o.contrast ?? 1;
     if (
+      !inRange(o.vignette, 0, 1) ||
+      !inRange(o.vignetteRadius, 0, 1) ||
+      !inRange(o.vignetteSoftness, 0, 1) ||
+      !inRange(o.grain, 0, 1) ||
+      !inRange(o.chromaticAberration, 0, 1) ||
+      !inRange(o.tint, -1, 1) ||
+      !inRange(o.temperature, 1667, 25000) ||
+      !validAuto(o.autoExposure) ||
       (o.curve !== undefined && o.curve !== 'agx' && o.curve !== 'acescg' && o.curve !== 'neutral') ||
       (o.inputColorSpace !== undefined && o.inputColorSpace !== 'linear-srgb' && o.inputColorSpace !== 'acescg') ||
       !Number.isFinite(e) ||
@@ -299,10 +360,21 @@ export class Tonemap implements EnginePlugin {
     const out = (c as { [OUTPUT]?: Output })[OUTPUT],
       excess = out?.excess,
       variableLUT = (this.lut?.size ?? 33) !== 33,
-      key = format + ':' + multisample?.count + (excess ? ':output' : '') + (variableLUT ? ':lut-size' : '');
+      o = this.options,
+      auto = !!o.autoExposure,
+      fxOn = usesEffects(o),
+      key =
+        format +
+        ':' +
+        multisample?.count +
+        (excess ? ':output' : '') +
+        (variableLUT ? ':lut-size' : '') +
+        (fxOn ? (auto ? ':fx-auto' : ':fx') : '');
     if (!this.pipeline || this.pipelineFormat !== key) {
-      const code = excess ? outputShader : tonemapShader,
-        module = c.device.createShaderModule({ code: variableLUT ? sizedLUTShader(code) : code });
+      let code = excess ? outputShader : tonemapShader;
+      if (variableLUT) code = sizedLUTShader(code);
+      if (fxOn) code = effectsShader(code, auto);
+      const module = c.device.createShaderModule({ code });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },
@@ -326,16 +398,18 @@ export class Tonemap implements EnginePlugin {
           { binding: 0, resource: { buffer: this.uniform! } },
           { binding: 1, resource: 'createView' in source ? source.createView() : source },
           { binding: 2, resource: this.lutTexture!.createView() },
+          ...(fxOn ? [{ binding: 3, resource: { buffer: this.effectsBuffer(c.device) } }] : []),
+          ...(auto ? [{ binding: 4, resource: { buffer: this.stateBuffer(c.device) } }] : []),
         ],
       };
+      this.meterGroup = undefined;
       this.group = c.device.createBindGroup(group);
       this.sourceTexture = source;
       this.excessGroup =
         this.excessPipeline &&
         c.device.createBindGroup({ ...group, layout: this.excessPipeline.getBindGroupLayout(0) });
     }
-    const v = this.values,
-      o = this.options;
+    const v = this.values;
     v[0] = o.exposure ?? 0;
     v[1] = o.contrast ?? 1;
     v[2] = o.curve === 'acescg' ? 1 : o.curve === 'agx' ? 0 : 2;
@@ -348,6 +422,7 @@ export class Tonemap implements EnginePlugin {
     v[13] = excess ? out!.peak : 0;
     v[14] = +!!(excess && out!.p3);
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
+    if (fxOn) this.applyEffects(c, source, auto);
     this.attachment.view = view;
     this.attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.presentation);
@@ -367,6 +442,64 @@ export class Tonemap implements EnginePlugin {
       extra.draw(3);
       extra.end();
     }
+  }
+  private effectsBuffer(device: GPUDevice): GPUBuffer {
+    return (this.fxBuffer ??= device.createBuffer({
+      size: 64,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    }));
+  }
+  private stateBuffer(device: GPUDevice): GPUBuffer {
+    return (this.aeBuffer ??= device.createBuffer({
+      size: 8,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    }));
+  }
+  // Writes the effects uniform and, with auto-exposure, meters the source into the adapted-exposure buffer.
+  private applyEffects(c: Context, source: GPUTexture | GPUTextureView, auto: boolean): void {
+    const o = this.options,
+      f = this.fxValues,
+      rect = viewRect(c) ?? [0, 0, c.width, c.height],
+      gain = whiteBalanceGain(o.temperature ?? NEUTRAL_TEMPERATURE, o.tint ?? 0);
+    f.set(gain, 0);
+    f[3] = o.vignette ?? 0;
+    f[4] = o.vignetteRadius ?? 0.5;
+    f[5] = Math.max(o.vignetteSoftness ?? 0.5, 1e-4);
+    f[6] = o.grain ?? 0;
+    f[7] = (o.chromaticAberration ?? 0) * 0.02;
+    f.set(rect, 8);
+    f[12] = this.frameCount++ & 0xffffff;
+    c.device.queue.writeBuffer(this.effectsBuffer(c.device), 0, f as Float32Array<ArrayBuffer>);
+    if (!auto) return;
+    const a = typeof o.autoExposure === 'object' ? o.autoExposure : {},
+      m = this.meterValues;
+    if (!this.meterPipeline) {
+      this.meterPipeline = c.device.createComputePipeline({
+        layout: 'auto',
+        compute: { module: c.device.createShaderModule({ code: meterShader }), entryPoint: 'main' },
+      });
+      this.meterBuffer = c.device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    }
+    if (!this.meterGroup)
+      this.meterGroup = c.device.createBindGroup({
+        layout: this.meterPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.meterBuffer! } },
+          { binding: 1, resource: 'createView' in source ? source.createView() : source },
+          { binding: 2, resource: { buffer: this.stateBuffer(c.device) } },
+        ],
+      });
+    m.set(rect, 0);
+    m[4] = a.min ?? -4;
+    m[5] = a.max ?? 4;
+    m[6] = 1 - Math.exp(-(a.speed ?? 1.5) * Math.max(0, Math.min(c.delta, 0.25)));
+    m[7] = a.compensation ?? 0;
+    c.device.queue.writeBuffer(this.meterBuffer!, 0, m as Float32Array<ArrayBuffer>);
+    const pass = c.encoder.beginComputePass();
+    pass.setPipeline(this.meterPipeline);
+    pass.setBindGroup(0, this.meterGroup);
+    pass.dispatchWorkgroups(1);
+    pass.end();
   }
   private excessPipeline?: GPURenderPipeline;
   private excessGroup?: GPUBindGroup;
@@ -392,6 +525,11 @@ export class Tonemap implements EnginePlugin {
     this.group = undefined;
     this.excessPipeline = undefined;
     this.excessGroup = undefined;
+    this.fxBuffer?.destroy();
+    this.aeBuffer?.destroy();
+    this.meterBuffer?.destroy();
+    this.fxBuffer = this.aeBuffer = this.meterBuffer = undefined;
+    this.meterPipeline = this.meterGroup = undefined;
     this.original = undefined;
     this.shaders.clear();
   }

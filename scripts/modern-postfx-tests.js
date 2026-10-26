@@ -311,6 +311,141 @@ try {
       ap1gray.slice(0, 3).every((v) => Math.abs(v - srgb(0.14)) < 0.00002),
       'ACEScg white-point conversion',
     );
+    // Tonemap extras (white balance, vignette, grain, chromatic aberration, auto-exposure) on the real GPU.
+    {
+      const { effectsShader, meterShader } = await import('/packages/tonemap/src/effects.ts');
+      grade[12] = 0;
+      grade[2] = 2;
+      grade[0] = 0;
+      const fx = buffer(64),
+        ae = device.createBuffer({
+          size: 8,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+        });
+      owned.push(ae);
+      const pipe = async (code) => {
+        const m = await module(code);
+        return device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module: m, entryPoint: 'vertex' },
+          fragment: { module: m, entryPoint: 'fragment', targets: [{ format: 'rgba32float' }] },
+        });
+      };
+      const fxPipe = await pipe(effectsShader(tonemapShader, false)),
+        autoPipe = await pipe(effectsShader(tonemapShader, true));
+      const fxGroup = group(fxPipe, [{ buffer: gradeUniform }, hdr.createView(), lut.createView(), { buffer: fx }]),
+        autoGroup = group(autoPipe, [
+          { buffer: gradeUniform },
+          hdr.createView(),
+          lut.createView(),
+          { buffer: fx },
+          { buffer: ae },
+        ]);
+      const setFx = (v) => device.queue.writeBuffer(fx, 0, new Float32Array(v));
+      // gain.xyz, vignette | radius, softness, grain, aberration | rect | seed
+      const neutralFx = [1, 1, 1, 0, 0.5, 0.5, 0, 0, -0.5, -0.5, 1, 1, 0, 0, 0, 0];
+      async function toneWith(pipeline, bind, rgb) {
+        device.queue.writeTexture({ texture: hdr }, new Float32Array([...rgb, 1]), { bytesPerRow: 16 }, [1, 1]);
+        device.queue.writeBuffer(gradeUniform, 0, grade);
+        const e = device.createCommandEncoder(),
+          p = e.beginRenderPass({
+            colorAttachments: [{ view: display.createView(), loadOp: 'clear', storeOp: 'store' }],
+          });
+        p.setPipeline(pipeline);
+        p.setBindGroup(0, bind);
+        p.draw(3);
+        p.end();
+        device.queue.submit([e.finish()]);
+        return read(display, 16);
+      }
+      const near = (a, b, eps, message) =>
+        check(
+          [0, 1, 2].every((i) => Math.abs(a[i] - b[i]) < eps),
+          `${message}: ${[...a.slice(0, 3)]} vs ${[...b.slice(0, 3)]}`,
+        );
+      const rgb = [0.2, 0.4, 0.6],
+        base = await tone(rgb);
+      setFx(neutralFx);
+      near(
+        await toneWith(fxPipe, fxGroup, rgb),
+        base,
+        0.00002,
+        'Neutral effects variant must equal the default shader',
+      );
+      setFx([2, 1, 0.5, 0, ...neutralFx.slice(4)]);
+      near(
+        await toneWith(fxPipe, fxGroup, rgb),
+        neutral([0.4, 0.4, 0.3]).map(srgb),
+        0.00002,
+        'White balance gain applies before the curve',
+      );
+      setFx([1, 1, 1, 0.5, 0.1, 0.1, 0, 0, -0.5, -0.5, 1, 1, 0, 0, 0, 0]);
+      near(
+        await toneWith(fxPipe, fxGroup, rgb),
+        neutral(rgb).map((v) => srgb(v * 0.5)),
+        0.00002,
+        'Vignette darkens by its intensity at the corner',
+      );
+      setFx([1, 1, 1, 0, 0.5, 0.5, 1, 0, -0.5, -0.5, 1, 1, 5, 0, 0, 0]);
+      const grain = await toneWith(fxPipe, fxGroup, rgb);
+      check(
+        grain.slice(0, 3).every((v) => v >= 0 && v <= 1 && Number.isFinite(v)),
+        'Grain stays in range',
+      );
+      check(Math.abs(grain[0] - base[0]) > 1e-4 && Math.abs(grain[0] - base[0]) < 0.15, 'Grain perturbs the picture');
+      setFx([1, 1, 1, 0, 0.5, 0.5, 0, 0.02, -0.5, -0.5, 1, 1, 0, 0, 0, 0]);
+      near(await toneWith(fxPipe, fxGroup, rgb), base, 0.00002, 'Aberration clamps at the texture edge');
+      // Metering: log-average luminance of a flat field drives the adapted stops toward 18% grey.
+      const field = texture(64, 64, 'rgba32float', T.TEXTURE_BINDING | T.COPY_DST),
+        meter = buffer(32),
+        meterPipeline = await compute(meterShader),
+        meterGroup = group(meterPipeline, [{ buffer: meter }, field.createView(), { buffer: ae }]);
+      const fill = (v) =>
+        device.queue.writeTexture(
+          { texture: field },
+          new Float32Array(64 * 64 * 4).fill(v),
+          { bytesPerRow: 64 * 16 },
+          [64, 64],
+        );
+      const readAE = async () => {
+        const out = device.createBuffer({ size: 8, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+        const e = device.createCommandEncoder();
+        e.copyBufferToBuffer(ae, 0, out, 0, 8);
+        device.queue.submit([e.finish()]);
+        await out.mapAsync(GPUMapMode.READ);
+        const v = new Float32Array(out.getMappedRange().slice(0));
+        out.destroy();
+        return v;
+      };
+      const run = (k, comp = 0) => {
+        device.queue.writeBuffer(meter, 0, new Float32Array([0, 0, 64, 64, -4, 4, k, comp]));
+        const e = device.createCommandEncoder(),
+          p = e.beginComputePass();
+        p.setPipeline(meterPipeline);
+        p.setBindGroup(0, meterGroup);
+        p.dispatchWorkgroups(1);
+        p.end();
+        device.queue.submit([e.finish()]);
+      };
+      fill(0.045);
+      run(1);
+      let state = await readAE();
+      check(Math.abs(state[0] - 2) < 0.01 && state[1] === 1, `Dark field meters +2 stops, got ${state[0]}`);
+      fill(0.18);
+      run(0.5);
+      state = await readAE();
+      check(Math.abs(state[0] - 1) < 0.01, `Adaptation moves half way, got ${state[0]}`);
+      run(1, 3);
+      state = await readAE();
+      check(Math.abs(state[0] - 3) < 0.01, `Compensation shifts the target, got ${state[0]}`);
+      state = new Float32Array([2, 1]);
+      device.queue.writeBuffer(ae, 0, state);
+      setFx(neutralFx);
+      const autoOut = await toneWith(autoPipe, autoGroup, rgb);
+      grade[0] = 2;
+      near(autoOut, await tone(rgb), 0.00002, 'Adapted stops add to exposure');
+      grade[0] = 0;
+    }
     await device.queue.onSubmittedWorkDone();
     const validation = await device.popErrorScope();
     check(!validation, validation?.message);

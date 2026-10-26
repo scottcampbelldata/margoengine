@@ -1,8 +1,19 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
+export { bindingLabel, type GlyphLayout } from './labels.js';
+export { Gestures, type GestureEvent, type GestureOptions, type GestureType } from './gestures.js';
+/** Modifier keys a `key` binding can require; the binding only fires while all of them are held. */
+export type Modifier = 'shift' | 'ctrl' | 'alt' | 'meta';
+const MODIFIER_CODES: Record<Modifier, readonly string[]> = {
+  shift: ['ShiftLeft', 'ShiftRight'],
+  ctrl: ['ControlLeft', 'ControlRight'],
+  alt: ['AltLeft', 'AltRight'],
+  meta: ['MetaLeft', 'MetaRight'],
+};
 /**
  * One source feeding an action. Each sample is multiplied by `scale` (finite, default 1) and summed into the action.
- * - `key`: `KeyboardEvent.code` (non-empty); 1 while held.
+ * - `key`: `KeyboardEvent.code` (non-empty); 1 while held. With `modifiers` it is a chord (for example Ctrl+S):
+ *   the key counts only while every listed modifier is also held.
  * - `mouse`: button 0..4; 1 while held.
  * - `pointer`: movement on `x`/`y` (pixels) or `wheel` (`WheelEvent.deltaY`) since the last update.
  * - `gamepad-axis` / `gamepad-button`: axis or button `index` (integer >= 0) of gamepad `gamepad` (default 0);
@@ -10,7 +21,7 @@ import { MargoError } from '@margoengine/math/errors';
  * - `touch`: a control from `createStick`/`bindTouchButton` by `id`; `axis` reads a stick in [-1, 1], otherwise 1 while down.
  */
 export type Binding =
-  | { type: 'key'; code: string; scale?: number }
+  | { type: 'key'; code: string; modifiers?: readonly Modifier[]; scale?: number }
   | { type: 'mouse'; button: number; scale?: number }
   | { type: 'pointer'; axis: 'x' | 'y' | 'wheel'; scale?: number }
   | { type: 'gamepad-axis' | 'gamepad-button'; index: number; gamepad?: number; scale?: number }
@@ -34,6 +45,44 @@ export interface InputOptions {
   gamepads?: () => readonly (Gamepad | null)[];
   /** Gamepad axis deadzone in [0, 1); axes rescale to fill the rest of the range. Default 0.15. */
   deadzone?: number;
+  /**
+   * Input contexts: context name to the actions it owns. An action listed in any context reads 0 unless one of its
+   * contexts is enabled (see {@link Input.setContext}); unlisted actions are always active. All contexts start enabled.
+   */
+  contexts?: Readonly<Record<string, readonly string[]>>;
+}
+
+/** Plain, JSON-safe snapshot of every action's bindings, as written by {@link Input.exportBindings}. */
+export type BindingMap = Record<string, Binding[]>;
+
+const BINDING_TYPES = ['key', 'mouse', 'pointer', 'gamepad-axis', 'gamepad-button', 'touch'];
+function validateBinding(binding: Binding): void {
+  if (!binding || typeof binding !== 'object')
+    throw new TypeError(
+      'Invalid action binding; bind an action to key, mouse, gamepad or touch codes (see InputOptions)',
+    );
+  if (!Number.isFinite(binding.scale ?? 1) || !BINDING_TYPES.includes(binding.type))
+    throw new TypeError(
+      'Invalid action binding; bind an action to key, mouse, gamepad or touch codes (see InputOptions)',
+    );
+  if (
+    (binding.type === 'key' &&
+      (!binding.code ||
+        (binding.modifiers !== undefined &&
+          (!Array.isArray(binding.modifiers) || binding.modifiers.some((m) => !(m in MODIFIER_CODES)))))) ||
+    (binding.type === 'mouse' && (!Number.isInteger(binding.button) || binding.button < 0 || binding.button > 4)) ||
+    ((binding.type === 'gamepad-axis' || binding.type === 'gamepad-button') &&
+      (!Number.isInteger(binding.index) ||
+        binding.index < 0 ||
+        !Number.isInteger(binding.gamepad ?? 0) ||
+        (binding.gamepad ?? 0) < 0)) ||
+    (binding.type === 'pointer' && !['x', 'y', 'wheel'].includes(binding.axis)) ||
+    (binding.type === 'touch' &&
+      (!binding.id || (binding.axis !== undefined && binding.axis !== 'x' && binding.axis !== 'y')))
+  )
+    throw new TypeError(
+      'Invalid action binding; bind an action to key, mouse, gamepad or touch codes (see InputOptions)',
+    );
 }
 
 /** Semantic action state is reused; sample once per simulation tick. */
@@ -48,48 +97,52 @@ export class Input {
   private readonly gamepads: () => readonly (Gamepad | null)[];
   private readonly deadzone: number;
   private disposed = false;
+  private readonly target: EventTarget;
+  private readonly initial: Record<string, readonly Binding[]>;
+  private bindingsByAction: Record<string, readonly Binding[]>;
+  private readonly owners = new Map<string, Set<string>>();
+  private readonly enabled = new Set<string>();
+  /** Current bindings per action. Replaced (not mutated) by {@link Input.rebind} and {@link Input.importBindings}. */
+  get actions(): Readonly<Record<string, readonly Binding[]>> {
+    return this.bindingsByAction;
+  }
   /**
    * Map named actions to bindings and start listening on `target`. Key presses inside form fields are ignored.
    * @throws RangeError for an invalid deadzone or a non-function `gamepads`.
    * @throws TypeError for an empty action name, an action without bindings, or an invalid binding.
    */
   constructor(
-    readonly actions: Readonly<Record<string, readonly Binding[]>>,
-    { target = window, gamepads = () => navigator.getGamepads?.() ?? [], deadzone = 0.15 }: InputOptions = {},
+    actions: Readonly<Record<string, readonly Binding[]>>,
+    {
+      target = window,
+      gamepads = () => navigator.getGamepads?.() ?? [],
+      deadzone = 0.15,
+      contexts = {},
+    }: InputOptions = {},
   ) {
+    this.target = target;
+    this.bindingsByAction = { ...actions };
+    this.initial = { ...actions };
     if (!Number.isFinite(deadzone) || deadzone < 0 || deadzone >= 1 || typeof gamepads !== 'function')
       throw new RangeError('Invalid input options; pass the documented option types');
     this.gamepads = gamepads;
     this.deadzone = deadzone;
     for (const [name, bindings] of Object.entries(actions)) {
-      if (!name || !bindings.length) throw new TypeError('Actions need names and bindings');
-      for (const binding of bindings) {
-        if (
-          !Number.isFinite(binding.scale ?? 1) ||
-          !['key', 'mouse', 'pointer', 'gamepad-axis', 'gamepad-button', 'touch'].includes(binding.type)
-        )
-          throw new TypeError(
-            'Invalid action binding; bind an action to key, mouse, gamepad or touch codes (see InputOptions)',
-          );
-        if (
-          (binding.type === 'key' && !binding.code) ||
-          (binding.type === 'mouse' &&
-            (!Number.isInteger(binding.button) || binding.button < 0 || binding.button > 4)) ||
-          ((binding.type === 'gamepad-axis' || binding.type === 'gamepad-button') &&
-            (!Number.isInteger(binding.index) ||
-              binding.index < 0 ||
-              !Number.isInteger(binding.gamepad ?? 0) ||
-              (binding.gamepad ?? 0) < 0)) ||
-          (binding.type === 'pointer' && !['x', 'y', 'wheel'].includes(binding.axis)) ||
-          (binding.type === 'touch' &&
-            (!binding.id || (binding.axis !== undefined && binding.axis !== 'x' && binding.axis !== 'y')))
-        )
-          throw new TypeError(
-            'Invalid action binding; bind an action to key, mouse, gamepad or touch codes (see InputOptions)',
-          );
-      }
+      if (!name || !bindings.length)
+        throw new TypeError('Actions need names and bindings; give every action at least one binding');
+      for (const binding of bindings) validateBinding(binding);
       this.states.set(name, { value: 0, down: false, pressed: false, released: false });
       this.samples.push({ name, state: this.states.get(name)! });
+    }
+    for (const [context, names] of Object.entries(contexts)) {
+      if (!context || !Array.isArray(names))
+        throw new TypeError('Invalid input context; map each context name to an array of action names');
+      for (const name of names) {
+        if (!this.states.has(name))
+          throw new TypeError('Unknown input action in context; list only actions defined in the first argument');
+        (this.owners.get(name) ?? this.owners.set(name, new Set()).get(name)!).add(context);
+      }
+      this.enabled.add(context);
     }
     try {
       this.listen(target, 'keydown', (event) => {
@@ -146,13 +199,26 @@ export class Input {
         name = sample.name,
         state = sample.state;
       let value = 0;
-      const bindings = this.actions[name];
-      for (let j = 0; j < bindings.length; j++) {
+      const bindings = this.bindingsByAction[name],
+        owners = this.owners.get(name);
+      let active = true;
+      if (owners) {
+        active = false;
+        for (const context of owners)
+          if (this.enabled.has(context)) {
+            active = true;
+            break;
+          }
+      }
+      for (let j = 0; active && j < bindings.length; j++) {
         const binding = bindings[j];
         let sample = 0;
         switch (binding.type) {
           case 'key':
             sample = +this.keys.has(binding.code);
+            if (sample && binding.modifiers)
+              for (const modifier of binding.modifiers)
+                if (!MODIFIER_CODES[modifier].some((code) => this.keys.has(code))) sample = 0;
             break;
           case 'mouse':
             sample = +!!(this.buttons & (1 << binding.button));
@@ -328,6 +394,117 @@ export class Input {
     if (!actuator) return false;
     await actuator.playEffect('dual-rumble', { duration, strongMagnitude: strength, weakMagnitude: strength });
     return true;
+  }
+  /**
+   * Enable or disable an input context from the constructor's `contexts` option (for example mute gameplay actions
+   * while a menu is open). Actions owned by no enabled context read 0, and held actions release on the next update.
+   * @throws TypeError for an unknown context.
+   */
+  setContext(context: string, enabled: boolean): void {
+    if (![...this.owners.values()].some((set) => set.has(context)))
+      throw new TypeError('Unknown input context; use a name from the contexts option');
+    if (enabled) this.enabled.add(context);
+    else this.enabled.delete(context);
+  }
+  /** Whether `context` is currently enabled. Unknown contexts are not. */
+  hasContext(context: string): boolean {
+    return this.enabled.has(context);
+  }
+  /**
+   * Replace the bindings of one action (for example from a rebinding screen).
+   * @throws TypeError for an unknown action, no bindings, or an invalid binding.
+   */
+  rebind(action: string, bindings: readonly Binding[]): void {
+    if (!this.states.has(action))
+      throw new TypeError('Unknown input action; use a name from the actions given to the constructor');
+    if (!bindings.length)
+      throw new TypeError('Actions need names and bindings; give every action at least one binding');
+    for (const binding of bindings) validateBinding(binding);
+    this.bindingsByAction = { ...this.bindingsByAction, [action]: bindings.map((b) => ({ ...b })) };
+  }
+  /** Copy of every action's bindings, safe to `JSON.stringify` into localStorage or a settings file. */
+  exportBindings(): BindingMap {
+    return JSON.parse(JSON.stringify(this.bindingsByAction)) as BindingMap;
+  }
+  /**
+   * Apply bindings from {@link Input.exportBindings} (or its JSON text). Unknown actions in the data are ignored so
+   * saved files survive action renames; actions missing from the data keep their bindings. Nothing changes if any
+   * entry is invalid.
+   * @throws TypeError for malformed JSON or an invalid binding.
+   */
+  importBindings(data: BindingMap | string): void {
+    let map: unknown;
+    try {
+      map = typeof data === 'string' ? JSON.parse(data) : data;
+    } catch {
+      throw new TypeError(
+        'Saved bindings are not valid JSON; pass the text from JSON.stringify(input.exportBindings())',
+      );
+    }
+    if (!map || typeof map !== 'object' || Array.isArray(map)) throw new TypeError('Saved bindings must be an object');
+    const next = { ...this.bindingsByAction };
+    for (const [action, bindings] of Object.entries(map as Record<string, unknown>)) {
+      if (!this.states.has(action)) continue;
+      if (!Array.isArray(bindings) || !bindings.length)
+        throw new TypeError('Invalid saved bindings; give each action a non-empty array of bindings');
+      for (const binding of bindings) validateBinding(binding as Binding);
+      next[action] = (bindings as Binding[]).map((b) => ({ ...b }));
+    }
+    this.bindingsByAction = next;
+  }
+  /** Restore the bindings given to the constructor. */
+  resetBindings(): void {
+    this.bindingsByAction = { ...this.initial };
+  }
+  /**
+   * Wait for the next key, mouse button or gamepad button press and resolve with it as a {@link Binding}, for a
+   * "press a key to rebind" prompt. Modifiers held with a key become `modifiers`. Escape cancels.
+   * @throws DOMException `AbortError` when `signal` aborts or the user presses Escape.
+   * @throws MargoError `'disposed'` after {@link Input.dispose}.
+   */
+  captureBinding({ signal }: { signal?: AbortSignal } = {}): Promise<Binding> {
+    return new Promise((resolve, reject) => {
+      if (this.disposed) return reject(new MargoError('disposed', 'Input is disposed; create a new Input'));
+      let timer = 0;
+      const done = (finish: () => void) => {
+        this.target.removeEventListener('keydown', onKey);
+        this.target.removeEventListener('pointerdown', onPointer);
+        signal?.removeEventListener('abort', abort);
+        if (timer) cancelAnimationFrame(timer);
+        finish();
+      };
+      const abort = () => done(() => reject(signal?.reason ?? new DOMException('Aborted', 'AbortError')));
+      const onKey = (event: Event) => {
+        const e = event as KeyboardEvent;
+        if (e.code === 'Escape') return done(() => reject(new DOMException('Cancelled', 'AbortError')));
+        const flags: Record<Modifier, boolean> = { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey };
+        const modifiers = (Object.keys(flags) as Modifier[]).filter(
+          (m) => flags[m] && !MODIFIER_CODES[m].includes(e.code),
+        );
+        e.preventDefault?.();
+        done(() =>
+          resolve(modifiers.length ? { type: 'key', code: e.code, modifiers } : { type: 'key', code: e.code }),
+        );
+      };
+      const onPointer = (event: Event) => {
+        const e = event as PointerEvent;
+        if (e.pointerType === 'touch' || !(e.button >= 0 && e.button <= 4)) return;
+        done(() => resolve({ type: 'mouse', button: e.button }));
+      };
+      if (signal?.aborted) return abort();
+      signal?.addEventListener('abort', abort);
+      this.target.addEventListener('keydown', onKey);
+      this.target.addEventListener('pointerdown', onPointer);
+      const poll = () => {
+        const pad = this.gamepads().find((g) => g?.buttons.some((b) => b.pressed));
+        if (pad) {
+          const index = pad.buttons.findIndex((b) => b.pressed);
+          return done(() => resolve({ type: 'gamepad-button', index, gamepad: pad.index }));
+        }
+        timer = requestAnimationFrame(poll);
+      };
+      if (typeof requestAnimationFrame === 'function') timer = requestAnimationFrame(poll);
+    });
   }
   /** Release all keys, buttons and touch controls and clear pending motion; runs on blur and pointercancel. */
   reset(): void {

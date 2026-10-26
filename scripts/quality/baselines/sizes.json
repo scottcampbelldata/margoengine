@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3244551,
+  "total": 3249697,
   "history": [
     {
       "date": "2026-10-24",
@@ -281,12 +281,6 @@
     },
     {
       "date": "2026-10-26",
-      "commit": "743f0635",
-      "reason": "DX pass A-L batch 2: throw messages now name their fix (clustered, creative/post), a few hundred gzip bytes of message text",
-      "grew": 2
-    },
-    {
-      "date": "2026-10-26",
       "commit": "f7963d9f",
       "reason": "queue item 23 milestone 2: animator gains addRootMotion, addLookAt and addAimConstraint (tree-shaken when unused); new entry @margoengine/rigging/ik (FABRIK chains with poles)",
       "grew": 2
@@ -329,9 +323,27 @@
     },
     {
       "date": "2026-10-26",
+      "commit": "743f0635",
+      "reason": "DX pass A-L batch 2: throw messages now name their fix (clustered, creative/post), a few hundred gzip bytes of message text",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-26",
       "commit": "caad6873",
       "reason": "DX pass A-L: error messages name their fix and bare Error throws became coded MargoError, so bundles carry longer strings",
       "grew": 12
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "6ed1e634",
+      "reason": "package depth: input gains chords, contexts, rebinding, labels and gestures; tonemap gains auto-exposure, white balance, vignette, grain and chromatic aberration",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "08fc904c",
+      "reason": "package depth: input chords, contexts, rebinding, labels, gestures",
+      "grew": 1
     }
   ],
   "items": {
@@ -455,7 +467,7 @@
     "@margoengine/ifc": 2819,
     "@margoengine/ifc dist/workers/ifc.js": 3443,
     "@margoengine/ifc/worker": 1470,
-    "@margoengine/input": 2553,
+    "@margoengine/input": 5168,
     "@margoengine/inspector": 5140,
     "@margoengine/inspector/frame": 8897,
     "@margoengine/kinematics-constraints": 6800,
@@ -593,7 +605,7 @@
     "@margoengine/taa": 9899,
     "@margoengine/terrain": 10598,
     "@margoengine/text": 15890,
-    "@margoengine/tonemap": 8552,
+    "@margoengine/tonemap": 11083,
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4339,
     "@margoengine/tween": 1056,

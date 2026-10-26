@@ -1098,7 +1098,8 @@
     "imports": "import { Tonemap } from '@margoengine/tonemap';",
     "exports": [
       "Tonemap",
-      "parseCube"
+      "parseCube",
+      "whiteBalanceGain"
     ],
     "example": "../demos/tonemap/",
     "exampleTitle": "Highlights and color",
@@ -1671,7 +1672,9 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/input@1.0.0",
     "imports": "import { Input } from '@margoengine/input';",
     "exports": [
-      "Input"
+      "Gestures",
+      "Input",
+      "bindingLabel"
     ],
     "category": "Animation and interaction"
   },
