@@ -5,7 +5,9 @@
 // gltf-pro's own (PBRInstances): world = model x instance with the model rows set to identity, so positions are the
 // same; normals come from the matrix cofactors instead of the CPU inverse transpose, the same direction once the
 // fragment normalizes them. Opaque draws of a run may reorder between batches (as engines sort opaque draws by
-// material); each batch keeps its meshes in draw order.
+// material); each batch keeps its meshes in draw order. Blended draws never reorder: one joins only the batch drawn
+// last, so a batch is a run of consecutive draws (instances rasterize in order), and draws of materials that differ
+// only in base colour fold into it with their colours as instance tints. Wireframe draws batch as line lists.
 import { instanceLayout } from '../../shared/instances.js';
 import { retire } from '../../shared/frame-resources.js';
 import { instancedShader } from './instanced-shader.js';
@@ -36,16 +38,21 @@ export class BatchInstances {
   buffer?: GPUBuffer;
   /** Rows the GPU buffer holds as uploaded. */
   private uploaded = 0;
-  /** True when the rows hold exactly `matrices` (as uploaded). */
-  holds(matrices: readonly ArrayLike<number>[]): boolean {
+  /** True when the rows hold exactly `matrices` and `tints` (see `write`), as uploaded. */
+  holds(matrices: readonly ArrayLike<number>[], tints?: readonly ArrayLike<number>[]): boolean {
     if (matrices.length > this.uploaded) return false;
     const data = this.data;
-    for (let i = 0; i < matrices.length; i++)
+    for (let i = 0; i < matrices.length; i++) {
       for (let k = 0; k < 16; k++) if (data[i * 24 + k] !== Math.fround(matrices[i][k])) return false;
+      for (let k = 0; k < 4; k++) if (data[i * 24 + 16 + k] !== (tints ? Math.fround(tints[i][k]) : 1)) return false;
+    }
     return true;
   }
-  /** Writes the rows' world matrices and uploads the changed range. Returns the vertex buffer. */
-  write(device: GPUDevice, matrices: readonly ArrayLike<number>[]): GPUBuffer {
+  /**
+   * Writes the rows' world matrices and tints (each member's base colour when the batch folds several materials, else
+   * 1) and uploads the changed range. Returns the vertex buffer.
+   */
+  write(device: GPUDevice, matrices: readonly ArrayLike<number>[], tints?: readonly ArrayLike<number>[]): GPUBuffer {
     const count = matrices.length;
     if (this.data.length < count * 24) {
       const capacity = Math.max(count, Math.ceil((this.data.length / 24) * 1.5), 16),
@@ -73,6 +80,14 @@ export class BatchInstances {
           data[o + k] = m[k];
           changed = true;
         }
+      const t = tints?.[i];
+      for (let k = 0; k < 4; k++) {
+        const value = t ? Math.fround(t[k]) : 1;
+        if (data[o + 16 + k] !== value) {
+          data[o + 16 + k] = value;
+          changed = true;
+        }
+      }
       if (changed) {
         if (i < lo) lo = i;
         hi = i + 1;

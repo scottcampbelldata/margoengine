@@ -3067,7 +3067,7 @@ interface Entry {
   order: number;
   opaque: boolean;
   blend: boolean;
-  /** Camera distance this frame, for the late phase's back-to-front sort. */
+  /** Squared camera distance this frame, for the late phase's back-to-front sort. */
   distance: number;
 }
 interface Phase {
@@ -3148,7 +3148,11 @@ function queue(runtime: Engine): MaterialDraws {
       const entry = phases[i].entry;
       if (check && !current(entry)) return false;
       const matrix = entry.model.primitives[0].node.matrix;
-      entry.distance = Math.hypot(eye[0] - matrix[12], eye[1] - matrix[13], eye[2] - matrix[14]);
+      // The squared distance sorts alike and needs no square root (2,000 blended meshes a frame).
+      const x = eye[0] - matrix[12],
+        y = eye[1] - matrix[13],
+        z = eye[2] - matrix[14];
+      entry.distance = x * x + y * y + z * z;
     }
     const count = phases.length - opaqueEnd;
     for (let i = 0; i < count; i++) tail[i] = phases[opaqueEnd + i];
@@ -3404,78 +3408,135 @@ function envBindings(m: Material, device: GPUDevice, owner: object): GPUBindGrou
     { binding: 190, resource: { buffer } },
   ];
 }
+/** A record's material, engine and placeholder ext row: hidden (not enumerable), so `{...record}` copies skip them. */
+const recordMaterial = Symbol('material'),
+  recordRuntime = Symbol('runtime'),
+  recordExt = Symbol('ext');
+type MaterialRecord = PBRMaterial & { [recordMaterial]: Material; [recordRuntime]: Engine; [recordExt]: number[] };
 /**
- * Points gltf-pro material record `g` at `current()`, read on every draw: values, maps (through the shading hook),
- * physical rows, render state and wireframe all follow a material swap or a live edit from the next frame.
+ * A live record field, read from the record's material on every access. Enumerable and configurable like the data
+ * properties they replace (`{...record}` copies still work). The getters are made once and shared by every record, so
+ * all records have one shape and gltf-pro's per-draw reads of them stay fast with thousands of materials.
  */
-function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void {
-  const plain = g.ext,
-    // Enumerable and configurable like the data properties they replace (`{...record}` copies still work).
-    get = (read: (m: Material) => unknown): PropertyDescriptor => ({
-      get: () => read(current()),
-      enumerable: true,
-      configurable: true,
-    });
-  Object.defineProperties(g, {
-    extendedFrame: { value: true, enumerable: true },
-    base: get((m) => m.color),
-    emission: get(emissionOf),
-    factors: get((m) => m.factors),
-    settings: get((m) => m.settings),
-    // The native frame holds 13 slots; the sparse map uniform owns all 17 slots.
-    uvt: get((m) => m.uvt.slice(0, extendedOf(m) ? 144 : 104)),
-    // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant.
-    physical: get((m) => m.physical),
-    ext: get((m) => m.ext ?? plain),
-    volume: get((m) => m.volume),
-    dispersion: get((m) => m.dispersion),
-    tint: get((m) => m.tint),
-    extended: get(extendedOf),
-    extensions: get(extensionsOf),
-    renderState: get(renderStateOf),
-    displacement: get((m) => displacementOf(m, runtime.gpu, runtime)),
-    clip: get((m) => clipOf(m, runtime.gpu, runtime)),
-    wireframe: {
-      ...get((m) => m.wireframe),
-      set: (v: boolean) => {
-        current().wireframe = v;
-      },
+const live = (read: (m: Material, g: MaterialRecord) => unknown): PropertyDescriptor => ({
+  get(this: MaterialRecord) {
+    return read(this[recordMaterial], this);
+  },
+  enumerable: true,
+  configurable: true,
+});
+const surfaceFields: PropertyDescriptorMap = {
+  extendedFrame: { value: true, enumerable: true },
+  base: live((m) => m.color),
+  emission: live(emissionOf),
+  factors: live((m) => m.factors),
+  settings: live((m) => m.settings),
+  // The native frame holds 13 slots; the sparse map uniform owns all 17 slots.
+  uvt: live((m) => m.uvt.slice(0, extendedOf(m) ? 144 : 104)),
+  // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant.
+  physical: live((m) => m.physical),
+  ext: live((m, g) => m.ext ?? g[recordExt]),
+  volume: live((m) => m.volume),
+  dispersion: live((m) => m.dispersion),
+  tint: live((m) => m.tint),
+  extended: live(extendedOf),
+  extensions: live(extensionsOf),
+  renderState: live(renderStateOf),
+  displacement: live((m, g) => displacementOf(m, g[recordRuntime].gpu, g[recordRuntime])),
+  clip: live((m, g) => clipOf(m, g[recordRuntime].gpu, g[recordRuntime])),
+  wireframe: {
+    ...live((m) => m.wireframe),
+    set(this: MaterialRecord, v: boolean) {
+      this[recordMaterial].wireframe = v;
     },
-    shading: {
-      enumerable: true,
-      value: {
-        get replacesTextures() {
-          const m = current();
-          return mapped(m) || bare(m);
-        },
-        get texturedTint() {
-          const m = current();
-          return mapped(m) && m.transmissive;
-        },
-        shader: (code: string, group: number) => {
-          const m = current(),
-            key = featureKey(m, code),
-            own = m.shader(code, group),
-            out = key ? featureShader(own, group, key) : own,
-            env = m.envMap ? envMapShader(out, group, envKind(m)) : out;
-          return m['clipping'].length ? clipShader(env, group) : env;
-        },
-        lit: (code: string) => {
-          const m = current(),
-            out = litShader(m, code);
-          return m.envMap ? envMapLit(out, envKind(m)) : out;
-        },
-        bindings: () => {
-          const m = current(),
-            entries = featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime)),
-            all = m.envMap ? [...entries, ...envBindings(m, runtime.gpu!, runtime)] : entries;
-          return m['clipping'].length
-            ? [...all, { binding: 199, resource: clipUniform(m, runtime.gpu!, runtime) }]
-            : all;
-        },
-      } satisfies PBRMaterialShading,
-    },
-  });
+  },
+};
+/** gltf-pro's shading hook for a record of `m` (see `surface`). */
+class MaterialShading implements PBRMaterialShading {
+  constructor(
+    private readonly m: Material,
+    private readonly runtime: Engine,
+  ) {}
+  get replacesTextures(): boolean {
+    return mapped(this.m) || bare(this.m);
+  }
+  get texturedTint(): boolean {
+    return mapped(this.m) && this.m.transmissive;
+  }
+  get shaderRevision(): number {
+    return shaderRevision(this.m);
+  }
+  shader(code: string, group: number): string {
+    const m = this.m,
+      key = featureKey(m, code),
+      own = m.shader(code, group),
+      out = key ? featureShader(own, group, key) : own,
+      env = m.envMap ? envMapShader(out, group, envKind(m)) : out;
+    return m['clipping'].length ? clipShader(env, group) : env;
+  }
+  lit(code: string): string {
+    const m = this.m,
+      out = litShader(m, code);
+    return m.envMap ? envMapLit(out, envKind(m)) : out;
+  }
+  bindings(): GPUBindGroupEntry[] {
+    const m = this.m,
+      runtime = this.runtime,
+      entries = featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime)),
+      all = m.envMap ? [...entries, ...envBindings(m, runtime.gpu!, runtime)] : entries;
+    return m['clipping'].length ? [...all, { binding: 199, resource: clipUniform(m, runtime.gpu!, runtime) }] : all;
+  }
+}
+/**
+ * A gltf-pro material record for `m` from the placeholder record's fields `blank`, read on every draw: values, maps
+ * (through the shading hook), physical rows, render state and wireframe all follow a live edit from the next frame.
+ * It is made in one `defineProperties` call from shared descriptors (redefining data properties as accessors would
+ * leave each record a dictionary of its own).
+ */
+function surface(blank: PropertyDescriptorMap, m: Material, runtime: Engine): PBRMaterial {
+  const fields: PropertyDescriptorMap = {};
+  for (const key of Object.keys(blank)) if (!(key in surfaceFields) && key !== 'shading') fields[key] = blank[key];
+  Object.assign(fields, surfaceFields);
+  fields.shading = { enumerable: true, value: new MaterialShading(m, runtime) };
+  fields[recordMaterial] = { value: m };
+  fields[recordRuntime] = { value: runtime };
+  fields[recordExt] = { value: blank.ext?.value };
+  return Object.defineProperties({}, fields) as PBRMaterial;
+}
+const shaderRevisions = new WeakMap<Material, { key: number; revision: number }>();
+let nextShaderRevision = 1;
+/**
+ * gltf-pro `PBRMaterialShading.shaderRevision` for `m`: a number that changes whenever what `shader()` and `lit()` read
+ * of `m` changes, so gltf-pro composes a material's shader again only then. Their text depends on the shading (fixed),
+ * whether the material is bare, the feature maps in use, the feature switches, the normal maps and anisotropy (the
+ * tangent frame), the envMap and the clipping planes. Materials with physical maps (their plan follows texture loading)
+ * and classes or instances with their own `shader` give NaN: composed on every frame, as before.
+ */
+function shaderRevision(m: Material): number {
+  if (m.shader !== Material.prototype.shader || mapped(m)) return Number.NaN;
+  const used = featureMapsUsed(m),
+    key =
+      +bare(m) |
+      (+used[0] << 1) |
+      (+used[1] << 2) |
+      (+used[2] << 3) |
+      (+used[3] << 4) |
+      (+m.flatShading << 5) |
+      (+m.vertexColors << 6) |
+      (+m.fog << 7) |
+      (+m.toneMapped << 8) |
+      (+(m.normalMap != null) << 9) |
+      (+(m.clearcoatNormalMap != null) << 10) |
+      (+m.extensions.includes('anisotropy') << 11) |
+      (+(m.envMap != null) << 12) |
+      (+(m['clipping'].length > 0) << 13);
+  let state = shaderRevisions.get(m);
+  if (!state) shaderRevisions.set(m, (state = { key, revision: nextShaderRevision++ }));
+  else if (state.key !== key) {
+    state.key = key;
+    state.revision = nextShaderRevision++;
+  }
+  return state.revision;
 }
 const records = new WeakMap<Material, WeakMap<Engine, PBRMaterial>>();
 /**
@@ -3488,8 +3549,7 @@ function recordOf(m: Material, runtime: Engine, blank: PropertyDescriptorMap): P
   if (!byEngine) records.set(m, (byEngine = new WeakMap()));
   let record = byEngine.get(runtime);
   if (!record) {
-    record = Object.defineProperties({}, blank) as PBRMaterial;
-    surface(record, () => m, runtime);
+    record = surface(blank, m, runtime);
     byEngine.set(runtime, record);
   }
   return record;

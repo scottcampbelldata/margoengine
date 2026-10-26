@@ -57,8 +57,8 @@ interface AssetOptions {
 class BatchInstances {
     data: Float32Array<ArrayBuffer>;
     buffer?: GPUBuffer;
-    holds(matrices: readonly ArrayLike<number>[]): boolean;
-    write(device: GPUDevice, matrices: readonly ArrayLike<number>[]): GPUBuffer;
+    holds(matrices: readonly ArrayLike<number>[], tints?: readonly ArrayLike<number>[]): boolean;
+    write(device: GPUDevice, matrices: readonly ArrayLike<number>[], tints?: readonly ArrayLike<number>[]): GPUBuffer;
     destroy(device: GPUDevice): void;
 }
 
@@ -144,9 +144,15 @@ interface DrawDerivation {
     } | undefined;
     mappedTint: boolean;
     modelFree: boolean;
+    tintable?: boolean;
+    blendStates?: BatchState[];
     joined?: object;
     joinedRun?: object;
     block: Float32Array;
+    revision?: number;
+    shading?: object;
+    renderState?: object;
+    structure?: number;
 }
 
 interface DrawFrame {
@@ -192,11 +198,14 @@ interface DrawResource {
     batch?: StaticBatch;
     edited?: boolean;
     batchStates?: Map<DrawDerivation, BatchState[]>;
+    nodeCache?: Float32Array;
 }
 
 interface DrawScratch {
     context?: Context;
     matrices: ArrayLike<number>[];
+    tints: ArrayLike<number>[];
+    checked: Set<PBRMaterial>;
     batchValues: Float32Array;
     viewData: Float32Array;
     bound: PassBindings;
@@ -679,6 +688,8 @@ class PBRDrawRun {
     readonly pending: PendingBatch[];
     readonly spare: PendingBatch[];
     readonly batches: Map<DrawDerivation, PendingBatch[]>;
+    fence: number;
+    readonly folds: Map<DrawDerivation, Map<DrawDerivation, boolean>>;
     quickFor(c: Context): QuickRun;
     end(): void;
 }
@@ -750,6 +761,7 @@ interface PBRMaterialShading extends LightingEffect {
     readonly replacesTextures?: boolean;
     readonly texturedTint?: boolean;
     lit?(code: string): string;
+    readonly shaderRevision?: number;
 }
 
 class PBRModel implements EnginePlugin {
@@ -915,6 +927,8 @@ interface PendingBatch {
     members: DrawResource[];
     models: PBRModel[];
     nodes: Mesh[];
+    folded: boolean;
+    fence: number;
 }
 
 interface PreparedGeometry {

@@ -22,6 +22,7 @@ import {
   objectId,
   sameFrame,
   sameLighting,
+  structureFlags,
   type DeviceDraws,
   type DrawDerivation,
   type DrawFrame,
@@ -288,9 +289,46 @@ interface RunView {
   at: GPUBufferBinding | undefined;
 }
 const noLighting: readonly LightingEffect[] = Object.freeze([]);
+/** Transmission's tint group 2: `effect`'s entries for the `tint` pipeline's layout (kept from `d` while the same). */
+function tintGroup(
+  d: DrawDerivation | undefined,
+  tint: GPURenderPipeline | undefined,
+  mapped: boolean,
+  effect: DrawDerivation['effect'],
+  device: GPUDevice,
+): DrawDerivation['tintEffect'] {
+  if (!tint || !mapped || !effect) return undefined;
+  const kept = d?.tintEffect;
+  return kept && kept.entries === effect.entries && d!.tint === tint
+    ? kept
+    : {
+        entries: effect.entries,
+        group: device.createBindGroup({ layout: tint.getBindGroupLayout(2), entries: effect.entries }),
+      };
+}
 /** A node matrix without an inverse (a zero scale) leaves the draw no normal matrix. */
 function singular(): never {
   throw new RangeError('Singular PBR transform: give the mesh a nonzero scale on every axis');
+}
+const tintable = new Map<string, boolean>();
+const count = (code: string, text: string): number => code.split(text).length - 1;
+/**
+ * True when finished shader `code` reads the base colour (`f.base`) and the interpolated vertex colour only as the
+ * product `f.base*i.color`: then base colour b with tint 1 draws exactly as base 1 with the vertex colour times b, and
+ * a batch may carry several materials' base colours as instance tints (`foldable`).
+ */
+function tintableCode(code: string): boolean {
+  let value = tintable.get(code);
+  if (value === undefined) {
+    if (tintable.size >= 256) tintable.clear();
+    const products = count(code, '*f.base*i.color');
+    value =
+      products > 0 &&
+      count(code, 'f.base') === products &&
+      count(code, 'i.color') === products + count(code, 'o.color=i.color');
+    tintable.set(code, value);
+  }
+  return value;
 }
 /** Whether a finished shader reads the model rows only in the instanced vertex stage (see `derive`), by shader. */
 const modelFreeCode = new Map<string, boolean>();
@@ -327,6 +365,63 @@ interface PendingBatch {
   models: PBRModel[];
   /** Each member's node, read for its matrix when the batch draws (not through its resource and primitive again). */
   nodes: Mesh[];
+  /** True once a member of another material record folded in (`foldable`): instance tints carry the base colours. */
+  folded: boolean;
+  /** The run's blended-batch count when this batch began: an opaque draw joins only a batch begun after the last one. */
+  fence: number;
+}
+/**
+ * True when draws of derivation `b` may join a batch of derivation `a` (another material record) and draw exactly as
+ * their own draws: the same context, pipeline inputs and uniform rows but for the base colour (76-79), which then goes
+ * in the instance tint (the instanced vertex stage multiplies the vertex colour by it). Node rows (16-47) and the
+ * determinant (97) are each draw's own. `drawBatch` checks the pipelines and group 2 bindings as it draws.
+ */
+function foldable(run: PBRDrawRun, a: DrawDerivation, b: DrawDerivation): boolean {
+  let known = run.folds.get(a);
+  const memo = known?.get(b);
+  if (memo !== undefined) return memo;
+  let result =
+    a.frame === b.frame &&
+    a.sign === b.sign &&
+    a.topology === b.topology &&
+    a.instances === b.instances &&
+    a.source === b.source &&
+    a.floatCount === b.floatCount &&
+    a.compact === b.compact &&
+    a.replacesTextures === b.replacesTextures &&
+    a.extension === undefined &&
+    b.extension === undefined &&
+    !a.tinted &&
+    !b.tinted &&
+    a.blend === b.blend &&
+    renderStateKey(a.state) === renderStateKey(b.state);
+  const x = a.block,
+    y = b.block;
+  for (let i = 0; result && i < x.length; i++)
+    if ((i < 16 || i >= 48) && (i < 76 || i >= 80) && i !== 97 && !Object.is(x[i], y[i])) result = false;
+  if (!known) run.folds.set(a, (known = new Map()));
+  known.set(b, result);
+  return result;
+}
+/** True when two derivations' group 2 hold the same resources. */
+function sameEffect(a: DrawDerivation['effect'], b: DrawDerivation['effect']): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.entries.length !== b.entries.length) return false;
+  for (let i = 0; i < a.entries.length; i++) {
+    const x = a.entries[i],
+      y = b.entries[i],
+      p = x.resource,
+      q = y.resource;
+    if (
+      x.binding !== y.binding ||
+      !(
+        p === q ||
+        ('buffer' in p && 'buffer' in q && p.buffer === q.buffer && p.offset === q.offset && p.size === q.size)
+      )
+    )
+      return false;
+  }
+  return true;
 }
 /** True when `a` and `b` hold the same values. */
 function sameValues(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
@@ -345,11 +440,37 @@ function joinBatch(
 ): void {
   const view = c.view ?? c,
     p = r.primitive;
+  if (d.blend) {
+    // Blended draws keep their order: one joins only the batch drawn last, of its own derivation or one it folds into.
+    const last = run.pending[run.pending.length - 1];
+    if (
+      last?.d.blend &&
+      last.view === view &&
+      last.viewAt === viewAt &&
+      last.owner.primitive.vertices === p.vertices &&
+      last.owner.primitive.indices === p.indices &&
+      (last.d === d || foldable(run, last.d, d))
+    ) {
+      if (last.d !== d) last.folded = true;
+      last.members.push(r);
+      last.models.push(model);
+      last.nodes.push(p.node);
+      return;
+    }
+    run.fence++;
+    const batch = newBatch(run, model, r, d, c, view, viewAt);
+    run.pending.push(batch);
+    batch.members.push(r);
+    batch.models.push(model);
+    batch.nodes.push(p.node);
+    return;
+  }
   // Most draws join the batch the previous draw of their derivation joined in this run (kept on the derivation: a map
   // lookup per draw cost more than the rest of the join).
   let batch = d.joinedRun === run ? (d.joined as PendingBatch | undefined) : undefined;
   if (
     batch &&
+    batch.fence === run.fence &&
     batch.view === view &&
     batch.viewAt === viewAt &&
     batch.owner.primitive.vertices === p.vertices &&
@@ -366,22 +487,19 @@ function joinBatch(
     for (let i = 0; i < list.length; i++) {
       const value = list[i],
         q = value.owner.primitive;
-      if (value.view === view && value.viewAt === viewAt && q.vertices === p.vertices && q.indices === p.indices) {
+      if (
+        value.fence === run.fence &&
+        value.view === view &&
+        value.viewAt === viewAt &&
+        q.vertices === p.vertices &&
+        q.indices === p.indices
+      ) {
         batch = value;
         break;
       }
     }
   if (!batch) {
-    // Batch records and their member arrays are kept by the run for its next frame, so a steady frame allocates none.
-    batch = run.spare.pop();
-    if (batch) {
-      batch.model = model;
-      batch.owner = r;
-      batch.d = d;
-      batch.c = c;
-      batch.view = view;
-      batch.viewAt = viewAt;
-    } else batch = { model, owner: r, d, c, view, viewAt, members: [], models: [], nodes: [] };
+    batch = newBatch(run, model, r, d, c, view, viewAt);
     if (!list) run.batches.set(d, (list = []));
     list.push(batch);
     run.pending.push(batch);
@@ -391,6 +509,29 @@ function joinBatch(
   batch.members.push(r);
   batch.models.push(model);
   batch.nodes.push(p.node);
+}
+/** A batch record for `r`'s draw: the run's spare one (kept with its member arrays, so a steady frame allocates none). */
+function newBatch(
+  run: PBRDrawRun,
+  model: PBRModel,
+  r: DrawResource,
+  d: DrawDerivation,
+  c: Context,
+  view: object,
+  viewAt: GPUBufferBinding,
+): PendingBatch {
+  const batch = run.spare.pop();
+  if (!batch)
+    return { model, owner: r, d, c, view, viewAt, members: [], models: [], nodes: [], folded: false, fence: run.fence };
+  batch.model = model;
+  batch.owner = r;
+  batch.d = d;
+  batch.c = c;
+  batch.view = view;
+  batch.viewAt = viewAt;
+  batch.folded = false;
+  batch.fence = run.fence;
+  return batch;
 }
 /** Draws `run`'s pending batches into its pass, in first-draw order. */
 function flushBatches(run: PBRDrawRun): void {
@@ -415,9 +556,10 @@ function flushBatches(run: PBRDrawRun): void {
   }
 }
 /**
- * True when `r` can join an instanced batch of its run: an opaque triangle draw without its own instances, deformation,
- * extension, tint or wireframe, an invertible node, and no texture of its own in group 1 (the batch binds the first
- * draw's group 1, so only default or replaced textures, which every such draw holds alike).
+ * True when `r` can join an instanced batch of its run: a draw of the node's triangles or (wireframe) their edges
+ * without its own instances, deformation, extension or transmission tint, an invertible node, and no texture of its own
+ * in group 1 (the batch binds the first draw's group 1, so only default or replaced textures, which every such draw
+ * holds alike). Blended draws batch only with the draws next to them in order (`joinBatch`).
  */
 function batchable(d: DrawDerivation, r: DrawResource, det: number): boolean {
   const p = r.primitive;
@@ -427,12 +569,10 @@ function batchable(d: DrawDerivation, r: DrawResource, det: number): boolean {
     !p.topology &&
     !r.batch &&
     !r.mergedInto &&
-    !d.blend &&
     !d.tinted &&
     d.extension === undefined &&
     det !== 0 &&
     Number.isFinite(det) &&
-    !p.material.wireframe &&
     (d.replacesTextures || !p.material.maps.some(Boolean))
   );
 }
@@ -573,6 +713,9 @@ export class PBRDrawRun {
   /** @internal Drawn batch records, emptied, for the run's next batches. */
   readonly spare: PendingBatch[] = [];
   readonly batches = new Map<DrawDerivation, PendingBatch[]>();
+  /** @internal Blended batches begun so far (`PendingBatch.fence`), and which derivations fold together this frame. */
+  fence = 0;
+  readonly folds = new Map<DrawDerivation, Map<DrawDerivation, boolean>>();
   /** @internal What `draw` checked once for the run's context: its section binding and device caches. */
   private quick?: QuickRun;
   /** @internal The run's context with its section binding and device caches, for draws that join batches. */
@@ -607,6 +750,7 @@ export class PBRDrawRun {
       this.lastFrame = this.lastContext = this.lastDescriptor = undefined;
       this.pending.length = 0;
       this.batches.clear();
+      this.folds.clear();
       this.view.at = this.view.format = undefined;
       this.quick = undefined;
       resetBindings(this.bindings, undefined);
@@ -783,6 +927,8 @@ interface DrawResource {
   edited?: boolean;
   /** Instanced batches this resource leads (draw-batch.ts), by derivation and view. */
   batchStates?: Map<DrawDerivation, BatchState[]>;
+  /** The node matrix this draw's normal rows were last derived for, then those rows (see `PBRModel.nodeRows`). */
+  nodeCache?: Float32Array;
 }
 interface ShadowCasterRecord {
   primitive: PBRPrimitive;
@@ -806,6 +952,38 @@ interface ShadowCasterRecord {
 }
 // Keep the original triangle buffer for queries and exports. Duplicate shared
 // edges deliberately: transparent triangle wireframes blend each edge twice.
+/**
+ * The line-list indices of triangle list `triangles`' edges, each edge once, in first-seen order. An edge two triangles
+ * share was listed twice (a b, b c, c a per triangle): a closed mesh drew every line twice, twice the vertex and line
+ * work for the same picture.
+ */
+function wireframeEdges(triangles: ArrayLike<number>): Uint32Array {
+  const out = new Uint32Array(triangles.length * 2),
+    seen = new Set<number | string>();
+  let vertices = 0;
+  for (let i = 0; i < triangles.length; i++) if (triangles[i] >= vertices) vertices = triangles[i] + 1;
+  // A number key while lo * vertices + hi stays exact (2^53), else a string.
+  const exact = vertices <= 2 ** 26;
+  let j = 0;
+  const edge = (a: number, b: number) => {
+    const lo = a < b ? a : b,
+      hi = a < b ? b : a,
+      key = exact ? lo * vertices + hi : lo + ',' + hi;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out[j++] = a;
+    out[j++] = b;
+  };
+  for (let i = 0; i + 2 < triangles.length; i += 3) {
+    const a = triangles[i],
+      b = triangles[i + 1],
+      c = triangles[i + 2];
+    edge(a, b);
+    edge(b, c);
+    edge(c, a);
+  }
+  return out.slice(0, j);
+}
 function wireframeIndices(r: DrawResource): DrawResource['wireframe'] {
   const p = r.primitive,
     flag = p.material.wireframe;
@@ -813,21 +991,10 @@ function wireframeIndices(r: DrawResource): DrawResource['wireframe'] {
     throw new TypeError('PBR material wireframe must be a boolean; set wireframe to true or false');
   if (!flag || p.topology) return;
   if (r.wireframe) return r.wireframe;
-  const size = p.indices.byteLength * 2;
-  if (size > r.device.limits.maxBufferSize)
+  if (p.indices.byteLength * 2 > r.device.limits.maxBufferSize)
     throw new RangeError('PBR wireframe buffer exceeds the device limit; split the geometry into smaller meshes');
-  const indices = new Uint32Array(p.indices.length * 2);
-  for (let i = 0, j = 0; i < p.indices.length; i += 3) {
-    const a = p.indices[i],
-      b = p.indices[i + 1],
-      c = p.indices[i + 2];
-    indices[j++] = a;
-    indices[j++] = b;
-    indices[j++] = b;
-    indices[j++] = c;
-    indices[j++] = c;
-    indices[j++] = a;
-  }
+  const indices = wireframeEdges(p.indices),
+    size = Math.max(4, indices.byteLength);
   const index = r.device.createBuffer({ size, usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
   try {
     r.device.queue.writeBuffer(index, 0, indices);
@@ -980,8 +1147,11 @@ function createDrawGroups(
 }
 interface DrawScratch {
   context?: Context;
-  /** A batch's member matrices and uniform values (draw-batch.ts). */
+  /** A batch's member matrices, tints (folded batches) and uniform values (draw-batch.ts). */
   matrices: ArrayLike<number>[];
+  tints: ArrayLike<number>[];
+  /** The material records a folded batch's check (`PBRModel.folds`) has seen. */
+  checked: Set<PBRMaterial>;
   batchValues: Float32Array;
   /** This call's view block (view-uniform.ts). */
   viewData: Float32Array;
@@ -1013,6 +1183,8 @@ function createDrawScratch(color: GPUTextureView, depth: GPUTextureView): DrawSc
   };
   const scratch: DrawScratch = {
     matrices: [],
+    tints: [],
+    checked: new Set(),
     batchValues: new Float32Array(0),
     viewData: new Float32Array(viewFloats),
     bound: { pass: undefined, groups: [undefined, undefined, undefined, undefined] },
@@ -1069,6 +1241,13 @@ export interface PBRMaterialShading extends LightingEffect {
    * materials give clustered lights their own BRDF there. Return `code` itself to leave it unchanged.
    */
   lit?(code: string): string;
+  /**
+   * A number that stays the same while `shader()` and `lit()` would return the same text for the same input code;
+   * undefined or NaN when that is not known. While it, the record's structure and the draw context stay the same, a
+   * draw keeps last frame's shader and pipeline instead of composing them again (with no lighting effects on the
+   * model); the uniform rows are read and `bindings()` runs every frame as before.
+   */
+  readonly shaderRevision?: number;
 }
 function uploadCompressedImage(
   device: GPUDevice,
@@ -2599,9 +2778,7 @@ export class PBRModel implements EnginePlugin {
           }
           const v = r.values;
           v.set(d.block);
-          v.set(a, 16);
-          if (!invertMatrixStable(a, this.inverse, this.workspace)) singular();
-          for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
+          this.nodeRows(r, a, v);
           v[97] = sign;
         }
         const { pipeline, blend, state, extension, effectBindings } = d;
@@ -2821,9 +2998,7 @@ export class PBRModel implements EnginePlugin {
       p = r.primitive,
       m = p.material,
       node = p.node;
-    // A blended draw never joins a batch (batchable): leave it to draw() before the checks below.
-    if (m.settings[0] === 2 || r.batch || r.mergedInto || p.instances || p.topology || primitiveAfterOpaque(p))
-      return false;
+    if (r.batch || r.mergedInto || p.instances || p.topology || primitiveAfterOpaque(p)) return false;
     const oit = this.transparency;
     if ((oit && separable(m)) || (this.transmission && transmits(m))) return false;
     if (phase !== 'all' && blended(m) !== (phase === 'blend')) return false;
@@ -2852,7 +3027,14 @@ export class PBRModel implements EnginePlugin {
     const a = node.matrix,
       det =
         a[0] * (a[5] * a[10] - a[6] * a[9]) - a[4] * (a[1] * a[10] - a[2] * a[9]) + a[8] * (a[1] * a[6] - a[2] * a[5]),
-      d = findDerivation(quick.draws.derivations.get(m), frame, p.extension, undefined, undefined, Math.sign(det));
+      d = findDerivation(
+        quick.draws.derivations.get(m),
+        frame,
+        p.extension,
+        undefined,
+        wireframeIndices(r) ? 'line-list' : undefined,
+        Math.sign(det),
+      );
     if (!d || !batchable(d, r, det)) return false;
     joinBatch(run, this, r, d, c, viewAt);
     return true;
@@ -2869,7 +3051,10 @@ export class PBRModel implements EnginePlugin {
       device = c.device,
       p = r.primitive,
       m = p.material,
-      count = p.indices.length,
+      // A wireframe batch draws the members' edges (line-list, the owner's edge indices: the geometry is shared).
+      topology = d.topology,
+      wireframe = topology ? wireframeIndices(r) : undefined,
+      count = wireframe?.count ?? p.indices.length,
       frame = d.frame,
       section = frame.section;
     if (bound.pass !== pass) resetBindings(bound, pass);
@@ -2889,28 +3074,36 @@ export class PBRModel implements EnginePlugin {
       const kind = batchKind(d.sign < 0),
         draws = deviceDraws(device),
         derived =
-          findDerivation(draws.derivations.get(m), frame, p.extension, kind, undefined, 1) ??
+          findDerivation(draws.derivations.get(m), frame, p.extension, kind, topology, 1) ??
           this.derivation(
             draws,
             m,
             frame,
             p.extension,
-            undefined,
+            topology,
             1,
             c,
             'beauty',
             scratch,
             r,
-            undefined,
+            wireframe,
             undefined,
             kind,
           ),
         pipeline = derived.pipeline;
-      if (!derived.modelFree) {
-        // The shader reads the model rows itself: each mesh draws on its own, as without a run.
+      // Members of other material records (folded in) need the same pipeline and group 2 and a shader that reads the
+      // base colour only as the vertex colour's factor; then each takes its own base colour as its instance tint.
+      if (!derived.modelFree || (batch.folded && !this.folds(batch, derived, kind, topology, scratch, draws))) {
+        // The shader reads the model rows itself (or a folded member differs): each mesh draws on its own, as
+        // without a run, in order.
         for (let i = 0; i < members.length; i++)
           if (!batch.models[i].disposed) batch.models[i].drawOwn(members[i], batch, run, scratch);
         return;
+      }
+      const tints = batch.folded ? scratch.tints : undefined;
+      if (tints) {
+        for (let i = 0; i < members.length; i++) tints[i] = members[i].primitive.material.base;
+        tints.length = members.length;
       }
       if (r.sectionBuffer !== section) {
         r.groups.clear();
@@ -2927,9 +3120,11 @@ export class PBRModel implements EnginePlugin {
         // The batch's GPU state, as a draw's own uniform: a later draw from the same view replaces its rows; another view
         // of the same frame (a viewport, a probe face) takes another state, so the earlier draws keep theirs until
         // submit. A view keeps its state frame after frame.
-        const states = (r.batchStates ??= new Map());
-        let list = states.get(d);
-        if (!list) {
+        // Blended batches change their first member as the sort order changes: their states stay with the derivation,
+        // one per batch drawn in a frame.
+        const states = d.blend ? undefined : (r.batchStates ??= new Map());
+        let list = states ? states.get(d) : (d.blendStates ??= []);
+        if (states && !list) {
           // Derivations come and go with contexts: keep the states of the last few.
           if (states.size >= 8)
             for (const [key, old] of states) {
@@ -2951,6 +3146,7 @@ export class PBRModel implements EnginePlugin {
         v.fill(0, 16, 48);
         v[16] = v[21] = v[26] = v[31] = v[32] = v[37] = v[42] = v[47] = 1;
         v[97] = 1;
+        if (tints) v[76] = v[77] = v[78] = v[79] = 1;
         const matrices = scratch.matrices,
           nodes = batch.nodes;
         for (let i = 0; i < nodes.length; i++) matrices[i] = nodes[i].matrix;
@@ -2962,13 +3158,18 @@ export class PBRModel implements EnginePlugin {
           mine: BatchState | undefined,
           equal: BatchState | undefined,
           free: BatchState | undefined;
-        for (const value of list) {
-          if (value.view === view) mine = value;
+        for (const value of list!) {
+          if (!states) {
+            if (value.frame !== now) {
+              free = value;
+              break;
+            }
+          } else if (value.view === view) mine = value;
           else if (value.frame === now) {
             if (
               !equal &&
               value.uniform.floats === v.length &&
-              value.instances.holds(matrices) &&
+              value.instances.holds(matrices, tints) &&
               sameValues(value.uniform.contents, v)
             )
               equal = value;
@@ -2976,7 +3177,7 @@ export class PBRModel implements EnginePlugin {
         }
         state = mine ?? equal ?? free;
         if (!state)
-          list.push(
+          list!.push(
             (state = {
               instances: new BatchInstances(),
               uniform: acquireUniform(device, derived.floatCount),
@@ -2989,8 +3190,9 @@ export class PBRModel implements EnginePlugin {
           state.frame = now;
           state.view = view;
         }
-        instances = state.instances.write(device, matrices);
+        instances = state.instances.write(device, matrices, tints);
         for (let i = 0; i < matrices.length; i++) matrices[i] = undefined!;
+        if (tints) for (let i = 0; i < tints.length; i++) tints[i] = undefined!;
         if (state.uniform.floats !== derived.floatCount) {
           retire(device, state.uniform);
           state.uniform = acquireUniform(device, derived.floatCount);
@@ -3007,17 +3209,64 @@ export class PBRModel implements EnginePlugin {
       setGroup(bound, 0, frameBindings);
       setGroup(bound, 1, groups[1]);
       if (derived.effect) setGroup(bound, 2, derived.effect.group);
-      setBuffers(bound, r.vertex, instances, r.index);
+      setBuffers(bound, r.vertex, instances, wireframe?.index ?? r.index);
       applyStencilReference(pass, derived.state);
       pass.drawIndexed(count, members.length);
       this.engine.stats.drawCalls++;
     } finally {
       endDraw(device);
       scratchDepth--;
+      scratch.checked.clear();
       scratch.code = '';
       for (let i = 0; i < scratch.effects.length; i++) scratch.effects[i] = undefined!;
       for (let i = 0; i < scratch.entries.length; i++) scratch.entries[i] = undefined!;
     }
+  }
+  /**
+   * @internal True when every member of folded `batch` draws as the owner's instanced variant `derived` would draw
+   * it: its own material's instanced variant has the same pipeline, group 2 entries and shader (`tintable`).
+   */
+  private folds(
+    batch: PendingBatch,
+    derived: DrawDerivation,
+    kind: BatchKind,
+    topology: GPUPrimitiveTopology | undefined,
+    scratch: DrawScratch,
+    draws: DeviceDraws,
+  ): boolean {
+    if (!derived.tintable) return false;
+    // Each material record is checked once (members of a few materials interleave in sort order).
+    const checked = scratch.checked;
+    checked.clear();
+    checked.add(batch.owner.primitive.material);
+    for (let i = 0; i < batch.members.length; i++) {
+      const r = batch.members[i],
+        p = r.primitive,
+        m = p.material;
+      if (checked.has(m)) continue;
+      checked.add(m);
+      const model = batch.models[i];
+      if (model.disposed) return false;
+      const own =
+        findDerivation(draws.derivations.get(m), batch.d.frame, p.extension, kind, topology, 1) ??
+        model.derivation(
+          draws,
+          m,
+          batch.d.frame,
+          p.extension,
+          topology,
+          1,
+          batch.c,
+          'beauty',
+          scratch,
+          r,
+          topology ? wireframeIndices(r) : undefined,
+          undefined,
+          kind,
+        );
+      if (own.pipeline !== derived.pipeline || !own.modelFree || !sameEffect(own.effect, derived.effect)) return false;
+    }
+    return true;
   }
   /** @internal Draws batch member `r` as its own draw (its material's shader reads the model rows; see `drawBatch`). */
   drawOwn(r: DrawResource, batch: PendingBatch, run: PBRDrawRun, scratch: DrawScratch): void {
@@ -3034,20 +3283,22 @@ export class PBRModel implements EnginePlugin {
         a[0] * (a[5] * a[10] - a[6] * a[9]) - a[4] * (a[1] * a[10] - a[2] * a[9]) + a[8] * (a[1] * a[6] - a[2] * a[5]),
       ),
       draws = deviceDraws(device);
-    let d = findDerivation(draws.derivations.get(m), frame, p.extension, undefined, undefined, sign);
+    const topology = batch.d.topology,
+      wireframe = topology ? wireframeIndices(r) : undefined;
+    let d = findDerivation(draws.derivations.get(m), frame, p.extension, undefined, topology, sign);
     if (!d?.complete)
       d = this.derivation(
         draws,
         m,
         frame,
         p.extension,
-        undefined,
+        topology,
         sign,
         c,
         'beauty',
         scratch,
         r,
-        undefined,
+        wireframe,
         undefined,
         undefined,
       );
@@ -3055,9 +3306,7 @@ export class PBRModel implements EnginePlugin {
       this.bindMaterial(r, device, device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
     const v = r.values;
     v.set(d.block);
-    v.set(a, 16);
-    if (!invertMatrixStable(a, this.inverse, this.workspace)) singular();
-    for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
+    this.nodeRows(r, a, v);
     v[97] = sign;
     const uniform = r.uniform.write(v, view),
       pipeline = d.pipeline;
@@ -3081,9 +3330,9 @@ export class PBRModel implements EnginePlugin {
     );
     setGroup(bound, 1, groups[1]);
     if (d.effect) setGroup(bound, 2, d.effect.group);
-    setBuffers(bound, r.vertex, undefined, r.index);
+    setBuffers(bound, r.vertex, undefined, wireframe?.index ?? r.index);
     applyStencilReference(pass, d.state);
-    pass.drawIndexed(p.indices.length);
+    pass.drawIndexed(wireframe?.count ?? p.indices.length);
     this.engine.stats.drawCalls++;
   }
   /**
@@ -3121,9 +3370,7 @@ export class PBRModel implements EnginePlugin {
     if (r.values.length !== floatCount || r.replacesTextures !== !!m.shading?.replacesTextures)
       this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
     const v = r.values;
-    v.set(node.matrix, 16);
-    if (!invertMatrixStable(node.matrix, this.inverse, this.workspace)) singular();
-    for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
+    this.nodeRows(r, node.matrix, v);
     v.set(m.base, 76);
     v.set(m.factors, 80);
     if (!m.maps[2] && !m.extendedFrame) v[82] = 0;
@@ -3151,6 +3398,72 @@ export class PBRModel implements EnginePlugin {
       v[98] = m.tint[0];
       v[99] = m.tint[1];
       v[102] = m.tint[2];
+    }
+    const source = p.extension ?? m.extension,
+      shading = m.shading,
+      // A normal map on UV1 or with a UV transform (glTF maps), or constructed material maps whose normal-slot affine
+      // rows are not the identity, take the tangent frame from the UV derivatives.
+      tangent =
+        !compact &&
+        !!(m.maps[2]
+          ? textureCoordinates(m.maps[2]).texCoord === 1 || textureCoordinates(m.maps[2]).transform
+          : m.extendedFrame &&
+            (v[123] > 0.5 ||
+              v[120] !== 1 ||
+              v[121] !== 0 ||
+              v[122] !== 0 ||
+              v[124] !== 0 ||
+              v[125] !== 1 ||
+              v[126] !== 0)),
+      structure = structureFlags(
+        m.settings[0],
+        v[90],
+        tangent,
+        !compact && !!m.tint,
+        !!m.physical,
+        !!m.physical && m.maps.length > 5,
+        !!shading?.texturedTint,
+        !!shading?.replacesTextures,
+      ),
+      revision = shading?.shaderRevision;
+    // The same shader and pipeline as `d` from an earlier frame (draw-memo.ts): the shading hook reports the same
+    // revision, nothing else that composes the shader changed, and no lighting effect or transparency hook patches it.
+    // Only the rows (above) and group 2's bindings are read again.
+    if (
+      d &&
+      revision !== undefined &&
+      d.revision === revision &&
+      d.shading === shading &&
+      d.renderState === m.renderState &&
+      d.structure === structure &&
+      d.floatCount === floatCount &&
+      d.compact === compact &&
+      !compact &&
+      !source &&
+      !m.extended &&
+      !frame.lighting.length &&
+      !through &&
+      !capture &&
+      (!build || d.pipeline !== undefined)
+    ) {
+      if (r.extension) {
+        retire(r.device, r.extension.uniform);
+        r.extension = undefined;
+      }
+      d.frame = frame;
+      d.replacesTextures = r.replacesTextures!;
+      // A pipeline from an earlier frame makes even a batch-only request complete: the draw that follows (a mesh of
+      // its own, or a batch of one) needs no second derivation.
+      const full = d.pipeline !== undefined;
+      d.complete = full;
+      if (full) {
+        d.effect = d.effectBindings
+          ? this.effectGroup(d, d.pipeline, c, scratch, shading, false, undefined)
+          : undefined;
+        d.tintEffect = tintGroup(d, d.tint, d.mappedTint, d.effect, c.device);
+      }
+      d.block.set(v);
+      return d;
     }
     // Physical materials listing only the five core maps (materials built in code) draw the factor-only variant;
     // transmission draws its transmissive form, extended materials the shader of decoders.materials.
@@ -3183,18 +3496,10 @@ export class PBRModel implements EnginePlugin {
     // materials compile without a discard and keep early depth testing. The compact path had lost
     // this outside instancing and MASK in the consolidation (8f710eb3).
     if (compact) code = compactTests(code);
-    const source = p.extension ?? m.extension;
     if (compact) {
       r.coordinates = coordinateExtension(m.maps, source, r.coordinates);
       code = coordinateShader(code, r.coordinates, !!m.maps[2] && v[94] === 1);
-    } else if (
-      m.maps[2]
-        ? textureCoordinates(m.maps[2]).texCoord === 1 || textureCoordinates(m.maps[2]).transform
-        : m.extendedFrame &&
-          // Constructed material maps use the retained normal-slot affine rows, not glTF texture definitions.
-          (v[123] > 0.5 || v[120] !== 1 || v[121] !== 0 || v[122] !== 0 || v[124] !== 0 || v[125] !== 1 || v[126] !== 0)
-    )
-      code = code.replace('if(abs(i.tangent.w)<0.5)', 'if(true)');
+    } else if (tangent) code = code.replace('if(abs(i.tangent.w)<0.5)', 'if(true)');
     const extension = compact ? (r.coordinates?.extension ?? source) : source;
     if (extension) {
       r.extension = prepareMaterialExtension(c.device, extension, r.extension);
@@ -3219,6 +3524,8 @@ export class PBRModel implements EnginePlugin {
       out.replacesTextures = r.replacesTextures!;
       out.extension = extension;
       out.complete = false;
+      // Derived without composing the shader: a later frame cannot keep the pipeline on what this derivation saw.
+      out.structure = undefined;
       out.blend = m.settings[0] === 2 || transmit;
       out.tinted = transmit && state?.blend === undefined;
       out.state = state;
@@ -3226,8 +3533,7 @@ export class PBRModel implements EnginePlugin {
       out.block.set(v);
       return out;
     }
-    const lighting = extension?.lighting !== false,
-      shading = m.shading;
+    const lighting = extension?.lighting !== false;
     if (shading || (mode !== 'gbuffer' && lighting && this.lighting.size)) {
       scratch.code = code;
       scratch.ambient = false;
@@ -3445,67 +3751,19 @@ export class PBRModel implements EnginePlugin {
         if (view) viewPipelines.add(tint);
       }
     }
-    let effect: DrawDerivation['effect'];
     const effectBindings = !!shading || (lit && ((lighting && this.lighting.size > 0) || through));
-    if (effectBindings && build) {
-      const entries = scratch.entries,
-        effects = scratch.effects;
-      let entryCount = 0;
-      scratch.effectCount = 0;
-      if (shading) snapshotDrawLighting.call(scratch, shading);
-      if (lit && lighting) this.lighting.forEach(snapshotDrawLighting, scratch);
-      effects.length = scratch.effectCount;
-      for (let i = 0; i < effects.length; i++) {
-        const bindings = effects[i].bindings();
-        for (let j = 0; j < bindings.length; j++) entries[entryCount++] = bindings[j];
-      }
-      if (through) {
-        const bindings = oit!.bindings();
-        for (let j = 0; j < bindings.length; j++) entries[entryCount++] = bindings[j];
-      }
-      entries.length = entryCount;
-      let cached = d?.effect;
-      let changed = !cached || d!.pipeline !== pipeline || entries.length !== cached.entries.length;
-      for (let i = 0; !changed && i < entries.length; i++) {
-        const entry = entries[i];
-        const previous = cached!.entries[i],
-          resource = entry.resource,
-          old = previous.resource;
-        changed =
-          entry.binding !== previous.binding ||
-          !(
-            resource === old ||
-            ('buffer' in resource &&
-              'buffer' in old &&
-              resource.buffer === old.buffer &&
-              resource.offset === old.offset &&
-              resource.size === old.size)
-          );
-      }
-      if (changed) {
-        const snapshot = entries.map(({ binding, resource }) => ({
-          binding,
-          resource:
-            'buffer' in resource ? { buffer: resource.buffer, offset: resource.offset, size: resource.size } : resource,
-        }));
-        const group = c.device.createBindGroup({ layout: pipeline!.getBindGroupLayout(2), entries: snapshot });
-        cached = { entries: snapshot, group };
-      }
-      effect = cached;
-    }
-    // Transmission's tint group 2 holds the same entries for the tint pipeline's layout.
-    let tintEffect: DrawDerivation['tintEffect'];
+    const effect =
+      effectBindings && build
+        ? this.effectGroup(d, pipeline!, c, scratch, shading, lit && lighting, through ? oit : undefined)
+        : undefined;
     const tint = tinted && build ? draws.pipelines.get(key + ':tint')! : undefined,
-      mappedTint = !!shading?.texturedTint;
-    if (tint && mappedTint && effect) {
-      tintEffect = d?.tintEffect;
-      if (!tintEffect || tintEffect.entries !== effect.entries || d!.tint !== tint)
-        tintEffect = {
-          entries: effect.entries,
-          group: c.device.createBindGroup({ layout: tint.getBindGroupLayout(2), entries: effect.entries }),
-        };
-    }
+      mappedTint = !!shading?.texturedTint,
+      tintEffect = tintGroup(d, tint, mappedTint, effect, c.device);
     const out: DrawDerivation = d ?? ({} as DrawDerivation);
+    out.revision = revision;
+    out.shading = shading;
+    out.renderState = m.renderState;
+    out.structure = structure;
     out.frame = frame;
     out.source = p.extension;
     out.instances = inst;
@@ -3526,9 +3784,85 @@ export class PBRModel implements EnginePlugin {
     out.tintEffect = tintEffect;
     out.mappedTint = mappedTint;
     out.modelFree = modelFree;
+    out.tintable = tintableCode(code);
     if (out.block?.length !== v.length) out.block = new Float32Array(v.length);
     out.block.set(v);
     return out;
+  }
+  /**
+   * Writes node matrix `a` (rows 16-31) and its normal matrix, the inverse transpose (rows 32-47), into `v`. The rows
+   * are kept on `r` and reused while the matrix stays the same: most meshes do not move between frames.
+   */
+  private nodeRows(r: DrawResource, a: ArrayLike<number>, v: Float32Array): void {
+    const cache = (r.nodeCache ??= new Float32Array(32).fill(Number.NaN));
+    let same = true;
+    for (let i = 0; same && i < 16; i++) same = cache[i] === Math.fround(a[i]);
+    if (!same) {
+      if (!invertMatrixStable(a, this.inverse, this.workspace)) singular();
+      for (let i = 0; i < 16; i++) {
+        cache[i] = a[i];
+        cache[16 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
+      }
+    }
+    v.set(cache, 16);
+  }
+  /**
+   * Group 2 of a draw of `pipeline`: the entries of the material's shading hook, then (`lit`) the model's lighting
+   * effects, then (`through`) the transparency hook, gathered now. `d`'s group is kept when they are the same.
+   */
+  private effectGroup(
+    d: DrawDerivation | undefined,
+    pipeline: GPURenderPipeline,
+    c: Context,
+    scratch: DrawScratch,
+    shading: PBRMaterialShading | undefined,
+    lit: boolean,
+    through: { bindings(): readonly GPUBindGroupEntry[] } | undefined,
+  ): DrawDerivation['effect'] {
+    const entries = scratch.entries,
+      effects = scratch.effects;
+    let entryCount = 0;
+    scratch.effectCount = 0;
+    if (shading) snapshotDrawLighting.call(scratch, shading);
+    if (lit) this.lighting.forEach(snapshotDrawLighting, scratch);
+    effects.length = scratch.effectCount;
+    for (let i = 0; i < effects.length; i++) {
+      const bindings = effects[i].bindings();
+      for (let j = 0; j < bindings.length; j++) entries[entryCount++] = bindings[j];
+    }
+    if (through) {
+      const bindings = through.bindings();
+      for (let j = 0; j < bindings.length; j++) entries[entryCount++] = bindings[j];
+    }
+    entries.length = entryCount;
+    let cached = d?.effect;
+    let changed = !cached || d!.pipeline !== pipeline || entries.length !== cached.entries.length;
+    for (let i = 0; !changed && i < entries.length; i++) {
+      const entry = entries[i];
+      const previous = cached!.entries[i],
+        resource = entry.resource,
+        old = previous.resource;
+      changed =
+        entry.binding !== previous.binding ||
+        !(
+          resource === old ||
+          ('buffer' in resource &&
+            'buffer' in old &&
+            resource.buffer === old.buffer &&
+            resource.offset === old.offset &&
+            resource.size === old.size)
+        );
+    }
+    if (changed) {
+      const snapshot = entries.map(({ binding, resource }) => ({
+        binding,
+        resource:
+          'buffer' in resource ? { buffer: resource.buffer, offset: resource.offset, size: resource.size } : resource,
+      }));
+      const group = c.device.createBindGroup({ layout: pipeline.getBindGroupLayout(2), entries: snapshot });
+      cached = { entries: snapshot, group };
+    }
+    return cached;
   }
   /** Isolated GPU resources for stereo eyes or another caller-owned WebGPU device. */
   createRenderer(device: GPUDevice): PBRDeviceRenderer {
@@ -3685,7 +4019,7 @@ export class PBRModel implements EnginePlugin {
       throw error;
     }
   }
-  /** World-space visible point and spot lights for `clustered.setLights()`. Hidden ancestors hide their lights. Directional lights are left to engine lighting; an unset range ends where intensity/d² reaches 1/256. */
+  /** World-space visible point and spot lights for `clustered.setLights()`. Hidden ancestors hide their lights. Directional lights are left to engine lighting; an unset range ends where intensity/dÂ² reaches 1/256. */
   clusteredLights(): GLTFClusteredLight[] {
     this.engine.store.tick(false);
     return this.lights

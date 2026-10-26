@@ -3,11 +3,14 @@
 // (shader text edits, a pipeline-state search and every lighting callback per primitive: 10,000 materials meshes
 // spent most of their 80 ms of CPU a frame there). The derivation reads only the material record and the draw's
 // context, so primitives with the same material record in one `draw()` call, or one `PBRDrawRun`, share it: each
-// frame derives it once and the rest reuse it. Nothing is reused across frames except GPU objects (pipelines and bind
-// groups whose inputs compare equal), so every live material, light and hook edit still shows on the next frame.
+// frame derives it once and the rest reuse it. Across frames the uniform rows and group 2's bindings are read again
+// every frame, so every live value and texture edit shows on the next one. The shader and pipeline are kept only when
+// the record's shading hook reports an unchanged `shaderRevision`, its structure (`structureFlags`), shading object and
+// render state are the same and no lighting effect or transparency hook patches the shader (4,096 materials meshes,
+// one material each, composed 4,096 shaders a frame); everything else composes them again each frame, as before.
 import type { LightingEffect, PBRRenderState } from './index.js';
 import type { PBRInstances } from './instancing.js';
-import type { BatchKind } from './draw-batch.js';
+import type { BatchKind, BatchState } from './draw-batch.js';
 import type { MaterialExtension } from './material-extension.js';
 import type { GLTFExtendedMaterials } from './asset.js';
 
@@ -56,11 +59,52 @@ export interface DrawDerivation {
   mappedTint: boolean;
   /** False when the finished shader reads the model rows itself, so instanced batches cannot draw it. */
   modelFree: boolean;
+  /** True when the finished shader reads the base colour only as the vertex colour's factor (index.ts `tintableCode`). */
+  tintable?: boolean;
+  /** @internal The GPU states of this derivation's blended batches, one per batch drawn in a frame (index.ts `drawBatch`). */
+  blendStates?: BatchState[];
   /** @internal The batch (draw-batch.ts) this derivation's last draw joined in run `joinedRun`, until that run draws it. */
   joined?: object;
   joinedRun?: object;
   /** The whole uniform as derived; draws copy it and write their own node rows (16-47) and determinant (97). */
   block: Float32Array;
+  /**
+   * @internal What the shader and pipeline were composed from, beyond the context (`frame`) and the fields above: the
+   * record's `shading.shaderRevision`, its shading object and render state, and `structure` (structureFlags). A later
+   * frame whose draw finds all of them unchanged keeps `pipeline` and `tint` (see `PBRModel.derive`).
+   */
+  revision?: number;
+  shading?: object;
+  renderState?: object;
+  structure?: number;
+}
+
+/**
+ * The record fields beyond the shading hooks that decide a draw's shader text and pipeline, as one number: alpha mode,
+ * side flag, the tangent-frame switch, transmission tint, physical rows and their map count, and the shading's
+ * texture flags. Two derivations with equal flags (and equal revision, shading, render state and context) compose the
+ * same shader and pipeline.
+ */
+export function structureFlags(
+  alphaMode: number,
+  side: number,
+  tangent: boolean,
+  tint: boolean,
+  physical: boolean,
+  physicalMaps: boolean,
+  texturedTint: boolean,
+  replacesTextures: boolean,
+): number {
+  return (
+    alphaMode +
+    side * 4 +
+    +tangent * 16 +
+    +tint * 32 +
+    +physical * 64 +
+    +physicalMaps * 128 +
+    +texturedTint * 256 +
+    +replacesTextures * 512
+  );
 }
 
 /** Per device: shader ids, pipelines and derivations by material record, shared by every model on the device. */

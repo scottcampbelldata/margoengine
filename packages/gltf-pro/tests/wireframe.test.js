@@ -87,7 +87,8 @@ async function fixture(t, { mode = 4, parts = false } = {}) {
   };
 }
 
-const edges = [0, 1, 1, 2, 2, 0, 0, 2, 2, 3, 3, 0];
+// Each edge once: the diagonal 0-2 the two triangles share is not drawn twice.
+const edges = [0, 1, 1, 2, 2, 0, 2, 3, 3, 0];
 
 test('live wireframe preserves triangle query data and reuses edge buffers and pipelines across toggles', async (t) => {
   const f = await fixture(t),
@@ -97,7 +98,7 @@ test('live wireframe preserves triangle query data and reuses edge buffers and p
   p.material.wireframe = true;
   const line = f.frame()[0];
   assert.equal(line.pipeline.primitive.topology, 'line-list');
-  assert.equal(line.count, 12);
+  assert.equal(line.count, 10);
   assert.deepEqual([...new Uint32Array(line.index.data)], edges);
   assert.equal(f.counts.buffers, buffers + 1);
   assert.deepEqual([...p.indices], [0, 1, 2, 0, 2, 3]);
@@ -126,10 +127,10 @@ test('wireframe auxiliary passes and forward device views use lines without poly
     assert.equal(draw.pipeline.depthStencil.depthBias ?? 0, 0, mode);
     assert.equal(draw.pipeline.depthStencil.depthBiasSlopeScale ?? 0, 0, mode);
     assert.equal(draw.pipeline.fragment.constants?.margoFaceTest ?? 0, 0, mode);
-    assert.equal(draw.count, 12, mode);
+    assert.equal(draw.count, 10, mode);
   }
   assert.equal(f.forward()[0].pipeline.primitive.topology, 'line-list');
-  assert.equal(f.forward()[0].count, 12);
+  assert.equal(f.forward()[0].count, 10);
 });
 
 test('shadow records can request wireframe before beauty, keep deformed vertices, and delete optional topology on reset', async (t) => {
@@ -142,7 +143,7 @@ test('shadow records can request wireframe before beauty, keep deformed vertices
   const shadow = f.model.shadowPrimitives[0];
   assert.equal(shadow.topology, 'line-list');
   assert.deepEqual([...new Uint32Array(shadow.index.data)], edges);
-  assert.equal(shadow.count, 12);
+  assert.equal(shadow.count, 10);
   assert.equal(shadow.vertex, deformed);
   assert.equal(f.frame()[0].index, shadow.index);
   assert.equal(f.frame()[0].vertex, deformed);
@@ -153,14 +154,14 @@ test('shadow records can request wireframe before beauty, keep deformed vertices
   deformed.destroy();
 });
 
-test('wireframe static batches retain duplicate triangle edges including mirrored parts', async (t) => {
+test('wireframe static batches draw the edges of every part once, mirrored parts included', async (t) => {
   const f = await fixture(t, { parts: true });
   f.primitive.material.wireframe = true;
   const draws = f.frame();
   assert.equal(draws.length, 1);
-  assert.equal(draws[0].count, 24);
-  assert.equal(f.model.shadowPrimitives[0].count, 24);
-  assert.equal(meshTriangles(f.primitive.node).source.shadowPrimitives[0].count, 12);
+  assert.equal(draws[0].count, 20);
+  assert.equal(f.model.shadowPrimitives[0].count, 20);
+  assert.equal(meshTriangles(f.primitive.node).source.shadowPrimitives[0].count, 10);
   assert.equal(f.model.pickingPrimitives.length, 2);
 });
 
