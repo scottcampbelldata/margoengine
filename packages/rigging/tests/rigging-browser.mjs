@@ -56,6 +56,13 @@ try {
   check('the lower half stays put', w.base, w);
   check('the drawn bend matches the CPU pose (97% of centroids)', w.inside >= 0.97 * w.total && w.total > 100, w);
 
+  const k = await run('ik');
+  const gap = Math.hypot(k.tip[0] - 0.9, k.tip[1] + 0.4, k.tip[2]);
+  check('solveSkeletonIK puts the tip on the target', k.reached && gap < 1e-3, k);
+  check('the elbow bends toward the pole (-x side)', k.elbow[0] < 0, k);
+  check('the GPU-skinned tip is drawn at the target, not upright', k.drawnNearTarget && !k.straightTipDrawn, k);
+  check('the drawn IK pose matches the CPU pose (97% of centroids)', k.inside >= 0.97 * k.total && k.total > 100, k);
+
   assert.deepEqual(pageErrors, []);
   for (const name of checks) console.log(`ok - ${name}`);
   console.log(`${checks.length} rigging browser checks passed (bone heat ${results.weights.solveMs.toFixed(1)} ms)`);

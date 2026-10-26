@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/animator",
   "version": "1.0.0",
-  "description": "Blend trees, additive layers, animation states, foot IK and CCD IK chains.",
+  "description": "Blend trees, additive layers, animation states, foot IK, CCD IK chains, root motion, and look-at and aim constraints.",
   "keywords": [
     "margoengine",
     "webgpu",

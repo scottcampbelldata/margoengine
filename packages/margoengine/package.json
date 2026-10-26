@@ -907,6 +907,10 @@
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"
     },
+    "./rigging/ik": {
+      "types": "./dist/rigging/ik.d.ts",
+      "import": "./dist/rigging/ik.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

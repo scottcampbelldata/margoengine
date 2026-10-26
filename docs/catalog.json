@@ -1503,7 +1503,7 @@
     "package": "@margoengine/animator",
     "version": "1.0.0",
     "published": false,
-    "description": "Blend trees, additive layers, animation states, foot IK and CCD IK chains.",
+    "description": "Blend trees, additive layers, animation states, foot IK, CCD IK chains, root motion, and look-at and aim constraints.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "animator",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/animator@1.0.0",
@@ -1511,7 +1511,10 @@
     "exports": [
       "Animator",
       "CCDSolver",
+      "addAimConstraint",
       "addCCDChain",
+      "addLookAt",
+      "addRootMotion",
       "blend1D",
       "blend2D",
       "solveTwoBoneIK"
@@ -1546,10 +1549,10 @@
     "package": "@margoengine/rigging",
     "version": "1.0.0",
     "published": false,
-    "description": "Rigging and animation authoring: automatic skin weights, weight painting and skin checks before export.",
-    "requirements": "See the package guide for requirements",
+    "description": "Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "rigging",
-    "install": "npm install @margoengine/rigging@1.0.0",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/rigging@1.0.0",
     "imports": "import { WeightMap } from '@margoengine/rigging';",
     "exports": [
       "WeightMap",

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3219306,
+  "total": 3223046,
   "history": [
     {
       "date": "2026-10-24",
@@ -302,6 +302,12 @@
       "commit": "8e01503b",
       "reason": "DX pass: selection error messages name their fix and bare Errors became MargoError (+220 B over the feature baseline)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "f7963d9f",
+      "reason": "queue item 23 milestone 2: animator gains addRootMotion, addLookAt and addAimConstraint (tree-shaken when unused); new entry @margoengine/rigging/ik (FABRIK chains with poles)",
+      "grew": 2
     }
   ],
   "items": {
@@ -528,6 +534,7 @@
     "@margoengine/react/post": 3770,
     "@margoengine/react/xr": 3429,
     "@margoengine/rigging": 7879,
+    "@margoengine/rigging/ik": 3740,
     "@margoengine/road": 1171,
     "@margoengine/scatter": 12434,
     "@margoengine/scenery": 474,

@@ -14,6 +14,10 @@ export interface AdditiveLayer {
     referenceTime?: number;
 }
 
+export interface AimConstraint extends Omit<LookAt, 'joints' | 'shares'> {
+    joint: number;
+}
+
 export class Animator implements EnginePlugin {
     readonly animation: Animation;
     readonly options: AnimatorOptions;
@@ -28,6 +32,7 @@ export class Animator implements EnginePlugin {
     addLayer(layer: AdditiveLayer): () => void;
     addFootIK(foot: FootIK): () => void;
     addSolver(step: () => void): () => void;
+    addPoseStep(step: (position: number[][], rotation: number[][]) => void): () => void;
     restRotation(index: number): readonly number[];
     writeNodeRotation(node: Mesh, rotation: readonly number[]): void;
     setup(engine: Engine): void;
@@ -152,7 +157,39 @@ export interface GroundHit {
     normal?: Vec3;
 }
 
+export interface LookAt {
+    joints: readonly number[];
+    target: Vec3;
+    shares?: readonly number[];
+    axis?: Vec3;
+    up?: Vec3 | null;
+    worldUp?: Vec3;
+    maxAngle?: number;
+    weight?: number;
+}
+
+export interface RootMotion {
+    readonly translation: Vec3;
+    readonly yaw: number;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface RootMotionOptions {
+    joint: number;
+    target?: Mesh;
+    axes?: 'xz' | 'xyz';
+    rotation?: boolean;
+    apply?: boolean;
+}
+
+export function addAimConstraint(animator: Animator, aim: AimConstraint): () => void;
+
 export function addCCDChain(animator: Animator, chain: CCDChain): () => void;
+
+export function addLookAt(animator: Animator, lookAt: LookAt): () => void;
+
+export function addRootMotion(animator: Animator, options: RootMotionOptions): RootMotion;
 
 export function blend1D(samples: readonly number[], value: number): Float32Array;
 

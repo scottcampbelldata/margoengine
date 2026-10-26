@@ -13,6 +13,10 @@ export { CCDSolver } from './ccd.js';
 export type { CCDConeLimit, CCDEulerLimit, CCDHingeLimit, CCDJointLimit, CCDResult } from './ccd.js';
 export { addCCDChain } from './ccd-chain.js';
 export type { CCDChain } from './ccd-chain.js';
+export { addRootMotion } from './root-motion.js';
+export type { RootMotion, RootMotionOptions } from './root-motion.js';
+export { addLookAt, addAimConstraint } from './look-at.js';
+export type { LookAt, AimConstraint } from './look-at.js';
 /**
  * What an animator state plays: a clip name, a 1D tree (`parameter` plus samples sorted by increasing `value`) or a
  * 2D tree (two `parameters` plus samples with unique `[x, y]` values). Parameters default to 0.
@@ -164,6 +168,7 @@ export class Animator implements EnginePlugin {
   private readonly scratch = new Map<number, Float32Array>();
   private feet = new Set<FootIK>();
   private readonly solvers: Array<() => void> = [];
+  private readonly poseSteps: Array<(position: number[][], rotation: number[][]) => void> = [];
   private disposed = false;
   private unsubscribe?: () => void;
   private previousPlaying: boolean;
@@ -319,6 +324,18 @@ export class Animator implements EnginePlugin {
       if (index !== -1) this.solvers.splice(index, 1);
     };
   }
+  /**
+   * @internal A step that edits the current state's sampled pose (local translations and rotations per glTF node)
+   * before crossfades, additive layers and foot IK ({@link addRootMotion} adds one). Returns its remover.
+   */
+  addPoseStep(step: (position: number[][], rotation: number[][]) => void): () => void {
+    if (this.disposed) throw new MargoError('disposed', 'Animator is disposed; attach a new Animator');
+    this.poseSteps.push(step);
+    return () => {
+      const index = this.poseSteps.indexOf(step);
+      if (index !== -1) this.poseSteps.splice(index, 1);
+    };
+  }
   /** @internal Node `index`'s rest (loaded) rotation, x y z w; read-only. */
   restRotation(index: number): readonly number[] {
     return this.rest.rotation[index];
@@ -404,6 +421,7 @@ export class Animator implements EnginePlugin {
         }
     }
     if (!pose) pose = clone(this.rest);
+    for (let i = 0; i < this.poseSteps.length; i++) this.poseSteps[i](pose.position, pose.rotation);
     if (this.fade) {
       const f = this.fade;
       f.elapsed += step;
@@ -660,6 +678,7 @@ export class Animator implements EnginePlugin {
     this.layers.clear();
     this.feet.clear();
     this.solvers.length = 0;
+    this.poseSteps.length = 0;
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;

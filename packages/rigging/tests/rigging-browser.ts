@@ -8,6 +8,7 @@ import { PostStack } from '../../post/dist/index.js';
 import { Tonemap } from '../../tonemap/dist/index.js';
 import { Skeleton, Skin } from '../../animation/dist/index.js';
 import { boneHeatWeights, checkSkin, type RigJoint } from '../dist/index.js';
+import { solveSkeletonIK } from '../dist/ik.js';
 import { tube } from './fixtures.js';
 
 declare const GPUBufferUsage: { COPY_DST: number; MAP_READ: number };
@@ -151,6 +152,60 @@ const fixture = {
       bentTip: covered(bent, 0, 0.8),
       bentSide: covered(bent, 0.8, 0),
       base: covered(bent, 0, -0.8),
+      inside,
+      total,
+    };
+    clear();
+    return result;
+  },
+  /**
+   * The same weighted tube posed by solveSkeletonIK so its tip reaches a target off to the side, bending toward a
+   * pole: the GPU-skinned tip is drawn at the target and the drawn mesh matches the CPU pose.
+   */
+  async ik() {
+    const mesh = tube({ radius: 0.12, y0: -1, y1: 1, rings: 24, sides: 16 }),
+      joints: RigJoint[] = [
+        { name: 'base', parent: -1, position: [0, -1, 0] },
+        { name: 'middle', parent: 0, position: [0, 0, 0] },
+        { name: 'tip', parent: 1, position: [0, 1, 0] },
+      ],
+      influences = (await boneHeatWeights(mesh, joints)).toInfluences(4),
+      model = createMesh(engine, geometry(mesh), new UnlitMaterial({ color: [1, 1, 1] })),
+      skeleton = skeletonOf(joints),
+      skin = Skin.attach(model, skeleton, influences.joints, influences.weights);
+    disposers.push(
+      () => model.destroy(),
+      () => skin.dispose(),
+    );
+    const target: [number, number, number] = [0.9, -0.4, 0],
+      solved = solveSkeletonIK(skeleton, { joints: ['base', 'middle', 'tip'], target, pole: [-1, 0.5, 0] }),
+      m = skeleton.matrices,
+      tip = [m[32 + 12], m[32 + 13], m[32 + 14]],
+      elbow = [m[16 + 12], m[16 + 13], m[16 + 14]],
+      image = await read(),
+      posed = skin.pose(mesh.positions).positions;
+    let inside = 0,
+      total = 0;
+    for (let t = 0; t < mesh.indices.length; t += 3) {
+      const c = [0, 1, 2].map(
+        (k) =>
+          (posed[mesh.indices[t] * 3 + k] + posed[mesh.indices[t + 1] * 3 + k] + posed[mesh.indices[t + 2] * 3 + k]) /
+          3,
+      );
+      if (c[2] < 0.08) continue; // only faces toward the camera
+      total++;
+      if (covered(image, c[0], c[1])) inside++;
+    }
+    const result = {
+      reached: solved.reached,
+      tip,
+      elbow,
+      // 0.08 back from the tip along the forearm (toward the elbow): drawn.
+      drawnNearTarget: (() => {
+        const d = Math.hypot(elbow[0] - tip[0], elbow[1] - tip[1]);
+        return covered(image, tip[0] + ((elbow[0] - tip[0]) / d) * 0.08, tip[1] + ((elbow[1] - tip[1]) / d) * 0.08);
+      })(),
+      straightTipDrawn: covered(image, 0, 0.9),
       inside,
       total,
     };

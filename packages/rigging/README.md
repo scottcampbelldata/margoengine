@@ -89,6 +89,70 @@ try {
 
 Input is a `WeightMap` or per-vertex influences (`{joints, weights, influences?}`, glTF's JOINTS_0 / WEIGHTS_0 at the default width 4); add `joints` (the rest skeleton) or `inverseBindMatrices` to check bones too. Defaults: `maxInfluences` 4, `tolerance` 1e-3.
 
+## IK chains with pole targets (`margoengine/rigging/ik`)
+
+FABRIK (A. Aristidou and J. Lasenby, 2011) chains of any length with a pole: the joints move so the last one reaches the target, every bone keeps its length, and the bend faces the pole (a knee or elbow hint). Solve on an Animator every frame, on a `Skeleton` while authoring a pose, or on raw joint positions.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Animation } from 'margoengine/animation';
+import { Animator } from 'margoengine/animator';
+import { addIKChain, type AnimatorIKChain } from 'margoengine/rigging/ik';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const model = await loadGLTF(engine, '/hero.glb');
+const animator = Animator.attach(Animation.attach(model), { initial: 'idle', states: { idle: 'Idle' } });
+const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
+const reach: AnimatorIKChain = {
+  joints: [node('LeftArm'), node('LeftForeArm'), node('LeftHand')], // each the child of the one before
+  target: [0.4, 1.3, 0.5], // world space; write into it every frame
+  pole: [0.3, 1.2, -0.6], // the elbow bends toward this point
+  weight: 1, // 0 keeps the animated pose
+  iterations: 32, // default 32
+  tolerance: 1e-4, // default 1e-4, world units
+};
+const remove = addIKChain(animator, reach);
+engine.start();
+remove(); // when done
+```
+
+For joint limits use `addCCDChain` from `margoengine/animator`. While authoring (no engine), `solveSkeletonIK(skeleton, {joints, target, pole})` poses an `@margoengine/animation` `Skeleton` by bone names or indices, `solvePoseIK({parents, local}, chain)` solves on a local pose array (10 numbers per bone, as `retargetRig` makes), and `solveFABRIK(points, target, {pole})` moves raw joint positions:
+
+```ts
+import { Skeleton } from 'margoengine/animation';
+import { solveFABRIK, solveSkeletonIK } from 'margoengine/rigging/ik';
+
+const leg = new Skeleton([
+  { name: 'hip', parent: -1 },
+  { name: 'knee', parent: 0, translation: [0, -0.45, 0] },
+  { name: 'ankle', parent: 1, translation: [0, -0.42, 0] },
+]);
+const result = solveSkeletonIK(leg, { joints: ['hip', 'knee', 'ankle'], target: [0.1, -0.7, 0.2], pole: [0, -0.4, 1] });
+console.log(result.reached, result.distance, result.iterations);
+
+const points = new Float64Array([0, 0, 0, 0, 1, 0, 0, 2, 0]); // xyz per joint, the first one fixed
+solveFABRIK(points, [1, 1, 0], { pole: [2, 0, 0], iterations: 32, tolerance: 1e-4 });
+```
+
+Unreachable targets straighten the chain toward them (`reached` false, `distance` the gap). A straight chain starts bending toward the pole (or, with none, a fixed side).
+
+**With `@margoengine/kinematics-constraints`.** `elbowEvaluator(upperLength, lowerLength, pole)` is the `ElbowEvaluator` an `AvoidanceSolver` needs: the elbow of a two-bone arm reaching from the shoulder to the target, turned `poleAngle` about the shoulder-target line from the pole's side. The solver then searches that angle for an elbow that clears the body's capsules and spheres:
+
+```ts
+import { AvoidanceSolver, CapsuleVolume } from 'margoengine/kinematics-constraints';
+import { elbowEvaluator } from 'margoengine/rigging/ik';
+
+const torso = new CapsuleVolume({ start: [0, 0.9, 0], end: [0, 1.5, 0], radius: 0.18 });
+const avoid = new AvoidanceSolver([torso], { minClearance: 0.01, targetRadius: 0.04 });
+const evaluate = elbowEvaluator(0.3, 0.28, [0.2, 1.2, -0.5]); // upper arm, forearm, pole
+const shoulder = [0.2, 1.4, 0], hand = new Float32Array([0.5, 1.2, 0.2]);
+const solved = avoid.solve(shoulder, hand, [-0.1, 1.2, 0.35], 0.3, 0.28, 0.05, 0.04, 1 / 60, evaluate);
+console.log(solved.status, solved.elbow, solved.target);
+```
+
+Root motion and look-at / aim constraints live with the Animator: `addRootMotion`, `addLookAt` and `addAimConstraint` in [`@margoengine/animator`](../animator/README.md).
+
 ## Sources
 
 Written clean room from the published papers listed in [docs/clean-room.md](../../docs/clean-room.md#rigging-margoenginerigging).

@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/rigging",
   "version": "1.0.0",
-  "description": "Rigging and animation authoring: automatic skin weights, weight painting and skin checks before export.",
+  "description": "Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -27,6 +27,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./ik": {
+      "types": "./dist/ik.d.ts",
+      "import": "./dist/ik.js"
     }
   },
   "files": [
@@ -40,6 +44,22 @@
   "dependencies": {
     "@margoengine/bvh": "^1.0.0",
     "@margoengine/math": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@margoengine/animator": "^1.0.0",
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/kinematics-constraints": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/animator": {
+      "optional": true
+    },
+    "@margoengine/core": {
+      "optional": true
+    },
+    "@margoengine/kinematics-constraints": {
+      "optional": true
+    }
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js rigging",

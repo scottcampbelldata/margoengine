@@ -81,6 +81,67 @@ Bundle cost (min+gzip, other packages external, the method of `examples/package-
 
 Animator owns pose playback while attached: it pauses `Animation`, updates node transforms and the morph weights its clips animate (other morph weights stay the application's, e.g. expression sliders) before world-matrix evaluation, and lets that same animation pass write its existing bone palette storage buffer and deform vertices. There is no second skinning buffer or pass. Attach `Animation` first. Unloading the model removes both plugins; disposing the animator restores the prior playback flag. Removing Animation also removes its animator on the next update. GPU restoration retains gameplay state. Core/stage stay frozen.
 
+## Root motion
+
+`addRootMotion(animator, {joint})` plays locomotion in place and moves the character instead: every frame, the travel the current state's clips give the root (hips) bone between the previous and the current time is taken out of that bone's pose and added to the character node. It is exact across loop wraps (whole cycles plus the partial ones) and follows 1D and 2D blend trees by their weights. The travel is in the bone's parent space and is carried into the character's frame, so a turned character walks the way it faces.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Animation } from 'margoengine/animation';
+import { Animator, addRootMotion } from 'margoengine/animator';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const model = await loadGLTF(engine, '/hero.glb'); // a Walk clip that travels forward
+const animator = Animator.attach(Animation.attach(model), { initial: 'walk', states: { walk: 'Walk' } });
+const hips = model.asset.doc.nodes!.findIndex((n) => n.name === 'Hips');
+const motion = addRootMotion(animator, {
+  joint: hips, // the bone whose clip translation is the travel
+  target: model.root, // default: the model's root node
+  axes: 'xz', // default: ground-plane travel; the hips' bob stays animated ('xyz' takes all of it)
+  rotation: false, // default: true also takes the hips' turn about +Y and turns the target by it
+  apply: true, // default: false only reports, e.g. to feed a physics character controller
+});
+engine.start();
+console.log(motion.translation, motion.yaw); // last frame's travel and turn
+motion.dispose(); // the hips travel with the clip again
+```
+
+A transition starts the new state's travel at its time 0; during a crossfade the travel follows the new state. Yaw is taken per clip cycle, so a clip should turn less than half a turn per cycle. The target's ancestors need nonzero scales.
+
+## Look-at and aim constraints
+
+`addLookAt(animator, lookAt)` turns a head (or a spine, neck and head, each taking a share) so a local axis points at a world target, after the pose, layers, foot IK and the solvers added before it. `addAimConstraint(animator, aim)` is the same for one bone. Both read their object every frame, so move the target by writing into it.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Animation } from 'margoengine/animation';
+import { Animator, addAimConstraint, addLookAt, type LookAt } from 'margoengine/animator';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const model = await loadGLTF(engine, '/hero.glb');
+const animator = Animator.attach(Animation.attach(model), { initial: 'idle', states: { idle: 'Idle' } });
+const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
+const look: LookAt = {
+  joints: [node('Spine2'), node('Neck'), node('Head')], // first to last, each below the one before
+  target: [0, 1.6, 2], // world point; write into it every frame
+  shares: [1, 2, 4], // default equal: how much of the turn each bone takes
+  axis: [0, 0, 1], // default: the last bone's local look direction (glTF forward)
+  up: [0, 1, 0], // default: rolled toward worldUp after aiming; null skips the roll
+  worldUp: [0, 1, 0], // default
+  maxAngle: Math.PI / 3, // default π: largest turn from the animated look direction
+  weight: 1, // default 1: blend from the animated pose
+};
+const removeLook = addLookAt(animator, look);
+const removeAim = addAimConstraint(animator, { joint: node('RightHand'), target: [1, 1, 1], axis: [0, 1, 0], up: null });
+engine.start();
+removeLook();
+removeAim();
+```
+
+Each bone in turn takes its share of what is left, so the last bone's axis ends exactly on the target (or `maxAngle` from where the animation pointed it). `weight` below 1 blends every bone's local rotation from the animated one to the solved one. Bones and their ancestors need positive uniform scales; rotations commit through `writeRotation` when it is set. For IK chains with poles see `addIKChain` in [`@margoengine/rigging`](../rigging/README.md).
+
 ## Explicit rotation writer
 
 `AnimatorOptions.writeRotation?: (node: Mesh, rotation: readonly number[]) => void` is an optional, explicit commit hook for applications that own their transform writer. It is captured and validated once during construction. Omit it to keep the current dynamic `Mesh.setQuaternion` call, including method overrides. This is an additive public API option; it does not change core/stage.
