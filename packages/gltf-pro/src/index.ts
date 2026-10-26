@@ -223,6 +223,20 @@ export interface PBRPickingGeometry {
   nodeIndex?: number;
 }
 const opaquePasses = new WeakMap<Context, Set<PBRModel>>();
+/**
+ * A run of `PBRModel.draw` calls that share one render pass (pass it as the last argument of each `draw`, then call
+ * `end()`). Without a run every draw begins and ends its own pass.
+ */
+export class PBRDrawRun {
+  /** The pass the run's draws continue, once one began; `end()` closes it. */
+  pass?: GPURenderPassEncoder;
+  /** Ends the shared pass. Safe to call twice. */
+  end(): void {
+    const pass = this.pass;
+    this.pass = undefined;
+    pass?.end();
+  }
+}
 // A symbol keeps separately bundled optional consumers interoperable without
 // importing the loader or attaching a second drawable core Geometry.
 const cpuSource = Symbol.for('margoengine.pbr-source.v1');
@@ -1905,7 +1919,12 @@ export class PBRModel implements EnginePlugin {
   }
   /** `transparent` draws only the BLEND primitives a transparency hook took over (`setTransparency`), into its pass; `transmission`
    * those a transmission hook took over (`setTransmission`); `capture` the opaque and MASK ones into the capture hook's pass
-   * (`setCapture`); for these `color`/`depth` are unused. */
+   * (`setCapture`); for these `color`/`depth` are unused.
+   *
+   * `carry` is a `PBRDrawRun`: draws that pass the same run share one render pass instead of each beginning one
+   * (a pass stores and reloads the multisampled colour and depth). A
+   * blended primitive still ends the pass around itself, so attachment-store rounding is unchanged. Call
+   * `carry.end()` after the last draw, before anything else records on `c.encoder`. */
   draw(
     c: Context,
     mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture' | 'occlusion',
@@ -1913,6 +1932,7 @@ export class PBRModel implements EnginePlugin {
     depth: GPUTextureView,
     phase: 'all' | 'opaque' | 'blend' = 'all',
     external?: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction },
+    carry?: PBRDrawRun,
   ): void {
     const transmission = mode === 'transmission',
       oit = transmission ? this.transmission : this.transparency,
@@ -1938,7 +1958,7 @@ export class PBRModel implements EnginePlugin {
     // Resources a callback releases during this draw stay valid until the frame is submitted.
     beginDraw(c.device, c.view ?? c);
     scratch.context = c;
-    let pass: GPURenderPassEncoder | undefined = external?.pass,
+    let pass: GPURenderPassEncoder | undefined = external?.pass ?? carry?.pass,
       shared: GPURenderPassEncoder | undefined;
     try {
       let resources = this.resources;
@@ -2391,6 +2411,7 @@ export class PBRModel implements EnginePlugin {
           if (!external && blend && mode !== 'gbuffer') {
             if (!external) pass?.end();
             pass = undefined;
+            if (carry) carry.pass = undefined;
           }
           if (!pass) {
             scratch.color.view = color;
@@ -2522,6 +2543,7 @@ export class PBRModel implements EnginePlugin {
         if (!external && blend && mode !== 'gbuffer' && !through && !capture) {
           pass!.end();
           pass = undefined;
+          if (carry) carry.pass = undefined;
         }
         if ((mode === 'beauty' || through) && !external) {
           this.engine.stats.visible += inst ? inst.count : 1;
@@ -2533,6 +2555,7 @@ export class PBRModel implements EnginePlugin {
         try {
           if (!external) pass?.end();
         } catch {}
+      if (carry) carry.pass = undefined;
       throw error;
     } finally {
       endDraw(c.device);
@@ -2546,7 +2569,8 @@ export class PBRModel implements EnginePlugin {
       scratch.liveBatches.clear();
       scratch.blendDistance.clear();
     }
-    if (!external) pass?.end();
+    if (carry && !external) carry.pass = pass;
+    else if (!external) pass?.end();
   }
   /** Isolated GPU resources for stereo eyes or another caller-owned WebGPU device. */
   createRenderer(device: GPUDevice): PBRDeviceRenderer {

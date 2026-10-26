@@ -4,6 +4,7 @@ import { engineRuntime, type Engine } from '@margoengine/core/extension';
 import {
   GLTFAsset,
   PBRModel,
+  PBRDrawRun,
   textureTransform,
   textureCoordinates,
   type PreparedGeometry,
@@ -3065,6 +3066,12 @@ const queues = new WeakMap<Engine, MaterialDraws>(),
 function lateEntry(entry: Entry, index: number): boolean {
   return late(entry.materials[index]) || primitiveAfterOpaque(entry.model.primitives[index]);
 }
+/** Bit 1: some slot of the mesh draws in the opaque phase; bit 2: some slot draws in the blend phase. No allocation: it runs for every mesh every frame. */
+function lateFlags(entry: Entry): number {
+  let flags = 0;
+  for (let i = 0; i < entry.materials.length; i++) flags |= lateEntry(entry, i) ? 2 : 1;
+  return flags;
+}
 let serial = 0;
 /** One pass per engine draws every material mesh: opaque then transparent, each by renderOrder; transparent meshes back to front. */
 function queue(runtime: Engine): MaterialDraws {
@@ -3082,8 +3089,9 @@ function queue(runtime: Engine): MaterialDraws {
     phases.length = 0;
     for (let i = 0; i < members.length; i++) {
       const entry = members[i],
-        opaque = entry.materials.some((_, i) => !lateEntry(entry, i)),
-        blend = entry.materials.some((_, i) => lateEntry(entry, i));
+        flags = lateFlags(entry),
+        opaque = (flags & 1) !== 0,
+        blend = (flags & 2) !== 0;
       entry.opaque = opaque;
       entry.blend = blend;
       if (opaque) phases.push({ entry, blend: false, phase: blend ? 'opaque' : 'all' });
@@ -3110,9 +3118,8 @@ function queue(runtime: Engine): MaterialDraws {
           if (!stale)
             for (let i = 0; i < members.length; i++) {
               const entry = members[i],
-                opaque = entry.materials.some((_, i) => !lateEntry(entry, i)),
-                blend = entry.materials.some((_, i) => lateEntry(entry, i));
-              if (opaque !== entry.opaque || blend !== entry.blend) {
+                flags = lateFlags(entry);
+              if (((flags & 1) !== 0) !== entry.opaque || ((flags & 2) !== 0) !== entry.blend) {
                 stale = true;
                 break;
               }
@@ -3133,9 +3140,16 @@ function queue(runtime: Engine): MaterialDraws {
             tail.sort((a, b) => a.entry.order - b.entry.order || distance.get(b.entry)! - distance.get(a.entry)!);
             for (let i = 0; i < count; i++) phases[opaqueEnd + i] = tail[i];
           }
-          for (let i = 0; i < phases.length; i++) {
-            const item = phases[i];
-            item.entry.model.draw(c, 'beauty', c.color, c.depth, item.phase);
+          // One render pass for every mesh: a pass per mesh stores and reloads the multisampled colour and depth each
+          // time and costs a begin, an end and a command-buffer flush (10,000 meshes: 168 ms of CPU a frame).
+          const run = new PBRDrawRun();
+          try {
+            for (let i = 0; i < phases.length; i++) {
+              const item = phases[i];
+              item.entry.model.draw(c, 'beauty', c.color, c.depth, item.phase, undefined, run);
+            }
+          } finally {
+            run.end();
           }
         },
       });

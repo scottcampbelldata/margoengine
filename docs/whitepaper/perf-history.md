@@ -201,6 +201,27 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
 - **Rerun:** `npm run quality` (sizes gate).
 - **Guard:** the leak items in `scripts/quality/baselines/sizes.json`, checked by `scripts/quality-gate.mjs` in CI.
 
+### 21. Materials meshes: one render pass per mesh
+
+- **Loss:** 10,000 `@margoengine/materials` meshes (`UnlitMaterial`, the speed-matrix scene `p-unlit`) cost **166.2 ms**
+  of CPU per frame in Margo against **6.3 ms** in three.js WebGL, with matching images. Diagnostic, busy machine
+  (RTX A6000, Edge 156 headless): `npm run bench -- parity --cases=p-unlit --engines=margo,three-webgl-parity --runs=3
+  --no-gate` on `1ff80aff`, run `20261025-232359-1ff80aff-dev` (`benchmarks/runs/`, not committed). The first speed-matrix
+  ledger run records its own first numbers; this entry keeps these.
+- **Cause:** every materials mesh is a gltf-pro `PBRModel`, and each model's `draw()` began and ended its own render
+  pass. A wrapper around the WebGPU calls counted 620,124 `beginRenderPass` calls in 62 frames, one per mesh per
+  frame; each pass stores and reloads the 4x multisampled colour and depth. The materials package's comment said "one
+  pass per engine", which was the intent.
+- **Fix:** `PBRDrawRun` in gltf-pro: draws given the same run continue one pass (a blended primitive still ends the
+  pass around itself); the materials queue passes one run per frame. The queue's per-frame staleness check also
+  allocated two closures per mesh; it is now a loop.
+- **After (diagnostic):** 166 -> about 80-97 ms per frame (profile script, busy machine, 3 runs 93.6, 91.2, 97.3 ms;
+  the bench tool could not take the GPU lock for hours). Still 13-15 times three.js: the cost left is per-mesh work
+  (one `queue.writeBuffer`, three `setBindGroup`, `setPipeline` and two buffer binds per mesh, plus about 3 us of
+  JavaScript per mesh), listed in [known-bugs.md](../known-bugs.md#10000-materials-meshes-cost-13-times-threejs-cpu).
+- **Rerun:** `npm run bench -- parity --cases=p-unlit --engines=margo,three-webgl-parity --runs=3`.
+- **Guard:** `packages/materials/tests/shared-pass.test.js` (10 meshes, one pass; a blended mesh keeps its own).
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks

@@ -302,6 +302,23 @@ Calls outside that optional phase retain their existing order and bindings.
 An extension with `afterOpaque: true` (materials transmission sets it) also flushes with the blended draws, after the
 opaque capture, but keeps its authored alpha mode, blending and depth writes; such primitives cast no opaque shadows.
 
+A package that draws many models itself passes a `PBRDrawRun` as the last argument of `draw()`. Every `draw()` of the
+run continues one render pass instead of beginning its own, which saves a store and a reload of the multisampled colour
+and depth per model (10,000 meshes of `@margoengine/materials` cost 168 ms of CPU a frame with a pass each). A blended
+primitive still ends the pass around itself. Call `run.end()` after the last draw:
+
+```ts
+import {PBRDrawRun, type PBRModel} from '@margoengine/gltf-pro';
+export function drawAll(models: PBRModel[], c: Parameters<PBRModel['draw']>[0]) {
+  const run = new PBRDrawRun();
+  try {
+    for (const model of models) model.draw(c, 'beauty', c.color, c.depth, 'all', undefined, run);
+  } finally {
+    run.end();
+  }
+}
+```
+
 Full generated WGSL, including the injection and resource layout, distinguishes
 pipeline cache entries. Even an empty extension cannot share the baseline
 pipeline. Removing an extension releases its secondary buffer on the next

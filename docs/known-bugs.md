@@ -55,6 +55,20 @@ The entries below were measured with `npm run bench -- instanced --engines=margo
 machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md),
 "Instanced: fixes and what is left"). Each cause was measured, not guessed.
 
+### 10,000 materials meshes cost 13 times three.js CPU
+
+- **What:** `p-unlit` of the speed matrix (10,000 unlit `@margoengine/materials` meshes): Margo 166.2 ms of CPU per
+  frame before the shared-pass fix, about 80-97 ms after (diagnostic, busy machine, profile script); three.js WebGL
+  6.3 ms. Scott's target is 6.3 ms or less on the bench tool.
+- **Fixed so far:** a render pass per mesh (620,124 `beginRenderPass` calls in 62 frames); see
+  [perf-history.md](whitepaper/perf-history.md) entry 21.
+- **Cause of the rest (measured, per frame at 10,000 meshes):** about 30 ms of WebGPU calls (a `queue.writeBuffer`
+  per mesh, three `setBindGroup`, `setPipeline`, two buffer binds); about 25-30 ms of JavaScript in gltf-pro's
+  `draw()` (uniform fill, a matrix inverse, pipeline-state lookups per mesh); about 15 ms in the materials queue and
+  its material getters. Every mesh also owns its own pipeline, vertex and index buffer and default textures.
+- **Plan:** one uniform arena per device (one upload instead of 10,000); pipelines, buffers and bind groups shared
+  between identical meshes so state is set only when it changes; per-mesh work skipped for meshes that did not change.
+
 ### createInstancedMesh reads vertex attributes its material does not use
 
 - **What:** `@margoengine/materials` `createInstancedMesh` boxes at 50,000: GPU 0.63 ms against three's WebGL2

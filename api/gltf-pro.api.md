@@ -202,6 +202,11 @@ export interface PBRDeviceRenderer {
     dispose(): void;
 }
 
+export class PBRDrawRun {
+    pass?: GPURenderPassEncoder;
+    end(): void;
+}
+
 export interface PBRLighting {
     readonly declarations: string;
     direct?(direct: string): string;
@@ -316,7 +321,7 @@ export class PBRModel implements EnginePlugin {
         pass: GPURenderPassEncoder;
         view: ArrayLike<number>;
         depthCompare: GPUCompareFunction;
-    }): void;
+    }, carry?: PBRDrawRun): void;
     createRenderer(device: GPUDevice): PBRDeviceRenderer;
     clusteredLights(): GLTFClusteredLight[];
     extras(): GLTFNodeExtras[];

@@ -152,6 +152,16 @@ Reading (diagnostic only):
   cost; 0.038-0.039 against 0.030 ms), and CPU for moving instances (1.2-1.3 against 0.62 ms; three's WebGPU
   renderer 0.91 ms).
 
+## Update 2026-10-26: 10,000 separate materials meshes (diagnostic, busy machine)
+
+Not an instanced path: 10,000 `UnlitMaterial` meshes from `@margoengine/materials` (speed-matrix scene `p-unlit`).
+**Before** (run `20261025-232359-1ff80aff-dev`, bench tool, 3 runs x 60 frames): Margo 166.2 ms CPU and 3.97 ms GPU per
+frame, three.js WebGL 6.3 ms CPU and 3.59 ms GPU. **Cause:** a render pass per mesh (620,124 `beginRenderPass`
+calls in 62 frames, each storing and reloading the multisampled targets). **Fix:** gltf-pro `PBRDrawRun`, one pass for
+all meshes. **After** (profile script, not the bench tool): about 91-97 ms CPU per frame. The remaining per-mesh cost
+and plan are in [known-bugs.md](../known-bugs.md#10000-materials-meshes-cost-13-times-threejs-cpu); history in
+[perf-history.md](perf-history.md) entry 21.
+
 ## Answer
 
 The smoke run's result was real and has one main cause in core: **Margo core never culls back faces in the

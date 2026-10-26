@@ -487,6 +487,11 @@ interface PBRDeviceRenderer {
     dispose(): void;
 }
 
+class PBRDrawRun {
+    pass?: GPURenderPassEncoder;
+    end(): void;
+}
+
 class PBRInstances {
     readonly data: Float32Array;
     readonly capacity: number;
@@ -625,7 +630,7 @@ class PBRModel implements EnginePlugin {
         pass: GPURenderPassEncoder;
         view: ArrayLike<number>;
         depthCompare: GPUCompareFunction;
-    }): void;
+    }, carry?: PBRDrawRun): void;
     createRenderer(device: GPUDevice): PBRDeviceRenderer;
     clusteredLights(): GLTFClusteredLight[];
     extras(): GLTFNodeExtras[];
