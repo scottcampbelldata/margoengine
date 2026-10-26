@@ -480,6 +480,52 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   `packages/animation/tests/keyframes.test.js` (tracks bind to bones once per clip and skeleton, a new skeleton or clip
   binds again; `Skeleton.index` for prototype names; `setPose` error text).
 
+### 28. Point-light shadows, TAA velocities, morphed and cloned models
+
+- **Loss:** `p-point-shadows` (1,000 boxes, 4 shadowed point lights) 15.40 ms of CPU a frame against three.js WebGL's
+  2.56; `p-taa` 5.41 against three.js WebGPU's 1.80; `p-morph` (100 morphed copies) 1.06 / 1.57 ms CPU / GPU against
+  0.27 / 0.14; `p-skeleton-clone` (50 `cloneModel` copies a call) 84.5 ms against 8.1.
+- **Causes, measured** (browser CPU profiles of each scene, timestamps per pass):
+  1. LocalShadows drew every caster into every one of the 24 cube faces (24,000 draws a frame) and wrote every
+     caster's block each frame (94% of the frame in its `render`);
+  2. TAA's velocity pass began a render pass per mesh, a compute pass per PBR snapshot, and wrote each mesh's block
+     every frame because the camera rows were in it;
+  3. each gltf-pro model drew in its own render pass, each Animation deformed in its own compute pass, and every draw's
+     derivation rebuilt its shader text (`compactTests`, `coordinateShader`), so the caches after it hashed new long
+     strings per draw per frame;
+  4. each `cloneModel` copy repacked its vertices from the shared accessors.
+- **Fixes:** a caster's bounding sphere (core meshes: their geometry's; new optional `LocalShadowPrimitive.bounds`)
+  is tested against each map's frustum planes, taken from that layer's own matrix, and a block is written only when
+  its caster moved. TAA draws all object velocities in one render pass, takes all snapshots in one compute pass after
+  it, and keeps the camera rows in one block a frame. gltf-pro models whose passes were added one right after another
+  draw as one `PBRDrawRun` at the first one's pass; Animations of a frame graph deform in one compute pass; the two
+  shader-text steps are memoised; packings are kept per asset and primitive. No core or stage bytes;
+  `clustered/shadows` grows 338 and `taa` 188 gzip bytes (baseline reasons recorded).
+- **Image:** the same SSIM and delta E against three.js as before: `p-point-shadows` 0.993 / 0.62, `p-morph` 0.99 /
+  1.67, `p-taa` 0.641 / 2.86 (it differed before too: the TAA algorithms differ, and three's WebGL TAA cannot run with
+  a moving camera).
+- **After** (diagnostic, busy machine, RTX A6000; run `20261026-180213` (5 runs; marked invalid for spread);
+  rows in [perf-vs-threejs.md](perf-vs-threejs.md)):
+
+  | Scene | Before | After | three.js |
+  | --- | --- | --- | --- |
+  | `p-point-shadows`, CPU / GPU ms a frame | 15.40 / 1.63 | 1.19 / 0.17 | 2.65 / 2.00 (WebGL), faster |
+  | `p-taa`, CPU / GPU ms a frame | 5.41 / 1.41 | 0.56 / 0.12 | 1.73 / 0.24 (WebGPU), faster |
+  | `p-morph`, CPU / GPU ms a frame | 1.06 / 1.57 | 0.51 / 1.32 | 0.26 / 0.15 (WebGL), slower |
+  | `p-skeleton-clone`, ms a call | 84.5 | 63.6 | 7.9 (WebGL), slower |
+
+  Still open, each in [known-bugs.md](../known-bugs.md#performance-losses-still-open): `p-morph`'s 100 compute
+  dispatches run one after another (1.18 ms of its 1.32); `p-skeleton-clone` creates each copy's GPU buffers, textures
+  and merged static parts and core `Engine.remove` unparents in quadratic time; `p-gpu-pick` builds a pick pipeline
+  per call in core; `helmet`'s GPU time is not isolated yet.
+- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity
+  --cases=p-point-shadows,p-taa,p-morph,p-skeleton-clone --runs=5`, then `node bench/parity-report.mjs <run.json>
+  --partial`.
+- **Guard:** `packages/clustered/test/shadows.test.js` (a caster with bounds draws only into the faces it reaches),
+  `tests/deep-render-taa-failures.test.js` (one velocity pass for four meshes; still meshes write no block),
+  `packages/gltf-pro/tests/model-runs.test.js` (back-to-back models share one pass, a pass between splits them; copies
+  share packed arrays), `tests/deep-interaction-animation-resources.test.js` (three Animations, one compute pass).
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks

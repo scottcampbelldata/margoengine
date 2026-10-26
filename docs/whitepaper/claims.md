@@ -165,7 +165,7 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 | oit-detached | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until a later change replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `b953071e`: 2,500 calls |
 | post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `151aa744`: 12,431 calls (AgX normalised for older refs, see below) |
 | post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `151aa744`: 37,182 calls |
-| taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `d41cdafd` |
+| taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
 | terrain-ssr | `6c20076d` (before terrain's capture hook) -> the water/terrain SSR commit: terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
 | water-ssr | `6c20076d` (before water's capture hook) -> the water/terrain SSR commit: 2,762 calls in 3 stories | `57250a49` |
 | quality-presets | `96daac7` -> `01e5e35` | `57250a49` |
@@ -284,6 +284,14 @@ draws and shader modules, byte for byte); only 30 calls of frame 9 move: the tex
 chain (`writeTexture`, views, the mip bind groups, passes and draws) now come before the beauty pass's
 `beginRenderPass` instead of after it. Both orders upload before the frame's commands run. The full trace matches
 `e2cb3815`.
+
+**taa-velocity, advanced to `8149bf4e` on 2026-10-26 (speed matrix row 13.7):** TAA's object velocities, a render pass per mesh before,
+now draw in one render pass, the PBR snapshots in one compute pass after it, and the camera rows moved out of each
+mesh's block into one camera block (binding 4) written once a frame, so a still mesh's block is written only when it
+changes. The calls differ in exactly that: fewer eginRenderPass/eginComputePass/end calls, smaller object blocks
+(160 or 192 bytes instead of 288 or 320) and fewer writeBuffer calls; the draws, pipelines' vertex and fragment
+work and the velocity values are the same, and the parity screenshot matches three.js as before (SSIM 0.641, delta E
+2.86, which differed already: the TAA algorithms differ).
 
 **taa-velocity, advanced to `d41cdafd` on 2026-10-21:** a hygiene pass converted TAA's bare Errors.
 The story records each thrown error as a `throw` entry (class and message), and exactly three per run changed: the

@@ -17,6 +17,16 @@
       }
     ]
   },
+  "8.2": {
+    "cause": "LocalShadows drew all 1,001 casters into each of the 24 cube faces (24,000 draws a frame) and wrote every caster block each frame; casters now draw only into maps whose frustum their bounding sphere reaches and write their block only when moved",
+    "fixes": [
+      {
+        "commit": "8149bf4e",
+        "tradeoff": "a sphere test per caster per map; casters without bounds (instanced, displaced, or external primitives that give none) still draw into every map",
+        "rerun": "npm run bench -- parity --cases=p-point-shadows --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      }
+    ]
+  },
   "9.1": {
     "cause": "Uploading a Float32Array as rgba16float converted it with Uint16Array.from(data, toHalf), a callback per value (160 ms for this image in Node). Now the built-in Float16Array bulk conversion (same bits), else a plain loop: 150 -> 16.95 ms against three-webgpu 20.3",
     "fixes": [
@@ -59,6 +69,17 @@
       }
     ]
   },
+  "12.5": {
+    "cause": "100 morphed copies each began a render pass and a compute pass, and every draw rebuilt its shader text each frame; models now draw as one run, Animations deform in one compute pass and the shader text steps are memoised. Still slower: the 100 per-model compute dispatches run one after another (1.18 ms GPU)",
+    "knownBug": "morph-targets-one-compute-dispatch-per-model",
+    "fixes": [
+      {
+        "commit": "63a7edec",
+        "tradeoff": "models share a run only when their passes were added back to back; others draw alone as before",
+        "rerun": "npm run bench -- parity --cases=p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      }
+    ]
+  },
   "12.6": {
     "cause": "Skeleton.index was a linear name search run per track per call (quadratic in bones); every setPose built its error labels and every track a pose object and a sample array",
     "fixes": [
@@ -68,6 +89,31 @@
         "rerun": "npm run bench -- parity --cases=p-keyframes --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
       }
     ]
+  },
+  "12.7": {
+    "cause": "every cloneModel copy repacked its vertices (now shared per asset). Still slower, different work: each copy creates its own GPU buffers, textures and merged static parts, and core Engine.remove unparents in quadratic time; three clones on the CPU only",
+    "knownBug": "clonemodel-uploads-every-copy-and-core-frees-meshes-in-quadratic-time",
+    "fixes": [
+      {
+        "commit": "63a7edec",
+        "tradeoff": "packed arrays live as long as the asset",
+        "rerun": "npm run bench -- parity --cases=p-skeleton-clone --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      }
+    ]
+  },
+  "13.7": {
+    "cause": "the velocity pass began a render pass per mesh (and a compute pass per PBR snapshot) and rewrote every mesh block each frame because the camera rows were in it; now one render pass, one snapshot pass and one camera block a frame. The image differs from three.js as before (different TAA algorithms; three-webgl has no moving-camera TAA)",
+    "fixes": [
+      {
+        "commit": "8149bf4e",
+        "tradeoff": "none",
+        "rerun": "npm run bench -- parity --cases=p-taa --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      }
+    ]
+  },
+  "16.2": {
+    "cause": "core GPURenderer.pick builds a shader module, pipeline, textures and buffers on every call; a core fix waits for the go-ahead under the freeze",
+    "knownBug": "gpu-picking-builds-its-pipeline-on-every-pick"
   },
   "17.11": {
     "cause": "the scene's density function summed every ball at every grid point (4.2 M terms a frame; three writes each ball only near it), and marchingCubes allocated its grids and a 1.8 M-slot vertex table every call",
