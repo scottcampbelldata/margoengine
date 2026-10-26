@@ -248,3 +248,11 @@ export function redrawAfterRestore(
 export { frameDue, frameStatus } from './pacing.js';
 /** 1 on phones and the light tier, 4 on the desktop full tier: the scene sample count core uses (call after applyQualityTier). */
 export const sceneSamples: () => 1 | 4 = samples; // typed here so the published .d.ts never points into ../../shared
+
+export {
+  ResolutionScaler,
+  watchResolution,
+  type ResolutionOptions,
+  type ResolutionWatch,
+  type WatchResolutionOptions,
+} from './resolution.js';

@@ -33,6 +33,25 @@ watchQuality();
 - `capFrameRate(engine, rate = 60)` sets the same pacing on any engine regardless of tier.
 - The light-tier measurement skips the first two seconds and gives up after ten, at any refresh rate.
 
+## Dynamic resolution
+
+```ts
+import {applyQualityTier, watchResolution} from 'margoengine/quality';
+import {Engine} from 'margoengine/core';
+declare const canvas: HTMLCanvasElement;
+applyQualityTier(); // light or phone tier
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+using resolution = watchResolution({budget: 12, min: 0.6}); // restores full resolution when disposed
+console.log(resolution.scale);
+```
+
+`watchResolution` times each frame's GPU work (submit to finished) and, when the average passes `budget` milliseconds
+(default 12), lowers the canvas pixel ratio in 5% steps sized to land under the budget; with room to spare (under 70% of
+it) it rises 5% at a time, and backs off after a rise it had to undo. It moves `globalThis.margoLow`, which core reads every
+frame, so it works on the light and phone tiers. On the full 4x MSAA tier it does nothing (changing the cap there would
+also switch off multisampling); pass your own `apply(scale)` to scale some other way. `ResolutionScaler` is the same
+decision logic without timers: `push(frameMs)` returns the new scale when it changes.
+
 ## Tier presets
 
 The tier also scales optional features. `applyQualityTier()` publishes the tier's `QualityPreset` as

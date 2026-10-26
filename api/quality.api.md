@@ -54,6 +54,26 @@ export interface QualityPreset {
 
 export type QualityTier = 'phone' | 'light' | 'high';
 
+export interface ResolutionOptions {
+    budget?: number;
+    min?: number;
+    max?: number;
+    window?: number;
+    granularity?: number;
+}
+
+export class ResolutionScaler {
+    scale: number;
+    constructor({ budget, min, max, window, granularity }?: ResolutionOptions);
+    push(ms: number): number | undefined;
+}
+
+export interface ResolutionWatch {
+    readonly scale: number;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
 export const SLOW_FPS = 55;
 
 export interface WatchOptions {
@@ -62,6 +82,16 @@ export interface WatchOptions {
     now?: () => number;
     store?: (value: 'high' | 'low') => void;
     reload?: () => void;
+}
+
+export interface WatchResolutionOptions extends ResolutionOptions {
+    request?: (callback: (time: number) => void) => unknown;
+    queue?: {
+        submit(buffers: unknown): unknown;
+        onSubmittedWorkDone(): Promise<unknown>;
+    };
+    now?: () => number;
+    apply?: (scale: number) => void;
 }
 
 export function applyQualityTier({ search, storage, userAgent }?: QualityOptions): QualityTier;
@@ -81,6 +111,8 @@ export function redrawAfterRestore(engine: EngineKernel, render: () => void, req
 export const sceneSamples: () => 1 | 4;
 
 export function watchQuality({ request, queue, now, store, reload }?: WatchOptions): void;
+
+export function watchResolution({ request, queue, now, apply, ...options }?: WatchResolutionOptions): ResolutionWatch;
 
 // Not exported from this entry, but used by the exports above:
 

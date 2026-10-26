@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3275096,
+  "total": 3279743,
   "history": [
     {
       "date": "2026-10-24",
@@ -281,12 +281,6 @@
     },
     {
       "date": "2026-10-26",
-      "commit": "743f0635",
-      "reason": "DX pass A-L batch 2: throw messages now name their fix (clustered, creative/post), a few hundred gzip bytes of message text",
-      "grew": 2
-    },
-    {
-      "date": "2026-10-26",
       "commit": "f7963d9f",
       "reason": "queue item 23 milestone 2: animator gains addRootMotion, addLookAt and addAimConstraint (tree-shaken when unused); new entry @margoengine/rigging/ik (FABRIK chains with poles)",
       "grew": 2
@@ -329,6 +323,12 @@
     },
     {
       "date": "2026-10-26",
+      "commit": "743f0635",
+      "reason": "DX pass A-L batch 2: throw messages now name their fix (clustered, creative/post), a few hundred gzip bytes of message text",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-26",
       "commit": "caad6873",
       "reason": "DX pass A-L: error messages name their fix and bare Error throws became coded MargoError, so bundles carry longer strings",
       "grew": 12
@@ -356,6 +356,12 @@
       "commit": "4193e72f",
       "reason": "item 47: gltf-pro's per-device uniform arena, shared view block, per-frame derivation memo and a run's instanced batches and short path (materials meshes 168 -> 5 ms CPU at 10,000; perf-history entry 22)",
       "grew": 5
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "d13e440d",
+      "reason": "package depth: tween easings, springs, timelines, array/path tweens; quality dynamic resolution",
+      "grew": 2
     }
   ],
   "items": {
@@ -574,7 +580,7 @@
     "@margoengine/procedural/lsystem": 2454,
     "@margoengine/procedural/noise": 2314,
     "@margoengine/procedural/voronoi": 5026,
-    "@margoengine/quality": 1879,
+    "@margoengine/quality": 2705,
     "@margoengine/quality/warm": 1536,
     "@margoengine/react": 24283,
     "@margoengine/react/kit": 11519,
@@ -620,7 +626,7 @@
     "@margoengine/tonemap": 11083,
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4339,
-    "@margoengine/tween": 1056,
+    "@margoengine/tween": 4877,
     "@margoengine/ui": 28622,
     "@margoengine/ui/react": 28708,
     "@margoengine/usdz": 8240,

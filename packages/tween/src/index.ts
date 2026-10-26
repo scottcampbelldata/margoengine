@@ -1,4 +1,9 @@
 import { MargoError } from '@margoengine/math/errors';
+import { lerpArray } from './interpolate.js';
+export * from './easings.js';
+export * from './interpolate.js';
+export { Spring, type SpringOptions } from './spring.js';
+export { Timeline, type TimelineOptions, type TimelineTweenOptions } from './timeline.js';
 /** Maps normalized progress `time` in [0, 1) to eased progress; must return a finite number. */
 export type Easing = (time: number) => number;
 /** Identity easing: constant speed. The default for `TweenOptions.easing`. */
@@ -17,6 +22,22 @@ export interface TweenOptions {
   easing?: Easing;
   /** Called once when the tween reaches its end value; not called when it is cancelled. */
   onComplete?: () => void;
+  /** Extra plays after the first (an integer >= 0, or `Infinity` to loop until cancelled). Default 0. */
+  repeat?: number;
+  /** With `repeat`, play every second pass backwards so the value swings back and forth. Default false. */
+  yoyo?: boolean;
+  /** Called at the start of each repeat pass. */
+  onRepeat?: () => void;
+}
+/** Options for {@link Tween.array}: timing plus how to blend the two arrays. */
+export interface ArrayTweenOptions extends TweenOptions {
+  /** Blend function; default {@link lerpArray}. Pass `slerpArray` for quaternions. */
+  interpolate?: (
+    out: number[] | Float32Array | Float64Array,
+    a: ArrayLike<number>,
+    b: ArrayLike<number>,
+    t: number,
+  ) => void;
 }
 interface Track {
   target: Record<string, number>;
@@ -27,6 +48,11 @@ interface Track {
   delay: number;
   easing: Easing;
   complete?: () => void;
+  apply?: (eased: number) => void;
+  cycles: number;
+  yoyo: boolean;
+  repeated?: () => void;
+  cycle: number;
   time: number;
   active: boolean;
 }
@@ -41,37 +67,40 @@ export class Tween {
    * @throws RangeError when the current or end value is not finite, `duration` or `delay` is negative or not finite,
    * or `easing`/`onComplete` is not a function.
    */
-  to(
-    target: Record<string, number>,
-    key: string,
-    to: number,
-    { duration, delay = 0, easing = linear, onComplete }: TweenOptions,
-  ): () => void {
+  to(target: Record<string, number>, key: string, to: number, options: TweenOptions): () => void {
     const from = target[key];
+    if (!Number.isFinite(from) || !Number.isFinite(to))
+      throw new RangeError('Tween needs a finite numeric target property and a finite to value; check the arguments.');
+    for (const track of this.tracks)
+      if (track.active && track.target === target && track.key === key) track.active = false;
+    return this.add({ target, key, from, to }, options);
+  }
+  private add(base: Pick<Track, 'target' | 'key' | 'from' | 'to' | 'apply'>, options: TweenOptions): () => void {
+    const { duration, delay = 0, easing = linear, onComplete, repeat = 0, yoyo = false, onRepeat } = options;
     if (
-      !Number.isFinite(from) ||
-      !Number.isFinite(to) ||
       !Number.isFinite(duration) ||
       duration < 0 ||
       !Number.isFinite(delay) ||
       delay < 0 ||
       typeof easing !== 'function' ||
-      (onComplete !== undefined && typeof onComplete !== 'function')
+      (onComplete !== undefined && typeof onComplete !== 'function') ||
+      (onRepeat !== undefined && typeof onRepeat !== 'function') ||
+      (repeat !== Infinity && (!Number.isInteger(repeat) || repeat < 0)) ||
+      typeof yoyo !== 'boolean'
     )
       throw new RangeError(
-        'Tween needs a finite numeric target property, finite to value, duration and delay of 0 or more, and function easing and onComplete; check the arguments.',
+        'Invalid tween; use finite duration and delay >= 0, an integer repeat >= 0 (or Infinity) and functions for callbacks',
       );
-    for (const track of this.tracks)
-      if (track.active && track.target === target && track.key === key) track.active = false;
     const track: Track = {
-      target,
-      key,
-      from,
-      to,
+      ...base,
       duration,
       delay,
       easing,
       complete: onComplete,
+      repeated: onRepeat,
+      cycles: repeat + 1,
+      yoyo,
+      cycle: 0,
       time: 0,
       active: true,
     };
@@ -79,6 +108,66 @@ export class Tween {
     return () => {
       track.active = false;
     };
+  }
+  /**
+   * Animate any value you can write from a progress number: `apply` receives the eased progress (0 at the start, 1 at
+   * the end, reversed on yoyo passes) every update. Use it for colours, quaternions, CSS, anything. Returns a cancel
+   * function.
+   * @throws RangeError for invalid timing options or when `apply` is not a function.
+   */
+  custom(apply: (progress: number) => void, options: TweenOptions): () => void {
+    if (typeof apply !== 'function')
+      throw new RangeError('Invalid tween; apply must be a function that takes the progress');
+    return this.add({ target: {}, key: '', from: 0, to: 1, apply }, options);
+  }
+  /**
+   * Animate an array (a position, a colour, a quaternion) from its current contents to `to`, in place. Blends with
+   * `interpolate` (default component-wise lerp; pass `slerpArray` for `[x, y, z, w]` rotations). Replaces any active
+   * tween of the same array.
+   * @throws RangeError for non-finite values, differing lengths or invalid timing options.
+   */
+  array(
+    target: number[] | Float32Array | Float64Array,
+    to: ArrayLike<number>,
+    { interpolate = lerpArray, ...options }: ArrayTweenOptions,
+  ): () => void {
+    if (
+      to.length !== target.length ||
+      Array.from(target)
+        .concat(Array.from(to))
+        .some((v) => !Number.isFinite(v))
+    )
+      throw new RangeError('Invalid tween; the arrays must have the same length and finite numbers');
+    for (const track of this.tracks) if (track.active && track.target === (target as unknown)) track.active = false;
+    const from = Float64Array.from(target),
+      end = Float64Array.from(to);
+    const cancel = this.add(
+      {
+        target: target as unknown as Record<string, number>,
+        key: '',
+        from: 0,
+        to: 1,
+        apply: (t) => interpolate(target, from, end, t),
+      },
+      options,
+    );
+    return cancel;
+  }
+  /**
+   * Move `target` along `path` (for example from `catmullRomPath`) as the tween progresses; `path(t, out)` must write
+   * the point at progress t into `out`.
+   * @throws RangeError for invalid timing options.
+   */
+  path(
+    target: number[] | Float32Array | Float64Array,
+    path: (t: number, out: number[]) => number[],
+    options: TweenOptions,
+  ): () => void {
+    const scratch = new Array<number>(target.length);
+    return this.custom((t) => {
+      path(t, scratch);
+      for (let i = 0; i < target.length; i++) target[i] = scratch[i];
+    }, options);
   }
   /**
    * Advance every active track by `delta` seconds (finite, >= 0), write the values and fire completions, then compact.
@@ -98,17 +187,37 @@ export class Tween {
         if (!track.active) continue;
         track.time += delta;
         if (track.time < track.delay) continue;
-        const t = track.duration ? Math.min(1, (track.time - track.delay) / track.duration) : 1,
-          eased = t === 1 ? 1 : track.easing(t);
+        const local = track.time - track.delay;
+        let t: number, done: boolean;
+        if (!track.duration) {
+          t = 1;
+          done = true;
+        } else {
+          const total = track.duration * track.cycles;
+          done = local >= total;
+          const cycle = done ? track.cycles - 1 : Math.floor(local / track.duration);
+          if (cycle !== track.cycle) {
+            track.cycle = cycle;
+            track.repeated?.();
+          }
+          const phase = done ? 1 : (local - cycle * track.duration) / track.duration;
+          t = track.yoyo && cycle % 2 === 1 ? 1 - phase : phase;
+        }
+        const eased = t === 1 ? 1 : t === 0 ? 0 : track.easing(t);
         if (!Number.isFinite(eased)) throw new RangeError('Easing must return a finite value');
-        const span = track.to - track.from;
-        track.target[track.key] =
-          t === 1
-            ? track.to
-            : Number.isFinite(span)
-              ? track.from + span * eased
-              : track.from * (1 - eased) + track.to * eased;
-        if (t === 1) {
+        if (track.apply) track.apply(eased);
+        else {
+          const span = track.to - track.from;
+          track.target[track.key] =
+            eased === 1
+              ? track.to
+              : eased === 0
+                ? track.from
+                : Number.isFinite(span)
+                  ? track.from + span * eased
+                  : track.from * (1 - eased) + track.to * eased;
+        }
+        if (done) {
           track.active = false;
           track.complete?.();
         }
