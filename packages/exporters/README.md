@@ -717,7 +717,7 @@ const usdz = exportUSDZ({
   ],
 });
 // usdz holds scene.usda and textures/albedo.png.
-``` Quick Look presentation remains untested on Apple hardware. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
+``` Quick Look presentation remains untested on Apple hardware. `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` (repository root, after `npm run build:packages`) writes the six small textured test scenes for that check (alpha mask, alpha blend, metal-rough with a normal map at scale 1 and 2, occlusion with emissive, texture transform with repeat and mirror wrapping) as `.usdz` files, with `.glb` twins the engine can draw as references; `tests/usdz-quicklook-kit.test.js` checks their layout. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
 
 ## Roblox GLB (`@margoengine/exporters/roblox`)
 
