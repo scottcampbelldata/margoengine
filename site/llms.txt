@@ -19,6 +19,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [Which import do I need?](https://margoengine.com/llms/docs/guides/imports.md): Which import to use: margoengine/<name> versus @margoengine/<name>
 - [Quality tiers: one app that runs at 60 FPS on a laptop and looks its best on a fast PC](https://margoengine.com/llms/docs/guides/quality-tiers.md): High and low quality tiers and how a page picks one
 - [Kits](https://margoengine.com/llms/docs/guides/kits.md): Kits: one import for a whole domain (CAD, games, viz, web)
+- [Prepare assets with margo-convert](https://margoengine.com/llms/docs/guides/asset-pipeline.md): margo-convert build: optimise, compress and package models for the web and for Unity, Unreal, Godot and Roblox
 - [Coming from three.js](https://margoengine.com/llms/docs/from-threejs.md): Moving from three.js: the same task in Margo, name by name
 - [Design envelope](https://margoengine.com/llms/docs/limits.md): Measured limits and sizes, with the commands that measure them
 - [Known bugs and unverified features](https://margoengine.com/llms/docs/known-bugs.md): Open bugs with repro and cause
