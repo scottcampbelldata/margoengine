@@ -13,9 +13,13 @@
 // - the worst case, 196,608 quads in one chunk layer (cutout and translucent), draws;
 // - no WebGPU validation errors; sane stats.
 // `--timing` adds a 16-chunk-radius synthetic world: spawn time, GPU time of the voxel passes (timestamp queries,
-// rough unless run behind scripts/quiet-gate.mjs) and the render bundle record cost.
+// rough unless run behind scripts/quiet-gate.mjs) and the render bundle record cost. `--repeat=<frames>` runs only
+// this: one still 4x view drawn frame after frame under CPU load, failing on any frame that differs from the first
+// (docs/known-bugs.md, "4x MSAA blending is not repeatable").
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
+import { availableParallelism } from 'node:os';
+import { Worker } from 'node:worker_threads';
 import { openBrowser } from '../../../scripts/browser.js';
 
 const path = '/packages/voxel/tests/render-browser-check.html',
@@ -23,7 +27,8 @@ const path = '/packages/voxel/tests/render-browser-check.html',
   context = await openBrowser({ startPath: path, port }),
   { page, hardware } = context,
   pageErrors = [],
-  report = { hardware, results: {} };
+  report = { hardware, results: {} },
+  repeat = Number(process.argv.find((a) => a.startsWith('--repeat='))?.slice(9) ?? 0);
 page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
@@ -35,7 +40,7 @@ const near = (actual, expected, label, tolerance = 2e-3) =>
   );
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
-  for (const samples of [4, 1]) {
+  for (const samples of repeat ? [] : [4, 1]) {
     await page.goto(`http://127.0.0.1:${port}${path}${samples === 1 ? '?samples=1' : ''}`);
     await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
     assert.equal(await page.evaluate(() => window.check.samples()), samples);
@@ -118,6 +123,26 @@ try {
       `ok ${samples}x worst case: 196,608 cutout and 196,608 translucent quads drawn (${wc.lit.join(', ')} px)`,
     );
   }
+  if (repeat) {
+    // Repro of docs/known-bugs.md "4x MSAA blending is not repeatable": the still tree-and-overhang view, frame after
+    // frame, with every core but one busy (the frames differ only while the CPU is loaded).
+    await page.goto(`http://127.0.0.1:${port}${path}`);
+    await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
+    const end = Date.now() + 30 * 60_000,
+      burners = Array.from(
+        { length: Math.max(1, availableParallelism() - 1) },
+        () => new Worker(`while (Date.now() < ${end}) for (let i = 0; i < 1e6; i++);`, { eval: true }),
+      );
+    try {
+      const r = await page.evaluate((n) => window.check.repeat(n, 'tree and overhang'), repeat);
+      assert.deepEqual(r.errors, []);
+      for (const d of r.differ.slice(0, 5)) console.log(`frame ${d.frame}: ${JSON.stringify(d)}`);
+      assert.equal(r.differ.length, 0, `4x tree and overhang: ${r.differ.length} of ${repeat} still frames differ`);
+      console.log(`ok 4x tree and overhang: ${repeat} still frames under CPU load drew the same pixels`);
+    } finally {
+      await Promise.all(burners.map((w) => w.terminate()));
+    }
+  }
   if (process.argv.includes('--timing')) {
     await page.goto(`http://127.0.0.1:${port}${path}`);
     await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
@@ -127,7 +152,7 @@ try {
     console.log(`timing (rough: no quiet gate) ${JSON.stringify(t)}`);
   }
   assert.deepEqual(pageErrors, []);
-  await writeFile('test-results/voxel-render-browser-check.json', JSON.stringify(report, null, 1));
+  if (!repeat) await writeFile('test-results/voxel-render-browser-check.json', JSON.stringify(report, null, 1));
   console.log('voxel render browser check passed');
 } finally {
   await context.close();

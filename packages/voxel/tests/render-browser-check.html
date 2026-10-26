@@ -166,6 +166,14 @@ window.check={
   reversed=false;
   return {results:Object.fromEntries(views.map((v,i)=>[v.name,compare(images[1][i],images[0][i],[0,0,0])])),arrivals,errors:errors.splice(0)};
  },
+ // One renderer, one still view, n frames: the frames that differ from the first (docs/known-bugs.md, "4x MSAA
+ // blending is not repeatable"). Nothing changes between the frames: no upload, no re-sort, the same uniforms.
+ async repeat(n,view){
+  look(views[0]);renderer=attach(world,keys,'greedy',4);await ready(renderer,world,keys,'greedy');
+  look(views.find((v)=>v.name===view));const first=await shot(),differ=[];
+  for(let i=0;i<n;i++){const c=compare(await shot(),first,[0,0,0]);if(c.differing)differ.push({frame:i,...c});}
+  renderer.dispose();return {differ,errors:errors.splice(0)};
+ },
  // T-junction cracks: pixels of the slab where the naive image is the slab colour and the greedy one is not.
  async cracks(){
   const l=runtime().lighting,saved=[l.direction.slice(),l.radiance.slice()];l.direction[3]=0;l.radiance[3]=0;

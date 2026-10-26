@@ -2520,6 +2520,31 @@ does not own. Each entry says exactly what is needed to close it.
   WebGPU XR binding (`XRGPUBinding`), or an AR headset with the same; then a reticle placed on a real floor and a real
   table (viewer source) and by screen tap (transient source), one placement anchored, and the result recorded here.
 
+## Open defects
+
+### 4x MSAA blending is not repeatable on the RTX A6000 under CPU load
+
+- **What:** the voxel GPU check (`packages/voxel/tests/render-browser-check.mjs`, run by `check:merge`) fails now and
+  then in a busy run at its "tree and overhang" view, at 4x MSAA: "meshes in another order drew {differing:36, max:1}"
+  (mesh arrival order step) and "greedy vs naive differ over an area" (same view, same pixels). Run alone it passes.
+- **Repro:** `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/voxel/tests/render-browser-check.mjs
+  --repeat=450`: one renderer, the still view drawn 450 times while the other cores spin. 1 to 3 frames in 450 differ
+  from the first by 1 in 8 bits (1 ulp on rgba16float) on 13 to 82 pixels, then the next frame is back (Edge and
+  Chrome, Dawn D3D12, RTX A6000, driver 32.0.16.1742, 2026-10-26).
+- **Cause (measured; below the WebGPU API):** every differing pixel is seen through the glass wall, along glass and
+  terrain edges (pixels whose samples hold more than one surface). Between the frames nothing that Margo hands the GPU
+  changes: no buffer write but the frame uniform and indirect arguments, bit for bit the same each frame; the glass
+  quads in the same order. The frames stay identical at 1x, without the glass, with the glass drawn unblended, with
+  blending on but the destination factor zero, with the glass drawn in the opaque pass, without core's mid-frame
+  resolve and with Dawn's D3D12 render-pass toggle off; they still differ with `max` blending, which does not depend
+  on order. So the GPU's blend unit reads the 4x colour target's destination samples differently from frame to frame
+  at partly covered pixels. Mesh arrival order is not involved: 168 permutations of the mesh replies drew the same
+  pixels on a quiet machine. Another vendor's GPU was not available to compare (the AMD iGPU offers no WebGPU
+  adapter).
+- **Needed to close:** the same repro on another GPU (AMD, Intel, another NVIDIA driver) to confirm it is this driver,
+  then a report to NVIDIA with the repro; and a decision on how the exact-pixel GPU checks treat blended 4x views on a
+  GPU that does not repeat them (the comparison itself must stay exact).
+
 ## Performance losses still open
 
 Measured but not fixed. Their history, sources and rerun commands are in
