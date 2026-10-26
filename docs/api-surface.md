@@ -36,10 +36,10 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/fsm | `.` 3 |  |  | 971 |
 | @margoengine/geometry | `.` 64, `./shapes` 20, `./triangulate` 5, `./extrude` 3, `./primitives` 17, `./utils` 21, `./extras` 6 | 15 |  | 20,231 |
 | @margoengine/gltf | `.` 4 |  |  | 5,720 |
-| @margoengine/gltf-pro | `.` 43, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 261 |  | 43,652 |
+| @margoengine/gltf-pro | `.` 43, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 324 |  | 43,652 |
 | @margoengine/html | `.` 7 |  |  | 4,851 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,568 |
-| @margoengine/input | `.` 12 |  |  | 2,416 |
+| @margoengine/input | `.` 12 |  |  | 4,912 |
 | @margoengine/inspector | `.` 2, `./frame` 16 | 1 |  | 5,074 |
 | @margoengine/kinematics-constraints | `.` 18 |  |  | 6,732 |
 | @margoengine/labels | `.` 19 | 2 |  | 4,581 |
@@ -79,7 +79,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/taa | `.` 7 |  |  | 9,819 |
 | @margoengine/terrain | `.` 13 | 2 |  | 10,289 |
 | @margoengine/text | `.` 35 | 2 |  | 15,647 |
-| @margoengine/tonemap | `.` 7 |  |  | 8,391 |
+| @margoengine/tonemap | `.` 7 |  |  | 10,825 |
 | @margoengine/toon | `.` 2 |  |  | 1,484 |
 | @margoengine/transitions | `.` 2 |  |  | 4,083 |
 | @margoengine/tween | `.` 6 |  |  | 887 |

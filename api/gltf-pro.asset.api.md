@@ -337,6 +337,7 @@ class PBRInstances {
     get needsUpdate(): boolean;
     set needsUpdate(v: boolean);
     setMatrixAt(i: number, m: ArrayLike<number>): this;
+    setMatrices(start: number, matrices: ArrayLike<number>): this;
     getMatrixAt<T extends {
         [k: number]: number;
     } = Float32Array>(i: number, out?: T): T;

@@ -204,6 +204,17 @@ export interface PBRDeviceRenderer {
 
 export class PBRDrawRun {
     pass?: GPURenderPassEncoder;
+    readonly frames: DrawFrame[];
+    lastFrame?: DrawFrame;
+    lastContext?: Context;
+    lastDescriptor?: unknown;
+    readonly bindings: PassBindings;
+    device?: GPUDevice;
+    readonly view: RunView;
+    readonly pending: PendingBatch[];
+    readonly spare: PendingBatch[];
+    readonly batches: Map<DrawDerivation, PendingBatch[]>;
+    quickFor(c: Context): QuickRun;
     end(): void;
 }
 
@@ -322,6 +333,9 @@ export class PBRModel implements EnginePlugin {
         view: ArrayLike<number>;
         depthCompare: GPUCompareFunction;
     }, carry?: PBRDrawRun): void;
+    joinRun(c: Context, run: PBRDrawRun, phase: 'all' | 'opaque' | 'blend', quick: QuickRun, viewAt: GPUBufferBinding): boolean;
+    drawBatch(batch: PendingBatch, run: PBRDrawRun): void;
+    drawOwn(r: DrawResource, batch: PendingBatch, run: PBRDrawRun, scratch: DrawScratch): void;
     createRenderer(device: GPUDevice): PBRDeviceRenderer;
     clusteredLights(): GLTFClusteredLight[];
     extras(): GLTFNodeExtras[];
@@ -431,6 +445,18 @@ export function viewGLTFCamera(model: PBRModel, camera?: number | GLTFCamera): v
 
 // Not exported from this entry, but used by the exports above:
 
+class Arena {
+    readonly device: GPUDevice;
+    readonly unit: number;
+    readonly chunks: Chunk[];
+    dirty: boolean;
+    draws: number;
+    readonly idle: (() => void)[];
+    constructor(device: GPUDevice);
+    allocate(floats: number, shared: boolean): UniformSlot;
+    free(slot: UniformSlot): void;
+}
+
 interface AssetOptions {
     signal?: AbortSignal;
     decoders?: GLTFDecoderHooks;
@@ -441,6 +467,47 @@ interface AssetOptions {
     maxNodes?: number;
 }
 
+class BatchInstances {
+    data: Float32Array<ArrayBuffer>;
+    buffer?: GPUBuffer;
+    holds(matrices: readonly ArrayLike<number>[]): boolean;
+    write(device: GPUDevice, matrices: readonly ArrayLike<number>[]): GPUBuffer;
+    destroy(device: GPUDevice): void;
+}
+
+class BatchKind {
+    readonly mirrored: boolean;
+    readonly layout: GPUVertexBufferLayout;
+    constructor(mirrored: boolean);
+    shader(code: string): string;
+}
+
+interface BatchPart {
+    primitive: PBRPrimitive;
+    stamp: Float32Array;
+    vertices: Float32Array;
+    indices: Uint32Array;
+}
+
+interface BatchState {
+    instances: BatchInstances;
+    uniform: UniformSlot;
+    groups: Map<GPURenderPipeline, Map<GPUBufferBinding, GPUBindGroup>>;
+    frame: number;
+    view: object;
+}
+
+interface Chunk {
+    buffer: GPUBuffer;
+    cpu: Float32Array<ArrayBuffer>;
+    used: number;
+    live: number;
+    units: number;
+    lo: number;
+    hi: number;
+    free: Map<number, number[]>;
+}
+
 type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
@@ -448,6 +515,126 @@ type Context = Extract<PassContext, {
 type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+interface CoordinateExtension {
+    extension: MaterialExtension;
+    source?: MaterialExtension;
+    length: number;
+    transforms: readonly (Float32Array | undefined)[];
+}
+
+interface DeviceDraws {
+    codes: Map<string, number>;
+    codeCount: number;
+    pipelines: Map<string, GPURenderPipeline>;
+    derivations: WeakMap<object, DrawDerivation[]>;
+}
+
+interface DrawDerivation {
+    frame: DrawFrame;
+    source: MaterialExtension | undefined;
+    instances: PBRInstances | BatchKind | undefined;
+    topology: GPUPrimitiveTopology | undefined;
+    sign: number;
+    complete: boolean;
+    compact: boolean;
+    floatCount: number;
+    replacesTextures: boolean;
+    extension: MaterialExtension | undefined;
+    pipeline: GPURenderPipeline;
+    tint: GPURenderPipeline | undefined;
+    tinted: boolean;
+    blend: boolean;
+    state: PBRRenderState | undefined;
+    effectBindings: boolean;
+    effect: {
+        entries: GPUBindGroupEntry[];
+        group: GPUBindGroup;
+    } | undefined;
+    tintEffect: {
+        entries: GPUBindGroupEntry[];
+        group: GPUBindGroup;
+    } | undefined;
+    mappedTint: boolean;
+    modelFree: boolean;
+    joined?: object;
+    joinedRun?: object;
+    block: Float32Array;
+}
+
+interface DrawFrame {
+    mode: string;
+    depthCompare: GPUCompareFunction | undefined;
+    format: GPUTextureFormat;
+    samples: number | undefined;
+    depthFormat: GPUTextureFormat;
+    section: GPUBuffer | undefined;
+    oit: object | undefined;
+    hook: object | undefined;
+    hooks: GLTFExtendedMaterials | undefined;
+    lighting: readonly LightingEffect[];
+}
+
+type DrawGroups = GPUBindGroup[] & {
+    view?: GPUBufferBinding;
+};
+
+interface DrawResource {
+    primitive: PBRPrimitive;
+    device: GPUDevice;
+    vertex: GPUBuffer;
+    index: GPUBuffer;
+    wireframe?: {
+        index: GPUBuffer;
+        count: number;
+    };
+    uniform: UniformSlot;
+    volume?: GPUBuffer;
+    volumeData?: Float32Array;
+    volumeWritten?: GPUBuffer;
+    values: Float32Array;
+    groups: Map<GPURenderPipeline, DrawGroups>;
+    copies?: Map<GPUBuffer, Map<GPUBufferBinding | undefined, Map<GPURenderPipeline, GPUBindGroup>>>;
+    sectionBuffer?: GPUBuffer;
+    views: GPUTextureView[];
+    samplers: GPUSampler[];
+    replacesTextures?: boolean;
+    extension?: MaterialExtensionResource;
+    coordinates?: CoordinateExtension;
+    mergedInto?: DrawResource;
+    batch?: StaticBatch;
+    edited?: boolean;
+    batchStates?: Map<DrawDerivation, BatchState[]>;
+}
+
+interface DrawScratch {
+    context?: Context;
+    matrices: ArrayLike<number>[];
+    batchValues: Float32Array;
+    viewData: Float32Array;
+    bound: PassBindings;
+    projection: Float32Array;
+    view: Float32Array;
+    eye: Float32Array;
+    resources: DrawResource[];
+    effects: LightingEffect[];
+    entries: GPUBindGroupEntry[];
+    color: GPURenderPassColorAttachment;
+    depth: GPURenderPassDepthStencilAttachment;
+    descriptor: GPURenderPassDescriptor;
+    compare: (a: DrawResource, b: DrawResource) => number;
+    code: string;
+    ambient: boolean;
+    effectCount: number;
+    liveBatches: Map<StaticBatch, boolean>;
+    blendDistance: Map<DrawResource, number>;
+}
+
+interface ExtensionGroup {
+    entries: GPUBindGroupEntry[];
+    group: GPUBindGroup;
+    gap?: GPUBindGroup;
+}
 
 interface GLTFAccessor extends GLTFProperty {
   bufferView?: number;
@@ -696,6 +883,13 @@ interface GLTFTextureTransform {
   texCoord?: number;
 }
 
+interface MaterialExtensionResource {
+    uniform?: GPUBuffer;
+    bytes: number;
+    entries: GPUBindGroupEntry[];
+    groups: Map<GPURenderPipeline, ExtensionGroup>;
+}
+
 class PBRInstances {
     readonly data: Float32Array;
     readonly capacity: number;
@@ -705,6 +899,7 @@ class PBRInstances {
     get needsUpdate(): boolean;
     set needsUpdate(v: boolean);
     setMatrixAt(i: number, m: ArrayLike<number>): this;
+    setMatrices(start: number, matrices: ArrayLike<number>): this;
     getMatrixAt<T extends {
         [k: number]: number;
     } = Float32Array>(i: number, out?: T): T;
@@ -718,6 +913,46 @@ class PBRInstances {
     get layout(): GPUVertexBufferLayout;
     shader(code: string): string;
     bounds(node: ArrayLike<number>, vertices: Float32Array, out: Float32Array): void;
+}
+
+interface PassBindings {
+    pass: GPURenderPassEncoder | undefined;
+    pipeline?: GPURenderPipeline;
+    groups: (GPUBindGroup | undefined)[];
+    vertex?: GPUBuffer;
+    instances?: GPUBuffer;
+    index?: GPUBuffer;
+}
+
+interface PendingBatch {
+    model: PBRModel;
+    owner: DrawResource;
+    d: DrawDerivation;
+    c: Context;
+    view: object;
+    viewAt: GPUBufferBinding;
+    members: DrawResource[];
+    models: PBRModel[];
+    nodes: Mesh[];
+}
+
+interface QuickRun {
+    c: Context;
+    section: GPUBuffer | undefined;
+    draws: DeviceDraws;
+    opaque: boolean;
+    viewChecked: boolean;
+    frame: DrawFrame | undefined;
+    lighting: readonly LightingEffect[] | undefined;
+    oit: object | undefined;
+    hook: object | undefined;
+    hooks: GLTFExtendedMaterials | undefined;
+}
+
+interface RunView {
+    data: Float32Array;
+    format: GPUTextureFormat | undefined;
+    at: GPUBufferBinding | undefined;
 }
 
 interface ShadowCasterRecord {
@@ -738,5 +973,27 @@ interface ShadowCasterRecord {
     displacement?: PBRMaterial['displacement'];
     clip?: GPUBufferBinding;
     dynamic: boolean;
+}
+
+interface StaticBatch {
+    node: Mesh;
+    material: PBRMaterial;
+    primitive: PBRPrimitive;
+    parts: BatchPart[];
+}
+
+class UniformSlot {
+    readonly chunk: Chunk;
+    readonly offset: number;
+    readonly floats: number;
+    readonly units: number;
+    readonly shared: boolean;
+    readonly binding: GPUBufferBinding;
+    constructor(arena: Arena, chunk: Chunk, offset: number, floats: number, units: number,
+    shared: boolean);
+    write(data: Float32Array, view: object): GPUBufferBinding | undefined;
+    get contents(): Float32Array;
+    get destroyed(): boolean;
+    destroy(): void;
 }
 ```
