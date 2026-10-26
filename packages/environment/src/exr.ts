@@ -1,6 +1,6 @@
 // OpenEXR scanline decoder for single-part scanline files with
 // NONE, RLE, ZIPS, ZIP or PIZ compression and HALF, FLOAT or UINT channels.
-import { halfToFloat } from './half.js';
+import { halfFloats } from './half.js';
 import { inflateZlib } from '../../shared/inflate.js';
 import { MAX_PIXELS, toBytes, type FloatImage } from './hdr.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -248,6 +248,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     else if (compression === 'ZIP' || compression === 'ZIPS') raw = unpredict(inflateZlib(packed, expected));
     else raw = decodePizChunk(packed, expected, channels, width, lines);
     const raw16 = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+    const halves = halfFloats();
     for (let line = 0; line < lines; line++) {
       const row = index * linesPerBlock + line,
         lineStart = line * lineBytes;
@@ -259,7 +260,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
           target = row * width * 4 + component;
         if (type === 'HALF')
           for (let x = 0; x < width; x++, source += 2, target += 4)
-            data[target] = halfToFloat(raw16.getUint16(source, true));
+            data[target] = halves[raw[source] | (raw[source + 1] << 8)];
         else if (type === 'FLOAT')
           for (let x = 0; x < width; x++, source += 4, target += 4) data[target] = raw16.getFloat32(source, true);
         else for (let x = 0; x < width; x++, source += 4, target += 4) data[target] = raw16.getUint32(source, true);
@@ -305,14 +306,15 @@ function rleDecode(packed: Uint8Array, expected: number): Uint8Array {
  * rest the odd-indexed ones.
  */
 function unpredict(stored: Uint8Array): Uint8Array {
-  const n = stored.length;
-  const summed = new Uint8Array(n);
-  if (n) summed[0] = stored[0];
-  for (let i = 1; i < n; i++) summed[i] = (summed[i - 1] + stored[i] - 128) & 255;
-  const out = new Uint8Array(n);
-  const half = (n + 1) >> 1;
-  for (let i = 0; i < half; i++) out[2 * i] = summed[i];
-  for (let i = half; i < n; i++) out[2 * (i - half) + 1] = summed[i];
+  // One pass: the running sum stays in a register and lands straight in its de-interleaved slot.
+  const n = stored.length,
+    out = new Uint8Array(n),
+    half = (n + 1) >> 1;
+  if (!n) return out;
+  let sum = stored[0];
+  out[0] = sum;
+  for (let i = 1; i < half; i++) out[2 * i] = sum = (sum + stored[i] - 128) & 255;
+  for (let i = half, o = 1; i < n; i++, o += 2) out[o] = sum = (sum + stored[i] - 128) & 255;
   return out;
 }
 

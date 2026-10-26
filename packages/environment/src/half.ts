@@ -13,6 +13,19 @@ export function halfToFloat(bits: number): number {
   return sign * (1 + mantissa / 1024) * 2 ** (exponent - 15);
 }
 
+let table: Float32Array | undefined;
+/**
+ * Every binary16 pattern decoded once (halfToFloat of each index, 256 KiB, built on first use). Every half value is
+ * exact in float32, so a lookup equals the computed value, about 10x faster than computing each texel.
+ */
+export function halfFloats(): Float32Array {
+  if (!table) {
+    table = new Float32Array(65536);
+    for (let bits = 0; bits < 65536; bits++) table[bits] = halfToFloat(bits);
+  }
+  return table;
+}
+
 /** Encodes a number as binary16 with round-to-nearest-even. Values beyond 65504 become infinity, NaN stays NaN. */
 export function floatToHalf(value: number): number {
   floatView[0] = value;

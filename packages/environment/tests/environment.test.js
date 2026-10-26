@@ -22,6 +22,7 @@ import {
   iblLayoutEntries,
 } from '../dist/index.js';
 import { SKY, decodeRGBE, skyRGBE } from '../scripts/make-hdr-fixture.js';
+import { halfFloats } from '../src/half.ts';
 
 const fixtures = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const fixture = (name) => readFileSync(fixtures + name);
@@ -51,6 +52,35 @@ test('binary16 round trip covers every finite and special half value', () => {
   assert.equal(floatToHalf(2 ** -25), 0, 'ties to even at the smallest subnormal');
   assert.equal(floatToHalf(1 + 2 ** -11), 0x3c00, 'ties to even');
   assert.equal(floatToHalf(1 + 3 * 2 ** -11), 0x3c02);
+});
+
+test('the half lookup table equals halfToFloat for every pattern, and BrightRings parses fast (p-exr-load)', () => {
+  // Regression: parseEXR computed halfToFloat (a 2 ** n per texel) and unpredicted ZIP chunks in three passes, 34 ms
+  // for the 800 x 800 BrightRings (the p-exr-load parity row); the table and one pass make it about 13.
+  const table = halfFloats();
+  for (let bits = 0; bits < 65536; bits++) assert.ok(same(table[bits], Math.fround(halfToFloat(bits))), `${bits}`);
+  if (!existsSync(fixtures + 'BrightRings.exr')) return;
+  // Timed against the per-texel conversion alone, on the same machine and load: the old parse did that and more.
+  const bytes = fixture('BrightRings.exr'),
+    texels = new Uint16Array(parseEXR(bytes).data.length).map((_, i) => (i * 40503) & 0xffff),
+    out = new Float32Array(texels.length),
+    best = (f) => {
+      let ms = Infinity;
+      for (let i = 0; i < 7; i++) {
+        const s = performance.now();
+        f();
+        ms = Math.min(ms, performance.now() - s);
+      }
+      return ms;
+    },
+    parse = best(() => parseEXR(bytes)),
+    convert = best(() => {
+      for (let i = 0; i < texels.length; i++) out[i] = halfToFloat(texels[i]);
+    });
+  assert.ok(
+    parse < convert,
+    `parse ${parse.toFixed(1)} ms is not below halfToFloat per texel ${convert.toFixed(1)} ms`,
+  );
 });
 
 // ------------------------------------------------------------------ OpenEXR

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { P3_TO_SRGB } from '../../math/dist/color.js';
 import { pbrShader } from '../../gltf-pro/src/shader.ts';
-import { toHalf } from '../src/texture-kinds.ts';
+import { toHalf, toHalfArray } from '../src/texture-kinds.ts';
 import { CubeTexture, Material, Texture, WgslMaterial, loadKTX2Texture } from '../dist/index.js';
 
 function device(features = []) {
@@ -60,6 +60,25 @@ test('half floats round to nearest even, keep subnormals and overflow to infinit
     [0x3c00, 0x3800, 0xc000, 0x7bff, 0x7c00, 0x7c00, 1, 0, 0x2e66, 0x8000],
   );
   assert.equal(toHalf(Number.NaN) & 0x7c00, 0x7c00);
+});
+
+test('bulk half conversion equals toHalf per value and is fast on large images (p-hdr-load, p-exr-load)', () => {
+  // Regression: Float32Array data converted with Uint16Array.from(data, toHalf) took about 165 ms for one 800 x 800
+  // RGBA image (most of the p-hdr-load and p-exr-load parity rows).
+  const bits = new Uint32Array(1 << 20);
+  let seed = 7;
+  for (let i = 0; i < bits.length; i++) bits[i] = seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+  const values = new Float32Array(bits.buffer),
+    expected = Uint16Array.from(values, toHalf);
+  for (const native of [true, false]) {
+    assert.deepEqual(toHalfArray(values, native), expected, `native ${native}`);
+    const big = new Float32Array(4_194_304).map((_, i) => (i % 9973) * 0.37 - 900);
+    toHalfArray(big, native);
+    const s = performance.now();
+    toHalfArray(big, native);
+    const ms = performance.now() - s;
+    assert.ok(ms < 120, `4M values took ${ms.toFixed(0)} ms (native ${native}); the per-value callback took ~400`);
+  }
 });
 
 test('float, one- and two-channel, 3D and array data allocate and upload as given', () => {
