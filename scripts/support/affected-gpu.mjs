@@ -74,7 +74,7 @@ export function workspaceOf(workspaces, file) {
 
 /** Why a file forces the full run, or undefined. Documents never do; WGSL inside a package belongs to that package. */
 export function fullReason(file, workspaces) {
-  if (file.endsWith('.md')) return undefined;
+  if (file.endsWith('.md') || isQualityBaseline(file)) return undefined;
   if (
     /(^|\/)package\.json$/.test(file) ||
     /(^|\/)(package-lock|npm-shrinkwrap)\.json$/.test(file) ||
@@ -94,10 +94,14 @@ export function fullReason(file, workspaces) {
   return undefined;
 }
 
+/** The quality gate's recorded baselines: data that only `npm run quality` reads, so a new baseline changes no GPU test. */
+export const isQualityBaseline = (file) => /^scripts\/quality\/baselines\/[\w.-]+\.json$/.test(file);
+
 /** True for files that never change what a GPU test draws or checks (documents, licences, site pages, ignore files). */
 export function isInert(file) {
   return (
     file.endsWith('.md') ||
+    isQualityBaseline(file) ||
     /^(LICENSE|NOTICE|\.gitignore|\.gitattributes)$/.test(file) ||
     file.startsWith('docs/') ||
     file.startsWith('site/') ||

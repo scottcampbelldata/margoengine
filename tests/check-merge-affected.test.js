@@ -112,6 +112,7 @@ test('documents, site pages and licences change nothing on the GPU; a catalog as
     'site/index.html',
     'LICENSE',
     'AGENTS.md',
+    'scripts/quality/baselines/sizes.json', // a recorded baseline, read only by npm run quality
   ]) {
     const result = run([file]);
     assert.equal(result.mode, 'affected', file);
