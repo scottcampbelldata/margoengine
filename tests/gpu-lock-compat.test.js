@@ -93,12 +93,17 @@ test('a new exclusive holder blocks an old client', () =>
     (await oldWaiter)();
   }));
 
+// The freshness window (MARGO_GPU_FRESH_MS, read on every poll) is set wide while a test checks "inside the window" and
+// to zero for "past it": with a 300 ms window a loaded machine (8 test files at once) sometimes let it pass before the
+// first poll, and the request got the lock it should have waited for.
 test('a just-made empty folder is an old client between its mkdir and owner.json: waited for, then ignored', () =>
   withBoth(async ({ now, lock }) => {
+    process.env.MARGO_GPU_FRESH_MS = '60000';
     mkdirSync(lock);
     const next = takeNew(now, 'new');
     assert.equal(await settled(next, 100), 'waiting', 'inside the window it counts as a holder');
     // No owner.json ever came: an empty, ownerless folder past the window is stale and is used.
+    process.env.MARGO_GPU_FRESH_MS = '0';
     assert.equal(await settled(next, 2000), 'got');
     (await next)();
     assert.equal(existsSync(lock), false, 'and it is tidied away on release');
@@ -148,10 +153,12 @@ test('a waiting request leaves no empty lock folder behind, which would make old
 
 test('an owner.json still being written counts as a holder; an unreadable old one is stale', () =>
   withBoth(async ({ now, lock }) => {
+    process.env.MARGO_GPU_FRESH_MS = '60000';
     mkdirSync(lock);
     writeFileSync(join(lock, 'owner.json'), '{"owner":');
     const next = takeNew(now, 'new');
     assert.equal(await settled(next, 100), 'waiting');
+    process.env.MARGO_GPU_FRESH_MS = '0';
     assert.equal(await settled(next, 2000), 'got');
     (await next)();
   }));
