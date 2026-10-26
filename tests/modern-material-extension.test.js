@@ -9,9 +9,9 @@ import { optionalGPU, uniformBytes } from './support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 // Degenerate tangent frames use a finite orthogonal basis; ordinary UV paths retain this shared shader.
-const baselineShader = '4e13d042e658461c784079b662c401cc4b830980feab5280a591c90d55c6ea75';
+const baselineShader = '522dffb290fb1910a93a43e10fb3c1e508b95b02470f6e8e2deef9a937896bb4';
 // The missing normal-map factor is zero; Camera.up-aware view math also preserves its signed-zero lanes.
-const baselineFrame = '0abd32314fbc275319398c26b44726992318ed9a3dce2870d43ae10efa40bf01';
+const baselineFrame = '611297c77674bf4a5642e187218a161e688e4b0cca3155598ff5768c34ecdba4';
 
 async function scene(primitiveCount = 1) {
   const harness = optionalGPU(),
@@ -115,7 +115,7 @@ test('unextended PBR retains the exact baseline shader, frame bytes, pipeline an
       priorNormalFactor[82] = 1;
       assert.equal(
         digest(new Uint8Array(priorNormalFactor.buffer)),
-        '4cb2947198324e7f284d979fc29c0930898f8bd11408b656a9d44cfdf1aee2a0',
+        '5620f2b09f739759ce1f9d9eb81a606f2b9d380c262dcb66b7729d3036e4cabc',
         'Only the absent normal-map factor changes from the preceding frame baseline',
       );
       assert.equal(
@@ -124,9 +124,10 @@ test('unextended PBR retains the exact baseline shader, frame bytes, pipeline an
         'Only the packed frame is uploaded, once: the other passes of the frame see the same values',
       );
       assert.deepEqual([...draw.groups.keys()], [0, 1]);
+      // The draw's own frame, then the view block (camera, light, target) that every draw of the view shares.
       assert.deepEqual(
         draw.groups.get(0).entries.map((entry) => entry.binding),
-        [0],
+        [0, 3],
       );
       assert.deepEqual(
         draw.groups.get(1).entries.map((entry) => entry.binding),

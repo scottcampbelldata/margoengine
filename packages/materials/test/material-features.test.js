@@ -567,12 +567,12 @@ test('fog false keeps a lit material out of the scene fog; toneMapped false clam
     ],
     meshes = materials.map((m) => createMesh(s.engine, quad, m));
   for (const mesh of meshes) fog.add(mesh);
-  const lit = codes(s.frame()).filter((c) => c.includes('fogAmount(i.position,f.eye.xyz)'));
+  const lit = codes(s.frame()).filter((c) => c.includes('fogAmount(i.position,margoView.eye.xyz)'));
   const phong = lit.find((c) => c.includes('mat_phong')),
     lambert = lit.find((c) => c.includes('fn margoFront(s:Surface)') && !c.includes('mat_phong')),
     both = lit.find((c) => c.includes('margoUnfogged') && c.includes('margoNeutral'));
   assert.ok(
-    phong.includes(',fogAmount(i.position,f.eye.xyz));if(f.settings.w<0.5) {}color=margoUnfogged;'),
+    phong.includes(',fogAmount(i.position,margoView.eye.xyz));if(margoView.flags.x<0.5) {}color=margoUnfogged;'),
     'fog mixed, then dropped',
   );
   assert.ok(!phong.includes('margoNeutral'), 'still tone mapped');
@@ -679,7 +679,9 @@ test('WgslMaterial splices shade() and displace(), binds its uniforms and textur
   const code = codes(log).find((c) => c.includes('fn shade('));
   assert.ok(
     code.startsWith(
-      'struct WgslUniforms {@align(16) tint:vec3f, @align(16) gain:f32}\n@group(2) @binding(48) var<uniform> uniforms:WgslUniforms;\n@group(2) @binding(50) var noise:texture_2d<f32>;\n@group(2) @binding(51) var noiseSampler:sampler;\n',
+      // The view block (camera, light, target) every draw shares, then the material's declarations.
+      'struct MargoView {camera:mat4x4f, view:mat4x4f, eye:vec4f, light:vec4f, radiance:vec4f, flags:vec4f}\n@group(0) @binding(3) var<uniform> margoView:MargoView;\n' +
+        'struct WgslUniforms {@align(16) tint:vec3f, @align(16) gain:f32}\n@group(2) @binding(48) var<uniform> uniforms:WgslUniforms;\n@group(2) @binding(50) var noise:texture_2d<f32>;\n@group(2) @binding(51) var noiseSampler:sampler;\n',
     ),
   );
   assert.ok(

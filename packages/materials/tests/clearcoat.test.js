@@ -10,7 +10,7 @@ import { materialQuad } from '../../../tests/support/materials-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
-const baselineShader = '4e13d042e658461c784079b662c401cc4b830980feab5280a591c90d55c6ea75';
+const baselineShader = '522dffb290fb1910a93a43e10fb3c1e508b95b02470f6e8e2deef9a937896bb4';
 
 async function scene(definition, images = [], configure = () => {}) {
   const harness = optionalGPU(),

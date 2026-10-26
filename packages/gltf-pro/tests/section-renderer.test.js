@@ -6,7 +6,7 @@ import { GLTFAsset, parseGLTF } from '../dist/index.js';
 import { PBRInstances } from '../dist/instancing.js';
 import { SectionPlanes } from '../../machinery/dist/index.js';
 import { wgsl } from '../../core/src/shaders.ts';
-import { compactTests, pbrShader } from '../src/shader.ts';
+import { compactTests, pbrShader, viewShader } from '../src/shader.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 async function fixture(t, { transmission = false } = {}) {
@@ -122,10 +122,10 @@ function assertClipped(draw) {
 test('loaded Box.glb retains the original PBR shader and bindings without SectionPlanes', async (t) => {
   const f = await fixture(t),
     [draw] = f.frame();
-  assert.equal(draw.pipeline.fragment.module.code, compactTests(pbrShader));
+  assert.equal(draw.pipeline.fragment.module.code, viewShader(compactTests(pbrShader)));
   assert.deepEqual(
     draw.groups.get(0).entries.map((entry) => entry.binding),
-    [0],
+    [0, 3],
   );
   assert.equal(draw.count, 36);
 });
@@ -168,10 +168,10 @@ test('loaded Box.glb section toggles and buffer replacement keep pipelines and r
   assert.notEqual(sectionBuffer(next), buffer);
   assert.deepEqual([...new Float32Array(sectionBuffer(next).data).slice(0, 4)], [0, 1, 0, 0.25]);
   const [plain] = f.frame();
-  assert.equal(plain.pipeline.fragment.module.code, compactTests(pbrShader));
+  assert.equal(plain.pipeline.fragment.module.code, viewShader(compactTests(pbrShader)));
   assert.deepEqual(
     plain.groups.get(0).entries.map((entry) => entry.binding),
-    [0],
+    [0, 3],
   );
 });
 

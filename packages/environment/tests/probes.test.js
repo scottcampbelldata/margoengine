@@ -269,7 +269,7 @@ test('LightProbes reach gltf-pro models through the ambient hook and the bake ca
     .find((code) => code.includes('fn surface('));
   assert.match(
     modelCode,
-    /let margoAmbient=probeShade\(i\.position,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness,\(s\.base\.rgb\*\(1\.0-s\.metal\)[^;]+\*f\.radiance\.w\)\*s\.occlusion;/,
+    /let margoAmbient=probeShade\(i\.position,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness,\(s\.base\.rgb\*\(1\.0-s\.metal\)[^;]+\*margoView\.radiance\.w\)\*s\.occlusion;/,
   );
   assert.match(
     modelCode,

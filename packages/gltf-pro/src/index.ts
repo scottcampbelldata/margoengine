@@ -16,6 +16,17 @@ import { applyView, inView } from '../../shared/view-rect.js';
 import { attenuationPower } from '../../shared/attenuation.js';
 import { beginDraw, endDraw, recording, retire } from '../../shared/frame-resources.js';
 import { acquireUniform, flushUniforms, type UniformSlot } from './uniform-arena.js';
+import {
+  deviceDraws,
+  derivationLimit,
+  objectId,
+  sameFrame,
+  sameLighting,
+  type DeviceDraws,
+  type DrawDerivation,
+  type DrawFrame,
+} from './draw-memo.js';
+import { viewBinding, viewFloats, viewPipelines } from './view-uniform.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/mesh-source.js';
@@ -52,6 +63,7 @@ import {
   transmissionPBR,
   texturedTintPBR,
   compactTests,
+  viewShader,
   type ExtendedPlan,
   type PBRLighting,
   type PBRTransparency,
@@ -228,6 +240,80 @@ export interface PBRPickingGeometry {
   nodeIndex?: number;
 }
 const opaquePasses = new WeakMap<Context, Set<PBRModel>>();
+/** What a pass has bound: draws on it set a pipeline, group or buffer only when it differs. */
+interface PassBindings {
+  pass: GPURenderPassEncoder | undefined;
+  pipeline?: GPURenderPipeline;
+  groups: (GPUBindGroup | undefined)[];
+  vertex?: GPUBuffer;
+  instances?: GPUBuffer;
+  index?: GPUBuffer;
+}
+function resetBindings(bound: PassBindings, pass: GPURenderPassEncoder | undefined): void {
+  bound.pass = pass;
+  bound.pipeline = bound.vertex = bound.instances = bound.index = undefined;
+  bound.groups.fill(undefined);
+}
+function setPipeline(bound: PassBindings, pipeline: GPURenderPipeline): void {
+  if (bound.pipeline !== pipeline) bound.pass!.setPipeline((bound.pipeline = pipeline));
+}
+function setGroup(bound: PassBindings, index: number, group: GPUBindGroup): void {
+  if (bound.groups[index] !== group) bound.pass!.setBindGroup(index, (bound.groups[index] = group));
+}
+function setBuffers(bound: PassBindings, vertex: GPUBuffer, instances: GPUBuffer | undefined, index: GPUBuffer): void {
+  const pass = bound.pass!;
+  if (bound.vertex !== vertex) pass.setVertexBuffer(0, (bound.vertex = vertex));
+  if (instances && bound.instances !== instances) pass.setVertexBuffer(1, (bound.instances = instances));
+  if (bound.index !== index) pass.setIndexBuffer((bound.index = index), 'uint32');
+}
+/**
+ * The draw context of one `draw()` call: the run's equal one when the run has it (so draws of different models share
+ * derivations), else a new one.
+ */
+function drawFrame(
+  run: PBRDrawRun | undefined,
+  mode: string,
+  depthCompare: GPUCompareFunction | undefined,
+  c: Context,
+  section: GPUBuffer | undefined,
+  oit: object | undefined,
+  hook: object | undefined,
+  hooks: GLTFExtendedMaterials | false | undefined,
+  lighting: ReadonlySet<LightingEffect>,
+): DrawFrame {
+  const samples = c.descriptor.multisample?.count,
+    depthFormat = c.descriptor.depthStencil!.format,
+    extended = hooks || undefined;
+  if (run)
+    for (const frame of run.frames)
+      if (
+        frame.mode === mode &&
+        frame.depthCompare === depthCompare &&
+        frame.format === c.format &&
+        frame.samples === samples &&
+        frame.depthFormat === depthFormat &&
+        frame.section === section &&
+        frame.oit === oit &&
+        frame.hook === hook &&
+        frame.hooks === extended &&
+        sameLighting(frame.lighting, lighting)
+      )
+        return frame;
+  const frame: DrawFrame = {
+    mode,
+    depthCompare,
+    format: c.format,
+    samples,
+    depthFormat,
+    section,
+    oit,
+    hook,
+    hooks: extended,
+    lighting: [...lighting],
+  };
+  if (run && run.frames.length < 16) run.frames.push(frame);
+  return frame;
+}
 /**
  * A run of `PBRModel.draw` calls that share one render pass and one uniform upload (pass it as the last argument of
  * each `draw`, then call `end()`). Without a run every draw begins and ends its own pass and uploads its own uniforms.
@@ -235,15 +321,25 @@ const opaquePasses = new WeakMap<Context, Set<PBRModel>>();
 export class PBRDrawRun {
   /** The pass the run's draws continue, once one began; `end()` closes it. */
   pass?: GPURenderPassEncoder;
-  constructor(readonly device: GPUDevice) {}
-  /** Ends the shared pass and uploads the draws' uniform changes. Safe to call twice. */
+  /** @internal The draw contexts of the run's draws (draw-memo.ts); draws under an equal one share derivations. */
+  readonly frames: DrawFrame[] = [];
+  /** @internal What the run's draws bound on `pass`, so they set only what changes. */
+  readonly bindings: PassBindings = { pass: undefined, groups: [undefined, undefined, undefined, undefined] };
+  /** @internal The device the run's draws record on; `end()` uploads their uniform changes there. */
+  device?: GPUDevice;
+  /**
+   * Ends the shared pass and uploads the draws' uniform changes. Safe to call twice; the run can then carry the next
+   * frame's draws (nothing derived for this frame carries over).
+   */
   end(): void {
     const pass = this.pass;
     this.pass = undefined;
+    this.frames.length = 0;
+    resetBindings(this.bindings, undefined);
     try {
       pass?.end();
     } finally {
-      flushUniforms(this.device);
+      if (this.device) flushUniforms(this.device);
     }
   }
 }
@@ -392,16 +488,18 @@ interface DrawResource {
   /** Buffer that `volumeData` was last written to. A new buffer uploads again. */
   volumeWritten?: GPUBuffer;
   values: Float32Array;
-  groups: Map<GPURenderPipeline, GPUBindGroup[]>;
-  /** Group 0 for each `writeUniform` copy of `uniform` (a later view of a frame), by pipeline; cleared with `groups`. */
-  copies?: Map<GPUBuffer, Map<GPURenderPipeline, GPUBindGroup>>;
+  groups: Map<GPURenderPipeline, DrawGroups>;
+  /**
+   * Group 0 for another view block or a copy of `uniform` (a draw repeated with other values in a frame), by uniform
+   * buffer, view block and pipeline; cleared with `groups`.
+   */
+  copies?: Map<GPUBuffer, Map<GPUBufferBinding | undefined, Map<GPURenderPipeline, GPUBindGroup>>>;
   sectionBuffer?: GPUBuffer;
   views: GPUTextureView[];
   samplers: GPUSampler[];
   replacesTextures?: boolean;
   extension?: MaterialExtensionResource;
   coordinates?: CoordinateExtension;
-  pipelineHistories?: Map<string, DrawPipelineState[]>;
   /** Set on a static part while its material batch can replace it. */
   mergedInto?: DrawResource;
   /** Set on the one resource that draws a material batch. */
@@ -504,23 +602,6 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
 // Remember the complete existing pipeline key per draw mode. The shader and
 // every mutable state field are still read each draw, but unchanged materials
 // need not build the same chain of temporary strings for every primitive.
-interface DrawPipelineState {
-  format: GPUTextureFormat;
-  blend: boolean;
-  transmit: boolean;
-  cull: GPUCullMode;
-  samples: number | undefined;
-  depth: GPUTextureFormat;
-  entry: string;
-  code: number;
-  mask: number;
-  state: string;
-  instanced: boolean;
-  face: number;
-  topology: GPUPrimitiveTopology | undefined;
-  key: string;
-  pipeline: GPURenderPipeline;
-}
 // Keep cold descriptor callbacks outside draw's per-primitive lexical scope.
 // Otherwise their captured material/resource locals require a fresh context
 // even when every pipeline and bind group is already cached.
@@ -540,19 +621,23 @@ function checkDrawLimits(
     }),
   ]);
 }
-// Group 0: the draw's uniform (its own buffer, or a frame-arena slice for a repeat draw), volume and section.
+/** A draw's groups 0 and 1 for one pipeline; `view` is the view block group 0 binds. */
+type DrawGroups = GPUBindGroup[] & { view?: GPUBufferBinding };
+// Group 0: the draw's uniform (its arena slot, or a copy for a repeat draw), volume, section and view block.
 function frameGroup(
   device: GPUDevice,
   pipeline: GPURenderPipeline,
   r: DrawResource,
   transmission: boolean,
   section: GPUBuffer | undefined,
+  view: GPUBufferBinding | undefined,
   uniform: GPUBufferBinding = r.uniform.binding,
 ): GPUBindGroup {
   return device.createBindGroup({
     layout: pipeline.getBindGroupLayout(0),
     entries: [
       { binding: 0, resource: uniform },
+      ...(view && viewPipelines.has(pipeline) ? [{ binding: 3, resource: view }] : []),
       ...(transmission
         ? [
             {
@@ -570,7 +655,7 @@ function frameGroup(
     ],
   });
 }
-// Group 0 for a uniform copy, cached so steady multi-view frames create no groups.
+// Group 0 for a uniform copy or another view block, cached so steady multi-view frames create no groups.
 function copyGroup(
   device: GPUDevice,
   pipeline: GPURenderPipeline,
@@ -578,11 +663,14 @@ function copyGroup(
   transmission: boolean,
   section: GPUBuffer | undefined,
   uniform: GPUBufferBinding,
+  view: GPUBufferBinding | undefined,
 ): GPUBindGroup {
-  let byPipeline = (r.copies ??= new Map()).get(uniform.buffer);
-  if (!byPipeline) r.copies.set(uniform.buffer, (byPipeline = new Map()));
+  let byView = (r.copies ??= new Map()).get(uniform.buffer);
+  if (!byView) r.copies.set(uniform.buffer, (byView = new Map()));
+  let byPipeline = byView.get(view);
+  if (!byPipeline) byView.set(view, (byPipeline = new Map()));
   let group = byPipeline.get(pipeline);
-  if (!group) byPipeline.set(pipeline, (group = frameGroup(device, pipeline, r, transmission, section, uniform)));
+  if (!group) byPipeline.set(pipeline, (group = frameGroup(device, pipeline, r, transmission, section, view, uniform)));
   return group;
 }
 function createDrawGroups(
@@ -592,10 +680,11 @@ function createDrawGroups(
   m: PBRMaterial,
   transmission: boolean,
   hooks: GLTFExtendedMaterials | undefined,
-  section?: GPUBuffer,
-): GPUBindGroup[] {
-  return [
-    frameGroup(device, pipeline, r, transmission, section),
+  section: GPUBuffer | undefined,
+  view: GPUBufferBinding | undefined,
+): DrawGroups {
+  const groups: DrawGroups = [
+    frameGroup(device, pipeline, r, transmission, section, view),
     device.createBindGroup({
       layout: pipeline.getBindGroupLayout(1),
       entries: r.views.flatMap((view, i) => {
@@ -609,9 +698,15 @@ function createDrawGroups(
       }),
     }),
   ];
+  groups.view = view;
+  return groups;
 }
 interface DrawScratch {
   context?: Context;
+  /** This call's view block (view-uniform.ts). */
+  viewData: Float32Array;
+  /** What this call bound on its pass (a call without a run). */
+  bound: PassBindings;
   /** This invocation's camera: a nested draw (probe face, second view) may change the context's camera meanwhile. */
   projection: Float32Array;
   view: Float32Array;
@@ -637,6 +732,8 @@ function createDrawScratch(color: GPUTextureView, depth: GPUTextureView): DrawSc
     depthStoreOp: 'store',
   };
   const scratch: DrawScratch = {
+    viewData: new Float32Array(viewFloats),
+    bound: { pass: undefined, groups: [undefined, undefined, undefined, undefined] },
     projection: new Float32Array(16),
     view: new Float32Array(16),
     eye: new Float32Array(3),
@@ -993,7 +1090,6 @@ export class PBRModel implements EnginePlugin {
   private readonly created: Mesh[] = [];
   private resources: DrawResource[] = [];
   private textures: GPUTexture[] = [];
-  private pipelines = new Map<string, GPURenderPipeline>();
   private readonly gpuCache = new Map<unknown, GPUBuffer | GPUTexture | GPURenderPipeline>();
   private readonly inverse = new Float32Array(16);
   private readonly workspace = new Float64Array(52);
@@ -1005,10 +1101,7 @@ export class PBRModel implements EnginePlugin {
   private engine: Engine;
   private readonly cleanupCallbacks = new Set<() => void>();
   private readonly lighting = new Set<LightingEffect>();
-  private readonly codes = new Map<string, number>();
-  private codeCount = 0;
   private readonly replays = new Map<string, string>();
-  private readonly lightingGroups = new Map<GPURenderPipeline, { entries: GPUBindGroupEntry[]; group: GPUBindGroup }>();
   private gpuRevision = 0;
   private readonly drawScratch: DrawScratch[] = [];
   private drawDepth = 0;
@@ -2024,10 +2117,37 @@ export class PBRModel implements EnginePlugin {
     scratch.eye.set(c.camera.position);
     if (external) scratch.view.set(external.view);
     else viewMatrix(scratch.view, c.camera);
+    // The view block every draw of this call binds (view-uniform.ts): camera, view, eye, light, radiance, HDR flag.
+    const viewData = scratch.viewData;
+    viewData.set(scratch.projection);
+    viewData.set(scratch.view, 16);
+    viewData.set(scratch.eye, 32);
+    viewData.set(this.engine.lighting.direction, 36);
+    viewData.set(this.engine.lighting.radiance, 40);
+    viewData[44] = +(c.format === 'rgba16float');
+    // Bound on the call's first draw, so a call that draws nothing holds no view block.
+    let viewAt: GPUBufferBinding | undefined;
     this.drawDepth++;
     // Resources a callback releases during this draw stay valid until the frame is submitted.
     beginDraw(c.device, c.view ?? c);
     scratch.context = c;
+    const draws = deviceDraws(c.device),
+      run = carry && !external ? carry : undefined,
+      // The state already set on the pass: a run's pass is the run's alone, so its draws skip what is already bound.
+      bound = run ? run.bindings : scratch.bound;
+    let frame = drawFrame(
+      run,
+      mode,
+      external?.depthCompare,
+      c,
+      section,
+      oit,
+      hook,
+      this.asset.hooks.materials,
+      this.lighting,
+    );
+    if (!run) resetBindings(bound, undefined);
+    if (carry) carry.device = c.device;
     let pass: GPURenderPassEncoder | undefined = external?.pass ?? carry?.pass,
       shared: GPURenderPassEncoder | undefined;
     try {
@@ -2100,381 +2220,113 @@ export class PBRModel implements EnginePlugin {
           index = wireframe?.index ?? r.index,
           count = wireframe?.count ?? p.indices.length;
         const instances = inst?.upload(c.device);
-        const compact =
-          !!(p.extension ?? m.extension)?.replacesPhysical || (!m.extendedFrame && !m.physical && !m.ext?.[0]);
-        const floatCount = compact ? 100 : m.extended ? 272 : 220;
-        if (r.values.length !== floatCount || r.replacesTextures !== !!m.shading?.replacesTextures)
-          this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
-        const v = r.values;
-        v.set(scratch.projection);
-        v.set(node.matrix, 16);
-        if (!invertMatrixStable(node.matrix, this.inverse, this.workspace))
-          throw new RangeError('Singular PBR transform; give the node a transform with a non-zero scale');
-        for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
-        v.set(scratch.view, 48);
-        v.set(scratch.eye, 64);
-        v.set(this.engine.lighting.direction, 68);
-        v.set(this.engine.lighting.radiance, 72);
-        v.set(m.base, 76);
-        v.set(m.factors, 80);
-        if (!m.maps[2] && !m.extendedFrame) v[82] = 0;
-        v.set(m.emission, 84);
-        v.set(m.settings, 88);
-        const side = sideOf(m),
-          flag = sideFlag(side);
-        v[90] = topology ? 1 : flag;
-        v[91] = +(c.format === 'rgba16float');
-        // coordsA/coordsB.x name each base map's slot; uv() reads that slot's KHR_texture_transform row, which carries its UV set.
-        for (let i = 0; i < 5; i++) v[92 + i] = compact ? (m.maps[i] ? textureCoordinates(m.maps[i]!).texCoord : 0) : i;
-        const a = node.matrix;
-        v[97] = Math.sign(
-          a[0] * (a[5] * a[10] - a[6] * a[9]) -
-            a[4] * (a[1] * a[10] - a[2] * a[9]) +
-            a[8] * (a[1] * a[6] - a[2] * a[5]),
-        );
-        if (!compact) {
-          v.set(m.ext!, 100);
-          v[103] = m.dispersion ?? 0;
-          v.set(m.uvt!, 104);
-        }
-        if (!compact && m.physical) {
-          const offset = m.extended ? 248 : 208;
-          v.set(m.physical, offset);
-          if (!m.maps[7] && !m.shading?.replacesTextures) v[offset + 2] = 0;
-        }
-        // Physical rows follow 26 UV rows (36 for extended materials); factor-only materials (five maps) use the same layout.
-        // The transmission tint (margoTint) in spare Frame lanes coordsB.zw and ext.z; zero for every other material.
-        if (!compact && m.tint) {
-          v[98] = m.tint[0];
-          v[99] = m.tint[1];
-          v[102] = m.tint[2];
-        }
-        // A later draw of this frame with other values (another view, a probe face) gets its own uniform slice.
-        const uniform = r.uniform.write(v, c.view ?? c);
-        // Physical materials listing only the five core maps (materials built in code) draw the factor-only variant;
-        // transmission draws its transmissive form, extended materials the shader of decoders.materials.
-        const x = this.asset.hooks.materials || undefined,
-          physical = compact
-            ? pbrShader
-            : m.physical
-              ? m.maps.length > 5
-                ? physicalShader()
-                : factorPhysicalShader()
-              : extendedPBRShader;
-        let code =
-            !compact && m.extended
-              ? x!.shader(planOf(m, x!))
-              : !compact && m.tint
-                ? transmissiveShader(physical)
-                : physical,
-          entry =
-            mode === 'beauty' || transmission
-              ? 'fragment'
-              : mode === 'gbuffer'
-                ? 'gbuffer'
-                : through
-                  ? 'transparent'
-                  : capture
-                    ? 'capture'
-                    : 'ambientFragment',
-          lit = mode === 'beauty' || through || capture;
-        // Every pipeline sets the face and alpha tests as constants (face, mask below), so plain opaque and blended
-        // materials compile without a discard and keep early depth testing. The compact path had lost
-        // this outside instancing and MASK in the consolidation (8f710eb3).
-        if (compact) code = compactTests(code);
-        const source = p.extension ?? m.extension;
-        if (compact) {
-          r.coordinates = coordinateExtension(m.maps, source, r.coordinates);
-          code = coordinateShader(code, r.coordinates, !!m.maps[2] && v[94] === 1);
-        } else if (
-          m.maps[2]
-            ? textureCoordinates(m.maps[2]).texCoord === 1 || textureCoordinates(m.maps[2]).transform
-            : m.extendedFrame &&
-              // Constructed material maps use the retained normal-slot affine rows, not glTF texture definitions.
-              (v[123] > 0.5 ||
-                v[120] !== 1 ||
-                v[121] !== 0 ||
-                v[122] !== 0 ||
-                v[124] !== 0 ||
-                v[125] !== 1 ||
-                v[126] !== 0)
-        )
-          code = code.replace('if(abs(i.tangent.w)<0.5)', 'if(true)');
-        const extension = compact ? (r.coordinates?.extension ?? source) : source;
-        if (extension) {
-          r.extension = prepareMaterialExtension(c.device, extension, r.extension);
-          code = materialExtensionShader(code, extension);
-        } else if (r.extension) {
-          retire(r.device, r.extension.uniform);
-          r.extension = undefined;
-        }
-        const lighting = extension?.lighting !== false,
-          shading = m.shading;
-        if (shading || (mode !== 'gbuffer' && lighting && this.lighting.size)) {
-          scratch.code = code;
-          scratch.ambient = false;
-          if (shading) patchDrawLighting.call(scratch, shading);
-          const surface = scratch.code;
-          // Effects with `pbr` hooks compose at gltf-pro's hook points; others (materials, LOD baking) still patch the text.
-          if (mode !== 'gbuffer' && lighting) this.lighting.forEach(patchDrawLighting, scratch);
-          if (shading?.lit) scratch.code = shading.lit(scratch.code);
-          const patched = scratch.code,
-            ambient = scratch.ambient;
-          // An `ambient` hook (environment IBL) is what SSAO's ambient replay returns from the lit fragment, `_=color` keeping every
-          // lighting binding in the layout. Unlit materials have no ambient.
-          if (lit) code = patched;
-          else if (mode === 'ambient' && ambient) {
-            let replay = this.replays.get(patched);
-            if (replay === undefined) {
-              if (this.replays.size >= 64) this.replays.clear();
-              this.replays.set(
-                patched,
-                (replay = patched.replace(
-                  'return vec4f(color,',
-                  compact
-                    ? '_=color;return vec4f(margoAmbient,'
-                    : '_=color;return vec4f(select(margoAmbient,vec3f(0),f.ext.x>0.5),',
-                )),
-              );
-            }
-            code = replay;
-            entry = 'fragment';
-            lit = true;
-          } else code = surface;
-        }
-        if (extension?.ambient) code = materialExtensionAmbientShader(code, extension);
-        if (transmission) code = transmissionPBR(code, oit!.declarations(2));
-        else if (through) code = transparentPBR(code, oit!.declarations(2));
-        else if (capture) code = capturePBR(code, hook!.declarations(code));
-        // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
-        if (inst) code = inst.shader(code);
-        if (side === 'back' && !topology) code = backSideShader(code);
-        if (m.shading?.texturedTint) code = texturedTintPBR(code);
-        if (mode === 'occlusion') {
-          const rewritten = occlusionShader(code);
-          // An appended occlusion fragment builds the plain surface: give it the extension's edits and bindings too.
-          code = extension ? materialExtensionSurface(rewritten.code, extension) : rewritten.code;
-          entry = rewritten.entry;
-        }
-        if (section) code = sectionShader(code, 0, 2);
-        // Keep the shader's original front-facing convention, including mirrored transforms.
-        // Mirrored instances flip winding per instance: no culling, the shader's face test discards back faces instead.
-        const face = +(!topology && !!inst?.mirrored && flag !== 1),
-          cull: GPUCullMode =
-            !wireframe && flag !== 1 && !face ? (v[97] > 0 === (side === 'front') ? 'back' : 'front') : 'none';
-        const state: PBRRenderState | undefined = mode === 'beauty' ? m.renderState : undefined;
-        if (state) validateRenderState(state, c.descriptor.depthStencil!.format);
-        // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
-        // Discard only where it can happen: back faces are culled by the pipeline and only MASK materials alpha-test.
-        const mask = +(m.settings[0] === 1);
-        let id = this.codes.get(code);
-        if (id === undefined) {
-          if (this.codes.size >= 256) this.codes.clear();
-          this.codes.set(code, (id = this.codeCount++));
-        }
-        const transmit = !compact && !!m.tint,
-          blend = m.settings[0] === 2 || transmit,
-          tinted = transmit && (mode === 'beauty' || mode === 'ambient') && state?.blend === undefined,
-          stateKey = renderStateKey(state) + (external?.depthCompare ?? '') + (extension ? ':extension' : ''),
-          samples = c.descriptor.multisample?.count,
-          depthFormat = c.descriptor.depthStencil!.format;
-        const states = r.pipelineHistories?.get(mode);
-        let previous: DrawPipelineState | undefined;
-        if (states)
-          for (let i = 0; i < states.length; i++) {
-            const value = states[i];
+        const a = node.matrix,
+          sign = Math.sign(
+            a[0] * (a[5] * a[10] - a[6] * a[9]) -
+              a[4] * (a[1] * a[10] - a[2] * a[9]) +
+              a[8] * (a[1] * a[6] - a[2] * a[5]),
+          ),
+          source = p.extension;
+        // A callback of an earlier primitive may have added or removed a lighting effect.
+        if (!sameLighting(frame.lighting, this.lighting))
+          frame = drawFrame(
+            run,
+            mode,
+            external?.depthCompare,
+            c,
+            section,
+            oit,
+            hook,
+            this.asset.hooks.materials,
+            this.lighting,
+          );
+        // Another primitive with this material record already derived the shader, pipeline and uniform rows for this
+        // call or run: reuse them (draw-memo.ts). Material extensions keep per-resource state and derive their own.
+        let list = draws.derivations.get(m),
+          d: DrawDerivation | undefined;
+        if (list)
+          for (let i = 0; i < list.length; i++) {
+            const value = list[i];
             if (
-              value.format === c.format &&
-              value.blend === blend &&
-              value.transmit === transmit &&
-              value.cull === cull &&
-              value.samples === samples &&
-              value.depth === depthFormat &&
-              value.entry === entry &&
-              value.code === id &&
-              value.mask === mask &&
-              value.state === stateKey &&
-              value.instanced === !!inst &&
-              value.face === face &&
-              value.topology === topology
+              value.frame === frame &&
+              value.source === source &&
+              value.instances === inst &&
+              value.topology === topology &&
+              value.sign === sign &&
+              value.extension === undefined
             ) {
-              previous = value;
-              // A main view and a probe can alternate the same mode every frame.
-              // Retain both records instead of replacing the state and key twice.
-              for (let j = i; j > 0; j--) states[j] = states[j - 1];
-              states[0] = value;
+              d = value;
               break;
             }
           }
-        const samePipeline = previous !== undefined;
-        const key = samePipeline
-          ? previous!.key
-          : mode +
-            ':' +
-            c.format +
-            ':' +
-            blend +
-            transmit +
-            ':' +
-            cull +
-            ':' +
-            c.descriptor.multisample?.count +
-            ':' +
-            c.descriptor.depthStencil!.format +
-            ':' +
-            entry +
-            ':' +
-            id +
-            ':' +
-            mask +
-            stateKey +
-            (inst ? ':i' + face : '') +
-            (topology ? ':' + topology : '');
-        let pipeline = samePipeline ? previous!.pipeline : this.pipelines.get(key);
-        if (!pipeline) {
-          checkDrawLimits(c.device, code, m, transmission, this.lighting);
-          const module = c.device.createShaderModule({ code }),
-            format = mode === 'beauty' ? c.format : 'rgba16float';
-          const descriptor: GPURenderPipelineDescriptor = {
-            layout: 'auto',
-            vertex: {
-              module,
-              entryPoint: 'vertex',
-              buffers: [
-                {
-                  arrayStride: 80,
-                  attributes: Array.from({ length: 5 }, (_, i) => ({
-                    shaderLocation: i,
-                    offset: i * 16,
-                    format: 'float32x4' as const,
-                  })),
-                },
-                ...(inst ? [inst.layout] : []),
-              ],
-            },
-            fragment: {
-              module,
-              entryPoint: entry,
-              constants: { margoFaceTest: face, margoAlphaTest: mask },
-              targets:
-                through || capture
-                  ? ((through ? oit! : hook!).targets as GPUColorTargetState[])
-                  : mode === 'occlusion'
-                    ? [
-                        { format },
-                        {
-                          format,
-                          blend: blend
-                            ? {
-                                color: transmit
-                                  ? { srcFactor: 'one', dstFactor: 'one' }
-                                  : { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-                                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-                              }
-                            : undefined,
-                        },
-                      ]
-                    : [
-                        {
-                          format,
-                          ...(state?.colorWrite === false ? { writeMask: 0 } : {}),
-                          blend:
-                            state?.blend !== undefined
-                              ? (state.blend ?? undefined)
-                              : blend && mode !== 'gbuffer'
-                                ? {
-                                    color: transmit
-                                      ? { srcFactor: 'one', dstFactor: 'one' }
-                                      : { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-                                    alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-                                  }
-                                : undefined,
-                        },
-                      ],
-            },
-            multisample: c.descriptor.multisample,
-            primitive: topology ? { topology } : { topology: 'triangle-list', cullMode: cull },
-            depthStencil: {
-              ...pipelineDepthState(
-                state,
-                !topology,
-                external?.depthCompare === 'less' || external?.depthCompare === 'less-equal',
-              ),
-              format: c.descriptor.depthStencil!.format,
-              depthWriteEnabled: state?.depthWrite ?? ((mode === 'beauty' || capture) && !blend),
-              depthCompare:
-                external?.depthCompare ??
-                state?.depthCompare ??
-                (mode === 'beauty' || through || capture ? 'greater-equal' : 'equal'),
-            },
-          };
-          pipeline = c.device.createRenderPipeline(descriptor);
-          this.pipelines.set(key, pipeline);
-          // Transmission's first draw: what is behind times the tint (no blend constant, see below).
-          if (tinted)
-            this.pipelines.set(
-              key + ':tint',
-              c.device.createRenderPipeline({
-                ...descriptor,
-                // The tint only reads depth and stencil; the lit draw performs each requested write once.
-                depthStencil: {
-                  ...descriptor.depthStencil!,
-                  depthWriteEnabled: false,
-                  ...(state && depthFormat.includes('stencil') ? { stencilWriteMask: 0 } : {}),
-                },
-                fragment: {
-                  module,
-                  entryPoint: 'margoTint',
-                  constants: m.shading?.texturedTint ? { margoFaceTest: face, margoAlphaTest: mask } : undefined,
-                  targets: [
-                    {
-                      format,
-                      ...(state?.colorWrite === false ? { writeMask: 0 } : {}),
-                      blend: {
-                        color: { srcFactor: 'zero', dstFactor: 'src' },
-                        alpha: { srcFactor: 'zero', dstFactor: 'one' },
-                      },
-                    },
-                  ],
-                },
-              }),
-            );
-        }
-        if (!samePipeline) {
-          const values = states ?? [];
-          if (!states) (r.pipelineHistories ??= new Map()).set(mode, values);
-          // Keep invalidation bounded even when callers animate material state.
-          if (values.length < 32) values.length++;
-          for (let i = values.length - 1; i > 0; i--) values[i] = values[i - 1];
-          values[0] = {
-            format: c.format,
-            blend,
-            transmit,
-            cull,
-            samples,
-            depth: depthFormat,
-            entry,
-            code: id,
-            mask,
-            state: stateKey,
-            instanced: !!inst,
-            face,
+        if (d) {
+          if (r.values.length !== d.floatCount || r.replacesTextures !== d.replacesTextures)
+            this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
+          r.coordinates = undefined;
+          if (r.extension) {
+            retire(r.device, r.extension.uniform);
+            r.extension = undefined;
+          }
+          const v = r.values;
+          v.set(d.block);
+          v.set(a, 16);
+          if (!invertMatrixStable(a, this.inverse, this.workspace)) throw new RangeError('Singular PBR transform; give the node a transform with a non-zero scale');
+          for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
+          v[97] = sign;
+        } else {
+          // The entry of the same context from an earlier call or frame, if any: derive into it, reusing its GPU objects.
+          let at = -1;
+          if (list)
+            for (let i = 0; i < list.length; i++) {
+              const value = list[i];
+              if (
+                value.source === source &&
+                value.instances === inst &&
+                value.topology === topology &&
+                value.sign === sign &&
+                sameFrame(value.frame, frame)
+              ) {
+                at = i;
+                break;
+              }
+            }
+          d = this.derive(
+            at >= 0 ? list![at] : undefined,
+            frame,
+            draws,
+            c,
+            mode,
+            scratch,
+            r,
             topology,
-            key,
-            pipeline,
-          };
+            wireframe,
+            sign,
+            external,
+          );
+          if (!list) draws.derivations.set(m, (list = []));
+          if (at < 0) {
+            if (list.length < derivationLimit) list.length++;
+            at = list.length - 1;
+          }
+          for (let i = at; i > 0; i--) list[i] = list[i - 1];
+          list[0] = d;
         }
+        const { pipeline, blend, state, extension, effectBindings } = d;
+        const uniform = r.uniform.write(r.values, c.view ?? c);
         if (r.sectionBuffer !== section) {
           r.groups.clear();
           r.copies?.clear();
           r.sectionBuffer = section;
         }
+        viewAt ??= viewBinding(c.device, viewData, c.view ?? c, external && this);
         let groups = r.groups.get(pipeline);
         if (!groups) {
-          groups = createDrawGroups(c.device, pipeline, r, m, transmission, x, section);
+          groups = createDrawGroups(c.device, pipeline, r, m, transmission, frame.hooks, section, viewAt);
           r.groups.set(pipeline, groups);
         }
-        if (uniform) groups = [copyGroup(c.device, pipeline, r, transmission, section, uniform), groups[1]];
+        let frameBindings = groups[0];
+        if (uniform || groups.view !== viewAt)
+          frameBindings = copyGroup(c.device, pipeline, r, transmission, section, uniform ?? r.uniform.binding, viewAt);
         let target: GPURenderPassEncoder;
         if (through || capture) target = shared ??= (through ? oit! : hook!).begin();
         else {
@@ -2508,105 +2360,52 @@ export class PBRModel implements EnginePlugin {
             r.volumeWritten = r.volume;
           }
         }
-        let effectGroup: GPUBindGroup | undefined;
-        const effectBindings = !!shading || (lit && ((lighting && this.lighting.size > 0) || through));
-        if (effectBindings) {
-          const entries = scratch.entries,
-            effects = scratch.effects;
-          let entryCount = 0;
-          scratch.effectCount = 0;
-          if (shading) snapshotDrawLighting.call(scratch, shading);
-          if (lit && lighting) this.lighting.forEach(snapshotDrawLighting, scratch);
-          effects.length = scratch.effectCount;
-          for (let i = 0; i < effects.length; i++) {
-            const bindings = effects[i].bindings();
-            for (let j = 0; j < bindings.length; j++) entries[entryCount++] = bindings[j];
-          }
-          if (through) {
-            const bindings = oit!.bindings();
-            for (let j = 0; j < bindings.length; j++) entries[entryCount++] = bindings[j];
-          }
-          entries.length = entryCount;
-          let cached = this.lightingGroups.get(pipeline);
-          let changed = !cached || entries.length !== cached.entries.length;
-          for (let i = 0; !changed && i < entries.length; i++) {
-            const entry = entries[i];
-            const previous = cached!.entries[i],
-              resource = entry.resource,
-              old = previous.resource;
-            changed =
-              entry.binding !== previous.binding ||
-              !(
-                resource === old ||
-                ('buffer' in resource &&
-                  'buffer' in old &&
-                  resource.buffer === old.buffer &&
-                  resource.offset === old.offset &&
-                  resource.size === old.size)
-              );
-          }
-          if (changed) {
-            const snapshot = entries.map(({ binding, resource }) => ({
-              binding,
-              resource:
-                'buffer' in resource
-                  ? { buffer: resource.buffer, offset: resource.offset, size: resource.size }
-                  : resource,
-            }));
-            const group = c.device.createBindGroup({ layout: pipeline.getBindGroupLayout(2), entries: snapshot });
-            cached = { entries: snapshot, group };
-            this.lightingGroups.set(pipeline, cached);
-          }
-          effectGroup = cached!.group;
-        }
         // A callback above (lighting, instancing, transparency hooks) may have disposed this model or its node.
         if (this.disposed) break;
         if (this.engine.meshes.get(node.id) !== node) continue;
+        if (bound.pass !== target) resetBindings(bound, target);
+        const vertex = p.deformed ?? r.vertex;
         // Transmission first multiplies the background, then adds the lit surface.
-        if (tinted) {
-          const tint = this.pipelines.get(key + ':tint')!,
-            mappedTint = !!shading?.texturedTint;
+        if (d.tint) {
+          const tint = d.tint,
+            mappedTint = d.mappedTint;
           let tintGroups = r.groups.get(tint);
           if (!tintGroups) {
-            tintGroups = mappedTint
-              ? createDrawGroups(c.device, tint, r, m, false, x, section)
-              : [frameGroup(c.device, tint, r, false, section)];
+            if (mappedTint) tintGroups = createDrawGroups(c.device, tint, r, m, false, frame.hooks, section, viewAt);
+            else {
+              tintGroups = [frameGroup(c.device, tint, r, false, section, viewAt)];
+              tintGroups.view = viewAt;
+            }
             r.groups.set(tint, tintGroups);
           }
-          if (uniform) tintGroups = [copyGroup(c.device, tint, r, false, section, uniform), ...tintGroups.slice(1)];
-          target.setPipeline(tint);
-          target.setBindGroup(0, tintGroups[0]);
+          const tintFrame =
+            uniform || tintGroups.view !== viewAt
+              ? copyGroup(c.device, tint, r, false, section, uniform ?? r.uniform.binding, viewAt)
+              : tintGroups[0];
+          setPipeline(bound, tint);
+          setGroup(bound, 0, tintFrame);
           if (mappedTint) {
-            target.setBindGroup(1, tintGroups[1]);
-            if (effectBindings) {
-              const snapshot = this.lightingGroups.get(pipeline)!.entries;
-              let cached = this.lightingGroups.get(tint);
-              if (!cached || cached.entries !== snapshot) {
-                cached = {
-                  entries: snapshot,
-                  group: c.device.createBindGroup({ layout: tint.getBindGroupLayout(2), entries: snapshot }),
-                };
-                this.lightingGroups.set(tint, cached);
-              }
-              target.setBindGroup(2, cached.group);
+            setGroup(bound, 1, tintGroups[1]);
+            if (effectBindings) setGroup(bound, 2, d.tintEffect!.group);
+            if (extension) {
+              bindMaterialExtension(c.device, target, tint, r.extension!, effectBindings);
+              bound.groups[2] = bound.groups[3] = undefined;
             }
-            if (extension) bindMaterialExtension(c.device, target, tint, r.extension!, effectBindings);
           }
-          target.setVertexBuffer(0, p.deformed ?? r.vertex);
-          if (instances) target.setVertexBuffer(1, instances);
-          target.setIndexBuffer(index, 'uint32');
+          setBuffers(bound, vertex, instances, index);
           applyStencilReference(target, state);
           if (inst) target.drawIndexed(count, inst.count);
           else target.drawIndexed(count);
         }
-        target.setPipeline(pipeline);
-        target.setBindGroup(0, groups[0]);
-        target.setBindGroup(1, groups[1]);
-        if (effectGroup) target.setBindGroup(2, effectGroup);
-        if (extension) bindMaterialExtension(c.device, target, pipeline, r.extension!, effectBindings);
-        target.setVertexBuffer(0, p.deformed ?? r.vertex);
-        if (instances) target.setVertexBuffer(1, instances);
-        target.setIndexBuffer(index, 'uint32');
+        setPipeline(bound, pipeline);
+        setGroup(bound, 0, frameBindings);
+        setGroup(bound, 1, groups[1]);
+        if (d.effect) setGroup(bound, 2, d.effect.group);
+        if (extension) {
+          bindMaterialExtension(c.device, target, pipeline, r.extension!, effectBindings);
+          bound.groups[2] = bound.groups[3] = undefined;
+        }
+        setBuffers(bound, vertex, instances, index);
         // A preceding material may have changed the reference on this shared pass.
         applyStencilReference(target, state);
         if (inst) target.drawIndexed(count, inst.count);
@@ -2644,6 +2443,413 @@ export class PBRModel implements EnginePlugin {
     else if (!external) pass?.end();
     if (!carry) flushUniforms(c.device);
   }
+  /**
+   * Derives what draws of `r`'s material record share under `frame` (draw-memo.ts): the shader, pipeline, lighting
+   * group and uniform rows. It fills `r.values` completely (node rows included) and returns the derivation, reusing
+   * `d`'s GPU objects when their inputs compare equal.
+   */
+  private derive(
+    d: DrawDerivation | undefined,
+    frame: DrawFrame,
+    draws: DeviceDraws,
+    c: Context,
+    mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture' | 'occlusion',
+    scratch: DrawScratch,
+    r: DrawResource,
+    topology: GPUPrimitiveTopology | undefined,
+    wireframe: DrawResource['wireframe'],
+    sign: number,
+    external: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction } | undefined,
+  ): DrawDerivation {
+    const p = r.primitive,
+      m = p.material,
+      node = p.node,
+      inst = p.instances,
+      transmission = mode === 'transmission',
+      oit = transmission ? this.transmission : this.transparency,
+      through = mode === 'transparent' || transmission,
+      hook = this.capture,
+      capture = mode === 'capture',
+      section = frame.section;
+    const compact =
+      !!(p.extension ?? m.extension)?.replacesPhysical || (!m.extendedFrame && !m.physical && !m.ext?.[0]);
+    const floatCount = compact ? 100 : m.extended ? 272 : 220;
+    if (r.values.length !== floatCount || r.replacesTextures !== !!m.shading?.replacesTextures)
+      this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
+    const v = r.values;
+    v.set(node.matrix, 16);
+    if (!invertMatrixStable(node.matrix, this.inverse, this.workspace)) throw new RangeError('Singular PBR transform; give the node a transform with a non-zero scale');
+    for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
+    v.set(m.base, 76);
+    v.set(m.factors, 80);
+    if (!m.maps[2] && !m.extendedFrame) v[82] = 0;
+    v.set(m.emission, 84);
+    v.set(m.settings, 88);
+    const side = sideOf(m),
+      flag = sideFlag(side);
+    v[90] = topology ? 1 : flag;
+    // coordsA/coordsB.x name each base map's slot; uv() reads that slot's KHR_texture_transform row, which carries its UV set.
+    for (let i = 0; i < 5; i++) v[92 + i] = compact ? (m.maps[i] ? textureCoordinates(m.maps[i]!).texCoord : 0) : i;
+    v[97] = sign;
+    if (!compact) {
+      v.set(m.ext!, 100);
+      v[103] = m.dispersion ?? 0;
+      v.set(m.uvt!, 104);
+    }
+    if (!compact && m.physical) {
+      const offset = m.extended ? 248 : 208;
+      v.set(m.physical, offset);
+      if (!m.maps[7] && !m.shading?.replacesTextures) v[offset + 2] = 0;
+    }
+    // Physical rows follow 26 UV rows (36 for extended materials); factor-only materials (five maps) use the same layout.
+    // The transmission tint (margoTint) in spare Frame lanes coordsB.zw and ext.z; zero for every other material.
+    if (!compact && m.tint) {
+      v[98] = m.tint[0];
+      v[99] = m.tint[1];
+      v[102] = m.tint[2];
+    }
+    // Physical materials listing only the five core maps (materials built in code) draw the factor-only variant;
+    // transmission draws its transmissive form, extended materials the shader of decoders.materials.
+    const x = this.asset.hooks.materials || undefined,
+      physical = compact
+        ? pbrShader
+        : m.physical
+          ? m.maps.length > 5
+            ? physicalShader()
+            : factorPhysicalShader()
+          : extendedPBRShader;
+    let code =
+        !compact && m.extended
+          ? x!.shader(planOf(m, x!))
+          : !compact && m.tint
+            ? transmissiveShader(physical)
+            : physical,
+      entry =
+        mode === 'beauty' || transmission
+          ? 'fragment'
+          : mode === 'gbuffer'
+            ? 'gbuffer'
+            : through
+              ? 'transparent'
+              : capture
+                ? 'capture'
+                : 'ambientFragment',
+      lit = mode === 'beauty' || through || capture;
+    // Every pipeline sets the face and alpha tests as constants (face, mask below), so plain opaque and blended
+    // materials compile without a discard and keep early depth testing. The compact path had lost
+    // this outside instancing and MASK in the consolidation (8f710eb3).
+    if (compact) code = compactTests(code);
+    const source = p.extension ?? m.extension;
+    if (compact) {
+      r.coordinates = coordinateExtension(m.maps, source, r.coordinates);
+      code = coordinateShader(code, r.coordinates, !!m.maps[2] && v[94] === 1);
+    } else if (
+      m.maps[2]
+        ? textureCoordinates(m.maps[2]).texCoord === 1 || textureCoordinates(m.maps[2]).transform
+        : m.extendedFrame &&
+          // Constructed material maps use the retained normal-slot affine rows, not glTF texture definitions.
+          (v[123] > 0.5 || v[120] !== 1 || v[121] !== 0 || v[122] !== 0 || v[124] !== 0 || v[125] !== 1 || v[126] !== 0)
+    )
+      code = code.replace('if(abs(i.tangent.w)<0.5)', 'if(true)');
+    const extension = compact ? (r.coordinates?.extension ?? source) : source;
+    if (extension) {
+      r.extension = prepareMaterialExtension(c.device, extension, r.extension);
+      code = materialExtensionShader(code, extension);
+    } else if (r.extension) {
+      retire(r.device, r.extension.uniform);
+      r.extension = undefined;
+    }
+    const lighting = extension?.lighting !== false,
+      shading = m.shading;
+    if (shading || (mode !== 'gbuffer' && lighting && this.lighting.size)) {
+      scratch.code = code;
+      scratch.ambient = false;
+      if (shading) patchDrawLighting.call(scratch, shading);
+      const surface = scratch.code;
+      // Effects with `pbr` hooks compose at gltf-pro's hook points; others (materials, LOD baking) still patch the text.
+      if (mode !== 'gbuffer' && lighting) this.lighting.forEach(patchDrawLighting, scratch);
+      if (shading?.lit) scratch.code = shading.lit(scratch.code);
+      const patched = scratch.code,
+        ambient = scratch.ambient;
+      // An `ambient` hook (environment IBL) is what SSAO's ambient replay returns from the lit fragment, `_=color` keeping every
+      // lighting binding in the layout. Unlit materials have no ambient.
+      if (lit) code = patched;
+      else if (mode === 'ambient' && ambient) {
+        let replay = this.replays.get(patched);
+        if (replay === undefined) {
+          if (this.replays.size >= 64) this.replays.clear();
+          this.replays.set(
+            patched,
+            (replay = patched.replace(
+              'return vec4f(color,',
+              compact
+                ? '_=color;return vec4f(margoAmbient,'
+                : '_=color;return vec4f(select(margoAmbient,vec3f(0),f.ext.x>0.5),',
+            )),
+          );
+        }
+        code = replay;
+        entry = 'fragment';
+        lit = true;
+      } else code = surface;
+    }
+    if (extension?.ambient) code = materialExtensionAmbientShader(code, extension);
+    if (transmission) code = transmissionPBR(code, oit!.declarations(2));
+    else if (through) code = transparentPBR(code, oit!.declarations(2));
+    else if (capture) code = capturePBR(code, hook!.declarations(code));
+    // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
+    if (inst) code = inst.shader(code);
+    if (side === 'back' && !topology) code = backSideShader(code);
+    if (m.shading?.texturedTint) code = texturedTintPBR(code);
+    if (mode === 'occlusion') {
+      const rewritten = occlusionShader(code);
+      // An appended occlusion fragment builds the plain surface: give it the extension's edits and bindings too.
+      code = extension ? materialExtensionSurface(rewritten.code, extension) : rewritten.code;
+      entry = rewritten.entry;
+    }
+    if (section) code = sectionShader(code, 0, 2);
+    // Camera, light and target rows come from the shared view block (view-uniform.ts).
+    code = viewShader(code);
+    // Keep the shader's original front-facing convention, including mirrored transforms.
+    // Mirrored instances flip winding per instance: no culling, the shader's face test discards back faces instead.
+    const face = +(!topology && !!inst?.mirrored && flag !== 1),
+      cull: GPUCullMode =
+        !wireframe && flag !== 1 && !face ? (v[97] > 0 === (side === 'front') ? 'back' : 'front') : 'none';
+    const state: PBRRenderState | undefined = mode === 'beauty' ? m.renderState : undefined;
+    if (state) validateRenderState(state, c.descriptor.depthStencil!.format);
+    // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
+    // Discard only where it can happen: back faces are culled by the pipeline and only MASK materials alpha-test.
+    const mask = +(m.settings[0] === 1);
+    let id = draws.codes.get(code);
+    if (id === undefined) {
+      if (draws.codes.size >= 256) draws.codes.clear();
+      draws.codes.set(code, (id = draws.codeCount++));
+    }
+    const transmit = !compact && !!m.tint,
+      blend = m.settings[0] === 2 || transmit,
+      tinted = transmit && (mode === 'beauty' || mode === 'ambient') && state?.blend === undefined,
+      stateKey = renderStateKey(state) + (external?.depthCompare ?? '') + (extension ? ':extension' : ''),
+      samples = c.descriptor.multisample?.count,
+      depthFormat = c.descriptor.depthStencil!.format;
+    const key =
+      mode +
+      ':' +
+      c.format +
+      ':' +
+      blend +
+      transmit +
+      ':' +
+      cull +
+      ':' +
+      samples +
+      ':' +
+      depthFormat +
+      ':' +
+      entry +
+      ':' +
+      id +
+      ':' +
+      mask +
+      stateKey +
+      (inst ? ':i' + face + ':' + objectId(inst.layout) : '') +
+      (topology ? ':' + topology : '') +
+      (through || capture ? ':o' + objectId((through ? oit! : hook!).targets) : '') +
+      (tinted && shading?.texturedTint ? ':t' : '');
+    let pipeline = draws.pipelines.get(key);
+    if (!pipeline) {
+      checkDrawLimits(c.device, code, m, transmission, this.lighting);
+      const module = c.device.createShaderModule({ code }),
+        format = mode === 'beauty' ? c.format : 'rgba16float';
+      const descriptor: GPURenderPipelineDescriptor = {
+        layout: 'auto',
+        vertex: {
+          module,
+          entryPoint: 'vertex',
+          buffers: [
+            {
+              arrayStride: 80,
+              attributes: Array.from({ length: 5 }, (_, i) => ({
+                shaderLocation: i,
+                offset: i * 16,
+                format: 'float32x4' as const,
+              })),
+            },
+            ...(inst ? [inst.layout] : []),
+          ],
+        },
+        fragment: {
+          module,
+          entryPoint: entry,
+          constants: { margoFaceTest: face, margoAlphaTest: mask },
+          targets:
+            through || capture
+              ? ((through ? oit! : hook!).targets as GPUColorTargetState[])
+              : mode === 'occlusion'
+                ? [
+                    { format },
+                    {
+                      format,
+                      blend: blend
+                        ? {
+                            color: transmit
+                              ? { srcFactor: 'one', dstFactor: 'one' }
+                              : { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+                            alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                          }
+                        : undefined,
+                    },
+                  ]
+                : [
+                    {
+                      format,
+                      ...(state?.colorWrite === false ? { writeMask: 0 } : {}),
+                      blend:
+                        state?.blend !== undefined
+                          ? (state.blend ?? undefined)
+                          : blend && mode !== 'gbuffer'
+                            ? {
+                                color: transmit
+                                  ? { srcFactor: 'one', dstFactor: 'one' }
+                                  : { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+                                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                              }
+                            : undefined,
+                    },
+                  ],
+        },
+        multisample: c.descriptor.multisample,
+        primitive: topology ? { topology } : { topology: 'triangle-list', cullMode: cull },
+        depthStencil: {
+          ...pipelineDepthState(
+            state,
+            !topology,
+            external?.depthCompare === 'less' || external?.depthCompare === 'less-equal',
+          ),
+          format: c.descriptor.depthStencil!.format,
+          depthWriteEnabled: state?.depthWrite ?? ((mode === 'beauty' || capture) && !blend),
+          depthCompare:
+            external?.depthCompare ??
+            state?.depthCompare ??
+            (mode === 'beauty' || through || capture ? 'greater-equal' : 'equal'),
+        },
+      };
+      pipeline = c.device.createRenderPipeline(descriptor);
+      if (draws.pipelines.size >= 4096) draws.pipelines.clear();
+      draws.pipelines.set(key, pipeline);
+      const view = code.includes('margoView.');
+      if (view) viewPipelines.add(pipeline);
+      // Transmission's first draw: what is behind times the tint (no blend constant, see below).
+      if (tinted) {
+        const tint = c.device.createRenderPipeline({
+          ...descriptor,
+          // The tint only reads depth and stencil; the lit draw performs each requested write once.
+          depthStencil: {
+            ...descriptor.depthStencil!,
+            depthWriteEnabled: false,
+            ...(state && depthFormat.includes('stencil') ? { stencilWriteMask: 0 } : {}),
+          },
+          fragment: {
+            module,
+            entryPoint: 'margoTint',
+            constants: m.shading?.texturedTint ? { margoFaceTest: face, margoAlphaTest: mask } : undefined,
+            targets: [
+              {
+                format,
+                ...(state?.colorWrite === false ? { writeMask: 0 } : {}),
+                blend: {
+                  color: { srcFactor: 'zero', dstFactor: 'src' },
+                  alpha: { srcFactor: 'zero', dstFactor: 'one' },
+                },
+              },
+            ],
+          },
+        });
+        draws.pipelines.set(key + ':tint', tint);
+        if (view) viewPipelines.add(tint);
+      }
+    }
+    let effect: DrawDerivation['effect'];
+    const effectBindings = !!shading || (lit && ((lighting && this.lighting.size > 0) || through));
+    if (effectBindings) {
+      const entries = scratch.entries,
+        effects = scratch.effects;
+      let entryCount = 0;
+      scratch.effectCount = 0;
+      if (shading) snapshotDrawLighting.call(scratch, shading);
+      if (lit && lighting) this.lighting.forEach(snapshotDrawLighting, scratch);
+      effects.length = scratch.effectCount;
+      for (let i = 0; i < effects.length; i++) {
+        const bindings = effects[i].bindings();
+        for (let j = 0; j < bindings.length; j++) entries[entryCount++] = bindings[j];
+      }
+      if (through) {
+        const bindings = oit!.bindings();
+        for (let j = 0; j < bindings.length; j++) entries[entryCount++] = bindings[j];
+      }
+      entries.length = entryCount;
+      let cached = d?.effect;
+      let changed = !cached || d!.pipeline !== pipeline || entries.length !== cached.entries.length;
+      for (let i = 0; !changed && i < entries.length; i++) {
+        const entry = entries[i];
+        const previous = cached!.entries[i],
+          resource = entry.resource,
+          old = previous.resource;
+        changed =
+          entry.binding !== previous.binding ||
+          !(
+            resource === old ||
+            ('buffer' in resource &&
+              'buffer' in old &&
+              resource.buffer === old.buffer &&
+              resource.offset === old.offset &&
+              resource.size === old.size)
+          );
+      }
+      if (changed) {
+        const snapshot = entries.map(({ binding, resource }) => ({
+          binding,
+          resource:
+            'buffer' in resource ? { buffer: resource.buffer, offset: resource.offset, size: resource.size } : resource,
+        }));
+        const group = c.device.createBindGroup({ layout: pipeline.getBindGroupLayout(2), entries: snapshot });
+        cached = { entries: snapshot, group };
+      }
+      effect = cached;
+    }
+    // Transmission's tint group 2 holds the same entries for the tint pipeline's layout.
+    let tintEffect: DrawDerivation['tintEffect'];
+    const tint = tinted ? draws.pipelines.get(key + ':tint')! : undefined,
+      mappedTint = !!shading?.texturedTint;
+    if (tint && mappedTint && effect) {
+      tintEffect = d?.tintEffect;
+      if (!tintEffect || tintEffect.entries !== effect.entries || d!.tint !== tint)
+        tintEffect = {
+          entries: effect.entries,
+          group: c.device.createBindGroup({ layout: tint.getBindGroupLayout(2), entries: effect.entries }),
+        };
+    }
+    const out: DrawDerivation = d ?? ({} as DrawDerivation);
+    out.frame = frame;
+    out.source = p.extension;
+    out.instances = inst;
+    out.topology = topology;
+    out.sign = sign;
+    out.compact = compact;
+    out.floatCount = floatCount;
+    out.replacesTextures = r.replacesTextures!;
+    out.extension = extension;
+    out.pipeline = pipeline;
+    out.tint = tint;
+    out.blend = blend;
+    out.state = state;
+    out.effectBindings = effectBindings;
+    out.effect = effect;
+    out.tintEffect = tintEffect;
+    out.mappedTint = mappedTint;
+    if (out.block?.length !== v.length) out.block = new Float32Array(v.length);
+    out.block.set(v);
+    return out;
+  }
   /** Isolated GPU resources for stereo eyes or another caller-owned WebGPU device. */
   createRenderer(device: GPUDevice): PBRDeviceRenderer {
     if (this.disposed || this.engine.disposed)
@@ -2671,19 +2877,15 @@ export class PBRModel implements EnginePlugin {
       created: [],
       resources: [],
       textures: [],
-      pipelines: new Map(),
       inverse: new Float32Array(16),
       workspace: new Float64Array(52),
       engine: this.engine,
       cleanupCallbacks: new Set(),
       lighting: new Set(),
-      lightingGroups: new Map(),
       gpuRevision: 0,
       gpuCache: new Map(),
       drawScratch: [],
       drawDepth: 0,
-      codes: new Map(),
-      codeCount: 0,
       replays: new Map(),
       pointsAndLines: this.pointsAndLines.map((primitive) => ({
         ...primitive,
@@ -2868,9 +3070,7 @@ export class PBRModel implements EnginePlugin {
     }
     this.resources = [];
     this.textures = [];
-    this.pipelines.clear();
     this.gpuCache.clear();
-    this.lightingGroups.clear();
     this.drawScratch.length = 0;
     cleanup.finish();
   }

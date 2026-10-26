@@ -210,7 +210,8 @@ test('NodeMaterial draws through materials and gltf-pro with node bindings; unif
     assert.equal(beauty().length, 2, 'plain material keeps its own pipeline');
     assert.match(
       code,
-      /^@group\(2\) @binding\(48\) var ndt0:texture_2d<f32>;\n@group\(2\) @binding\(49\) var ndt0s:sampler;\nstruct NdUniforms \{\n  strength:f32,\n\}\n@group\(2\) @binding\(50\) var<uniform> ndu:NdUniforms;/,
+      // The view block (camera, light, target) every draw shares, then the node material's declarations.
+      /^struct MargoView \{[^}]*\}\n@group\(0\) @binding\(3\) var<uniform> margoView:MargoView;\n@group\(2\) @binding\(48\) var ndt0:texture_2d<f32>;\n@group\(2\) @binding\(49\) var ndt0s:sampler;\nstruct NdUniforms \{\n  strength:f32,\n\}\n@group\(2\) @binding\(50\) var<uniform> ndu:NdUniforms;/,
     );
     assert.match(
       code,

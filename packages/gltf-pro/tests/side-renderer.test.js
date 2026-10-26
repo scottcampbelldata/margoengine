@@ -6,7 +6,7 @@ import { loadGLTFProgressive } from '../dist/progressive.js';
 import { PBRInstances } from '../dist/instancing.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
-import { compactTests, pbrShader } from '../src/shader.ts';
+import { compactTests, pbrShader, viewShader } from '../src/shader.ts';
 import { backSideShader } from '../src/side-shader.ts';
 import { uniformBytes } from '../../../tests/support/optional-gpu.js';
 /** Whether a bound uniform window is the arena slot of a draw resource. */
@@ -322,7 +322,7 @@ test('front and double draws retain the default shader source while back changes
   const f = await fixture(t),
     material = f.model.primitives[0].material;
   const front = f.frame().vertex.module.code;
-  assert.equal(front, compactTests(pbrShader));
+  assert.equal(front, viewShader(compactTests(pbrShader)));
   material.side = 'double';
   assert.equal(f.frame().vertex.module.code, front);
   material.side = 'back';

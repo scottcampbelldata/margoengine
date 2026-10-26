@@ -79,7 +79,9 @@ test('custom-device PBR draws and lighting callbacks execute on every pass; unch
   assert.equal(f.draws.length, 303);
   assert.equal(shaderCalls, 202);
   assert.equal(bindingCalls, 101);
-  for (const draw of f.draws) assert.deepEqual(draw.slice(0, f.uploads[0].bits.length), f.uploads[0].bits);
+  // The upload starts at the first float that differs from the arena's zeros (the slot is the chunk's first).
+  const at = f.uploads[0].offset / 4;
+  for (const draw of f.draws) assert.deepEqual(draw.slice(at), f.uploads[0].bits.slice(0, draw.length - at));
 });
 
 test('absent normal maps disable the fallback texel perturbation while preserving material scale', async (t) => {
@@ -292,9 +294,10 @@ test('a custom writer receives the changed range of the arena, not a copy per dr
   assert.equal(seen.length, 1);
   const { buffer, values, dataOffset, size } = seen[0];
   assert.ok(values instanceof Float32Array, 'the data is the arena float array');
-  assert.ok(size <= f.model.resources[0].values.length, 'one slot, only from its first changed value');
+  // The draw's slot (the chunk's first, 1024 bytes) from its first changed value, through the view block after it.
+  assert.ok(dataOffset * 4 + size * 4 <= 1024 + 192, 'one range: the draw slot and the shared view block');
   assert.equal(
-    new Float32Array(buffer.data)[dataOffset + 76],
+    new Float32Array(buffer.data)[76],
     Math.fround(f.model.primitives[0].material.base[0]),
     'the base colour is where the uniform layout puts it',
   );

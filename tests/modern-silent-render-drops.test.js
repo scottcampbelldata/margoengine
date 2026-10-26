@@ -376,8 +376,13 @@ for (const fixture of loadedPBRFixtures) {
       try {
         taa = TAA.attach(engine);
         h.frame();
+        // TAA's compute group: two storage buffers (gltf-pro's group 0 also binds two buffers, its uniforms).
         const snapshot = groups.find(
-          (group) => group.entries.length === 2 && group.entries.every((entry) => entry.resource.buffer),
+          (group) =>
+            group.entries.length === 2 &&
+            group.entries.every(
+              (entry) => entry.resource.buffer && entry.resource.buffer.usage & GPUBufferUsage.STORAGE,
+            ),
         );
         assert.ok(snapshot, 'TAA created its source/snapshot compute group');
         const source = snapshot.entries[0].resource.buffer;

@@ -75,9 +75,13 @@ test('two views of one model in one frame keep their own camera at submit', asyn
   draw();
   submit();
   assert.equal(gpu.rows.length, 4);
-  for (const row of gpu.rows) assert.deepEqual(row.submitted, row.encoded);
+  for (const row of gpu.rows) {
+    assert.deepEqual(row.submitted, row.encoded);
+    assert.deepEqual(row.submittedView, row.encodedView);
+  }
+  // The camera matrix is the first row of the view block each draw binds.
   assert.deepEqual(
-    gpu.rows.map((row) => row.submitted[12]),
+    gpu.rows.map((row) => row.submittedView[12]),
     [0, 0, 3, 3],
   );
 });
@@ -97,7 +101,7 @@ test('a callback that moves the camera mid-draw does not change later primitives
   submit();
   assert.ok(moved);
   assert.deepEqual(
-    gpu.rows.map((row) => row.submitted[12]),
+    gpu.rows.map((row) => row.submittedView[12]),
     [0, 0],
   );
 });

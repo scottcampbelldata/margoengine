@@ -682,3 +682,27 @@ export function extendedShader(plan: ExtendedPlan): string {
   extended.set(key, out);
   return out;
 }
+
+// The camera, light and target rows of the Frame come from the view block every draw of a view shares
+// (view-uniform.ts): group 0, binding 3, 48 floats.
+const viewDeclarations =
+  'struct MargoView {camera:mat4x4f, view:mat4x4f, eye:vec4f, light:vec4f, radiance:vec4f, flags:vec4f}\n' +
+  '@group(0) @binding(3) var<uniform> margoView:MargoView;\n';
+// The rows `f.camera`, `f.view`, `f.eye`, `f.light`, `f.radiance` and `f.settings.w` of the draw's Frame: every effect
+// that patches the PBR shader reads them under these names, so the finished shader is rewritten once.
+const reads = /\bf\.(camera|view|eye|light|radiance)\b|\bf\.settings\.w\b/g;
+const rewritten = new Map<string, string>();
+
+/** `code` reading its view rows from `margoView` (group 0, binding 3); `code` itself when it reads none. Cached. */
+export function viewShader(code: string): string {
+  let out = rewritten.get(code);
+  if (out === undefined) {
+    if (rewritten.size >= 256) rewritten.clear();
+    const body = code.replace(reads, (_, field: string | undefined) =>
+      field ? 'margoView.' + field : 'margoView.flags.x',
+    );
+    out = body === code ? code : viewDeclarations + body;
+    rewritten.set(code, out);
+  }
+  return out;
+}

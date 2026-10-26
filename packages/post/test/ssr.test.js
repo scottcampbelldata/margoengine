@@ -311,7 +311,7 @@ for (const samples of [4, 1])
     assert.ok(
       code.some((c) =>
         c.includes(
-          'margoCapture(s,v,layers(s,v,normalize(f.light.xyz),vec3f(1))-layers(s,v,normalize(f.light.xyz),vec3f(0)))',
+          'margoCapture(s,v,layers(s,v,normalize(margoView.light.xyz),vec3f(1))-layers(s,v,normalize(margoView.light.xyz),vec3f(0)))',
         ),
       ),
       'clearcoat k',

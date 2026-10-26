@@ -38,7 +38,11 @@ async function scene() {
   };
 }
 
-const depthBuffer = (h) => h.groups.at(-1)?.entries.find((entry) => entry.binding === 196)?.resource.buffer;
+// The newest shading group (group 2) that binds the depth uniform.
+const depthBuffer = (h) =>
+  h.groups
+    .findLast((group) => group.entries.some((entry) => entry.binding === 196))
+    ?.entries.find((entry) => entry.binding === 196)?.resource.buffer;
 const floats = (buffer) => [...new Float32Array(buffer.data)];
 
 test('depth and distance modes choose their packing defaults and retain an owned reference position', () => {
@@ -141,7 +145,7 @@ test('real mesh frames upload live depth controls to one shared 32-byte uniform'
     assert.equal(buffer?.size, 32);
     assert.deepEqual(floats(buffer), [2, -3, 4, 0, 0, 12, 1, 0]);
     const groups = s.h.groups.filter((g) => g.entries.some((e) => e.binding === 196));
-    assert.equal(groups.length, 2);
+    assert.equal(groups.length, 1, 'meshes of one material share its shading group');
     assert.ok(groups.every((g) => g.entries.find((e) => e.binding === 196).resource.buffer === buffer));
     const allocations = { buffers: s.h.counts.buffers, textures: s.h.counts.textures };
     material.referencePosition = [-4, 5, 6];

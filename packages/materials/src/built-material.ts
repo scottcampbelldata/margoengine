@@ -3166,7 +3166,7 @@ function queue(runtime: Engine): MaterialDraws {
           }
           // One render pass for every mesh: a pass per mesh stores and reloads the multisampled colour and depth each
           // time and costs a begin, an end and a command-buffer flush (10,000 meshes: 168 ms of CPU a frame).
-          const run = new PBRDrawRun(c.device);
+          const run = new PBRDrawRun();
           try {
             for (let i = 0; i < phases.length; i++) {
               const item = phases[i];
@@ -3433,6 +3433,23 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
     },
   });
 }
+const records = new WeakMap<Material, WeakMap<Engine, PBRMaterial>>();
+/**
+ * The gltf-pro material record the meshes of `runtime` draw `m` with: one per material, as glTF primitives that use one
+ * material share one record, so gltf-pro derives a material's shader, pipeline and uniform rows once per frame for
+ * all of its meshes instead of once per mesh. `blank` is gltf-pro's record for the placeholder material (`{}`).
+ */
+function recordOf(m: Material, runtime: Engine, blank: PropertyDescriptorMap): PBRMaterial {
+  let byEngine = records.get(m);
+  if (!byEngine) records.set(m, (byEngine = new WeakMap()));
+  let record = byEngine.get(runtime);
+  if (!record) {
+    record = Object.defineProperties({}, blank) as PBRMaterial;
+    surface(record, () => m, runtime);
+    byEngine.set(runtime, record);
+  }
+  return record;
+}
 /** A materials mesh: the gltf-pro model plus the live `material` it draws with (read by @margoengine/exporters `exportModel`). */
 export type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {
   /**
@@ -3507,11 +3524,18 @@ export function createMesh<M extends Material | readonly Material[]>(
     for (const release of held.values()) release();
     held.clear();
   });
-  for (const primitive of model.primitives) {
-    const slot = primitive.definition.material!;
-    // Primitives of one slot share their glTF material.
-    if (!Object.hasOwn(primitive.material, 'extendedFrame')) surface(primitive.material, () => assigned[slot], runtime);
+  // gltf-pro's record for the placeholder material, copied for each material's shared record (own arrays each).
+  const fresh = model.primitives[0].material,
+    blank = Object.getOwnPropertyDescriptors(fresh);
+  for (const key of Object.keys(blank)) {
+    const value = blank[key].value;
+    if (Array.isArray(value)) blank[key].value = [...value];
   }
+  const point = () => {
+    for (const primitive of model.primitives)
+      primitive.material = recordOf(assigned[primitive.definition.material!], runtime, blank);
+  };
+  point();
   const entry: Entry = {
     model,
     materials: groups.map((g) => assigned[g.materialIndex]),
@@ -3531,6 +3555,7 @@ export function createMesh<M extends Material | readonly Material[]>(
       );
     (list as Material[]).forEach(usable);
     assigned.splice(0, assigned.length, ...(list as Material[]));
+    point();
     for (let i = 0; i < groups.length; i++) entry.materials[i] = assigned[groups[i].materialIndex];
     if (array) snapshot = Object.freeze([...assigned]);
     hold();

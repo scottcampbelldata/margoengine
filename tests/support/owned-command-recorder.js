@@ -83,8 +83,19 @@ export function strictGPU() {
     }
     drawIndexed(count, instances = 1) {
       this.check();
-      const uniform = this.groups.get(0)?.entries.find((e) => e.binding === 0)?.resource,
-        row = { count, instances, uniform, groups: new Map(this.groups), encoded: read(uniform) };
+      // Group 0: the draw's own uniform (binding 0) and, for gltf-pro, the view block it shares (binding 3).
+      const frame = this.groups.get(0)?.entries,
+        uniform = frame?.find((e) => e.binding === 0)?.resource,
+        view = frame?.find((e) => e.binding === 3)?.resource,
+        row = {
+          count,
+          instances,
+          uniform,
+          view,
+          groups: new Map(this.groups),
+          encoded: read(uniform),
+          encodedView: view && read(view),
+        };
       for (const g of this.groups.values()) for (const e of g.entries) live(e.resource?.buffer, 'drawIndexed');
       rows.push(row);
       unsettled.push(row);
@@ -190,6 +201,7 @@ export function strictGPU() {
           for (const row of c.draws) {
             for (const g of row.groups.values()) for (const e of g.entries) live(e.resource?.buffer, 'submit');
             row.submitted = read(row.uniform);
+            if (row.view) row.submittedView = read(row.view);
           }
         }
         note('submit');
@@ -199,7 +211,10 @@ export function strictGPU() {
   };
   /** Re-reads the uniform bytes of every row encoded since the last call (see the header). */
   const settle = () => {
-    for (const row of unsettled.splice(0)) row.encoded = read(row.uniform);
+    for (const row of unsettled.splice(0)) {
+      row.encoded = read(row.uniform);
+      if (row.view) row.encodedView = read(row.view);
+    }
   };
   return { device, calls, rows, buffers, settle };
 }

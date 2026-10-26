@@ -28,18 +28,22 @@ class Arena {
   readonly unit: number;
   readonly chunks: Chunk[] = [];
   dirty = false;
+  /** Slots held by draws (not shared view blocks); when the last goes, `idle` runs (view blocks let go). */
+  draws = 0;
+  idle?: () => void;
   constructor(readonly device: GPUDevice) {
     this.unit = Math.max(MIN_UNIT, device.limits?.minUniformBufferOffsetAlignment ?? MIN_UNIT);
   }
-  allocate(floats: number): UniformSlot {
+  allocate(floats: number, shared: boolean): UniformSlot {
+    if (!shared) this.draws++;
     const units = Math.ceil((floats * 4) / this.unit);
     for (const chunk of this.chunks) {
       const reuse = chunk.free.get(units)?.pop();
-      if (reuse !== undefined) return new UniformSlot(this, chunk, reuse, floats, units);
+      if (reuse !== undefined) return new UniformSlot(this, chunk, reuse, floats, units, shared);
       if (chunk.used + units <= chunk.units) {
         const offset = chunk.used;
         chunk.used += units;
-        return new UniformSlot(this, chunk, offset, floats, units);
+        return new UniformSlot(this, chunk, offset, floats, units, shared);
       }
     }
     const count = Math.max(units, Math.min(LAST_CHUNK, FIRST_CHUNK << Math.min(this.chunks.length, 8))),
@@ -58,7 +62,7 @@ class Arena {
         free: new Map(),
       };
     this.chunks.push(chunk);
-    return new UniformSlot(this, chunk, 0, floats, units);
+    return new UniformSlot(this, chunk, 0, floats, units, shared);
   }
   /**
    * Returns a slot. Callers go through `retire`, which defers this while commands that read the slot wait for submit,
@@ -70,11 +74,12 @@ class Arena {
     if (chunk.live === 0) {
       this.chunks.splice(this.chunks.indexOf(chunk), 1);
       chunk.buffer.destroy();
-      return;
+    } else {
+      let free = chunk.free.get(slot.units);
+      if (!free) chunk.free.set(slot.units, (free = []));
+      free.push(slot.offset);
     }
-    let free = chunk.free.get(slot.units);
-    if (!free) chunk.free.set(slot.units, (free = []));
-    free.push(slot.offset);
+    if (!slot.shared && --this.draws === 0) this.idle?.();
   }
 }
 
@@ -106,6 +111,8 @@ export class UniformSlot {
     readonly offset: number,
     readonly floats: number,
     readonly units: number,
+    /** A view block shared by draws (view-uniform.ts) rather than one draw's own. */
+    readonly shared: boolean,
   ) {
     chunk.live++;
     this.start = (offset * arena.unit) / 4;
@@ -172,9 +179,16 @@ export class UniformSlot {
   }
 }
 
-/** A uniform block of `floats` floats on `device`. */
-export function acquireUniform(device: GPUDevice, floats: number): UniformSlot {
-  return arenaOf(device).allocate(floats);
+/** A uniform block of `floats` floats on `device`: a draw's own, or (`shared`) one that draws share. */
+export function acquireUniform(device: GPUDevice, floats: number, shared = false): UniformSlot {
+  return arenaOf(device).allocate(floats, shared);
+}
+
+/**
+ * Runs `release` when the last draw slot on `device` goes (the device's shared blocks are then unused).
+ */
+export function onUniformsIdle(device: GPUDevice, release: () => void): void {
+  arenaOf(device).idle = release;
 }
 
 /**

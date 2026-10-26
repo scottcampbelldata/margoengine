@@ -15,6 +15,7 @@ import {
   transmissiveShader,
   transparentPBR,
   capturePBR,
+  viewShader,
 } from '../src/shader.ts';
 import { lightPBR } from '../../shared/pbr-hooks.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
@@ -566,11 +567,11 @@ test('physical extensions select the physical shader variant, its maps and the t
       groups = calls.filter((c) => c[0] === 'group' && c[1] === 1).map((c) => c[2].entries.length);
     assert.equal(
       pipelines[0].vertex.module.code,
-      compactTests(pbrShader),
+      viewShader(compactTests(pbrShader)),
       'opaque plain material draws first with the base shader, its tests behind constants',
     );
     // Transmission (5w.f): the transmissive physical variant, drawn twice: the background times the tint, then the lit surface added.
-    assert.equal(pipelines[1].vertex.module.code, transmissiveShader());
+    assert.equal(pipelines[1].vertex.module.code, viewShader(transmissiveShader()));
     assert.equal(pipelines[2].vertex.module, pipelines[1].vertex.module);
     assert.deepEqual(
       pipelines.slice(1).map((p) => [p.fragment.entryPoint, p.fragment.targets[0].blend.color]),

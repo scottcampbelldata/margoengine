@@ -325,7 +325,7 @@ test('glTF-pro models: applyTo lights and fogs opaque and blended primitives in 
       );
       assert.match(
         code,
-        /color=mix\(select\(color,pbrNeutral\(max\(color,vec3f\(0\)\)\),f\.settings\.w<0\.5\),margoFog\.color\.rgb,fogAmount\(i\.position,f\.eye\.xyz\)\);if\(f\.settings\.w<0\.5\) \{/,
+        /color=mix\(select\(color,pbrNeutral\(max\(color,vec3f\(0\)\)\),margoView\.flags\.x<0\.5\),margoFog\.color\.rgb,fogAmount\(i\.position,margoView\.eye\.xyz\)\);if\(margoView\.flags\.x<0\.5\) \{/,
       );
     }
     assert.ok(

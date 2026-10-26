@@ -155,31 +155,28 @@ test('alternating main and probe targets reuse warmed pipeline records and bound
     pipelines.map((value) => value.fragment.targets[0].format),
     ['bgra8unorm', 'bgra8unorm', 'rgba16float'],
   );
-  // Pipeline creation alone missed this regression: the old implementation
-  // reused GPU pipelines while rebuilding a CPU key and record every switch.
-  const records = f.model.resources[0].pipelineHistories.get('beauty'),
-    identities = new Set(records);
-  assert.equal(identities.size, 3);
-  const count = f.h.pipelines.length;
+  // Steady alternation between warmed targets creates no pipelines and no bind groups: each target keeps its own
+  // derivation (shader, pipeline, lighting group) and only re-derives the shader text, never the GPU objects.
+  const count = f.h.pipelines.length,
+    groups = f.h.counts.groups;
   for (let i = 0; i < 120; i++) {
     const index = i % targets.length;
     assert.equal(f.frame('beauty', targets[index])[0].pipeline, pipelines[index]);
-    assert.equal(f.model.resources[0].pipelineHistories.get('beauty'), records);
-    assert.deepEqual(new Set(records), identities);
+    await null; // the next frame
   }
+  assert.equal(f.h.counts.groups, groups);
   assert.equal(f.h.pipelines.length, count);
   const material = f.model.primitives[0].material;
   material.renderState = { depthCompare: 'always' };
   for (let i = 0; i < 80; i++) {
     material.renderState.label = i;
     assert.equal(f.frame()[0].pipeline.depthStencil.depthCompare, 'always');
-    assert.ok(records.length <= 32, 'Animated states must not retain an unbounded record history');
   }
   delete material.renderState;
   assert.equal(f.frame()[0].pipeline, pipelines[0], 'Eviction must still reuse the original GPU pipeline');
 });
 
-test('PBR lighting snapshots each primitive effect set and consumes binding callbacks every draw', async (t) => {
+test('PBR lighting snapshots each primitive effect set and consumes binding callbacks every frame', async (t) => {
   const f = await scene(2);
   t.after(() => f.engine.dispose());
   const calls = [],
@@ -221,7 +218,8 @@ test('PBR lighting snapshots each primitive effect set and consumes binding call
   const groups = f.h.counts.groups;
   calls.length = 0;
   f.frame();
-  assert.deepEqual(calls, ['first', 'third', 'first', 'third']);
+  // Both primitives share the material and now the same effects: one derivation, one call of each callback.
+  assert.deepEqual(calls, ['first', 'third']);
   assert.equal(f.h.counts.groups, groups, 'Stable bindings should reuse the last GPU lighting group');
 });
 
@@ -247,14 +245,15 @@ test('PBR lighting scratch is isolated when a binding callback reenters the same
     },
   });
   f.frame();
-  assert.equal(calls, 4, 'Both inner and outer invocations should visit both primitives');
+  // The primitives share their material: each invocation (inner and outer) derives once and draws both.
+  assert.equal(calls, 2, 'Each invocation consumes the bindings callback once');
   assert.deepEqual(
     f.draws.map((draw) => draw.lighting.entries[0].resource.offset),
     [256, 256, 0, 0],
   );
   const groups = f.h.counts.groups;
   f.frame();
-  assert.equal(calls, 6);
+  assert.equal(calls, 3);
   assert.equal(f.h.counts.groups, groups);
 });
 
@@ -280,7 +279,7 @@ test('PBR lighting scratch trims removed effects and changing binding counts wit
       [entries.slice(0, count).map((entry) => entry.binding), entries.slice(0, count).map((entry) => entry.binding)],
     );
   }
-  assert.equal(calls, 10, 'Every primitive retains its live bindings callback');
+  assert.equal(calls, 5, 'Every frame consumes the live bindings callback once for the shared material');
   remove();
   const replacement = f.model.addLighting({ shader: (source) => source, bindings: () => [entries[1]] });
   assert.deepEqual(

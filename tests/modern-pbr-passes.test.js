@@ -238,7 +238,8 @@ test('PBR culls authored single-sided faces in every pass and reuses mirrored an
     assert.equal(pipelines.length, afterLighting);
     model.onDeviceRestored(engine);
     const restored = draws('beauty');
-    assert.equal(pipelines.length, afterLighting + 4, 'Restoration must rebuild device-owned raster variants');
+    // Pipelines belong to the device: a restore onto the same device reuses them (a new device builds its own).
+    assert.equal(pipelines.length, afterLighting, 'Restoration onto the same device reuses its raster variants');
     assert.deepEqual(
       restored.map((draw) => draw.pipeline.primitive.cullMode),
       ['front', 'back', 'none', 'back'],

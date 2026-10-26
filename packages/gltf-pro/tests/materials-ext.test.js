@@ -30,6 +30,7 @@ import {
   factorPhysicalShader,
   physicalShader,
   transmissiveShader,
+  viewShader,
 } from '../src/shader.ts';
 import { lightPBR } from '../../shared/pbr-hooks.js';
 
@@ -451,7 +452,7 @@ test('transmission: tint multiply then lit add (no blend constant); ambient hook
   let log = draw();
   const pipelines = log.filter((e) => e[0] === 'renderPipeline'),
     passes = log.filter((e) => e[0].startsWith('pass.')).map((e) => (e[0] === 'pass.setPipeline' ? e[1] : e[0]));
-  assert.equal(log.find((e) => e[0] === 'module')[2].code, transmissiveShader());
+  assert.equal(log.find((e) => e[0] === 'module')[2].code, viewShader(transmissiveShader()));
   assert.deepEqual(
     pipelines.map((e) => [e[2].fragment.entryPoint, e[2].fragment.targets[0].blend.color]),
     [
@@ -462,7 +463,10 @@ test('transmission: tint multiply then lit add (no blend constant); ambient hook
   assert.ok(!passes.includes('pass.setBlendConstant'));
   assert.deepEqual(passes.slice(0, 2), [pipelines[1][1], 'pass.setBindGroup'], 'the tint draw comes first');
   assert.equal(passes.filter((e) => e === 'pass.drawIndexed').length, 2);
-  const values = floatsOf(log.find((e) => e[0] === 'writeBuffer')[3]);
+  // The arena uploads the changed range of its chunk; the model's one uniform is the chunk's first slot.
+  const write = log.find((e) => e[0] === 'writeBuffer'),
+    values = new Float32Array(write[2] / 4 + floatsOf(write[3]).length);
+  values.set(floatsOf(write[3]), write[2] / 4);
   near([values[98], values[99], values[102]], [0.4, 0.8, 0.2], 1e-6, 'tint lanes');
   ibl.applyTo(model);
   log = draw();
