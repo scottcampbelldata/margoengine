@@ -2509,9 +2509,11 @@ does not own. Each entry says exactly what is needed to close it.
   1. An iPhone or iPad on iOS 17 or later, or a Mac on macOS 14 or later (Quick Look and AR Quick Look).
   2. Five exported files opened there, each compared with the same scene drawn by Margo: a base-colour texture with an
      alpha mask (`opacityThreshold`), a blended (alpha) texture, a metal-rough map plus a normal map at `normalScale` 1
-     and 2, an occlusion plus emissive map, and a base-colour texture transform (offset, rotation and scale) with
+     and 2, an occlusion plus emissive map, and a base-colour texture transform (offset and scale; the exporter has no rotation) with
      repeat and mirror wrapping.
-  3. `pip install usd-core`, then `python packages/exporters/tests/validate-usdz.py <file>` on the same five files.
+     `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` writes them (six files: `normalScale` 1 and 2 are separate),
+     with engine-drawn reference twins.
+  3. `pip install usd-core`, then `python packages/exporters/tests/validate-usdz.py <file>` on the same files.
   4. The result (pass, or the difference seen) recorded here and in `docs/threejs-parity.md` (USDZExporter row).
 
 ### WebXR AR hit testing: never run on an AR device
