@@ -11,7 +11,7 @@ import { EnvironmentLighting, Fog } from '../../environment/dist/index.js';
 import { Raycaster } from '../../bvh/dist/index.js';
 import { instancedGLTF } from '../../../tests/support/instanced-gltf.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
-import { instancedShader } from '../src/instancing.ts';
+import { instancedShader } from '../src/instanced-shader.ts';
 import { pbrShader, physicalShader } from '../src/shader.ts';
 import { NodeMaterial, positionLocal, normalLocal, uv, color, mix } from '../../shader/dist/index.js';
 

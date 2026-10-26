@@ -288,6 +288,10 @@ interface RunView {
   at: GPUBufferBinding | undefined;
 }
 const noLighting: readonly LightingEffect[] = Object.freeze([]);
+/** A node matrix without an inverse (a zero scale) leaves the draw no normal matrix. */
+function singular(): never {
+  throw new RangeError('Singular PBR transform: give the mesh a nonzero scale on every axis');
+}
 /** Whether a finished shader reads the model rows only in the instanced vertex stage (see `derive`), by shader. */
 const modelFreeCode = new Map<string, boolean>();
 // Global, not per model: draws nest (a callback may draw), and one stack serves every model.
@@ -2576,7 +2580,7 @@ export class PBRModel implements EnginePlugin {
           const v = r.values;
           v.set(d.block);
           v.set(a, 16);
-          if (!invertMatrixStable(a, this.inverse, this.workspace)) throw new RangeError('Singular PBR transform; give the node a transform with a non-zero scale');
+          if (!invertMatrixStable(a, this.inverse, this.workspace)) singular();
           for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
           v[97] = sign;
         }
@@ -3028,7 +3032,7 @@ export class PBRModel implements EnginePlugin {
     const v = r.values;
     v.set(d.block);
     v.set(a, 16);
-    if (!invertMatrixStable(a, this.inverse, this.workspace)) throw new Error('Singular PBR transform');
+    if (!invertMatrixStable(a, this.inverse, this.workspace)) singular();
     for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
     v[97] = sign;
     const uniform = r.uniform.write(v, view),
@@ -3094,7 +3098,7 @@ export class PBRModel implements EnginePlugin {
       this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
     const v = r.values;
     v.set(node.matrix, 16);
-    if (!invertMatrixStable(node.matrix, this.inverse, this.workspace)) throw new RangeError('Singular PBR transform; give the node a transform with a non-zero scale');
+    if (!invertMatrixStable(node.matrix, this.inverse, this.workspace)) singular();
     for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
     v.set(m.base, 76);
     v.set(m.factors, 80);

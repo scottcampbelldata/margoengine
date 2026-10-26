@@ -11,7 +11,7 @@ import { backSideShader } from '../src/side-shader.ts';
 import { uniformBytes } from '../../../tests/support/optional-gpu.js';
 /** Whether a bound uniform window is the arena slot of a draw resource. */
 const same = (binding, slot) => binding.buffer === slot.binding.buffer && (binding.offset ?? 0) === slot.binding.offset;
-import { instancedShader } from '../src/instancing.ts';
+import { instancedShader } from '../src/instanced-shader.ts';
 
 test('back-only instancing gives extension helpers and the surface the same instance handedness', () => {
   const helper = 'fn layer(i:Out,front:bool)->bool {let facing=front==(f.coordsB.y>0);return facing;}\n',

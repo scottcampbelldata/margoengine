@@ -8,7 +8,7 @@
 // material); each batch keeps its meshes in draw order.
 import { instanceLayout } from '../../shared/instances.js';
 import { retire } from '../../shared/frame-resources.js';
-import { instancedShader } from './instancing.js';
+import { instancedShader } from './instanced-shader.js';
 import type { UniformSlot } from './uniform-arena.js';
 
 declare const GPUBufferUsage: { VERTEX: number; COPY_DST: number };
