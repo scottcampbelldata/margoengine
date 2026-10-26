@@ -35,14 +35,25 @@ export function finite(value: unknown, width: number, label: string): ArrayLike<
       throw new RangeError(`${label} has a non-finite value; pass finite numbers`);
   return v;
 }
-const rotation = [0, 0, 0, 0]; // normalizeQuaternion scratch
-// Each bone keeps 10 numbers per pose: translation 0-2, rotation 3-6, scale 7-9. Validates all before writing any.
-function writePose(target: Float64Array, at: number, pose: BonePose, label: string): void {
-  const t = pose.translation === undefined ? undefined : finite(pose.translation, 3, label + ' translation'),
-    s = pose.scale === undefined ? undefined : finite(pose.scale, 3, label + ' scale'),
-    q = pose.rotation === undefined ? undefined : finite(pose.rotation, 4, label + ' rotation');
+const rotation = new Float64Array(4); // normalizeQuaternion scratch (typed, like the samples it sits beside)
+// True for `width` finite numbers; the checks of `finite`, without building its message.
+function valid(value: unknown, width: number): value is ArrayLike<number> {
+  const v = value as ArrayLike<number> | undefined;
+  if (!v || typeof v !== 'object' || v.length !== width) return false;
+  for (let i = 0; i < width; i++) if (typeof v[i] !== 'number' || !Number.isFinite(v[i])) return false;
+  return true;
+}
+// Each bone keeps 10 numbers per pose: translation 0-2, rotation 3-6, scale 7-9. Validates all before writing any. The
+// label ("Skeleton bone <bone>") is built only for an error: setPose runs per bone per frame.
+function writePose(target: Float64Array, at: number, pose: BonePose, bone: number): void {
+  const t = pose.translation,
+    s = pose.scale,
+    q = pose.rotation;
+  if (t !== undefined && !valid(t, 3)) finite(t, 3, `Skeleton bone ${bone} translation`);
+  if (s !== undefined && !valid(s, 3)) finite(s, 3, `Skeleton bone ${bone} scale`);
+  if (q !== undefined && !valid(q, 4)) finite(q, 4, `Skeleton bone ${bone} rotation`);
   if (q && !(q[0] || q[1] || q[2] || q[3]))
-    throw new RangeError(`${label} rotation is a zero quaternion; pass a unit quaternion`);
+    throw new RangeError(`Skeleton bone ${bone} rotation is a zero quaternion; pass a unit quaternion`);
   if (t) target.set(t, at);
   if (s) target.set(s, at + 7);
   // Also normalizes finite quaternions whose length overflows or underflows.
@@ -69,6 +80,7 @@ export class Skeleton {
   private readonly world: Float64Array;
   private readonly skin: Float64Array;
   private readonly order: number[] = [];
+  private readonly byName: ReadonlyMap<string, number>;
   private readonly local = new Float64Array(16);
   private readonly workspace = new Float64Array(52);
   private dirty = true;
@@ -86,7 +98,8 @@ export class Skeleton {
           throw new TypeError(`Skeleton bone ${i} needs a nonempty string name`);
         return bone.name;
       });
-    if (new Set(names).size !== n) throw new TypeError('Skeleton bone names repeat; give every bone a unique name');
+    this.byName = new Map(names.map((name, i) => [name, i]));
+    if (this.byName.size !== n) throw new TypeError('Skeleton bone names repeat; give every bone a unique name');
     const parents = bones.map(({ parent }, i) => {
       if (!Number.isInteger(parent) || parent < -1 || parent >= n || parent === i)
         throw new RangeError(`Skeleton bone ${i} parent ${parent} is invalid; use -1 or another bone's index`);
@@ -110,7 +123,7 @@ export class Skeleton {
     this.base = new Float64Array(n * 10);
     bones.forEach((bone, i) => {
       this.base.set([0, 0, 0, 0, 0, 0, 1, 1, 1, 1], i * 10);
-      writePose(this.base, i * 10, bone, `Skeleton bone ${i}`);
+      writePose(this.base, i * 10, bone, i);
     });
     this.pose = this.base.slice();
     this.world = new Float64Array(n * 16);
@@ -125,7 +138,7 @@ export class Skeleton {
   }
   /** Index of the bone with this name, or -1. */
   index(name: string): number {
-    return this.names.indexOf(name);
+    return this.byName.get(name) ?? -1;
   }
   private bone(bone: number): number {
     if (!Number.isInteger(bone) || bone < 0 || bone >= this.count)
@@ -134,7 +147,7 @@ export class Skeleton {
   }
   /** Sets any of a bone's local translation, rotation and scale in the current pose. */
   setPose(bone: number, pose: BonePose): this {
-    writePose(this.pose, this.bone(bone) * 10, pose ?? {}, `Skeleton bone ${bone}`);
+    writePose(this.pose, this.bone(bone) * 10, pose ?? {}, bone);
     return this.changed();
   }
   /** A copy of a bone's current local transform. */

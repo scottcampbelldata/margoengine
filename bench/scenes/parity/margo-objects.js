@@ -271,23 +271,38 @@ export const builders = {
         .createMesh()
         .setMaterial(new PbrMaterial({ color: '#d08a50', roughness: 0.4, metalness: 0.1, ...single })),
       res = data.resolution,
-      centres = [];
-    // three's metaball field in unit-cube coordinates: sum of max(0, strength / d^2 - subtract), surface at isolation.
-    const field = (x, y, z) => {
-      const ux = (x + 1) / 2,
-        uy = (y + 1) / 2,
-        uz = (z + 1) / 2;
-      let v = 0;
-      for (const c of centres) {
-        const d2 = (ux - c[0]) ** 2 + (uy - c[1]) ** 2 + (uz - c[2]) ** 2;
-        v += Math.max(0, BALLS.strength / Math.max(d2, 1e-6) - BALLS.subtract);
+      centres = [],
+      grid = new Float32Array(res ** 3),
+      unit = new Float64Array(res),
+      reach = Math.sqrt(BALLS.strength / BALLS.subtract);
+    for (let i = 0; i < res; i++) unit[i] = i / (res - 1);
+    // three's metaball field in unit-cube coordinates: isolation - sum of max(0, strength / d^2 - subtract), surface at
+    // 0. A ball adds nothing beyond `reach`, so each one is written only into the grid samples within reach of it.
+    const span = (c) => [
+      Math.max(0, Math.floor((c - reach) * (res - 1))),
+      Math.min(res - 1, Math.ceil((c + reach) * (res - 1))),
+    ];
+    const splat = () => {
+      grid.fill(BALLS.isolation);
+      for (const [cx, cy, cz] of centres) {
+        const [x0, x1] = span(cx),
+          [y0, y1] = span(cy),
+          [z0, z1] = span(cz);
+        for (let z = z0; z <= z1; z++)
+          for (let y = y0; y <= y1; y++) {
+            const yz = (unit[y] - cy) ** 2 + (unit[z] - cz) ** 2;
+            for (let x = x0, i = x0 + res * (y + res * z); x <= x1; x++, i++) {
+              const add = BALLS.strength / Math.max((unit[x] - cx) ** 2 + yz, 1e-6) - BALLS.subtract;
+              if (add > 0) grid[i] -= add;
+            }
+          }
       }
-      return BALLS.isolation - v;
     };
     let triangles = 0;
     const update = (t) => {
       ballCentres(data.balls, t, centres);
-      const g = marchingCubes(field, { resolution: [res, res, res] });
+      splat();
+      const g = marchingCubes(grid, { resolution: [res, res, res] });
       if (g) {
         mesh.setGeometry(g); // marchingCubes returns a core Geometry
         triangles = g.indices.length / 3;
@@ -300,7 +315,7 @@ export const builders = {
       info: () => ({
         drawCalls: engine.stats.drawCalls,
         triangles,
-        note: 'procedural marchingCubes (marching tetrahedra, more triangles) on the CPU each frame, new core Geometry each frame',
+        note: 'procedural marchingCubes (marching tetrahedra, more triangles) of a sampled grid on the CPU each frame, balls written only within reach as three does; new core Geometry each frame',
       }),
     };
   },

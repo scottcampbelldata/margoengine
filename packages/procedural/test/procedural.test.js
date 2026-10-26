@@ -26,6 +26,66 @@ test('Marching Cubes extracts a sphere with radial normals and returns null for 
   );
   assert.throws(() => marchingCubes(() => NaN), /finite/);
 });
+test('Marching Cubes takes a sampled grid: same surface as the function, grid-gradient normals, length checked', () => {
+  const field = (x, y, z) => Math.hypot(x - 0.1, y, z * 1.3) - 0.6,
+    resolution = [24, 20, 28],
+    bounds = [
+      [-1, -0.9, -1.1],
+      [0.9, 1, 1],
+    ];
+  const grid = new Float64Array(resolution[0] * resolution[1] * resolution[2]);
+  for (let z = 0, i = 0; z < resolution[2]; z++)
+    for (let y = 0; y < resolution[1]; y++)
+      for (let x = 0; x < resolution[0]; x++, i++)
+        grid[i] = field(
+          ...[x, y, z].map((c, a) => bounds[0][a] + ((bounds[1][a] - bounds[0][a]) * c) / (resolution[a] - 1)),
+        );
+  const a = marchingCubes(field, { resolution, bounds }),
+    b = marchingCubes(grid, { resolution, bounds });
+  assert.deepEqual(b.indices, a.indices);
+  for (let i = 0; i < a.vertices.length; i += 6) {
+    for (let k = 0; k < 3; k++) assert.equal(b.vertices[i + k], a.vertices[i + k]);
+    const dot =
+      a.vertices[i + 3] * b.vertices[i + 3] +
+      a.vertices[i + 4] * b.vertices[i + 4] +
+      a.vertices[i + 5] * b.vertices[i + 5];
+    assert.ok(dot > 0.97, `normal ${i / 6} off by ${Math.acos(Math.min(1, dot))} rad`);
+  }
+  assert.throws(() => marchingCubes(grid.subarray(1), { resolution, bounds }), /resolution\[0\]/);
+  assert.throws(
+    () => marchingCubes(Object.assign(new Float32Array(grid), { 5: NaN }), { resolution, bounds }),
+    /finite/,
+  );
+});
+test('Marching Cubes reuses its scratch safely: after a throw, and from inside a density function', () => {
+  const sphere = (x, y, z) => Math.hypot(x, y, z) - 0.5,
+    reference = marchingCubes(sphere, { resolution: [20, 20, 20] });
+  // A throw part-way through leaves no stale shared vertices behind.
+  let calls = 0;
+  assert.throws(
+    () =>
+      marchingCubes(
+        (x, y, z) => {
+          if (++calls > 20 ** 3 + 50) throw new RangeError('stop');
+          return sphere(x, y, z);
+        },
+        { resolution: [20, 20, 20] },
+      ),
+    /stop/,
+  );
+  assert.deepEqual(marchingCubes(sphere, { resolution: [20, 20, 20] }), reference);
+  // A nested call (a field built from another surface) gets its own buffers.
+  let inner;
+  const outer = marchingCubes(
+    (x, y, z) => {
+      inner ??= marchingCubes(sphere, { resolution: [20, 20, 20] });
+      return sphere(x, y, z);
+    },
+    { resolution: [20, 20, 20] },
+  );
+  assert.deepEqual(inner, reference);
+  assert.deepEqual(outer, reference);
+});
 test('surface extraction is closed, outward-wound and close to the true shape (sphere and torus SDFs)', () => {
   const check = (field, resolution, genus, volume, area) => {
     const g = marchingCubes(field, { resolution: [resolution, resolution, resolution] }),

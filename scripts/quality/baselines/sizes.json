@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3355239,
+  "total": 3356722,
   "history": [
     {
       "date": "2026-10-24",
@@ -416,13 +416,25 @@
       "commit": "594c45af",
       "reason": "perf(exporters,machinery,shared): shortest-number search by bisection with a cache and slicing-by-8 CRC-32 (USDZ export 52.8 to 16 ms), lazy part fingerprints in the CAD worker (item 47 rows p-export-usdz, p-stl)",
       "grew": 5
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "594c45af",
+      "reason": "procedural: marchingCubes takes a sampled grid (grid-gradient normals) and reuses its scratch buffers; p-marching-cubes 15.96 -> 2.87 ms CPU, three.js 3.08 (item 47)",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "2fd70499",
+      "reason": "animation: Skeleton.index by Map, keyframe clips bind bones once and reuse one sample and pose per path, setPose builds error text only on a throw; p-keyframes 420 -> 30.3 ms, three.js 32.4 (item 47)",
+      "grew": 3
     }
   ],
   "items": {
-    "@margoengine/animation": 19272,
-    "@margoengine/animation/pointer": 6882,
+    "@margoengine/animation": 19547,
+    "@margoengine/animation/pointer": 6858,
     "@margoengine/animation/sampling": 1177,
-    "@margoengine/animation/skeleton-utils": 8810,
+    "@margoengine/animation/skeleton-utils": 8966,
     "@margoengine/animation/vat": 8130,
     "@margoengine/animator": 17372,
     "@margoengine/audio": 7716,
@@ -632,7 +644,7 @@
     "@margoengine/post/ssgi": 11862,
     "@margoengine/post/ssr": 11154,
     "@margoengine/post/stack": 4001,
-    "@margoengine/procedural": 7833,
+    "@margoengine/procedural": 8909,
     "@margoengine/procedural/expression": 4720,
     "@margoengine/procedural/lsystem": 2454,
     "@margoengine/procedural/noise": 2314,

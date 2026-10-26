@@ -2,7 +2,7 @@ import type { PBRModel } from '@margoengine/gltf-pro';
 import { normalizeQuaternion } from '@margoengine/math/quat';
 import { finite, Skeleton } from './skin.js';
 
-const rotation = [0, 0, 0, 0]; // normalizeQuaternion scratch
+const rotation = new Float64Array(4); // normalizeQuaternion scratch (typed, like the samples it sits beside)
 
 /**
  * How a key moves to the next key: hold then jump, straight, a cubic ease in, out, or in and out, or `'cubicSpline'`: a
@@ -456,6 +456,26 @@ export interface KeyframeModelTarget {
 }
 
 const sample = new Float64Array(4);
+const posed = (path: 'translation' | 'rotation' | 'scale', width: number) => {
+  const value = new Float64Array(width);
+  return { value, pose: { [path]: value } };
+};
+const poses = { translation: posed('translation', 3), rotation: posed('rotation', 4), scale: posed('scale', 3) };
+// Per clip and skeleton, each track's bone (-1: weights, or no bone of that name). Both are fixed once made (a clip's
+// tracks and a skeleton's names are read-only), so the binding is resolved once. Keyed by the tracks array, so a clip
+// object rebuilt around other tracks binds again.
+const bindings = new WeakMap<readonly KeyframeTrack[], WeakMap<Skeleton, Int32Array>>();
+function boneBinding(clip: KeyframeClip, skeleton: Skeleton): Int32Array {
+  const tracks = clip.tracks;
+  let bySkeleton = bindings.get(tracks);
+  if (!bySkeleton) bindings.set(tracks, (bySkeleton = new WeakMap()));
+  let bones = bySkeleton.get(skeleton);
+  if (!bones || bones.length !== tracks.length) {
+    bones = Int32Array.from(tracks, (track) => (track.path === 'weights' ? -1 : skeleton.index(track.target)));
+    bySkeleton.set(skeleton, bones);
+  }
+  return bones;
+}
 /**
  * Poses `target` at `time`. On a `Skeleton`, every translation, rotation or scale track whose target names one of its
  * bones sets that bone's property (weights tracks are skipped: bones have no morphs). On a glTF-pro model's
@@ -490,15 +510,25 @@ export function applyKeyframeClip(
     return;
   }
   if (target instanceof Skeleton) {
-    for (const track of clip.tracks) {
-      const bone = track.path === 'weights' ? -1 : target.index(track.target);
-      if (bone >= 0) target.setPose(bone, { [track.path]: sampleKeyframes(track, time) });
+    const tracks = clip.tracks,
+      bones = boneBinding(clip, target);
+    for (let i = 0; i < tracks.length; i++) {
+      const bone = bones[i],
+        track = tracks[i];
+      if (bone < 0) continue;
+      // setPose copies the values, so one reused sample and pose object per path serves every track.
+      const pose = poses[track.path as 'translation' | 'rotation' | 'scale'];
+      sampleKeyframes(track, time, pose.value);
+      target.setPose(bone, pose.pose);
     }
     return;
   }
-  const { nodes, primitives } = target.model;
+  const { nodes, primitives } = target.model,
+    // First node per name, built once per call (a lookup per track would scan every node).
+    byName = new Map<string, number>();
+  for (let i = nodes.length - 1; i >= 0; i--) if (typeof nodes[i].name === 'string') byName.set(nodes[i].name!, i);
   for (const track of clip.tracks) {
-    const index = nodes.findIndex((node) => node.name === track.target);
+    const index = byName.get(track.target) ?? -1;
     if (index < 0) continue;
     const value = sampleKeyframes(track, time),
       node = nodes[index];

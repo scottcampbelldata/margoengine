@@ -209,3 +209,49 @@ test('baked samplers are exact at keys and at every baked time, through the glTF
   assert.throws(() => bakeKeyframeClip(clip, 0, () => 1), RangeError);
   assert.throws(() => bakeKeyframeClip(clip, 30), TypeError);
 });
+
+test('applyKeyframeClip binds tracks to bones once per clip and skeleton, and a new tracks array binds again', () => {
+  const names = Array.from({ length: 64 }, (_, i) => `b${i}`),
+    skeleton = new Skeleton(names.map((name, i) => ({ name, parent: i ? 0 : -1 })));
+  const clip = createKeyframeClip({
+    tracks: names.map((target, i) => ({
+      target,
+      path: i % 2 ? 'rotation' : 'translation',
+      keys: [
+        { time: 0, value: i % 2 ? [0, 0, 0, 1] : [0, 0, 0] },
+        { time: 1, value: i % 2 ? sz(90) : [i, 0, 0] },
+      ],
+    })),
+  });
+  let lookups = 0;
+  const index = skeleton.index.bind(skeleton);
+  skeleton.index = (name) => (lookups++, index(name));
+  for (let k = 0; k <= 10; k++) applyKeyframeClip(clip, skeleton, k / 10);
+  // Once per track, not once per track per call (it was a linear name search per track per call: quadratic in bones).
+  assert.equal(lookups, names.length);
+  near(skeleton.getPose(4).translation, [4, 0, 0]);
+  near(skeleton.getPose(5).rotation, sz(90), 1e-12);
+  // Same tracks on another skeleton whose bone order differs: bound to that skeleton's indices.
+  const other = new Skeleton([...names].reverse().map((name, i) => ({ name, parent: i ? 0 : -1 })));
+  applyKeyframeClip(clip, other, 0.5);
+  near(other.getPose(other.index('b4')).translation, [2, 0, 0]);
+  const fresh = createKeyframeClip({
+    tracks: [{ target: 'b7', path: 'scale', keys: [{ time: 0, value: [2, 2, 2] }] }],
+  });
+  applyKeyframeClip(fresh, skeleton, 0);
+  near(skeleton.getPose(7).scale, [2, 2, 2]);
+  assert.equal(lookups, names.length + 1);
+});
+
+test('Skeleton.index finds every bone by name in constant time and -1 for others, prototype names included', () => {
+  const names = ['root', 'toString', '__proto__', 'constructor', 'hasOwnProperty'],
+    skeleton = new Skeleton(names.map((name, i) => ({ name, parent: i ? 0 : -1 })));
+  names.forEach((name, i) => assert.equal(skeleton.index(name), i));
+  for (const name of ['valueOf', 'missing', '', undefined]) assert.equal(skeleton.index(name), -1);
+  assert.throws(
+    () => skeleton.setPose(1, { translation: [0, NaN, 0] }),
+    /Skeleton bone 1 translation has a non-finite/,
+  );
+  assert.throws(() => skeleton.setPose(2, { rotation: [0, 0, 0] }), /Skeleton bone 2 rotation needs 4 numbers/);
+  assert.throws(() => skeleton.setPose(3, { rotation: [0, 0, 0, 0] }), /Skeleton bone 3 rotation is a zero quaternion/);
+});

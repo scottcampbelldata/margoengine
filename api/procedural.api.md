@@ -87,7 +87,7 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf'): {
     radius: number;
 };
 
-export function marchingCubes(field: DensityField, { resolution, bounds, level }?: MarchingCubesOptions): Geometry | null;
+export function marchingCubes(field: DensityField | ArrayLike<number>, { resolution, bounds, level }?: MarchingCubesOptions): Geometry | null;
 
 export function permutation(seed: number): Uint8Array;
 

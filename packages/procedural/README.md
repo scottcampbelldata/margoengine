@@ -50,6 +50,19 @@ const geometry = marchingCubes((x,y,z) => x*x+y*y+z*z-0.5, {resolution: [32,32,3
 
 Surface extraction is the package's own marching tetrahedra (since 5l.v; it replaced the `isosurface` dependency): each grid cube is split into six tetrahedra around its main diagonal, so neighbouring cubes cut shared faces the same way and the indexed mesh is closed wherever the surface stays inside the grid. It makes more, smaller triangles than classic Marching Cubes and none of its ambiguous-case holes. Negative density is inside; gradient normals and triangle winding face outward. Empty surfaces return null. Resolution is 3..128 on each axis, with a bounded output geometry. Worley searches a sufficient five-cell neighborhood per axis for F1. Sampling/extraction are CPU work, not frame-time GPU voxel meshing.
 
+For a surface that changes every frame (metaballs, sculpting), pass the samples instead of a function: a grid of
+`resolution[0] * [1] * [2]` values, x fastest, then y, then z, sampled at the grid points of `bounds`. Writing each
+blob only into the samples near it is far cheaper than a function that sums every blob at every grid point.
+
+```ts
+import {marchingCubes} from 'margoengine/procedural';
+const n = 48, grid = new Float32Array(n * n * n).fill(1); // 1: outside
+for (let z = 0, i = 0; z < n; z++)
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++, i++) grid[i] = Math.hypot(x - 24, y - 24, z - 24) / 16 - 1; // a sphere
+const sphere = marchingCubes(grid, {resolution: [n, n, n]}); // normals from the grid's gradient
+```
+
 ```ts
 import {generateTreeMesh, generateShrubMesh} from 'margoengine/procedural';
 const pine = generateTreeMesh('conifer'); // Also accepts 'broadleaf'.
