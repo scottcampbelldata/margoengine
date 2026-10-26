@@ -16,6 +16,10 @@ export const GUIDES = [
   ['docs/guides/imports.md', 'Which import to use: margoengine/<name> versus @margoengine/<name>'],
   ['docs/guides/quality-tiers.md', 'High and low quality tiers and how a page picks one'],
   ['docs/guides/kits.md', 'Kits: one import for a whole domain (CAD, games, viz, web)'],
+  [
+    'docs/guides/asset-pipeline.md',
+    'margo-convert build: optimise, compress and package models for the web and for Unity, Unreal, Godot and Roblox',
+  ],
   ['docs/from-threejs.md', 'Moving from three.js: the same task in Margo, name by name'],
   ['docs/limits.md', 'Measured limits and sizes, with the commands that measure them'],
   ['docs/known-bugs.md', 'Open bugs with repro and cause'],

@@ -11,5 +11,16 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "files": ["cli.js", "convert.js"]
+  "files": [
+    "cli.js",
+    "cad-cli.js",
+    "convert.js",
+    "pipeline/cli.js",
+    "pipeline/build.js",
+    "pipeline/optimize.js",
+    "pipeline/presets.js",
+    "pipeline/gltf-io.js",
+    "pipeline/passes.js",
+    "pipeline/meshopt-encode.js"
+  ]
 }

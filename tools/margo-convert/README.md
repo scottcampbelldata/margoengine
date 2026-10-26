@@ -1,7 +1,86 @@
 # margo-convert
 
-Offline STEP / IGES / BREP to GLB for [Margo Engine](https://margoengine.com): tessellate once at build time and ship a
-small GLB instead of the 3.1 MB (gzip) OCCT runtime that `loadCAD` downloads for STEP and IGES.
+The asset pipeline for [Margo Engine](https://margoengine.com): one command that imports, optimises, compresses and
+packages models for the web and for each export target, plus an offline
+STEP / IGES / BREP to GLB converter.
+
+```sh
+npx margo-convert build ./assets --out dist                  # web preset (default)
+npx margo-convert build ./assets --out dist --preset mobile
+npx margo-convert optimize helmet.glb                       # one model -> helmet.optimized.glb
+npx margo-convert part.step part.glb                        # CAD to GLB (below)
+```
+
+## Build and optimize
+
+`build` takes a folder (or one file) and writes optimised copies, a manifest and a size report to `--out` (default
+`dist`). `optimize` does the same for one model. Both take `--preset`:
+
+| Preset | Models |
+| --- | --- |
+| `web` (default) | quantised, meshopt-compressed GLB; static meshes merged; empty nodes removed |
+| `mobile` | as `web` |
+| `unity` | plain GLB, hierarchy and empty nodes kept, no required extensions |
+| `unreal` | as `unity` |
+| `godot` | as `unity` |
+| `roblox` | as `unity` |
+
+Textures and audio files are copied to the output unchanged for now; the presets already carry their texture sizes and
+audio settings, which later versions apply.
+
+See [docs/guides/asset-pipeline.md](../../docs/guides/asset-pipeline.md) for examples of each.
+
+What happens to a model (`.glb`, `.gltf` with its external files, or STEP/IGES/BREP, which are converted first):
+
+- **Prune.** Texture coordinate sets no material reads, tangents without a normal map, then unused nodes, meshes,
+  materials, textures, samplers, images, skins and cameras. Nodes that carry nothing are removed only for the web
+  presets (game engines use empty nodes as attachment points).
+- **Dedupe.** Identical images (by content), samplers, textures, materials and meshes are merged.
+- **Weld.** Identical vertices are merged (every attribute and morph target equal), unreferenced vertices and
+  triangles with no area are dropped, vertices are numbered in order of first use.
+- **Merge** (web presets). Static, unskinned meshes that share a material and attribute layout become one primitive,
+  baked into world space. Safe means: no animation on the node or an ancestor, no morph targets, no node extensions,
+  and the mesh used by one node only (shared meshes stay instanced).
+- **Quantise** (web presets, KHR_mesh_quantization). Positions to 16-bit with the mesh bounds folded into the node
+  transform (one scale on all axes, so normals stay correct; a node with children or animation gets a child node for
+  the mesh), normals and tangents to 8 bits, texture coordinates in 0..1 to 16 bits, colours and skin weights to 8
+  bits. Meshes with morph targets are left alone; skinned meshes keep float positions.
+- **Compress** (web presets, EXT_meshopt_compression). Vertex attributes and triangle indices are written with the
+  meshopt codecs by an encoder written for Margo from the extension specification (`pipeline/meshopt-encode.js`);
+  Margo's decoder (`@margoengine/decoders/meshopt`) reads them, and so do other glTF loaders that support the
+  extension. The output lists the extension as required.
+- A model is never written larger than it came in, and a model that uses an extension the optimiser does not rewrite
+  (Draco, `KHR_animation_pointer`, EXT_structural_metadata and similar) is copied unchanged with the reason in the
+  manifest.
+
+### Manifest, size report, incremental builds
+
+`build` writes `margo-manifest.json` and `margo-size-report.txt` to the output folder. The manifest has one entry per
+input with its relative path, size and SHA-256, the status (`built`, `cached`, `copied`, `skipped`, `failed`), every
+output with its path, size and SHA-256, what was done or could not be done, and counts from the model passes. It
+names no times, so the same inputs and settings give the same manifest. `--hash-names` puts the first eight digits
+of the content hash in output names (`Fox.85828f49.glb`) for long-lived caching; the manifest maps each source to its
+file.
+
+An input is skipped when its content hash, the preset and the tool version match the previous manifest and every output
+still exists with the recorded hash. Change a file, switch the preset or damage an output and only that is rebuilt;
+`--force` rebuilds everything. Outputs of inputs that no longer exist are removed. A failed input is recorded and the
+build goes on; the exit code is 1 if any failed.
+
+From code: `import {build} from 'margo-convert/build'`, `import {optimizeModel} from 'margo-convert/optimize'`,
+`import {PRESETS} from 'margo-convert/presets'`.
+
+### Not done, and why
+
+- **Draco encoding.** No Draco encoder is installed (the repository ships only the decoder), so Draco is not written.
+  Meshopt covers the same job and is smaller to decode.
+- **Level of detail.** The repository has no mesh simplifier, so no LODs are generated.
+- **KTX2 / Basis Universal textures.** No encoder is installed.
+
+## CAD to GLB
+
+Offline STEP / IGES / BREP to GLB: tessellate once at build time and ship a small GLB instead of the 3.1 MB (gzip) OCCT
+runtime that `loadCAD` downloads for STEP and IGES.
 
 ```sh
 npx margo-convert part.step                 # writes part.glb next to it
@@ -59,9 +138,8 @@ const model = await loadGLTF(engine, '/assembly.glb'); // or @margoengine/gltf-p
   same edges at load, about 1 ms per 1,000 distinct triangles in Node (1.8 ms for `as1-oc-214`'s 1,996, 4.0 ms for
   4,348; diagnostic, busy machine), so baking only pays off for models with hundreds of thousands of distinct triangles
   once `FeatureEdges` takes precomputed edges.
-- **Not written:** Draco or meshopt compression. No Draco encoder is installed, and the repository's meshopt encoder
-  (`packages/decoders/tests/support/meshopt-encode.js`) is a test tool, so `--meshopt` would mean a production encoder
-  and gltf-pro's meshopt decoder at load time. Serve the GLB with gzip or brotli instead.
+- **Not written:** Draco compression (no encoder is installed). Run `margo-convert build` on the result for meshopt
+  compression, or serve the GLB with gzip or brotli.
 
 ## Why a separate package
 

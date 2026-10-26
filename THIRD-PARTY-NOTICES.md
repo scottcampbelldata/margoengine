@@ -74,9 +74,12 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     `dist` files). `margo-convert` depends on the unmodified npm package, so npm can swap it.
 - **MPL-2.0 (web-ifc, peer of `@margoengine/ifc`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves `web-ifc.wasm` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
-- **Development tools only (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries (LGPL-3.0) are
-  installed as an optional dependency of Next.js for `examples/next`, and `scripts/optimize-demo-assets.js` and
-  `scripts/build-scifi-helmet.mjs` use sharp to resize textures. Neither is in any tarball or served by the site.
+- **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries
+  (LGPL-3.0) are installed as an optional dependency of Next.js for `examples/next`, and
+  `scripts/optimize-demo-assets.js` and `scripts/build-scifi-helmet.mjs` use sharp to resize textures. `margo-convert
+  build` also uses a sharp that is already installed in the project it runs in (WebP, AVIF and JPEG encoding, resizing);
+  it is not a dependency or peer of any package, nothing is downloaded, and without it `margo-convert` falls back to
+  its own PNG writer. Neither sharp nor libvips is in any tarball or served by the site.
 - **MIT (React).** Keep the copyright and permission notice: npm dependencies carry their own
   LICENSE files.
 - **Site and demos.** The site build copies this file to `/THIRD-PARTY-NOTICES.md`, so the demos that bundle Draco,

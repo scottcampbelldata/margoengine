@@ -1,15 +1,19 @@
 {
   "name": "margo-convert",
   "version": "1.0.0",
-  "description": "Offline STEP / IGES / BREP to GLB converter for Margo Engine: npx margo-convert part.step part.glb",
+  "description": "Offline asset pipeline and CAD converter for Margo Engine: margo-convert build ./assets --preset web; margo-convert part.step part.glb",
   "keywords": [
-    "margoengine",
-    "webgpu",
-    "3d",
+    "asset-pipeline",
     "cli",
     "converter",
     "gltf",
-    "step"
+    "margoengine",
+    "meshopt",
+    "optimize",
+    "step",
+    "webgpu",
+    "webp",
+    "3d"
   ],
   "homepage": "https://margoengine.com",
   "bugs": {
@@ -27,12 +31,17 @@
     "margo-convert": "cli.js"
   },
   "exports": {
-    ".": "./convert.js"
+    ".": "./convert.js",
+    "./build": "./pipeline/build.js",
+    "./optimize": "./pipeline/optimize.js",
+    "./presets": "./pipeline/presets.js"
   },
   "sideEffects": false,
   "files": [
     "cli.js",
+    "cad-cli.js",
     "convert.js",
+    "pipeline",
     "NOTICE"
   ],
   "engines": {
@@ -40,6 +49,7 @@
   },
   "dependencies": {
     "@margoengine/core": "^1.0.0",
+    "@margoengine/decoders": "^1.0.0",
     "@margoengine/exporters": "^1.0.0",
     "@margoengine/machinery": "^1.0.0",
     "@margoengine/math": "^1.0.0",
