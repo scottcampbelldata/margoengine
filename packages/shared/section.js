@@ -3,11 +3,22 @@
 // `clippingPlanes`) use the same layout under another name, so one shader can carry both.
 const bindingPattern = /@group\(0\) @binding\((\d+)\) var<uniform> section:Section;/;
 const cache = new Map();
+// The section binding of the last shader read: draws call this per model, and a frame keeps one core shader.
+let lastShader, lastBinding;
 export function sectionState(context) {
-  const match = bindingPattern.exec(context.shader);
-  if (!match) return;
-  const resource = context.bindings.find((entry) => entry.binding === Number(match[1]))?.resource;
-  return resource && 'buffer' in resource ? resource : undefined;
+  const shader = context.shader;
+  if (shader !== lastShader) {
+    const match = bindingPattern.exec(shader);
+    lastShader = shader;
+    lastBinding = match ? Number(match[1]) : undefined;
+  }
+  if (lastBinding === undefined) return;
+  const bindings = context.bindings;
+  for (let i = 0; i < bindings.length; i++)
+    if (bindings[i].binding === lastBinding) {
+      const resource = bindings[i].resource;
+      return resource && 'buffer' in resource ? resource : undefined;
+    }
 }
 /**
  * The WGSL statement that discards `position` against uniform `name`'s planes. SectionPlanes ('section') cut away the
