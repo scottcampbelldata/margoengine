@@ -118,3 +118,30 @@ test('a PBRDrawRun shares one pass across models and a draw without one keeps it
     w.destroy();
   }
 });
+
+test('a reused run keeps its batch records for the next frame instead of allocating new ones', async () => {
+  const w = await world();
+  try {
+    const material = new Material({ color: [1, 0, 0] }),
+      meshes = Array.from({ length: 4 }, (_, i) => createMesh(w.engine, triangle, material));
+    meshes.forEach((mesh, i) => mesh.root.setPosition([i, 0, 0]));
+    w.store.tick(false);
+    const run = new PBRDrawRun(),
+      frame = () => {
+        for (const mesh of meshes)
+          mesh.draw(w.context, 'beauty', w.context.color, w.context.depth, 'all', undefined, run);
+        const pending = [...run.pending];
+        run.end();
+        return pending;
+      };
+    frame();
+    const [first] = frame();
+    await null; // the next frame
+    const [second] = frame();
+    assert.ok(first, 'the meshes drew as one batch');
+    assert.equal(second, first, 'the same batch record, emptied and reused');
+    assert.equal(second.members.length, 0, 'emptied after the run drew it');
+  } finally {
+    w.destroy();
+  }
+});

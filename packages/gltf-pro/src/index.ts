@@ -351,7 +351,16 @@ function joinBatch(
       }
     }
   if (!batch) {
-    batch = { model, owner: r, d, c, view, viewAt, members: [], models: [] };
+    // Batch records and their member arrays are kept by the run for its next frame, so a steady frame allocates none.
+    batch = run.spare.pop();
+    if (batch) {
+      batch.model = model;
+      batch.owner = r;
+      batch.d = d;
+      batch.c = c;
+      batch.view = view;
+      batch.viewAt = viewAt;
+    } else batch = { model, owner: r, d, c, view, viewAt, members: [], models: [] };
     if (!list) run.batches.set(d, (list = []));
     list.push(batch);
     run.pending.push(batch);
@@ -369,7 +378,14 @@ function flushBatches(run: PBRDrawRun): void {
       if (!batch.model.disposed) batch.model.drawBatch(batch, run);
     }
   } finally {
+    for (let i = 0; i < pending.length; i++) {
+      const batch = pending[i];
+      batch.members.length = batch.models.length = 0;
+      batch.model = batch.c = batch.view = batch.viewAt = batch.owner = batch.d = undefined!;
+      run.spare.push(batch);
+    }
     pending.length = 0;
+    for (const list of run.batches.values()) list.length = 0;
     run.batches.clear();
   }
 }
@@ -529,6 +545,8 @@ export class PBRDrawRun {
   readonly view: RunView = { data: new Float32Array(viewFloats), format: undefined, at: undefined };
   /** @internal Draws waiting to draw as instanced batches (draw-batch.ts), in first-draw order, and by derivation. */
   readonly pending: PendingBatch[] = [];
+  /** @internal Drawn batch records, emptied, for the run's next batches. */
+  readonly spare: PendingBatch[] = [];
   readonly batches = new Map<DrawDerivation, PendingBatch[]>();
   /** @internal What `draw` checked once for the run's context: its section binding and device caches. */
   private quick?: QuickRun;

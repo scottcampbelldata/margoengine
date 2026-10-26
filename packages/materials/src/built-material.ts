@@ -3105,9 +3105,12 @@ function queue(runtime: Engine): MaterialDraws {
     phases: Phase[] = [],
     tail: Phase[] = [],
     distance = new Map<Entry, number>(),
-    name = 'materials:' + serial++;
+    name = 'materials:' + serial++,
+    // One run, reused every frame: it keeps its batch records (gltf-pro draw-batch.ts) instead of making new ones.
+    run = new PBRDrawRun();
   let opaqueEnd = 0,
-    arranged = false;
+    arranged = false,
+    running = false;
   // Opaque order is stable until membership or a transparent flag changes. Distance sorts only the late phase.
   const arrange = () => {
     phases.length = 0;
@@ -3166,14 +3169,17 @@ function queue(runtime: Engine): MaterialDraws {
           }
           // One render pass for every mesh: a pass per mesh stores and reloads the multisampled colour and depth each
           // time and costs a begin, an end and a command-buffer flush (10,000 meshes: 168 ms of CPU a frame).
-          const run = new PBRDrawRun();
+          // A frame drawn inside this one (a draw callback rendering a probe) takes a run of its own.
+          const own = running ? new PBRDrawRun() : run;
+          running = true;
           try {
             for (let i = 0; i < phases.length; i++) {
               const item = phases[i];
-              item.entry.model.draw(c, 'beauty', c.color, c.depth, item.phase, undefined, run);
+              item.entry.model.draw(c, 'beauty', c.color, c.depth, item.phase, undefined, own);
             }
           } finally {
-            run.end();
+            if (own === run) running = false;
+            own.end();
           }
         },
       });
