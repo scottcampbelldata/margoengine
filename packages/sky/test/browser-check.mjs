@@ -47,6 +47,20 @@ try {
       console.log(`ok ${name} ${samples}x: ${frames.length} frames identical`);
     }
   }
+  // Weather: rain, snow and lightning draw on a real GPU and leave no trace once off.
+  await page.goto('http://127.0.0.1:5211/packages/sky/test/weather-check.html');
+  await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+  const weather = await page.evaluate(() => window.check.run());
+  report.results.weather = weather;
+  assert.equal(weather.validation, null);
+  assert.deepEqual(weather.errors, []);
+  assert.ok(weather.rainChanged > 200, `rain changed ${weather.rainChanged} of ${weather.pixels} pixels`);
+  assert.ok(weather.snowChanged > 200, `snow changed ${weather.snowChanged} of ${weather.pixels} pixels`);
+  assert.equal(weather.afterNone, 0, 'precipitation none draws nothing');
+  assert.equal(weather.dry, 0, 'intensity 0 draws nothing');
+  assert.ok(weather.flashGain > 0, `the flash lit the frame: ${JSON.stringify(weather)}`);
+  assert.equal(weather.afterFlash, 0, 'the frame returns to dry after the flash');
+  console.log('ok weather: rain', weather.rainChanged, 'snow', weather.snowChanged, 'flash gain', weather.flashGain);
   assert.deepEqual(pageErrors, []);
   await writeFile('test-results/sky-entries-browser-check.json', JSON.stringify(report, null, 1));
   console.log('sky entries browser check passed');

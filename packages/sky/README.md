@@ -2,7 +2,7 @@
 
 Install `npm i margoengine` and import `margoengine/sky` (or this package alone: `npm i @margoengine/sky`, imported as `@margoengine/sky`; the two are the same module).
 
-WebGPU atmospheric background with an analytical Preetham/Perez daytime sky and an Earth-based Bruneton-style precomputed Rayleigh/Mie model, an optional stylized night (stars, phased moon) and distance or height fog. This is Margo's one sky: scenery's `SkyMoon` is a midnight preset of it.
+WebGPU atmospheric background with an analytical Preetham/Perez daytime sky and an Earth-based Bruneton-style precomputed Rayleigh/Mie model, an optional stylized night (stars, phased moon) and distance or height fog, plus optional weather (rain, snow, lightning and thunder timing). This is Margo's one sky: scenery's `SkyMoon` is a midnight preset of it.
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -36,6 +36,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/fog` | `fog` | 1.7 kB |
 | `/reflection` | `reflectionTexture` | 0.8 kB |
 | `/lighting` | `lighting` (engine sun/moon light, ambient) | 1.0 kB |
+| `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, lightning, thunder timing | 5.6 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
@@ -218,6 +219,68 @@ Sky.attach(engine, {hours: 12, environment: true});
 It updates before rendering, including paused manual renders. To switch local
 lights and emissive batches together, set `lights.intensityScale =
 instances.emissiveIntensity = () => sky.nightFactor` using clustered and scatter.
+
+## Weather: rain, snow and lightning
+
+`Weather` from `@margoengine/sky/weather` is its own plugin, not a feature of `Sky`, so a clear-sky scene pays nothing
+for it. Rain streaks or snow flakes fall in a box that follows the camera (25 m half-width and 20 m high by default).
+Each particle is placed by an integer hash and moved by the wind with no per-frame upload, drawn depth-tested over the
+scene (nearer geometry hides it) after the sky and fog. Defaults: 24,000 rain streaks or 16,000 flakes at intensity 1.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+import {Weather} from 'margoengine/sky/weather';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const sky = Sky.attach(engine, {hours: 17, clouds: {coverage: 0.8}});
+const weather = Weather.attach(engine, {
+  precipitation: 'rain', intensity: 0.8, wind: [4, 0],
+  lightning: {rate: 8, seed: 42},
+});
+// A storm that builds over four seconds; rain dims with the dusk and the clouds thicken with it.
+engine.onFrame(() => {
+  weather.options.brightness = 1 - 0.8 * sky.nightFactor;
+  sky.options.clouds!.coverage = 0.45 + 0.5 * weather.amount;
+});
+const stopLightning = weather.onLightning((strike) => console.log('flash', strike.distance, 'm'));
+const stopThunder = weather.onThunder((strike) => console.log('rumble', strike.loudness, strike.rumble, 's'));
+weather.strike({distance: 800});       // a strike you place yourself
+stopLightning(); stopThunder();
+```
+
+Options are read every frame from `weather.options`; change them live. `intensity` (0 to 1) is the target and
+`weather.amount` the eased value, reaching it over `fadeSeconds` (default 4). Fields and defaults:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `precipitation` | `'rain'` | `'rain'`, `'snow'` or `'none'` |
+| `intensity` | 0.5 | target amount, 0 to 1 |
+| `fadeSeconds` | 4 | seconds across the whole range; 0 jumps |
+| `wind` | `[0, 0]` | metres per second, world X and Z: rain slants, snow drifts |
+| `radius`, `height` | 25, 20 | half-width and height in metres of the box that follows the camera |
+| `particles` | 24,000 rain, 16,000 snow | count at intensity 1, up to 500,000; the amount scales it |
+| `color`, `brightness`, `opacity` | pale grey-blue (rain) or white (snow), 1, 0.35 (rain) or 0.8 (snow) | linear RGB, its scale, one particle's alpha |
+| `lightning` | none | storms, below |
+
+Particle colour is a fixed linear RGB, so scale `brightness` with the light of the scene (above, `1 - sky.nightFactor`).
+A flake or streak smaller than a pixel dims instead of sparkling. Rain falls at 9 m/s and snow at 1.2 m/s with a
+gentle sway.
+
+Lightning (`lightning: {}` for the defaults) strikes as a Poisson process: `rate` strikes a minute (default 6) at
+intensity 1, rising from nothing at `threshold` (default 0.6), at a random distance between `minDistance` (300 m) and
+`maxDistance` (6,000 m) and direction around the listener. The same `seed` and frame times give the same storm. A strike
+has one to four return strokes (each rises in 8 ms and decays with a 70 ms time constant) and adds `strength` (default
+0.35) of `color` over the frame, brighter toward the top. `onLightning` fires as the flash starts, `onThunder` after
+`distance / 343` seconds with a `loudness` (falls with distance) and `rumble` length for your audio; a throwing listener
+does not stop the others. `weather.flash` (0 to 1) is the same flash as a number to drive a light.
+`thunderDelay(distance, speed)` and `lightningFlash(seconds, offsets, amplitudes)` are the underlying functions.
+
+The state reads as plain numbers: `amount`, `flash`, `wetness` (rises under rain in about 20 s, dries in 90 s; drive
+roughness with it) and `snowCover` (builds in 2 minutes, melts in 5; drive a snow layer). `weather.listener` is the
+position strikes are placed around; the render pass follows the camera, and without a GPU engine you may set it yourself
+and call `onPreUpdate(delta)` for audio or game logic. `Weather` needs WebGPU (`MargoError` `'unsupported'` on WebGL2).
+This is a screen-space-free particle overlay: no splashes on the ground, no rain running down the lens, no rain
+occlusion under roofs (it respects the scene depth, not covered areas).
 
 This is a compact atmospheric approximation, not a reference-quality reproduction of the original planetary renderer: no ozone spectrum, ground-albedo irradiance feedback, terrain light shafts or physical aerial perspective. Coarse angular sampling can band; the visible horizon uses a skyward sample to avoid a dark ground strip. Preetham is a daytime model with a night fade.
 

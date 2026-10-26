@@ -1011,6 +1011,10 @@
       "types": "./dist/sky/lighting.d.ts",
       "import": "./dist/sky/lighting.js"
     },
+    "./sky/weather": {
+      "types": "./dist/sky/weather.d.ts",
+      "import": "./dist/sky/weather.js"
+    },
     "./splats": {
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"

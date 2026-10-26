@@ -1,12 +1,13 @@
 {
   "name": "@margoengine/sky",
   "version": "1.0.0",
-  "description": "Procedural atmospheric skies, clouds, sun, moon and stars.",
+  "description": "Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning).",
   "keywords": [
     "margoengine",
     "webgpu",
     "3d",
-    "sky"
+    "sky",
+    "weather"
   ],
   "homepage": "https://margoengine.com",
   "bugs": {
@@ -57,6 +58,10 @@
     "./lighting": {
       "types": "./dist/lighting.d.ts",
       "import": "./dist/lighting.js"
+    },
+    "./weather": {
+      "types": "./dist/weather.d.ts",
+      "import": "./dist/weather.js"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3283437,
+  "total": 3289316,
   "history": [
     {
       "date": "2026-10-24",
@@ -368,6 +368,12 @@
       "commit": "b91aeaf9",
       "reason": "package depth (item 21.5): physics ropes, rope and spring joints, compound and convex-decomposition colliders, ray-cast vehicles; Rope and Vehicle tree-shake out of a Physics-only bundle",
       "grew": 1
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "b91aeaf9",
+      "reason": "sky/weather: new optional entry (rain, snow, lightning and thunder timing with its own shaders); nothing else grows",
+      "grew": 1
     }
   ],
   "items": {
@@ -620,6 +626,7 @@
     "@margoengine/sky/night": 2523,
     "@margoengine/sky/preetham": 953,
     "@margoengine/sky/reflection": 1399,
+    "@margoengine/sky/weather": 5879,
     "@margoengine/splats": 8739,
     "@margoengine/splats/data": 1629,
     "@margoengine/splines": 1555,

@@ -764,7 +764,7 @@
     "package": "@margoengine/sky",
     "version": "1.0.0",
     "published": false,
-    "description": "Procedural atmospheric skies, clouds, sun, moon and stars.",
+    "description": "Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning).",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "sky",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/sky@1.0.0",

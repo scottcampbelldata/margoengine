@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky weather browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// Renders a scene with and without Weather and reads the HDR scene back: rain and snow must change pixels, a
+// lightning flash must add light, and the frame must return to the dry one once weather is off or the flash is over.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Weather} from '/packages/sky/dist/weather.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,4,14],target:[0,3,-30],near:0.1,far:800}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+engine.createMesh().setGeometry(box(60,0.2,200)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,-60]);
+engine.createMesh().setGeometry(box(30,30,1)).setMaterial(new PbrMaterial({color:'#101010',roughness:0.9})).setPosition([0,10,-6]);
+for(let i=0;i<3;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+async function shot(delta=1/60){engine.render({delta});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);}
+const sum=a=>{let s=0;for(let i=0;i<a.length;i+=4)s+=a[i]+a[i+1]+a[i+2];return s;};
+const changed=(a,b)=>{let n=0;for(let p=0;p<a.length;p+=4)if(Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2])>1e-4)n++;return n;};
+window.check={
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const clear=await shot();
+  const weather=new Weather({precipitation:'rain',intensity:1,fadeSeconds:0,particles:30000,opacity:0.8,brightness:3,wind:[4,0]});
+  engine.use(weather);
+  await shot();const rain=await shot();
+  out.rainChanged=changed(clear,rain);out.pixels=clear.length/4;
+  weather.options.precipitation='snow';weather.options.brightness=1;weather.options.opacity=1;
+  await shot();const snow=await shot();out.snowChanged=changed(clear,snow);
+  weather.options.precipitation='none';await shot();
+  out.afterNone=changed(clear,await shot());
+  weather.options.precipitation='rain';weather.options.intensity=0;await shot();
+  out.dry=changed(clear,await shot());
+  weather.options.lightning={strength:0.5,seed:3};
+  const before=sum(await shot());
+  weather.strike({distance:500,strength:1});
+  let best=0;for(let i=0;i<30;i++){best=Math.max(best,sum(await shot(1/240))-before);}
+  out.flashGain=best;
+  for(let i=0;i<40;i++)await shot(1/30);
+  out.afterFlash=changed(clear,await shot());
+  weather.dispose();
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }};
+// For looking at it: `?show=rain|snow|storm` leaves that weather running on the canvas.
+const show=new URLSearchParams(location.search).get('show');
+if(show){const w=new Weather({precipitation:show==='snow'?'snow':'rain',intensity:1,fadeSeconds:0,wind:[3,0],lightning:show==='storm'?{}:undefined});engine.use(w);if(show==='storm')w.strike({distance:400,strength:1});for(let i=0;i<4;i++)await shot(1/120);}
+window.ready=true;
+</script></body></html>
