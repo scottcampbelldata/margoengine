@@ -551,7 +551,7 @@ rtest('colliders follow the radius rule: near moving bodies, loaded chunks only,
 });
 
 rtest('a chunk that comes back after edits made out of range leaves no stale seam', () => {
-  const { physics, world, voxels } = setup();
+  const { physics, world, voxels } = setup({ budget: Infinity }); // the seam is under test, not the time budget
   fill(world, 0, 128, -1, 0, 0, 16, stone); // floor, top at y 0
   fill(world, 30, 34, 0, 1, 0, 16, stone); // a wall across the chunk border x 32
   const body = cube(physics, 0.4, [20, 0.402, 8.3], [0, 0, 0]);
