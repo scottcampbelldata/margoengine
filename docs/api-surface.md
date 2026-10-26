@@ -62,7 +62,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 7,307 |
 | @margoengine/quality | `.` 17, `./warm` 3 | 1 |  | 1,634 |
 | @margoengine/react | `.` 146, `./kit` 29, `./post` 30, `./physics` 34, `./xr` 12 | 33 |  | 23,696 |
-| @margoengine/rigging | `.` 21 |  |  |  |
+| @margoengine/rigging | `.` 21 |  |  | 7,623 |
 | @margoengine/road | `.` 3 |  |  | 915 |
 | @margoengine/scatter | `.` 18 | 1 |  | 11,560 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
