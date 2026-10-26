@@ -274,6 +274,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/controls`](packages/controls/README.md) | Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine. |
 | [`@margoengine/cameras`](packages/cameras/README.md) | Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking. |
 | [`@margoengine/input`](packages/input/README.md) | Semantic keyboard, pointer, gamepad and touch actions with haptics. |
+| [`@margoengine/ui`](packages/ui/README.md) | Game UI drawn in the engine: menus, HUDs, health bars, inventories, dialogs and toasts with flex layout, theming, keyboard, gamepad and touch navigation, screen reader support and React components. |
 | [`@margoengine/viewcube`](packages/viewcube/README.md) | CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle. |
 | [`@margoengine/selection`](packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
 | [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |
@@ -6160,6 +6161,108 @@ Call update once per simulation tick. State objects are reused. Opposing binding
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/input
+
+=== @margoengine/ui (packages/ui/README.md) ===
+
+# @margoengine/ui
+
+Install `npm i margoengine` and import `margoengine/ui` (or this package alone: `npm i @margoengine/ui`, imported as
+`@margoengine/ui`; the two are the same module).
+
+Game UI that is drawn inside the engine, so it works in fullscreen and in exported games, with no DOM on top of the
+canvas:
+
+- **Widgets:** panels, labels, buttons, toggles, sliders, progress and health bars, lists, inventory grids, menus,
+  dialogs, toasts and tooltips.
+- **Layout:** anchors, flex-style rows and columns, grids, scrolling, safe areas.
+- **Scaling:** a reference resolution, the device pixel ratio and the user's text size, with text that stays sharp
+  because it is drawn by `@margoengine/text` as signed distance fields.
+- **Themes:** a good-looking dark theme by default, a light theme, a high contrast theme, and `createTheme` for your own.
+  All status colours come from the colour-blind-safe Okabe-Ito palette and meaning never rests on colour alone.
+
+The package is optional and tree-shakable and adds nothing to core. `Ui` holds the widgets and produces a list of
+rectangles and text in pixels; it touches neither the GPU nor the DOM, so it runs in Node and in tests.
+`UiRenderer` is the engine plugin that draws that list on WebGPU. On the WebGL2 backend it warns once and draws nothing.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Ui, UiRenderer, Menu } from '@margoengine/ui';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const ui = new Ui(); // dark theme, 1 UI unit = 1 CSS pixel, system font
+UiRenderer.attach(engine, ui); // steps the UI every frame and draws it over the finished frame
+
+ui.add(
+  new Menu({
+    title: 'Paused',
+    items: [
+      { label: 'Resume', onSelect: () => ui.toast('Back in the game') },
+      { label: 'Quit', onSelect: async () => (await ui.confirm('Quit to the title screen?')) && location.reload() },
+    ],
+  }),
+);
+```
+
+## Building a screen
+
+Every widget is a class you construct with an options object. Put them in a `Panel` (a column by default) and add the
+panel to `ui`. Layout options are on every widget.
+
+```ts
+import { Ui, Panel, Label, Button, Toggle, Slider } from '@margoengine/ui';
+
+const ui = new Ui();
+const settings = new Panel({
+  background: 'surface',
+  border: true,
+  shadow: true,
+  padding: 24,
+  gap: 12,
+  width: 360,
+  anchor: 'center',
+  children: [
+    new Label({ text: 'Settings', size: 'title' }),
+    new Slider({ text: 'Volume', value: 0.8, onChange: (e) => console.log('volume', e.value) }),
+    new Toggle({ text: 'Subtitles', checked: true, onChange: (e) => console.log('subtitles', e.value) }),
+    new Button({ text: 'Done', variant: 'primary', onClick: () => settings.removeFromParent() }),
+  ],
+});
+ui.add(settings);
+```
+
+`on(type, handler)` works on every widget and returns a function that unsubscribes; it is also disposable, so
+`using off = button.on('click', fn)` ends the subscription at the end of the block. Option callbacks (`onClick`,
+`onChange`, `onSelect`) are shortcuts for `on('click' | 'change' | 'select', ...)`.
+
+## Layout
+
+Sizes are UI units. By default one unit is one CSS pixel; see Scaling.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `direction` | `'column'` | `'row'`, `'column'`, `'stack'` (children anchored over each other) or `'grid'` |
+| `gap` | `0` | space between children; a number or `[column gap, row gap]` |
+| `align` | stretch (column), center (row) | cross-axis placement: `'start'`, `'center'`, `'end'`, `'stretch'` |
+| `justify` | `'start'` | main-axis placement: `'start'`, `'center'`, `'end'`, `'space-between'`, `'space-around'`, `'space-evenly'` |
+| `padding`, `margin` | `0` | a number, `[vertical, horizontal]` or `[top, right, bottom, left]` |
+| `width`, `height` | `'auto'` | a number, `'auto'` (fit content), `'fill'` or a percentage such as `'50%'` |
+| `minWidth`, `maxWidth`, `minHeight`, `maxHeight` | none | bounds in UI units |
+| `grow`, `shrink` | `0`, `1` | shares of the free or missing main-axis space |
+| `alignSelf` | the parent's `align` | cross-axis placement of this child |
+| `anchor` | `'stretch'` in a stack | `'top-left'`, `'top'`, `'top-right'`, `'left'`, `'center'`, `'right'`, `'bottom-left'`, `'bottom'`, `'bottom-right'` or `'stretch'`; `margin` is the distance from the edges |
+| `position` | `'flow'` | `'absolute'` takes the child out of a row or column and anchors it |
+| `offset` | `[0, 0]` | shift after layout, for animation |
+| `bleed` | `false` | in a stack, ignore the parent's padding and the safe area |
+| `columns`, `cellWidth`, `cellHeight` | `1`, widest, tallest | for `direction: 'grid'` |
+| `overflow` | `'visible'` | `'hidden'` clips; `'scroll'` clips and scrolls on the main axis |
+
+The screen layer is a stack, so a widget with an `anchor` sits at that corner or edge of the screen, inside the safe area:
+
+```ts
+import { Ui, Panel, Label } from '@margoengine/ui';
+```
+
+[README continues: https://margoengine.com/llms/packages/ui.md]
 
 === @margoengine/viewcube (packages/viewcube/README.md) ===
 
