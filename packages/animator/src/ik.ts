@@ -1,6 +1,19 @@
 import type { Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 const subtract = (a: Vec3, b: Vec3) => a.map((v, i) => v - b[i]) as [number, number, number];
+/**
+ * Analytical two-bone IK (a leg or an arm): places the knee and ankle so the ankle reaches `target`, bending the knee
+ * toward `pole`. A target out of reach clamps to the limb's reach.
+ * @param root The hip (or shoulder) position.
+ * @param knee The knee (or elbow) position; its distance to `root` is the upper bone length.
+ * @param ankle The ankle (or wrist) position; its distance to `knee` is the lower bone length.
+ * @param target Where the ankle should go.
+ * @param pole A point the knee bends toward; any point off the root-to-target line.
+ * @returns The new knee and ankle positions (world space, same space as the inputs).
+ * @throws RangeError when a bone has zero length; TypeError when a point is not three finite numbers.
+ * @example
+ * const {knee, ankle} = solveTwoBoneIK([0, 1, 0], [0, 0.5, 0.1], [0, 0, 0], [0, 0.2, 0.3], [0, 0.5, 1]);
+ */
 export function solveTwoBoneIK(
   root: Vec3,
   knee: Vec3,
@@ -11,7 +24,8 @@ export function solveTwoBoneIK(
   for (const v of [root, knee, ankle, target, pole]) finiteVector(v, 3, 'IK point');
   const upper = Math.hypot(...subtract(knee, root)),
     lower = Math.hypot(...subtract(ankle, knee));
-  if (upper <= 1e-8 || lower <= 1e-8) throw new RangeError('IK bones have zero length');
+  if (upper <= 1e-8 || lower <= 1e-8)
+    throw new RangeError('IK bones have zero length; give root, knee and ankle three distinct positions');
   let axis = subtract(target, root),
     distance = Math.hypot(...axis);
   if (distance < 1e-8) {
@@ -47,7 +61,7 @@ export function solveTwoBoneIK(
 export function rotationBetween(from: Vec3, to: Vec3): number[] {
   const aLength = Math.hypot(...from),
     bLength = Math.hypot(...to);
-  if (aLength < 1e-8 || bLength < 1e-8) throw new RangeError('Zero IK direction');
+  if (aLength < 1e-8 || bLength < 1e-8) throw new RangeError('Zero IK direction; pass non-zero from and to vectors');
   const a = from.map((v) => v / aLength),
     b = to.map((v) => v / bLength),
     dot = a.reduce((sum, v, i) => sum + v * b[i], 0);

@@ -10,7 +10,7 @@ export const sideCode = (side: Side | undefined): number => {
   if (side === undefined || side === 'double') return SIDE_DOUBLE;
   if (side === 'front') return SIDE_FRONT;
   if (side === 'back') return SIDE_BACK;
-  throw new TypeError(`Unknown side ${String(side)}`);
+  throw new TypeError(`Unknown side ${String(side)}; use 'front', 'back' or 'double'`);
 };
 
 /**
@@ -432,7 +432,7 @@ export function frustumPlanes(
       if (c < 3) length += value * value;
     }
     length = Math.sqrt(length);
-    if (!length) throw new RangeError('Degenerate frustum');
+    if (!length) throw new RangeError('Degenerate frustum; use a projection with a non-zero view volume');
     for (let c = 0; c < 4; c++) out[plane * 4 + c] /= length;
   }
   return out;

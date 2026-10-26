@@ -77,7 +77,8 @@ export function checkSource(
   if (indices || finite)
     for (let i = 0; i < count; i++) {
       const v = indices ? indices[i] : i;
-      if (!(v >= 0 && v < vertexCount) || v !== Math.floor(v)) throw new RangeError('Index exceeds vertices');
+      if (!(v >= 0 && v < vertexCount) || v !== Math.floor(v))
+        throw new RangeError('Index exceeds vertices; keep every index below the vertex count');
       if (finite) checkPosition(positions[v * stride], positions[v * stride + 1], positions[v * stride + 2]);
     }
   return count / 3;

@@ -32,7 +32,10 @@ function manifest(document) {
   return bytes;
 }
 function rejects(document, message) {
-  assert.throws(() => decodeMargo(manifest(document)), { name: 'TypeError', message });
+  assert.throws(
+    () => decodeMargo(manifest(document)),
+    (error) => error.name === 'TypeError' && error.message.startsWith(message + '; '),
+  );
 }
 
 test('manifest subset retains scene and optional-array validation', () => {

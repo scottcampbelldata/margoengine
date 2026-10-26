@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import type { Animation } from './index.js';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { neutralShader } from '../../shared/display.js';
@@ -31,6 +32,7 @@ export interface VATData {
   uvs: Float32Array;
   clips: VATClip[];
 }
+/** Options for {@link bakeVAT}. */
 export interface VATBakeOptions {
   /** Rows per second. Default 30. */ fps?: number;
   /** Clip names or indices. Default: all. */
@@ -64,7 +66,9 @@ export function bakeVAT(animation: Animation, { fps = 30, clips }: VATBakeOption
     typeof c === 'string' ? animation.clips.findIndex((x) => x.name === c) : c,
   );
   if (!(fps > 0 && fps <= 1000) || !ids.length || ids.some((i) => !animation.clips[i]))
-    throw new RangeError('Invalid VAT fps or clips');
+    throw new RangeError(
+      'Invalid VAT fps or clips; pass fps in (0, 1000] and clip indices that exist in animation.clips',
+    );
   const parts = model.primitives.map((p) => {
     const def = p.definition,
       s = doc.nodes![p.nodeIndex].skin === undefined ? null : doc.skins![doc.nodes![p.nodeIndex].skin!],
@@ -89,7 +93,8 @@ export function bakeVAT(animation: Animation, { fps = 30, clips }: VATBakeOption
     frames = ids.map((i) => Math.max(1, Math.ceil(animation.clips[i].duration * fps))),
     rows = frames.reduce((n, f) => n + f + 1, 0);
   const height = Math.ceil((rows * vertexCount * 2) / VAT_WIDTH);
-  if (height > 8192) throw new RangeError('VAT data exceeds 8192 texture rows');
+  if (height > 8192)
+    throw new RangeError('VAT data exceeds 8192 texture rows; bake fewer clips, a lower fps or a lighter mesh');
   const texels = new Float32Array(VAT_WIDTH * height * 4),
     uvs = new Float32Array(vertexCount * 2),
     indices: number[] = [];
@@ -114,7 +119,8 @@ export function bakeVAT(animation: Animation, { fps = 30, clips }: VATBakeOption
       for (let r = 0; r <= frames[c]; r++, row++) {
         animation.seek((duration * r) / frames[c]);
         store.tick(false);
-        if (!invertMatrixStable(model.root.matrix, root, work)) throw new Error('Singular VAT model root');
+        if (!invertMatrixStable(model.root.matrix, root, work))
+          throw new RangeError('Singular VAT model root; give the model root a non-zero scale before baking');
         let o = row * vertexCount * 8;
         for (const x of parts) {
           const { p, joints, palette, ids: j, weights: w } = x,
@@ -217,10 +223,15 @@ export function bakeVAT(animation: Animation, { fps = 30, clips }: VATBakeOption
 
 /** Instance layout (24 floats): world matrix, then clip, time offset (s), speed, 0, then UV offset.xy and scale.xy. */
 export const VAT_STRIDE = 24;
+/** One crowd member for {@link VATCrowd.add} and {@link VATCrowd.set}. */
 export interface VATInstance {
+  /** Column-major 4x4 world matrix (16 numbers). Default identity. */
   matrix?: ArrayLike<number>;
+  /** Index into `vat.clips`. Default 0. */
   clip?: number;
+  /** Time offset into the clip in seconds, so crowd members do not move in step. Default 0. */
   offset?: number;
+  /** Playback speed multiplier. Default 1. */
   speed?: number;
   /** Atlas region (offset and scale; no rotation). */
   uvTransform?: { offset?: readonly number[]; scale?: readonly number[] };
@@ -229,10 +240,15 @@ export interface VATInstance {
 export interface VATMap {
   bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }
+/** Options for {@link VATCrowd}. */
 export interface VATCrowdOptions {
+  /** Base colour, linear RGBA. Default `[1, 1, 1, 1]`. */
   color?: readonly number[];
+  /** Base colour texture (a `@margoengine/materials` Texture). Default none. */
   map?: VATMap | null;
+  /** Surface roughness, 0..1. Default 0.6. */
   roughness?: number;
+  /** Metalness, 0..1. Default 0. */
   metalness?: number;
 }
 
@@ -273,6 +289,7 @@ fn texel(row:u32,v:u32,k:u32)->vec4f {let i=(row*u32(f.vat.x)+v)*2u+k;let w=u32(
   srgbShader =
     'fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}\n';
 // GGX (Walter et al. 2007) + Schlick, F0 0.04 (glTF 2.0 App. B); hemisphere fill is Margo design (gltf-pro's).
+/** The WGSL source the crowd draws with: bindings, vertex-texture pose sampling and neutral shading. Exposed for tooling and tests; {@link VATCrowd} builds its pipeline from it. */
 export const vatShader = `${neutralShader}${vatVertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, PBR Neutral + sRGB unless the target is HDR.
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let albedo=(f.base*textureSample(map,mapSampler,i.uv)).rgb;let rough=f.options.z;let metal=f.options.w;
@@ -366,7 +383,9 @@ export class VATCrowd implements EnginePlugin {
       color.length !== 4 ||
       !(roughness >= 0 && roughness <= 1 && metalness >= 0 && metalness <= 1)
     )
-      throw new TypeError('Invalid VAT crowd');
+      throw new TypeError(
+        'Invalid VAT crowd; pass baked VAT data with clips, a 4-number color, and roughness and metalness in 0..1',
+      );
     this.color = [...color];
     this.roughness = roughness;
     this.metalness = metalness;
@@ -399,7 +418,9 @@ export class VATCrowd implements EnginePlugin {
       (clip !== undefined && !(Number.isInteger(clip) && clip >= 0 && clip < this.vat.clips.length)) ||
       (matrix !== undefined && matrix.length !== 16)
     )
-      throw new RangeError('Invalid VAT instance');
+      throw new RangeError(
+        'Invalid VAT instance; use an index below the instance count, a clip from vat.clips, a 16-number matrix and finite values',
+      );
     const o = index * VAT_STRIDE,
       d = this.data;
     if (matrix) d.set(matrix, o);
@@ -410,13 +431,18 @@ export class VATCrowd implements EnginePlugin {
       d.set(uvTransform.offset ?? [0, 0], o + 20);
       d.set(uvTransform.scale ?? [1, 1], o + 22);
     }
-    for (let i = o; i < o + VAT_STRIDE; i++) if (!Number.isFinite(d[i])) throw new RangeError('Invalid VAT instance');
+    for (let i = o; i < o + VAT_STRIDE; i++)
+      if (!Number.isFinite(d[i]))
+        throw new RangeError(
+          'Invalid VAT instance; use an index below the instance count, a clip from vat.clips, a 16-number matrix and finite values',
+        );
     this.dirty = true;
     return this;
   }
   /** Drops the last `count - n` instances. */
   truncate(n: number): void {
-    if (!(Number.isInteger(n) && n >= 0 && n <= this.n)) throw new RangeError('Invalid VAT count');
+    if (!(Number.isInteger(n) && n >= 0 && n <= this.n))
+      throw new RangeError('Invalid VAT count; truncate to an integer from 0 to the current count');
     this.n = n;
   }
   setup(engine: Engine): void {
@@ -475,9 +501,12 @@ export class VATCrowd implements EnginePlugin {
   /** Lights the crowd with an effect's gltf-pro `pbr` hooks; `shadows.add(crowd)` and `lighting.add(crowd)` call this. Returns a remover. */
   addLighting(effect: VATLighting): () => void {
     if (this.disposed || !effect || typeof effect.pbr !== 'function' || typeof effect.bindings !== 'function')
-      throw new TypeError('VAT crowds take lighting effects with pbr hooks');
+      throw new TypeError('VAT crowd lighting needs a live crowd and an effect with pbr() and bindings() functions');
     if (effect.owner && this.engine && effect.owner !== this.engine)
-      throw new Error('VAT lighting belongs to another engine');
+      throw new MargoError(
+        'attached',
+        "VAT lighting belongs to another engine; use an effect created on the crowd's engine",
+      );
     this.lighting.add(effect);
     return () => {
       this.lighting.delete(effect);

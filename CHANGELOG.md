@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Error messages and classes (developer-experience pass, packages animation to lod)
+
+Every throw message now names its fix after a `; ` clause, so match on `error.code` or the error class, not on the
+whole message text. Changed classes (all still extend `Error`):
+
+- `@margoengine/animation`: `Animation.play` on a disposed animation throws `MargoError` code `disposed`;
+  `Animation.setup` with a disposed model or another engine throws code `attached`, without WebGPU code `unsupported`;
+  `VATCrowd.addLighting` with an effect from another engine throws code `attached`; duplicate animation targets, more
+  than eight joint influences and singular skinned or VAT root transforms are `RangeError`.
+- `@margoengine/animator`: `addFootIK` on a chain that is not a direct hip, knee, ankle chain is `TypeError`; foot IK
+  with non-uniform or non-positive scales is `RangeError`; a rotation writer re-entering an update, and attaching an
+  Animator before its Animation, throw `MargoError` code `state`. `Unknown animator clip "X"` quotes the name.
+- `@margoengine/audio`: `play()` with no source throws `MargoError` code `state`; use after `dispose()` code
+  `disposed`; missing Web Audio or `fetch` code `unsupported`; an HTTP or decode failure code `failed`.
+- `@margoengine/blender`, `@margoengine/bvh`: classes unchanged, messages end with a fix clause.
+
 ### Open source release
 
 - Every published package is now under the Apache License 2.0.

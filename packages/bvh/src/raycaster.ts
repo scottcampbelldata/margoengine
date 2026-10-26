@@ -53,7 +53,7 @@ export function setGeometryBVH(geometry: Geometry | GeometryLike, bvh: MeshBVH |
     return;
   }
   if (!(bvh instanceof MeshBVH) || bvh.positions !== geometry.vertices)
-    throw new TypeError('BVH was not built over this geometry');
+    throw new TypeError('BVH was not built over this geometry; build it with MeshBVH.fromGeometry(geometry)');
   bvhCache.set(geometry, bvh);
 }
 /** Whether a geometry already has a cached (or installed) BVH. */
@@ -303,10 +303,12 @@ export class Raycaster {
   setFromCamera(coords: ArrayLike<number>, camera: Camera, webgpu = true): this {
     const m = camera.matrix,
       inverse = invertMatrix(m, new Float64Array(16));
-    if (!inverse) throw new RangeError('Camera matrix is singular');
+    if (!inverse)
+      throw new RangeError('Camera matrix is singular; use a camera with a non-zero scale and a valid projection');
     const x = coords[0],
       y = coords[1];
-    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new RangeError('Invalid device coordinates');
+    if (!Number.isFinite(x) || !Number.isFinite(y))
+      throw new RangeError('Invalid device coordinates; pass finite x and y in -1..1');
     return cameraRay(this, inverse, isOrthographic(m), camera.position, x, y, webgpu);
   }
 
@@ -341,7 +343,8 @@ export class Raycaster {
       throw new TypeError('Expected a deformed picking source');
     const root = source.root as unknown as RuntimeMesh & { engine: RuntimeEngine },
       runtime = root.engine;
-    if (!runtime || !runtime.meshes || !runtime.store) throw new TypeError('Picking source root has no engine');
+    if (!runtime || !runtime.meshes || !runtime.store)
+      throw new TypeError('Picking source root has no engine; add the model to an Engine before picking');
     if (source.disposed || runtime.disposed)
       throw new MargoError('disposed', 'Picking source or engine is disposed; pick a live model on a live Engine.');
     if (runtime.meshes.get(root.id) !== root)
@@ -352,7 +355,8 @@ export class Raycaster {
     const { near, far, side, firstHitOnly, layers, filter } = this,
       bvhOptions = { ...this.bvhOptions };
     if (!(near >= 0) || !(far >= near)) throw new RangeError('Expected 0 <= near <= far');
-    if (!['material', 'front', 'back', 'double'].includes(side)) throw new TypeError('Invalid raycaster side');
+    if (!['material', 'front', 'back', 'double'].includes(side))
+      throw new TypeError('Invalid raycaster side; use material, front, back or double');
     const origin = this.origin.slice(),
       direction = this.direction.slice(),
       store = runtime.store;
@@ -374,10 +378,12 @@ export class Raycaster {
     let best = far;
     for (let i = 0; i < geometry.length; i++) {
       const snapshot = geometry[i];
-      if (!snapshot || !snapshot.node) throw new TypeError('Invalid picking geometry snapshot');
+      if (!snapshot || !snapshot.node)
+        throw new TypeError('Invalid picking geometry snapshot; pass the snapshots returned by readPickingGeometry()');
       const handle = snapshot.node,
         mesh = handle as unknown as RuntimeMesh & { engine: RuntimeEngine };
-      if (mesh.engine !== runtime) throw new TypeError('Picking geometry belongs to another engine');
+      if (mesh.engine !== runtime)
+        throw new TypeError('Picking geometry belongs to another engine; read it from this source model');
       if (runtime.meshes.get(mesh.id) !== mesh || hiddenInTree(runtime.store, mesh.id)) continue;
       if (!(getMeshLayers(handle) & layers) || (filter && !filter(handle))) continue;
       // User predicates can dispose or reparent scene objects synchronously as well.
@@ -404,19 +410,24 @@ export class Raycaster {
         !indices.length ||
         indices.length % 3
       )
-        throw new RangeError('Invalid stride-20 picking geometry');
+        throw new RangeError(
+          'Invalid stride-20 picking geometry; pass whole vertices (20 floats each) and whole triangles',
+        );
       if (
         typeof doubleSided !== 'boolean' ||
         (snapshot.side !== undefined && !['front', 'back', 'double'].includes(snapshot.side)) ||
         !(matrix instanceof Float32Array) ||
         matrix.length !== 16
       )
-        throw new TypeError('Invalid picking material or world matrix');
+        throw new TypeError(
+          'Invalid picking material or world matrix; pass a 16-number world matrix and the material fields from readPickingGeometry()',
+        );
       if (vertices.some((v) => !Number.isFinite(v)) || matrix.some((v) => !Number.isFinite(v)))
         throw new RangeError('Picking geometry must be finite');
       if (matrix[3] || matrix[7] || matrix[11] || matrix[15] !== 1)
         throw new RangeError('Picking matrix must be affine');
-      if (indices.some((index) => index >= count)) throw new RangeError('Picking index exceeds vertex count');
+      if (indices.some((index) => index >= count))
+        throw new RangeError('Picking index exceeds vertex count; keep every index below the vertex count');
       // Identity is the snapshot's own, captured by the source before its readback; never derived from position or node.
       const { primitiveIndex, nodeIndex } = snapshot;
       for (const [name, value] of [

@@ -294,6 +294,14 @@ nodes and morph weights once, in `add`, and group playback creates no typed arra
 `sampleTrack` and `sampleTrackInto` (also on the root) without the deformation pipeline or
 gltf-pro, for code that samples tracks itself (`@margoengine/animator` does).
 
+```ts
+import {sampleTrack} from 'margoengine/animation/sampling';
+
+const times = new Float32Array([0, 1]);
+const values = new Float32Array([0, 0, 0, 10, 0, 0]); // x, y, z per key
+const position = sampleTrack(times, values, 3, 0.5, 'LINEAR'); // Float32Array [5, 0, 0]
+```
+
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
 
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:

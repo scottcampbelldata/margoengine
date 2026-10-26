@@ -1,4 +1,6 @@
+/** A read-only `[x, y, z]` vector in metres. */
 export type Vec3 = readonly [number, number, number];
+/** How volume falls with distance, as in the Web Audio PannerNode. */
 export type DistanceModel = 'linear' | 'inverse' | 'exponential';
 
 /**
@@ -26,7 +28,7 @@ export function distanceGain(
   const d = Math.max(distance, refDistance);
   if (model === 'inverse') return refDistance / (refDistance + rolloffFactor * (d - refDistance));
   if (model === 'exponential') return Math.pow(d / refDistance, -rolloffFactor);
-  throw new TypeError(`Unknown distance model ${String(model)}`);
+  throw new TypeError(`Unknown distance model ${String(model)}; use 'linear', 'inverse' or 'exponential'`);
 }
 
 /** Sound cone gain as the Web Audio PannerNode computes it, with angles in degrees. */

@@ -38,6 +38,19 @@ engine.onFrame(() => meter.style.width = `${analyser.getAverageFrequency() / 2.5
 engine.removePlugin(listener.name);
 ```
 
+## Cancel a load, and clean up with `using`
+
+```ts
+import {AudioListener, Audio} from 'margoengine/audio';
+
+using listener = new AudioListener({volume: 0.8}); // disposed at the end of the block
+const buffer = await listener.load('/sounds/step.ogg', {signal: AbortSignal.timeout(10_000)}); // rejects with an AbortError
+using step = new Audio(listener).setBuffer(buffer);
+step.play();
+```
+
+Errors carry a stable `code` (`error.code`): `disposed` for a sound used after `dispose()`, `state` for `play()` before a source is set, `unsupported` when Web Audio or `fetch` is missing, `failed` for an HTTP or decoding failure. Each message says what to do.
+
 ## How it works
 
 - **Lazy context.** Nothing touches `AudioContext`, `window` or `document` at import time. The listener creates its `AudioContext` the first time `listener.context` is read (normally when the first sound is created), or uses the context you pass, for example an `OfflineAudioContext`. A context the listener created is closed on dispose; a context you passed is left open.

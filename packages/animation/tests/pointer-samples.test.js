@@ -67,7 +67,10 @@ test('AnimatedColorsCube: the pointer base colour follows the file keys, the TRS
     sampler = clip.samplers[colour.sampler],
     times = floats(file, sampler.input),
     values = floats(file, sampler.output);
-  assert.equal(colour.target.extensions.KHR_animation_pointer.pointer, '/materials/0/pbrMetallicRoughness/baseColorFactor');
+  assert.equal(
+    colour.target.extensions.KHR_animation_pointer.pointer,
+    '/materials/0/pbrMetallicRoughness/baseColorFactor',
+  );
   const model = await load(t, bytes),
     animation = new Animation(model, { loop: false, pointers: pointerChannels });
   assert.deepEqual(animation.warnings, []);

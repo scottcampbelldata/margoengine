@@ -570,7 +570,7 @@ export function bakeKeyframeTrack(track: KeyframeTrack | PropertyKeyframeTrack, 
   for (let k = 0; k < keys.length; k++) {
     if (!add(keys[k]))
       throw new RangeError(
-        `Keyframe track ${'path' in track ? track.target + ' ' + track.path : track.name} keys are closer than Float32 time precision`,
+        `Keyframe track ${'path' in track ? track.target + ' ' + track.path : track.name} keys are closer than Float32 time precision; space keys further apart`,
       );
     if (plain || k === keys.length - 1 || interpolations[k] === 'linear') continue;
     const end = Math.fround(keys[k + 1]);

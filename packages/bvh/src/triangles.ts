@@ -72,7 +72,8 @@ export function worldTriangles(
       add(geometry.vertices, 6, geometry.indices, [world(object)]);
     }
   }
-  if (vertexCount > 0xffffffff) throw new RangeError('Too many vertices for 32-bit indices');
+  if (vertexCount > 0xffffffff)
+    throw new RangeError('Too many vertices for 32-bit indices; split the meshes into smaller batches');
   const vertices = new Float32Array(vertexCount * 3),
     indices = new Uint32Array(indexCount);
   let v = 0,

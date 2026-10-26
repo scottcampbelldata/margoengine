@@ -1,3 +1,10 @@
+import { margoError } from '../../shared/errors.js';
+
+/**
+ * Options for {@link loadAudioBuffer} and `AudioListener.load`.
+ * @example
+ * const buffer = await listener.load('/sounds/step.ogg', {signal: AbortSignal.timeout(10_000)});
+ */
 export interface LoadAudioOptions {
   /** Rejects this caller with an AbortError. The download itself is cancelled once every waiting caller aborted. */
   signal?: AbortSignal;
@@ -22,7 +29,13 @@ const abortError = (signal?: AbortSignal): unknown =>
 export function decodeAudio(context: BaseAudioContext, bytes: ArrayBuffer): Promise<AudioBuffer> {
   return new Promise((resolve, reject) => {
     const result = context.decodeAudioData(bytes, resolve, (error) =>
-      reject(error ?? new Error('Audio decoding failed')),
+      reject(
+        error ??
+          margoError(
+            'failed',
+            'Audio decoding failed; use a file format this browser can decode (ogg, mp3, wav or m4a)',
+          ),
+      ),
     );
     if (result && typeof result.then === 'function') result.then(resolve, reject);
   });
@@ -40,7 +53,8 @@ export function loadAudioBuffer(
   const { signal, cache = true } = options;
   if (signal?.aborted) return Promise.reject(abortError(signal));
   const fetcher = options.fetch ?? (globalThis.fetch as LoadAudioOptions['fetch']);
-  if (!fetcher) return Promise.reject(new Error('fetch is unavailable in this environment'));
+  if (!fetcher)
+    return Promise.reject(margoError('unsupported', 'fetch is unavailable in this environment; pass options.fetch'));
   let map = caches.get(context);
   if (!map) {
     map = new Map();
@@ -56,7 +70,11 @@ export function loadAudioBuffer(
       settled: false,
       promise: (async () => {
         const response = await fetcher(key, { signal: controller.signal });
-        if (!response.ok) throw new Error(`HTTP ${response.status} loading ${key}`);
+        if (!response.ok)
+          throw margoError(
+            'failed',
+            `HTTP ${response.status} loading ${key}; check the URL and that the server allows this origin`,
+          );
         const bytes = await response.arrayBuffer();
         controller.signal.throwIfAborted();
         return decodeAudio(context, bytes);

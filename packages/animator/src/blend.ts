@@ -1,10 +1,22 @@
+/**
+ * Weights for a 1D blend tree: the two samples around `value` share the weight linearly, and a value outside the
+ * range clamps to the nearest end sample.
+ * @param samples Strictly increasing, finite sample positions.
+ * @param value The blend parameter, finite.
+ * @returns One weight per sample; they sum to 1.
+ * @throws RangeError when the samples are empty, not strictly increasing or not finite.
+ * @example
+ * blend1D([0, 1, 3], 2); // Float32Array [0, 0.5, 0.5]
+ */
 export function blend1D(samples: readonly number[], value: number): Float32Array {
   if (
     !samples.length ||
     !Number.isFinite(value) ||
     samples.some((v, i) => !Number.isFinite(v) || (i > 0 && v <= samples[i - 1]))
   )
-    throw new RangeError('Invalid 1D blend samples');
+    throw new RangeError(
+      'Invalid 1D blend samples; pass finite sample values in strictly increasing order and a finite blend value',
+    );
   const weights = new Float32Array(samples.length);
   if (value <= samples[0]) {
     weights[0] = 1;
@@ -21,6 +33,17 @@ export function blend1D(samples: readonly number[], value: number): Float32Array
   weights[high] = t;
   return weights;
 }
+/**
+ * Weights for a 2D blend tree: normalised inverse-square distance to every sample, so a point exactly on a sample
+ * reproduces that sample alone.
+ * @param samples Unique, finite `[x, y]` positions.
+ * @param x The first blend parameter, finite.
+ * @param y The second blend parameter, finite.
+ * @returns One weight per sample; they sum to 1.
+ * @throws RangeError when the samples are empty, duplicated or not finite.
+ * @example
+ * blend2D([[0, 0], [1, 0]], 0, 0); // Float32Array [1, 0]
+ */
 export function blend2D(samples: readonly (readonly [number, number])[], x: number, y: number): Float32Array {
   if (
     !samples.length ||
@@ -28,7 +51,7 @@ export function blend2D(samples: readonly (readonly [number, number])[], x: numb
     samples.some((v) => v.length !== 2 || v.some((n) => !Number.isFinite(n))) ||
     new Set(samples.map((v) => v.join(','))).size !== samples.length
   )
-    throw new RangeError('Invalid 2D blend samples');
+    throw new RangeError('Invalid 2D blend samples; pass finite [x, y] pairs without duplicates and a finite x and y');
   const weights = new Float32Array(samples.length),
     distances = samples.map((v) => Math.hypot(v[0] - x, v[1] - y)),
     nearest = Math.min(...distances),
@@ -64,7 +87,10 @@ export function quaternionBlend(a: ArrayLike<number>, b: ArrayLike<number>, weig
     q2 = a[2] * x + b[2] * y * sign,
     q3 = a[3] * x + b[3] * y * sign,
     length = Math.hypot(q0, q1, q2, q3);
-  if (!length) throw new RangeError('Zero blend quaternion');
+  if (!length)
+    throw new RangeError(
+      'Zero blend quaternion; the two rotations cancel out, so use unit quaternions and a weight away from the exact opposite pose',
+    );
   if (!out) return [q0 / length, q1 / length, q2 / length, q3 / length];
   out[0] = q0 / length;
   out[1] = q1 / length;

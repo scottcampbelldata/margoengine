@@ -1,9 +1,15 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type FrameGraph } from '@margoengine/core/extension';
+import { margoError } from '../../shared/errors.js';
 import { normalize, smoothParam, type Vec3 } from './math.js';
 import { loadAudioBuffer, type LoadAudioOptions } from './loader.js';
 
+/**
+ * Options for {@link AudioListener}. Every field is optional.
+ * @example
+ * AudioListener.attach(engine, {volume: 0.8});
+ */
 export interface AudioListenerOptions {
   /** An existing context (for example an OfflineAudioContext) or a factory. Default: `new AudioContext()` on first use. */
   context?: BaseAudioContext | (() => BaseAudioContext);
@@ -31,7 +37,11 @@ const defaultForward: Vec3 = [0, 0, -1],
   meshForward: Vec3 = [0, 0, 1];
 const audioContextClass = (): (new () => AudioContext) => {
   const constructor = (globalThis as { AudioContext?: new () => AudioContext }).AudioContext;
-  if (!constructor) throw new Error('Web Audio is unavailable in this environment');
+  if (!constructor)
+    throw margoError(
+      'unsupported',
+      'Web Audio is unavailable in this environment; run in a browser, or pass options.context (for example an OfflineAudioContext)',
+    );
   return constructor;
 };
 
@@ -193,7 +203,7 @@ export class AudioListener implements EnginePlugin {
    */
   follow(target: 'camera' | Mesh | null, forward: Vec3 = meshForward): this {
     if (target !== 'camera' && target !== null && !Number.isInteger(meshRuntime(target)?.id))
-      throw new TypeError("The listener follows a core Mesh, 'camera' or null");
+      throw new TypeError("The listener follows a core Mesh, 'camera' or null; pass one of those to follow()");
     const f = this.forwardScratch;
     if (!normalize(forward[0], forward[1], forward[2], f, meshForward))
       throw new RangeError('Listener forward axis must be nonzero');

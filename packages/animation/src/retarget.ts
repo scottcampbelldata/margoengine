@@ -170,7 +170,10 @@ function world(
 /** Writes the current local pose of a Skeleton's bones or a model's nodes into `out`, 10 numbers each. */
 function read(from: Skeleton | PBRModel, count: number, label: string, out: Float64Array): void {
   if (from instanceof Skeleton) {
-    if (from.count !== count) throw new RangeError(`Retarget ${label} has ${from.count} bones but its rig ${count}`);
+    if (from.count !== count)
+      throw new RangeError(
+        `Retarget ${label} has ${from.count} bones but its rig has ${count}; use a source with the rig's bone count`,
+      );
     for (let b = 0; b < count; b++) {
       const { translation, rotation, scale } = from.getPose(b);
       out.set(translation, b * 10);
@@ -384,14 +387,18 @@ export class Retarget {
     const out = this.pose(this.input, this.output);
     if (target instanceof Skeleton) {
       if (target.count !== this.target.names.length)
-        throw new RangeError(`Retarget target has ${target.count} bones but its rig ${this.target.names.length}`);
+        throw new RangeError(
+          `Retarget target has ${target.count} bones but its rig has ${this.target.names.length}; pass a target with the rig's bone count`,
+        );
       for (let b = 0; b < this.map.length; b++)
         if (this.map[b] >= 0 || b === this.hip) target.setPose(b, this.poses[b]);
       return;
     }
     if (!(target instanceof PBRModel)) throw new TypeError('Retarget target must be a Skeleton or a glTF-pro model');
     if (target.nodes.length !== this.target.names.length)
-      throw new RangeError(`Retarget target has ${target.nodes.length} nodes but its rig ${this.target.names.length}`);
+      throw new RangeError(
+        `Retarget target has ${target.nodes.length} nodes but its rig has ${this.target.names.length}; pass a model with the rig's node count`,
+      );
     const q = this.quaternion,
       v = this.vector;
     for (let b = 0; b < this.map.length; b++) {

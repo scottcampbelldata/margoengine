@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import type { PBRModel, PBRPrimitive, PBRDeformationContext } from '@margoengine/gltf-pro';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
@@ -100,8 +101,11 @@ interface Deformation {
   inverseBind: Float32Array[];
   pipeline: GPUComputePipeline;
 }
+/** Options for {@link Animation}. */
 export interface AnimationOptions {
+  /** Wrap time at the end of the clip. Default true; false holds the last frame. */
   loop?: boolean;
+  /** Playback rate multiplier, finite and >= 0. Default 1. */
   speed?: number;
   /**
    * KHR_animation_pointer playback, opt-in so apps without pointer channels do not ship it: pass `pointerChannels`
@@ -182,6 +186,18 @@ function writeInput(
     args[2] = undefined!;
   }
 }
+/**
+ * Plays a glTF model's animation clips on the GPU: node translation, rotation and scale, skinning and morph targets. Add it to the engine with {@link Animation.attach}; it advances each frame and removes itself when the model is disposed.
+ *
+ * Defaults: plays clip 0, looping, at speed 1 (see {@link AnimationOptions}).
+ *
+ * @example
+ * ```ts
+ * const model = await loadGLTF(engine, 'character.glb');
+ * const animation = Animation.attach(model);
+ * animation.play('Walk');
+ * ```
+ */
 export class Animation implements EnginePlugin {
   readonly name: string;
   readonly clips: readonly Clip[];
@@ -245,29 +261,45 @@ export class Animation implements EnginePlugin {
       warnings.push(...plan.warnings);
       const destinations = new Set<string>();
       const track = (node: number, path: Track['path'], samplerId: unknown): Track => {
-        if (animationNode(doc.nodes[node]).matrix) throw new TypeError('Invalid animation target');
+        if (animationNode(doc.nodes[node]).matrix)
+          throw new TypeError(
+            'Invalid animation target; glTF animations cannot drive a node that has a matrix, give it translation/rotation/scale',
+          );
         const key = node + ':' + path;
-        if (destinations.has(key)) throw new Error('Duplicate animation target');
+        if (destinations.has(key))
+          throw new RangeError(
+            'Duplicate animation target; give each node and path (translation, rotation, scale, weights) one channel per animation',
+          );
         destinations.add(key);
         const sampler = animationSampler(def.samplers[animationIndex(samplerId, def.samplers.length, 'sampler')]),
           times = model.asset.accessor(sampler.input, 'SCALAR'),
           interpolation = animationInterpolation(sampler.interpolation);
         if (times.some((v, i) => v < 0 || (i > 0 && v <= times[i - 1])))
-          throw new RangeError('Invalid animation time/interpolation');
+          throw new RangeError(
+            'Invalid animation time/interpolation; keyframe times must be >= 0 and strictly increasing',
+          );
         if (
           animationAccessor(doc, sampler.input)?.componentType !== 5126 ||
           animationAccessor(doc, sampler.output)?.componentType !== 5126
         )
-          throw new TypeError('Animation accessors must be Float32');
+          throw new TypeError(
+            'Animation accessors must be Float32; re-export the glTF without quantised animation data',
+          );
         const weights = model.primitives.find((p) => p.nodeIndex === node)?.weights.length;
         const width = path === 'rotation' ? 4 : path === 'weights' ? (weights ?? 0) : 3;
-        if (!width) throw new TypeError('Animation target has no morph weights');
+        if (!width)
+          throw new TypeError(
+            'Animation target has no morph weights; animate weights only on a node whose mesh has morph targets',
+          );
         const values = model.asset.accessor(
             sampler.output,
             path === 'weights' ? 'SCALAR' : path === 'rotation' ? 'VEC4' : 'VEC3',
           ),
           factor = interpolation === 'CUBICSPLINE' ? 3 : 1;
-        if (values.length !== times.length * width * factor) throw new RangeError('Animation output count mismatch');
+        if (values.length !== times.length * width * factor)
+          throw new RangeError(
+            'Animation output count mismatch; the output accessor needs one value per key (three per key for CUBICSPLINE)',
+          );
         return {
           node,
           path,
@@ -308,7 +340,9 @@ export class Animation implements EnginePlugin {
     for (const primitive of this.model.primitives) {
       const width = widths.get(primitive.nodeIndex);
       if (width !== undefined && width !== primitive.weights.length)
-        throw new RangeError("Morph target counts must match across a node's primitives");
+        throw new RangeError(
+          "Morph target counts must match across a node's primitives; give every primitive of the mesh the same targets",
+        );
       widths.set(primitive.nodeIndex, primitive.weights.length);
     }
     if (
@@ -316,16 +350,17 @@ export class Animation implements EnginePlugin {
       !Number.isFinite(this.options.speed ?? 1) ||
       (this.options.speed ?? 1) < 0
     )
-      throw new RangeError('Invalid animation options');
+      throw new RangeError('Invalid animation options; loop must be a boolean and speed a finite number >= 0');
     if (this.options.pointers !== undefined && typeof this.options.pointers !== 'function')
       throw new TypeError(
         'Animation pointers option must be pointerChannels; import it from @margoengine/animation/pointer',
       );
   }
   play(clip: string | number = 0): this {
-    if (this.disposed) throw new Error('Animation is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Animation is disposed; create a new Animation');
     const id = typeof clip === 'string' ? this.clips.findIndex((c) => c.name === clip) : clip;
-    if (!Number.isInteger(id) || id < 0 || id >= this.clips.length) throw new RangeError('Unknown animation clip');
+    if (!Number.isInteger(id) || id < 0 || id >= this.clips.length)
+      throw new RangeError('Unknown animation clip; pass a clip name or an index from animation.clips');
     for (const [i, rest] of this.rest.entries())
       this.model.nodes[i].setPosition(rest.position).setScale(rest.scale).setQuaternion(rest.rotation);
     this.clip = id;
@@ -335,7 +370,8 @@ export class Animation implements EnginePlugin {
     return this;
   }
   seek(time: number): this {
-    if (!Number.isFinite(time) || time < 0 || this.disposed) throw new RangeError('Invalid animation time');
+    if (!Number.isFinite(time) || time < 0 || this.disposed)
+      throw new RangeError('Invalid animation time; seek to a finite time >= 0 on a live Animation');
     this.time = time;
     this.apply(time);
     return this;
@@ -351,7 +387,9 @@ export class Animation implements EnginePlugin {
         if (target >= primitives[i].weights.length) fits = false;
       }
     if (!found || !fits || !Number.isFinite(Math.fround(weight)) || this.disposed)
-      throw new RangeError('Invalid morph target/weight');
+      throw new RangeError(
+        'Invalid morph target/weight; pass a morph target index the node has and a finite weight, on a live Animation',
+      );
     for (let i = 0; i < primitives.length; i++)
       if (primitives[i].nodeIndex === node) primitives[i].weights[target] = weight;
   }
@@ -387,8 +425,15 @@ export class Animation implements EnginePlugin {
   }
   setup(engine: Engine, device = engine.gpu): void {
     if (engine !== this.model.root.engine || this.model.disposed || this.disposed)
-      throw new Error('Animation model is disposed or belongs to another engine');
-    if (!device) throw new Error('Animation requires WebGPU');
+      throw new MargoError(
+        'attached',
+        'Animation model is disposed or belongs to another engine; attach the Animation to the engine that loaded the model',
+      );
+    if (!device)
+      throw new MargoError(
+        'unsupported',
+        'Animation requires WebGPU; use a browser with WebGPU or leave skinning and morphing out',
+      );
     this.device = device;
     this.unsubscribe?.();
     this.unsubscribe = this.model.onDispose(() => this.destroy());
@@ -403,7 +448,9 @@ export class Animation implements EnginePlugin {
         skinId = animationNode(doc.nodes[p.nodeIndex]).skin;
       const skinValue = typeof skinId === 'number' ? doc.skins[skinId] : undefined;
       if (skinId !== undefined && (typeof skinId !== 'number' || !Number.isInteger(skinId) || skinId < 0 || !skinValue))
-        throw new TypeError('Missing glTF skin');
+        throw new TypeError(
+          'Missing glTF skin; the node must reference a skin index that exists in the glTF skins array',
+        );
       if (!targets.length && skinId === undefined) continue;
       const count = p.vertices.length / 20,
         buffers: GPUBuffer[] = [],
@@ -432,14 +479,16 @@ export class Animation implements EnginePlugin {
           size > this.device!.limits.maxBufferSize ||
           (usage & GPUBufferUsage.STORAGE && size > this.device!.limits.maxStorageBufferBindingSize)
         )
-          throw new RangeError('Animation buffer exceeds device limit');
+          throw new RangeError(
+            'Animation buffer exceeds device limit; split the mesh or reduce vertices, joints and morph targets',
+          );
         const b = this.device!.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST });
         buffers.push(b);
         if (data.byteLength) this.device!.queue.writeBuffer(b, 0, data as Float32Array<ArrayBuffer>);
         return b;
       };
       if (count * targets.length * 48 > this.device.limits.maxStorageBufferBindingSize)
-        throw new RangeError('Morph deltas exceed device limit');
+        throw new RangeError('Morph deltas exceed device limit; reduce the vertex or morph target count');
       const deltas = new Float32Array(Math.max(12, count * targets.length * 12));
       targets.forEach((target, t) => {
         for (const [name, at] of [
@@ -449,7 +498,8 @@ export class Animation implements EnginePlugin {
         ] as const)
           if (target[name] !== undefined) {
             const data = this.model.asset.accessor(target[name], 'VEC3');
-            if (data.length !== count * 3) throw new RangeError('Morph target count mismatch');
+            if (data.length !== count * 3)
+              throw new RangeError('Morph target count mismatch; every morph attribute needs one VEC3 per vertex');
             for (let i = 0; i < count; i++) deltas.set(data.subarray(i * 3, i * 3 + 3), (t * count + i) * 12 + at);
           }
       });
@@ -472,11 +522,14 @@ export class Animation implements EnginePlugin {
           skin.inverseBindMatrices !== undefined &&
           animationAccessor(doc, skin.inverseBindMatrices)?.componentType !== 5126
         )
-          throw new TypeError('Inverse bind matrices must be Float32');
-        if (inverseBind.length !== joints.length * 16) throw new RangeError('Inverse bind matrix count mismatch');
+          throw new TypeError('Inverse bind matrices must be Float32; re-export the glTF without quantised matrices');
+        if (inverseBind.length !== joints.length * 16)
+          throw new RangeError('Inverse bind matrix count mismatch; the skin needs one 4x4 matrix per joint');
         for (const name of Object.keys(attributes))
           if (/^(JOINTS|WEIGHTS)_/.test(name) && !/^(JOINTS|WEIGHTS)_[01]$/.test(name))
-            throw new Error('More than eight joint influences are unsupported');
+            throw new RangeError(
+              'More than eight joint influences are unsupported; limit each vertex to JOINTS_0 and JOINTS_1',
+            );
         const sets: Array<{ ids: Float32Array; weights: Float32Array }> = [];
         for (let set = 0; set < (extra ? 2 : 1); set++) {
           const jointIndex = attributes['JOINTS_' + set],
@@ -492,7 +545,9 @@ export class Animation implements EnginePlugin {
             (jointAccessor?.componentType !== 5121 && jointAccessor?.componentType !== 5123) ||
             jointAccessor?.normalized
           )
-            throw new TypeError('Invalid skin attributes');
+            throw new TypeError(
+              'Invalid skin attributes; JOINTS_n must be unsigned byte or short VEC4, WEIGHTS_n VEC4, one per vertex',
+            );
           const weightAccessor = animationAccessor(doc, weightIndex);
           if (
             !weightAccessor ||
@@ -501,7 +556,9 @@ export class Animation implements EnginePlugin {
               weightAccessor.componentType !== 5123) ||
             (weightAccessor.componentType !== 5126 && !weightAccessor.normalized)
           )
-            throw new TypeError('Invalid skin weight component type');
+            throw new TypeError(
+              'Invalid skin weight component type; use float, or normalized unsigned byte or short weights',
+            );
           sets.push({ ids, weights });
         }
         for (let i = 0; i < count; i++) {
@@ -518,7 +575,9 @@ export class Animation implements EnginePlugin {
                 at = i * 4 + c,
                 base = i * stride + set * 8;
               if (!Number.isInteger(ids[at]) || ids[at] < 0 || ids[at] >= joints.length || weights[at] < 0)
-                throw new RangeError('Invalid skin joint/weight');
+                throw new RangeError(
+                  'Invalid skin joint/weight; joint indices must address the skin joints and weights must be >= 0',
+                );
               jointIds[base + c] = ids[at];
               influenceFloats[base + 4 + c] = weights[at] / sum;
             }
@@ -562,7 +621,8 @@ export class Animation implements EnginePlugin {
       return;
     }
     this.validate();
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid animation delta');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('Invalid animation delta; pass a finite delta >= 0 seconds');
     if (this.playing) {
       this.time += delta * (this.options.speed ?? 1);
       this.apply(this.time);
@@ -578,17 +638,19 @@ export class Animation implements EnginePlugin {
     for (const r of this.resources) {
       const weights = r.primitive.weights;
       for (let i = 0; i < weights.length; i++)
-        if (!Number.isFinite(weights[i])) throw new RangeError('Invalid morph weights');
+        if (!Number.isFinite(weights[i]))
+          throw new RangeError('Invalid morph weights; set finite weights on the primitive');
       if (r.joints.length) {
         if (!invertMatrixStable(r.primitive.node.matrix, this.inverse, this.workspace))
-          throw new Error('Singular skinned mesh transform');
+          throw new RangeError('Singular skinned mesh transform; give the skinned node a non-zero scale');
         for (let i = 0; i < r.joints.length; i++) {
           multiplyMatrices(this.model.nodes[r.joints[i]].matrix, r.inverseBind[i], this.joint);
           multiplyMatrices(this.inverse, this.joint, this.product);
           r.palette.set(this.product, i * 16);
         }
         for (let i = 0; i < r.palette.length; i++)
-          if (!Number.isFinite(r.palette[i])) throw new RangeError('Skin matrix overflow');
+          if (!Number.isFinite(r.palette[i]))
+            throw new RangeError('Skin matrix overflow; use finite joint transforms and inverse bind matrices');
         const queue = context.device.queue,
           writer = queue.writeBuffer,
           reusable = reusableWriter(queue, writer);

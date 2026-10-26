@@ -405,7 +405,10 @@ test('recursive writer updates reject before changing time/playback/pose and the
       playing = f.animation.playing,
       current = f.animator.current;
     if (fail) f.animator.onPreUpdate(1);
-    assert.throws(() => f.animator.onPreUpdate(1), /cannot reenter/);
+    assert.throws(
+      () => f.animator.onPreUpdate(1),
+      (e) => e.code === 'state' && e.name === 'MargoError' && /cannot reenter updates; do not/.test(e.message),
+    );
     nested++;
     assert.equal(f.animator.time, time);
     assert.equal(f.animation.playing, playing);

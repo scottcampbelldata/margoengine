@@ -196,7 +196,7 @@ function attributes(source: GeometryLike | TriangleSource): Attributes {
       : Float32Array.from(source.normals)
     : null;
   if (normals && positions.length >= 3 && normals.length < Math.floor((positions.length - 3) / stride) * stride + 3)
-    throw new RangeError('normals are shorter than positions');
+    throw new RangeError('normals are shorter than positions; supply one normal per vertex');
   return { positions, stride, normals, normalStride: stride, normalOffset: 0 };
 }
 
@@ -262,7 +262,8 @@ export class MeshBVH {
 
   /** Restores a BVH from `serialize()` output. The source supplies positions (and normals); its indices are not needed. */
   static deserialize(data: SerializedBVH, source: GeometryLike | TriangleSource): MeshBVH {
-    if (!data || data.version !== 1) throw new TypeError('Unknown serialized BVH version');
+    if (!data || data.version !== 1)
+      throw new TypeError('Unknown serialized BVH version; rebuild the BVH with this release and serialize it again');
     return new MeshBVH({ nodes: data.nodes, index: data.index, triangles: data.triangles }, source);
   }
 
@@ -270,9 +271,11 @@ export class MeshBVH {
   static fromArrayBuffer(buffer: ArrayBuffer, source: GeometryLike | TriangleSource): MeshBVH {
     if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 16) throw new TypeError('Expected a BVH ArrayBuffer');
     const [magic, version, nodeCount, triangleCount] = new Uint32Array(buffer, 0, 4);
-    if (magic !== MAGIC || version !== 1) throw new TypeError('Not a Margo Engine BVH buffer');
+    if (magic !== MAGIC || version !== 1)
+      throw new TypeError('Not a Margo Engine BVH buffer; pass the output of toArrayBuffer()');
     const nodeBytes = nodeCount * NODE_WORDS * 4;
-    if (buffer.byteLength !== 16 + nodeBytes + triangleCount * 16) throw new RangeError('Truncated BVH buffer');
+    if (buffer.byteLength !== 16 + nodeBytes + triangleCount * 16)
+      throw new RangeError('Truncated BVH buffer; re-read the whole file or serialize again');
     return new MeshBVH(
       {
         nodes: buffer.slice(16, 16 + nodeBytes),
@@ -292,14 +295,14 @@ export class MeshBVH {
     this.normalStride = a.normalStride;
     this.normalOffset = a.normalOffset;
     if (!(data.nodes instanceof ArrayBuffer) || !data.nodes.byteLength || data.nodes.byteLength % (NODE_WORDS * 4))
-      throw new RangeError('Invalid BVH nodes');
+      throw new RangeError('Invalid BVH nodes; pass the unmodified output of serialize()');
     if (
       !(data.index instanceof Uint32Array) ||
       !(data.triangles instanceof Uint32Array) ||
       data.index.length !== data.triangles.length * 3 ||
       !data.triangles.length
     )
-      throw new RangeError('Invalid BVH triangles');
+      throw new RangeError('Invalid BVH triangles; pass the unmodified output of serialize()');
     this.nodes = data.nodes;
     this.nodeBounds = new Float32Array(data.nodes);
     this.nodeData = new Uint32Array(data.nodes);
@@ -315,14 +318,16 @@ export class MeshBVH {
       const word = u[w + 7];
       if (word & INTERNAL_FLAG) {
         if ((word & 0x7fffffff) > 2 || u[w + 6] <= node + 1 || u[w + 6] >= count)
-          throw new RangeError('Invalid BVH node links');
+          throw new RangeError('Invalid BVH node links; pass the unmodified output of serialize()');
       } else {
-        if (!word || u[w + 6] !== covered) throw new RangeError('Invalid BVH leaf ranges');
+        if (!word || u[w + 6] !== covered)
+          throw new RangeError('Invalid BVH leaf ranges; pass the unmodified output of serialize()');
         covered += word;
         leaves++;
       }
     }
-    if (covered !== this.triangleCount) throw new RangeError('BVH leaves do not cover every triangle');
+    if (covered !== this.triangleCount)
+      throw new RangeError('BVH leaves do not cover every triangle; pass the unmodified output of serialize()');
     // Walking backwards, each internal node must take its two children's subtree roots off the stack: this proves
     // one packed tree with every node reached once, so a restored tree with shared or cyclic links cannot loop.
     const roots = new Uint32Array(leaves);
@@ -331,12 +336,12 @@ export class MeshBVH {
       const w = node * NODE_WORDS;
       if (u[w + 7] & INTERNAL_FLAG) {
         if (top < 2 || roots[top - 1] !== node + 1 || roots[top - 2] !== u[w + 6])
-          throw new RangeError('Invalid BVH node links');
+          throw new RangeError('Invalid BVH node links; pass the unmodified output of serialize()');
         top -= 2;
       }
       roots[top++] = node;
     }
-    if (top !== 1) throw new RangeError('Invalid BVH node links');
+    if (top !== 1) throw new RangeError('Invalid BVH node links; pass the unmodified output of serialize()');
   }
 
   get nodeCount(): number {
@@ -359,7 +364,7 @@ export class MeshBVH {
   leafTriangles(node: number): Uint32Array {
     const w = node * NODE_WORDS,
       word = this.nodeData[w + 7];
-    if (word & INTERNAL_FLAG) throw new RangeError('Not a leaf node');
+    if (word & INTERNAL_FLAG) throw new RangeError('Not a leaf node; check isLeaf(node) before calling leafTriangles');
     return this.triangles.subarray(this.nodeData[w + 6], this.nodeData[w + 6] + word);
   }
 
@@ -842,7 +847,7 @@ export class MeshBVH {
       bz1 = box.max[2];
     if (!(bx0 <= bx1 && by0 <= by1 && bz0 <= bz1)) return false;
     const inverse = matrix ? invertMatrix(matrix, new Float64Array(16)) : null;
-    if (matrix && !inverse) throw new RangeError('Box matrix is singular');
+    if (matrix && !inverse) throw new RangeError('Box matrix is singular; pass an invertible matrix (no zero scale)');
     // Conservative BVH-space bounds of the oriented box.
     const bounds = matrix ? transformBox(matrix, bx0, by0, bz0, bx1, by1, bz1) : [bx0, by0, bz0, bx1, by1, bz1];
     const pad =

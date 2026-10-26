@@ -3,16 +3,24 @@ import type { EngineKernel, Mesh } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import type { AudioListener, ListenerSource } from './listener.js';
 import { normalize, smoothParam, type DistanceModel, type Vec3 } from './math.js';
+import { margoError } from '../../shared/errors.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 
+/**
+ * Options for {@link Audio}. Every field is optional; a sound with no options plays its buffer once at full volume.
+ * @example
+ * new Audio(listener, {volume: 0.5, loop: true});
+ */
 export interface AudioOptions {
   /** Volume of this sound, default 1. */
   volume?: number;
+  /** Restart from the loop start when the end is reached. Default false. */
   loop?: boolean;
   /** Loop region start in seconds (buffer sources). */
   loopStart?: number;
   /** Loop region end in seconds; 0 means the end of the buffer. */
   loopEnd?: number;
+  /** Speed multiplier; 2 plays an octave higher and twice as fast. Default 1. */
   playbackRate?: number;
   /** Detune in cents (buffer sources). */
   detune?: number;
@@ -30,11 +38,22 @@ export interface AudioOptions {
   onEnded?: (audio: Audio) => void;
 }
 
+/**
+ * Options for {@link PositionalAudio}: everything in {@link AudioOptions} plus the panner. The distance fields follow
+ * the Web Audio PannerNode defaults.
+ * @example
+ * new PositionalAudio(listener, {mesh: truck, refDistance: 2, distanceModel: 'inverse'});
+ */
 export interface PositionalAudioOptions extends AudioOptions {
+  /** Spatialisation algorithm. Default 'equalpower'. */
   panningModel?: PanningModelType;
+  /** How volume falls with distance. Default 'inverse'. */
   distanceModel?: DistanceModel;
+  /** Distance in metres at which attenuation starts. Default 1. */
   refDistance?: number;
+  /** Distance beyond which attenuation stops (the 'linear' model reaches silence here). Default 10000. */
   maxDistance?: number;
+  /** How fast the volume falls with distance. Default 1. */
   rolloffFactor?: number;
   /** Cone angles in degrees (360 disables the cone). */
   coneInnerAngle?: number;
@@ -221,7 +240,8 @@ export class Audio implements ListenerSource {
     } else if (this.kind === 'stream' || this.kind === 'node') {
       this.source!.connect(this.head);
     } else
-      throw new Error(
+      throw margoError(
+        'state',
         'Audio has no source; call setBuffer, setMediaElementSource, setMediaStreamSource or setNodeSource first',
       );
     this.playing = true;
@@ -507,7 +527,7 @@ export class Audio implements ListenerSource {
     this.fade.gain.setValueAtTime(value, now);
   }
   private assertLive(): void {
-    if (this.disposed) throw new Error('Audio is disposed');
+    if (this.disposed) throw margoError('disposed', 'Audio is disposed; create a new Audio');
   }
   private clearTimer(): void {
     if (this.fadeTimer !== undefined) {
@@ -665,7 +685,7 @@ export class PositionalAudio extends Audio {
   }
   set distanceModel(value: DistanceModel) {
     if (value !== 'linear' && value !== 'inverse' && value !== 'exponential')
-      throw new TypeError(`Unknown distance model ${String(value)}`);
+      throw new TypeError(`Unknown distance model ${String(value)}; use 'linear', 'inverse' or 'exponential'`);
     this.panner.distanceModel = value;
   }
   get refDistance(): number {

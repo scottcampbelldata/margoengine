@@ -68,7 +68,8 @@ export function animationDocument(value: unknown): AnimationDocument {
 }
 export function animationDefinition(value: unknown): AnimationDefinition {
   const def = record(value, 'Invalid glTF animation');
-  if (def.name !== undefined && typeof def.name !== 'string') throw new TypeError('Invalid glTF animation');
+  if (def.name !== undefined && typeof def.name !== 'string')
+    throw new TypeError('Invalid glTF animation; name must be a string when present');
   return {
     name: def.name,
     channels: array(def.channels, 'Invalid glTF animation'),
@@ -99,18 +100,18 @@ export function animationAccessor(doc: AnimationDocument, id: unknown): Animatio
 }
 export function animationIndex(value: unknown, length: number, label: string): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length)
-    throw new TypeError('Invalid animation ' + label);
+    throw new TypeError(`Invalid animation ${label}; use an integer index inside the array it refers to`);
   return value;
 }
 export function animationPath(value: unknown): AnimationPath {
   if (value !== 'translation' && value !== 'rotation' && value !== 'scale' && value !== 'weights')
-    throw new TypeError('Invalid animation target');
+    throw new TypeError('Invalid animation target; path must be translation, rotation, scale or weights');
   return value;
 }
 export function animationInterpolation(value: unknown): Interpolation {
   if (value === undefined) return 'LINEAR';
   if (value !== 'STEP' && value !== 'LINEAR' && value !== 'CUBICSPLINE')
-    throw new RangeError('Invalid animation time/interpolation');
+    throw new RangeError('Invalid animation time/interpolation; interpolation must be STEP, LINEAR or CUBICSPLINE');
   return value;
 }
 export function skinDefinition(value: unknown, nodeCount: number): Skin {
@@ -124,7 +125,7 @@ export function skinDefinition(value: unknown, nodeCount: number): Skin {
         typeof joint === 'number' && Number.isInteger(joint) && joint >= 0 && joint < nodeCount,
     )
   )
-    throw new TypeError('Invalid skin joints');
+    throw new TypeError('Invalid skin joints; use integer node indices inside the glTF nodes array');
   return { joints, inverseBindMatrices: skin.inverseBindMatrices };
 }
 export function morphDefinition(value: unknown): MorphDefinition {

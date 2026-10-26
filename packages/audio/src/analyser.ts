@@ -1,12 +1,19 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Audio } from './audio.js';
 
+/**
+ * Options for {@link AudioAnalyser}.
+ * @example
+ * new AudioAnalyser(music, {fftSize: 1024, smoothingTimeConstant: 0.6});
+ */
 export interface AudioAnalyserOptions {
   /** FFT size, a power of two from 32 to 32768. Default 2048. */
   fftSize?: number;
   /** Averaging between successive frames, 0..1. Default 0.8 (the Web Audio default). */
   smoothingTimeConstant?: number;
+  /** Lowest decibel value mapped to 0 in byte data. Default -100 (the Web Audio default). */
   minDecibels?: number;
+  /** Highest decibel value mapped to 255 in byte data. Default -30 (the Web Audio default). */
   maxDecibels?: number;
 }
 

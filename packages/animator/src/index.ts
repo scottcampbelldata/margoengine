@@ -13,20 +13,34 @@ export { CCDSolver } from './ccd.js';
 export type { CCDConeLimit, CCDEulerLimit, CCDHingeLimit, CCDJointLimit, CCDResult } from './ccd.js';
 export { addCCDChain } from './ccd-chain.js';
 export type { CCDChain } from './ccd-chain.js';
+/**
+ * What an animator state plays: a clip name, a 1D tree (`parameter` plus samples sorted by increasing `value`) or a
+ * 2D tree (two `parameters` plus samples with unique `[x, y]` values). Parameters default to 0.
+ */
 export type BlendTree =
   | string
   | { parameter: string; samples: readonly { value: number; clip: string }[] }
   | { parameters: readonly [string, string]; samples: readonly { value: readonly [number, number]; clip: string }[] };
+/** An automatic state change: when `when(parameters)` is true in state `from`, the animator crossfades to `to`. */
 export interface AnimatorTransition {
+  /** The state this transition leaves. */
   from: string;
+  /** The state it enters. */
   to: string;
+  /** Evaluated once per frame, in declaration order, while in `from`. */
   when: (parameters: Readonly<Record<string, number>>) => boolean;
+  /** Crossfade length in seconds, 0 or more. Default 0.15. */
   duration?: number;
 }
+/** Options for {@link Animator}. */
 export interface AnimatorOptions {
+  /** Named states; each is a clip name or a blend tree. At least one is required. */
   states: Record<string, BlendTree>;
+  /** The state to start in; must be a key of `states`. */
   initial: string;
+  /** Starting blend parameters. Default: none (every parameter reads 0). */
   parameters?: Record<string, number>;
+  /** Automatic state changes. Default: none. */
   transitions?: readonly AnimatorTransition[];
   /**
    * Optional explicit rotation commit, captured once during construction.
@@ -39,24 +53,39 @@ export interface AnimatorOptions {
    */
   writeRotation?: (node: Mesh, rotation: readonly number[]) => void;
 }
+/** A masked additive layer: the difference between a clip and its reference pose, added to the base pose. */
 export interface AdditiveLayer {
+  /** The clip to add. */
   clip: string;
+  /** Strength from 0 to 1; read every frame, so it may be animated. */
   weight: number;
+  /** glTF node indices the layer affects. */
   mask: readonly number[];
   /** Reference clip time. A zero reference scale axis contributes an identity scale delta. */
   referenceTime?: number;
 }
+/** What a {@link FootIK} `raycast` returns for a hit. */
 export interface GroundHit {
+  /** World-space hit point. */
   position: Vec3;
+  /** Unit surface normal; when given the ankle's local +Y aligns with it. Default: no alignment. */
   normal?: Vec3;
 }
+/** One leg for {@link Animator.addFootIK}: a direct hip, knee, ankle chain that plants the foot on the ground. */
 export interface FootIK {
+  /** glTF node index of the hip. */
   hip: number;
+  /** glTF node index of the knee; a child of `hip`. */
   knee: number;
+  /** glTF node index of the ankle; a child of `knee`. */
   ankle: number;
+  /** World-space point the knee bends toward. */
   pole: Vec3;
+  /** Casts a ray from a world-space `origin` along `direction` (down); returns the hit or `null`. */
   raycast: (origin: Vec3, direction: Vec3) => GroundHit | null;
+  /** Height of the ankle above the ground, in metres. Default 0. */
   offset?: number;
+  /** How far above the ankle the ray starts, in metres; above 0. Default 1. */
   probeHeight?: number;
 }
 interface Pose {
@@ -98,10 +127,25 @@ const copyPose = (source: Pose, out: Pose, weightNodes: readonly number[]): Pose
   }
   return out;
 };
+/**
+ * Gameplay animation on top of an {@link Animation}: named states, blend trees, crossfades, additive layers and foot
+ * IK. Attach the Animation first; the Animator takes over its playback until disposed (`using` works).
+ * @example
+ * const animator = Animator.attach(Animation.attach(model), {
+ *   initial: 'idle',
+ *   states: {idle: 'Idle', run: 'Run'},
+ *   transitions: [{from: 'idle', to: 'run', when: (p) => p.speed > 0.5}],
+ * });
+ * animator.parameters.speed = 1;
+ */
 export class Animator implements EnginePlugin {
+  /** Plugin name, `animator:<model name>`. */
   readonly name: string;
+  /** Blend parameters by name; write them to steer blend trees and transitions. Missing names read 0. */
   readonly parameters: Record<string, number>;
+  /** The current state name; change it with {@link Animator.transition}. */
   state: string;
+  /** Seconds spent in the current state. */
   time = 0;
   /**
    * Advances state time and crossfades while true; false holds the current pose in place. Time also scales by the
@@ -133,9 +177,9 @@ export class Animator implements EnginePlugin {
     this.parameters = { ...options.parameters };
     this.state = options.initial;
     if (!options.states || !Object.hasOwn(options.states, this.state) || !Object.keys(options.states).length)
-      throw new TypeError('Invalid animator states');
+      throw new TypeError('Invalid animator states; pass a non-empty states object that contains the initial state');
     for (const [name, tree] of Object.entries(options.states)) {
-      if (!name) throw new TypeError('Empty animator state');
+      if (!name) throw new TypeError('Empty animator state; give every state a non-empty name');
       if (typeof tree === 'string') this.clip(tree);
       else if ('parameter' in tree) {
         blend1D(
@@ -144,7 +188,8 @@ export class Animator implements EnginePlugin {
         );
         for (const s of tree.samples) this.clip(s.clip);
       } else {
-        if (tree.parameters.length !== 2) throw new TypeError('Invalid blend parameters');
+        if (tree.parameters.length !== 2)
+          throw new TypeError('Invalid blend parameters; a 2D blend tree takes exactly two parameter names');
         blend2D(
           tree.samples.map((s) => s.value),
           0,
@@ -161,9 +206,14 @@ export class Animator implements EnginePlugin {
         !Number.isFinite(t.duration ?? 0.15) ||
         (t.duration ?? 0.15) < 0
       )
-        throw new TypeError('Invalid animator transition');
+        throw new TypeError(
+          'Invalid animator transition; use known from and to states, a when function and a duration of 0 or more',
+        );
     const writer = options.writeRotation;
-    if (writer !== undefined && typeof writer !== 'function') throw new TypeError('Invalid animator rotation writer');
+    if (writer !== undefined && typeof writer !== 'function')
+      throw new TypeError(
+        'Invalid animator rotation writer; pass a function (node, rotation) => void or omit writeRotation',
+      );
     this.writeRotation = writer;
     const nodes = animation.model.nodes,
       t = animation.model.root.engine.store.transforms;
@@ -201,11 +251,13 @@ export class Animator implements EnginePlugin {
   private clip(name: string) {
     const clips = this.animation.clips;
     for (let i = 0; i < clips.length; i++) if (clips[i].name === name) return clips[i];
-    throw new RangeError('Unknown animator clip: ' + name);
+    throw new RangeError(`Unknown animator clip "${name}"; use a clip name from animation.clips`);
   }
   transition(state: string, duration = 0.15): this {
     if (this.disposed || !Object.hasOwn(this.options.states, state) || !Number.isFinite(duration) || duration < 0)
-      throw new RangeError('Invalid animator transition');
+      throw new RangeError(
+        'Invalid animator transition; pass a state name from options.states and a duration of 0 or more, on an Animator that is not disposed',
+      );
     if (state === this.state) return this;
     this.fade = duration ? { pose: clone(this.current), elapsed: 0, duration } : undefined;
     this.state = state;
@@ -229,7 +281,9 @@ export class Animator implements EnginePlugin {
       !Number.isFinite(layer.referenceTime ?? 0) ||
       (layer.referenceTime ?? 0) < 0
     )
-      throw new RangeError('Invalid additive layer');
+      throw new RangeError(
+        'Invalid additive layer; use a weight from 0 to 1, a mask of node indices inside the model and a referenceTime of 0 or more, on an Animator that is not disposed',
+      );
   }
   addFootIK(foot: FootIK): () => void {
     const nodes = this.animation.model.nodes;
@@ -241,11 +295,15 @@ export class Animator implements EnginePlugin {
       !Number.isFinite(foot.probeHeight ?? 1) ||
       (foot.probeHeight ?? 1) <= 0
     )
-      throw new TypeError('Invalid foot IK');
+      throw new TypeError(
+        'Invalid foot IK; pass hip, knee and ankle node indices inside the model, a raycast function, a finite offset and a probeHeight above 0, on an Animator that is not disposed',
+      );
     finiteVector(foot.pole, 3, 'IK pole');
     const parents = nodes[0].engine.store.parents;
     if (parents[nodes[foot.knee].id] !== nodes[foot.hip].id || parents[nodes[foot.ankle].id] !== nodes[foot.knee].id)
-      throw new Error('IK requires a direct hip/knee/ankle chain');
+      throw new TypeError(
+        'IK requires a direct hip/knee/ankle chain; pass a knee that is a child of the hip and an ankle that is a child of the knee',
+      );
     this.feet.add(foot);
     return () => this.feet.delete(foot);
   }
@@ -276,22 +334,31 @@ export class Animator implements EnginePlugin {
       engine !== this.animation.model.root.engine ||
       !engine.hasPlugin(this.animation.name)
     )
-      throw new Error('Attach Animation before its Animator');
+      throw new MargoError(
+        'state',
+        'Attach Animation before its Animator; call Animation.attach(model) on the same engine first, and use an Animation and Animator that are not disposed',
+      );
     this.engine = engine;
     this.animation.playing = false;
     this.unsubscribe = this.animation.model.onDispose(() => this.dispose());
   }
   onPreUpdate(delta: number): void {
-    if (this.rotationWriteActive) throw new Error('Animator rotation writer cannot reenter updates');
+    if (this.rotationWriteActive)
+      throw new MargoError(
+        'state',
+        'Animator rotation writer cannot reenter updates; do not call onPreUpdate or change the Animator from inside writeRotation',
+      );
     if (this.disposed) return;
     if (this.engine && !this.engine.hasPlugin(this.animation.name)) {
       this.dispose();
       return;
     }
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid animator delta');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('Invalid animator delta; pass a finite delta of 0 or more seconds');
     this.animation.playing = false;
     for (const v of Object.values(this.parameters))
-      if (!Number.isFinite(v)) throw new RangeError('Invalid blend parameter');
+      if (!Number.isFinite(v))
+        throw new RangeError('Invalid blend parameter; set every animator.parameters value to a finite number');
     const transitions = this.options.transitions;
     if (transitions)
       for (const t of transitions)
@@ -470,7 +537,11 @@ export class Animator implements EnginePlugin {
       node.setQuaternion(rotation);
       return;
     }
-    if (this.rotationWriteActive) throw new Error('Animator rotation writer cannot reenter updates');
+    if (this.rotationWriteActive)
+      throw new MargoError(
+        'state',
+        'Animator rotation writer cannot reenter updates; do not call onPreUpdate or change the Animator from inside writeRotation',
+      );
     this.rotationWriteActive = true;
     try {
       writer(node, rotation);
@@ -534,7 +605,9 @@ export class Animator implements EnginePlugin {
     for (let id = node.id; id !== -1; id = parents[id]) chain.push(id);
     for (const id of chain.reverse()) {
       if (t.sx[id] <= 0 || Math.abs(t.sx[id] - t.sy[id]) > 1e-5 || Math.abs(t.sx[id] - t.sz[id]) > 1e-5)
-        throw new Error('Foot IK requires positive uniform bone and ancestor scales');
+        throw new RangeError(
+          'Foot IK requires positive uniform bone and ancestor scales; set the leg bones and their parents to one equal positive scale',
+        );
       q = quaternionMultiply(q, [t.qx[id], t.qy[id], t.qz[id], t.qw[id]]);
     }
     return q;

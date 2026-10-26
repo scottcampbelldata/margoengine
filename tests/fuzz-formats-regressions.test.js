@@ -278,7 +278,7 @@ test('.margo scene JSON that is not JSON, and null scene nodes or materials: nam
     offset = view.getUint32(68, true);
   const broken = margo.slice();
   broken[offset] = 0x5b; // '[' where the document's '{' was
-  await named(() => parseMargo(kernel, broken), /^TypeError: Invalid \.margo scene JSON$/);
+  await named(() => parseMargo(kernel, broken), /^TypeError: Invalid \.margo scene JSON; /);
   // Fuzz: TypeError: Cannot read properties of null (reading 'skin' / 'pbrMetallicRoughness').
   const doc = JSON.parse(new TextDecoder().decode(margo.subarray(offset, offset + view.getUint32(72, true))));
   for (const [key, list] of [
@@ -287,7 +287,7 @@ test('.margo scene JSON that is not JSON, and null scene nodes or materials: nam
   ])
     await named(
       () => parseMargo(kernel, margoWithScene(margo, encode(JSON.stringify({ ...doc, [key]: list })))),
-      new RegExp(`^TypeError: Invalid (glTF|\\.margo) ${key}$`),
+      new RegExp(`^TypeError: Invalid (glTF|\\.margo) ${key}(; |$)`),
     );
 });
 
