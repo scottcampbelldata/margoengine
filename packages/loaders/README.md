@@ -2,7 +2,7 @@
 
 Install `npm i margoengine` and import `margoengine/loaders` (or this package alone: `npm i @margoengine/loaders`, imported as `@margoengine/loaders`; the two are the same module).
 
-PLY, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own, plus three optional entries: TrueType fonts and extruded 3D text (`@margoengine/loaders/font`), SVG (`@margoengine/loaders/svg`) and OBJ meshes with their MTL materials and textures (`@margoengine/loaders/mtl`).
+PLY, STL, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own, plus three optional entries: TrueType fonts and extruded 3D text (`@margoengine/loaders/font`), SVG (`@margoengine/loaders/svg`) and OBJ meshes with their MTL materials and textures (`@margoengine/loaders/mtl`).
 
 Packages that read their own formats import the shared parts without the other parsers: `@margoengine/loaders/common`
 (`LoaderError`, `fetchBytes`, `readZipDirectory`, `readZipEntry`, `crc32`, `computeVertexNormals`, `faceNormal` and
@@ -35,6 +35,7 @@ Every parser returns the same `LoadedGeometry`:
 | Function | Reads |
 | --- | --- |
 | `parsePLY` | ASCII, binary little and big endian; x y z, nx ny nz, red green blue (uchar, ushort or float), s/t, u/v, texture_u/texture_v; polygon faces fan-triangulated; files without faces become point clouds; unknown elements and properties skipped |
+| `parseSTL` | See [STL](#stl) |
 | `parse3MF` (async) | Own ZIP reader (stored and deflate through `DecompressionStream('deflate-raw')`, CRC-32 checked); objects, meshes, components, build items, 3x4 transforms; `basematerials` and materials-extension `colorgroup` colors; production-extension `p:path` parts; unit conversion to meters |
 | `parseDXF` | ASCII and binary (R13 on) DXF: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), in each entity's object coordinate system; POINT, TEXT and MTEXT (formatting removed); 3DSOLID, BODY and REGION ACIS data decoded to SAT text. Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
 | `parsePCD` | `DATA ascii`, `binary`, `binary_compressed` (own LZF decompressor); x y z, normal_x/y/z, packed `rgb`/`rgba`, `intensity`, any other field skipped |
@@ -81,7 +82,31 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 - Core `Geometry` holds positions and normals only, at most 1,000,000 vertices: UVs and vertex colors are kept in `LoadedGeometry` but not rendered, and larger meshes must be split by group. Point clouds render as octahedron markers (subsampled past `maxPoints`) because core has no point primitive.
 - PLY face colors and other per-face properties are ignored. OFF per-face colors and binary OFF are not supported. VTK XML (`.vtp`, `.vtu`), other legacy dataset types, VERTICES/LINES cells and cell data are not read. PCD ignores fields other than position, normal, rgb/rgba and intensity.
 - 3MF: textures (`texture2dgroup`), composite materials, multi-properties, beam lattices, slices and ZIP64 or encrypted packages are not supported; objects of type `other` are skipped.
-- STL, STEP and IGES live in the machinery package (its OBJ reader is the CAD path: positions and faces only); glTF in gltf and gltf-pro.
+- STEP and IGES live in the machinery package, and so does `parseCAD`, the CAD path for STL (welded parts for sections, edges and deduplication; see [STL](#stl)); glTF in gltf and gltf-pro.
+
+## STL
+
+`parseSTL` reads binary and ASCII STL into plain typed arrays and does nothing else: no GPU objects, no parts, no smoothing, and no welding unless you ask. A 204,800-triangle binary file becomes 614,400 vertices, as the file stores them.
+
+```ts
+import {parseSTL, toGeometry} from 'margoengine/loaders';
+
+const bytes = await (await fetch('/parts/bracket.stl', {signal})).arrayBuffer();
+const mesh = parseSTL(bytes, {signal});          // weld: true shares corners that have equal positions
+console.log(mesh.positions.length / 9, 'triangles', mesh.colors ? 'with colors' : 'without colors');
+const geometry = toGeometry(mesh, {normals: 'flat'}); // a core Geometry, if the mesh is under 1,000,000 vertices
+```
+
+| Result | Content |
+| --- | --- |
+| `positions` | three vertices per triangle in file order (`weld: true`: one vertex per distinct position) |
+| `normals` | the file's facet normal on each corner; a zero or non-finite stored normal (many writers leave zero) is replaced by the flat normal computed from the corners. With `weld: true`: smooth area-weighted normals |
+| `colors` | binary files using the VisCAM / SolidView color extension (attribute bit 15 set; red bits 10-14, green 5-9, blue 0-4), sRGB 0 to 1, 0.8 gray for facets without one; absent otherwise and for ASCII |
+| `indices` | `0, 1, 2, ...`, or the weld's indices |
+
+Options (defaults): `weld: false`, `maxTriangles: 16,000,000`, `maxVertices: 8,000,000` (checked before allocating, so a short file cannot claim millions), `signal` (aborts with a `LoaderError` of code `'aborted'`, checked every 16,384 triangles). A binary file is recognised by its length (`84 + 50 * triangles`), so binary files whose header starts with `solid` still work; otherwise text starting with `solid` is read as ASCII, several solids in one file are concatenated, and keywords are case-insensitive. Errors are `LoaderError`s: `'truncated'` (data shorter than the header says; pass the whole file), `'syntax'`, `'limit'` (raise `maxTriangles` or `maxVertices`), `'header'`, `'aborted'`. The Materialise Magics color variant and per-facet colors in ASCII files are not read.
+
+`parseCAD(engine, bytes, 'stl')` from `@margoengine/machinery/cad` is the CAD path: it also welds corners, builds parts and creates meshes, which CAD sections, edges and deduplication need, so it costs more. The repository's speed matrix (`docs/whitepaper`, row 10.11) measures both.
 
 ## Tests
 

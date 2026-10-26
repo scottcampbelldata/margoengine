@@ -966,6 +966,16 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       params: {},
       data: () => ({ bytes: stlBytes(grid(320)) }),
     },
+    'p-stl-cad': {
+      area: 'loaders',
+      kind: 'task',
+      rows: ['10.11'],
+      title: 'STL parse, CAD path',
+      draws:
+        'One call: parse the same binary STL through the CAD path (welded parts, face normals and GPU meshes). Margo only: three.js has no CAD path; compare with p-stl.',
+      params: {},
+      data: () => ({ bytes: stlBytes(grid(320)) }),
+    },
     'p-ply': {
       area: 'loaders',
       kind: 'task',
@@ -1648,7 +1658,7 @@ export const ROWS = {
   '10.8': { scenes: ['p-fbx'] },
   '10.9': { scenes: ['p-obj'] },
   '10.10': { scenes: ['p-mtl'] },
-  '10.11': { scenes: ['p-stl'] },
+  '10.11': { scenes: ['p-stl', 'p-stl-cad'] },
   '10.12': { scenes: ['p-ply'] },
   '10.13': { scenes: ['p-3mf'] },
   '10.14': { scenes: ['p-usdz'] },

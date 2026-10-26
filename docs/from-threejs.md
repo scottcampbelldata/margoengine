@@ -599,11 +599,12 @@ const ply = await new PLYLoader().loadAsync('/scan.ply');
 import {loadFBX} from '@margoengine/fbx';
 import {loadUSDZ} from '@margoengine/usdz';
 import {loadCAD} from '@margoengine/machinery/cad';
-import {parsePLY, createMeshes} from '@margoengine/loaders';
+import {parsePLY, parseSTL, createMeshes} from '@margoengine/loaders';
 
 const character = await loadFBX(engine, '/character.fbx');  // skins, morphs and clips; a gltf-pro model
 const chair = await loadUSDZ(engine, '/chair.usdz');        // static USDA/USDC/USDZ
 const part = await loadCAD(engine, '/part.stl');            // STL, OBJ (geometry only), STEP and IGES in a worker
+const raw = parseSTL(await (await fetch('/part.stl')).arrayBuffer()); // STL as plain typed arrays, like STLLoader
 const scan = createMeshes(engine, parsePLY(await (await fetch('/scan.ply')).arrayBuffer()));
 ```
 

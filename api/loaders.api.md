@@ -561,6 +561,11 @@ export interface PointsToGeometryOptions {
     maxPoints?: number;
 }
 
+export interface STLOptions extends ParseLimits {
+    weld?: boolean;
+    signal?: AbortSignal;
+}
+
 export const THREEMF_UNITS: Readonly<Record<string, number>>;
 
 export type TMXLayer = TMXTileLayer | TMXObjectLayer;
@@ -783,6 +788,8 @@ export function parsePCDHeader(input: BinaryInput, options?: ParseLimits): PCDHe
 export function parsePLY(input: BinaryInput, options?: PLYOptions): LoadedGeometry;
 
 export function parsePLYHeader(input: BinaryInput): PLYHeader;
+
+export function parseSTL(input: BinaryInput, options?: STLOptions): LoadedGeometry;
 
 export function parseTMX(input: BinaryInput | string, options?: TMXParseOptions): Promise<LoadedTMX>;
 

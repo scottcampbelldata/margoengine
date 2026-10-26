@@ -245,6 +245,20 @@ export const builders = {
   },
 
   async 'p-stl'(canvas, data, marks) {
+    const { parseSTL } = await timed(marks, () => import('@margoengine/loaders'));
+    let out;
+    return {
+      task() {
+        out = parseSTL(data.bytes);
+      },
+      output: () => geometryCounts([out]),
+      info: () => ({
+        note: 'parseSTL: CPU geometry data (typed arrays, no weld, flat normals computed where the file stores zero); like-for-like with a plain STL loader. The CAD path is p-stl-cad',
+      }),
+    };
+  },
+
+  async 'p-stl-cad'(canvas, data, marks) {
     const engine = await engineFor(canvas, CAMERA, 64, marks),
       { parseCAD } = await timed(marks, () => import('@margoengine/machinery/cad'));
     let model;

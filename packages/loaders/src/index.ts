@@ -100,3 +100,5 @@ export { fetchBytes, load, DEFAULT_MAX_BYTES } from './load.js';
 export type { FetchOptions } from './load.js';
 export { detectFormat, parseAny } from './detect.js';
 export type { LoaderFormat, AnyOptions } from './detect.js';
+export { parseSTL } from './stl.js';
+export type { STLOptions } from './stl.js';
