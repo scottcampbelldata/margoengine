@@ -387,3 +387,28 @@ test('CLI texture flags: --max-texture, --texture-format, --mipmaps', { timeout:
     rmSync(w.dir, { recursive: true, force: true });
   }
 });
+
+test('each preset sizes a 1500 x 900 texture by its own rule', { ...needsSharp, timeout: 120_000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-convert-sizes-'));
+  try {
+    const input = join(dir, 'in');
+    mkdirSync(input, { recursive: true });
+    writeFileSync(join(input, 'wall.png'), encodePNG(picture(1500, 900, false), 1500, 900));
+    const expected = {
+      web: [1500, 900, 'webp'],
+      mobile: [1024, 512, 'webp'],
+      unity: [1500, 900, 'png'],
+      unreal: [1024, 512, 'png'],
+      godot: [1500, 900, 'png'],
+      roblox: [1024, 614, 'png'],
+    };
+    for (const [name, [width, height, format]] of Object.entries(expected)) {
+      const { manifest } = await build({ input, outDir: join(dir, name), preset: name });
+      const out = manifest.files[0].outputs[0];
+      const info = await sharp(readFileSync(join(dir, name, out.path))).metadata();
+      assert.deepEqual([name, info.width, info.height, info.format], [name, width, height, format]);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
