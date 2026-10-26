@@ -337,7 +337,12 @@ self.onmessage = async (event: MessageEvent) => {
       });
       progress(50);
     }
-    const seen = new Map<string, Array<{ data: Float32Array; index: number }>>();
+    const seen = new Map<string, Array<{ data: Float32Array; index: number }>>(),
+      // Only parts with equal triangle counts can match (smoothing keeps the count), so a part whose count no other
+      // part has skips the fingerprint: a sort of all its triangles plus a CRC, 40 ms for a 200k-triangle STL.
+      counts = new Map<number, number>();
+    for (const part of parts)
+      counts.set(part.geometry.indices.length, (counts.get(part.geometry.indices.length) ?? 0) + 1);
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       // STL/OBJ carry no surface normals: weld and smooth them up to the crease angle. STEP/IGES already have
@@ -345,14 +350,16 @@ self.onmessage = async (event: MessageEvent) => {
       if (smoothing && (format === 'stl' || format === 'obj'))
         part.geometry = smooth(part.geometry, creaseAngle, (p) => progress(50 + (49 * (i + p)) / parts.length));
       const g = part.geometry,
-        data = fingerprint(g),
-        key = `${data.length}:${hash(data)}`,
-        bucket = seen.get(key) ?? [],
-        match = bucket.find((entry) => entry.data.every((value, i) => value === data[i]));
+        data = counts.get(g.indices.length)! > 1 ? fingerprint(g) : undefined,
+        key = data && `${data.length}:${hash(data)}`,
+        bucket = (key && seen.get(key)) || [],
+        match = data && bucket.find((entry) => entry.data.every((value, i) => value === data[i]));
       if (match) self.postMessage({ part: { name: part.name, reuse: match.index } });
       else {
-        bucket.push({ data, index: i });
-        seen.set(key, bucket);
+        if (data && key) {
+          bucket.push({ data, index: i });
+          seen.set(key, bucket);
+        }
         self.postMessage({ part: { name: part.name, vertices: g.vertices, indices: g.indices, bounds: g.bounds } }, [
           g.vertices.buffer,
           g.indices.buffer,

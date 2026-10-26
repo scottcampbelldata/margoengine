@@ -41,7 +41,23 @@ export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number;
     known = new Map<Geometry, Geometry>(),
     pbrSeen = new Map<string, Float32Array[]>(),
     pairs = new Map<object, Map<string, PBRSourcePrimitive[]>>(),
-    deformableSeen = new Set<Mesh>();
+    deformableSeen = new Set<Mesh>(),
+    // Only parts with equal triangle counts can match, so a part fingerprints (a sort of its triangles plus a CRC) only
+    // once a second part with its count arrives: `lone` holds the first of each count, unfingerprinted. One 200k-triangle
+    // STL spent 40 of its 110 ms fingerprinting itself against nothing.
+    lone = new Map<number, Geometry>(),
+    fingerprinted = new Set<number>();
+  const enter = (geometry: Geometry): Geometry | undefined => {
+    const data = fingerprint(geometry),
+      key = `${data.length}:${hash(data)}`,
+      bucket = seen.get(key) ?? [],
+      match = bucket.find((entry) => entry.data.length === data.length && entry.data.every((v, i) => v === data[i]));
+    if (!match) {
+      bucket.push({ data, geometry });
+      seen.set(key, bucket);
+    }
+    return match?.geometry;
+  };
   let parts = 0,
     unique = 0;
   for (const handle of meshes) {
@@ -78,15 +94,21 @@ export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number;
     const { geometry } = triangles;
     let canonical = known.get(geometry);
     if (!canonical) {
-      const data = fingerprint(geometry),
-        key = `${data.length}:${hash(data)}`,
-        bucket = seen.get(key) ?? [],
-        match = bucket.find((entry) => entry.data.length === data.length && entry.data.every((v, i) => v === data[i]));
-      canonical = match?.geometry ?? geometry;
-      if (!match) {
-        bucket.push({ data, geometry: canonical });
-        seen.set(key, bucket);
+      const count = geometry.indices.length,
+        first = lone.get(count);
+      if (!first && !fingerprinted.has(count)) {
+        lone.set(count, geometry);
+        canonical = geometry;
         unique++;
+      } else {
+        if (first) {
+          lone.delete(count);
+          fingerprinted.add(count);
+          enter(first); // the first of its count: unique, already counted
+        }
+        const match = enter(geometry);
+        canonical = match ?? geometry;
+        if (!match) unique++;
       }
       known.set(geometry, canonical);
     }

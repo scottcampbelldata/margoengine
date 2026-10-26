@@ -21,26 +21,28 @@ function exactKey(value: number): number {
   return f32Bits[0];
 }
 /** FNV-style mix of the six weld values stored at `offset`. */
-function weldHash(keys: number[], offset: number): number {
+function weldHash(keys: Int32Array, offset: number): number {
   let h = 0x811c9dc5;
-  for (let i = 0; i < 6; i++) h = Math.imul(h ^ (keys[offset + i] | 0), 0x01000193);
+  for (let i = 0; i < 6; i++) h = Math.imul(h ^ keys[offset + i], 0x01000193);
   return h ^ (h >>> 15);
 }
-function flat(positions: number[], progress?: (value: number) => void): Geometry {
-  if (
-    !positions.length ||
-    positions.length / 3 > maxIndices ||
-    positions.length % 9 ||
-    !positions.every((v) => Number.isFinite(Math.fround(v)))
-  )
+function flat(positions: ArrayLike<number>, progress?: (value: number) => void): Geometry {
+  let finiteValues = true;
+  for (let i = 0; i < positions.length && finiteValues; i++) finiteValues = Number.isFinite(Math.fround(positions[i]));
+  if (!positions.length || positions.length / 3 > maxIndices || positions.length % 9 || !finiteValues)
     throw new RangeError('CAD requires bounded finite triangles');
-  // Welding keys are six numbers per unique vertex (the exact Float32 position, the normal rounded to 1e-5), behind an
-  // open-addressed table of vertex ids.
-  const packed: number[] = [],
-    normals: number[] = [],
-    indices: number[] = [],
-    keys: number[] = [];
-  let table = new Int32Array(1024).fill(-1);
+  // Welding keys are six int32s per unique vertex (the exact Float32 position bits, the normal rounded to 1e-5), behind
+  // an open-addressed table of vertex ids. Everything lives in typed arrays sized for the worst case (no welds): JS
+  // arrays grown by push cost about half of a 200k-triangle STL read. Positions and normals stay float64, as given, so
+  // Geometry rounds and bounds them exactly as before.
+  const corners = positions.length / 3,
+    capacity = Math.min(corners, maxVertices + 1),
+    packed = new Float64Array(capacity * 3),
+    normals = new Float64Array(capacity * 3),
+    indices = new Uint32Array(corners),
+    keys = new Int32Array((capacity + 1) * 6);
+  let table = new Int32Array(1024).fill(-1),
+    count = 0;
   for (let i = 0; i < positions.length; i += 9) {
     const ux = positions[i + 3] - positions[i],
       uy = positions[i + 4] - positions[i + 1],
@@ -64,8 +66,13 @@ function flat(positions: number[], progress?: (value: number) => void): Geometry
       const x = positions[o],
         y = positions[o + 1],
         z = positions[o + 2],
-        at = keys.length;
-      keys.push(exactKey(x), exactKey(y), exactKey(z), r3, r4, r5);
+        at = count * 6; // the candidate's keys go in the next free vertex slot
+      keys[at] = exactKey(x);
+      keys[at + 1] = exactKey(y);
+      keys[at + 2] = exactKey(z);
+      keys[at + 3] = r3;
+      keys[at + 4] = r4;
+      keys[at + 5] = r5;
       let slot = weldHash(keys, at) & (table.length - 1),
         id = table[slot];
       while (id !== -1) {
@@ -82,13 +89,16 @@ function flat(positions: number[], progress?: (value: number) => void): Geometry
         slot = (slot + 1) & (table.length - 1);
         id = table[slot];
       }
-      if (id !== -1) keys.length = at;
-      else {
-        id = packed.length / 3;
+      if (id === -1) {
+        id = count++;
         if (id >= maxVertices) throw capError(`CAD unique vertex limit (over ${maxVertices} in one part)`, 'obj');
         table[slot] = id;
-        packed.push(x, y, z);
-        normals.push(nx, ny, nz);
+        packed[id * 3] = x;
+        packed[id * 3 + 1] = y;
+        packed[id * 3 + 2] = z;
+        normals[id * 3] = nx;
+        normals[id * 3 + 1] = ny;
+        normals[id * 3 + 2] = nz;
         // Keep the table under half full; rebuilding re-inserts every vertex id from its stored key.
         if ((id + 1) * 2 > table.length) {
           table = new Int32Array(table.length * 4).fill(-1);
@@ -99,12 +109,12 @@ function flat(positions: number[], progress?: (value: number) => void): Geometry
           }
         }
       }
-      indices.push(id);
+      indices[o / 3] = id;
     }
     if (i % 90_000 === 0) progress?.(0.5 + (0.5 * i) / positions.length);
   }
   // Core uses uint32 indices consistently across both GPU backends.
-  return new Geometry(packed, normals, indices);
+  return new Geometry(packed.subarray(0, count * 3), normals.subarray(0, count * 3), indices);
 }
 /** Strict UTF-8 text, or a named error instead of TextDecoder's own TypeError. */
 function utf8(data: Uint8Array, format: string): string {
@@ -125,11 +135,12 @@ function stl(
     if (84 + count * 50 === input.length) {
       if (count * 3 > maxIndices) throw capError(`STL triangle limit (${count} > ${maxIndices / 3})`, 'stl');
       if (!count) throw new RangeError('STL contains no triangles; check that the file has at least one facet.');
+      const corners = new Float32Array(count * 9);
       for (let face = 0; face < count; face++) {
-        for (let i = 0; i < 9; i++) positions.push(view.getFloat32(84 + face * 50 + 12 + i * 4, true));
+        for (let i = 0, at = 84 + face * 50 + 12; i < 9; i++) corners[face * 9 + i] = view.getFloat32(at + i * 4, true);
         if (face % 10_000 === 0) progress?.((0.5 * face) / count);
       }
-      return [{ name: 'STL body', geometry: flat(positions, progress) }];
+      return [{ name: 'STL body', geometry: flat(corners, progress) }];
     }
   }
   const text = typeof input === 'string' ? input : utf8(input, 'STL');

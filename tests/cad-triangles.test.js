@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { parseCAD } from '../packages/machinery/dist/index.js';
+import { deduplicateParts, parseCAD } from '../packages/machinery/dist/index.js';
 
 const root = join(import.meta.dirname, '..');
 const box = [
@@ -120,3 +120,71 @@ for (const smoothing of [false, true])
       'screw 2475 keeps 3 corners',
     );
   });
+
+/** A binary STL of a side x side grid on y = sin(x)/20 (the parity p-stl input at side 320: 204,800 triangles). */
+function gridSTL(side) {
+  const t = side * side * 2,
+    out = new DataView(new ArrayBuffer(84 + t * 50)),
+    at = (x, y) => [x / side, Math.sin(x * 0.1) * 0.05, y / side];
+  out.setUint32(80, t, true);
+  let face = 0;
+  for (let y = 0; y < side; y++)
+    for (let x = 0; x < side; x++)
+      for (const tri of [
+        [at(x, y), at(x, y + 1), at(x + 1, y)],
+        [at(x + 1, y), at(x, y + 1), at(x + 1, y + 1)],
+      ]) {
+        tri.flat().forEach((v, i) => out.setFloat32(84 + face * 50 + 12 + i * 4, v, true));
+        face++;
+      }
+  return new Uint8Array(out.buffer);
+}
+
+test('deduplicateParts fingerprints a part only when another part has its triangle count (p-stl)', async () => {
+  // Regression: every part was fingerprinted (a sort of all its triangles plus a CRC) even with nothing to match it
+  // against: 40 of the 110 ms parseCAD took for one 204,800-triangle STL (the p-stl parity row).
+  const engine = new Engine(
+    { width: 8, height: 8, clientWidth: 8, clientHeight: 8 },
+    await TransformStore.create(64),
+    { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },
+    undefined,
+    null,
+  );
+  try {
+    const big = parseCAD(engine, gridSTL(320), 'stl');
+    assert.equal(big.meshes[0].geometry.indices.length, 614_400);
+    let best = Infinity;
+    for (let i = 0; i < 5; i++) {
+      const s = performance.now();
+      assert.deepEqual(deduplicateParts(big.meshes), { parts: 1, unique: 1 });
+      best = Math.min(best, performance.now() - s);
+    }
+    assert.ok(
+      best < 10,
+      `a lone 204,800-triangle part took ${best.toFixed(1)} ms to deduplicate; fingerprinting took 40`,
+    );
+    // Matching still works once a second part with the same count arrives, in any order of counts.
+    const facet = (c) =>
+        `facet normal 0 0 1\nouter loop\n${c.map((p) => `vertex ${p.join(' ')}`).join('\n')}\nendloop\nendfacet\n`,
+      part = (...tris) => parseCAD(engine, `solid p\n${tris.map(facet).join('')}endsolid p\n`, 'stl').meshes[0],
+      moved = good.map(([x, y, z]) => [x + 1, y, z]),
+      a = part(good),
+      b = part(good, moved),
+      c = part(moved),
+      d = part(good);
+    assert.deepEqual(deduplicateParts([a, b, c, d]), { parts: 4, unique: 3 });
+    assert.equal(d.geometry, a.geometry, 'the later copy of the lone first part shares its geometry');
+    assert.notEqual(c.geometry, a.geometry);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('CAD worker: a repeated part is reused and lone parts skip fingerprinting without changing the result', async () => {
+  const result = await cadWorker([mesh('box', box), mesh('screw', screw), mesh('box again', box)], false);
+  assert.equal(result.error, undefined, result.error);
+  assert.deepEqual(
+    result.parts.map((p) => (p.reuse === undefined ? p.name : `${p.name}->${p.reuse}`)),
+    ['box', 'screw', 'box again->0'],
+  );
+});

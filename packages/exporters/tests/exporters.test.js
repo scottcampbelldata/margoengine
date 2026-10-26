@@ -1005,3 +1005,91 @@ test('a 70-node parent chain exports and a chain past the depth limit refuses', 
   assert.ok(deep.json.nodes.length > 70);
   assert.throws(() => exportGLTF(chain(1100)), /Hierarchy is too deep/);
 });
+
+test('numbers are written as the shortest text that reads back as the same Float32 (and fast: p-export-usdz)', async () => {
+  // Regression: num() tried toPrecision(1..9) for every value, 75% of exportUSDZ's 56 ms for 1,000 boxes (the
+  // p-export-usdz parity row). A binary search, an integer shortcut and a cache of recent values must give the same text.
+  const reference = (value) => {
+    const f = Math.fround(value);
+    if (f === 0) return '0';
+    for (let digits = 1; digits < 10; digits++) {
+      const text = f.toPrecision(digits);
+      if (Math.fround(Number(text)) === f) return String(Number(text));
+    }
+    return String(f);
+  };
+  const bits = new Uint32Array(60_000);
+  let seed = 11;
+  for (let i = 0; i < bits.length; i++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    // Every fourth value: a power of two, a subnormal, an integer or a top-binade value; the rest any finite pattern.
+    const kind = i % 16;
+    bits[i] =
+      kind === 0
+        ? (seed & 0x80000000) | ((seed % 254) << 23)
+        : kind === 1
+          ? seed & 0x807fffff
+          : kind === 2
+            ? new Uint32Array(new Float32Array([(seed % 33_554_432) - 16_777_216]).buffer)[0]
+            : kind === 3
+              ? (seed & 0x807fffff) | (254 << 23)
+              : (seed & 0xff7fffff) | (((seed >>> 23) & 255) === 255 ? 0 : seed & 0x7f800000);
+  }
+  const positions = new Float32Array(bits.buffer); // 60,000 values: 20,000 vertices
+  const v = positions.length / 3,
+    { obj } = exportOBJ({
+      nodes: [
+        {
+          geometry: {
+            positions,
+            normals: new Float32Array(v * 3).fill(1),
+            indices: Uint32Array.from({ length: v - (v % 3) }, (_, i) => i),
+          },
+        },
+      ],
+    }),
+    written = obj
+      .split('\n')
+      .filter((l) => l.startsWith('v '))
+      .flatMap((l) => l.slice(2).split(' '));
+  assert.equal(written.length, positions.length);
+  for (let i = 0; i < positions.length; i++)
+    if (written[i] !== reference(positions[i]))
+      assert.fail(`${positions[i]}: wrote ${written[i]}, shortest is ${reference(positions[i])}`);
+  const { exportUSDZ } = await import('../dist/usdz.js'),
+    geometry = {
+      positions: new Float32Array(72).map((_, i) => ((i * 7) % 5) * 0.25 - 0.5),
+      normals: new Float32Array(72).fill(0.5),
+      uvs: new Float32Array(48).fill(0.5),
+      indices: Uint32Array.from({ length: 36 }, (_, i) => i % 24),
+    },
+    nodes = Array.from({ length: 1000 }, (_, i) => ({
+      translation: [Math.sin(i) * 20, (i % 7) * 0.31, Math.cos(i * 1.3) * 20],
+      rotation: [0, Math.sin(i / 2), 0, Math.cos(i / 2)],
+      geometry,
+      material: { color: [0.2, 0.4, 0.6, 1] },
+    }));
+  // Timed against the old digit-by-digit search over the numbers the mesh lines hold, on the same machine and load: the
+  // old export ran that search and more.
+  const text = new TextDecoder().decode(exportUSDZ({ nodes })),
+    numbers = text
+      .split('\n')
+      .filter((l) => /points =|normals =|primvars:st =/.test(l))
+      .flatMap((l) => l.match(/-?[\d.]+(?:e[-+]?\d+)?/g).map(Number)),
+    best = (job) => {
+      let ms = Infinity;
+      for (let i = 0; i < 3; i++) {
+        const start = performance.now();
+        job();
+        ms = Math.min(ms, performance.now() - start);
+      }
+      return ms;
+    },
+    usdz = best(() => exportUSDZ({ nodes })),
+    search = best(() => numbers.forEach(reference));
+  assert.ok(numbers.length > 140_000, `${numbers.length} numbers`);
+  assert.ok(
+    usdz < search,
+    `USDZ export ${usdz.toFixed(1)} ms is not below the old search alone ${search.toFixed(1)} ms`,
+  );
+});

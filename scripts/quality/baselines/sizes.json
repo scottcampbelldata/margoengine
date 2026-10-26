@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3352482,
+  "total": 3355239,
   "history": [
     {
       "date": "2026-10-24",
@@ -410,6 +410,12 @@
       "commit": "0414607f",
       "reason": "materials item 21.5: parallax occlusion/relief/offset mapping, world-space triplanar mapping and thick/thin subsurface scattering on Material (their WGSL, options and setters); each compiles in only while used, so existing shaders, bindings and uniforms are unchanged",
       "grew": 2
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "594c45af",
+      "reason": "perf(exporters,machinery,shared): shortest-number search by bisection with a cache and slicing-by-8 CRC-32 (USDZ export 52.8 to 16 ms), lazy part fingerprints in the CAD worker (item 47 rows p-export-usdz, p-stl)",
+      "grew": 5
     }
   ],
   "items": {
@@ -481,9 +487,9 @@
     "@margoengine/environment/reflector": 10886,
     "@margoengine/environment/refractor": 10843,
     "@margoengine/environment/volumetric": 8462,
-    "@margoengine/exporters": 33584,
-    "@margoengine/exporters/capture": 6916,
-    "@margoengine/exporters/dae": 10086,
+    "@margoengine/exporters": 34716,
+    "@margoengine/exporters/capture": 7241,
+    "@margoengine/exporters/dae": 10560,
     "@margoengine/exporters/godot": 10258,
     "@margoengine/exporters/godot-addon": 1609,
     "@margoengine/exporters/godot-flipbook": 3605,
@@ -505,7 +511,7 @@
     "@margoengine/exporters/unreal-pixel-art": 1126,
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,
-    "@margoengine/exporters/usdz": 10841,
+    "@margoengine/exporters/usdz": 11341,
     "@margoengine/fbx": 17917,
     "@margoengine/fbx dist/workers/fbx.js": 51819,
     "@margoengine/fbx/worker": 18806,
@@ -556,7 +562,7 @@
     "@margoengine/loaders/worker": 8181,
     "@margoengine/lod": 10648,
     "@margoengine/machinery": 44630,
-    "@margoengine/machinery dist/workers/cad-runtime.js": 8021,
+    "@margoengine/machinery dist/workers/cad-runtime.js": 8347,
     "@margoengine/machinery/assembly": 977,
     "@margoengine/machinery/cad": 12871,
     "@margoengine/machinery/cad-async": 1775,
