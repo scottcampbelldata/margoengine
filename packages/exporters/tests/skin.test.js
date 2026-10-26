@@ -169,7 +169,13 @@ test('checkJoints and humanoidJoints', () => {
   checkJoints(humanoid);
   assert.equal(humanoid.length, 18);
   assert.deepEqual(humanoid[5], { name: 'head', parent: 4, position: [5, 19, 2] });
-  assert.deepEqual(humanoid[14].position, [5 + 10 * -0.14, 20 * 0.03, 2 + 4 * 0.05]);
+  assert.deepEqual(humanoid[14].position, [5 + 10 * 0.14, 20 * 0.03, 2 + 4 * 0.05]);
+  // glTF figures face +z, so their left side is +x: every left joint sits at +x, its right twin mirrored at -x.
+  for (const joint of humanoid.filter((j) => j.name.startsWith('left'))) {
+    const twin = humanoid.find((j) => j.name === joint.name.replace('left', 'right'));
+    assert.ok(joint.position[0] > 5, `${joint.name} is on the figure's left (+x)`);
+    assert.ok(Math.abs(twin.position[0] - 5 + (joint.position[0] - 5)) < 1e-12, `${twin.name} mirrors ${joint.name}`);
+  }
   assert.throws(() => humanoidJoints([0, 0, 0], [1, -1, 1]), RangeError);
 });
 

@@ -262,9 +262,9 @@ export function skinHierarchy(
 }
 
 /**
- * An upright humanoid rest skeleton fitted to the box `min`..`max` (y up, the figure facing +z): root, hips, spine,
- * chest, neck and head on the centre line, shoulders, elbows and wrists, hips, knees and ankles on each side; 18
- * joints, a starting point for manual refinement.
+ * An upright humanoid rest skeleton fitted to the box `min`..`max` (y up, the figure facing +z as in glTF, so its left
+ * side is +x): root, hips, spine, chest, neck and head on the centre line, shoulders, elbows and wrists, hips, knees
+ * and ankles on each side; 18 joints, a starting point for manual refinement.
  * @throws RangeError unless every `max` component is >= its `min`.
  */
 export function humanoidJoints(min: Vec3, max: Vec3): SkinJoint[] {
@@ -282,18 +282,18 @@ export function humanoidJoints(min: Vec3, max: Vec3): SkinJoint[] {
     ['chest', 2, 0, 0.74],
     ['neck', 3, 0, 0.86],
     ['head', 4, 0, 0.95],
-    ['leftShoulder', 3, -0.2, 0.78],
-    ['leftElbow', 6, -0.34, 0.65],
-    ['leftWrist', 7, -0.46, 0.51],
-    ['rightShoulder', 3, 0.2, 0.78],
-    ['rightElbow', 9, 0.34, 0.65],
-    ['rightWrist', 10, 0.46, 0.51],
-    ['leftHip', 1, -0.12, 0.47],
-    ['leftKnee', 12, -0.13, 0.25],
-    ['leftAnkle', 13, -0.14, 0.03, 0.05],
-    ['rightHip', 1, 0.12, 0.47],
-    ['rightKnee', 15, 0.13, 0.25],
-    ['rightAnkle', 16, 0.14, 0.03, 0.05],
+    ['leftShoulder', 3, 0.2, 0.78],
+    ['leftElbow', 6, 0.34, 0.65],
+    ['leftWrist', 7, 0.46, 0.51],
+    ['rightShoulder', 3, -0.2, 0.78],
+    ['rightElbow', 9, -0.34, 0.65],
+    ['rightWrist', 10, -0.46, 0.51],
+    ['leftHip', 1, 0.12, 0.47],
+    ['leftKnee', 12, 0.13, 0.25],
+    ['leftAnkle', 13, 0.14, 0.03, 0.05],
+    ['rightHip', 1, -0.12, 0.47],
+    ['rightKnee', 15, -0.13, 0.25],
+    ['rightAnkle', 16, -0.14, 0.03, 0.05],
   ];
   return layout.map(([name, parent, x, y, z]) => ({ name, parent, position: at(x, y, z) }));
 }

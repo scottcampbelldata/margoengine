@@ -567,7 +567,7 @@ An optional subpath (nothing else imports it) that skins a mesh to an authored r
 | `skinWeights(positions, joints, {origin?, influences?})` | `{joints: Uint16Array, weights: Float32Array}`, four per vertex: the `influences` (default 4) nearest bone segments (parent to joint; the root's is its point), inverse-distance weights summing to 1, ties to the lower joint index. Points so far away that distances overflow are measured in a scaled space, so every finite point gets positive weights |
 | `skinBindMatrices(joints, origin?)` | Column-major `local`, `world` and `inverseBind` rest matrices, 16 values per joint |
 | `skinHierarchy(joints, {origin?, name?})` | Joint `ExportNode`s (`root`, `nodes`) and the `SkinData` for the mesh node, skeleton set |
-| `humanoidJoints(min, max)` | An 18-joint upright humanoid rest skeleton fitted to a box (y up, facing +z), to refine by hand |
+| `humanoidJoints(min, max)` | An 18-joint upright humanoid rest skeleton fitted to a box (y up, facing +z, its left side at +x as in glTF), to refine by hand |
 
 Coordinate conventions: joint positions are in joint space, the mesh's vertices in mesh space, and `origin` is the
 joint-space point at the mesh's origin (joint = mesh + origin; a voxel model's pivot when joints are grid
