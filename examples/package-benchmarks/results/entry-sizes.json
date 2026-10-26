@@ -1,5 +1,5 @@
 {
-  "commit": "48666086",
+  "commit": "e91ac855",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -476,8 +476,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 172328,
-        "gzip": 53782
+        "raw": 173680,
+        "gzip": 54287
       },
       "./asset": {
         "raw": 17246,
@@ -500,16 +500,16 @@
         "gzip": 16523
       },
       "./progressive": {
-        "raw": 190182,
-        "gzip": 60451
+        "raw": 191540,
+        "gzip": 60972
       },
       "./coordinates": {
         "raw": 1380,
         "gzip": 563
       },
       "./worker": {
-        "raw": 174097,
-        "gzip": 54269
+        "raw": 175447,
+        "gzip": 54805
       },
       "dist/workers/gltf.js": {
         "raw": 60427,
@@ -1240,8 +1240,8 @@
         "gzip": 9110
       },
       "dist/workers/usdz.js": {
-        "raw": 193084,
-        "gzip": 62823
+        "raw": 194434,
+        "gzip": 63320
       }
     },
     "@margoengine/vfx": {
@@ -1539,9 +1539,9 @@
       "brotli": 43890
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 190869,
-      "gzip": 62655,
-      "brotli": 54113
+      "raw": 192075,
+      "gzip": 63134,
+      "brotli": 54499
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 20098,
