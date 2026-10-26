@@ -35,6 +35,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'rolldown/utils';
 import { entries as errorHelp } from './errors/entries.js';
+import { countNoFix } from './support/throw-messages.js';
 import { isUmbrellaAlias } from './umbrella.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -267,8 +268,6 @@ if (!quick) {
   // --- Gate 7: error convention (typed throws). Also recorded per file for the quality gate (not scored): `bare` Error
   // throws and `noFix`, throws whose literal message names no fix (no '; ' clause and no fix verb such as must, needs,
   // use, call, pass; scripts/quality/api.js ratchets both).
-  const fix =
-    /;|\b(must|needs?|expects?|expected|use|call|pass|set|give|create|run|requires?|only|at (most|least)|between|install|enable|add|load|remove|provide|choose|one of|instead|before|after|try|check|should|wait|await|reduce|increase|split|keep|make|within|up to|no more than)\b/i;
   const throwSites = {},
     help = new Set(errorHelp.map((entry) => entry.id));
   for (const dir of packages.concat('shared')) {
@@ -277,15 +276,7 @@ if (!quick) {
       const throws = [...text.matchAll(/\bthrow new (\w+)\(/g)].map((m) => m[1]);
       const bare = throws.filter((t) => t === 'Error').length;
       add(dir, 'errors', throws.length, Math.max(0, bare - (allowlist.errors?.[file]?.count ?? 0)));
-      let noFix = 0;
-      for (const m of text.matchAll(
-        /\bthrow (?:new (Error|TypeError|RangeError|MargoError)|(margoError))\(\s*(?:(['"`])[^'"`]*\3\s*,\s*)?(?=(['"`]))/g,
-      )) {
-        if ((m[1] === 'MargoError' || m[2]) && !m[3]) continue; // a code literal comes first; message is a variable
-        const quote = m[4];
-        const end = text.indexOf(quote, m.index + m[0].length + 1);
-        if (!fix.test(text.slice(m.index + m[0].length + 1, end))) noFix++;
-      }
+      let noFix = countNoFix(text); // reads the whole message, including text after an interpolated variable
       // A short message linked to its help entry names its fix there: fault(code, message[, anchor]),
       // typeError(message, anchor) and rangeError(message, anchor) from packages/shared/errors.js, with an anchor
       // that site/errors.html has (scripts/errors/entries.js). A link to a missing entry counts as naming no fix.

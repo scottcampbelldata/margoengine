@@ -1,7 +1,7 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 71,
+  "total": 53,
   "history": [
     {
       "date": "2026-10-24",
@@ -31,15 +31,8 @@
     "no-fix packages/exporters/src/unity-precision.ts": 1,
     "no-fix packages/exporters/src/unreal-precision.ts": 1,
     "no-fix packages/fbx/src/reader.ts": 1,
-    "no-fix packages/gltf-pro/src/asset.ts": 5,
+    "no-fix packages/gltf-pro/src/asset.ts": 1,
     "no-fix packages/gltf-pro/src/compression.ts": 1,
-    "no-fix packages/gltf-pro/src/extended.ts": 1,
-    "no-fix packages/gltf-pro/src/index.ts": 2,
-    "no-fix packages/gltf-pro/src/instancing.ts": 1,
-    "no-fix packages/gltf-pro/src/pack.ts": 1,
-    "no-fix packages/gltf-pro/src/render-state.ts": 7,
-    "no-fix packages/gltf-pro/src/shader.ts": 1,
-    "no-fix packages/gltf-pro/src/texture-coordinates.ts": 1,
     "no-fix packages/shared/asset-url.js": 2,
     "no-fix packages/shared/gpu.js": 2,
     "no-fix packages/shared/loading.js": 4,

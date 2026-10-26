@@ -172,5 +172,7 @@ export function checkSkin(input: SkinCheckInput): SkinReport {
 export function assertSkin(input: SkinCheckInput): void {
   const report = checkSkin(input);
   if (!report.ok)
-    throw new RangeError(`Skin is not ready to export: ${report.issues.map((issue) => issue.message).join('; ')}`);
+    throw new RangeError(
+      `Skin is not ready to export: ${report.issues.map((issue) => issue.message).join('; ')}; fix them, then call assertSkin again`,
+    );
 }
