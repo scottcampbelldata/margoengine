@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3208316,
+  "total": 3210968,
   "history": [
     {
       "date": "2026-10-24",
@@ -272,6 +272,12 @@
       "commit": "9cc8170b",
       "reason": "New optional @margoengine/ui (queue item 20): widgets, layout, themes, input and the accessibility mirror. The text package is a required dependency (every widget draws text with it), so ui and ui/react count as leaks of it; ui/react also lists react as an optional peer.",
       "grew": 4
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "55e2f7c4",
+      "reason": "DX pass B2: error messages name their fix and bare Errors became MargoError (physics, post, procedural, react/kit); the extra text grows these entries",
+      "grew": 4
     }
   ],
   "items": {
@@ -465,9 +471,9 @@
     "@margoengine/navmesh/build": 10491,
     "@margoengine/net": 1371,
     "@margoengine/oit": 3199,
-    "@margoengine/physics": 11916,
+    "@margoengine/physics": 12553,
     "@margoengine/points": 19649,
-    "@margoengine/post": 39077,
+    "@margoengine/post": 40343,
     "@margoengine/post/afterimage": 5661,
     "@margoengine/post/bloom": 6716,
     "@margoengine/post/decals": 4760,
@@ -485,7 +491,7 @@
     "@margoengine/post/ssgi": 11862,
     "@margoengine/post/ssr": 11154,
     "@margoengine/post/stack": 4001,
-    "@margoengine/procedural": 7492,
+    "@margoengine/procedural": 7833,
     "@margoengine/procedural/expression": 4720,
     "@margoengine/procedural/lsystem": 2454,
     "@margoengine/procedural/noise": 2314,
@@ -493,7 +499,7 @@
     "@margoengine/quality": 1879,
     "@margoengine/quality/warm": 1536,
     "@margoengine/react": 24283,
-    "@margoengine/react/kit": 11111,
+    "@margoengine/react/kit": 11519,
     "@margoengine/react/physics": 5943,
     "@margoengine/react/post": 3770,
     "@margoengine/react/xr": 3429,

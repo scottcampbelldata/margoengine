@@ -40,7 +40,7 @@ function scene(module, samples, count, bands) {
     try {
       run(view.c);
     } catch (error) {
-      gpu.note('throw', error.constructor.name, error.message);
+      gpu.note('throw');
     }
     view.end();
     gpu.note('stats', engine.stats.drawCalls);

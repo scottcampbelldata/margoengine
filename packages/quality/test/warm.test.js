@@ -226,3 +226,16 @@ test('frames rendered outside the warm frames, unstable identities and other err
 
   assert.deepEqual(await warmUp(engine([], 'webgl2')), { pipelines: 0, fallbacks: 0, rounds: 0, rebooted: false });
 });
+
+test('warmUp rejects with the abort reason and renders nothing once aborted', async () => {
+  const controller = new AbortController();
+  controller.abort(new Error('loading cancelled'));
+  const before = engine([]);
+  await assert.rejects(warmUp(before, { signal: controller.signal }), /loading cancelled/);
+  assert.equal(before.frames.length, 0);
+
+  const mid = new AbortController(),
+    during = engine([() => mid.abort(new Error('stopped mid-way'))]);
+  await assert.rejects(warmUp(during, { signal: mid.signal }), /stopped mid-way/);
+  assert.equal(Object.hasOwn(during.gpu, 'createRenderPipeline'), false, 'patches removed after an abort');
+});

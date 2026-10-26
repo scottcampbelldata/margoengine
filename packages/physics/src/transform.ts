@@ -19,7 +19,7 @@ const chain = new Int32Array(65),
 export function worldMatrix(store: TransformStoreLike, id: number, out: Float64Array): Float64Array {
   let count = 0;
   for (let node = id; node !== -1; node = store.parents[node]) {
-    if (count === chain.length) throw new RangeError('Parent depth: 64');
+    if (count === chain.length) throw new RangeError('Parent chain is deeper than 64 nodes; flatten the hierarchy.');
     chain[count++] = node;
   }
   localMatrix(store, chain[--count], out);

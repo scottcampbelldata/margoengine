@@ -253,11 +253,11 @@ export class SMAA implements EnginePlugin {
       (o.enabled !== undefined && typeof o.enabled !== 'boolean')
     )
       throw new TypeError(
-        "Invalid SMAA options: quality 'low', 'medium', 'high' or 'ultra', edgeDetection 'luma' or 'color', enabled boolean",
+        "Invalid SMAA options; quality must be 'low', 'medium', 'high' or 'ultra', edgeDetection 'luma' or 'color', enabled a boolean.",
       );
     if (!(t >= 0.01 && t <= 0.5) || !(Number.isInteger(n) && n >= 1 && n <= 32) || !(r >= 0 && r <= 1))
       throw new RangeError(
-        'Invalid SMAA options: threshold 0.01-0.5, maxSearchSteps an integer 1-32, cornerRounding 0-1',
+        'Invalid SMAA options; threshold must be 0.01-0.5, maxSearchSteps an integer 1-32, cornerRounding 0-1.',
       );
   }
   private joinStack(): StackStage {

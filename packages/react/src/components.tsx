@@ -28,6 +28,7 @@ import type { PBRModel, LightingEffect } from '@margoengine/gltf-pro';
 import type { Shadows } from '@margoengine/shadows';
 import type { Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment';
 import { createAssetCache, activateAssetCache, disposeAssetCache, environmentAsset, retainAsset } from './assets.js';
+import { MargoError } from '@margoengine/math/errors';
 export { preload } from './assets.js';
 import { MeshShadows } from './shadows.js';
 export { Shadows, type ShadowsProps } from './shadows.js';
@@ -64,7 +65,7 @@ export interface MargoContextValue {
 export const MargoContext = createContext<MargoContextValue | null>(null);
 export function useMargo(): MargoContextValue {
   const value = useContext(MargoContext);
-  if (!value) throw new Error('useMargo requires <MargoCanvas>');
+  if (!value) throw new MargoError('state', 'useMargo requires <MargoCanvas>; call it inside one.');
   return value;
 }
 export interface CanvasProps extends EngineOptions {
@@ -728,7 +729,7 @@ function values(value: readonly number[], size: number, label: string, min = 0, 
     value.length !== size ||
     value.some((v) => typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || v < min || v > max)
   )
-    throw new RangeError('Invalid ' + label);
+    throw new RangeError(`Invalid ${label}: pass an array of ${size} finite number(s) between ${min} and ${max}.`);
 }
 
 export interface EnvironmentProps {
@@ -890,7 +891,8 @@ function acquireOverlay(engine: Engine): OverlayEntry {
     entry = {
       users: 0,
       promise: optionalPeer('@margoengine/html', () => import('@margoengine/html')).then(({ HTML }) => {
-        if (engine.disposed) throw new Error('Canvas disposed');
+        if (engine.disposed)
+          throw new MargoError('disposed', 'Canvas is disposed; render the component inside a live <Canvas>.');
         return HTML.attach(engine as unknown as EngineKernel);
       }),
     };

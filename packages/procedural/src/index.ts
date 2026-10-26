@@ -57,7 +57,9 @@ export function marchingCubes(
     bounds.some((p) => p.length !== 3 || p.some((v) => !Number.isFinite(Math.fround(v)))) ||
     bounds[0].some((v, i) => v >= bounds[1][i])
   )
-    throw new RangeError('Invalid voxel surface');
+    throw new RangeError(
+      'Invalid voxel surface; pass a density function, a finite level, resolution 3-128 per axis and bounds with min below max.',
+    );
   const evaluate: DensityField = (x, y, z) => {
     const value = field(x, y, z) - level;
     if (!Number.isFinite(value)) throw new RangeError('Density must be finite');
@@ -140,7 +142,7 @@ function extract(
     if (id < 0) {
       const t = values[p] / (values[p] - values[q]);
       id = shared[slot] = positions.length / 3;
-      if (id >= 1_000_000) throw new RangeError('Voxel output exceeds geometry budget');
+      if (id >= 1_000_000) throw new RangeError('Voxel output exceeds the geometry budget; reduce the resolution.');
       for (let c = 0; c < 3; c++) positions.push(grid[p * 3 + c] + (grid[q * 3 + c] - grid[p * 3 + c]) * t);
     }
     return id;

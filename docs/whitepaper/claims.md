@@ -288,3 +288,8 @@ GPU/browser identities; new profiles require a complete repeated capture with cl
 views retain their own source and environment provenance when a profile is partially refreshed.
 The render-state candidate, including upstream kernel-column maintenance `ac2fdfa`, passes all 55 comparisons against
 that NVIDIA reference with the new controls disabled. `npm run check:merge` reproduces the full build, proof and visual gate.
+
+**Proof stories no longer record error text (DX pass B, 2026-10-26):** a "rejected frame" in the post, colour, taa,
+splats, water and quality-presets stories used to note the thrown message, so rewording an error message (messages now
+name their fix) changed the recorded calls. The stories note only that a throw happened (`gpu.note('throw')`), for
+reference and candidate alike; GPU calls, bindings and uploads are unchanged.

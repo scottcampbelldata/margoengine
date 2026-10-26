@@ -209,7 +209,7 @@ async function ssrStory(m, g, make, samples, shader) {
       try {
         for (const pass of passList) pass.execute(view.c);
       } catch (error) {
-        gpu.note('throw', error.constructor.name, error.message);
+        gpu.note('throw');
       }
       view.end();
     }

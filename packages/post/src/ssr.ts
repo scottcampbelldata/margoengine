@@ -278,14 +278,16 @@ export class SSR implements EnginePlugin {
       s > 256 ||
       (o.enabled !== undefined && typeof o.enabled !== 'boolean')
     )
-      throw new RangeError('Invalid SSR options');
+      throw new RangeError(
+        'Invalid SSR options; maxRoughness must be in (0, 1], thickness and maxDistance above 0, steps 1-256.',
+      );
   }
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'SSR is disposed; create a new SSR');
     if (!this.host)
       throw margoError(
         'state',
-        'SSR runs in a PostStack: SSR.attach(engine) or PostStack.attach(engine, [..., new SSR(), ...])',
+        'SSR runs in a PostStack; use SSR.attach(engine) or PostStack.attach(engine, [..., new SSR(), ...]).',
       );
     if (!engine.gpu) throw margoError('unsupported', 'SSR requires WebGPU; use a WebGPU engine');
     this.engine = engine;

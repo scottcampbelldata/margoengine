@@ -142,7 +142,7 @@ export class LensFlare implements EnginePlugin {
       (o.enabled !== undefined && typeof o.enabled !== 'boolean')
     )
       throw new RangeError(
-        'Invalid LensFlare options: sun a function, color three finite values >= 0, intensity 0-10, occlusionRadius 1-64',
+        'Invalid LensFlare options; sun must be a function, color three finite values >= 0, intensity 0-10, occlusionRadius 1-64.',
       );
   }
   setup(engine: Engine): void {

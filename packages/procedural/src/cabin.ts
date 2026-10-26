@@ -56,11 +56,14 @@ export function generateCabinMesh(height: HeightField, position: readonly [numbe
     !Number.isFinite(Math.fround(position[0])) ||
     !Number.isFinite(Math.fround(position[1]))
   )
-    throw new RangeError('Invalid cabin terrain or position');
+    throw new RangeError(
+      'Invalid cabin terrain or position; pass a height(x, z) function and a finite [x, z] position.',
+    );
   const [cx, cz] = position;
   const sample = (x: number, z: number) => {
     const value = height(x, z);
-    if (!Number.isFinite(Math.fround(value))) throw new RangeError('Invalid cabin terrain height');
+    if (!Number.isFinite(Math.fround(value)))
+      throw new RangeError('Invalid cabin terrain height; height(x, z) must return a finite number.');
     return value;
   };
   let floor = -Infinity;

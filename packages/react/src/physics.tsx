@@ -18,6 +18,7 @@ import { useScene, useCommit, useResourceEffect, type Scene, type Registry } fro
 import { descendants, worldPose, setWorldPose, type Triple, type Quaternion } from './scene-transform.js';
 import { rotateByQuaternion } from '@margoengine/math/quat';
 import { optionalPeer } from './optional.js';
+import { MargoError } from '@margoengine/math/errors';
 
 interface PhysicsState {
   world: PhysicsWorld | null;
@@ -123,7 +124,7 @@ export function Physics({
 
 export function usePhysics(): PhysicsWorld | null {
   const state = useContext(Context);
-  if (!state) throw new Error('usePhysics requires <Physics>');
+  if (!state) throw new MargoError('state', 'usePhysics requires <Physics>; call it inside one.');
   return state.world;
 }
 export type AutomaticColliderMode = 'cuboid' | 'hull' | 'trimesh';
@@ -208,7 +209,9 @@ function fitCollider(
   const point = (world: Triple) => {
     const p = rotateByQuaternion([world[0] - position[0], world[1] - position[1], world[2] - position[2]], inverse);
     if (p.some((value) => !Number.isFinite(value)))
-      throw new RangeError('RigidBody: collider geometry contains non-finite positions');
+      throw new RangeError(
+        'RigidBody: collider geometry contains non-finite positions; fix the mesh data or pass an explicit collider.',
+      );
     for (let axis = 0; axis < 3; axis++) {
       min[axis] = Math.min(min[axis], p[axis]);
       max[axis] = Math.max(max[axis], p[axis]);
@@ -272,8 +275,8 @@ function fitCollider(
   };
   for (const mesh of meshes)
     if (mesh.geometry && !geometry(mesh, mesh.geometry.vertices, mesh.geometry.indices, 6)) {
-      if (mode === 'trimesh') throw new Error(retainedGeometryError);
-      if (!boundCorners(mesh.geometry.bounds, mesh)) throw new Error(missingBoundsError);
+      if (mode === 'trimesh') throw new MargoError('state', retainedGeometryError);
+      if (!boundCorners(mesh.geometry.bounds, mesh)) throw new MargoError('state', missingBoundsError);
     }
   for (const model of scene.resources.models)
     if (!model.disposed && meshes.has(model.root)) {
@@ -281,15 +284,15 @@ function fitCollider(
       for (const primitive of model.primitives)
         if (!geometry(primitive.node, primitive.vertices, primitive.indices, 20)) missing = true;
       if (!missing) continue;
-      if (mode === 'trimesh') throw new Error(retainedGeometryError);
+      if (mode === 'trimesh') throw new MargoError('state', retainedGeometryError);
       // Plugin-owned primitives may expose bounds without CPU attributes. Their bounds are world-space.
       let bounds: ArrayLike<number> | undefined;
       try {
         bounds = model.bounds;
       } catch {
-        throw new Error(missingBoundsError);
+        throw new MargoError('state', missingBoundsError);
       }
-      if (!boundCorners(bounds)) throw new Error(missingBoundsError);
+      if (!boundCorners(bounds)) throw new MargoError('state', missingBoundsError);
     }
   if (!Number.isFinite(min[0])) return;
   if (mode === 'trimesh') return { shape: 'trimesh', vertices: points, indices };
@@ -440,7 +443,7 @@ function ColliderBinding({
   onError?: (error: unknown) => void;
 }) {
   const binding = useContext(BodyContext);
-  if (!binding) throw new Error('Collider components require <RigidBody>');
+  if (!binding) throw new MargoError('state', 'Collider components require <RigidBody>; render them inside one.');
   const { engine, registry } = useScene(),
     latest = useRef({ options, onError });
   latest.current = { options, onError };
@@ -501,7 +504,7 @@ function BodyBinding({
   ...options
 }: Omit<RigidBodyProps, keyof MeshProps> & { transform: Pick<MeshProps, 'position' | 'rotation' | 'scale'> }) {
   const state = useContext(Context);
-  if (!state) throw new Error('RigidBody requires <Physics>');
+  if (!state) throw new MargoError('state', 'RigidBody requires <Physics>; render it inside one.');
   const binding = useContext(BodyContext)!,
     scene = useScene(),
     { engine, registry } = scene,

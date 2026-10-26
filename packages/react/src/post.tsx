@@ -18,6 +18,7 @@ import type { Afterimage as AfterimageEffect, AfterimageOptions } from '@margoen
 import type { PostStack } from '@margoengine/post/stack';
 import { useScene, useCommit, useResourceEffect, type Scene } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { MargoError } from '@margoengine/math/errors';
 
 // Stack order: HDR effects, the display effect, then LDR effects (PostStack's rule); TAA attaches on its own, last.
 const order = [
@@ -171,7 +172,10 @@ function velocitySource(scene: Scene, model: Model) {
           input.deformed ||
           input.vertices.byteLength !== primitive.vertex.size
         )
-          throw new Error('TAA requires matching static PBR vertex data or a storage-capable deformed buffer');
+          throw new MargoError(
+            'state',
+            'TAA requires matching static PBR vertex data or a storage-capable deformed buffer; remove TAA or use static meshes.',
+          );
         used.add(primitive.vertex);
         let copy = copies.get(primitive.vertex);
         if (copy && copy.vertices !== input.vertices) {
@@ -344,7 +348,11 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
   const validate = (desired: Pass[]) => {
     const kinds = new Set<Kind>();
     for (const pass of desired) {
-      if (kinds.has(pass.kind)) throw new Error('EffectComposer cannot attach duplicate ' + pass.kind + ' passes');
+      if (kinds.has(pass.kind))
+        throw new MargoError(
+          'state',
+          `EffectComposer cannot attach duplicate ${pass.kind} passes; keep one of each kind.`,
+        );
       kinds.add(pass.kind);
     }
     if (kinds.has('smaa') && kinds.has('fxaa'))
@@ -385,7 +393,10 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     let attaching: Pass | undefined;
     try {
       if (desired.length && (scene.engine.backend !== 'webgpu' || !scene.engine.gpu))
-        throw new Error('EffectComposer requires WebGPU');
+        throw new MargoError(
+          'unsupported',
+          'EffectComposer requires WebGPU; use an engine created with a WebGPU backend.',
+        );
       validate(desired);
       const effects = desired.filter((pass) => pass.kind !== 'taa'),
         stacked = effects.length > 1;
@@ -516,7 +527,7 @@ function usePass<T extends Effect>(
   lut?: CubeLUT | string | null,
 ) {
   const manager = useContext(Context);
-  if (!manager) throw new Error('Post effects require <EffectComposer>');
+  if (!manager) throw new MargoError('state', 'Post effects require <EffectComposer>; render them inside one.');
   const pass = useMemo<Pass>(() => ({ kind, options: {} }), [manager, kind]);
   pass.options = options;
   pass.lut = lut;

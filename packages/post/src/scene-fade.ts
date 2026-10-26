@@ -89,7 +89,7 @@ export class SceneFade implements EnginePlugin {
   private disposed = false;
   constructor(readonly duration = 180) {
     if (!Number.isFinite(duration) || duration < 0 || duration > 1000)
-      throw new RangeError('Invalid scene fade duration');
+      throw new RangeError('Invalid scene fade duration; pass a finite number of milliseconds from 0 to 1000.');
     this.finished = new Promise((resolve) => {
       this.finish = resolve;
     });

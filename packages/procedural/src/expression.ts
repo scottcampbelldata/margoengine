@@ -376,7 +376,9 @@ function tokenize(source: string): Token[] {
 
 function checkNames(names: readonly string[]): void {
   if (names.length > VOXEL_EXPRESSION_LIMITS.parameters)
-    throw new RangeError('Voxel expression parameter count exceeds the 32-parameter limit.');
+    throw new RangeError(
+      'Voxel expression parameter count exceeds the 32-parameter limit; pass at most 32 parameters.',
+    );
   for (const name of names)
     if (typeof name !== 'string' || !NAME.test(name) || reserved(name))
       throw new RangeError(

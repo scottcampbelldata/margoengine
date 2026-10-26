@@ -14,7 +14,10 @@ export function createSnapshot(): Snapshot {
   return { position: new Float64Array(3), rotation: new Float64Array(identity), velocity: new Float64Array(3) };
 }
 const valid = (value: ArrayLike<number>, size: number): void => {
-  if (value.length !== size) throw new TypeError('Invalid snapshot vector size');
+  if (value.length !== size)
+    throw new TypeError(
+      'Snapshot vectors need 3 values (position, velocity) or 4 (rotation); pass arrays of the right length.',
+    );
   for (let i = 0; i < size; i++) if (!Number.isFinite(value[i])) throw new RangeError('Snapshot values must be finite');
 };
 
@@ -41,7 +44,9 @@ export class SnapshotBuffer {
       maxPrediction < 0 ||
       maxPrediction > 10
     )
-      throw new RangeError('Invalid snapshot buffer');
+      throw new RangeError(
+        'SnapshotBuffer needs an integer capacity from 2 to 65536 and a maxPrediction between 0 and 10 seconds; fix the arguments.',
+      );
     this.samples = new Float64Array(capacity * 11);
   }
   /** Timestamp and velocity use seconds. Duplicate/out-of-order packets are ignored. */
@@ -51,12 +56,13 @@ export class SnapshotBuffer {
     rotation: ArrayLike<number> = identity,
     velocity: ArrayLike<number> = zero,
   ): boolean {
-    if (!Number.isFinite(time)) throw new RangeError('Invalid snapshot timestamp');
+    if (!Number.isFinite(time))
+      throw new RangeError('Snapshot time must be a finite number of seconds; pass a finite timestamp.');
     valid(position, 3);
     valid(rotation, 4);
     valid(velocity, 3);
     let length = Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]);
-    if (!length) throw new RangeError('Zero snapshot quaternion');
+    if (!length) throw new RangeError('Snapshot rotation has zero length; pass a non-zero quaternion [x, y, z, w].');
     // Keep ordinary normalization exact; scale only overflowing or subnormal magnitudes.
     const scale =
       Number.isFinite(length) && length >= 2.2250738585072014e-308
@@ -85,9 +91,12 @@ export class SnapshotBuffer {
    * @throws TypeError for a malformed output.
    */
   sample(time: number, output: Snapshot = this.output): Snapshot | null {
-    if (!Number.isFinite(time)) throw new RangeError('Invalid playback time');
+    if (!Number.isFinite(time))
+      throw new RangeError('Playback time must be a finite number of seconds; pass a finite time.');
     if (output.position.length !== 3 || output.rotation.length !== 4 || output.velocity.length !== 3)
-      throw new TypeError('Invalid snapshot output');
+      throw new TypeError(
+        'Snapshot output needs position and velocity of length 3 and rotation of length 4; pass a Snapshot made by createSnapshot.',
+      );
     if (!this.count) return null;
     const data = this.samples,
       oldest = (this.head - this.count + this.capacity) % this.capacity;

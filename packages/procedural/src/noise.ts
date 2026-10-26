@@ -52,12 +52,12 @@ function gradient(h: number, x: number, y: number, z: number): number {
 }
 const coordinates = (x: number, y: number, z = 0, w = 0): void => {
   if (!(Math.abs(x) <= 1e7 && Math.abs(y) <= 1e7 && Math.abs(z) <= 1e7 && Math.abs(w) <= 1e7))
-    throw new RangeError('Noise coordinates exceed finite bounds');
+    throw new RangeError('Noise coordinates exceed finite bounds; keep every coordinate within 10,000,000 of zero.');
 };
 
 /** The simplex permutation for `seed`: a xorshift32 Fisher-Yates shuffle of 0..255, stored twice (512 entries) so nested lookups need no wrap. */
 export function permutation(seed: number): Uint8Array {
-  if (!Number.isSafeInteger(seed)) throw new RangeError('Invalid noise seed');
+  if (!Number.isSafeInteger(seed)) throw new RangeError('Invalid noise seed; pass a safe integer.');
   let state = seed >>> 0 || 1;
   const p = Uint8Array.from({ length: 512 }, (_, i) => i & 255);
   for (let i = 255; i > 0; i--) {
@@ -320,7 +320,8 @@ export function domainWarp(
   noise: NoiseFunction,
   { warp = noise, strength = 1, dimensions = 3 }: WarpOptions = {},
 ): NoiseFunction {
-  if (!Number.isFinite(strength) || ![2, 3, 4].includes(dimensions)) throw new RangeError('Invalid warp options');
+  if (!Number.isFinite(strength) || ![2, 3, 4].includes(dimensions))
+    throw new RangeError('Invalid warp options; strength must be finite and dimensions 2, 3 or 4.');
   return (x, y, z = 0, w = 0) => {
     const at = (o: number) => strength * warp(x + o, y + o, z + o, w + o);
     return noise(

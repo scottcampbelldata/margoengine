@@ -92,6 +92,7 @@ import {redrawAfterRestore} from 'margoengine/quality';
 
 // ...attach features and build the scene, then, still behind the loading screen:
 const report = await warmUp(engine);      // {pipelines, fallbacks, rounds, rebooted}
+// Options: {frames: 2, maxRounds: 256, signal}; pass an AbortSignal to cancel (rejects with signal.reason).
 engine.start();
 redrawAfterRestore(engine, () => engine.render({delta: 0})); // only for apps that render on demand
 ```

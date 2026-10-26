@@ -185,7 +185,7 @@ test('collisionGroups packs memberships and filters', () => {
   assert.equal(collisionGroups([0], [1, 2]), ((1 << 16) | 0b110) >>> 0);
   assert.equal(collisionGroups(0xffff, 0xffff), 0xffffffff);
   assert.equal(collisionGroups([15], 0), 0x80000000);
-  assert.throws(() => collisionGroups([16]), /0\.\.15/);
+  assert.throws(() => collisionGroups([16]), /from 0 to 15/);
 });
 
 test('geometryPositions reads stride-6 core geometry and packed raw arrays', () => {
@@ -236,7 +236,7 @@ rtest(
     const physics = create(),
       mesh = fakeMesh();
     try {
-      assert.throws(() => physics.addBody(mesh), { message: 'No geometry' });
+      assert.throws(() => physics.addBody(mesh), { code: 'state', message: /Mesh has no geometry/ });
       assert.equal(physics.bodyCount, 0);
       assert.equal(physics.world.bodies.len(), 0, 'The failed default collider must release its native body');
       assert.equal(physics.bodyOf(mesh), undefined);
@@ -829,13 +829,13 @@ rtest('only root-level meshes may carry bodies; disposed meshes drop their bodie
   const physics = create();
   const child = fakeMesh();
   parents[child.id] = 0;
-  assert.throws(() => physics.addBody(child), /root-level meshes/);
+  assert.throws(() => physics.addBody(child), { code: 'state', message: /root-level meshes/ });
   parents[child.id] = -1;
   const body = physics.addBody(child, { colliders: { shape: 'sphere', radius: 1 } });
-  assert.throws(() => physics.addBody(child), /already has a physics body/);
+  assert.throws(() => physics.addBody(child), { code: 'state', message: /already has a physics body/ });
   assert.equal(physics.bodyOf(child), body);
   parents[child.id] = 0;
-  assert.throws(() => physics.update(1 / 60), /root-level meshes/);
+  assert.throws(() => physics.update(1 / 60), { code: 'state', message: /root-level meshes/ });
   parents[child.id] = -1;
   child.dispose();
   physics.update(1 / 60);
@@ -892,8 +892,8 @@ rtest('dispose frees every body, collider, joint, controller and the world', () 
   assert.deepEqual(removedControllers, [controller.raw]);
   assert.ok(!a.valid && !b.valid && !character.valid && !joint.valid, 'handles are invalidated');
   assert.equal(physics.bodyCount, 0);
-  assert.throws(() => physics.world, /disposed/);
-  assert.throws(() => a.position, /removed/);
+  assert.throws(() => physics.world, { code: 'disposed', message: /disposed/ });
+  assert.throws(() => a.position, { code: 'state', message: /removed/ });
   assert.equal(physics.update(1), 0);
   physics.dispose(); // idempotent
 });
@@ -1130,7 +1130,10 @@ rtest(
         const node = nested ? engine.createMesh(root) : root;
         registerPBR(node, { [flag]: true });
         try {
-          assert.throws(() => physics.addBody(root), { message: 'Skinned mesh needs an explicit collider' });
+          assert.throws(() => physics.addBody(root), {
+            code: 'state',
+            message: /Skinned mesh needs an explicit collider/,
+          });
           assert.equal(physics.bodyCount, 0);
           assert.equal(physics.world.bodies.len(), 0);
           assert.equal(physics.bodyOf(root), undefined);
@@ -1159,7 +1162,10 @@ rtest(
     const child = engine.createMesh(root),
       source = registerPBR(child);
     try {
-      assert.throws(() => physics.addBody(foreign.createMesh().setGeometry(box())), /another engine/);
+      assert.throws(() => physics.addBody(foreign.createMesh().setGeometry(box())), {
+        name: 'TypeError',
+        message: /another engine/,
+      });
       source.primitives[0].vertices[0] = NaN;
       assert.throws(
         () => physics.addBody(root, { colliders: [{ shape: 'sphere', radius: 1 }, { shape: 'box' }] }),
@@ -1173,7 +1179,7 @@ rtest(
       clearMeshSource(child);
       child.dispose();
       engine.createMesh().setGeometry(box());
-      assert.throws(() => physics.addBody(root), { message: 'No geometry' });
+      assert.throws(() => physics.addBody(root), { code: 'state', message: /Mesh has no geometry/ });
       assert.equal(physics.bodyCount, 0);
       assert.equal(physics.world.bodies.len(), 0);
       root.dispose();
@@ -1263,4 +1269,31 @@ test('published physics declarations keep Rapier optional and accept its install
   `,
   );
   assert.doesNotThrow(compile, 'Installed Rapier declarations must satisfy the structural protocol');
+});
+
+rtest('misuse throws coded errors that name the fix', () => {
+  const physics = create();
+  const opts = { colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } };
+  const a = physics.addBody(null, opts);
+  const b = physics.addBody(null, opts);
+  assert.throws(() => physics.addJoint(a, a, { type: 'fixed' }), {
+    code: 'state',
+    message: /two different bodies; pass/,
+  });
+  assert.throws(() => physics.removeCollider(a, b.colliders[0]), { code: 'state', message: /pass a collider from/ });
+  const other = create();
+  const outsider = other.addBody(null, opts);
+  assert.throws(() => physics.addJoint(a, outsider, { type: 'fixed' }), { code: 'state', message: /addBody first/ });
+  assert.throws(() => physics.createCharacterController(outsider), { code: 'state', message: /addBody first/ });
+  assert.throws(() => physics.addBody(null, { type: 'sideways', colliders: [] }), /use dynamic, fixed/);
+  const joint = physics.addJoint(a, b, { type: 'fixed' });
+  joint.remove();
+  assert.throws(() => joint.setLimits(0, 1), { code: 'state', message: /Joint was removed; create/ });
+  const engineA = { hasPlugin: () => false },
+    engineB = { hasPlugin: () => false };
+  physics.setup(engineA);
+  assert.throws(() => physics.setup(engineB), { code: 'attached', message: /one Physics per engine/ });
+  physics.dispose();
+  assert.throws(() => physics.setup(engineA), { code: 'disposed', message: /create a new Physics/ });
+  other.dispose();
 });

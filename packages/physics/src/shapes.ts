@@ -60,12 +60,15 @@ export function collisionGroups(
   const mask = (value: number | readonly number[]): number => {
     if (typeof value === 'number') {
       if (!Number.isInteger(value) || value < 0 || value > 0xffff)
-        throw new RangeError('Group masks are 16-bit integers');
+        throw new RangeError(
+          'Group mask must be an integer from 0 to 65535; pass a 16-bit mask or an array of group indices.',
+        );
       return value;
     }
     let bits = 0;
     for (const group of value) {
-      if (!Number.isInteger(group) || group < 0 || group > 15) throw new RangeError('Group indices are 0..15');
+      if (!Number.isInteger(group) || group < 0 || group > 15)
+        throw new RangeError('Group indices must be integers from 0 to 15; use one of the 16 groups.');
       bits |= 1 << group;
     }
     return bits;
@@ -85,7 +88,9 @@ export function geometryPositions(source: ColliderGeometry, scale: Vec3 = [1, 1,
   // A core Geometry interleaves position and normal (stride 6); raw sources default to packed xyz.
   const stride = ('stride' in source ? source.stride : undefined) ?? ('bounds' in source ? 6 : 3);
   if (!Number.isInteger(stride) || stride < 3 || vertices.length % stride)
-    throw new RangeError('Vertex array length is not a multiple of its stride');
+    throw new RangeError(
+      'Vertex array length must be a multiple of its stride; pass whole vertices and a stride of at least 3.',
+    );
   const count = vertices.length / stride,
     out = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) for (let a = 0; a < 3; a++) out[i * 3 + a] = vertices[i * stride + a] * scale[a];
@@ -100,7 +105,8 @@ export function bounds(positions: Float32Array): { min: [number, number, number]
       min[a] = Math.min(min[a], positions[i + a]);
       max[a] = Math.max(max[a], positions[i + a]);
     }
-  if (!positions.length) throw new RangeError('Geometry has no vertices');
+  if (!positions.length)
+    throw new RangeError('Geometry has no vertices; give the mesh geometry or set an explicit collider size.');
   return { min, max };
 }
 
@@ -179,7 +185,10 @@ export function createColliderDesc(
       if (points.length < 12 || points.length % 3) throw new RangeError('A convex hull needs at least 4 points');
       finite(points, 'Convex hull points');
       desc = R.ColliderDesc.convexHull(points);
-      if (!desc) throw new RangeError('Convex hull computation failed (degenerate points)');
+      if (!desc)
+        throw new RangeError(
+          'Convex hull failed because the points are degenerate; provide points that span a volume.',
+        );
       break;
     }
     case 'trimesh': {
@@ -195,7 +204,7 @@ export function createColliderDesc(
         throw new RangeError('A trimesh needs whole triangles');
       for (let i = 0; i < indexSource.length; i++)
         if (!Number.isInteger(indexSource[i]) || indexSource[i] < 0 || indexSource[i] >= vertices.length / 3)
-          throw new RangeError('Trimesh index exceeds vertices');
+          throw new RangeError('Trimesh index is out of range; keep every index below the vertex count.');
       finite(vertices, 'Trimesh vertices');
       const indices = Uint32Array.from(indexSource);
       desc = R.ColliderDesc.trimesh(vertices, indices);
@@ -221,7 +230,9 @@ export function createColliderDesc(
       desc = options.desc;
       break;
     default:
-      throw new TypeError(`Unknown collider shape ${(options as { shape: string }).shape}`);
+      throw new TypeError(
+        `Unknown collider shape ${(options as { shape: string }).shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield or custom.`,
+      );
   }
   return { desc, center };
 }
@@ -239,7 +250,7 @@ const combine = (R: RapierModule, rule: CombineRule): number => {
     multiply: R.CoefficientCombineRule.Multiply,
     max: R.CoefficientCombineRule.Max,
   }[rule];
-  if (value === undefined) throw new TypeError(`Unknown combine rule ${rule}`);
+  if (value === undefined) throw new TypeError(`Unknown combine rule ${rule}; use average, min, multiply or max.`);
   return value;
 };
 

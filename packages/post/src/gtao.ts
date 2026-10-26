@@ -121,7 +121,9 @@ export class GTAO extends SSAO {
       steps > 16 ||
       (o.enabled !== undefined && typeof o.enabled !== 'boolean')
     )
-      throw new RangeError('Invalid GTAO options: radius (0, 100], slices 1-4, steps 1-16');
+      throw new RangeError(
+        'Invalid GTAO options; radius must be in (0, 100], slices an integer 1-4, steps an integer 1-16.',
+      );
   }
   protected override occlusionShader(): string {
     return gtaoShader;

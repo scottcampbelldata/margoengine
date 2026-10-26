@@ -41,7 +41,7 @@ function values(value: readonly number[], size: number, label: string, min = 0, 
     value.length !== size ||
     value.some((v) => typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || v < min || v > max)
   )
-    throw new RangeError('Invalid ' + label);
+    throw new RangeError(`Invalid ${label}: pass an array of ${size} finite number(s) between ${min} and ${max}.`);
 }
 function applyMaterials(originals: Map<PBRMaterial, PBRMaterial>, overrides: ModelProps['materials']): void {
   for (const [material, original] of originals) {
@@ -78,7 +78,8 @@ function applyMaterials(originals: Map<PBRMaterial, PBRMaterial>, overrides: Mod
       m.settings[1] = o.alphaCutoff;
     }
     if (o.doubleSided !== undefined) {
-      if (typeof o.doubleSided !== 'boolean') throw new TypeError('Invalid doubleSided');
+      if (typeof o.doubleSided !== 'boolean')
+        throw new TypeError('materials doubleSided must be a boolean; pass true or false.');
       m.settings[2] = +o.doubleSided;
     }
   }

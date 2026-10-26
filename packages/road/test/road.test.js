@@ -35,6 +35,6 @@ test('road sweep builds curbs, normalized hard normals, outward triangles and ti
         ]),
         { segments: 0 },
       ),
-    /dimensions/,
+    { name: 'RangeError', message: /road options/ },
   );
 });

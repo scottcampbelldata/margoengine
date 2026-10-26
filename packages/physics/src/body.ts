@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import type { Collider, RigidBody, World } from './rapier-types.js';
 import type { Mesh } from '@margoengine/core';
 import { checkVec, quat, tuple, tuple4, vec, type Quat, type Vec3 } from './math.js';
@@ -79,7 +80,7 @@ export class PhysicsBody {
     this.colliders.length = 0;
   }
   private check(): RigidBody {
-    if (this.removed) throw new Error('Physics body was removed');
+    if (this.removed) throw new MargoError('state', 'Physics body was removed; add a new body with physics.addBody.');
     return this.raw;
   }
 

@@ -54,7 +54,10 @@ for (const fixture of loadedPBRFixtures) {
         mesh.setParent(null);
         const source = meshTriangles(mesh).source;
         if (source.skinned || source.morphed) {
-          assert.throws(() => physics.addBody(mesh), { message: 'Skinned mesh needs an explicit collider' });
+          assert.throws(() => physics.addBody(mesh), {
+            code: 'state',
+            message: /Skinned mesh needs an explicit collider/,
+          });
           assert.equal(physics.bodyCount, 0, 'automatic bind-pose fitting cannot retain an empty skinned body');
           assert.equal(mesh.geometry, null);
           return;

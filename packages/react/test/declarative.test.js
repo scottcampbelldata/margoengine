@@ -441,7 +441,10 @@ test('SSR skips all optional resources and hooks reject missing canvas providers
     useMargo();
     return null;
   }
-  assert.throws(() => renderToString(React.createElement(Outside)), /requires <MargoCanvas>/);
+  assert.throws(() => renderToString(React.createElement(Outside)), {
+    code: 'state',
+    message: /requires <MargoCanvas>/,
+  });
 });
 const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost' });
 for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'navigator'])

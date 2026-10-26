@@ -4,6 +4,7 @@ import type { FrameCallback, Mesh as MeshHandle } from '@margoengine/core';
 import type { PBRModel, LightingEffect } from '@margoengine/gltf-pro';
 import type { Shadows } from '@margoengine/shadows';
 import type { AssetCache } from './assets.js';
+import { MargoError } from '@margoengine/math/errors';
 
 export interface Registry {
   current: EngineMesh | null;
@@ -89,12 +90,12 @@ export function createViews(engine: Engine): Views {
 export const Context = createContext<Scene | null>(null);
 export function useScene(): Scene {
   const scene = useContext(Context);
-  if (!scene) throw new Error('Engine components require <Canvas>');
+  if (!scene) throw new MargoError('state', 'Engine components require <Canvas>; render them inside one.');
   return scene;
 }
 export function useMesh(): Registry {
   const { registry } = useScene();
-  if (!registry) throw new Error('Geometry and material require <Mesh>');
+  if (!registry) throw new MargoError('state', 'Geometry and material require <Mesh>; render them inside one.');
   return registry;
 }
 export function live(registry: Registry): EngineMesh | null {

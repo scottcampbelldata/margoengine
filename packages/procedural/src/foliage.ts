@@ -141,7 +141,8 @@ function leafClumps(x: number, y: number, z: number, size: number, phase: number
  * the canopy centre.
  */
 export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
-  if (kind !== 'conifer' && kind !== 'broadleaf') throw new RangeError('Invalid tree kind');
+  if (kind !== 'conifer' && kind !== 'broadleaf')
+    throw new RangeError("Invalid tree kind; pass 'conifer' or 'broadleaf'.");
   const trunkHeight = kind === 'conifer' ? 6.2 : 5.3,
     trunk = cylinderGeometry(0.11, 0.32, trunkHeight, 8, 6);
   for (let i = 0; i < trunk.positions.length; i += 3) {
@@ -316,7 +317,8 @@ export function generateFernMesh(): GeometryData {
 
 /** Crossed tapered grass ribbons for near/middle/far scatter meshes. */
 export function generateGrassMesh(blades = 3): GeometryData {
-  if (!Number.isInteger(blades) || blades < 1 || blades > 64) throw new RangeError('Invalid grass blade count');
+  if (!Number.isInteger(blades) || blades < 1 || blades > 64)
+    throw new RangeError('Invalid grass blade count; pass an integer from 1 to 64.');
   const p: number[] = [],
     n: number[] = [],
     uv: number[] = [],
@@ -341,7 +343,8 @@ export function generateGrassMesh(blades = 3): GeometryData {
  * @throws RangeError when either height is not finite.
  */
 export function contactAO(y: number, groundY: number): number {
-  if (!Number.isFinite(y) || !Number.isFinite(groundY)) throw new RangeError('Invalid contact height');
+  if (!Number.isFinite(y) || !Number.isFinite(groundY))
+    throw new RangeError('Invalid contact height; pass finite y and groundY values.');
   return Math.min(1, 0.2 + 0.8 * Math.max(0, (y - groundY) / 0.6));
 }
 
@@ -362,6 +365,6 @@ export function radialAO(x: number, y: number, z: number, center: ArrayLike<numb
     !Number.isFinite(radius) ||
     radius <= 0
   )
-    throw new RangeError('Invalid occlusion volume');
+    throw new RangeError('Invalid occlusion volume; use finite x, y, z, a 3-value center and radius above 0.');
   return Math.min(1, 0.25 + (0.75 * Math.hypot(x - center[0], y - center[1], z - center[2])) / radius);
 }

@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import type { Collider, EventQueue, PhysicsHooks, Ray, RigidBody, World } from './rapier-types.js';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
@@ -246,7 +247,7 @@ export class Physics implements EnginePlugin, BodyOwner {
 
   /** The Rapier `World`. Use it for anything this wrapper does not cover. */
   get world(): World {
-    if (this.disposed) throw new Error('Physics is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
     return this.worldRef!;
   }
   get isDisposed(): boolean {
@@ -273,8 +274,9 @@ export class Physics implements EnginePlugin, BodyOwner {
 
   // Engine plugin hooks.
   setup(engine: EngineKernel): void {
-    if (this.disposed) throw new Error('Physics is disposed');
-    if (this.engine && this.engine !== engine) throw new Error('Physics is attached to another engine');
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+    if (this.engine && this.engine !== engine)
+      throw new MargoError('attached', 'Physics is attached to another engine; create one Physics per engine.');
     this.engine = engine;
   }
   onPreUpdate(delta: number): void {
@@ -347,7 +349,8 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** Writes body poses to their meshes, interpolated by `alpha` between the last two steps. Allocates nothing. */
   sync(alpha = this.lastAlpha): void {
     if (this.disposed) return;
-    if (!Number.isFinite(alpha)) throw new RangeError('Invalid physics interpolation alpha');
+    if (!Number.isFinite(alpha))
+      throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
     this.syncAlpha = this.interpolate ? Math.min(1, Math.max(0, alpha)) : 1;
     this.bodies.forEach(this.syncBody);
   }
@@ -416,19 +419,22 @@ export class Physics implements EnginePlugin, BodyOwner {
         !Number.isFinite(Math.fround(position[1])) ||
         !Number.isFinite(Math.fround(position[2]))
       )
-        throw new RangeError('Invalid physics position');
+        throw new RangeError('Physics body position must be finite; check the body for NaN or Infinity.');
       if (
         !Number.isFinite(Math.fround(x)) ||
         !Number.isFinite(Math.fround(y)) ||
         !Number.isFinite(Math.fround(z)) ||
         !Number.isFinite(Math.fround(w))
       )
-        throw new RangeError('Invalid physics quaternion');
+        throw new RangeError('Physics body rotation must be finite; check the body for NaN or Infinity.');
       // Core's setters allocate nothing, so preallocated `position` and `out` go straight in.
       mesh.setPosition(position).setQuaternion(out);
     } else {
       if (parentOf(mesh) !== -1)
-        throw new Error('Non-core physics bodies need root-level meshes; child meshes require core transform storage');
+        throw new MargoError(
+          'state',
+          'Non-core physics bodies need root-level meshes; use a core Mesh for child meshes.',
+        );
       mesh.setPosition(position).setQuaternion(out);
     }
     body.dirty = false;
@@ -445,7 +451,8 @@ export class Physics implements EnginePlugin, BodyOwner {
   private toLocal(store: TransformStoreLike, parent: number, position: number[], rotation: number[]): void {
     const m = worldMatrix(store, parent, this.parentScratch),
       inverse = invertMatrix(m, this.inverseScratch);
-    if (!inverse) throw new RangeError('Physics body parent has a singular world transform');
+    if (!inverse)
+      throw new RangeError('Physics body parent has a singular world transform; give the parent a non-zero scale.');
     const x = position[0],
       y = position[1],
       z = position[2];
@@ -482,12 +489,19 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (mesh) {
       mesh.check();
       if (mesh instanceof CoreMesh && this.engine && meshRuntime(mesh).engine !== this.engine)
-        throw new TypeError('Physics mesh belongs to another engine');
-      if (this.byMesh.has(mesh)) throw new Error('This mesh already has a physics body');
+        throw new TypeError(
+          'Physics mesh belongs to another engine; add meshes from the engine this Physics is attached to.',
+        );
+      if (this.byMesh.has(mesh))
+        throw new MargoError(
+          'state',
+          'This mesh already has a physics body; remove it first or use the existing body.',
+        );
       if (parentOf(mesh) !== -1) {
         if (!(mesh instanceof CoreMesh))
-          throw new Error(
-            'Non-core physics bodies need root-level meshes; child meshes require core transform storage',
+          throw new MargoError(
+            'state',
+            'Non-core physics bodies need root-level meshes; use a core Mesh for child meshes.',
           );
         const runtime = meshRuntime(mesh);
         worldPose = worldMatrix(runtime.engine.store, runtime.id, new Float64Array(16));
@@ -501,7 +515,8 @@ export class Physics implements EnginePlugin, BodyOwner {
         kinematicVelocity: 'kinematicVelocityBased',
       } as const
     )[type];
-    if (!factory) throw new TypeError(`Unknown body type ${type}`);
+    if (!factory)
+      throw new TypeError(`Unknown body type ${type}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
     const desc = R.RigidBodyDesc[factory]();
     const position =
       options.position ??
@@ -576,7 +591,9 @@ export class Physics implements EnginePlugin, BodyOwner {
     const type: BodyType = bodyOptions.type ?? 'dynamic',
       shape = requested ?? (type === 'dynamic' ? 'convexHull' : 'trimesh');
     if (shape !== 'trimesh' && shape !== 'convexHull')
-      throw new TypeError(`Model colliders are 'trimesh' or 'convexHull', not ${String(shape)}`);
+      throw new TypeError(
+        `Model colliders must be 'trimesh' or 'convexHull', not ${String(shape)}; choose one of them.`,
+      );
     if (!model?.root || !Array.isArray(model.primitives))
       throw new TypeError('addModel needs a gltf-pro model (root and primitives)');
     const groups = new Map<Mesh, ModelPrimitiveLike[]>();
@@ -697,7 +714,8 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** @internal use `body.removeCollider`. */
   removeCollider(body: PhysicsBody, collider: Collider): void {
     const index = body.colliders.indexOf(collider);
-    if (index < 0) throw new Error('Collider does not belong to this body');
+    if (index < 0)
+      throw new MargoError('state', 'Collider does not belong to this body; pass a collider from body.colliders.');
     body.colliders.splice(index, 1);
     this.byCollider.delete(collider.handle);
     this.world.removeCollider(collider, true);
@@ -718,8 +736,12 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** Connects two bodies with a fixed, spherical, revolute or prismatic joint. Anchors are in each body's local frame. */
   addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint {
     if (!this.bodies.has(bodyA) || !this.bodies.has(bodyB))
-      throw new Error('Both bodies must belong to this physics world');
-    if (bodyA === bodyB) throw new Error('A joint needs two different bodies');
+      throw new MargoError(
+        'state',
+        'Both bodies must belong to this physics world; add them with physics.addBody first.',
+      );
+    if (bodyA === bodyB)
+      throw new MargoError('state', 'A joint needs two different bodies; pass bodyA and bodyB that are not the same.');
     const raw = this.world.createImpulseJoint(createJointData(this.rapier, options), bodyA.raw, bodyB.raw, true);
     const joint = new PhysicsJoint(this, raw, options.type, bodyA, bodyB);
     this.joints.add(joint);
@@ -739,7 +761,8 @@ export class Physics implements EnginePlugin, BodyOwner {
 
   /** Wraps Rapier's KinematicCharacterController around a kinematicPosition body. */
   createCharacterController(body: PhysicsBody, options?: CharacterControllerOptions): CharacterController {
-    if (!this.bodies.has(body)) throw new Error('Body must belong to this physics world');
+    if (!this.bodies.has(body))
+      throw new MargoError('state', 'Body must belong to this physics world; add it with physics.addBody first.');
     const controller = new CharacterController(this, body, options);
     this.controllers.add(controller);
     return controller;
@@ -1020,7 +1043,8 @@ function primitiveGeometry(mesh: Mesh): ColliderGeometry | null {
   const triangles = meshTriangles(meshRuntime(mesh));
   if (!triangles) return null;
   if (triangles.kind === 'core') return triangles.geometry;
-  if (triangles.source.skinned || triangles.source.morphed) throw new Error('Skinned mesh needs an explicit collider');
+  if (triangles.source.skinned || triangles.source.morphed)
+    throw new MargoError('state', 'Skinned mesh needs an explicit collider; pass colliders in the body options.');
   const { primitives } = triangles.source;
   if (!primitives.length) return null;
   return mergePrimitives(primitives);
@@ -1032,7 +1056,8 @@ function colliderGeometry(mesh: Mesh): { geometry: ColliderGeometry; scale: Vec3
   if (direct) return { geometry: direct, scale: [mesh.scale.x, mesh.scale.y, mesh.scale.z] };
   const root = meshRuntime(mesh),
     engine = root.engine;
-  if (!engine.meshes || !engine.store.tick) throw new Error('No geometry');
+  if (!engine.meshes || !engine.store.tick)
+    throw new MargoError('state', 'Mesh has no geometry; set geometry before adding a body.');
   engine.store.tick(false);
   const sources: { node: CoreMesh; positions: Float32Array; indices: ArrayLike<number> }[] = [];
   let vertexCount = 0,
@@ -1050,7 +1075,7 @@ function colliderGeometry(mesh: Mesh): { geometry: ColliderGeometry; scale: Vec3
     vertexCount += positions.length / 3;
     indexCount += geometry.indices.length;
   }
-  if (!vertexCount) throw new Error('No geometry');
+  if (!vertexCount) throw new MargoError('state', 'Mesh has no geometry; set geometry before adding a body.');
 
   const vertices = new Float32Array(vertexCount * 3),
     indices = new Uint32Array(indexCount);

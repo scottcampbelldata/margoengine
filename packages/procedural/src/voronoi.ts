@@ -71,7 +71,7 @@ function readBounds(bounds: readonly number[], dimensions: number): void {
     !bounds.every(Number.isFinite) ||
     bounds.some((v, i) => i < dimensions && v >= bounds[i + dimensions])
   )
-    throw new RangeError('Invalid bounds');
+    throw new RangeError('Invalid bounds; pass finite min then max corners, min below max.');
 }
 const neighborLists = (count: number, pairs: Set<number>, stride: number): number[][] => {
   const lists: number[][] = Array.from({ length: count }, () => []);
@@ -736,7 +736,9 @@ export function fractureMesh(
   let points: ArrayLike<number>;
   if (typeof sites === 'number') {
     if (!Number.isInteger(sites) || sites < 1 || sites > 4096 || !Number.isSafeInteger(seed))
-      throw new RangeError('Invalid fracture site count or seed');
+      throw new RangeError(
+        'Invalid fracture site count or seed; pass sites as an integer from 1 to 4096 and seed as a safe integer.',
+      );
     let state = seed >>> 0 || 1;
     const random = () => {
       state ^= state << 13;

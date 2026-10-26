@@ -324,7 +324,7 @@ export class SSGI implements EnginePlugin {
       (o.enabled !== undefined && typeof o.enabled !== 'boolean')
     )
       throw new RangeError(
-        'Invalid SSGI options: rays 1-16, maxDistance > 0, thickness > 0, steps 1-256, intensity 0-4',
+        'Invalid SSGI options; rays must be an integer 1-16, maxDistance > 0, thickness > 0, steps an integer 1-256, intensity 0-4.',
       );
   }
   setup(engine: Engine): void {
@@ -374,7 +374,7 @@ export class SSGI implements EnginePlugin {
       own = this.ownDepth,
       rays = o.rays ?? 4;
     if (!invertMatrixStable(c.camera.matrix, this.inverse, this.workspace))
-      throw margoError('state', 'Invalid SSGI camera: its matrix cannot be inverted');
+      throw margoError('state', 'Invalid SSGI camera: its matrix cannot be inverted; use an invertible camera.');
     v.set(c.camera.matrix, 16);
     v[32] = c.width;
     v[33] = c.height;

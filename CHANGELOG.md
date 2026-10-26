@@ -88,6 +88,9 @@ Message text changed: branch on `error.code` or the class, not the text. Changed
 - machinery: bare `Error` became `MargoError` (codes `state`, `attached`, `disposed`, `unsupported`, `failed`).
 - materials: bare `Error` became `MargoError` (`state`, `disposed`, `attached`); a node-graph cycle and a graph
   without exactly one emit are now `TypeError`.
+- physics: bare `Error` became `MargoError` (`disposed`, `attached`, `state`).
+- react: bare `Error` became `MargoError` (`state`, `disposed`, `attached`, `unsupported`).
+- quality: `warmUp` accepts a `signal` (AbortSignal) and rejects with its reason.
 
 ### USDZ dependency cleanup
 

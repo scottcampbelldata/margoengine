@@ -13,6 +13,7 @@ import type {
 import { Mesh, type MeshProps } from './components.js';
 import { useScene, useResourceEffect } from './internal.js';
 import { setWorldPose } from './scene-transform.js';
+import { MargoError } from '@margoengine/math/errors';
 
 export interface XRContextValue {
   readonly manager: XRManager | null;
@@ -154,7 +155,7 @@ export function XR({ children, ...props }: XRProps) {
 }
 export function useXR(): XRContextValue {
   const value = useContext(Context);
-  if (!value) throw new Error('useXR requires <XR>');
+  if (!value) throw new MargoError('state', 'useXR requires <XR>; call it inside one.');
   return value;
 }
 export interface ControllerEvent {
@@ -201,7 +202,7 @@ export function Controller({
 }
 function ControllerBinding(props: Omit<ControllerProps, keyof MeshProps>) {
   const context = useContext(Context);
-  if (!context) throw new Error('Controller requires <XR>');
+  if (!context) throw new MargoError('state', 'Controller requires <XR>; render it inside one.');
   const { engine, registry } = useScene(),
     latest = useRef(props);
   latest.current = props;

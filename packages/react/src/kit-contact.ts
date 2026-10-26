@@ -2,6 +2,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import type { Shadows } from '@margoengine/shadows';
 import { live, type Registry } from './internal.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 export interface ContactGroundOptions {
@@ -41,7 +42,11 @@ export class ContactGround implements EnginePlugin {
     private options: () => ContactGroundOptions,
   ) {}
   setup(engine: Engine): void {
-    if (!engine.gpu) throw new Error('ContactShadows requires WebGPU');
+    if (!engine.gpu)
+      throw new MargoError(
+        'unsupported',
+        'ContactShadows requires WebGPU; use an engine created with a WebGPU backend.',
+      );
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
@@ -69,7 +74,9 @@ export class ContactGround implements EnginePlugin {
       color.length !== 3 ||
       color.some((value) => !Number.isFinite(value) || value < 0)
     )
-      throw new RangeError('Invalid contact shadows options');
+      throw new RangeError(
+        'ContactShadows: width and height must be above 0, opacity between 0 and 1, and color three numbers >= 0.',
+      );
     if (opacity === 0) return;
     const key =
       context.format +

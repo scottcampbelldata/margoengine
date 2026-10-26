@@ -80,7 +80,9 @@ export function poseHumanoid(
     !Number.isFinite(speed) ||
     speed < 0
   )
-    throw new RangeError('Invalid humanoid pose');
+    throw new RangeError(
+      'Invalid humanoid pose; pass a finite 3-value position, heading, phase and speed of at least 0.',
+    );
   rig.root.position.set(position[0], position[1] + Math.sin(phase * 2) * Math.min(0.035, speed * 0.007), position[2]);
   rig.root.rotation.y = heading;
   for (let i = 0; i < 4; i++) {

@@ -21,7 +21,7 @@ const copy = (v: Vec3) => [v[0], v[1], v[2]] as unknown as Vec3;
 const distance = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 function point(value: Vec3): void {
   if (value.length !== 3 || value.some((v) => !Number.isFinite(Math.fround(v))))
-    throw new RangeError('Expected finite 3D point');
+    throw new RangeError('Point must be finite [x, y, z]; pass numbers.');
 }
 
 /** Convex planar walkable polygons, linked by shared vertex-index edges. */
@@ -49,7 +49,7 @@ export class NavMesh {
    */
   constructor(vertices: readonly Vec3[], polygons: readonly (readonly number[])[]) {
     if (vertices.length < 3 || vertices.length > 100_000 || !polygons.length || polygons.length > 4096)
-      throw new RangeError('Navmesh size exceeded');
+      throw new RangeError('Navmesh needs 3-100000 vertices and 1-4096 polygons; split bigger levels.');
     this.vertices = vertices.map((v) => {
       point(v);
       return [...v] as unknown as Vec3;
@@ -62,7 +62,7 @@ export class NavMesh {
         new Set(indices).size !== indices.length ||
         indices.some((id) => !Number.isInteger(id) || id < 0 || id >= vertices.length)
       )
-        throw new TypeError('Invalid polygon indices');
+        throw new TypeError('Polygons need 3+ distinct vertex indices; fix them.');
       const a = this.vertices[indices[0]],
         b = this.vertices[indices[1]],
         c = this.vertices[indices[2]],
@@ -111,7 +111,7 @@ export class NavMesh {
           edges.set(key, { polygon, a, b, linked: false });
           continue;
         }
-        if (edge.linked) throw new TypeError('Non-manifold navmesh edge');
+        if (edge.linked) throw new TypeError('Edge shared by 3+ polygons; keep at most two.');
         edge.linked = true;
         for (const [from, to] of [
           [polygon, edge.polygon],

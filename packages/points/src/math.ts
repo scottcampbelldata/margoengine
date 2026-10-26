@@ -69,7 +69,9 @@ function select(
  */
 export function buildBlocks(positions: ArrayLike<number>, count: number, blockSize = 16384, seed = 1): PointBlocks {
   if (!Number.isInteger(count) || count < 0 || positions.length < count * 3)
-    throw new RangeError('positions holds fewer than count points');
+    throw new RangeError(
+      'positions holds fewer than count points; pass an integer count of at most positions.length / 3.',
+    );
   if (!Number.isInteger(blockSize) || blockSize < 1) throw new RangeError('blockSize must be a positive integer');
   const index = new Uint32Array(count);
   let finite = 0;
@@ -502,8 +504,12 @@ export function packColors(
   offset = 0,
 ): Uint32Array {
   if (components !== 3 && components !== 4) throw new RangeError('Colors need 3 (RGB) or 4 (RGBA) components');
-  if (source.length < count * components) throw new RangeError('Too few color values');
-  if (offset + count > out.length) throw new RangeError('Color range exceeds the cloud');
+  if (source.length < count * components)
+    throw new RangeError(
+      'source holds fewer color values than count * components; pass one value per component for every point.',
+    );
+  if (offset + count > out.length)
+    throw new RangeError('The color range runs past the end of the cloud; use a smaller offset or count.');
   const bytes = source instanceof Uint8Array || source instanceof Uint8ClampedArray;
   const byte = bytes ? (v: number) => v : (v: number) => (v > 0 ? (v < 1 ? Math.round(v * 255) : 255) : 0);
   for (let i = 0; i < count; i++) {
@@ -538,7 +544,9 @@ export function atlasRect(index: number, columns: number, rows: number, padding 
     index < 0 ||
     index >= columns * rows
   )
-    throw new RangeError('Atlas cell out of range');
+    throw new RangeError(
+      'Atlas cell index must be an integer below columns * rows; pass an index inside the atlas grid.',
+    );
   const column = index % columns,
     row = Math.floor(index / columns),
     w = 1 / columns,

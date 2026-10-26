@@ -36,7 +36,9 @@ export function road(
     segments < 1 ||
     segments > 4096
   )
-    throw new RangeError('Invalid road dimensions');
+    throw new RangeError(
+      'Road width, curbWidth, curbHeight, uvMeters and the curve length must be finite and above 0, and segments an integer from 1 to 4096; fix the road options.',
+    );
   const section = crossSection ?? [
     [-width / 2 - curbWidth, 0],
     [-width / 2 - curbWidth, curbHeight],
@@ -48,7 +50,9 @@ export function road(
     [width / 2 + curbWidth, 0],
   ];
   if (section.length < 2 || section.length > 32 || section.some((p) => p.length !== 2 || !p.every(Number.isFinite)))
-    throw new RangeError('Invalid road cross-section');
+    throw new RangeError(
+      'Road crossSection needs 2 to 32 [x, y] points with finite numbers; pass fewer, finite points.',
+    );
   const strips = section.length - 1,
     row = strips * 2,
     count = (segments + 1) * row;
@@ -59,7 +63,8 @@ export function road(
     offsets = new Float64Array(section.length);
   for (let i = 1; i < section.length; i++) {
     const length = Math.hypot(section[i][0] - section[i - 1][0], section[i][1] - section[i - 1][1]);
-    if (!length) throw new RangeError('Duplicate cross-section points');
+    if (!length)
+      throw new RangeError('Road crossSection has two equal neighbouring points; remove the duplicate point.');
     offsets[i] = offsets[i - 1] + length;
   }
   const center = new Float64Array(3),

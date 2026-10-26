@@ -81,10 +81,12 @@ export function expand(
     !Number.isInteger(maxModules) ||
     maxModules < 1
   )
-    throw new RangeError('Invalid L-system iterations, seed or module budget');
+    throw new RangeError(
+      'Invalid L-system options; iterations must be 0-64, seed a safe integer, maxModules at least 1.',
+    );
   const table = new Map<string, { rules: Rule[]; parsed: (Module[] | undefined)[] }>();
   for (const [symbol, value] of Object.entries(rules)) {
-    if ([...symbol].length !== 1) throw new TypeError(`L-system rule keys are single symbols, got "${symbol}"`);
+    if ([...symbol].length !== 1) throw new TypeError(`L-system rule keys must be single symbols; got "${symbol}".`);
     const list = (
       typeof value === 'string' ? [{ successor: value }] : Array.isArray(value) ? value : [value]
     ) as Rule[];
@@ -95,7 +97,9 @@ export function expand(
           !(Number.isFinite(r.weight ?? 1) && (r.weight ?? 1) > 0),
       )
     )
-      throw new TypeError(`Invalid rule for "${symbol}"`);
+      throw new TypeError(
+        `Invalid rule for "${symbol}"; give a successor string or function and a finite weight above 0.`,
+      );
     table.set(symbol, {
       rules: list,
       parsed: list.map((r) => (typeof r.successor === 'string' ? parseModules(r.successor) : undefined)),
@@ -135,7 +139,8 @@ export function expand(
       const successor = entry.rules[pick].successor,
         made = entry.parsed[pick] ?? (successor as Exclude<Successor, string>)(...module.params);
       for (const m of typeof made === 'string' ? parseModules(made) : made) next.push(m);
-      if (next.length > maxModules) throw new RangeError('L-system expansion exceeds the module budget');
+      if (next.length > maxModules)
+        throw new RangeError('L-system expansion exceeds the module budget; reduce iterations or raise maxModules.');
     }
     modules = next;
   }
@@ -172,7 +177,7 @@ export function interpret(
   }: TurtleOptions = {},
 ): Branches {
   if (![angle, step, radius, radiusScale, ...origin].every(Number.isFinite) || origin.length !== 3)
-    throw new RangeError('Invalid turtle options');
+    throw new RangeError('Invalid turtle options; use finite angle, step, radius, radiusScale and a 3-value origin.');
   let p: V = [origin[0], origin[1], origin[2]],
     h: V = [0, 1, 0],
     l: V = [-1, 0, 0],
@@ -236,9 +241,12 @@ export function tubes(branches: Branches, { radialSegments = 6, tipScale = 0.6 }
   const { positions: P, radii, ups, parents, depths } = branches,
     count = radii.length;
   if (!Number.isInteger(radialSegments) || radialSegments < 3 || radialSegments > 32 || !(tipScale >= 0))
-    throw new RangeError('Invalid tube options');
-  if (!count) throw new RangeError('No branches to build');
-  if (count * 2 * radialSegments > 1_000_000) throw new RangeError('Tube mesh exceeds the geometry budget');
+    throw new RangeError(
+      'Invalid tube options; radialSegments must be an integer from 3 to 32 and tipScale at least 0.',
+    );
+  if (!count) throw new RangeError('No branches to build; interpret modules that draw.');
+  if (count * 2 * radialSegments > 1_000_000)
+    throw new RangeError('Tube mesh exceeds the geometry budget; reduce radialSegments.');
   // The continuation of a segment: its first child at the same depth, else its first child.
   const next = new Int32Array(count).fill(-1);
   for (let s = 0; s < count; s++) {

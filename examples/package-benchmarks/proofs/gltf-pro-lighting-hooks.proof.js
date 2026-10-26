@@ -114,7 +114,7 @@ async function story([gltf, shadowsModule, clusteredModule, environment], sample
         try {
           model.draw(view.c, mode, view.c.color, view.c.depth);
         } catch (error) {
-          gpu.note('throw', error.message);
+          gpu.note('throw');
         }
       }
     });

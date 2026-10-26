@@ -44,7 +44,7 @@ function story(make, samples, edit) {
       try {
         for (const pass of list) pass.execute(view.c);
       } catch (error) {
-        gpu.note('throw', error.constructor.name, error.message);
+        gpu.note('throw');
       }
       view.end();
     }

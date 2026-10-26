@@ -27,6 +27,7 @@ import {
 import { MeshShadows } from './shadows.js';
 import { ContactGround, type ContactGroundOptions } from './kit-contact.js';
 import { optionalPeer } from './optional.js';
+import { MargoError } from '@margoengine/math/errors';
 
 interface ErrorProps {
   onError?: (error: unknown) => void;
@@ -409,7 +410,9 @@ export const PointerLock = forwardRef<PointerControls, PointerLockProps>(functio
       maxPolarAngle > Math.PI ||
       minPolarAngle > maxPolarAngle
     )
-      throw new RangeError('Invalid pointer lock options');
+      throw new RangeError(
+        'PointerLock: speeds must be >= 0 and polar angles within 0 to PI with min <= max; pass valid numbers.',
+      );
     Object.assign(controls, { enabled, pointerSpeed, movementSpeed, requireLock, minPolarAngle, maxPolarAngle });
   }, [
     controls,
@@ -524,7 +527,9 @@ function TransformBinding({
         (value) => value !== null && (!Number.isFinite(value) || value <= 0),
       )
     )
-      throw new RangeError('Invalid transform controls options');
+      throw new RangeError(
+        'TransformControls: mode must be translate, rotate or scale, space world or local, and size and snaps above 0.',
+      );
     controls.enabled = enabled;
     controls.visible = visible;
     controls.setMode(mode);
@@ -575,7 +580,8 @@ function acquireTextRenderer(scene: Scene): TextRendererLease {
     entry = {
       users: 0,
       promise: optionalPeer('@margoengine/text', () => import('@margoengine/text')).then((api) => {
-        if (scene.engine.disposed) throw new Error('Canvas disposed');
+        if (scene.engine.disposed)
+          throw new MargoError('disposed', 'Canvas is disposed; render the component inside a live <Canvas>.');
         const renderer = new api.TextRenderer({ name: 'margoengine-react:text' });
         scene.engine.use(renderer);
         return { renderer, api };

@@ -250,7 +250,9 @@ export class PointCloud {
   private range(start: number, length: number, stride: number): number {
     const n = length / stride;
     if (!Number.isInteger(start) || !Number.isInteger(n) || start < 0 || start + n > this.count)
-      throw new RangeError(`Range ${start}..${start + n} is outside the cloud of ${this.count} points`);
+      throw new RangeError(
+        `Range ${start}..${start + n} is outside the cloud of ${this.count} points; pass an integer start and values that fit inside the cloud.`,
+      );
     return n;
   }
 }

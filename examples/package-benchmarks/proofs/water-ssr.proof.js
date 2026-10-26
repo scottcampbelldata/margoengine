@@ -78,7 +78,7 @@ function story(m, options) {
       try {
         for (const p of passes) p.execute(view.c);
       } catch (error) {
-        gpu.note('throw', error.constructor.name, error.message);
+        gpu.note('throw');
       }
       view.end();
     }

@@ -19,6 +19,8 @@ export interface WarmUpOptions {
   frames?: number;
   /** Safety cap on warm render calls. Default 256. */
   maxRounds?: number;
+  /** Stops the warm-up: the promise rejects with `signal.reason` and the device is left unpatched. */
+  signal?: AbortSignal;
 }
 
 type Kind = 'createRenderPipeline' | 'createComputePipeline';
@@ -61,8 +63,9 @@ function override<T extends object>(object: T, name: string, value: unknown): ()
  */
 export async function warmUp(
   engine: EngineKernel,
-  { frames = 2, maxRounds = 256 }: WarmUpOptions = {},
+  { frames = 2, maxRounds = 256, signal }: WarmUpOptions = {},
 ): Promise<WarmUpReport> {
+  signal?.throwIfAborted();
   const report: WarmUpReport = { pipelines: 0, fallbacks: 0, rounds: 0, rebooted: false };
   const gpu = (): GPUDevice | null | undefined => (engine as unknown as { gpu?: GPUDevice | null }).gpu;
   const device = gpu() as (GPUDevice & Record<Method, Call>) | null | undefined;
@@ -171,6 +174,7 @@ export async function warmUp(
   };
   try {
     for (let complete = 0; complete < frames && report.rounds < maxRounds && !engine.disposed; ) {
+      signal?.throwIfAborted();
       report.rounds++;
       pending = undefined;
       encoders.length = 0;
@@ -207,6 +211,7 @@ export async function warmUp(
     }
     // Pipelines a feature created synchronously (at attach, before warmUp) compile on the GPU queue: wait them out here.
     if (!engine.disposed) await gpu()?.queue.onSubmittedWorkDone();
+    signal?.throwIfAborted();
   } finally {
     unpatch();
     target?.destroy();

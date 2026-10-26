@@ -98,5 +98,5 @@ test('road generation retains minimum/maximum topology budgets and invalid-profi
       ],
     },
   ])
-    assert.throws(() => road(curve, options), /dimensions|cross-section/);
+    assert.throws(() => road(curve, options), { name: 'RangeError', message: /road options|crossSection/ });
 });

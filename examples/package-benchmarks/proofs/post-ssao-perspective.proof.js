@@ -63,7 +63,7 @@ function story(module, samples) {
       try {
         run(view.c);
       } catch (error) {
-        gpu.note('throw', error.constructor.name, error.message);
+        gpu.note('throw');
       }
       view.end();
     }

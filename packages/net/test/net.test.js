@@ -21,7 +21,7 @@ test('finite extreme quaternion components normalize without overflow or subnorm
     buffer.push(1, [0, 0, 0], [-magnitude, magnitude, -magnitude, magnitude]);
     assert.ok(Math.abs(Math.hypot(...buffer.sample(0.5).rotation) - 1) < 1e-15);
     assert.equal(buffer.push(0.5, [0, 0, 0], [magnitude, magnitude, magnitude, magnitude]), false);
-    assert.throws(() => buffer.push(2, [0, 0, 0], [0, 0, 0, 0]), /Zero/);
+    assert.throws(() => buffer.push(2, [0, 0, 0], [0, 0, 0, 0]), { name: 'RangeError', message: /zero length/ });
   }
 });
 

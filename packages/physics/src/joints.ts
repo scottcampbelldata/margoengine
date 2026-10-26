@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import type { ImpulseJoint, JointData, UnitImpulseJoint } from './rapier-types.js';
 import type { RapierModule } from './shapes.js';
 import type { PhysicsBody } from './body.js';
@@ -55,7 +56,7 @@ export class PhysicsJoint {
     this.removed = true;
   }
   private unit(): UnitImpulseJoint {
-    if (!this.valid) throw new Error('Joint was removed');
+    if (!this.valid) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
     if (this.type !== 'revolute' && this.type !== 'prismatic')
       throw new TypeError('Limits and motors need a revolute or prismatic joint');
     return this.raw as UnitImpulseJoint;
@@ -130,6 +131,8 @@ export function createJointData(R: RapierModule, options: JointOptions): JointDa
         : R.JointData.prismatic(vec(anchorA), vec(anchorB), axis);
     }
     default:
-      throw new TypeError(`Unknown joint type ${(options as { type: string }).type}`);
+      throw new TypeError(
+        `Unknown joint type ${(options as { type: string }).type}; use fixed, spherical, revolute or prismatic.`,
+      );
   }
 }

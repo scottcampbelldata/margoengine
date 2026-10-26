@@ -124,7 +124,9 @@ export class SpriteBatch {
   /** Marks sprites `start .. start + count` changed after direct writes to `data`. */
   markDirty(start = 0, count = this.used - start): this {
     if (!Number.isInteger(start) || !Number.isInteger(count) || start < 0 || count < 0 || start + count > this.used)
-      throw new RangeError('Sprite range out of bounds');
+      throw new RangeError(
+        'The sprite range must lie inside the used sprites; pass integer start and count within 0..used.',
+      );
     this.dirty.push([start, start + count]);
     return this;
   }
@@ -146,7 +148,8 @@ export class SpriteBatch {
   }
 
   private check(index: number): void {
-    if (!Number.isInteger(index) || index < 0 || index >= this.used) throw new RangeError(`No sprite ${index}`);
+    if (!Number.isInteger(index) || index < 0 || index >= this.used)
+      throw new RangeError(`No sprite ${index}; pass an integer index below the sprite count.`);
   }
 
   private write(index: number, sprite: SpriteOptions, defaults: boolean): void {

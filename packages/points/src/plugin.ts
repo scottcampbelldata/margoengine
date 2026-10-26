@@ -282,7 +282,7 @@ export class PointsPlugin implements EnginePlugin {
     this.edlStrength = options.edlStrength ?? 1;
     this.edlRadius = options.edlRadius ?? 1.4;
     if (!this.name || typeof this.name !== 'string' || !Number.isFinite(this.order))
-      throw new TypeError('Invalid PointsPlugin options');
+      throw new TypeError('PointsPlugin needs a non-empty string name and a finite order; fix the options.');
     if (!(this.pointBudget >= 0) || !(this.edlStrength >= 0) || !(this.edlRadius > 0))
       throw new RangeError('pointBudget, edlStrength and edlRadius must be non-negative');
   }
@@ -458,7 +458,8 @@ export class PointsPlugin implements EnginePlugin {
    * frame's camera, transforms and level of detail of the view picked through. Meshes do not occlude picks.
    */
   pick(x: number, y: number, options: PointsPickOptions = {}): PointsPickResult | null {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new RangeError('Invalid pick coordinates');
+    if (!Number.isFinite(x) || !Number.isFinite(y))
+      throw new RangeError('pick() needs finite x and y pixel coordinates; pass finite numbers.');
     const radius = options.radius ?? 6;
     if (!(radius >= 0)) throw new RangeError('radius must be non-negative');
     const engine = this.engine as unknown as EngineKernel | undefined;
@@ -582,7 +583,10 @@ export class PointsPlugin implements EnginePlugin {
     };
     const width = image.naturalWidth || image.videoWidth || image.width || 0,
       height = image.naturalHeight || image.videoHeight || image.height || 0;
-    if (!width || !height) throw new RangeError('Texture source has no size');
+    if (!width || !height)
+      throw new RangeError(
+        'The texture source has no size yet; wait until the image or video has loaded before using it.',
+      );
     const texture = device.createTexture({
       size: [width, height],
       format: 'rgba8unorm-srgb',
@@ -621,7 +625,7 @@ export class PointsPlugin implements EnginePlugin {
       limit = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize);
     if (cloud.count * 12 > limit)
       throw new RangeError(
-        `Point cloud of ${cloud.count} points exceeds the device storage limit of ${Math.floor(limit / 12)} points`,
+        `Point cloud of ${cloud.count} points exceeds the device storage limit of ${Math.floor(limit / 12)} points; split it into several clouds.`,
       );
     const created: GPUBuffer[] = [];
     const make = (size: number, usage: number) => {

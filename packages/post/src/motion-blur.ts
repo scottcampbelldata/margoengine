@@ -184,7 +184,7 @@ export class MotionBlur implements EnginePlugin {
       samples > 64 ||
       (o.enabled !== undefined && typeof o.enabled !== 'boolean')
     )
-      throw new RangeError('Invalid MotionBlur options: shutter 0-1, maxBlur 1-128 pixels, samples 2-64');
+      throw new RangeError('Invalid MotionBlur options; shutter must be 0-1, maxBlur 1-128 pixels, samples 2-64.');
   }
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'MotionBlur is disposed; create a new MotionBlur');
@@ -236,7 +236,7 @@ export class MotionBlur implements EnginePlugin {
       jitter = vectors.jitter,
       values = this.values;
     if (!invertMatrixStable(c.camera.matrix, values.subarray(0, 16), this.workspace))
-      throw margoError('state', 'Invalid MotionBlur camera: its matrix cannot be inverted');
+      throw margoError('state', 'Invalid MotionBlur camera: its matrix cannot be inverted; use an invertible camera.');
     // The inverse takes full-target pixels (the velocity and depth textures) back to world space.
     fromTarget(c, values);
     values.set(c.camera.position, 16);

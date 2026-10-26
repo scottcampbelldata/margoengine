@@ -55,7 +55,8 @@ export class PostStack implements EnginePlugin {
       displays = 0;
     this.stages = effects.map((effect) => {
       const join = (effect as { joinStack?: (host: StackHost) => StackStage }).joinStack;
-      if (typeof join !== 'function') throw new TypeError(`${effect.name} cannot join a PostStack`);
+      if (typeof join !== 'function')
+        throw new TypeError(`${effect.name} cannot join a PostStack; pass a post effect.`);
       const stage = join.call(effect, this.host);
       if (rank[stage.kind] < last || (displays += +(stage.kind === 'display')) > 1)
         throw new RangeError('PostStack order: HDR effects, at most one display effect, then LDR effects');

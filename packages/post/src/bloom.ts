@@ -238,7 +238,9 @@ export class Bloom implements EnginePlugin {
       !Number.isFinite(e) ||
       Math.abs(e) > 10
     )
-      throw new RangeError('Invalid bloom options');
+      throw new RangeError(
+        'Invalid bloom options; use finite values: radius 0-1, strength 0-4, threshold 0-100, exposure -10 to 10.',
+      );
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)

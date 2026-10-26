@@ -382,7 +382,7 @@ test('Box default fitting rolls back empty roots and disposed model handles with
   await withBox(({ engine, model }) => {
     const physics = new Physics(engine, { rapier: RAPIER });
     try {
-      assert.throws(() => physics.addBody(engine.createMesh()), { message: 'No geometry' });
+      assert.throws(() => physics.addBody(engine.createMesh()), { code: 'state', message: /Mesh has no geometry/ });
       assert.equal(physics.bodyCount, 0);
       const leftover = model.root;
       model.dispose();
@@ -409,7 +409,10 @@ test('a genuine Box morph source needs an explicit collider even when discovered
     assert.equal(meshTriangles(mesh).source.morphed, true);
     const physics = new Physics(engine, { rapier: RAPIER });
     try {
-      assert.throws(() => physics.addBody(model.root), { message: 'Skinned mesh needs an explicit collider' });
+      assert.throws(() => physics.addBody(model.root), {
+        code: 'state',
+        message: /Skinned mesh needs an explicit collider/,
+      });
       assert.equal(physics.bodyCount, 0);
       const body = physics.addBody(model.root, { colliders: { shape: 'capsule', halfHeight: 0.4, radius: 0.15 } });
       assert.equal(body.colliders.length, 1);

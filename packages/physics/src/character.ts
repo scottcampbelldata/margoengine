@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { MargoError } from '@margoengine/math/errors';
 import type { Collider, KinematicCharacterController, World } from './rapier-types.js';
 import type { PhysicsBody } from './body.js';
 import { checkVec, tuple, vec, type Vec3 } from './math.js';
@@ -86,8 +87,13 @@ export class CharacterController {
     desired: Vec3,
     filter?: { groups?: number; flags?: number; predicate?: (collider: Collider) => boolean },
   ): CharacterMoveResult {
-    if (this.disposed) throw new Error('Character controller is disposed');
-    if (!this.body.valid) throw new Error('Character body was removed');
+    if (this.disposed)
+      throw new MargoError(
+        'disposed',
+        'Character controller is disposed; create a new one with physics.createCharacterController.',
+      );
+    if (!this.body.valid)
+      throw new MargoError('state', 'Character body was removed; create a new body and controller.');
     checkVec(desired, 'Desired movement');
     const collider = this.body.colliders[0];
     this.raw.computeColliderMovement(collider, vec(desired), filter?.flags, filter?.groups, filter?.predicate);

@@ -7,6 +7,7 @@ import type { TransmissionOptions } from '@margoengine/materials';
 import { PbrMaterial, type PbrMaterialProps } from './components.js';
 import { live, useMesh, useResourceEffect, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { MargoError } from '@margoengine/math/errors';
 
 export interface MeshTransmissionMaterialProps extends PbrMaterialProps, Omit<TransmissionOptions, 'opaqueColor'> {
   onError?: (error: unknown) => void;
@@ -151,7 +152,10 @@ function TransmissionBinding(props: MeshTransmissionMaterialProps) {
         });
       };
       if (registry.geometryOverride)
-        throw new Error('MeshTransmissionMaterial: only one transmission material may attach to a Mesh');
+        throw new MargoError(
+          'attached',
+          'MeshTransmissionMaterial: only one transmission material may attach to a Mesh; remove the extra one.',
+        );
       registry.geometryOverride = override;
       const attach = (target: EngineMesh) => override(target, registry.geometry ?? target.geometry);
       registry.attachments.add(attach);

@@ -8,6 +8,7 @@ import { EngineKernel } from "@margoengine/core";
 export interface WarmUpOptions {
     frames?: number;
     maxRounds?: number;
+    signal?: AbortSignal;
 }
 
 export interface WarmUpReport {
@@ -17,7 +18,7 @@ export interface WarmUpReport {
     rebooted: boolean;
 }
 
-export function warmUp(engine: EngineKernel, { frames, maxRounds }?: WarmUpOptions): Promise<WarmUpReport>;
+export function warmUp(engine: EngineKernel, { frames, maxRounds, signal }?: WarmUpOptions): Promise<WarmUpReport>;
 
 declare global {
     var margoLow: number | undefined;

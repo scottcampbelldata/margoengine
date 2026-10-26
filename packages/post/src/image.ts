@@ -385,7 +385,11 @@ export class ImagePost implements EnginePlugin {
       if (failure === undefined) {
         controller.signal.throwIfAborted();
         if (scopeFailure !== undefined) throw scopeFailure;
-        if (validationError) throw margoError('failed', `ImagePost GPU validation failed: ${validationError.message}`);
+        if (validationError)
+          throw margoError(
+            'failed',
+            `ImagePost GPU validation failed (${validationError.message}); check the input and device limits.`,
+          );
       }
     }
   }

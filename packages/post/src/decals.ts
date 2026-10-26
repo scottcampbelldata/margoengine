@@ -185,13 +185,14 @@ export class Decals implements EnginePlugin {
         (d.up !== undefined && !vec(d.up))
       )
         throw new RangeError(
-          'Invalid decal: position, direction, positive size, rect in 0..1, color >= 0, opacity 0..1, angle in (0, PI/2], mode',
+          'Invalid decal; position, direction and up need three finite numbers, size above 0, rect 0..1, color >= 0, opacity 0..1, angle in (0, PI/2], mode "multiply" or "over".',
         );
       const n = f.map((v) => v / length),
         hint: readonly number[] = d.up ?? (Math.abs(n[1]) > 0.999 ? [0, 0, 1] : [0, 1, 0]),
         r = [hint[1] * n[2] - hint[2] * n[1], hint[2] * n[0] - hint[0] * n[2], hint[0] * n[1] - hint[1] * n[0]],
         rl = Math.hypot(...r);
-      if (!(rl > 1e-6 * Math.hypot(...hint))) throw new RangeError('Decal up is parallel to its direction');
+      if (!(rl > 1e-6 * Math.hypot(...hint)))
+        throw new RangeError('Decal up is parallel to its direction; give an up vector that points another way.');
       const right = r.map((v) => v / rl),
         up = [n[1] * right[2] - n[2] * right[1], n[2] * right[0] - n[0] * right[2], n[0] * right[1] - n[1] * right[0]];
       const values = [

@@ -191,7 +191,8 @@ export class SSAO implements EnginePlugin {
     this.options.enabled = value;
   }
   add(source: SSAOSource): () => void {
-    if (!source || typeof source.draw !== 'function') throw new TypeError('Invalid SSAO source');
+    if (!source || typeof source.draw !== 'function')
+      throw new TypeError('Invalid SSAO source; pass an object with a draw() method.');
     this.sources.add(source);
     return () => this.sources.delete(source);
   }
@@ -212,7 +213,7 @@ export class SSAO implements EnginePlugin {
       s > 32 ||
       (o.enabled !== undefined && typeof o.enabled !== 'boolean')
     )
-      throw new RangeError('Invalid SSAO options');
+      throw new RangeError('Invalid SSAO options; radius must be in (0, 100], bias 0 up to radius, samples 1-32.');
   }
   /** The occlusion kernel (compute, bindings: frame, depth, gbuffer, 4x4 noise, the `kernel()` buffer, r32float output). */
   protected occlusionShader(): string {

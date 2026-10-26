@@ -7,6 +7,7 @@ import type { Vec3 } from '@margoengine/core/extension';
 import { useCommit, useResourceEffect, useScene } from './internal.js';
 import { ModelContext } from './model.js';
 import { optionalPeer } from './optional.js';
+import { MargoError } from '@margoengine/math/errors';
 
 export interface AnimationProps {
   /** A glTF animation name, or a key of `blendTrees`. */
@@ -91,7 +92,9 @@ function restore(model: PBRModel, value: Pose): void {
 function validate({ clip, playing = true, loop = true, blend = 0, speed = 1, time, parameters }: AnimationProps): void {
   if (typeof clip !== 'string' || !clip) throw new TypeError('Animation: clip must name a glTF animation');
   if (typeof playing !== 'boolean' || typeof loop !== 'boolean' || !Number.isFinite(blend) || blend < 0)
-    throw new RangeError('Animation: invalid playing, loop, or blend option');
+    throw new RangeError(
+      'Animation: playing and loop must be booleans and blend a finite number >= 0; pass valid values.',
+    );
   if (!Number.isFinite(speed) || speed < 0) throw new RangeError('Animation: speed must be a finite number >= 0');
   if (time !== undefined && (!Number.isFinite(time) || time < 0))
     throw new RangeError('Animation: time must be a finite number of seconds >= 0');
@@ -139,7 +142,9 @@ function select(current: Playback, props: AnimationProps): void {
   validate(props);
   const isClip = current.animation.clips.some((clip) => clip.name === props.clip);
   if (!isClip && !Object.hasOwn(props.blendTrees ?? {}, props.clip))
-    throw new RangeError('Animation: unknown clip "' + props.clip + '"');
+    throw new RangeError(
+      `Animation: unknown clip "${props.clip}"; use a clip name from the model or a key of blendTrees.`,
+    );
   checkTrees(current, props);
   current.animation.options.loop = props.loop ?? true;
   current.animation.options.speed = props.speed ?? 1;
@@ -209,7 +214,8 @@ export const Animation = forwardRef<AnimationHandle, AnimationProps>(function An
     },
   };
   useImperativeHandle(ref, () => handle.current!, []);
-  if (model === undefined) throw new Error('Animation requires a parent <Gltf>, <Model>, or <Fbx>');
+  if (model === undefined)
+    throw new MargoError('state', 'Animation requires a parent <Gltf>, <Model>, or <Fbx>; render it inside one.');
   const report = (error: unknown) => {
     try {
       latest.current.onError?.(error);
@@ -234,7 +240,10 @@ export const Animation = forwardRef<AnimationHandle, AnimationProps>(function An
         const api = await optionalPeer('@margoengine/animation', () => import('@margoengine/animation'));
         if (!lease.active || scene.engine.disposed || model.disposed) return;
         if (scene.engine.hasPlugin('animation:' + model.name))
-          throw new Error('Animation: this model already has an animation plugin');
+          throw new MargoError(
+            'attached',
+            'Animation: this model already has an animation plugin; mount one <Animation> per model.',
+          );
         const animation = new api.Animation(model, { loop: latest.current.loop ?? true });
         const rest = pose(model);
         owned = { animation, clip: '', prepareMixer: () => {}, resample: () => {}, layerKey: '[]', layerOff: [] };
@@ -243,7 +252,9 @@ export const Animation = forwardRef<AnimationHandle, AnimationProps>(function An
           !animation.clips.some((value) => value.name === latest.current.clip) &&
           !Object.hasOwn(latest.current.blendTrees ?? {}, latest.current.clip)
         )
-          throw new RangeError('Animation: unknown clip "' + latest.current.clip + '"');
+          throw new RangeError(
+            `Animation: unknown clip "${latest.current.clip}"; use a clip name from the model or a key of blendTrees.`,
+          );
         // A non-looping clip that reached its end fires onFinished once per run.
         const watchFinish = () => {
           const props = latest.current;
@@ -302,7 +313,10 @@ export const Animation = forwardRef<AnimationHandle, AnimationProps>(function An
               restore(model, visual);
             }
             if (scene.engine.hasPlugin(animator.name))
-              throw new Error('Animation: this model already has an animator plugin');
+              throw new MargoError(
+                'attached',
+                'Animation: this model already has an animator plugin; mount one <Animation> per model.',
+              );
             scene.engine.use(animator);
             playback.animator = animator;
             const advance = animator.onPreUpdate.bind(animator);

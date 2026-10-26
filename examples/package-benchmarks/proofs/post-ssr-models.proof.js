@@ -70,7 +70,7 @@ function story(m, make, samples, shader) {
       try {
         for (const pass of passes) pass.execute(view.c);
       } catch (error) {
-        gpu.note('throw', error.constructor.name, error.message);
+        gpu.note('throw');
       }
       view.end();
     }
