@@ -158,9 +158,11 @@ Not an instanced path: 10,000 `UnlitMaterial` meshes from `@margoengine/material
 **Before** (run `20261025-232359-1ff80aff-dev`, bench tool, 3 runs x 60 frames): Margo 166.2 ms CPU and 3.97 ms GPU per
 frame, three.js WebGL 6.3 ms CPU and 3.59 ms GPU. **Cause:** a render pass per mesh (620,124 `beginRenderPass`
 calls in 62 frames, each storing and reloading the multisampled targets). **Fix:** gltf-pro `PBRDrawRun`, one pass for
-all meshes. **After** (profile script, not the bench tool): about 91-97 ms CPU per frame. The remaining per-mesh cost
-and plan are in [known-bugs.md](../known-bugs.md#10000-materials-meshes-cost-13-times-threejs-cpu); history in
-[perf-history.md](perf-history.md) entry 21.
+all meshes. **After** (profile script, not the bench tool): about 91-97 ms CPU per frame; history in
+[perf-history.md](perf-history.md) entry 21. **Then** (entry 22: one uniform upload per frame, shared derivations and
+pipelines, one view block, instanced batches): 4.94 ms CPU against three.js WebGL's 6.52 ms (run
+`20261026-080031-fd52ab3b-dev`, bench tool, 3 runs). Materials scenes still slower are in
+[known-bugs.md](../known-bugs.md#materials-scenes-still-slower-than-threejs).
 
 ## Answer
 

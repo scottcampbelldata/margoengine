@@ -218,9 +218,72 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
 - **After (diagnostic):** 166 -> about 80-97 ms per frame (profile script, busy machine, 3 runs 93.6, 91.2, 97.3 ms;
   the bench tool could not take the GPU lock for hours). Still 13-15 times three.js: the cost left is per-mesh work
   (one `queue.writeBuffer`, three `setBindGroup`, `setPipeline` and two buffer binds per mesh, plus about 3 us of
-  JavaScript per mesh), listed in [known-bugs.md](../known-bugs.md#10000-materials-meshes-cost-13-times-threejs-cpu).
+  JavaScript per mesh), listed in [known-bugs.md](../known-bugs.md#materials-scenes-still-slower-than-threejs); entry 22 has what came next.
 - **Rerun:** `npm run bench -- parity --cases=p-unlit --engines=margo,three-webgl-parity --runs=3`.
 - **Guard:** `packages/materials/tests/shared-pass.test.js` (10 meshes, one pass; a blended mesh keeps its own).
+
+### 22. Materials meshes: per-mesh draw work
+
+- **Loss:** after entry 21, 10,000 `@margoengine/materials` meshes still cost about 80-97 ms of CPU per frame
+  (profile script) against three.js WebGL's 6.3 ms (`p-unlit`; entry 21 keeps the 166.2 ms first result). The other
+  materials scenes of the speed matrix were as far behind ([perf-vs-threejs.md](perf-vs-threejs.md), first run).
+- **Causes, measured** (CPU profiles of the bench page and of a mock-device frame of the same meshes; wrapper counts of
+  WebGPU calls):
+  1. a `queue.writeBuffer` per mesh, 10,000 a frame (about 8 ms);
+  2. each draw derived its shader text, searched a pipeline history and ran every shading and lighting callback, and
+     every mesh owned its own pipelines (10,001 shader modules at build);
+  3. each draw's uniform held the camera rows, so a moving camera changed every mesh's block: about 10 MB uploaded per
+     frame, and compared and copied on the CPU;
+  4. a draw call per mesh: `setPipeline`, three `setBindGroup`, two buffer binds and `drawIndexed`, plus the `draw()`
+     set-up for every mesh;
+  5. per-frame text work: a regular expression over the core shader per draw (`sectionState`), the physical-maps
+     specialization (28% of the 400-sphere physical frame) and a scan of each finished shader;
+  6. the materials queue walked every mesh once for its phase check and again to draw it, and found each draw's batch
+     through a `Map`;
+  7. a blended mesh ended and began the render pass around itself, so 2,000 transparent meshes were 2,000 passes.
+- **Fixes** (one commit each): a per-device uniform arena, one upload per frame (`uniform-arena.ts`); one derivation per
+  material record per frame and device-wide pipelines (`draw-memo.ts`); a 192-byte view block shared by every draw of a
+  view (`view-uniform.ts`); a run draws meshes of one material record and geometry as one instanced draw, rows written
+  only where a mesh moved (`draw-batch.ts`), through a short path in `draw()`; caches for the section binding, the
+  physical-maps shader and the model-row scan; the phase check beside each draw; the batch kept on its derivation; a
+  run's blended draws continue its pass.
+- **Image:** the same picture: SSIM and delta E against three.js as in the first run for every scene (for example
+  `p-unlit` 0.997 / 0.34, `p-transparency` 0.983 / 2.44, `p-blending` 1 / 0).
+- **After (diagnostic, busy machine, RTX A6000, 3 runs each; runs `20261026-071108`, `20261026-073905` and
+  `20261026-080031`, rows in [perf-vs-threejs.md](perf-vs-threejs.md)):** Margo against the faster three.js backend,
+  CPU ms per frame.
+
+  | Scene | Margo | three.js |
+  | --- | --- | --- |
+  | `p-unlit` (10,000) | 4.94 | 6.52 |
+  | `p-lambert` | 7.37 | 7.56 |
+  | `p-phong` | 5.22 | 7.65 |
+  | `p-toon` | 4.60 | 7.53 |
+  | `p-matcap` | 4.83 | 7.29 |
+  | `p-normal-material` | 3.31 | 7.02 |
+  | `p-depth-material` | 3.37 | 5.74 |
+  | `p-double-sided` | 4.37 | 7.20 |
+  | `p-alpha-test` | 1.17 | 2.58 |
+  | `p-physical` | 0.29 | 0.39 |
+  | `p-clipping` | 6.60 | 9.00 |
+  | `p-attributes` | 4.70 | 8.20 |
+  | `p-maps` | 0.27 | 0.77 |
+  | `p-transmission` | 0.46 | 0.98 |
+  | `p-shadow-catcher` | 0.93 | 1.67 |
+  | `p-wireframe` | 1.48 | 0.66 (slower) |
+  | `p-transparency` (2,000) | 4.08 (was 12.5 before the pass fix) | 1.70 (slower) |
+  | `p-blending` (2,000) | 5.75 (was 16.7) | 1.33 (slower) |
+  | `p-uv-transform` (4,096 materials) | 63.6 | 6.31 (slower) |
+
+  The four slower scenes are open losses in [known-bugs.md](../known-bugs.md#materials-scenes-still-slower-than-threejs).
+- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity
+  --cases=p-unlit,p-lambert,p-phong,p-toon,p-matcap,p-normal-material,p-depth-material,p-double-sided,p-alpha-test,p-physical,p-clipping,p-attributes,p-maps,p-transmission,p-shadow-catcher,p-wireframe,p-transparency,p-blending,p-uv-transform
+  --runs=3`, then `node bench/parity-report.mjs <run.json> --partial`.
+- **Guard:** `packages/materials/tests/shared-derivation.test.js` (one derivation, one instanced draw for 20 meshes,
+  instance rows in mesh order, a moved mesh uploads 96 bytes, a moving camera 192), `shared-pass.test.js` (one pass,
+  blended meshes included; a phase change draws each mesh once, in its new phase), `physical-maps-cache.test.js`,
+  `tests/gltf-pro-uniform-writers.test.js`, `packages/gltf-pro/tests/views.test.js` (two views keep their cameras at
+  submit).
 
 ## Size of the frozen core
 
@@ -419,6 +482,9 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   - Still open: `createInstancedMesh` vertex fetch at 10k-50k, the 1k GPU cost of a package pass, and CPU for moving
     instances. Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
   - [claims.md](claims.md) records that there is no publishable result yet.
+- **Four materials scenes of the speed matrix** (entry 22): `p-uv-transform` 63.6 against 6.31 ms CPU, `p-blending`
+  5.75 against 1.33, `p-transparency` 4.08 against 1.70, `p-wireframe` 1.48 against 0.66 (diagnostic). Causes and plan:
+  [known-bugs.md](../known-bugs.md#materials-scenes-still-slower-than-threejs).
 - **Galaxy S23 Ultra island demo.** A report of 3–5 FPS on that phone, with particles off making no difference.
   - Partial fixes: `909e384a`, and `1c627cdc` (scatter compiles the fade `discard` only when instances can fade).
   - No after number is recorded. The project has no S23 to test on.
