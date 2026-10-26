@@ -1,5 +1,5 @@
 {
-  "commit": "c95275a1",
+  "commit": "00d18f4f",
   "dirty": false,
   "browser": "msedge 156.0.4314.42 headless",
   "adapter": "nvidia ampere",
@@ -11,8 +11,17 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 374,
+      "gzip": 370,
       "brotli": 228
+    },
+    {
+      "path": "assets/index-Bk1Rs0-D.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 23699,
+      "raw": 58102,
+      "gzip": 23318,
+      "brotli": 20570
     },
     {
       "path": "assets/geometry-DT4GWWnY.js",
@@ -22,15 +31,6 @@
       "raw": 2289,
       "gzip": 1165,
       "brotli": 1049
-    },
-    {
-      "path": "assets/index-DRzWLwXK.js",
-      "role": "Entry: core + stage + app",
-      "encoding": "gzip",
-      "transferred": 23700,
-      "raw": 58102,
-      "gzip": 23319,
-      "brotli": 20541
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 33689,
+    "transferred": 33688,
     "raw": 75164,
-    "gzip": 30676,
-    "brotli": 26995
+    "gzip": 30671,
+    "brotli": 27024
   },
   "notFetched": [
     {
@@ -81,10 +81,6 @@
       "raw": 19095
     },
     {
-      "path": "assets/dist-9iF4oFj6.js",
-      "raw": 44
-    },
-    {
       "path": "assets/dist-BEUo_LQ7.js",
       "raw": 87886
     },
@@ -93,12 +89,16 @@
       "raw": 66834
     },
     {
-      "path": "assets/dist-D6iANQTi.js",
+      "path": "assets/dist-CqkOg2TY.js",
       "raw": 41515
     },
     {
-      "path": "assets/dist-F1kCSmCG.js",
-      "raw": 36022
+      "path": "assets/dist-DFDfWT29.js",
+      "raw": 36994
+    },
+    {
+      "path": "assets/dist-fZfJqsY-.js",
+      "raw": 44
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",
@@ -109,11 +109,11 @@
       "raw": 97856
     },
     {
-      "path": "assets/particles-B8nayEmK.js",
-      "raw": 28511
+      "path": "assets/particles-C-ZxNXRm.js",
+      "raw": 29218
     },
     {
-      "path": "assets/particles-BPtFOrJb.js",
+      "path": "assets/particles-C310_Kgr.js",
       "raw": 55
     },
     {
@@ -125,12 +125,12 @@
       "raw": 52
     },
     {
-      "path": "assets/sky-9iF4oFj6.js",
-      "raw": 44
+      "path": "assets/sky-B0AP5oFk.js",
+      "raw": 21585
     },
     {
-      "path": "assets/sky-BWzK9mBP.js",
-      "raw": 21359
+      "path": "assets/sky-fZfJqsY-.js",
+      "raw": 44
     },
     {
       "path": "assets/validate-DE7v94fO.js",
