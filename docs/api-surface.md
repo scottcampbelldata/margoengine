@@ -13,7 +13,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 
 | Package | Exports per entry | Unexported | `any` | Gzip |
 | --- | --- | ---: | ---: | ---: |
-| @margoengine/animation | `.` 39, `./vat` 14, `./sampling` 3, `./pointer` 4, `./skeleton-utils` 6 | 44 |  | 18,977 |
+| @margoengine/animation | `.` 39, `./vat` 14, `./sampling` 3, `./pointer` 4, `./skeleton-utils` 6 | 44 |  | 19,175 |
 | @margoengine/animator | `.` 32 |  |  | 16,866 |
 | @margoengine/audio | `.` 19 | 2 |  | 7,625 |
 | @margoengine/blender | `.` 5 |  |  | 3,744 |
@@ -36,7 +36,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/fsm | `.` 3 |  |  | 971 |
 | @margoengine/geometry | `.` 64, `./shapes` 20, `./triangulate` 5, `./extrude` 3, `./primitives` 17, `./utils` 21, `./extras` 6 | 15 |  | 20,231 |
 | @margoengine/gltf | `.` 4 |  |  | 5,720 |
-| @margoengine/gltf-pro | `.` 43, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 333 |  | 53,433 |
+| @margoengine/gltf-pro | `.` 43, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 333 |  | 53,782 |
 | @margoengine/html | `.` 7 |  |  | 4,851 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,568 |
 | @margoengine/input | `.` 12 |  |  | 4,912 |
@@ -76,7 +76,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/stage | `.` 24 | 1 |  | 2,941 |
 | @margoengine/staging | `.` 4 |  |  | 6,040 |
 | @margoengine/stats | `.` 3 |  |  | 4,897 |
-| @margoengine/taa | `.` 7 |  |  | 9,819 |
+| @margoengine/taa | `.` 7 |  |  | 10,087 |
 | @margoengine/terrain | `.` 13 | 2 |  | 10,289 |
 | @margoengine/text | `.` 35 | 2 |  | 15,647 |
 | @margoengine/tonemap | `.` 7 |  |  | 10,825 |

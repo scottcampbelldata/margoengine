@@ -176,6 +176,76 @@ test('Core picking resolves null when the device is lost during the readback, an
   }
 });
 
+test('Core picking compiles its pipeline once per shader text and counts it toward the shader limit', async (t) => {
+  for (const [key, value] of Object.entries({
+    GPUBufferUsage: { UNIFORM: 1, COPY_DST: 2, MAP_READ: 4 },
+    GPUTextureUsage: { RENDER_ATTACHMENT: 1, COPY_SRC: 2 },
+    GPUMapMode: { READ: 1 },
+  })) {
+    const old = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+    t.after(() => (old ? Object.defineProperty(globalThis, key, old) : delete globalThis[key]));
+  }
+  const modules = [],
+    pipelines = [];
+  const resource = () => ({
+    destroy() {},
+    createView: () => ({}),
+    mapAsync: async () => {},
+    getMappedRange: () => new Uint32Array([0xffffffff]).buffer,
+    unmap() {},
+  });
+  const device = {
+    createBuffer: resource,
+    createTexture: resource,
+    createBindGroup: () => ({}),
+    lost: new Promise(() => {}),
+    addEventListener() {},
+    destroy() {},
+    queue: { writeBuffer() {}, submit() {} },
+    createShaderModule: (d) => (modules.push(d.code), {}),
+    createRenderPipeline: (d) => (pipelines.push(d), { getBindGroupLayout: () => ({}) }),
+    createCommandEncoder: () => ({
+      copyTextureToBuffer() {},
+      finish: () => ({}),
+      beginRenderPass: () => ({ setPipeline() {}, setBindGroup() {}, end() {} }),
+    }),
+  };
+  const renderer = new GPURenderer(
+    { width: 4, height: 4 },
+    device,
+    { configure() {}, unconfigure() {} },
+    'bgra8unorm',
+    { getBindGroupLayout: () => ({}) },
+    { multisample: { count: 4 }, depthStencil: { format: 'depth32float' } },
+    { getBindGroupLayout: () => ({}) },
+  );
+  const camera = new Camera();
+  camera.update(1, true);
+  const light = { direction: new Float32Array(4), radiance: new Float32Array(4) },
+    graph = new FrameGraph();
+  let patch = '';
+  graph.add({ name: 'patch', order: 1, execute() {}, prepare: (c) => void (c.shader = patch + c.shader) });
+  try {
+    for (let i = 0; i < 5; i++) assert.equal(await renderer.pick(camera, light, [], graph, 0, 0), null);
+    assert.equal(pipelines.length, 1, 'each pick compiled its own pipeline');
+    assert.equal(pipelines[0].fragment.targets[0].format, 'r32uint');
+    patch = '\n// variant';
+    await renderer.pick(camera, light, [], graph, 0, 0);
+    patch = '';
+    await renderer.pick(camera, light, [], graph, 0, 0);
+    assert.equal(pipelines.length, 2, 'a hook that changes the shader text needs its own pick pipeline, kept');
+    for (let i = 2; i < 64; i++) {
+      patch = `\n// ${i}`;
+      await renderer.pick(camera, light, [], graph, 0, 0);
+    }
+    patch = '\n// overflow';
+    await assert.rejects(renderer.pick(camera, light, [], graph, 0, 0), /Shader limit: 64/);
+  } finally {
+    renderer.dispose();
+  }
+});
+
 test('Core draw bindings observe mutable buffer ranges and shader variants observe depth format', (t) => {
   for (const [key, value] of Object.entries({
     GPUBufferUsage: { UNIFORM: 1, COPY_DST: 2 },

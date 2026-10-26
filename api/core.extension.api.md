@@ -174,6 +174,7 @@ export class Mesh {
     readonly scene: Scene;
     [Symbol.dispose]: () => void;
     name: string;
+    kids?: Set<number>;
     readonly position: VectorRef;
     readonly rotation: VectorRef;
     readonly scale: VectorRef;

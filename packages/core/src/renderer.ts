@@ -433,22 +433,11 @@ export class GPURenderer implements Renderer {
           (context.shader !== wgsl || context.format !== this.format || context.descriptor !== this.descriptor)
         ) {
           const key = context.descriptor.multisample?.count + context.format + context.descriptor.depthStencil?.format;
-          // Keep shader source separate: hashing a new concatenated shader key
-          // flattens its entire string on every draw, even on cache hits.
-          let cached: GPURenderPipeline | undefined;
-          for (const variant of this.variants)
-            if (variant[0] === context.shader && variant[1] === key) cached = variant[2];
-          if (!cached) {
-            if (this.variants.length >= 64) throw rangeError('Shader limit: 64', 'limits');
-            const module = this.device.createShaderModule({ code: context.shader });
-            cached = this.device.createRenderPipeline({
-              ...context.descriptor,
-              vertex: { ...this.descriptor.vertex, module },
-              fragment: { ...this.descriptor.fragment!, module, targets: [{ format: context.format }] },
-            });
-            this.variants.push([context.shader, key, cached]);
-          }
-          pipeline = cached;
+          pipeline = this.variant(context.shader, key, (module) => ({
+            ...context.descriptor,
+            vertex: { ...this.descriptor.vertex, module },
+            fragment: { ...this.descriptor.fragment!, module, targets: [{ format: context.format }] },
+          }));
         }
         let group = this.bindGroup;
         if (pipeline !== this.pipeline || bindings.length) {
@@ -550,22 +539,7 @@ export class GPURenderer implements Renderer {
               pass.setBindGroup(0, p === pipeline ? group : this.culledGroup);
             }
             const resource = this.resources.get(batch.geometry)!;
-            // Upload only the changed range, everything into a new buffer.
-            if (resource.frame !== this.frameId) {
-              const start = resource.frame < 0 ? 0 : (batch.start ?? 0),
-                end = Math.min(resource.frame < 0 ? 1 / 0 : (batch.end ?? 1 / 0), batch.count * 24);
-              if (end > start)
-                this.device.queue.writeBuffer(
-                  resource.instance,
-                  start * 4,
-                  batch.instances as Float32Array<ArrayBuffer>,
-                  start,
-                  end - start,
-                );
-              batch.start = 1 / 0;
-              batch.end = 0;
-              resource.frame = this.frameId;
-            }
+            if (resource.frame !== this.frameId) this.upload(batch, resource, this.frameId);
             const redirect = batch.redirect;
             pass.setVertexBuffer(0, resource.vertex);
             pass.setVertexBuffer(1, redirect?.instances ?? resource.instance);
@@ -709,6 +683,37 @@ export class GPURenderer implements Renderer {
     pass.draw(3);
     pass.end();
   }
+  /** Uploads the batch's changed instance range (all of it into a buffer not yet written), marked as `frame`'s. */
+  private upload(batch: Batch, resource: { instance: GPUBuffer; frame: number }, frame: number): void {
+    const start = resource.frame < 0 ? 0 : (batch.start ?? 0),
+      end = Math.min(resource.frame < 0 ? 1 / 0 : (batch.end ?? 1 / 0), batch.count * 24);
+    if (end > start)
+      this.device.queue.writeBuffer(
+        resource.instance,
+        start * 4,
+        batch.instances as Float32Array<ArrayBuffer>,
+        start,
+        end - start,
+      );
+    batch.start = 1 / 0;
+    batch.end = 0;
+    resource.frame = frame;
+  }
+  /**
+   * The cached pipeline for shader text and key (draw variants, and pick pipelines with key ''), made on first use.
+   * Shader source stays a separate field: hashing a concatenated key would flatten the whole string on every draw.
+   */
+  private variant(
+    code: string,
+    key: string,
+    descriptor: (module: GPUShaderModule) => GPURenderPipelineDescriptor,
+  ): GPURenderPipeline {
+    for (const variant of this.variants) if (variant[0] === code && variant[1] === key) return variant[2];
+    if (this.variants.length >= 64) throw rangeError('Shader limit: 64', 'limits');
+    const pipeline = this.device.createRenderPipeline(descriptor(this.device.createShaderModule({ code })));
+    this.variants.push([code, key, pipeline]);
+    return pipeline;
+  }
   async pick(
     camera: Camera,
     lighting: Lighting,
@@ -775,14 +780,14 @@ export class GPURenderer implements Renderer {
         .replace('o.color=i.color.rgb', 'o.id=u32(i.factors.w);o.color=i.color.rgb')
         .replace('->@location(0) vec4f {', '->@location(0) u32 {')
         .replace(/let n=normalize\(i.normal\)[\s\S]*$/, 'return i.id;\n}');
-      const module = device.createShaderModule({ code }),
-        pipeline = device.createRenderPipeline({
+      // Cached like draw variants: compiling a pick pipeline every call cost about 3 ms a pick.
+      const pipeline = this.variant(code, '', (module) => ({
           ...this.descriptor,
           multisample: { count: 1 },
           vertex: { ...this.descriptor.vertex, module },
           fragment: { module, entryPoint: 'fragment', targets: [{ format: 'r32uint' }] },
           depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater-equal' },
-        }),
+        })),
         group = device.createBindGroup({
           layout: pipeline.getBindGroupLayout(0),
           entries: [{ binding: 0, resource: { buffer: uniform } }, ...context.bindings],
@@ -803,8 +808,9 @@ export class GPURenderer implements Renderer {
       for (const batch of batches)
         if (batch.count) {
           const r = this.resources.get(batch.geometry)!;
-          device.queue.writeBuffer(r.instance, 0, batch.instances as Float32Array<ArrayBuffer>, 0, batch.count * 24);
-          r.frame = -1;
+          // Only the changed range, as a frame does (rewriting every instance cost each pick 960 KB for 10k meshes); the
+          // next frame then has nothing left to upload. Before the first frame, frameId - 1 is -1: upload all again.
+          this.upload(batch, r, this.frameId - 1);
           pass.setVertexBuffer(0, r.vertex);
           pass.setVertexBuffer(1, r.instance);
           pass.setIndexBuffer(r.index, 'uint32');

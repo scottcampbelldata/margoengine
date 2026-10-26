@@ -175,6 +175,8 @@ export class Mesh {
   /** `dispose()`, for `using` (set at the end of this file where the runtime has `Symbol.dispose`). */
   declare [Symbol.dispose]: () => void;
   name = '';
+  /** @internal Ids of this mesh's children, so removing it unparents them without scanning every slot. */
+  declare kids?: Set<number>;
   readonly position = new VectorRef(this, 'position');
   readonly rotation = new VectorRef(this, 'rotation');
   readonly scale = new VectorRef(this, 'scale');
@@ -288,7 +290,10 @@ export class Mesh {
       if (id === this.id) throw typeError('Hierarchy cycle', 'hierarchy');
       if (++depth >= 64) throw rangeError('Parent depth: 64', 'hierarchy');
     }
-    this.engine.store.parents[this.id] = parent?.id ?? -1;
+    const parents = this.engine.store.parents;
+    this.engine.meshes.get(parents[this.id])?.kids?.delete(this.id);
+    if (parent) (parent.kids ??= new Set()).add(this.id);
+    parents[this.id] = parent?.id ?? -1;
     return this;
   }
   setGeometry(geometry: Geometry | null): this {
@@ -658,11 +663,13 @@ export class Engine {
     }
   }
   remove(mesh: Mesh): void {
-    // Detach children with a native scan of the parent column (free slots are reset on reuse); skipped when the engine goes.
+    // Detach the children and leave the parent's child set (free slots are reset on reuse); skipped when the engine goes.
     const parents = this.store.parents;
     mesh.check();
-    if (!this.disposing)
-      for (let id = parents.indexOf(mesh.id); id >= 0; id = parents.indexOf(mesh.id, id + 1)) parents[id] = -1;
+    if (!this.disposing) {
+      for (const id of mesh.kids ?? []) parents[id] = -1;
+      mesh.setParent(null);
+    }
     if (mesh.geometry) this.release(mesh.geometry);
     this.meshes.delete(mesh.id);
     (mesh.scene.meshes as Map<number, Mesh>).delete(mesh.id);
