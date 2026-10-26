@@ -6,7 +6,7 @@
 // runs anything, naming the script.
 // Options: --no-build (dist is current), --only=<substring> (run matching tests), --select=<id>,<id> (run exactly these:
 // `<dir>/<script>` or `root/<script>`, see testId; check:merge passes the ones a change affects), --list (print the plan).
-// Holds the GPU lock (scripts/gpu-lock.mjs) for the whole run; each test's result and time go to
+// Holds one shared slot of the GPU lock (scripts/gpu-lock.mjs, up to 3 at once) for the whole run; each test's result and time go to
 // test-results/gpu-packages.json.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -153,7 +153,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     process.exit(0);
   }
   // Children taking this same lock run inside it; any other lock they take is still taken.
-  const env = { ...process.env, MARGO_GPU_LOCK_NESTED: join(lockDir, 'nested') };
+  const env = { ...process.env, MARGO_GPU_LOCK_NESTED: join(lockDir, 'nested'), MARGO_GPU_LOCK_NESTED_MODE: 'shared' };
   const run = (command, cwd) => {
     const t0 = performance.now();
     const { status } = spawnSync(command, { cwd: join(root, cwd), shell: true, stdio: 'inherit', env });
@@ -163,7 +163,8 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (!process.argv.includes('--no-build') && !run('npm run build:packages', '.').ok)
     throw new Error('npm run build:packages failed; fix the build first');
   // A short poll: other holders often release and take the lock again within seconds.
-  const release = await acquire({ owner: 'check:gpu-packages', poll: 2000 });
+  // Held for the whole run (about 10 min alone, 15 with another run beside it), so the hold limit is 60 min.
+  const release = await acquire({ owner: 'check:gpu-packages', mode: 'shared', max: 60, poll: 2000 });
   const started = performance.now();
   const results = [];
   try {

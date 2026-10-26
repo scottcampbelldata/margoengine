@@ -8,32 +8,16 @@
 // Writes examples/package-benchmarks/results/gates-memory.json.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { acPower } from '../cad/power.mjs';
 import { rich, binary } from '../../../packages/fbx/test/fixtures.js';
+import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const cycles = +(process.argv.find((a) => a.startsWith('--cycles='))?.split('=')[1] ?? 20);
-const lock =
-  process.env.MARGO_GPU_LOCK_NESTED ??
-  resolve(
-    dirname(
-      execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim(),
-    ),
-    'test-results/gpu.lock',
-  );
-for (;;) {
-  try {
-    mkdirSync(lock);
-    break;
-  } catch (e) {
-    if (e.code !== 'EEXIST') throw e;
-    console.log('gpu.lock held, waiting');
-    await new Promise((r) => setTimeout(r, 15_000));
-  }
-}
+// Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
+const releaseGpu = await acquire({ owner: 'gate-memory', mode: 'exclusive' });
 mkdirSync('test-results', { recursive: true });
 // The fbx package's test fixture (pivots, inherit types, n-gons, layered attributes, materials, skin, blend shape, clips) as zlib binary FBX.
 writeFileSync('test-results/gates-fbx-rich.fbx', binary(rich({ morphAnimation: true }), { compress: true }));
@@ -136,5 +120,5 @@ try {
   console.log('memory gate passed; wrote examples/package-benchmarks/results/gates-memory.json');
 } finally {
   await context?.close();
-  rmSync(lock, { recursive: true, force: true });
+  releaseGpu();
 }

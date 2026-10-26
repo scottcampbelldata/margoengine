@@ -3,8 +3,9 @@
 //   npm run visual:update [-- --only=...] [--runs=3] [--no-build]             re-capture baselines and noise tolerances
 //   npm run visual:device-loss [-- --only=...] [--no-build]                     device loss in every site demo (5i.d)
 // Run `npm run build:packages` first; the script builds the site (scripts/build-site.js) and serves site/dist.
-// Refuses on battery, takes test-results/gpu.lock in the main checkout (waits, polling every 60 s), and discards the
-// run if AC power is lost. Report, actual and diff images: test-results/visual/index.html.
+// Refuses on battery, takes a shared slot of test-results/gpu.lock in the main checkout (scripts/gpu-lock.mjs: up to 3
+// correctness checks at once, waits behind a benchmark), and discards the run if AC power is lost.
+// Report, actual and diff images: test-results/visual/index.html (with checks side by side, the last to finish writes it).
 // --device-loss (site demos only, one run): after the normal capture, every GPUDevice the page made is destroyed at the
 // start of its next render pass (mid-frame; a demo that renders no frame within 2 s is hit while idle). Core restores
 // the device and the packages their GPU state; a view passes once a new device has submitted work and the capture
@@ -23,11 +24,12 @@ import { chromium } from '@playwright/test';
 import { preview, createServer } from 'vite';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { mkdir, rm, readFile, writeFile, copyFile } from 'node:fs/promises';
-import { rmSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve } from 'node:path';
 import { deflateSync, crc32 } from 'node:zlib';
 import { decodePNG } from '../tests/support/png.js';
 import { acPower } from '../examples/package-benchmarks/cad/power.mjs';
+import { acquire } from './gpu-lock.mjs';
+import { clearVisualOutput } from './support/visual-output.js';
 import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { demos } from './support/visual-demos.js';
 import { margoError } from '../packages/shared/errors.js';
@@ -238,35 +240,14 @@ if (acPower() === false) {
   console.error('On battery: refusing to run (GPU and CPU are throttled). Plug in and retry.');
   process.exit(1);
 }
-const lock =
-  process.env.MARGO_GPU_LOCK_NESTED ??
-  resolve(
-    dirname(
-      execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
-        cwd: root,
-        encoding: 'utf8',
-      }).trim(),
-    ),
-    'test-results/gpu.lock',
-  );
 if (!process.argv.includes('--no-build') && cases.some((c) => !c.demo.dev)) {
   const built = spawnSync(process.execPath, ['scripts/build-site.js'], { cwd: root, stdio: 'inherit' });
   if (built.status !== 0) process.exit(built.status ?? 1);
 }
-await mkdir(dirname(lock), { recursive: true });
-for (;;) {
-  try {
-    await mkdir(lock);
-    break;
-  } catch (e) {
-    if (e.code !== 'EEXIST') throw e;
-    console.log('gpu.lock held, waiting 60 s');
-    await new Promise((r) => setTimeout(r, 60_000));
-  }
-}
-const unlock = () => rmSync(lock, { recursive: true, force: true });
+// A correctness check: it shares the GPU (up to MARGO_GPU_SLOTS at once; scripts/gpu-lock.mjs).
+const releaseGpu = await acquire({ owner: 'visual-check', mode: 'shared' });
 process.on('SIGINT', () => {
-  unlock();
+  releaseGpu();
   process.exit(130);
 });
 
@@ -282,8 +263,7 @@ let server,
   environment = {},
   exitCode = 0;
 try {
-  await rm(out, { recursive: true, force: true });
-  await mkdir(out, { recursive: true });
+  await clearVisualOutput(out, { mine: cases.map((c) => c.id), known: allCases.map((c) => c.id) });
   const powerBefore = acPower(),
     sourceChangesBefore = changedRenderedInputs();
   if (cases.some((c) => !c.demo.dev))
@@ -580,6 +560,6 @@ try {
 } finally {
   await server?.close();
   await devServer?.close();
-  unlock();
+  releaseGpu();
 }
 process.exit(exitCode);

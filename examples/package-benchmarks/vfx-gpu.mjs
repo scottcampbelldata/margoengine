@@ -10,9 +10,10 @@
 // nothing occludes them (worst case). Writes examples/package-benchmarks/results/vfx-gpu-<label>.json.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
+import { acquire } from '../../scripts/gpu-lock.mjs';
 
 const arg = (name, fallback) =>
   process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -38,24 +39,8 @@ const power = () =>
     ],
     { encoding: 'utf8' },
   ).trim() === 'True';
-const lock =
-  process.env.MARGO_GPU_LOCK_NESTED ??
-  resolve(
-    dirname(
-      execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim(),
-    ),
-    'test-results/gpu.lock',
-  );
-for (;;) {
-  try {
-    mkdirSync(lock);
-    break;
-  } catch (e) {
-    if (e.code !== 'EEXIST') throw e;
-    console.log('GPU lock held, waiting');
-    await new Promise((r) => setTimeout(r, 15000));
-  }
-}
+// Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
+const releaseGpu = await acquire({ owner: 'vfx-gpu', mode: 'exclusive' });
 let browser;
 try {
   const report = {
@@ -101,7 +86,7 @@ try {
   console.log('wrote', out);
 } finally {
   await browser?.close();
-  rmdirSync(lock);
+  releaseGpu();
 }
 
 /** Shared page setup: device, render targets, the island camera and a frame context for VFX.simulate/draw. */

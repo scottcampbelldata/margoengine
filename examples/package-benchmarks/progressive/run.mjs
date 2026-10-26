@@ -114,7 +114,7 @@ const report = {
 };
 async function withBrowser(work) {
   if (!diagnostic) report.machine.push(await waitForQuiet());
-  const release = await acquire({ owner, poll: 60_000 });
+  const release = await acquire({ owner, mode: 'exclusive', poll: 60_000 });
   let context;
   try {
     assert.notEqual(acPower(), false, 'On battery');

@@ -2,8 +2,8 @@
 // log in test-results/nightly/<YYYY-MM-DD>T<HHMM>.log (output of the run, then a one-line result). Exit code = the
 // run's. It registers nothing with the OS; schedule it with whatever runs jobs on this PC:
 //   node scripts/nightly-full.mjs
-// Run it from a checkout at the commit to test (the main checkout, after `git pull --ff-only`). Takes the GPU lock for
-// the whole run (the steps inside nest under it), so landing runs wait their turn.
+// Run it from a checkout at the commit to test (the main checkout, after `git pull --ff-only`). Takes the GPU lock exclusively (it
+// includes timed steps) for the whole run (the steps inside nest under it), so landing runs wait their turn.
 import { spawn } from 'node:child_process';
 import { createWriteStream, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -20,7 +20,17 @@ export const stamp = (date = new Date()) => {
 /** The command that runs the full check under the GPU lock. */
 export const nightlyCommand = () => [
   process.execPath,
-  ['scripts/gpu-lock.mjs', 'run', '--owner=nightly-full', '--', 'npm', 'run', 'check:merge:full'],
+  [
+    'scripts/gpu-lock.mjs',
+    'run',
+    '--owner=nightly-full',
+    '--exclusive',
+    '--max=240',
+    '--',
+    'npm',
+    'run',
+    'check:merge:full',
+  ],
 ];
 
 async function main() {

@@ -37,7 +37,7 @@ const stats = (list) => {
   };
 };
 
-const release = await acquire({ owner: 'voxel-sandbox-bench' });
+const release = await acquire({ owner: 'voxel-sandbox-bench', mode: 'exclusive' });
 let context;
 try {
   let quiet;

@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { buildPages, browserSession, externalEngines, serve } from './lib/browser.mjs';
 import { environment, mainRoot, root } from './lib/env.mjs';
+import { lockDir } from '../scripts/gpu-lock.mjs';
 import { openGate, settle } from './lib/gate.mjs';
 import {
   SCHEMA,
@@ -123,7 +124,8 @@ if (timed) {
   result.gate = gate.record;
   result.invalid.push(...gate.invalid);
   // Child processes a suite starts (scripts that take the GPU lock themselves) must not wait for this run's lock.
-  if (needsGpu) process.env.MARGO_GPU_LOCK_NESTED ??= join(gate.record.lock.dir, 'nested');
+  process.env.MARGO_GPU_LOCK_NESTED ??= join(lockDir, 'nested');
+  process.env.MARGO_GPU_LOCK_NESTED_MODE ??= 'exclusive';
 }
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'])
   process.on(signal, () => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
-import { openBrowser } from './browser.js';
+import { listenWhenFree, openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
 import { preview } from 'vite';
 const browser = await openBrowser({ startPath: '/tests/modern.html' }),
@@ -106,12 +106,16 @@ try {
     name: 'Six simultaneous planes intersect into a closed box with solid reversed-depth caps',
     pixel: cap,
   });
-  starter = await preview({
-    root: 'examples/vite',
-    configFile: false,
-    logLevel: 'error',
-    preview: { host: '127.0.0.1', port: 5194, strictPort: true },
-  });
+  starter = await listenWhenFree(
+    () =>
+      preview({
+        root: 'examples/vite',
+        configFile: false,
+        logLevel: 'error',
+        preview: { host: '127.0.0.1', port: 5194, strictPort: true },
+      }),
+    { port: 5194 },
+  );
   await page.goto('http://127.0.0.1:5194/');
   await page.waitForFunction(() => document.querySelector('.badge')?.textContent?.includes('webgpu'));
   await page.getByText('Domain tools', { exact: true }).click();

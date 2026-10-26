@@ -3,7 +3,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { preview } from 'vite';
-import { openBrowser } from './browser.js';
+import { listenWhenFree, openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
 const context = await openBrowser({ startPath: '/tests/modern.html' }),
   { page, hardware } = context,
@@ -133,12 +133,16 @@ try {
     assert.ok(!manifest['index.html'].imports?.includes(key));
     chunks[name] = manifest[key].file;
   }
-  vite = await preview({
-    root: 'examples/vite',
-    configFile: false,
-    logLevel: 'error',
-    preview: { host: '127.0.0.1', port: 5194, strictPort: true },
-  });
+  vite = await listenWhenFree(
+    () =>
+      preview({
+        root: 'examples/vite',
+        configFile: false,
+        logLevel: 'error',
+        preview: { host: '127.0.0.1', port: 5194, strictPort: true },
+      }),
+    { port: 5194 },
+  );
   page.on('request', (request) => requests.add(new URL(request.url()).pathname.slice(1)));
   await page.goto('http://127.0.0.1:5194');
   await page.getByText('Rust / Wasm + webgpu', { exact: true }).waitFor();

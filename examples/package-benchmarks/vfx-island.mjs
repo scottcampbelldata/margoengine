@@ -8,10 +8,11 @@
 // simulate + draw passes. Variant "off" (always included) has no particles. Sky time and camera are frozen.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
+import { acquire } from '../../scripts/gpu-lock.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
   arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -38,24 +39,8 @@ const power = () =>
     ],
     { encoding: 'utf8' },
   ).trim() === 'True';
-const lock =
-  process.env.MARGO_GPU_LOCK_NESTED ??
-  resolve(
-    dirname(
-      execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim(),
-    ),
-    'test-results/gpu.lock',
-  );
-for (;;) {
-  try {
-    mkdirSync(lock);
-    break;
-  } catch (e) {
-    if (e.code !== 'EEXIST') throw e;
-    console.log('GPU lock held, waiting');
-    await new Promise((r) => setTimeout(r, 15000));
-  }
-}
+// Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
+const releaseGpu = await acquire({ owner: 'vfx-island', mode: 'exclusive' });
 let server, browser;
 const median = (v) => {
   const x = v.slice().sort((p, q) => p - q),
@@ -247,5 +232,5 @@ try {
 } finally {
   await browser?.close();
   await server?.close();
-  rmdirSync(lock);
+  releaseGpu();
 }

@@ -8,8 +8,7 @@
 // Writes examples/package-benchmarks/results/workers.json (fixtures go to test-results/workers-*).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { bigGLB } from '../../../tests/support/big-glb.js';
@@ -17,6 +16,7 @@ import { acPower } from '../cad/power.mjs';
 import { binary, grid } from '../../../packages/fbx/test/fixtures.js';
 import { exportUSDZ } from '../../../packages/exporters/dist/usdz.js';
 import { torusKnotGeometry, toGeometry } from '../../../packages/geometry/dist/index.js';
+import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const rounds = +arg('rounds', 6),
@@ -33,24 +33,8 @@ writeFileSync(
   exportUSDZ({ nodes: [{ geometry: toGeometry(torusKnotGeometry(1, 0.3, 1000, 100)) }] }),
 );
 
-const lock =
-  process.env.MARGO_GPU_LOCK_NESTED ??
-  resolve(
-    dirname(
-      execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim(),
-    ),
-    'test-results/gpu.lock',
-  );
-for (;;) {
-  try {
-    mkdirSync(lock);
-    break;
-  } catch (e) {
-    if (e.code !== 'EEXIST') throw e;
-    console.log(new Date().toISOString(), 'gpu.lock held, waiting 60 s');
-    await new Promise((r) => setTimeout(r, 60_000));
-  }
-}
+// Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
+const releaseGpu = await acquire({ owner: 'workers', mode: 'exclusive' });
 const output = 'examples/package-benchmarks/results/workers.json',
   previous = existsSync(output) ? JSON.parse(readFileSync(output, 'utf8')) : {};
 const report = {
@@ -161,5 +145,5 @@ try {
     report.acPowerAfter,
   );
 } finally {
-  rmSync(lock, { recursive: true, force: true });
+  releaseGpu();
 }

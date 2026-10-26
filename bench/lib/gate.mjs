@@ -1,6 +1,7 @@
 // The quiet-machine gate that runs before every benchmark run (docs/benchmarking.md "Quiet-machine rules"):
 // 1. AC power (a laptop on battery throttles; refused unless BENCH_ALLOW_BATTERY=1, which marks the run invalid);
-// 2. the GPU lock (scripts/gpu-lock.mjs) for any suite that uses the GPU, held until the run ends;
+// 2. the GPU lock (scripts/gpu-lock.mjs), taken exclusively for any timed run: no correctness test shares the GPU or
+//    the machine with a measurement. Held until the run ends;
 // 3. an idle baseline: whole-machine CPU at or under --quiet-max % for --quiet-hold s (scripts/quiet-gate.mjs), and on
 //    NVIDIA GPUs utilisation at or under --gpu-max % (nvidia-smi).
 // Between cases `settle()` re-checks the CPU and waits again when another job has started.
@@ -40,15 +41,11 @@ export async function openGate({ needsGpu, skip, quietMax, quietHold, gpuMax, ti
       throw new Error('On battery: plug in before timing runs (BENCH_ALLOW_BATTERY=1 records an invalid run anyway).');
     invalid.push('on battery');
   }
-  let release = () => {},
-    lock = null;
-  if (needsGpu) {
-    const nested = !!process.env.MARGO_GPU_LOCK_NESTED;
-    release = await acquire({ owner, log });
-    // Results are committed: the lock's place, not this machine's path.
-    const dir = lockDir.replaceAll('\\', '/').replace(/^.*\/(test-results\/gpu\.lock)$/, '<main checkout>/$1');
-    lock = nested ? { held: 'by the wrapping gpu-lock run', dir } : { ...status(), dir };
-  }
+  const nested = !!process.env.MARGO_GPU_LOCK_NESTED;
+  const release = await acquire({ owner, mode: 'exclusive', max: 130, log });
+  // Results are committed: the lock's place, not this machine's path.
+  const dir = lockDir.replaceAll('\\', '/').replace(/^.*\/(test-results\/gpu\.lock)$/, '<main checkout>/$1');
+  const lock = nested ? { held: 'by the wrapping gpu-lock run', dir } : { ...status(), dir };
   let quiet;
   try {
     if (skip) {

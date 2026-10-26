@@ -10,34 +10,17 @@
 // Writes examples/package-benchmarks/results/gates-post-stack.json.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { writeFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { acPower } from '../cad/power.mjs';
+import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const arg = (name, fallback) => +(process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);
 const rounds = arg('rounds', 8),
   frames = arg('frames', 120);
-const lock =
-  process.env.MARGO_GPU_LOCK_NESTED ??
-  resolve(
-    dirname(
-      execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim(),
-    ),
-    'test-results/gpu.lock',
-  );
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-for (;;) {
-  try {
-    mkdirSync(lock);
-    break;
-  } catch (e) {
-    if (e.code !== 'EEXIST') throw e;
-    console.log('gpu.lock held, waiting');
-    await sleep(15_000);
-  }
-}
+// Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
+const releaseGpu = await acquire({ owner: 'gate-post-stack', mode: 'exclusive' });
 const all = ['ssao', 'dof', 'bloom', 'tonemap', 'fxaa'];
 const report = {
   date: new Date().toISOString(),
@@ -202,5 +185,5 @@ try {
   console.log('post stack gate passed; wrote examples/package-benchmarks/results/gates-post-stack.json');
 } finally {
   await context?.close();
-  rmSync(lock, { recursive: true, force: true });
+  releaseGpu();
 }

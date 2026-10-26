@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
+import { listenWhenFree } from './browser.js';
 import { resolve } from 'node:path';
 import { installDemoLoadAudit } from './demo-load-audit.js';
 
@@ -14,7 +15,7 @@ const server = await createServer({
   logLevel: 'error',
   server: { host: '127.0.0.1', port: 5198, strictPort: true, watch: null },
 });
-await server.listen();
+await listenWhenFree(() => server.listen(), { port: 5198 });
 let browser, hardware;
 const results = [];
 try {

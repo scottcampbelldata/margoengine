@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build, preview } from 'vite';
-import { openBrowser } from './browser.js';
+import { listenWhenFree, openBrowser } from './browser.js';
 const root = resolve('test-results/machinery-runtime-consumer');
 await mkdir(root, { recursive: true });
 await writeFile(
@@ -350,12 +350,16 @@ try {
     logLevel: 'warn',
     build: { outDir: resolve(root, 'dist'), emptyOutDir: true, target: 'es2022', assetsInlineLimit: 0 },
   });
-  server = await preview({
-    root,
-    configFile: false,
-    logLevel: 'error',
-    preview: { host: '127.0.0.1', port: 5194, strictPort: true },
-  });
+  server = await listenWhenFree(
+    () =>
+      preview({
+        root,
+        configFile: false,
+        logLevel: 'error',
+        preview: { host: '127.0.0.1', port: 5194, strictPort: true },
+      }),
+    { port: 5194 },
+  );
   await page.goto('http://127.0.0.1:5194');
   for (const [format, input] of [
     ['obj', obj],
@@ -372,13 +376,17 @@ try {
     logLevel: 'warn',
     build: { outDir: resolve(root, 'starter-dist'), emptyOutDir: true, target: 'es2022' },
   });
-  starter = await preview({
-    root: resolve('examples/vite'),
-    configFile: false,
-    logLevel: 'error',
-    build: { outDir: resolve(root, 'starter-dist') },
-    preview: { host: '127.0.0.1', port: 5195, strictPort: true },
-  });
+  starter = await listenWhenFree(
+    () =>
+      preview({
+        root: resolve('examples/vite'),
+        configFile: false,
+        logLevel: 'error',
+        build: { outDir: resolve(root, 'starter-dist') },
+        preview: { host: '127.0.0.1', port: 5195, strictPort: true },
+      }),
+    { port: 5195 },
+  );
   await page.goto('http://127.0.0.1:5195');
   await page.waitForFunction(() => document.querySelector('.badge')?.textContent?.includes('webgpu'));
   await page.getByText('Domain tools', { exact: true }).click();

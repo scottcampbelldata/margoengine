@@ -4,11 +4,10 @@
 // that started or ended on battery. Writes examples/package-benchmarks/cad/results-<label>.json.
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
-import { writeFile, mkdir, rm } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { cpus, totalmem } from 'node:os';
-import { execFileSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
 import { acPower } from './power.mjs';
+import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const flag = (name) => process.argv.includes(`--${name}`);
@@ -20,13 +19,6 @@ const sizes = list('sizes', '10000,50000,max'),
   label = arg('label', 'culling'),
   port = +arg('port', 5232);
 const modulesFor = (size) => (size === 'max' ? Math.floor((100_000 - 1 - 105) / 30) : Math.ceil(+size / 27));
-// The lock lives in the main checkout so git worktrees share it.
-const lock =
-  process.env.MARGO_GPU_LOCK_NESTED ??
-  resolve(
-    execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim(),
-    '../test-results/gpu.lock',
-  );
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function waitForAC() {
   while (acPower() === false) {
@@ -34,18 +26,8 @@ async function waitForAC() {
     await sleep(30_000);
   }
 }
-
-await mkdir(dirname(lock), { recursive: true });
-for (;;) {
-  try {
-    await mkdir(lock);
-    break;
-  } catch (error) {
-    if (error.code !== 'EEXIST') throw error;
-    console.log('gpu.lock held, waiting');
-    await sleep(15_000);
-  }
-}
+// Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
+const releaseGpu = await acquire({ owner: 'cad-culling', mode: 'exclusive' });
 const isolate = (_, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
@@ -185,5 +167,5 @@ try {
 } finally {
   await browser?.close();
   await server?.close();
-  await rm(lock, { recursive: true, force: true });
+  releaseGpu();
 }

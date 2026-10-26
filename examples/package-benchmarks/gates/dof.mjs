@@ -13,12 +13,13 @@
 //    medians with min/max spread.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { build } from 'vite';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { acPower } from '../cad/power.mjs';
+import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const option = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const rounds = +option('rounds', 6),
@@ -83,20 +84,8 @@ const variants = {
 };
 const names = Object.keys(variants);
 
-const lock =
-  process.env.MARGO_GPU_LOCK_NESTED ??
-  resolve(dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir')), 'test-results/gpu.lock');
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-for (;;) {
-  try {
-    mkdirSync(lock);
-    break;
-  } catch (e) {
-    if (e.code !== 'EEXIST') throw e;
-    console.log('gpu.lock held, waiting');
-    await sleep(60_000);
-  }
-}
+// Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
+const releaseGpu = await acquire({ owner: 'gate-dof', mode: 'exclusive' });
 const report = {
   date: new Date().toISOString(),
   commit: git('rev-parse', '--short', 'HEAD'),
@@ -257,5 +246,5 @@ try {
   console.log('wrote', out);
 } finally {
   await context?.close();
-  rmSync(lock, { recursive: true, force: true });
+  releaseGpu();
 }
