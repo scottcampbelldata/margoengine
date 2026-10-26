@@ -58,13 +58,23 @@ export async function startKernel(base, path, signal) {
 }
 
 /**
- * Waits until a browser page holds a connection to the kernel (the server counts them in `connections`). Running cells
- * before that makes the app ask which kernel to use, and the run never starts.
+ * Runs in the page (JupyterLab 4 or Notebook 7, served with `expose_app_in_browser`): true once the notebook at `path`
+ * holds its own connection to the kernel `kernelId`, the state in which Run All runs the cells. Before it, Run All asks
+ * "Select Kernel" and runs nothing. The server's connection count is not this state: JupyterLab's help menu connects to
+ * every running kernel to read its banner and closes that connection again, and the server counts it before the
+ * notebook has connected (a check that ran the cells on that count stalled on the dialog under load).
  */
-export async function pageConnected(base, kernelId, signal) {
-  for (;;) {
-    const state = await (await fetch(`${base}/api/kernels/${kernelId}`, { signal })).json();
-    if (state.connections > 0) return;
-    await new Promise((r) => setTimeout(r, 100));
-  }
+export function notebookHasKernel({ path, kernelId }) {
+  const app = globalThis.jupyterapp;
+  if (!app) return false;
+  const panel = [...app.shell.widgets('main')].find((widget) => widget.context?.path === path);
+  const context = panel?.sessionContext;
+  const kernel = context?.session?.kernel;
+  return Boolean(context?.isReady && !context.hasNoKernel && kernel?.id === kernelId && kernel.connectionStatus === 'connected');
+}
+
+/** The port a Jupyter server serves on, from its log (it moves on from a port in use), or undefined before it says. */
+export function serverPort(log) {
+  const port = /http:\/\/127\.0\.0\.1:(\d+)\/(?:lab|tree)\b/.exec(log)?.[1];
+  return port && Number(port);
 }

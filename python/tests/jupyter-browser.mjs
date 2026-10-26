@@ -2,7 +2,8 @@
 // (test-results/.venv-data in the main checkout, python/requirements-notebook.txt), opens the same notebook in
 // JupyterLab 4 and in Notebook 7 in headless Edge, runs it, and checks that each figure's widget view appears and draws
 // (non-background pixels in its canvas) with no errors in the page. In JupyterLab it also checks the camera both ways:
-// the camera the kernel sets is where the view starts, and dragging in the view reaches the kernel's `camera` trait.
+// the camera the kernel sets is where the view starts, and dragging in the view reaches the kernel's `camera` trait,
+// and a notebook that connects to its kernel late still runs its cells (lateNotebookConnection).
 // Last, fig.to_png draws a figure in its own headless browser. Every step has a hard time limit (jupyter-steps.mjs): a
 // step that hangs is named, and the Jupyter server, its kernels and the browser are all ended. The kernel imports this checkout's python/ package and
 // the server loads this checkout's built extension (PYTHONPATH and JUPYTER_PATH), whatever the venv has installed.
@@ -10,11 +11,12 @@
 //   node scripts/gpu-lock.mjs run --owner=<you> -- npm run test:python:browser
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { decodePNG } from '../../tests/support/png.js';
-import { killTree, pageConnected, startKernel, step } from './jupyter-steps.mjs';
+import { killTree, notebookHasKernel, serverPort, startKernel, step } from './jupyter-steps.mjs';
 
 // Run by a supervisor: this file starts itself as a child under a hard time limit and, on timeout, ends the child and
 // everything it started (the server, kernels, browser) and says so. The child does the work below.
@@ -35,8 +37,10 @@ if (!process.env.MARGO_JUPYTER_CHILD) {
   await new Promise(() => {});
 }
 // A hung step ends the whole tree (this process, the server, kernels and browser), not just throws.
+let versions;
 process.on('uncaughtException', (error) => {
   console.error(error?.step ? `jupyter: ${error.message}` : error);
+  if (versions) console.error(`jupyter: ran on ${versions}`);
   killTree(process.pid);
   process.exit(1);
 });
@@ -49,6 +53,21 @@ const root = resolve(import.meta.dirname, '../..'),
   extension = join(root, 'python/margoengine/labextension');
 assert.ok(jupyter && python, `no jupyter in ${venv}: install python/requirements-notebook.txt there`);
 assert.ok(existsSync(join(extension, 'package.json')), 'the extension is not built: run node python/build-frontend.mjs');
+
+// The Python and Jupyter stack the check runs on, at the head of the server log kept on failure and in the success
+// line, so a failure names the versions it ran against. Only the venv's own packages count: the venv excludes the
+// system and user site-packages.
+const stack = spawnSync(
+  python,
+  [
+    '-c',
+    'import sys, site, importlib.metadata as m\nnames = ["jupyterlab", "notebook", "jupyter_server", "jupyter_client", "ipykernel", "ipywidgets", "tornado"]\nprint(f"python {sys.version.split()[0]} {sys.executable}; user site {site.ENABLE_USER_SITE}; " + ", ".join(f"{n} {m.version(n)}" for n in names))',
+  ],
+  { encoding: 'utf8', timeout: 60_000 },
+);
+assert.equal(stack.status, 0, `reading the venv's versions failed: ${stack.stderr}`);
+versions = stack.stdout.trim();
+console.log(`jupyter: runs on ${versions}`);
 
 // The classic AMD module VS Code loads: it asks the loader for @jupyter-widgets/base only and returns the two widget
 // classes built on it, with the model's defaults naming this module.
@@ -115,21 +134,40 @@ const settings = join(folder, 'settings/@jupyterlab/notebook-extension');
 mkdirSync(settings, { recursive: true });
 writeFileSync(join(settings, 'tracker.jupyterlab-settings'), JSON.stringify({ windowingMode: 'none' }));
 
-const port = 8913;
+// Several checks run at once on this PC (one per worktree), so nothing is shared between them. The server takes the
+// first free port from one this check holds while it starts, and the check reads the port it took from its log (a fixed
+// port sent a second check to the first one's server, or left it waiting for a log line that never came). Its
+// workspaces and config live in the check folder (JUPYTER_CONFIG_DIR), not the user's ~/.jupyter, where concurrent
+// checks overwrote one shared workspace. Both apps expose `window.jupyterapp`, from which the check reads when a
+// notebook holds its kernel (notebookHasKernel).
+const portHolder = createServer();
+await new Promise((done) => portHolder.listen(0, '127.0.0.1', done));
+const offered = portHolder.address().port;
 const server = spawn(
   jupyter,
-  ['lab', '--no-browser', `--port=${port}`, '--ServerApp.token=', '--ServerApp.password=', '--ServerApp.ip=127.0.0.1', `--ServerApp.root_dir=${folder}`],
+  [
+    'lab',
+    '--no-browser',
+    `--port=${offered}`,
+    '--ServerApp.token=',
+    '--ServerApp.password=',
+    '--ServerApp.ip=127.0.0.1',
+    `--ServerApp.root_dir=${folder}`,
+    '--LabApp.expose_app_in_browser=True',
+    '--JupyterNotebookApp.expose_app_in_browser=True',
+  ],
   {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
+      JUPYTER_CONFIG_DIR: join(folder, 'config'),
       JUPYTERLAB_SETTINGS_DIR: join(folder, 'settings'),
       JUPYTER_PATH: join(folder, 'data'),
       PYTHONPATH: join(root, 'python'),
     },
   },
 );
-let log = '';
+let log = `${versions}\n`;
 server.stdout.on('data', (d) => (log += d));
 server.stderr.on('data', (d) => (log += d));
 
@@ -152,7 +190,7 @@ const waitFor = (what, test, ms = 60_000) =>
       await new Promise((r) => setTimeout(r, 100));
     }
   });
-const base = `http://127.0.0.1:${port}`;
+let base;
 
 // The page errors an app shows by itself: a notebook without Margo, opened and run the same way. (Notebook 7.6.3
 // throws "Cannot read properties of undefined (reading 'schema')" from its own settings loading on every notebook.)
@@ -170,9 +208,9 @@ async function ownErrors(browser, path) {
   return errors;
 }
 
-// Starts the notebook's kernel through the server and opens the notebook in `page`. The page must hold its kernel
-// connection before cells run: Run All sent earlier makes the app ask "Select Kernel" and run nothing, which under
-// load left the check waiting for figures that never came.
+// Starts the notebook's kernel through the server and opens the notebook in `page`. The notebook must hold its own
+// kernel connection before cells run: Run All sent earlier makes the app ask "Select Kernel" and run nothing, which
+// under load left the check waiting for figures that never came.
 async function open(page, path, notebook, label) {
   const abort = new AbortController();
   try {
@@ -181,10 +219,69 @@ async function open(page, path, notebook, label) {
       await page.goto(`${base}${path}`);
       await page.waitForSelector('.jp-NotebookPanel .jp-Cell');
     });
-    await step(`${label}: connect the page to the kernel`, 60_000, () => pageConnected(base, kernel, abort.signal));
+    await step(`${label}: connect the notebook to its kernel`, 60_000, () =>
+      page.waitForFunction(notebookHasKernel, { path: notebook, kernelId: kernel }, { timeout: 60_000, polling: 100 }),
+    );
   } finally {
     abort.abort();
   }
+}
+
+// Regression check for the stall above: JupyterLab's help menu opens a connection of its own to the running kernel
+// before the notebook connects, to read the kernel's banner, and closes it when the banner comes. Under load the
+// just-started kernel answered late, the server counted that connection while the notebook had none yet, and a check
+// that ran the cells on that count met "Select Kernel" (or Run All ran nothing). Here both happen every time: the first
+// connection to each kernel (the help menu's) never gets its answers, so it stays open, and the notebook's session
+// lookup is held back 5 s, so the notebook connects late. Run All must still run the cell, with no dialog.
+async function lateNotebookConnection(browser) {
+  const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+  let lookups = 0;
+  const held = new Map();
+  await page.route(
+    (url) => url.pathname === '/api/sessions',
+    async (route) => {
+      if (route.request().method() === 'GET' && lookups++ > 0) await new Promise((r) => setTimeout(r, 5000));
+      await route.continue();
+    },
+  );
+  await page.routeWebSocket(
+    (url) => {
+      const kernel = /\/api\/kernels\/([^/]+)\/channels$/.exec(url.pathname)?.[1];
+      if (kernel && !held.has(kernel)) held.set(kernel, url.searchParams.get('session_id'));
+      return Boolean(kernel) && held.get(kernel) === url.searchParams.get('session_id');
+    },
+    (ws) => ws.connectToServer().onMessage(() => {}),
+  );
+  try {
+    await open(page, '/lab/tree/plain.ipynb', 'plain.ipynb', 'JupyterLab, late notebook connection');
+    await page.locator('.lm-MenuBar-itemLabel', { hasText: /^Run$/ }).click();
+    await page.locator('.lm-Menu-itemLabel', { hasText: /^Run All Cells$/ }).click();
+    const outcome = await step('JupyterLab, late notebook connection: run the cell', 60_000, () =>
+      Promise.race([
+        page.waitForSelector('.jp-Dialog', { timeout: 60_000 }).then(async (d) => `the dialog "${(await d.textContent()).trim()}"`),
+        page
+          .waitForFunction(() => document.querySelector('.jp-OutputArea-output')?.textContent.trim() === '2', null, { timeout: 60_000 })
+          .then(() => 'ran'),
+      ]),
+    );
+    assert.equal(outcome, 'ran', `JupyterLab, late notebook connection: Run All showed ${outcome}`);
+    assert.ok(lookups > 1, 'the notebook looked its session up after the first lookup (the one held back)');
+    const { id, clientId } = await page.evaluate(() => {
+      const kernel = [...globalThis.jupyterapp.shell.widgets('main')].find((w) => w.context?.path === 'plain.ipynb').sessionContext.session.kernel;
+      return { id: kernel.id, clientId: kernel.clientId };
+    });
+    assert.ok(held.has(id) && held.get(id) !== clientId, `a connection other than the notebook's (${held.get(id)}, not ${clientId}) was held open`);
+  } catch (error) {
+    await keepEvidence(page);
+    throw error;
+  }
+  await page.close();
+}
+
+// The page as it was when the check failed, with the server's log, for diagnosis.
+async function keepEvidence(page) {
+  await page.screenshot({ path: join(root, 'test-results/jupyter-browser.png'), fullPage: true, timeout: 10_000 }).catch(() => {});
+  writeFileSync(join(root, 'test-results/jupyter-server.log'), log);
 }
 
 // Opens the notebook at `path`, runs every cell from the Run menu (the same in both apps) and returns the bright
@@ -234,21 +331,26 @@ async function runNotebook(browser, path, app, own = new Set()) {
     for (const [k, lit] of drawn.entries()) assert.ok(lit > 500, `${app}: figure ${k} drew ${lit} bright pixels`);
     return { page, drawn };
   } catch (error) {
-    // The page as it was when the check failed, for diagnosis (with the server's log).
-    await page.screenshot({ path: join(root, 'test-results/jupyter-browser.png'), fullPage: true, timeout: 10_000 }).catch(() => {});
-    writeFileSync(join(root, 'test-results/jupyter-server.log'), log);
+    await keepEvidence(page);
     throw error;
   }
 }
 
 let browser;
 try {
-  await step('start the Jupyter server', 60_000, async () => {
-    while (!log.includes(`127.0.0.1:${port}`)) await new Promise((r) => setTimeout(r, 100));
+  const port = await step('start the Jupyter server', 60_000, async () => {
+    for (;;) {
+      const port = serverPort(log);
+      if (port) return port;
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }).catch((error) => {
     error.message += `\n${log}`;
     throw error;
   });
+  portHolder.close();
+  assert.notEqual(port, offered, 'the server moved on from the port in use');
+  base = `http://127.0.0.1:${port}`;
   browser = await step('launch the browser', 60_000, () =>
     chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true }),
   );
@@ -291,6 +393,11 @@ try {
   console.log(
     `jupyter: JupyterLab drew 3 figures (${lab.drawn.join(', ')} bright pixels); camera kernel -> view -> kernel, then drag to [${moved.position.map((v) => v.toFixed(2))}]; click hit point ${click.hit.index}; box selected ${selected['1']} points`,
   );
+  // JupyterLab saved its workspace in the check folder, not in the user's ~/.jupyter.
+  const workspaces = join(folder, 'config/lab/workspaces');
+  await waitFor('JupyterLab to save its workspace in the check folder', () => existsSync(workspaces) && readdirSync(workspaces).length);
+  await lateNotebookConnection(browser);
+  console.log('jupyter: a notebook that connects to its kernel late still runs its cells (no "Select Kernel")');
 
   // Notebook 7 (the notebook package's own interface, served by the same server).
   const own = await ownErrors(browser, '/notebooks/plain.ipynb');
