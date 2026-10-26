@@ -5,9 +5,10 @@ import type { ParseSogOptions, SogFiles } from './sog.js';
 import type { ParseSpzOptions } from './spz.js';
 
 /**
- * Decodes an SPZ file (versions 2 and 3) to {@link SplatData}. Loads the decoder on first use.
+ * Decodes an SPZ file (versions 2, 3 and 4) to {@link SplatData}. Loads the decoder on first use (the Zstandard
+ * decoder only when a version 4 file is read).
  * @throws TypeError when `input` is not bytes; RangeError for a damaged file or unknown version; MargoError
- * `unsupported` for SPZ version 4 (Zstandard), which needs exporting as version 3.
+ * `unsupported` for a version 4 stream that needs a Zstandard dictionary.
  * @example
  * const splats = await parseSpz(await (await fetch('scene.spz')).arrayBuffer());
  */

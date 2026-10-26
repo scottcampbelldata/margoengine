@@ -463,7 +463,7 @@
     "published": false,
     "description": "Optional Gaussian splats with GPU covariance projection and stable compute radix sorting.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
-    "keywords": "splats",
+    "keywords": "splats gaussian splatting 3dgs ply spz sog splat zstandard zstd",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/splats@1.0.0",
     "imports": "import { Splats } from '@margoengine/splats';",
     "exports": [

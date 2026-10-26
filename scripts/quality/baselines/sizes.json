@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3387170,
+  "total": 3397224,
   "history": [
     {
       "date": "2026-10-24",
@@ -383,9 +383,21 @@
     },
     {
       "date": "2026-10-26",
+      "commit": "7f50d239",
+      "reason": "package depth (item 21.5): navmesh Crowd manager (tree-shakable), area costs, off-mesh links, closest point, one-sided ORCA neighbours, carved build obstacles",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-26",
       "commit": "d336ca13",
       "reason": "inspector: undo/redo history, search, colour and double-sided editing, canvas picking, scene snapshots, resources and shader view (panel +3.9 kB gzip); new optional entries inspector/history, inspector/snapshot, inspector/resources",
       "grew": 4
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "7d70cb65",
+      "reason": "package depth (item 21.5): splats parsePly (SH 0-3), .splat writer, crop, filter, transform with SH rotation, merge and moment-matched LOD; all tree-shakable from ./data",
+      "grew": 2
     },
     {
       "date": "2026-10-26",
@@ -443,18 +455,6 @@
     },
     {
       "date": "2026-10-26",
-      "commit": "7f50d239",
-      "reason": "package depth (item 21.5): navmesh Crowd manager (tree-shakable), area costs, off-mesh links, closest point, one-sided ORCA neighbours, carved build obstacles",
-      "grew": 2
-    },
-    {
-      "date": "2026-10-26",
-      "commit": "7d70cb65",
-      "reason": "package depth (item 21.5): splats parsePly (SH 0-3), .splat writer, crop, filter, transform with SH rotation, merge and moment-matched LOD; all tree-shakable from ./data",
-      "grew": 2
-    },
-    {
-      "date": "2026-10-26",
       "commit": "711f9b39",
       "reason": "package depth (item 21.5): splats parseSpz (SPZ v2/v3) and parseSog (SOG v2 with a built-in lossless WebP decoder and ZIP reader); loaded lazily through import() on first call",
       "grew": 2
@@ -464,6 +464,12 @@
       "commit": "907e13a5",
       "reason": "loaders: new parseSTL (binary and ASCII STL, VisCAM colors, optional weld, abort signal) adds about 325 B gzip to the root entry; it is a separate module, so apps that do not import it pay nothing",
       "grew": 1
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "cfeafb1b",
+      "reason": "package depth (item 29.5) splats reads SPZ version 4 through a built-in clean-room Zstandard decoder (RFC 8878 with xxHash64 checksums) loaded by import() only when a version 4 file is read",
+      "grew": 2
     }
   ],
   "items": {
@@ -721,8 +727,8 @@
     "@margoengine/sky/preetham": 953,
     "@margoengine/sky/reflection": 1399,
     "@margoengine/sky/weather": 5879,
-    "@margoengine/splats": 19841,
-    "@margoengine/splats/data": 12621,
+    "@margoengine/splats": 24851,
+    "@margoengine/splats/data": 17665,
     "@margoengine/splines": 1555,
     "@margoengine/stage": 3197,
     "@margoengine/staging": 6296,

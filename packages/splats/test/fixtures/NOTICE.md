@@ -17,7 +17,7 @@ Each fixture keeps only the splats whose x lies in a thin slab (a few thousand s
 | `lizard-v2.spz` | 192,790 | 8,109 horned-lizard splats, same way |
 | `raccoon-v2.ply` | 1,980,364 | `raccoon-v2.spz` converted to a Gaussian-splat PLY by PlayCanvas splat-transform 3.10.3 (MIT), the reference decode |
 | `raccoon-v3.spz` | 226,647 | `raccoon-v2.ply` written as SPZ version 3 by splat-transform (`--spz-version 3`) |
-| `raccoon-v4.spz` | 212,673 | the same as SPZ version 4 (Zstandard); the reader must refuse it with a clear error |
+| `raccoon-v4.spz` | 212,673 | the same as SPZ version 4 (Zstandard streams); must decode exactly like `raccoon-v3.spz` |
 | `raccoon.sog` | 184,051 | `raccoon-v2.ply` written as a bundled SOG by splat-transform (`-g cpu`) |
 | `raccoon-sog.ply` | 1,980,364 | `raccoon.sog` converted back to PLY by splat-transform (SOG reorders splats, so it is its own reference) |
 

@@ -45,11 +45,39 @@ test('parseSpz reads SPZ version 3 (smallest-three rotations) within quantisatio
   );
 });
 
-test('parseSpz refuses version 4 with a coded error and rejects damaged files', async () => {
-  await assert.rejects(
-    parseSpz(fixture('raccoon-v4.spz')),
-    (e) => e.name === 'MargoError' && e.code === 'unsupported' && /version 3/.test(e.message),
+test('parseSpz reads SPZ version 4 (Zstandard) exactly like version 3 of the same scene', async () => {
+  const v4 = await parseSpz(fixture('raccoon-v4.spz')),
+    v3 = await parseSpz(fixture('raccoon-v3.spz'));
+  assert.equal(v4.positions.length / 3, 8385);
+  const d = difference(v4, v3);
+  assert.deepEqual(d, { positions: 0, covariances: 0, colors: 0, sphericalHarmonics: 0 });
+  const source = difference(v4, parsePly(fixture('raccoon-v2.ply')));
+  assert.ok(
+    source.positions < 1e-3 && source.covariances < 1e-2 && source.colors < 0.02 && source.sphericalHarmonics < 0.05,
+    JSON.stringify(source),
   );
+});
+
+test('parseSpz rejects damaged, truncated and aborted version 4 files', async () => {
+  const whole = fixture('raccoon-v4.spz');
+  for (const n of [0, 8, 31, 100, 200, whole.length - 1])
+    await assert.rejects(parseSpz(whole.subarray(0, n)), RangeError, `prefix ${n}`);
+  const wrongSize = Buffer.from(whole);
+  wrongSize.writeUInt32LE(wrongSize.readUInt32LE(40) + 1, 40);
+  await assert.rejects(parseSpz(wrongSize), /stream 0 holds/);
+  const damagedStream = Buffer.from(whole);
+  damagedStream[0x80 + 20] ^= 0xff;
+  await assert.rejects(parseSpz(damagedStream), RangeError);
+  const fewStreams = Buffer.from(whole);
+  fewStreams[15] = 4;
+  await assert.rejects(parseSpz(fewStreams), /attribute streams/);
+  const gzipV4 = Buffer.from(whole);
+  gzipV4.writeUInt32LE(5, 4);
+  await assert.rejects(parseSpz(gzipV4), /version 5/);
+  await assert.rejects(parseSpz(whole, { signal: AbortSignal.abort(new Error('stop')) }), /stop/);
+});
+
+test('parseSpz rejects damaged files', async () => {
   await assert.rejects(parseSpz(new Uint8Array(40)), RangeError);
   await assert.rejects(parseSpz('nope'), TypeError);
   const whole = fixture('raccoon-v2.spz');
