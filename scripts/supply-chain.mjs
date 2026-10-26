@@ -144,6 +144,10 @@ const ASSETS = [
     'test fixtures: Khronos CarConcept textures Dot_C.ktx2 and Rib_N.ktx2 (CC BY 4.0, Darmstadt Graphics Group, Eric Chadwick)',
   ],
   [
+    'packages/splats/test/fixtures/NOTICE.md',
+    'test fixtures: slices of the Niantic Labs racoonfamily.spz and hornedlizard.spz samples (MIT, github.com/nianticlabs/spz), converted with PlayCanvas splat-transform (MIT) to PLY, SPZ and SOG',
+  ],
+  [
     'packages/exporters/tests/fixtures/NOTICE.md',
     'test fixtures: Khronos glTF sample models Box and BoxTextured (CC BY 4.0, Cesium)',
   ],

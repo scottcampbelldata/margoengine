@@ -141,43 +141,102 @@ export function parsePly(input: ArrayBuffer | ArrayBufferView): SplatData {
     op = at('opacity'),
     sc = at('scale_0'),
     ro = at('rot_0'),
-    restAt = rest ? at('f_rest_0') : 0;
-  const positions = new Float32Array(count * 3),
-    covariances = new Float32Array(count * 6),
-    colors = new Float32Array(count * 4),
-    sh = perChannel > 1 ? new Float32Array(count * perChannel * 3) : undefined;
+    restAt = rest ? at('f_rest_0') : 0,
+    coefficients = perChannel - 1;
+  const raw: GaussianAttributes = {
+    count,
+    positions: new Float32Array(count * 3),
+    logScales: new Float32Array(count * 3),
+    rotations: new Float32Array(count * 4),
+    dc: new Float32Array(count * 3),
+    alphas: new Float32Array(count),
+    rest: coefficients ? new Float32Array(count * coefficients * 3) : undefined,
+  };
   for (let i = 0; i < count; i++) {
     const v = (k: number) => values[i * width + k];
-    positions[i * 3] = v(px);
-    positions[i * 3 + 1] = v(at('y'));
-    positions[i * 3 + 2] = v(at('z'));
-    let w = v(ro),
-      x = v(ro + 1),
-      y = v(ro + 2),
-      z = v(ro + 3);
+    raw.positions.set([v(px), v(at('y')), v(at('z'))], i * 3);
+    raw.rotations.set([v(ro), v(ro + 1), v(ro + 2), v(ro + 3)], i * 4);
+    raw.logScales.set([v(sc), v(sc + 1), v(sc + 2)], i * 3);
+    raw.dc.set([v(dc), v(dc + 1), v(dc + 2)], i * 3);
+    raw.alphas[i] = 1 / (1 + Math.exp(-v(op)));
+    // f_rest is channel-major (all of R, then G, then B); the shared layout puts the channel innermost.
+    if (raw.rest)
+      for (let c = 0; c < 3; c++)
+        for (let j = 0; j < coefficients; j++)
+          raw.rest[(i * coefficients + j) * 3 + c] = v(restAt + c * coefficients + j);
+  }
+  return splatsFromAttributes(raw);
+}
+
+/**
+ * Gaussian-splat attributes as stored by the training PLY and the compressed formats, before they become
+ * {@link SplatData}. Shared by the PLY, SPZ and SOG readers.
+ */
+export interface GaussianAttributes {
+  count: number;
+  /** Centres, 3 floats per splat. */
+  positions: Float32Array;
+  /** Natural log of the three axis scales, 3 floats per splat. */
+  logScales: Float32Array;
+  /** Rotations as (w, x, y, z), 4 floats per splat; normalised on conversion. */
+  rotations: Float32Array;
+  /** Band-0 spherical-harmonic coefficients (display colour = 0.5 + C0 * dc), 3 floats per splat. */
+  dc: Float32Array;
+  /** Opacity 0..1. */
+  alphas: Float32Array;
+  /** Bands 1 and up: `(perChannel - 1) * 3` floats per splat, coefficient-major with the colour channel innermost. */
+  rest?: Float32Array;
+}
+
+/**
+ * Converts raw Gaussian attributes to {@link SplatData}: normalised rotations, covariance from rotation and scale,
+ * display-space colour to linear (exactly for the base band, to first order for the view-dependent terms).
+ * @throws RangeError for a zero rotation, an unsupported SH size, or a cloud that fails `validateSplats`.
+ */
+export function splatsFromAttributes(raw: GaussianAttributes): SplatData {
+  const { count } = raw,
+    coefficients = raw.rest ? raw.rest.length / count / 3 : 0,
+    perChannel = coefficients + 1;
+  if (!Number.isInteger(coefficients) || ![0, 3, 8, 15].includes(coefficients))
+    throw new RangeError(
+      'Splat spherical harmonics must hold 3, 8 or 15 coefficients per colour channel (degree 1-3).',
+    );
+  const covariances = new Float32Array(count * 6),
+    colors = new Float32Array(count * 4),
+    sh = coefficients ? new Float32Array(count * perChannel * 3) : undefined;
+  for (let i = 0; i < count; i++) {
+    let w = raw.rotations[i * 4],
+      x = raw.rotations[i * 4 + 1],
+      y = raw.rotations[i * 4 + 2],
+      z = raw.rotations[i * 4 + 3];
     const length = Math.hypot(w, x, y, z);
-    if (!(length > 0)) throw new RangeError('A splat PLY rotation is the zero quaternion; check the file.');
+    if (!(length > 0)) throw new RangeError('A splat rotation is the zero quaternion; check the file.');
     w /= length;
     x /= length;
     y /= length;
     z /= length;
-    writeCovariance(covariances, i, [x, y, z, w], [Math.exp(v(sc)), Math.exp(v(sc + 1)), Math.exp(v(sc + 2))]);
-    colors[i * 4 + 3] = 1 / (1 + Math.exp(-v(op)));
+    writeCovariance(
+      covariances,
+      i,
+      [x, y, z, w],
+      [Math.exp(raw.logScales[i * 3]), Math.exp(raw.logScales[i * 3 + 1]), Math.exp(raw.logScales[i * 3 + 2])],
+    );
+    colors[i * 4 + 3] = raw.alphas[i];
     for (let c = 0; c < 3; c++) {
-      // Display colour of the base band, converted to linear exactly; f_rest is channel-major (all of R, G, then B).
-      const display = 0.5 + C0 * v(dc + c),
+      // Display colour of the base band, converted to linear exactly.
+      const display = 0.5 + C0 * raw.dc[i * 3 + c],
         base = linear(Math.min(1, Math.max(0, display)));
       colors[i * 4 + c] = base;
       if (!sh) continue;
       const k = slope(display);
       sh[i * perChannel * 3 + c] = (base - 0.5) / C0;
       for (let j = 1; j < perChannel; j++)
-        sh[(i * perChannel + j) * 3 + c] = v(restAt + c * (perChannel - 1) + (j - 1)) * k;
+        sh[(i * perChannel + j) * 3 + c] = raw.rest![(i * coefficients + j - 1) * 3 + c] * k;
     }
   }
   const data: SplatData = sh
-    ? { positions, covariances, colors, sphericalHarmonics: sh }
-    : { positions, covariances, colors };
+    ? { positions: raw.positions, covariances, colors, sphericalHarmonics: sh }
+    : { positions: raw.positions, covariances, colors };
   validateSplats(data);
   return data;
 }

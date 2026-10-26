@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3373156,
+  "total": 3385312,
   "history": [
     {
       "date": "2026-10-24",
@@ -383,14 +383,20 @@
     },
     {
       "date": "2026-10-26",
+      "commit": "7f50d239",
+      "reason": "package depth (item 21.5): navmesh Crowd manager (tree-shakable), area costs, off-mesh links, closest point, one-sided ORCA neighbours, carved build obstacles",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-26",
       "commit": "d336ca13",
       "reason": "inspector: undo/redo history, search, colour and double-sided editing, canvas picking, scene snapshots, resources and shader view (panel +3.9 kB gzip); new optional entries inspector/history, inspector/snapshot, inspector/resources",
       "grew": 4
     },
     {
       "date": "2026-10-26",
-      "commit": "7f50d239",
-      "reason": "package depth (item 21.5): navmesh Crowd manager (tree-shakable), area costs, off-mesh links, closest point, one-sided ORCA neighbours, carved build obstacles",
+      "commit": "7d70cb65",
+      "reason": "package depth (item 21.5): splats parsePly (SH 0-3), .splat writer, crop, filter, transform with SH rotation, merge and moment-matched LOD; all tree-shakable from ./data",
       "grew": 2
     },
     {
@@ -449,8 +455,8 @@
     },
     {
       "date": "2026-10-26",
-      "commit": "7d70cb65",
-      "reason": "package depth (item 21.5): splats parsePly (SH 0-3), .splat writer, crop, filter, transform with SH rotation, merge and moment-matched LOD; all tree-shakable from ./data",
+      "commit": "711f9b39",
+      "reason": "package depth (item 21.5): splats parseSpz (SPZ v2/v3) and parseSog (SOG v2 with a built-in lossless WebP decoder and ZIP reader); loaded lazily through import() on first call",
       "grew": 2
     }
   ],
@@ -709,8 +715,8 @@
     "@margoengine/sky/preetham": 953,
     "@margoengine/sky/reflection": 1399,
     "@margoengine/sky/weather": 5879,
-    "@margoengine/splats": 13685,
-    "@margoengine/splats/data": 6621,
+    "@margoengine/splats": 19841,
+    "@margoengine/splats/data": 12621,
     "@margoengine/splines": 1555,
     "@margoengine/stage": 3197,
     "@margoengine/staging": 6296,

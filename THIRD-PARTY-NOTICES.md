@@ -196,6 +196,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | [`packages/points/tests/fixtures/NOTICE.md`](packages/points/tests/fixtures/NOTICE.md) | test fixture: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan) |
 | [`packages/decoders/tests/fixtures/NOTICE.md`](packages/decoders/tests/fixtures/NOTICE.md) | test fixtures: Khronos glTF sample models Box (CC BY 4.0, Cesium) and Avocado (CC0 1.0, Microsoft), Draco-compressed; AnisotropyBarnLamp normal texture (CC BY 4.0, Wayfair, Eric Chadwick) |
 | [`packages/decoders/tests/fixtures/KTX2-README.md`](packages/decoders/tests/fixtures/KTX2-README.md) | test fixtures: Khronos CarConcept textures Dot_C.ktx2 and Rib_N.ktx2 (CC BY 4.0, Darmstadt Graphics Group, Eric Chadwick) |
+| [`packages/splats/test/fixtures/NOTICE.md`](packages/splats/test/fixtures/NOTICE.md) | test fixtures: slices of the Niantic Labs racoonfamily.spz and hornedlizard.spz samples (MIT, github.com/nianticlabs/spz), converted with PlayCanvas splat-transform (MIT) to PLY, SPZ and SOG |
 | [`packages/exporters/tests/fixtures/NOTICE.md`](packages/exporters/tests/fixtures/NOTICE.md) | test fixtures: Khronos glTF sample models Box and BoxTextured (CC BY 4.0, Cesium) |
 
 ## Development and workspace tooling (never shipped)

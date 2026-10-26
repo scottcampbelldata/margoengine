@@ -21,7 +21,7 @@ engine.start();
 
 For generated data, supply `SplatData`: `positions` has three Float32 values per splat; `covariances` has six (xx, xy, xz, yy, yz, zz); `colors` has four (linear RGB and opacity, each 0..1). Construction validates lengths, finite values and positive-definite covariance, then copies the data for ownership/device recovery. Colors are converted to sRGB for ordinary display targets and remain linear in HDR targets.
 
-Optional `sphericalHarmonics` contains 4, 9 or 16 coefficients per splat, with RGB interleaved for each coefficient. Evaluation uses the real SH basis through degree 3, the camera-to-splat direction, and the usual 0.5 offset. SH replaces RGB; `colors` still supplies opacity. Large SH buffers can exceed an adapter's storage binding limit even when the base cloud fits; attachment rejects before allocating. `parseSplat()` decodes the common 32-byte binary layout (xyz, positive xyz scales, byte RGBA, byte quaternion in wxyz order), converts byte sRGB to linear, normalizes quaternions and derives covariance. `parsePly()` reads Gaussian-splat PLY files (below); compressed SPZ and training are outside this package.
+Optional `sphericalHarmonics` contains 4, 9 or 16 coefficients per splat, with RGB interleaved for each coefficient. Evaluation uses the real SH basis through degree 3, the camera-to-splat direction, and the usual 0.5 offset. SH replaces RGB; `colors` still supplies opacity. Large SH buffers can exceed an adapter's storage binding limit even when the base cloud fits; attachment rejects before allocating. `parseSplat()` decodes the common 32-byte binary layout (xyz, positive xyz scales, byte RGBA, byte quaternion in wxyz order), converts byte sRGB to linear, normalizes quaternions and derives covariance. `parsePly()` reads Gaussian-splat PLY files (below); `parseSpz()` and `parseSog()` read compressed captures (below); training is outside this package.
 
 Orthographic cameras (any `camera.matrix` with a constant clip w, such as `CameraProjection` from `@margoengine/cameras`) use the affine Jacobian: a splat's pixel size depends only on the zoom, not its depth. The depth range is the projection's own near/far, which may lie behind the eye, sort keys are measured from the near plane, and spherical harmonics use the fixed viewing direction. The package reads only the clip matrix and does not depend on the cameras package.
 
@@ -66,6 +66,15 @@ console.log(both.positions.length / 3, saved.size);
 - **`cropSplats(data, {box: {min, max}} | {sphere: {center, radius}}, {invert})`** keeps the splats whose centres are inside (or outside) the region; **`filterSplats(data, keep)`** keeps those `keep(index)` accepts. SH travels with the kept splats.
 - **`transformSplats(data, matrix)`** applies a column-major 4x4 affine matrix: centres by the matrix, covariances by its linear part (scale and shear stretch the splats), and SH by the matrix's rotation (from its polar decomposition, by an exact least-squares fit per SH band), so view-dependent colour turns with the cloud.
 - **`mergeSplats(...clouds)`** concatenates clouds with the same SH degree. **`decimateSplats(data, {cellSize})`** merges the splats of each grid cell into one Gaussian with the same weighted mean and second moment (weights: opacity times volume); colour, opacity and SH are the weighted means. It is a moment-matched preview level, not a trained one.
-- Compressed `.spz` and `.sog` files are not read yet.
+- **`parseSpz(bytes, {signal})`** reads SPZ versions 2 and 3 (gzip: 24-bit fixed-point positions, byte log-scales, byte colours, 3-byte or smallest-three rotations, SH degrees 0-3) and **`parseSog(bytes | files, {signal})`** reads SOG version 2, bundled (`.sog` ZIP) or as loose files (`meta.json` plus its lossless WebP textures; a built-in decoder, no image API needed). Both return a promise, honour an `AbortSignal`, and need `DecompressionStream` (current browsers, Node 18+). SPZ version 4 (Zstandard) throws a `MargoError` with code `unsupported` whose message says to export version 3; lossy SOG textures do the same. Tested bit for bit against the PlayCanvas splat-transform decode of real captures (`test/fixtures/NOTICE.md`).
+
+```ts
+import {parseSog, parseSpz} from 'margoengine/splats/data';
+
+const abort = new AbortController();
+const spz = await parseSpz(await (await fetch('/capture.spz')).arrayBuffer(), {signal: abort.signal});
+const sog = await parseSog(await (await fetch('/capture.sog')).arrayBuffer());
+console.log(spz.positions.length / 3, sog.positions.length / 3);
+```
 
 `gpuState` exposes sorted key/index pairs, projected ellipses and evaluated colors (fogged while a fog is set) for diagnostics. Ellipse records are eight floats: normalized center xyz and opacity, then two normalized-screen ellipse axes. `dispose()`/`destroy()` releases all owned GPU resources. Device restoration reuploads the copied input and recreates sorting/rendering passes. The package stays outside core/stage and has no dependencies on other optional renderers; parser-only imports discard GPU code. It follows the workspace's `@margoengine/*` naming convention.
