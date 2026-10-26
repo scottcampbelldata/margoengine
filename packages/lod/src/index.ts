@@ -23,6 +23,7 @@ export {
 } from './imposter.js';
 import { MargoError } from '@margoengine/math/errors';
 import { overlayDepthPass } from '../../shared/pass.js';
+import { worldRadius } from '../../shared/sphere.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -409,15 +410,8 @@ export class LODSystem implements EnginePlugin {
       const x = m[o] * k[0] + m[o + 4] * k[1] + m[o + 8] * k[2] + m[o + 12],
         y = m[o + 1] * k[0] + m[o + 5] * k[1] + m[o + 9] * k[2] + m[o + 13],
         z = m[o + 2] * k[0] + m[o + 6] * k[1] + m[o + 10] * k[2] + m[o + 14];
-      const r =
-        imp.radius *
-        Math.sqrt(
-          Math.max(
-            m[o] * m[o] + m[o + 1] * m[o + 1] + m[o + 2] * m[o + 2],
-            m[o + 4] * m[o + 4] + m[o + 5] * m[o + 5] + m[o + 6] * m[o + 6],
-            m[o + 8] * m[o + 8] + m[o + 9] * m[o + 9] + m[o + 10] * m[o + 10],
-          ),
-        );
+      // A bound that holds under shear too (a rotated child of a non-uniformly scaled parent).
+      const r = worldRadius(m, o, imp.radius, x, y, z);
       let inside = true;
       for (let q = 0; q < 24; q += 4)
         if (planes[q] * x + planes[q + 1] * y + planes[q + 2] * z + planes[q + 3] < -r) {

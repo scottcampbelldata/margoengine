@@ -28,6 +28,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { casterBuffers, casterRuntime, displacementGroup } from '../../shared/caster.js';
+import { worldRadius } from '../../shared/sphere.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -279,16 +280,9 @@ function worldSphere(out: Float32Array, local: ArrayLike<number> | undefined, m:
   out[0] = m[0] * x + m[4] * y + m[8] * z + m[12];
   out[1] = m[1] * x + m[5] * y + m[9] * z + m[13];
   out[2] = m[2] * x + m[6] * y + m[10] * z + m[14];
-  // The largest axis scale bounds how far any vertex moved from the centre.
-  out[3] =
-    local[3] *
-    Math.sqrt(
-      Math.max(
-        m[0] * m[0] + m[1] * m[1] + m[2] * m[2],
-        m[4] * m[4] + m[5] * m[5] + m[6] * m[6],
-        m[8] * m[8] + m[9] * m[9] + m[10] * m[10],
-      ),
-    );
+  // Bounds how far any vertex moved from the centre, shear included (a rotated child of a non-uniformly scaled
+  // parent), with float32 padding.
+  out[3] = worldRadius(m, 0, local[3], out[0], out[1], out[2]);
 }
 /**
  * The six clip planes of the column-major view-projection at `m[o]` (Gribb and Hartmann, "Fast Extraction of Viewing

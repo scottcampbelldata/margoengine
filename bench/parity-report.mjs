@@ -10,7 +10,7 @@ import sharp from 'sharp';
 import { mainRoot, root } from './lib/env.mjs';
 import { dirs } from './lib/results.mjs';
 import { SCENES, caseId } from './scenes/catalog.js';
-import { ROWS } from './scenes/parity.js';
+import { LABELS, ROWS } from './scenes/parity.js';
 
 const { values: o, positionals } = parseArgs({
   allowPositionals: true,
@@ -292,6 +292,8 @@ ledger.engines = { ...(ledger.engines ?? {}), ...run.settings?.engines };
 writeFileSync(ledgerFile, `${JSON.stringify(ledger, null, 1)}\n`);
 
 const latest = (slot) => slot?.later?.at(-1) ?? slot?.first;
+/** A case id in backticks, with what it measures when bench/scenes/parity.js LABELS names it. */
+const named = (key) => `\`${key}\`${LABELS[key] ? ` (${LABELS[key].replace(/\|/g, '/')})` : ''}`;
 const causes = existsSync(resolve(root, 'bench/parity-causes.json'))
   ? JSON.parse(readFileSync(resolve(root, 'bench/parity-causes.json'), 'utf8'))
   : {};
@@ -424,7 +426,7 @@ lines.push(
   '| --- | --- | --- | --- |',
   ...worst.slice(0, 15).map((x) => {
     const ids = rows.filter((r) => r.keys.includes(x.key)).map((r) => r.id);
-    return `| \`${x.key}\` | ${ids.join(', ')} | ${f(x.worse)}x | ${ids.map(causeText).find(Boolean) ?? 'not diagnosed yet'} |`;
+    return `| ${named(x.key)} | ${ids.join(', ')} | ${f(x.worse)}x | ${ids.map(causeText).find(Boolean) ?? 'not diagnosed yet'} |`;
   }),
   '',
   '## Every row',
@@ -433,7 +435,7 @@ lines.push(
   '| --- | --- | --- | --- | --- | --- |',
   ...rows.map(
     (r) =>
-      `| ${r.id} | ${r.feature.replace(/\|/g, '/').slice(0, 80)} | ${r.first} | ${r.now} | ${r.keys.map((k) => `\`${k}\``).join(' ')} | ${(causeText(r.id) ?? r.note ?? (r.owner ? `measured by ${r.owner}` : '')).replace(/\|/g, '/')} |`,
+      `| ${r.id} | ${r.feature.replace(/\|/g, '/').slice(0, 80)} | ${r.first} | ${r.now} | ${r.keys.map(named).join(' ')} | ${(causeText(r.id) ?? r.note ?? (r.owner ? `measured by ${r.owner}` : '')).replace(/\|/g, '/')} |`,
   ),
   '',
   '## Raw results',
@@ -450,7 +452,7 @@ lines.push(
         b = slot.later?.at(-1),
         img = (b ?? a).image,
         bytes = (b ?? a).bytes;
-      return `| \`${key}\` | ${describe(a)} (\`${a.run}\`) | ${a.verdict} | ${b ? `${describe(b)} (\`${b.run}\`)` : ''} | ${b?.verdict ?? ''} | ${img ? (img.error ?? `${img.ssim}, ${img.meanDeltaE}${img.match ? '' : ' (differs)'}`) : ''} | ${bytes ? `${bytes.margo.toLocaleString('en-US')} / ${bytes.three.toLocaleString('en-US')}` : ''} |`;
+      return `| ${named(key)} | ${describe(a)} (\`${a.run}\`) | ${a.verdict} | ${b ? `${describe(b)} (\`${b.run}\`)` : ''} | ${b?.verdict ?? ''} | ${img ? (img.error ?? `${img.ssim}, ${img.meanDeltaE}${img.match ? '' : ' (differs)'}`) : ''} | ${bytes ? `${bytes.margo.toLocaleString('en-US')} / ${bytes.three.toLocaleString('en-US')}` : ''} |`;
     }),
   '',
 );

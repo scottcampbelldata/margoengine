@@ -630,3 +630,137 @@ test('local shadows: a caster with bounds draws only into the maps whose frustum
   shadows.dispose();
   lights.dispose();
 });
+
+// Ground truth for the per-map caster cull: does any point of the caster's local sphere, moved by its node matrix, land
+// inside a layer's clip volume (WebGPU: -w <= x, y <= w, 0 <= z <= w)? Samples fill the ball and cover its surface.
+const ballSamples = (() => {
+  const out = [];
+  for (let i = -6; i <= 6; i++)
+    for (let j = -6; j <= 6; j++)
+      for (let k = -6; k <= 6; k++) if (i * i + j * j + k * k <= 36) out.push([i / 6, j / 6, k / 6]);
+  const n = 2000,
+    golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < n; i++) {
+    const y = 1 - (2 * (i + 0.5)) / n,
+      r = Math.sqrt(1 - y * y);
+    out.push([Math.cos(golden * i) * r, y, Math.sin(golden * i) * r]);
+  }
+  return out;
+})();
+function touches(layer, o, bounds, m) {
+  for (const [u, v, w] of ballSamples) {
+    const lx = bounds[0] + bounds[3] * u,
+      ly = bounds[1] + bounds[3] * v,
+      lz = bounds[2] + bounds[3] * w,
+      p = [0, 1, 2].map((r) => m[r] * lx + m[4 + r] * ly + m[8 + r] * lz + m[12 + r]),
+      [x, y, z, cw] = [0, 1, 2, 3].map(
+        (r) => layer[o + r] * p[0] + layer[o + 4 + r] * p[1] + layer[o + 8 + r] * p[2] + layer[o + 12 + r],
+      );
+    if (cw > 0 && Math.abs(x) <= cw && Math.abs(y) <= cw && z >= 0 && z <= cw) return true;
+  }
+  return false;
+}
+/** The faces each caster (told apart by its index count) was drawn into, and any face it reaches but was culled from. */
+function cullCheck(h, shadows, casters) {
+  h.frame();
+  const layers = [...new Set(h.passes)],
+    matrices = shadows['matrices'],
+    missing = [],
+    faces = [];
+  for (const { caster: c, bounds, count, label } of casters) {
+    const m = c.shadowPrimitives[0].node.matrix,
+      drawn = new Set(h.drawn.filter(([, n]) => n === count).map(([layer]) => layers.indexOf(layer)));
+    faces.push([...drawn].sort());
+    for (let l = 0; l < layers.length; l++)
+      if (!drawn.has(l) && touches(matrices, l * 64, bounds, m)) missing.push(`${label}: face ${l}`);
+  }
+  return { missing, faces };
+}
+
+test('local shadows: the per-map cull keeps every caster that reaches a cube face (seams, corners, grazing)', () => {
+  const h = harness(),
+    lights = Clustered.attach(h.engine, { grid: [2, 2, 2] }),
+    shadows = LocalShadows.attach(h.engine, { lights, maxLights: 1, resolution: 64 });
+  lights.setLights([{ position: [0, 0, 0], range: 10, castShadow: true }]);
+  const list = [];
+  const put = (label, bounds, [x, y, z], expect) => {
+    const count = 3 * (list.length + 1),
+      c = caster(h.engine, { bounds, count });
+    c.shadowPrimitives[0].node.matrix.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
+    shadows.add(c);
+    list.push({ caster: c, bounds, count, label, expect });
+  };
+  // Faces in layer order: +x, -x, +y, -y, +z, -z.
+  // The centre lies outside the +x face's frustum (above its x = y seam plane, in +y), the radius crosses into it.
+  put('centre in +y, overlapping the +x seam', [0, 0, 0, 0.6], [2, 2.5, 0], [0, 2]);
+  put('centre in +x, overlapping the +y seam', [0, 0, 0, 0.6], [2.5, 2, 0], [0, 2]);
+  // On the edge where +x and +y meet, and on the corner where +x, +y and +z meet.
+  put('on the +x/+y edge', [0, 0, 0, 0.1], [3, 3, 0], [0, 2]);
+  put('on the +x/+y/+z corner', [0, 0, 0, 0.1], [2, 2, 2], [0, 2, 4]);
+  // Grazing the far plane (range 10) from beyond it, and grazing -x across the -z seam at a shallow angle.
+  put('grazing the far plane', [0, 0, 0, 0.5], [0, 10.3, 0], [2]);
+  put('grazing -x across the -z seam', [0, 0, 0, 0.25], [-4.2, 0, -4.5], [1, 5]);
+  // Wholly inside one face, and wholly beyond the range.
+  put('inside +z', [0, 0, 0, 0.5], [0, 0, 5], [4]);
+  put('beyond the range', [0, 0, 0, 0.5], [0, 0, 11], []);
+  const { missing, faces } = cullCheck(h, shadows, list);
+  assert.deepEqual(missing, []);
+  assert.deepEqual(
+    faces,
+    list.map((c) => c.expect),
+  );
+  shadows.dispose();
+  lights.dispose();
+});
+
+test('local shadows: the per-map cull bounds sheared node matrices (rotated child of a non-uniformly scaled parent)', () => {
+  const h = harness(),
+    lights = Clustered.attach(h.engine, { grid: [2, 2, 2] }),
+    shadows = LocalShadows.attach(h.engine, { lights, maxLights: 1, resolution: 64 });
+  lights.setLights([{ position: [0, 0, 0], range: 10, castShadow: true }]);
+  // A parent rotation times a parent scale times a child rotation shears the child's axes: the longest column then
+  // underestimates how far the sphere reaches (here 1.13 against 1.6 along x).
+  const rotation = (a, b) => {
+    const [ca, sa, cb, sb] = [Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b)];
+    // About z by a, then about x by b; column-major 3x3.
+    return [ca, sa * cb, sa * sb, -sa, ca * cb, ca * sb, 0, -sb, cb];
+  };
+  const mul = (a, b) => {
+    const out = new Array(9).fill(0);
+    for (let c = 0; c < 3; c++)
+      for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) out[c * 3 + r] += a[k * 3 + r] * b[c * 3 + k];
+    return out;
+  };
+  const list = [];
+  const put = (label, outer, scale, inner, at) => {
+    const m3 = mul(outer, mul([scale[0], 0, 0, 0, scale[1], 0, 0, 0, scale[2]], inner)),
+      m = new Float32Array(16);
+    for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) m[c * 4 + r] = m3[c * 3 + r];
+    m.set(at, 12);
+    m[15] = 1;
+    const count = 3 * (list.length + 1),
+      bounds = [0, 0, 0, 0.4],
+      c = caster(h.engine, { bounds, count });
+    c.shadowPrimitives[0].node.matrix.set(m);
+    shadows.add(c);
+    list.push({ caster: c, bounds, count, label });
+  };
+  const still = rotation(0, 0);
+  // Stretched along x by 4 under a 45-degree child turn, 1.3 m beyond the range: its tip reaches 0.3 m inside +x.
+  put('sheared, grazing the far plane', still, [4, 0.1, 1], rotation(Math.PI / 4, 0), [11.3, 0, 0]);
+  // Seeded casters near the seams and the range, with their long axis in any direction.
+  let seed = 12345;
+  const rand = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32) * 2 - 1;
+  for (let i = 0; i < 120; i++) {
+    const outer = rotation(Math.PI * rand(), Math.PI * rand()),
+      inner = rotation(Math.PI * rand(), Math.PI * rand()),
+      scale = [1 + 3 * Math.abs(rand()), 0.1 + 0.3 * Math.abs(rand()), 0.5 + Math.abs(rand())],
+      d = 2 + 9 * Math.abs(rand());
+    put(`sheared caster ${i}`, outer, scale, inner, [d, d * (1 + 0.5 * rand()), d * 0.5 * rand()]);
+  }
+  const { missing, faces } = cullCheck(h, shadows, list);
+  assert.deepEqual(missing, []);
+  assert.deepEqual(faces[0], [0]);
+  shadows.dispose();
+  lights.dispose();
+});

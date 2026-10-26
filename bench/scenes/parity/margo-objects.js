@@ -298,11 +298,25 @@ export const builders = {
           }
       }
     };
+    // mode dense: the original workload, three's field summed over every ball at every grid point, the field given as
+    // a function of the [-1, 1]^3 point (normals from the function).
+    const field = (x, y, z) => {
+      const ux = (x + 1) / 2,
+        uy = (y + 1) / 2,
+        uz = (z + 1) / 2;
+      let v = 0;
+      for (const c of centres) {
+        const d2 = (ux - c[0]) ** 2 + (uy - c[1]) ** 2 + (uz - c[2]) ** 2;
+        v += Math.max(0, BALLS.strength / Math.max(d2, 1e-6) - BALLS.subtract);
+      }
+      return BALLS.isolation - v;
+    };
+    const dense = data.mode === 'dense';
     let triangles = 0;
     const update = (t) => {
       ballCentres(data.balls, t, centres);
-      splat();
-      const g = marchingCubes(grid, { resolution: [res, res, res] });
+      if (!dense) splat();
+      const g = marchingCubes(dense ? field : grid, { resolution: [res, res, res] });
       if (g) {
         mesh.setGeometry(g); // marchingCubes returns a core Geometry
         triangles = g.indices.length / 3;
@@ -315,7 +329,9 @@ export const builders = {
       info: () => ({
         drawCalls: engine.stats.drawCalls,
         triangles,
-        note: 'procedural marchingCubes (marching tetrahedra, more triangles) of a sampled grid on the CPU each frame, balls written only within reach as three does; new core Geometry each frame',
+        note: dense
+          ? 'procedural marchingCubes (marching tetrahedra, more triangles) of a field function on the CPU each frame, every ball summed at every grid point (the original workload; three writes each ball only near it); new core Geometry each frame'
+          : 'procedural marchingCubes (marching tetrahedra, more triangles) of a sampled grid on the CPU each frame, balls written only within reach as three does; new core Geometry each frame',
       }),
     };
   },

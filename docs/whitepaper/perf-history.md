@@ -651,6 +651,40 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   another pose bakes anew; copies share samplers), `tests/modern-silent-render-drops.test.js` (eye renderers on one
   device share the static vertex buffer and free everything on disposal).
 
+### 33. Audit of the item 47 speed work: same pixels, same bytes, both marching-cubes workloads
+
+- **Pixels:** every parity case Margo runs (139) was rendered from the packages built at `82da467e` (before the
+  item 47 commits) and at `83c79d15`, 60 frames at a fixed 1/60 s step, and the screenshots compared. 130 are
+  byte-identical files (the dense marching cubes among them); six differ by at most one level in a channel
+  (`p-alpha-test`, `p-canvas-texture`, `p-double-sided`, `p-matcap`, `p-phong`, `p-physical`); three differ in a few
+  edge pixels, SSIM 1.0 and mean delta E 0.001 or less: `p-blending` (90 pixels, up to 29 levels, where neighbouring
+  blended quads meet; not traced to one commit), `p-transparency` (up to 4 levels) and `p-wireframe` (7 pixels, up
+  to 8 levels; each edge is now drawn once, in one direction). The current build renders the same pixels on a second run, so these come from the changes, not
+  from noise, and all sit far inside the matrix's tolerance (SSIM >= 0.9, mean delta E <= 6).
+- **Bytes:** OBJ, STL and PLY (binary and ASCII), GLB and USDZ exports, EXR writing, all 32 EXR and HDR fixtures and
+  the CAD path's STL geometry hash the same before and after (`b30af0b8`, `1be3aca1`).
+- **Marching cubes:** `4be0e7d2` also changed the scene, from summing every ball at every grid point to writing each
+  ball only near it as three's add-on does, so `p-marching-cubes` compared two workloads. Row 17.11 now runs both,
+  labelled: `p-marching-cubes-dense` (the original scene, its image byte-identical to the original's) and
+  `p-marching-cubes-localized` (the add-on's work). Run `20261026-221004`, CPU ms per frame:
+
+  | Scene | Margo | three.js (WebGL) |
+  | --- | --- | --- |
+  | `p-marching-cubes-dense` | 9.76 | 3.17 (three always runs its localized add-on) |
+  | `p-marching-cubes-localized` | 2.90 | 3.17 |
+
+- **Bug found:** the point-light shadow cull of `8149bf4e` took a caster's world radius from the longest column of its
+  node matrix, which is short under shear (a rotated child of a non-uniformly scaled parent): such a caster near a
+  cube-face edge or the light's range could lose its shadow in that face. `shared/sphere.js` `worldRadius` bounds the
+  stretch through the Gershgorin bound of M^T M (exact for rotation and scale) plus a float32 pad; LocalShadows, the
+  LOD imposter cull and gltf-pro's progressive load order use it. The `p-point-shadows` image is unchanged.
+- **Labels:** the matrix names what each case of a multi-case row measures (`bench/scenes/parity.js` `LABELS`): helmet's
+  default PCSS shadows beside the setup closest to three's, `parseSTL` beside `parseCAD`, dense beside localized.
+- **Guard:** `packages/clustered/test/shadows.test.js` (casters across face seams, on edges and corners, grazing the
+  range, a centre outside one face's frustum overlapping the next, and 120 sheared casters, each checked against
+  sampled sphere points), `tests/shared-sphere.test.js`, and `tests/bench.test.js` (row 17.11 keeps the dense case,
+  every label names a case).
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks

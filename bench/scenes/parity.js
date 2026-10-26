@@ -1543,9 +1543,13 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       area: 'objects',
       rows: ['17.11'],
       title: 'Marching cubes',
-      draws: '16 moving metaballs polygonised every frame on a 64^3 grid.',
-      params: {},
-      data: () => ({ balls: 16, resolution: 64, camera: orbit(3, 1.5, 100) }),
+      // Two workloads, both published (row 17.11): `dense` is the original scene, every ball summed at every grid point
+      // (identical maths, the field as a function); `localized` writes each ball only into the samples within its
+      // reach, as three's MarchingCubes add-on does. three.js runs its add-on (localized) for both.
+      draws:
+        '16 moving metaballs polygonised every frame on a 64^3 grid; mode dense sums every ball at every grid point (Margo only; three always runs its localized add-on), mode localized writes each ball only near it like three.',
+      params: { mode: 'localized' },
+      data: (p) => ({ balls: 16, resolution: 64, camera: orbit(3, 1.5, 100), mode: p.mode }),
     },
 
     // 18. Audio
@@ -1736,7 +1740,13 @@ export const ROWS = {
   '17.8': { scenes: ['p-reflector'] },
   '17.9': { scenes: ['p-water'] },
   '17.10': { scenes: ['p-decals'] },
-  '17.11': { scenes: ['p-marching-cubes'] },
+  // The original full-grid workload beside the localized one that matches three's add-on (both labelled in the matrix).
+  '17.11': {
+    scenes: [
+      { scene: 'p-marching-cubes', params: { mode: 'dense' } },
+      { scene: 'p-marching-cubes', params: { mode: 'localized' } },
+    ],
+  },
   '18.1': { scenes: ['p-audio'] },
   '19.1': { none: 'not measurable headless: WebXR sessions need an XR device' },
   '19.2': { none: 'not measurable headless: WebXR sessions need an XR device' },
@@ -1758,3 +1768,26 @@ export function parityCases(scenes) {
     primary: scenes[c.scene]?.kind === 'task' ? ['taskMs'] : ['cpuMs', 'gpuMs'],
   }));
 }
+
+/**
+ * What a case measures, where a row names more than one way to do its job: shown beside the case id in the matrix
+ * (docs/whitepaper/perf-vs-threejs.md) so a reader sees which row is Margo's default, which is the setup closest to
+ * three's, and which does more or less work than three.js.
+ */
+export const LABELS = {
+  helmet:
+    "Margo's default shadows: PCSS soft filter, 4 cascades (an accepted GPU-time loss against three's one PCF map)",
+  'helmet-filterpcf-cascades1':
+    "the shadow setup closest to three's: filter 'pcf', 1 cascade (three: one PCFSoftShadowMap)",
+  'p-stl':
+    "parseSTL: STL raw triangles + flat normals (typed arrays, no weld) against three's STLLoader, which copies the file's zero normals (an accepted difference in work); its first runs timed the CAD path, now p-stl-cad",
+  'p-stl-normals': "like-for-like with usable normals: parseSTL against three's STLLoader + computeVertexNormals()",
+  'p-stl-cad':
+    'parseCAD: CAD parse with weld and topology (welded parts, face normals, GPU meshes; no three.js equivalent)',
+  'p-marching-cubes-dense':
+    'dense: the original workload, every ball summed at every grid point (more work than three, whose add-on writes each ball only near it)',
+  'p-marching-cubes-localized':
+    "localized: each ball written only within its reach, the same work as three's MarchingCubes add-on",
+  'p-marching-cubes':
+    'history only: first run dense, later runs localized; superseded by p-marching-cubes-dense and -localized',
+};

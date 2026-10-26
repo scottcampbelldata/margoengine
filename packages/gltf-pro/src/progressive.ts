@@ -4,6 +4,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { canUseWorker } from '../../shared/worker.js';
 import { Cleanup } from '../../shared/cleanup.js';
+import { worldRadius } from '../../shared/sphere.js';
 import {
   GLTFAsset,
   assetLimit,
@@ -214,9 +215,8 @@ export function loadGLTFProgressive(
             (m[8 + r] * (lo[2] + hi[2])) / 2 +
             m[12 + r],
         );
-      const radius =
-        (Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2) *
-        Math.max(Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10]));
+      // A bound that holds under shear too (a rotated child of a non-uniformly scaled parent).
+      const radius = worldRadius(m, 0, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2, c[0], c[1], c[2]);
       let visible = 1;
       if (cull)
         for (let j = 0; j < 24; j += 4)

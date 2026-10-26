@@ -102,3 +102,25 @@ test('bench suites: every suite loads and lists its cases', async () => {
   assert.match(out, /transforms-100k/);
   assert.match(out, /boxes-10000/);
 });
+
+test('bench parity: labelled cases exist, and marching cubes keeps its dense workload beside the localized one', async () => {
+  const { LABELS, ROWS, parityCases } = await import('../bench/scenes/parity.js'),
+    { readFileSync } = await import('node:fs'),
+    ids = new Set(parityCases(SCENES).map((c) => caseId(c.scene, c.params))),
+    ledger = JSON.parse(readFileSync(new URL('../docs/whitepaper/perf-vs-threejs.json', import.meta.url), 'utf8'));
+  // A label names a case the matrix runs, or one the ledger keeps as history.
+  for (const key of Object.keys(LABELS)) assert.ok(ids.has(key) || ledger.scenes[key], key);
+  // Row 17.11: the original full-grid scene is never replaced by the cheaper one (session rule 11); both are labelled.
+  const rows = ROWS['17.11'].scenes.map((c) => caseId(c.scene, c.params));
+  assert.deepEqual(rows, ['p-marching-cubes-dense', 'p-marching-cubes-localized']);
+  for (const key of rows) assert.ok(LABELS[key], key);
+  const data = (mode) => SCENES['p-marching-cubes'].data(sceneParams('p-marching-cubes', { mode }), {});
+  assert.equal((await data('dense')).mode, 'dense');
+  assert.equal((await data('localized')).mode, 'localized');
+  // helmet's default shadows and the setup closest to three's stay side by side in row 9.3, each labelled.
+  const helmet = ROWS['9.3'].scenes.map((c) => (typeof c === 'string' ? caseId(c) : caseId(c.scene, c.params)));
+  for (const key of ['helmet', 'helmet-filterpcf-cascades1']) {
+    assert.ok(helmet.includes(key), key);
+    assert.ok(LABELS[key], key);
+  }
+});
