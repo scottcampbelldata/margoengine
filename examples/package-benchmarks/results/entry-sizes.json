@@ -1,5 +1,5 @@
 {
-  "commit": "0863259b",
+  "commit": "ba591628",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -202,12 +202,12 @@
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 61847,
-        "gzip": 18911
+        "raw": 62101,
+        "gzip": 18983
       },
       "./particles": {
-        "raw": 777,
-        "gzip": 535
+        "raw": 1023,
+        "gzip": 602
       },
       "./targets": {
         "raw": 7480,
@@ -1242,12 +1242,12 @@
     },
     "@margoengine/vfx": {
       ".": {
-        "raw": 26343,
-        "gzip": 9420
+        "raw": 35846,
+        "gzip": 12350
       },
       "./base": {
-        "raw": 19062,
-        "gzip": 7014
+        "raw": 20208,
+        "gzip": 7316
       },
       "./obstacles": {
         "raw": 2782,
@@ -1264,6 +1264,14 @@
       "./texture": {
         "raw": 2730,
         "gzip": 1310
+      },
+      "./curves": {
+        "raw": 3278,
+        "gzip": 1560
+      },
+      "./emitter": {
+        "raw": 5298,
+        "gzip": 2400
       }
     },
     "@margoengine/video": {
@@ -1452,9 +1460,9 @@
       "brotli": 7835
     },
     "packages/creative/dist/particles.js": {
-      "raw": 29785,
-      "gzip": 10957,
-      "brotli": 9832
+      "raw": 30824,
+      "gzip": 11219,
+      "brotli": 10053
     },
     "packages/creative/dist/post.js": {
       "raw": 19039,

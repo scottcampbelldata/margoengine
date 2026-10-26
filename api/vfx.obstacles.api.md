@@ -19,6 +19,34 @@ interface ParticleAtlas {
     frames: 'random' | 'lifetime';
 }
 
+interface VFXCurves {
+    size?: readonly number[];
+    alpha?: readonly number[];
+    color?: readonly {
+        at: number;
+        color: readonly [number, number, number];
+    }[];
+}
+
+type VFXEmitter = {
+    shape: 'sphere';
+    radius?: number;
+    shell?: boolean;
+    speed?: number;
+} | {
+    shape: 'cone';
+    radius?: number;
+    angle?: number;
+    axis?: Vec3;
+    speed?: number;
+} | {
+    shape: 'mesh';
+    positions: ArrayLike<number>;
+    indices?: ArrayLike<number>;
+    scale?: number;
+    speed?: number;
+};
+
 interface VFXFeatures {
     obstacles?: {
         patch(simulation: string): string;
@@ -36,6 +64,22 @@ interface VFXFeatures {
         copy(texture: VFXTexture): VFXTexture;
         patch(billboard: string, texture: VFXTexture): string;
         create(device: GPUDevice, texture: VFXTexture, owned: OwnedResources): GPUBindGroupEntry[];
+    };
+    curves?: {
+        validate(curves: VFXCurves): void;
+        patch(billboard: string, curves: VFXCurves): string;
+        create(device: GPUDevice, owned: OwnedResources): {
+            entries: GPUBindGroupEntry[];
+            write(queue: GPUQueue, curves: VFXCurves): void;
+        };
+    };
+    emitter?: {
+        validate(emitter: VFXEmitter, mesh?: boolean): void;
+        patch(simulation: string, emitter: VFXEmitter): string;
+        create(device: GPUDevice, emitter: VFXEmitter, owned: OwnedResources): {
+            entries: GPUBindGroupEntry[];
+            write(queue: GPUQueue, emitter: VFXEmitter): void;
+        };
     };
 }
 

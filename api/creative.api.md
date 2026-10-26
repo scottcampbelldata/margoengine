@@ -5,7 +5,8 @@
 ```ts
 import { EngineKernel, Vec3, VectorRef } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
-import { VFX, VFXObstacle, VFXTexture } from "@margoengine/vfx";
+import { VFXObstacle, VFXTexture } from "@margoengine/vfx";
+import { VFX } from "@margoengine/vfx/base";
 
 export interface AtmosphereOptions {
     density?: number;

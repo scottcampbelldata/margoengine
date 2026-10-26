@@ -255,7 +255,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/scenery`](packages/scenery/README.md) | Procedural moonlit skies and scenery passes for Margo Engine. |
 | [`@margoengine/scatter`](packages/scatter/README.md) | Seeded instancing, distance-based LOD and procedural wind. |
 | [`@margoengine/road`](packages/road/README.md) | Arc-length spline road surfaces, raised curbs and tiled UVs. |
-| [`@margoengine/vfx`](packages/vfx/README.md) | GPU particle simulation and indirect billboards. |
+| [`@margoengine/vfx`](packages/vfx/README.md) | GPU particle simulation and indirect billboards, with curves over life and sphere, cone and mesh-surface emitters. |
 | [`@margoengine/creative`](packages/creative/README.md) | WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine. |
 | [`@margoengine/procedural`](packages/procedural/README.md) | Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language. |
 | [`@margoengine/wfc`](packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |
@@ -5494,7 +5494,7 @@ around `position` (default zero). `intensity` multiplies RGB for HDR emission,
 One million particles use 64 MB for state plus 4 MB for the draw list, regardless of the live count. Per-frame CPU work is bounded uniform updates and pass submission; there is no JavaScript object/array per particle. GPU performance still depends on capacity, fill rate and hardware.
 
 This is Margo's one particle system; `GPUParticles` in `@margoengine/creative/particles` is a leaf-field preset
-over it. Four optional features patch the shaders only when set, so effects without them compile the same WGSL
+over it. Six optional features patch the shaders only when set, so effects without them compile the same WGSL
 and make the same GPU calls:
 
 - `obstacles: [{kind:'sphere', center, radius}, {kind:'box', center, halfSize}]` (up to 64): the flow bends
@@ -5561,8 +5561,8 @@ const {Planet} = await import('margoengine/creative/planet'); // loaded only whe
 ```
 
 `GPUParticles({count, gravity, wind, size, curl, obstacles, sort, texture})` keeps `count` particles drifting
-inside a 6 m cube centred on the origin, re-entering on the opposite face. It is a `VFX` from `@margoengine/vfx`
-(`instanceof VFX`, plugin name `gpu-particles`): `wind` is added to `gravity`, `curl` is VFX `turbulence`, and
+inside a 6 m cube centred on the origin, re-entering on the opposite face. It is a `VFX` from `@margoengine/vfx/base`
+(`instanceof VFX` of that entry, with the obstacles, wrap, sort and texture features only; plugin name `gpu-particles`): `wind` is added to `gravity`, `curl` is VFX `turbulence`, and
 `size` is the sprite half-width. Use `VFX` directly for emitters, lifetimes, bursts or up to 1,000,000 particles.
 
 `PostProcessing` grades the HDR scene: exponential height fog, screen-space god rays, a depth-of-field focus

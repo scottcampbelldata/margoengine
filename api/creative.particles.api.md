@@ -4,7 +4,8 @@
 
 ```ts
 import { EngineKernel, Vec3 } from "@margoengine/core";
-import { VFX, VFXObstacle, VFXTexture } from "@margoengine/vfx";
+import { VFXObstacle, VFXTexture } from "@margoengine/vfx";
+import { VFX } from "@margoengine/vfx/base";
 
 export class GPUParticles extends VFX {
     readonly name = "gpu-particles";
