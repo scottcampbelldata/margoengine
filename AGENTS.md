@@ -101,6 +101,7 @@ Several agents push to `main`. Each push must leave it at least as clean as it f
   `npm run quality -- --update` does), measures both size records at the rebased `HEAD`, checks that they name one
   commit and makes one `records:` commit. Then run `verify` and push. Commit nothing else by hand in those files.
   `build:site` and `test:basic-scene` take the GPU lock themselves, only around the browser; do not wrap them in it.
+- GPU tests share 3 slots; benchmarks take the GPU exclusively; every lock hold has a time limit.
 
 ## One branch: main
 

@@ -4,6 +4,7 @@ import { writeFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
+import { listenWhenFree } from '../../../scripts/browser.js';
 const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/post-image/vite-cache',
@@ -11,7 +12,7 @@ const server = await createServer({
   server: { host: '127.0.0.1', port: 5341, strictPort: true, watch: null },
   logLevel: 'error',
 });
-await server.listen();
+await listenWhenFree(() => server.listen(), { port: 5341 });
 const browser = await chromium.launch({ channel: 'msedge', headless: true }),
   page = await browser.newPage(),
   errors = [];

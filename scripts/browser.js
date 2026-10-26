@@ -4,6 +4,31 @@ import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 
+/**
+ * Starts a server on a fixed port with `start` (for example `() => server.listen()`), waiting while something else holds
+ * the port: GPU suites share the GPU (scripts/gpu-lock.mjs, 3 slots), so two suites that use the same port can run at
+ * once and the second waits for the first to close its server. Other errors are thrown as they are; past `waitMs`
+ * (default 20 min, a shared GPU hold's limit) it throws naming the port.
+ */
+export async function listenWhenFree(start, { port, waitMs = 20 * 60_000, poll = 1000, log = console.error } = {}) {
+  const begun = Date.now();
+  for (let told = false; ; ) {
+    try {
+      return await start();
+    } catch (error) {
+      if (error?.code !== 'EADDRINUSE' && !/already in use/i.test(error?.message ?? '')) throw error;
+      if (Date.now() - begun > waitMs)
+        throw new Error(
+          `port ${port} stayed in use for ${Math.round((Date.now() - begun) / 1000)} s; find what holds it (netstat -ano | findstr :${port}) and stop it`,
+          { cause: error },
+        );
+      if (!told) log(`port ${port} is in use, most likely by another GPU suite sharing the GPU; waiting for it`);
+      told = true;
+      await new Promise((resolve) => setTimeout(resolve, poll));
+    }
+  }
+}
+
 export async function openBrowser({
   browserName = 'chromium',
   channel = process.env.BROWSER_CHANNEL ?? 'msedge',
@@ -26,7 +51,7 @@ export async function openBrowser({
     server: { host: '127.0.0.1', port, strictPort: true, watch: null },
     logLevel: 'error',
   });
-  await server.listen();
+  await listenWhenFree(() => server.listen(), { port });
   let browser;
   try {
     if (!['chromium', 'firefox', 'webkit'].includes(browserName)) throw new TypeError('Unsupported browser');

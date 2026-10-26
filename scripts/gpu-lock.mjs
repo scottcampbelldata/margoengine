@@ -1,19 +1,63 @@
-// One GPU user at a time across agents and worktrees: test-results/gpu.lock in the MAIN checkout.
-// Acquire is an atomic mkdir plus owner.json; release removes the lock only if this owner still holds it; a lock whose
-// owner process is gone is stale and taken over. Never delete a lock you don't own.
-// CLI: node scripts/gpu-lock.mjs run --owner=<agent id> -- <command...>   (holds the lock only while the command runs)
+// GPU access across agents and worktrees, as a reader/writer lock in test-results/gpu.lock of the MAIN checkout.
+//   shared     correctness tests: up to MARGO_GPU_SLOTS (default 3) holders at once. The default for `gpu.lock`.
+//   exclusive  anything that measures speed: `--exclusive` / acquire({mode: 'exclusive'}), and automatically every
+//              `bench*` npm script and every script under bench/, benchmarks/ or *-benchmarks/ (or named bench*.mjs).
+//              It waits until no holder is left and, while it waits, new shared holders queue behind it, so it cannot
+//              starve. Every lock other than `gpu.lock` (the landing lock, say) is exclusive.
+// Nothing hangs while holding or waiting:
+//   hold limit  every holder has a maximum hold time (default 20 min shared, 60 min exclusive, 30 min for any other lock
+//               such as the landing lock; `--max=<min>` / acquire({max})). `run` kills the command's whole process tree
+//               (Windows: taskkill /T /F) when it is exceeded, frees the lock and exits 124 with
+//               "TIMEOUT after N min: <command>". A holder that called acquire() itself is ended the same way by its
+//               heartbeat process, a few seconds after the limit.
+//   heartbeat   a heartbeat process refreshes each holder's entry every 15 s while the holder lives; a waiter reclaims an
+//               entry whose process is dead, or that nobody has refreshed for 2 min (MARGO_GPU_LEASE_MIN), live or not.
+//   wait limit  a request waits at most 60 min (`--wait-max=<min>` / acquire({waitMax})), then fails naming each holder,
+//               its owner and the command it runs.
+// Layout of the lock folder: shared/<token>.json per shared holder, exclusive.json for the exclusive holder and mutex/
+// (a mkdir held for microseconds around every state change). Queued exclusive requests are <ts>-<token>.json in the
+// folder beside it, gpu.lock-waiting/, which an old client's release (it removes the whole lock folder) leaves alone. A holder, waiter or legacy owner.json whose process is gone is stale and removed. Release removes
+// only our own entry: never delete an entry you don't own.
+// Compatibility with the one-holder lock (before 2026-10-26, still run by agents in older worktrees): that version
+// holds the GPU by creating the folder itself (atomic mkdir, then owner.json) and waits while the folder exists. Every
+// holder here keeps its entry inside the folder and the folder is removed only when empty, so an old client waits
+// while any new holder, shared or exclusive, is in. In the other direction an old owner.json counts as an exclusive
+// holder, and a folder made in the last 5 s with nothing in it is an old client between its mkdir and its
+// owner.json, so it is waited for too. Old clients therefore take turns with new ones as with each other.
+// CLI: node scripts/gpu-lock.mjs run [--exclusive] [--max=<min>] [--wait-max=<min>] --owner=<agent id> -- <command...>
 //      node scripts/gpu-lock.mjs status
-// Scripts that take test-results/gpu.lock themselves use MARGO_GPU_LOCK_NESTED (a folder inside the held lock; it
-// excuses only that lock, so a GPU test inside the landing lock still takes the GPU lock) when
-// run under `run`, so wrapping them can't deadlock; acquire() is a no-op there too.
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
-import { join, resolve } from 'node:path';
+// Env: MARGO_GPU_SLOTS=<n> shared slots (default 3); MARGO_GPU_EXCLUSIVE=1 makes every acquire exclusive (it can only
+// raise a request to exclusive, never lower it); MARGO_GPU_LOCK=<folder> uses another lock.
+// Scripts that take the lock themselves use MARGO_GPU_LOCK_NESTED (a folder inside the held lock; it excuses only that
+// lock, so a GPU test inside the landing lock still takes the GPU lock) when run under `run`, so wrapping them can't
+// deadlock; acquire() is a no-op there. MARGO_GPU_LOCK_NESTED_MODE names the outer holder's mode: an exclusive request
+// inside a shared hold would wait on itself forever, so it throws and says to start the outer command with --exclusive.
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  rmdirSync,
+  statSync,
+  unlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const main = resolve(import.meta.dirname, '..').replace(/[\\/]\.[\w-]+[\\/]worktrees[\\/][^\\/]+$/, '');
 export const lockDir = process.env.MARGO_GPU_LOCK ?? join(main, 'test-results', 'gpu.lock');
-const ownerFile = join(lockDir, 'owner.json');
+const sharedDir = join(lockDir, 'shared'),
+  waitingDir = `${lockDir}-waiting`,
+  mutexDir = join(lockDir, 'mutex'),
+  exclusiveFile = join(lockDir, 'exclusive.json'),
+  legacyFile = join(lockDir, 'owner.json');
+const isGpuLock = basename(lockDir) === 'gpu.lock';
+const MIN = 60_000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const alive = (pid) => {
   try {
@@ -23,50 +67,366 @@ const alive = (pid) => {
     return error.code === 'EPERM';
   }
 };
-
-export function status() {
+const read = (file) => {
   try {
-    return JSON.parse(readFileSync(ownerFile, 'utf8'));
+    return JSON.parse(readFileSync(file, 'utf8'));
   } catch {
+    return null;
+  }
+};
+const files = (dir) => {
+  try {
+    return readdirSync(dir).filter((name) => name.endsWith('.json'));
+  } catch {
+    return [];
+  }
+};
+const number = (name, fallback) => {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const n = Number(raw);
+  if (!(n > 0)) throw new RangeError(`${name} must be a positive number, got "${raw}"`);
+  return n;
+};
+/** Milliseconds without a heartbeat after which a holder's entry may be reclaimed (MARGO_GPU_LEASE_MIN, default 2 min). */
+const leaseMs = () =>
+  process.env.MARGO_GPU_LEASE_MS ? Number(process.env.MARGO_GPU_LEASE_MS) : number('MARGO_GPU_LEASE_MIN', 2) * MIN;
+const beatMs = () => Number(process.env.MARGO_GPU_BEAT_MS ?? 15_000);
+// How long an empty folder with no owner.json counts as an old client that has just made it (see Compatibility).
+const freshMs = () => Number(process.env.MARGO_GPU_FRESH_MS ?? 5_000);
+
+/**
+ * Ends a process and everything it started. On Windows `taskkill /T /F` (a plain kill stops only the shell or launcher
+ * and leaves browsers, servers and kernels running); elsewhere the process group, which `spawnLimited` makes.
+ */
+function killTree(pid) {
+  if (!pid) return;
+  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+  else
     try {
-      readFileSync(join(lockDir, 'owner.txt'));
-      return { legacy: true };
-    } catch {}
+      process.kill(-pid, 'SIGKILL');
+    } catch {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {}
+    }
+}
+
+// Starts `command` (a shell string, or [program, ...args]) and ends its whole process tree past `timeoutMs`. Resolves
+// to {code, timedOut} (code 124 on a timeout), with the child as `.child`.
+function spawnLimited(command, { timeoutMs, env }) {
+  const windows = process.platform === 'win32',
+    child = Array.isArray(command)
+      ? spawn(command[0], command.slice(1), { env, stdio: 'inherit', detached: !windows })
+      : spawn(command, { env, stdio: 'inherit', shell: true, detached: !windows });
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    killTree(child.pid);
+  }, timeoutMs);
+  const result = new Promise((done) => {
+    const finish = (code) => {
+      clearTimeout(timer);
+      done({ code: timedOut ? 124 : (code ?? 1), timedOut });
+    };
+    child.once('error', () => finish(1));
+    child.once('close', finish);
+  });
+  result.child = child;
+  return result;
+}
+
+const BENCH_SCRIPT = /(^|[\\/])(bench|[\w-]*benchmarks)[\\/].*\.[cm]?[jt]s$|(^|[\\/])bench[\w.-]*\.[cm]?[jt]s$/i;
+/**
+ * Whether a command measures speed and so needs the GPU to itself: an npm script named bench*, or a script under
+ * bench/, benchmarks/ or *-benchmarks/, or named bench*.mjs. `words` is the command (program and arguments).
+ */
+export function measuresSpeed(words, lifecycle = process.env.npm_lifecycle_event) {
+  if (/^bench/.test(lifecycle ?? '')) return true;
+  return words.some(
+    (word, i) => BENCH_SCRIPT.test(word) || (/^bench/.test(word) && /^(run|run-script)$/.test(words[i - 1] ?? '')),
+  );
+}
+
+/** The number of shared slots: MARGO_GPU_SLOTS, default 3. */
+export function slots() {
+  const raw = process.env.MARGO_GPU_SLOTS;
+  if (raw === undefined || raw === '') return 3;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1)
+    throw new RangeError(`MARGO_GPU_SLOTS must be a whole number of 1 or more, got "${raw}"`);
+  return n;
+}
+
+/**
+ * The mode an acquire really uses. `requested` is 'shared' or 'exclusive' (default: shared on gpu.lock, exclusive on
+ * any other lock). MARGO_GPU_EXCLUSIVE=1 raises a shared request to exclusive; nothing lowers one.
+ */
+export function resolveMode(requested) {
+  if (requested !== undefined && requested !== 'shared' && requested !== 'exclusive')
+    throw new TypeError(`gpu-lock: mode must be "shared" or "exclusive", got "${requested}"`);
+  if (requested === 'exclusive' || /^(1|true|yes)$/i.test(process.env.MARGO_GPU_EXCLUSIVE ?? '')) return 'exclusive';
+  if (requested === undefined && measuresSpeed(process.argv.slice(1, 2))) return 'exclusive';
+  return isGpuLock ? (requested ?? 'shared') : 'exclusive';
+}
+
+/** The default longest hold, in minutes: 20 for a shared slot, 60 exclusive on the GPU lock, 30 for any other lock. */
+export const defaultMaxMinutes = (mode) => (isGpuLock ? (mode === 'shared' ? 20 : 60) : 30);
+
+// Runs `fn` (synchronous, short) while holding the lock's mutex. A mutex older than 10 s belongs to a crashed process.
+// `fn` gets {fresh}: true when the folder was made by someone else less than freshMs() ago (an old client mid-acquire
+// when nothing is in it; see Compatibility). A folder `fn` leaves empty is removed again unless it is fresh: an empty
+// folder would make old clients wait forever.
+async function locked(fn) {
+  mkdirSync(dirname(lockDir), { recursive: true });
+  let fresh = false;
+  for (;;) {
     try {
       mkdirSync(lockDir);
-      rmSync(lockDir, { recursive: true });
-      return null;
-    } catch {
-      return { unknown: true };
+      fresh = false;
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      try {
+        const made = statSync(lockDir);
+        fresh = Date.now() - (made.birthtimeMs || made.mtimeMs) < freshMs();
+      } catch {}
     }
+    try {
+      mkdirSync(mutexDir);
+      break;
+    } catch (error) {
+      if (error.code === 'ENOENT') continue; // a release just tidied the folder away
+      if (error.code !== 'EEXIST') throw error;
+      try {
+        if (Date.now() - statSync(mutexDir).mtimeMs > 10_000) rmSync(mutexDir, { recursive: true, force: true });
+      } catch {}
+      await sleep(10);
+    }
+  }
+  try {
+    return fn({ fresh });
+  } finally {
+    rmSync(mutexDir, { recursive: true, force: true });
+    if (!fresh)
+      try {
+        rmdirSync(lockDir);
+      } catch {}
   }
 }
 
-/** Waits (polling every `poll` ms) until the lock is ours. Returns a release function that only removes our own lock. */
-export async function acquire({ owner, poll = 30_000, log = console.error } = {}) {
+/** Why a holder's entry is dead, or null when it is alive: its process is gone, its heartbeat stopped, or it overran. */
+function deadReason(entry, file) {
+  if (entry.pid && !alive(entry.pid)) return `pid ${entry.pid} gone`;
+  if (entry.beats) {
+    let beat = 0;
+    try {
+      beat = statSync(file).mtimeMs;
+    } catch {}
+    if (Date.now() - beat > leaseMs()) return `no heartbeat for ${Math.round((Date.now() - beat) / 1000)} s`;
+    // The limit is enforced by the holder's wrapper and heartbeat process; this covers both having died.
+    if (entry.deadline && Date.now() > entry.deadline + 2 * MIN) return 'past its hold limit';
+  }
+  return null;
+}
+
+// The live entries of each kind; dead ones are removed (and logged). Call inside `locked`.
+function snapshot(log, fresh = false) {
+  const live = (dir) =>
+    files(dir).flatMap((name) => {
+      const file = join(dir, name),
+        entry = read(file);
+      const reason = entry && deadReason(entry, file);
+      if (entry && !reason) return [{ ...entry, file }];
+      if (entry) log?.(`gpu-lock: removing stale ${basename(dir)} entry of ${entry.owner} (${reason})`);
+      try {
+        unlinkSync(file);
+      } catch {}
+      return [];
+    });
+  let exclusive = read(exclusiveFile);
+  const legacy = read(legacyFile); // a holder from before shared slots existed
+  for (const [file, entry] of [
+    [exclusiveFile, exclusive],
+    [legacyFile, legacy],
+  ]) {
+    const reason = entry && deadReason(entry, file);
+    if (reason) {
+      log?.(`gpu-lock: taking over stale lock from ${entry.owner} (${reason})`);
+      rmSync(file, { force: true });
+      if (entry === exclusive) exclusive = null;
+    }
+  }
+  let held = exclusive ?? (legacy && !deadReason(legacy, legacyFile) ? legacy : null);
+  const shared = live(sharedDir),
+    waiting = live(waitingDir).sort((a, b) => a.file.localeCompare(b.file));
+  // An old client makes the folder, then writes owner.json: a just-made folder with nothing in it is one in between,
+  // and so is an owner.json being written (unreadable for a moment). Past freshMs() an unreadable one is stale.
+  if (!held && legacy === null && existsSync(legacyFile)) {
+    let age = Number.POSITIVE_INFINITY;
+    try {
+      age = Date.now() - statSync(legacyFile).mtimeMs;
+    } catch {}
+    if (age < freshMs()) held = { owner: 'an older gpu-lock client (writing owner.json)', mode: 'exclusive' };
+    else {
+      log?.('gpu-lock: removing an unreadable owner.json');
+      rmSync(legacyFile, { force: true });
+    }
+  }
+  if (!held && fresh && !shared.length && !existsSync(legacyFile))
+    held = { owner: 'an older gpu-lock client (it has just made the lock folder)', mode: 'exclusive' };
+  return { exclusive: held, shared, waiting };
+}
+
+// Removes the lock folder when nothing is in it, so a script that still makes the folder by hand (older checkouts) is
+// not blocked by an empty one. Skipped when another process is changing the lock right now.
+function tidy() {
+  try {
+    mkdirSync(mutexDir);
+  } catch {
+    return;
+  }
+  for (const dir of [sharedDir, waitingDir, mutexDir, lockDir])
+    try {
+      rmdirSync(dir);
+    } catch {}
+}
+
+/**
+ * Who holds the GPU now: null when nobody; the exclusive holder's entry (plus `mode: 'exclusive'`); or, when shared
+ * holders exist, `{mode: 'shared', holders, slots}`. `waiting` lists queued exclusive requests when there are any.
+ */
+export function status() {
+  const liveEntry = (file) => {
+    const entry = read(file);
+    return entry && !deadReason(entry, file) ? entry : null;
+  };
+  const waiting = files(waitingDir)
+    .map((name) => read(join(waitingDir, name)))
+    .filter((entry) => entry && (!entry.pid || alive(entry.pid)));
+  const exclusive = liveEntry(exclusiveFile) ?? liveEntry(legacyFile);
+  const holders = files(sharedDir)
+    .map((name) => liveEntry(join(sharedDir, name)))
+    .filter(Boolean);
+  const extra = waiting.length ? { waiting } : {};
+  if (exclusive) return { ...exclusive, mode: 'exclusive', ...extra };
+  if (holders.length) return { mode: 'shared', holders, slots: slots(), ...extra };
+  return waiting.length ? { mode: 'idle', ...extra } : null;
+}
+
+const describe = (entry) =>
+  entry
+    ? `${entry.owner} (${entry.mode ?? 'exclusive'}${entry.takenAt ? `, since ${entry.takenAt}` : ''}${entry.command ? `, running: ${entry.command}` : ''})`
+    : 'an unlabelled holder';
+
+// Starts the process that keeps a holder's entry fresh and ends the holder if it overruns. It is separate from the holder
+// because a holder busy in a long synchronous call (spawnSync) cannot refresh anything itself.
+function startHeartbeat(file, token, deadline) {
+  const child = spawn(
+    process.execPath,
+    [import.meta.filename, 'beat', file, token, String(process.pid), String(deadline)],
+    { detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, MARGO_GPU_LOCK: lockDir } },
+  );
+  child.unref();
+}
+
+/**
+ * Waits until the lock is ours and returns a release function (with the mode used as `.mode`) that removes only our own
+ * entry. `mode` is 'shared' or 'exclusive' (see resolveMode). `max` is the longest hold in minutes (default by mode, see
+ * defaultMaxMinutes) and `waitMax` the longest wait in minutes (default 60, MARGO_GPU_WAIT_MAX_MIN): past it this throws,
+ * naming the holder and its command. `command` says what the holder runs (shown to those who wait).
+ */
+export async function acquire({
+  owner,
+  mode: requested,
+  max,
+  waitMax = number('MARGO_GPU_WAIT_MAX_MIN', 60),
+  command = process.argv.slice(1).join(' ').slice(0, 300),
+  poll = 1_000,
+  log = console.error,
+} = {}) {
   if (!owner) throw new Error('gpu-lock: pass an owner (agent id)');
+  const mode = resolveMode(requested);
   // Inside `run` of this same lock the command already holds it; a different lock (the landing lock around GPU
   // tests, say) is still taken.
-  if (process.env.MARGO_GPU_LOCK_NESTED === join(lockDir, 'nested')) return () => {};
-  const token = `${owner}:${process.pid}:${Date.now()}`;
-  for (let waited = 0; ; waited += poll) {
-    try {
-      mkdirSync(lockDir, { recursive: false });
-      writeFileSync(ownerFile, JSON.stringify({ owner, pid: process.pid, token, takenAt: new Date().toISOString() }));
-      return () => {
-        if (status()?.token === token) rmSync(lockDir, { recursive: true, force: true });
-      };
-    } catch (error) {
-      if (error.code !== 'EEXIST') throw error;
-      const held = status();
-      if (held?.pid && !alive(held.pid)) {
-        log(`gpu-lock: taking over stale lock from ${held.owner} (pid ${held.pid} gone)`);
-        rmSync(lockDir, { recursive: true, force: true });
-        continue;
+  if (process.env.MARGO_GPU_LOCK_NESTED === join(lockDir, 'nested')) {
+    if (mode === 'exclusive' && process.env.MARGO_GPU_LOCK_NESTED_MODE === 'shared')
+      throw new Error(
+        `gpu-lock: ${owner} needs the GPU exclusively (it measures speed) but the wrapping gpu-lock run holds only a shared slot; start the outer command with "node scripts/gpu-lock.mjs run --exclusive ..."`,
+      );
+    const noop = () => {};
+    noop.mode = mode;
+    return noop;
+  }
+  const maxMinutes = max ?? defaultMaxMinutes(mode);
+  const token = `${owner.replace(/[^\w.-]/g, '_')}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    entry = (beats = true) => {
+      const now = Date.now();
+      return JSON.stringify({
+        owner,
+        pid: process.pid,
+        token,
+        mode,
+        command,
+        takenAt: new Date(now).toISOString(),
+        maxMinutes,
+        deadline: now + maxMinutes * MIN,
+        beats,
+      });
+    };
+  const ticket = `${String(Date.now()).padStart(15, '0')}-${token}.json`;
+  let queued = false;
+  const waitStart = Date.now();
+  const take = (file) => {
+    startHeartbeat(file, token, Date.now() + maxMinutes * MIN);
+    const release = () => {
+      if (read(file)?.token === token) rmSync(file, { force: true });
+      tidy();
+    };
+    release.mode = mode;
+    return release;
+  };
+  const giveUp = (held) => {
+    if (queued) rmSync(join(waitingDir, ticket), { force: true });
+    tidy();
+    return new Error(
+      `gpu-lock: gave up after ${Math.round((Date.now() - waitStart) / MIN)} min waiting for the GPU (${mode} request by ${owner}); it is held by ${held.map(describe).join('; ')}. Wait longer with --wait-max=<min>, or look at the holder: node scripts/gpu-lock.mjs status`,
+    );
+  };
+  for (let announced = 0; ; ) {
+    const result = await locked(({ fresh }) => {
+      const state = snapshot(log, fresh),
+        others = state.waiting.filter((w) => w.token !== token);
+      // An old client's release removes the whole folder, our ticket with it: queue again, in the same place.
+      if (queued && others.length === state.waiting.length) queued = false;
+      const first = state.waiting[0]?.token === token || (!queued && others.length === 0);
+      if (mode === 'shared') {
+        if (!state.exclusive && !state.waiting.length && state.shared.length < slots()) {
+          mkdirSync(sharedDir, { recursive: true });
+          const file = join(sharedDir, `${token}.json`);
+          writeFileSync(file, entry());
+          return { file };
+        }
+        return { held: [state.exclusive, ...state.shared, ...state.waiting].filter(Boolean) };
       }
-      if (waited % (poll * 10) === 0) log(`gpu-lock: held by ${held?.owner ?? 'an unlabelled holder'}; waiting`);
-      await sleep(poll);
+      if (!state.exclusive && !state.shared.length && first) {
+        if (queued) rmSync(join(waitingDir, ticket), { force: true });
+        writeFileSync(exclusiveFile, entry());
+        return { file: exclusiveFile };
+      }
+      if (!queued) {
+        mkdirSync(waitingDir, { recursive: true });
+        writeFileSync(join(waitingDir, ticket), entry(false));
+        queued = true;
+      }
+      return { held: [state.exclusive, ...state.shared, ...others].filter(Boolean) };
+    });
+    if (result.file) return take(result.file);
+    if (Date.now() - waitStart > waitMax * MIN) throw giveUp(result.held);
+    if (Date.now() - announced >= 10 * MIN || announced === 0) {
+      announced = Date.now();
+      log(`gpu-lock: ${mode} request waiting for ${result.held.map(describe).join('; ')}`);
     }
+    await sleep(poll);
   }
 }
 
@@ -82,27 +442,82 @@ export function quoteWindows(arg) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [verb, ...rest] = process.argv.slice(2);
   if (verb === 'status') console.log(JSON.stringify(status()));
-  else if (verb === 'run') {
+  else if (verb === 'beat') {
+    // The heartbeat process: node gpu-lock.mjs beat <entry file> <token> <holder pid> <deadline ms>
+    const [file, token, parent, deadline] = rest;
+    const grace = Number(process.env.MARGO_GPU_GRACE_MS ?? 15_000);
+    setInterval(() => {
+      const entry = read(file);
+      if (!entry || entry.token !== token) process.exit(0); // released
+      if (!alive(Number(parent))) {
+        rmSync(file, { force: true });
+        process.exit(0);
+      }
+      if (Date.now() > Number(deadline) + grace) {
+        killTree(Number(parent));
+        rmSync(file, { force: true });
+        try {
+          appendFileSync(
+            join(dirname(lockDir), 'gpu-lock-timeouts.log'),
+            `${new Date().toISOString()} TIMEOUT after ${entry.maxMinutes} min: ${entry.owner}: ${entry.command}\n`,
+          );
+        } catch {}
+        process.exit(0);
+      }
+      try {
+        const now = new Date();
+        utimesSync(file, now, now);
+      } catch {}
+    }, beatMs());
+  } else if (verb === 'run') {
     const split = rest.indexOf('--'),
-      owner = rest.find((a) => a.startsWith('--owner='))?.slice(8),
+      flags = rest.slice(0, split < 0 ? rest.length : split),
+      flag = (name) => flags.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3),
+      owner = flag('owner'),
+      mode = flags.includes('--exclusive') || measuresSpeed(rest.slice(split + 1)) ? 'exclusive' : undefined,
       command = rest.slice(split + 1);
-    if (split < 0 || !command.length) throw new Error('usage: gpu-lock.mjs run --owner=<id> -- <command...>');
-    const release = await acquire({ owner });
-    let code = 1;
+    if (split < 0 || !command.length)
+      throw new Error(
+        'usage: gpu-lock.mjs run [--exclusive] [--max=<min>] [--wait-max=<min>] --owner=<id> -- <command...>',
+      );
+    const given = (name) => (flag(name) === undefined ? undefined : Number(flag(name)));
+    for (const name of ['max', 'wait-max'])
+      if (given(name) !== undefined && !(given(name) > 0))
+        throw new RangeError(`--${name} must be a positive number of minutes`);
     // Each argument reaches the command as given, spaces and quotes included. Windows starts npm and other .cmd
     // tools only through cmd.exe, so there the command line is built with every argument quoted for it; elsewhere the
     // arguments go straight to the program.
     const windows = process.platform === 'win32',
-      env = { ...process.env, MARGO_GPU_LOCK_NESTED: join(lockDir, 'nested') };
+      text = command.join(' ');
+    let release;
     try {
-      code =
-        (windows
-          ? spawnSync(command.map(quoteWindows).join(' '), { stdio: 'inherit', shell: true, env })
-          : spawnSync(command[0], command.slice(1), { stdio: 'inherit', env })
-        ).status ?? 1;
-    } finally {
-      release();
+      release = await acquire({ owner, mode, max: given('max'), waitMax: given('wait-max'), command: text });
+    } catch (error) {
+      console.error(error.message);
+      process.exit(2);
     }
+    const maxMinutes = given('max') ?? defaultMaxMinutes(release.mode),
+      env = {
+        ...process.env,
+        MARGO_GPU_LOCK_NESTED: join(lockDir, 'nested'),
+        MARGO_GPU_LOCK_NESTED_MODE: release.mode,
+      };
+    const running = spawnLimited(windows ? command.map(quoteWindows).join(' ') : command, {
+      timeoutMs: maxMinutes * MIN,
+      env,
+    });
+    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'])
+      process.on(signal, () => {
+        killTree(running.child.pid);
+        release();
+        process.exit(130);
+      });
+    const { code, timedOut } = await running;
+    release();
+    if (timedOut) console.error(`TIMEOUT after ${+maxMinutes.toFixed(2)} min: ${text}`);
     process.exit(code);
-  } else throw new Error('usage: gpu-lock.mjs run --owner=<id> -- <command...> | status');
+  } else
+    throw new Error(
+      'usage: gpu-lock.mjs run [--exclusive] [--max=<min>] [--wait-max=<min>] --owner=<id> -- <command...> | status',
+    );
 }

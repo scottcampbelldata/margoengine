@@ -1,15 +1,15 @@
-// scripts/gpu-lock.mjs `run`: the command gets its arguments exactly as given (spaces and quotes survive, on Windows
-// too, where cmd.exe starts it), and the nested marker covers only the lock being held, so a GPU test inside the
-// landing lock still takes the GPU lock.
+// scripts/gpu-lock.mjs: `run` passes arguments exactly as given (spaces and quotes survive, on Windows too, where cmd.exe
+// starts it); the nested marker covers only the lock being held, so a GPU test inside the landing lock still takes the
+// GPU lock; and the reader/writer rules: shared slots, an exclusive request that waits without starving, stale holders.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const run = (lock, args, env = {}) =>
-  spawnSync(process.execPath, ['scripts/gpu-lock.mjs', 'run', '--owner=test', '--', ...args], {
+const run = (lock, args, env = {}, flags = []) =>
+  spawnSync(process.execPath, ['scripts/gpu-lock.mjs', 'run', ...flags, '--owner=test', '--', ...args], {
     encoding: 'utf8',
     env: { ...process.env, MARGO_GPU_LOCK: lock, MARGO_GPU_LOCK_NESTED: '', ...env },
   });
@@ -47,7 +47,7 @@ test('the nested marker excuses only the held lock: a different lock is still ta
     // A GPU test inside the landing lock's run: the GPU lock is really taken.
     const inside = acquireUnder(gpu, join(landing, 'nested'));
     assert.equal(inside.status, 0, inside.stderr);
-    assert.equal(JSON.parse(inside.stdout.trim()).owner, 'child');
+    assert.equal(JSON.parse(inside.stdout.trim()).holders[0].owner, 'child');
     rmSync(gpu, { recursive: true, force: true });
     // A child of the GPU lock's own run: already held, not taken again.
     const same = acquireUnder(gpu, join(gpu, 'nested'));
@@ -56,4 +56,239 @@ test('the nested marker excuses only the held lock: a different lock is still ta
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
+});
+
+test('run: --exclusive holds exclusively and tells the command; the default is a shared slot', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
+    lock = join(folder, 'gpu.lock');
+  try {
+    const probe =
+      "console.log(process.env.MARGO_GPU_LOCK_NESTED_MODE + ' ' + require('fs').readdirSync(process.argv[1]).join())";
+    const shared = run(lock, [process.execPath, '-e', probe, lock]);
+    assert.equal(shared.status, 0, shared.stderr);
+    assert.match(shared.stdout, /^shared .*shared/);
+    const exclusive = run(lock, [process.execPath, '-e', probe, lock], {}, ['--exclusive']);
+    assert.equal(exclusive.status, 0, exclusive.stderr);
+    assert.match(exclusive.stdout, /^exclusive .*exclusive\.json/);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+// In-process tests: each loads its own copy of the module, so its lock folder (read once at load) is its own.
+let copies = 0;
+async function lockIn(folder, env = {}) {
+  const saved = {};
+  const set = { MARGO_GPU_LOCK: folder, MARGO_GPU_LOCK_NESTED: '', MARGO_GPU_EXCLUSIVE: '', ...env };
+  for (const [key, value] of Object.entries(set)) {
+    saved[key] = process.env[key];
+    process.env[key] = value;
+  }
+  try {
+    return await import(`../scripts/gpu-lock.mjs?copy=${copies++}`);
+  } finally {
+    for (const key of Object.keys(saved)) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
+}
+const quiet = () => {};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// 'got' as soon as the promise resolves, 'waiting' if it has not within `ms`.
+const settled = (promise, ms = 500) => Promise.race([promise.then(() => 'got'), sleep(ms).then(() => 'waiting')]);
+const deadPid = () => spawnSync(process.execPath, ['-e', '']).pid;
+const take = (gpu, owner, mode) => gpu.acquire({ owner, mode, poll: 10, log: quiet });
+// Runs `body(gpu, folder)` against a fresh gpu.lock; `env` is set while the module loads and, for MARGO_GPU_SLOTS and
+// MARGO_GPU_LOCK_NESTED*, while the body runs.
+async function withLock(body, envOrFn = {}) {
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
+    env = typeof envOrFn === 'function' ? envOrFn(folder) : envOrFn,
+    gpu = await lockIn(join(folder, 'gpu.lock'), env),
+    saved = {};
+  for (const [key, value] of Object.entries(env)) {
+    saved[key] = process.env[key];
+    process.env[key] = value;
+  }
+  try {
+    await body(gpu, folder);
+  } finally {
+    for (const key of Object.keys(saved)) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+    rmSync(folder, { recursive: true, force: true });
+  }
+}
+
+test('shared holders share: up to the slot count at once, the next waits for a free slot', () =>
+  withLock(async (gpu) => {
+    const held = [await take(gpu, 'a'), await take(gpu, 'b'), await take(gpu, 'c')];
+    assert.equal(gpu.status().holders.length, 3);
+    const fourth = take(gpu, 'd');
+    assert.equal(await settled(fourth), 'waiting');
+    held[1]();
+    assert.equal(await settled(fourth), 'got');
+    assert.equal(gpu.status().holders.length, 3);
+    (await fourth)();
+    held[0]();
+    held[2]();
+    assert.equal(gpu.status(), null);
+  }));
+
+test('MARGO_GPU_SLOTS sets the slot count; a bad value is refused', async () => {
+  await withLock(
+    async (gpu) => {
+      const one = await take(gpu, 'a'),
+        two = take(gpu, 'b');
+      assert.equal(await settled(two), 'waiting');
+      one();
+      (await two)();
+    },
+    { MARGO_GPU_SLOTS: '1' },
+  );
+  await withLock(
+    async (gpu) => {
+      await assert.rejects(take(gpu, 'a'), /MARGO_GPU_SLOTS/);
+      assert.throws(() => gpu.slots(), RangeError);
+    },
+    { MARGO_GPU_SLOTS: 'two' },
+  );
+});
+
+test('an exclusive request waits until no shared holder is left', () =>
+  withLock(async (gpu) => {
+    const a = await take(gpu, 'a'),
+      b = await take(gpu, 'b'),
+      bench = take(gpu, 'bench', 'exclusive');
+    assert.equal(await settled(bench), 'waiting');
+    a();
+    assert.equal(await settled(bench), 'waiting');
+    b();
+    assert.equal(await settled(bench), 'got');
+    const release = await bench;
+    assert.equal(release.mode, 'exclusive');
+    assert.equal(gpu.status().mode, 'exclusive');
+    release();
+    assert.equal(gpu.status(), null);
+  }));
+
+test('an exclusive request cannot starve: new shared holders queue behind it, though slots are free', () =>
+  withLock(async (gpu) => {
+    const a = await take(gpu, 'a'),
+      bench = take(gpu, 'bench', 'exclusive');
+    assert.equal(await settled(bench), 'waiting');
+    const late = take(gpu, 'late'); // a slot is free, but the benchmark is first in line
+    assert.equal(await settled(late), 'waiting');
+    assert.equal(gpu.status().waiting[0].owner, 'bench');
+    a();
+    assert.equal(await settled(bench), 'got');
+    assert.equal(await settled(late), 'waiting'); // still behind the running benchmark
+    (await bench)();
+    assert.equal(await settled(late), 'got');
+    (await late)();
+  }));
+
+test('exclusive requests are served in the order they arrived', () =>
+  withLock(async (gpu) => {
+    const first = await take(gpu, 'first', 'exclusive'),
+      order = [],
+      second = take(gpu, 'second', 'exclusive').then((r) => (order.push('second'), r));
+    await sleep(30);
+    const third = take(gpu, 'third', 'exclusive').then((r) => (order.push('third'), r));
+    assert.equal(await settled(second), 'waiting');
+    first();
+    const release = await second;
+    assert.deepEqual(order, ['second']);
+    release();
+    (await third)();
+    assert.deepEqual(order, ['second', 'third']);
+  }));
+
+test('MARGO_GPU_EXCLUSIVE raises a shared request to exclusive; other locks are always exclusive', async () => {
+  await withLock(
+    async (gpu) => {
+      const release = await take(gpu, 'a');
+      assert.equal(release.mode, 'exclusive');
+      release();
+    },
+    { MARGO_GPU_EXCLUSIVE: '1' },
+  );
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-'));
+  try {
+    const landing = await lockIn(join(folder, 'land.lock')),
+      first = await take(landing, 'one'),
+      second = take(landing, 'two');
+    assert.equal(first.mode, 'exclusive');
+    assert.equal(await settled(second), 'waiting');
+    first();
+    (await second)();
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('holders and waiters whose process is gone are removed; live ones stay', () =>
+  withLock(async (gpu, folder) => {
+    const lock = join(folder, 'gpu.lock'),
+      entry = (owner, pid) => JSON.stringify({ owner, pid, token: owner, mode: 'shared' });
+    for (const dir of [join(lock, 'shared'), `${lock}-waiting`]) mkdirSync(dir, { recursive: true });
+    writeFileSync(join(lock, 'shared', 'ghost1.json'), entry('ghost1', deadPid()));
+    writeFileSync(join(lock, 'shared', 'ghost2.json'), entry('ghost2', deadPid()));
+    writeFileSync(join(`${lock}-waiting`, '000-ghost3.json'), entry('ghost3', deadPid()));
+    writeFileSync(join(lock, 'exclusive.json'), entry('ghost4', deadPid()));
+    writeFileSync(join(lock, 'owner.json'), entry('ghost5-legacy', deadPid()));
+    const live = await take(gpu, 'live'); // all the ghosts are cleared, not waited for
+    const bench = take(gpu, 'bench', 'exclusive');
+    assert.equal(await settled(bench), 'waiting'); // the live holder still counts
+    assert.deepEqual(
+      gpu.status().holders.map((h) => h.owner),
+      ['live'],
+    );
+    live();
+    (await bench)();
+    assert.equal(gpu.status(), null);
+  }));
+
+test('a legacy owner.json holder blocks until it is released or its process is gone', () =>
+  withLock(
+    async (gpu, folder) => {
+      const lock = join(folder, 'gpu.lock');
+      mkdirSync(lock, { recursive: true });
+      writeFileSync(join(lock, 'owner.json'), JSON.stringify({ owner: 'old', pid: process.pid, token: 'old' }));
+      const next = take(gpu, 'new');
+      assert.equal(await settled(next), 'waiting');
+      // Released the old way (the folder's owner.json goes, the folder stays empty a moment): got once the folder is
+      // older than the window in which an old client is between its mkdir and its owner.json.
+      rmSync(join(lock, 'owner.json'));
+      assert.equal(await settled(next, 1500), 'got');
+      (await next)();
+    },
+    { MARGO_GPU_FRESH_MS: '200' },
+  ));
+
+test('a release removes only our own entry', () =>
+  withLock(async (gpu, folder) => {
+    const release = await take(gpu, 'a'),
+      dir = join(folder, 'gpu.lock', 'shared'),
+      [file] = readdirSync(dir);
+    writeFileSync(join(dir, file), JSON.stringify({ owner: 'other', pid: process.pid, token: 'not-ours' }));
+    release();
+    assert.equal(gpu.status().holders[0].owner, 'other');
+  }));
+
+test('nested: a child of a shared hold takes nothing and refuses to wait on its parent for exclusive', async () => {
+  const nested = (mode) => (folder) => ({
+    MARGO_GPU_LOCK_NESTED: join(folder, 'gpu.lock', 'nested'),
+    MARGO_GPU_LOCK_NESTED_MODE: mode,
+  });
+  await withLock(async (gpu) => {
+    (await take(gpu, 'child'))();
+    assert.equal(gpu.status(), null, 'nothing was taken');
+    await assert.rejects(take(gpu, 'bench', 'exclusive'), /run --exclusive/);
+  }, nested('shared'));
+  await withLock(async (gpu) => {
+    (await take(gpu, 'bench', 'exclusive'))();
+    assert.equal(gpu.status(), null, 'nothing was taken');
+  }, nested('exclusive'));
 });

@@ -15,6 +15,7 @@ import { join, resolve } from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { chromium } from '@playwright/test';
 import { build, preview } from 'vite';
+import { listenWhenFree } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
@@ -129,13 +130,17 @@ assert.ok(
   'the build output holds the OCCT .wasm (so not fetching it is a real check)',
 );
 
-const server = await preview({
-  configFile: false,
-  root: fixture,
-  logLevel: 'warn',
-  build: { outDir: out },
-  preview: { host: '127.0.0.1', port, strictPort: true },
-});
+const server = await listenWhenFree(
+  () =>
+    preview({
+      configFile: false,
+      root: fixture,
+      logLevel: 'warn',
+      build: { outDir: out },
+      preview: { host: '127.0.0.1', port, strictPort: true },
+    }),
+  { port },
+);
 const release = await acquire({ owner: 'basic-scene-network', poll: 2000 });
 let held = true;
 const releaseGpu = () => {
