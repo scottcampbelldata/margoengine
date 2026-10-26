@@ -22,6 +22,37 @@ const redWidth = async () => {
   for (let x = 0; x < image.width; x++) if (image.data[(row + x) * 4] > 200 && image.data[(row + x) * 4 + 1] < 60) n++;
   return n;
 };
+/** The canvas's pixels at row fraction y. */
+const row = async (y = 0.5) => {
+  const image = await decodePNG(await page.locator('canvas').screenshot()),
+    r = Math.floor(image.height * y) * image.width;
+  return Array.from({ length: image.width }, (_, x) => [...image.data.slice((r + x) * 4, (r + x) * 4 + 3)]);
+};
+const isRed = (p) => p[0] > 200 && p[1] < 60 && p[2] < 60,
+  isBlue = (p) => p[2] > 200 && p[0] < 60 && p[1] < 60;
+/** The red share of the red and blue pixels in the middle row. */
+const redShare = async () => {
+  const pixels = await row(),
+    red = pixels.filter(isRed).length;
+  return red / (red + pixels.filter(isBlue).length);
+};
+/** Pixels at world points (x, y) of the camera-facing 2x2 plane at z 0, placed by the plane's extent in the middle row. */
+const atWorld = async (points) => {
+  const image = await decodePNG(await page.locator('canvas').screenshot()),
+    middle = Math.floor(image.height / 2) * image.width,
+    lit = (x) => Math.max(...image.data.slice((middle + x) * 4, (middle + x) * 4 + 3)) > 60;
+  let left = 0,
+    right = image.width - 1;
+  while (left < right && !lit(left)) left++;
+  while (right > left && !lit(right)) right--;
+  const half = (right - left + 1) / 2,
+    cx = (left + right + 1) / 2,
+    cy = image.height / 2;
+  return points.map(([x, y]) => {
+    const o = (Math.floor(cy - y * half) * image.width + Math.floor(cx + x * half)) * 4;
+    return [...image.data.slice(o, o + 3)];
+  });
+};
 const near = (actual, expected, label, tolerance = 3) =>
   assert.ok(
     actual.every((v, i) => Math.abs(v - expected[i]) <= tolerance),
@@ -91,6 +122,17 @@ const expected = {
   wgslLit: gray(local * Math.SQRT1_2),
   vertexColorsTint: [0, 0, 255],
   displacedHookShadow: gray((base / Math.PI) * Math.SQRT1_2 * (1 - (Math.SQRT2 / 10) ** 4) ** 2),
+  // The tilted normal (204, 128, 230) decoded, lit from (1, 0, 1).
+  triplanarNormal: gray(
+    local *
+      lambert(
+        [204, 128, 230].map((v) => (v / 255) * 2 - 1),
+        [1, 0, 1],
+      ),
+  ),
+  // Lit from behind: the thin sheet as a front-lit Lambert surface, the thick object through 1 - thickness 0.5.
+  subsurfaceThin: gray(local),
+  subsurfaceThick: gray(local * 0.5),
 };
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
@@ -146,6 +188,13 @@ try {
     'displacedLocalShadow',
     'displacedHookShadow',
     'litEffects',
+    'parallax',
+    'triplanar',
+    'triplanarUp',
+    'triplanarNormal',
+    'subsurfaceThin',
+    'subsurfaceThick',
+    'surfaceAll',
     'video',
   ]) {
     if (name === 'video') await page.evaluate(() => window.videoStep('#ff00ff'));
@@ -260,6 +309,72 @@ try {
       const white = await pixel();
       assert.ok(Math.min(...white) > 40, name + ' white base takes the sky diffuse: ' + white);
       console.log('  white base', white);
+    }
+    if (name === 'surfaceAll') {
+      const drawn = (await row()).filter((p) => p.some((v, i) => Math.abs(v - [5, 6, 9][i]) > 20)).length;
+      assert.ok(drawn > 50, `surfaceAll drew ${drawn} pixels of the middle row`);
+    }
+    if (name === 'parallax') {
+      // The boundary at x = 0.5 * 3 / (3 + 1) on the plane from -1 to 1: red share (1 + 0.375) / 2. Offset mapping's
+      // single step (no 1 / n.v) lands within a pixel of it this close to the normal.
+      for (const mode of ['occlusion', 'relief', 'offset']) {
+        const share = await redShare();
+        assert.ok(Math.abs(share - 0.6875) < 0.012, `parallax ${mode}: red share ${share}`);
+        console.log('  parallax', mode, 'red share', share.toFixed(4));
+        await step();
+      }
+      const flat = await redShare();
+      assert.ok(Math.abs(flat - 0.75) < 0.012, `parallaxScale 0, live: red share ${flat}`);
+    }
+    if (name === 'triplanar') {
+      const points = [-0.75, -0.25, 0.25, 0.75].map((x) => [x, 0.1]);
+      const world = await atWorld(points);
+      for (const [k, rgb] of [
+        [255, 0, 0],
+        [0, 0, 255],
+        [255, 0, 0],
+        [0, 0, 255],
+      ].entries())
+        near(world[k], rgb, `triplanar at x = ${points[k][0]}`);
+      await step();
+      const uv = await atWorld(points);
+      for (const [k, rgb] of [
+        [255, 0, 0],
+        [255, 0, 0],
+        [0, 0, 255],
+        [0, 0, 255],
+      ].entries())
+        near(uv[k], rgb, `triplanar off, live: UVs at x = ${points[k][0]}`);
+    }
+    if (name === 'triplanarUp') {
+      const points = [-0.25, 0.25, 0.75].map((y) => [0.1, y]);
+      const world = await atWorld(points);
+      for (const [k, rgb] of [
+        [255, 0, 0],
+        [0, 0, 255],
+        [255, 0, 0],
+      ].entries())
+        near(world[k], rgb, `triplanar at y = ${points[k][1]}`);
+      await step();
+      const uv = await atWorld(points);
+      for (const [k, rgb] of [
+        [0, 0, 255],
+        [255, 0, 0],
+        [255, 0, 0],
+      ].entries())
+        near(uv[k], rgb, `triplanar off: UVs at y = ${points[k][1]}`);
+    }
+    if (name === 'triplanarNormal') {
+      await step();
+      near(await pixel(), expected.triplanarNormal, 'the UV-mapped normal map, live: the same tilt');
+    }
+    if (name === 'subsurfaceThin') {
+      await step();
+      near(await pixel(), [0, 0, 0], 'subsurface 0, live: lit from behind, nothing');
+    }
+    if (name === 'subsurfaceThick') {
+      await step();
+      near(await pixel(), gray((local * 2) / 3), 'lit from the front: the wrap moves a third past the terminator');
     }
     if (name === 'standard' || name === 'effects' || name === 'litEffects')
       assert.ok(

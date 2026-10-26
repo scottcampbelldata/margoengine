@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3345318,
+  "total": 3352482,
   "history": [
     {
       "date": "2026-10-24",
@@ -404,6 +404,12 @@
       "commit": "9bce9eb3",
       "reason": "gltf-pro + materials (p-uv-transform, item 47/53): material change stamps (PBRMaterialShading.version) reuse a steady derivation whole, and draws of materials that share a pipeline and group 2 batch as rows batches (each instance reads its own uniform block); 4,096 materials, one each: 41.7 -> 3 ms CPU",
       "grew": 5
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "0414607f",
+      "reason": "materials item 21.5: parallax occlusion/relief/offset mapping, world-space triplanar mapping and thick/thin subsurface scattering on Material (their WGSL, options and setters); each compiles in only while used, so existing shaders, bindings and uniforms are unchanged",
+      "grew": 2
     }
   ],
   "items": {
@@ -566,9 +572,9 @@
     "@margoengine/machinery/spatial": 16757,
     "@margoengine/machinery/surface": 14351,
     "@margoengine/machinery/telemetry": 13826,
-    "@margoengine/materials": 56764,
+    "@margoengine/materials": 61113,
     "@margoengine/materials/atlas": 2014,
-    "@margoengine/materials/batched": 33638,
+    "@margoengine/materials/batched": 36453,
     "@margoengine/materials/transmission": 7151,
     "@margoengine/math": 12483,
     "@margoengine/math/affine": 3936,

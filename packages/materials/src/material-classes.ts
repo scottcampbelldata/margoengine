@@ -24,6 +24,16 @@ type EnvKeys =
   | 'combine'
   | 'reflectivity';
 type MetalKeys = 'roughness' | 'metalness' | 'metalRoughnessMap';
+/** Subsurface scattering: standard, Lambert and Phong shading only. */
+type SubsurfaceKeys =
+  | 'subsurface'
+  | 'subsurfaceMode'
+  | 'subsurfaceColor'
+  | 'subsurfaceThickness'
+  | 'subsurfaceThicknessMap'
+  | 'subsurfaceDistortion'
+  | 'subsurfacePower'
+  | 'subsurfaceWrap';
 type LightKeys = 'emissive' | 'emissiveMap' | 'aoMap' | 'aoMapIntensity';
 
 /** Unlit (`shading: 'basic'`): colour, maps and emissive, no lighting. */
@@ -31,7 +41,7 @@ export class UnlitMaterial extends Material {
   constructor(
     options: Omit<
       MaterialOptions,
-      ModelKeys | MetalKeys | 'normalMap' | 'normalScale' | 'aoMap' | 'aoMapIntensity'
+      ModelKeys | MetalKeys | SubsurfaceKeys | 'normalMap' | 'normalScale' | 'aoMap' | 'aoMapIntensity'
     > = {},
   ) {
     super({ ...options, shading: 'basic' });
@@ -56,7 +66,12 @@ export class PhongMaterial extends Material {
  * light it as Lambert. No highlight and no environment map. For a loaded glTF-pro model, use `toonModel`.
  */
 export class ToonMaterial extends Material {
-  constructor(options: Omit<MaterialOptions, Exclude<ModelKeys, 'steps' | 'gradientMap'> | MetalKeys | EnvKeys> = {}) {
+  constructor(
+    options: Omit<
+      MaterialOptions,
+      Exclude<ModelKeys, 'steps' | 'gradientMap'> | MetalKeys | EnvKeys | SubsurfaceKeys
+    > = {},
+  ) {
     super({ ...options, shading: 'toon' });
   }
 }
@@ -75,13 +90,18 @@ export class PbrMaterial extends Material {
 }
 /** View-space normals as colour (`shading: 'normal'`); normal maps apply, colour alpha and map alpha cut out. */
 export class NormalMaterial extends Material {
-  constructor(options: Omit<MaterialOptions, ModelKeys | MetalKeys | LightKeys | EnvKeys> = {}) {
+  constructor(options: Omit<MaterialOptions, ModelKeys | MetalKeys | LightKeys | EnvKeys | SubsurfaceKeys> = {}) {
     super({ ...options, shading: 'normal' });
   }
 }
 /** Lit by a matcap image (`shading: 'matcap'`, the `matcap` texture) looked up by the view-space normal. */
 export class MatcapMaterial extends Material {
-  constructor(options: Omit<MaterialOptions, Exclude<ModelKeys, 'matcap'> | MetalKeys | LightKeys | EnvKeys> = {}) {
+  constructor(
+    options: Omit<
+      MaterialOptions,
+      Exclude<ModelKeys, 'matcap'> | MetalKeys | LightKeys | EnvKeys | SubsurfaceKeys
+    > = {},
+  ) {
     super({ ...options, shading: 'matcap' });
   }
 }
@@ -90,7 +110,13 @@ export class DepthMaterial extends Material {
   constructor(
     options: Omit<
       MaterialOptions,
-      Exclude<ModelKeys, 'depthPacking'> | MetalKeys | LightKeys | EnvKeys | 'normalMap' | 'normalScale'
+      | Exclude<ModelKeys, 'depthPacking'>
+      | MetalKeys
+      | LightKeys
+      | EnvKeys
+      | SubsurfaceKeys
+      | 'normalMap'
+      | 'normalScale'
     > = {},
   ) {
     super({ ...options, shading: 'depth' });
@@ -101,7 +127,7 @@ export class DistanceMaterial extends Material {
   constructor(
     options: Omit<
       MaterialOptions,
-      Exclude<ModelKeys, DistanceKeys> | MetalKeys | LightKeys | EnvKeys | 'normalMap' | 'normalScale'
+      Exclude<ModelKeys, DistanceKeys> | MetalKeys | LightKeys | EnvKeys | SubsurfaceKeys | 'normalMap' | 'normalScale'
     > = {},
   ) {
     super({ ...options, shading: 'distance' });

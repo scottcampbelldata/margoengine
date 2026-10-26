@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/materials",
   "version": "1.0.0",
-  "description": "Optional glTF PBR material lobes, transmission, volume and typed node graphs through an isolated extension slot.",
+  "description": "Optional glTF PBR material lobes, transmission, volume, parallax occlusion, triplanar and subsurface scattering, and typed node graphs through an isolated extension slot.",
   "keywords": [
     "margoengine",
     "webgpu",

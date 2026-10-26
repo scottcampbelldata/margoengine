@@ -101,13 +101,13 @@ export interface DataImage {
 }
 
 export class DepthMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'depthPacking'> | MetalKeys | LightKeys | EnvKeys | 'normalMap' | 'normalScale'>);
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'depthPacking'> | MetalKeys | LightKeys | EnvKeys | SubsurfaceKeys | 'normalMap' | 'normalScale'>);
 }
 
 export type DepthPacking = 'basic' | 'rgba';
 
 export class DistanceMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, DistanceKeys> | MetalKeys | LightKeys | EnvKeys | 'normalMap' | 'normalScale'>);
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, DistanceKeys> | MetalKeys | LightKeys | EnvKeys | SubsurfaceKeys | 'normalMap' | 'normalScale'>);
 }
 
 export interface EmitNode {
@@ -169,7 +169,7 @@ export class LambertMaterial extends Material {
 export type MapSlot = (typeof mapSlots)[number];
 
 export class MatcapMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'matcap'> | MetalKeys | LightKeys | EnvKeys>);
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'matcap'> | MetalKeys | LightKeys | EnvKeys | SubsurfaceKeys>);
 }
 
 export class Material {
@@ -213,6 +213,36 @@ export class Material {
     set lightMapIntensity(v: number);
     get lightMapResponse(): 'multiply' | 'lambertian';
     set lightMapResponse(v: 'multiply' | 'lambertian');
+    get parallaxMap(): Texture | null;
+    set parallaxMap(v: Texture | null);
+    get parallaxScale(): number;
+    set parallaxScale(v: number);
+    get parallaxSteps(): number;
+    set parallaxSteps(v: number);
+    get parallaxMode(): ParallaxMode;
+    set parallaxMode(v: ParallaxMode);
+    get triplanar(): boolean;
+    set triplanar(v: boolean);
+    get triplanarScale(): number;
+    set triplanarScale(v: number);
+    get triplanarSharpness(): number;
+    set triplanarSharpness(v: number);
+    get subsurface(): number;
+    set subsurface(v: number);
+    get subsurfaceMode(): SubsurfaceMode;
+    set subsurfaceMode(v: SubsurfaceMode);
+    get subsurfaceColor(): number[];
+    set subsurfaceColor(c: ColorInput);
+    get subsurfaceThickness(): number;
+    set subsurfaceThickness(v: number);
+    get subsurfaceThicknessMap(): Texture | null;
+    set subsurfaceThicknessMap(v: Texture | null);
+    get subsurfaceDistortion(): number;
+    set subsurfaceDistortion(v: number);
+    get subsurfacePower(): number;
+    set subsurfacePower(v: number);
+    get subsurfaceWrap(): number;
+    set subsurfaceWrap(v: number);
     get clearcoatMap(): Texture | null;
     set clearcoatMap(v: Texture | null);
     get clearcoatRoughnessMap(): Texture | null;
@@ -376,7 +406,7 @@ export class Material {
     set side(v: MaterialSide);
     get doubleSided(): boolean;
     set doubleSided(v: boolean);
-    setUVTransform(t: TextureTransform | null, slot?: MapSlot | 'alphaMap' | 'bumpMap' | 'displacementMap' | 'lightMap'): this;
+    setUVTransform(t: TextureTransform | null, slot?: MapSlot | (typeof featureMaps)[number] | (typeof surfaceMaps)[number]): this;
     get customState(): boolean;
     clone(): this;
     copy(source: Material): this;
@@ -472,6 +502,21 @@ export interface MaterialOptions extends PhysicalOptions {
     lightMap?: Texture | null;
     lightMapIntensity?: number;
     lightMapResponse?: 'multiply' | 'lambertian';
+    parallaxMap?: Texture | null;
+    parallaxScale?: number;
+    parallaxMode?: ParallaxMode;
+    parallaxSteps?: number;
+    triplanar?: boolean;
+    triplanarScale?: number;
+    triplanarSharpness?: number;
+    subsurface?: number;
+    subsurfaceMode?: SubsurfaceMode;
+    subsurfaceColor?: ColorInput;
+    subsurfaceThickness?: number;
+    subsurfaceThicknessMap?: Texture | null;
+    subsurfaceDistortion?: number;
+    subsurfacePower?: number;
+    subsurfaceWrap?: number;
     clippingPlanes?: readonly (readonly number[])[];
     clipShadows?: boolean;
     clipIntersection?: boolean;
@@ -568,8 +613,10 @@ export interface NormalMapNode {
 }
 
 export class NormalMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, ModelKeys | MetalKeys | LightKeys | EnvKeys>);
+    constructor(options?: Omit<MaterialOptions, ModelKeys | MetalKeys | LightKeys | EnvKeys | SubsurfaceKeys>);
 }
+
+export type ParallaxMode = 'offset' | 'occlusion' | 'relief';
 
 export class PbrMaterial extends Material {
     constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, keyof PhysicalOptions> | 'combine' | 'reflectivity'>);
@@ -656,6 +703,8 @@ export class StencilBuffer implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
+
+export type SubsurfaceMode = 'thick' | 'thin';
 
 export class Texture {
     readonly source: TextureSource;
@@ -758,7 +807,7 @@ export interface TileGridOptions {
 }
 
 export class ToonMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'steps' | 'gradientMap'> | MetalKeys | EnvKeys>);
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'steps' | 'gradientMap'> | MetalKeys | EnvKeys | SubsurfaceKeys>);
 }
 
 export class ToonModel {
@@ -812,7 +861,7 @@ export interface TransmissionOptions extends TransmissionPassOptions {
 }
 
 export class UnlitMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, ModelKeys | MetalKeys | 'normalMap' | 'normalScale' | 'aoMap' | 'aoMapIntensity'>);
+    constructor(options?: Omit<MaterialOptions, ModelKeys | MetalKeys | SubsurfaceKeys | 'normalMap' | 'normalScale' | 'aoMap' | 'aoMapIntensity'>);
 }
 
 export type ValueNode = ColorNode | ScalarNode | TextureNode | AddNode | MulNode | MixNode;
@@ -935,9 +984,15 @@ type Pixels = {
     height: number;
 };
 
+type SubsurfaceKeys = 'subsurface' | 'subsurfaceMode' | 'subsurfaceColor' | 'subsurfaceThickness' | 'subsurfaceThicknessMap' | 'subsurfaceDistortion' | 'subsurfacePower' | 'subsurfaceWrap';
+
 interface TransmissionPassOptions {
     order?: number;
 }
 
+const featureMaps: readonly ['alphaMap', 'bumpMap', 'displacementMap', 'lightMap'];
+
 const mapSlots: readonly ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap', 'transmissionMap', 'sheenColorMap', 'sheenRoughnessMap', 'specularIntensityMap', 'specularColorMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'thicknessMap'];
+
+const surfaceMaps: readonly ['parallaxMap', 'subsurfaceThicknessMap'];
 ```

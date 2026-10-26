@@ -153,6 +153,36 @@ class Material {
     set lightMapIntensity(v: number);
     get lightMapResponse(): 'multiply' | 'lambertian';
     set lightMapResponse(v: 'multiply' | 'lambertian');
+    get parallaxMap(): Texture | null;
+    set parallaxMap(v: Texture | null);
+    get parallaxScale(): number;
+    set parallaxScale(v: number);
+    get parallaxSteps(): number;
+    set parallaxSteps(v: number);
+    get parallaxMode(): ParallaxMode;
+    set parallaxMode(v: ParallaxMode);
+    get triplanar(): boolean;
+    set triplanar(v: boolean);
+    get triplanarScale(): number;
+    set triplanarScale(v: number);
+    get triplanarSharpness(): number;
+    set triplanarSharpness(v: number);
+    get subsurface(): number;
+    set subsurface(v: number);
+    get subsurfaceMode(): SubsurfaceMode;
+    set subsurfaceMode(v: SubsurfaceMode);
+    get subsurfaceColor(): number[];
+    set subsurfaceColor(c: ColorInput);
+    get subsurfaceThickness(): number;
+    set subsurfaceThickness(v: number);
+    get subsurfaceThicknessMap(): Texture | null;
+    set subsurfaceThicknessMap(v: Texture | null);
+    get subsurfaceDistortion(): number;
+    set subsurfaceDistortion(v: number);
+    get subsurfacePower(): number;
+    set subsurfacePower(v: number);
+    get subsurfaceWrap(): number;
+    set subsurfaceWrap(v: number);
     get clearcoatMap(): Texture | null;
     set clearcoatMap(v: Texture | null);
     get clearcoatRoughnessMap(): Texture | null;
@@ -316,7 +346,7 @@ class Material {
     set side(v: MaterialSide);
     get doubleSided(): boolean;
     set doubleSided(v: boolean);
-    setUVTransform(t: TextureTransform | null, slot?: MapSlot | 'alphaMap' | 'bumpMap' | 'displacementMap' | 'lightMap'): this;
+    setUVTransform(t: TextureTransform | null, slot?: MapSlot | (typeof featureMaps)[number] | (typeof surfaceMaps)[number]): this;
     get customState(): boolean;
     clone(): this;
     copy(source: Material): this;
@@ -376,6 +406,21 @@ interface MaterialOptions extends PhysicalOptions {
     lightMap?: Texture | null;
     lightMapIntensity?: number;
     lightMapResponse?: 'multiply' | 'lambertian';
+    parallaxMap?: Texture | null;
+    parallaxScale?: number;
+    parallaxMode?: ParallaxMode;
+    parallaxSteps?: number;
+    triplanar?: boolean;
+    triplanarScale?: number;
+    triplanarSharpness?: number;
+    subsurface?: number;
+    subsurfaceMode?: SubsurfaceMode;
+    subsurfaceColor?: ColorInput;
+    subsurfaceThickness?: number;
+    subsurfaceThicknessMap?: Texture | null;
+    subsurfaceDistortion?: number;
+    subsurfacePower?: number;
+    subsurfaceWrap?: number;
     clippingPlanes?: readonly (readonly number[])[];
     clipShadows?: boolean;
     clipIntersection?: boolean;
@@ -418,6 +463,8 @@ interface MeshGeometry {
     }[];
 }
 
+type ParallaxMode = 'offset' | 'occlusion' | 'relief';
+
 interface PhysicalOptions {
     clearcoat?: number;
     clearcoatRoughness?: number;
@@ -458,6 +505,8 @@ type RawImage = {
 };
 
 type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance' | 'lambert' | 'phong' | 'toon';
+
+type SubsurfaceMode = 'thick' | 'thin';
 
 class Texture {
     readonly source: TextureSource;
@@ -538,5 +587,9 @@ interface TranscodedTexture {
 
 type Wrap = 'repeat' | 'clamp' | 'mirror';
 
+const featureMaps: readonly ['alphaMap', 'bumpMap', 'displacementMap', 'lightMap'];
+
 const mapSlots: readonly ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap', 'transmissionMap', 'sheenColorMap', 'sheenRoughnessMap', 'specularIntensityMap', 'specularColorMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'thicknessMap'];
+
+const surfaceMaps: readonly ['parallaxMap', 'subsurfaceThicknessMap'];
 ```

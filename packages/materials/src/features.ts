@@ -6,6 +6,7 @@ import { MargoError } from '@margoengine/math/errors';
 // The uniform (MargoFeatures: [bumpScale, displacementScale, displacementBias, lightMapIntensity], then two UV rows per
 // map) and the displacement are shared with the shadow casters' depth shaders.
 import { featureStruct, displacementWgsl } from '../../shared/displacement.js';
+import { parallaxShader, subsurfaceShader, surfaceDeclarations, triplanarShader } from './surface-features.js';
 /** Feature maps in UV-row (and binding) order, with their WGSL names. */
 export const featureMaps = ['alphaMap', 'bumpMap', 'displacementMap', 'lightMap'] as const;
 const names = ['Alpha', 'Bump', 'Displacement', 'Light'];
@@ -102,7 +103,12 @@ export function featureShader(code: string, group: number, key: string): string 
 ${maps.map((used, k) => (used ? `@group(${group}) @binding(${180 + k * 2}) var margo${names[k]}Map:texture_2d<f32>;\n@group(${group}) @binding(${181 + k * 2}) var margo${names[k]}Sampler:sampler;\n` : '')).join('')}fn margoFeatureUV(uv:vec4f,k:u32)->vec2f {let a=margoFeatures.uvt[k*2]; let p=vec3f(select(uv.xy,uv.zw,a.w>0.5),1); return vec2f(dot(a.xyz,p),dot(margoFeatures.uvt[k*2+1].xyz,p));}
 ${maps[1] ? bump : ''}${maps[2] ? displacementWgsl : ''}`
     : '';
-  out = declarations + out;
+  // Subsurface edits the directional light and surface()'s head; parallax then triplanar wrap surface() in turn.
+  if (has('s')) out = subsurfaceShader(out, has('k'));
+  if (has('p')) out = parallaxShader(out);
+  if (has('x')) out = triplanarShader(out);
+  const surface = has('p') || has('x') || has('s');
+  out = declarations + (surface ? surfaceDeclarations(group, has('p'), has('s'), has('k')) : '') + out;
   if (!inner) {
     if (cache.size >= 64) cache.clear();
     cache.set(code, (inner = new Map()));

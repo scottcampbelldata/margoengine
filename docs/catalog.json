@@ -478,7 +478,7 @@
     "package": "@margoengine/materials",
     "version": "1.0.0",
     "published": false,
-    "description": "Optional glTF PBR material lobes, transmission, volume and typed node graphs through an isolated extension slot.",
+    "description": "Optional glTF PBR material lobes, transmission, volume, parallax occlusion, triplanar and subsurface scattering, and typed node graphs through an isolated extension slot.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "materials clearcoat transmission ior volume refraction attenuation KHR_materials_clearcoat KHR_materials_transmission KHR_materials_ior KHR_materials_volume coat factor roughness normal texture pbr gltf sheen specular anisotropy iridescence thinfilm KHR_materials_sheen KHR_materials_specular KHR_materials_anisotropy KHR_materials_iridescence",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/materials@1.0.0",

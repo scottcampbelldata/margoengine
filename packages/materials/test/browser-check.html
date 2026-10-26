@@ -149,6 +149,39 @@ scenarios.litEffects=()=>{
   lights.setLights([{position:[0,1.5,1],range:6,color:[1,0.5,0.2],intensity:10}]);
   return {destroy(){for(const p of [ssao,shadows,lights,fog])plugin(p).destroy();ground.destroy();model.destroy();}};
 };
+// parallaxMap: an unlit 2x2 plane whose map turns from red to blue at u = 0.75 (x = 0.5), under a height map at 0
+// (the full depth) 1 world unit deep: from the camera 3 units away the ray meets the floor at x' = x * 4/3, so the
+// boundary shows at x = 0.375. Steps: relief, offset, then parallaxScale 0 (the flat plane, x = 0.5).
+const stripe=new Texture({data:new Uint8Array([255,0,0,255,255,0,0,255,255,0,0,255,0,0,255,255]),width:4,height:1},{magFilter:'nearest',minFilter:'nearest',mipmaps:false});
+scenarios.parallax=()=>{const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:stripe,parallaxMap:solid(0,0,0),parallaxScale:1}));const steps=[()=>{m.material.parallaxMode='relief';},()=>{m.material.parallaxMode='offset';},()=>{m.material.parallaxScale=0;}];return {destroy(){m.destroy();},step(){steps.shift()();}};};
+// triplanar: an unlit 2x2 plane facing +z reads its map at the world (x, y) (scale 1), not at its UVs: red/blue
+// halves repeat every unit across x; the step turns triplanar off live (the UVs: red left of x = 0, blue right).
+// triplanarUp: the image's top half red, repeating every unit up y (V up, as the UVs).
+const repeating=(data,width,height)=>new Texture({data:new Uint8Array(data),width,height},{magFilter:'nearest',minFilter:'nearest',mipmaps:false,wrapS:'repeat',wrapT:'repeat'});
+scenarios.triplanar=()=>{const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:repeating([255,0,0,255,0,0,255,255],2,1),triplanar:true}));return {destroy(){m.destroy();},step(){m.material.triplanar=false;}};};
+scenarios.triplanarUp=()=>{const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:new Texture(flip,{magFilter:'nearest',minFilter:'nearest',mipmaps:false,wrapS:'repeat',wrapT:'repeat'}),triplanar:true}));return {destroy(){m.destroy();},step(){m.material.triplanar=false;}};};
+// A triplanar normal map tilts the normal in the projection's own frame (U along +x on a +z face), as the UV frame
+// does: a Lambert plane lit from (1, 0, 1) shows the same value with triplanar on (first) and off (the step).
+scenarios.triplanarNormal=()=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction.set([1,0,1,2]);engine.lighting.radiance[3]=0;const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'lambert',map:solid(188,188,188),normalMap:solid(204,128,230),triplanar:true}));return {destroy(){m.destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);},step(){m.material.triplanar=false;}};};
+// Subsurface on a Lambert plane under irradiance 2, no ambient. Thin, thickness 0, lit from behind: the sheet shows
+// the light through it as a front-lit Lambert surface would (the step sets subsurface 0: black). Thick (thickness 0.5,
+// distortion 0.2), lit from behind straight through to the eye: half of that; the step lights it from the front, where
+// the wrap (0.5) moves a third of the light past the terminator: 2/3 of Lambert.
+const scattered=(direction,options)=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction.set([...direction,2]);engine.lighting.radiance[3]=0;const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'lambert',map:solid(188,188,188),subsurface:1,...options}));return {m,destroy(){m.destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);}};};
+scenarios.subsurfaceThin=()=>{const s=scattered([0,0,-1],{subsurfaceMode:'thin',subsurfaceThickness:0});return {...s,step(){s.m.material.subsurface=0;}};};
+scenarios.subsurfaceThick=()=>{const s=scattered([0,0,-1],{});return {...s,step(){engine.lighting.direction.set([0,0,1,2]);}};};
+// Every surface feature together on standard (with a clearcoat: the physical shader), Phong (instanced) and Lambert
+// meshes sharing one material and geometry (one shared instanced draw), with shadows, clustered lights and SSAO.
+scenarios.surfaceAll=()=>{
+  const a=createMesh(engine,sphereGeometry(0.5,32,16),new Material({map:solid(200,120,90),normalMap:solid(128,128,255),parallaxMap:solid(128,128,128),parallaxMode:'relief',triplanar:true,subsurface:0.8,subsurfaceThicknessMap:solid(60,60,60),clearcoat:0.5}));a.root.setPosition([-0.6,0,0]);
+  const b=createInstancedMesh(engine,boxGeometry(0.4,0.4,0.4),new Material({shading:'phong',map:solid(90,160,200),triplanar:true,parallaxMap:solid(200,0,0),subsurface:0.5,subsurfaceMode:'thin'}),2);
+  b.instances.setMatrixAt(0,[1,0,0,0,0,1,0,0,0,0,1,0,0.6,0.3,0,1]);b.instances.setMatrixAt(1,[1,0,0,0,0,1,0,0,0,0,1,0,0.6,-0.3,0,1]);b.instances.count=2;
+  const shared=new Material({shading:'lambert',map:solid(220,220,220),triplanar:true,triplanarScale:3,subsurface:1}),geometry=boxGeometry(0.2,0.2,0.2),c=[createMesh(engine,geometry,shared),createMesh(engine,geometry,shared)];c[0].root.setPosition([0,0.5,0]);c[1].root.setPosition([0,-0.5,0]);
+  const shadows=Shadows.attach(engine,{resolution:512}),lights=Clustered.attach(engine),ssao=SSAO.attach(engine);
+  for(const m of [a,b,...c]){shadows.add(m);lights.add(m);ssao.add(m);}
+  lights.setLights([{position:[0,1.5,1],range:6,intensity:10}]);
+  return {destroy(){for(const p of [ssao,shadows,lights])plugin(p).destroy();a.destroy();b.destroy();for(const m of c)m.destroy();}};
+};
 const video=document.createElement('video'),source=document.createElement('canvas');source.width=16;source.height=16;const sc=source.getContext('2d');sc.fillStyle='#ff00ff';sc.fillRect(0,0,16,16);
 video.muted=true;video.playsInline=true;video.srcObject=source.captureStream(30);
 const videoTexture=new Texture(video);

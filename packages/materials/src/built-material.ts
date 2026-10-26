@@ -19,6 +19,7 @@ import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { physicalMapsShader } from './physical-maps.js';
 import { depthDistanceShader } from './depth-distance.js';
 import { featureMaps, featureShader } from './features.js';
+import { surfaceFloats } from './surface-features.js';
 import { catcherLit } from './catcher.js';
 import { toonDeclarations, toonEdits, toonLit } from './toon-shader.js';
 import { envFloats, envMapLit, envMapShader, packEnv, type EnvCombine, type EnvironmentMap } from './env-map.js';
@@ -105,6 +106,10 @@ export type TextureSource =
   | CubeSource;
 /** Texture wrap mode on one axis: `'repeat'` (default), `'clamp'` or `'mirror'`. */
 export type Wrap = 'repeat' | 'clamp' | 'mirror';
+/** How `parallaxMap` is marched: one offset step, stepped occlusion mapping, or relief mapping refined by bisection. */
+export type ParallaxMode = 'offset' | 'occlusion' | 'relief';
+/** The subsurface approximation: a thick object (light seen through it, wrapped diffuse) or a thin sheet lit from behind. */
+export type SubsurfaceMode = 'thick' | 'thin';
 /** Texture sampling filter: `'linear'` (default) or `'nearest'`. */
 export type Filter = 'linear' | 'nearest';
 /** Options for `new Texture(source, options)`; every field is optional and documented with its default. */
@@ -1276,6 +1281,53 @@ export interface MaterialOptions extends PhysicalOptions {
   /** Multiply by the light map (default), or Lambertian irradiance / pi on lit shadings. Use a linear lightMap texture; physical intensity must be nonnegative. Live. */
   lightMapResponse?: 'multiply' | 'lambertian';
   /**
+   * Height map (red, linear: 1 the surface, 0 `parallaxScale` below it) the view ray is marched through, so every map
+   * on its UV set (UV0 unless its UV transform names UV1) shifts as if the surface had that relief. Shading only: the
+   * silhouette, depth, shadows and picking keep the flat mesh. Live; null for none.
+   */
+  parallaxMap?: Texture | null;
+  /** Depth of `parallaxMap`'s full range in world units, finite and >= 0 (default 0.05). Live. */
+  parallaxScale?: number;
+  /**
+   * `'occlusion'` (default) steps along the ray and interpolates the hit, `'relief'` refines it by bisection (sharper
+   * steps), `'offset'` takes one cheap step that flattens at grazing angles. Live.
+   */
+  parallaxMode?: ParallaxMode;
+  /** Steps of the occlusion and relief march, an integer 1 through 64 (default 16). Live. */
+  parallaxSteps?: number;
+  /**
+   * Projects the maps on UV0 from world space along X, Y and Z and blends the three by the normal, so a mesh needs no
+   * unwrap and textures meet without seams or stretching; UV1 maps (a lightMap) keep their UVs. Default false. Live.
+   */
+  triplanar?: boolean;
+  /** Texture repeats per world unit of the triplanar projection, finite and > 0 (default 1). Live. */
+  triplanarScale?: number;
+  /** Exponent of the blend weights |n|^sharpness, finite and >= 1 (default 4): higher gives narrower transitions. Live. */
+  triplanarSharpness?: number;
+  /**
+   * Subsurface scattering weight, 0 through 1 (default 0: off). Standard, Lambert and Phong shading. Light from the
+   * engine's directional light enters the surface and leaves elsewhere, tinted by the base colour and
+   * `subsurfaceColor`. Live.
+   */
+  subsurface?: number;
+  /**
+   * `'thick'` (default): light seen through the object around the light (statues, skin, wax) plus a diffuse that wraps
+   * past the terminator; `'thin'`: a sheet lit from behind shows the light through it (leaves, paper, cloth). Live.
+   */
+  subsurfaceMode?: SubsurfaceMode;
+  /** Colour the scattered light picks up, multiplied by the base colour (default white). Live. */
+  subsurfaceColor?: ColorInput;
+  /** Local thickness 0 through 1 (default 0.5); light passes through 1 - thickness. Times `subsurfaceThicknessMap`. Live. */
+  subsurfaceThickness?: number;
+  /** Local thickness (red, linear) times `subsurfaceThickness`: white blocks the light, black lets it through. Live. */
+  subsurfaceThicknessMap?: Texture | null;
+  /** Thick only: how far the surface normal bends the light seen through the object, finite and >= 0 (default 0.2). Live. */
+  subsurfaceDistortion?: number;
+  /** Thick only: how tightly the light seen through gathers around the light's direction, finite and > 0 (default 4). Live. */
+  subsurfacePower?: number;
+  /** Thick only: how far diffuse light wraps past the terminator, 0 through 1 (default 0.5). Live. */
+  subsurfaceWrap?: number;
+  /**
    * Up to 6 world-space planes `[a, b, c, d]`: points with `a x + b y + c z + d < 0` are cut away (the SectionPlanes
    * convention), in every pass that draws the material. Live; default none.
    */
@@ -1599,6 +1651,9 @@ type MapState = {
   values?: Float32Array;
   features?: GPUBuffer;
   featureData?: Float32Array;
+  /** The surface-feature uniform (surface-features.ts MargoSurface) and its values. */
+  surface?: GPUBuffer;
+  surfaceData?: Float32Array;
   /** The envMap uniform (env-map.ts MargoEnv) and its values. */
   env?: GPUBuffer;
   envData?: Float32Array;
@@ -1631,6 +1686,7 @@ function retainMaps(m: Material, engine: Engine): () => void {
     m['changes'] = changeStamp();
     state.buffer?.destroy();
     state.features?.destroy();
+    state.surface?.destroy();
     state.env?.destroy();
     state.clip?.destroy();
     mapStates.get(m)?.delete(engine);
@@ -1641,7 +1697,7 @@ function materialBuffer(
   device: GPUDevice,
   owner: object,
   size: number,
-  field: 'buffer' | 'features' | 'env' | 'clip' = 'buffer',
+  field: 'buffer' | 'features' | 'surface' | 'env' | 'clip' = 'buffer',
 ): GPUBuffer {
   const state = mapState(m, owner);
   if (state.device !== device || !state[field]) {
@@ -1685,9 +1741,37 @@ function featureKey(m: Material, code: string): string {
     (m.flatShading && m.shading !== 'basic' && m.shading !== 'depth' && m.shading !== 'distance' ? 'f' : '') +
     (m.vertexColors ? '' : 'v') +
     (lit.includes(m.shading) ? (m.fog ? '' : 'g') + (m.toneMapped ? '' : 't') : '') +
-    (m.normalMap || m.clearcoatNormalMap || m.extensions.includes('anisotropy') || lobeFrame ? 'n' : '')
+    (m.normalMap || m.clearcoatNormalMap || m.extensions.includes('anisotropy') || lobeFrame ? 'n' : '') +
+    surfaceKey(m)
   );
 }
+/** The surface maps (surface-features.ts bindings 171-174), in uniform-row order. */
+const surfaceMaps = ['parallaxMap', 'subsurfaceThicknessMap'] as const;
+const parallaxModes: readonly ParallaxMode[] = ['offset', 'occlusion', 'relief'];
+/** Shadings the subsurface terms light (their fragment keeps gltf-pro's directional-light line). */
+const scattering: readonly Shading[] = ['standard', 'lambert', 'phong'];
+/** The surface features (surface-features.ts) `m` uses now: parallax, triplanar, subsurface and its thickness map. */
+function surfaceUsed(m: Material): readonly [boolean, boolean, boolean, boolean] {
+  const maps = m['surfaceTextures'],
+    subsurface = m.subsurface > 0 && scattering.includes(m.shading);
+  return [!!maps[0], m.triplanar, subsurface, subsurface && !!maps[1]];
+}
+/** The feature letters of the surface features `m` uses: `p` parallax, `x` triplanar, `s` subsurface, `k` its map. */
+function surfaceKey(m: Material): string {
+  const [parallax, triplanar, subsurface, thickness] = surfaceUsed(m);
+  return (parallax ? 'p' : '') + (triplanar ? 'x' : '') + (subsurface ? 's' : '') + (thickness ? 'k' : '');
+}
+/** The surface uniform of `m` for `owner`, written with its current values. */
+function surfaceUniform(m: Material, device: GPUDevice, owner: object): GPUBuffer {
+  const buffer = materialBuffer(m, device, owner, surfaceFloats * 4, 'surface'),
+    data = (mapState(m, owner).surfaceData ??= new Float32Array(surfaceFloats));
+  data.set(m['surfaceValues']);
+  device.queue.writeBuffer(buffer, 0, data);
+  return buffer;
+}
+/** Surface map `k`'s view and sampler (0 parallax, 1 thickness); one still loading reads white (no relief, full thickness). */
+const surfaceTexture = (m: Material, k: number, device: GPUDevice) =>
+  m['surfaceTextures'][k]!.sampled(device, false, surfaceMaps[k]) ?? fallback(device, 0);
 /** The feature uniform of `m` for `owner`, written with its current values. */
 function featureUniform(m: Material, device: GPUDevice, owner: object): GPUBuffer {
   const buffer = materialBuffer(m, device, owner, 144, 'features'),
@@ -1703,14 +1787,27 @@ const featureTexture = (m: Material, k: number, device: GPUDevice) =>
   m['featureTextures'][k]!.sampled(device, k === 3, featureMaps[k]) ?? fallback(device, k < 2 ? 0 : 3);
 /** `entries` plus the feature uniform and maps `m` uses now (none for a material without features). */
 function featureBindings(m: Material, device: GPUDevice, owner: object, entries: GPUBindGroupEntry[]) {
-  const maps = featureMapsUsed(m);
-  if (!maps.some(Boolean)) return entries;
-  const out = [...entries, { binding: 198, resource: { buffer: featureUniform(m, device, owner) } }];
+  const maps = featureMapsUsed(m),
+    [parallax, triplanar, subsurface, thickness] = surfaceUsed(m),
+    mapped = maps.some(Boolean);
+  if (!mapped && !parallax && !triplanar && !subsurface) return entries;
+  const out = [...entries];
+  if (mapped) out.push({ binding: 198, resource: { buffer: featureUniform(m, device, owner) } });
   maps.forEach((used, k) => {
     if (!used) return;
     const [view, sampler] = featureTexture(m, k, device);
     out.push({ binding: 180 + k * 2, resource: view }, { binding: 181 + k * 2, resource: sampler });
   });
+  if (parallax || triplanar || subsurface)
+    out.push({ binding: 170, resource: { buffer: surfaceUniform(m, device, owner) } });
+  for (const [used, k] of [
+    [parallax, 0],
+    [thickness, 1],
+  ] as const)
+    if (used) {
+      const [view, sampler] = surfaceTexture(m, k, device);
+      out.push({ binding: 171 + k * 2, resource: view }, { binding: 172 + k * 2, resource: sampler });
+    }
   return out;
 }
 /** What shadow casters bind to displace `m` like its beauty shader (gltf-pro `PBRMaterial.displacement`), kept while the same. */
@@ -2144,6 +2241,170 @@ export class Material {
     }
     this.lightResponse = v;
   }
+  /** The surface maps (`surfaceMaps` order): parallaxMap, subsurfaceThicknessMap. */
+  private readonly surfaceTextures: (Texture | null)[] = [null, null];
+  /** The surface uniform (surface-features.ts MargoSurface), at its defaults: every feature off. */
+  private readonly surfaceValues: number[] = [
+    0.05,
+    16,
+    1,
+    0,
+    ...textureTransform({}, 0),
+    1,
+    4,
+    0,
+    0,
+    0,
+    0,
+    0.2,
+    4,
+    1,
+    1,
+    1,
+    0.5,
+    0.5,
+    0,
+    0,
+    0,
+    ...textureTransform({}, 0),
+  ];
+  private triplanarOn = false;
+  private setSurfaceMap(k: number, v: Texture | null): void {
+    if (v != null && !(v instanceof Texture))
+      throw new TypeError(`Material ${surfaceMaps[k]} must be a Texture; pass a Texture or null`);
+    this.surfaceTextures[k] = v ?? null;
+  }
+  /** Sets surface uniform value `k` to the already checked `v`. */
+  private setSurface(k: number, v: number): void {
+    this.surfaceValues[k] = v;
+  }
+  /** Height map the view ray is marched through (red, linear; 1 the surface), live; null for none. */
+  get parallaxMap(): Texture | null {
+    return this.surfaceTextures[0];
+  }
+  set parallaxMap(v: Texture | null) {
+    this.setSurfaceMap(0, v);
+  }
+  /** Depth of `parallaxMap`'s full range in world units, finite and >= 0 (default 0.05), live. */
+  get parallaxScale(): number {
+    return this.surfaceValues[0];
+  }
+  set parallaxScale(v: number) {
+    if (rasterFloat(v, 'parallaxScale') < 0)
+      throw new RangeError('Material parallaxScale must be >= 0; set a depth in world units');
+    this.setSurface(0, v);
+  }
+  /** Steps of the occlusion and relief march, an integer 1 through 64 (default 16), live. */
+  get parallaxSteps(): number {
+    return this.surfaceValues[1];
+  }
+  set parallaxSteps(v: number) {
+    if (typeof v !== 'number') throw new TypeError('Material parallaxSteps must be a number; set an integer 1 to 64');
+    if (!Number.isInteger(v) || v < 1 || v > 64)
+      throw new RangeError('Material parallaxSteps must be an integer from 1 through 64; set one in that range');
+    this.setSurface(1, v);
+  }
+  /** `'occlusion'` (default), `'relief'` or `'offset'`, live. */
+  get parallaxMode(): ParallaxMode {
+    return parallaxModes[this.surfaceValues[2]];
+  }
+  set parallaxMode(v: ParallaxMode) {
+    const mode = parallaxModes.indexOf(v);
+    if (mode < 0)
+      throw new TypeError("Material parallaxMode must be 'occlusion', 'relief' or 'offset'; set one of them");
+    this.setSurface(2, mode);
+  }
+  /** World-space triplanar projection of the UV0 maps (default false), live. */
+  get triplanar(): boolean {
+    return this.triplanarOn;
+  }
+  set triplanar(v: boolean) {
+    this.triplanarOn = flag(v, 'triplanar');
+  }
+  /** Texture repeats per world unit of the triplanar projection, finite and > 0 (default 1), live. */
+  get triplanarScale(): number {
+    return this.surfaceValues[12];
+  }
+  set triplanarScale(v: number) {
+    if (!(rasterFloat(v, 'triplanarScale') > 0))
+      throw new RangeError('Material triplanarScale must be > 0; set texture repeats per world unit');
+    this.setSurface(12, v);
+  }
+  /** Exponent of the triplanar blend weights, finite and >= 1 (default 4), live. */
+  get triplanarSharpness(): number {
+    return this.surfaceValues[13];
+  }
+  set triplanarSharpness(v: number) {
+    if (rasterFloat(v, 'triplanarSharpness') < 1)
+      throw new RangeError('Material triplanarSharpness must be >= 1; set 1 (soft) or more (sharper)');
+    this.setSurface(13, v);
+  }
+  /** Subsurface scattering weight 0 through 1 (default 0: off); standard, Lambert and Phong shading. Live. */
+  get subsurface(): number {
+    return this.surfaceValues[16];
+  }
+  set subsurface(v: number) {
+    unit(v, 'subsurface');
+    if (v > 0 && !scattering.includes(this.shading))
+      throw new TypeError('Material subsurface needs standard, lambert or phong shading; use one of those materials');
+    this.setSurface(16, v);
+  }
+  /** `'thick'` (default) or `'thin'`, live. */
+  get subsurfaceMode(): SubsurfaceMode {
+    return this.surfaceValues[17] ? 'thin' : 'thick';
+  }
+  set subsurfaceMode(v: SubsurfaceMode) {
+    if (v !== 'thick' && v !== 'thin')
+      throw new TypeError("Material subsurfaceMode must be 'thick' or 'thin'; set one");
+    this.setSurface(17, +(v === 'thin'));
+  }
+  /** Linear colour the scattered light picks up (default white); assign any colour input. Live. */
+  get subsurfaceColor(): number[] {
+    return this.surfaceValues.slice(20, 23);
+  }
+  set subsurfaceColor(c: ColorInput) {
+    const v = linear(c, 'subsurfaceColor');
+    this.surfaceValues.splice(20, 3, v[0], v[1], v[2]);
+  }
+  /** Local thickness 0 through 1 (default 0.5), times `subsurfaceThicknessMap`. Live. */
+  get subsurfaceThickness(): number {
+    return this.surfaceValues[23];
+  }
+  set subsurfaceThickness(v: number) {
+    this.setSurface(23, unit(v, 'subsurfaceThickness'));
+  }
+  /** Local thickness map (red, linear), live; null for none. */
+  get subsurfaceThicknessMap(): Texture | null {
+    return this.surfaceTextures[1];
+  }
+  set subsurfaceThicknessMap(v: Texture | null) {
+    this.setSurfaceMap(1, v);
+  }
+  /** Thick only: normal distortion of the light seen through, finite and >= 0 (default 0.2). Live. */
+  get subsurfaceDistortion(): number {
+    return this.surfaceValues[18];
+  }
+  set subsurfaceDistortion(v: number) {
+    if (rasterFloat(v, 'subsurfaceDistortion') < 0)
+      throw new RangeError('Material subsurfaceDistortion must be >= 0; set 0 for none');
+    this.setSurface(18, v);
+  }
+  /** Thick only: exponent of the light seen through, finite and > 0 (default 4). Live. */
+  get subsurfacePower(): number {
+    return this.surfaceValues[19];
+  }
+  set subsurfacePower(v: number) {
+    if (!(rasterFloat(v, 'subsurfacePower') > 0))
+      throw new RangeError('Material subsurfacePower must be > 0; set 1 (broad) or more (tight)');
+    this.setSurface(19, v);
+  }
+  /** Thick only: diffuse wrap past the terminator, 0 through 1 (default 0.5). Live. */
+  get subsurfaceWrap(): number {
+    return this.surfaceValues[24];
+  }
+  set subsurfaceWrap(v: number) {
+    this.setSurface(24, unit(v, 'subsurfaceWrap'));
+  }
   private readonly physicalTextures: (Texture | null)[] = Array(12).fill(null);
   private setMap(i: number, value: Texture | null): void {
     const key = mapSlots[i + 5] as keyof PhysicalOptions;
@@ -2322,6 +2583,21 @@ export class Material {
       'clippingPlanes',
       'clipShadows',
       'clipIntersection',
+      'parallaxMap',
+      'parallaxScale',
+      'parallaxMode',
+      'parallaxSteps',
+      'triplanar',
+      'triplanarScale',
+      'triplanarSharpness',
+      'subsurface',
+      'subsurfaceMode',
+      'subsurfaceColor',
+      'subsurfaceThickness',
+      'subsurfaceThicknessMap',
+      'subsurfaceDistortion',
+      'subsurfacePower',
+      'subsurfaceWrap',
     ] as const)
       if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
@@ -2873,11 +3149,12 @@ export class Material {
    */
   setUVTransform(
     t: TextureTransform | null,
-    slot?: MapSlot | 'alphaMap' | 'bumpMap' | 'displacementMap' | 'lightMap',
+    slot?: MapSlot | (typeof featureMaps)[number] | (typeof surfaceMaps)[number],
   ): this {
     const f = featureMaps.indexOf(slot as (typeof featureMaps)[number]),
-      i = slot === undefined || f >= 0 ? -1 : mapSlots.indexOf(slot as MapSlot);
-    if (slot !== undefined && f < 0 && i < 0)
+      g = surfaceMaps.indexOf(slot as (typeof surfaceMaps)[number]),
+      i = slot === undefined || f >= 0 || g >= 0 ? -1 : mapSlots.indexOf(slot as MapSlot);
+    if (slot !== undefined && f < 0 && g < 0 && i < 0)
       throw new TypeError('Invalid UV transform slot; pass a map name such as map or normalMap, or omit it.');
     const transform: TextureTransform = f === 3 ? { texCoord: 1, ...t } : (t ?? {}),
       { texCoord } = textureCoordinates({ extensions: { KHR_texture_transform: transform } }),
@@ -2886,9 +3163,14 @@ export class Material {
       this.featureValues.splice(4 + f * 8, 8, ...rows);
       return this;
     }
+    if (g >= 0) {
+      this.surfaceValues.splice(4 + g * 24, 8, ...rows);
+      return this;
+    }
     if (i < 0) {
       this.uvDefault = rows;
       for (let k = 0; k < 3; k++) this.featureValues.splice(4 + k * 8, 8, ...rows);
+      for (let k = 0; k < 2; k++) this.surfaceValues.splice(4 + k * 24, 8, ...rows);
     }
     while (this.uvt.length < Math.max(40, (i + 1) * 8)) this.uvt.push(...this.uvDefault);
     for (let k = 0; k < this.uvt.length / 8; k++) if (i < 0 || k === i) this.uvt.splice(k * 8, 8, ...rows);
@@ -2957,6 +3239,7 @@ export class Material {
       if (!state.refs) {
         state.buffer?.destroy();
         state.features?.destroy();
+        state.surface?.destroy();
         state.env?.destroy();
         state.clip?.destroy();
         states!.delete(owner);
@@ -3601,6 +3884,7 @@ class MaterialShading implements PBRMaterialShading {
     let v = liveStamp(m, this.seen);
     const base = m['baseMaps'],
       features = m['featureTextures'],
+      surface = m['surfaceTextures'],
       toon = m['toonMap'],
       env = m['env'].map;
     for (let i = 0; i < base.length; i++) {
@@ -3610,6 +3894,11 @@ class MaterialShading implements PBRMaterialShading {
     }
     for (let i = 0; i < features.length; i++) {
       const s = features[i]?.steady(device) ?? 0;
+      if (s !== s) return s;
+      if (s > v) v = s;
+    }
+    for (let i = 0; i < surface.length; i++) {
+      const s = surface[i]?.steady(device) ?? 0;
       if (s !== s) return s;
       if (s > v) v = s;
     }
@@ -3674,6 +3963,7 @@ let nextShaderRevision = 1;
 function shaderRevision(m: Material): number {
   if (m.shader !== Material.prototype.shader || mapped(m)) return Number.NaN;
   const used = featureMapsUsed(m),
+    surface = surfaceUsed(m),
     key =
       +bare(m) |
       (+used[0] << 1) |
@@ -3688,7 +3978,11 @@ function shaderRevision(m: Material): number {
       (+(m.clearcoatNormalMap != null) << 10) |
       (+m.extensions.includes('anisotropy') << 11) |
       (+(m.envMap != null) << 12) |
-      (+(m['clipping'].length > 0) << 13);
+      (+(m['clipping'].length > 0) << 13) |
+      (+surface[0] << 14) |
+      (+surface[1] << 15) |
+      (+surface[2] << 16) |
+      (+surface[3] << 17);
   let state = shaderRevisions.get(m);
   if (!state) shaderRevisions.set(m, (state = { key, revision: nextShaderRevision++ }));
   else if (state.key !== key) {

@@ -646,6 +646,52 @@ const leaves = new LambertMaterial({map: leafColour, alphaMap: leafCutout, alpha
 leaves.alphaMap = null; // live: the next frame draws without it
 ```
 
+## Parallax, triplanar and subsurface
+
+Three more surface options, live like the others. Each compiles into a material's shader only while it is in use:
+a material that never sets one keeps exactly its shader, bindings and uniforms, and steady frames upload nothing for
+them.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { LambertMaterial, PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
+import { boxGeometry, planeGeometry, sphereGeometry } from 'margoengine/geometry';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const [bricks, bricksHeight, rock] = await Promise.all(
+  ['/bricks.png', '/bricks-height.png', '/rock.png'].map((url) => loadTexture(url)),
+);
+// Parallax occlusion mapping: mortar 2 cm deep on a flat wall, no extra triangles.
+const wall = new PbrMaterial({ map: bricks, parallaxMap: bricksHeight, parallaxScale: 0.02 });
+createMesh(engine, planeGeometry(4, 4), wall);
+wall.parallaxMode = 'relief'; // sharper steps, live
+// Triplanar: rock projected from world space, two repeats per metre, no UV unwrap needed.
+createMesh(engine, boxGeometry(3, 1, 2), new PbrMaterial({ map: rock, triplanar: true, triplanarScale: 2 }));
+// Subsurface scattering: wax glowing where the sun shines through it, and a leaf lit from behind.
+createMesh(engine, sphereGeometry(0.5), new PbrMaterial({ color: '#f4e4c8', subsurface: 0.8, subsurfaceColor: '#ff9a50' }));
+createMesh(engine, planeGeometry(0.3, 0.5), new LambertMaterial({ color: '#4a8a2a', side: 'double', subsurface: 1, subsurfaceMode: 'thin' }));
+```
+
+| Option | Meaning |
+| --- | --- |
+| `parallaxMap`, `parallaxScale` | Height map (red, linear: 1 the surface, 0 the deepest) and the depth of its full range in world units (default 0.05, finite, >= 0). The view ray is marched through it and every map on the same UV set (UV0, unless `setUVTransform(t, 'parallaxMap')` names UV1) is read where the ray meets the relief. Any shading |
+| `parallaxMode` | `'occlusion'` (default): parallax occlusion mapping, stepped along the ray and interpolated between the last two steps (Tatarchuk 2006). `'relief'`: the step refined by six bisections (Policarpo et al. 2005), sharper edges. `'offset'`: one step without dividing by n.v (Welsh 2004), cheapest, flattens at grazing angles |
+| `parallaxSteps` | Steps of the occlusion and relief march, an integer 1 through 64 (default 16). Every step is one texture read per pixel |
+| `triplanar`, `triplanarScale`, `triplanarSharpness` | `true` projects the maps on UV0 (colour, metal-roughness, normal, occlusion, emissive, alpha, bump, parallax and physical maps) from world space along X, Y and Z, `triplanarScale` repeats per world unit (default 1, > 0), blended by the normal's components to the power `triplanarSharpness` (default 4, >= 1). Maps on UV1 (a `lightMap`) keep their UVs. Each projection runs U to the viewer's right and V up, so no face shows its texture mirrored; normal maps tilt in each projection's own plane. Default false; any shading |
+| `subsurface` | Subsurface scattering weight, 0 through 1 (default 0: off). Standard, Lambert and Phong shading (others throw a `TypeError`). The engine's directional light scatters, tinted by the base colour times `subsurfaceColor` (default white); metals do not |
+| `subsurfaceMode` | `'thick'` (default): light seen through the object around the light's direction (Barre-Brisebois and Bouchard 2011), plus a diffuse that wraps past the terminator and keeps Lambert's total energy (Green 2004). `'thin'`: a sheet lit from behind shows the light through it as a front-lit Lambert surface would (leaves, paper, lampshades) |
+| `subsurfaceThickness`, `subsurfaceThicknessMap` | Local thickness 0 through 1 (default 0.5) times the map's red channel (linear); light passes through 1 - thickness |
+| `subsurfaceDistortion`, `subsurfacePower`, `subsurfaceWrap` | Thick only: how far the normal bends the light seen through (default 0.2, >= 0), how tightly it gathers around the light (default 4, > 0), and how far diffuse light wraps (default 0.5, 0 through 1) |
+
+These are shading effects: the silhouette, depth, shadow maps, picking, bounds and exports keep the flat mesh, and
+`exportModel` leaves the options out (glTF has none of them). Triplanar mapping reads every map three times and the
+march reads the height map once per step, so use them where they show. World-space triplanar textures stay where they
+are when a mesh moves; a `WgslMaterial`'s `shade()` runs once per projection and sees that projection's
+coordinates in `i.uv.xy`. The subsurface translucency is not shadowed (light reaching the back of an object is assumed to
+arrive) and clustered point and spot lights do not scatter. Each map has its UV transform slot
+(`setUVTransform(t, 'parallaxMap')`, `'subsurfaceThicknessMap'`).
+
 ## Shadow catcher
 
 `ShadowCatcherMaterial` is invisible except for the shadows it receives, for ground planes under product shots.
