@@ -30,8 +30,8 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 3, `./tga` 3, `./dds` 5, `./ktx` 5, `./tiff` 3 | 5 |  | 478,227 |
 | @margoengine/dof | `.` 2 |  |  | 7,001 |
 | @margoengine/ecs | `.` 6 |  |  | 1,495 |
-| @margoengine/environment | `.` 62, `./probes` 8, `./volumetric` 3, `./reflector` 7, `./refractor` 7, `./cube-camera` 4, `./exr-write` 4 | 15 |  | 29,395 |
-| @margoengine/exporters | `.` 61, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./roblox` 16, `./roblox-chunks` 22, `./skin` 9, `./godot` 7, `./godot-addon` 2, `./unity` 12, `./hash` 2, `./import-names` 7, `./godot-lightmap` 3, `./unity-precision` 21, `./unity-precision-importer` 3, `./unity-pixel-art` 2, `./unreal-precision` 23, `./unreal-precision-importer` 2, `./unreal-pixel-art` 2, `./godot-precision-addon` 3, `./godot-precision` 23, `./godot-flipbook` 2, `./roblox-runtime` 25, `./roblox-runtime-restore` 1 | 92 |  | 33,383 |
+| @margoengine/environment | `.` 62, `./probes` 8, `./volumetric` 3, `./reflector` 7, `./refractor` 7, `./cube-camera` 4, `./exr-write` 4 | 15 |  | 29,436 |
+| @margoengine/exporters | `.` 61, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./roblox` 16, `./roblox-chunks` 22, `./skin` 9, `./godot` 7, `./godot-addon` 2, `./unity` 12, `./hash` 2, `./import-names` 7, `./godot-lightmap` 3, `./unity-precision` 21, `./unity-precision-importer` 3, `./unity-pixel-art` 2, `./unreal-precision` 23, `./unreal-precision-importer` 2, `./unreal-pixel-art` 2, `./godot-precision-addon` 3, `./godot-precision` 23, `./godot-flipbook` 2, `./roblox-runtime` 25, `./roblox-runtime-restore` 1 | 92 |  | 33,704 |
 | @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  | 17,395 |
 | @margoengine/fsm | `.` 3 |  |  | 971 |
 | @margoengine/geometry | `.` 64, `./shapes` 20, `./triangulate` 5, `./extrude` 3, `./primitives` 17, `./utils` 21, `./extras` 6 | 15 |  | 20,231 |
@@ -45,11 +45,11 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/labels | `.` 19 | 2 |  | 4,581 |
 | @margoengine/lightmap | `.` 9, `./global` 4, `./refracted` 6 | 12 |  | 3,801 |
 | @margoengine/lines | `.` 50 | 3 |  | 18,046 |
-| @margoengine/loaders | `.` 139, `./worker` 2, `./common` 17, `./usd` 8, `./font` 10, `./svg` 7, `./mtl` 10, `./render` 2 | 31 |  | 49,266 |
+| @margoengine/loaders | `.` 139, `./worker` 2, `./common` 17, `./usd` 8, `./font` 10, `./svg` 7, `./mtl` 10, `./render` 2 | 31 |  | 49,433 |
 | @margoengine/lod | `.` 17 |  |  | 10,512 |
-| @margoengine/machinery | `.` 49, `./cad` 7, `./cad-async` 4, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 43,330 |
+| @margoengine/machinery | `.` 49, `./cad` 7, `./cad-async` 4, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 43,628 |
 | margoengine | `.` 24, `./game` 43, `./cad` 41, `./viz` 33, `./web` 15 |  |  | 52 |
-| @margoengine/materials | `.` 112, `./atlas` 8, `./transmission` 8, `./batched` 4 | 48 |  | 59,333 |
+| @margoengine/materials | `.` 112, `./atlas` 8, `./transmission` 8, `./batched` 4 | 48 |  | 59,395 |
 | @margoengine/math | `.` 53, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 3, `./matrix3` 1, `./matrix4` 1, `./color` 15, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 2, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 11, `./validate` 3, `./quat` 10, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 87 |  | 12,457 |
 | @margoengine/mcp | `.` 38 | 1 |  | 8,408 |
 | @margoengine/mesh-edit | `.` 88 | 2 |  | 29,555 |
@@ -91,7 +91,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 10, `./lightmap` 3 | 80 |  | 5,911 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./assist` 3, `./library` 6 | 73 |  | 7,533 |
 | @margoengine/voxel-net | `.` 23, `./server` 9, `./bot` 4 | 10 |  | 5,395 |
-| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 71,885 |
+| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 72,035 |
 | @margoengine/water | `.` 8 |  |  | 18,697 |
 | @margoengine/webgl | `.` 3 |  |  | 3,127 |
 | @margoengine/wfc | `.` 3, `./overlapping` 5 |  |  | 1,787 |
