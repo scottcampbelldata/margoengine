@@ -265,6 +265,22 @@ function findDerivation(
     }
   return undefined;
 }
+/** What a run's short path (`PBRModel.joinRun`) checked once for its pass context. */
+interface QuickRun {
+  c: Context;
+  section: GPUBuffer | undefined;
+  draws: DeviceDraws;
+  /** A caller-owned opaque phase is open (`beginOpaquePass`): draws take the full path. */
+  opaque: boolean;
+  /** The run's view block matched the camera, lights and target since the last full draw. */
+  viewChecked: boolean;
+  /** The last derivation context, and the model inputs it was made for. */
+  frame: DrawFrame | undefined;
+  lighting: readonly LightingEffect[] | undefined;
+  oit: object | undefined;
+  hook: object | undefined;
+  hooks: GLTFExtendedMaterials | undefined;
+}
 /** A run's last view block (see `PBRDrawRun.view`). */
 interface RunView {
   data: Float32Array;
@@ -515,11 +531,23 @@ export class PBRDrawRun {
   readonly pending: PendingBatch[] = [];
   readonly batches = new Map<DrawDerivation, PendingBatch[]>();
   /** @internal What `draw` checked once for the run's context: its section binding and device caches. */
-  private quick?: { c: Context; section: GPUBuffer | undefined; draws: DeviceDraws };
+  private quick?: QuickRun;
   /** @internal The run's context with its section binding and device caches, for draws that join batches. */
-  quickFor(c: Context): { section: GPUBuffer | undefined; draws: DeviceDraws } {
+  quickFor(c: Context): QuickRun {
     let quick = this.quick;
-    if (quick?.c !== c) this.quick = quick = { c, section: sectionState(c)?.buffer, draws: deviceDraws(c.device) };
+    if (quick?.c !== c)
+      this.quick = quick = {
+        c,
+        section: sectionState(c)?.buffer,
+        draws: deviceDraws(c.device),
+        opaque: !!opaquePasses.get(c),
+        viewChecked: false,
+        frame: undefined,
+        lighting: undefined,
+        oit: undefined,
+        hook: undefined,
+        hooks: undefined,
+      };
     return quick;
   }
   /**
@@ -2315,7 +2343,9 @@ export class PBRModel implements EnginePlugin {
     // A run's later draws of a one-primitive model that joins an instanced batch skip the set-up below (joinRun).
     if (carry && !external && mode === 'beauty' && carry.pass && carry.view.at && carry.view.format === c.format) {
       const quick = carry.quickFor(c);
-      if (!opaquePasses.get(c) && this.joinRun(c, carry, phase, quick.section, quick.draws, carry.view.at)) return;
+      if (!quick.opaque && this.joinRun(c, carry, phase, quick, carry.view.at)) return;
+      // A full draw may run callbacks that move the camera or change the lights: check the view block again after it.
+      quick.viewChecked = false;
     }
     const transmission = mode === 'transmission',
       oit = transmission ? this.transmission : this.transparency,
@@ -2740,8 +2770,7 @@ export class PBRModel implements EnginePlugin {
     c: Context,
     run: PBRDrawRun,
     phase: 'all' | 'opaque' | 'blend',
-    section: GPUBuffer | undefined,
-    draws: DeviceDraws,
+    quick: QuickRun,
     viewAt: GPUBufferBinding,
   ): boolean {
     const resources = this.resources;
@@ -2751,28 +2780,35 @@ export class PBRModel implements EnginePlugin {
       m = p.material,
       node = p.node;
     if (r.batch || r.mergedInto || p.instances || p.topology || primitiveAfterOpaque(p)) return false;
-    if ((this.transparency && separable(m)) || (this.transmission && transmits(m))) return false;
+    const oit = this.transparency;
+    if ((oit && separable(m)) || (this.transmission && transmits(m))) return false;
     if (phase !== 'all' && blended(m) !== (phase === 'blend')) return false;
-    // The run's view block holds this call's camera, lights and target only while they are unchanged.
-    if (!sameView(run.view.data, c.camera, this.engine.lighting)) return false;
+    // The run's view block holds the camera, lights and target only while they are unchanged; nothing but a full
+    // draw (its callbacks) can change them during a run, so one check serves the draws until the next full draw.
+    if (!quick.viewChecked) {
+      if (!sameView(run.view.data, c.camera, this.engine.lighting)) return false;
+      quick.viewChecked = true;
+    }
     if (!inView(c, node)) return true;
     node.check();
     if (!nodeVisible(this.engine, node)) return true;
-    const frame = drawFrame(
-        run,
-        'beauty',
-        undefined,
-        c,
-        section,
-        this.transparency,
-        this.capture,
-        this.asset.hooks.materials,
-        this.lightingList,
-      ),
-      a = node.matrix,
+    // The derivation context: the last one when this model's lighting and hooks are the same objects.
+    const lighting = this.lightingList,
+      hook = this.capture,
+      hooks = this.asset.hooks.materials || undefined;
+    let frame = quick.frame;
+    if (!frame || quick.lighting !== lighting || quick.oit !== oit || quick.hook !== hook || quick.hooks !== hooks) {
+      frame = drawFrame(run, 'beauty', undefined, c, quick.section, oit, hook, hooks, lighting);
+      quick.frame = frame;
+      quick.lighting = lighting;
+      quick.oit = oit;
+      quick.hook = hook;
+      quick.hooks = hooks;
+    }
+    const a = node.matrix,
       det =
         a[0] * (a[5] * a[10] - a[6] * a[9]) - a[4] * (a[1] * a[10] - a[2] * a[9]) + a[8] * (a[1] * a[6] - a[2] * a[5]),
-      d = findDerivation(draws.derivations.get(m), frame, p.extension, undefined, undefined, Math.sign(det));
+      d = findDerivation(quick.draws.derivations.get(m), frame, p.extension, undefined, undefined, Math.sign(det));
     if (!d || !batchable(d, r, det)) return false;
     joinBatch(run, this, r, d, c, viewAt);
     this.engine.stats.visible++;

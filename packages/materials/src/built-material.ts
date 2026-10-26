@@ -3531,6 +3531,8 @@ export function createMesh<M extends Material | readonly Material[]>(
     const value = blank[key].value;
     if (Array.isArray(value)) blank[key].value = [...value];
   }
+  // Own and writable, so the per-frame routing check (primitiveAfterOpaque) reads it without a prototype-chain miss.
+  blank.extension ??= { value: undefined, writable: true, configurable: true, enumerable: false };
   const point = () => {
     for (const primitive of model.primitives)
       primitive.material = recordOf(assigned[primitive.definition.material!], runtime, blank);
