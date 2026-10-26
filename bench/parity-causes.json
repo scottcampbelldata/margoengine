@@ -1,0 +1,62 @@
+{
+  "6.5": {
+    "cause": "Before: about 10 us of CPU per materials mesh per frame (1,000 boxes), not the video upload. Fixed by the materials draw-path work (runs, instancing, reused steady materials) through b89ac9c1, with no change of its own; rerun 20261026-165034 shows 0.46 ms CPU against three-webgl 0.75. The image differs only because the video plays in real time (SSIM 0.93)",
+    "fixes": [
+      {
+        "commit": "b89ac9c1",
+        "rerun": "node bench/cli.mjs parity --cases=p-video --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "6.6": {
+    "cause": "Before: about 15 us of CPU per materials mesh per frame (1,000 boxes), not the canvas upload. Fixed by the materials draw-path work through b89ac9c1, with no change of its own; rerun 20261026-165034 shows 0.34 ms CPU against three-webgpu 1.98",
+    "fixes": [
+      {
+        "commit": "b89ac9c1",
+        "rerun": "node bench/cli.mjs parity --cases=p-canvas-texture --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "9.1": {
+    "cause": "Uploading a Float32Array as rgba16float converted it with Uint16Array.from(data, toHalf), a callback per value (160 ms for this image in Node). Now the built-in Float16Array bulk conversion (same bits), else a plain loop: 150 -> 16.95 ms against three-webgpu 20.3",
+    "fixes": [
+      {
+        "commit": "1be3aca1",
+        "tradeoff": "none; bit-identical texels",
+        "rerun": "node bench/cli.mjs parity --cases=p-hdr-load,p-exr-load --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "9.2": {
+    "cause": "The same half-float upload as 9.1, plus parseEXR computing halfToFloat (a 2 ** n) per texel and unpredicting ZIP chunks in three passes. Now a 65,536-entry half table and a one-pass unpredict: 221 -> 19.6 ms against three-webgpu 25.9",
+    "fixes": [
+      {
+        "commit": "1be3aca1",
+        "tradeoff": "a 256 KiB table, built on the first HALF decode; bit-identical floats",
+        "rerun": "node bench/cli.mjs parity --cases=p-hdr-load,p-exr-load --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "10.11": {
+    "cause": "Before: JS arrays grown by push in the STL read and weld (63 ms in Node) and a fingerprint of the lone part with nothing to match (40 ms). Now typed arrays and lazy fingerprints: 111 -> 28.7 ms. The rest is different work: three's STLLoader copies the file's floats into one non-indexed buffer (614,400 vertices, with the file's facet normals, zero here); parseCAD welds corners (205,440 vertices), computes face normals and creates GPU meshes with a PbrMaterial. Matching it would mean dropping the weld, which CAD sections, edges and dedup rely on",
+    "knownBug": "stl-import-does-more-work-than-threes-stloader",
+    "fixes": [
+      {
+        "commit": "b30af0b8",
+        "tradeoff": "worst-case typed arrays, about 260 bytes per triangle while parsing, freed after",
+        "rerun": "node bench/cli.mjs parity --cases=p-stl --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "11.3": {
+    "cause": "Before: num() tried toPrecision(1..9) for every number (75% of the time) and CRC-32 ran a byte at a time. Now a binary search with a value cache and slicing-by-8: 52.8 -> 16.0 ms, byte-identical archive. The rest is different output: Margo writes every mesh in world space (2.46 MB for 1,000 boxes), three's archive is 444 KB, so it writes far fewer numbers. Closing it means writing a shared mesh once with per-node transforms, an exporter format change left for a decision",
+    "knownBug": "usdz-export-writes-every-mesh-in-world-space",
+    "fixes": [
+      {
+        "commit": "b30af0b8",
+        "tradeoff": "+500 B gzip on exporters/usdz",
+        "rerun": "node bench/cli.mjs parity --cases=p-export-usdz --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  }
+}

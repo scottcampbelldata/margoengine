@@ -2601,6 +2601,32 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
   a whole range in one call, and a separate matrix stream so moving instances upload 64 bytes each. Both are package
   changes; the validation itself stays (it is what keeps a bad matrix from reaching the GPU).
 
+The two entries below come from the three.js speed matrix ([whitepaper/perf-vs-threejs.md](whitepaper/perf-vs-threejs.md),
+rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their first causes are fixed (perf-history entry
+26); what is left is different work.
+
+### STL import does more work than three's STLLoader
+
+- **What:** `p-stl`, a 204,800-triangle binary STL: `parseCAD` 28.7 ms (111 before entry 26) against three's
+  `STLLoader` 2.6 ms.
+- **Cause (measured, Node CPU profile of `parseCADGeometry`):** three copies the file's floats into one non-indexed
+  buffer (614,400 vertices). `parseCAD` welds the corners through a hash table (205,440 vertices, about 20 ms in
+  Node), computes face normals, builds a core `Geometry` (bounds, about 6 ms) and creates a GPU mesh with a
+  `PbrMaterial`. The weld is what CAD sections, edges and part deduplication rely on, so `parseCAD` keeps it.
+- **Plan:** a like-for-like reader: `parseSTL` in `@margoengine/loaders`, returning CPU geometry data like `parsePLY`
+  (no weld, no GPU), and the parity scene timing that; `parseCAD` stays the CAD path.
+
+### USDZ export writes every mesh in world space
+
+- **What:** `p-export-usdz`, 1,000 boxes: `exportUSDZ` 16.0 ms (52.8 before entry 26) against three's `USDZExporter`
+  2.5 ms; the archives are 2.46 MB against 444 KB.
+- **Cause (measured):** `exportUSDZ` writes each node as its own world-space mesh, so the box's 24 vertices, normals
+  and UVs are written 1,000 times as shortest round-trip text (144,000 numbers). three's archive is 5.5x
+  smaller, so it writes far fewer.
+- **Plan:** write a geometry shared by several nodes once (a mesh under a class prim) and give each node an Xform with
+  its transform that references it, with `orientation = "leftHanded"` for mirrored nodes. It changes the archive's
+  layout, so it waits for the Quick Look check of the entry at the top of this page.
+
 ## Unverified against the specification
 
 ### IGES parametric spline surface (entity 114): coefficient order not checked

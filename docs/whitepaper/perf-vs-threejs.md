@@ -8,7 +8,7 @@ is fixed later, its after numbers appear next to the before, with the cause, the
 rerun command. Rows still slower stay listed and link to their known-bugs entry. `bench/parity-report.mjs` renders
 this page from the ledger `perf-vs-threejs.json` next to it, which every run adds to.
 
-First run: `20261025-132015-d3fec42e-dev`. Latest run added: `20261026-143425-9bce9eb3-dev` (invalid: parity/p-uv-transform cpuMs spread 12.7%; parity/p-uv-transform gpuMs spread 48.0%; parity/p-uv-transform@three-webgl-parity gpuMs spread 16.4%). Engines: `margo` 1.0.0, `three-webgpu-parity` 0.186.1, `three-webgl-parity` 0.186.1. Machine: , ; browser 156.0.4314.42. 5 runs per case (1 warm-up), 300 frames, interleaved per scene. This run's matrix took 2.4 min.
+First run: `20261025-132015-d3fec42e-dev`. Latest run added: `20261026-165034-594c45af-dev` (invalid: parity/p-video@three-webgl-parity gpuMs spread 10.7%; parity/p-canvas-texture@three-webgl-parity cpuMs spread 14.7%; parity/p-canvas-texture@three-webgl-parity gpuMs spread 13.8%). Engines: `margo` 1.0.0, `three-webgpu-parity` 0.186.1, `three-webgl-parity` 0.186.1. Machine: , ; browser 156.0.4314.42. 3 runs per case (1 warm-up), 300 frames, interleaved per scene. This run's matrix took 2.7 min.
 
 Rerun:
 
@@ -29,9 +29,9 @@ fetched for the scene.
 
 | Verdict | First run | Now |
 | --- | --- | --- |
-| faster | 61 | 74 |
+| faster | 61 | 78 |
 | no workload | 9 | 9 |
-| slower | 73 | 59 |
+| slower | 73 | 55 |
 | Margo missing | 8 | 8 |
 | no three.js equivalent | 3 | 3 |
 | equal | 3 | 4 |
@@ -45,20 +45,20 @@ fetched for the scene.
 | Scene | Rows | Margo / three (worst primary metric) | Cause |
 | --- | --- | --- | --- |
 | `p-marching-cubes` | 17.11 | 212x | not diagnosed yet |
-| `p-stl` | 10.11 | 41.30x | not diagnosed yet |
-| `p-export-usdz` | 11.3 | 19.02x | not diagnosed yet |
-| `p-video` | 6.5 | 16.90x | not diagnosed yet |
-| `p-canvas-texture` | 6.6 | 16.36x | not diagnosed yet |
 | `p-keyframes` | 12.6 | 12.80x | not diagnosed yet |
+| `p-stl` | 10.11 | 11.02x | Before: JS arrays grown by push in the STL read and weld (63 ms in Node) and a fingerprint of the lone part with nothing to match (40 ms). Now typed arrays and lazy fingerprints: 111 -> 28.7 ms. The rest is different work: three's STLLoader copies the file's floats into one non-indexed buffer (614,400 vertices, with the file's facet normals, zero here); parseCAD welds corners (205,440 vertices), computes face normals and creates GPU meshes with a PbrMaterial. Matching it would mean dropping the weld, which CAD sections, edges and dedup rely on. [known bug](../known-bugs.md#stl-import-does-more-work-than-threes-stloader). fixed in b30af0b8 (trade-off: worst-case typed arrays, about 260 bytes per triangle while parsing, freed after), rerun `node bench/cli.mjs parity --cases=p-stl --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail` |
 | `p-morph` | 12.5 | 10.86x | not diagnosed yet |
 | `p-skeleton-clone` | 12.7 | 10.41x | not diagnosed yet |
 | `helmet` | 9.3 | 9.46x | not diagnosed yet |
-| `p-exr-load` | 9.2 | 8.14x | not diagnosed yet |
-| `p-hdr-load` | 9.1 | 7.15x | not diagnosed yet |
+| `p-export-usdz` | 11.3 | 6.42x | Before: num() tried toPrecision(1..9) for every number (75% of the time) and CRC-32 ran a byte at a time. Now a binary search with a value cache and slicing-by-8: 52.8 -> 16.0 ms, byte-identical archive. The rest is different output: Margo writes every mesh in world space (2.46 MB for 1,000 boxes), three's archive is 444 KB, so it writes far fewer numbers. Closing it means writing a shared mesh once with per-node transforms, an exporter format change left for a decision. [known bug](../known-bugs.md#usdz-export-writes-every-mesh-in-world-space). fixed in b30af0b8 (trade-off: +500 B gzip on exporters/usdz), rerun `node bench/cli.mjs parity --cases=p-export-usdz --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail` |
 | `p-gpu-pick` | 16.2 | 6.24x | not diagnosed yet |
 | `p-taa` | 13.7 | 5.78x | not diagnosed yet |
 | `p-point-shadows` | 8.2 | 5.70x | not diagnosed yet |
 | `p-motion-blur` | 13.17 | 5.55x | not diagnosed yet |
+| `p-node-material` | 2.6 | 5.26x | not diagnosed yet |
+| `p-export-exr` | 11.4 | 4.32x | not diagnosed yet |
+| `p-custom-shader` | 2.5 | 3.32x | not diagnosed yet |
+| `p-pmrem` | 9.3 | 3.19x | not diagnosed yet |
 
 ## Every row
 
@@ -118,8 +118,8 @@ fetched for the scene.
 | 6.2 | CubeTexture, CubeTextureLoader | faster | faster | `p-background` |  |
 | 6.3 | DataTexture, Data3DTexture, DataArrayTexture | slower | slower | `p-data-texture` |  |
 | 6.4 | CompressedTexture (KTX2/Basis) | equal | equal | `p-ktx2` |  |
-| 6.5 | VideoTexture, VideoFrameTexture | slower | slower | `p-video` |  |
-| 6.6 | CanvasTexture | slower | slower | `p-canvas-texture` |  |
+| 6.5 | VideoTexture, VideoFrameTexture | slower | faster | `p-video` | Before: about 10 us of CPU per materials mesh per frame (1,000 boxes), not the video upload. Fixed by the materials draw-path work (runs, instancing, reused steady materials) through b89ac9c1, with no change of its own; rerun 20261026-165034 shows 0.46 ms CPU against three-webgl 0.75. The image differs only because the video plays in real time (SSIM 0.93). fixed in b89ac9c1, rerun `node bench/cli.mjs parity --cases=p-video --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail` |
+| 6.6 | CanvasTexture | slower | faster | `p-canvas-texture` | Before: about 15 us of CPU per materials mesh per frame (1,000 boxes), not the canvas upload. Fixed by the materials draw-path work through b89ac9c1, with no change of its own; rerun 20261026-165034 shows 0.34 ms CPU against three-webgpu 1.98. fixed in b89ac9c1, rerun `node bench/cli.mjs parity --cases=p-canvas-texture --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail` |
 | 6.7 | Texture `offset` / `repeat` / `rotation` / `center`, texture atlases | slower | faster | `p-uv-transform` |  |
 | 6.8 | DepthTexture | faster | faster | `p-depth-texture` |  |
 | 6.9 | Mipmaps, wrapping, filtering | equal | equal | `p-mipmaps` |  |
@@ -135,8 +135,8 @@ fetched for the scene.
 | 8.1 | Directional light shadows (incl. CSM add-on, PCF/PCFSoft) | faster | faster | `p-csm` `shadows-1000` |  |
 | 8.2 | PointLight shadows | slower | slower | `p-point-shadows` |  |
 | 8.3 | SpotLight shadows | faster | faster | `p-spot-shadows` |  |
-| 9.1 | HDRLoader / RGBELoader | slower | slower | `p-hdr-load` |  |
-| 9.2 | EXRLoader | slower | slower | `p-exr-load` |  |
+| 9.1 | HDRLoader / RGBELoader | slower | faster | `p-hdr-load` | Uploading a Float32Array as rgba16float converted it with Uint16Array.from(data, toHalf), a callback per value (160 ms for this image in Node). Now the built-in Float16Array bulk conversion (same bits), else a plain loop: 150 -> 16.95 ms against three-webgpu 20.3. fixed in 1be3aca1 (trade-off: none; bit-identical texels), rerun `node bench/cli.mjs parity --cases=p-hdr-load,p-exr-load --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail` |
+| 9.2 | EXRLoader | slower | faster | `p-exr-load` | The same half-float upload as 9.1, plus parseEXR computing halfToFloat (a 2 ** n) per texel and unpredicting ZIP chunks in three passes. Now a 65,536-entry half table and a one-pass unpredict: 221 -> 19.6 ms against three-webgpu 25.9. fixed in 1be3aca1 (trade-off: a 256 KiB table, built on the first HALF decode; bit-identical floats), rerun `node bench/cli.mjs parity --cases=p-hdr-load,p-exr-load --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail` |
 | 9.3 | PMREMGenerator, `scene.environment` (IBL) | slower | slower | `p-pmrem` `helmet` |  |
 | 9.4 | Fog, FogExp2 | faster | faster | `p-fog` |  |
 | 9.5 | Volumetric fog and light shafts (`VolumeNodeMaterial`, `webgpu_volume_lighting`) | slower | slower | `p-volumetric` |  |
@@ -154,7 +154,7 @@ fetched for the scene.
 | 10.8 | FBXLoader | slower | slower | `p-fbx` |  |
 | 10.9 | OBJLoader | faster | faster | `p-obj` |  |
 | 10.10 | MTLLoader | slower | slower | `p-mtl` |  |
-| 10.11 | STLLoader | slower | slower | `p-stl` |  |
+| 10.11 | STLLoader | slower | slower | `p-stl` | Before: JS arrays grown by push in the STL read and weld (63 ms in Node) and a fingerprint of the lone part with nothing to match (40 ms). Now typed arrays and lazy fingerprints: 111 -> 28.7 ms. The rest is different work: three's STLLoader copies the file's floats into one non-indexed buffer (614,400 vertices, with the file's facet normals, zero here); parseCAD welds corners (205,440 vertices), computes face normals and creates GPU meshes with a PbrMaterial. Matching it would mean dropping the weld, which CAD sections, edges and dedup rely on. [known bug](../known-bugs.md#stl-import-does-more-work-than-threes-stloader). fixed in b30af0b8 (trade-off: worst-case typed arrays, about 260 bytes per triangle while parsing, freed after), rerun `node bench/cli.mjs parity --cases=p-stl --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail` |
 | 10.12 | PLYLoader | faster | faster | `p-ply` |  |
 | 10.13 | 3MFLoader | faster | faster | `p-3mf` |  |
 | 10.14 | USDZLoader, USDLoader | not run | not run | `p-usdz` |  |
@@ -168,7 +168,7 @@ fetched for the scene.
 | 10.22 | LoadingManager, Cache, progress events | no workload | no workload |  | no workload: loading manager and cache bookkeeping |
 | 11.1 | GLTFExporter | faster | faster | `p-export-gltf` |  |
 | 11.2 | OBJExporter, STLExporter, PLYExporter | slower | slower | `p-export-mesh` |  |
-| 11.3 | USDZExporter | slower | slower | `p-export-usdz` |  |
+| 11.3 | USDZExporter | slower | slower | `p-export-usdz` | Before: num() tried toPrecision(1..9) for every number (75% of the time) and CRC-32 ran a byte at a time. Now a binary search with a value cache and slicing-by-8: 52.8 -> 16.0 ms, byte-identical archive. The rest is different output: Margo writes every mesh in world space (2.46 MB for 1,000 boxes), three's archive is 444 KB, so it writes far fewer numbers. Closing it means writing a shared mesh once with per-node transforms, an exporter format change left for a decision. [known bug](../known-bugs.md#usdz-export-writes-every-mesh-in-world-space). fixed in b30af0b8 (trade-off: +500 B gzip on exporters/usdz), rerun `node bench/cli.mjs parity --cases=p-export-usdz --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail` |
 | 11.4 | EXRExporter | slower | slower | `p-export-exr` |  |
 | 11.5 | DRACOExporter, KTX2Exporter | Margo missing | Margo missing |  | Margo missing (Draco and KTX2 encoders are a documented limit) |
 | 12.1 | AnimationMixer, clip playback | slower | slower | `p-mixer-100` |  |
@@ -251,7 +251,7 @@ is the newest run after the first, when there is one.
 | `p-background` | margo 0.09 / 0.05 / 2875 / 32; three-webgl-parity 0.66 / 0.05 / 1069 / 50 (`20261025-132015-d3fec42e-dev`) | faster |  |  | 0.993, 0.65 | 57,211 / 1,607 |
 | `p-blending` | margo 24.61 / 5.68 / 35 / 1024; three-webgl-parity 1.33 / 0.52 / 615 / 18 (`20261025-135606-d3fec42e-dev`) | slower | margo 1.30 / 0.07 / 637 / 184; three-webgl-parity 1.38 / 0.57 / 600 / 18 (`20261026-105135-fbc01bdc-dev`) | faster | 1, 0 | 74,255 / 1,607 |
 | `p-bloom` | margo 0.10 / 0.21 / 2703 / 124; three-webgl-parity 0.85 / 0.39 / 892 / 31 (`20261025-162530-d3fec42e-dev`) | faster |  |  | 0.993, 0.64 | 48,599 / 1,607 |
-| `p-canvas-texture` | margo 15.19 / 2.24 / 58 / 643; three-webgpu-parity 3.25 / 0.14 / 261 / 217 (`20261025-144617-d3fec42e-dev`) | slower |  |  | 0.996, 0.61 | 162,939 / 1,607 |
+| `p-canvas-texture` | margo 15.19 / 2.24 / 58 / 643; three-webgpu-parity 3.25 / 0.14 / 261 / 217 (`20261025-144617-d3fec42e-dev`) | slower | margo 0.34 / 0.08 / 1243 / 176; three-webgpu-parity 1.98 / 0.14 / 436 / 171 (`20261026-165034-594c45af-dev`) | faster | 0.996, 0.61 | 178,971 / 1,607 |
 | `p-clipping` | margo 180 / 4.71 / 6 / 4419; three-webgl-parity 7.76 / 5.12 / 121 / 35 (`20261025-133001-d3fec42e-dev`) | slower | margo 6.60 / 1.14 / 137 / 90; three-webgl-parity 8.99 / 9.42 / 101 / 36 (`20261026-073905-14354737-dev`) | equal | 0.998, 0.29 | 73,489 / 1,607 |
 | `p-collada` | margo 12.86 / 27.21; three-webgl-parity 17.04 / 27.79 (`20261025-161120-d3fec42e-dev`) | faster |  |  |  | 153,368 / 1,607 |
 | `p-color-grading` | margo Error: unsupported: hue rotation (creative PostProcessing has contrast; three-webgl-parity 0.81 / 0.37 / 914 / 24 (`20261025-162530-d3fec42e-dev`) | Margo missing |  |  |  | 0 / 24,137 |
@@ -277,8 +277,8 @@ is the newest run after the first, when there is one.
 | `p-export-exr` | margo 648 / 620; three-webgl-parity 150 / 162 (`20261025-161539-d3fec42e-dev`) | slower |  |  |  | 29,410 / 1,607 |
 | `p-export-gltf` | margo 1.33 / 6.35; three-webgpu-parity 1.85 / 6.14 (`20261025-161539-d3fec42e-dev`) | faster | margo 1.31 / 5.91; three-webgpu-parity 1.76 / 5.02 (`20261025-170145-d3fec42e-dev`) | faster |  | 89,583 / 1,607 |
 | `p-export-mesh` | margo 253 / 305; three-webgpu-parity 101 / 129 (`20261025-161539-d3fec42e-dev`) | slower |  |  |  | 89,583 / 1,607 |
-| `p-export-usdz` | margo 52.79 / 64.22; three-webgpu-parity 2.77 / 6.83 (`20261025-161539-d3fec42e-dev`) | slower |  |  |  | 63,284 / 1,607 |
-| `p-exr-load` | margo 221 / 240; three-webgpu-parity 27.12 / 33.85 (`20261025-155040-d3fec42e-dev`) | slower |  |  |  | 190,101 / 1,607 |
+| `p-export-usdz` | margo 52.79 / 64.22; three-webgpu-parity 2.77 / 6.83 (`20261025-161539-d3fec42e-dev`) | slower | margo 15.96 / 26.27; three-webgl-parity 2.48 / 5.19 (`20261026-165034-594c45af-dev`) | slower |  | 64,495 / 1,607 |
+| `p-exr-load` | margo 221 / 240; three-webgpu-parity 27.12 / 33.85 (`20261025-155040-d3fec42e-dev`) | slower | margo 19.55 / 31.31; three-webgpu-parity 25.93 / 32.04 (`20261026-165034-594c45af-dev`) | faster |  | 206,417 / 1,607 |
 | `p-extrude` | margo 2.54 / 9.18; three-webgl-parity 1.95 / 8.04 (`20261025-134730-d3fec42e-dev`) | slower |  |  |  | 50,325 / 1,607 |
 | `p-fbx` | margo 12.81 / 26.61; three-webgl-parity 4.16 / 11.61 (`20261025-161120-d3fec42e-dev`) | slower |  |  |  | 154,131 / 1,607 |
 | `p-film` | margo 0.10 / 0.14 / 3064 / 77; three-webgl-parity 0.81 / 0.27 / 918 / 24 (`20261025-162530-d3fec42e-dev`) | faster |  |  | 0.226, 12.91 (differs) | 42,090 / 1,607 |
@@ -293,7 +293,7 @@ is the newest run after the first, when there is one.
 | `p-god-rays` | margo 0.10 / 0.14 / 2940 / 76; three n/a (`20261025-162530-d3fec42e-dev`) | three missing |  |  |  |  |
 | `p-gpu-pick` | margo 407 / 422; three-webgl-parity 65.13 / 82.11 (`20261025-164210-d3fec42e-dev`) | slower |  |  |  | 27,558 / 1,607 |
 | `p-gtao` | margo 0.12 / 0.38 / 1645 / 150; three-webgl-parity 1.63 / 1.42 / 505 / 37 (`20261025-162530-d3fec42e-dev`) | faster |  |  | 0.972, 0.9 | 53,296 / 1,607 |
-| `p-hdr-load` | margo 150 / 164; three-webgpu-parity 20.98 / 31.23 (`20261025-155040-d3fec42e-dev`) | slower |  |  |  | 190,101 / 1,607 |
+| `p-hdr-load` | margo 150 / 164; three-webgpu-parity 20.98 / 31.23 (`20261025-155040-d3fec42e-dev`) | slower | margo 16.95 / 20.15; three-webgpu-parity 20.29 / 28.55 (`20261026-165034-594c45af-dev`) | faster |  | 206,417 / 1,607 |
 | `p-helpers` | margo 0.35 / 0.20 / 959 / 117; three-webgl-parity 2.02 / 1.24 / 410 / 48 (`20261025-163815-d3fec42e-dev`) | faster |  |  | 0.955, 3.5 | 48,480 / 1,607 |
 | `p-hemisphere` | margo 0.17 / 0.10 / 2254 / 36; three-webgl-parity 9.71 / 7.19 / 97 / 35 (`20261025-152656-d3fec42e-dev`) | faster |  |  | 0.995, 0.67 | 56,532 / 1,607 |
 | `p-hierarchy` | margo 0.65 / 0.10 / 1029 / 17; three-webgl-parity 4.59 / 2.61 / 197 / 30 (`20261025-132015-d3fec42e-dev`) | faster |  |  | 0.988, 1.01 | 28,146 / 1,607 |
@@ -354,7 +354,7 @@ is the newest run after the first, when there is one.
 | `p-ssao` | margo 0.12 / 0.36 / 1662 / 137; three-webgpu-parity 0.86 / 0.27 / 846 / 172 (`20261025-162530-d3fec42e-dev`) | slower |  |  | 0.809, 5.83 (differs) | 51,482 / 1,607 |
 | `p-ssgi` | margo 0.12 / 0.67 / 1227 / 163; three-webgpu-parity 0.84 / 1.05 / 778 / 218 (`20261025-162530-d3fec42e-dev`) | faster |  |  | 0.644, 13.47 (differs) | 53,271 / 1,607 |
 | `p-ssr` | margo 0.12 / 0.42 / 1826 / 139; three-webgpu-parity 0.86 / 0.91 / 837 / 191 (`20261025-162530-d3fec42e-dev`) | faster |  |  | 0.567, 16.2 (differs) | 52,532 / 1,607 |
-| `p-stl` | margo 111 / 120; three-webgpu-parity 2.69 / 3.65 (`20261025-161120-d3fec42e-dev`) | slower |  |  |  | 50,027 / 1,607 |
+| `p-stl` | margo 111 / 120; three-webgpu-parity 2.69 / 3.65 (`20261025-161120-d3fec42e-dev`) | slower | margo 28.65 / 42.44; three-webgl-parity 2.60 / 3.52 (`20261026-165034-594c45af-dev`) | slower |  | 48,869 / 1,607 |
 | `p-svg` | margo 74.78 / 105; three-webgpu-parity 36.90 / 52.12 (`20261025-161120-d3fec42e-dev`) | slower |  |  |  | 65,814 / 1,607 |
 | `p-taa` | margo 5.41 / 1.41 / 156 / 107; three-webgpu-parity 1.80 / 0.24 / 466 / 175 (`20261025-162530-d3fec42e-dev`) | slower |  |  | 0.641, 2.86 (differs) | 39,574 / 1,607 |
 | `p-text` | margo 22.56 / 45.49; three-webgl-parity 7.60 / 19.89 (`20261025-134730-d3fec42e-dev`) | slower |  |  |  | 48,439 / 1,607 |
@@ -368,7 +368,7 @@ is the newest run after the first, when there is one.
 | `p-unlit` | margo 168 / 3.85 / 6 / 4234; three-webgl-parity 6.46 / 3.87 / 144 / 24 (`20261025-135606-d3fec42e-dev`) | slower | margo 4.94 / 1.16 / 183 / 111; three-webgl-parity 6.52 / 3.81 / 146 / 21 (`20261026-080031-fd52ab3b-dev`) | faster | 0.997, 0.34 | 169,017 / 1,607 |
 | `p-usdz` | margo 0.09 / 1.69; three n/a (`20261025-161120-d3fec42e-dev`) | not run |  |  |  |  |
 | `p-uv-transform` | margo 64.55 / 4.25 / 15 / 1757; three-webgl-parity 6.71 / 5.13 / 140 / 99 (`20261025-144617-d3fec42e-dev`) | slower | margo 2.87 / 0.15 / 307 / 214; three-webgl-parity 6.53 / 5.46 / 141 / 98 (`20261026-143425-9bce9eb3-dev`) | faster | 0.994, 1.09 | 176,154 / 1,607 |
-| `p-video` | margo 10.70 / 1.82 / 68 / 626; three-webgl-parity 0.83 / 0.11 / 900 / 26 (`20261025-144617-d3fec42e-dev`) | slower |  |  | 0.889, 6.88 (differs) | 162,939 / 1,607 |
+| `p-video` | margo 10.70 / 1.82 / 68 / 626; three-webgl-parity 0.83 / 0.11 / 900 / 26 (`20261025-144617-d3fec42e-dev`) | slower | margo 0.46 / 0.06 / 1038 / 181; three-webgl-parity 0.75 / 0.08 / 994 / 27 (`20261026-165034-594c45af-dev`) | faster | 0.929, 3.22 | 178,971 / 1,607 |
 | `p-view-helper` | margo 0.17 / 0.10 / 1794 / 17; three-webgl-parity 9.49 / 6.68 / 99 / 38 (`20261025-163815-d3fec42e-dev`) | faster |  |  | 0.973, 2.51 | 33,942 / 1,607 |
 | `p-volumetric` | margo 0.23 / 0.22 / 1879 / 177; three-webgpu-parity 2.23 / 0.18 / 375 / 217 (`20261025-155040-d3fec42e-dev`) | slower |  |  | 0.441, 31.88 (differs) | 57,881 / 1,607 |
 | `p-vox` | margo 0.42 / 7.06; three-webgl-parity 0.49 / 4.33 (`20261025-161120-d3fec42e-dev`) | faster |  |  |  | 56,608 / 1,607 |

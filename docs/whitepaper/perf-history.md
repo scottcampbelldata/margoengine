@@ -378,6 +378,67 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
   shape; a view made anew each frame binds its own camera; a material whose meshes all went binds new buffers),
   `packages/materials/tests/steady-batches.test.js` (a steady material composes no shader and runs no bindings).
 
+### 25. HDR and EXR load: half floats converted one callback at a time
+
+- **Loss:** speed matrix rows 9.1 and 9.2 (run `20261025-155040`): `p-hdr-load` 150 ms against three.js WebGPU 21.0,
+  `p-exr-load` 221 ms against 27.1 (parse to linear floats, upload as `rgba16float`).
+- **Causes, measured** (Node CPU profiles):
+  1. `@margoengine/materials` converted a Float32Array for a half-float texture with `Uint16Array.from(data, toHalf)`:
+     a callback per value, 160-170 ms for either image;
+  2. `parseEXR` decoded each HALF texel with `halfToFloat` (a `2 ** n` each, 21 ms of BrightRings' 34) and unpredicted
+     each ZIP chunk in three passes.
+- **Fixes:** `1be3aca1`. Materials' `toHalfArray` uses the built-in `Float16Array` bulk conversion (the same
+  round-to-nearest-even bits) where the runtime has it, else a plain loop; environment decodes HALF through a
+  65,536-entry table built on first use (every half is exact in float32) and unpredicts in one pass. Trade-off: a
+  256 KiB table once the first HALF channel is read. Output is bit-identical (all 22 EXR fixtures hash the same).
+- **After** (diagnostic, busy machine, RTX A6000; run `20261026-165034`, 3 runs): ms per call.
+
+  | Scene | Before | After | three.js (WebGPU) |
+  | --- | --- | --- | --- |
+  | `p-hdr-load` | 150 | 16.95 | 20.3, faster |
+  | `p-exr-load` | 221 | 19.6 | 25.9, faster |
+
+- **Rerun:** `node bench/cli.mjs parity --cases=p-hdr-load,p-exr-load --engines=margo,three-webgpu-parity,three-webgl-parity
+  --runs=3 --warmup=1 --no-compare --no-fail`, then `node bench/parity-report.mjs <run.json> --partial`.
+- **Guard:** `packages/materials/test/texture-formats.test.js` (bulk conversion equals `toHalf` on a million random
+  patterns on both paths, and 4M values convert in under 120 ms), `packages/environment/tests/environment.test.js` (the
+  table equals `halfToFloat` for every pattern; BrightRings parses faster than the per-texel conversion alone).
+
+### 26. STL import and USDZ export: pushes, needless fingerprints and the digit search
+
+- **Loss:** speed matrix rows 10.11 and 11.3 (runs `20261025-161120`, `20261025-161539`): `p-stl` (204,800-triangle
+  binary STL through `parseCAD`) 111 ms against three.js 2.69; `p-export-usdz` (1,000 boxes) 52.8 ms against 2.78.
+- **Causes, measured** (Node CPU profiles):
+  1. the STL reader and the corner weld grew JS arrays by `push` (1.8 million pushes; `parseCADGeometry` 63 ms);
+  2. `deduplicateParts` (and the CAD worker) fingerprinted every part, a sort of all its triangles plus a CRC, even
+     when no other part had its triangle count and nothing could match: 40 ms for the one STL part;
+  3. the exporters' `num()` tried `toPrecision(1..9)` for every number until one read back: 75% of `exportUSDZ`;
+  4. CRC-32 ran a byte at a time (4 ms for the 2.5 MB archive).
+- **Fixes:** `b30af0b8`. Typed arrays sized for the worst case (positions and normals stay float64, so `Geometry`
+  rounds and bounds them as before); a part is fingerprinted only once a second part with its triangle count arrives;
+  `num()` binary-searches the digit count (the read-back interval is symmetric except at powers of two, which still
+  scan every count), returns integers directly and caches recent values; CRC-32 runs slicing-by-8. Output is
+  bit-identical: the same welded geometry, a byte-identical archive. Trade-off: +500 B gzip on `exporters/usdz`,
+  +326 B on the CAD worker.
+- **After** (diagnostic, busy machine, RTX A6000; run `20261026-165034`, 3 runs): ms per call.
+
+  | Scene | Before | After | three.js |
+  | --- | --- | --- | --- |
+  | `p-stl` | 111 | 28.7 | 2.6, still slower |
+  | `p-export-usdz` | 52.8 | 16.0 | 2.5, still slower |
+
+  Both rows are still slower because the work differs (see [Open losses](#open-losses)).
+- **Rerun:** `node bench/cli.mjs parity --cases=p-stl,p-export-usdz --engines=margo,three-webgpu-parity,three-webgl-parity
+  --runs=3 --warmup=1 --no-compare --no-fail`, then `node bench/parity-report.mjs <run.json> --partial`.
+- **Guard:** `tests/cad-triangles.test.js` (a lone 204,800-triangle part deduplicates in under 10 ms; matching still
+  works in any order of counts; the worker reuses a repeated part), `packages/exporters/tests/exporters.test.js`
+  (written numbers equal the old search on 60,000 edge and random Float32 values; a 1,000-box USDZ export takes less
+  time than the old search over its numbers alone).
+
+The video and canvas texture rows (6.5, 6.6, run `20261025-144617`: 10.7 and 15.2 ms of CPU per frame against 0.83
+and 3.26) were the per-mesh cost of entries 21-24, not texture upload: run `20261026-165034` has them at 0.46 and 0.34
+ms against 0.75 and 1.98, faster, with no change of their own.
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks
@@ -575,6 +636,12 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   - Still open: `createInstancedMesh` vertex fetch at 10k-50k, the 1k GPU cost of a package pass, and CPU for moving
     instances. Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
   - [claims.md](claims.md) records that there is no publishable result yet.
+- **STL import and USDZ export against three.js: partly closed (entry 26).** `p-stl` 28.7 ms against 2.6 and
+  `p-export-usdz` 16.0 ms against 2.5 (run `20261026-165034`, diagnostic). What is left is different work: `parseCAD`
+  welds corners, computes normals and creates GPU meshes where three copies floats; `exportUSDZ` writes every mesh in
+  world space (2.46 MB) where three's archive is 444 KB. Causes and plans:
+  [known-bugs.md](../known-bugs.md#stl-import-does-more-work-than-threes-stloader) and
+  [the USDZ entry](../known-bugs.md#usdz-export-writes-every-mesh-in-world-space).
 - **Galaxy S23 Ultra island demo.** A report of 3–5 FPS on that phone, with particles off making no difference.
   - Partial fixes: `909e384a`, and `1c627cdc` (scatter compiles the fade `discard` only when instances can fade).
   - No after number is recorded. The project has no S23 to test on.

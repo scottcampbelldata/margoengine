@@ -9738,7 +9738,146 @@
      "margo": 162939,
      "three": 1607
     }
-   }
+   },
+   "later": [
+    {
+     "run": "20261026-165034-594c45af-dev",
+     "date": "2026-10-26T16:50:34.256Z",
+     "commit": "594c45af",
+     "label": "dev",
+     "valid": false,
+     "kind": "frame",
+     "verdict": "faster",
+     "margo": {
+      "cpuMs": {
+       "median": 0.46,
+       "spread": 0.0543
+      },
+      "gpuMs": {
+       "median": 0.06,
+       "spread": 0.0167
+      },
+      "fps": {
+       "median": 1038.2,
+       "spread": 0.106
+      },
+      "firstFrameMs": {
+       "median": 180.5,
+       "spread": 0.0814
+      },
+      "loadMs": {
+       "median": 468.8,
+       "spread": 0.0531
+      },
+      "buildMs": {
+       "median": 106.9,
+       "spread": 0.0337
+      },
+      "jsHeapMB": {
+       "median": 16.16,
+       "spread": 0
+      },
+      "gpuMB": {
+       "median": 35.66,
+       "spread": 0
+      },
+      "drawCalls": {
+       "median": 2,
+       "spread": 0
+      }
+     },
+     "three": {
+      "engine": "three-webgl-parity",
+      "metrics": {
+       "cpuMs": {
+        "median": 0.75,
+        "spread": 0.0133
+       },
+       "gpuMs": {
+        "median": 0.084,
+        "spread": 0.1071
+       },
+       "fps": {
+        "median": 993.7,
+        "spread": 0.0222
+       },
+       "firstFrameMs": {
+        "median": 26.6,
+        "spread": 0.0564
+       },
+       "loadMs": {
+        "median": 176.7,
+        "spread": 0.06
+       },
+       "buildMs": {
+        "median": 19.4,
+        "spread": 0.0825
+       },
+       "jsHeapMB": {
+        "median": 6.03,
+        "spread": 0.0017
+       },
+       "drawCalls": {
+        "median": 945,
+        "spread": 0
+       }
+      }
+     },
+     "others": [
+      {
+       "engine": "three-webgpu-parity",
+       "metrics": {
+        "cpuMs": {
+         "median": 0.815,
+         "spread": 0.0184
+        },
+        "gpuMs": {
+         "median": 0.11,
+         "spread": 0.0091
+        },
+        "fps": {
+         "median": 830.9,
+         "spread": 0.0143
+        },
+        "firstFrameMs": {
+         "median": 224.4,
+         "spread": 0.0036
+        },
+        "loadMs": {
+         "median": 405.3,
+         "spread": 0.0131
+        },
+        "buildMs": {
+         "median": 18.6,
+         "spread": 0.0054
+        },
+        "jsHeapMB": {
+         "median": 11.96,
+         "spread": 0
+        },
+        "gpuMB": {
+         "median": 56.45,
+         "spread": 0
+        },
+        "drawCalls": {
+         "median": 0,
+         "spread": 0
+        }
+       }
+      }
+     ],
+     "image": {
+      "meanDeltaE": 3.22,
+      "over10": 5.4,
+      "ssim": 0.929,
+      "match": true
+     },
+     "bytes": {
+      "margo": 178971,
+      "three": 1607
+     }
+    }
+   ]
   },
   "p-canvas-texture": {
    "first": {
@@ -9877,7 +10016,146 @@
      "margo": 162939,
      "three": 1607
     }
-   }
+   },
+   "later": [
+    {
+     "run": "20261026-165034-594c45af-dev",
+     "date": "2026-10-26T16:50:34.256Z",
+     "commit": "594c45af",
+     "label": "dev",
+     "valid": false,
+     "kind": "frame",
+     "verdict": "faster",
+     "margo": {
+      "cpuMs": {
+       "median": 0.34,
+       "spread": 0.0294
+      },
+      "gpuMs": {
+       "median": 0.079,
+       "spread": 0
+      },
+      "fps": {
+       "median": 1243.1,
+       "spread": 0.0162
+      },
+      "firstFrameMs": {
+       "median": 175.6,
+       "spread": 0.1691
+      },
+      "loadMs": {
+       "median": 458.8,
+       "spread": 0.0878
+      },
+      "buildMs": {
+       "median": 89.7,
+       "spread": 0.068
+      },
+      "jsHeapMB": {
+       "median": 16.25,
+       "spread": 0
+      },
+      "gpuMB": {
+       "median": 37.48,
+       "spread": 0
+      },
+      "drawCalls": {
+       "median": 2,
+       "spread": 0
+      }
+     },
+     "three": {
+      "engine": "three-webgpu-parity",
+      "metrics": {
+       "cpuMs": {
+        "median": 1.98,
+        "spread": 0.0202
+       },
+       "gpuMs": {
+        "median": 0.136,
+        "spread": 0.0147
+       },
+       "fps": {
+        "median": 436.2,
+        "spread": 0.0147
+       },
+       "firstFrameMs": {
+        "median": 171.1,
+        "spread": 0.0199
+       },
+       "loadMs": {
+        "median": 332.2,
+        "spread": 0.0063
+       },
+       "buildMs": {
+        "median": 4.5,
+        "spread": 0.0889
+       },
+       "jsHeapMB": {
+        "median": 12.05,
+        "spread": 0.0008
+       },
+       "gpuMB": {
+        "median": 58.27,
+        "spread": 0
+       },
+       "drawCalls": {
+        "median": 0,
+        "spread": 0
+       }
+      }
+     },
+     "others": [
+      {
+       "engine": "three-webgl-parity",
+       "metrics": {
+        "cpuMs": {
+         "median": 13.435,
+         "spread": 0.147
+        },
+        "gpuMs": {
+         "median": 16.499,
+         "spread": 0.1376
+        },
+        "fps": {
+         "median": 72.7,
+         "spread": 0.0743
+        },
+        "firstFrameMs": {
+         "median": 30.8,
+         "spread": 0.1006
+        },
+        "loadMs": {
+         "median": 171.9,
+         "spread": 0.0471
+        },
+        "buildMs": {
+         "median": 3.8,
+         "spread": 0
+        },
+        "jsHeapMB": {
+         "median": 6.02,
+         "spread": 0
+        },
+        "drawCalls": {
+         "median": 945,
+         "spread": 0
+        }
+       }
+      }
+     ],
+     "image": {
+      "meanDeltaE": 0.61,
+      "over10": 0.4,
+      "ssim": 0.996,
+      "match": true
+     },
+     "bytes": {
+      "margo": 178971,
+      "three": 1607
+     }
+    }
+   ]
   },
   "p-uv-transform": {
    "first": {
@@ -12341,7 +12619,97 @@
      "margo": 190101,
      "three": 1607
     }
-   }
+   },
+   "later": [
+    {
+     "run": "20261026-165034-594c45af-dev",
+     "date": "2026-10-26T16:50:34.256Z",
+     "commit": "594c45af",
+     "label": "dev",
+     "valid": false,
+     "kind": "task",
+     "verdict": "faster",
+     "margo": {
+      "loadMs": {
+       "median": 865.6,
+       "spread": 0.0262
+      },
+      "buildMs": {
+       "median": 6,
+       "spread": 0.2
+      },
+      "taskMs": {
+       "median": 16.95,
+       "spread": 0.0162
+      },
+      "coldMs": {
+       "median": 20.15,
+       "spread": 0.0144
+      },
+      "jsHeapMB": {
+       "median": 297.34,
+       "spread": 0.0135
+      }
+     },
+     "three": {
+      "engine": "three-webgpu-parity",
+      "metrics": {
+       "loadMs": {
+        "median": 877.6,
+        "spread": 0.0181
+       },
+       "buildMs": {
+        "median": 5.3,
+        "spread": 0.1321
+       },
+       "taskMs": {
+        "median": 20.285,
+        "spread": 0.0382
+       },
+       "coldMs": {
+        "median": 28.55,
+        "spread": 0.0165
+       },
+       "jsHeapMB": {
+        "median": 24.46,
+        "spread": 0.2306
+       }
+      }
+     },
+     "others": [
+      {
+       "engine": "three-webgl-parity",
+       "metrics": {
+        "loadMs": {
+         "median": 5316.1,
+         "spread": 0.07
+        },
+        "buildMs": {
+         "median": 5.8,
+         "spread": 0.1897
+        },
+        "taskMs": {
+         "median": 279.135,
+         "spread": 0.0473
+        },
+        "coldMs": {
+         "median": 31.115,
+         "spread": 8.723
+        },
+        "jsHeapMB": {
+         "median": 22.98,
+         "spread": 0.0875
+        }
+       }
+      }
+     ],
+     "image": null,
+     "bytes": {
+      "margo": 206417,
+      "three": 1607
+     }
+    }
+   ]
   },
   "p-exr-load": {
    "first": {
@@ -12431,7 +12799,97 @@
      "margo": 190101,
      "three": 1607
     }
-   }
+   },
+   "later": [
+    {
+     "run": "20261026-165034-594c45af-dev",
+     "date": "2026-10-26T16:50:34.256Z",
+     "commit": "594c45af",
+     "label": "dev",
+     "valid": false,
+     "kind": "task",
+     "verdict": "faster",
+     "margo": {
+      "loadMs": {
+       "median": 1038.6,
+       "spread": 0.0091
+      },
+      "buildMs": {
+       "median": 2.5,
+       "spread": 0.08
+      },
+      "taskMs": {
+       "median": 19.555,
+       "spread": 0.0049
+      },
+      "coldMs": {
+       "median": 31.31,
+       "spread": 0.121
+      },
+      "jsHeapMB": {
+       "median": 398.4,
+       "spread": 0.0118
+      }
+     },
+     "three": {
+      "engine": "three-webgpu-parity",
+      "metrics": {
+       "loadMs": {
+        "median": 1079.4,
+        "spread": 0.0481
+       },
+       "buildMs": {
+        "median": 1.9,
+        "spread": 0.2632
+       },
+       "taskMs": {
+        "median": 25.925,
+        "spread": 0.0685
+       },
+       "coldMs": {
+        "median": 32.04,
+        "spread": 0.0833
+       },
+       "jsHeapMB": {
+        "median": 37.66,
+        "spread": 0.0027
+       }
+      }
+     },
+     "others": [
+      {
+       "engine": "three-webgl-parity",
+       "metrics": {
+        "loadMs": {
+         "median": 10062.1,
+         "spread": 0.021
+        },
+        "buildMs": {
+         "median": 1.9,
+         "spread": 0.2632
+        },
+        "taskMs": {
+         "median": 298.52,
+         "spread": 0.0183
+        },
+        "coldMs": {
+         "median": 37.95,
+         "spread": 7.1088
+        },
+        "jsHeapMB": {
+         "median": 52.69,
+         "spread": 0.6056
+        }
+       }
+      }
+     ],
+     "image": null,
+     "bytes": {
+      "margo": 206417,
+      "three": 1607
+     }
+    }
+   ]
   },
   "p-pmrem": {
    "first": {
@@ -14105,7 +14563,97 @@
      "margo": 50027,
      "three": 1607
     }
-   }
+   },
+   "later": [
+    {
+     "run": "20261026-165034-594c45af-dev",
+     "date": "2026-10-26T16:50:34.256Z",
+     "commit": "594c45af",
+     "label": "dev",
+     "valid": false,
+     "kind": "task",
+     "verdict": "slower",
+     "margo": {
+      "loadMs": {
+       "median": 1217.6,
+       "spread": 0.0079
+      },
+      "buildMs": {
+       "median": 3.4,
+       "spread": 0.4118
+      },
+      "taskMs": {
+       "median": 28.65,
+       "spread": 0.0037
+      },
+      "coldMs": {
+       "median": 42.44,
+       "spread": 0.033
+      },
+      "jsHeapMB": {
+       "median": 77.45,
+       "spread": 0
+      }
+     },
+     "three": {
+      "engine": "three-webgl-parity",
+      "metrics": {
+       "loadMs": {
+        "median": 231.8,
+        "spread": 0.0259
+       },
+       "buildMs": {
+        "median": 1.8,
+        "spread": 0
+       },
+       "taskMs": {
+        "median": 2.6,
+        "spread": 0.0404
+       },
+       "coldMs": {
+        "median": 3.525,
+        "spread": 0.0142
+       },
+       "jsHeapMB": {
+        "median": 97.37,
+        "spread": 0
+       }
+      }
+     },
+     "others": [
+      {
+       "engine": "three-webgpu-parity",
+       "metrics": {
+        "loadMs": {
+         "median": 250.9,
+         "spread": 0.0343
+        },
+        "buildMs": {
+         "median": 1.9,
+         "spread": 0.1053
+        },
+        "taskMs": {
+         "median": 2.615,
+         "spread": 0.0306
+        },
+        "coldMs": {
+         "median": 3.505,
+         "spread": 0.0243
+        },
+        "jsHeapMB": {
+         "median": 85.01,
+         "spread": 0
+        }
+       }
+      }
+     ],
+     "image": null,
+     "bytes": {
+      "margo": 48869,
+      "three": 1607
+     }
+    }
+   ]
   },
   "p-ply": {
    "first": {
@@ -15143,7 +15691,97 @@
      "margo": 63284,
      "three": 1607
     }
-   }
+   },
+   "later": [
+    {
+     "run": "20261026-165034-594c45af-dev",
+     "date": "2026-10-26T16:50:34.256Z",
+     "commit": "594c45af",
+     "label": "dev",
+     "valid": false,
+     "kind": "task",
+     "verdict": "slower",
+     "margo": {
+      "loadMs": {
+       "median": 699.5,
+       "spread": 0.0183
+      },
+      "buildMs": {
+       "median": 6.9,
+       "spread": 0.2029
+      },
+      "taskMs": {
+       "median": 15.96,
+       "spread": 0.0414
+      },
+      "coldMs": {
+       "median": 26.275,
+       "spread": 0.0472
+      },
+      "jsHeapMB": {
+       "median": 35.77,
+       "spread": 0.1666
+      }
+     },
+     "three": {
+      "engine": "three-webgl-parity",
+      "metrics": {
+       "loadMs": {
+        "median": 215.9,
+        "spread": 0.0797
+       },
+       "buildMs": {
+        "median": 4.5,
+        "spread": 0.2
+       },
+       "taskMs": {
+        "median": 2.485,
+        "spread": 0.0926
+       },
+       "coldMs": {
+        "median": 5.19,
+        "spread": 0.0347
+       },
+       "jsHeapMB": {
+        "median": 21.45,
+        "spread": 0.0392
+       }
+      }
+     },
+     "others": [
+      {
+       "engine": "three-webgpu-parity",
+       "metrics": {
+        "loadMs": {
+         "median": 230.9,
+         "spread": 0.0221
+        },
+        "buildMs": {
+         "median": 4.2,
+         "spread": 0.0476
+        },
+        "taskMs": {
+         "median": 2.575,
+         "spread": 0.0369
+        },
+        "coldMs": {
+         "median": 5.27,
+         "spread": 0.0484
+        },
+        "jsHeapMB": {
+         "median": 22.81,
+         "spread": 0
+        }
+       }
+      }
+     ],
+     "image": null,
+     "bytes": {
+      "margo": 64495,
+      "three": 1607
+     }
+    }
+   ]
   },
   "p-export-exr": {
    "first": {
@@ -22169,7 +22807,7 @@
  "engines": {
   "margo": {
    "version": "1.0.0",
-   "commit": "9bce9eb3"
+   "commit": "594c45af"
   },
   "three-webgpu-parity": {
    "version": "0.186.1",
