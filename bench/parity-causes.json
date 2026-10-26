@@ -57,7 +57,7 @@
         "rerun": "node bench/cli.mjs parity --cases=p-stl --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
       },
       {
-        "commit": "997d0abf",
+        "commit": "d8cefa7b",
         "tradeoff": "+1.9 KB gzip on the loaders root entry (separate module); computes flat normals where the file stores zero",
         "rerun": "node bench/cli.mjs parity --cases=p-stl,p-stl-cad --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
       }

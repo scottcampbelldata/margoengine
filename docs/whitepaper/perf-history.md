@@ -589,7 +589,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
 - **Loss:** `p-stl` (204,800-triangle binary STL) timed `parseCAD` at 28.7 ms against three.js's `STLLoader` at 2.6
   (entry 26). The cause left after entry 26 was different work, not a slow loop: `parseCAD` welds corners (205,440
   vertices), computes face normals, builds parts and creates GPU meshes, which CAD sections, edges and dedup need.
-- **Change:** `parseSTL` in `@margoengine/loaders` (`997d0abf`), a plain reader like three's: binary and ASCII STL to
+- **Change:** `parseSTL` in `@margoengine/loaders` (`d8cefa7b`), a plain reader like three's: binary and ASCII STL to
   typed arrays (3 vertices per triangle, the file's facet normals or flat normals where the file stores zero,
   VisCAM/SolidView colors if present), no weld unless `weld: true`, `AbortSignal`, coded errors. `p-stl` now times
   `parseSTL`; the old `parseCAD` path stays as the Margo-only scene `p-stl-cad` (three.js has no CAD path), so the CAD
