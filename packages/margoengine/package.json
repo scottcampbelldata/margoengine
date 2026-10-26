@@ -911,6 +911,10 @@
       "types": "./dist/rigging/ik.d.ts",
       "import": "./dist/rigging/ik.js"
     },
+    "./rigging/retarget": {
+      "types": "./dist/rigging/retarget.d.ts",
+      "import": "./dist/rigging/retarget.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

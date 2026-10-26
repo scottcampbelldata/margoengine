@@ -262,7 +262,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/animation`](packages/animation/README.md) | Storage-buffer skinning and compute morph targets for Margo Engine. |
 | [`@margoengine/animator`](packages/animator/README.md) | Blend trees, additive layers, animation states, foot IK, CCD IK chains, root motion, and look-at and aim constraints. |
 | [`@margoengine/kinematics-constraints`](packages/kinematics-constraints/README.md) | Standalone analytical capsule and sphere constraints for IK target and arm clearance. |
-| [`@margoengine/rigging`](packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles. |
+| [`@margoengine/rigging`](packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets. |
 | [`@margoengine/tween`](packages/tween/README.md) | Allocation-free numeric tween updates and easing timelines. |
 | [`@margoengine/cinematic`](packages/cinematic/README.md) | Critically damped camera follow, look-at and screen shake. |
 | [`@margoengine/controls`](packages/controls/README.md) | Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine. |

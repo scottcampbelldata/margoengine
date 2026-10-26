@@ -2,7 +2,7 @@
 
 Install `npm i margoengine` and import `margoengine/rigging` (or this package alone: `npm i @margoengine/rigging`, imported as `@margoengine/rigging`; the two are the same module).
 
-Rigging and animation authoring for characters made in Margo or anywhere else: smooth automatic skin weights, weight painting with undo, and the skin checks game engines need before export. Everything here is plain data in, plain data out: no engine, renderer or GPU is needed, core is never imported, and an app that does not import this package ships none of it.
+Rigging and animation authoring for characters made in Margo or anywhere else: smooth automatic skin weights, weight painting with undo, the skin checks game engines need before export, IK chains with poles and retarget presets that play Mixamo, Godot and Roblox clips on any humanoid. Everything here is plain data in, plain data out: no engine, renderer or GPU is needed, core is never imported, and an app that does not import this package ships none of it.
 
 ## Automatic weights (bone heat)
 
@@ -152,6 +152,38 @@ console.log(solved.status, solved.elbow, solved.target);
 ```
 
 Root motion and look-at / aim constraints live with the Animator: `addRootMotion`, `addLookAt` and `addAimConstraint` in [`@margoengine/animator`](../animator/README.md).
+
+## Retarget presets (`margoengine/rigging/retarget`)
+
+Clips made for one skeleton play on another: `prepareRetarget(source, target)` recognises each rig's naming (Mixamo with any `mixamorig` prefix, Godot's humanoid profile, Roblox R15, the joints of `@margoengine/exporters/skin`'s `humanoidJoints()`, or the 55 humanoid bone names themselves), maps every target bone to its source bone, and by default turns the target's reference pose so each bone points the way the source's does at rest (an A-pose character driven by T-pose clips). Pass the result to `@margoengine/animation`'s `Retarget`:
+
+```ts
+import { Animation, applyKeyframeClip } from 'margoengine/animation';
+import { Retarget, retargetRig } from 'margoengine/animation/skeleton-utils';
+import { createStage } from 'margoengine';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { detectSkeleton, prepareRetarget } from 'margoengine/rigging/retarget';
+
+const stage = await createStage('#viewport', { backend: 'webgpu' });
+const [mixamoModel, godotHero] = await Promise.all(
+  ['/mixamo-walk.glb', '/godot-hero.glb'].map((url) => loadGLTF(stage.engine, url)),
+);
+const source = retargetRig(mixamoModel), target = retargetRig(godotHero);
+console.log(detectSkeleton(source.names)); // { preset: 'mixamo', bones: (humanoid bones found) }, or null
+const prepared = prepareRetarget(source, target); // or { from: 'mixamo', to: 'godot', alignRest: true }
+console.log(prepared.from, prepared.to, prepared.hip, prepared.unmapped); // mixamo godot Hips [...]
+const retarget = new Retarget(source, prepared.target, prepared); // names and hip come from prepared
+const walk = retarget.clip({ animation: Animation.attach(mixamoModel), clip: 'Walk' }, { fps: 30 });
+applyKeyframeClip(walk, Animation.attach(godotHero), 0.5);
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `from` | detected | The source's naming: `mixamo`, `godot`, `roblox`, `margo` or `humanoid`. |
+| `to` | detected | The target's naming. |
+| `alignRest` | `true` | Turn the target's reference pose to the source's, bone by bone. `false` keeps the target's own rest pose (both rigs already stand alike). |
+
+Target bones with no source bone (a Godot `Root`, Roblox's `HumanoidRootPart`, fingers a source lacks) map to `''` and stay at rest; the humanoid bones among them are listed in `unmapped`. Roblox R15 has no neck, shoulders, toes or fingers, so clips from it leave those at rest. Both rigs' model spaces must face the same way (glTF: +z forward, the figure's left at +x). `humanoidBones(names, preset)` gives the humanoid bone -> index map for your own tools, and `HUMANOID_BONES` lists every humanoid bone, parents first. An unrecognised naming throws a `RangeError` that asks for `from` or `to`.
 
 ## Sources
 

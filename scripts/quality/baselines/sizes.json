@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3223046,
+  "total": 3228797,
   "history": [
     {
       "date": "2026-10-24",
@@ -281,6 +281,12 @@
     },
     {
       "date": "2026-10-26",
+      "commit": "f7963d9f",
+      "reason": "queue item 23 milestone 2: animator gains addRootMotion, addLookAt and addAimConstraint (tree-shaken when unused); new entry @margoengine/rigging/ik (FABRIK chains with poles)",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-26",
       "commit": "c36c298b",
       "reason": "DX pass B3: error messages name their fix and bare Errors became MargoError (selection, scatter, shadows, sky, terrain, transitions, vfx); the extra text grows these entries",
       "grew": 7
@@ -305,8 +311,8 @@
     },
     {
       "date": "2026-10-26",
-      "commit": "f7963d9f",
-      "reason": "queue item 23 milestone 2: animator gains addRootMotion, addLookAt and addAimConstraint (tree-shaken when unused); new entry @margoengine/rigging/ik (FABRIK chains with poles)",
+      "commit": "aeb78049",
+      "reason": "queue item 23 milestones 2-3: animator gains addRootMotion, addLookAt and addAimConstraint (tree-shaken when unused); new entry @margoengine/rigging/retarget (Mixamo, Godot, Roblox R15 and humanoid retarget presets)",
       "grew": 2
     }
   ],
@@ -316,7 +322,7 @@
     "@margoengine/animation/sampling": 1177,
     "@margoengine/animation/skeleton-utils": 8810,
     "@margoengine/animation/vat": 8130,
-    "@margoengine/animator": 12344,
+    "@margoengine/animator": 15233,
     "@margoengine/audio": 7716,
     "@margoengine/blender": 4000,
     "@margoengine/bvh": 23398,
@@ -535,6 +541,7 @@
     "@margoengine/react/xr": 3429,
     "@margoengine/rigging": 7879,
     "@margoengine/rigging/ik": 3740,
+    "@margoengine/rigging/retarget": 2862,
     "@margoengine/road": 1171,
     "@margoengine/scatter": 12434,
     "@margoengine/scenery": 474,
