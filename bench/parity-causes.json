@@ -75,8 +75,8 @@
     ]
   },
   "12.5": {
-    "cause": "100 morphed copies each began a render pass and a compute pass, and every draw rebuilt its shader text each frame; models now draw as one run, Animations deform in one compute pass and the shader text steps are memoised. Still slower: the 100 per-model compute dispatches run one after another (1.18 ms GPU)",
-    "knownBug": "morph-targets-one-compute-dispatch-per-model",
+    "cause": "100 morphed copies each began a render pass and a compute pass, and every draw rebuilt its shader text each frame; models now draw as one run, Animations deform in one compute pass and the shader text steps are memoised. Still slower: that pass holds 200 dispatches (2 primitives x 100 copies, 150,000 vertices in all), each writing its own output buffer, and they run one after another (1.18 ms GPU); three morphs in each draw's vertex shader",
+    "knownBug": "morph-targets-one-compute-dispatch-per-primitive",
     "fixes": [
       {
         "commit": "63a7edec",
@@ -96,8 +96,8 @@
     ]
   },
   "12.7": {
-    "cause": "every cloneModel copy repacked its vertices (now shared per asset), and core Engine.remove scanned every slot of the parent column for each removed mesh (now each mesh keeps its children). Still slower, different work: each copy creates its own GPU buffers, textures and merged static parts; three clones on the CPU only",
-    "knownBug": "clonemodel-uploads-every-copy",
+    "cause": "every cloneModel copy repacked its vertices (now shared per asset), core Engine.remove scanned every slot of the parent column for each removed mesh (now each mesh keeps its children), and every copy uploaded its own vertex and index buffers, re-baked its static parts and made a view and sampler per map slot (now counted per asset, reused and cached). Still slower (CPU profile): installBatches runs two engine-wide kernel ticks per model, quadratic in the copies (about 6.5 of 17.6 ms), then per-copy uniforms and bind groups and core node creation; three clones on the CPU only",
+    "knownBug": "clonemodel-two-engine-wide-ticks-per-copy",
     "fixes": [
       {
         "commit": "63a7edec",
@@ -107,6 +107,11 @@
       {
         "commit": "2d541368",
         "tradeoff": "a Set of child ids per mesh with children",
+        "rerun": "npm run bench -- parity --cases=p-skeleton-clone --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      },
+      {
+        "commit": "641246d3",
+        "tradeoff": "a model rewrites a geometry buffer in place only while no other copy holds it; the first edit of a shared one uploads a new buffer",
         "rerun": "npm run bench -- parity --cases=p-skeleton-clone --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
       }
     ]

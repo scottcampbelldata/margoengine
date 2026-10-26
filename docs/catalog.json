@@ -475,7 +475,9 @@
       "filterSplats",
       "mergeSplats",
       "parsePly",
+      "parseSog",
       "parseSplat",
+      "parseSpz",
       "transformSplats",
       "validateSplats"
     ],

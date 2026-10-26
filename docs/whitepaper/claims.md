@@ -149,8 +149,8 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 | animation-vat (measurement, no baseline) | gltf-pro + animation at `700838e` | - |
 | materials-atlas (measurement, no baseline) | geometry + materials at `700838e` | - |
 | binding-limit | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | - |
-| gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `b953071e`: 4,180 calls |
-| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `e2cb3815`: 1,117 calls |
+| gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `641246d3`: 4,112 calls |
+| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `641246d3`: 1,085 calls |
 | lines-perspective | `96edc75` -> `6da7f7e`: 946 calls | `2d192a71` (per-line clipping planes at `86063c47`: the style uniform grew from 128 to 224 bytes and the shader gained a world-position varying and a zero-count plane loop; then `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose both times) |
 | math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
 | post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `57250a49` |
@@ -162,7 +162,7 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 | color-output | `7dcc958` -> `225b1d6`: 6,174 calls | `57250a49` |
 | deformed-shadows | `38d448e` -> `282e751` | `2cd81c1` |
 | environment-volumetric | `7c47a09` -> `366ebff` | `2cd81c1`: 70 root calls; 344/533 isolated calls |
-| oit-detached | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until a later change replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `b953071e`: 2,500 calls |
+| oit-detached | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until a later change replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `641246d3`: 2,392 calls |
 | post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `151aa744`: 12,431 calls (AgX normalised for older refs, see below) |
 | post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `151aa744`: 37,182 calls |
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
@@ -284,6 +284,15 @@ draws and shader modules, byte for byte); only 30 calls of frame 9 move: the tex
 chain (`writeTexture`, views, the mip bind groups, passes and draws) now come before the beauty pass's
 `beginRenderPass` instead of after it. Both orders upload before the frame's commands run. The full trace matches
 `e2cb3815`.
+
+**gltf-pro-lighting-hooks, oit-detached and materials-uv-transform, advanced to `641246d3` on 2026-10-26 (speed matrix
+row 12.7, perf-history entry 32):** gltf-pro makes one default view per texture and one sampler per device and sampler
+state, where it made one of each for every map slot of every primitive. Against the previous references the working
+tree makes exactly those calls fewer and nothing else differs: with sampler and view calls left out and object ids
+renumbered, every remaining call is identical, in the same order (first sample count of each story):
+gltf-pro-lighting-hooks 2,090 -> 2,056 calls (samplers 23 -> 4, views 34 -> 19), oit-detached 1,250 -> 1,196 (samplers
+31 -> 2, views 36 -> 11), materials-uv-transform 1,117 -> 1,085 (samplers 40 -> 11, views 69 -> 66). Bind groups bind
+the shared view or sampler with the same descriptor in place of a fresh one. The full traces match `641246d3`.
 
 **taa-velocity, advanced to `8149bf4e` on 2026-10-26 (speed matrix row 13.7):** TAA's object velocities, a render pass per mesh before,
 now draw in one render pass, the PBR snapshots in one compute pass after it, and the camera rows moved out of each

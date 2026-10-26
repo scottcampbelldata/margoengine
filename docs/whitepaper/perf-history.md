@@ -618,6 +618,39 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   normals, colors, weld, truncated and malformed input, limits, abort); the loaders `npm test` script now passes
   `--experimental-test-module-mocks` like `verify`, which `mtl-vectors.test.js` needs.
 
+### 32. cloneModel copies share their GPU buffers and baked batches
+
+- **Loss:** `p-skeleton-clone` (50 `cloneModel` copies of RobotExpressive a call, the previous 50 destroyed) 47.9 ms
+  against three.js WebGL's 8.0 after entry 29.
+- **Causes, measured** (browser CPU profile of the call): every copy created and filled its own GPU vertex and index
+  buffers for arrays it already shared with the source (about 11 ms), re-baked its static parts into new arrays at the
+  same pose (about 13 ms), and made a texture view and a sampler for every map slot of every primitive, native calls
+  (about 10 ms with the bind groups).
+- **Fixes:** gltf-pro counts vertex and index buffers per device, asset and array: a model of the same asset takes
+  the buffer instead of uploading, writes one in place only while no other model holds it (`writeGeometry` gives it
+  its own buffer otherwise), and the last holder retires it. Baked static batch arrays are reused for the same part
+  arrays at the same root-relative poses (bit-equal, four poses per first part kept), so their buffers are shared too.
+  Each texture has one default view and each sampler state one sampler per device. Models of different assets never
+  share buffers. Trade-off: the first edit of a geometry buffer another copy holds uploads a new buffer. No core
+  bytes.
+- **Image:** no scene image (a task scene); the visual check covers gltf-pro's draws.
+- **After** (diagnostic, busy machine, RTX A6000; run `20261026-203857`; rows in
+  [perf-vs-threejs.md](perf-vs-threejs.md)):
+
+  | Scene | Before | After | three.js |
+  | --- | --- | --- | --- |
+  | `p-skeleton-clone`, ms a call | 47.9 | 17.6 | 7.8 (WebGL), slower |
+
+  Still open, in [known-bugs.md](../known-bugs.md#clonemodel-two-engine-wide-ticks-per-copy): `installBatches`
+  runs two engine-wide kernel ticks per model, quadratic in the copies (about 6.5 ms), then per-copy uniforms and bind
+  groups and core node creation.
+- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity --cases=p-skeleton-clone
+  --runs=5`, then `node bench/parity-report.mjs <run.json> --partial`.
+- **Guard:** `packages/gltf-pro/tests/model-runs.test.js` (copies share vertex and index buffers, freed with the last
+  one; a copy's edit leaves the shared buffer and later copies with the asset data; copies share baked batch arrays,
+  another pose bakes anew; copies share samplers), `tests/modern-silent-render-drops.test.js` (eye renderers on one
+  device share the static vertex buffer and free everything on disposal).
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks

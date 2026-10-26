@@ -5,7 +5,7 @@
 // standard, physical, unlit and blended materials) records every GPU call, descriptor, shader module and buffer
 // write of gltf-pro + shadows + clustered + environment at `ref` and at the candidate: they must be identical.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/gltf-pro-lighting-hooks.proof.js [ref] [pin] [--current]
-// Pinned: 15c87f1 against cf2953e, the commit that replaced the text patches with hooks. --current: b953071e (57250a49 before the materials draw work) against the
+// Pinned: 15c87f1 against cf2953e, the commit that replaced the text patches with hooks. --current: 641246d3 (b953071e before views and samplers were cached per texture and state; 57250a49 before the materials draw work) against the
 // working tree, including the approved cotangent frame, IBL energy, phone shadows and PBR Neutral output (claims.md).
 // f8a36ca's IBL BRDF LUT storage-buffer change is mapped back by binding-limit.proof.js for its older pinned refs.
 import assert from 'node:assert/strict';
@@ -14,7 +14,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
-const { ref, pin } = refs('15c87f1', 'cf2953e', 'b953071e');
+const { ref, pin } = refs('15c87f1', 'cf2953e', '641246d3');
 const load = async () => {
   const all = await Promise.all(
     ['gltf-pro', 'shadows', 'clustered', 'environment'].map((name) => versions(name, ref, undefined, pin)),

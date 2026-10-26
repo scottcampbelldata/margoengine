@@ -2647,27 +2647,35 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   its transform that references it, with `orientation = "leftHanded"` for mirrored nodes. It changes the archive's
   layout, so it waits for the Quick Look check of the entry at the top of this page.
 
-### Morph targets: one compute dispatch per model
+### Morph targets: one compute dispatch per primitive
 
-- **What:** `p-morph`, 100 MorphStressTest copies with 8 weights each changing every frame: 0.51 ms CPU and 1.32 ms
-  GPU a frame against three's WebGL 0.26 and 0.15 (1.06 / 1.57 before entry 28).
-- **Cause (measured, timestamp per pass):** the models now draw in one render pass and deform in one compute pass, and
-  that compute pass is 1.18 of the 1.32 ms: 100 small dispatches, one per model, each writing its own output buffer,
-  which the GPU runs one after another. three applies morph targets in the vertex shader of each draw.
+- **What:** `p-morph`, 100 MorphStressTest copies with 8 weights each changing every frame: 0.51 ms CPU and 1.31 ms
+  GPU a frame against three's WebGL 0.27 and 0.15 (1.06 / 1.57 before entry 28).
+- **Cause (measured, timestamp per pass):** the models draw in one render pass and deform in one compute pass, and
+  that compute pass is 1.18 of the 1.31 ms: 200 small dispatches (MorphStressTest has two primitives, 24 and 1,504
+  vertices; 150,000 vertices in all, a few MB of reads), each writing its own output buffer, which the GPU runs one
+  after another. three applies morph targets in the vertex shader of each draw.
 - **Plan:** dispatch the copies of one primitive together: one dispatch over (vertex, copy) reading each copy's
-  weights, writing into one output buffer that the draws bind at their copy's offset. It needs gltf-pro to draw a
-  deformed primitive from a buffer offset. The CPU half is the 100 Animations' per-frame checks and uploads.
+  weights and bones, writing one output buffer. Every reader of `PBRPrimitive.deformed` binds it at offset 0 today
+  (gltf-pro draws, shadow caster records, TAA snapshots, selection, the CPU readback), so the copies need a deformed
+  buffer offset in all of them; copying each slice back into its own buffer instead would keep one command per copy
+  and move the cost out of the measured passes, so it is not a fix. The CPU half is the 100 Animations' per-frame
+  checks and uploads.
 
-### cloneModel uploads every copy
+### cloneModel: two engine-wide ticks per copy
 
 - **What:** `p-skeleton-clone`, 50 `cloneModel` copies of RobotExpressive per call (the call also destroys the
-  previous 50): 47.9 ms against three's `SkeletonUtils.clone` 8.0 ms (84.5 before entry 28, 63.6 before entry 29).
-- **Cause (measured, CPU profile of the call):** creating and filling each copy's GPU vertex buffers, its textures and
-  bind groups, and re-merging its static parts in world space, about 11, 10 and 13 ms a call. three's clone shares
-  geometry and textures and touches no GPU. Fixed so far: the repacking of every copy's vertices (entry 28) and core
-  `Engine.remove` scanning the whole parent column for every removed mesh, about 17 ms (entry 29).
-- **Plan:** in gltf-pro, copies of one asset share its GPU vertex buffers, textures and merged static parts, counted by
-  reference, so `cloneModel` creates only nodes, skeleton and uniforms.
+  previous 50): 17.6 ms against three's `SkeletonUtils.clone` 7.8 ms (84.5 before entry 28, 63.6 before entry 29, 47.9
+  before entry 32).
+- **Cause (measured, CPU profile of the call):** `PBRModel.installBatches` runs `store.tick(false)` before and after
+  baking the static parts, and a tick runs every mesh of the engine, so 50 copies cost 100 ticks over a growing
+  scene (about 6.5 ms); then each copy's material uniforms and bind groups (about 3 ms) and core node creation
+  (about 2.5 ms). three's clone creates objects only. Fixed so far: repacked vertices (entry 28), core `Engine.remove`
+  (entry 29), per-copy GPU buffers, baked arrays, views and samplers (entry 32).
+- **Plan:** bake the static batches of models set up in one go after one tick (for example on the first frame or
+  CPU read that needs them) instead of two ticks per model. Skipping a tick alone breaks draws made before the next
+  one: skipping the first for a model with nothing to bake left its node matrices unpublished
+  (`packages/gltf-pro/tests/model-runs.test.js` caught it), and the second publishes the batch nodes'.
 
 ### GPU picking waits for one readback per pick
 
