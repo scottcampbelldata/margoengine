@@ -75,7 +75,8 @@ test('TAA restores public camera state on capture and motion failure and retries
       h.engine.geometryBuffers = () => ({ vertex, index });
       const create = d.createBindGroup;
       d.createBindGroup = (descriptor) => {
-        if (descriptor.entries[0]?.resource.buffer?.size === 288) throw failure;
+        // The object velocity group: its own 160-byte block (model, previous model, settings, alpha).
+        if (descriptor.entries[0]?.resource.buffer?.size === 160) throw failure;
         return create(descriptor);
       };
       restore = () => (d.createBindGroup = create);
@@ -174,5 +175,59 @@ test('instanced PBR casters retain camera reprojection without a non-instanced o
     alpha.destroy();
     await null;
     assert.ok(h.resources.every((resource) => resource.destroyed));
+  }
+});
+
+test('TAA draws every object velocity in one render pass and rewrites a mesh block only when the mesh moves', () => {
+  const h = harness(),
+    d = h.engine.gpu,
+    taa = new TAA();
+  h.engine.use(taa);
+  const vertex = d.createBuffer({ size: 72, usage: GPUBufferUsage.VERTEX }),
+    index = d.createBuffer({ size: 12, usage: GPUBufferUsage.INDEX });
+  h.engine.geometryBuffers = () => ({ vertex, index });
+  const nodes = [0, 1, 2, 3].map((id) => ({
+    id,
+    engine: h.engine,
+    geometry: { indices: new Uint32Array([0, 1, 2]) },
+    matrix: h.matrix.slice(),
+    check() {},
+  }));
+  for (const node of nodes) {
+    h.engine.meshes.set(node.id, node);
+    h.engine.store.visible[node.id] = 1;
+  }
+  const begin = h.context.encoder.beginRenderPass,
+    write = d.queue.writeBuffer;
+  let objectPasses = 0,
+    blocks = 0;
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    if (descriptor.depthStencilAttachment?.depthReadOnly && descriptor.colorAttachments[0].loadOp === 'load')
+      objectPasses++;
+    return begin.call(h.context.encoder, descriptor);
+  };
+  d.queue.writeBuffer = (buffer, ...rest) => {
+    if (buffer.size === 160) blocks++;
+    return write.call(d.queue, buffer, ...rest);
+  };
+  try {
+    h.frame();
+    assert.equal(objectPasses, 1, 'four meshes, one velocity pass');
+    assert.equal(blocks, 4);
+    h.frame();
+    // The second frame sets each block's consecutive-frame flag; after that a still mesh writes nothing.
+    h.frame();
+    blocks = 0;
+    h.frame();
+    assert.equal(blocks, 0, 'still meshes keep their blocks');
+    nodes[2].matrix[12] = 1;
+    h.frame();
+    assert.equal(blocks, 1, 'the moved mesh writes its block');
+  } finally {
+    h.context.encoder.beginRenderPass = begin;
+    d.queue.writeBuffer = write;
+    taa.dispose();
+    vertex.destroy();
+    index.destroy();
   }
 });

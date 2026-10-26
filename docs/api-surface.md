@@ -13,7 +13,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 
 | Package | Exports per entry | Unexported | `any` | Gzip |
 | --- | --- | ---: | ---: | ---: |
-| @margoengine/animation | `.` 39, `./vat` 14, `./sampling` 3, `./pointer` 4, `./skeleton-utils` 6 | 44 |  | 18,710 |
+| @margoengine/animation | `.` 39, `./vat` 14, `./sampling` 3, `./pointer` 4, `./skeleton-utils` 6 | 44 |  | 18,977 |
 | @margoengine/animator | `.` 32 |  |  | 16,866 |
 | @margoengine/audio | `.` 19 | 2 |  | 7,625 |
 | @margoengine/blender | `.` 5 |  |  | 3,744 |
@@ -59,7 +59,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/physics | `.` 43 | 22 |  | 15,773 |
 | @margoengine/points | `.` 41 | 3 |  | 19,516 |
 | @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2, `./mrt` 4, `./depth` 2 | 21 |  | 39,167 |
-| @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 7,577 |
+| @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 8,649 |
 | @margoengine/quality | `.` 22, `./warm` 3 | 1 |  | 2,449 |
 | @margoengine/react | `.` 146, `./kit` 29, `./post` 30, `./physics` 34, `./xr` 12 | 33 |  | 24,050 |
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10 |  |  | 7,638 |

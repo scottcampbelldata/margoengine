@@ -2627,6 +2627,47 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   its transform that references it, with `orientation = "leftHanded"` for mirrored nodes. It changes the archive's
   layout, so it waits for the Quick Look check of the entry at the top of this page.
 
+### Morph targets: one compute dispatch per model
+
+- **What:** `p-morph`, 100 MorphStressTest copies with 8 weights each changing every frame: 0.51 ms CPU and 1.32 ms
+  GPU a frame against three's WebGL 0.26 and 0.15 (1.06 / 1.57 before entry 28).
+- **Cause (measured, timestamp per pass):** the models now draw in one render pass and deform in one compute pass, and
+  that compute pass is 1.18 of the 1.32 ms: 100 small dispatches, one per model, each writing its own output buffer,
+  which the GPU runs one after another. three applies morph targets in the vertex shader of each draw.
+- **Plan:** dispatch the copies of one primitive together: one dispatch over (vertex, copy) reading each copy's
+  weights, writing into one output buffer that the draws bind at their copy's offset. It needs gltf-pro to draw a
+  deformed primitive from a buffer offset. The CPU half is the 100 Animations' per-frame checks and uploads.
+
+### cloneModel uploads every copy and core frees meshes in quadratic time
+
+- **What:** `p-skeleton-clone`, 50 `cloneModel` copies of RobotExpressive per call (the call also destroys the
+  previous 50): 63.6 ms against three's `SkeletonUtils.clone` 7.9 ms (84.5 before entry 28).
+- **Cause (measured, CPU profile of the call):** about 17 ms is core `Engine.remove`, which unparents a removed mesh's
+  children by scanning the whole parents array (`indexOf` from 0 again for every child) for each of the 3,700 meshes
+  destroyed; about 13 ms creates and fills each copy's GPU vertex buffers, 12 ms its textures and bind groups, and
+  13 ms re-merges its static parts in world space. three's clone shares geometry and textures and touches no GPU.
+  Entry 28 removed the repacking of every copy's vertices (about 13 ms).
+- **Plan:** in core (a bug fix, needs the coordinator's go-ahead under the freeze): unparent in one pass over the
+  children of the removed mesh. In gltf-pro: copies of one asset share its GPU vertex buffers, textures and merged
+  static parts, counted by reference, so `cloneModel` creates only nodes, skeleton and uniforms.
+
+### GPU picking builds its pipeline on every pick
+
+- **What:** `p-gpu-pick`, 100 `engine.pick` calls: 407 ms against three's 65 ms.
+- **Cause (read, not yet profiled):** core `GPURenderer.pick` compiles a shader module and creates a render pipeline
+  for every call (and a 1x1 colour and depth texture and two buffers), then waits for its own readback; picks run one
+  at a time.
+- **Plan:** in core (needs the coordinator's go-ahead under the freeze): keep the pick pipeline per pick shader text and
+  the 1x1 targets, so a pick costs one pass and one readback.
+
+### SciFiHelmet with image-based lighting: GPU time
+
+- **What:** `helmet`: 0.77 ms GPU a frame against three's WebGL 0.08 (CPU 0.11 against 0.07).
+- **Cause (measured in part):** timestamps per pass on this machine: four shadow cascades 0.05 ms, the core pass
+  (floor and sky) 0.28 ms, the model's pass 0.47 ms. Which instructions cost it (IBL sampling, the procedural sky, 4x
+  MSAA) is not isolated yet.
+- **Plan:** a GPU capture of both passes against three's draw of the same scene.
+
 ## Unverified against the specification
 
 ### IGES parametric spline surface (entity 114): coefficient order not checked

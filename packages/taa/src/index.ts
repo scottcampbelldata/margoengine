@@ -85,7 +85,10 @@ export interface VelocitySource {
 }
 interface Draw {
   uniform: GPUBuffer;
+  /** What `uniform` holds: model, previous model, settings, alpha (and alpha UV rows). */
   values: Float32Array;
+  /** The camera block its group binds. */
+  camera: GPUBuffer;
   previous: Float32Array;
   vertices?: GPUBuffer;
   source?: GPUBuffer;
@@ -159,6 +162,9 @@ export class TAA implements EnginePlugin {
   private motionDepth?: GPUTextureView;
   private objectPipelines = new Map<string, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<object, Draw>>();
+  /** The object velocity draws' shared camera block, and its rows. */
+  private objectCamera?: GPUBuffer;
+  private readonly cameraRows = new Float32Array(36);
   private sources = new Set<VelocitySource>();
   private readonly values = new Float32Array(52);
   private readonly jittered = new Float32Array(16);
@@ -480,7 +486,19 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     camera.setBindGroup(0, this.cameraGroup!);
     camera.draw(3);
     camera.end();
-    const submitted = new Map<Mesh, Set<object>>(),
+    // Every object draw's camera rows: this frame's matrix, the previous one (into the target) and the size and history
+    // flag, written once a frame.
+    this.objectCamera ??= c.device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    const block = this.cameraRows;
+    block.set(c.camera.matrix);
+    block.set(this.valid ? this.previous : c.camera.matrix, 16);
+    toTarget(c, block, 16);
+    block[32] = c.width;
+    block[33] = c.height;
+    block[34] = +this.valid;
+    c.device.queue.writeBuffer(this.objectCamera, 0, block as Float32Array<ArrayBuffer>);
+    const pending: { r: Draw; p: VelocityPrimitive }[] = [],
+      submitted = new Map<Mesh, Set<object>>(),
       draw = (primitive: VelocityPrimitive) => {
         const key = primitive.primitive ?? primitive.index;
         let indices = submitted.get(primitive.node);
@@ -490,7 +508,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           submitted.set(primitive.node, indices);
         }
         indices.add(key);
-        this.drawMotion(c, primitive);
+        this.drawMotion(c, primitive, pending);
       };
     for (const mesh of this.engine!.meshes.values()) {
       const triangles = meshTriangles(mesh);
@@ -506,6 +524,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       }
       for (const primitive of source.shadowPrimitives) draw(primitive);
     }
+    this.flushMotion(c, pending);
     if (this.motionViews.length) {
       const depth = sceneTarget(c)!.depthSource!;
       if (this.motionDepth !== depth) {
@@ -537,7 +556,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           if (!records.size) this.draws.delete(mesh);
         }
   }
-  private drawMotion(c: Context, p: VelocityPrimitive): void {
+  private drawMotion(c: Context, p: VelocityPrimitive, out: { r: Draw; p: VelocityPrimitive }[]): void {
     // Per-instance previous transforms are unavailable; retain camera reprojection for these casters.
     if (p.instances) return;
     p.node.check();
@@ -596,6 +615,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     if (
       !r ||
       !r.group ||
+      r.camera !== this.objectCamera ||
       r.pipeline !== pipeline ||
       r.vertex !== p.vertex ||
       r.alpha !== p.alphaTexture ||
@@ -605,12 +625,13 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       r?.vertices?.destroy();
       r?.source?.destroy();
       const uniform = c.device.createBuffer({
-        size: transform ? 320 : 288,
+        size: transform ? 192 : 160,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
       r = {
         uniform,
-        values: new Float32Array(transform ? 80 : 72),
+        values: new Float32Array(transform ? 48 : 40),
+        camera: this.objectCamera!,
         previous: p.node.matrix.slice(),
         group: undefined!,
         pipeline,
@@ -657,6 +678,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         layout: pipeline.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: { buffer: uniform } },
+          { binding: 4, resource: { buffer: this.objectCamera! } },
           ...(pbr
             ? [
                 { binding: 1, resource: { buffer: r.vertices! } },
@@ -667,28 +689,41 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         ],
       });
     }
-    r.values.set(c.camera.matrix);
-    r.values.set(this.valid ? this.previous : c.camera.matrix, 16);
-    toTarget(c, r.values, 16);
-    r.values.set(p.node.matrix, 32);
-    r.values.set(r.previous, 48);
-    r.values.set(
-      [
-        c.width,
-        c.height,
-        +(this.valid && r.frame === this.frame - 1),
-        0,
-        p.alpha ?? 1,
-        p.cutoff ?? 0,
-        p.texCoord ?? 0,
-        0,
-      ],
-      64,
-    );
-    if (transform) r.values.set(transform, 72);
-    c.device.queue.writeBuffer(r.uniform, 0, r.values as Float32Array<ArrayBuffer>);
+    // The camera rows live in the frame's one camera block (writeCamera); a mesh's own block changes only when it moves
+    // or its alpha settings do, so a still mesh writes nothing.
+    const v = r.values,
+      consecutive = +(r.frame === this.frame - 1);
+    let changed = r.frame < 0;
+    const put = (at: number, value: number) => {
+      if (v[at] !== Math.fround(value)) {
+        v[at] = value;
+        changed = true;
+      }
+    };
+    const model = p.node.matrix;
+    for (let i = 0; i < 16; i++) {
+      put(i, model[i]);
+      put(16 + i, r.previous[i]);
+    }
+    put(34, consecutive);
+    put(36, p.alpha ?? 1);
+    put(37, p.cutoff ?? 0);
+    put(38, p.texCoord ?? 0);
+    if (transform) for (let i = 0; i < 8; i++) put(40 + i, transform[i]);
+    if (changed) c.device.queue.writeBuffer(r.uniform, 0, v as Float32Array<ArrayBuffer>);
     if (r.source && p.vertex.usage & GPUBufferUsage.COPY_SRC)
       c.encoder.copyBufferToBuffer(p.vertex, 0, r.source, 0, p.vertex.size);
+    r.previous.set(p.node.matrix);
+    r.frame = this.frame;
+    out.push({ r, p });
+  }
+  /**
+   * Draws the frame's object velocities in one render pass, then takes every PBR snapshot (this frame's vertices, read
+   * as the previous ones next frame) in one compute pass: each draw reads its own snapshot buffer, so taking them all
+   * after all draws is the same as after each.
+   */
+  private flushMotion(c: Context, draws: { r: Draw; p: VelocityPrimitive }[]): void {
+    if (!draws.length) return;
     const pass = c.encoder.beginRenderPass({
       colorAttachments: (this.motionViews.length ? this.motionViews : [this.velocityView!, this.expectedView!]).map(
         (view) => ({ view, loadOp: 'load', storeOp: 'store' }),
@@ -700,21 +735,23 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       },
     });
     applyView(pass, c);
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(0, r.group);
-    pass.setVertexBuffer(0, p.vertex);
-    pass.setIndexBuffer(p.index, 'uint32');
-    pass.drawIndexed(p.count);
-    pass.end();
-    r.previous.set(p.node.matrix);
-    r.frame = this.frame;
-    if (r.snapshot) {
-      const copy = c.encoder.beginComputePass();
-      copy.setPipeline(this.snapshotPipeline!);
-      copy.setBindGroup(0, r.snapshot);
-      copy.dispatchWorkgroups(Math.ceil(p.vertex.size / 16 / 256));
-      copy.end();
+    for (const { r, p } of draws) {
+      pass.setPipeline(r.pipeline);
+      pass.setBindGroup(0, r.group);
+      pass.setVertexBuffer(0, p.vertex);
+      pass.setIndexBuffer(p.index, 'uint32');
+      pass.drawIndexed(p.count);
     }
+    pass.end();
+    if (!draws.some(({ r }) => r.snapshot)) return;
+    const copy = c.encoder.beginComputePass();
+    copy.setPipeline(this.snapshotPipeline!);
+    for (const { r, p } of draws)
+      if (r.snapshot) {
+        copy.setBindGroup(0, r.snapshot);
+        copy.dispatchWorkgroups(Math.ceil(p.vertex.size / 16 / 256));
+      }
+    copy.end();
   }
   private finish(c: Context): void {
     try {
@@ -783,6 +820,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         r.source?.destroy();
       }
     this.uniform?.destroy();
+    this.objectCamera?.destroy();
+    this.objectCamera = undefined;
     this.textures = [];
     this.histories = [];
     this.historyDepths = [];

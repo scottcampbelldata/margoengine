@@ -599,3 +599,34 @@ test('local shadows: a smaller castShadow map renders into its layer corner with
     lights.dispose();
   }
 });
+
+test('local shadows: a caster with bounds draws only into the maps whose frustum it reaches', () => {
+  const h = harness(),
+    lights = Clustered.attach(h.engine, { grid: [2, 2, 2] }),
+    shadows = LocalShadows.attach(h.engine, { lights, maxLights: 1, resolution: 64 });
+  lights.setLights([{ position: [0, 3, 0], range: 10, castShadow: true }]);
+  const below = caster(h.engine, { bounds: [0, 0, 0, 0.5] }),
+    far = caster(h.engine, { bounds: [0, 0, 0, 0.5] }),
+    unknown = caster(h.engine);
+  far.shadowPrimitives[0].node.matrix[12] = 100;
+  shadows.add(below);
+  shadows.add(far);
+  shadows.add(unknown);
+  h.frame();
+  assert.equal(h.passes.length, 6);
+  const layers = [...new Set(h.passes)];
+  // The box under the light reaches only the -y face (axes +x, -x, +y, -y, +z, -z); the far one no face; the one
+  // without bounds every face.
+  assert.deepEqual(
+    h.drawn.map(([layer]) => layers.indexOf(layer)),
+    [0, 1, 2, 3, 3, 4, 5].sort(),
+  );
+  assert.equal(h.drawn.length, 7);
+  // Scaled up by 8 its sphere (radius 4, 3 m below) holds the light itself, so it reaches every face.
+  const m = below.shadowPrimitives[0].node.matrix;
+  m[0] = m[5] = m[10] = 8;
+  h.frame();
+  assert.equal(h.drawn.length, 12);
+  shadows.dispose();
+  lights.dispose();
+});

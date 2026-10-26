@@ -38,6 +38,7 @@ export interface LocalShadowPrimitive {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
     };
+    bounds?: ArrayLike<number>;
 }
 
 export interface LocalShadowSource {

@@ -16,18 +16,20 @@ export const cameraVelocity =
   if(d==0){o.depth=-1;}return o;}`;
 export function objectVelocity(pbr: boolean, transformed = false): string {
   return `
-struct ObjectFrame {current:mat4x4f,previous:mat4x4f,model:mat4x4f,previousModel:mat4x4f,settings:vec4f,alpha:vec4f${transformed ? ',alphaUV0:vec4f,alphaUV1:vec4f' : ''}}
+struct ObjectCamera {current:mat4x4f,previous:mat4x4f,settings:vec4f}
+struct ObjectFrame {model:mat4x4f,previousModel:mat4x4f,settings:vec4f,alpha:vec4f${transformed ? ',alphaUV0:vec4f,alphaUV1:vec4f' : ''}}
 @group(0) @binding(0) var<uniform> f:ObjectFrame;
+@group(0) @binding(4) var<uniform> camera:ObjectCamera;
 ${pbr ? '@group(0) @binding(1) var<storage,read> previousVertices:array<vec4f>;\n@group(0) @binding(2) var alphaMap:texture_2d<f32>;\n@group(0) @binding(3) var alphaSampler:sampler;' : ''}
 struct Input {@location(0) position:${pbr ? 'vec4f' : 'vec3f'}${pbr ? ',@location(1) uv:vec4f,@location(2) color:vec4f' : ''}}
 struct Out {@builtin(position) clip:vec4f,@location(0) previous:vec4f${pbr ? ',@location(1) uv:vec4f,@location(2) alpha:f32' : ''}}
-@vertex fn vertex(i:Input,@builtin(vertex_index) index:u32)->Out {var o:Out;let p=vec4f(i.position.xyz,1);${pbr ? 'let world=f.model*p;o.clip=f.current*world;' : 'o.clip=f.current*f.model*p;'}
-  ${pbr ? 'let old=select(p,vec4f(previousVertices[index*5].xyz,1),f.settings.z>0);' : 'let old=p;'}
-  o.previous=f.previous*f.previousModel*old;if(f.settings.z==0){o.previous.w=-1;}
+@vertex fn vertex(i:Input,@builtin(vertex_index) index:u32)->Out {var o:Out;let p=vec4f(i.position.xyz,1);let valid=f.settings.z*camera.settings.z>0;${pbr ? 'let world=f.model*p;o.clip=camera.current*world;' : 'o.clip=camera.current*f.model*p;'}
+  ${pbr ? 'let old=select(p,vec4f(previousVertices[index*5].xyz,1),valid);' : 'let old=p;'}
+  o.previous=camera.previous*f.previousModel*old;if(!valid){o.previous.w=-1;}
   ${pbr ? 'o.uv=i.uv;o.alpha=i.color.a;' : ''}return o;}
 ${motion}
 @fragment fn fragment(i:Out)->Motion {${pbr ? 'var uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);' + (transformed ? 'uv=vec2f(dot(f.alphaUV0.xy,uv)+f.alphaUV0.z,dot(f.alphaUV1.xy,uv)+f.alphaUV1.z);' : '') + 'let alpha=textureSample(alphaMap,alphaSampler,uv).a*i.alpha*f.alpha.x;if(alpha<f.alpha.y){discard;}' : ''}
-  return motion(i.clip.xy/f.settings.xy,i.previous);}`;
+  return motion(i.clip.xy/camera.settings.xy,i.previous);}`;
 }
 export const snapshot = `@group(0) @binding(0) var<storage,read> source:array<vec4f>;
 @group(0) @binding(1) var<storage,read_write> destination:array<vec4f>;

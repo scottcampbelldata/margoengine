@@ -73,6 +73,12 @@ export interface LocalShadowPrimitive {
   instances?: { readonly count: number; readonly needsUpdate?: boolean; upload(device: GPUDevice): GPUBuffer };
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices), bound at group 2. */
   displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /**
+   * Bounding sphere of the vertices in the node's local space: centre x, y, z and radius (core `Geometry.bounds`).
+   * With it, each shadow map draws the caster only when the sphere reaches its light's frustum; without it (and for
+   * instanced or displaced casters) every map draws it. Core meshes added with `add` get theirs from their geometry.
+   */
+  bounds?: ArrayLike<number>;
 }
 /** A caster `LocalShadows.add` takes besides a core mesh, such as a gltf-pro model or materials mesh. */
 export interface LocalShadowSource {
@@ -106,6 +112,10 @@ interface Draw {
   key: string;
   displacement?: LocalShadowPrimitive['displacement'];
   displaced?: GPUBindGroup;
+  /** World bounding sphere (x, y, z, radius); a NaN radius is unknown: drawn into every map. */
+  sphere: Float32Array;
+  /** Its uniform block needs writing (new or moved). */
+  stale: boolean;
 }
 const MAX_LIGHTS = 16,
   LAYERS = MAX_LIGHTS * 6,
@@ -257,6 +267,58 @@ function lightMatrix(
   out[o + 14] = k * far + k * dot(f);
   out[o + 15] = -dot(f);
 }
+/** `local` (centre and radius in node space) moved by column-major `m` into `out`; radius NaN when `local` is absent. */
+function worldSphere(out: Float32Array, local: ArrayLike<number> | undefined, m: ArrayLike<number>): void {
+  if (!local || local.length < 4) {
+    out[3] = Number.NaN;
+    return;
+  }
+  const x = local[0],
+    y = local[1],
+    z = local[2];
+  out[0] = m[0] * x + m[4] * y + m[8] * z + m[12];
+  out[1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+  out[2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+  // The largest axis scale bounds how far any vertex moved from the centre.
+  out[3] =
+    local[3] *
+    Math.sqrt(
+      Math.max(
+        m[0] * m[0] + m[1] * m[1] + m[2] * m[2],
+        m[4] * m[4] + m[5] * m[5] + m[6] * m[6],
+        m[8] * m[8] + m[9] * m[9] + m[10] * m[10],
+      ),
+    );
+}
+/**
+ * The six clip planes of the column-major view-projection at `m[o]` (Gribb and Hartmann, "Fast Extraction of Viewing
+ * Frustum Planes from the World-View-Projection Matrix", 2001), for WebGPU clip space (0 <= z <= w), each scaled to a
+ * unit normal: a, b, c, d per plane into `out`, inside where a x + b y + c z + d >= 0.
+ */
+function frustumPlanes(m: ArrayLike<number>, o: number, out: Float64Array): void {
+  const row = (i: number, k: number) => m[o + k * 4 + i];
+  for (let p = 0; p < 6; p++) {
+    const axis = p >> 1,
+      sign = p & 1 ? -1 : 1;
+    let length = 0;
+    for (let k = 0; k < 4; k++) {
+      // x and y: w +- x, w +- y; z: z (near, reversed or not) and w - z.
+      const v = axis < 2 ? row(3, k) + sign * row(axis, k) : sign > 0 ? row(2, k) : row(3, k) - row(2, k);
+      out[p * 4 + k] = v;
+      if (k < 3) length += v * v;
+    }
+    length = Math.sqrt(length) || 1;
+    for (let k = 0; k < 4; k++) out[p * 4 + k] /= length;
+  }
+}
+/** True when the sphere (x, y, z, radius) lies wholly outside one of the planes; never for an unknown radius. */
+function outside(planes: Float64Array, s: Float32Array): boolean {
+  const r = s[3];
+  if (!(r >= 0)) return false;
+  for (let p = 0; p < 24; p += 4)
+    if (planes[p] * s[0] + planes[p + 1] * s[1] + planes[p + 2] * s[2] + planes[p + 3] < -r) return true;
+  return false;
+}
 function fits(width: number, height: number, size: number, kind: string): void {
   if (width > size || height > size)
     throw new RangeError(
@@ -321,6 +383,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   /** Layers the depth-pass camera buffer holds; it grows past the point and spot layers only for directional and area maps. */
   private cameraLayers = 0;
   private readonly list: Draw[] = [];
+  private readonly planes = new Float64Array(24);
   private layers = 0;
   private changed = true;
   private disposed = false;
@@ -673,6 +736,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         p.vertex = buffers.vertex;
         p.index = buffers.index;
         p.count = node.geometry!.indices.length;
+        p.bounds = node.geometry!.bounds;
         primitives = r.mesh;
       } else {
         primitives = r.source.shadowPrimitives;
@@ -715,7 +779,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           d.visible = visible;
           d.count = p.count;
           d.instances = inst?.count ?? 0;
+          d.stale = true;
         }
+        worldSphere(d.sphere, inst || p.displacement ? undefined : p.bounds, node.matrix);
         if (visible && p.count && (!inst || inst.count)) list.push(d);
       }
     }
@@ -744,7 +810,10 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     // The view matches the buffer: the point and spot layers, or every layer once directional or area maps grew it.
     const upload = this.matrices.subarray(0, this.cameraLayers * 64) as Float32Array<ArrayBuffer>;
     c.device.queue.writeBuffer(this.cameras!, 0, upload, 0, layers * 64);
+    // A caster's block changes only with what `moved` compares (its matrix, alpha, cutoff, UV set and transform).
     for (const d of list) {
+      if (!d.stale) continue;
+      d.stale = false;
       const p = d.p!;
       d.values.set(p.node.matrix);
       d.values[16] = p.alpha ?? 1;
@@ -753,6 +822,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       if (p.alphaTransform) d.values.set(p.alphaTransform, 20);
       c.device.queue.writeBuffer(d.uniform, 0, d.values as Float32Array<ArrayBuffer>);
     }
+    const planes = this.planes;
     for (let l = 0; l < layers; l++) {
       if (!this.dirtyLayers[l]) continue;
       this.dirtyLayers[l] = 0;
@@ -760,11 +830,14 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.depthAttachment.view = this.layerViews[l];
       const pass = c.encoder.beginRenderPass(this.depthPass);
       this.offset[0] = l * 256;
+      frustumPlanes(this.matrices, l * 64, planes);
       try {
         const width = this.viewports[l * 2];
         if (width) pass.setViewport(0, 0, width, this.viewports[l * 2 + 1], 0, 1);
         pass.setBindGroup(0, this.cameraGroup!, this.offset);
         for (const d of list) {
+          // Only casters whose bounds reach this map's frustum (light range and face, cascade or spot cone).
+          if (outside(planes, d.sphere)) continue;
           const p = d.p!;
           pass.setPipeline(this.pipeline(d.key));
           pass.setBindGroup(1, d.group);
@@ -942,6 +1015,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           key,
           displacement,
           displaced: displacementGroup(this.device!, () => this.displacementLayout(), displacement),
+          sphere: new Float32Array([0, 0, 0, Number.NaN]),
+          stale: true,
         };
         records.set(identity, d);
         this.changed = true;
