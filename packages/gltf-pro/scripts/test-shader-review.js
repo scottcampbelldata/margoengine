@@ -23,7 +23,7 @@ try {
     async (payload) => {
       const { Engine } = await import('/packages/core/dist/index.js'),
         { parseGLTF } = await import('/packages/gltf-pro/dist/index.js'),
-        { pbrShader } = await import('/packages/gltf-pro/src/shader.ts');
+        { pbrShader, viewShader } = await import('/packages/gltf-pro/src/shader.ts');
       const assert = (value, message) => {
           if (!value) throw new Error(message);
         },
@@ -35,10 +35,14 @@ try {
           code.indexOf('@fragment fn fragment('),
         );
       const intro = (code) => code.slice(code.indexOf('@fragment fn fragment('), code.indexOf('  var color='));
-      const oldHelper = helper(payload.baseline),
-        newHelper = helper(pbrShader),
-        oldIntro = intro(payload.baseline),
-        newIntro = intro(pbrShader);
+      // Finished shaders read their camera and light rows from the shared view block (viewShader), so both texts are
+      // compared as rewritten the same way.
+      const oldShader = viewShader(payload.baseline),
+        newShader = viewShader(pbrShader),
+        oldHelper = helper(oldShader),
+        newHelper = helper(newShader),
+        oldIntro = intro(oldShader),
+        newIntro = intro(newShader);
       const checks = [];
       async function capture(useBaseline, variant) {
         const canvas = document.createElement('canvas');
