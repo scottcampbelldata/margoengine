@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
 import { animatedTriangle } from './support/gltf-pro-fixture.js';
-import { optionalGPU } from './support/optional-gpu.js';
+import { optionalGPU, uniformBytes } from './support/optional-gpu.js';
 
 async function scene(
   materials = ['BLEND', 'MASK', 'BLEND', 'OPAQUE'].map((alphaMode) => ({ alphaMode, doubleSided: true })),
@@ -62,7 +62,7 @@ async function scene(
           pipeline = value;
         },
         setBindGroup(binding, group) {
-          if (binding === 0) uniform = group.entries[0].resource.buffer;
+          if (binding === 0) uniform = group.entries[0].resource;
         },
         setVertexBuffer(_, value) {
           vertex = value;
@@ -71,17 +71,20 @@ async function scene(
           index = value;
         },
         drawIndexed(count) {
+          // The uniforms reach the GPU when draw() returns, so the node a draw belongs to is read from them afterwards.
+          const bound = uniform;
           record.draws.push({
             pipeline,
-            uniform,
+            uniform: bound,
             vertex,
             index,
             count,
-            node: model.primitives.find(
-              (p) =>
-                p.material.settings[0] === new Float32Array(uniform.data)[88] &&
-                p.node.matrix[14] === new Float32Array(uniform.data)[30],
-            )?.node,
+            get node() {
+              const floats = new Float32Array(uniformBytes(bound).slice().buffer);
+              return model.primitives.find(
+                (p) => p.material.settings[0] === floats[88] && p.node.matrix[14] === floats[30],
+              )?.node;
+            },
           });
         },
         end() {
@@ -177,7 +180,7 @@ test('PBR culls authored single-sided faces in every pass and reuses mirrored an
       assert.ok(rendered.every((draw) => (draw.pipeline.primitive.topology ?? 'triangle-list') === 'triangle-list'));
       assert.ok(rendered.every((draw) => (draw.pipeline.primitive.frontFace ?? 'ccw') === 'ccw'));
       assert.deepEqual(
-        rendered.map((draw) => new Float32Array(draw.uniform.data)[97]),
+        rendered.map((draw) => new Float32Array(uniformBytes(draw.uniform).slice().buffer)[97]),
         [-1, 1, -1, 1],
       );
       for (const draw of rendered) {
@@ -293,14 +296,14 @@ test('material renderState overrides only beauty pipelines, keys the cache and l
   }
 });
 
-test('PBR closes a partially encoded pass after an upload failure and remains usable', async () => {
+test('PBR leaves no pass open after an upload failure and the next draw uploads the same bytes', async () => {
   const { engine, model, context, color, depth, passes, resources } = await scene();
   const queue = engine.gpu.queue,
     write = queue.writeBuffer;
   let uploads = 0;
   const failure = new Error('GPU upload failed');
   queue.writeBuffer = (...args) => {
-    if (++uploads === 2) throw failure;
+    if (++uploads === 1) throw failure;
     return write(...args);
   };
   try {
@@ -308,14 +311,20 @@ test('PBR closes a partially encoded pass after an upload failure and remains us
       () => model.draw(context, 'beauty', color, depth),
       (error) => error === failure,
     );
-    assert.equal(passes.length, 1);
-    assert.equal(passes[0].draws.length, 1);
-    assert.equal(passes[0].ended, true);
+    // The uniforms upload once, when the draw returns: every pass was encoded and ended before the failure.
+    assert.equal(passes.length, 3);
+    assert.equal(passes.flatMap((pass) => pass.draws).length, 4);
+    assert.ok(passes.every((pass) => pass.ended));
     queue.writeBuffer = write;
     model.draw(context, 'beauty', color, depth);
-    assert.equal(passes.length, 4);
-    assert.equal(passes.slice(1).flatMap((pass) => pass.draws).length, 4);
-    assert.ok(passes.slice(1).every((pass) => pass.ended));
+    assert.equal(uploads, 1, 'the failed range uploaded again with the real writer');
+    assert.equal(passes.length, 6);
+    assert.equal(passes.slice(3).flatMap((pass) => pass.draws).length, 4);
+    assert.ok(passes.slice(3).every((pass) => pass.ended));
+    assert.deepEqual(
+      passes.slice(3).flatMap((pass) => pass.draws.map((draw) => draw.node)),
+      passes.slice(0, 3).flatMap((pass) => pass.draws.map((draw) => draw.node)),
+    );
   } finally {
     queue.writeBuffer = write;
     engine.dispose();

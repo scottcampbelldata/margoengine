@@ -12,6 +12,7 @@ import { DracoDecoder } from '../../decoders/dist/index.js';
 import { loadGLTF } from '../dist/index.js';
 import { loadGLTFProgressive } from '../dist/progressive.js';
 import { instancing } from '../dist/instancing.js';
+import { uniformBytes } from '../../../tests/support/optional-gpu.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { snapshot } from '../../../tests/support/pbr-snapshot.js';
@@ -176,7 +177,7 @@ function gpu(model, draw) {
     resources: model['resources'].map((r) => ({
       vertex: bytes(r.vertex.data),
       index: bytes(r.index.data),
-      uniform: bytes(r.uniform.data),
+      uniform: bytes(uniformBytes(r.uniform)),
       live: [r.vertex, r.index, r.uniform].map((b) => b.destroyed),
       sizes: [r.vertex.size, r.index.size, r.vertex.usage, r.index.usage],
       views: r.views.map((v) => texture(v.texture)),

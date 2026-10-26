@@ -14,7 +14,8 @@ import { splitTRS } from '@margoengine/math/quat';
 import { viewMatrix } from '../../shared/view.js';
 import { applyView, inView } from '../../shared/view-rect.js';
 import { attenuationPower } from '../../shared/attenuation.js';
-import { beginDraw, endDraw, recording, retire, writeUniform } from '../../shared/frame-resources.js';
+import { beginDraw, endDraw, recording, retire } from '../../shared/frame-resources.js';
+import { acquireUniform, flushUniforms, type UniformSlot } from './uniform-arena.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/mesh-source.js';
@@ -228,17 +229,22 @@ export interface PBRPickingGeometry {
 }
 const opaquePasses = new WeakMap<Context, Set<PBRModel>>();
 /**
- * A run of `PBRModel.draw` calls that share one render pass (pass it as the last argument of each `draw`, then call
- * `end()`). Without a run every draw begins and ends its own pass.
+ * A run of `PBRModel.draw` calls that share one render pass and one uniform upload (pass it as the last argument of
+ * each `draw`, then call `end()`). Without a run every draw begins and ends its own pass and uploads its own uniforms.
  */
 export class PBRDrawRun {
   /** The pass the run's draws continue, once one began; `end()` closes it. */
   pass?: GPURenderPassEncoder;
-  /** Ends the shared pass. Safe to call twice. */
+  constructor(readonly device: GPUDevice) {}
+  /** Ends the shared pass and uploads the draws' uniform changes. Safe to call twice. */
   end(): void {
     const pass = this.pass;
     this.pass = undefined;
-    pass?.end();
+    try {
+      pass?.end();
+    } finally {
+      flushUniforms(this.device);
+    }
   }
 }
 // A symbol keeps separately bundled optional consumers interoperable without
@@ -378,7 +384,8 @@ interface DrawResource {
   vertex: GPUBuffer;
   index: GPUBuffer;
   wireframe?: { index: GPUBuffer; count: number };
-  uniform: GPUBuffer;
+  /** This draw's uniform block: a window of the device's uniform arena (`uniform-arena.ts`). */
+  uniform: UniformSlot;
   volume?: GPUBuffer;
   /** Float32 copy of `material.volume`, reused so a transmission draw does not allocate. */
   volumeData?: Float32Array;
@@ -540,7 +547,7 @@ function frameGroup(
   r: DrawResource,
   transmission: boolean,
   section: GPUBuffer | undefined,
-  uniform: GPUBufferBinding = { buffer: r.uniform },
+  uniform: GPUBufferBinding = r.uniform.binding,
 ): GPUBindGroup {
   return device.createBindGroup({
     layout: pipeline.getBindGroupLayout(0),
@@ -1599,7 +1606,7 @@ export class PBRModel implements EnginePlugin {
     if (r.values?.length !== floats) {
       retire(r.device, r.uniform);
       r.values = new Float32Array(floats);
-      r.uniform = device.createBuffer({ size: floats * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      r.uniform = acquireUniform(device, floats);
     }
     r.views = [];
     r.samplers = [];
@@ -2143,7 +2150,7 @@ export class PBRModel implements EnginePlugin {
           v[102] = m.tint[2];
         }
         // A later draw of this frame with other values (another view, a probe face) gets its own uniform slice.
-        const uniform = writeUniform(c.device, r.uniform, v as Float32Array<ArrayBuffer>, c.view ?? c);
+        const uniform = r.uniform.write(v, c.view ?? c);
         // Physical materials listing only the five core maps (materials built in code) draw the factor-only variant;
         // transmission draws its transmissive form, extended materials the shader of decoders.materials.
         const x = this.asset.hooks.materials || undefined,
@@ -2635,6 +2642,7 @@ export class PBRModel implements EnginePlugin {
     }
     if (carry && !external) carry.pass = pass;
     else if (!external) pass?.end();
+    if (!carry) flushUniforms(c.device);
   }
   /** Isolated GPU resources for stereo eyes or another caller-owned WebGPU device. */
   createRenderer(device: GPUDevice): PBRDeviceRenderer {
@@ -2847,7 +2855,7 @@ export class PBRModel implements EnginePlugin {
   private releaseGPU(): void {
     this.gpuRevision++;
     const cleanup = new Cleanup(),
-      buffers = new Map<GPUBuffer, GPUDevice>(),
+      buffers = new Map<{ destroy(): void }, GPUDevice>(),
       device = this.resources[0]?.device ?? this.engine.gpu;
     for (const r of this.resources)
       for (const b of [r.vertex, r.index, r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume])

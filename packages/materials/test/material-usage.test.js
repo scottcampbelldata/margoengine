@@ -65,9 +65,8 @@ test('mesh.material = other draws the new material next frame and moves per-engi
   const phong = of(log, 'writeBuffer').filter((e) => e[1] === blueBuffer[1]);
   assert.deepEqual([...floats(phong[0][3])], [...blue.specular, 8].map(Math.fround));
   // The beauty uniform carries the new base colour (floats 76-79).
-  const frames = of(log, 'writeBuffer')
-    .filter((e) => e[3].length === 880 * 2)
-    .map((e) => [...floats(e[3]).slice(76, 80)]);
+  // (Uniforms upload as one changed range of a shared arena, so read each mesh's slot.)
+  const frames = [mesh, other].map((m) => [...m['resources'][0].uniform.contents.slice(76, 80)]);
   assert.ok(frames.some((v) => v.join() === '0,0,1,1'));
   assert.ok(
     frames.some((v) => v.join() === '1,0,0,1'),
@@ -198,10 +197,7 @@ test('swapping between extended physical materials recompiles gltf-pro for the n
   assert.ok(!fresh.some((c) => c.includes('fn margoIridescence(')), 'the old plan is not reused');
   mesh.material = new Material();
   log = s.frame();
-  assert.ok(
-    of(log, 'writeBuffer').some((e) => e[3].length === 880 * 2),
-    'back to the standard uniform layout',
-  );
+  assert.equal(mesh['resources'][0].uniform.binding.size, 880, 'back to the standard uniform layout');
   s.engine.dispose();
 });
 
@@ -226,9 +222,8 @@ test('colours take set(input) and assignment with hex strings, 0xrrggbb numbers 
   assert.deepEqual([...m.emissive, ...m.specular], [0, 0, 0, 1, 1, 1]);
   m.color[1] = 0.25; // element writes keep working
   assert.equal(mesh.primitives[0].material.base, color);
-  const log = s.frame(),
-    frame = of(log, 'writeBuffer').find((e) => e[3].length === 880 * 2);
-  assert.deepEqual([...floats(frame[3]).slice(76, 80)], [0, 0.25, 1, 1]);
+  const log = s.frame();
+  assert.deepEqual([...mesh['resources'][0].uniform.contents.slice(76, 80)], [0, 0.25, 1, 1]);
   const phong = phongBuffers(log)[0];
   assert.deepEqual(
     [...floats(of(log, 'writeBuffer').find((e) => e[1] === phong[1])[3])],
@@ -390,9 +385,8 @@ test('copy(source) writes every value into this material in place; meshes show i
   );
   source.color.set(0xff0000);
   assert.equal(target.color[0], 0, 'no link to the source afterwards');
-  const log = s.frame(),
-    frame = of(log, 'writeBuffer').find((e) => e[3].length === 880 * 2);
-  assert.deepEqual([...floats(frame[3]).slice(76, 80)], [0, 0, 1, 0.5]);
+  s.frame();
+  assert.deepEqual([...mesh['resources'][0].uniform.contents.slice(76, 80)], [0, 0, 1, 0.5]);
   assert.equal(mesh.primitives[0].material.settings[0], 2, 'now blended');
   assert.throws(() => target.copy(new Material({ shading: 'phong' })), { name: 'TypeError', message: /same shading/ });
   assert.throws(() => target.copy({}), TypeError);
@@ -576,10 +570,7 @@ test('physical options set after createMesh switch that material to the physical
   assert.deepEqual(coat.extensions, ['clearcoat', 'transmission', 'anisotropy']);
   log = s.frame();
   assert.ok(codes(log).some((c) => c.includes('fn margoAnisotropy(')));
-  assert.ok(
-    of(log, 'writeBuffer').some((e) => e[3].length === 1088 * 2),
-    'extended uniform rows',
-  );
+  assert.equal(mesh['resources'][0].uniform.binding.size, 1088, 'extended uniform rows');
   assert.ok(
     of(log, 'renderPipeline').some((e) => e[2].fragment.entryPoint === 'margoTint'),
     'tinted transmission',

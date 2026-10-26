@@ -239,7 +239,7 @@ test('standard glTF metadata installs all four lobes synchronously through one g
     assert.equal(extension.textures?.length ?? 0, 0);
     s.draw();
     assert.ok(s.draws.at(-1).groups.has(3));
-    assert.equal(s.draws.at(-1).groups.get(0).entries[0].resource.buffer.size, 400);
+    assert.equal(s.draws.at(-1).groups.get(0).entries[0].resource.size, 400);
     installation.dispose();
     assert.equal(s.model.primitives[0].material.extension, undefined);
   } finally {

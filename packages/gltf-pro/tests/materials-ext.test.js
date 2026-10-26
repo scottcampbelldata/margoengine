@@ -113,9 +113,7 @@ for (const variant of ['physical', 'extended', 'factors']) {
         view.begin(0);
         const authoredScale = material.physical[2],
           log = gpu.record(() => model.draw(view.c, 'beauty', view.c.color, view.c.depth)),
-          uniform = model['resources'][0].uniform,
-          write = log.find((event) => event[0] === 'writeBuffer' && event[1] === gpu.snap(uniform)),
-          frame = floatsOf(write[3]);
+          frame = model['resources'][0].uniform.contents;
         assert.equal(frame[variant === 'extended' ? 250 : 210], mapped ? 1.75 : 0);
         assert.equal(material.physical[2], authoredScale, 'Rendering must not mutate authored normal scale');
       } finally {
@@ -362,9 +360,8 @@ test('extended material: uniform rows, 1088-byte buffer, only used textures boun
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
   );
   const uniform = model['resources'][0].uniform,
-    write = log.find((e) => e[0] === 'writeBuffer' && e[1] === gpu.snap(uniform));
-  assert.equal(uniform.size, 1088);
-  const floats = floatsOf(write[3]);
+    floats = uniform.contents;
+  assert.equal(uniform.binding.size, 1088);
   near(
     Array.from(floats.slice(248 + 12, 272)),
     m.physical.slice(12),
@@ -512,15 +509,14 @@ test('KHR_materials_variants: names, switching rebinds the mapped material, unde
   model.selectVariant('Red');
   assert.equal(p.material, model.primitives[1].material, 'the mapped material object');
   await null; // next frame: within one frame a changed uniform goes to a frame-arena slice
-  const write = draw().find(
-    (e) => e[0] === 'writeBuffer' && e[1] === gpu.snap(model['resources'].find((r) => r.primitive === p).uniform),
-  );
-  assert.deepEqual(Array.from(floatsOf(write[3]).slice(76, 80)), [1, 0, 0, 1], 'primitive 0 draws red');
+  draw();
+  const frame = model['resources'].find((r) => r.primitive === p).uniform.contents;
+  assert.deepEqual(Array.from(frame.slice(76, 80)), [1, 0, 0, 1], 'primitive 0 draws red');
   model.selectVariant(1);
   assert.deepEqual(p.material.extended, { iridescence: true, anisotropy: false, diffuseTransmission: false });
   const log = draw();
   assert.equal(
-    model['resources'].find((r) => r.primitive === p).uniform.size,
+    model['resources'].find((r) => r.primitive === p).uniform.binding.size,
     1088,
     'uniform buffer resized for the extended material',
   );

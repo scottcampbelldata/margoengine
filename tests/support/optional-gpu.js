@@ -100,3 +100,9 @@ export function optionalGPU() {
     },
   };
 }
+
+/** The bytes of a uniform binding ({buffer, offset, size}) or of a gltf-pro uniform slot, on the fake GPU's buffers. */
+export function uniformBytes(binding) {
+  const { buffer, offset = 0, size } = binding.binding ?? binding;
+  return new Uint8Array(buffer.data, offset, size ?? buffer.size - offset);
+}

@@ -6,7 +6,7 @@ import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { parseGLTF, PBRModel } from '../packages/gltf-pro/dist/index.js';
 import { install, installNodeMaterial, nodeMaterial } from '../packages/materials/dist/index.js';
 import { transmission } from '../packages/materials/dist/transmission.js';
-import { optionalGPU } from './support/optional-gpu.js';
+import { optionalGPU, uniformBytes } from './support/optional-gpu.js';
 import { materialQuad } from './support/materials-fixture.js';
 
 const scalar = (value) => ({ type: 'scalar', value });
@@ -72,14 +72,22 @@ async function scene(modes = ['OPAQUE'], sharedMaterial = false) {
           setVertexBuffer() {},
           setIndexBuffer() {},
           drawIndexed(count) {
-            const buffer = groups.get(0).entries[0].resource.buffer;
-            const frame = new Uint8Array(buffer.data).slice();
+            // The uniforms reach the GPU when draw() returns (before the frame is submitted), so the frame bytes are
+            // read when a test asks for them.
+            const binding = groups.get(0).entries[0].resource;
+            const frame = () => uniformBytes(binding).slice();
             draws.push({
               count,
               pipeline,
-              frame,
-              settings: new Float32Array(frame.buffer)[88],
-              z: new Float32Array(frame.buffer)[30],
+              get frame() {
+                return frame();
+              },
+              get settings() {
+                return new Float32Array(frame().buffer)[88];
+              },
+              get z() {
+                return new Float32Array(frame().buffer)[30];
+              },
               groups: [...groups.keys()],
             });
           },

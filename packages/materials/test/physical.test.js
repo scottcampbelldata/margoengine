@@ -219,7 +219,7 @@ test("physical materials meshes draw gltf-pro's factor-only physical variant: 5 
   assert.doesNotMatch(code, /clearcoatMap|Map,\w+Sampler,uv\(i,\d/);
   m.clearcoat = 0.5;
   log = frame(1);
-  const v = floats(of(log, 'writeBuffer').find((e) => e[3].length === 1760)[3]);
+  const v = mesh['resources'][0].uniform.contents; // the uploaded slot, read back from the arena
   assert.deepEqual(
     [v[101], v[208], v[216], v[219]].map((x) => +x.toFixed(6)),
     [1.4, 0.5, 0.2, 0],

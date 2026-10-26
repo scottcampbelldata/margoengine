@@ -245,8 +245,9 @@ test('opaque captures replay mixed models in the explicit blend phase order', as
   PBRModel.endOpaquePass(f.context);
   assert.deepEqual(
     f.draws.slice(2).map((draw) => {
-      const buffer = draw.groups[0].entries[0].resource.buffer;
-      return buffer === far.resources[1].uniform ? 'far' : buffer === near.resources[1].uniform ? 'near' : 'other';
+      const bound = draw.groups[0].entries[0].resource,
+        is = (slot) => bound.buffer === slot.binding.buffer && (bound.offset ?? 0) === slot.binding.offset;
+      return is(far.resources[1].uniform) ? 'far' : is(near.resources[1].uniform) ? 'near' : 'other';
     }),
     ['far', 'near'],
     'The deferred blend draws retain far-to-near queue order independently of opaque insertion order',

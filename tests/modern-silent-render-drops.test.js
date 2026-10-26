@@ -260,7 +260,7 @@ for (const fixture of loadedPBRFixtures) {
             rendered.push({ pipeline });
           },
           setBindGroup(index, group) {
-            if (index === 0) rendered.at(-1).uniform = group.entries[0].resource.buffer;
+            if (index === 0) rendered.at(-1).uniform = group.entries[0].resource;
           },
           setVertexBuffer(index, buffer) {
             if (index === 0) rendered.at(-1).vertex = buffer;
@@ -286,7 +286,11 @@ for (const fixture of loadedPBRFixtures) {
           second = draw(right);
         assert.notEqual(first.vertex, originalVertex);
         assert.notEqual(first.vertex, second.vertex);
-        assert.notEqual(first.uniform, second.uniform);
+        // Each eye's uniform block is its own window: another buffer, or the same arena buffer at another offset.
+        assert.ok(
+          first.uniform.buffer !== second.uniform.buffer || first.uniform.offset !== second.uniform.offset,
+          'eye renderers never share a uniform block',
+        );
         assert.equal(first.pipeline.vertex.buffers[0].arrayStride, 80);
         assert.equal(first.pipeline.depthStencil.depthCompare, 'less-equal');
         assert.equal(first.count, primitive.indices.length);

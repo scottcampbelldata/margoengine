@@ -4,11 +4,13 @@ import '../../examples/package-benchmarks/proofs/gpu-recorder.js';
 // A strict CPU WebGPU device for frame-ordering tests. Buffers hold real bytes; `queue.writeBuffer` changes them at
 // once, as a real queue does before any later submit. Each draw records the bytes of its group-0 uniform binding when
 // encoded; `submit` refuses destroyed resources and records the bytes the GPU would read at that point. A test then
-// checks that every draw still sees what it was encoded with.
+// checks that every draw still sees what it was encoded with. A draw whose uniforms upload when its `draw()` call
+// returns (gltf-pro's arena) calls `settle()` then, and the rows encoded since take the bytes the queue holds now.
 export function strictGPU() {
   let next = 0;
   const calls = [],
     rows = [],
+    unsettled = [],
     buffers = [],
     note = (...row) => calls.push(row),
     id = (prefix) => prefix + ++next;
@@ -85,6 +87,7 @@ export function strictGPU() {
         row = { count, instances, uniform, groups: new Map(this.groups), encoded: read(uniform) };
       for (const g of this.groups.values()) for (const e of g.entries) live(e.resource?.buffer, 'drawIndexed');
       rows.push(row);
+      unsettled.push(row);
       this.encoder.draws.push(row);
       note('drawIndexed', count, instances);
     }
@@ -194,5 +197,9 @@ export function strictGPU() {
       async onSubmittedWorkDone() {},
     },
   };
-  return { device, calls, rows, buffers };
+  /** Re-reads the uniform bytes of every row encoded since the last call (see the header). */
+  const settle = () => {
+    for (const row of unsettled.splice(0)) row.encoded = read(row.uniform);
+  };
+  return { device, calls, rows, buffers, settle };
 }

@@ -58,7 +58,10 @@ async function scene(t, { batch = false } = {}) {
       descriptor: { depthStencil: { format: 'depth32float' }, multisample: { count: 1 } },
     };
   engine.store.tick(false);
-  const draw = () => model.draw(c, 'beauty', c.color, c.depth),
+  const draw = () => {
+      model.draw(c, 'beauty', c.color, c.depth);
+      gpu.settle(); // the uniforms uploaded when draw() returned
+    },
     submit = () => gpu.device.queue.submit([c.encoder.finish()]);
   return { gpu, model, c, draw, submit };
 }
@@ -112,9 +115,10 @@ test('a callback that disposes its model mid-draw keeps the encoded buffers unti
   draw();
   submit();
   assert.equal(gpu.rows.length, 1, 'the second primitive is not drawn from a disposed model');
-  assert.equal(gpu.rows[0].uniform.buffer.destroyed, false);
+  const arena = gpu.rows[0].uniform.buffer;
+  assert.equal(arena.destroyed, false);
   await null;
-  assert.equal(gpu.rows[0].uniform.buffer.destroyed, true);
+  assert.equal(arena.destroyed, true, 'the arena goes back to the device with its last slot');
 });
 
 test('a view draws only the nodes in its layers; a static batch falls back to its matching parts', async (t) => {
@@ -150,7 +154,8 @@ test('a dispose from a later pass of a multi-view frame keeps the encoded buffer
   draw();
   model.dispose();
   submit();
-  assert.equal(gpu.rows[0].uniform.buffer.destroyed, false);
+  const arena = gpu.rows[0].uniform.buffer;
+  assert.equal(arena.destroyed, false);
   await null;
-  assert.equal(gpu.rows[0].uniform.buffer.destroyed, true);
+  assert.equal(arena.destroyed, true, 'the arena goes back to the device with its last slot');
 });

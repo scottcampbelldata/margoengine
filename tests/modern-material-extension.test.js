@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
 import { animatedTriangle } from './support/gltf-pro-fixture.js';
-import { optionalGPU } from './support/optional-gpu.js';
+import { optionalGPU, uniformBytes } from './support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 // Degenerate tangent frames use a finite orthogonal basis; ordinary UV paths retain this shared shader.
@@ -44,13 +44,15 @@ async function scene(primitiveCount = 1) {
   const draws = [],
     uploads = [],
     queueWrite = device.queue.writeBuffer;
-  device.queue.writeBuffer = (buffer, offset, values) => {
+  device.queue.writeBuffer = (buffer, offset, values, dataOffset = 0, size) => {
+    const unit = values.BYTES_PER_ELEMENT ?? 1,
+      length = size === undefined ? values.length - dataOffset : size;
     uploads.push({
       buffer,
       offset,
-      bytes: new Uint8Array(values.buffer, values.byteOffset, values.byteLength).slice(),
+      bytes: new Uint8Array(values.buffer, values.byteOffset + dataOffset * unit, length * unit).slice(),
     });
-    return queueWrite(buffer, offset, values);
+    return queueWrite(buffer, offset, values, dataOffset, size);
   };
   const context = {
     ...harness.context,
@@ -97,7 +99,7 @@ test('unextended PBR retains the exact baseline shader, frame bytes, pipeline an
   try {
     assert.deepEqual(
       s.resources.filter((resource) => resource.data).map((buffer) => buffer.size),
-      [240, 12, 400],
+      [240, 12, 65536], // the third is gltf-pro's uniform arena, its first chunk (64 KiB)
     );
     assert.equal(s.counts.textures, 5);
     for (const mode of ['beauty', 'gbuffer', 'ambient']) {
@@ -105,7 +107,7 @@ test('unextended PBR retains the exact baseline shader, frame bytes, pipeline an
       s.draw(mode);
       const draw = s.draws.at(-1),
         pipeline = draw.pipeline,
-        frame = draw.groups.get(0).entries[0].resource.buffer;
+        frame = { data: uniformBytes(draw.groups.get(0).entries[0].resource).slice().buffer };
       assert.equal(digest(pipeline.vertex.module.code), baselineShader);
       assert.equal(digest(new Uint8Array(frame.data)), baselineFrame);
       const priorNormalFactor = new Float32Array(frame.data.slice(0));
@@ -116,7 +118,11 @@ test('unextended PBR retains the exact baseline shader, frame bytes, pipeline an
         '4cb2947198324e7f284d979fc29c0930898f8bd11408b656a9d44cfdf1aee2a0',
         'Only the absent normal-map factor changes from the preceding frame baseline',
       );
-      assert.equal(s.uploads.length, before + 1, 'Only the packed frame is uploaded');
+      assert.equal(
+        s.uploads.length,
+        before + (mode === 'beauty' ? 1 : 0),
+        'Only the packed frame is uploaded, once: the other passes of the frame see the same values',
+      );
       assert.deepEqual([...draw.groups.keys()], [0, 1]);
       assert.deepEqual(
         draw.groups.get(0).entries.map((entry) => entry.binding),

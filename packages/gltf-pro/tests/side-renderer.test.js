@@ -8,6 +8,9 @@ import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { compactTests, pbrShader } from '../src/shader.ts';
 import { backSideShader } from '../src/side-shader.ts';
+import { uniformBytes } from '../../../tests/support/optional-gpu.js';
+/** Whether a bound uniform window is the arena slot of a draw resource. */
+const same = (binding, slot) => binding.buffer === slot.binding.buffer && (binding.offset ?? 0) === slot.binding.offset;
 import { instancedShader } from '../src/instancing.ts';
 
 test('back-only instancing gives extension helpers and the surface the same instance handedness', () => {
@@ -61,7 +64,7 @@ async function fixture(
         pipeline = value;
       },
       setBindGroup(index, group) {
-        if (index === 0) uniform = group.entries.find((entry) => entry.binding === 0).resource.buffer;
+        if (index === 0) uniform = group.entries.find((entry) => entry.binding === 0).resource;
       },
       setVertexBuffer(index, value) {
         if (index === 0) vertex = value;
@@ -69,7 +72,18 @@ async function fixture(
       setIndexBuffer() {},
       drawIndexed(count, instances = 1) {
         drawn = pipeline;
-        draws.push({ pipeline, count, instances, vertex, uniform, values: new Float32Array(uniform.data).slice() });
+        // The uniforms reach the GPU when draw() returns, so the values are read when a test asks for them.
+        const bound = uniform;
+        draws.push({
+          pipeline,
+          count,
+          instances,
+          vertex,
+          uniform: bound,
+          get values() {
+            return new Float32Array(uniformBytes(bound).slice().buffer);
+          },
+        });
       },
       end() {},
     };
@@ -137,7 +151,7 @@ test('coalesced static triangles keep one draw and live front, back and double s
       assert.equal(f.draws[0].count, 6, label);
       assert.equal(f.draws[0].instances, 1, label);
       assert.equal(f.draws[0].vertex, batch.vertex, label);
-      assert.equal(f.draws[0].uniform, batch.uniform, label);
+      assert.ok(same(f.draws[0].uniform, batch.uniform), label);
       assert.equal(f.draws[0].values[90], state.flag, label);
       assert.equal(pipeline.primitive.cullMode, state.cull, label);
       assert.equal(pipeline.fragment.constants.margoFaceTest, 0, label);

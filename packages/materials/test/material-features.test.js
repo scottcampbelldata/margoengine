@@ -414,10 +414,7 @@ test('emissiveIntensity scales the emission gltf-pro draws, live and validated, 
   const s = await scene(),
     material = new PbrMaterial({ emissive: [1, 0.5, 0], emissiveIntensity: 3 }),
     mesh = createMesh(s.engine, quad, material),
-    emission = (log) => {
-      const frame = log.filter((e) => e[0] === 'writeBuffer' && e[3].length >= 880 * 2).at(-1);
-      return [...floats(frame[3]).slice(84, 87)];
-    };
+    emission = () => [...mesh['resources'][0].uniform.contents.slice(84, 87)];
   let log = s.frame();
   assert.ok(codes(log).every((c) => !c.includes('margoFeatures')));
   assert.deepEqual(emission(log), [3, 1.5, 0]);

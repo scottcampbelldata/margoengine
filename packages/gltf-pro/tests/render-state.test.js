@@ -4,6 +4,9 @@ import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { parseGLTF } from '../dist/index.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { uniformBytes } from '../../../tests/support/optional-gpu.js';
+/** Whether a bound uniform window is the arena slot of a draw resource. */
+const same = (binding, slot) => binding.buffer === slot.binding.buffer && (binding.offset ?? 0) === slot.binding.offset;
 import { mockGPU, context as recordedContext } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 
 async function fixture(
@@ -69,20 +72,24 @@ async function fixture(
         references.push({ pass, value });
       },
       setBindGroup(index, group) {
-        if (index === 0) uniform = group.entries.find((entry) => entry.binding === 0).resource.buffer;
+        if (index === 0) uniform = group.entries.find((entry) => entry.binding === 0).resource;
       },
       setVertexBuffer(index, value) {
         if (index === 0) vertex = value;
       },
       setIndexBuffer() {},
       drawIndexed() {
+        // The uniforms reach the GPU when draw() returns, so the matrix is read when a test asks for it.
+        const bound = uniform;
         draws.push({
           pipeline,
           reference,
           pass,
-          uniform,
+          uniform: bound,
           vertex,
-          matrix: new Float32Array(uniform.data).slice(16, 32),
+          get matrix() {
+            return new Float32Array(uniformBytes(bound).slice().buffer).slice(16, 32);
+          },
         });
       },
       end() {},
@@ -313,7 +320,7 @@ test('asymmetric stencil faces draw original mirrored static nodes and symmetric
   assert.ok(batch, 'the unchanged static mirrored nodes begin in a shared batch');
   const baseline = f.frame();
   assert.equal(baseline.length, 1);
-  assert.equal(baseline[0].uniform, batch.uniform);
+  assert.ok(same(baseline[0].uniform, batch.uniform));
   const baselinePipeline = baseline[0].pipeline;
   material.renderState = {
     colorWrite: false,
@@ -333,10 +340,8 @@ test('asymmetric stencil faces draw original mirrored static nodes and symmetric
     separate.map((draw) => draw.matrix[12]),
     [-1, 1],
   );
-  assert.deepEqual(
-    separate.map((draw) => draw.uniform),
-    originalResources.map((resource) => resource.uniform),
-  );
+  assert.equal(separate.length, originalResources.length);
+  separate.forEach((draw, i) => assert.ok(same(draw.uniform, originalResources[i].uniform)));
   assert.deepEqual(
     separate.map((draw) => draw.vertex),
     originalResources.map((resource) => resource.vertex),
@@ -357,7 +362,7 @@ test('asymmetric stencil faces draw original mirrored static nodes and symmetric
   delete material.renderState;
   const restored = f.frame();
   assert.equal(restored.length, 1);
-  assert.equal(restored[0].uniform, batch.uniform);
+  assert.ok(same(restored[0].uniform, batch.uniform));
   assert.equal(restored[0].pipeline, baselinePipeline);
 });
 
@@ -380,7 +385,7 @@ test('native transmission gates both draws and writes stencil once while suppres
     };
     const frame = f.frame(),
       materialUniform = f.model.resources[0].uniform,
-      draws = frame.filter((draw) => draw.uniform === materialUniform);
+      draws = frame.filter((draw) => same(draw.uniform, materialUniform));
     assert.equal(draws.length, 2);
     assert.deepEqual(
       draws.map((draw) => draw.pipeline.fragment.entryPoint),
@@ -434,7 +439,7 @@ test('transmission tint preserves depth for the lit draw when a strict depth tes
   });
   const frame = f.frame(),
     uniform = f.model.resources[0].uniform,
-    draws = frame.filter((draw) => draw.uniform === uniform);
+    draws = frame.filter((draw) => same(draw.uniform, uniform));
   assert.deepEqual(
     draws.map((draw) => draw.pipeline.fragment.entryPoint),
     ['margoTint', 'fragment'],

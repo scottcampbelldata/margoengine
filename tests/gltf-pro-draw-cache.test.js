@@ -4,7 +4,7 @@ import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
 import { PBRInstances } from '../packages/gltf-pro/dist/instancing.js';
 import { animatedTriangle } from './support/gltf-pro-fixture.js';
-import { optionalGPU } from './support/optional-gpu.js';
+import { optionalGPU, uniformBytes } from './support/optional-gpu.js';
 
 async function scene(count = 1, shareMaterial = false) {
   const h = optionalGPU(),
@@ -54,12 +54,20 @@ async function scene(count = 1, shareMaterial = false) {
       },
       setBindGroup(slot, group) {
         if (slot === 2) lighting = group;
-        if (slot === 0) uniform = group.entries.find((entry) => entry.binding === 0).resource.buffer;
+        if (slot === 0) uniform = group.entries.find((entry) => entry.binding === 0).resource;
       },
       setVertexBuffer() {},
       setIndexBuffer() {},
       drawIndexed() {
-        draws.push({ pipeline, lighting, x: new Float32Array(uniform.data)[28] });
+        // The uniforms upload when draw() returns, before the frame is submitted: read them when asked.
+        const bound = uniform;
+        draws.push({
+          pipeline,
+          lighting,
+          get x() {
+            return new Float32Array(uniformBytes(bound).slice().buffer)[28];
+          },
+        });
       },
       end() {},
     };

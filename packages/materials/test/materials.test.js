@@ -197,8 +197,9 @@ test('createMesh draws through gltf-pro with patched shader and default bindings
     );
     assert.equal(group.entries[0].resource, group.entries[2].resource, 'missing maps share the white default');
     assert.notEqual(group.entries[4].resource, group.entries[0].resource, 'normal slot uses the flat normal default');
-    const uniform = s.h.resources.find((r) => r.size === 880); // gltf-pro's per-draw Frame uniform
-    assert.deepEqual([...new Float32Array(uniform.data, 76 * 4, 4)], [0.5, 0.25, 1, 1]);
+    const uniform = model['resources'][0].uniform; // gltf-pro's per-draw Frame uniform (a slot of its arena)
+    assert.equal(uniform.binding.size, 880);
+    assert.deepEqual([...uniform.contents.slice(76, 80)], [0.5, 0.25, 1, 1]);
   } finally {
     s.close();
   }
@@ -453,8 +454,8 @@ test('uvTransform follows KHR_texture_transform, defaults to gltf-pro identity r
     const material = new Material({ uvTransform: { offset: [0.25, 0.5], scale: [0.5, 0.25] } }),
       model = createMesh(s.engine, boxGeometry(1, 1, 1), material);
     s.frame();
-    const uniform = s.h.resources.find((r) => r.size === 880),
-      rows = () => [...new Float32Array(uniform.data, 104 * 4, 8)];
+    const uniform = model['resources'][0].uniform,
+      rows = () => [...uniform.contents.slice(104, 112)];
     assert.deepEqual(rows(), [0.5, 0, 0.25, 0, -0, 0.25, 0.5, 0]);
     material.setUVTransform({ offset: [0.75, 0] }, 'map');
     await null; // the next frame
@@ -642,9 +643,9 @@ test('grouped meshes share vertices and a node while keeping each group material
     s.frame();
     assert.equal(model.primitives[1].material.base[1], 0.5);
     assert.equal(model.primitives[0].buffers.vertex, model.primitives[1].buffers.vertex);
-    const uniforms = s.h.resources.filter((r) => r.size === 880);
+    const uniforms = model['resources'].map((r) => r.uniform);
     assert.deepEqual(
-      uniforms.map((r) => [...new Float32Array(r.data, 76 * 4, 4)]),
+      uniforms.map((u) => [...u.contents.slice(76, 80)]),
       [
         [0, 0, 1, 1],
         [1, 0.5, 0, 1],

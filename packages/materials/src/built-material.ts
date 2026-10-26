@@ -3166,7 +3166,7 @@ function queue(runtime: Engine): MaterialDraws {
           }
           // One render pass for every mesh: a pass per mesh stores and reloads the multisampled colour and depth each
           // time and costs a begin, an end and a command-buffer flush (10,000 meshes: 168 ms of CPU a frame).
-          const run = new PBRDrawRun();
+          const run = new PBRDrawRun(c.device);
           try {
             for (let i = 0; i < phases.length; i++) {
               const item = phases[i];

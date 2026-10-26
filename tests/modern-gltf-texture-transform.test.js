@@ -126,7 +126,7 @@ test('offset, rotation and scale use group 3 without widening PBR vertices or th
     const { pipeline, groups } = s.draws[0];
     assert.equal(s.model.primitives[0].vertices.length, 4 * 20);
     assert.equal(pipeline.vertex.buffers[0].arrayStride, 80);
-    assert.equal(groups.get(0).entries[0].resource.buffer.size, 400);
+    assert.equal(groups.get(0).entries[0].resource.size, 400);
     assert.ok(groups.has(3));
     const factors = groups.get(3).entries.find((entry) => entry.binding === 0).resource.buffer;
     assert.equal(factors.size, 32);
@@ -200,7 +200,7 @@ test('each PBR texture channel supports an independent texture transform', async
     try {
       s.draw();
       assert.ok(s.draws[0].groups.has(3), channel);
-      assert.equal(s.draws[0].groups.get(0).entries[0].resource.buffer.size, 400);
+      assert.equal(s.draws[0].groups.get(0).entries[0].resource.size, 400);
     } finally {
       s.engine.dispose();
     }
