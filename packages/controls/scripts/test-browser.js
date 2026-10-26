@@ -155,6 +155,18 @@ try {
       window.controlsState.engine.render();
     }, mode);
     await page.locator('#gpu').screenshot({ path: resolve(results, `gizmo-${mode}.png`) });
+    if (mode === 'scale') {
+      const scaled = await page.evaluate(() => window.gizmoView([6, 4, 6]));
+      assert.ok(
+        ['XY', 'YZ', 'XZ'].some((plane) => scaled.handles.includes(plane)),
+        `scale mode offers plane handles ${scaled.handles}`,
+      );
+      assert.ok(
+        scaled.counts.red + scaled.counts.yellow > 100 && scaled.counts.green > 100 && scaled.counts.blue > 100,
+        `scale gizmo with plane handles renders ${JSON.stringify(scaled.counts)}`,
+      );
+      checks.push(`Scale gizmo draws axis and plane handles (${scaled.handles.join(', ')})`);
+    }
   }
   const end = await page.evaluate(() => window.finish());
   assert.ok(end.before > 0);

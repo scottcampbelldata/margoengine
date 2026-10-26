@@ -253,7 +253,7 @@ test('gizmo: axes within 5 degrees of the view and planes within 10 degrees of e
   assert.deepEqual(names('translate', 0), ['X', 'XY', 'XYZ', 'Y']);
   assert.deepEqual(names('translate', 45), ['X', 'XY', 'XYZ', 'Y', 'YZ', 'Z']);
   assert.deepEqual(names('translate', 90), ['XYZ', 'Y', 'YZ', 'Z']);
-  assert.deepEqual(names('scale', 0), ['X', 'XYZ', 'Y']);
+  assert.deepEqual(names('scale', 0), ['X', 'XY', 'XYZ', 'Y']);
   assert.deepEqual(names('translate', 4.9), names('translate', 0), 'axis still hidden at 4.9 degrees');
   assert.ok(names('translate', 5.1).includes('Z'), 'axis back at 5.1 degrees');
   assert.ok(!names('translate', 9.9).includes('YZ') && names('translate', 10.1).includes('YZ'), 'plane at 10 degrees');

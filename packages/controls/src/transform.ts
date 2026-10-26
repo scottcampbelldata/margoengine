@@ -224,6 +224,96 @@ export class TransformControls extends EventDispatcher {
     this.size = size;
     this.dispatchEvent({ type: 'change' });
   }
+  /**
+   * Steps used while Ctrl (or Meta) is held during a drag and no explicit snap is set, like the snap key of CAD and
+   * DCC apps. Defaults: 0.25 world units, 15 degrees, 0.1 scale. Set a field to null to turn that one off.
+   */
+  heldSnap: { translation: number | null; rotation: number | null; scale: number | null } = {
+    translation: 0.25,
+    rotation: Math.PI / 12,
+    scale: 0.1,
+  };
+  /** Key codes of {@link listenToKeyEvents}. Defaults: W translate, E rotate, R scale, Q toggles space, +/- size, Escape cancels a drag. */
+  keys = {
+    translate: 'KeyW',
+    rotate: 'KeyE',
+    scale: 'KeyR',
+    space: 'KeyQ',
+    larger: 'Equal',
+    smaller: 'Minus',
+    cancel: 'Escape',
+  };
+  private holdingSnap = false;
+  private keyTarget: { removeEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void } | null =
+    null;
+  /** The snap step in force for `kind`: the explicit snap, else the held-key step while Ctrl or Meta is down. */
+  private step(kind: 'translation' | 'rotation' | 'scale'): number | null {
+    const explicit =
+      kind === 'translation' ? this.translationSnap : kind === 'rotation' ? this.rotationSnap : this.scaleSnap;
+    return explicit || (this.holdingSnap ? this.heldSnap[kind] || null : null);
+  }
+  /**
+   * Turns on the keyboard shortcuts in `keys` (W/E/R modes, Q space, +/- size, Escape cancels a drag). Pass `window` or a
+   * focusable element; keys typed into text fields are ignored. Returns the controls.
+   */
+  listenToKeyEvents(target: {
+    addEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void;
+    removeEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void;
+  }): this {
+    this.stopListenToKeyEvents();
+    target.addEventListener('keydown', this.onKey);
+    this.keyTarget = target;
+    return this;
+  }
+  /** Turns the keyboard shortcuts off. */
+  stopListenToKeyEvents(): void {
+    this.keyTarget?.removeEventListener('keydown', this.onKey);
+    this.keyTarget = null;
+  }
+  /** Ends the current drag and puts the mesh back to where the drag began. Returns false when nothing is being dragged. */
+  cancelDrag(): boolean {
+    if (!this.dragging || !this.object || !this.resetState) return false;
+    const s = this.resetState,
+      pointerId = this.pointerId;
+    this.object.setPosition(s.position).setQuaternion(s.quaternion).setScale(s.scale);
+    if (pointerId !== null) {
+      try {
+        this.element?.releasePointerCapture?.(pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+    this.endDrag();
+    this.dispatchEvent({ type: 'objectChange' });
+    this.dispatchEvent({ type: 'change' });
+    return true;
+  }
+  private readonly onKey = (event: KeyboardEvent): void => {
+    if (!this.enabled) return;
+    const target = event.target as { tagName?: string; isContentEditable?: boolean } | null;
+    if (
+      target?.isContentEditable ||
+      target?.tagName === 'INPUT' ||
+      target?.tagName === 'TEXTAREA' ||
+      target?.tagName === 'SELECT'
+    )
+      return;
+    const k = this.keys,
+      code = event.code;
+    if (code === k.cancel) {
+      if (this.cancelDrag()) event.preventDefault?.();
+      return;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (code === k.translate) this.setMode('translate');
+    else if (code === k.rotate) this.setMode('rotate');
+    else if (code === k.scale) this.setMode('scale');
+    else if (code === k.space) this.setSpace(this.space === 'world' ? 'local' : 'world');
+    else if (code === k.larger || code === 'NumpadAdd') this.setSize(this.size * 1.1);
+    else if (code === k.smaller || code === 'NumpadSubtract') this.setSize(this.size / 1.1);
+    else return;
+    event.preventDefault?.();
+  };
   setTranslationSnap(step: number | null): void {
     this.translationSnap = step;
   }
@@ -319,6 +409,7 @@ export class TransformControls extends EventDispatcher {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.stopListenToKeyEvents();
     this.disconnect();
     this.object = null;
     this.overlay.release();
@@ -351,6 +442,7 @@ export class TransformControls extends EventDispatcher {
       return;
     }
     if (event.pointerId !== this.pointerId) return;
+    this.holdingSnap = !!(event.ctrlKey || event.metaKey);
     this.pointerMove(p.x, p.y);
   };
   private readonly onDown = (event: PointerEvent): void => {
@@ -388,6 +480,7 @@ export class TransformControls extends EventDispatcher {
   };
   private endDrag(): void {
     this.pointerId = null;
+    this.holdingSnap = false;
     if (!this.dragging) return;
     this.dragging = false;
     this.drag = null;
@@ -489,7 +582,7 @@ export class TransformControls extends EventDispatcher {
       const a = d.axes['XYZ'.indexOf(d.axis)];
       offset = scale(a, dot(offset, a));
     } else if (d.axis.length === 2) offset = sub(offset, scale(d.normal, dot(offset, d.normal)));
-    const snap = this.translationSnap,
+    const snap = this.step('translation'),
       local = this.space === 'local';
     if (snap && local && d.axis !== 'XYZ') {
       let snapped: V3 = [0, 0, 0];
@@ -517,6 +610,18 @@ export class TransformControls extends EventDispatcher {
           d.free,
         ),
       );
+      const step = this.step('rotation');
+      if (step) {
+        // Snap the accumulated turn's angle about its own axis; the unsnapped turn keeps accumulating underneath.
+        const [fx, fy, fz, fw] = d.free,
+          sine = Math.hypot(fx, fy, fz);
+        if (sine > 1e-9) {
+          const turn = 2 * Math.atan2(sine, fw),
+            snapped = Math.round(turn / step) * step;
+          this.applyRotation(d, object, axisAngleToQuaternion([fx / sine, fy / sine, fz / sine], snapped));
+          return;
+        }
+      }
       this.applyRotation(d, object, d.free);
       return;
     }
@@ -538,7 +643,8 @@ export class TransformControls extends EventDispatcher {
           ((x - d.screenStart.x) * d.tangent.x + (y - d.screenStart.y) * d.tangent.y) / Math.max(1, d.pixelsPerUnit);
       }
     }
-    if (this.rotationSnap) angle = Math.round(angle / this.rotationSnap) * this.rotationSnap;
+    const rotationStep = this.step('rotation');
+    if (rotationStep) angle = Math.round(angle / rotationStep) * rotationStep;
     d.angle = angle;
     this.applyRotation(d, object, axisAngleToQuaternion(axis, angle));
   }
@@ -574,7 +680,7 @@ export class TransformControls extends EventDispatcher {
         if (Math.abs(start) > 1e-9) next[i] = (d.scale[i] * dot(end, d.axes[i])) / start;
       }
     }
-    const snap = this.scaleSnap;
+    const snap = this.step('scale');
     for (let i = 0; i < 3; i++) {
       if (snap) next[i] = Math.round(next[i] / snap) * snap || snap;
       if (Math.abs(next[i]) < 1e-4) next[i] = Math.sign(next[i] || d.scale[i]) * 1e-4;

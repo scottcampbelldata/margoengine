@@ -51,6 +51,10 @@ export class OrbitControls extends Controls {
     maxDistance: number;
     minPolarAngle: number;
     maxPolarAngle: number;
+    targetBounds: {
+        min: readonly number[];
+        max: readonly number[];
+    } | null;
     minAzimuthAngle: number;
     maxAzimuthAngle: number;
     keys: {

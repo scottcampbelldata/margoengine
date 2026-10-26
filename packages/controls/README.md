@@ -178,6 +178,27 @@ Programmatic motion: `rotate(axis, angle)` (world axis through the target), `pan
 engine's. A `CameraProjection` answers `camera.up` with its own `up` for an exactly vertical view, so a roll is not kept
 at that one orientation.
 
+## Keep the target in bounds, snap and shortcuts
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {OrbitControls, TransformControls} from 'margoengine/controls';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const mesh = engine.createMesh().setGeometry(box());
+
+const orbit = OrbitControls.attach(engine);
+orbit.zoomToCursor = true;                                       // dolly toward the point under the pointer
+orbit.targetBounds = {min: [-5, 0, -5], max: [5, 3, 5]};         // panning cannot leave this box
+
+const gizmo = TransformControls.attach(engine, {mode: 'scale'}); // axis, plane (XY, YZ, XZ) and uniform handles
+gizmo.attach(mesh);
+gizmo.listenToKeyEvents(window);                                 // W/E/R modes, Q space, + / - size, Escape cancels a drag
+gizmo.addEventListener('dragging-changed', event => {orbit.enabled = !event.value;});
+gizmo.rotationSnap = Math.PI / 12;                               // also snaps the free rotation disc
+// Holding Ctrl while dragging snaps to gizmo.heldSnap (0.25 m, 15 degrees, 0.1 scale) when no snap is set.
+```
+
 ## Navigation profiles
 
 Engineers get the mouse, wheel, touch and keys of the tool they know, in one call:
@@ -277,6 +298,7 @@ any of them.
 | `minPolarAngle`, `maxPolarAngle` | Orbit, Map, PointerLock | `0`, `PI` |
 | `minAzimuthAngle`, `maxAzimuthAngle` | Orbit, Map | `-Infinity`, `Infinity` |
 | `zoomToCursor`, `screenSpacePanning`, `keyPanSpeed` | Orbit, Map | `false`, `true` (`false` for Map), `7` px |
+| `targetBounds` (`{min, max}` boxes the target) | Orbit, Map | `null` |
 | `autoRotate`, `autoRotateSpeed` | Orbit, Map | `false`, `2` (one turn per 30 s) |
 | `mouseButtons`, `touches`, `keys` | Orbit, Map, Trackball | Left rotates, middle dollies, right pans (Map: left pans, right rotates); one finger rotates, two dolly and pan (Map: pan, dolly and rotate); arrow keys (Trackball: A, S, D), using the exported `MOUSE` and `TOUCH` |
 | `setProfile(profile)`, `profile` | Orbit, Map | `null` (same as `MARGO`); see Navigation profiles |
@@ -287,6 +309,7 @@ any of them.
 | `pointerSpeed`, `movementSpeed`, `requireLock`, `keys` | PointerLock | `1`, `1`, `true`, WASD/arrows/R/F |
 | `mode`, `space`, `size` | Transform | `'translate'`, `'world'`, `1` |
 | `translationSnap`, `rotationSnap` (radians), `scaleSnap` | Transform | `null` |
+| `heldSnap` (steps used while Ctrl or Meta is held and no snap is set), `keys` (shortcut key codes) | Transform | 0.25, 15 degrees, 0.1; W E R Q + - Escape |
 | `showX`, `showY`, `showZ`, `visible`, `enabled` | Transform | `true` |
 | `element`, `order` | Transform | engine canvas, `1000` |
 | `view` (one of `engine.views`: its camera, pointers inside its rectangle, drawn only there) | Transform | `null` (engine camera, whole element) |
@@ -294,8 +317,8 @@ any of them.
 ## Limits
 
 - No roll except in `ArcballControls` (see above). Trackball rotation therefore cannot pass over the poles.
-- Orthographic cameras come from @margoengine/cameras (dolly becomes ortho zoom there; pan and the gizmo read the orthographic height from `camera.matrix`); an orbit `zoom` property is not implemented. `minTargetRadius`, `maxTargetRadius` and `cursor` are not implemented.
-- `TransformControls` has no plane scale handles, does not flip arrows toward the camera, draws no start-to-current delta helper lines, and does not snap free (trackball) rotation. A parent with non-uniform scale and rotation shears its children; drags use the parent's rotation without the shear.
+- Orthographic cameras come from @margoengine/cameras (dolly becomes ortho zoom there; pan and the gizmo read the orthographic height from `camera.matrix`); an orbit `zoom` property is not implemented. `minTargetRadius`, `maxTargetRadius` and `cursor` are not implemented (use `targetBounds` to limit the target).
+- `TransformControls` does not flip arrows toward the camera and draws no start-to-current delta helper lines. A parent with non-uniform scale and rotation shears its children; drags use the parent's rotation without the shear.
 - The gizmo is always on top of the scene (no occlusion by scene geometry).
 - `ArcballControls` has no on-screen gizmo, double-click focus or keyboard bindings. `DragControls` has no rotate mode, `recursive` or `transformGroup` options; pass a model to drag the whole model, or a core mesh to drag that mesh. Skinned models are grabbed in their bind pose (see @margoengine/bvh).
 

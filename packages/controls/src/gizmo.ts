@@ -186,7 +186,7 @@ export function buildGizmo(f: GizmoFrame): Handle[] {
         pick: { type: 'segment', a: madd(o, a, LAYOUT.pickStart * s), b: madd(o, a, end * s) },
       });
     }
-    if (f.mode === 'translate')
+    if (f.mode === 'translate' || f.mode === 'scale')
       for (const [name, i, j, k] of PLANES) {
         if (hidden(name) || Math.abs(dot(axes[k], eye)) < PLANE_EDGE_ON_COS) continue;
         const u = axes[i],

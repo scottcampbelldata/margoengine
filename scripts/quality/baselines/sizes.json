@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3139297,
+  "total": 3140782,
   "history": [
     {
       "date": "2026-10-24",
@@ -248,6 +248,12 @@
       "commit": "82da467e",
       "reason": "sciviz: vector fields: quiver arrows and RK4 streamlines",
       "grew": 2
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "804d2dea",
+      "reason": "controls: scale plane handles, free-rotation snap, held-key snap, gizmo shortcuts, drag cancel, orbit targetBounds (item 21.5)",
+      "grew": 2
     }
   ],
   "items": {
@@ -284,12 +290,12 @@
     "@margoengine/compute/signal": 7496,
     "@margoengine/compute/sparse": 7283,
     "@margoengine/compute/stream": 1422,
-    "@margoengine/controls": 22891,
+    "@margoengine/controls": 23713,
     "@margoengine/controls/arcball": 4582,
     "@margoengine/controls/drag": 2633,
     "@margoengine/controls/orbit": 5726,
     "@margoengine/controls/profiles": 960,
-    "@margoengine/controls/transform": 9547,
+    "@margoengine/controls/transform": 10210,
     "@margoengine/controls/walk": 13027,
     "@margoengine/core": 20932,
     "@margoengine/core/extension": 19995,

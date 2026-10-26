@@ -38,6 +38,26 @@ export class TransformControls extends EventDispatcher {
     setMode(mode: TransformMode): void;
     setSpace(space: TransformSpace): void;
     setSize(size: number): void;
+    heldSnap: {
+        translation: number | null;
+        rotation: number | null;
+        scale: number | null;
+    };
+    keys: {
+        translate: string;
+        rotate: string;
+        scale: string;
+        space: string;
+        larger: string;
+        smaller: string;
+        cancel: string;
+    };
+    listenToKeyEvents(target: {
+        addEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void;
+        removeEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void;
+    }): this;
+    stopListenToKeyEvents(): void;
+    cancelDrag(): boolean;
     setTranslationSnap(step: number | null): void;
     setRotationSnap(step: number | null): void;
     setScaleSnap(step: number | null): void;

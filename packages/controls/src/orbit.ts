@@ -106,6 +106,11 @@ export class OrbitControls extends Controls {
   minPolarAngle = 0;
   /** Largest polar angle (radians from +Y). Default PI. */
   maxPolarAngle = Math.PI;
+  /**
+   * Keeps the target inside an axis-aligned box (world units), so panning and zoom-to-cursor cannot drift away from the
+   * model. The camera moves with the target. Default null (unbounded); a bound of Infinity leaves that side free.
+   */
+  targetBounds: { min: readonly number[]; max: readonly number[] } | null = null;
   /** Azimuth limits in radians; both must be finite to apply. Defaults -Infinity and Infinity. */
   minAzimuthAngle = -Infinity;
   maxAzimuthAngle = Infinity;
@@ -369,6 +374,19 @@ export class OrbitControls extends Controls {
         ny = hit[1] + (ny - hit[1]) * k;
         nz = hit[2] + (nz - hit[2]) * k;
       }
+    }
+
+    const box = this.targetBounds;
+    if (box) {
+      const cx = clamp(nx, box.min[0], box.max[0]),
+        cy = clamp(ny, box.min[1], box.max[1]),
+        cz = clamp(nz, box.min[2], box.max[2]);
+      qx += cx - nx;
+      qy += cy - ny;
+      qz += cz - nz;
+      nx = cx;
+      ny = cy;
+      nz = cz;
     }
 
     this.write([qx, qy, qz], [nx, ny, nz]);
