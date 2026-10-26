@@ -25,7 +25,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/compute | `.` 35, `./linalg` 5, `./fft` 8, `./signal` 7, `./random` 5, `./autodiff` 3, `./sparse` 13, `./stream` 8, `./frame` 3 | 253 | 18 | 31,888 |
 | @margoengine/controls | `.` 50, `./orbit` 7, `./arcball` 5, `./transform` 5, `./drag` 3, `./profiles` 13, `./walk` 6 | 63 |  | 23,268 |
 | @margoengine/core | `.` 17, `./extension` 26 | 16 |  | 20,454 |
-| @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 18,911 |
+| @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 18,983 |
 | @margoengine/culling | `.` 6 |  |  | 9,457 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 3, `./tga` 3, `./dds` 5, `./ktx` 5, `./tiff` 3 | 5 |  | 478,227 |
 | @margoengine/dof | `.` 2 |  |  | 7,001 |
@@ -85,7 +85,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/tween | `.` 47 |  |  | 4,621 |
 | @margoengine/ui | `.` 97, `./react` 23 | 62 |  | 27,788 |
 | @margoengine/usdz | `.` 7, `./worker` 2 | 24 |  | 8,072 |
-| @margoengine/vfx | `.` 9, `./base` 9, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1, `./curves` 3, `./emitter` 2 | 45 |  | 9,420 |
+| @margoengine/vfx | `.` 9, `./base` 9, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1, `./curves` 3, `./emitter` 2 | 45 |  | 12,350 |
 | @margoengine/video | `.` 2 |  |  | 2,123 |
 | @margoengine/viewcube | `.` 5 |  |  | 3,434 |
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 10, `./lightmap` 3 | 80 |  | 5,911 |
