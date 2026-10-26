@@ -219,7 +219,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/clustered`](packages/clustered/README.md) | WebGPU clustered forward point and spot lighting with optional local shadows. |
 | [`@margoengine/shadows`](packages/shadows/README.md) | Four-cascade cached directional shadows with PCSS. |
 | [`@margoengine/lightmap`](packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
-| [`@margoengine/sky`](packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon and stars. |
+| [`@margoengine/sky`](packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning). |
 | [`@margoengine/toon`](packages/toon/README.md) | Stepped diffuse shading and inverted-hull outlines. |
 | [`@margoengine/oit`](packages/oit/README.md) | Weighted blended order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: no popping between overlapping transparent parts. |
 | [`@margoengine/lod`](packages/lod/README.md) | Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas. |
@@ -4054,7 +4054,7 @@ opaque; there is no diffuse bounce, rough glass or dispersion.
 
 Install `npm i margoengine` and import `margoengine/sky` (or this package alone: `npm i @margoengine/sky`, imported as `@margoengine/sky`; the two are the same module).
 
-WebGPU atmospheric background with an analytical Preetham/Perez daytime sky and an Earth-based Bruneton-style precomputed Rayleigh/Mie model, an optional stylized night (stars, phased moon) and distance or height fog. This is Margo's one sky: scenery's `SkyMoon` is a midnight preset of it.
+WebGPU atmospheric background with an analytical Preetham/Perez daytime sky and an Earth-based Bruneton-style precomputed Rayleigh/Mie model, an optional stylized night (stars, phased moon) and distance or height fog, plus optional weather (rain, snow, lightning and thunder timing). This is Margo's one sky: scenery's `SkyMoon` is a midnight preset of it.
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -4088,6 +4088,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/fog` | `fog` | 1.7 kB |
 | `/reflection` | `reflectionTexture` | 0.8 kB |
 | `/lighting` | `lighting` (engine sun/moon light, ambient) | 1.0 kB |
+| `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, lightning, thunder timing | 5.6 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
@@ -4105,25 +4106,6 @@ Atmospheric transmittance tints the sun; clouds continue to occlude both bodies.
 The moon uses a lower radiance and tighter halo to keep its antialiased limb
 readable through HDR bloom. Moon appearance follows the optional moon lighting
 described below; caller exposure and bloom strength still affect its glow.
-
-Set `clouds: {coverage: 0.45, speed: 8, height: 1500}` for an optional animated
-procedural cloud layer. Coverage is 0-1, speed is signed world meters per second
-along a fixed XZ wind direction, and height is 100-10,000 world meters. Defaults
-are 0.45, 8 and 1500; omitting `clouds` disables the layer. The layer is a curved
-shell at that height around the planet (radius 6,360 km), so clouds reach the
-horizon and only the ground hides them; they fade by distance into the haze (half
-strength at 28 km), not by angle. Four octaves of value noise on an integer hash
-(pcg2d, Jarzynski and Olano 2020: no precision loss on phone GPUs), each turned 37°,
-give the shape; coverage remaps it (Schneider 2015) and the fine octaves erode the
-edges. Fine octaves fade to their mean once a pixel covers them. Three samples
-toward the sun through the layer give Beer-Lambert self-shadowing with a powder
-term, lit by the sun's transmittance colour with a two-lobe Henyey-Greenstein phase
-(Hillaire 2016); the surrounding sky lights them as ambient, and the lighting moon
-by night. A sky pixel evaluates at most ten noise lookups (four for the shape and
-erosion, six for the sun samples), two where the sky is clear, and no
-texture reads. The visible sky, water's reflection and the lighting environment use
-the same cloud field and clock, with filtering matched to each target's resolution.
-This layer has no cloud shadows on the ground or volumetric flight-through rendering.
 
 [README continues: https://margoengine.com/llms/packages/sky.md]
 

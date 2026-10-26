@@ -1,5 +1,5 @@
 {
-  "commit": "532cb9f6",
+  "commit": "08fdae7e",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1089,7 +1089,7 @@
     "@margoengine/sky": {
       ".": {
         "raw": 43453,
-        "gzip": 15545
+        "gzip": 15542
       },
       "./base": {
         "raw": 16621,
@@ -1122,6 +1122,10 @@
       "./lighting": {
         "raw": 7750,
         "gzip": 3473
+      },
+      "./weather": {
+        "raw": 14354,
+        "gzip": 5623
       }
     },
     "@margoengine/splats": {
@@ -1432,8 +1436,8 @@
     },
     "packages/scenery/dist/sky.js": {
       "raw": 22171,
-      "gzip": 8763,
-      "brotli": 7834
+      "gzip": 8760,
+      "brotli": 7835
     },
     "packages/creative/dist/particles.js": {
       "raw": 29785,
