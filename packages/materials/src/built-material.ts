@@ -3104,18 +3104,25 @@ function queue(runtime: Engine): MaterialDraws {
   let draws = queues.get(runtime);
   if (draws) return draws;
   const members: Entry[] = [],
-    phases: Phase[] = [],
     tail: Phase[] = [],
     distance = new Map<Entry, number>(),
     name = 'materials:' + serial++,
     // One run, reused every frame: it keeps its batch records (gltf-pro draw-batch.ts) instead of making new ones.
     run = new PBRDrawRun();
-  let opaqueEnd = 0,
+  // Each arrange() makes a new list, so a loop that is drawing one keeps it while a draw re-arranges the queue.
+  let phases: Phase[] = [],
+    opaqueEnd = 0,
     arranged = false,
-    running = false;
+    running = false,
+    epoch = 0;
+  /** True when the entry's slots still draw in the phases it was arranged into. */
+  const current = (entry: Entry): boolean => {
+    const flags = lateFlags(entry);
+    return ((flags & 1) !== 0) === entry.opaque && ((flags & 2) !== 0) === entry.blend;
+  };
   // Opaque order is stable until membership or a transparent flag changes. Distance sorts only the late phase.
   const arrange = () => {
-    phases.length = 0;
+    const next: Phase[] = [];
     for (let i = 0; i < members.length; i++) {
       const entry = members[i],
         flags = lateFlags(entry),
@@ -3123,13 +3130,33 @@ function queue(runtime: Engine): MaterialDraws {
         blend = (flags & 2) !== 0;
       entry.opaque = opaque;
       entry.blend = blend;
-      if (opaque) phases.push({ entry, model: entry.model, blend: false, phase: blend ? 'opaque' : 'all' });
-      if (blend) phases.push({ entry, model: entry.model, blend: true, phase: opaque ? 'blend' : 'all' });
+      if (opaque) next.push({ entry, model: entry.model, blend: false, phase: blend ? 'opaque' : 'all' });
+      if (blend) next.push({ entry, model: entry.model, blend: true, phase: opaque ? 'blend' : 'all' });
     }
-    phases.sort((a, b) => +a.blend - +b.blend || a.entry.order - b.entry.order);
+    next.sort((a, b) => +a.blend - +b.blend || a.entry.order - b.entry.order);
     opaqueEnd = 0;
-    while (opaqueEnd < phases.length && !phases[opaqueEnd].blend) opaqueEnd++;
+    while (opaqueEnd < next.length && !next[opaqueEnd].blend) opaqueEnd++;
+    phases = next;
     arranged = true;
+    epoch++;
+  };
+  /** Sorts the late phase back to front from `eye`. With `check`, returns false (unsorted) when one of its entries changed phase. */
+  const sortLate = (eye: ArrayLike<number>, check: boolean): boolean => {
+    distance.clear();
+    if (opaqueEnd === phases.length) return true;
+    for (let i = opaqueEnd; i < phases.length; i++) {
+      const entry = phases[i].entry;
+      if (distance.has(entry)) continue;
+      if (check && !current(entry)) return false;
+      const matrix = entry.model.primitives[0].node.matrix;
+      distance.set(entry, Math.hypot(eye[0] - matrix[12], eye[1] - matrix[13], eye[2] - matrix[14]));
+    }
+    const count = phases.length - opaqueEnd;
+    for (let i = 0; i < count; i++) tail[i] = phases[opaqueEnd + i];
+    tail.length = count;
+    tail.sort((a, b) => a.entry.order - b.entry.order || distance.get(b.entry)! - distance.get(a.entry)!);
+    for (let i = 0; i < count; i++) phases[opaqueEnd + i] = tail[i];
+    return true;
   };
   runtime.use({
     name,
@@ -3143,42 +3170,50 @@ function queue(runtime: Engine): MaterialDraws {
         order: 1,
         execute: (c) => {
           if (c.backend !== 'webgpu') return;
-          let stale = !arranged;
-          if (!stale)
-            for (let i = 0; i < members.length; i++) {
-              const entry = members[i],
-                flags = lateFlags(entry);
-              if (((flags & 1) !== 0) !== entry.opaque || ((flags & 2) !== 0) !== entry.blend) {
-                stale = true;
-                break;
-              }
-            }
-          if (stale) arrange();
-          distance.clear();
-          if (opaqueEnd < phases.length) {
-            const eye = c.camera.position;
-            for (let i = opaqueEnd; i < phases.length; i++) {
-              const entry = phases[i].entry;
-              if (distance.has(entry)) continue;
-              const matrix = entry.model.primitives[0].node.matrix;
-              distance.set(entry, Math.hypot(eye[0] - matrix[12], eye[1] - matrix[13], eye[2] - matrix[14]));
-            }
-            const count = phases.length - opaqueEnd;
-            for (let i = 0; i < count; i++) tail[i] = phases[opaqueEnd + i];
-            tail.length = count;
-            tail.sort((a, b) => a.entry.order - b.entry.order || distance.get(b.entry)! - distance.get(a.entry)!);
-            for (let i = 0; i < count; i++) phases[opaqueEnd + i] = tail[i];
-          }
+          if (!arranged) arrange();
+          // The late phase's entries are checked before anything draws, so one that turned opaque draws with the
+          // opaque phase this frame.
+          const eye = c.camera.position;
+          while (!sortLate(eye, true)) arrange();
           // One render pass for every mesh: a pass per mesh stores and reloads the multisampled colour and depth each
           // time and costs a begin, an end and a command-buffer flush (10,000 meshes: 168 ms of CPU a frame).
           // A frame drawn inside this one (a draw callback rendering a probe) takes a run of its own.
           const own = running ? new PBRDrawRun() : run,
             color = c.color,
-            depth = c.depth;
+            depth = c.depth,
+            first = epoch;
           running = true;
           try {
-            for (let i = 0; i < phases.length; i++) {
-              const item = phases[i];
+            // Each opaque entry is checked beside its draw rather than in a pass of its own over every mesh first
+            // (10,000 meshes: one more trip through memory a frame). An entry that changed phase re-arranges the queue,
+            // and so may a frame drawn inside a draw; the loop then continues on the new list, skipping what drew.
+            let list = phases,
+              end = opaqueEnd,
+              at = epoch,
+              drawn: Set<Entry> | undefined;
+            for (let i = 0; i < end; i++) {
+              const item = list[i],
+                entry = item.entry;
+              if (drawn?.has(entry)) continue;
+              let done = 0;
+              if (current(entry)) {
+                item.model.draw(c, 'beauty', color, depth, item.phase, undefined, own);
+                if (at === epoch) continue;
+                done = 1;
+              } else arrange();
+              drawn ??= new Set();
+              for (let k = 0; k < i + done; k++) drawn.add(list[k].entry);
+              list = phases;
+              end = opaqueEnd;
+              at = epoch;
+              i = -1;
+            }
+            // Re-arranged while drawing: the late phase is sorted again (a change from here on shows next frame).
+            if (epoch !== first) sortLate(eye, false);
+            list = phases;
+            end = list.length;
+            for (let i = opaqueEnd; i < end; i++) {
+              const item = list[i];
               item.model.draw(c, 'beauty', color, depth, item.phase, undefined, own);
             }
           } finally {

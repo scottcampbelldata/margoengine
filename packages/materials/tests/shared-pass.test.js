@@ -145,3 +145,54 @@ test('a reused run keeps its batch records for the next frame instead of allocat
     w.destroy();
   }
 });
+
+test('a mesh that changes phase between frames, or during a frame, draws once and in its new phase', async () => {
+  const w = await world();
+  try {
+    const order = [],
+      materials = {},
+      meshes = {};
+    for (const name of ['a', 'b', 'c', 'd']) {
+      materials[name] = new Material({ color: [1, 0, 0], opacity: 0.5 });
+      const mesh = (meshes[name] = createMesh(w.engine, triangle, materials[name]));
+      mesh.root.setPosition([0, 0, -'abcd'.indexOf(name)]);
+      mesh.draw = function (...args) {
+        order.push(name);
+        return PBRModel.prototype.draw.apply(this, args);
+      };
+    }
+    w.store.tick(false);
+    const frame = () => {
+      order.length = 0;
+      w.engine.frameGraph.execute(w.context);
+      return order.join('');
+    };
+    assert.equal(frame(), 'abcd');
+    // Opaque to blended: it leaves the opaque phase and draws after it.
+    materials.b.transparent = true;
+    assert.equal(frame(), 'acdb');
+    // Blended to opaque, and another to blended, in one frame: the opaque phase is in mesh order again.
+    materials.b.transparent = false;
+    materials.c.transparent = true;
+    assert.equal(frame(), 'abdc');
+    // The first and the last mesh of the opaque phase.
+    materials.c.transparent = false;
+    materials.a.transparent = true;
+    materials.d.transparent = true;
+    assert.equal(frame(), 'bcda');
+    materials.a.transparent = false;
+    materials.d.transparent = false;
+    assert.equal(frame(), 'abcd');
+    // Changed by a draw during the frame: the later mesh is not drawn as opaque, and still draws once.
+    const draw = meshes.a.draw;
+    meshes.a.draw = function (...args) {
+      materials.c.transparent = true;
+      return draw.apply(this, args);
+    };
+    assert.equal(frame(), 'abdc');
+    meshes.a.draw = draw;
+    assert.equal(frame(), 'abdc');
+  } finally {
+    w.destroy();
+  }
+});
