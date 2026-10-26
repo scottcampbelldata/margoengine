@@ -1,10 +1,24 @@
 // Private sparse map specialization for constructed PhysicalMaterial surfaces.
 // Logical slots stay stable even when texture views and samplers are shared.
+// Derived once per source, group and slot plan: every frame derives each material's shader again (gltf-pro
+// draw-memo.ts), and these edits on the whole PBR shader were most of a 400-mesh physical frame's CPU.
+const derived = new Map<string, Map<string, string>>();
 export function physicalMapsShader(
   source: string,
   group: number,
   slots: readonly (readonly [number, number] | null)[],
 ): string {
+  let bySlots = derived.get(source);
+  if (!bySlots) {
+    if (derived.size >= 64) derived.clear();
+    derived.set(source, (bySlots = new Map()));
+  }
+  const key = group + ':' + slots.map((slot) => (slot ? slot[0] + '.' + slot[1] : '-')).join();
+  let out = bySlots.get(key);
+  if (out === undefined) bySlots.set(key, (out = specialize(source, group, slots)));
+  return out;
+}
+function specialize(source: string, group: number, slots: readonly (readonly [number, number] | null)[]): string {
   const sample = (k: number): string => {
     const slot = slots[k];
     return slot

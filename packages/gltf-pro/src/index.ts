@@ -272,6 +272,8 @@ interface RunView {
   at: GPUBufferBinding | undefined;
 }
 const noLighting: readonly LightingEffect[] = Object.freeze([]);
+/** Whether a finished shader reads the model rows only in the instanced vertex stage (see `derive`), by shader. */
+const modelFreeCode = new Map<string, boolean>();
 // Global, not per model: draws nest (a callback may draw), and one stack serves every model.
 const scratchStack: DrawScratch[] = [];
 let scratchDepth = 0;
@@ -3195,7 +3197,12 @@ export class PBRModel implements EnginePlugin {
     code = viewShader(code);
     // An instanced batch sets the model rows to identity: a shader that reads them itself (beyond the instanced vertex
     // stage) needs each mesh's own draw.
-    const modelFree = !/\bf\.(model|normalMatrix)\b/.test(code.replaceAll('let margoI=f.model*', ''));
+    let modelFree = modelFreeCode.get(code);
+    if (modelFree === undefined) {
+      if (modelFreeCode.size >= 256) modelFreeCode.clear();
+      modelFree = !/\bf\.(model|normalMatrix)\b/.test(code.replaceAll('let margoI=f.model*', ''));
+      modelFreeCode.set(code, modelFree);
+    }
     // Keep the shader's original front-facing convention, including mirrored transforms.
     // Mirrored instances flip winding per instance: no culling, the shader's face test discards back faces instead.
     const face = +(!topology && !!inst?.mirrored && flag !== 1),
