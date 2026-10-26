@@ -17,6 +17,8 @@ export { addRootMotion } from './root-motion.js';
 export type { RootMotion, RootMotionOptions } from './root-motion.js';
 export { addLookAt, addAimConstraint } from './look-at.js';
 export type { LookAt, AimConstraint } from './look-at.js';
+export { addFootPlacement } from './foot-placement.js';
+export type { FootPlacement, FootPlacementHandle, PlacedLeg } from './foot-placement.js';
 /**
  * What an animator state plays: a clip name, a 1D tree (`parameter` plus samples sorted by increasing `value`) or a
  * 2D tree (two `parameters` plus samples with unique `[x, y]` values). Parameters default to 0.
@@ -25,16 +27,45 @@ export type BlendTree =
   | string
   | { parameter: string; samples: readonly { value: number; clip: string }[] }
   | { parameters: readonly [string, string]; samples: readonly { value: readonly [number, number]; clip: string }[] };
-/** An automatic state change: when `when(parameters)` is true in state `from`, the animator crossfades to `to`. */
+/**
+ * An automatic state change: in state `from`, once every condition it lists holds (`when`, `trigger`, `exitTime`; at
+ * least one), the animator crossfades to `to`. Transitions are checked once per frame in declaration order and the
+ * first that holds wins.
+ */
 export interface AnimatorTransition {
-  /** The state this transition leaves. */
+  /** The state this transition leaves, or `'*'` for any state (except `to` itself). */
   from: string;
   /** The state it enters. */
   to: string;
-  /** Evaluated once per frame, in declaration order, while in `from`. */
-  when: (parameters: Readonly<Record<string, number>>) => boolean;
+  /** Holds when it returns true; evaluated while in `from`. Default: no parameter condition. */
+  when?: (parameters: Readonly<Record<string, number>>) => boolean;
+  /** Holds while this trigger is set ({@link Animator.setTrigger}); taking the transition clears it. Default: none. */
+  trigger?: string;
+  /**
+   * Holds once the state's normalized time ({@link Animator.normalizedTime}) reaches this value: 1 is the end of the
+   * state's longest clip, 0.8 lets the crossfade overlap its last fifth. Default: none.
+   */
+  exitTime?: number;
   /** Crossfade length in seconds, 0 or more. Default 0.15. */
   duration?: number;
+}
+/** A named moment in a state's cycle (a footstep, a hit frame), delivered through `animator.on('event')`. */
+export interface AnimatorEvent {
+  /** The state it belongs to. */
+  state: string;
+  /** Normalized time in the state's cycle, 0 to 1 (0.5 is halfway through its longest clip). */
+  time: number;
+  /** Event name, for example `'footstep'`. */
+  name: string;
+  /** Anything the listener needs (which foot, a sound name). Default undefined. */
+  data?: unknown;
+}
+/** Events an Animator emits, keyed by type. */
+export interface AnimatorEventMap {
+  /** A timed event from `options.events`, once per cycle it is passed (loops included). */
+  event: { name: string; state: string; time: number; data: unknown };
+  /** The state changed, by a transition rule or {@link Animator.transition}. */
+  statechange: { from: string; to: string; duration: number };
 }
 /** Options for {@link Animator}. */
 export interface AnimatorOptions {
@@ -46,6 +77,8 @@ export interface AnimatorOptions {
   parameters?: Record<string, number>;
   /** Automatic state changes. Default: none. */
   transitions?: readonly AnimatorTransition[];
+  /** Timed events per state (footsteps, hit frames), delivered through `animator.on('event')`. Default: none. */
+  events?: readonly AnimatorEvent[];
   /**
    * Optional explicit rotation commit, captured once during construction.
    * Receives a borrowed normal array for sampled/blended poses and FootIK.
@@ -57,17 +90,26 @@ export interface AnimatorOptions {
    */
   writeRotation?: (node: Mesh, rotation: readonly number[]) => void;
 }
-/** A masked additive layer: the difference between a clip and its reference pose, added to the base pose. */
+/**
+ * A masked layer over the base pose. `additive` (default) adds the difference between the clip and its reference
+ * pose; `override` blends the masked bones toward the clip's pose by `weight` (an upper-body wave over a walk).
+ */
 export interface AdditiveLayer {
-  /** The clip to add. */
+  /** The clip to add or blend in. */
   clip: string;
   /** Strength from 0 to 1; read every frame, so it may be animated. */
   weight: number;
   /** glTF node indices the layer affects. */
   mask: readonly number[];
-  /** Reference clip time. A zero reference scale axis contributes an identity scale delta. */
+  /** `'additive'` (default) or `'override'`. */
+  blend?: 'additive' | 'override';
+  /** Clip time in seconds, read every frame (default the state's time), to play a layer on its own clock. */
+  time?: number;
+  /** Additive reference clip time. A zero reference scale axis contributes an identity scale delta. */
   referenceTime?: number;
 }
+/** A masked additive or override layer ({@link Animator.addLayer}). */
+export type AnimatorLayer = AdditiveLayer;
 /** What a {@link FootIK} `raycast` returns for a hit. */
 export interface GroundHit {
   /** World-space hit point. */
@@ -170,6 +212,11 @@ export class Animator implements EnginePlugin {
   private readonly solvers: Array<() => void> = [];
   private readonly poseSteps: Array<(position: number[][], rotation: number[][]) => void> = [];
   private disposed = false;
+  private readonly triggers = new Set<string>();
+  private readonly durations = new Map<string, number>();
+  private readonly events = new Map<string, AnimatorEvent[]>();
+  private readonly listeners = new Map<keyof AnimatorEventMap, Set<(event: never) => void>>();
+  private entered = true;
   private unsubscribe?: () => void;
   private previousPlaying: boolean;
   private readonly writeRotation?: AnimatorOptions['writeRotation'];
@@ -185,6 +232,7 @@ export class Animator implements EnginePlugin {
       throw new TypeError('Invalid animator states; pass a non-empty states object that contains the initial state');
     for (const [name, tree] of Object.entries(options.states)) {
       if (!name) throw new TypeError('Empty animator state; give every state a non-empty name');
+      if (name === '*') throw new TypeError("Animator state '*' is reserved for any-state transitions; rename it");
       if (typeof tree === 'string') this.clip(tree);
       else if ('parameter' in tree) {
         blend1D(
@@ -203,17 +251,40 @@ export class Animator implements EnginePlugin {
         for (const s of tree.samples) this.clip(s.clip);
       }
     }
+    // A state's cycle is its longest clip: what normalized time, exit times and events measure.
+    for (const [name, tree] of Object.entries(options.states)) {
+      const clips = typeof tree === 'string' ? [tree] : tree.samples.map((sample) => sample.clip);
+      this.durations.set(name, Math.max(0, ...clips.map((clip) => this.clip(clip).duration)));
+    }
     for (const t of options.transitions ?? [])
       if (
-        !Object.hasOwn(options.states, t.from) ||
+        (t.from !== '*' && !Object.hasOwn(options.states, t.from)) ||
         !Object.hasOwn(options.states, t.to) ||
-        typeof t.when !== 'function' ||
+        (t.when !== undefined && typeof t.when !== 'function') ||
+        (t.trigger !== undefined && (typeof t.trigger !== 'string' || !t.trigger)) ||
+        (t.exitTime !== undefined && !(t.exitTime >= 0 && t.exitTime < Infinity)) ||
+        (t.when === undefined && t.trigger === undefined && t.exitTime === undefined) ||
         !Number.isFinite(t.duration ?? 0.15) ||
         (t.duration ?? 0.15) < 0
       )
         throw new TypeError(
-          'Invalid animator transition; use known from and to states, a when function and a duration of 0 or more',
+          "Invalid animator transition; use known from (or '*') and to states, at least one of a when function, a trigger name or an exitTime of 0 or more, and a duration of 0 or more",
         );
+    for (const event of options.events ?? []) {
+      if (
+        !event ||
+        !Object.hasOwn(options.states, event.state) ||
+        typeof event.name !== 'string' ||
+        !event.name ||
+        !(event.time >= 0 && event.time <= 1)
+      )
+        throw new TypeError(
+          "Invalid animator event; pass {state, time, name} with a known state, a normalized time from 0 to 1 and a non-empty name, e.g. {state: 'walk', time: 0.5, name: 'footstep'}",
+        );
+      let list = this.events.get(event.state);
+      if (!list) this.events.set(event.state, (list = []));
+      list.push(event);
+    }
     const writer = options.writeRotation;
     if (writer !== undefined && typeof writer !== 'function')
       throw new TypeError(
@@ -265,9 +336,72 @@ export class Animator implements EnginePlugin {
       );
     if (state === this.state) return this;
     this.fade = duration ? { pose: clone(this.current), elapsed: 0, duration } : undefined;
+    const from = this.state;
     this.state = state;
     this.time = 0;
+    this.entered = true;
+    this.emit('statechange', { from, to: state, duration });
     return this;
+  }
+  /**
+   * Time in the current state as a fraction of its cycle (its longest clip): 0 on entry, 1 after one cycle, 2.5
+   * halfway through the third. A state whose clips have no duration reads 1.
+   */
+  get normalizedTime(): number {
+    const duration = this.durations.get(this.state) ?? 0;
+    return duration > 0 ? this.time / duration : 1;
+  }
+  /** Sets a trigger: the next transition that lists it (and whose other conditions hold) is taken and clears it. */
+  setTrigger(name: string): this {
+    if (typeof name !== 'string' || !name)
+      throw new TypeError('Animator trigger needs a non-empty name; pass the trigger a transition lists');
+    this.triggers.add(name);
+    return this;
+  }
+  /** Clears a trigger that no transition has taken yet. */
+  resetTrigger(name: string): this {
+    this.triggers.delete(name);
+    return this;
+  }
+  /** True while `name` is set and not yet taken by a transition. */
+  hasTrigger(name: string): boolean {
+    return this.triggers.has(name);
+  }
+  /** Subscribes to timed events or state changes. Returns an unsubscribe function. */
+  on<K extends keyof AnimatorEventMap>(type: K, listener: (event: AnimatorEventMap[K]) => void): () => void {
+    if (typeof listener !== 'function')
+      throw new TypeError("Animator listener must be a function: animator.on('event', (e) => {})");
+    let set = this.listeners.get(type);
+    if (!set) this.listeners.set(type, (set = new Set()));
+    set.add(listener as (event: never) => void);
+    return () => {
+      set!.delete(listener as (event: never) => void);
+    };
+  }
+  private emit<K extends keyof AnimatorEventMap>(type: K, event: AnimatorEventMap[K]): void {
+    const set = this.listeners.get(type);
+    if (set) for (const listener of [...set]) (listener as (event: AnimatorEventMap[K]) => void)(event);
+  }
+  /** Emits the current state's timed events passed between state times `from` and `to` (seconds), loops included. */
+  private fireEvents(from: number, to: number): void {
+    const entered = this.entered;
+    this.entered = false;
+    const list = this.events.get(this.state);
+    if (!list || !this.listeners.get('event')?.size || (!(to > from) && !entered)) return;
+    const duration = this.durations.get(this.state) ?? 0,
+      loop = (this.animation.options.loop ?? true) && duration > 0,
+      state = this.state;
+    for (const e of list) {
+      const at = e.time * duration;
+      // Every cycle k whose moment k * duration + at lies in (from, to], or [from, to] on the frame the state began.
+      for (let k = loop ? Math.max(0, Math.ceil((from - at) / duration)) : 0; ; k++) {
+        const moment = k * duration + at;
+        if (moment > to) break;
+        if (moment > from || (entered && moment >= from))
+          this.emit('event', { name: e.name, state, time: e.time, data: e.data });
+        if (!loop) break;
+      }
+    }
   }
   addLayer(layer: AdditiveLayer): () => void {
     this.clip(layer.clip);
@@ -278,6 +412,8 @@ export class Animator implements EnginePlugin {
   private validateLayer(layer: AdditiveLayer): void {
     if (
       this.disposed ||
+      (layer.blend !== undefined && layer.blend !== 'additive' && layer.blend !== 'override') ||
+      !(layer.time === undefined || (layer.time >= 0 && layer.time < Infinity)) ||
       !Number.isFinite(layer.weight) ||
       layer.weight < 0 ||
       layer.weight > 1 ||
@@ -287,7 +423,7 @@ export class Animator implements EnginePlugin {
       (layer.referenceTime ?? 0) < 0
     )
       throw new RangeError(
-        'Invalid additive layer; use a weight from 0 to 1, a mask of node indices inside the model and a referenceTime of 0 or more, on an Animator that is not disposed',
+        "Invalid animator layer; use a weight from 0 to 1, a mask of node indices inside the model, blend 'additive' or 'override', and a time and referenceTime of 0 or more, on an Animator that is not disposed",
       );
   }
   addFootIK(foot: FootIK): () => void {
@@ -377,16 +513,25 @@ export class Animator implements EnginePlugin {
       if (!Number.isFinite(v))
         throw new RangeError('Invalid blend parameter; set every animator.parameters value to a finite number');
     const transitions = this.options.transitions;
-    if (transitions)
-      for (const t of transitions)
-        if (t.from === this.state && t.when(this.parameters)) {
-          this.transition(t.to, t.duration);
-          break;
-        }
+    if (transitions) {
+      const normalized = this.normalizedTime;
+      for (const t of transitions) {
+        if (t.from === '*' ? t.to === this.state : t.from !== this.state) continue;
+        if (t.exitTime !== undefined && normalized < t.exitTime) continue;
+        if (t.trigger !== undefined && !this.triggers.has(t.trigger)) continue;
+        if (t.when && !t.when(this.parameters)) continue;
+        if (t.trigger !== undefined) this.triggers.delete(t.trigger);
+        this.transition(t.to, t.duration);
+        break;
+      }
+    }
     const speed = this.animation.options.speed ?? 1;
     if (!Number.isFinite(speed) || speed < 0) throw new RangeError('Animation speed must be a finite number >= 0');
-    const step = this.playing ? delta * speed : 0;
+    const step = this.playing ? delta * speed : 0,
+      before = this.time;
     this.time += step;
+    if (this.events.size) this.fireEvents(before, this.time);
+    else this.entered = false;
     const tree = this.options.states[this.state];
     let pose: Pose | undefined;
     // One unlayered clip needs one owned pose, not a deep clone of every node
@@ -431,8 +576,24 @@ export class Animator implements EnginePlugin {
     if (this.layers.size)
       for (const layer of this.layers) {
         this.validateLayer(layer);
-        const sample = this.sample(layer.clip, this.time),
-          reference = this.sample(layer.clip, layer.referenceTime ?? 0, false);
+        const sample = this.sample(layer.clip, layer.time ?? this.time);
+        if (layer.blend === 'override') {
+          // Blend the masked bones toward the clip's pose.
+          const w = layer.weight;
+          for (const i of layer.mask) {
+            for (let c = 0; c < 3; c++) {
+              pose.position[i][c] += (sample.position[i][c] - pose.position[i][c]) * w;
+              pose.scale[i][c] += (sample.scale[i][c] - pose.scale[i][c]) * w;
+            }
+            pose.rotation[i] = quaternionBlend(pose.rotation[i], sample.rotation[i], w);
+            const weights = pose.weights.get(i),
+              sampleWeights = sample.weights.get(i);
+            if (weights && sampleWeights)
+              for (let j = 0; j < weights.length; j++) weights[j] += (sampleWeights[j] - weights[j]) * w;
+          }
+          continue;
+        }
+        const reference = this.sample(layer.clip, layer.referenceTime ?? 0, false);
         for (const i of layer.mask) {
           for (let c = 0; c < 3; c++) {
             pose.position[i][c] += (sample.position[i][c] - reference.position[i][c]) * layer.weight;
@@ -677,6 +838,8 @@ export class Animator implements EnginePlugin {
     this.animation.playing = this.previousPlaying;
     this.layers.clear();
     this.feet.clear();
+    this.listeners.clear();
+    this.triggers.clear();
     this.solvers.length = 0;
     this.poseSteps.length = 0;
     this.engine = undefined;

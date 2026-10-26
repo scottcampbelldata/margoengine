@@ -11,6 +11,8 @@ export interface AdditiveLayer {
     clip: string;
     weight: number;
     mask: readonly number[];
+    blend?: 'additive' | 'override';
+    time?: number;
     referenceTime?: number;
 }
 
@@ -29,6 +31,11 @@ export class Animator implements EnginePlugin {
     constructor(animation: Animation, options: AnimatorOptions);
     static attach(animation: Animation, options: AnimatorOptions): Animator;
     transition(state: string, duration?: number): this;
+    get normalizedTime(): number;
+    setTrigger(name: string): this;
+    resetTrigger(name: string): this;
+    hasTrigger(name: string): boolean;
+    on<K extends keyof AnimatorEventMap>(type: K, listener: (event: AnimatorEventMap[K]) => void): () => void;
     addLayer(layer: AdditiveLayer): () => void;
     addFootIK(foot: FootIK): () => void;
     addSolver(step: () => void): () => void;
@@ -43,18 +50,44 @@ export class Animator implements EnginePlugin {
     destroy(): void;
 }
 
+export interface AnimatorEvent {
+    state: string;
+    time: number;
+    name: string;
+    data?: unknown;
+}
+
+export interface AnimatorEventMap {
+    event: {
+        name: string;
+        state: string;
+        time: number;
+        data: unknown;
+    };
+    statechange: {
+        from: string;
+        to: string;
+        duration: number;
+    };
+}
+
+export type AnimatorLayer = AdditiveLayer;
+
 export interface AnimatorOptions {
     states: Record<string, BlendTree>;
     initial: string;
     parameters?: Record<string, number>;
     transitions?: readonly AnimatorTransition[];
+    events?: readonly AnimatorEvent[];
     writeRotation?: (node: Mesh, rotation: readonly number[]) => void;
 }
 
 export interface AnimatorTransition {
     from: string;
     to: string;
-    when: (parameters: Readonly<Record<string, number>>) => boolean;
+    when?: (parameters: Readonly<Record<string, number>>) => boolean;
+    trigger?: string;
+    exitTime?: number;
     duration?: number;
 }
 
@@ -152,6 +185,25 @@ export interface FootIK {
     probeHeight?: number;
 }
 
+export interface FootPlacement {
+    pelvis: number;
+    legs: readonly PlacedLeg[];
+    raycast: (origin: Vec3, direction: Vec3) => GroundHit | null;
+    ground?: Mesh;
+    probeHeight?: number;
+    probeDepth?: number;
+    maxPelvisDrop?: number;
+    alignFeet?: boolean;
+    weight?: number;
+}
+
+export interface FootPlacementHandle {
+    readonly pelvisOffset: number;
+    readonly footOffsets: readonly number[];
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
 export interface GroundHit {
     position: Vec3;
     normal?: Vec3;
@@ -166,6 +218,13 @@ export interface LookAt {
     worldUp?: Vec3;
     maxAngle?: number;
     weight?: number;
+}
+
+export interface PlacedLeg {
+    hip: number;
+    knee: number;
+    ankle: number;
+    pole: Vec3;
 }
 
 export interface RootMotion {
@@ -186,6 +245,8 @@ export interface RootMotionOptions {
 export function addAimConstraint(animator: Animator, aim: AimConstraint): () => void;
 
 export function addCCDChain(animator: Animator, chain: CCDChain): () => void;
+
+export function addFootPlacement(animator: Animator, placement: FootPlacement): FootPlacementHandle;
 
 export function addLookAt(animator: Animator, lookAt: LookAt): () => void;
 

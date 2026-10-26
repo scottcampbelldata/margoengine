@@ -1516,6 +1516,7 @@
       "CCDSolver",
       "addAimConstraint",
       "addCCDChain",
+      "addFootPlacement",
       "addLookAt",
       "addRootMotion",
       "blend1D",

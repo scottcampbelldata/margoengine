@@ -142,6 +142,94 @@ removeAim();
 
 Each bone in turn takes its share of what is left, so the last bone's axis ends exactly on the target (or `maxAngle` from where the animation pointed it). `weight` below 1 blends every bone's local rotation from the animated one to the solved one. Bones and their ancestors need positive uniform scales; rotations commit through `writeRotation` when it is set. For IK chains with poles see `addIKChain` in [`@margoengine/rigging`](../rigging/README.md).
 
+## Triggers, exit times, any-state transitions and events
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Animation } from 'margoengine/animation';
+import { Animator } from 'margoengine/animator';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const model = await loadGLTF(engine, '/hero.glb'); // clips named Idle, Walk, Jump, Land
+const animator = Animator.attach(Animation.attach(model), {
+  initial: 'idle',
+  parameters: { speed: 0 },
+  states: { idle: 'Idle', walk: 'Walk', jump: 'Jump', land: 'Land' },
+  transitions: [
+    { from: 'idle', to: 'walk', when: (p) => p.speed > 0.1 },
+    { from: 'walk', to: 'idle', when: (p) => p.speed <= 0.1 },
+    { from: '*', to: 'jump', trigger: 'jump', duration: 0.05 }, // from any state
+    { from: 'jump', to: 'land', exitTime: 1 }, // once the jump clip has played through
+    { from: 'land', to: 'idle', exitTime: 0.9, duration: 0.2 },
+  ],
+  events: [
+    { state: 'walk', time: 0.1, name: 'footstep', data: 'left' }, // normalized time in the state's cycle
+    { state: 'walk', time: 0.6, name: 'footstep', data: 'right' },
+  ],
+});
+animator.on('event', (e) => console.log(e.name, e.data)); // footstep left, footstep right, every cycle
+animator.on('statechange', (e) => console.log(`${e.from} -> ${e.to}`));
+addEventListener('keydown', (e) => {
+  if (e.code === 'Space') animator.setTrigger('jump');
+});
+engine.start();
+```
+
+- **Conditions.** A transition lists any of `when(parameters)`, `trigger` and `exitTime`; it is taken once all of them hold. At least one is required. Transitions are checked once per frame in declaration order; the first that holds wins.
+- **Any state.** `from: '*'` applies in every state except its own `to` (so it never restarts the state it leads to). The name `'*'` is reserved.
+- **Triggers.** `setTrigger(name)` sets a one-shot flag; the transition that takes it clears it. A trigger no transition can take yet stays set until `resetTrigger(name)`. `hasTrigger(name)` reads it.
+- **Normalized time.** `animator.normalizedTime` is the time in the current state over its cycle (its longest clip): 0 on entry, 1 after one cycle, 2.5 halfway through the third. `exitTime` and events measure the same way.
+- **Events.** `options.events` lists `{state, time, name, data}` moments, `time` from 0 to 1 in the state's cycle. Each fires once per cycle it is passed, loops and long frames included (a 3-cycle frame fires it three times); an event at 0 fires on entering the state. With `Animation.options.loop` false each fires once. Paused (`playing = false`) nothing passes. `animator.on('event' | 'statechange', listener)` returns its unsubscribe function; `statechange` reports `{from, to, duration}` for rules and for `transition()`.
+
+## Override layers
+
+`addLayer({clip, weight, mask, blend: 'override'})` blends the masked bones toward the clip's pose by `weight` (an upper-body wave or aim over a walk), where the default `blend: 'additive'` adds the clip's difference from its reference pose. `time` (seconds, read every frame) plays a layer on its own clock; by default a layer follows the state's time. `weight` and `time` may change every frame, for example from `@margoengine/tween`.
+
+```ts
+import type { Animator } from 'margoengine/animator';
+declare const animator: Animator, upperBody: number[]; // glTF node indices of the spine, arms and head
+const wave = { clip: 'Wave', weight: 0, mask: upperBody, blend: 'override' as const, time: 0 };
+const removeWave = animator.addLayer(wave);
+wave.weight = 1; // then advance wave.time from your frame loop; removeWave() when done
+removeWave();
+```
+
+## Foot placement (feet on uneven ground, pelvis drop)
+
+`addFootPlacement(animator, placement)` keeps a walk's stride on stairs and slopes: each frame it casts a ray down through every animated ankle, raises or lowers that foot by how far the ground under it is from the character's flat floor (the `ground` node, default the model root, so a lifted swing foot stays lifted), drops the pelvis by the largest downward offset (at most `maxPelvisDrop`) so that foot can reach, then bends each leg with two-bone IK toward its pole. Feet keep their animated world orientation and, with `alignFeet`, tilt to the ground normal. Unlike `addFootIK`, which plants each ankle on the hit point, this keeps the animation's foot motion.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Animation } from 'margoengine/animation';
+import { Animator, addFootPlacement } from 'margoengine/animator';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const model = await loadGLTF(engine, '/hero.glb');
+const animator = Animator.attach(Animation.attach(model), { initial: 'walk', states: { walk: 'Walk' } });
+const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
+const stepHeight = (x: number) => (x > 2 ? 0.2 : 0); // your terrain or physics raycast
+const feet = addFootPlacement(animator, {
+  pelvis: node('Hips'),
+  legs: [
+    { hip: node('LeftUpLeg'), knee: node('LeftLeg'), ankle: node('LeftFoot'), pole: [0, 0.5, 2] },
+    { hip: node('RightUpLeg'), knee: node('RightLeg'), ankle: node('RightFoot'), pole: [0, 0.5, 2] },
+  ],
+  raycast: (origin) => ({ position: [origin[0], stepHeight(origin[0]), origin[2]], normal: [0, 1, 0] }),
+  probeHeight: 0.5, // default: highest step found above the ankle
+  probeDepth: 0.5, // default: deepest drop followed
+  maxPelvisDrop: 0.5, // default
+  alignFeet: true, // default
+  weight: 1, // default
+});
+engine.start();
+console.log(feet.pelvisOffset, feet.footOffsets);
+feet.dispose();
+```
+
+The placement object is read every frame, so poles, weight and the raycast may change. A leg whose ray misses keeps its animated pose. Each frame starts from the animated pose, so nothing accumulates. Bones and their ancestors need positive uniform scales; rotations commit through `writeRotation` when it is set.
+
 ## Explicit rotation writer
 
 `AnimatorOptions.writeRotation?: (node: Mesh, rotation: readonly number[]) => void` is an optional, explicit commit hook for applications that own their transform writer. It is captured and validated once during construction. Omit it to keep the current dynamic `Mesh.setQuaternion` call, including method overrides. This is an additive public API option; it does not change core/stage.

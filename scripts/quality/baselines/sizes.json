@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3289316,
+  "total": 3291455,
   "history": [
     {
       "date": "2026-10-24",
@@ -374,6 +374,12 @@
       "commit": "b91aeaf9",
       "reason": "sky/weather: new optional entry (rain, snow, lightning and thunder timing with its own shaders); nothing else grows",
       "grew": 1
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "27c083c1",
+      "reason": "package depth (item 21.5): animator triggers, exit-time and any-state transitions, timed and state-change events, override layers, foot placement with pelvis drop (tree-shakable)",
+      "grew": 1
     }
   ],
   "items": {
@@ -382,7 +388,7 @@
     "@margoengine/animation/sampling": 1177,
     "@margoengine/animation/skeleton-utils": 8810,
     "@margoengine/animation/vat": 8130,
-    "@margoengine/animator": 15233,
+    "@margoengine/animator": 17372,
     "@margoengine/audio": 7716,
     "@margoengine/blender": 4000,
     "@margoengine/bvh": 23398,

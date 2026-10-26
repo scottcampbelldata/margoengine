@@ -106,7 +106,7 @@ test('Animator constructor, transition, layer and foot IK errors name their fix'
   throwsFix(
     () => f.animator.addLayer({ clip: 'Move', weight: 2, mask: [] }),
     RangeError,
-    /Invalid additive layer; use a weight from 0 to 1/,
+    /Invalid animator layer; use a weight from 0 to 1/,
   );
   throwsFix(
     () => f.animator.addFootIK({ hip: 99, knee: 0, ankle: 0, pole: [0, 0, 1], raycast() {} }),
