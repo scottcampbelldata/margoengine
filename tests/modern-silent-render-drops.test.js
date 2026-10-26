@@ -285,7 +285,8 @@ for (const fixture of loadedPBRFixtures) {
         const first = draw(left),
           second = draw(right);
         assert.notEqual(first.vertex, originalVertex);
-        assert.notEqual(first.vertex, second.vertex);
+        // Both eyes draw the same static arrays on one device: one counted vertex buffer, freed with the last holder.
+        assert.equal(first.vertex, second.vertex, 'eye renderers on one device upload the same arrays twice');
         // Each eye's uniform block is its own window: another buffer, or the same arena buffer at another offset.
         assert.ok(
           first.uniform.buffer !== second.uniform.buffer || first.uniform.offset !== second.uniform.offset,

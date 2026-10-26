@@ -93,3 +93,70 @@ test('models of one asset share its packed vertex and index arrays', async (t) =
   const other = parseGLTF(f.engine, f.doc, f.buffers);
   assert.notEqual(other.primitives[0].vertices, a.primitives[0].vertices, 'another asset packs its own');
 });
+
+test('copies of one asset share vertex and index GPU buffers until the last one lets go', async (t) => {
+  // p-skeleton-clone: each cloneModel copy created and filled its own GPU buffers for arrays it shared.
+  const f = await fixture(t),
+    a = parseGLTF(f.engine, f.doc, f.buffers);
+  if (f.engine.plugins.get(a.name) !== a) f.engine.use(a);
+  const b = new PBRModel(f.engine, a.asset, []);
+  f.engine.use(b);
+  const vertex = a.primitives[0].buffers.vertex,
+    index = a.primitives[0].buffers.index;
+  assert.equal(b.primitives[0].buffers.vertex, vertex, 'a copy uploads its own vertex buffer');
+  assert.equal(b.primitives[0].buffers.index, index, 'a copy uploads its own index buffer');
+  const [ra] = a['resources'],
+    [rb] = b['resources'];
+  assert.ok(ra.samplers[0]);
+  assert.equal(rb.samplers[0], ra.samplers[0], 'each copy created its own samplers (one native call per map slot)');
+  a.dispose();
+  assert.equal(vertex.destroyed, false, 'freed while a copy still draws from it');
+  assert.equal(index.destroyed, false);
+  b.dispose();
+  assert.equal(vertex.destroyed, true, 'the last copy to go frees it');
+  assert.equal(index.destroyed, true);
+});
+
+test('writeGeometry on one copy leaves the shared buffer, and later copies, with the asset data', async (t) => {
+  const f = await fixture(t),
+    a = parseGLTF(f.engine, f.doc, f.buffers);
+  if (f.engine.plugins.get(a.name) !== a) f.engine.use(a);
+  const b = new PBRModel(f.engine, a.asset, []);
+  f.engine.use(b);
+  const shared = a.primitives[0].buffers.vertex,
+    packed = new Float32Array(a.primitives[0].vertices),
+    edit = () => {
+      const vertices = packed.slice();
+      vertices[0] = 42;
+      return [{ vertices, indices: a.primitives[0].indices.slice() }];
+    };
+  a.writeGeometry(edit());
+  assert.notEqual(a.primitives[0].buffers.vertex, shared, 'the edit went into the buffer the copy draws from');
+  assert.equal(b.primitives[0].buffers.vertex, shared);
+  assert.deepEqual(new Float32Array(shared.data), packed, 'the copy sees the edit');
+  b.writeGeometry(edit());
+  assert.equal(b.primitives[0].buffers.vertex, shared, 'its only holder rewrites a fitting buffer in place');
+  const c = new PBRModel(f.engine, a.asset, []);
+  f.engine.use(c);
+  assert.notEqual(c.primitives[0].buffers.vertex, shared, 'a later copy drew from an edited buffer');
+  assert.deepEqual(new Float32Array(c.primitives[0].buffers.vertex.data), packed, 'a later copy got edited data');
+});
+
+test('copies of one asset share their baked static batch arrays and its buffers', async (t) => {
+  const f = await fixture(t),
+    doc = { ...f.doc, materials: [{}], nodes: [{ mesh: 0 }, { mesh: 0, translation: [3, 0, 0] }] },
+    a = parseGLTF(f.engine, doc, f.buffers);
+  if (f.engine.plugins.get(a.name) !== a) f.engine.use(a);
+  const b = new PBRModel(f.engine, a.asset, []);
+  f.engine.use(b);
+  const [one] = a['staticBatches'],
+    [two] = b['staticBatches'];
+  assert.ok(one && two, 'two static parts of one material bake into a batch');
+  assert.equal(two.primitive.vertices, one.primitive.vertices, 'a copy baked its own static batch');
+  assert.equal(two.primitive.indices, one.primitive.indices);
+  assert.equal(two.primitive.buffers.vertex, one.primitive.buffers.vertex);
+  const moved = new PBRModel(f.engine, a.asset, []);
+  moved.nodes[1].setPosition([1, 0, 0]);
+  f.engine.use(moved);
+  assert.notEqual(moved['staticBatches'][0].primitive.vertices, one.primitive.vertices, 'another pose bakes anew');
+});

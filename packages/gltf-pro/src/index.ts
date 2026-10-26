@@ -1578,6 +1578,47 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
 }
 /** Main-thread packings per asset and primitive definition, kept as long as the asset is. */
 const assetPacks = new WeakMap<GLTFAsset, WeakMap<object, PreparedGeometry>>();
+/**
+ * Vertex and index GPU buffers by device, asset and CPU array, counted by the models holding them: models of one asset
+ * (cloneModel copies) share its packed arrays and baked static batches, so they upload each array once. A model writes
+ * a counted buffer in place only while no other model holds it (writeGeometry gives it its own otherwise), and the last
+ * one to let go retires it. Models of different assets never share buffers, even for one array.
+ */
+interface SharedBuffer {
+  buffer: GPUBuffer;
+  data: object;
+  usage: number;
+  users: number;
+  map: WeakMap<object, SharedBuffer>;
+}
+const sharedBuffers = new WeakMap<GPUDevice, WeakMap<GLTFAsset, WeakMap<object, SharedBuffer>>>(),
+  bufferShares = new WeakMap<GPUBuffer, SharedBuffer>(),
+  // A material map's default view per texture and its sampler per device and state: both immutable, so every slot,
+  // primitive and model shares them (each was a native call per map slot of every primitive of every model).
+  textureViews = new WeakMap<GPUTexture, GPUTextureView>(),
+  deviceSamplers = new WeakMap<GPUDevice, Map<string, GPUSampler>>();
+/**
+ * Whether a model may write `buffer` in place: no other model counts on it. Its array's entry is forgotten then, so a
+ * later copy of the old array uploads that array instead of reading the new contents.
+ */
+function ownBuffer(buffer: GPUBuffer): boolean {
+  const share = bufferShares.get(buffer);
+  if (!share) return true;
+  if (share.users > 1) return false;
+  forget(share);
+  return true;
+}
+function forget(share: SharedBuffer): void {
+  bufferShares.delete(share.buffer);
+  if (share.map.get(share.data) === share) share.map.delete(share.data);
+}
+/** Lets go of a vertex or index buffer: retires it unless another model still counts on it. */
+function dropBuffer(device: GPUDevice, buffer: GPUBuffer): void {
+  const share = bufferShares.get(buffer);
+  if (share && --share.users > 0) return;
+  if (share) forget(share);
+  retire(device, buffer);
+}
 function primitive(
   asset: GLTFAsset,
   p: GLTFPrimitive,
@@ -1964,9 +2005,21 @@ export class PBRModel implements EnginePlugin {
   }
   private bufferUpload(device: GPUDevice): (data: Float32Array | Uint32Array, usage: number) => GPUBuffer {
     const cache = this.gpuCache;
+    let assets = sharedBuffers.get(device);
+    if (!assets) sharedBuffers.set(device, (assets = new WeakMap()));
+    let shared = assets.get(this.asset);
+    if (!shared) assets.set(this.asset, (shared = new WeakMap()));
+    const map = shared;
     return (data, usage) => {
       const existing = cache.get(data) as GPUBuffer | undefined;
       if (existing) return existing;
+      // Another model on this device uploaded the same array: count this one in (cloneModel copies upload nothing).
+      const share = map.get(data);
+      if (share && share.usage === usage) {
+        share.users++;
+        cache.set(data, share.buffer);
+        return share.buffer;
+      }
       if (data.byteLength > device.limits.maxBufferSize)
         throw new RangeError(
           'PBR buffer exceeds device limit; load a smaller model, or reduce its textures and meshes',
@@ -1978,9 +2031,17 @@ export class PBRModel implements EnginePlugin {
         b.destroy();
         throw e;
       }
+      const entry = { buffer: b, data, usage, users: 1, map };
+      map.set(data, entry);
+      bufferShares.set(b, entry);
       cache.set(data, b);
       return b;
     };
+  }
+  /** Lets go of one of this model's vertex or index buffers and forgets every cache key that names it. */
+  private dropBuffer(device: GPUDevice, buffer: GPUBuffer): void {
+    for (const [key, value] of this.gpuCache) if (value === buffer) this.gpuCache.delete(key);
+    dropBuffer(device, buffer);
   }
   setup(engine: Engine, device = engine.gpu): void {
     if (engine !== this.engine || this.disposed)
@@ -2052,10 +2113,7 @@ export class PBRModel implements EnginePlugin {
         r.primitive.buffers = { vertex: from.vertex, index: from.index };
       }
     for (const buffer of old)
-      if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer)) {
-        for (const [key, value] of this.gpuCache) if (value === buffer) this.gpuCache.delete(key);
-        retire(to.device, buffer);
-      }
+      if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer)) this.dropBuffer(to.device, buffer);
     return true;
   }
   /**
@@ -2141,7 +2199,8 @@ export class PBRModel implements EnginePlugin {
       if (!to) {
         const fits = part || data.byteLength <= from.size;
         // Mid-frame, earlier draws (this model's, shadows') keep the old contents: the new data takes a new buffer.
-        if (!claimed.has(from) && fits && !midFrame) {
+        // So does a buffer other models draw from (ownBuffer, last: it forgets the old array's entry).
+        if (!claimed.has(from) && fits && !midFrame && ownBuffer(from)) {
           if (!part) r.device.queue.writeBuffer(from, 0, data as Float32Array<ArrayBuffer>);
           else if (part[1])
             r.device.queue.writeBuffer(from, part[0] * 4, data as Float32Array<ArrayBuffer>, part[0], part[1]);
@@ -2179,28 +2238,25 @@ export class PBRModel implements EnginePlugin {
       p.buffers = { vertex: r.vertex, index: r.index };
       r.edited = true;
     }
+    for (const buffer of dropped)
+      if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer)) dropBuffer(device!, buffer);
     for (let i = 0; i < list.length; i++) {
       for (const data of [list[i].vertices, list[i].indices]) if (!written.has(data)) this.gpuCache.delete(data);
       list[i].vertices = geometry[i].vertices;
       list[i].indices = geometry[i].indices;
     }
     for (const [data, buffer] of written) this.gpuCache.set(data, buffer);
-    for (const buffer of dropped)
-      if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer)) retire(device!, buffer);
   }
   /** Drops every static material batch for good: its parts draw individually from their own, now editable, buffers. */
   private retireBatches(): void {
     if (!this.staticBatches?.length) return;
     for (const r of this.resources)
-      if (r.batch)
-        for (const b of [r.vertex, r.index, r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume])
-          retire(r.device, b);
+      if (r.batch) {
+        for (const b of [r.vertex, r.index]) this.dropBuffer(r.device, b);
+        for (const b of [r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume]) retire(r.device, b);
+      }
     this.resources = this.resources.filter((r) => !r.batch);
     for (const r of this.resources) r.mergedInto = undefined;
-    for (const { primitive } of this.staticBatches) {
-      this.gpuCache.delete(primitive.vertices);
-      this.gpuCache.delete(primitive.indices);
-    }
     this.staticBatches = [];
   }
   /** Bakes static same-material triangles once the asset's geometry and instances are final. */
@@ -2388,7 +2444,9 @@ export class PBRModel implements EnginePlugin {
           );
         if (!compressed) generateMipmaps(device, texture, levels, cache, mipSampler);
       }
-      r.views.push(texture.createView());
+      let view = textureViews.get(texture);
+      if (!view) textureViews.set(texture, (view = texture.createView()));
+      r.views.push(view);
       const s = def?.sampler === undefined ? {} : entry(this.asset.doc.samplers, def.sampler, 'sampler');
       const wrap = (v: unknown) => {
         if (v === undefined || v === 10497) return 'repeat';
@@ -2401,16 +2459,20 @@ export class PBRModel implements EnginePlugin {
         (s.minFilter !== undefined && ![9728, 9729, 9984, 9985, 9986, 9987].includes(s.minFilter!))
       )
         throw new TypeError('Invalid texture filter; use a glTF sampler constant');
-      r.samplers.push(
-        device.createSampler({
+      const state: GPUSamplerDescriptor = {
           addressModeU: wrap(s.wrapS),
           addressModeV: wrap(s.wrapT),
           magFilter: s.magFilter === 9728 ? 'nearest' : 'linear',
           minFilter: [9728, 9984, 9986].includes(s.minFilter!) ? 'nearest' : 'linear',
           mipmapFilter: [9984, 9985].includes(s.minFilter!) ? 'nearest' : 'linear',
           lodMaxClamp: [9728, 9729].includes(s.minFilter!) ? 0 : 32,
-        }),
-      );
+        },
+        samplerKey = Object.values(state).join();
+      let samplers = deviceSamplers.get(device);
+      if (!samplers) deviceSamplers.set(device, (samplers = new Map()));
+      let sampler = samplers.get(samplerKey);
+      if (!sampler) samplers.set(samplerKey, (sampler = device.createSampler(state)));
+      r.samplers.push(sampler);
     }
   }
   registerPasses(graph: FrameGraph): void {
@@ -4469,6 +4531,7 @@ export class PBRModel implements EnginePlugin {
     this.gpuRevision++;
     const cleanup = new Cleanup(),
       buffers = new Map<{ destroy(): void }, GPUDevice>(),
+      counted = new Map<GPUBuffer, GPUDevice>(),
       device = this.resources[0]?.device ?? this.engine.gpu;
     for (const r of this.resources) {
       if (r.batchStates)
@@ -4485,10 +4548,12 @@ export class PBRModel implements EnginePlugin {
             if (state.instances.buffer) buffers.set(state.instances.buffer, r.device);
           }
       r.rowStates = undefined;
-      for (const b of [r.vertex, r.index, r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume])
-        if (b) buffers.set(b, r.device);
+      for (const b of [r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume]) if (b) buffers.set(b, r.device);
+      for (const b of [r.vertex, r.index]) if (b) counted.set(b, r.device);
     }
     for (const [b, owner] of buffers) cleanup.run(() => retire(owner, b));
+    // Each of this model's vertex and index buffers once, however many of its primitives draw from it.
+    for (const [b, owner] of counted) cleanup.run(() => dropBuffer(owner, b));
     if (device) for (const t of this.textures) cleanup.run(() => retire(device, t));
     for (const p of [...this.primitives, ...this.pointsAndLines]) {
       p.buffers = undefined;

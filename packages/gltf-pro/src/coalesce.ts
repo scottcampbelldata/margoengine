@@ -25,6 +25,35 @@ export interface StaticBatch {
 
 const stride = 20;
 
+/**
+ * Baked arrays by the first part's vertices: a batch of the same part arrays at the same root-relative poses bakes the
+ * same arrays, so models of one asset (cloneModel copies) reuse them, and with them one GPU upload (PBRModel counts
+ * buffers by array). Four poses per first part at most; the arrays are never written after baking.
+ */
+interface Baked {
+  parts: (Float32Array | Uint32Array)[];
+  stamps: Float32Array[];
+  vertices: Float32Array;
+  indices: Uint32Array;
+}
+const bakedBatches = new WeakMap<Float32Array, Baked[]>();
+function sameBits(a: Float32Array, b: Float32Array): boolean {
+  for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+  return true;
+}
+function bakedFor(parts: readonly PBRPrimitive[], stamps: readonly Float32Array[]): Baked | undefined {
+  return bakedBatches
+    .get(parts[0].vertices)
+    ?.find(
+      (b) =>
+        b.parts.length === parts.length * 2 &&
+        parts.every(
+          (p, i) =>
+            b.parts[2 * i] === p.vertices && b.parts[2 * i + 1] === p.indices && sameBits(b.stamps[i], stamps[i]),
+        ),
+    );
+}
+
 function determinant(m: ArrayLike<number>): number {
   return m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
 }
@@ -113,11 +142,12 @@ export function buildStaticBatches(
       mirrors.push(det < 0);
     }
     if (singular || vertices > 1_000_000 || !indices) continue;
-    const baked = new Float32Array(vertices * stride),
-      merged = new Uint32Array(indices);
+    const reused = bakedFor(parts, stamps),
+      baked = reused?.vertices ?? new Float32Array(vertices * stride),
+      merged = reused?.indices ?? new Uint32Array(indices);
     let vertexBase = 0,
       indexBase = 0;
-    for (let i = 0; i < parts.length; i++) {
+    for (let i = 0; !reused && i < parts.length; i++) {
       const part = parts[i],
         mirror = mirrors[i];
       multiplyMatrices(inverse, part.node.matrix, relative);
@@ -143,6 +173,12 @@ export function buildStaticBatches(
       }
       vertexBase += source.length / stride;
       indexBase += index.length;
+    }
+    if (!reused) {
+      let list = bakedBatches.get(parts[0].vertices);
+      if (!list) bakedBatches.set(parts[0].vertices, (list = []));
+      if (list.length >= 4) list.shift();
+      list.push({ parts: parts.flatMap((p) => [p.vertices, p.indices]), stamps, vertices: baked, indices: merged });
     }
     const node = createNode();
     const primitive: PBRPrimitive = {

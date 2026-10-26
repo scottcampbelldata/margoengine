@@ -336,9 +336,10 @@ export function loadGLTFProgressive(
         p.indices = indices;
       }
       rebuild(byKey[key]);
+      // Through the model, which counts buffers other models may share (PBRModel dropBuffer).
       for (const data of old) {
-        (cache.get(data) as GPUBuffer | undefined)?.destroy();
-        cache.delete(data);
+        const buffer = cache.get(data) as GPUBuffer | undefined;
+        if (buffer) model!['dropBuffer'](device(), buffer);
       }
       progress.primitivesLoaded++;
       emit('geometry');

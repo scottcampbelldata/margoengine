@@ -17,7 +17,8 @@ async function own(image: GLTFImage): Promise<GLTFImage> {
  * It shares the source's parsed asset (document, buffers, accessors) and compressed textures, and its packed vertex
  * arrays where gltf-pro cached them (worker and progressive loads, prepared static scenes); otherwise the clone packs
  * its own from the shared accessors. Decoded bitmaps are copied (`createImageBitmap`) because disposing a model closes
- * its own. GPU buffers and textures are created per model by gltf-pro. Materials come from the document, so edits made
+ * its own. gltf-pro shares the GPU vertex and index buffers of shared arrays (and of baked static batches at the same
+ * pose) between the copies, freeing them with the last one; textures, uniforms and bind groups are per model. Materials come from the document, so edits made
  * to the source's materials at runtime are not copied. Clone after a progressive load has finished.
  */
 export async function cloneModel(model: PBRModel): Promise<PBRModel> {
