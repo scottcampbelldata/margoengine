@@ -29,7 +29,11 @@ test('the physical-maps shader is derived once per source and slot plan', () => 
   }
   assert.equal(again, first);
   assert.equal(edits, 0, 'the second call reuses the first derivation');
-  const other = physicalMapsShader(source, 2, slots.map((slot, k) => (k === 4 ? [1, 0] : slot)));
+  const other = physicalMapsShader(
+    source,
+    2,
+    slots.map((slot, k) => (k === 4 ? [1, 0] : slot)),
+  );
   assert.notEqual(other, first, 'another slot plan derives its own');
   assert.match(other, /margoPhysicalMap1/);
   assert.notEqual(physicalMapsShader(source, 3, slots), first, 'another group derives its own');
