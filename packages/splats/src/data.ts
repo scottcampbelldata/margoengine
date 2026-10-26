@@ -123,3 +123,5 @@ export function parseSplat(input: ArrayBuffer | ArrayBufferView): SplatData {
   validateSplats(data);
   return data;
 }
+export { parsePly, encodeSplat, decomposeCovariance } from './ply.js';
+export { cropSplats, filterSplats, transformSplats, mergeSplats, decimateSplats, type SplatRegion } from './edit.js';

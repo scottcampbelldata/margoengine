@@ -467,7 +467,15 @@
     "imports": "import { Splats } from '@margoengine/splats';",
     "exports": [
       "Splats",
+      "cropSplats",
+      "decimateSplats",
+      "decomposeCovariance",
+      "encodeSplat",
+      "filterSplats",
+      "mergeSplats",
+      "parsePly",
       "parseSplat",
+      "transformSplats",
       "validateSplats"
     ],
     "category": "Loading and formats"

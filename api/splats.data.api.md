@@ -10,7 +10,42 @@ export interface SplatData {
     sphericalHarmonics?: Float32Array;
 }
 
+export type SplatRegion = {
+    box: {
+        min: readonly [number, number, number];
+        max: readonly [number, number, number];
+    };
+} | {
+    sphere: {
+        center: readonly [number, number, number];
+        radius: number;
+    };
+};
+
+export function cropSplats(data: SplatData, region: SplatRegion, options?: {
+    invert?: boolean;
+}): SplatData;
+
+export function decimateSplats(data: SplatData, options: {
+    cellSize: number;
+}): SplatData;
+
+export function decomposeCovariance(c: ArrayLike<number>, at?: number): {
+    scale: number[];
+    rotation: number[];
+};
+
+export function encodeSplat(data: SplatData): Uint8Array<ArrayBuffer>;
+
+export function filterSplats(data: SplatData, keep: (index: number, data: SplatData) => boolean): SplatData;
+
+export function mergeSplats(...clouds: SplatData[]): SplatData;
+
+export function parsePly(input: ArrayBuffer | ArrayBufferView): SplatData;
+
 export function parseSplat(input: ArrayBuffer | ArrayBufferView): SplatData;
+
+export function transformSplats(data: SplatData, matrix: ArrayLike<number>): SplatData;
 
 export function validateSplats(data: SplatData): number;
 ```

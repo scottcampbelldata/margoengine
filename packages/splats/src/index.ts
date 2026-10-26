@@ -18,6 +18,8 @@ import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { alphaBlend } from '../../shared/pass.js';
 export { parseSplat, validateSplats, type SplatData } from './data.js';
+export { parsePly, encodeSplat, decomposeCovariance } from './ply.js';
+export { cropSplats, filterSplats, transformSplats, mergeSplats, decimateSplats, type SplatRegion } from './edit.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number; INDEX: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 let nextId = 0;

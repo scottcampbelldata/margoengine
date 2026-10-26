@@ -40,7 +40,18 @@ test('data entries preserve public root identities without exposing parser inter
   ]);
   assert.deepEqual(Object.keys(asset), ['GLTFAsset']);
   assert.equal(asset.GLTFAsset, pbr.GLTFAsset);
-  assert.deepEqual(Object.keys(data).sort(), ['parseSplat', 'validateSplats']);
-  assert.equal(data.parseSplat, splats.parseSplat);
-  assert.equal(data.validateSplats, splats.validateSplats);
+  const dataNames = [
+    'cropSplats',
+    'decimateSplats',
+    'decomposeCovariance',
+    'encodeSplat',
+    'filterSplats',
+    'mergeSplats',
+    'parsePly',
+    'parseSplat',
+    'transformSplats',
+    'validateSplats',
+  ];
+  assert.deepEqual(Object.keys(data).sort(), dataNames);
+  for (const name of dataNames) assert.equal(data[name], splats[name], name);
 });
