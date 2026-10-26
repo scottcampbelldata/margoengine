@@ -1,4 +1,5 @@
 import type { EngineKernel, Geometry, Mesh } from '@margoengine/core';
+import { margoError } from '../../shared/errors.js';
 import {
   engineRuntime,
   meshRuntime,
@@ -9,10 +10,12 @@ import {
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 
+/** Options of scene queries: whether hidden meshes are excluded (default true). */
 export interface SceneQueryOptions {
   /** Exclude meshes hidden by themselves or any ancestor. Defaults to true; ignores frustum culling. */
   visibleOnly?: boolean;
 }
+/** Options of fitting the camera to a scene: query options plus aspect ratio, duration and padding. */
 export interface SceneFitOptions extends SceneQueryOptions {
   /** Defaults to the canvas's displayed aspect ratio. */
   aspect?: number;
@@ -27,6 +30,7 @@ interface SceneBufferBase extends Pick<GeometryBuffers, 'vertex' | 'index'> {
   readonly count: number;
   readonly indexFormat: 'uint32';
 }
+/** The GPU buffers of a core mesh node, for custom passes. */
 export interface CoreSceneBuffers extends SceneBufferBase {
   readonly kind: 'core';
   readonly stride: 24;
@@ -34,6 +38,7 @@ export interface CoreSceneBuffers extends SceneBufferBase {
   /** Shared batch storage from the last render; does not identify this node's instance offset. */
   readonly instance: GeometryBuffers['instance'];
 }
+/** The GPU buffers of a PBR model node, with its alpha texture and cutoff, for custom passes. */
 export interface PBRSceneBuffers extends SceneBufferBase {
   readonly kind: 'pbr';
   readonly stride: 80;
@@ -46,6 +51,7 @@ export interface PBRSceneBuffers extends SceneBufferBase {
   readonly alphaTransform?: Float32Array;
   readonly doubleSided?: boolean;
 }
+/** The GPU buffers of a scene node: a core mesh's or a PBR model's. */
 export type SceneBuffers = CoreSceneBuffers | PBRSceneBuffers;
 
 /** Validate all selected roots before touching transforms, camera state or GPU resources. */
@@ -54,14 +60,14 @@ function selectedMeshes(
   roots: Iterable<Mesh>,
   { visibleOnly = true }: SceneQueryOptions,
 ): { engine: Engine; meshes: RuntimeMesh[] } {
-  if (instance.disposed) throw new Error('Engine disposed');
-  if (typeof visibleOnly !== 'boolean') throw new TypeError('Invalid visibleOnly');
+  if (instance.disposed) throw margoError('disposed', 'Engine disposed; create a new engine');
+  if (typeof visibleOnly !== 'boolean') throw new TypeError('Invalid visibleOnly; pass true or false');
   const engine = engineRuntime(instance),
     selected = new Set<number>();
   for (const handle of Array.from(roots)) {
     handle.check();
     const mesh = meshRuntime(handle);
-    if (mesh.engine !== engine) throw new TypeError('Foreign mesh');
+    if (mesh.engine !== engine) throw new TypeError('Foreign mesh; pass meshes created by the same engine');
     selected.add(mesh.id);
   }
   engine.store.tick(false);
@@ -70,7 +76,7 @@ function selectedMeshes(
     let included = false,
       depth = 0;
     for (let id = mesh.id; id !== -1; id = engine.store.parents[id]) {
-      if (++depth > 64) throw new RangeError('Parent depth: 64');
+      if (++depth > 64) throw new RangeError('Parent depth: 64; flatten the mesh hierarchy');
       if (selected.has(id)) included = true;
     }
     if (included && (!visibleOnly || !hiddenInTree(engine.store, mesh.id))) meshes.push(mesh);
@@ -108,7 +114,8 @@ export function getSceneBounds(
     else if (triangles?.kind === 'pbr')
       for (const primitive of triangles.source.primitives) include(primitive.vertices, 20, mesh.matrix);
   }
-  if (!Number.isFinite(bounds[0])) throw new Error('No geometry');
+  if (!Number.isFinite(bounds[0]))
+    throw margoError('state', 'No geometry; select meshes with triangles');
   return Float32Array.from(bounds);
 }
 
@@ -144,7 +151,7 @@ export function gatherSceneBuffers(
     const triangles = meshTriangles(mesh);
     if (triangles?.kind === 'core') {
       const buffers = engine.geometryBuffers(triangles.geometry);
-      if (!buffers) throw new Error('Geometry unavailable');
+      if (!buffers) throw margoError('state', 'Geometry unavailable; render one frame first');
       records.push({
         kind: 'core',
         node: mesh,
@@ -159,7 +166,8 @@ export function gatherSceneBuffers(
       });
     } else if (triangles?.kind === 'pbr') {
       const draws = triangles.source.draws;
-      if (triangles.source.primitives.length && !draws.length) throw new Error('PBR geometry unavailable');
+      if (triangles.source.primitives.length && !draws.length)
+        throw margoError('state', 'PBR geometry unavailable; render one frame first');
       for (const draw of draws)
         records.push({ ...draw, kind: 'pbr', matrix: mesh.matrix, stride: 80, indexFormat: 'uint32' });
     }

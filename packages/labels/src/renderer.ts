@@ -13,6 +13,7 @@ import {
 import { hiddenInTree } from '../../shared/visibility.js';
 import { createScreenPoint, isOrthographic, projectPoint, type ScreenPoint } from '@margoengine/math/mat4';
 
+/** Where a label sits this frame: its screen position, depth, distance from the camera and world anchor. */
 export interface LabelInfo {
   /** Projected position in CSS pixels relative to the canvas. */
   readonly x: number;
@@ -26,8 +27,10 @@ export interface LabelInfo {
 }
 /** Return true to hide the label this frame (custom occlusion, for example a raycast against the scene). */
 export type OccludeHook = (label: Label, info: LabelInfo) => boolean;
+/** Scales a label by distance: a reference distance, optionally clamped between min and max scale. */
 export type DistanceScale = number | { reference: number; min?: number; max?: number };
 
+/** Options of a label: the mesh or position it follows, its offset, anchor, culling, occlusion and visibility. */
 export interface LabelOptions {
   /** Mesh to follow. The anchor is the mesh origin plus `offset`. */
   mesh?: Mesh | null;
@@ -52,6 +55,7 @@ export interface LabelOptions {
   visible?: boolean;
 }
 
+/** Options of a CSS3D object: the mesh or matrix it follows, its pixel scale and visibility. */
 export interface CSS3DOptions {
   mesh?: Mesh | null;
   /** Column-major world matrix when not following a mesh. */
@@ -66,6 +70,7 @@ export interface CSS3DOptions {
   visible?: boolean;
 }
 
+/** Options of LabelRenderer: parent element, z-index, default occlusion, frame-pass order and view. */
 export interface LabelRendererOptions {
   /** Element that receives the overlay. Default: the canvas's parent, right after the canvas. */
   parent?: HTMLElement;

@@ -65,7 +65,10 @@ export function checkJoints(joints: readonly SkinJoint[]): void {
   joints.forEach((joint, i) => {
     let at = i;
     for (let steps = 0; at !== -1; steps++) {
-      if (steps > joints.length) throw new RangeError(`Joint ${joint.name} is in a parent cycle`);
+      if (steps > joints.length)
+        throw new RangeError(
+          `Joint ${joint.name} is in a parent cycle; remove the parent cycle from the joint hierarchy`,
+        );
       at = joints[at].parent;
     }
   });
@@ -157,7 +160,7 @@ export function skinWeights(
       py = positions[v * 3 + 1] + oy,
       pz = positions[v * 3 + 2] + oz;
     if (!Number.isFinite(px) || !Number.isFinite(py) || !Number.isFinite(pz))
-      throw new RangeError(`Skin position ${v} is not finite`);
+      throw new RangeError(`Skin position ${v} is not finite; replace the NaN or infinite position`);
     nearest(px, py, pz, 1);
     if (bestDistance[0] < 1e290) {
       let total = 0;

@@ -129,7 +129,8 @@ export function animateTransforms(
   const times = samples(clip, poses.length, 'poses'),
     tracks = [...new Set<Path>(paths)].map((path) => {
       const values = poses.map((pose, i) => {
-        if (!isObject(pose) || pose[path] === undefined) throw new TypeError(`poses[${i}] has no ${path}`);
+        if (!isObject(pose) || pose[path] === undefined)
+          throw new TypeError(`poses[${i}] has no ${path}; give every pose a value for each animated path`);
         const value = vector(pose[path], path === 'rotation' ? 4 : 3, `poses[${i}].${path}`);
         // The rest pose keeps the saved numbers; only the channel keys are Float32 accessor data.
         return path === 'rotation' ? savedRotation(value) : value;

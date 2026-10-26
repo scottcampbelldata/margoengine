@@ -44,6 +44,6 @@ test('Draco indices past a declared UNSIGNED_SHORT load exactly', async () => {
 test('a Draco index past the vertex count is still refused', async () => {
   await assert.rejects(asset(new Uint32Array([0, 1, vertices])).decode(), {
     name: 'RangeError',
-    message: 'Invalid glTF Draco triangle indices',
+    message: 'Invalid glTF Draco triangle indices; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
   });
 });

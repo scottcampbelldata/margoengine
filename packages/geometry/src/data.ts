@@ -56,7 +56,7 @@ export function toGeometry(data: GeometryData): Geometry {
 /** Maximum local XZ distance from the origin, including asymmetric mesh lobes. */
 export function footprintRadius(data: GeometryData): number {
   if (data.positions.length % 3 || !data.positions.every(Number.isFinite))
-    throw new RangeError('Invalid footprint positions');
+    throw new RangeError('Invalid footprint positions; pass finite x,z pairs, at least three points');
   let radius = 0;
   for (let i = 0; i < data.positions.length; i += 3)
     radius = Math.max(radius, Math.hypot(data.positions[i], data.positions[i + 2]));
@@ -76,7 +76,7 @@ export function pbrVertexStream(
     data.tangents?.length !== count * 4 ||
     (occlusion !== undefined && typeof occlusion !== 'function')
   )
-    throw new RangeError('Invalid PBR vertex attributes');
+    throw new RangeError('Invalid PBR vertex attributes; pass finite vertex data with matching lengths');
   const vertices = new Float32Array(count * 20),
     P = data.positions,
     N = data.normals,
@@ -100,7 +100,8 @@ export function pbrVertexStream(
     vertices[o + 12] = vertices[o + 14] = UV[i * 2];
     vertices[o + 13] = vertices[o + 15] = UV[i * 2 + 1];
     const ao = occlusion ? occlusion(P[p], P[p + 1], P[p + 2]) : 1;
-    if (!Number.isFinite(ao) || ao < 0 || ao > 1) throw new RangeError('Invalid baked vertex occlusion');
+    if (!Number.isFinite(ao) || ao < 0 || ao > 1)
+      throw new RangeError('Invalid baked vertex occlusion; pass one finite value from 0 to 1 per vertex');
     vertices[o + 16] = vertices[o + 17] = vertices[o + 18] = 1;
     vertices[o + 19] = ao;
   }

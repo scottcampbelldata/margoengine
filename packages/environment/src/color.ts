@@ -34,7 +34,7 @@ function colorPair(value: ColorInput): { srgb: RGB; linear: RGB } {
   }
   if (hex !== undefined) {
     if (!Number.isInteger(hex) || hex < 0 || hex > 0xffffff)
-      throw new RangeError(`Color ${hex} is outside 0x000000..0xffffff`);
+      throw new RangeError(`Color ${hex} is outside 0x000000..0xffffff; use a value from 0x000000 to 0xffffff`);
     const srgb: RGB = [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
     return { srgb, linear: [srgbToLinear(srgb[0]), srgbToLinear(srgb[1]), srgbToLinear(srgb[2])] };
   }

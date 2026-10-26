@@ -6,7 +6,7 @@ export type { GLTFExtendedMaterials } from './asset.js';
 const number = (value: unknown, fallback: number, min: number, max: number, label: string): number => {
   const v = value ?? fallback;
   if (typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || v < min || v > max)
-    throw new TypeError('Invalid glTF ' + label);
+    throw new TypeError('Invalid glTF ' + label + '; re-export the file and check it with the glTF Validator');
   return v;
 };
 
@@ -27,7 +27,10 @@ export const extendedMaterials: GLTFExtendedMaterials = {
     if (!iridescence && !anisotropy && !diffuse) return undefined;
     const color = dt?.diffuseTransmissionColorFactor ?? [1, 1, 1],
       rotation = number(an?.anisotropyRotation, 0, -Infinity, Infinity, 'anisotropy rotation');
-    if (!Array.isArray(color) || color.length !== 3) throw new TypeError('Invalid glTF diffuse transmission color');
+    if (!Array.isArray(color) || color.length !== 3)
+      throw new TypeError(
+        'Invalid glTF diffuse transmission color; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     return {
       features: { iridescence: !!iridescence, anisotropy: !!anisotropy, diffuseTransmission: !!diffuse },
       // Slots 13-17; an extension whose factor is 0 binds nothing.

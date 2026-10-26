@@ -515,7 +515,7 @@ test('progressive: an accessor past the end of its buffer rejects instead of wai
       await rejectsInTime(
         (await gpuEngine()).engine,
         base + path,
-        /^RangeError: glTF mesh 0 primitive 0: POSITION \(accessor \d+\): Invalid glTF bufferView bounds$/,
+        /^RangeError: glTF mesh 0 primitive 0: POSITION \(accessor \d+\): Invalid glTF bufferView bounds(;.*)?$/,
       );
   }));
 
@@ -523,7 +523,7 @@ test('progressive: an accessor past the end of its buffer rejects instead of wai
 test('progressive: an image view outside its buffer rejects instead of waiting forever', () =>
   withGlobals(false, async () => {
     for (const path of ['/negative-image.glb', '/plain/negative-image.glb'])
-      await rejectsInTime((await gpuEngine()).engine, base + path, /^TypeError: Invalid glTF view offset$/);
+      await rejectsInTime((await gpuEngine()).engine, base + path, /^TypeError: Invalid glTF view offset(;.*)?$/);
   }));
 
 // Fuzz finding (gate 11a): the main thread allocated placeholder buffers at their declared sizes (here 4 GiB) before
@@ -545,6 +545,6 @@ test('progressive: a server that sends short range replies rejects instead of wa
     rejectsInTime(
       (await gpuEngine()).engine,
       base + '/short/past-end.glb',
-      /^RangeError: Truncated glTF range response$/,
+      /^RangeError: Truncated glTF range response(;.*)?$/,
     ),
   ));

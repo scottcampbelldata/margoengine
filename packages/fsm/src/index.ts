@@ -50,13 +50,13 @@ export class StateMachine<C> {
       let name: string | undefined = key;
       while (name !== undefined) {
         if (!Object.hasOwn(states, name) || path.includes(name))
-          throw new TypeError('Unknown parent or hierarchy cycle');
+          throw new TypeError('Unknown parent or hierarchy cycle; name an existing parent and avoid cycles');
         path.unshift(name);
         name = states[name].parent;
       }
       this.paths.set(key, path);
     }
-    if (!this.paths.has(initial)) throw new TypeError('Unknown initial state');
+    if (!this.paths.has(initial)) throw new TypeError('Unknown initial state; name a state added with state()');
     for (const transition of transitions)
       if (
         !this.paths.has(transition.from) ||
@@ -65,7 +65,7 @@ export class StateMachine<C> {
         !Number.isFinite(transition.duration ?? 0) ||
         (transition.duration ?? 0) < 0
       )
-        throw new TypeError('Invalid transition');
+        throw new TypeError('Invalid transition; give from and to as existing state names');
     this.state = initial;
     for (const name of this.paths.get(initial)!) states[name].enter?.(context);
   }
@@ -96,7 +96,7 @@ export class StateMachine<C> {
    */
   goto(next: string, duration = 0): void {
     if (!this.paths.has(next) || !Number.isFinite(duration) || duration < 0)
-      throw new RangeError('Invalid state transition');
+      throw new RangeError('Invalid state transition; transition only to a state that exists');
     if (this.changing)
       throw new MargoError(
         'state',
@@ -124,7 +124,8 @@ export class StateMachine<C> {
    * @throws RangeError when `delta` is negative or not finite.
    */
   update(delta: number): void {
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid state delta');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('Invalid state delta; pass a finite, non-negative number of seconds');
     this.elapsed += delta;
     if (this.previous && this.elapsed >= this.duration) this.previous = null;
     const path = this.paths.get(this.state)!;

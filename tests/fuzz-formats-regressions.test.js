@@ -72,10 +72,10 @@ test('glTF JSON that is not UTF-8 or not JSON: named TypeError, not TextDecoder 
   const notUtf8 = glbWithJSON(Uint8Array.of(0x7b, 0xff, 0x7d)),
     notJson = glbWithJSON(encode('{"asset":{"version":"2.0"},')),
     text = encode('{"asset": [}');
-  await named(() => parseLight(kernel, notUtf8), /^TypeError: Invalid glTF JSON: not UTF-8$/);
+  await named(() => parseLight(kernel, notUtf8), /^TypeError: Invalid glTF JSON: not UTF-8(;.*)?$/);
   await named(() => parseLight(kernel, notJson), /^TypeError: Invalid glTF JSON: /);
   await named(() => parseLight(kernel, new TextDecoder().decode(text)), /^TypeError: Invalid glTF JSON: /);
-  await bothPaths(notUtf8, /^TypeError: Invalid glTF JSON: not UTF-8$/);
+  await bothPaths(notUtf8, /^TypeError: Invalid glTF JSON: not UTF-8(;.*)?$/);
   await bothPaths(notJson, /^TypeError: Invalid glTF JSON: /);
   await bothPaths(text, /^TypeError: Invalid glTF JSON: /);
 });
@@ -88,7 +88,7 @@ test('glTF lists with null or non-object entries: named TypeError at the trust b
         kernel,
         triangle((d) => (d.buffers = [null])),
       ),
-    /^TypeError: Invalid glTF buffers entry$/,
+    /^TypeError: Invalid glTF buffers entry(;.*)?$/,
   );
   await named(
     () =>
@@ -96,7 +96,7 @@ test('glTF lists with null or non-object entries: named TypeError at the trust b
         kernel,
         triangle((d) => (d.meshes = [null])),
       ),
-    /^TypeError: Invalid glTF meshes entry$/,
+    /^TypeError: Invalid glTF meshes entry(;.*)?$/,
   );
   await named(
     () =>
@@ -104,56 +104,56 @@ test('glTF lists with null or non-object entries: named TypeError at the trust b
         kernel,
         triangle((d) => (d.meshes[0].primitives = [7])),
       ),
-    /^TypeError: Missing glTF primitives$/,
+    /^TypeError: Missing glTF primitives(;.*)?$/,
   );
   await bothPaths(
     triangle((d) => (d.images = [null])),
-    /^TypeError: Invalid glTF images$/,
+    /^TypeError: Invalid glTF images(;.*)?$/,
   );
   await bothPaths(
     triangle((d) => (d.materials = [null])),
-    /^TypeError: Invalid glTF materials$/,
+    /^TypeError: Invalid glTF materials(;.*)?$/,
   );
   await bothPaths(
     triangle((d) => (d.buffers = 7)),
-    /^TypeError: Invalid glTF buffers$/,
+    /^TypeError: Invalid glTF buffers(;.*)?$/,
   );
   // Fuzz: TypeError: number 65536 is not iterable / object is not iterable (primitives, morph targets, samplers).
   await bothPaths(
     triangle((d) => (d.meshes[0].primitives = 65536)),
-    /^TypeError: Invalid glTF primitives$/,
+    /^TypeError: Invalid glTF primitives(;.*)?$/,
   );
   await bothPaths(
     triangle((d) => (d.meshes[0].primitives[0].targets = 5)),
-    /^TypeError: Invalid glTF primitives$/,
+    /^TypeError: Invalid glTF primitives(;.*)?$/,
   );
   await bothPaths(
     triangle((d) => (d.animations = [{ samplers: {}, channels: [] }])),
-    /^TypeError: Invalid glTF animation$/,
+    /^TypeError: Invalid glTF animation(;.*)?$/,
   );
   // Fuzz: TypeError: doc.extensionsUsed?.includes is not a function.
   await bothPaths(
     triangle((d) => (d.extensionsUsed = 'KHR_mesh_quantization')),
-    /^TypeError: Invalid glTF extensionsUsed$/,
+    /^TypeError: Invalid glTF extensionsUsed(;.*)?$/,
   );
   // Review: TypeError: def.uri.startsWith is not a function.
   await bothPaths(
     triangle((d) => (d.buffers[0].uri = 5)),
-    /^TypeError: Invalid glTF (buffer uri|data URI)$/,
+    /^TypeError: Invalid glTF (buffer uri|data URI)(;.*)?$/,
   );
 });
 
 test('a base64 data URI whose length the pattern accepts but atob rejects: named TypeError, not DOMException', async () => {
   // Fuzz: InvalidCharacterError: Invalid character (atob).
   const uri = (d) => (d.buffers[0].uri = 'data:application/octet-stream;base64,A');
-  await named(() => parseLight(kernel, triangle(uri, undefined)), /^TypeError: Invalid glTF data URI$/);
-  await bothPaths(triangle(uri, undefined), /^TypeError: Invalid glTF data URI$/);
+  await named(() => parseLight(kernel, triangle(uri, undefined)), /^TypeError: Invalid glTF data URI(;.*)?$/);
+  await bothPaths(triangle(uri, undefined), /^TypeError: Invalid glTF data URI(;.*)?$/);
 });
 
 test('glTF JSON nested thousands deep: named TypeError before a recursive reader or structured clone overflows', async () => {
   // Fuzz: RangeError: Maximum call stack size exceeded (the worker's transfer-list walk).
   const deep = encode(`{"extras":${'['.repeat(100_000)}${']'.repeat(100_000)},"asset":{"version":"2.0"}}`);
-  await bothPaths(deep, /^TypeError: Invalid glTF JSON: nested deeper than 256 levels$/);
+  await bothPaths(deep, /^TypeError: Invalid glTF JSON: nested deeper than 256 levels(;.*)?$/);
   let nested = [];
   for (let i = 0; i < 100_000; i++) nested = [nested];
   assert.equal(transferables({ nested, bytes: new Uint8Array(4) }).size, 1);
@@ -209,7 +209,7 @@ test('EXT_mesh_gpu_instancing: instance matrices count toward the decoded budget
   }, bin);
   await named(
     () => parseGLTFAsync(kernel, glb, { maxDownloadBytes: 4096, decoders: { instancing } }),
-    /^RangeError: Decoded glTF exceeds byte budget$/,
+    /^RangeError: Decoded glTF exceeds byte budget(;.*)?$/,
   );
   (await parseGLTFAsync(kernel, glb, { maxDownloadBytes: 8192, decoders: { instancing } })).dispose();
 });
@@ -243,7 +243,7 @@ test('a supplied non-finite NORMAL takes the zero-normal path: a named error, ne
   // NaN in the file: refused when the accessor is read, before packing.
   const nan = bin.slice();
   new DataView(nan.buffer).setFloat32(36, Number.NaN, true);
-  await bothPaths(triangle(normals, nan), /^RangeError: .*Non-finite glTF accessor$/);
+  await bothPaths(triangle(normals, nan), /^RangeError: .*Non-finite glTF accessor(;.*)?$/);
   // NaN in a parse worker's reply: decoded accessors seed the main thread's cache as they are, and a primitive the
   // worker could not pack is packed again there, so the normal reaches the packer's own zero-length check.
   const prepared = await prepareGLTF(undefined, triangle(normals, bin));
@@ -252,7 +252,7 @@ test('a supplied non-finite NORMAL takes the zero-normal path: a named error, ne
     [1, Float32Array.of(Number.NaN, 0, 1, 0, 0, 1, 0, 0, 1)],
   ];
   prepared.geometry = prepared.geometry.map((primitives) => primitives.map(() => null));
-  await named(() => modelFromPrepared(kernel, prepared), /^RangeError: .*Zero or non-finite glTF normal$/);
+  await named(() => modelFromPrepared(kernel, prepared), /^RangeError: .*Zero or non-finite glTF normal(;.*)?$/);
 });
 
 test('the parse worker counts packed geometry toward the decoded budget, as the main thread does', async () => {
@@ -304,7 +304,7 @@ test('meshopt: truncated v1 vertex groups and non-integer counts are named error
   });
   await named(
     () => decodeMeshoptBuffer(checked, meta.count, meta.stride, meta.mode, meta.filter),
-    /^(Range)?Error: EXT_meshopt_compression: truncated vertex stream$/,
+    /^(Range|Margo)?Error: EXT_meshopt_compression: truncated vertex stream(;.*)?$/,
   );
   // Fuzz: RangeError: Invalid typed array length: -6.
   for (const count of [-1, 1.5, 2 ** 53])
@@ -328,7 +328,7 @@ test('Draco: a buffer without a Draco header fails the same way every time (no u
     messages = new Set();
   for (let i = 0; i < 3; i++)
     messages.add(
-      (await named(() => decodeDraco(draco, garbage.slice()), /^TypeError: Draco: invalid header$/)).message,
+      (await named(() => decodeDraco(draco, garbage.slice()), /^TypeError: Draco: invalid header(;.*)?$/)).message,
     );
   assert.equal(messages.size, 1);
 });
@@ -355,8 +355,8 @@ test('KTX2: a level whose declared uncompressed size exceeds its blocks is refus
       [99, 255],
     ]);
   let basis = await wasm('basis');
-  await named(() => transcodeKTX2(basis, warmup, 'rgba8'), /^Error: KTX2: could not transcode level 0$/);
-  await named(() => transcodeKTX2(basis, trap.slice(), 'bc7'), /^TypeError: KTX2: invalid file \(level 0 size\)$/);
+  await named(() => transcodeKTX2(basis, warmup, 'rgba8'), /^(Margo)?Error: KTX2: could not transcode level 0(;.*)?$/);
+  await named(() => transcodeKTX2(basis, trap.slice(), 'bc7'), /^TypeError: KTX2: invalid file \(level 0 size\)(;.*)?$/);
   // The same calls transcodeKTX2 made before the check, on the same module state: the transcoder itself traps.
   const file = new basis.KTX2File(trap);
   assert.ok(file.isValid() && file.startTranscoding());
@@ -429,12 +429,12 @@ test('HDR and EXR headers that claim a large image fail before it is allocated',
   // Radiance: a 30-byte header for 8192 x 8192 pixels used to allocate 1 GiB first.
   const hdr = encode('#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 8192 +X 8192\n'),
     a = before();
-  await named(() => parseHDR(hdr), /^RangeError: Invalid HDR: truncated pixel data$/);
+  await named(() => parseHDR(hdr), /^RangeError: Invalid HDR: truncated pixel data(;.*)?$/);
   assert.ok(process.memoryUsage().arrayBuffers - a < 1 << 20, 'no image allocated');
   // OpenEXR: a 4096 x 4096 HALF Y header whose 256 ZIP chunks hold one byte each used to allocate 256 MiB first.
   const exr = exrClaim(4096, 256),
     b = before();
-  await named(() => parseEXR(exr), /^RangeError: Invalid EXR: chunks are too small for the image size$/);
+  await named(() => parseEXR(exr), /^RangeError: Invalid EXR: chunks are too small for the image size(;.*)?$/);
   assert.ok(process.memoryUsage().arrayBuffers - b < 1 << 20, 'no image allocated');
 });
 
@@ -452,7 +452,7 @@ test('EXR attributes: an empty compression value and a long part type are named 
     empty = file.slice();
   new DataView(empty.buffer).setInt32(sizeAt, 0, true);
   // With size 0 the parser read the next attribute's first byte as the compression.
-  await named(() => parseEXR(empty), /^TypeError: Invalid EXR: bad compression$/);
+  await named(() => parseEXR(empty), /^TypeError: Invalid EXR: bad compression(;.*)?$/);
   // String.fromCharCode(...1 MiB) overflowed the call stack.
   const value = new Uint8Array(1 << 20).fill(0x61),
     attribute = new Uint8Array([...encode('type\0string\0'), 0, 0, 0, 0, ...value]);

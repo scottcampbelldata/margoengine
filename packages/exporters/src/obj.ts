@@ -13,6 +13,7 @@ import {
   type SceneOptions,
 } from './scene.js';
 
+/** Options of exportOBJ: MTL materials, usemtl grouping, textures and the file names written into the OBJ. */
 export interface OBJOptions extends SceneOptions {
   /** Also write an MTL file and `usemtl` lines. Default false. */
   materials?: boolean;
@@ -54,6 +55,7 @@ export interface OBJOptions extends SceneOptions {
   scale?: number;
 }
 
+/** The OBJ text, plus the MTL text, texture files and opacity maps that go beside it. */
 export interface OBJResult {
   obj: string;
   /** The MTL text when `materials` is true, else null. */

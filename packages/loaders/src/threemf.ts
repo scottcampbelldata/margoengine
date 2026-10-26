@@ -18,6 +18,9 @@ export const THREEMF_UNITS: Readonly<Record<string, number>> = {
   meter: 1,
 };
 
+/**
+ * Options of parse3MF: size limits, zip limits, the unit handling, the component nesting depth and an AbortSignal.
+ */
 export interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
   /** `'meters'` (default) scales by the model unit; `'file'` keeps the file's own units. */
   units?: 'meters' | 'file';

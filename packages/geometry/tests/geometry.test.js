@@ -1081,7 +1081,7 @@ test('Loop subdivision quadruples faces, stays watertight and converges toward a
   bad.indices = Uint32Array.from([0, 1, 9]);
   assert.throws(() => loopSubdivide(bad, 1), {
     name: 'RangeError',
-    message: 'loopSubdivide: index 9 is past the 4 vertices',
+    message: 'loopSubdivide: index 9 is past the 4 vertices; keep every index below the vertex count',
   });
 });
 

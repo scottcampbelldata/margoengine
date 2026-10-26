@@ -121,7 +121,10 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
       if (channels.length > 1024)
         throw new RangeError('Invalid EXR: too many channels; the decoder reads at most 1024');
     } else if (name === 'compression' && type === 'compression') {
-      if (size < 1) throw new TypeError('Invalid EXR: bad compression');
+      if (size < 1)
+        throw new TypeError(
+          'Invalid EXR: bad compression; save the file with NONE, RLE, ZIPS, ZIP, PIZ, PXR24, B44 or DWA compression',
+        );
       const value = bytes[position],
         label = COMPRESSION_NAMES[value] ?? `#${value}`;
       if (!(label in LINES_PER_BLOCK))
@@ -138,7 +141,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
       if (name === 'dataWindow') dataWindow = box;
       else displayWindow = box;
     } else if (name === 'lineOrder' && type === 'lineOrder') {
-      if (size < 1) throw new TypeError('Invalid EXR: bad lineOrder');
+      if (size < 1) throw new TypeError('Invalid EXR: bad lineOrder; re-save the file with a standard line order');
       lineOrder = bytes[position];
     } else if (name === 'type' && type === 'string') {
       // Spread only a short value: a long one would overflow the call stack (and cannot be 'scanlineimage').
@@ -204,16 +207,25 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
   for (let block = 0; block < blocks; block++) {
     const offset = offsets[block];
     if (!(offset >= 8 && offset + 8 <= bytes.length))
-      throw new RangeError(`Invalid EXR: chunk ${block} offset out of bounds`);
+      throw new RangeError(
+        `Invalid EXR: chunk ${block} offset out of bounds; the file is truncated, download or export it again`,
+      );
     const dataSize = view.getInt32(offset + 4, true);
     if (dataSize < 0 || offset + 8 + dataSize > bytes.length)
-      throw new RangeError(`Invalid EXR: chunk ${block} data out of bounds`);
+      throw new RangeError(
+        `Invalid EXR: chunk ${block} data out of bounds; the file is truncated, download or export it again`,
+      );
     capacity += dataSize * (compression === 'NONE' ? 1 : 2048);
   }
-  if (capacity < height * lineBytes) throw new RangeError('Invalid EXR: chunks are too small for the image size');
+  if (capacity < height * lineBytes)
+    throw new RangeError(
+      'Invalid EXR: chunks are too small for the image size; the file is truncated, download or export it again',
+    );
   // One chunk's decoded lines are allocated at once (many channels times a wide image can claim gigabytes).
   if (Math.min(linesPerBlock, height) * lineBytes > 1 << 28)
-    throw new RangeError('Unsupported EXR: a chunk decodes to more than 256 MiB');
+    throw new RangeError(
+      'Unsupported EXR: a chunk decodes to more than 256 MiB; export the image with smaller chunks or a smaller size',
+    );
   const data = new Float32Array(width * height * 4);
   if (indices[3] < 0) for (let i = 3; i < data.length; i += 4) data[i] = 1;
   const filled = new Uint8Array(blocks);

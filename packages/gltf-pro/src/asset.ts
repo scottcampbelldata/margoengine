@@ -1,3 +1,4 @@
+import { margoError } from '../../shared/errors.js';
 import { parseJSON as parseSafeJSON } from '../../shared/json.js';
 import { assetURL } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
@@ -25,6 +26,9 @@ export interface KTX2Image {
   readonly height: number;
   close(): void;
 }
+/**
+ * A decoded glTF image: an ImageBitmap, a transcoded KTX2 image, a compressed GPU image, or undefined when absent.
+ */
 export type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | undefined;
 export interface GLTFImageOptions {
   signal?: AbortSignal;
@@ -148,12 +152,13 @@ const meshopt = (def: GLTFBufferView) =>
   def?.extensions?.EXT_meshopt_compression ?? def?.extensions?.KHR_meshopt_compression;
 export function integer(value: unknown, label: string, min = 0): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min)
-    throw new TypeError('Invalid glTF ' + label);
+    throw new TypeError('Invalid glTF ' + label + '; re-export the file and check it with the glTF Validator');
   return value;
 }
 export function entry<T>(array: readonly T[] | undefined, id: unknown, label: string): T {
   const value = array?.[integer(id, label)];
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Missing glTF ' + label);
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new TypeError('Missing glTF ' + label + '; re-export the file and check it with the glTF Validator');
   return value;
 }
 /** UTF-8 bytes as text; malformed UTF-8 throws TypeError('Invalid glTF JSON: not UTF-8'). */
@@ -161,7 +166,9 @@ function utf8(bytes: Uint8Array): string {
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
-    throw new TypeError('Invalid glTF JSON: not UTF-8');
+    throw new TypeError(
+      'Invalid glTF JSON: not UTF-8; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   }
 }
 /**
@@ -179,7 +186,10 @@ export function parseJSON(source: string | Uint8Array): GLTFDocument {
       else if (c === 34) string = false;
     } else if (c === 34) string = true;
     else if (c === 91 || c === 123) {
-      if (++depth > 256) throw new TypeError('Invalid glTF JSON: nested deeper than 256 levels');
+      if (++depth > 256)
+        throw new TypeError(
+          'Invalid glTF JSON: nested deeper than 256 levels; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
     } else if (c === 93 || c === 125) depth--;
   }
   try {
@@ -201,14 +211,22 @@ const objects = (list: unknown): boolean =>
 export function checkDocument(doc: GLTFDocument): void {
   if (!doc || typeof doc !== 'object' || doc.asset?.version !== '2.0') throw new TypeError('Expected glTF 2.0');
   const record = doc as unknown as Record<string, unknown>;
-  for (const key of lists) if (!objects(record[key])) throw new TypeError('Invalid glTF ' + key);
+  for (const key of lists)
+    if (!objects(record[key]))
+      throw new TypeError('Invalid glTF ' + key + '; re-export the file and check it with the glTF Validator');
   for (const mesh of doc.meshes ?? [])
     if (!objects(mesh.primitives) || !(mesh.primitives ?? []).every((p) => objects(p.targets)))
-      throw new TypeError('Invalid glTF primitives');
+      throw new TypeError(
+        'Invalid glTF primitives; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
   for (const animation of doc.animations ?? [])
-    if (!objects(animation.samplers) || !objects(animation.channels)) throw new TypeError('Invalid glTF animation');
+    if (!objects(animation.samplers) || !objects(animation.channels))
+      throw new TypeError(
+        'Invalid glTF animation; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
   for (const key of ['extensionsRequired', 'extensionsUsed'])
-    if (record[key] !== undefined && !Array.isArray(record[key])) throw new TypeError('Invalid glTF ' + key);
+    if (record[key] !== undefined && !Array.isArray(record[key]))
+      throw new TypeError('Invalid glTF ' + key + '; re-export the file and check it with the glTF Validator');
 }
 export function container(
   input: string | object | ArrayBuffer | ArrayBufferView,
@@ -243,12 +261,17 @@ export function container(
 export function embedded(uri: string, limit = assetLimit): Uint8Array {
   const match = /^data:[^;,]+;base64,([A-Za-z0-9+/]*={0,2})$/.exec(uri);
   if (match && match[1].length > (limit * 4) / 3 + 4) throw overBudget('glTF exceeds download budget', limit);
-  if (!match) throw new TypeError('Invalid glTF data URI');
+  if (!match)
+    throw new TypeError(
+      'Invalid glTF data URI; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   let text: string;
   try {
     text = atob(match[1]); // throws on a bad length or misplaced padding the pattern lets through
   } catch {
-    throw new TypeError('Invalid glTF data URI');
+    throw new TypeError(
+      'Invalid glTF data URI; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   }
   return Uint8Array.from(text, (c) => c.charCodeAt(0));
 }
@@ -260,13 +283,18 @@ const meshoptExtension = 'EXT_meshopt_compression',
 export function textureSource(def: GLTFTexture): number {
   const extension = def.extensions?.[basisuExtension];
   if (extension !== undefined && (!extension || typeof extension !== 'object' || Array.isArray(extension)))
-    throw new TypeError('Invalid glTF KHR_texture_basisu');
+    throw new TypeError(
+      'Invalid glTF KHR_texture_basisu; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   return integer(extension === undefined ? def.source : extension.source, 'image source');
 }
 function accessorLayout(doc: GLTFDocument, id: unknown, type?: string) {
   const index = integer(id, 'accessor'),
     def = entry(doc.accessors, index, 'accessor');
-  if (type && def.type !== type) throw new TypeError('Invalid glTF accessor type');
+  if (type && def.type !== type)
+    throw new TypeError(
+      'Invalid glTF accessor type; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   const size = typeof def.componentType === 'number' ? COMPONENT_BYTES[def.componentType] : undefined,
     width = typeof def.type === 'string' && Object.hasOwn(components, def.type) ? components[def.type] : undefined,
     count = integer(def.count, 'accessor count', 1);
@@ -277,11 +305,14 @@ function accessorLayout(doc: GLTFDocument, id: unknown, type?: string) {
     (def.normalized && [5125, 5126].includes(def.componentType))
   )
     throw new TypeError(
-      `Unsupported glTF accessor ${index} (componentType ${def.componentType}, type ${def.type}${def.normalized ? ', normalized' : ''})`,
+      `Unsupported glTF accessor ${index} (componentType ${def.componentType}, type ${def.type}${def.normalized ? ', normalized' : ''}); re-export the model without it, or convert the texture format`,
     );
   return { index, def, size, width, count };
 }
 const normalizers: Record<number, number> = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 };
+/**
+ * A parsed glTF or GLB: its JSON document and binary buffers, with decoded accessor data cached under a byte budget.
+ */
 export class GLTFAsset {
   readonly buffers: Uint8Array[];
   private readonly cache = new Map<number, Float32Array>();
@@ -294,7 +325,8 @@ export class GLTFAsset {
   /** @internal Account for retained decoded data, including topology without an accessor. */
   reserveDecodedBytes(byteLength: number): void {
     integer(byteLength, 'decoded byte length');
-    if (this.decoded + byteLength > this.maxBytes * 4) throw new RangeError('Decoded glTF exceeds byte budget');
+    if (this.decoded + byteLength > this.maxBytes * 4)
+      throw new RangeError('Decoded glTF exceeds byte budget; load a smaller model, or reduce its textures and meshes');
     this.decoded += byteLength;
   }
   constructor(
@@ -315,7 +347,8 @@ export class GLTFAsset {
         !hooks[hookFor[name]],
     );
     if (missing.length)
-      throw new Error(
+      throw margoError(
+        'unsupported',
         'Required glTF extensions are unsupported: ' +
           missing
             .map((name: string) => (hookFor[name] ? name + ' (pass a ' + hookFor[name] + ' decoder)' : name))
@@ -324,10 +357,16 @@ export class GLTFAsset {
     checkCount('Too many glTF nodes', doc.nodes?.length ?? 0, maxNodes, 'maxNodes');
     let total = 0;
     this.buffers = (doc.buffers ?? []).map((def, i) => {
-      if (!def || typeof def !== 'object' || Array.isArray(def)) throw new TypeError('Invalid glTF buffer');
+      if (!def || typeof def !== 'object' || Array.isArray(def))
+        throw new TypeError(
+          'Invalid glTF buffer; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       const length = integer(def.byteLength, 'buffer length', 1);
       const fallback = def.extensions?.[meshoptExtension]?.fallback;
-      if (fallback !== undefined && typeof fallback !== 'boolean') throw new TypeError('Invalid glTF meshopt fallback');
+      if (fallback !== undefined && typeof fallback !== 'boolean')
+        throw new TypeError(
+          'Invalid glTF meshopt fallback; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       const input = buffers[i],
         placeholder = (!input || input.byteLength === 0) && !def.uri && (i !== 0 || !binary);
       if (fallback === true || (placeholder && doc.extensionsRequired?.includes(meshoptExtension))) {
@@ -337,7 +376,9 @@ export class GLTFAsset {
           views.some((view) => !view.extensions?.[meshoptExtension]) ||
           doc.bufferViews?.some((view) => view?.extensions?.[meshoptExtension]?.buffer === i)
         )
-          throw new TypeError('Invalid glTF meshopt fallback references');
+          throw new TypeError(
+            'Invalid glTF meshopt fallback references; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+          );
         return new Uint8Array();
       }
       const data = input
@@ -349,7 +390,8 @@ export class GLTFAsset {
           : i === 0
             ? binary
             : undefined;
-      if (!data || length > data.length) throw new RangeError('Truncated glTF buffer');
+      if (!data || length > data.length)
+        throw new RangeError('Truncated glTF buffer; download the file again, it is incomplete');
       total += data.byteLength;
       if (total > maxBytes) throw overBudget('glTF buffers exceed byte budget', maxBytes);
       return data.subarray(0, length);
@@ -364,13 +406,17 @@ export class GLTFAsset {
       length = integer(def.byteLength, 'view length', 1);
     const declaredLength = integer(entry(this.doc.buffers, bufferId, 'buffer').byteLength, 'buffer length', 1);
     if (length > declaredLength || offset > declaredLength - length)
-      throw new RangeError('Invalid glTF bufferView bounds');
+      throw new RangeError(
+        'Invalid glTF bufferView bounds; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     const extension = meshopt(def);
     if (extension !== undefined) {
       const cached = this.viewCache.get(index);
       if (cached) return cached;
       if (!extension || typeof extension !== 'object' || Array.isArray(extension))
-        throw new TypeError('Invalid glTF meshopt extension');
+        throw new TypeError(
+          'Invalid glTF meshopt extension; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       const source = this.buffers[integer(extension.buffer, 'meshopt buffer reference')],
         sourceOffset = integer(extension.byteOffset ?? 0, 'meshopt offset'),
         sourceLength = integer(extension.byteLength, 'meshopt length', 1);
@@ -379,13 +425,17 @@ export class GLTFAsset {
         mode = extension.mode,
         filter = extension.filter ?? 'NONE';
       if (!source || sourceLength > source.length || sourceOffset > source.length - sourceLength)
-        throw new RangeError('Invalid glTF meshopt source bounds');
+        throw new RangeError(
+          'Invalid glTF meshopt source bounds; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       if (
         !Number.isSafeInteger(count * stride) ||
         count * stride !== length ||
         (def.byteStride !== undefined && def.byteStride !== stride)
       )
-        throw new RangeError('Invalid glTF meshopt decoded layout');
+        throw new RangeError(
+          'Invalid glTF meshopt decoded layout; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       if (
         mode === 'ATTRIBUTES'
           ? stride > 256 || stride % 4 !== 0
@@ -393,7 +443,9 @@ export class GLTFAsset {
             ![2, 4].includes(stride) ||
             (mode === 'TRIANGLES' && count % 3 !== 0)
       )
-        throw new TypeError('Invalid glTF meshopt mode/stride/count');
+        throw new TypeError(
+          'Invalid glTF meshopt mode/stride/count; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       if (
         !['NONE', 'OCTAHEDRAL', 'QUATERNION', 'EXPONENTIAL', 'COLOR'].includes(filter) ||
         (filter !== 'NONE' && mode !== 'ATTRIBUTES') ||
@@ -401,8 +453,13 @@ export class GLTFAsset {
         (filter === 'QUATERNION' && stride !== 8) ||
         (filter === 'EXPONENTIAL' && stride % 4 !== 0)
       )
-        throw new TypeError('Invalid glTF meshopt filter');
-      if (this.decoded + length > this.maxBytes * 4) throw new RangeError('Decoded glTF exceeds byte budget');
+        throw new TypeError(
+          'Invalid glTF meshopt filter; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
+      if (this.decoded + length > this.maxBytes * 4)
+        throw new RangeError(
+          'Decoded glTF exceeds byte budget; load a smaller model, or reduce its textures and meshes',
+        );
       const sourceBytes = source.subarray(sourceOffset, sourceOffset + sourceLength);
       let bytes: Uint8Array;
       if (this.hooks.meshopt) {
@@ -413,19 +470,29 @@ export class GLTFAsset {
       this.viewCache.set(index, bytes);
       return bytes;
     }
-    if (!buffer || offset + length > buffer.length) throw new RangeError('Invalid glTF bufferView bounds');
+    if (!buffer || offset + length > buffer.length)
+      throw new RangeError(
+        'Invalid glTF bufferView bounds; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     return buffer.subarray(offset, offset + length);
   }
   /** Supply already normalized Draco data before constructing a PBR model. */
   setDecodedAccessor(id: unknown, values: Float32Array): void {
     const { index, width, count } = accessorLayout(this.doc, id);
     if (!(values instanceof Float32Array) || values.length !== count * width)
-      throw new RangeError('Mismatched decoded glTF accessor');
-    if (values.some((value) => !Number.isFinite(value))) throw new RangeError('Non-finite decoded glTF accessor');
+      throw new RangeError(
+        'Mismatched decoded glTF accessor; the file holds invalid numbers, re-export it and check it with the glTF Validator',
+      );
+    if (values.some((value) => !Number.isFinite(value)))
+      throw new RangeError(
+        'Non-finite decoded glTF accessor; the file holds invalid numbers, re-export it and check it with the glTF Validator',
+      );
     const cached = this.cache.get(index);
     if (cached) {
       if (cached !== values && cached.some((value, i) => value !== values[i]))
-        throw new TypeError('Conflicting decoded glTF accessor');
+        throw new TypeError(
+          'Conflicting decoded glTF accessor; the file holds invalid numbers, re-export it and check it with the glTF Validator',
+        );
       return;
     }
     this.reserveDecodedBytes(values.byteLength);
@@ -479,7 +546,9 @@ export class GLTFAsset {
     // Element i lands at row i, or at row ids[i] for sparse values.
     const read = (bytes: Uint8Array, offset: number, stride: number, n: number, ids?: number[]) => {
       if (offset % size || stride % size || offset + (n - 1) * stride + width * size > bytes.length)
-        throw new RangeError('Invalid glTF accessor bounds/alignment');
+        throw new RangeError(
+          'Invalid glTF accessor bounds/alignment; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
         type: number = def.componentType,
         divisor = def.normalized ? (normalizers[type] ?? 1) : 0;
@@ -488,7 +557,10 @@ export class GLTFAsset {
         for (let c = 0, at = offset + i * stride; c < width; c++, at += size) {
           let value = readComponent(view, at, type);
           if (divisor) value = Math.max(-1, value / divisor);
-          if (!Number.isFinite(Math.fround(value))) throw new RangeError('Non-finite glTF accessor');
+          if (!Number.isFinite(Math.fround(value)))
+            throw new RangeError(
+              'Non-finite glTF accessor; the file holds invalid numbers, re-export it and check it with the glTF Validator',
+            );
           output[row + c] = value;
         }
       }
@@ -497,7 +569,9 @@ export class GLTFAsset {
       const v = entry(this.doc.bufferViews, def.bufferView, 'bufferView'),
         stride = integer(v.byteStride ?? size * width, 'stride', size * width);
       if (stride > 252 || integer(v.byteOffset ?? 0, 'view offset') % size)
-        throw new RangeError('Invalid glTF stride/alignment');
+        throw new RangeError(
+          'Invalid glTF stride/alignment; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       read(this.view(def.bufferView), integer(def.byteOffset ?? 0, 'accessor offset'), stride, count);
     } else if (!def.sparse || def.byteOffset) {
       if (
@@ -513,7 +587,9 @@ export class GLTFAsset {
         )
       )
         throw new Error('Draco geometry requires parseGLTFAsync or loadGLTF');
-      throw new TypeError('Accessor has no data or invalid offset');
+      throw new TypeError(
+        'Accessor has no data or invalid offset; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     }
     if (def.sparse) {
       const sparse = def.sparse,
@@ -522,7 +598,9 @@ export class GLTFAsset {
         values = sparse.values,
         indexSize = COMPONENT_BYTES[indices?.componentType];
       if (n > count || ![5121, 5123, 5125].includes(indices?.componentType))
-        throw new TypeError('Invalid glTF sparse indices');
+        throw new TypeError(
+          'Invalid glTF sparse indices; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       const bytes = this.view(indices.bufferView),
         at = integer(indices.byteOffset ?? 0, 'sparse offset');
       if (
@@ -531,14 +609,19 @@ export class GLTFAsset {
         entry(this.doc.bufferViews, indices.bufferView, 'sparse indices').byteStride !== undefined ||
         entry(this.doc.bufferViews, values?.bufferView, 'sparse values').byteStride !== undefined
       )
-        throw new RangeError('Invalid sparse bounds/stride');
+        throw new RangeError(
+          'Invalid sparse bounds/stride; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
         ids: number[] = [];
       let previous = -1;
       for (let i = 0; i < n; i++) {
         const p = at + i * indexSize,
           id = indexSize === 1 ? v.getUint8(p) : indexSize === 2 ? v.getUint16(p, true) : v.getUint32(p, true);
-        if (id <= previous || id >= count) throw new RangeError('Invalid sparse index order/bounds');
+        if (id <= previous || id >= count)
+          throw new RangeError(
+            'Invalid sparse index order/bounds; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+          );
         ids.push(id);
         previous = id;
       }
@@ -582,7 +665,10 @@ function ktxHeader(
   device?: GPUDevice,
 ): { width: number; height: number; levels: number } {
   const magic = [171, 75, 84, 88, 32, 50, 48, 187, 13, 10, 26, 10];
-  if (data.length < 80 || magic.some((v, i) => data[i] !== v)) throw new TypeError('Invalid glTF KTX2 header');
+  if (data.length < 80 || magic.some((v, i) => data[i] !== v))
+    throw new TypeError(
+      'Invalid glTF KTX2 header; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength),
     width = view.getUint32(20, true),
     height = view.getUint32(24, true),
@@ -601,11 +687,16 @@ function ktxHeader(
     !levels ||
     levels > Math.floor(Math.log2(Math.max(width, height))) + 1
   )
-    throw new RangeError('Invalid glTF KTX2 dimensions or mip levels');
+    throw new RangeError(
+      'Invalid glTF KTX2 dimensions or mip levels; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   let worstBytes = 0;
   for (let level = 0; level < levels; level++)
     worstBytes += Math.max(1, width >> level) * Math.max(1, height >> level) * 4;
-  if (worstBytes > asset.remainingDecodedBytes) throw new RangeError('glTF KTX2 exceeds decoded byte budget');
+  if (worstBytes > asset.remainingDecodedBytes)
+    throw new RangeError(
+      'glTF KTX2 exceeds decoded byte budget; load a smaller model, or reduce its textures and meshes',
+    );
   return { width, height, levels };
 }
 function validateKTX2(result: TranscodedKTX2Result, header: ReturnType<typeof ktxHeader>, asset: GLTFAsset): KTX2Image {
@@ -627,7 +718,9 @@ function validateKTX2(result: TranscodedKTX2Result, header: ReturnType<typeof kt
     typeof result.srgb !== 'boolean' ||
     typeof result.hasAlpha !== 'boolean'
   )
-    throw new TypeError('Invalid transcoded glTF KTX2 image');
+    throw new TypeError(
+      'Invalid transcoded glTF KTX2 image; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   let total = 0;
   for (let level = 0; level < result.mipmaps.length; level++) {
     const mip = result.mipmaps[level];
@@ -642,7 +735,9 @@ function validateKTX2(result: TranscodedKTX2Result, header: ReturnType<typeof kt
       mip.data.byteLength !== length ||
       mip.byteLength !== length
     )
-      throw new RangeError('Invalid transcoded glTF KTX2 mip');
+      throw new RangeError(
+        'Invalid transcoded glTF KTX2 mip; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     total += length;
   }
   asset.reserveDecodedBytes(total);
@@ -776,7 +871,10 @@ export async function loadAsset(
     if (def.extensions?.[meshoptExtension]?.fallback === true) continue;
     if (!def.uri) {
       if (i === 0 && binary) buffers[i] = binary;
-    } else if (typeof def.uri !== 'string') throw new TypeError('Invalid glTF buffer uri');
+    } else if (typeof def.uri !== 'string')
+      throw new TypeError(
+        'Invalid glTF buffer uri; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     else if (def.uri.startsWith('data:')) {
       const b = embedded(def.uri, limit);
       total += b.length;
@@ -806,12 +904,17 @@ export async function loadAsset(
         total += data.length;
         if (total > limit) throw overBudget('glTF exceeds download budget', limit);
       } else if (typeof def.uri === 'string') data = await fetchBytes(resolve(def.uri));
-      else throw new TypeError('Invalid glTF image');
+      else
+        throw new TypeError(
+          'Invalid glTF image; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       const bitmap = sources.has(index) ? await decoder.decode(data) : await decodeImage(data, def.mimeType, index);
       images[index] = bitmap;
       decodedImages += bitmap.width * bitmap.height * 4;
       if (bitmap.width * bitmap.height > 16_777_216 || decodedImages > limit * 4)
-        throw new RangeError('glTF images exceed decoded size limit');
+        throw new RangeError(
+          'glTF images exceed decoded size limit; load a smaller model, or reduce its textures and meshes',
+        );
       signal?.throwIfAborted();
     }
     return { asset, images };

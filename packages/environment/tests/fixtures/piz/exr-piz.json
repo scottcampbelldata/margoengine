@@ -591,7 +591,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -601,7 +601,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -611,7 +611,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -621,7 +621,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -631,7 +631,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -641,7 +641,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -651,7 +651,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -661,7 +661,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 2 data out of bounds"
+    "message": "Invalid EXR: chunk 2 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -671,7 +671,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 2 data out of bounds"
+    "message": "Invalid EXR: chunk 2 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -681,7 +681,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 2 data out of bounds"
+    "message": "Invalid EXR: chunk 2 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -691,7 +691,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 2 data out of bounds"
+    "message": "Invalid EXR: chunk 2 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -701,7 +701,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 3 data out of bounds"
+    "message": "Invalid EXR: chunk 3 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -711,7 +711,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 3 data out of bounds"
+    "message": "Invalid EXR: chunk 3 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -721,7 +721,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 3 data out of bounds"
+    "message": "Invalid EXR: chunk 3 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -731,7 +731,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 3 data out of bounds"
+    "message": "Invalid EXR: chunk 3 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -741,7 +741,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 4 data out of bounds"
+    "message": "Invalid EXR: chunk 4 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -751,7 +751,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 4 data out of bounds"
+    "message": "Invalid EXR: chunk 4 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -761,7 +761,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 4 data out of bounds"
+    "message": "Invalid EXR: chunk 4 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -771,7 +771,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 5 data out of bounds"
+    "message": "Invalid EXR: chunk 5 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -781,7 +781,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 5 data out of bounds"
+    "message": "Invalid EXR: chunk 5 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -791,7 +791,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 5 data out of bounds"
+    "message": "Invalid EXR: chunk 5 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -801,7 +801,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 5 data out of bounds"
+    "message": "Invalid EXR: chunk 5 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -811,7 +811,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 6 data out of bounds"
+    "message": "Invalid EXR: chunk 6 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -821,7 +821,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 6 data out of bounds"
+    "message": "Invalid EXR: chunk 6 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -831,7 +831,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 6 data out of bounds"
+    "message": "Invalid EXR: chunk 6 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -841,7 +841,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 6 data out of bounds"
+    "message": "Invalid EXR: chunk 6 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -851,7 +851,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 7 data out of bounds"
+    "message": "Invalid EXR: chunk 7 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -861,7 +861,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 7 data out of bounds"
+    "message": "Invalid EXR: chunk 7 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -871,7 +871,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 7 data out of bounds"
+    "message": "Invalid EXR: chunk 7 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -881,7 +881,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 7 data out of bounds"
+    "message": "Invalid EXR: chunk 7 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1530,7 +1530,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1540,7 +1540,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1550,7 +1550,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1560,7 +1560,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1570,7 +1570,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1580,7 +1580,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1590,7 +1590,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1600,7 +1600,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1610,7 +1610,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1620,7 +1620,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1630,7 +1630,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1640,7 +1640,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1650,7 +1650,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1660,7 +1660,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1670,7 +1670,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1680,7 +1680,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1690,7 +1690,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1700,7 +1700,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1710,7 +1710,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1720,7 +1720,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 0 data out of bounds"
+    "message": "Invalid EXR: chunk 0 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1730,7 +1730,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1740,7 +1740,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1750,7 +1750,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1760,7 +1760,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1770,7 +1770,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1780,7 +1780,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1790,7 +1790,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1800,7 +1800,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {
@@ -1810,7 +1810,7 @@
    "result": {
     "name": "RangeError",
     "code": null,
-    "message": "Invalid EXR: chunk 1 data out of bounds"
+    "message": "Invalid EXR: chunk 1 data out of bounds; the file is truncated, download or export it again"
    }
   },
   {

@@ -87,6 +87,6 @@ export function validateOutputValues(out: MutableVec3View, x: number, y: number,
     (out instanceof Float32Array &&
       (Math.abs(x) > FLOAT32_MAX || Math.abs(y) > FLOAT32_MAX || Math.abs(z) > FLOAT32_MAX))
   ) {
-    throw new RangeError('Result exceeds output precision');
+    throw new RangeError('Result exceeds output precision; scale the scene down or move it nearer the origin');
   }
 }

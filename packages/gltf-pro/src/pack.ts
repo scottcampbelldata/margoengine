@@ -53,7 +53,10 @@ export function listIndices(v: Uint32Array, mode: number): Uint32Array {
 function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
   const mode = p.mode ?? 4,
     per = mode === 0 ? 1 : mode < 4 ? 2 : 3;
-  if (!Number.isInteger(mode) || mode < 0 || mode > 6) throw new TypeError('Invalid glTF primitive mode');
+  if (!Number.isInteger(mode) || mode < 0 || mode > 6)
+    throw new TypeError(
+      'Invalid glTF primitive mode; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   const a = p.attributes ?? {},
     read = (label: string, id: unknown, type?: string) => {
       try {
@@ -77,7 +80,7 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
     if (a[key] !== undefined && !(quantized && key !== 'COLOR_0')) {
       const def = entry(asset.doc.accessors, a[key], 'attribute');
       if (![5126, 5121, 5123].includes(def.componentType) || (def.componentType !== 5126 && !def.normalized))
-        throw new TypeError('Invalid normalized ' + key);
+        throw new TypeError('Invalid normalized ' + key + '; re-export the file and check it with the glTF Validator');
     }
   const normals = a.NORMAL === undefined ? new Float32Array(positions.length) : read('NORMAL', a.NORMAL, 'VEC3');
   const indexValues =
@@ -85,18 +88,26 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
   if (indexValues)
     for (let i = 0; i < indexValues.length; i++) {
       const v = indexValues[i];
-      if (!Number.isInteger(v) || v < 0 || v >= count) throw new RangeError('Invalid glTF triangle indices');
+      if (!Number.isInteger(v) || v < 0 || v >= count)
+        throw new RangeError(
+          'Invalid glTF triangle indices; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
     }
   let indices: Uint32Array = indexValues ? new Uint32Array(indexValues) : new Uint32Array(count);
   if (!indexValues) for (let i = 0; i < count; i++) indices[i] = i;
   indices = listIndices(indices, mode);
-  if (!indices.length || indices.length % per) throw new RangeError('Invalid glTF triangle indices');
+  if (!indices.length || indices.length % per)
+    throw new RangeError(
+      'Invalid glTF triangle indices; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   if (
     p.indices !== undefined &&
     (![5121, 5123, 5125].includes(entry(asset.doc.accessors, p.indices, 'indices').componentType) ||
       asset.doc.accessors![p.indices].normalized)
   )
-    throw new TypeError('Invalid index component type');
+    throw new TypeError(
+      'Invalid index component type; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   if (a.NORMAL === undefined && per === 3)
     for (let i = 0; i < indices.length; i += 3) {
       const x = indices[i] * 3,
@@ -133,7 +144,9 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
     (tangent && tangent.length !== count * 4) ||
     (colors && ![3, 4].includes(colorWidth))
   )
-    throw new RangeError('Mismatched glTF attributes');
+    throw new RangeError(
+      'Mismatched glTF attributes; the file holds invalid numbers, re-export it and check it with the glTF Validator',
+    );
   const vertices = new Float32Array(count * 20);
   // Packed vertex: position+1, normal+0, tangent, uv0 uv1, color.
   for (let i = 0, o = 0; i < count; i++, o += 20) {
@@ -150,7 +163,10 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
     // which draw unlit) gets +Z, and so does one whose summed face normals overflow Float32 (coordinates past about
     // 1e19: Infinity / Infinity would be NaN); a zero or non-finite normal the file supplies is an error.
     if (!length || !Number.isFinite(length)) {
-      if (a.NORMAL !== undefined) throw new RangeError('Zero or non-finite glTF normal');
+      if (a.NORMAL !== undefined)
+        throw new RangeError(
+          'Zero or non-finite glTF normal; the file holds invalid numbers, re-export it and check it with the glTF Validator',
+        );
       vertices[o + 6] = 1;
     } else {
       vertices[o + 4] = nx / length;

@@ -14,7 +14,7 @@ function curve(node: FBXNode): Curve {
   const raw = findChild(node, 'KeyTime')?.properties[0] as ArrayLike<number | bigint> | undefined,
     values = array(node, 'KeyValueFloat');
   if (!raw || !raw.length || raw.length !== values.length || raw.length > maxKeys)
-    throw new RangeError('Invalid FBX animation key count');
+    throw new RangeError('Invalid FBX animation key count; re-export the file, it looks damaged');
   const times: number[] = [];
   let previous = -1,
     mode: 'LINEAR' | 'STEP' | undefined;
@@ -27,24 +27,33 @@ function curve(node: FBXNode): Curve {
       Array.from(refs).some((v) => !Number.isInteger(v) || v < 1) ||
       Array.from(refs).reduce((a, b) => a + b, 0) !== raw.length
     )
-      throw new RangeError('Invalid FBX key attribute references');
+      throw new RangeError('Invalid FBX key attribute references; re-export the file, it looks damaged');
   }
   if (flags) {
     if (!flags.length || (!refs && flags.length !== 1 && flags.length !== raw.length))
-      throw new RangeError('Invalid FBX key flags');
+      throw new RangeError('Invalid FBX key flags; re-export the file, it looks damaged');
     for (let i = 0; i < flags.length; i++) {
       const bits = flags[i] & 14,
         next = bits === 2 ? 'STEP' : bits === 4 ? 'LINEAR' : undefined;
-      if (bits === 2 && flags[i] & 0x100) throw new TypeError('Unsupported FBX constant-next interpolation');
-      if (!next) throw new TypeError(`Unsupported FBX cubic animation: ${objectName(node)}`);
-      if (mode && mode !== next) throw new TypeError('Unsupported FBX mixed animation interpolation');
+      if (bits === 2 && flags[i] & 0x100)
+        throw new TypeError(
+          'Unsupported FBX constant-next interpolation; bake or remove it in your 3D tool before export',
+        );
+      if (!next)
+        throw new TypeError(
+          `Unsupported FBX cubic animation: ${objectName(node)}; bake or remove it in your 3D tool before export`,
+        );
+      if (mode && mode !== next)
+        throw new TypeError(
+          'Unsupported FBX mixed animation interpolation; bake or remove it in your 3D tool before export',
+        );
       mode = next;
     }
   }
   for (let i = 0; i < raw.length; i++) {
     const time = Number(raw[i]) / ticksPerSecond;
     if (!Number.isFinite(time) || time < 0 || time <= previous || !Number.isFinite(values[i]))
-      throw new RangeError('Invalid FBX animation key');
+      throw new RangeError('Invalid FBX animation key; re-export the file, it looks damaged');
     times.push(time);
     previous = time;
   }
@@ -67,17 +76,25 @@ function commonTimes(curves: Curve[]): number[] {
   const values = new Set<number>();
   let mode: string | undefined;
   for (const c of curves) {
-    if (mode && mode !== c.interpolation) throw new TypeError('Unsupported FBX mixed animation interpolation');
+    if (mode && mode !== c.interpolation)
+      throw new TypeError(
+        'Unsupported FBX mixed animation interpolation; bake or remove it in your 3D tool before export',
+      );
     mode = c.interpolation;
     for (const t of c.times) {
       values.add(t);
-      if (values.size > maxKeys) throw new RangeError('FBX animation key budget exceeded');
+      if (values.size > maxKeys)
+        throw new RangeError(
+          'FBX animation key budget exceeded; simplify or split the scene, the import limits are listed in the README',
+        );
     }
   }
   const result = [...values].sort((a, b) => a - b);
   for (let i = 1; i < result.length; i++)
     if (Math.fround(result[i]) <= Math.fround(result[i - 1]))
-      throw new RangeError('FBX animation times collapse in Float32');
+      throw new RangeError(
+        'FBX animation times collapse in Float32; simplify or split the scene, the import limits are listed in the README',
+      );
   return result;
 }
 type Axes = (Curve | undefined)[];
@@ -115,7 +132,9 @@ function createLocalSampler(
       override.scale &&
       (Math.abs(override.scale[0] - override.scale[1]) > 1e-7 || Math.abs(override.scale[1] - override.scale[2]) > 1e-7)
     )
-      throw new TypeError('Unsupported FBX animated nonuniform parent scale');
+      throw new TypeError(
+        'Unsupported FBX animated nonuniform parent scale; bake or remove it in your 3D tool before export',
+      );
     return localParts(ctx, model, override);
   };
 }
@@ -158,20 +177,28 @@ function refineTimes(seed: number[], evaluate: (time: number) => Parts, rotation
     return 1 - Math.min(1, Math.abs(agreement) / Math.sqrt(length)) <= 1.25e-9; // angular error <= 1e-4 radians
   };
   const visit = (start: number, end: number, a: Parts, b: Parts, depth: number): void => {
-    if (++work > 1_000_000) throw new RangeError('FBX animation baking work budget exceeded');
+    if (++work > 1_000_000)
+      throw new RangeError(
+        'FBX animation baking work budget exceeded; simplify or split the scene, the import limits are listed in the README',
+      );
     let split = rotation?.some((c) => c && Math.abs(sample(c, end) - sample(c, start)) > 45) ?? false;
     for (const alpha of [0.25, 0.5, 0.75])
       if (!acceptable(a, b, evaluate(start + (end - start) * alpha), alpha)) split = true;
     if (split) {
       const mid = (start + end) / 2;
       if (depth >= 18 || Math.fround(mid) <= Math.fround(start) || Math.fround(mid) >= Math.fround(end))
-        throw new RangeError('FBX animation cannot meet baking tolerance');
+        throw new RangeError(
+          'FBX animation cannot meet baking tolerance; simplify or split the scene, the import limits are listed in the README',
+        );
       const p = evaluate(mid);
       visit(start, mid, a, p, depth + 1);
       visit(mid, end, p, b, depth + 1);
     } else {
       out.push(end);
-      if (out.length > 200_000) throw new RangeError('FBX baked animation key budget exceeded');
+      if (out.length > 200_000)
+        throw new RangeError(
+          'FBX baked animation key budget exceeded; simplify or split the scene, the import limits are listed in the README',
+        );
     }
   };
   for (let i = 1; i < seed.length; i++) visit(seed[i - 1], seed[i], evaluate(seed[i - 1]), evaluate(seed[i]), 0);
@@ -183,8 +210,9 @@ function axes(ctx: SceneContext, node: FBXNode, cache: Map<bigint, Curve>): Axes
     const source = ctx.document.objects.get(c.child)!;
     if (c.kind !== 'OP' || source.name !== 'AnimationCurve') continue;
     const axis = ['d|X', 'd|Y', 'd|Z'].indexOf(c.property ?? '');
-    if (axis === -1) throw new TypeError('Unsupported FBX animation axis');
-    if (out[axis]) throw new TypeError('Duplicate FBX animation axis');
+    if (axis === -1)
+      throw new TypeError('Unsupported FBX animation axis; bake or remove it in your 3D tool before export');
+    if (out[axis]) throw new TypeError('Duplicate FBX animation axis; keep one per target when exporting');
     let data = cache.get(c.child);
     if (!data) {
       data = curve(source);
@@ -202,7 +230,10 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
     bakingSamples = 0;
   const reserve = (count: number) => {
     totalValues += count;
-    if (totalValues > 16_000_000) throw new RangeError('FBX animation byte budget exceeded');
+    if (totalValues > 16_000_000)
+      throw new RangeError(
+        'FBX animation byte budget exceeded; simplify or split the scene, the import limits are listed in the README',
+      );
     ctx.signal?.throwIfAborted();
   };
   for (const stack of ctx.document.objects.values()) {
@@ -211,11 +242,15 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
       weights = new Map<bigint, Curve>(),
       channels: AnimationChannelData[] = [];
     const layers = children(ctx, id(stack.properties[0])).filter((n) => n.name === 'AnimationLayer');
-    if (layers.length > 1) throw new TypeError('Unsupported FBX animation layer blending');
+    if (layers.length > 1)
+      throw new TypeError('Unsupported FBX animation layer blending; bake or remove it in your 3D tool before export');
     for (const layer of layers) {
       if (Number(property(layer, 'Weight', 100)) !== 100 || Number(property(layer, 'Mute', 0)) !== 0)
-        throw new TypeError('Unsupported FBX animation layer blending');
-      if (Number(property(layer, 'BlendMode', 0)) !== 0) throw new TypeError('Unsupported FBX animation layer mode');
+        throw new TypeError(
+          'Unsupported FBX animation layer blending; bake or remove it in your 3D tool before export',
+        );
+      if (Number(property(layer, 'BlendMode', 0)) !== 0)
+        throw new TypeError('Unsupported FBX animation layer mode; bake or remove it in your 3D tool before export');
       for (const track of children(ctx, id(layer.properties[0])).filter((n) => n.name === 'AnimationCurveNode')) {
         const tracks = axes(ctx, track, cache);
         if (!tracks.some(Boolean)) continue;
@@ -224,16 +259,20 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
           const path = target.property ?? '';
           if (path === 'DeformPercent') {
             if (tracks.filter(Boolean).length !== 1 || !tracks[0])
-              throw new TypeError('Unsupported FBX morph curve axes');
-            if (weights.has(target.parent)) throw new TypeError('Duplicate animation target');
+              throw new TypeError('Unsupported FBX morph curve axes; bake or remove it in your 3D tool before export');
+            if (weights.has(target.parent))
+              throw new TypeError('Duplicate animation target; keep one per target when exporting');
             weights.set(target.parent, tracks[0]);
             continue;
           }
           if (!['Lcl Translation', 'Lcl Rotation', 'Lcl Scaling'].includes(path))
-            throw new TypeError(`Unsupported FBX animated property: ${path}`);
-          if (!ctx.models.has(target.parent)) throw new TypeError('FBX animation target is not a model');
+            throw new TypeError(
+              `Unsupported FBX animated property: ${path}; bake or remove it in your 3D tool before export`,
+            );
+          if (!ctx.models.has(target.parent))
+            throw new TypeError('FBX animation target is not a model; animate a model node');
           const record = models.get(target.parent) ?? new Map<string, Axes>();
-          if (record.has(path)) throw new TypeError('Duplicate animation target');
+          if (record.has(path)) throw new TypeError('Duplicate animation target; keep one per target when exporting');
           record.set(path, tracks);
           models.set(target.parent, record);
         }
@@ -245,7 +284,10 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
         all = [...tracks.values()].flat().filter((c): c is Curve => !!c),
         interpolation = all[0].interpolation;
       const sampleLocal = createLocalSampler(ctx, model, tracks, () => {
-        if (++bakingSamples > 100_000) throw new RangeError('FBX animation sampling work budget exceeded');
+        if (++bakingSamples > 100_000)
+          throw new RangeError(
+            'FBX animation sampling work budget exceeded; simplify or split the scene, the import limits are listed in the README',
+          );
       });
       const seed = commonTimes(all),
         times = interpolation === 'LINEAR' ? refineTimes(seed, sampleLocal, tracks.get('Lcl Rotation')) : seed;
@@ -296,7 +338,8 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
       });
     }
     for (const key of weights.keys())
-      if (!morphs.some((m) => m.channels.includes(key))) throw new TypeError('FBX morph animation has no shape target');
+      if (!morphs.some((m) => m.channels.includes(key)))
+        throw new TypeError('FBX morph animation has no shape target; clean up the source model before export');
     if (channels.length) clips.push({ name: objectName(stack), channels });
   }
   return clips;

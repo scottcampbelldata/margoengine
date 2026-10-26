@@ -8,6 +8,7 @@ import { parseXYZ, type XYZOptions } from './xyz.js';
 import { parseVTK, type VTKOptions } from './vtk.js';
 import { parseUSDA, parseUSDZ, type USDOptions } from './usdz.js';
 
+/** A format detectFormat and parseAny can detect: ply, 3mf, pcd, off, xyz, vtk, usda or usdz. */
 export type LoaderFormat = 'ply' | '3mf' | 'pcd' | 'off' | 'xyz' | 'vtk' | 'usda' | 'usdz';
 const EXTENSIONS: Record<string, LoaderFormat> = {
   ply: 'ply',
@@ -52,6 +53,7 @@ export function detectFormat(input: BinaryInput, name?: string): LoaderFormat | 
   return null;
 }
 
+/** The union of every loader's options, plus a file name hint and a forced format, for parseAny. */
 export type AnyOptions = PLYOptions &
   ThreeMFOptions &
   PCDOptions &

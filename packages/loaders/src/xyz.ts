@@ -21,6 +21,7 @@ export type XYZLayout =
   | 'xyz-normal-rgb'
   | 'xyz-intensity'
   | 'xyz-intensity-rgb';
+/** Options of parseXYZ: the shared size limits and the column layout. */
 export interface XYZOptions extends ParseLimits {
   layout?: XYZLayout;
 }

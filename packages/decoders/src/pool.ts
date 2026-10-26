@@ -1,4 +1,4 @@
-import { decodeFailed } from './errors.js';
+import { decodeFailed, deviceUnsupported } from './errors.js';
 import type { WorkerResponse } from './protocol.js';
 
 interface Job {
@@ -49,7 +49,7 @@ export const spawnDecoderWorker = (): Worker => new Worker(workerURL(), { name: 
 
 export function requireWorkers(owner: string): void {
   if (typeof Worker === 'undefined')
-    throw new Error(`${owner} needs a browser with Web Workers; it cannot decode during SSR`);
+    throw deviceUnsupported(`${owner} needs a browser with Web Workers; it cannot decode during SSR`);
 }
 
 /** Copy view data out of a larger buffer; whole ArrayBuffers are transferred only when the caller opts in. */

@@ -40,16 +40,20 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
   const skins = children(ctx, id(mesh.source.properties[0])).filter(
     (n) => n.name === 'Deformer' && n.properties[2] === 'Skin',
   );
-  if (skins.length > 1) throw new TypeError('Multiple FBX skins on geometry');
+  if (skins.length > 1) throw new TypeError('Multiple FBX skins on geometry; keep one per target when exporting');
   if (!skins.length) return null;
   const source = skins[0],
     type = findChild(source, 'SkinningType')?.properties[0];
-  if (type !== undefined && type !== 'Linear' && type !== 0) throw new TypeError('Unsupported FBX skinning type');
+  if (type !== undefined && type !== 'Linear' && type !== 0)
+    throw new TypeError('Unsupported FBX skinning type; bake or remove it in your 3D tool before export');
   const clusters = children(ctx, id(source.properties[0])).filter((n) => n.properties[2] === 'Cluster');
-  if (!clusters.length || clusters.length > 65535) throw new RangeError('Invalid FBX skin cluster count');
+  if (!clusters.length || clusters.length > 65535)
+    throw new RangeError('Invalid FBX skin cluster count; re-export the file, it looks damaged');
   const cpCount = array(mesh.source, 'Vertices').length / 3;
   if (!Number.isSafeInteger(cpCount) || cpCount < 1 || cpCount > 1_000_000)
-    throw new RangeError('FBX geometry budget exceeded');
+    throw new RangeError(
+      'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
+    );
   // Reserve control-point scratch once per source, before allocating it. Material
   // groups and instances reuse the same influence reduction and bind matrices.
   ctx.budget.reserve(cpCount * 44 + clusters.length * 144);
@@ -64,12 +68,14 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
     ctx.signal?.throwIfAborted();
     const label = objectName(cluster),
       mode = findChild(cluster, 'Mode')?.properties[0];
-    if (mode !== undefined && mode !== 'Normalize') throw new TypeError(`Unsupported FBX cluster mode: ${label}`);
+    if (mode !== undefined && mode !== 'Normalize')
+      throw new TypeError(`Unsupported FBX cluster mode: ${label}; bake or remove it in your 3D tool before export`);
     const links = children(ctx, id(cluster.properties[0])).filter((n) => n.name === 'Model');
     if (links.length !== 1) throw new TypeError(`FBX cluster needs one joint: ${label}`);
     const jointKey = id(links[0].properties[0]),
       joint = ctx.nodes.get(jointKey);
-    if (!joint || seen.has(jointKey)) throw new TypeError(`Invalid FBX cluster joint: ${label}`);
+    if (!joint || seen.has(jointKey))
+      throw new TypeError(`Invalid FBX cluster joint: ${label}; re-export the file, it looks damaged`);
     seen.add(jointKey);
     const jointIndex = joints.length;
     joints.push(joint);
@@ -78,18 +84,21 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
       transform = array(cluster, 'Transform');
       link = array(cluster, 'TransformLink');
     } catch {
-      throw new TypeError(`Missing FBX bind matrix: ${label}`);
+      throw new TypeError(`Missing FBX bind matrix: ${label}; re-export the file, it looks damaged`);
     }
-    if (transform.length !== 16 || link.length !== 16) throw new TypeError(`Invalid FBX bind matrix: ${label}`);
+    if (transform.length !== 16 || link.length !== 16)
+      throw new TypeError(`Invalid FBX bind matrix: ${label}; re-export the file, it looks damaged`);
     // Geometry transforms are already baked into vertices. Transform is the mesh-node bind space.
     ctx.budget.reserve(256);
     const bind = multiply(inverse(convertedMatrix(ctx, link)), convertedMatrix(ctx, transform));
     binds.set(bind, jointIndex * 16);
     for (let i = 0; i < 16; i++)
-      if (!Number.isFinite(binds[jointIndex * 16 + i])) throw new RangeError(`Invalid FBX bind matrix: ${label}`);
+      if (!Number.isFinite(binds[jointIndex * 16 + i]))
+        throw new RangeError(`Invalid FBX bind matrix: ${label}; re-export the file, it looks damaged`);
     const indices = array(cluster, 'Indexes'),
       values = array(cluster, 'Weights');
-    if (indices.length !== values.length) throw new RangeError(`FBX cluster weight count mismatch: ${label}`);
+    if (indices.length !== values.length)
+      throw new RangeError(`FBX cluster weight count mismatch: ${label}; re-export the file, it looks damaged`);
     ctx.budget.work(indices.length * 8);
     for (let i = 0; i < indices.length; i++) {
       const cp = indices[i],
@@ -102,7 +111,7 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
         !Number.isFinite(weight) ||
         weight < 0
       )
-        throw new RangeError(`Invalid FBX cluster weight: ${label}`);
+        throw new RangeError(`Invalid FBX cluster weight: ${label}; re-export the file, it looks damaged`);
       used[cp] = jointIndex + 1;
       if (!weight) continue;
       insertInfluence(jointIds, weights, cp, jointIndex, weight);
@@ -132,10 +141,11 @@ export function attachSkin(ctx: SceneContext, mesh: MeshBinding): void {
   for (let i = 0; i < mesh.controlPoints.length; i++) {
     const point = mesh.controlPoints[i];
     if (!Number.isInteger(point) || point < 0 || point >= data.cpCount)
-      throw new RangeError('Invalid FBX skin control point');
+      throw new RangeError('Invalid FBX skin control point; re-export the file, it looks damaged');
     const cp = point * 4,
       sum = weights[cp] + weights[cp + 1] + weights[cp + 2] + weights[cp + 3];
-    if (!(sum > 0) || !Number.isFinite(sum)) throw new RangeError('FBX skin vertex has no positive weights');
+    if (!(sum > 0) || !Number.isFinite(sum))
+      throw new RangeError('FBX skin vertex has no positive weights; clean up the source model before export');
     for (let k = 0; k < 4; k++) {
       ids[i * 4 + k] = jointIds[cp + k];
       out[i * 4 + k] = weights[cp + k] / sum;

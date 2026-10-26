@@ -74,13 +74,14 @@ export function validatedDracoLimits(
     attributeWidths = Object.create(null);
     for (const [semantic, width] of Object.entries(limits.attributeWidths)) {
       if (!Number.isSafeInteger(width) || width < 1 || width > 16)
-        throw new RangeError(`Draco: invalid ${semantic} width limit`);
+        throw new RangeError(`Draco: invalid ${semantic} width limit; use a width limit from 1 to 4`);
       attributeWidths![semantic] = width;
     }
   }
   return { maxVertices, maxIndices, maxDecodedBytes, attributeWidths };
 }
 
+/** One transcoded mip level: its pixel or block data, size in pixels and byte length. */
 export interface KTX2Mip {
   data: Uint8Array;
   width: number;
@@ -88,6 +89,7 @@ export interface KTX2Mip {
   byteLength: number;
 }
 
+/** The result of a KTX2 transcode: size, GPU format, every mip level and the target actually used. */
 export interface TranscodedKTX2Result {
   width: number;
   height: number;

@@ -8,18 +8,21 @@ import {
 } from '@margoengine/loaders/common';
 import { checkStep } from './step.js';
 
+/** Options of parseIFC: size limits, an AbortSignal and web-ifc settings. */
 export interface IFCOptions extends ParseLimits {
   maxBytes?: number;
   signal?: AbortSignal;
   /** Native web-ifc settings. Model coordinates are kept unless COORDINATE_TO_ORIGIN is set. */
   settings?: LoaderSettings;
 }
+/** One IFC product: its express ID, type, optional GlobalId and name. */
 export interface IFCProduct {
   expressID: number;
   type: string;
   globalId?: string;
   name?: string;
 }
+/** The geometry parseIFC returns, with the IFC schema name and the list of products. */
 export interface IFCResult extends LoadedGeometry {
   kind: 'mesh';
   schema: string;

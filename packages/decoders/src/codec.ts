@@ -19,13 +19,13 @@ export type ScriptLoader = (url: string) => Promise<void>;
 /** Run a classic Emscripten script in module-worker global scope. Indirect eval keeps its top-level `var` global. */
 export const evaluateScript: ScriptLoader = async (url) => {
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Could not load ${url} (${response.status})`);
+  if (!response.ok) throw decodeFailed(`Could not load ${url} (${response.status})`);
   (0, eval)(await response.text());
 };
 
 async function binary(url: string): Promise<ArrayBuffer> {
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Could not load ${url} (${response.status})`);
+  if (!response.ok) throw decodeFailed(`Could not load ${url} (${response.status})`);
   return response.arrayBuffer();
 }
 
@@ -45,7 +45,10 @@ export async function initDraco(
       DracoDecoderModule?: (options: { wasmBinary: ArrayBuffer }) => PromiseLike<DracoModule>;
     }
   ).DracoDecoderModule;
-  if (typeof factory !== 'function') throw new Error('Draco wrapper did not define DracoDecoderModule');
+  if (typeof factory !== 'function')
+    throw decodeFailed(
+      'Draco wrapper did not define DracoDecoderModule; load the unmodified draco_decoder.js from the package assets',
+    );
   return new Promise((resolve, reject) => {
     factory({ wasmBinary }).then((module) => resolve({ module }), reject);
   });
@@ -60,12 +63,18 @@ export async function initBasis(
   const factory = (
     globalThis as typeof globalThis & { BASIS?: (options: { wasmBinary: ArrayBuffer }) => PromiseLike<BasisModule> }
   ).BASIS;
-  if (typeof factory !== 'function') throw new Error('Basis transcoder did not define BASIS');
+  if (typeof factory !== 'function')
+    throw decodeFailed(
+      'Basis transcoder did not define BASIS; load the unmodified basis_transcoder.js from the package assets',
+    );
   const module = await new Promise<{ m: BasisModule }>((resolve, reject) => {
     factory({ wasmBinary }).then((m) => resolve({ m }), reject);
   }).then((box) => box.m);
   module.initializeBasis();
-  if (typeof module.KTX2File !== 'function') throw new Error('Basis transcoder lacks KTX2 support');
+  if (typeof module.KTX2File !== 'function')
+    throw decodeFailed(
+      'Basis transcoder lacks KTX2 support; use the basis_transcoder build that ships with this release',
+    );
   return { module };
 }
 
@@ -133,7 +142,7 @@ export function decodeDraco(draco: DracoModule, bytes: Uint8Array, request: Drac
   // The 11-byte Draco header ("DRACO", version, geometry type 0 or 1, method, flags) is checked here: for a header it
   // cannot parse, GetEncodedGeometryType returns an uninitialized value, so the outcome would depend on Wasm memory.
   if (bytes.length < 11 || dracoMagic.some((b, i) => bytes[i] !== b) || bytes[7] > 1)
-    throw new TypeError('Draco: invalid header');
+    throw new TypeError('Draco: invalid header; pass an unmodified .drc buffer');
   const decoder = guard('Draco', () => new draco.Decoder()),
     buffer = guard('Draco', () => new draco.DecoderBuffer());
   let geometry: DracoGeometry | null = null,
@@ -148,21 +157,25 @@ export function decodeDraco(draco: DracoModule, bytes: Uint8Array, request: Drac
     } else if (kind === draco.POINT_CLOUD) {
       geometry = new draco.PointCloud();
       status = decoder.DecodeBufferToPointCloud(buffer, geometry);
-    } else throw new Error('Draco: unknown geometry type');
-    if (!status.ok() || !geometry.ptr) throw new Error('Draco: ' + status.error_msg());
+    } else throw decodeFailed('Draco: unknown geometry type; pass a mesh or point-cloud Draco file');
+    if (!status.ok() || !geometry.ptr)
+      throw decodeFailed('Draco: ' + status.error_msg() + '; re-export the mesh, the file is damaged');
     const vertexCount: number = geometry.num_points();
     if (!Number.isSafeInteger(vertexCount) || vertexCount < 1 || vertexCount > limits.maxVertices)
-      throw new RangeError('Draco: invalid vertex count or vertex limit exceeded');
+      throw new RangeError(
+        'Draco: invalid vertex count or vertex limit exceeded; raise maxVertices or re-export a smaller mesh',
+      );
     const faces: number = kind === draco.TRIANGULAR_MESH ? geometry.num_faces!() : 0;
     if (!Number.isSafeInteger(faces) || faces < (kind === draco.TRIANGULAR_MESH ? 1 : 0))
-      throw new RangeError('Draco: invalid face count');
+      throw new RangeError('Draco: invalid face count; re-export the mesh with a valid triangle count');
     const indexCount = faces * 3,
       wide = vertexCount >= 65536,
       indexBytes = indexCount * (wide ? 4 : 2);
     if (!Number.isSafeInteger(indexCount) || indexCount > limits.maxIndices || !Number.isSafeInteger(indexBytes))
-      throw new RangeError('Draco: index limit exceeded');
+      throw new RangeError('Draco: index limit exceeded; raise maxIndices or re-export a smaller mesh');
     let decodedBytes = indexBytes;
-    if (decodedBytes > limits.maxDecodedBytes) throw new RangeError('Draco: decoded byte limit exceeded');
+    if (decodedBytes > limits.maxDecodedBytes)
+      throw new RangeError('Draco: decoded byte limit exceeded; raise maxDecodedBytes or re-export a smaller mesh');
     const byId = request.attributeIds !== undefined;
     const ids: Record<string, number> = request.attributeIds ?? {};
     if (!byId)
@@ -175,7 +188,8 @@ export function decodeDraco(draco: DracoModule, bytes: Uint8Array, request: Drac
         const id = decoder.GetAttributeId(geometry, draco[type]);
         if (id >= 0) ids[semantic] = id;
       }
-    if (!byId && !Object.hasOwn(ids, 'POSITION')) throw new Error('Draco: geometry has no POSITION attribute');
+    if (!byId && !Object.hasOwn(ids, 'POSITION'))
+      throw decodeFailed('Draco: geometry has no POSITION attribute; export the mesh with positions');
     const descriptors: {
       semantic: string;
       attribute: DracoPointAttribute;
@@ -189,22 +203,33 @@ export function decodeDraco(draco: DracoModule, bytes: Uint8Array, request: Drac
       byteLength: number;
     }[] = [];
     for (const [semantic, id] of Object.entries(ids)) {
-      if (!Number.isSafeInteger(id) || id < 0) throw new TypeError(`Draco: invalid attribute id for ${semantic}`);
+      if (!Number.isSafeInteger(id) || id < 0)
+        throw new TypeError(
+          `Draco: invalid attribute id for ${semantic}; map each glTF attribute to an attribute id present in the file`,
+        );
       const attribute = byId ? decoder.GetAttributeByUniqueId(geometry, id) : decoder.GetAttribute(geometry, id);
-      if (!attribute || !attribute.ptr) throw new Error(`Draco: missing attribute ${semantic}`);
+      if (!attribute || !attribute.ptr)
+        throw decodeFailed(
+          `Draco: missing attribute ${semantic}; remove it from the attribute map or re-export the mesh with it`,
+        );
       const field = fields[semantic],
         requestedType = request.componentTypes?.[semantic],
         componentType = requestedType ?? 5126,
         type = dracoTypes[componentType];
-      if (!type) throw new TypeError(`Draco: unsupported component type ${componentType} for ${semantic}`);
+      if (!type)
+        throw new TypeError(
+          `Draco: unsupported component type ${componentType} for ${semantic}; use a float, byte, short or integer accessor`,
+        );
       const [name, Ctor] = type,
         itemSize: number = attribute.num_components(),
         count = vertexCount * itemSize,
         byteLength = count * Ctor.BYTES_PER_ELEMENT;
       if (!Number.isSafeInteger(itemSize) || itemSize < 1 || itemSize > 16)
-        throw new RangeError(`Draco: invalid ${semantic} width`);
+        throw new RangeError(`Draco: invalid ${semantic} width; re-export the mesh with a 1 to 4 wide attribute`);
       if (limits.attributeWidths?.[semantic] !== undefined && limits.attributeWidths[semantic] !== itemSize)
-        throw new RangeError(`Draco: ${semantic} width does not match accessor`);
+        throw new RangeError(
+          `Draco: ${semantic} width does not match accessor; correct the accessor type to match the Draco data`,
+        );
       const outputBytes = field ? count * Float32Array.BYTES_PER_ELEMENT : byteLength;
       if (
         !Number.isSafeInteger(count) ||
@@ -212,7 +237,7 @@ export function decodeDraco(draco: DracoModule, bytes: Uint8Array, request: Drac
         !Number.isSafeInteger(outputBytes) ||
         outputBytes > limits.maxDecodedBytes - decodedBytes
       )
-        throw new RangeError('Draco: decoded byte limit exceeded');
+        throw new RangeError('Draco: decoded byte limit exceeded; raise maxDecodedBytes or re-export a smaller mesh');
       decodedBytes += outputBytes;
       descriptors.push({
         semantic,
@@ -242,11 +267,12 @@ export function decodeDraco(draco: DracoModule, bytes: Uint8Array, request: Drac
       byteLength,
     } of descriptors) {
       const pointer = draco._malloc(byteLength);
-      if (!pointer) throw new Error('Draco: could not allocate attribute output');
+      if (!pointer)
+        throw decodeFailed('Draco: could not allocate attribute output; reduce the mesh size or free memory');
       let array: DracoArray;
       try {
         if (!decoder.GetAttributeDataArrayForAllPoints(geometry, attribute, draco[name], byteLength, pointer))
-          throw new Error(`Draco: could not read ${semantic}`);
+          throw decodeFailed(`Draco: could not read ${semantic}; re-export the mesh, the attribute data is damaged`);
         array = new Ctor(draco.HEAPU8.buffer, pointer, count).slice();
       } finally {
         draco._free(pointer);
@@ -271,17 +297,17 @@ export function decodeDraco(draco: DracoModule, bytes: Uint8Array, request: Drac
       else result.attributes[semantic] = { array, itemSize, componentType };
     }
     if (!result.positions.length && (!byId || Object.hasOwn(ids, 'POSITION')))
-      throw new Error('Draco: geometry has no POSITION attribute');
+      throw decodeFailed('Draco: geometry has no POSITION attribute; export the mesh with positions');
     if (kind === draco.TRIANGULAR_MESH) {
       const count = indexCount,
         byteLength = indexBytes,
         pointer = draco._malloc(byteLength);
-      if (!pointer) throw new Error('Draco: could not allocate index output');
+      if (!pointer) throw decodeFailed('Draco: could not allocate index output; reduce the mesh size or free memory');
       try {
         const ok = wide
           ? decoder.GetTrianglesUInt32Array(geometry, byteLength, pointer)
           : decoder.GetTrianglesUInt16Array(geometry, byteLength, pointer);
-        if (!ok) throw new Error('Draco: could not read indices');
+        if (!ok) throw decodeFailed('Draco: could not read indices; re-export the mesh, the index data is damaged');
         result.indices = wide
           ? new Uint32Array(draco.HEAPU8.buffer, pointer, count).slice()
           : new Uint16Array(draco.HEAPU8.buffer, pointer, count).slice();
@@ -324,7 +350,7 @@ const ktx2Identifier = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x
  */
 function checkKTX2(bytes: Uint8Array): void {
   const fail = (what: string) => {
-    throw new TypeError(`KTX2: invalid file (${what})`);
+    throw new TypeError(`KTX2: invalid file (${what}); pass an unmodified .ktx2 file`);
   };
   if (bytes.length < 80) fail('truncated header');
   if (ktx2Identifier.some((b, i) => bytes[i] !== b)) fail('not KTX 2.0');
@@ -359,23 +385,28 @@ function checkKTX2(bytes: Uint8Array): void {
  * with the trap as its cause (isDecoderCrash).
  */
 export function transcodeKTX2(basis: BasisModule, bytes: Uint8Array, target: TranscodeTarget): TranscodedKTX2Result {
-  if (!transcodeFormats[target]) throw new TypeError(`Unknown transcode target ${target}`);
+  if (!transcodeFormats[target])
+    throw new TypeError(`Unknown transcode target ${target}; use one of the targets listed in KTX2Options.target`);
   checkKTX2(bytes);
   const file = guard('KTX2', () => new basis.KTX2File(bytes));
   let failure: unknown;
   try {
-    if (!file.isValid()) throw new Error('KTX2: invalid or unsupported file');
-    if (file.isHDR?.()) throw new Error('KTX2: HDR textures are not supported');
+    if (!file.isValid()) throw decodeFailed('KTX2: invalid or unsupported file; pass an unmodified .ktx2 file');
+    if (file.isHDR?.())
+      throw decodeFailed(
+        'KTX2: HDR textures are not supported; use an 8-bit KTX2 texture, or decode HDR data another way',
+      );
     if (file.getFaces() > 1 || file.getLayers() > 1)
-      throw new Error('KTX2: cube maps and texture arrays are not supported');
+      throw decodeFailed('KTX2: cube maps and texture arrays are not supported; use a single 2D KTX2 texture');
     const width: number = file.getWidth(),
       height: number = file.getHeight(),
       levels: number = file.getLevels();
     if (!width || !height || !levels || width > 16384 || height > 16384)
-      throw new RangeError('KTX2: invalid dimensions');
+      throw new RangeError('KTX2: invalid dimensions; re-encode the texture with non-zero dimensions');
     const chosen: TranscodeTarget = target !== 'rgba8' && (width % 4 || height % 4) ? 'rgba8' : target,
       format = transcodeFormats[chosen];
-    if (!file.startTranscoding()) throw new Error('KTX2: startTranscoding failed');
+    if (!file.startTranscoding())
+      throw decodeFailed('KTX2: startTranscoding failed; re-encode the file with Basis Universal');
     const sizes: number[] = [];
     for (let level = 0; level < levels; level++)
       sizes.push(file.getImageTranscodedSizeInBytes(level, 0, 0, format.basis));
@@ -384,7 +415,7 @@ export function transcodeKTX2(basis: BasisModule, bytes: Uint8Array, target: Tra
     for (let level = 0, offset = 0; level < levels; offset += sizes[level++]) {
       const data = out.subarray(offset, offset + sizes[level]);
       if (!file.transcodeImage(data, level, 0, 0, format.basis, 0, -1, -1))
-        throw new Error(`KTX2: could not transcode level ${level}`);
+        throw decodeFailed(`KTX2: could not transcode level ${level}; re-encode the file, the level data is damaged`);
       mipmaps.push({
         data,
         width: Math.max(1, width >> level),

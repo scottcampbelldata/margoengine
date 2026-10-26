@@ -27,6 +27,9 @@ export async function convert(
   const animations = buildAnimations(ctx, morphs),
     bytes = exportGLB({ nodes: ctx.roots, animations }, { generator: 'Margo Engine fbx' });
   signal?.throwIfAborted();
-  if (bytes.byteLength > 128 * 1024 * 1024) throw new RangeError('FBX conversion budget exceeded');
+  if (bytes.byteLength > 128 * 1024 * 1024)
+    throw new RangeError(
+      'FBX conversion budget exceeded; simplify or split the scene, the import limits are listed in the README',
+    );
   return bytes.buffer as ArrayBuffer;
 }

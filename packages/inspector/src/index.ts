@@ -11,9 +11,11 @@ import {
 } from '@margoengine/core/extension';
 import { Lines, Line, BoxHelper, VertexNormalsHelper, LightsHelper } from '@margoengine/lines';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
+import { margoError } from '../../shared/errors.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { inView } from '../../shared/view-rect.js';
 
+/** Options of the Inspector: the parent element for its panel and the effect options it edits. */
 export interface InspectorOptions {
   parent?: HTMLElement;
   /** Mutable options of an attached PostProcessing/Tonemap effect. */
@@ -104,6 +106,9 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}button
 [aria-selected=true]>.row{background:#d6eee7;color:#084f40}.muted{opacity:.55}[role=group]{padding-left:12px}.axes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.axes label{display:block}.axes input{width:100%}input:disabled{opacity:.5}
 `;
 
+/**
+ * A DOM panel with a scene tree, frame statistics and debug overlays (wireframe, normals, bounds, lights). Install it as an engine plugin; dispose it to remove the panel.
+ */
 export class Inspector implements EnginePlugin {
   readonly name = 'inspector';
   readonly element: HTMLDivElement;
@@ -199,7 +204,8 @@ export class Inspector implements EnginePlugin {
       input.addEventListener('input', () =>
         this.edit(input, () => {
           const value = input.valueAsNumber;
-          if (!Number.isFinite(value) || value < min || value > 1) throw new RangeError('Invalid material value');
+          if (!Number.isFinite(value) || value < min || value > 1)
+            throw new RangeError('Invalid material value; pass a finite number in the control range');
           if (this.liveSelection()) this.selection!.material.data[slot] = value;
         }),
       );
@@ -220,7 +226,8 @@ export class Inspector implements EnginePlugin {
       input.addEventListener('input', () =>
         this.edit(input, () => {
           const value = input.valueAsNumber;
-          if (!Number.isFinite(value) || value < min || value > max) throw new RangeError('Invalid effect value');
+          if (!Number.isFinite(value) || value < min || value > max)
+            throw new RangeError('Invalid effect value; pass a finite, non-negative number');
           if (this.effects) this.effects[key] = value;
         }),
       );
@@ -246,11 +253,13 @@ export class Inspector implements EnginePlugin {
   }
 
   select(handle: MeshHandle | null): void {
-    if (this.disposed || !this.engine) throw new Error('Inspector is not attached');
+    if (this.disposed || !this.engine)
+      throw margoError('state', 'Inspector is not attached; install it on an engine first');
     const mesh = handle ? meshRuntime(handle) : null;
     if (mesh) {
       mesh.check();
-      if (mesh.engine !== this.engine) throw new TypeError('Mesh belongs to another engine');
+      if (mesh.engine !== this.engine)
+        throw new TypeError('Mesh belongs to another engine; select a mesh created by this engine');
     }
     this.selection = mesh;
     if (mesh)
@@ -261,15 +270,18 @@ export class Inspector implements EnginePlugin {
   }
 
   setDebug(mode: Mode, enabled: boolean): void {
-    if (this.disposed) throw new Error('Inspector is disposed');
-    if (!Object.hasOwn(this.debug, mode) || typeof enabled !== 'boolean') throw new TypeError('Invalid debug mode');
-    if (enabled && this.engine?.backend !== 'webgpu') throw new Error('Debug rendering requires WebGPU');
+    if (this.disposed) throw margoError('disposed', 'Inspector is disposed; create a new Inspector');
+    if (!Object.hasOwn(this.debug, mode) || typeof enabled !== 'boolean')
+      throw new TypeError('Invalid debug mode; use wireframe, normals, bounds or lights');
+    if (enabled && this.engine?.backend !== 'webgpu')
+      throw margoError('unsupported', 'Debug rendering requires WebGPU; use a browser that supports it');
     this.debug[mode] = enabled;
     this.inputs.get(mode)!.checked = enabled;
   }
 
   setup(engine: Engine): void {
-    if (this.disposed || this.engine) throw new Error('Inspector is disposed or attached');
+    if (this.disposed || this.engine)
+      throw margoError('attached', 'Inspector is disposed or already attached; create a new Inspector for this engine');
     this.engine = engine;
     if (engine.backend === 'webgpu') this.lines.setup(engine);
     this.refresh();

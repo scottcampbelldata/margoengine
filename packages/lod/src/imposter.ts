@@ -311,7 +311,9 @@ export class Imposter {
       frameSize < 16 ||
       frameSize > 1024
     )
-      throw new RangeError('Imposter frames 4-32, frameSize a power of two 16-1024');
+      throw new RangeError(
+        'Imposter frames 4-32, frameSize a power of two 16-1024; use 4 to 32 frames and a power-of-two frame size from 16 to 1024',
+      );
     if (material !== undefined && !(material instanceof PbrMaterial)) throw new TypeError('Expected a PbrMaterial');
     this.frames = frames;
     this.frameSize = frameSize;
@@ -343,7 +345,7 @@ export class Imposter {
         data.radius > 0 &&
         data.center?.length === 3 &&
         data.center.every(Number.isFinite);
-    if (!ok) throw new TypeError('Invalid imposter data');
+    if (!ok) throw new TypeError('Invalid imposter data; pass the result of Imposter.export()');
     const i = new Imposter(engineRuntime(engine), undefined, data, data);
     i.center.splice(0, 3, ...data.center);
     i.radius = data.radius;
@@ -363,7 +365,8 @@ export class Imposter {
     if (this.source instanceof PBRModel && this.source.disposed) this.source = undefined;
     if (!this.data && !this.source) return false;
     const size = this.size;
-    if (size > device.limits.maxTextureDimension2D) throw new RangeError('Imposter atlas exceeds device limit');
+    if (size > device.limits.maxTextureDimension2D)
+      throw new RangeError('Imposter atlas exceeds device limit; use fewer frames or a smaller frame size');
     this.color = device.createTexture({
       size: [size, size],
       format: 'rgba8unorm-srgb',

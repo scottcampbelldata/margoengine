@@ -16,7 +16,9 @@ serve(async ({ url, input, resourcePath, allowedURLs }: FBXJob) => {
   // parseFBX's texture budget (all textures together), checked after decoding as it does.
   if (prepared.images.reduce((sum, image) => sum + (image ? image.width * image.height : 0), 0) > 16_000_000) {
     for (const image of prepared.images) if (image && 'close' in image) image.close();
-    throw new RangeError('FBX texture pixel budget exceeded');
+    throw new RangeError(
+      'FBX texture pixel budget exceeded; simplify or split the scene, the import limits are listed in the README',
+    );
   }
   return prepared;
 });

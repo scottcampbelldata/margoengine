@@ -176,7 +176,8 @@ export function expandLine(points: ArrayLike<number>, options: ExpandLineOptions
   const join = JOINS.indexOf(options.join ?? 'round'),
     cap = CAPS.indexOf(options.cap ?? 'round'),
     limit = options.miterLimit ?? 4;
-  if (join < 0 || cap < 0 || !MODES.includes(mode)) throw new TypeError('Unknown line mode, join or cap');
+  if (join < 0 || cap < 0 || !MODES.includes(mode))
+    throw new TypeError('Unknown line mode, join or cap; use the values listed in the line options');
   const aa = options.antialias === false ? 0 : 1,
     hwG = hw + aa,
     out: number[] = [];

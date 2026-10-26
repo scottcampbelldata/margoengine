@@ -1,3 +1,4 @@
+import { margoError } from '../../shared/errors.js';
 import type { GLTFPrimitive } from '../../shared/gltf.js';
 import { GLB_BIN, GLB_JSON, GLB_MAGIC } from '../../shared/glb.js';
 import { COMPONENT_BYTES } from '../../shared/accessor.js';
@@ -173,7 +174,11 @@ export class GLTFStream {
   private fetch(source: Source, headers?: Record<string, string>): Promise<Response> {
     if (!['http:', 'https:'].includes(source.url.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
     return fetch(source.url, { signal: this.signal, headers }).then((r) => {
-      if (!r.ok) throw new Error(`glTF download request failed: HTTP ${r.status}`);
+      if (!r.ok)
+        throw margoError(
+          'failed',
+          `glTF download request failed: HTTP ${r.status}; check the URL and that the server allows the request`,
+        );
       return r;
     });
   }
@@ -264,7 +269,9 @@ export class GLTFStream {
     }
     const total = view.getUint32(8, true);
     if (view.getUint32(4, true) !== 2 || total < 20 || (range && +range[1] !== total))
-      throw new TypeError('Invalid GLB header');
+      throw new TypeError(
+        'Invalid GLB header; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     this.allocate(s, total);
     s.data!.set(first.subarray(0, total));
     add(s.got, 0, Math.min(length, total));
@@ -284,7 +291,7 @@ export class GLTFStream {
           this.bytes();
           this.notify();
         }
-        if (!s.ranged && at < total) throw new RangeError('Truncated GLB');
+        if (!s.ranged && at < total) throw new RangeError('Truncated GLB; download the file again, it is incomplete');
       } catch (e) {
         this.failure ??= e;
         this.notify();
@@ -295,14 +302,16 @@ export class GLTFStream {
       await body;
       // A short first reply: what it claimed is marked as asked, so the gap would never be requested again.
       if (!this.failure && !covered(s.got, 0, Math.min(65536, total)))
-        throw new RangeError('Truncated glTF range response');
+        throw new RangeError('Truncated glTF range response; download the file again, it is incomplete');
     }
     // Header, JSON chunk and BIN chunk header.
     const json = () => new DataView(s.data!.buffer).getUint32(12, true),
       need = () => Math.min(total, 28 + json());
     while (!covered(s.got, 0, 20)) await this.next();
     if (json() % 4 || 20 + json() > total || new DataView(s.data!.buffer).getUint32(16, true) !== GLB_JSON)
-      throw new TypeError('Invalid GLB chunk');
+      throw new TypeError(
+        'Invalid GLB chunk; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     if (s.ranged) for (const [a, b] of gaps(s.got, 0, need())) this.request(0, a, b);
     while (!covered(s.got, 0, need())) await this.next();
     return parseJSON(s.data!.subarray(20, 20 + json()));
@@ -376,7 +385,7 @@ export class GLTFStream {
         lo = (v.byteOffset ?? 0) + offset,
         end = (v.byteOffset ?? 0) + v.byteLength;
       if (!b || !Number.isSafeInteger(lo) || lo < 0 || !Number.isSafeInteger(end) || !(length > 0))
-        throw new TypeError('range');
+        throw new TypeError('range; pass a { start, end } byte range');
       // Clipped to the glTF buffer: bytes past its end never arrive, so waiting for them would never finish (the
       // accessor read then reports the bounds error).
       const hi = Math.min(lo + length, end, this.asset!.buffers[v.buffer].length);
@@ -409,17 +418,20 @@ export class GLTFStream {
       const response = await this.fetch(s, { Range: `bytes=${lo}-${hi - 1}` }),
         range = /^bytes (\d+)-\d+\/(\d+)$/.exec(response.headers.get('content-range') ?? '');
       if (response.status === 206 && range && +range[1] === lo) {
-        if (s.ranged === undefined && +range[2] < s.data!.length) throw new RangeError('Truncated glTF buffer');
+        if (s.ranged === undefined && +range[2] < s.data!.length)
+          throw new RangeError('Truncated glTF buffer; download the file again, it is incomplete');
         s.ranged = true;
         await this.read(s, response, lo, request);
         // A short 206 reply would leave its gap unfilled and every waiter on it waiting forever.
-        if (!covered(s.got, lo, Math.min(hi, s.data!.length))) throw new RangeError('Truncated glTF range response');
+        if (!covered(s.got, lo, Math.min(hi, s.data!.length)))
+          throw new RangeError('Truncated glTF range response; download the file again, it is incomplete');
       } else {
         // No range support: this reply is the whole file; take it from the start.
         s.ranged = false;
         add(s.asked, 0, s.data!.length);
         await this.read(s, response, 0, request);
-        if (!covered(s.got, 0, s.data!.length)) throw new RangeError('Truncated glTF buffer');
+        if (!covered(s.got, 0, s.data!.length))
+          throw new RangeError('Truncated glTF buffer; download the file again, it is incomplete');
       }
     })()
       .catch((e) => {
@@ -552,12 +564,17 @@ export class GLTFStream {
           throw e instanceof RangeError ? overBudget('glTF exceeds download budget', this.limit) : e;
         });
         this.loaded += data.length;
-      } else throw new TypeError('Invalid glTF image');
+      } else
+        throw new TypeError(
+          'Invalid glTF image; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       const image = await decodeImage(data, def.mimeType, index);
       decoded += image.width * image.height * 4;
       if (image.width * image.height > 16_777_216) {
         image.close?.();
-        throw new RangeError('glTF images exceed decoded size limit');
+        throw new RangeError(
+          'glTF images exceed decoded size limit; load a smaller model, or reduce its textures and meshes',
+        );
       }
       if (decoded > this.limit * 4) {
         image.close?.();

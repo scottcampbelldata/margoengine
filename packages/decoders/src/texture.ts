@@ -27,6 +27,7 @@ export function getBytesPerRow(format: GPUTextureFormat, width: number): number 
   return Math.ceil(width / entry.block) * entry.blockBytes;
 }
 
+/** Options of createKTX2Texture: a debug label and the texture usage flags. */
 export interface KTX2TextureOptions {
   label?: string;
   /** Default: TEXTURE_BINDING | COPY_DST. */

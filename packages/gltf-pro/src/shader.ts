@@ -1,3 +1,4 @@
+import { margoError } from '../../shared/errors.js';
 import { neutralShader } from '../../shared/display.js';
 import { transmittedDiffuse } from '../../shared/pbr-transmission.js';
 import { cotangentFrameShader } from '../../shared/tangent-frame.js';
@@ -254,7 +255,11 @@ export function transparentPBR(code: string, declarations: string): string {
   let cache = through.get(declarations),
     out = cache?.get(code);
   if (out !== undefined) return out;
-  if (code.split(head).length !== 2) throw new Error('PBR transparency hook point missing or used twice');
+  if (code.split(head).length !== 2)
+    throw margoError(
+      'failed',
+      'PBR transparency hook point missing or used twice; keep exactly one hook marker in the shader source',
+    );
   out =
     declarations +
     code.replace(head, 'fn margoShade(i:Out,front:bool)->vec4f {') +
@@ -289,7 +294,11 @@ export function capturePBR(code: string, declarations: string): string {
   let cache = captured.get(declarations),
     out = cache?.get(code);
   if (out !== undefined) return out;
-  if (code.split(head).length !== 2) throw new Error('PBR capture hook point missing or used twice');
+  if (code.split(head).length !== 2)
+    throw margoError(
+      'failed',
+      'PBR capture hook point missing or used twice; keep exactly one hook marker in the shader source',
+    );
   // Clearcoat and sheen scale the base layer (ambient included) affinely: k = layers(1) - layers(0).
   const k = code.includes('fn layers(')
     ? 'layers(s,v,normalize(f.light.xyz),vec3f(1))-layers(s,v,normalize(f.light.xyz),vec3f(0))'
@@ -330,7 +339,10 @@ const sample = (name: string) => `textureSample(${name}Map,${name}Sampler,uv(i,$
 function patch(source: string, edits: [string | RegExp, string][]): string {
   for (const [from, to] of edits) {
     if (typeof from === 'string' ? !source.includes(from) : !from.test(source))
-      throw new Error('PBR shader patch target missing: ' + from);
+      throw margoError(
+        'failed',
+        'PBR shader patch target missing: ' + from + '; the shader source changed, update the patch',
+      );
     source = typeof from === 'string' ? source.replaceAll(from, to) : source.replace(from, to);
   }
   return source;
@@ -470,7 +482,11 @@ export function transmissionPBR(code: string, declarations: string): string {
   let cache = transmitted.get(declarations),
     out = cache?.get(code);
   if (out !== undefined) return out;
-  if (code.split(base).length !== 2) throw new Error('PBR transmission hook point missing or used twice');
+  if (code.split(base).length !== 2)
+    throw margoError(
+      'failed',
+      'PBR transmission hook point missing or used twice; keep exactly one hook marker in the shader source',
+    );
   out =
     '@group(0) @binding(1) var<uniform> margoVolume:vec4f;\n' +
     declarations +

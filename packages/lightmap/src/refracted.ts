@@ -144,7 +144,8 @@ function volumesOf(input: readonly RefractedGlassVolume[]) {
     )
       throw new TypeError(`${label} glass needs Float32Array positions and Uint32Array triangle indices`);
     const corner = (i: number): V3 => {
-        if (i * 3 + 2 >= value.positions.length) throw new RangeError(`${label} glass index out of range`);
+        if (i * 3 + 2 >= value.positions.length)
+          throw new RangeError(`${label} glass index out of range; use an index of refraction of 1 or more`);
         const p = [...value.positions.subarray(i * 3, i * 3 + 3)] as V3;
         if (!p.every(Number.isFinite)) throw new RangeError(`${label} glass positions must be finite`);
         return p;

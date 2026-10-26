@@ -2,6 +2,9 @@ import type { EngineKernel } from '@margoengine/core';
 import { parseGLTF, type PBRModel } from '@margoengine/gltf-pro';
 import { readResponse } from '../../shared/loading.js';
 import { convert } from './convert.js';
+/**
+ * Options of the FBX functions: where to resolve texture paths, an AbortSignal, a custom fetch and an allow-list of URLs the file may reference.
+ */
 export interface FBXOptions {
   resourcePath?: string;
   signal?: AbortSignal;
@@ -21,12 +24,15 @@ export async function convertFBX(
     input.byteLength < 32 ||
     input.byteLength > budget
   )
-    throw new RangeError('Invalid FBX byte budget');
+    throw new RangeError('Invalid FBX byte budget; pass a 32 byte to 64 MiB FBX file');
   if (resourcePath && !['http:', 'https:'].includes(new URL(resourcePath, globalThis.location?.href).protocol))
     throw new TypeError('FBX resources need HTTP(S)');
   return convert(input, resourcePath, signal, { fetch: get, allowedURLs });
 }
 
+/**
+ * Converts FBX bytes and uploads the result as a PBRModel. @throws RangeError when the file exceeds an import limit; TypeError for unsupported features. Aborts with `options.signal`.
+ */
 export async function parseFBX(
   engine: EngineKernel,
   input: ArrayBuffer | ArrayBufferView,
@@ -51,7 +57,10 @@ export async function parseFBX(
       );
       images.push(bitmap);
       pixels += bitmap.width * bitmap.height;
-      if (pixels > 16_000_000) throw new RangeError('FBX texture pixel budget exceeded');
+      if (pixels > 16_000_000)
+        throw new RangeError(
+          'FBX texture pixel budget exceeded; simplify or split the scene, the import limits are listed in the README',
+        );
     }
     options.signal?.throwIfAborted();
     return parseGLTF(engine, glb, [], images);
@@ -60,6 +69,9 @@ export async function parseFBX(
     throw error;
   }
 }
+/**
+ * Fetches an HTTP(S) FBX file and parses it into a PBRModel; texture paths resolve against the final response URL. Aborts with `options.signal`.
+ */
 export async function loadFBX(engine: EngineKernel, url: string | URL, options: FBXOptions = {}): Promise<PBRModel> {
   const target = new URL(url, globalThis.location?.href);
   if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('FBX URL needs HTTP(S)');

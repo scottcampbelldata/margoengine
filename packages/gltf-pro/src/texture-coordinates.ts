@@ -13,10 +13,15 @@ export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'ext
   texCoord: 0 | 1;
   transform?: Float32Array;
 } {
-  if (!info || typeof info !== 'object' || Array.isArray(info)) throw new TypeError('Invalid texture coordinates');
+  if (!info || typeof info !== 'object' || Array.isArray(info))
+    throw new TypeError(
+      'Invalid texture coordinates; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   const value = info?.extensions?.KHR_texture_transform;
   if (value !== undefined && (!value || typeof value !== 'object' || Array.isArray(value)))
-    throw new TypeError('Invalid KHR_texture_transform');
+    throw new TypeError(
+      'Invalid KHR_texture_transform; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   const coord = value?.texCoord !== undefined ? value.texCoord : info.texCoord === undefined ? 0 : info.texCoord;
   if (coord !== 0 && coord !== 1) throw new RangeError('Texture requires TEXCOORD_0 or TEXCOORD_1');
   if (value === undefined) return { texCoord: coord };
@@ -27,14 +32,18 @@ export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'ext
       v.length !== 2 ||
       Array.from(v).some((n) => typeof n !== 'number' || !Number.isFinite(Math.fround(n)))
     )
-      throw new TypeError('Invalid texture transform ' + label);
+      throw new TypeError(
+        'Invalid texture transform ' + label + '; re-export the file and check it with the glTF Validator',
+      );
     return v;
   };
   const offset = pair(value.offset, [0, 0], 'offset'),
     scale = pair(value.scale, [1, 1], 'scale'),
     rotation = value.rotation === undefined ? 0 : value.rotation;
   if (typeof rotation !== 'number' || !Number.isFinite(Math.fround(rotation)))
-    throw new TypeError('Invalid texture transform rotation');
+    throw new TypeError(
+      'Invalid texture transform rotation; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   if (rotation === 0 && offset[0] === 0 && offset[1] === 0 && scale[0] === 1 && scale[1] === 1)
     return { texCoord: coord };
   // UVs have a top-left origin. Match Khronos Sample Renderer and the authored

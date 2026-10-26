@@ -27,6 +27,7 @@ export interface ExportTrack {
   values: ArrayLike<number>;
   interpolation?: 'STEP' | 'LINEAR' | 'CUBICSPLINE';
 }
+/** One named animation clip to write: its tracks, each addressing a node path. */
 export interface ExportClip {
   name?: string;
   tracks: readonly ExportTrack[];
@@ -37,6 +38,7 @@ export interface ExportAnimation {
   clips: readonly ExportClip[];
 }
 
+/** Options of exportModel: GLB or .gltf output, the clips to write, visibility handling and texture size limits. */
 export interface ModelExportOptions {
   /** Return GLB bytes (true) or a `.gltf` result (false, default). */
   binary?: boolean;
@@ -610,7 +612,7 @@ export async function exportModel(
     typeof generator !== 'string' ||
     !Array.isArray(animations)
   )
-    throw new TypeError('Invalid export options');
+    throw new TypeError('Invalid export options; pass the documented option types');
   if (!(maxTextureSize >= 1)) throw new RangeError('maxTextureSize must be at least 1');
   if (!list.length || list.some((m) => !m?.asset?.doc || !Array.isArray(m.nodes) || m.disposed))
     throw new TypeError('Expected live gltf-pro models');

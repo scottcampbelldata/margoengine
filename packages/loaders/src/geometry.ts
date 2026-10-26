@@ -6,6 +6,7 @@ const F = 'Geometry';
 /** Vertex limit of a core `Geometry`. */
 export const CORE_MAX_VERTICES = 1_000_000;
 
+/** Options of toGeometry: how normals are made and which group to build. */
 export interface ToGeometryOptions {
   /**
    * `'auto'` (default) uses the file's normals when present and smooth normals otherwise; `'smooth'` always
@@ -132,6 +133,7 @@ function build(positions: Float32Array, normals: Float32Array, indices: Uint32Ar
   return new Geometry(positions, normals, indices);
 }
 
+/** Options of pointsToGeometry: the marker size and the most points kept. */
 export interface PointsToGeometryOptions {
   /** Half-size of each point marker in model units. Default 0.4% of the bounding box diagonal. */
   size?: number;

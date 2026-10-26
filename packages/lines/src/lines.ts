@@ -85,7 +85,7 @@ export class Lines implements EnginePlugin {
     this.name = options.name ?? 'lines';
     this.order = options.order ?? 20;
     if (!this.name || typeof this.name !== 'string' || !Number.isFinite(this.order))
-      throw new TypeError('Invalid Lines options');
+      throw new TypeError('Invalid Lines options; pass the documented option types');
   }
 
   /** Lines currently drawn by this plugin. */

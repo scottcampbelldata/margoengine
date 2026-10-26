@@ -135,7 +135,7 @@ export class LODSystem implements EnginePlugin {
   }
   constructor({ hysteresis = 0.1, bias = 1 }: LODSystemOptions = {}) {
     if (!(hysteresis >= 0 && hysteresis < 1) || !(bias > 0 && bias < Infinity))
-      throw new RangeError('Invalid LOD options');
+      throw new RangeError('Invalid LOD options; pass the documented option types');
     this.hysteresis = hysteresis;
     this.bias = bias;
   }
@@ -164,7 +164,7 @@ export class LODSystem implements EnginePlugin {
     if (!e) throw new MargoError('state', 'Use the LOD system on an engine first');
     const mesh = meshRuntime(anchor);
     mesh.check();
-    if (mesh.engine !== e) throw new TypeError('Anchor belongs to another engine');
+    if (mesh.engine !== e) throw new TypeError('Anchor belongs to another engine; use an anchor from this engine');
     const n = levels?.length,
       screen = levels?.[1]?.screen !== undefined;
     if (!Number.isInteger(n) || n < 1 || n > MAX_LEVELS) throw new RangeError('LOD needs 1-8 levels');
@@ -184,7 +184,7 @@ export class LODSystem implements EnginePlugin {
           typeof (object as { root: Mesh })?.root?.visible === 'boolean'
         )
       )
-        throw new TypeError('Invalid LOD level object');
+        throw new TypeError('Invalid LOD level object; pass a mesh or a function that builds one');
       const value = l === 0 ? 0 : screen ? 1 / (size as number) : (distance as number);
       if (
         (l > 0 &&
@@ -221,7 +221,7 @@ export class LODSystem implements EnginePlugin {
         : sized instanceof Geometry
           ? sized.bounds[3]
           : (sized?.geometry?.bounds[3] ?? mesh.geometry?.bounds[3] ?? 1));
-    if (!(r > 0 && r < Infinity)) throw new RangeError('Invalid LOD radius');
+    if (!(r > 0 && r < Infinity)) throw new RangeError('Invalid LOD radius; pass a finite radius above 0');
     this.ids[i] = mesh.id;
     this.counts[i] = n;
     this.current[i] = -1;

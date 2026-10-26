@@ -46,6 +46,9 @@ export interface ParseLimits {
   maxTriangles?: number;
 }
 
+/**
+ * Why a LoaderError was thrown: a bad header, truncated data, a size limit, a value out of range, a syntax fault, an unsupported feature, a bad zip, an abort or a failed fetch.
+ */
 export type LoaderErrorCode =
   | 'header'
   | 'truncated'

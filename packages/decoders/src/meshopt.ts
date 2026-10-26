@@ -2,10 +2,11 @@
 // specifications (Appendix A "Bitstream", Appendix B "Filters", Appendix C "Differences"). Covers the attribute codec
 // in versions 0 and 1, the triangle and index-sequence codecs, and the OCTAHEDRAL, QUATERNION, EXPONENTIAL and COLOR
 // filters. Synchronous, dependency-free, and every read is bounds checked before it happens.
+import { decodeFailed } from './errors.js';
 
 const PREFIX = 'EXT_meshopt_compression: ';
 const fail = (message: string): never => {
-  throw new Error(PREFIX + message);
+  throw decodeFailed(PREFIX + message);
 };
 const failRange = (message: string): never => {
   throw new RangeError(PREFIX + message);

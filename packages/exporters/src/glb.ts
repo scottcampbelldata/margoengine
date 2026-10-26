@@ -94,10 +94,10 @@ export function splitGLB(bytes: Uint8Array, options: SplitGLBOptions = {}): GLBP
     // Untrusted file: the default parser drops __proto__/constructor/prototype keys so they cannot reach a caller's merge.
     json = parse(new TextDecoder('utf-8', { fatal: true }).decode(chunks[0].data));
   } catch (cause) {
-    throw new TypeError('GLB JSON chunk is not valid UTF-8 JSON', { cause });
+    throw new TypeError('GLB JSON chunk is not valid UTF-8 JSON; pass an unmodified GLB file', { cause });
   }
   if (!isObject(json) || Array.isArray(json) || !isObject(json.asset) || json.asset.version !== '2.0')
-    throw new TypeError('GLB JSON is not a glTF 2.0 document');
+    throw new TypeError('GLB JSON is not a glTF 2.0 document; pass a GLB that holds a glTF 2.0 document');
   const bin = chunks[1]?.type === GLB_BIN ? chunks[1].data : null,
     buffers = json.buffers;
   if (buffers !== undefined && (!Array.isArray(buffers) || !buffers.every(isObject)))
@@ -108,7 +108,7 @@ export function splitGLB(bytes: Uint8Array, options: SplitGLBOptions = {}): GLBP
     if (!first || first.uri !== undefined || !Number.isSafeInteger(length) || (length as number) < 1)
       throw new TypeError('GLB BIN chunk needs buffer 0 without a uri');
     if ((length as number) > bin.length || bin.length - (length as number) > 3)
-      throw new TypeError('GLB buffer 0 byteLength does not match its BIN chunk');
+      throw new TypeError('GLB buffer 0 byteLength does not match its BIN chunk; pass an unmodified GLB file');
   }
   return {
     json: json as Record<string, unknown>,
@@ -308,7 +308,7 @@ function checkMesh(
   const indices = Uint32Array.from({ length: source.length }, (_, i) => {
     const index = source[i];
     if (!Number.isInteger(index) || index < 0 || index >= count)
-      throw new RangeError(`${label} index exceeds vertices`);
+      throw new RangeError(`${label} index exceeds vertices; keep every index below the vertex count`);
     return index;
   });
   const min: Point = [Infinity, Infinity, Infinity],
@@ -329,7 +329,7 @@ function checkMesh(
   for (let i = 0; i < indices.length; i += 3) {
     const a = point(indices[i]);
     if (cross(sub(point(indices[i + 1]), a), sub(point(indices[i + 2]), a)).every((v) => v === 0))
-      throw new RangeError(`${label} has a triangle without area at index ${i}`);
+      throw new RangeError(`${label} has a triangle without area at index ${i}; remove the zero-area triangle`);
   }
   if (mesh.volume) {
     // An edge, a plane through it, then any point off that plane.
@@ -377,7 +377,7 @@ export function appendGLBMeshes(bytes: Uint8Array, meshes: readonly AppendedMesh
   (lists.scenes ?? []).forEach((scene, i) => references(scene.nodes, `scene ${i} nodes`));
   (lists.nodes ?? []).forEach((node, i) => references(node.children, `node ${i} children`));
   if (json.scene !== undefined && !index(json.scene, lists.scenes?.length ?? 0))
-    throw new TypeError('glTF scene index is out of range');
+    throw new TypeError('glTF scene index is out of range; pick a scene index below the scene count');
   const prepared = meshes.map((mesh, i) => {
     if (!isObject(mesh)) throw new TypeError(`meshes[${i}] must be an object`);
     if (typeof mesh.name !== 'string' || !mesh.name || /[\u0000-\u001f]/.test(mesh.name))
@@ -402,7 +402,7 @@ export function appendGLBMeshes(bytes: Uint8Array, meshes: readonly AppendedMesh
   const sceneIndex = (json.scene ?? 0) as number,
     scenes = lists.scenes;
   if (!Number.isSafeInteger(sceneIndex) || sceneIndex < 0 || sceneIndex >= scenes.length)
-    throw new TypeError('glTF scene index is out of range');
+    throw new TypeError('glTF scene index is out of range; pick a scene index below the scene count');
   json.scene = sceneIndex;
   const roots = ((scenes[sceneIndex].nodes as number[] | undefined) ??= []),
     nodes = (lists.nodes ??= []),

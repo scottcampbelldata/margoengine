@@ -6,10 +6,12 @@ import { multiplyMatrices } from '@margoengine/math/mat4';
 import { LinearToSRGB } from '@margoengine/math/color';
 
 const F = 'USD';
+/** Options of the USDA and USDZ readers: size and zip limits, the unit handling and the nesting depth. */
 export interface USDOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'signal'> {
   units?: 'meters' | 'file';
   maxDepth?: number;
 }
+/** A value read from a USDA layer: a number, string, boolean, array, or a path or asset reference. */
 export type USDValue = number | string | boolean | USDValue[] | { path: string } | { asset: string };
 type Value = USDValue;
 /** One `def` prim of a USDA layer. `attrs` keys are property names as written (`outputs:surface.connect`); `properties` holds each property's `( ... )` metadata. */
@@ -23,11 +25,13 @@ export interface USDPrim {
   children: USDPrim[];
 }
 type Prim = USDPrim;
+/** A parsed USDA layer: its metadata, root prims and every prim by path. */
 export interface USDALayer {
   metadata: Map<string, Value>;
   roots: USDPrim[];
   prims: Map<string, USDPrim>;
 }
+/** Options of readUSDA: nesting depth, an AbortSignal, and how to treat asset paths and over or class prims. */
 export interface USDAReadOptions {
   maxDepth?: number;
   signal?: AbortSignal;

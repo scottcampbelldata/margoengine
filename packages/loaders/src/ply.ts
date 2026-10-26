@@ -74,16 +74,19 @@ function read(view: DataView, offset: number, code: number, little: boolean): nu
 const MAX_HEADER = 1 << 20;
 const MAX_POLYGON = 65536;
 
+/** One PLY property: its name, scalar type and, for a list, the count type. */
 export interface PLYProperty {
   name: string;
   type: ScalarType;
   list?: { count: ScalarType };
 }
+/** One element of a PLY file (vertex, face, ...): its name, count and properties. */
 export interface PLYElement {
   name: string;
   count: number;
   properties: PLYProperty[];
 }
+/** A parsed PLY header: the data format, the elements, the comments and where the body starts. */
 export interface PLYHeader {
   format: 'ascii' | 'binary_little_endian' | 'binary_big_endian';
   elements: PLYElement[];
@@ -91,6 +94,7 @@ export interface PLYHeader {
   bodyOffset: number;
 }
 
+/** Options of parsePLY: the shared size limits (ParseLimits). */
 export interface PLYOptions extends ParseLimits {}
 
 /** Parses only the PLY header. */

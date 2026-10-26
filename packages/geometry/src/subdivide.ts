@@ -62,7 +62,10 @@ function subdivideOnce(data: GeometryData, tolerance: number): GeometryData {
     canonBuckets = new Map<number, number[]>(),
     first: number[] = [],
     I = Uint32Array.from(data.indices, (v) => {
-      if (!(v < count)) throw new RangeError(`loopSubdivide: index ${v} is past the ${count} vertices`);
+      if (!(v < count))
+        throw new RangeError(
+          `loopSubdivide: index ${v} is past the ${count} vertices; keep every index below the vertex count`,
+        );
       const c = cellIndex(canonBuckets, canonCells, weld[v], Math.round(UV[v * 2] * q), Math.round(UV[v * 2 + 1] * q));
       if (c === first.length) first.push(v);
       return first[c];

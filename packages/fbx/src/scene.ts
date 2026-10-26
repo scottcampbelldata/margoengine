@@ -28,18 +28,24 @@ export class SceneBudget {
   reserve(bytes: number): void {
     this.signal?.throwIfAborted();
     if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > 128 * 1024 * 1024 - this.bytes)
-      throw new RangeError('FBX scene allocation budget exceeded');
+      throw new RangeError(
+        'FBX scene allocation budget exceeded; simplify or split the scene, the import limits are listed in the README',
+      );
     this.bytes += bytes;
   }
   work(steps = 1): void {
     this.signal?.throwIfAborted();
     if (!Number.isSafeInteger(steps) || steps < 0 || steps > 128_000_000 - this.steps)
-      throw new RangeError('FBX scene work budget exceeded');
+      throw new RangeError(
+        'FBX scene work budget exceeded; simplify or split the scene, the import limits are listed in the README',
+      );
     this.steps += steps;
   }
   morph(bytes: number): void {
     if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > 64 * 1024 * 1024 - this.morphBytes)
-      throw new RangeError('FBX morph byte budget exceeded');
+      throw new RangeError(
+        'FBX morph byte budget exceeded; simplify or split the scene, the import limits are listed in the README',
+      );
     this.reserve(bytes);
     this.morphBytes += bytes;
   }
@@ -104,7 +110,7 @@ export function context(document: FBXDocument, signal?: AbortSignal): SceneConte
       axes.some((a) => !Number.isInteger(a) || a < 0 || a > 2) ||
       signs.some((s) => s !== 1 && s !== -1)
     )
-      throw new TypeError('Invalid FBX axis or unit settings');
+      throw new TypeError('Invalid FBX axis or unit settings; re-export the file, it looks damaged');
     basis.fill(0);
     basis[15] = 1;
     for (let row = 0; row < 3; row++) basis[axes[row] * 4 + row] = signs[row] * unit;
@@ -149,7 +155,9 @@ export function localParts(
   try {
     return decomposeTRS(convertedMatrix(ctx, fbxLocalTransform(model, overrides)));
   } catch (error) {
-    throw new TypeError(`FBX model ${objectName(model)}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new TypeError(
+      `FBX model ${objectName(model)}: ${error instanceof Error ? error.message : String(error)}; fix the model or remove it before export`,
+    );
   }
 }
 
@@ -183,7 +191,7 @@ export function transformGeometry(
     n[i + 1] = b / l;
     n[i + 2] = c / l;
     if (!Number.isFinite(p[i]) || !Number.isFinite(p[i + 1]) || !Number.isFinite(p[i + 2]))
-      throw new RangeError('FBX position overflow');
+      throw new RangeError('FBX position overflow; scale the model down or move it nearer the origin');
   }
   const flip = determinant3(m) < 0 ? -1 : 1,
     t = geometry.tangents as Float32Array | undefined;
@@ -196,7 +204,8 @@ export function transformGeometry(
         b = m[1] * x + m[5] * y + m[9] * z,
         c = m[2] * x + m[6] * y + m[10] * z,
         l = Math.hypot(a, b, c);
-      if (!l || !Number.isFinite(l)) throw new RangeError('Invalid FBX tangent transform');
+      if (!l || !Number.isFinite(l))
+        throw new RangeError('Invalid FBX tangent transform; re-export the file, it looks damaged');
       t[i] = a / l;
       t[i + 1] = b / l;
       t[i + 2] = c / l;
@@ -215,21 +224,30 @@ export function transformGeometry(
 function preflight(ctx: SceneContext, source: FBXNode): void {
   const positions = array(source, 'Vertices'),
     indices = array(source, 'PolygonVertexIndex');
-  if (positions.length > 3_000_000 || indices.length > 3_000_000) throw new RangeError('FBX geometry budget exceeded');
+  if (positions.length > 3_000_000 || indices.length > 3_000_000)
+    throw new RangeError(
+      'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
+    );
   ctx.budget.work(positions.length + indices.length * 4);
   let polygon = 0,
     triangles = 0;
   for (let i = 0; i < indices.length; i++) {
     polygon++;
-    if (polygon > 4096) throw new RangeError('FBX geometry budget exceeded');
+    if (polygon > 4096)
+      throw new RangeError(
+        'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
+      );
     if (indices[i] < 0) {
       ctx.budget.work(polygon * polygon);
       triangles += (polygon - 2) * 3;
       polygon = 0;
     }
   }
-  if (polygon) throw new RangeError('FBX polygon is missing its terminator');
-  if (triangles > 3_000_000) throw new RangeError('FBX geometry budget exceeded');
+  if (polygon) throw new RangeError('FBX polygon is missing its terminator; re-export the file, it looks damaged');
+  if (triangles > 3_000_000)
+    throw new RangeError(
+      'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
+    );
   const uv = findChild(source, 'LayerElementUV') ? 2 : 0,
     tangent = findChild(source, 'LayerElementTangent') ? 4 : 0,
     color = findChild(source, 'LayerElementColor') ? 4 : 0;
@@ -276,7 +294,8 @@ export function buildScene(ctx: SceneContext): void {
   for (const [key, node] of ctx.nodes) {
     ctx.budget.work((ctx.outgoing.get(key) ?? []).length);
     const parents = (ctx.outgoing.get(key) ?? []).filter((c) => c.kind === 'OO' && ctx.nodes.has(c.parent));
-    if (parents.length > 1) throw new TypeError(`FBX model ${node.name} has multiple parents`);
+    if (parents.length > 1)
+      throw new TypeError(`FBX model ${node.name} has multiple parents; keep one per target when exporting`);
     if (parents.length) {
       parentIds.set(key, parents[0].parent);
       (ctx.nodes.get(parents[0].parent)!.children as ExportNode[]).push(node);
@@ -286,11 +305,13 @@ export function buildScene(ctx: SceneContext): void {
     let depth = 0;
     for (let parent = parentIds.get(key); parent !== undefined; parent = parentIds.get(parent)) {
       ctx.budget.work();
-      if (++depth > 60) throw new RangeError('FBX hierarchy is too deep');
+      if (++depth > 60) throw new RangeError('FBX hierarchy is too deep; flatten the hierarchy');
       const s = ctx.nodes.get(parent)!.scale ?? [1, 1, 1];
       // RrSs inheritance is not parent*local when ancestors have nonuniform scale.
       if (Math.abs(s[0] - s[1]) > 1e-7 || Math.abs(s[1] - s[2]) > 1e-7)
-        throw new TypeError(`Unsupported FBX nonuniform parent scale: ${node.name}`);
+        throw new TypeError(
+          `Unsupported FBX nonuniform parent scale: ${node.name}; bake or remove it in your 3D tool before export`,
+        );
     }
   }
   let vertices = 0;
@@ -305,7 +326,8 @@ export function buildScene(ctx: SceneContext): void {
   for (const [key, model] of ctx.models) {
     const node = ctx.nodes.get(key)!,
       sources = children(ctx, key).filter((n) => n.name === 'Geometry' && n.properties[2] === 'Mesh');
-    if (sources.length > 1) throw new TypeError(`Multiple FBX geometries on model ${node.name}`);
+    if (sources.length > 1)
+      throw new TypeError(`Multiple FBX geometries on model ${node.name}; keep one per target when exporting`);
     for (const source of sources) {
       ctx.signal?.throwIfAborted();
       let base = cache.get(source);
@@ -315,7 +337,10 @@ export function buildScene(ctx: SceneContext): void {
         if ((instances.get(source) ?? 0) > 1) cache.set(source, base);
       }
       vertices += base.vertexCount;
-      if (vertices > 1_000_000) throw new RangeError('FBX geometry budget exceeded');
+      if (vertices > 1_000_000)
+        throw new RangeError(
+          'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
+        );
       const baked = (instances.get(source) ?? 0) > 1 ? cloneGeometry(ctx, base) : base;
       ctx.budget.reserve(2304 + baked.primitives.length * 512);
       ctx.budget.work(1024 + baked.primitives.length);
@@ -344,5 +369,5 @@ export function buildScene(ctx: SceneContext): void {
       }
     }
   }
-  if (!vertices) throw new RangeError('FBX has no mesh geometry');
+  if (!vertices) throw new RangeError('FBX has no mesh geometry; clean up the source model before export');
 }

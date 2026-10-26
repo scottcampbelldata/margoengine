@@ -566,7 +566,8 @@ export function applyMatrix4(data: GeometryData, m: ArrayLike<number>): Geometry
     c21 = m02 * m10 - m00 * m12,
     c22 = m00 * m11 - m01 * m10;
   const det = m00 * c00 + m01 * c01 + m02 * c02;
-  if (!det || !Number.isFinite(det)) throw new RangeError('Matrix upper 3x3 is singular');
+  if (!det || !Number.isFinite(det))
+    throw new RangeError('Matrix upper 3x3 is singular; pass a matrix with a non-zero determinant');
   const positions = new Float32Array(data.positions.length),
     normals = new Float32Array(data.normals.length),
     P = data.positions,
@@ -751,7 +752,7 @@ export function wireframe(data: GeometryData): Uint32Array {
 
 /** Expands distinct triangle edges for line rendering with a vertical lift. */
 export function wireframePositions(data: GeometryData, offsetY = 0): Float32Array {
-  if (!Number.isFinite(offsetY)) throw new RangeError('Invalid wireframe offset');
+  if (!Number.isFinite(offsetY)) throw new RangeError('Invalid wireframe offset; pass a finite number');
   const edges = wireframe(data),
     positions = new Float32Array(edges.length * 3);
   for (let i = 0; i < edges.length; i++) {

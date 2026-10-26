@@ -1,5 +1,6 @@
 import { LoaderError } from './types.js';
 
+/** Options of fetchBytes: an AbortSignal, the size limit, a custom fetch and extra RequestInit. */
 export interface FetchOptions {
   signal?: AbortSignal;
   /** Maximum response size in bytes. Default 256 MiB. */
@@ -11,6 +12,7 @@ export interface FetchOptions {
 }
 
 const F = 'load';
+/** The default response size limit of fetchBytes: 256 MiB. */
 export const DEFAULT_MAX_BYTES = 256 * 1024 * 1024;
 
 /** Fetches `url` into memory, enforcing `maxBytes` on both Content-Length and the streamed body. */

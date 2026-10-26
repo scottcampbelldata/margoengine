@@ -4,6 +4,7 @@ import { LoaderError, type LoadedGeometry, type LoadedGroup } from './types.js';
 import { pointsToGeometry, toGeometry, type PointsToGeometryOptions, type ToGeometryOptions } from './geometry.js';
 import { SRGBToLinear as toLinear } from '@margoengine/math/color';
 
+/** Options of createMeshes: parent, material values, one mesh or one per group, and the geometry options. */
 export interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals'>, PointsToGeometryOptions {
   /** Parent for every created mesh. */
   parent?: Mesh | null;
@@ -21,6 +22,7 @@ export interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals'>,
   vertexColors?: 'average' | 'ignore';
 }
 
+/** The meshes, geometries and materials createMeshes made, with dispose() to release them. */
 export interface LoadedMeshes {
   meshes: Mesh[];
   geometries: Geometry[];

@@ -37,15 +37,23 @@ export function attachMorphs(ctx: SceneContext, mesh: MeshBinding): MorphBinding
       const sources = children(ctx, id(channel.properties[0])).filter((n) => n.properties[2] === 'Shape');
       const full = findChild(channel, 'FullWeights');
       // Blender also emits one all-100 FullWeights value per affected control point.
-      if (sources.length !== 1) throw new TypeError(`Unsupported FBX progressive morph: ${objectName(channel)}`);
+      if (sources.length !== 1)
+        throw new TypeError(
+          `Unsupported FBX progressive morph: ${objectName(channel)}; bake or remove it in your 3D tool before export`,
+        );
       if (full) {
         const values = array(channel, 'FullWeights');
         ctx.budget.work(values.length);
         for (let i = 0; i < values.length; i++)
           if (!Number.isFinite(values[i]) || Math.abs(values[i] - 100) > 1e-6)
-            throw new TypeError(`Unsupported FBX progressive morph: ${objectName(channel)}`);
+            throw new TypeError(
+              `Unsupported FBX progressive morph: ${objectName(channel)}; bake or remove it in your 3D tool before export`,
+            );
       }
-      if (targets.length >= 256) throw new RangeError('FBX morph target budget exceeded');
+      if (targets.length >= 256)
+        throw new RangeError(
+          'FBX morph target budget exceeded; simplify or split the scene, the import limits are listed in the README',
+        );
       const shape = sources[0];
       let data = cache.get(shape);
       if (!data) {
@@ -54,25 +62,28 @@ export function attachMorphs(ctx: SceneContext, mesh: MeshBinding): MorphBinding
           normalNode = findChild(shape, 'Normals'),
           normals = normalNode ? array(shape, 'Normals') : undefined;
         if (positions.length !== indices.length * 3 || (normals && normals.length !== positions.length))
-          throw new RangeError('FBX morph delta count mismatch');
+          throw new RangeError('FBX morph delta count mismatch; re-export the file, it looks damaged');
         if (!Number.isSafeInteger(cpCount) || cpCount < 1 || cpCount > 1_000_000)
-          throw new RangeError('FBX geometry budget exceeded');
+          throw new RangeError(
+            'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
+          );
         ctx.budget.reserve(cpCount * 4 + 128);
         ctx.budget.work(cpCount + indices.length * 8);
         const lookup = new Int32Array(cpCount).fill(-1);
         for (let i = 0; i < indices.length; i++) {
           const cp = indices[i];
           if (!Number.isInteger(cp) || cp < 0 || cp >= cpCount || lookup[cp] !== -1)
-            throw new RangeError('Invalid FBX morph control point');
+            throw new RangeError('Invalid FBX morph control point; re-export the file, it looks damaged');
           lookup[cp] = i;
           for (let k = 0; k < 3; k++)
             if (!Number.isFinite(positions[i * 3 + k]) || (normals && !Number.isFinite(normals[i * 3 + k])))
-              throw new RangeError('Invalid FBX morph delta');
+              throw new RangeError('Invalid FBX morph delta; re-export the file, it looks damaged');
         }
         data = { cpCount, lookup, positions, normals };
         cache.set(shape, data);
       }
-      if (data.cpCount !== cpCount) throw new RangeError('Invalid FBX morph control-point count');
+      if (data.cpCount !== cpCount)
+        throw new RangeError('Invalid FBX morph control-point count; re-export the file, it looks damaged');
       const { lookup, positions, normals } = data;
       ctx.budget.morph(mesh.controlPoints.length * 12 * (normals ? 2 : 1));
       ctx.budget.work(mesh.controlPoints.length * (normals ? 24 : 8));
@@ -90,7 +101,7 @@ export function attachMorphs(ctx: SceneContext, mesh: MeshBinding): MorphBinding
         out[dst + 1] = m[1] * x + m[5] * y + m[9] * z;
         out[dst + 2] = m[2] * x + m[6] * y + m[10] * z;
         if (!Number.isFinite(out[dst]) || !Number.isFinite(out[dst + 1]) || !Number.isFinite(out[dst + 2]))
-          throw new RangeError('FBX morph position overflow');
+          throw new RangeError('FBX morph position overflow; scale the model down or move it nearer the origin');
         if (normals && normalOut) {
           const base = mesh.geometry.normals,
             nx = base[dst],
@@ -106,7 +117,8 @@ export function attachMorphs(ctx: SceneContext, mesh: MeshBinding): MorphBinding
               inv[4] * bx + inv[5] * by + inv[6] * bz,
               inv[8] * bx + inv[9] * by + inv[10] * bz,
             ) / bl;
-          if (!length || !Number.isFinite(length)) throw new RangeError('Invalid FBX morph normal transform');
+          if (!length || !Number.isFinite(length))
+            throw new RangeError('Invalid FBX morph normal transform; re-export the file, it looks damaged');
           const a = normals[at],
             c = normals[at + 1],
             d = normals[at + 2];
@@ -118,11 +130,12 @@ export function attachMorphs(ctx: SceneContext, mesh: MeshBinding): MorphBinding
             !Number.isFinite(normalOut[dst + 1]) ||
             !Number.isFinite(normalOut[dst + 2])
           )
-            throw new RangeError('FBX morph normal overflow');
+            throw new RangeError('FBX morph normal overflow; scale the model down or move it nearer the origin');
         }
       }
       const weight = Number(property(channel, 'DeformPercent', 0)) / 100;
-      if (!Number.isFinite(weight)) throw new RangeError('Invalid FBX morph weight');
+      if (!Number.isFinite(weight))
+        throw new RangeError('Invalid FBX morph weight; re-export the file, it looks damaged');
       ctx.budget.reserve(128);
       targets.push({ name: objectName(channel), positions: out, normals: normalOut });
       weights.push(weight);

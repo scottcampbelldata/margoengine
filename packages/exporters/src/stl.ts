@@ -1,6 +1,7 @@
 // STL writer: world-space triangles with face normals.
 import { collect, drawables, num, toWorld, type ExportSource, type SceneOptions } from './scene.js';
 
+/** Options of exportSTL: binary or ASCII output and the solid name. */
 export interface STLOptions extends SceneOptions {
   /** Binary (default) or ASCII. */
   binary?: boolean;
@@ -26,7 +27,8 @@ export function exportSTL(source: ExportSource, options: STLOptions = {}): Uint8
   if (binary) {
     if (name.length > 80 || /^solid/i.test(name))
       throw new TypeError('Binary STL header must be at most 80 ASCII bytes and not start with "solid"');
-    if (count > 0xffffffff) throw new RangeError('Too many triangles for STL');
+    if (count > 0xffffffff)
+      throw new RangeError('Too many triangles for STL; export fewer triangles or split the mesh');
   }
   const solid = name.replace(/\s+/g, '_'),
     out = new Uint8Array(binary ? 84 + count * 50 : 0),

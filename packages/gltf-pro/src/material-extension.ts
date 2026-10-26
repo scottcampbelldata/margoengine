@@ -48,7 +48,7 @@ interface ExtensionGroup {
 }
 function validateDeclarations(declarations: unknown): void {
   if (declarations !== undefined && typeof declarations !== 'string')
-    throw new TypeError('Invalid material extension WGSL');
+    throw new TypeError('Invalid material extension WGSL; pass WGSL source that follows the documented hook');
   if (typeof declarations === 'string' && /@\s*(?:group|binding)\b/.test(declarations))
     throw new TypeError('Material extension declarations cannot declare @group or @binding; use factors and textures');
 }
@@ -75,7 +75,7 @@ export function prepareMaterialExtension(
     (extension.lighting !== undefined && typeof extension.lighting !== 'boolean') ||
     (extension.declarations !== undefined && typeof extension.declarations !== 'string')
   )
-    throw new TypeError('Invalid material extension WGSL');
+    throw new TypeError('Invalid material extension WGSL; pass WGSL source that follows the documented hook');
   if (extension.afterOpaque !== undefined && typeof extension.afterOpaque !== 'boolean')
     throw new TypeError('Material extension afterOpaque must be a boolean; pass true or false');
   validateDeclarations(extension.declarations);
@@ -90,14 +90,18 @@ export function prepareMaterialExtension(
     throw new TypeError('Material extension factors require finite vec4 values');
   const bytes = factors?.byteLength ?? 0;
   if (bytes > Math.min(device.limits.maxUniformBufferBindingSize ?? Infinity, device.limits.maxBufferSize))
-    throw new RangeError('Material extension factors exceed device limit');
+    throw new RangeError(
+      'Material extension factors exceed device limit; load a smaller model, or reduce its textures and meshes',
+    );
   if (!Array.isArray(textures) || textures.some((t) => !t?.view))
-    throw new TypeError('Invalid material extension textures');
+    throw new TypeError('Invalid material extension textures; pass the documented texture bindings');
   if (
     textures.length + 5 > (device.limits.maxSampledTexturesPerShaderStage ?? Infinity) ||
     textures.filter((texture) => texture.sampler).length + 5 > (device.limits.maxSamplersPerShaderStage ?? Infinity)
   )
-    throw new RangeError('Material extension textures exceed device binding limits');
+    throw new RangeError(
+      'Material extension textures exceed device binding limits; load a smaller model, or reduce its textures and meshes',
+    );
   if ((bytes || textures.length) && (device.limits.maxBindGroups ?? 4) < 4)
     throw new RangeError('Material extensions require bind group 3');
   const resource: MaterialExtensionResource = previous ?? { bytes: 0, entries: [], groups: new Map() };

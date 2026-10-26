@@ -231,7 +231,8 @@ export class LightsHelper extends Line {
     readonly lights: () => readonly unknown[],
     private readonly options: LightHelperOptions = {},
   ) {
-    if (typeof lights !== 'function') throw new TypeError('LightsHelper takes a function returning the lights to draw');
+    if (typeof lights !== 'function')
+      throw new TypeError('LightsHelper takes a function returning the lights to draw; pass () => lights');
     const { color, size, length, position, ...style } = options;
     if ((size !== undefined && !(size > 0)) || (length !== undefined && !(length > 0)))
       throw new RangeError('Light helper size and length must be above 0');

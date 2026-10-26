@@ -42,6 +42,7 @@ export interface GeometryData {
   morphs?: readonly MorphData[];
 }
 
+/** One morph target to write: position deltas and optional normal and tangent deltas. */
 export interface MorphData {
   name?: string;
   positions: ArrayLike<number>;
@@ -57,6 +58,7 @@ export interface MorphData {
  */
 export type Extras = { readonly [key: string]: unknown };
 
+/** A skin to write: its joint nodes, inverse bind matrices and optional skeleton root. */
 export interface SkinData {
   name?: string;
   /** References to nodes included in this scene. */
@@ -68,6 +70,7 @@ export interface SkinData {
   extras?: Extras;
 }
 
+/** One animation channel: the node and path it drives, its interpolation, key times and values. */
 export interface AnimationChannelData {
   node: ExportNode;
   path: 'translation' | 'rotation' | 'scale' | 'weights';
@@ -78,6 +81,7 @@ export interface AnimationChannelData {
   values: ArrayLike<number>;
 }
 
+/** A named animation made of channels, written into the glTF. */
 export interface AnimationData {
   name?: string;
   channels: readonly AnimationChannelData[];
@@ -304,6 +308,9 @@ interface Lookup<K, V> {
   get(key: K): V | undefined;
 }
 
+/**
+ * Options shared by every scene exporter: visibility, the root mesh to export and richer geometry and material data.
+ */
 export interface SceneOptions {
   /** Skip hidden meshes and their descendants. Default true. */
   onlyVisible?: boolean;
@@ -517,7 +524,8 @@ function triangleIndices(source: unknown, count: number, label: string): Uint32A
   const indices = new Uint32Array(source.length);
   for (let i = 0; i < indices.length; i++) {
     const index = (source as unknown as ArrayLike<number>)[i];
-    if (!Number.isInteger(index) || index < 0 || index >= count) throw new RangeError('Index exceeds vertices');
+    if (!Number.isInteger(index) || index < 0 || index >= count)
+      throw new RangeError('Index exceeds vertices; keep every index below the vertex count');
     indices[i] = index;
   }
   return indices;
@@ -696,7 +704,8 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
   if (isCoreMaterial(data)) {
     const d = data.data;
     for (let i = 0; i < 8; i++)
-      if (!Number.isFinite(d[i]) || d[i] < 0 || d[i] > 1) throw new RangeError('Invalid material values');
+      if (!Number.isFinite(d[i]) || d[i] < 0 || d[i] > 1)
+        throw new RangeError('Invalid material values; use finite values from 0 to 1');
     return {
       color: [d[0], d[1], d[2], d[3]],
       roughness: d[4],
@@ -777,7 +786,7 @@ function factor(value: unknown, label: string, fallback: number, valid: (value: 
   if (value === undefined) return fallback;
   if (typeof value !== 'number') fail(`Material ${label} must be a number`);
   if (!Number.isFinite(value) || !valid(value))
-    throw new RangeError(`Material ${label} ${value} is outside its glTF range`);
+    throw new RangeError(`Material ${label} ${value} is outside its glTF range; use a value inside the glTF range`);
   return value;
 }
 
@@ -853,7 +862,8 @@ export function normalMatrix(m: Float64Array): Float64Array {
     h = m[9],
     i = m[10];
   const det = determinant3(m);
-  if (!det || !Number.isFinite(det)) throw new RangeError('Singular transform');
+  if (!det || !Number.isFinite(det))
+    throw new RangeError('Singular transform; use a transform with a non-zero determinant');
   // Cofactor matrix equals det * inverse transpose.
   return new Float64Array([
     (e * i - f * h) / det,
@@ -1096,7 +1106,8 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
       const mesh = meshRuntime(handle),
         id = mesh.id,
         t = store.transforms;
-      if (depth > MAX_HIERARCHY_DEPTH) throw new RangeError('Hierarchy is too deep');
+      if (depth > MAX_HIERARCHY_DEPTH)
+        throw new RangeError('Hierarchy is too deep; flatten the hierarchy or reduce its depth');
       if (onlyVisible && store.hidden[id]) return null;
       const node = makeNode(
         mesh.name,
@@ -1146,7 +1157,8 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
   const visit = (data: ExportNode, parent: Float64Array | null, depth: number): Node | null => {
     if (!isObject(data)) fail('Scene nodes must be objects');
     if (seen.has(data)) fail('A scene node appears twice');
-    if (depth > MAX_HIERARCHY_DEPTH) throw new RangeError('Hierarchy is too deep');
+    if (depth > MAX_HIERARCHY_DEPTH)
+      throw new RangeError('Hierarchy is too deep; flatten the hierarchy or reduce its depth');
     seen.add(data);
     if (data.visible !== undefined && typeof data.visible !== 'boolean') fail('visible must be boolean');
     if (onlyVisible && data.visible === false) return null;

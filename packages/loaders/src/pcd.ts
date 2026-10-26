@@ -5,6 +5,7 @@ import { decompressLZF } from './lzf.js';
 const F = 'PCD';
 const MAX_HEADER = 1 << 16;
 
+/** One PCD field: its name, size, type, element count and byte offset. */
 export interface PCDField {
   name: string;
   size: number;
@@ -12,6 +13,7 @@ export interface PCDField {
   count: number;
   offset: number;
 }
+/** A parsed PCD header: version, fields, size, viewpoint and the data encoding. */
 export interface PCDHeader {
   version: string;
   fields: PCDField[];
@@ -23,6 +25,7 @@ export interface PCDHeader {
   rowSize: number;
   bodyOffset: number;
 }
+/** Options of parsePCD: the shared size limits and whether to keep invalid (NaN) points. */
 export interface PCDOptions extends ParseLimits {
   /** Keep points whose x, y or z is NaN or infinite (organized clouds mark holes that way). Default false. */
   keepInvalid?: boolean;

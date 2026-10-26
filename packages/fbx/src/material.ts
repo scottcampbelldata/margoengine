@@ -17,18 +17,21 @@ export async function attachMaterials(
     const value = node && findChild(node, 'Content')?.properties[0];
     if (value instanceof Uint8Array) return value;
     if (typeof value === 'string' && value) {
-      if (value.length > (limit * 4) / 3 + 4) throw new RangeError('FBX texture byte budget exceeded');
+      if (value.length > (limit * 4) / 3 + 4)
+        throw new RangeError(
+          'FBX texture byte budget exceeded; simplify or split the scene, the import limits are listed in the README',
+        );
       try {
         return Uint8Array.from(atob(value.replace(/\s/g, '')), (c) => c.charCodeAt(0));
       } catch {
-        throw new TypeError('Invalid FBX embedded texture');
+        throw new TypeError('Invalid FBX embedded texture; re-export the file, it looks damaged');
       }
     }
   };
   const texture = async (source: FBXNode): Promise<TextureData> => {
     ctx.signal?.throwIfAborted();
     const videos = children(ctx, id(source.properties[0])).filter((n) => n.name === 'Video');
-    if (videos.length > 1) throw new TypeError('Multiple FBX texture videos');
+    if (videos.length > 1) throw new TypeError('Multiple FBX texture videos; keep one per target when exporting');
     const video = videos[0];
     let image = content(video) ?? content(source);
     if (!image) {
@@ -39,7 +42,7 @@ export async function attachMaterials(
           findChild(video ?? source, 'Filename')?.properties[0] ??
           '',
       );
-      if (!raw) throw new TypeError('Missing FBX texture image');
+      if (!raw) throw new TypeError('Missing FBX texture image; re-export the file, it looks damaged');
       const path = raw.replace(/\\/g, '/'),
         base = resourcePath || globalThis.location?.href;
       let target: URL;
@@ -55,7 +58,10 @@ export async function attachMaterials(
       image = await readResponse(response, { maxBytes: limit - bytes, signal: ctx.signal, label: 'FBX texture' });
     }
     bytes += image.byteLength;
-    if (bytes > limit) throw new RangeError('FBX texture byte budget exceeded');
+    if (bytes > limit)
+      throw new RangeError(
+        'FBX texture byte budget exceeded; simplify or split the scene, the import limits are listed in the README',
+      );
     const png = image.length > 8 && image[0] === 137 && image[1] === 80 && image[2] === 78 && image[3] === 71,
       jpeg = image.length > 3 && image[0] === 255 && image[1] === 216 && image[2] === 255;
     if (!png && !jpeg) throw new TypeError('FBX textures must be PNG or JPEG');
@@ -64,7 +70,8 @@ export async function attachMaterials(
   const material = async (source: FBXNode): Promise<MaterialData> => {
     const scalar = (name: string, fallback: number) => {
       const value = Number(property(source, name, fallback));
-      if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError(`Invalid FBX material ${name}`);
+      if (!Number.isFinite(value) || value < 0 || value > 1)
+        throw new RangeError(`Invalid FBX material ${name}; re-export the file, it looks damaged`);
       return value;
     };
     const color = (name: string, fallback: unknown) => {
@@ -74,11 +81,12 @@ export async function attachMaterials(
         value.length !== 3 ||
         value.some((v) => typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1)
       )
-        throw new RangeError(`Invalid FBX material ${name}`);
+        throw new RangeError(`Invalid FBX material ${name}; re-export the file, it looks damaged`);
       return value as number[];
     };
     const shininess = Number(property(source, 'Shininess', 0));
-    if (!Number.isFinite(shininess) || shininess < 0) throw new RangeError('Invalid FBX shininess');
+    if (!Number.isFinite(shininess) || shininess < 0)
+      throw new RangeError('Invalid FBX shininess; re-export the file, it looks damaged');
     const explicitOpacity = property(source, 'Opacity', undefined),
       alpha = explicitOpacity === undefined ? 1 - scalar('TransparencyFactor', 0) : scalar('Opacity', 1),
       factor = scalar('DiffuseFactor', 1),
@@ -98,14 +106,16 @@ export async function attachMaterials(
     for (const c of ctx.incoming.get(id(source.properties[0])) ?? []) {
       if (c.kind !== 'OP' || !['DiffuseColor', 'NormalMap'].includes(c.property ?? '')) continue;
       const t = ctx.document.objects.get(c.child)!;
-      if (t.name !== 'Texture') throw new TypeError('Unsupported FBX layered texture');
+      if (t.name !== 'Texture')
+        throw new TypeError('Unsupported FBX layered texture; bake or remove it in your 3D tool before export');
       let promise = textures.get(c.child);
       if (!promise) {
         promise = texture(t);
         textures.set(c.child, promise);
       }
       const key = c.property === 'NormalMap' ? 'normalTexture' : 'baseColorTexture';
-      if (out[key]) throw new TypeError('Multiple FBX textures on one material property');
+      if (out[key])
+        throw new TypeError('Multiple FBX textures on one material property; keep one per target when exporting');
       out[key] = await promise;
     }
     return out;
@@ -115,11 +125,13 @@ export async function attachMaterials(
     ctx.signal?.throwIfAborted();
     const sources = children(ctx, id(mesh.model.properties[0])).filter((n) => n.name === 'Material');
     if (!sources.length) {
-      if (mesh.materialIndex > 0) throw new RangeError('FBX material index exceeds model materials');
+      if (mesh.materialIndex > 0)
+        throw new RangeError('FBX material index exceeds model materials; re-export the file, it looks damaged');
       continue;
     }
     const source = sources[mesh.materialIndex];
-    if (!source) throw new RangeError('FBX material index exceeds model materials');
+    if (!source)
+      throw new RangeError('FBX material index exceeds model materials; re-export the file, it looks damaged');
     const key = id(source.properties[0]);
     let promise = materials.get(key);
     if (!promise) {

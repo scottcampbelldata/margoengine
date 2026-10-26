@@ -8,6 +8,7 @@ import {
   validateVector,
 } from './types.js';
 
+/** Closest points between two segments, their distance and the parameter of each point along its segment. */
 export interface SegmentDistanceResult {
   pointA: MutableVec3View;
   pointB: MutableVec3View;
@@ -16,10 +17,12 @@ export interface SegmentDistanceResult {
   parameterB: number;
 }
 
+/** A sphere collider: its centre and radius in scene units. */
 export interface SphereVolumeOptions {
   center: Vec3View;
   radius: number;
 }
+/** A capsule collider: the two end points of its axis and its radius in scene units. */
 export interface CapsuleVolumeOptions {
   start: Vec3View;
   end: Vec3View;
@@ -221,7 +224,7 @@ export function closestPointsBetweenSegments(
         Math.abs(pby) > 3.4028234663852886e38 ||
         Math.abs(pbz) > 3.4028234663852886e38))
   ) {
-    throw new RangeError('Result exceeds output precision');
+    throw new RangeError('Result exceeds output precision; scale the scene down or move it nearer the origin');
   }
   result.pointA[0] = pax;
   result.pointA[1] = pay;

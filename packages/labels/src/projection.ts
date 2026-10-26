@@ -7,6 +7,7 @@
 import type { Backend } from '@margoengine/math/mat4';
 export type { Backend };
 
+/** Three numbers [x, y, z] in world units. */
 export type Vec3 = readonly [number, number, number];
 
 // Rounding grid for every number written into a transform string: fine enough for sub-micro-pixel placement, coarse

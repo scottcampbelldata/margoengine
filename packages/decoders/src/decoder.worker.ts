@@ -39,7 +39,7 @@ self.onmessage = async ({ data }) => {
       });
       const result = transcodeKTX2((await basis).module, new Uint8Array(data.buffer), data.target);
       self.postMessage({ id, result }, [result.mipmaps[0].data.buffer as ArrayBuffer]);
-    } else throw new TypeError('Unknown decoder job');
+    } else throw new TypeError('Unknown decoder job; post a job made by the decoders package');
   } catch (error) {
     // After a Wasm trap the module's memory and stack are undefined: drop it so the next job instantiates a fresh one.
     if (isDecoderCrash(error)) {

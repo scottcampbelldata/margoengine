@@ -147,9 +147,15 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
 
   const check = (node: Node): void => {
     const label = `Node ${node.name ?? '(unnamed)'}`;
-    if (node.morphWeights) throw new TypeError(`${label}: Roblox export has no morph targets`);
+    if (node.morphWeights)
+      throw new TypeError(
+        `${label}: Roblox export has no morph targets; remove morph targets before exporting for Roblox`,
+      );
     if (node.skin && !skins) throw new TypeError(`${label} is skinned; pass skins: true to keep Roblox-valid skins`);
-    if (node.camera || node.light) throw new TypeError(`${label}: Roblox export has no cameras or lights`);
+    if (node.camera || node.light)
+      throw new TypeError(
+        `${label}: Roblox export has no cameras or lights; remove cameras and lights before exporting for Roblox`,
+      );
     for (const name of [node.name, node.meshName])
       if (name !== undefined && CAGE.test(name))
         throw new TypeError(`${label}: Studio reads ${name} as a layered-clothing cage; rename it`);
@@ -191,7 +197,10 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
         );
   };
   const checkPrimitive = (label: string, geo: Geo, mat: Mat | undefined): void => {
-    if (geo.morphs) throw new TypeError(`${label}: Roblox export has no morph targets`);
+    if (geo.morphs)
+      throw new TypeError(
+        `${label}: Roblox export has no morph targets; remove morph targets before exporting for Roblox`,
+      );
     if (geo.uvs1 || mat?.baseColorTexture?.texCoord === 1)
       throw new TypeError(`${label}: Roblox export has one UV set; drop uvs1`);
     if (

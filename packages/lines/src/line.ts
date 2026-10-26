@@ -119,7 +119,8 @@ export class LineMaterial {
     if (this.miterLimit < 1) throw new RangeError('Miter limit must be at least 1');
     if (this.dashSize <= 0 || this.gapSize < 0)
       throw new RangeError('Dash size must be positive and gap size non-negative');
-    if (!JOINS.includes(this.join) || !CAPS.includes(this.cap)) throw new TypeError('Unknown line join or cap');
+    if (!JOINS.includes(this.join) || !CAPS.includes(this.cap))
+      throw new TypeError('Unknown line join or cap; use the values listed in the line options');
     for (const flag of [this.worldUnits, this.dashed, this.onTop, this.antialias, this.fog, this.clipIntersection])
       if (typeof flag !== 'boolean') throw new TypeError('Line flags must be boolean');
   }
@@ -178,7 +179,7 @@ export class Line {
 
   constructor(options: LineOptions = {}) {
     const { positions, colors, mode = 'strip', material, mesh = null, matrix, visible = true, ...style } = options;
-    if (!MODES.includes(mode)) throw new TypeError('Unknown line mode');
+    if (!MODES.includes(mode)) throw new TypeError('Unknown line mode; use the values listed in the line options');
     this.mode = mode;
     this.visible = visible;
     this.material = material ?? new LineMaterial();
@@ -208,7 +209,7 @@ export class Line {
     if (positions.length % 3) throw new RangeError('Positions need x, y, z per point');
     finiteArray(positions, 'Line positions');
     const count = positions.length / 3;
-    if (count > 4_000_000) throw new RangeError('Too many line points');
+    if (count > 4_000_000) throw new RangeError('Too many line points; split the line into several lines');
     if (count * 4 > this.points.length) {
       this.points = new Float32Array(count * 4);
       this.capacityVersion++;

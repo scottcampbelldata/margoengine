@@ -120,7 +120,7 @@ test('an accessor gltf-pro cannot decode names mesh, primitive, attribute and ac
       COLOR_0: { data: new Float32Array(27).fill(0.5), type: 'MAT3', componentType: 5126 },
     });
     const message =
-      'glTF mesh 0 "part" primitive 0: COLOR_0 (accessor 1): Unsupported glTF accessor 1 (componentType 5126, type MAT3)';
+      'glTF mesh 0 "part" primitive 0: COLOR_0 (accessor 1): Unsupported glTF accessor 1 (componentType 5126, type MAT3); re-export the model without it, or convert the texture format';
     await assert.rejects(parseGLTFAsync(await headless(), bytes.slice()), { name: 'TypeError', message });
     const prepared = await runParseWorker(worker, { url: 'https://example.test/', input: bytes.slice().buffer });
     const engine = await headless();

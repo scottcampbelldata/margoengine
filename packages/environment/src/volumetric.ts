@@ -310,7 +310,7 @@ export class VolumetricFog implements EnginePlugin {
         (s) => s !== undefined && (typeof s?.pbr !== 'function' || typeof s.bindings !== 'function'),
       )
     )
-      throw new RangeError('Invalid volumetric fog options');
+      throw new RangeError('Invalid volumetric fog options; pass finite, in-range values (see VolumetricFogOptions)');
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
@@ -371,7 +371,7 @@ export class VolumetricFog implements EnginePlugin {
     const size = [grid[0], grid[1], grid[2]],
       usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC;
     if (size.some((v) => v > device.limits.maxTextureDimension3D))
-      throw new RangeError('Volumetric grid exceeds device limit');
+      throw new RangeError('Volumetric grid exceeds device limit; reduce the fog resolution or depth slices');
     const textures: GPUTexture[] = [];
     try {
       for (let i = 0; i < 3; i++)

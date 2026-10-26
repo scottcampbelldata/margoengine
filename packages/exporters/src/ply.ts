@@ -2,6 +2,7 @@ import { LinearToSRGB as toSrgb } from '@margoengine/math/color';
 // PLY writer: one merged world-space mesh.
 import { byte, collect, drawables, num, toWorld, type ExportSource, type SceneOptions } from './scene.js';
 
+/** Options of exportPLY: binary or ASCII output and per-vertex colours. */
 export interface PLYOptions extends SceneOptions {
   /** binary_little_endian (true) or ascii (default false). */
   binary?: boolean;

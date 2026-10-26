@@ -31,6 +31,9 @@ import {
 } from './scene.js';
 import { cameraDefinition, lightDefinition } from './scene-metadata.js';
 
+/**
+ * Options of exportGLB and exportGLTF, on top of SceneOptions: flatten the hierarchy and set the generator string.
+ */
 export interface GLTFOptions extends SceneOptions {
   /**
    * Write every mesh as a root node with its world transform instead of keeping the hierarchy, one node per
@@ -60,6 +63,7 @@ export interface GLBOptions extends GLTFOptions {
   maxBytes?: number;
 }
 
+/** Options of exportGLTF: embed the binary buffer as a data URI or return it separately under a chosen URI. */
 export interface GLTFJsonOptions extends GLTFOptions {
   /** Embed the binary buffer as a base64 data URI (default) or return it separately. */
   embed?: boolean;
@@ -67,6 +71,9 @@ export interface GLTFJsonOptions extends GLTFOptions {
   binUri?: string;
 }
 
+/**
+ * The .gltf result: the document as an object and as JSON text, with the separate buffer when it is not embedded.
+ */
 export interface GLTFJsonResult {
   /** The glTF document object. */
   json: Record<string, unknown>;
@@ -579,9 +586,12 @@ class Writer {
         !['translation', 'rotation', 'scale', 'weights'].includes(path) ||
         !['STEP', 'LINEAR', 'CUBICSPLINE'].includes(interpolation)
       )
-        throw new TypeError('Invalid animation path or interpolation');
+        throw new TypeError(
+          'Invalid animation path or interpolation; use translation, rotation, scale or weights with STEP, LINEAR or CUBICSPLINE',
+        );
       const key = node + ':' + path;
-      if (destinations.has(key)) throw new TypeError('Duplicate animation target');
+      if (destinations.has(key))
+        throw new TypeError('Duplicate animation target; give each node and path one animation track');
       destinations.add(key);
       const count = channel.times?.length;
       if (!Number.isSafeInteger(count) || count < 1) throw new TypeError('Animation times must be nonempty');
@@ -691,7 +701,10 @@ function document(
     nodeData = new Map<ExportNode, Node>();
   const resolve = (node: ExportNode): number => {
     const index = nodeIndices.get(node);
-    if (index === undefined) throw new TypeError('Skin joint or animation target is not an exported scene node');
+    if (index === undefined)
+      throw new TypeError(
+        'Skin joint or animation target is not an exported scene node; include every joint and target node in the exported scene',
+      );
     return index;
   };
   json.asset = { version: '2.0', generator };
@@ -701,7 +714,9 @@ function document(
       const geometries =
         node.primitives?.map((primitive) => primitive.geometry) ?? (node.geometry ? [node.geometry] : []);
       if (node.skin || node.morphWeights || geometries.some((geometry) => geometry.joints || geometry.morphs))
-        throw new TypeError('Flatten does not support skins, morphs or animation');
+        throw new TypeError(
+          'Flatten does not support skins, morphs or animation; export without flatten, or remove skins, morphs and animation first',
+        );
       if (node.camera || node.light)
         throw new TypeError('Flatten does not support cameras or lights; keep the hierarchy');
       if (node.retainedVisibility !== undefined)
@@ -710,7 +725,9 @@ function document(
     };
     roots.forEach(check);
     if (animations?.length || materialAnimations?.length)
-      throw new TypeError('Flatten does not support skins, morphs or animation');
+      throw new TypeError(
+        'Flatten does not support skins, morphs or animation; export without flatten, or remove skins, morphs and animation first',
+      );
     for (const item of drawables(roots)) {
       const parts = decompose(item.world);
       const node = parts
@@ -760,7 +777,7 @@ function document(
         const skin = writer.skin(node.skin, resolve);
         const geometries = node.primitives?.map((primitive) => primitive.geometry) ?? [node.geometry];
         if (geometries.some((geometry) => geometry.joints!.some((joint) => joint >= node.skin!.joints.length)))
-          throw new RangeError('Joint index exceeds skin joints');
+          throw new RangeError('Joint index exceeds skin joints; keep joint indices below the skin joint count');
         json.nodes[resolve(sourceNode)].skin = skin;
       } else if (node.geometry?.joints) throw new TypeError('Joint attributes need a skin on the same node');
     }

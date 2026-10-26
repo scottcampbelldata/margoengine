@@ -51,7 +51,7 @@ interface DeviceState {
 
 const finiteNumber = (value: unknown, label: string, min = -Infinity, max = Infinity): number => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max)
-    throw new RangeError(`Invalid ${label}`);
+    throw new RangeError(`Invalid ${label}; pass a finite number in the documented range`);
   return value;
 };
 
@@ -109,7 +109,8 @@ export class EnvironmentBackground {
     this.blur = options.blur ?? 0;
     this.rotation = options.rotation ?? 0;
     this.source = options.source ?? 'auto';
-    if (!['auto', 'equirect', 'cube'].includes(this.source)) throw new TypeError('Invalid background source');
+    if (!['auto', 'equirect', 'cube'].includes(this.source))
+      throw new TypeError('Invalid background source; pass a colour, a texture or a cube map');
   }
 
   get exposure(): number {

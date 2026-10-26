@@ -143,9 +143,11 @@ export function applyGainMap(sdr: RGBA8Image, gain: RGBA8Image, meta: GainMapMet
       image.height < 1 ||
       image.data.length < image.width * image.height * 4
     )
-      throw new TypeError('Invalid RGBA8 image');
-  if (width * height > MAX_PIXELS) throw new RangeError('UltraHDR image is too large');
-  if (!(weight >= 0 && weight <= 1)) throw new RangeError('Invalid gain-map weight');
+      throw new TypeError(
+        'Invalid RGBA8 image; pass a decoded RGBA8 image with matching width, height and data length',
+      );
+  if (width * height > MAX_PIXELS) throw new RangeError('UltraHDR image is too large; use a smaller image');
+  if (!(weight >= 0 && weight <= 1)) throw new RangeError('Invalid gain-map weight; pass a finite weight from 0 to 1');
   // Boost factor per channel for each 8-bit gain value; fractional (upsampled) gains interpolate between entries.
   const linear = new Float32Array(256),
     boost = new Float32Array(768);

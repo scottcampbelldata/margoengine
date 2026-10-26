@@ -69,7 +69,8 @@ export async function encodeZIP(
     if (!text && !(data instanceof Uint8Array) && !(typeof Blob === 'function' && data instanceof Blob))
       throw new TypeError(`ZIP entry ${name} data must be a Uint8Array, Blob or string`);
     const bytes = encoder.encode(name);
-    if (bytes.length > 65535) throw new RangeError(`ZIP entry name ${name} is longer than 65,535 bytes`);
+    if (bytes.length > 65535)
+      throw new RangeError(`ZIP entry name ${name} is longer than 65,535 bytes; shorten the entry name`);
     total += size(data, text) + 30 + bytes.length + 46 + bytes.length;
     if (total > maxBytes) throw new RangeError(`ZIP would exceed ${maxBytes} bytes; export fewer or smaller files`);
     return { name: bytes, data, text };
@@ -83,7 +84,10 @@ export async function encodeZIP(
     const { name, data, text } = plan[i],
       bytes = text ?? (data instanceof Uint8Array ? data : new Uint8Array(await (data as Blob).arrayBuffer()));
     signal?.throwIfAborted();
-    if (bytes.length !== size(data, text)) throw new RangeError('A ZIP entry changed size while being written');
+    if (bytes.length !== size(data, text))
+      throw new RangeError(
+        'A ZIP entry changed size while being written; do not change the data while the archive is being written',
+      );
     const crc = crc32(bytes);
     view.setUint32(at, 0x04034b50, true);
     view.setUint16(at + 4, 20, true);

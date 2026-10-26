@@ -2,6 +2,7 @@ import { WorkerPool, jobTimeout, payload, requireWorkers, timeLimit, workerLimit
 import type { DecodedDracoGeometry, DracoRequest } from './protocol.js';
 import { validatedDracoLimits } from './protocol.js';
 
+/** Options of a DracoDecoder: where the Wasm lives, the worker count and the per-decode time limit. */
 export interface DracoOptions {
   /** Folder holding draco_wasm_wrapper.js and draco_decoder.wasm, e.g. 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/'. Defaults to the copy bundled with this package. */
   decoderPath?: string;
@@ -14,6 +15,9 @@ export interface DracoOptions {
   timeout?: number;
 }
 
+/**
+ * Per-call options of DracoDecoder.decode: attribute map and size limits (DracoRequest), an AbortSignal and buffer transfer.
+ */
 export interface DracoDecodeOptions extends DracoRequest {
   signal?: AbortSignal;
   /** Transfer a whole input ArrayBuffer to the worker instead of copying it. The caller's buffer is detached. */

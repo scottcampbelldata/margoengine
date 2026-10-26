@@ -174,7 +174,8 @@ export function parseHDR(source: ArrayBuffer | ArrayBufferView, options: HDRPars
 
   // Every scanline takes at least 4 bytes: a header claiming more scanlines than the file can hold fails before the
   // image is allocated (up to 1 GiB).
-  if (bytes.length - position < major * 4) throw new RangeError('Invalid HDR: truncated pixel data');
+  if (bytes.length - position < major * 4)
+    throw new RangeError('Invalid HDR: truncated pixel data; the file is truncated, download or export it again');
   const data = new Float32Array(width * height * channels),
     scanline = new Uint8Array(minor * 4),
     counts = { flat: 0, legacyRLE: 0, planarRLE: 0 };

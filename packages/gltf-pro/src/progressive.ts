@@ -23,6 +23,7 @@ interface StaticBatchDeferral {
   commit?: () => void;
 }
 
+/** A progress report of loadGLTFProgressive: the stage, bytes loaded and total, and primitives drawn and loaded. */
 export interface ProgressiveGLTFProgress {
   /** `ready`: placeholders drawn; `geometry`/`textures`: streaming; `complete`: equal to a plain `loadGLTF` model. */
   stage: 'ready' | 'geometry' | 'textures' | 'complete';
@@ -34,11 +35,17 @@ export interface ProgressiveGLTFProgress {
   images: number;
   imagesLoaded: number;
 }
+/**
+ * Options of loadGLTFProgressive: the loadGLTF options, a progress callback and the per-frame upload budget in milliseconds.
+ */
 export interface ProgressiveGLTFOptions extends GLTFLoadOptions {
   onProgress?: (progress: ProgressiveGLTFProgress) => void;
   /** Main-thread milliseconds per frame spent on GPU uploads (default 4); at least one upload step runs each frame. */
   frameBudget?: number;
 }
+/**
+ * A progressive load: `ready` resolves with placeholder boxes, `complete` with the full model, and abort() stops it.
+ */
 export interface ProgressiveGLTF {
   /** The model, as soon as the JSON is parsed: one box per primitive (its POSITION bounds, material colours), bounds valid. */
   readonly ready: Promise<PBRModel>;
@@ -302,7 +309,9 @@ export function loadGLTFProgressive(
       if (u) {
         if (!u.buffer) {
           if (u.data.byteLength > device().limits.maxBufferSize)
-            throw new RangeError('PBR buffer exceeds device limit');
+            throw new RangeError(
+              'PBR buffer exceeds device limit; load a smaller model, or reduce its textures and meshes',
+            );
           pending.add(
             (u.buffer = device().createBuffer({ size: u.data.byteLength, usage: u.usage | GPUBufferUsage.COPY_DST })),
           );
@@ -503,7 +512,9 @@ export function loadGLTFProgressive(
         jobs.push(geometry(m.key, m.vertices!, m.indices!));
       } else if (m.type === 'image') {
         if (!Number.isInteger(m.index) || m.index < 0 || m.index >= images.length)
-          throw new RangeError('Progressive glTF worker sent an invalid image index');
+          throw new RangeError(
+            'Progressive glTF worker sent an invalid image index; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+          );
         images[m.index] = m.image;
         settled[m.index] = true;
         if (m.image) progress.imagesLoaded++;

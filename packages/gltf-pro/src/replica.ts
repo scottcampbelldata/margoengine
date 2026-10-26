@@ -1,5 +1,9 @@
+import { margoError } from '../../shared/errors.js';
 import type { PassContext } from '@margoengine/core/extension';
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/**
+ * Draws a model's PBR shader into a caller-owned render pass on another device: prepare() encodes deformation, draw() appends the draw calls, dispose() releases the replica.
+ */
 export interface PBRDeviceRenderer {
   /** Encode deformation on this renderer's device before opening the eye pass. */
   prepare(context: Pick<Context, 'backend' | 'device' | 'encoder'>): void;
@@ -7,6 +11,7 @@ export interface PBRDeviceRenderer {
   draw(context: Context, pass: GPURenderPassEncoder, view: ArrayLike<number>): void;
   dispose(): void;
 }
+/** Encodes only a model's skinning and morph deformation on another device; dispose() releases it. */
 export interface PBRDeformationRenderer {
   prepare(context: Pick<Context, 'backend' | 'device' | 'encoder'>): void;
   dispose(): void;
@@ -24,13 +29,15 @@ export function deviceRenderer(
     unsubscribe: (() => void) | undefined;
   const renderer: PBRDeviceRenderer = {
     prepare(context) {
-      if (disposed) throw new Error('PBR device renderer is disposed');
-      if (context.device !== device) throw new Error('PBR renderer belongs to another GPU device');
+      if (disposed) throw margoError('disposed', 'PBR device renderer is disposed; create a new one');
+      if (context.device !== device)
+        throw margoError('attached', 'PBR renderer belongs to another GPU device; create one per device');
       prepare(context);
     },
     draw(context, pass, view) {
-      if (disposed) throw new Error('PBR device renderer is disposed');
-      if (context.device !== device) throw new Error('PBR renderer belongs to another GPU device');
+      if (disposed) throw margoError('disposed', 'PBR device renderer is disposed; create a new one');
+      if (context.device !== device)
+        throw margoError('attached', 'PBR renderer belongs to another GPU device; create one per device');
       draw(context, pass, view);
     },
     dispose() {

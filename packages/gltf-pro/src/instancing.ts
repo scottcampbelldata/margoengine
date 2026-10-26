@@ -1,3 +1,4 @@
+import { margoError } from '../../shared/errors.js';
 import type { GLTFInstancing } from '../../shared/gltf.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 // @margoengine/gltf-pro/instancing: PBRInstances, its vertex-stage patch and the EXT_mesh_gpu_instancing reader. The root
@@ -35,7 +36,7 @@ export class PBRInstances {
   constructor(capacity: number) {
     this.capacity = capacity;
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 1_000_000)
-      throw new RangeError('Invalid instance capacity');
+      throw new RangeError('Invalid instance capacity; pass a whole number from 0 up to the capacity');
     this.data = new Float32Array(capacity * 24);
     for (let i = 0; i < capacity; i++) this.data.set(identity, i * 24);
     this.drawn = this.high = capacity;
@@ -49,7 +50,8 @@ export class PBRInstances {
       this.source.count = n;
       return;
     }
-    if (!Number.isInteger(n) || n < 0 || n > this.capacity) throw new RangeError('Invalid instance count');
+    if (!Number.isInteger(n) || n < 0 || n > this.capacity)
+      throw new RangeError('Invalid instance count; pass a whole number from 0 up to the capacity');
     this.drawn = n;
     this.stale = true;
   }
@@ -70,7 +72,8 @@ export class PBRInstances {
     }
   }
   private index(i: number): number {
-    if (!Number.isInteger(i) || i < 0 || i >= this.capacity) throw new RangeError('Instance index out of range');
+    if (!Number.isInteger(i) || i < 0 || i >= this.capacity)
+      throw new RangeError('Instance index out of range; use an index below the instance count');
     return i * 24;
   }
   private row(i: number, at: number, values: ArrayLike<number>, n: number, min = -Infinity): this {
@@ -110,7 +113,8 @@ export class PBRInstances {
   }
   /** Column-major 4x4 (`Matrix4.elements` from @margoengine/math, `camera.matrix` layout); the last row must be 0, 0, 0, 1. */
   setMatrixAt(i: number, m: ArrayLike<number>): this {
-    if (m?.length !== 16 || m[3] || m[7] || m[11] || m[15] !== 1) throw new TypeError('Invalid instance matrix');
+    if (m?.length !== 16 || m[3] || m[7] || m[11] || m[15] !== 1)
+      throw new TypeError('Invalid instance matrix; pass 16 finite numbers, column-major');
     return this.row(i, 0, m, 16);
   }
   getMatrixAt<T extends { [k: number]: number } = Float32Array>(
@@ -123,14 +127,16 @@ export class PBRInstances {
   }
   /** Linear RGB or RGBA (0 or more; 1 = unchanged), multiplied into the base colour like a vertex colour. */
   setColorAt(i: number, color: ArrayLike<number>): this {
-    if (color?.length !== 3 && color?.length !== 4) throw new TypeError('Invalid instance color');
+    if (color?.length !== 3 && color?.length !== 4)
+      throw new TypeError('Invalid instance color; pass finite RGB or RGBA numbers');
     return this.row(i, 16, color.length === 3 ? [color[0], color[1], color[2], 1] : color, 4, 0);
   }
   /** UV offset and scale (an `packAtlas` region); rotation is not supported per instance. `null` restores the identity. */
   setUVTransformAt(i: number, t: TextureTransform | null): this {
     const offset = t?.offset ?? [0, 0],
       scale = t?.scale ?? [1, 1];
-    if (t?.rotation || offset.length !== 2 || scale.length !== 2) throw new TypeError('Invalid instance UV transform');
+    if (t?.rotation || offset.length !== 2 || scale.length !== 2)
+      throw new TypeError('Invalid instance UV transform; pass finite offset and scale numbers');
     return this.row(i, 20, [scale[0], scale[1], offset[0], offset[1]], 4);
   }
   /** True when some drawn instance has a negative determinant (mirrored); such primitives draw without face culling. */
@@ -247,7 +253,9 @@ export const instancing = {
       s = read('SCALE', 'VEC3'),
       n = t ? t.length / 3 : r ? r.length / 4 : s ? s.length / 3 : 0;
     if (!n || (t && t.length !== n * 3) || (r && r.length !== n * 4) || (s && s.length !== n * 3))
-      throw new TypeError('Invalid EXT_mesh_gpu_instancing attributes');
+      throw new TypeError(
+        'Invalid EXT_mesh_gpu_instancing attributes; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     // 96 bytes per instance (per node) count toward the decoded budget (4x maxDownloadBytes) before allocating: a
     // 12-byte TRANSLATION per instance would otherwise expand 8x past it, once for every node that uses the accessors.
     asset.reserveDecodedBytes(n * 96);
@@ -256,7 +264,7 @@ export const instancing = {
     for (let i = 0; i < n; i++) {
       if (r) {
         const l = Math.hypot(r[i * 4], r[i * 4 + 1], r[i * 4 + 2], r[i * 4 + 3]);
-        if (!l) throw new RangeError('Zero instance rotation');
+        if (!l) throw new RangeError('Zero instance rotation; use a unit quaternion, not [0, 0, 0, 0]');
         for (let k = 0; k < 4; k++) q[k] = r[i * 4 + k] / l;
       }
       composeMatrix(
@@ -273,12 +281,17 @@ export const instancing = {
 // the node matrix times the instance matrix, normals by its cofactor matrix (the inverse-transpose up to a positive scale,
 // normalized per fragment), per-instance handedness for facing and tangents, tint and UV scale/offset.
 const instancedCode = new Map<string, string>();
+/** Patches a PBR shader's WGSL source so it reads per-instance transforms; results are cached by source text. */
 export function instancedShader(code: string): string {
   let out = instancedCode.get(code);
   if (out !== undefined) return out;
   const edit = (from: string | RegExp, to: string) => {
     const next = out!.replace(from, to);
-    if (next === out) throw new Error('PBR instancing patch target missing: ' + from);
+    if (next === out)
+      throw margoError(
+        'failed',
+        'PBR instancing patch target missing: ' + from + '; the shader source changed, update the patch',
+      );
     out = next;
   };
   out = code;

@@ -15,6 +15,7 @@ import {
 
 const F = 'OFF';
 
+/** Options of parseOFF: the shared size limits (ParseLimits). */
 export interface OFFOptions extends ParseLimits {}
 
 /**

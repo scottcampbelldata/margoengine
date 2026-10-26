@@ -4,6 +4,7 @@ import { crc32 } from '../../shared/crc32.js';
 
 const F = 'ZIP';
 
+/** One entry of a zip central directory: its name, method, sizes, CRC and header offset. */
 export interface ZipEntry {
   /** Entry path as stored (forward slashes). */
   name: string;
@@ -16,6 +17,7 @@ export interface ZipEntry {
   headerOffset: number;
 }
 
+/** Limits when reading a zip: entry count, entry size, expansion ratio and an AbortSignal. */
 export interface ZipOptions {
   /** Maximum entries in the central directory. Default 10,000. */
   maxEntries?: number;

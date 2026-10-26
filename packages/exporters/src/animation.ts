@@ -13,7 +13,7 @@ export function writeAnimation(w: Writer, clip: ExportClip, map: Int32Array): vo
       interpolation = track.interpolation ?? 'LINEAR';
     if (!(node >= 0)) continue; // hidden or unknown node
     if (!['STEP', 'LINEAR', 'CUBICSPLINE'].includes(interpolation))
-      throw new TypeError('Invalid animation interpolation');
+      throw new TypeError('Invalid animation interpolation; use STEP, LINEAR or CUBICSPLINE');
     const input = w.memo(track.times, () => w.accessor(track.times, 'SCALAR', FLOAT, undefined, true));
     const output = w.memo(track.values, () =>
       w.accessor(track.values, track.path === 'rotation' ? 'VEC4' : track.path === 'weights' ? 'SCALAR' : 'VEC3'),

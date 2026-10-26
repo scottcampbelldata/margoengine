@@ -294,7 +294,8 @@ export interface FogOptions {
 }
 
 const finite = (value: number, label: string, min = -Infinity): number => {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < min) throw new RangeError(`Invalid fog ${label}`);
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min)
+    throw new RangeError(`Invalid fog ${label}; pass a finite number of 0 or more`);
   return value;
 };
 // Linear and EXP2 fog as the OpenGL 1.x fixed-function fog equations; height thinning is a plain exponential density.

@@ -58,7 +58,7 @@ export class Input {
     { target = window, gamepads = () => navigator.getGamepads?.() ?? [], deadzone = 0.15 }: InputOptions = {},
   ) {
     if (!Number.isFinite(deadzone) || deadzone < 0 || deadzone >= 1 || typeof gamepads !== 'function')
-      throw new RangeError('Invalid input options');
+      throw new RangeError('Invalid input options; pass the documented option types');
     this.gamepads = gamepads;
     this.deadzone = deadzone;
     for (const [name, bindings] of Object.entries(actions)) {
@@ -68,7 +68,9 @@ export class Input {
           !Number.isFinite(binding.scale ?? 1) ||
           !['key', 'mouse', 'pointer', 'gamepad-axis', 'gamepad-button', 'touch'].includes(binding.type)
         )
-          throw new TypeError('Invalid action binding');
+          throw new TypeError(
+            'Invalid action binding; bind an action to key, mouse, gamepad or touch codes (see InputOptions)',
+          );
         if (
           (binding.type === 'key' && !binding.code) ||
           (binding.type === 'mouse' &&
@@ -82,7 +84,9 @@ export class Input {
           (binding.type === 'touch' &&
             (!binding.id || (binding.axis !== undefined && binding.axis !== 'x' && binding.axis !== 'y')))
         )
-          throw new TypeError('Invalid action binding');
+          throw new TypeError(
+            'Invalid action binding; bind an action to key, mouse, gamepad or touch codes (see InputOptions)',
+          );
       }
       this.states.set(name, { value: 0, down: false, pressed: false, released: false });
       this.samples.push({ name, state: this.states.get(name)! });
@@ -127,7 +131,7 @@ export class Input {
    */
   state(action: string): Readonly<ActionState> {
     const state = this.states.get(action);
-    if (!state) throw new TypeError('Unknown input action');
+    if (!state) throw new TypeError('Unknown input action; add it to the actions option first');
     return state;
   }
   /**
@@ -190,7 +194,10 @@ export class Input {
    * @throws TypeError when disposed, `id` is empty, or `id` is already used by a touch control.
    */
   createStick(parent: HTMLElement, id: string): HTMLDivElement {
-    if (this.disposed || !id || this.touch.has(id)) throw new TypeError('Invalid or duplicate touch control');
+    if (this.disposed || !id || this.touch.has(id))
+      throw new TypeError(
+        'Invalid or duplicate touch control; give each touch control a unique name and a finite radius',
+      );
     const doc = parent.ownerDocument,
       element = doc.createElement('div'),
       knob = doc.createElement('div'),
@@ -252,7 +259,10 @@ export class Input {
    * @throws TypeError when disposed, `id` is empty, or `id` is already used by a touch control.
    */
   bindTouchButton(element: HTMLElement, id: string): void {
-    if (this.disposed || !id || this.touch.has(id)) throw new TypeError('Invalid or duplicate touch control');
+    if (this.disposed || !id || this.touch.has(id))
+      throw new TypeError(
+        'Invalid or duplicate touch control; give each touch control a unique name and a finite radius',
+      );
     const state = { x: 0, y: 0, down: false };
     this.touch.set(id, state);
     let pointer: number | null = null,
@@ -313,7 +323,7 @@ export class Input {
       !Number.isInteger(gamepad) ||
       gamepad < 0
     )
-      throw new RangeError('Invalid haptics');
+      throw new RangeError('Invalid haptics; pass finite durations and magnitudes from 0 to 1');
     const actuator = this.gamepads()[gamepad]?.vibrationActuator;
     if (!actuator) return false;
     await actuator.playEffect('dual-rumble', { duration, strongMagnitude: strength, weakMagnitude: strength });

@@ -4,6 +4,7 @@ import type { GLTFDocument } from '../../shared/gltf.js';
 import { glbFrame } from './glb.js';
 import { ACCESSOR_WIDTHS } from '../../shared/accessor.js';
 
+/** A glTF document as an object and as JSON text, with its separate binary buffer when it is not embedded. */
 export interface GLTFJsonResult {
   /** The glTF document object. */
   json: Record<string, unknown>;

@@ -300,7 +300,7 @@ export async function createGodotPrecisionBundle(input: GodotPrecisionBundleInpu
           const value = values[at]!;
           if (!Number.isSafeInteger(value) || value < 0 || value > 0x7fffffff)
             throw new RangeError(
-              'GODOT_PRECISION_INDEX_RANGE: Source indices exceed exact native signed 32-bit range.',
+              'GODOT_PRECISION_INDEX_RANGE: Source indices exceed exact native signed 32-bit range; split the mesh so every index fits in 32 bits',
             );
           view.setInt32(i * 4, value, true);
         } else view.setFloat32(i * 4, values[i]!, true);

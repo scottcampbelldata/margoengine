@@ -535,7 +535,7 @@ test('KHR_materials_variants: names, switching rebinds the mapped material, unde
   assert.equal(model.primitives[1].material, model.primitives[1].material, 'unmapped primitives keep theirs');
   assert.throws(() => model.selectVariant('Blue'), {
     name: 'RangeError',
-    message: 'selectVariant: the model has no material variant Blue',
+    message: 'selectVariant: the model has no material variant Blue; pass an index below the variant count',
   });
   assert.throws(() => model.selectVariant(2), RangeError);
   model.dispose();

@@ -10,6 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { GPUProfiler } from '@margoengine/stats';
 import { FramePanel } from './frame-panel.js';
+import { margoError } from '../../shared/errors.js';
 import { meshTriangles, type MeshSourceOwner } from '../../shared/mesh-source.js';
 
 declare const GPUBufferUsage: { COPY_SRC: number; COPY_DST: number; MAP_READ: number };
@@ -421,7 +422,11 @@ export class FrameDebugger implements EnginePlugin {
 
   /** Engine plugin hook: starts resource bookkeeping on the engine's device. */
   setup(engine: Engine): void {
-    if (this.disposed || this.engine) throw new Error('FrameDebugger is disposed or attached');
+    if (this.disposed || this.engine)
+      throw margoError(
+        'attached',
+        'FrameDebugger is disposed or already attached; create a new FrameDebugger for this engine',
+      );
     this.engine = engine;
     if (engine.gpu) this.track(engine.gpu);
   }

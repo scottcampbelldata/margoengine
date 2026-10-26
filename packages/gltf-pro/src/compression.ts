@@ -2,6 +2,9 @@ import type { GLTFPrimitive } from '../../shared/gltf.js';
 import type { DracoDecoder, KTX2Decoder } from '@margoengine/decoders';
 import { type GLTFAsset, entry, integer, assetLimit } from './asset.js';
 
+/**
+ * Options for loading compressed glTF: an AbortSignal and optional reusable Draco, meshopt and KTX2 decoders the caller owns.
+ */
 export interface GLTFLoadOptions {
   signal?: AbortSignal;
   /** Optional reusable decoder. The caller retains ownership; otherwise a decoder is created and disposed per load. */
@@ -40,20 +43,27 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
         if (!ext || ready.has(p)) continue;
         if ((p.mode ?? 4) !== 4) throw new Error('PBR requires triangle primitives');
         if (!ext.attributes || typeof ext.attributes !== 'object' || Array.isArray(ext.attributes))
-          throw new TypeError('Invalid glTF Draco attributes');
+          throw new TypeError(
+            'Invalid glTF Draco attributes; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+          );
         const componentTypes: Record<string, number> = {},
           attributeIds: Record<string, number> = {},
           attributeWidths: Record<string, number> = {};
         const position = entry(asset.doc.accessors, p.attributes?.POSITION, 'Draco POSITION');
         const vertexCount = integer(position.count, 'Draco vertex count', 3);
         if (position.type !== 'VEC3' || vertexCount > 1_000_000)
-          throw new RangeError('Invalid glTF Draco POSITION size');
+          throw new RangeError(
+            'Invalid glTF Draco POSITION size; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+          );
         let bytes = 0;
         for (const [semantic, id] of Object.entries(ext.attributes)) {
           const def = entry(asset.doc.accessors, p.attributes?.[semantic], 'Draco attribute');
           const count = integer(def.count, 'Draco accessor count', 1),
             width = Object.hasOwn(widths, def.type) ? widths[def.type] : undefined;
-          if (!width || count !== vertexCount) throw new RangeError('Invalid glTF Draco accessor size');
+          if (!width || count !== vertexCount)
+            throw new RangeError(
+              'Invalid glTF Draco accessor size; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+            );
           bytes += count * width * 4;
           componentTypes[semantic] = integer(def.componentType, 'Draco component type');
           attributeIds[semantic] = integer(id, 'Draco attribute id');
@@ -62,18 +72,32 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
         const indexDef = p.indices === undefined ? undefined : entry(asset.doc.accessors, p.indices, 'Draco indices');
         if (indexDef) {
           if (indexDef.type !== 'SCALAR' || ![5121, 5123, 5125].includes(indexDef.componentType) || indexDef.normalized)
-            throw new TypeError('Invalid glTF Draco indices');
+            throw new TypeError(
+              'Invalid glTF Draco indices; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+            );
           const count = integer(indexDef.count, 'Draco index count', 1);
-          if (count > 1_000_000 || count % 3) throw new RangeError('Invalid glTF Draco index count');
+          if (count > 1_000_000 || count % 3)
+            throw new RangeError(
+              'Invalid glTF Draco index count; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+            );
           bytes += count * 4;
         }
-        if (bytes > assetLimit * 4) throw new RangeError('Decoded glTF exceeds byte budget');
+        if (bytes > assetLimit * 4)
+          throw new RangeError(
+            'Decoded glTF exceeds byte budget; load a smaller model, or reduce its textures and meshes',
+          );
         const source = asset.view(ext.bufferView);
-        if (bytes > asset.remainingDecodedBytes) throw new RangeError('Decoded glTF exceeds byte budget');
+        if (bytes > asset.remainingDecodedBytes)
+          throw new RangeError(
+            'Decoded glTF exceeds byte budget; load a smaller model, or reduce its textures and meshes',
+          );
         const maxIndices = indexDef
           ? indexDef.count
           : Math.min(1_000_000, Math.floor((asset.remainingDecodedBytes - bytes) / 4));
-        if (maxIndices < 3) throw new RangeError('Decoded glTF exceeds index byte budget');
+        if (maxIndices < 3)
+          throw new RangeError(
+            'Decoded glTF exceeds index byte budget; load a smaller model, or reduce its textures and meshes',
+          );
         if (!draco) {
           const { DracoDecoder } = await import('@margoengine/decoders');
           signal?.throwIfAborted();
@@ -102,7 +126,9 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
           indices.some((i) => i >= count) ||
           (indexDef && indices.length !== indexDef.count)
         )
-          throw new RangeError('Invalid glTF Draco triangle indices');
+          throw new RangeError(
+            'Invalid glTF Draco triangle indices; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+          );
         // The index accessor's componentType does not bound decoded Draco indices: they are stored as Float32 (exact
         // to 2^24) and each is checked against the vertex count above. Blender's exporter (4.2) declares UNSIGNED_SHORT
         // for Draco primitives of up to 94,965 vertices (NASA's ISS GLB), and other glTF viewers load those files.
@@ -124,7 +150,10 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
           const normalized = Float32Array.from(values);
           if (def.normalized && semantic !== 'COLOR_0') {
             const scale = scales[def.componentType];
-            if (!scale) throw new TypeError('Invalid normalized Draco attribute');
+            if (!scale)
+              throw new TypeError(
+                'Invalid normalized Draco attribute; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+              );
             for (let i = 0; i < normalized.length; i++) normalized[i] = Math.max(-1, normalized[i] / scale);
           }
           asset.setDecodedAccessor(id, normalized);

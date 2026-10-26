@@ -15,7 +15,7 @@ export function multiply(a: ArrayLike<number>, b: ArrayLike<number>): Float64Arr
 
 export function inverse(m: ArrayLike<number>): Float64Array {
   const out = new Float64Array(16);
-  if (!invert(out, m)) throw new RangeError('FBX singular transform');
+  if (!invert(out, m)) throw new RangeError('FBX singular transform; clean up the source model before export');
   return out;
 }
 
@@ -47,7 +47,8 @@ const orders = ['XYZ', 'XZY', 'YZX', 'YXZ', 'ZXY', 'ZYX'];
 /** FBX's Euler order names specify the order in which fixed-axis rotations are applied. */
 export function rotationEuler(degrees: ArrayLike<number>, order = 0): Float64Array {
   const v = vector(degrees, 'Euler rotation');
-  if (!Number.isInteger(order) || !orders[order]) throw new RangeError(`FBX unsupported RotationOrder ${order}`);
+  if (!Number.isInteger(order) || !orders[order])
+    throw new RangeError(`FBX unsupported RotationOrder ${order}; bake or remove it in your 3D tool before export`);
   let out = identity();
   for (const axis of orders[order]) {
     const index = axis === 'X' ? 0 : axis === 'Y' ? 1 : 2,
@@ -127,12 +128,14 @@ export function decomposeTRS(m: ArrayLike<number>): TRS {
   let sx = Math.hypot(m[0], m[1], m[2]);
   const sy = Math.hypot(m[4], m[5], m[6]),
     sz = Math.hypot(m[8], m[9], m[10]);
-  if (!sx || !sy || !sz) throw new RangeError('FBX singular transform');
+  if (!sx || !sy || !sz) throw new RangeError('FBX singular transform; clean up the source model before export');
   if (determinant3(m) < 0) sx = -sx;
   const r = [m[0] / sx, m[1] / sx, m[2] / sx, m[4] / sy, m[5] / sy, m[6] / sy, m[8] / sz, m[9] / sz, m[10] / sz];
   const dot = (a: number, b: number) => r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2];
   if (Math.abs(dot(0, 3)) > 1e-7 || Math.abs(dot(0, 6)) > 1e-7 || Math.abs(dot(3, 6)) > 1e-7)
-    throw new RangeError('FBX transform shear cannot be represented as glTF TRS');
+    throw new RangeError(
+      'FBX transform shear cannot be represented as glTF TRS; bake or remove it in your 3D tool before export',
+    );
   const q = rotationToQuaternion(r);
   normalizeQuaternion(q, q);
   const sign = q[3] < 0 ? -1 : 1; // glTF convention here: w >= 0
@@ -163,7 +166,8 @@ export function transformNormal(m: ArrayLike<number>, x: number, y: number, z: n
     h = m[9],
     i = m[10],
     det = determinant3(m);
-  if (!det || !Number.isFinite(det)) throw new RangeError('FBX singular normal transform');
+  if (!det || !Number.isFinite(det))
+    throw new RangeError('FBX singular normal transform; clean up the source model before export');
   const nx = ((e * i - f * h) * x + (c * h - b * i) * y + (b * f - c * e) * z) / det;
   const ny = ((f * g - d * i) * x + (a * i - c * g) * y + (c * d - a * f) * z) / det;
   const nz = ((d * h - e * g) * x + (b * g - a * h) * y + (a * e - b * d) * z) / det,
@@ -189,8 +193,14 @@ export function fbxLocalTransform(node: FBXNode, overrides: TransformOverrides =
     rotationActive = active !== 0 && active !== false;
   const order = rotationActive ? Number(property(node, 'RotationOrder', 0)) : 0,
     inherit = Number(property(node, 'InheritType', 0));
-  if (inherit !== 0) throw new RangeError(`FBX unsupported InheritType ${inherit} on ${objectName(node)}`);
-  if (!orders[order]) throw new RangeError(`FBX unsupported RotationOrder ${order} on ${objectName(node)}`);
+  if (inherit !== 0)
+    throw new RangeError(
+      `FBX unsupported InheritType ${inherit} on ${objectName(node)}; bake or remove it in your 3D tool before export`,
+    );
+  if (!orders[order])
+    throw new RangeError(
+      `FBX unsupported RotationOrder ${order} on ${objectName(node)}; bake or remove it in your 3D tool before export`,
+    );
   const pivot = pvector(node, 'RotationPivot'),
     spivot = pvector(node, 'ScalingPivot');
   const matrices = [

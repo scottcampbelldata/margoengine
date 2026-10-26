@@ -493,7 +493,7 @@ export class LightProbes extends ShaderEffect {
     this.near = options.near ?? 0.05;
     this.far = options.far ?? 1000;
     if (!finite(this.near) || !finite(this.far) || this.near <= 0 || this.far <= this.near)
-      throw new RangeError('Invalid light probe near/far');
+      throw new RangeError('Invalid light probe near/far; use 0 < near < far');
     this.resolution = powerOfTwo(options.resolution, 128, 16, 256, 'resolution');
     const view = new DataView(this.header);
     let texels = 0;
@@ -635,7 +635,7 @@ export class LightProbes extends ShaderEffect {
   /** Moves a reflection probe's capture point inside its box. Call `bake()` again to capture the scene there. */
   setReflectionPosition(index: number, position: Vec3): void {
     if (!Number.isInteger(index) || index < 0 || index >= this.reflections.length)
-      throw new RangeError('Invalid reflection probe index');
+      throw new RangeError('Invalid reflection probe index; use an index below the reflection probe count');
     const probe = this.reflections[index];
     if (!vector(position) || position.some((v, i) => v < probe.min[i] || v > probe.max[i]))
       throw new RangeError('Reflection probe position must be finite and inside the box');
@@ -720,7 +720,7 @@ export class LightProbes extends ShaderEffect {
   }
   private allocate(device: GPUDevice): void {
     if (this.byteLength > device.limits.maxStorageBufferBindingSize || this.byteLength > device.limits.maxBufferSize)
-      throw new RangeError('Light probe buffer exceeds device limit');
+      throw new RangeError('Light probe buffer exceeds device limit; use fewer probes or a smaller resolution');
     this.buffer = device.createBuffer({
       label: 'light probes',
       size: this.byteLength,

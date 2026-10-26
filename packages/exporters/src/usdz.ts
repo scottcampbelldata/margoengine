@@ -165,7 +165,9 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
       }
     for (let v = 0; v < positions.length; v++)
       if (!Number.isFinite(Math.fround(positions[v])))
-        throw new RangeError('USDZ world position exceeds Float32 range');
+        throw new RangeError(
+          'USDZ world position exceeds Float32 range; move the model closer to the origin or lower its scale',
+        );
     const min = [Infinity, Infinity, Infinity],
       max = [-Infinity, -Infinity, -Infinity];
     for (let v = 0; v < positions.length; v++) {

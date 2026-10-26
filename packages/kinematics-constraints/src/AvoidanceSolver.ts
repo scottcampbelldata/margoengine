@@ -1,7 +1,9 @@
+import { margoError } from '../../shared/errors.js';
 import type { ConstraintVolume, Vec3View } from './types.js';
 import { length3, validateVector, validateNonNegative, validatePositive } from './types.js';
 import { evaluateVolumeInto, segmentVolumeInto, type SegmentDistanceResult } from './volumes.js';
 
+/** Why a solve ended: clear, swivel-rate limited, clamped by a singularity band, or blocked by an obstacle. */
 export enum SolveStatus {
   /** The evaluated discrete pose and its checked link capsules have static clearance. */
   Success = 0,
@@ -13,6 +15,7 @@ export enum SolveStatus {
   ObstacleOccluded = 3,
 }
 
+/** Per-solve options: swivel speed limit, reach and fold margins and the angular search budget. */
 export interface SolveOptions {
   /** Maximum swivel speed, radians/second. Defaults to 2 PI. */
   swivelSpeedLimit?: number;
@@ -24,6 +27,7 @@ export interface SolveOptions {
   searchBudget?: number;
 }
 
+/** Options of AvoidanceSolver: the colliders, clearances, damping, iteration limit and tolerance. */
 export interface AvoidanceSolverOptions {
   colliders?: readonly ConstraintVolume[];
   minClearance?: number;
@@ -40,6 +44,9 @@ export interface AvoidanceSolverOptions {
   rootExclusion?: number;
 }
 
+/**
+ * Outcome of resolving a target: whether it resolved, the clearance, the deepest penetration and the iterations used.
+ */
 export interface TargetResult {
   resolved: boolean;
   clearance: number;
@@ -47,6 +54,7 @@ export interface TargetResult {
   iterations: number;
 }
 
+/** Outcome of a solve: status, the resolved target and elbow positions and the pole angle. */
 export interface SolveResult extends TargetResult {
   status: SolveStatus;
   targetResolved: boolean;
@@ -57,6 +65,9 @@ export interface SolveResult extends TargetResult {
   poleAngleOffset: number;
 }
 
+/**
+ * Outcome of searching the pole angle for clearance: the elbow and pole positions, their offset, the clearance and the iterations used.
+ */
 export interface PoleClearanceResult {
   resolved: boolean;
   elbow: Float32Array;
@@ -66,6 +77,7 @@ export interface PoleClearanceResult {
   iterations: number;
 }
 
+/** Writes the elbow position for a root, a target and a pole angle into `outElbow`. */
 export type ElbowEvaluator = (root: Vec3View, target: Vec3View, poleAngle: number, outElbow: Float32Array) => void;
 
 const EMPTY_SOLVE_OPTIONS: SolveOptions = Object.freeze({});
@@ -211,28 +223,32 @@ export class AvoidanceSolver {
   }
 
   addVolume(volume: ConstraintVolume): void {
-    if (this.busy) throw new Error('Solver is not reentrant');
+    if (this.busy)
+      throw margoError('state', 'Solver is not reentrant; do not call the solver from inside its own callback');
     this.checkVolume(volume);
     this.volumes.push(volume);
   }
 
   /** Clear both target and swivel history after a teleport or change of pole convention. */
   reset(): void {
-    if (this.busy) throw new Error('Solver is not reentrant');
+    if (this.busy)
+      throw margoError('state', 'Solver is not reentrant; do not call the solver from inside its own callback');
     this.hasTarget = this.hasPole = false;
     this.previousPole = 0;
     this.poleArguments.accepted = undefined;
   }
 
   private enter(): void {
-    if (this.busy) throw new Error('Solver is not reentrant');
+    if (this.busy)
+      throw margoError('state', 'Solver is not reentrant; do not call the solver from inside its own callback');
     this.busy = true;
   }
 
   private copyInput(value: Vec3View, output: Float64Array): void {
     validateVector(value);
     for (let i = 0; i < 3; i++) {
-      if (!Number.isFinite(Math.fround(value[i]))) throw new RangeError('Position exceeds Float32 output range');
+      if (!Number.isFinite(Math.fround(value[i])))
+        throw new RangeError('Position exceeds Float32 output range; move the target closer to the origin');
       output[i] = value[i];
     }
   }
@@ -240,7 +256,8 @@ export class AvoidanceSolver {
   private evaluateInto(volume: ConstraintVolume, point: Vec3View): void {
     this.distance[0] = NaN;
     evaluateVolumeInto(volume, point, this.surface, this.normal, this.distance);
-    if (!Number.isFinite(this.distance[0])) throw new RangeError('Non-finite volume distance');
+    if (!Number.isFinite(this.distance[0]))
+      throw new RangeError('Non-finite volume distance; check the collider for NaN or infinite values');
     validateVector(this.surface);
     validateVector(this.normal);
     if (Math.abs(length3(this.normal[0], this.normal[1], this.normal[2]) - 1) > 1e-6)
@@ -404,7 +421,7 @@ export class AvoidanceSolver {
         upperGap = this.distance[0];
       }
       if (!Number.isFinite(lowerGap) || (upperRadius !== null && !Number.isFinite(upperGap)))
-        throw new RangeError('Non-finite segment clearance');
+        throw new RangeError('Non-finite segment clearance; check the collider for NaN or infinite values');
       clearance = Math.min(
         clearance,
         elbowGap - this.minClearance,
@@ -517,7 +534,10 @@ export class AvoidanceSolver {
       validateNonNegative(elbowRadius, 'elbowRadius');
       validateNonNegative(forearmRadius, 'forearmRadius');
       validatePositive(dt, 'dt');
-      if (typeof evaluateElbowIK !== 'function') throw new TypeError('An elbow evaluator is required');
+      if (typeof evaluateElbowIK !== 'function')
+        throw new TypeError(
+          'An elbow evaluator is required; pass an evaluator to the constructor or use the two-bone solver',
+        );
       const speed = options.swivelSpeedLimit ?? Math.PI * 2;
       const fold = options.foldMargin ?? 1e-5,
         reach = options.reachMargin ?? 1e-5;
@@ -529,7 +549,7 @@ export class AvoidanceSolver {
       const minimum = Math.abs(upperArmLen - forearmLen) + fold,
         maximum = upperArmLen + forearmLen - reach;
       if (minimum >= maximum || !Number.isFinite(Math.fround(maximum)))
-        throw new RangeError('Singularity margins leave no operational reach');
+        throw new RangeError('Singularity margins leave no operational reach; lower reachMargin or foldMargin');
       this.singular = false;
       const rawDistance = length3(this.raw[0] - this.root[0], this.raw[1] - this.root[1], this.raw[2] - this.root[2]);
       if (rawDistance < minimum || rawDistance > maximum) this.singular = true;

@@ -161,6 +161,9 @@ export interface GLTFLightReceiver {
   setLights(lights: GLTFClusteredLight[]): unknown;
   add(model: PBRModel): () => void;
 }
+/**
+ * Options of loadGLTF: asset limits and fetch options, plus the Draco, meshopt and KTX2 decoders and an AbortSignal.
+ */
 export type GLTFLoadOptions = Omit<AssetOptions, 'buffers'> & CompressionOptions;
 const srgbMaps = [0, 4, 9, 12, 17],
   normalMaps = [2, 7],
@@ -207,6 +210,7 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; REND
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 /** Narrow encoding hook for optional GPU deformation consumers. */
 export type PBRDeformationContext = Pick<Context, 'backend' | 'device' | 'encoder'>;
+/** The triangles of one node for picking: its vertices, indices, sidedness and world matrix. */
 export interface PBRPickingGeometry {
   node: Mesh;
   vertices: Float32Array;
@@ -240,10 +244,14 @@ export class PBRDrawRun {
 // A symbol keeps separately bundled optional consumers interoperable without
 // importing the loader or attaching a second drawable core Geometry.
 const cpuSource = Symbol.for('margoengine.pbr-source.v1');
+/** Which faces a material draws: 'front', 'back' or 'double'. */
 export type MaterialSide = 'front' | 'back' | 'double';
 const sideOf = (m: PBRMaterial): MaterialSide =>
   m.side ?? (m.settings[2] === 2 ? 'back' : m.settings[2] >= 0.5 ? 'double' : 'front');
 const sideFlag = (side: MaterialSide): number => (side === 'double' ? 1 : side === 'back' ? 2 : 0);
+/**
+ * A glTF PBR material as the model draws it: base colour, factors, emission, settings, side and optional extension.
+ */
 export interface PBRMaterial extends GLTFMaterial {
   base: number[];
   factors: number[];
@@ -279,6 +287,7 @@ export interface PBRMaterial extends GLTFMaterial {
   /** Use the retained UV-transform frame layout for constructed optional materials. */
   extendedFrame?: boolean;
 }
+/** One drawn glTF primitive: its node, CPU vertices and indices, source definition, material and morph weights. */
 export interface PBRPrimitive {
   node: Mesh;
   nodeIndex: number;
@@ -346,7 +355,7 @@ function preparedPrimitive(
   const { vertices, indices } = data;
   if ((p.mode ?? 4) !== 4 || p.targets || p.extensions) throw new TypeError('Prepared PBR requires static triangles');
   const m = p.material === undefined ? material() : materials[integer(p.material, 'material')];
-  if (!m) throw new TypeError('Missing prepared PBR material');
+  if (!m) throw new TypeError('Missing prepared PBR material; this is a loader bug, report it with the file');
   for (const map of m.maps)
     if (map) {
       if (integer(map.texCoord ?? 0, 'texture coordinate') > 1) throw new RangeError('Invalid prepared PBR UV set');
@@ -688,7 +697,10 @@ function uploadCompressedImage(
   };
   const base = image.format.replace(/-srgb$/, ''),
     target = formats[base];
-  if (!target) throw new TypeError('Unsupported KTX2 texture format ' + image.format);
+  if (!target)
+    throw new TypeError(
+      'Unsupported KTX2 texture format ' + image.format + '; transcode to a format the device supports',
+    );
   const format = (base + (srgb ? '-srgb' : '')) as GPUTextureFormat;
   if (
     !Number.isSafeInteger(image.width) ||
@@ -698,14 +710,18 @@ function uploadCompressedImage(
     !image.mipmaps.length ||
     image.mipmaps.length > Math.floor(Math.log2(Math.max(image.width, image.height))) + 1
   )
-    throw new RangeError('Invalid compressed image dimensions');
+    throw new RangeError(
+      'Invalid compressed image dimensions; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   const block = target === 'rgba8' ? 1 : 4;
   const mipmaps = image.mipmaps.map((m, level) => {
     const width = Math.max(1, image.width >> level),
       height = Math.max(1, image.height >> level),
       byteLength = getBytesPerRow(format, width) * Math.ceil(height / block);
     if (m.width !== width || m.height !== height || !(m.data instanceof Uint8Array) || m.data.byteLength !== byteLength)
-      throw new RangeError('Invalid compressed image mip');
+      throw new RangeError(
+        'Invalid compressed image mip; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     return { ...m, byteLength };
   });
   return createKTX2Texture(device, { ...image, format, target, srgb, hasAlpha: true, mipmaps });
@@ -717,7 +733,7 @@ const vector = (value: unknown, size: number, label: string, min = -Infinity, ma
     value.length !== size ||
     value.some((v) => typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || v < min || v > max)
   )
-    throw new TypeError('Invalid glTF ' + label);
+    throw new TypeError('Invalid glTF ' + label + '; re-export the file and check it with the glTF Validator');
   return value;
 };
 const scalar = (v: unknown, min: number, max: number, label: string) => vector([v], 1, label, min, max)[0];
@@ -743,9 +759,14 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
           KHR_materials_unlit: def.extensions?.KHR_materials_unlit,
           KHR_materials_emissive_strength: def.extensions?.KHR_materials_emissive_strength,
         };
-  if (!['OPAQUE', 'MASK', 'BLEND'].includes(alpha)) throw new TypeError('Invalid glTF alpha mode');
+  if (!['OPAQUE', 'MASK', 'BLEND'].includes(alpha))
+    throw new TypeError(
+      'Invalid glTF alpha mode; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   if (def.doubleSided !== undefined && typeof def.doubleSided !== 'boolean')
-    throw new TypeError('Invalid glTF doubleSided');
+    throw new TypeError(
+      'Invalid glTF doubleSided; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   const cc = e.KHR_materials_clearcoat,
     tr = e.KHR_materials_transmission,
     sh = e.KHR_materials_sheen,
@@ -807,7 +828,8 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
       return this.settings[2] === 2 ? 'back' : this.settings[2] >= 0.5 ? 'double' : 'front';
     },
     set side(value: MaterialSide) {
-      if (!['front', 'back', 'double'].includes(value)) throw new TypeError('Invalid material side');
+      if (!['front', 'back', 'double'].includes(value))
+        throw new TypeError('Invalid material side; use front, back or double');
       this.settings[2] = sideFlag(value);
     },
     maps,
@@ -859,7 +881,10 @@ function primitive(
     !!g.topology,
   );
   const targets = p.targets ?? [];
-  if (!Array.isArray(targets)) throw new TypeError('Invalid morph targets');
+  if (!Array.isArray(targets))
+    throw new TypeError(
+      'Invalid morph targets; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   const weights = vector(
     asset.doc.nodes![nodeIndex].weights ?? mesh.weights ?? Array(targets.length).fill(0),
     targets.length,
@@ -884,7 +909,10 @@ function primitive(
 // Material `m` as primitive `p` draws it: every map must name a texture and a UV set the primitive has. glTF 2.0 3.9.2:
 // points and lines without NORMAL are rendered without lighting (here: the base colour, as KHR_materials_unlit).
 function fit(asset: GLTFAsset, p: GLTFPrimitive, m: PBRMaterial, pointsOrLines: boolean): PBRMaterial {
-  if (!m) throw new TypeError('Missing glTF material');
+  if (!m)
+    throw new TypeError(
+      'Missing glTF material; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+    );
   const a = p.attributes ?? {};
   for (const map of m.maps)
     if (map) {
@@ -901,7 +929,9 @@ function transform(node: Mesh, def: GLTFNode): void {
   if (def.matrix !== undefined) {
     const m = vector(def.matrix, 16, 'matrix');
     if (def.translation || def.rotation || def.scale || m[3] || m[7] || m[11] || m[15] !== 1)
-      throw new TypeError('Invalid glTF affine matrix');
+      throw new TypeError(
+        'Invalid glTF affine matrix; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     const trs = splitTRS(m);
     if (typeof trs === 'string')
       throw trs === 'singular' ? new RangeError('Singular glTF matrix') : new Error('Sheared matrices are unsupported');
@@ -916,6 +946,9 @@ function transform(node: Mesh, def: GLTFNode): void {
 function nodeVisible(engine: Engine, node: Mesh): boolean {
   return !hiddenInTree(engine.store, node.id);
 }
+/**
+ * A glTF model attached to an engine as a plugin: its nodes, materials, variants, animation targets and picking data. Dispose it to release the GPU resources.
+ */
 export class PBRModel implements EnginePlugin {
   /** Optional scene-wide opaque phase, used by caller-owned color captures. */
   static beginOpaquePass(context: Context): void {
@@ -993,11 +1026,15 @@ export class PBRModel implements EnginePlugin {
       ));
     const variants = doc.extensions?.KHR_materials_variants?.variants ?? [];
     if (!Array.isArray(variants) || variants.some((v) => typeof v?.name !== 'string'))
-      throw new TypeError('Invalid glTF material variants');
+      throw new TypeError(
+        'Invalid glTF material variants; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     this.variants = variants.map((v) => v.name);
     defs.forEach((def, id) => {
       if (!def || (def.children !== undefined && !Array.isArray(def.children)))
-        throw new TypeError('Invalid glTF node');
+        throw new TypeError(
+          'Invalid glTF node; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       const visibility = def.extensions?.KHR_node_visibility;
       if (
         visibility !== undefined &&
@@ -1009,14 +1046,16 @@ export class PBRModel implements EnginePlugin {
         throw new TypeError(`glTF node ${id} KHR_node_visibility must be an object with an optional boolean visible`);
       for (const child of def.children ?? []) {
         const c = integer(child, 'child');
-        if (c >= defs.length || parents[c] !== -1 || c === id) throw new Error('Invalid glTF hierarchy');
+        if (c >= defs.length || parents[c] !== -1 || c === id)
+          throw new TypeError('Invalid glTF hierarchy; give each node one parent and valid child indices');
         parents[c] = id;
       }
     });
     for (let i = 0; i < defs.length; i++) {
       let depth = 0;
       for (let p = i; p !== -1; p = parents[p])
-        if (++depth > 62) throw new Error('glTF hierarchy cycle or depth limit');
+        if (++depth > 62)
+          throw new RangeError('glTF hierarchy cycle or depth limit; remove the cycle or flatten the nodes');
     }
     const roots = doc.scenes
       ? (entry(doc.scenes, doc.scene ?? 0, 'scene').nodes ?? [])
@@ -1026,7 +1065,9 @@ export class PBRModel implements EnginePlugin {
       new Set(roots).size !== roots.length ||
       roots.some((i) => parents[integer(i, 'scene root')] !== -1)
     )
-      throw new TypeError('Invalid scene roots');
+      throw new TypeError(
+        'Invalid scene roots; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      );
     const active = new Set<number>(),
       visit = (id: number) => {
         entry(defs, id, 'node');
@@ -1064,7 +1105,9 @@ export class PBRModel implements EnginePlugin {
             (def.range !== undefined && !(def.range > 0)) ||
             spot.innerConeAngle! >= spot.outerConeAngle!
           )
-            throw new TypeError('Invalid glTF light');
+            throw new TypeError(
+              'Invalid glTF light; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+            );
           this.lights.push({
             ...def,
             ...spot,
@@ -1077,7 +1120,9 @@ export class PBRModel implements EnginePlugin {
         if (d.camera !== undefined) {
           const def = entry(doc.cameras, d.camera, 'camera');
           if (!['perspective', 'orthographic'].includes(def.type) || typeof def[def.type] !== 'object')
-            throw new TypeError('Invalid glTF camera');
+            throw new TypeError(
+              'Invalid glTF camera; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+            );
           this.cameras.push({ ...def, node: this.nodes[i], nodeIndex: i });
         }
       }
@@ -1094,9 +1139,12 @@ export class PBRModel implements EnginePlugin {
       for (const i of active)
         if (defs[i].mesh !== undefined) {
           const mesh = entry(doc.meshes, defs[i].mesh, 'mesh');
-          if (!Array.isArray(mesh.primitives) || !mesh.primitives.length) throw new TypeError('Missing primitives');
+          if (!Array.isArray(mesh.primitives) || !mesh.primitives.length)
+            throw new TypeError(
+              'Missing primitives; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+            );
           if (prepared && prepared[defs[i].mesh]?.length !== mesh.primitives.length)
-            throw new TypeError('Missing prepared PBR primitives');
+            throw new TypeError('Missing prepared PBR primitives; this is a loader bug, report it with the file');
           const gpu = defs[i].extensions?.EXT_mesh_gpu_instancing,
             instances = gpu && reader?.read(asset, gpu);
           for (let j = 0; j < mesh.primitives.length; j++) {
@@ -1117,7 +1165,8 @@ export class PBRModel implements EnginePlugin {
             (made.topology ? this.pointsAndLines : this.primitives).push(made);
           }
         }
-      if (!this.primitives.length && !this.pointsAndLines.length) throw new Error('glTF contains no renderable meshes');
+      if (!this.primitives.length && !this.pointsAndLines.length)
+        throw margoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
       const source: PBRSource = this;
       for (const node of this.created) Object.defineProperty(node, cpuSource, { value: source, configurable: true });
       for (const node of new Set(this.primitives.map((p) => p.node))) {
@@ -1168,7 +1217,7 @@ export class PBRModel implements EnginePlugin {
   }
   /** Current node transforms applied to bind-pose CPU positions. Does not perform GPU readback. */
   get bounds(): Float32Array {
-    if (this.disposed) throw new Error('PBRModel is disposed');
+    if (this.disposed) throw margoError('disposed', 'PBRModel is disposed; load the model again');
     this.engine.store.tick(false);
     const out = new Float32Array([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]);
     for (const p of this.pointsAndLines.length ? [...this.primitives, ...this.pointsAndLines] : this.primitives) {
@@ -1186,7 +1235,8 @@ export class PBRModel implements EnginePlugin {
           out[axis + 3] = Math.max(out[axis + 3], n);
         }
     }
-    if (!Number.isFinite(out[0])) throw new Error('No geometry');
+    if (!Number.isFinite(out[0]))
+      throw margoError('state', 'No geometry; load a model with triangle meshes first');
     return out;
   }
   /** Borrowed GPU buffers, preserving one record per primitive and current deformation. */
@@ -1198,7 +1248,10 @@ export class PBRModel implements EnginePlugin {
     return (data, usage) => {
       const existing = cache.get(data) as GPUBuffer | undefined;
       if (existing) return existing;
-      if (data.byteLength > device.limits.maxBufferSize) throw new RangeError('PBR buffer exceeds device limit');
+      if (data.byteLength > device.limits.maxBufferSize)
+        throw new RangeError(
+          'PBR buffer exceeds device limit; load a smaller model, or reduce its textures and meshes',
+        );
       const b = device.createBuffer({ size: data.byteLength, usage: usage | GPUBufferUsage.COPY_DST });
       try {
         device.queue.writeBuffer(b, 0, data as Float32Array<ArrayBuffer>);
@@ -1211,8 +1264,9 @@ export class PBRModel implements EnginePlugin {
     };
   }
   setup(engine: Engine, device = engine.gpu): void {
-    if (engine !== this.engine || this.disposed) throw new Error('PBRModel belongs to another engine or is disposed');
-    if (!device) throw new Error('PBRModel requires WebGPU');
+    if (engine !== this.engine || this.disposed)
+      throw margoError('attached', 'PBRModel belongs to another engine or is disposed; load it into this engine');
+    if (!device) throw margoError('unsupported', 'PBRModel requires WebGPU; use a browser that supports it');
     const mipSampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
     const upload = this.bufferUpload(device);
     for (const p of this.pointsAndLines.length ? [...this.primitives, ...this.pointsAndLines] : this.primitives) {
@@ -1436,7 +1490,7 @@ export class PBRModel implements EnginePlugin {
     delete host[deferStaticBatches];
     if (this.disposed || this.staticBatches !== undefined) return;
     const device = this.engine.gpu;
-    if (!device) throw new Error('PBRModel requires WebGPU');
+    if (!device) throw margoError('unsupported', 'PBRModel requires WebGPU; use a browser that supports it');
     this.installBatches(
       device,
       device.createSampler({ minFilter: 'linear', magFilter: 'linear' }),
@@ -1569,7 +1623,8 @@ export class PBRModel implements EnginePlugin {
               .find((s) => s !== undefined && this.images[s]) ?? integer(def.source, 'image'))
           : -1,
         image = this.images[source];
-      if (def && !image) throw new TypeError('Missing decoded glTF image');
+      if (def && !image)
+        throw new TypeError('Missing decoded glTF image; this is a loader bug, report it with the file');
       const compressed = image && 'ktx2' in image ? image.ktx2 : image && 'mipmaps' in image ? image : undefined,
         format = compressed
           ? ((compressed.format.replace(/-srgb$/, '') + (srgbMaps.includes(i) ? '-srgb' : '')) as GPUTextureFormat)
@@ -1577,7 +1632,8 @@ export class PBRModel implements EnginePlugin {
             ? 'rgba8unorm-srgb'
             : 'rgba8unorm',
         size = image ? [image.width, image.height] : [1, 1];
-      if (size.some((n) => n > device.limits.maxTextureDimension2D)) throw new RangeError('Image exceeds device limit');
+      if (size.some((n) => n > device.limits.maxTextureDimension2D))
+        throw new RangeError('Image exceeds device limit; load a smaller model, or reduce its textures and meshes');
       const key = image ? source + ':' + format : 'default:' + i;
       let texture = cache.get(key) as GPUTexture | undefined;
       if (!texture && compressed) {
@@ -1619,13 +1675,13 @@ export class PBRModel implements EnginePlugin {
         if (v === undefined || v === 10497) return 'repeat';
         if (v === 33071) return 'clamp-to-edge';
         if (v === 33648) return 'mirror-repeat';
-        throw new TypeError('Invalid texture wrapping');
+        throw new TypeError('Invalid texture wrapping; use a glTF sampler constant');
       };
       if (
         (s.magFilter !== undefined && ![9728, 9729].includes(s.magFilter)) ||
         (s.minFilter !== undefined && ![9728, 9729, 9984, 9985, 9986, 9987].includes(s.minFilter!))
       )
-        throw new TypeError('Invalid texture filter');
+        throw new TypeError('Invalid texture filter; use a glTF sampler constant');
       r.samplers.push(
         device.createSampler({
           addressModeU: wrap(s.wrapS),
@@ -1649,9 +1705,9 @@ export class PBRModel implements EnginePlugin {
   }
   /** Borrow a decoded image for optional material packages; the model owns its lifetime. */
   image(index: number): Exclude<GLTFImage, undefined> {
-    if (this.disposed) throw new Error('PBRModel is disposed');
+    if (this.disposed) throw margoError('disposed', 'PBRModel is disposed; load the model again');
     const image = this.images[integer(index, 'image')];
-    if (!image) throw new TypeError('Missing decoded glTF image');
+    if (!image) throw new TypeError('Missing decoded glTF image; this is a loader bug, report it with the file');
     return image;
   }
   /** Upload a retained image; the caller owns and destroys the returned texture. */
@@ -1680,8 +1736,9 @@ export class PBRModel implements EnginePlugin {
       typeof (effect.pbr ?? effect.shader) !== 'function' ||
       typeof effect.bindings !== 'function'
     )
-      throw new TypeError('Invalid PBR lighting effect');
-    if (effect.owner && effect.owner !== this.engine) throw new Error('PBR lighting belongs to another engine');
+      throw new TypeError('Invalid PBR lighting effect; pass the effect made by createLighting for this engine');
+    if (effect.owner && effect.owner !== this.engine)
+      throw margoError('attached', 'PBR lighting belongs to another engine; create it with this engine');
     this.lighting.add(effect);
     return () => this.lighting.delete(effect);
   }
@@ -1695,7 +1752,7 @@ export class PBRModel implements EnginePlugin {
       typeof hook.begin !== 'function' ||
       !Array.isArray(hook.targets)
     )
-      throw new TypeError('Invalid PBR transparency hook');
+      throw new TypeError('Invalid PBR transparency hook; pass a function, or null to remove the hook');
     this.transparency = hook;
     return () => {
       if (this.transparency === hook) this.transparency = undefined;
@@ -1710,7 +1767,7 @@ export class PBRModel implements EnginePlugin {
       typeof hook.begin !== 'function' ||
       !Array.isArray(hook.targets)
     )
-      throw new TypeError('Invalid PBR capture hook');
+      throw new TypeError('Invalid PBR capture hook; pass a function, or null to remove the hook');
     this.capture = hook;
     return () => {
       if (this.capture === hook) this.capture = undefined;
@@ -1726,7 +1783,7 @@ export class PBRModel implements EnginePlugin {
       typeof hook.begin !== 'function' ||
       !Array.isArray(hook.targets)
     )
-      throw new TypeError('Invalid PBR transmission hook');
+      throw new TypeError('Invalid PBR transmission hook; pass a function, or null to remove the hook');
     this.transmission = hook;
     return () => {
       if (this.transmission === hook) this.transmission = undefined;
@@ -1743,13 +1800,18 @@ export class PBRModel implements EnginePlugin {
       this.disposed ||
       (variant !== undefined && !(Number.isInteger(index) && index >= 0 && index < this.variants.length))
     )
-      throw new RangeError(`selectVariant: the model has no material variant ${variant}`);
+      throw new RangeError(
+        `selectVariant: the model has no material variant ${variant}; pass an index below the variant count`,
+      );
     // Every material is resolved (and validated) before any primitive changes.
     const changes: [PBRPrimitive, PBRMaterial][] = [];
     for (const p of [...this.primitives, ...this.pointsAndLines]) {
       const mappings = p.definition.extensions?.KHR_materials_variants?.mappings;
       if (mappings === undefined) continue;
-      if (!Array.isArray(mappings)) throw new TypeError('Invalid glTF material variant mappings');
+      if (!Array.isArray(mappings))
+        throw new TypeError(
+          'Invalid glTF material variant mappings; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
       const own = this.defaults.get(p) ?? p.material,
         hit = mappings.find((m) => Array.isArray(m?.variants) && m.variants.includes(index));
       const m = hit
@@ -1842,7 +1904,9 @@ export class PBRModel implements EnginePlugin {
               throw new TypeError('Deformed picking snapshots require COPY_SRC buffers');
             const size = record.primitive.vertices.byteLength;
             if (size > device.limits.maxBufferSize)
-              throw new RangeError('Picking snapshot exceeds device buffer limit');
+              throw new RangeError(
+                'Picking snapshot exceeds device buffer limit; load a smaller model, or reduce its textures and meshes',
+              );
             record.read = device.createBuffer({
               label: 'PBR picking snapshot',
               size,
@@ -2038,7 +2102,8 @@ export class PBRModel implements EnginePlugin {
         const v = r.values;
         v.set(scratch.projection);
         v.set(node.matrix, 16);
-        if (!invertMatrixStable(node.matrix, this.inverse, this.workspace)) throw new Error('Singular PBR transform');
+        if (!invertMatrixStable(node.matrix, this.inverse, this.workspace))
+          throw new RangeError('Singular PBR transform; give the node a transform with a non-zero scale');
         for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
         v.set(scratch.view, 48);
         v.set(scratch.eye, 64);
@@ -2574,7 +2639,8 @@ export class PBRModel implements EnginePlugin {
   }
   /** Isolated GPU resources for stereo eyes or another caller-owned WebGPU device. */
   createRenderer(device: GPUDevice): PBRDeviceRenderer {
-    if (this.disposed || this.engine.disposed) throw new Error('PBRModel is disposed');
+    if (this.disposed || this.engine.disposed)
+      throw margoError('disposed', 'PBRModel is disposed; load the model again');
     // GPU texture views supplied by callers cannot cross devices. Fail explicitly
     // rather than drawing a bind pose or silently omitting an extended surface.
     for (const primitive of [...this.primitives, ...this.pointsAndLines]) {
@@ -2886,6 +2952,9 @@ export function parsePreparedPBR(
     throw error;
   }
 }
+/**
+ * Fetches a glTF or GLB over HTTP(S), decodes it and attaches it to the engine as a PBRModel. Aborts with `options.signal`. @throws TypeError or RangeError when the file is malformed or over a limit.
+ */
 export async function loadGLTF(
   instance: EngineKernel,
   url: string | URL,
@@ -3026,7 +3095,10 @@ const orthographic = new WeakSet<object>();
  */
 export function viewGLTFCamera(model: PBRModel, camera: number | GLTFCamera = 0): void {
   const def = typeof camera === 'number' ? model.cameras[camera] : camera;
-  if (!def) throw new RangeError(`viewGLTFCamera: the model has no glTF camera ${camera}`);
+  if (!def)
+    throw new RangeError(
+      `viewGLTFCamera: the model has no glTF camera ${camera}; pass an index below the camera count`,
+    );
   const engine = model['engine'],
     view = engine.camera;
   engine.store.tick(false);

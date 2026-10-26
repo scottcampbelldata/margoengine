@@ -8,12 +8,16 @@ import {
   type LabelRendererOptions,
   type LabelOptions,
 } from '@margoengine/labels';
+import { margoError } from '../../shared/errors.js';
 import { acquireDepth, compute, group, dispatch } from '../../shared/gpu.js';
 import { resolveMSAA } from '../../shared/msaa.js';
 export type { Label, CSS3DObject } from '@margoengine/labels';
 export type { LabelOptions, CSS3DOptions, LabelInfo } from '@margoengine/labels';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
+/**
+ * Options of HTML: label renderer options plus optional depth-texture occlusion, the anchor capacity and a depth bias.
+ */
 export interface HTMLOptions extends LabelRendererOptions {
   depth?: false | (() => GPUTexture | undefined);
   capacity?: number;
@@ -69,7 +73,9 @@ export class HTML extends LabelRenderer {
       bias > 0.05 ||
       (settings.depth !== undefined && settings.depth !== false && typeof settings.depth !== 'function')
     )
-      throw new RangeError('Invalid HTML depth options');
+      throw new RangeError(
+        'Invalid HTML depth options; pass depth: false or a function returning a depth texture, and a finite depthBias',
+      );
     this.capacity = capacity;
     this.values = new Float32Array(capacity * 4);
     this.slots = new Array(capacity);
@@ -80,9 +86,9 @@ export class HTML extends LabelRenderer {
     return overlay;
   }
   override add(element: HTMLElement, options: LabelOptions = {}): Label {
-    if (this.disposed) throw new Error('HTML is disposed');
+    if (this.disposed) throw margoError('disposed', 'HTML is disposed; create a new HTML renderer');
     const index = this.slots.findIndex((record) => !record);
-    if (index < 0) throw new RangeError('HTML anchor capacity exceeded');
+    if (index < 0) throw new RangeError('HTML anchor capacity exceeded; raise capacity or remove anchors');
     const label = super.add(element, {
       ...options,
       occlude: (item, info) => {
@@ -120,7 +126,7 @@ export class HTML extends LabelRenderer {
     super.remove(item);
   }
   override setup(instance: EngineKernel): void {
-    if (this.disposed) throw new Error('HTML is disposed');
+    if (this.disposed) throw margoError('disposed', 'HTML is disposed; create a new HTML renderer');
     this.runtime = engineRuntime(instance);
     super.setup(instance);
     this.setupGPU();
@@ -158,7 +164,10 @@ export class HTML extends LabelRenderer {
     resolveMSAA(c);
     const depth = this.source!();
     if (!depth || depth.width !== c.width || depth.height !== c.height || !depth.format.startsWith('depth'))
-      throw new Error('HTML requires viewport-sized scene depth');
+      throw margoError(
+        'state',
+        'HTML requires viewport-sized scene depth; pass a depth texture that matches the canvas, or depth: false',
+      );
     if (!this.records.size) return;
     for (let i = 0; i < this.capacity; i++)
       if (!this.slots[i] || !this.slots[i]!.label.visible || !this.slots[i]!.label.screen.inFrustum) {

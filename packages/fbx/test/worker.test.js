@@ -87,7 +87,7 @@ test('FBX worker errors keep their type and message', () =>
   headlessModels(async () => {
     await assert.rejects(
       runParseWorker(worker, { input: new Uint8Array(8).buffer, resourcePath: 'https://example.test/' }),
-      { name: 'RangeError', message: 'Invalid FBX byte budget' },
+      { name: 'RangeError', message: 'Invalid FBX byte budget; pass a 32 byte to 64 MiB FBX file' },
     );
   }));
 

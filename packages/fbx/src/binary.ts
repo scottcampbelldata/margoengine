@@ -1,3 +1,4 @@
+import { margoError } from '../../shared/errors.js';
 import { invalid, type ParseBudget } from './document.js';
 import type { FBXNode, FBXValue } from './document.js';
 
@@ -34,7 +35,11 @@ export async function parseBinary(
     return Number(value);
   }
   async function inflate(payload: Uint8Array, length: number): Promise<Uint8Array> {
-    if (typeof DecompressionStream !== 'function') throw new Error('FBX deflate decoding requires DecompressionStream');
+    if (typeof DecompressionStream !== 'function')
+      throw margoError(
+        'unsupported',
+        'FBX deflate decoding requires DecompressionStream; use a current browser or Node 18+',
+      );
     const output = new Uint8Array(length);
     const chunk =
       payload.buffer instanceof ArrayBuffer

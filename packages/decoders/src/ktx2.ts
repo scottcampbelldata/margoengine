@@ -4,6 +4,9 @@ import { WorkerPool, jobTimeout, payload, requireWorkers, timeLimit, workerLimit
 import type { TranscodeTarget, TranscodedKTX2Result } from './protocol.js';
 import { createKTX2Texture, getSupportedTranscodeFormat, type KTX2TextureOptions } from './texture.js';
 
+/**
+ * Options of a KTX2Decoder: the GPU device that picks the transcode target, the transcoder location, the worker count and the time limit.
+ */
 export interface KTX2Options {
   /** Device whose enabled features choose the transcode target. */
   device?: GPUDevice;
@@ -20,6 +23,7 @@ export interface KTX2Options {
   timeout?: number;
 }
 
+/** Per-call options of KTX2Decoder.transcode: an AbortSignal and buffer transfer. */
 export interface KTX2DecodeOptions {
   signal?: AbortSignal;
   /** Transfer a whole input ArrayBuffer to the worker instead of copying it. The caller's buffer is detached. */
@@ -39,7 +43,10 @@ export class KTX2Decoder {
     this.workerLimit = workerLimit(options.workerLimit);
     this.device = options.device;
     this.target = options.target ?? getSupportedTranscodeFormat(options.device);
-    if (!transcodeFormats[this.target]) throw new TypeError(`Unknown transcode target ${this.target}`);
+    if (!transcodeFormats[this.target])
+      throw new TypeError(
+        `Unknown transcode target ${this.target}; use one of the targets listed in KTX2Options.target`,
+      );
     this.transcoderPath = options.transcoderPath;
     this.timeout = timeLimit(options.timeout);
   }
@@ -68,7 +75,7 @@ export class KTX2Decoder {
     data: ArrayBuffer | ArrayBufferView,
     options: KTX2DecodeOptions & KTX2TextureOptions = {},
   ): Promise<GPUTexture> {
-    if (!this.device) throw new Error('KTX2Decoder.createTexture needs a device');
+    if (!this.device) throw new TypeError('KTX2Decoder.createTexture needs a device; pass one in KTX2Options.device');
     const result = await this.transcode(data, options);
     options.signal?.throwIfAborted();
     return createKTX2Texture(this.device, result, options);

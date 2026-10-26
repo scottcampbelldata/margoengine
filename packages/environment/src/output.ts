@@ -135,7 +135,9 @@ export class ColorOutput {
       typeof force !== 'boolean' ||
       !(peak >= 1 && peak <= 16)
     )
-      throw new RangeError('Invalid ColorOutput options');
+      throw new RangeError(
+        'Invalid ColorOutput options; pass a peak from 1 to 16 and finite exposure and gamma values',
+      );
     this.peak = peak;
   }
   /** Gamut of the canvas now: 'p3' only when the display, the browser and the options all allow it. */

@@ -2,6 +2,7 @@ import { LoaderError } from '@margoengine/loaders/common';
 import { movable, runWorker } from '../../shared/worker.js';
 import type { IFCOptions, IFCResult } from './index.js';
 
+/** Options of parseIFCInWorker: IFCOptions plus the web-ifc script and wasm locations and the worker time limit. */
 export interface IFCWorkerOptions extends IFCOptions {
   /** URL of web-ifc's classic-script build (`web-ifc/web-ifc-api-iife.js`), served by the app. */
   webIfc: string | URL;

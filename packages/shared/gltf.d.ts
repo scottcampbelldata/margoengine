@@ -200,6 +200,9 @@ export interface GLTFCameraDefinition extends GLTFProperty {
   perspective?: { yfov: number; znear: number; zfar?: number; aspectRatio?: number };
   orthographic?: { xmag: number; ymag: number; znear: number; zfar: number };
 }
+/**
+ * A glTF 2.0 JSON document as the loaders read it: scenes, nodes, meshes, materials, animations and the other top-level arrays.
+ */
 export interface GLTFDocument extends GLTFProperty {
   asset?: { version: string; generator?: string; [key: string]: unknown };
   buffers?: GLTFBuffer[];

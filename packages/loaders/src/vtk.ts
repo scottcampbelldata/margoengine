@@ -25,6 +25,7 @@ const SIZES: Record<string, number> = {
   vtkidtype: 8,
 };
 
+/** Options of parseVTK: the shared size limits (ParseLimits). */
 export interface VTKOptions extends ParseLimits {}
 
 class Reader {

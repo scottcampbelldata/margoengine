@@ -645,7 +645,7 @@ export class Environment implements EnginePlugin {
       ['intensity', options.intensity],
     ] as const)
       if (value !== undefined && (!Number.isFinite(value) || (label === 'intensity' && value < 0)))
-        throw new RangeError(`Invalid ${label}`);
+        throw new RangeError(`Invalid ${label}; pass a finite number (intensity must be 0 or more)`);
     const device = deviceOf(target);
     const settings = resolveSettings(device, source, options);
     const resources = await build(device, source, settings, options.rotation ?? 0, options.intensity ?? 1);
@@ -726,7 +726,7 @@ export class Environment implements EnginePlugin {
     return this.rotationValue;
   }
   set rotation(value: number) {
-    if (!Number.isFinite(value)) throw new RangeError('Invalid rotation');
+    if (!Number.isFinite(value)) throw new RangeError('Invalid rotation; pass a finite number of radians');
     this.rotationValue = value;
     this.writeParams();
   }
@@ -734,7 +734,8 @@ export class Environment implements EnginePlugin {
     return this.intensityValue;
   }
   set intensity(value: number) {
-    if (!Number.isFinite(value) || value < 0) throw new RangeError('Invalid intensity');
+    if (!Number.isFinite(value) || value < 0)
+      throw new RangeError('Invalid intensity; pass a finite number of 0 or more');
     this.intensityValue = value;
     this.writeParams();
   }

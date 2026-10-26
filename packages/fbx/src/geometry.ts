@@ -6,7 +6,9 @@ const MAX_VERTICES = 1_000_000,
   MAX_POLYGON = 4096,
   MAX_WORK = 40_000_000;
 const budget = (): never => {
-  throw new RangeError('FBX geometry budget exceeded');
+  throw new RangeError(
+    'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
+  );
 };
 const finite = (value: number, label: string): number => {
   if (typeof value !== 'number' || !Number.isFinite(Math.fround(value)))
@@ -14,7 +16,8 @@ const finite = (value: number, label: string): number => {
   return value;
 };
 const integer = (value: number, limit: number, label: string): number => {
-  if (!Number.isSafeInteger(value) || value < 0 || value >= limit) throw new RangeError(`FBX ${label} out of range`);
+  if (!Number.isSafeInteger(value) || value < 0 || value >= limit)
+    throw new RangeError(`FBX ${label} out of range; re-export the file, it looks damaged`);
   return value;
 };
 
@@ -32,12 +35,15 @@ function layer(node: FBXNode, name: string, values: string, indexes: string, siz
   const mapping = String(findChild(child, 'MappingInformationType')?.properties[0]),
     reference = String(findChild(child, 'ReferenceInformationType')?.properties[0]);
   if (!['ByVertice', 'ByVertex', 'ByControlPoint', 'ByPolygonVertex', 'ByPolygon', 'AllSame'].includes(mapping))
-    throw new RangeError(`FBX unsupported ${name} mapping ${mapping}`);
+    throw new RangeError(`FBX unsupported ${name} mapping ${mapping}; bake or remove it in your 3D tool before export`);
   if (!['Direct', 'IndexToDirect', 'Index'].includes(reference))
-    throw new RangeError(`FBX unsupported ${name} reference ${reference}`);
+    throw new RangeError(
+      `FBX unsupported ${name} reference ${reference}; bake or remove it in your 3D tool before export`,
+    );
   const direct = array(child, values),
     indices = reference === 'Direct' ? [] : array(child, indexes);
-  if (!direct.length || direct.length % size) throw new RangeError(`FBX malformed ${name} values`);
+  if (!direct.length || direct.length % size)
+    throw new RangeError(`FBX malformed ${name} values; re-export the file, it looks damaged`);
   return { values: direct, indices, mapping, reference, size, label: name };
 }
 
@@ -51,7 +57,8 @@ function layerIndex(layer: Layer, cp: number, corner: number, polygon: number): 
           ? corner
           : cp;
   if (layer.reference !== 'Direct') {
-    if (mapped >= layer.indices.length) throw new RangeError(`FBX ${layer.label} index array too short`);
+    if (mapped >= layer.indices.length)
+      throw new RangeError(`FBX ${layer.label} index array too short; re-export the file, it looks damaged`);
     return integer(layer.indices[mapped], layer.values.length / layer.size, `${layer.label} direct index`);
   }
   return integer(mapped, layer.values.length / layer.size, `${layer.label} index`);
@@ -101,7 +108,8 @@ function triangulate(
   }
   const axis =
     Math.abs(nx) > Math.abs(ny) ? (Math.abs(nx) > Math.abs(nz) ? 0 : 2) : Math.abs(ny) > Math.abs(nz) ? 1 : 2;
-  if (!Math.hypot(nx, ny, nz)) throw new RangeError('FBX polygon has zero area');
+  if (!Math.hypot(nx, ny, nz))
+    throw new RangeError('FBX polygon has zero area; clean up the source model before export');
   const points: Point[] = corners.map((c) => {
     const p = controlPoints[c] * 3;
     return axis === 0
@@ -121,7 +129,7 @@ function triangulate(
     eps = extent * extent * Number.EPSILON * 64;
   let area = 0;
   for (let i = 1; i < n - 1; i++) area += cross(points[0], points[i], points[i + 1]);
-  if (Math.abs(area) <= eps) throw new RangeError('FBX polygon has zero area');
+  if (Math.abs(area) <= eps) throw new RangeError('FBX polygon has zero area; clean up the source model before export');
   const winding = Math.sign(area);
   let convex = true,
     turn = 0;
@@ -132,7 +140,10 @@ function triangulate(
       value = cross(a, b, c);
     if (Math.abs(value) <= eps || Math.sign(value) !== winding) convex = false;
     turn += Math.atan2(value, (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]));
-    if (a[0] === b[0] && a[1] === b[1]) throw new RangeError('FBX polygon has repeated adjacent vertices');
+    if (a[0] === b[0] && a[1] === b[1])
+      throw new RangeError(
+        'FBX polygon has repeated adjacent vertices; bake or remove it in your 3D tool before export',
+      );
   }
   // A star can have same-sign turns; one complete turn is required for the convex fast path.
   if (convex && Math.abs(Math.abs(turn) - 2 * Math.PI) < 1e-6) {
@@ -145,7 +156,7 @@ function triangulate(
       if (j === i + 1 || (i === 0 && j === n - 1)) continue;
       charge();
       if (intersects(points[i], points[(i + 1) % n], points[j], points[(j + 1) % n], eps))
-        throw new RangeError('FBX polygon crosses itself');
+        throw new RangeError('FBX polygon crosses itself; bake or remove it in your 3D tool before export');
     }
   const ring = Array.from({ length: n }, (_, i) => i),
     out: number[] = [];
@@ -183,11 +194,12 @@ function triangulate(
         break;
       }
     }
-    if (!clipped) throw new RangeError('FBX polygon cannot be triangulated');
+    if (!clipped)
+      throw new RangeError('FBX polygon cannot be triangulated; bake or remove it in your 3D tool before export');
   }
   if (ring.length === 3 && Math.abs(cross(points[ring[0]], points[ring[1]], points[ring[2]])) > eps)
     out.push(...ring.map((i) => corners[i]));
-  if (!out.length) throw new RangeError('FBX polygon has zero area');
+  if (!out.length) throw new RangeError('FBX polygon has zero area; clean up the source model before export');
   return out;
 }
 
@@ -223,12 +235,16 @@ export function buildGeometry(node: FBXNode): BuiltGeometry {
   const material = findChild(node, 'LayerElementMaterial');
   const materialMapping = material ? String(findChild(material, 'MappingInformationType')?.properties[0]) : 'AllSame';
   if (material && !['ByPolygon', 'AllSame', 'NoMappingInformation'].includes(materialMapping))
-    throw new RangeError(`FBX unsupported material mapping ${materialMapping}`);
+    throw new RangeError(
+      `FBX unsupported material mapping ${materialMapping}; bake or remove it in your 3D tool before export`,
+    );
   const materials = material && materialMapping !== 'NoMappingInformation' ? array(material, 'Materials') : undefined;
   if (materials) {
     const reference = String(findChild(material!, 'ReferenceInformationType')?.properties[0]);
     if (!['Direct', 'IndexToDirect', 'Index'].includes(reference))
-      throw new RangeError(`FBX unsupported material reference ${reference}`);
+      throw new RangeError(
+        `FBX unsupported material reference ${reference}; bake or remove it in your 3D tool before export`,
+      );
   }
   const cp: number[] = [],
     cornerPolygon: number[] = [],
@@ -255,8 +271,10 @@ export function buildGeometry(node: FBXNode): BuiltGeometry {
       polygonCount++;
     }
   }
-  if (polygon.length) throw new RangeError('FBX polygon is missing its terminator');
-  if (!triangles.length) throw new RangeError('FBX geometry contains no triangles');
+  if (polygon.length)
+    throw new RangeError('FBX polygon is missing its terminator; re-export the file, it looks damaged');
+  if (!triangles.length)
+    throw new RangeError('FBX geometry contains no triangles; remove the empty mesh or add faces in your 3D tool');
   const generated = new Float64Array(count * 3);
   for (let i = 0; i < triangles.length; i += 3) {
     const a = cp[triangles[i]] * 3,
@@ -271,7 +289,8 @@ export function buildGeometry(node: FBXNode): BuiltGeometry {
     const nx = uy * vz - uz * vy,
       ny = uz * vx - ux * vz,
       nz = ux * vy - uy * vx;
-    if (!Math.hypot(nx, ny, nz)) throw new RangeError('FBX triangle has zero area');
+    if (!Math.hypot(nx, ny, nz))
+      throw new RangeError('FBX triangle has zero area; clean up the source model before export');
     for (const v of [a, b, c]) {
       generated[v] += nx;
       generated[v + 1] += ny;
@@ -286,7 +305,8 @@ export function buildGeometry(node: FBXNode): BuiltGeometry {
     let materialIndex = materialMapping === 'NoMappingInformation' ? -1 : 0;
     if (materials) {
       const index = materialMapping === 'AllSame' ? 0 : poly;
-      if (index >= materials.length) throw new RangeError('FBX material index array too short');
+      if (index >= materials.length)
+        throw new RangeError('FBX material index array too short; re-export the file, it looks damaged');
       // The FBX SDK uses -1 for an unassigned polygon, even when the node has other materials.
       materialIndex = materials[index] === -1 ? -1 : integer(materials[index], 65536, 'material index');
     }
@@ -330,7 +350,7 @@ export function buildGeometry(node: FBXNode): BuiltGeometry {
       nz = generated[control * 3 + 2];
     }
     const length = Math.hypot(nx, ny, nz);
-    if (!length) throw new RangeError('FBX generated normal has zero length');
+    if (!length) throw new RangeError('FBX generated normal has zero length; clean up the source model before export');
     nx /= length;
     ny /= length;
     nz /= length;
