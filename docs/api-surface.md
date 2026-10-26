@@ -36,7 +36,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/fsm | `.` 3 |  |  | 971 |
 | @margoengine/geometry | `.` 64, `./shapes` 20, `./triangulate` 5, `./extrude` 3, `./primitives` 17, `./utils` 21, `./extras` 6 | 15 |  | 20,231 |
 | @margoengine/gltf | `.` 4 |  |  | 5,720 |
-| @margoengine/gltf-pro | `.` 43, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 333 |  | 51,262 |
+| @margoengine/gltf-pro | `.` 43, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 333 |  | 53,433 |
 | @margoengine/html | `.` 7 |  |  | 4,851 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,568 |
 | @margoengine/input | `.` 12 |  |  | 4,912 |
@@ -49,7 +49,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/lod | `.` 17 |  |  | 10,512 |
 | @margoengine/machinery | `.` 49, `./cad` 7, `./cad-async` 4, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 43,330 |
 | margoengine | `.` 24, `./game` 43, `./cad` 41, `./viz` 33, `./web` 15 |  |  | 52 |
-| @margoengine/materials | `.` 110, `./atlas` 8, `./transmission` 8, `./batched` 4 | 41 |  | 55,792 |
+| @margoengine/materials | `.` 110, `./atlas` 8, `./transmission` 8, `./batched` 4 | 41 |  | 56,595 |
 | @margoengine/math | `.` 53, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 3, `./matrix3` 1, `./matrix4` 1, `./color` 15, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 2, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 11, `./validate` 3, `./quat` 10, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 87 |  | 12,457 |
 | @margoengine/mcp | `.` 38 | 1 |  | 8,408 |
 | @margoengine/mesh-edit | `.` 88 | 2 |  | 29,555 |
