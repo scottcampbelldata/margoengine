@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shader node editor browser check</title><style>body{margin:0;display:flex}#editor{width:760px;height:420px}#stage{width:300px;height:300px}</style></head><body><div id="editor"></div><div id="stage"></div>
+<script type="module">
+// A user builds a surface graph in the editor (palette, typing, dragging wires); every valid graph is turned into a
+// material on a plane drawn by the real GPU, and the test reads the pixels back from the canvas.
+import {createStage} from '/packages/stage/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {createMesh} from '/packages/materials/dist/index.js';
+import {createGraphMaterial} from '/packages/shader/dist/graph.js';
+import {NodeEditor} from '/packages/shader/dist/editor.js';
+const stage=await createStage('#stage',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];let mesh=null,builds=0;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const editor=new NodeEditor(document.getElementById('editor'));
+editor.onGraph(graph=>{
+  const material=createGraphMaterial(graph,{shading:'basic'});
+  if(mesh)mesh.material=material;else mesh=createMesh(engine,planeGeometry(2,2),material);
+  builds++;
+});
+window.check={
+  editor,
+  async render(){device.pushErrorScope('validation');engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),builds};},
+  state:()=>({graph:editor.status.ok?editor.graph:null,status:editor.status,selection:editor.selection,layout:editor.layout}),
+};
+window.ready=true;
+</script></body></html>

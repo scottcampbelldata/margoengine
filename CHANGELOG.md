@@ -4,6 +4,10 @@
 
 ### Added
 
+- `@margoengine/shader/editor`: `NodeEditor`, a visual node editor for the portable surface graph (palette, wires, typed
+  constants, undo and redo, live validation with the node to fix, WGSL view, keyboard and screen-reader friendly), and the
+  DOM-free `GraphModel` behind it. `editor.onGraph` reports each new valid graph for hot reload.
+
 - `@margoengine/vfx`: two optional features. `curves: {size, alpha, color}` (`@margoengine/vfx/curves`) shapes each
   particle's size, opacity and colour over its life; `emitter` (`@margoengine/vfx/emitter`) starts births on a sphere
   (volume or shell), a cone or the area-weighted surface of a triangle mesh and pushes them along the shape's direction

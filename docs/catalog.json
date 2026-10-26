@@ -537,7 +537,7 @@
     "package": "@margoengine/shader",
     "version": "1.0.0",
     "published": false,
-    "description": "Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes.",
+    "description": "Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes, with a visual node editor.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "shader",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/shader@1.0.0",

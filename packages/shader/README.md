@@ -69,6 +69,60 @@ The compiler hash-conses the graph, so equal subexpressions built separately (th
 
 Float uniforms (scalars, vectors and matrices) must stay finite as float32; otherwise construction or a `.value` assignment throws `TypeError` and keeps the previous value. Portable graphs (`@margoengine/shader/graph`) need complete three-number `fallback.color` and `fallback.emissive` arrays. A material from `createGraphMaterial` keeps its validated graph in `material.surfaceGraph`, so a baking host can evaluate the same pattern with `evaluateSurfaceGraph`.
 
+## Visual editor (`@margoengine/shader/editor`)
+
+`NodeEditor` is a node-graph editor for the portable surface graph (`SurfaceGraph`, `@margoengine/shader/graph`): pick nodes
+from a palette, wire outputs to inputs, type constants, and see at once whether the graph is valid. It is plain DOM in a shadow
+root (light and dark), needs no framework and has no effect on import. `onGraph` hands you every new valid graph, so a
+material can be rebuilt as the artist edits (hot reload).
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from 'margoengine/materials';
+import {sphereGeometry} from 'margoengine/geometry';
+import {createGraphMaterial, type SurfaceGraph} from 'margoengine/shader/graph';
+import {NodeEditor} from 'margoengine/shader/editor';
+const stage = await createStage('#app');
+const geometry = sphereGeometry(1, 64, 32);
+const saved = localStorage.getItem('surface');                      // {graph, layout} saved below, if any
+const editor = new NodeEditor(document.querySelector<HTMLElement>('#editor')!, saved ? JSON.parse(saved) : {});
+const mesh = createMesh(stage.engine, geometry, createGraphMaterial(editor.model.toGraph()));
+const stop = editor.onGraph((graph: SurfaceGraph) => {              // called for each new VALID graph, not for moves
+  mesh.material = createGraphMaterial(graph);                       // swapped live from the next frame
+  localStorage.setItem('surface', JSON.stringify({graph, layout: editor.layout}));
+});
+editor.onChange(status => console.log(status.ok ? 'ok' : status.message));   // fix-it text, e.g. which input is empty
+// later: stop(); editor.dispose();   (or pass {signal} and abort it; `using editor = new NodeEditor(...)` works too)
+```
+
+- **Using it.** `Shift+A` or a double click on the canvas opens the palette (type to search; arrows and Enter; 28 operations).
+  Drag from a node's output socket to an input socket, or click an output and then an input. Drag from a wired input to move
+  or drop the wire; click a wired input to pick its wire up. Drag a title bar to move nodes; drag empty canvas to pan, wheel to
+  zoom at the cursor. `Delete` removes the selection (or the wire of a focused input), `Ctrl+Z` / `Ctrl+Y` undo and redo,
+  `Ctrl+D` duplicates, `Ctrl+A` selects all, arrows nudge (Shift: 32 px), `F` fits, `Esc` cancels. Sockets are buttons with
+  labels, so the keyboard and screen readers can wire a graph; the status line is a live region. Touch works through the same
+  pointer events.
+- **Unconnected inputs.** Most second inputs have a default shown as a number field (`Multiply` B = 1, `Mix` Factor = 0.5,
+  `Clamp` 0 to 1, `Combine` 0, 0, 0); type there instead of adding a Number node. The editor adds them as hidden `float`
+  nodes when it exports. Inputs without a default (the first input of most nodes) must be wired; until then the status line
+  names the node and input and `graph` throws, and nothing is reported to `onGraph`.
+- **Validation as you edit.** The editor runs the real validator: loops are refused when you wire them, type mistakes (a vec3
+  into a number slot), the 128 node, depth 32 and work limits show in the status line, and the node a message is about is
+  outlined (click the status line to select it). Each node shows its output type. The **WGSL** button shows the shader
+  `createGraphMaterial` generates for the current graph (debugging).
+- **Saving.** `editor.graph` is the portable graph (`serializeSurfaceGraph` makes the JSON) and `editor.layout` the node
+  positions; pass both back as `{graph, layout}`. Layout is not part of the portable graph. Constants of a portable graph are
+  immutable by design, so editing a number rebuilds the material (the pipeline cache makes equal graphs free); use a
+  `uniform` in code for values that change every frame.
+- **Without the DOM.** `GraphModel` is the editor's state: `addNode`, `connect`, `connectOutput`, `setValue`, `setInline`,
+  `removeNodes`, `duplicate`, `batch`, `undo` / `redo`, `status()`, `toGraph()`. Use it to script graph edits in tools and tests.
+  `readOnly: true` shows a graph without allowing edits.
+
+`node packages/shader/test/editor-check.mjs` (real GPU, under the GPU lock) builds a graph with a real mouse and keyboard in a
+browser (palette, typed constants, dragged wires), draws the material it makes and reads the pixels back: the colour, a
+rebuild after a retyped number, no rebuild after a node move, undo and redo, and that an incomplete or ill-typed graph keeps
+the last valid material on screen.
+
 ## Noise (`@margoengine/shader/noise`, +2.0 kB min+gzip over the root entry)
 
 ```ts

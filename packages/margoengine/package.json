@@ -983,6 +983,10 @@
       "types": "./dist/shader/effects.d.ts",
       "import": "./dist/shader/effects.js"
     },
+    "./shader/editor": {
+      "types": "./dist/shader/editor.d.ts",
+      "import": "./dist/shader/editor.js"
+    },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"
