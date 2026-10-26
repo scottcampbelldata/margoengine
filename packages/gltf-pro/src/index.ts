@@ -310,6 +310,37 @@ function sameValues(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
 }
+/** Adds `r`'s draw to its batch in `run` (a new one when none matches), in first-draw order (draw-batch.ts). */
+function joinBatch(
+  run: PBRDrawRun,
+  model: PBRModel,
+  r: DrawResource,
+  d: DrawDerivation,
+  c: Context,
+  viewAt: GPUBufferBinding,
+): void {
+  const view = c.view ?? c,
+    p = r.primitive;
+  let list = run.batches.get(d),
+    batch: PendingBatch | undefined;
+  if (list)
+    for (let i = 0; i < list.length; i++) {
+      const value = list[i],
+        q = value.owner.primitive;
+      if (value.view === view && value.viewAt === viewAt && q.vertices === p.vertices && q.indices === p.indices) {
+        batch = value;
+        break;
+      }
+    }
+  if (!batch) {
+    batch = { model, owner: r, d, c, view, viewAt, members: [], models: [] };
+    if (!list) run.batches.set(d, (list = []));
+    list.push(batch);
+    run.pending.push(batch);
+  }
+  batch.members.push(r);
+  batch.models.push(model);
+}
 /** Draws `run`'s pending batches into its pass, in first-draw order. */
 function flushBatches(run: PBRDrawRun): void {
   const pending = run.pending;
@@ -387,6 +418,43 @@ function drawFrame(
   hooks: GLTFExtendedMaterials | false | undefined,
   lighting: readonly LightingEffect[],
 ): DrawFrame {
+  // The run's last context, when this call's inputs are the same objects (the common case: one context, no lighting).
+  const last = run?.lastFrame;
+  if (
+    last &&
+    last.lighting === lighting &&
+    run!.lastContext === c &&
+    run!.lastDescriptor === c.descriptor &&
+    last.mode === mode &&
+    last.depthCompare === depthCompare &&
+    last.format === c.format &&
+    last.section === section &&
+    last.oit === oit &&
+    last.hook === hook &&
+    last.hooks === (hooks || undefined) &&
+    last.samples === c.descriptor.multisample?.count &&
+    last.depthFormat === c.descriptor.depthStencil!.format
+  )
+    return last;
+  const frame = matchFrame(run, mode, depthCompare, c, section, oit, hook, hooks, lighting);
+  if (run) {
+    run.lastFrame = frame;
+    run.lastContext = c;
+    run.lastDescriptor = c.descriptor;
+  }
+  return frame;
+}
+function matchFrame(
+  run: PBRDrawRun | undefined,
+  mode: string,
+  depthCompare: GPUCompareFunction | undefined,
+  c: Context,
+  section: GPUBuffer | undefined,
+  oit: object | undefined,
+  hook: object | undefined,
+  hooks: GLTFExtendedMaterials | false | undefined,
+  lighting: readonly LightingEffect[],
+): DrawFrame {
   const samples = c.descriptor.multisample?.count,
     depthFormat = c.descriptor.depthStencil!.format,
     extended = hooks || undefined;
@@ -431,6 +499,10 @@ export class PBRDrawRun {
   pass?: GPURenderPassEncoder;
   /** @internal The draw contexts of the run's draws (draw-memo.ts); draws under an equal one share derivations. */
   readonly frames: DrawFrame[] = [];
+  /** @internal The last of them, and the pass context and descriptor it was matched for. */
+  lastFrame?: DrawFrame;
+  lastContext?: Context;
+  lastDescriptor?: unknown;
   /** @internal What the run's draws bound on `pass`, so they set only what changes. */
   readonly bindings: PassBindings = { pass: undefined, groups: [undefined, undefined, undefined, undefined] };
   /** @internal The device the run's draws record on; `end()` uploads their uniform changes there. */
@@ -440,6 +512,14 @@ export class PBRDrawRun {
   /** @internal Draws waiting to draw as instanced batches (draw-batch.ts), in first-draw order, and by derivation. */
   readonly pending: PendingBatch[] = [];
   readonly batches = new Map<DrawDerivation, PendingBatch[]>();
+  /** @internal What `draw` checked once for the run's context: its section binding and device caches. */
+  private quick?: { c: Context; section: GPUBuffer | undefined; draws: DeviceDraws };
+  /** @internal The run's context with its section binding and device caches, for draws that join batches. */
+  quickFor(c: Context): { section: GPUBuffer | undefined; draws: DeviceDraws } {
+    let quick = this.quick;
+    if (quick?.c !== c) this.quick = quick = { c, section: sectionState(c)?.buffer, draws: deviceDraws(c.device) };
+    return quick;
+  }
   /**
    * Ends the shared pass and uploads the draws' uniform changes. Safe to call twice; the run can then carry the next
    * frame's draws (nothing derived for this frame carries over).
@@ -451,9 +531,11 @@ export class PBRDrawRun {
     } finally {
       this.pass = undefined;
       this.frames.length = 0;
+      this.lastFrame = this.lastContext = this.lastDescriptor = undefined;
       this.pending.length = 0;
       this.batches.clear();
       this.view.at = this.view.format = undefined;
+      this.quick = undefined;
       resetBindings(this.bindings, undefined);
       try {
         pass?.end();
@@ -2228,6 +2310,11 @@ export class PBRModel implements EnginePlugin {
     external?: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction },
     carry?: PBRDrawRun,
   ): void {
+    // A run's later draws of a one-primitive model that joins an instanced batch skip the set-up below (joinRun).
+    if (carry && !external && mode === 'beauty' && carry.pass && carry.view.at && carry.view.format === c.format) {
+      const quick = carry.quickFor(c);
+      if (!opaquePasses.get(c) && this.joinRun(c, carry, phase, quick.section, quick.draws, carry.view.at)) return;
+    }
     const transmission = mode === 'transmission',
       oit = transmission ? this.transmission : this.transparency,
       through = mode === 'transparent' || transmission,
@@ -2416,31 +2503,7 @@ export class PBRModel implements EnginePlugin {
             runView!.format = c.format;
             runView!.data.set(viewData);
           }
-          const view = c.view ?? c;
-          let list = run.batches.get(d),
-            batch: PendingBatch | undefined;
-          if (list)
-            for (let i = 0; i < list.length; i++) {
-              const value = list[i],
-                q = value.owner.primitive;
-              if (
-                value.view === view &&
-                value.viewAt === viewAt &&
-                q.vertices === p.vertices &&
-                q.indices === p.indices
-              ) {
-                batch = value;
-                break;
-              }
-            }
-          if (!batch) {
-            batch = { model: this, owner: r, d, c, view, viewAt, members: [], models: [] };
-            if (!list) run.batches.set(d, (list = []));
-            list.push(batch);
-            run.pending.push(batch);
-          }
-          batch.members.push(r);
-          batch.models.push(this);
+          joinBatch(run, this, r, d, c, viewAt);
           this.engine.stats.visible++;
           continue;
         }
@@ -2665,6 +2728,53 @@ export class PBRModel implements EnginePlugin {
     for (let i = at; i > 0; i--) list[i] = list[i - 1];
     list[0] = d;
     return d;
+  }
+  /**
+   * @internal `draw()`'s short path in a run: when this model is one opaque primitive whose draw joins an instanced
+   * batch of `run` under the run's current view block and an existing derivation, adds it (or skips it when hidden)
+   * and returns true; returns false for everything else, which `draw()` handles.
+   */
+  joinRun(
+    c: Context,
+    run: PBRDrawRun,
+    phase: 'all' | 'opaque' | 'blend',
+    section: GPUBuffer | undefined,
+    draws: DeviceDraws,
+    viewAt: GPUBufferBinding,
+  ): boolean {
+    const resources = this.resources;
+    if (this.disposed || resources.length !== 1 || this.staticBatches?.length) return false;
+    const r = resources[0],
+      p = r.primitive,
+      m = p.material,
+      node = p.node;
+    if (r.batch || r.mergedInto || p.instances || p.topology || primitiveAfterOpaque(p)) return false;
+    if ((this.transparency && separable(m)) || (this.transmission && transmits(m))) return false;
+    if (phase !== 'all' && blended(m) !== (phase === 'blend')) return false;
+    // The run's view block holds this call's camera, lights and target only while they are unchanged.
+    if (!sameView(run.view.data, c.camera, this.engine.lighting)) return false;
+    if (!inView(c, node)) return true;
+    node.check();
+    if (!nodeVisible(this.engine, node)) return true;
+    const frame = drawFrame(
+        run,
+        'beauty',
+        undefined,
+        c,
+        section,
+        this.transparency,
+        this.capture,
+        this.asset.hooks.materials,
+        this.lightingList,
+      ),
+      a = node.matrix,
+      det =
+        a[0] * (a[5] * a[10] - a[6] * a[9]) - a[4] * (a[1] * a[10] - a[2] * a[9]) + a[8] * (a[1] * a[6] - a[2] * a[5]),
+      d = findDerivation(draws.derivations.get(m), frame, p.extension, undefined, undefined, Math.sign(det));
+    if (!d || !batchable(d, r, det)) return false;
+    joinBatch(run, this, r, d, c, viewAt);
+    this.engine.stats.visible++;
+    return true;
   }
   /**
    * @internal Draws `batch` (draw-batch.ts) into `run`'s pass: one mesh as its own draw, exactly as without a run;
