@@ -56,7 +56,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 ## Packages: Rendering and lighting
 
 - [@margoengine/materials](https://margoengine.com/llms/packages/materials.md): Optional glTF PBR material lobes, transmission, volume and typed node graphs through an isolated extension slot.
-- [@margoengine/shader](https://margoengine.com/llms/packages/shader.md): Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes.
+- [@margoengine/shader](https://margoengine.com/llms/packages/shader.md): Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes, with a visual node editor.
 - [@margoengine/environment](https://margoengine.com/llms/packages/environment.md): HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on…
 - [@margoengine/clustered](https://margoengine.com/llms/packages/clustered.md): WebGPU clustered forward point and spot lighting with optional local shadows.
 - [@margoengine/shadows](https://margoengine.com/llms/packages/shadows.md): Four-cascade cached directional shadows with PCSS.
@@ -168,7 +168,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 2 entry points
 - [@margoengine/splats API](https://margoengine.com/llms/api/splats.md): 2 entry points
 - [@margoengine/materials API](https://margoengine.com/llms/api/materials.md): 4 entry points
-- [@margoengine/shader API](https://margoengine.com/llms/api/shader.md): 6 entry points
+- [@margoengine/shader API](https://margoengine.com/llms/api/shader.md): 7 entry points
 - [@margoengine/environment API](https://margoengine.com/llms/api/environment.md): 7 entry points
 - [@margoengine/clustered API](https://margoengine.com/llms/api/clustered.md): 7 entry points
 - [@margoengine/shadows API](https://margoengine.com/llms/api/shadows.md): 1 entry point
