@@ -304,8 +304,8 @@ because arbitrary named vertex attributes remain absent. Physical maps and dispe
 front/back/double-side rendering, and material blend/depth/polygon-offset/stencil controls are implemented in optional
 packages. Wireframe now covers constructed materials and live native materials across render and shadow paths,
 with Node and GPU evidence. Variable-size `.cube` LUTs are also implemented
-in tonemap, with parser, runtime and physical-GPU evidence. The current totals
-are 138 / 16 / 6 (2026-10-21, after the visual-parity pass: raw shaders and screen effects, fog on every renderer, mirrors,
+in tonemap, with parser, runtime and physical-GPU evidence. The totals at that point
+were 138 / 16 / 6 (2026-10-21, after the visual-parity pass: raw shaders and screen effects, fog on every renderer, mirrors,
 cube cameras and render layers, toon and envMap per material, new texture kinds, directional and area light shadows,
 SMAA, glitch and afterimage, fonts and 3D text, SVG and MTL loading, extra geometries, skeleton tools).
 
@@ -364,4 +364,4 @@ Positioning caveats for a public page:
 - **Rows marked †.** For these, the evidence is that the named exports exist, the source is non-trivial, the package README describes the behavior, and keyword searches across `packages/*/src` agree. The implementation itself was not audited line by line.
 - **MISSING.** A row is MISSING when no matching class, function or keyword was found in any package's `src/`. README files and tests were not counted as implementation.
 - **The three.js side.** The feature list comes from knowledge of three.js r186, its documentation (<https://threejs.org/docs/>) and `three/addons`. It was not re-checked against the r186 tag while writing.
-- **Re-checking.** When a gap is closed, update its row, the counts in the Summary, and [What is missing or partial, and what to do](#what-is-missing-or-partial-and-what-to-do). Update the "Not yet" table in [`from-threejs.md`](from-threejs.md) when that page names the same gap.
+- **Re-checking.** `npm run check:parity` (part of verify) recounts the rows and fails if the Summary, the "Recounted" line or three-parity-matrix.md disagrees. When a gap is closed, update its row, the counts in the Summary, and [What is missing or partial, and what to do](#what-is-missing-or-partial-and-what-to-do). Update the "Not yet" table in [`from-threejs.md`](from-threejs.md) when that page names the same gap.
