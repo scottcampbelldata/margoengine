@@ -236,8 +236,8 @@ test('removing a model, disposing it, and materials meshes (normal blending via 
   glass.material.transparent = false;
   assert.deepEqual(
     passes(frame(3)).map((p) => p.label),
-    [undefined, undefined],
-    'opaque again: drawn by the materials pass',
+    [undefined],
+    'opaque again: drawn by the materials pass, which the additive mesh continues',
   );
   assert.throws(() => model.setTransparency({}), TypeError);
 });

@@ -75,7 +75,7 @@ test('ten opaque materials meshes draw in one render pass', async () => {
   }
 });
 
-test('a blended mesh keeps its own pass between opaque meshes, in render order', async () => {
+test('a blended mesh draws after the opaque meshes, in the same pass', async () => {
   const w = await world();
   try {
     const opaque = new Material({ color: [1, 0, 0] }),
@@ -85,8 +85,9 @@ test('a blended mesh keeps its own pass between opaque meshes, in render order',
     createMesh(w.engine, triangle, opaque);
     w.store.tick(false);
     w.engine.frameGraph.execute(w.context);
-    // Both opaque meshes share the first pass (one instanced draw); the blended mesh follows in a pass of its own.
-    assert.deepEqual(w.log, ['begin', 'draw0', 'draw0', 'call', 'end', 'begin', 'draw1', 'call', 'end']);
+    // Both opaque meshes draw first (one instanced draw), then the blended mesh, all in one pass: a pass per blended
+    // mesh stored and reloaded the multisampled colour and depth each time (2,000 blended meshes, 2,000 passes).
+    assert.deepEqual(w.log, ['begin', 'draw0', 'draw0', 'call', 'draw0', 'call', 'end']);
   } finally {
     w.destroy();
   }

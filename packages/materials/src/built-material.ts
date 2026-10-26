@@ -3067,6 +3067,8 @@ interface Entry {
   order: number;
   opaque: boolean;
   blend: boolean;
+  /** Camera distance this frame, for the late phase's back-to-front sort. */
+  distance: number;
 }
 interface Phase {
   entry: Entry;
@@ -3105,7 +3107,6 @@ function queue(runtime: Engine): MaterialDraws {
   if (draws) return draws;
   const members: Entry[] = [],
     tail: Phase[] = [],
-    distance = new Map<Entry, number>(),
     name = 'materials:' + serial++,
     // One run, reused every frame: it keeps its batch records (gltf-pro draw-batch.ts) instead of making new ones.
     run = new PBRDrawRun();
@@ -3142,19 +3143,17 @@ function queue(runtime: Engine): MaterialDraws {
   };
   /** Sorts the late phase back to front from `eye`. With `check`, returns false (unsorted) when one of its entries changed phase. */
   const sortLate = (eye: ArrayLike<number>, check: boolean): boolean => {
-    distance.clear();
     if (opaqueEnd === phases.length) return true;
     for (let i = opaqueEnd; i < phases.length; i++) {
       const entry = phases[i].entry;
-      if (distance.has(entry)) continue;
       if (check && !current(entry)) return false;
       const matrix = entry.model.primitives[0].node.matrix;
-      distance.set(entry, Math.hypot(eye[0] - matrix[12], eye[1] - matrix[13], eye[2] - matrix[14]));
+      entry.distance = Math.hypot(eye[0] - matrix[12], eye[1] - matrix[13], eye[2] - matrix[14]);
     }
     const count = phases.length - opaqueEnd;
     for (let i = 0; i < count; i++) tail[i] = phases[opaqueEnd + i];
     tail.length = count;
-    tail.sort((a, b) => a.entry.order - b.entry.order || distance.get(b.entry)! - distance.get(a.entry)!);
+    tail.sort((a, b) => a.entry.order - b.entry.order || b.entry.distance - a.entry.distance);
     for (let i = 0; i < count; i++) phases[opaqueEnd + i] = tail[i];
     return true;
   };
@@ -3589,6 +3588,7 @@ export function createMesh<M extends Material | readonly Material[]>(
     order: renderOrder,
     opaque: false,
     blend: false,
+    distance: 0,
   };
   let snapshot = array ? Object.freeze([...assigned]) : undefined;
   const swap = (next: Material | readonly Material[]) => {

@@ -304,8 +304,8 @@ opaque capture, but keeps its authored alpha mode, blending and depth writes; su
 
 A package that draws many models itself passes a `PBRDrawRun` as the last argument of `draw()`. Every `draw()` of the
 run continues one render pass instead of beginning its own, which saves a store and a reload of the multisampled colour
-and depth per model (10,000 meshes of `@margoengine/materials` cost 168 ms of CPU a frame with a pass each). A blended
-primitive still ends the pass around itself. Within a run:
+and depth per model (10,000 meshes of `@margoengine/materials` cost 168 ms of CPU a frame with a pass each). Blended
+draws continue it too; a blended primitive drawn without a run ends the pass around itself. Within a run:
 
 - draws of one material record derive its shader, pipeline and lighting bind group once per frame, not once per draw;
 - the run sets a pipeline, bind group or buffer only when it changes;

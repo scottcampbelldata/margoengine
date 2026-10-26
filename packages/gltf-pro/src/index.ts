@@ -2371,8 +2371,8 @@ export class PBRModel implements EnginePlugin {
    * (`setCapture`); for these `color`/`depth` are unused.
    *
    * `carry` is a `PBRDrawRun`: draws that pass the same run share one render pass instead of each beginning one
-   * (a pass stores and reloads the multisampled colour and depth). A
-   * blended primitive still ends the pass around itself, so attachment-store rounding is unchanged. Call
+   * (a pass stores and reloads the multisampled colour and depth), blended draws included; a blended primitive drawn
+   * without a run ends the pass around itself. Call
    * `carry.end()` after the last draw, before anything else records on `c.encoder`. */
   draw(
     c: Context,
@@ -2462,8 +2462,8 @@ export class PBRModel implements EnginePlugin {
         resources.length = source.length;
         // Sorting an all-opaque list only returns the original stable order.
         // Preserve a snapshot for hooks while avoiding V8's sort workspace.
-        // Distances are filled once; the comparator used to call hypot twice per pair.
-        if (sort) {
+        // Distances are filled once; the comparator used to call hypot twice per pair. One primitive needs no sort.
+        if (sort && resources.length > 1) {
           const position = scratch.eye,
             distances = scratch.blendDistance;
           distances.clear();
@@ -2630,11 +2630,12 @@ export class PBRModel implements EnginePlugin {
         let target: GPURenderPassEncoder;
         if (through || capture) target = shared ??= (through ? oit! : hook!).begin();
         else {
-          // Retain transparent pass boundaries so attachment-store rounding stays unchanged.
-          if (!external && blend && mode !== 'gbuffer') {
-            if (!external) pass?.end();
+          // A blended primitive drawn on its own ends the pass around itself. A run's blended draws continue its pass:
+          // a pass per blended mesh stores and reloads the multisampled colour and depth each time (2,000 blended
+          // meshes: 2,000 passes a frame).
+          if (!external && !carry && blend && mode !== 'gbuffer') {
+            pass?.end();
             pass = undefined;
-            if (carry) carry.pass = undefined;
           }
           if (!pass) {
             scratch.color.view = color;
@@ -2710,10 +2711,9 @@ export class PBRModel implements EnginePlugin {
         applyStencilReference(target, state);
         if (inst) target.drawIndexed(count, inst.count);
         else target.drawIndexed(count);
-        if (!external && blend && mode !== 'gbuffer' && !through && !capture) {
+        if (!external && !carry && blend && mode !== 'gbuffer' && !through && !capture) {
           pass!.end();
           pass = undefined;
-          if (carry) carry.pass = undefined;
         }
         if ((mode === 'beauty' || through) && !external) {
           this.engine.stats.visible += inst ? inst.count : 1;
@@ -2821,7 +2821,9 @@ export class PBRModel implements EnginePlugin {
       p = r.primitive,
       m = p.material,
       node = p.node;
-    if (r.batch || r.mergedInto || p.instances || p.topology || primitiveAfterOpaque(p)) return false;
+    // A blended draw never joins a batch (batchable): leave it to draw() before the checks below.
+    if (m.settings[0] === 2 || r.batch || r.mergedInto || p.instances || p.topology || primitiveAfterOpaque(p))
+      return false;
     const oit = this.transparency;
     if ((oit && separable(m)) || (this.transmission && transmits(m))) return false;
     if (phase !== 'all' && blended(m) !== (phase === 'blend')) return false;
