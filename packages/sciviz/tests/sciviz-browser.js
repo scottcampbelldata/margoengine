@@ -699,6 +699,55 @@ window.runSciVizTests = async () => {
     figure.dispose();
   });
 
+  await check('a timeline plays every frame in order, never overlapping slow frames, and stops on abort', async () => {
+    const figure = await figureOn(canvas, { axes: false });
+    const nx = 16,
+      surface = figure.surface(new Float32Array(nx * nx), { nx, range: [0, 1] });
+    const shown = [];
+    let active = 0,
+      overlapped = false,
+      events = 0;
+    const timeline = figure.timeline([0, 0.25, 0.5, 0.75, 1], async (index, time) => {
+      active++;
+      overlapped ||= active > 1;
+      surface.setHeights(new Float32Array(nx * nx).fill(time));
+      await new Promise((r) => setTimeout(r, 15));
+      shown.push(index);
+      active--;
+    });
+    timeline.addEventListener('time', () => events++);
+    await figure.play({ fps: 1000 });
+    assert(shown.join() === '0,1,2,3,4' && !overlapped, `frames ${shown}, overlap ${overlapped}`);
+    assert(events === 5 && timeline.index === 4 && timeline.time === 1, `events ${events}, index ${timeline.index}`);
+    const slider = timeline.element.querySelector('input[type=range]');
+    assert(slider.value === '4' && timeline.element.textContent.includes('1'), 'the slider follows');
+    // Dragging the slider shows that frame.
+    slider.value = '2';
+    slider.dispatchEvent(new Event('input'));
+    await timeline.seek(2);
+    assert(timeline.index === 2 && shown.at(-1) === 2, `slider seek ${timeline.index}`);
+    // Looping playback stops with the signal's reason.
+    const controller = new AbortController();
+    const looping = figure.play({ fps: 200, loop: true, signal: controller.signal });
+    await new Promise((r) => setTimeout(r, 200));
+    const before = shown.length;
+    controller.abort(new DOMException('stop', 'AbortError'));
+    let reason;
+    try {
+      await looping;
+    } catch (error) {
+      reason = error;
+    }
+    assert(reason?.name === 'AbortError' && !timeline.playing, `aborted: ${reason}`);
+    assert(before > 6, `it looped past the last frame (${before} frames shown)`);
+    // pause() resolves play().
+    const paused = figure.play({ fps: 5, loop: true });
+    figure.pause();
+    await paused;
+    figure.dispose();
+    assert(!timeline.element.isConnected, 'disposing the figure removes the controls');
+  });
+
   await check('colour maps the page can use as CSS', async () => {
     assert(colormap('aurora').css().startsWith('linear-gradient('), 'css');
   });

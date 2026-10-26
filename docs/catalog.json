@@ -2166,6 +2166,7 @@
       "SliceLayer",
       "SurfaceLayer",
       "THEMES",
+      "Timeline",
       "VolumeLayer",
       "colormap",
       "colormapNames",

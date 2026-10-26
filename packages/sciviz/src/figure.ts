@@ -22,6 +22,7 @@ import { IsosurfaceLayer, levelColour, type IsosurfaceLayerOptions } from './iso
 import { dataToClip, nearestPoint, screenRay, selectPoints, type SelectRegion } from './pick.js';
 import { packColour, RectsLayer } from './rects.js';
 import { formatValue } from './ticks.js';
+import { Timeline, type TimelineFrame, type PlayOptions, type TimelineOptions } from './timeline.js';
 import { Legend, type LegendEntry, type LegendPosition } from './legend.js';
 import { axisScale, type Scale, type ScaleType } from './scales.js';
 import type { PNGOptions, SVGOptions } from './export.js';
@@ -390,6 +391,7 @@ export class Figure extends EventTarget {
   readonly #scales: [Scale, Scale, Scale];
   readonly #dated = [false, false, false];
   #legend: Legend | undefined;
+  #timeline: Timeline | undefined;
   #series = 0;
   // Colours and widths of scatter and line layers, for SVG export.
   readonly #styles = new WeakMap<Layer, { color: string; colors?: Float32Array; width: number }>();
@@ -1508,6 +1510,50 @@ export class Figure extends EventTarget {
     return out.join('\n');
   }
 
+  /**
+   * Gives the figure a time series: `frame(index, time)` updates the layers for one frame (and may return a promise).
+   * Shows a play button, slider and time over the canvas (`controls: false` hides them) and replaces any earlier
+   * timeline. Shows the first frame.
+   */
+  timeline(times: ArrayLike<number>, frame: TimelineFrame, options: TimelineOptions = {}): Timeline {
+    this.#check();
+    const canvas = (this.engine as unknown as { canvas?: HTMLCanvasElement }).canvas;
+    // A 2D chart makes room for the controls below its axes.
+    if (this.#flat && (options.controls ?? true) && this.#options.margin?.bottom === undefined) {
+      this.#margin = { ...this.#margin, bottom: MARGIN.bottom + 44 };
+      this.#updateLegend();
+    }
+    this.#timeline?.dispose();
+    const timeline = new Timeline(
+      typeof HTMLCanvasElement !== 'undefined' && canvas instanceof HTMLCanvasElement ? canvas : undefined,
+      this.theme,
+      times,
+      frame,
+      options,
+    );
+    this.#timeline = timeline;
+    timeline.seek(0).catch(reportError);
+    return timeline;
+  }
+
+  /**
+   * Plays the timeline (see {@link Figure.timeline}) at `fps` (default 10), once or with `loop`. Resolves at the last
+   * frame or on pause(); rejects with the signal's reason when `signal` aborts.
+   */
+  play(options: PlayOptions = {}): Promise<void> {
+    this.#check();
+    if (!this.#timeline)
+      return Promise.reject(
+        fault('state', 'play needs a timeline: call figure.timeline(times, frame) first', 'sciviz'),
+      );
+    return this.#timeline.play(options);
+  }
+
+  /** Pauses the timeline's playback. */
+  pause(): void {
+    this.#timeline?.pause();
+  }
+
   /** A colour bar legend for `colormap` over `range`, at the canvas's right edge. */
   colorbar(colormap: ColormapSource, range: readonly [number, number], options: ColorBarOptions = {}): ColorBar {
     this.#check();
@@ -1540,6 +1586,7 @@ export class Figure extends EventTarget {
     for (const bar of this.#bars) bar.dispose();
     this.#axes?.dispose();
     this.#legend?.dispose();
+    this.#timeline?.dispose();
     this.#offFrame?.();
     if (this.#flat) {
       const engine = this.engine as unknown as { views?: unknown; camera: { project?: unknown } };

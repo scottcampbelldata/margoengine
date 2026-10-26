@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3228797,
+  "total": 3230086,
   "history": [
     {
       "date": "2026-10-24",
@@ -314,6 +314,12 @@
       "commit": "aeb78049",
       "reason": "queue item 23 milestones 2-3: animator gains addRootMotion, addLookAt and addAimConstraint (tree-shaken when unused); new entry @margoengine/rigging/retarget (Mixamo, Godot, Roblox R15 and humanoid retarget presets)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "4cdbfba0",
+      "reason": "sciviz: time series timeline with slider and figure.play()",
+      "grew": 1
     }
   ],
   "items": {
@@ -546,7 +552,7 @@
     "@margoengine/scatter": 12434,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
-    "@margoengine/sciviz": 35513,
+    "@margoengine/sciviz": 36802,
     "@margoengine/sciviz/colormaps": 4433,
     "@margoengine/sciviz/maths": 5638,
     "@margoengine/selection": 18404,

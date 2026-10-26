@@ -161,6 +161,9 @@ export class Figure extends EventTarget {
     heatmap(values: DataSource, options?: HeatmapLayerOptions): Promise<RectsLayer>;
     toPNG(options?: PNGOptions): Promise<Blob>;
     toSVG(options?: SVGOptions): Promise<string>;
+    timeline(times: ArrayLike<number>, frame: TimelineFrame, options?: TimelineOptions): Timeline;
+    play(options?: PlayOptions): Promise<void>;
+    pause(): void;
     colorbar(colormap: ColormapSource, range: readonly [number, number], options?: ColorBarOptions): ColorBar;
     remove(layer: Layer): void;
     dispose(): void;
@@ -292,6 +295,12 @@ export interface PickResult {
     readonly y: number;
     readonly z: number;
     readonly value?: number;
+}
+
+export interface PlayOptions {
+    readonly fps?: number;
+    readonly loop?: boolean;
+    readonly signal?: AbortSignal;
 }
 
 export interface PointSelection {
@@ -480,6 +489,27 @@ export interface Ticks {
     readonly values: readonly number[];
     readonly step: number;
     readonly labels: readonly string[];
+}
+
+export class Timeline extends EventTarget {
+    readonly times: Float64Array;
+    readonly element: HTMLDivElement | undefined;
+    constructor(canvas: HTMLCanvasElement | undefined, theme: Theme, times: ArrayLike<number>, onFrame: TimelineFrame, options?: TimelineOptions);
+    get index(): number;
+    get time(): number;
+    get playing(): boolean;
+    seek(index: number): Promise<void>;
+    play(options?: PlayOptions): Promise<void>;
+    pause(): void;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export type TimelineFrame = (index: number, time: number) => void | Promise<void>;
+
+export interface TimelineOptions {
+    readonly controls?: boolean;
+    readonly format?: (time: number) => string;
 }
 
 export class VolumeLayer implements Drawable {

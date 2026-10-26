@@ -212,6 +212,34 @@ for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) x.push(i / 7 - 0.5), y.p
 await fig.quiver({ x, y, u: x.map((xi, k) => -y[k] + 0.3 * xi), v: x.map((xi, k) => xi + 0.3 * y[k]) }, { color: '#ffffff' });
 ```
 
+## Time series
+
+`fig.timeline(times, frame, options)` gives a figure a time series: `frame(index, time)` updates your layers for one
+frame and may return a promise. Controls over the canvas's bottom edge show a play button, a slider and the current
+time (`controls: false` hides them; `format` sets the time text). A 2D chart makes room for them below its axes.
+
+`await fig.play({ fps, loop, signal })` steps through the frames (default 10 per second, once). It waits for each
+frame's update before the next, so slow updates never overlap. It resolves at the last frame or on `fig.pause()`,
+and rejects with the signal's reason when `signal` aborts. The timeline's `seek(index)`, `index`, `time` and `time`
+event follow the current frame.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+
+const canvas = document.querySelector('canvas')!;
+const fig = await Figure.create(canvas);
+const nx = 64;
+const heights = new Float32Array(nx * nx);
+const surface = fig.surface(heights, { nx, range: [-1, 1] });
+const times = Array.from({ length: 60 }, (_, k) => k / 10);
+const timeline = fig.timeline(times, (_, t) => {
+  for (let j = 0; j < nx; j++) for (let i = 0; i < nx; i++) heights[j * nx + i] = Math.sin(i / 6 + t) * Math.cos(j / 8);
+  surface.setHeights(heights);
+}, { format: (t) => `${t.toFixed(1)} s` });
+timeline.addEventListener('time', () => console.log(timeline.index));
+await fig.play({ fps: 30, signal: AbortSignal.timeout(10_000) });
+```
+
 ## Picking, tooltips and selection
 
 Hovering shows a tooltip for the scatter point, line vertex, surface point, bar or heatmap cell under the pointer, with its x, y, z, its
