@@ -8,9 +8,12 @@
 // the record's shading hook reports an unchanged `shaderRevision`, its structure (`structureFlags`), shading object and
 // render state are the same and no lighting effect or transparency hook patches the shader (4,096 materials meshes,
 // one material each, composed 4,096 shaders a frame); everything else composes them again each frame, as before.
+// A record whose shading hook reports a `version` goes further: while that number and the draw context stay the same,
+// the derivation is reused whole from an earlier frame (its rows, pipeline and group 2), without reading the record or
+// calling `bindings()` (`steadyDerivation` in index.ts); 4,096 such materials read about 1.5 us each per frame before.
 import type { LightingEffect, PBRRenderState } from './index.js';
 import type { PBRInstances } from './instancing.js';
-import type { BatchKind, BatchState } from './draw-batch.js';
+import type { BatchKind, BatchState, RowsState } from './draw-batch.js';
 import type { MaterialExtension } from './material-extension.js';
 import type { GLTFExtendedMaterials } from './asset.js';
 
@@ -63,6 +66,22 @@ export interface DrawDerivation {
   tintable?: boolean;
   /** @internal The GPU states of this derivation's blended batches, one per batch drawn in a frame (index.ts `drawBatch`). */
   blendStates?: BatchState[];
+  /** @internal The same for its blended rows batches (`BatchKind.rows`). */
+  blendRows?: RowsState[];
+  /**
+   * @internal What draws of other material records may share an instanced draw with this one's, each reading its own
+   * uniform block (`BatchKind.rows`): the same object for derivations with the same pipeline and group 2 resources
+   * (`drawGroup`); undefined until the derivation is complete.
+   */
+  group?: object;
+  /**
+   * @internal Whether this derivation's rows variant drew as `rowsOf` (another record's rows variant) does, checked at
+   * this derivation's version `rowsAt` and `rowsOf`'s version `rowsOfAt` (index.ts `rowsFit`).
+   */
+  rowsOf?: DrawDerivation;
+  rowsAt?: number;
+  rowsOfAt?: number;
+  rowsOk?: boolean;
   /** @internal The batch (draw-batch.ts) this derivation's last draw joined in run `joinedRun`, until that run draws it. */
   joined?: object;
   joinedRun?: object;
@@ -77,6 +96,12 @@ export interface DrawDerivation {
   shading?: object;
   renderState?: object;
   structure?: number;
+  /**
+   * @internal The record's `shading.version` when this derivation was last made complete under the conditions that
+   * keep its pipeline (no lighting effects, a beauty-like pass); NaN otherwise. A later frame whose record reports the
+   * same version reuses the derivation whole (`steadyDerivation`).
+   */
+  version?: number;
 }
 
 /**
@@ -113,13 +138,45 @@ export interface DeviceDraws {
   codeCount: number;
   pipelines: Map<string, GPURenderPipeline>;
   derivations: WeakMap<object, DrawDerivation[]>;
+  /** Draw groups (`DrawDerivation.group`) by pipeline and group 2 resources. */
+  groups: Map<string, object>;
 }
 const devices = new WeakMap<GPUDevice, DeviceDraws>();
 export function deviceDraws(device: GPUDevice): DeviceDraws {
   let state = devices.get(device);
   if (!state)
-    devices.set(device, (state = { codes: new Map(), codeCount: 0, pipelines: new Map(), derivations: new WeakMap() }));
+    devices.set(
+      device,
+      (state = { codes: new Map(), codeCount: 0, pipelines: new Map(), derivations: new WeakMap(), groups: new Map() }),
+    );
   return state;
+}
+
+/**
+ * The draw group (`DrawDerivation.group`) of complete derivation `d`: one object per pipeline, uniform size, texture
+ * replacement and group 2 resources, so derivations of different material records that draw alike share it.
+ */
+export function drawGroup(draws: DeviceDraws, d: DrawDerivation): object {
+  let key = objectId(d.pipeline) + ':' + d.floatCount + ':' + +d.replacesTextures;
+  const entries = d.effect?.entries;
+  if (entries)
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i],
+        resource = entry.resource as GPUBindingResource & Partial<GPUBufferBinding>;
+      key +=
+        ',' +
+        entry.binding +
+        '=' +
+        ('buffer' in resource
+          ? objectId(resource.buffer) + '@' + (resource.offset ?? 0) + '+' + (resource.size ?? '')
+          : objectId(resource as object));
+    }
+  let group = draws.groups.get(key);
+  if (!group) {
+    if (draws.groups.size >= 4096) draws.groups.clear();
+    draws.groups.set(key, (group = {}));
+  }
+  return group;
 }
 
 const ids = new WeakMap<object, number>();

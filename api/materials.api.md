@@ -177,12 +177,18 @@ export class Material {
     readonly factors: number[];
     readonly settings: number[];
     readonly uvt: number[];
-    map: Texture | null;
-    metalRoughnessMap: Texture | null;
-    normalMap: Texture | null;
-    aoMap: Texture | null;
-    emissiveMap: Texture | null;
-    matcap: Texture | null;
+    get map(): Texture | null;
+    set map(v: Texture | null);
+    get metalRoughnessMap(): Texture | null;
+    set metalRoughnessMap(v: Texture | null);
+    get normalMap(): Texture | null;
+    set normalMap(v: Texture | null);
+    get aoMap(): Texture | null;
+    set aoMap(v: Texture | null);
+    get emissiveMap(): Texture | null;
+    set emissiveMap(v: Texture | null);
+    get matcap(): Texture | null;
+    set matcap(v: Texture | null);
     get clippingPlanes(): number[][];
     set clippingPlanes(v: readonly (readonly number[])[]);
     get clipIntersection(): boolean;
@@ -683,6 +689,7 @@ export class Texture {
     [Symbol.dispose]: () => void;
     gpuTexture(device: GPUDevice): GPUTexture | undefined;
     sampled(device: GPUDevice, srgb: boolean, slot: string): [GPUTextureView, GPUSampler] | undefined;
+    steady(device: GPUDevice): number;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }
 

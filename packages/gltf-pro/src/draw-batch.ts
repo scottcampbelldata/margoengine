@@ -8,12 +8,15 @@
 // material); each batch keeps its meshes in draw order. Blended draws never reorder: one joins only the batch drawn
 // last, so a batch is a run of consecutive draws (instances rasterize in order), and draws of materials that differ
 // only in base colour fold into it with their colours as instance tints. Wireframe draws batch as line lists.
+// Draws of different material records that share a pipeline and group 2 resources (a draw group: 4,096 materials of
+// one atlas, each with its own UV transform) batch too, as rows batches: each instance reads its own uniform block
+// from an array of blocks (`BatchRows`, `rowsShader`), one draw per 64 KiB of blocks.
 import { instanceLayout } from '../../shared/instances.js';
 import { retire } from '../../shared/frame-resources.js';
 import { instancedShader } from './instanced-shader.js';
 import type { UniformSlot } from './uniform-arena.js';
 
-declare const GPUBufferUsage: { VERTEX: number; COPY_DST: number };
+declare const GPUBufferUsage: { VERTEX: number; UNIFORM: number; COPY_DST: number };
 
 /**
  * What gltf-pro's derivation reads of a batch's instancing (as of a `PBRInstances`): the instance layout, the
@@ -22,14 +25,111 @@ declare const GPUBufferUsage: { VERTEX: number; COPY_DST: number };
  */
 export class BatchKind {
   readonly layout = instanceLayout as GPUVertexBufferLayout;
-  constructor(readonly mirrored: boolean) {}
+  /**
+   * @param rows - Each instance reads its own uniform block (`rowsShader`, applied by the derivation once the shader is
+   *   finished): a batch of meshes whose materials share a pipeline and group 2 but not their uniform rows.
+   */
+  constructor(
+    readonly mirrored: boolean,
+    readonly rows = false,
+  ) {}
   shader(code: string): string {
     return instancedShader(code);
   }
 }
-const kinds = [new BatchKind(false), new BatchKind(true)];
-/** The batch kind for draws whose node matrices are mirrored (negative determinant) or not. */
-export const batchKind = (mirrored: boolean): BatchKind => kinds[+mirrored];
+const kinds = [new BatchKind(false), new BatchKind(true), new BatchKind(false, true), new BatchKind(true, true)];
+/** The batch kind for draws whose node matrices are mirrored (negative determinant) or not; `rows`: see `BatchKind`. */
+export const batchKind = (mirrored: boolean, rows = false): BatchKind => kinds[+mirrored + 2 * +rows];
+
+/**
+ * The uniform blocks of a rows batch (`BatchKind.rows`), one per instance in draw order: `perBinding` blocks per
+ * binding, each binding 256-byte aligned. A block is written again only when its slot changes hands or its
+ * derivation's version changes (NaN versions compare the values).
+ */
+export class BatchRows {
+  data = new Float32Array(0);
+  buffer?: GPUBuffer;
+  /** One binding per `perBinding` blocks; replaced (with the buffer) when the buffer grows. */
+  bindings: GPUBufferBinding[] = [];
+  private floats = 0;
+  private perBinding = 0;
+  /** Floats from one binding's start to the next. */
+  private stride = 0;
+  private readonly owners: (object | undefined)[] = [];
+  private readonly versions: number[] = [];
+  /**
+   * Writes block `blocks[i]` (with identity model rows and determinant 1: the instance rows place each mesh) into slot
+   * `i` and uploads what changed. `owners[i]` and `versions[i]` name where the block came from.
+   */
+  write(
+    device: GPUDevice,
+    blocks: readonly Float32Array[],
+    owners: readonly object[],
+    versions: readonly number[],
+    floats: number,
+    perBinding: number,
+  ): void {
+    const count = blocks.length,
+      chunks = Math.ceil(count / perBinding);
+    if (floats !== this.floats || perBinding !== this.perBinding) {
+      this.floats = floats;
+      this.perBinding = perBinding;
+      this.stride = Math.ceil((perBinding * floats) / 64) * 64;
+      this.data = new Float32Array(0);
+      this.owners.length = this.versions.length = 0;
+    }
+    if (this.data.length < chunks * this.stride) {
+      const capacity = Math.max(chunks, Math.ceil((this.data.length / this.stride) * 1.5)),
+        data = new Float32Array(capacity * this.stride);
+      data.set(this.data);
+      this.data = data;
+      if (this.buffer) retire(device, this.buffer);
+      this.buffer = undefined;
+      this.owners.length = this.versions.length = 0;
+    }
+    if (!this.buffer) {
+      this.buffer = device.createBuffer({
+        label: 'gltf-pro draw batch rows',
+        size: this.data.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      this.bindings = [];
+      for (let c = 0; c < this.data.length / this.stride; c++)
+        this.bindings.push({ buffer: this.buffer, offset: c * this.stride * 4, size: perBinding * floats * 4 });
+    }
+    const data = this.data;
+    let lo = data.length,
+      hi = 0;
+    for (let i = 0; i < count; i++) {
+      const owner = owners[i],
+        version = versions[i];
+      if (this.owners[i] === owner && this.versions[i] === version) continue;
+      const block = blocks[i],
+        o = Math.floor(i / perBinding) * this.stride + (i % perBinding) * floats;
+      let changed = this.owners[i] === undefined;
+      for (let k = 0; k < floats; k++) {
+        const value = k >= 16 && k < 48 ? +((k - (k < 32 ? 16 : 32)) % 5 === 0) : k === 97 ? 1 : block[k];
+        if (data[o + k] !== value) {
+          data[o + k] = value;
+          changed = true;
+        }
+      }
+      this.owners[i] = owner;
+      this.versions[i] = version;
+      if (changed) {
+        if (o < lo) lo = o;
+        if (o + floats > hi) hi = o + floats;
+      }
+    }
+    if (lo < hi) device.queue.writeBuffer(this.buffer, lo * 4, data, lo, hi - lo);
+  }
+  destroy(device: GPUDevice): void {
+    if (this.buffer) retire(device, this.buffer);
+    this.buffer = undefined;
+    this.bindings = [];
+    this.owners.length = this.versions.length = 0;
+  }
+}
 
 /** The instance rows of a batch of several meshes. */
 export class BatchInstances {
@@ -110,13 +210,29 @@ export class BatchInstances {
   }
 }
 
+/** A batch's group 0 by pipeline, uniform binding and view block (index.ts `batchGroup`). */
+export type BatchGroups = Map<GPURenderPipeline, Map<GPUBufferBinding, Map<GPUBufferBinding, GPUBindGroup>>>;
+
+/** A rows batch's GPU state (`BatchKind.rows`), kept like `BatchState`. */
+export interface RowsState {
+  instances: BatchInstances;
+  rows: BatchRows;
+  /** Group 0 by pipeline, rows binding and view block. */
+  groups: BatchGroups;
+  /** Group 1 by pipeline, made from the leading resource's texture views `texturesOf`. */
+  textures: Map<GPURenderPipeline, GPUBindGroup>;
+  texturesOf?: object;
+  frame: number;
+  view: object;
+}
+
 /** A batch's GPU state, kept on its first draw's resource across frames (one per derivation and view). */
 export interface BatchState {
   instances: BatchInstances;
   /** The batch's uniform: the derivation's rows with identity model rows. */
   uniform: UniformSlot;
-  /** Group 0 by pipeline and uniform binding. */
-  groups: Map<GPURenderPipeline, Map<GPUBufferBinding, GPUBindGroup>>;
+  /** Group 0 by pipeline, uniform binding and view block. */
+  groups: BatchGroups;
   /** The frame and view that last drew it. */
   frame: number;
   view: object;

@@ -43,3 +43,53 @@ export function instancedShader(code: string): string {
   instancedCode.set(code, out);
   return out;
 }
+/** Uniform blocks of `floats` floats one 64 KiB uniform binding holds (the WebGPU minimum of maxUniformBufferBindingSize). */
+export const rowsPerBinding = (floats: number): number => Math.floor(65536 / (floats * 4));
+const rowsCode = new Map<string, string>(),
+  frameDeclaration = '@group(0) @binding(0) var<uniform> f:Frame;';
+/**
+ * Patches a finished instanced PBR shader (`instancedShader`, then every later edit) so each instance reads its own
+ * uniform block: binding 0 becomes an array of `count` blocks, every `f.` read becomes a read of block `margoK`, and
+ * the vertex stage and every fragment entry set `margoK` (`instance_index % count`, passed flat). A draw of more
+ * instances binds one array per `count` of them and starts each at a multiple of `count` (`firstInstance`). The reads
+ * go to the uniform array itself: copying the block into a private struct put its dynamically indexed UV rows in local
+ * memory and cost 1.5 ms of GPU time on 4,096 boxes. Undefined when the shader uses `f` other than as `f.field` (a
+ * local of that name, or `f` passed whole): such draws keep their own uniforms.
+ */
+export function rowsShader(code: string, count: number): string | undefined {
+  const key = count + ':' + code;
+  let out = rowsCode.get(key);
+  if (out !== undefined) return out || undefined;
+  out = code.includes(frameDeclaration) ? code.replace(/(?<![\w.])f\.(?=[A-Za-z_])/g, 'margoRows[margoK].') : '';
+  if (out && /(?<![\w.])f(?!\w)/.test(out.replace(frameDeclaration, ''))) out = '';
+  if (out) {
+    const edit = (from: string | RegExp, to: string | ((match: string, ...groups: string[]) => string)) => {
+      const next = out!.replace(from, to as string);
+      if (next === out)
+        throw margoError(
+          'failed',
+          'PBR instance rows patch target missing; the shader source changed, update the patch: ' + from,
+        );
+      out = next;
+    };
+    edit(
+      frameDeclaration,
+      `@group(0) @binding(0) var<uniform> margoRows:array<Frame,${count}>;\nvar<private> margoK:u32;`,
+    );
+    // The block's index travels to the fragment stage at the first free location.
+    edit(/(struct Out \{[^}]*?)\n\}/, (_, body: string) => {
+      let next = 0;
+      for (const [, n] of body.matchAll(/@location\((\d+)\)/g)) next = Math.max(next, +n + 1);
+      return `${body}, @location(${next}) @interpolate(flat) margoK:u32\n}`;
+    });
+    edit(
+      '@vertex fn vertex(i:Input,k:Instance)->Out {',
+      `@vertex fn vertex(i:Input,k:Instance,@builtin(instance_index) margoN:u32)->Out {margoK=margoN%${count}u;`,
+    );
+    edit('o.mirror=margoS;', 'o.mirror=margoS; o.margoK=margoK;');
+    edit(/@fragment fn \w+\(i:Out[^)]*\)[^{]*\{/g, (head: string) => head + 'margoK=i.margoK;');
+  }
+  if (rowsCode.size >= 64) rowsCode.clear();
+  rowsCode.set(key, out);
+  return out || undefined;
+}

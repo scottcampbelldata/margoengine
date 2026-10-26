@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3328938,
+  "total": 3345318,
   "history": [
     {
       "date": "2026-10-24",
@@ -398,6 +398,12 @@
       "commit": "e86bc8ca",
       "reason": "shader item 21.5: new optional entry @margoengine/shader/editor (visual node editor and DOM-free GraphModel); it carries the surface-graph validators and createGraphMaterial that shader/graph carries, so it has the same two peer-dependency leaks (materials, gltf-pro) as shader/graph; no existing entry grows",
       "grew": 3
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "9bce9eb3",
+      "reason": "gltf-pro + materials (p-uv-transform, item 47/53): material change stamps (PBRMaterialShading.version) reuse a steady derivation whole, and draws of materials that share a pipeline and group 2 batch as rows batches (each instance reads its own uniform block); 4,096 materials, one each: 41.7 -> 3 ms CPU",
+      "grew": 5
     }
   ],
   "items": {
@@ -506,7 +512,7 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 5406,
     "@margoengine/gltf": 5976,
-    "@margoengine/gltf-pro": 51345,
+    "@margoengine/gltf-pro": 55036,
     "@margoengine/gltf-pro dist/workers/gltf.js": 20085,
     "@margoengine/gltf-pro dist/workers/progressive.js": 14944,
     "@margoengine/gltf-pro/asset": 5501,
@@ -514,9 +520,9 @@
     "@margoengine/gltf-pro/extended": 6502,
     "@margoengine/gltf-pro/instancing": 3380,
     "@margoengine/gltf-pro/prepare": 16587,
-    "@margoengine/gltf-pro/progressive": 57850,
+    "@margoengine/gltf-pro/progressive": 61641,
     "@margoengine/gltf-pro/scene": 1471,
-    "@margoengine/gltf-pro/worker": 51639,
+    "@margoengine/gltf-pro/worker": 55295,
     "@margoengine/html": 5013,
     "@margoengine/ifc": 2819,
     "@margoengine/ifc dist/workers/ifc.js": 3443,
@@ -562,7 +568,7 @@
     "@margoengine/machinery/telemetry": 13826,
     "@margoengine/materials": 56764,
     "@margoengine/materials/atlas": 2014,
-    "@margoengine/materials/batched": 32115,
+    "@margoengine/materials/batched": 33638,
     "@margoengine/materials/transmission": 7151,
     "@margoengine/math": 12483,
     "@margoengine/math/affine": 3936,
@@ -671,7 +677,7 @@
     "@margoengine/ui": 28622,
     "@margoengine/ui/react": 28708,
     "@margoengine/usdz": 8240,
-    "@margoengine/usdz dist/workers/usdz.js": 60214,
+    "@margoengine/usdz dist/workers/usdz.js": 63933,
     "@margoengine/usdz/worker": 9113,
     "@margoengine/vfx": 12721,
     "@margoengine/vfx/base": 7572,

@@ -360,10 +360,20 @@ function kindOption(kind: Kind | undefined, key: keyof TextureOptions, v: unknow
     return `Texture mipmaps are not generated for ${kind.format} texels; use a 16-bit float format or mipmaps: false`;
   return undefined;
 }
+/** Floats `liveStamp` watches: colour (4), emissive (3), specular (3), factors (4), settings (4). */
+const liveFloats = 18;
+/**
+ * Change stamps shared by textures and materials: each change takes the next number, so the largest stamp of a
+ * material and the textures it binds grows whenever any of them changes (`MaterialShading.version`).
+ */
+let stamps = 0;
+const changeStamp = (): number => ++stamps;
 /** A shareable texture. GPU copies are made lazily per device; video sources re-upload whenever `currentTime` changes, other sources on `update()`. */
 export class Texture {
   private version = 0;
   private samplerVersion = 0;
+  /** The stamp (`changeStamp`) of this texture's last `update()`, option change or `dispose()`. */
+  private stamp = changeStamp();
   /** A flipY, colorSpace or mipmaps change makes the next `update()` a full one. */
   private reshaped = false;
   private readonly slots = new Map<GPUDevice, Slot>();
@@ -509,6 +519,7 @@ export class Texture {
     const problem = kindOption(this.kind, key, v);
     if (problem) throw new TypeError(problem);
     this.options[key] = v;
+    this.stamp = changeStamp();
     if (key === 'flipY' || key === 'colorSpace' || key === 'mipmaps') this.reshaped = true;
     else this.samplerVersion++;
   }
@@ -521,6 +532,7 @@ export class Texture {
    * the affected texels needs per-level rounding (odd sizes shift the 2x2 footprint) for little gain.
    */
   update(region?: TextureRegion): void {
+    this.stamp = changeStamp();
     if (region === undefined || this.reshaped) {
       this.version++;
       this.reshaped = false;
@@ -593,6 +605,7 @@ export class Texture {
    * again. A borrowed GPUTexture or CubeTarget stays its owner's.
    */
   dispose(): void {
+    this.stamp = changeStamp();
     for (const slot of this.slots.values()) {
       slot.texture?.destroy();
       slot.p3?.destroy();
@@ -787,6 +800,40 @@ export class Texture {
         `Material ${slot} samples 32-bit float texels, which needs the device feature float32-filterable; request it in Engine.create features or use a 16-bit float format`,
       );
     return this.bind(device, srgb);
+  }
+  /**
+   * @internal A stamp that stays the same while `bind(device, srgb)` would return the same view and sampler as last
+   * time without uploading anything (`MaterialShading.version`); NaN while that is not known: no GPU copy on `device`
+   * yet, a pending upload, region or sampler rebuild, a source whose size no longer matches its copy, a video, or a cube
+   * made from faces or an equirect source.
+   */
+  steady(device: GPUDevice): number {
+    const k = this.kind,
+      slot = this.slots.get(device),
+      t = slot?.texture;
+    if (!slot || slot.samplerVersion !== this.samplerVersion) return Number.NaN;
+    if (k?.type === 'gpu') return slot.samplerMips === k.texture.mipLevelCount > 1 ? this.stamp : Number.NaN;
+    if (
+      !t ||
+      slot.version !== this.version ||
+      slot.region ||
+      slot.samplerMips !== slot.mips ||
+      k?.type === 'faces' ||
+      k?.type === 'equirect' ||
+      this.isVideo
+    )
+      return Number.NaN;
+    if (k?.type === 'ktx2') return this.stamp;
+    if (!k) {
+      // `dimensions` without its array: this runs for every map of every steady material each frame.
+      const s = this.source as ImageDimensions;
+      return (s.videoWidth ?? s.displayWidth ?? s.naturalWidth ?? s.width ?? 0) === t.width &&
+        (s.videoHeight ?? s.displayHeight ?? s.naturalHeight ?? s.height ?? 0) === t.height
+        ? this.stamp
+        : Number.NaN;
+    }
+    const [w, h, d] = this.size();
+    return w === t.width && h === t.height && d === t.depthOrArrayLayers ? this.stamp : Number.NaN;
   }
   /** @internal View and sampler for a material slot, or undefined while the source has no pixels (unloaded image or video). */
   bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined {
@@ -1468,15 +1515,22 @@ const linear = (c: ColorInput, label: string): number[] => {
   v.forEach((x) => unit(x, label));
   return v;
 };
+/** The `set` of live colours by label: one function per label, so all colours of a label keep one hidden class. */
+const colorSetters = new Map<string, (this: number[], input: ColorInput) => number[]>();
 /** `values` with a `set(input)` that writes the parsed colour into it (opacity only from a four-component array). */
-const liveColor = (values: number[], label: string): LiveColor =>
-  Object.defineProperty(values, 'set', {
-    value(input: ColorInput) {
-      const v = linear(input, label);
-      for (let k = 0; k < Math.min(v.length, values.length); k++) values[k] = v[k];
-      return values;
-    },
-  }) as LiveColor;
+function liveColor(values: number[], label: string): LiveColor {
+  let set = colorSetters.get(label);
+  if (!set)
+    colorSetters.set(
+      label,
+      (set = function (this: number[], input: ColorInput) {
+        const v = linear(input, label);
+        for (let k = 0; k < Math.min(v.length, this.length); k++) this[k] = v[k];
+        return this;
+      }),
+    );
+  return Object.defineProperty(values, 'set', { value: set }) as LiveColor;
+}
 // Lambert and Blinn-Phong rewrite gltf-pro's direct and hemisphere terms in place, so every lighting hook point
 // (direct+ambient(s), var color=, fn ambient, the tone-map line) and the shadows, fog and SSAO hooks stay. Radiance is
 // scaled as on the standard path: the diffuse BRDF base/pi times n.l times the light's irradiance, the hemisphere times
@@ -1573,6 +1627,8 @@ function retainMaps(m: Material, engine: Engine): () => void {
   state.refs++;
   return () => {
     if (--state.refs) return;
+    // Bind groups made with these buffers must not be reused (`MaterialShading.version`).
+    m['changes'] = changeStamp();
     state.buffer?.destroy();
     state.features?.destroy();
     state.env?.destroy();
@@ -1591,6 +1647,8 @@ function materialBuffer(
   if (state.device !== device || !state[field]) {
     state[field]?.destroy();
     state.device = device;
+    // A new buffer is a new binding: bind groups made with the old one must be made again (`MaterialShading.version`).
+    m['changes'] = changeStamp();
     const buffer = (state[field] = device.createBuffer({
       size,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -1899,12 +1957,60 @@ export class Material {
   /** gltf-pro layout: two rows per map slot (offset*rotation*scale), in `MapSlot` order. */
   readonly uvt: number[] = [];
   private uvDefault = textureTransform({}, 0);
-  map: Texture | null;
-  metalRoughnessMap: Texture | null;
-  normalMap: Texture | null;
-  aoMap: Texture | null;
-  emissiveMap: Texture | null;
-  matcap: Texture | null;
+  /** The base maps in `slots` order: map, metalRoughnessMap, normalMap, aoMap, emissiveMap, matcap. */
+  private readonly baseMaps: (Texture | null)[] = [null, null, null, null, null, null];
+  /**
+   * The change stamp (`changeStamp`) of this material's last edit: every setter, `setUVTransform` and `copy` take a
+   * new one once meshes draw it (`trackChanges`), and an in-place colour write is found by `liveStamp`.
+   */
+  private changes = changeStamp();
+  private setBaseMap(i: number, v: Texture | null): void {
+    if (v != null && !(v instanceof Texture))
+      throw new TypeError(`Material ${slots[i]} must be a Texture; pass a Texture instance or null.`);
+    this.baseMaps[i] = v ?? null;
+  }
+  /** Base colour map (sRGB unless its colorSpace says otherwise), live; null for none. */
+  get map(): Texture | null {
+    return this.baseMaps[0];
+  }
+  set map(v: Texture | null) {
+    this.setBaseMap(0, v);
+  }
+  /** glTF metallic-roughness map (G roughness, B metalness, linear), live; null for none. */
+  get metalRoughnessMap(): Texture | null {
+    return this.baseMaps[1];
+  }
+  set metalRoughnessMap(v: Texture | null) {
+    this.setBaseMap(1, v);
+  }
+  /** Tangent-space normal map (linear), live; null for none. */
+  get normalMap(): Texture | null {
+    return this.baseMaps[2];
+  }
+  set normalMap(v: Texture | null) {
+    this.setBaseMap(2, v);
+  }
+  /** Ambient occlusion map (R, linear), live; null for none. */
+  get aoMap(): Texture | null {
+    return this.baseMaps[3];
+  }
+  set aoMap(v: Texture | null) {
+    this.setBaseMap(3, v);
+  }
+  /** Emissive map (sRGB), live; null for none. */
+  get emissiveMap(): Texture | null {
+    return this.baseMaps[4];
+  }
+  set emissiveMap(v: Texture | null) {
+    this.setBaseMap(4, v);
+  }
+  /** Matcap texture (matcap shading), live; null for none. */
+  get matcap(): Texture | null {
+    return this.baseMaps[5];
+  }
+  set matcap(v: Texture | null) {
+    this.setBaseMap(5, v);
+  }
   /** The feature maps (features.ts `featureMaps` order). */
   private readonly featureTextures: (Texture | null)[] = [null, null, null, null];
   /** The feature uniform (features.ts): four values, then two UV rows per feature map (lightMap's on UV1). */
@@ -2846,6 +2952,7 @@ export class Material {
   dispose(): void {
     disposedMaterials.add(this);
     const states = mapStates.get(this);
+    this.changes = changeStamp();
     for (const [owner, state] of states ?? [])
       if (!state.refs) {
         state.buffer?.destroy();
@@ -3427,6 +3534,18 @@ const live = (read: (m: Material, g: MaterialRecord) => unknown): PropertyDescri
 });
 const surfaceFields: PropertyDescriptorMap = {
   extendedFrame: { value: true, enumerable: true },
+  // gltf-pro's placeholder record makes its own `side` accessor per record, which gave every record a hidden class
+  // of its own (gltf-pro's reads of thousands of records then missed every inline cache).
+  side: {
+    get(this: MaterialRecord) {
+      return this[recordMaterial].side;
+    },
+    set(this: MaterialRecord, v: MaterialSide) {
+      this[recordMaterial].side = v;
+    },
+    enumerable: true,
+    configurable: true,
+  },
   base: live((m) => m.color),
   emission: live(emissionOf),
   factors: live((m) => m.factors),
@@ -3453,6 +3572,8 @@ const surfaceFields: PropertyDescriptorMap = {
 };
 /** gltf-pro's shading hook for a record of `m` (see `surface`). */
 class MaterialShading implements PBRMaterialShading {
+  /** What `liveStamp` last saw of the arrays a caller may write in place (colour, emissive, specular, factors, settings). */
+  private readonly seen = new Float64Array(liveFloats).fill(Number.NaN);
   constructor(
     private readonly m: Material,
     private readonly runtime: Engine,
@@ -3465,6 +3586,44 @@ class MaterialShading implements PBRMaterialShading {
   }
   get shaderRevision(): number {
     return shaderRevision(this.m);
+  }
+  /**
+   * gltf-pro `PBRMaterialShading.version`: the largest change stamp of the material and of every texture its bindings
+   * read, so it grows whenever anything this record, `shader()`, `lit()` or `bindings()` reads changes. NaN where that
+   * cannot be known: a material with its own `shader` or `bindings` (NodeMaterial, WgslMaterial), physical maps, an
+   * envMap that is not a Texture, or a texture that is not steady (`Texture.steady`).
+   */
+  get version(): number {
+    const m = this.m,
+      device = this.runtime.gpu;
+    if (!device || m.shader !== Material.prototype.shader || m.bindings !== Material.prototype.bindings || mapped(m))
+      return Number.NaN;
+    let v = liveStamp(m, this.seen);
+    const base = m['baseMaps'],
+      features = m['featureTextures'],
+      toon = m['toonMap'],
+      env = m['env'].map;
+    for (let i = 0; i < base.length; i++) {
+      const s = base[i]?.steady(device) ?? 0;
+      if (s !== s) return s;
+      if (s > v) v = s;
+    }
+    for (let i = 0; i < features.length; i++) {
+      const s = features[i]?.steady(device) ?? 0;
+      if (s !== s) return s;
+      if (s > v) v = s;
+    }
+    if (toon) {
+      const s = toon.steady(device);
+      if (s !== s) return s;
+      if (s > v) v = s;
+    }
+    if (env) {
+      const s = env instanceof Texture ? env.steady(device) : Number.NaN;
+      if (s !== s) return s;
+      if (s > v) v = s;
+    }
+    return v;
   }
   shader(code: string, group: number): string {
     const m = this.m,
@@ -3538,6 +3697,82 @@ function shaderRevision(m: Material): number {
   }
   return state.revision;
 }
+/**
+ * `m`'s change stamp, after a look at the arrays a caller may write element by element (`color[0] = 1`; gltf-pro's
+ * factor and settings rows): a difference from `seen` (what one record last saw of them) takes a new stamp.
+ */
+function liveStamp(m: Material, seen: Float64Array): number {
+  const a = m['rgba'],
+    b = m['glow'],
+    c = m['highlight'],
+    d = m.factors,
+    e = m.settings;
+  if (
+    seen[0] !== a[0] ||
+    seen[1] !== a[1] ||
+    seen[2] !== a[2] ||
+    seen[3] !== a[3] ||
+    seen[4] !== b[0] ||
+    seen[5] !== b[1] ||
+    seen[6] !== b[2] ||
+    seen[7] !== c[0] ||
+    seen[8] !== c[1] ||
+    seen[9] !== c[2] ||
+    seen[10] !== d[0] ||
+    seen[11] !== d[1] ||
+    seen[12] !== d[2] ||
+    seen[13] !== d[3] ||
+    seen[14] !== e[0] ||
+    seen[15] !== e[1] ||
+    seen[16] !== e[2] ||
+    seen[17] !== e[3]
+  ) {
+    for (let i = 0; i < 4; i++) {
+      seen[i] = a[i];
+      seen[10 + i] = d[i];
+      seen[14 + i] = e[i];
+    }
+    for (let i = 0; i < 3; i++) {
+      seen[4 + i] = b[i];
+      seen[7 + i] = c[i];
+    }
+    m['changes'] = changeStamp();
+  }
+  return m['changes'];
+}
+let tracking = false;
+/**
+ * Makes every Material setter, `setUVTransform` and `copy` take a new change stamp (`Material.changes`), from the first
+ * mesh record on: a record's `version` (gltf-pro `PBRMaterialShading.version`) then lets gltf-pro skip reading a steady
+ * material's rows and bindings. Edits before that need no stamp, as gltf-pro has derived nothing yet.
+ */
+function trackChanges(): void {
+  if (tracking) return;
+  tracking = true;
+  const proto = Material.prototype as unknown as Record<string, unknown>;
+  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(proto))) {
+    const set = descriptor.set;
+    if (set)
+      Object.defineProperty(proto, key, {
+        ...descriptor,
+        set(this: Material, v: unknown) {
+          set.call(this, v);
+          this['changes'] = changeStamp();
+        },
+      });
+  }
+  for (const key of ['setUVTransform', 'copy']) {
+    const method = proto[key] as (this: Material, ...args: unknown[]) => unknown;
+    Object.defineProperty(proto, key, {
+      ...Object.getOwnPropertyDescriptor(proto, key),
+      value(this: Material, ...args: unknown[]) {
+        const out = method.apply(this, args);
+        this['changes'] = changeStamp();
+        return out;
+      },
+    });
+  }
+}
 const records = new WeakMap<Material, WeakMap<Engine, PBRMaterial>>();
 /**
  * The gltf-pro material record the meshes of `runtime` draw `m` with: one per material, as glTF primitives that use one
@@ -3549,6 +3784,7 @@ function recordOf(m: Material, runtime: Engine, blank: PropertyDescriptorMap): P
   if (!byEngine) records.set(m, (byEngine = new WeakMap()));
   let record = byEngine.get(runtime);
   if (!record) {
+    trackChanges();
     record = surface(blank, m, runtime);
     byEngine.set(runtime, record);
   }

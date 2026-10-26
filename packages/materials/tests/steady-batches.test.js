@@ -2,7 +2,8 @@
 // batched, blended meshes were one draw each (sorted back to front), and every material composed its shader again every
 // frame. Now wireframe meshes batch as line-list instanced draws, consecutive blended meshes batch in their sort order
 // (materials that differ only in colour fold into one draw, the colours as instance tints), and a material whose shader
-// inputs did not change keeps last frame's shader and pipeline. CPU recording only: the fake pass records the draws.
+// inputs did not change keeps last frame's shader and pipeline (and, since perf-history entry 24, a material that did
+// not change at all is reused whole; material-version.test.js). CPU recording only: the fake pass records the draws.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
@@ -172,7 +173,7 @@ test('a blended mesh of another blending between them ends the batch, and the or
   }
 });
 
-test('a material keeps its shader across frames until a shader input changes; its bindings run every frame', async () => {
+test('a steady material composes no shader and runs no bindings; shader inputs and rows still show next frame', async () => {
   const w = await world();
   const shader = Material.prototype.shader,
     bindings = Material.prototype.bindings,
@@ -187,7 +188,8 @@ test('a material keeps its shader across frames until a shader input changes; it
   };
   try {
     const map = new Texture({ data: new Uint8Array(16).fill(255), width: 2, height: 2 }, { mipmaps: false }),
-      materials = [0, 1, 2].map((k) => new PbrMaterial({ map, uvTransform: { offset: [k / 4, 0] } }));
+      // Offsets that are not the identity: an identity UV row takes no tangent frame, another shader.
+      materials = [1, 2, 3].map((k) => new PbrMaterial({ map, uvTransform: { offset: [k / 4, 0] } }));
     materials.forEach((material, k) => createMesh(w.engine, triangle, material).root.setPosition([k, 0, 0]));
     w.frame();
     await null;
@@ -197,15 +199,30 @@ test('a material keeps its shader across frames until a shader input changes; it
     await null;
     w.frame();
     assert.equal(calls.shader, 0, 'no shader composed on a steady frame');
-    assert.equal(calls.bindings, 3, "each material's bindings (texture uploads, live values) still run");
+    assert.equal(calls.bindings, 0, 'nothing a steady material binds changed, so its bindings do not run');
     assert.equal(w.harness.pipelines.length, pipelines);
-    assert.equal(w.draws.length, 3);
+    // One draw: the three materials differ only in their UV rows, which each instance reads from its own block.
+    assert.deepEqual(
+      w.draws.map((draw) => draw.n),
+      [3],
+    );
+    const offset = (draw, i) => new Float32Array(uniformBytes(draw.uniform).slice().buffer, (i * 220 + 104) * 4, 8)[2];
+    assert.deepEqual(
+      [0, 1, 2].map((i) => offset(w.draws[0], i)),
+      [0.25, 0.5, 0.75],
+    );
     // A shader input (flat shading) composes that material's shader again, and only that one.
     materials[1].flatShading = true;
     await null;
     w.frame();
     assert.equal(calls.shader, 1);
-    assert.notEqual(w.draws[1].pipeline, w.draws[0].pipeline, 'the flat-shaded material draws its new pipeline');
+    assert.equal(calls.bindings, 1, 'only the edited material binds again');
+    assert.deepEqual(
+      w.draws.map((draw) => draw.n),
+      [2, 1],
+      'meshes 0 and 2 still share a draw; the flat-shaded one draws its new pipeline',
+    );
+    assert.notEqual(w.draws[1].pipeline, w.draws[0].pipeline);
     assert.match(w.draws[1].pipeline.vertex.module.code, /dpdx|dpdy/, 'flat shading takes the face normal');
     // A row edit (the UV transform) shows without composing anything.
     calls.shader = 0;
@@ -213,8 +230,8 @@ test('a material keeps its shader across frames until a shader input changes; it
     await null;
     w.frame();
     assert.equal(calls.shader, 0);
-    const rows = new Float32Array(uniformBytes(w.draws[2].uniform).slice().buffer, 104 * 4, 8);
-    assert.deepEqual([rows[2], rows[6]], [0.5, 0.5], 'the new offset reaches the draw');
+    const rows = new Float32Array(uniformBytes(w.draws[0].uniform).slice().buffer, (220 + 104) * 4, 8);
+    assert.deepEqual([rows[2], rows[6]], [0.5, 0.5], "the new offset reaches mesh 2's block");
   } finally {
     Material.prototype.shader = shader;
     Material.prototype.bindings = bindings;

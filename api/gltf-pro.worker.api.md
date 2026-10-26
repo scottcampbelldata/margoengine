@@ -50,6 +50,8 @@ interface AssetOptions {
     maxNodes?: number;
 }
 
+type BatchGroups = Map<GPURenderPipeline, Map<GPUBufferBinding, Map<GPUBufferBinding, GPUBindGroup>>>;
+
 class BatchInstances {
     data: Float32Array<ArrayBuffer>;
     buffer?: GPUBuffer;
@@ -60,8 +62,9 @@ class BatchInstances {
 
 class BatchKind {
     readonly mirrored: boolean;
+    readonly rows: boolean;
     readonly layout: GPUVertexBufferLayout;
-    constructor(mirrored: boolean);
+    constructor(mirrored: boolean, rows?: boolean);
     shader(code: string): string;
 }
 
@@ -72,10 +75,18 @@ interface BatchPart {
     indices: Uint32Array;
 }
 
+class BatchRows {
+    data: Float32Array<ArrayBuffer>;
+    buffer?: GPUBuffer;
+    bindings: GPUBufferBinding[];
+    write(device: GPUDevice, blocks: readonly Float32Array[], owners: readonly object[], versions: readonly number[], floats: number, perBinding: number): void;
+    destroy(device: GPUDevice): void;
+}
+
 interface BatchState {
     instances: BatchInstances;
     uniform: UniformSlot;
-    groups: Map<GPURenderPipeline, Map<GPUBufferBinding, GPUBindGroup>>;
+    groups: BatchGroups;
     frame: number;
     view: object;
 }
@@ -111,6 +122,7 @@ interface DeviceDraws {
     codeCount: number;
     pipelines: Map<string, GPURenderPipeline>;
     derivations: WeakMap<object, DrawDerivation[]>;
+    groups: Map<string, object>;
 }
 
 interface DrawDerivation {
@@ -142,6 +154,12 @@ interface DrawDerivation {
     modelFree: boolean;
     tintable?: boolean;
     blendStates?: BatchState[];
+    blendRows?: RowsState[];
+    group?: object;
+    rowsOf?: DrawDerivation;
+    rowsAt?: number;
+    rowsOfAt?: number;
+    rowsOk?: boolean;
     joined?: object;
     joinedRun?: object;
     block: Float32Array;
@@ -149,6 +167,7 @@ interface DrawDerivation {
     shading?: object;
     renderState?: object;
     structure?: number;
+    version?: number;
 }
 
 interface DrawFrame {
@@ -194,6 +213,7 @@ interface DrawResource {
     batch?: StaticBatch;
     edited?: boolean;
     batchStates?: Map<DrawDerivation, BatchState[]>;
+    rowStates?: Map<DrawDerivation, RowsState[]>;
     nodeCache?: Float32Array;
 }
 
@@ -201,6 +221,8 @@ interface DrawScratch {
     context?: Context;
     matrices: ArrayLike<number>[];
     tints: ArrayLike<number>[];
+    blocks: Float32Array[];
+    versions: number[];
     checked: Set<PBRMaterial>;
     batchValues: Float32Array;
     viewData: Float32Array;
@@ -683,7 +705,7 @@ class PBRDrawRun {
     readonly view: RunView;
     readonly pending: PendingBatch[];
     readonly spare: PendingBatch[];
-    readonly batches: Map<DrawDerivation, PendingBatch[]>;
+    readonly batches: Map<object, PendingBatch[]>;
     fence: number;
     readonly folds: Map<DrawDerivation, Map<DrawDerivation, boolean>>;
     quickFor(c: Context): QuickRun;
@@ -758,6 +780,7 @@ interface PBRMaterialShading extends LightingEffect {
     readonly texturedTint?: boolean;
     lit?(code: string): string;
     readonly shaderRevision?: number;
+    readonly version?: number;
 }
 
 class PBRModel implements EnginePlugin {
@@ -923,7 +946,9 @@ interface PendingBatch {
     members: DrawResource[];
     models: PBRModel[];
     nodes: Mesh[];
+    ds: DrawDerivation[];
     folded: boolean;
+    rows: boolean;
     fence: number;
 }
 
@@ -944,6 +969,16 @@ interface QuickRun {
     oit: object | undefined;
     hook: object | undefined;
     hooks: GLTFExtendedMaterials | undefined;
+}
+
+interface RowsState {
+    instances: BatchInstances;
+    rows: BatchRows;
+    groups: BatchGroups;
+    textures: Map<GPURenderPipeline, GPUBindGroup>;
+    texturesOf?: object;
+    frame: number;
+    view: object;
 }
 
 interface RunView {

@@ -324,7 +324,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
   | `p-uv-transform` (4,096 materials) | 63.6 / 4.60 | 41.7 / 4.64 (36.2 in run `20261026-104231`) | 6.00 / 6.41 (WebGL), slower |
 
   `p-blending`'s CPU is within the run's spread of three.js (the run is marked invalid for spread); its GPU time is an
-  eighth. `p-uv-transform` is still about 7 times three.js: [known-bugs.md](../known-bugs.md#p-uv-transform-4096-materials-meshes-one-material-each-still-slower-than-threejs).
+  eighth. `p-uv-transform` was still about 7 times three.js; entry 24 fixed it.
 - **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity
   --cases=p-uv-transform,p-blending,p-transparency,p-wireframe --runs=5`, then
   `node bench/parity-report.mjs <run.json> --partial`.
@@ -332,6 +332,51 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
   consecutive blended meshes as one draw, back to front; colour-only materials folded with their tints in sort order and
   live edits; another blending ends the batch; a steady material composes no shader while its bindings run and a flat
   shading edit composes one; record copies), `packages/gltf-pro/tests/wireframe.test.js` (each edge once).
+
+### 24. Materials meshes: 4,096 materials, one each
+
+- **Loss:** after entry 23, `p-uv-transform` (4,096 boxes, each with its own textured material and UV transform) took
+  36.2-41.7 ms of CPU per frame against three.js WebGL's 5.9-6.0: the last scene of the speed matrix slower than
+  three.js.
+- **Causes, measured** (mock-device CPU profiles of the scene, 4,096 meshes: 37 ms a frame):
+  1. every mesh was its own draw: a batch carried one uniform block, so materials that differ in more than the base
+     colour never shared a draw (drawOwn, uniform compare, bind groups: about 6 us a mesh);
+  2. every material read its rows through the record's getters and ran `bindings()` (texture lookups, a new entries
+     list, the group 2 compare) every frame, about 3 us each, because nothing said whether it had changed;
+  3. every material record still had a hidden class of its own: gltf-pro's placeholder record makes its `side`
+     accessor per record, and the materials records copied it (entry 23 had replaced the other accessors);
+  4. every live colour had its own hidden class too: its `set` was a new closure per colour.
+- **Fixes:** a change stamp on `Material` (every setter, `setUVTransform`, `copy`, buffer releases, and a compare of the
+  colour and factor arrays a caller may write in place) and on `Texture` (`update()`, options, `dispose()`, and
+  `steady(device)`: no upload or sampler rebuild pending), reported to gltf-pro as the new optional
+  `PBRMaterialShading.version`; while it and the draw context stay the same, a draw reuses the derivation whole (rows,
+  pipeline, group 2) without reading the record or calling `bindings()`; complete derivations carry a draw group (one
+  object per pipeline and group 2 resources), and draws of different material records of one group batch as rows
+  batches, whose instances each read their own uniform block from an array of 64 KiB bindings (74 blocks each, one draw
+  per binding, `firstInstance` at each binding's start); the record's `side` and the colours' `set` are shared
+  functions. No core or stage bytes.
+- **Bug found on the way:** a batch's group 0 was cached by pipeline and uniform only, but a batch state also serves
+  other views (a view made anew each frame takes a free state; views with equal rows share one), so a second view could
+  bind the first view's camera block. Group 0 is now cached by view block too.
+- **Image:** the same SSIM and delta E against three.js as before: 0.994 / 1.09.
+- **After** (diagnostic, busy machine, RTX A6000; run `20261026-143425` (5 runs; marked invalid for spread: one GPU sample of 0.22 among 0.15s); row in [perf-vs-threejs.md](perf-vs-threejs.md)): CPU / GPU ms per frame.
+
+  | Scene | Before | After | three.js |
+  | --- | --- | --- | --- |
+  | `p-uv-transform` (4,096 materials) | 41.7 / 4.64 (36.2 in run `20261026-104231`) | 2.87 / 0.15 | 6.53 / 5.46 (WebGL), faster |
+
+  4,096 draws became 56. The mock-device profile went from 37 to about 3.6 ms a frame. The first version of the rows
+  shader copied each instance's block into a private struct, which put its dynamically indexed UV rows in local memory:
+  6.14 ms of GPU time (run `20261026-134031`); reading the uniform array directly gives 0.15.
+- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity --cases=p-uv-transform
+  --runs=5`, then `node bench/parity-report.mjs <run.json> --partial`; mock profile: `packages/materials/tests/
+  material-version.test.js` builds the same kind of scene.
+- **Guard:** `packages/materials/tests/material-version.test.js` (the version changes with every kind of edit and stays
+  while nothing changes; NaN for materials with their own shader; a steady material binds nothing while in-place
+  colours, texture updates and map swaps still show; 200 materials of one atlas draw as 3 draws of 74/74/52 with their
+  own blocks and an edit uploads one block; different textures keep their own draws; records and colours keep one
+  shape; a view made anew each frame binds its own camera; a material whose meshes all went binds new buffers),
+  `packages/materials/tests/steady-batches.test.js` (a steady material composes no shader and runs no bindings).
 
 ## Size of the frozen core
 
@@ -530,8 +575,6 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   - Still open: `createInstancedMesh` vertex fetch at 10k-50k, the 1k GPU cost of a package pass, and CPU for moving
     instances. Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
   - [claims.md](claims.md) records that there is no publishable result yet.
-- **`p-uv-transform`** (entry 23): 4,096 materials meshes, one material each, 36.2-41.7 ms of CPU per frame against
-  three.js WebGL's 5.9-6.0 (diagnostic). Cause and plan: [known-bugs.md](../known-bugs.md#p-uv-transform-4096-materials-meshes-one-material-each-still-slower-than-threejs).
 - **Galaxy S23 Ultra island demo.** A report of 3–5 FPS on that phone, with particles off making no difference.
   - Partial fixes: `909e384a`, and `1c627cdc` (scatter compiles the fade `discard` only when instances can fade).
   - No after number is recorded. The project has no S23 to test on.
