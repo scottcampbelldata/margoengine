@@ -17,6 +17,19 @@ rig.shake(0.2, 0.4);
 
 follow accepts a live mesh from the attached engine or a world-position tuple. Mesh targets use world transforms. Shake amplitude is in world units and duration is seconds; it does not alter the settled spring position. The frame plugin owns camera position/target while attached, so disable competing camera controls. dispose detaches it.
 
+Scope the rig with `using` (it calls `dispose()` and returns the camera to your controls):
+
+```ts
+import {Cinematic} from 'margoengine/cinematic';
+{
+  using rig = Cinematic.attach(engine, {offset: [0, 3, 6]});
+  rig.follow([0, 1.6, 0]);
+  rig.update(1 / 60);
+}
+```
+
+Errors name their fix: a bad argument throws `RangeError` or `TypeError` (for example `Invalid camera delta; pass a finite delta of 0 or more seconds`), and attaching a rig twice throws `MargoError` with code `attached`.
+
 Set `ground: (x,z) => height` to keep the camera arm above a CPU heightfield.
 `clearance` defaults to 0.65 world units. The rig checks both its desired arm and
 the resulting damped/shaken camera, without changing your requested `offset`.

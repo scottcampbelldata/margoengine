@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel, Mesh, RenderView } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import { EventDispatcher, type ControlElement } from './controls.js';
 import {
   buildGizmo,
@@ -24,20 +25,29 @@ import {
 import { basis, intersectPlane, project, ray, type Basis } from './view.js';
 import { viewSize } from '../../shared/view-rect.js';
 
+/** The frame the gizmo axes follow: `world` (the default) or the attached object's `local` axes. */
 export type TransformSpace = 'world' | 'local';
 export type { TransformMode, HandleName };
 
+/** Options of `TransformControls`; every field is optional. */
 export interface TransformControlsOptions {
+  /** Default `translate`. */
   mode?: TransformMode;
+  /** Default `world`. */
   space?: TransformSpace;
   /** Gizmo size multiplier. Default 1. */
   size?: number;
+  /** Snap step for moving, in world units. Default null: no snapping. */
   translationSnap?: number | null;
-  /** Radians. */
+  /** Snap step for rotating, in radians. Default null: no snapping. */
   rotationSnap?: number | null;
+  /** Snap step for scaling. Default null: no snapping. */
   scaleSnap?: number | null;
+  /** Show the X handles. Default true. */
   showX?: boolean;
+  /** Show the Y handles. Default true. */
   showY?: boolean;
+  /** Show the Z handles. Default true. */
   showZ?: boolean;
   /** Element to listen on. Defaults to the engine canvas. */
   element?: ControlElement;
@@ -159,7 +169,7 @@ export class TransformControls extends EventDispatcher {
   }
 
   connect(element: ControlElement): void {
-    if (this.disposed) throw new Error('Controls are disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Controls are disposed; create new controls');
     this.disconnect();
     this.element = element;
     try {
@@ -188,7 +198,7 @@ export class TransformControls extends EventDispatcher {
   attach(object: Mesh): this {
     meshRuntime(object).check();
     if ((meshRuntime(object) as unknown as { engine: unknown }).engine !== engineRuntime(this.engine))
-      throw new TypeError('Mesh belongs to another engine');
+      throw new TypeError('Mesh belongs to another engine; attach a mesh created by this engine');
     if (this.dragging) this.endDrag();
     this.object = object;
     this.resetState = this.local();

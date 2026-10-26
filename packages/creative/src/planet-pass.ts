@@ -81,7 +81,9 @@ export class PlanetPass {
           image.height < 1 ||
           Math.max(image.width, image.height) > device.limits.maxTextureDimension2D)
       )
-        throw new RangeError('Planet image dimensions exceed GPU limits');
+        throw new RangeError(
+          'Planet image dimensions exceed GPU limits; downscale the maps to the device maxTextureDimension2D',
+        );
     }
     this.uniformData[35] = config.radius;
     this.uniformData.set(config.atmosphereColor, 40);
@@ -99,7 +101,8 @@ export class PlanetPass {
     this.shellDescriptor = { colorAttachments: [this.color], depthStencilAttachment: this.shellDepth };
     try {
       const buffer = (data: Float32Array | Uint32Array, usage: number): GPUBuffer => {
-        if (data.byteLength > device.limits.maxBufferSize) throw new RangeError('Planet buffers exceed GPU limits');
+        if (data.byteLength > device.limits.maxBufferSize)
+          throw new RangeError('Planet buffers exceed GPU limits; lower the mesh detail');
         const resource = device.createBuffer({ size: data.byteLength, usage: usage | GPUBufferUsage.COPY_DST });
         this.buffers.push(resource);
         device.queue.writeBuffer(resource, 0, data as Float32Array<ArrayBuffer>);

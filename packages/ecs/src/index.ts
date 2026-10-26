@@ -25,13 +25,16 @@ export class Component<S extends Schema = Schema> {
     readonly world: World,
     schema: S,
   ) {
-    if (!Object.keys(schema).length) throw new TypeError('Empty component schema');
+    if (!Object.keys(schema).length)
+      throw new TypeError('Empty component schema; give at least one field, e.g. {x: Float32Array}');
     this.sparse = new Int32Array(world.capacity).fill(-1);
     this.entities = new Uint32Array(world.capacity);
     this.fields = Object.fromEntries(
       Object.entries(schema).map(([key, Type]) => {
         if (![Float32Array, Float64Array, Int32Array, Uint32Array, Uint8Array].includes(Type as typeof Float32Array))
-          throw new TypeError('Unsupported component storage');
+          throw new TypeError(
+            'Unsupported component storage; use Float32Array, Float64Array, Int32Array, Uint32Array or Uint8Array',
+          );
         return [key, new Type(world.capacity)];
       }),
     ) as typeof this.fields;
@@ -64,7 +67,7 @@ export class Component<S extends Schema = Schema> {
         (field instanceof Uint32Array && (!Number.isInteger(value) || value < 0 || value > 0xffffffff)) ||
         (field instanceof Uint8Array && (!Number.isInteger(value) || value < 0 || value > 255))
       )
-        throw new RangeError('Invalid component data');
+        throw new RangeError('Invalid component data; pass finite numbers that fit the field type');
     }
     let row = this.index(entity);
     if (row < 0) {
@@ -106,7 +109,7 @@ export class World {
    */
   constructor(readonly capacity = 4096) {
     if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > capacityLimit)
-      throw new RangeError('Invalid ECS capacity');
+      throw new RangeError('Invalid ECS capacity; use an integer from 1 to 1000000');
     this.live = new Uint8Array(capacity);
     this.generations = new Uint32Array(capacity);
     this.free = new Uint32Array(capacity);
@@ -132,7 +135,8 @@ export class World {
    * @throws RangeError when all `capacity` slots are in use.
    */
   create(): Entity {
-    if (!this.freeCount) throw new RangeError('Entity capacity exhausted');
+    if (!this.freeCount)
+      throw new RangeError('Entity capacity exhausted; destroy entities or create the World with a larger capacity');
     const slot = this.free[--this.freeCount];
     this.live[slot] = 1;
     return this.generations[slot] * this.capacity + slot;
@@ -194,7 +198,10 @@ export class World {
         }
       }
       if (match) {
-        if (count === output.length) throw new RangeError('Query output is too small');
+        if (count === output.length)
+          throw new RangeError(
+            'Query output is too small; pass a Uint32Array at least as long as the entity count (world.capacity always fits)',
+          );
         output[count++] = entity;
       }
     }

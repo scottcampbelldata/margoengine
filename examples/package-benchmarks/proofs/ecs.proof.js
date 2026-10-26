@@ -72,11 +72,11 @@ for (const { World, Component } of [baseline, candidate]) {
   assert.equal(output[0], e[1]);
   assert.throws(() => world.query([position], new Uint32Array(0)), {
     name: 'RangeError',
-    message: 'Query output is too small',
+    message: /^Query output is too small/,
   });
   assert.throws(() => world.query([], output), { name: 'TypeError' });
   assert.throws(() => world.query([new World(2).component({ x: Float32Array })], output), { name: 'TypeError' });
-  assert.throws(() => position.add(e[1], { x: NaN }), { name: 'RangeError', message: 'Invalid component data' });
+  assert.throws(() => position.add(e[1], { x: NaN }), { name: 'RangeError', message: /^Invalid component data/ });
   assert.throws(() => position.add(e[1], { y: 1 }), { name: 'RangeError' });
   world.destroy(e[0]);
   assert.equal(position.size, 2);

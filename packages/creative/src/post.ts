@@ -159,7 +159,8 @@ export class PostProcessing implements EnginePlugin {
     for (const key in o)
       if (Object.hasOwn(o, key)) {
         const value = o[key as keyof PostOptions];
-        if (typeof value === 'number' && !finite(value)) throw new RangeError(`Invalid post ${key}`);
+        if (typeof value === 'number' && !finite(value))
+          throw new RangeError(`Invalid post ${key}; use a finite number`);
       }
     if (
       !range(o.exposure ?? 0, -10, 10) ||
@@ -172,15 +173,15 @@ export class PostProcessing implements EnginePlugin {
       !range(a.heightFalloff ?? 0, 0, 10) ||
       !range(a.godRays ?? 0, 0, 4)
     )
-      throw new RangeError('Invalid post or atmosphere options');
+      throw new RangeError('Invalid post or atmosphere options; keep each value inside its documented range');
     const g = o.gain ?? gain,
       l = o.lift ?? lift,
       c = a.color ?? color,
       s = a.sun ?? sun;
     if (!vectorRange(g, 0, 16) || !vectorRange(l, -4, 4) || !vectorRange(c, 0, 1))
-      throw new RangeError('Post color vector exceeds limits');
+      throw new RangeError('Post color vector exceeds limits; keep gain in 0..16, lift in -4..4 and colour in 0..1');
     if (!vectorFinite(g) || !vectorFinite(l) || !vectorFinite(c) || !vectorFinite(s))
-      throw new RangeError('Invalid post vector');
+      throw new RangeError('Invalid post vector; use finite numbers');
     if (!Math.hypot(...s)) throw new RangeError('Sun direction must be nonzero');
   }
   setup(engine: Engine): void {

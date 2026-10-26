@@ -29,7 +29,7 @@ export class ToonShading implements EnginePlugin {
   }
   constructor({ bands = 4, rim = 0.15 }: ToonOptions = {}) {
     if (!Number.isSafeInteger(bands) || bands < 2 || bands > 16 || !Number.isFinite(rim) || rim < 0 || rim > 1)
-      throw new RangeError('Invalid toon options');
+      throw new RangeError('Invalid toon options; use integer bands 2..16 and rim 0..1');
     this.values = new Float32Array([bands, rim, 0, 0]);
   }
   setup(engine: Engine): void {

@@ -244,7 +244,9 @@ export class Clustered implements EnginePlugin {
       grid.some((v) => !Number.isInteger(v) || v < 1 || v > 128) ||
       grid.reduce((a, b) => a * b, 1) > 32768
     )
-      throw new RangeError('Invalid cluster grid');
+      throw new RangeError(
+        'Invalid cluster grid; pass [x, y, z] integers from 1 to 128 whose product is at most 32768',
+      );
     this.grid = [...grid] as [number, number, number];
     if (options.shadows !== undefined) this.localShadows = new LocalShadowMaps(options.shadows);
   }
@@ -311,7 +313,7 @@ export class Clustered implements EnginePlugin {
           (light.innerAngle ?? 0) < 0 ||
           (light.innerAngle ?? 0) > light.outerAngle!
         )
-          throw new RangeError('Invalid spot cone');
+          throw new RangeError('Invalid spot cone; set outerAngle above 0 and innerAngle between 0 and outerAngle');
       }
     }
     const fresh = (light: PointLight | SpotLight) =>
@@ -391,7 +393,9 @@ export class Clustered implements EnginePlugin {
       this.receivers.has(receiver) ||
       typeof receiveShadow !== 'boolean'
     )
-      throw new TypeError('Invalid or duplicate clustered receiver');
+      throw new TypeError(
+        'Invalid or duplicate clustered receiver; pass a model or mesh with addLighting once, and a boolean receiveShadow',
+      );
     const remove = receiver.addLighting(receiveShadow ? this : this.unshadowed);
     this.receivers.set(receiver, remove);
     return () => {
@@ -493,7 +497,7 @@ export class Clustered implements EnginePlugin {
     const count = this.grid[0] * this.grid[1] * this.grid[2],
       bytes = count * 1024 * 4;
     if (bytes > this.device.limits.maxStorageBufferBindingSize || bytes > this.device.limits.maxBufferSize)
-      throw new RangeError('Cluster index list exceeds device limit');
+      throw new RangeError('Cluster index list exceeds device limit; use a smaller cluster grid');
     const buffer = (size: number, usage: number) =>
       this.device!.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST });
     this.uniform = buffer(128, GPUBufferUsage.UNIFORM);
@@ -531,7 +535,9 @@ export class Clustered implements EnginePlugin {
         if (c.backend !== 'webgpu') return;
         const intensity = typeof this.intensityScale === 'function' ? this.intensityScale() : this.intensityScale;
         if (typeof intensity !== 'number' || !Number.isFinite(Math.fround(intensity)) || intensity < 0)
-          throw new RangeError('Invalid clustered intensity scale');
+          throw new RangeError(
+            'Invalid clustered intensity scale; set intensityScale (or return from it) a finite number of 0 or more',
+          );
         for (const [receiver, remove] of this.receivers)
           if ('disposed' in receiver && receiver.disposed) {
             remove();

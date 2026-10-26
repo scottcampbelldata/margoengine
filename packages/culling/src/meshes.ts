@@ -116,7 +116,8 @@ export class CulledMeshes implements EnginePlugin {
     this.check();
   }
   private check(): void {
-    if (!(this.minRadius >= 0 && this.minRadius < 1e6)) throw new RangeError('Invalid culled mesh options');
+    if (!(this.minRadius >= 0 && this.minRadius < 1e6))
+      throw new RangeError('Invalid culled mesh options; set minRadius to a number from 0 up to 1e6');
   }
 
   setup(engine: Engine): void {

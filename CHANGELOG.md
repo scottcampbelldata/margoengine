@@ -17,6 +17,12 @@ whole message text. Changed classes (all still extend `Error`):
 - `@margoengine/audio`: `play()` with no source throws `MargoError` code `state`; use after `dispose()` code
   `disposed`; missing Web Audio or `fetch` code `unsupported`; an HTTP or decode failure code `failed`.
 - `@margoengine/blender`, `@margoengine/bvh`: classes unchanged, messages end with a fix clause.
+- `@margoengine/cameras`: `FloatingOrigin` methods used before `engine.use(origin)` throw `MargoError` code `state`.
+- `@margoengine/controls`: `connect()` on disposed controls (and `TransformControls`) throws `MargoError` code `disposed`; a
+  failed gizmo shader compile or link throws `MargoError` code `unsupported`, with the GL log and the advice to use a
+  WebGL2 context.
+- `@margoengine/cinematic`, `clustered`, `creative`, `culling`, `dof`, `ecs`: classes unchanged, messages end with a
+  fix clause.
 
 ### Open source release
 

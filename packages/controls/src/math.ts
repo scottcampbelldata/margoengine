@@ -50,7 +50,8 @@ export function invertAffine(m: ArrayLike<number>): number[] {
     B = f * g - d * i,
     C = d * h - e * g,
     det = a * A + b * B + c * C;
-  if (!det || !Number.isFinite(det)) throw new RangeError('Parent matrix is not invertible');
+  if (!det || !Number.isFinite(det))
+    throw new RangeError('Parent matrix is not invertible; use a parent with non-zero scale on every axis');
   const r = 1 / det;
   const n = [
     A * r,

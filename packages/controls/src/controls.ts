@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Camera, EngineKernel } from '@margoengine/core';
+import { MargoError } from '@margoengine/math/errors';
 
 /** Native handlers may specialize the event type, as in the DOM listener overloads. */
 export type InputEventListener = { handleEvent(event: Event): void }['handleEvent'];
@@ -32,11 +33,13 @@ export interface EventTargetLike {
   removeEventListener(type: string, listener: InputEventListener, options?: EventListenerOptions | boolean): void;
 }
 
+/** What a control dispatches to its listeners: `type` (for example `change`, `start`, `end`) and the control as `target`. */
 export interface ControlEvent {
   type: string;
   target: unknown;
   [key: string]: unknown;
 }
+/** A function passed to `addEventListener` on a control; it receives the {@link ControlEvent}. */
 export type ControlListener = (event: ControlEvent) => void;
 
 /** Minimal `EventDispatcher`. */
@@ -153,7 +156,7 @@ export abstract class Controls extends EventDispatcher {
   protected onDisconnect(): void {}
 
   connect(element: ControlElement): void {
-    if (this.disposed) throw new Error('Controls are disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Controls are disposed; create new controls');
     this.disconnect();
     this.element = element;
     try {

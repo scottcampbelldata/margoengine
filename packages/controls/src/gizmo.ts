@@ -2,7 +2,9 @@ import { madd, type V3 } from './math.js';
 import { cross, dot, normalize, sub } from '@margoengine/math/vec3';
 import { intersectPlane, project, ray, type Basis } from './view.js';
 
+/** What the transform gizmo does: move (`translate`, the default), `rotate` or `scale`. */
 export type TransformMode = 'translate' | 'rotate' | 'scale';
+/** The gizmo handle being hovered or dragged: an axis (`X`, `Y`, `Z`), a plane (`XY`, `YZ`, `XZ`), `XYZ` (free or uniform), `E` (view-aligned ring) or `XYZE` (trackball ring). */
 export type HandleName = 'X' | 'Y' | 'Z' | 'XY' | 'YZ' | 'XZ' | 'XYZ' | 'E' | 'XYZE';
 type RGBA = readonly [number, number, number, number];
 
@@ -19,6 +21,7 @@ interface TrianglePrim {
   points: V3[];
   color: RGBA;
 }
+/** A drawable gizmo primitive in world space: a list of lines or a list of triangles. */
 export type Prim = LinePrim | TrianglePrim;
 
 type Pick =
@@ -28,6 +31,7 @@ type Pick =
   | { type: 'quad'; normal: V3; u: V3; v: V3; min: number; max: number; size: number }
   | { type: 'disc'; radius: number; minPx: number; score: number };
 
+/** One pickable part of the gizmo: its name, the primitives that draw it and how a pointer picks it. */
 export interface Handle {
   name: HandleName;
   prims: Prim[];

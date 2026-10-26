@@ -36,7 +36,7 @@ export class GPUParticles extends VFX {
   constructor(options: ParticleOptions = {}) {
     const { count = 5000, gravity = [0, -0.5, 0], wind = [0.4, 0, 0], size = 0.035, curl = 0 } = options;
     if (!Number.isFinite(size) || !(curl >= 0 && curl <= 10) || gravity.length !== 3 || wind.length !== 3)
-      throw new RangeError('Invalid particle options');
+      throw new RangeError('Invalid particle options; use a finite size, curl 0..10 and 3-value gravity and wind');
     super({
       capacity: count,
       initialCount: count,

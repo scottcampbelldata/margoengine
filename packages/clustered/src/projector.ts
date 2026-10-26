@@ -214,7 +214,9 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
       const size = Math.max(1024, 2 ** Math.ceil(Math.log2(this.words.byteLength))),
         limits = this.device!.limits;
       if (size > limits.maxStorageBufferBindingSize || size > limits.maxBufferSize)
-        throw new RangeError('Projector images exceed the device storage buffer limit');
+        throw new RangeError(
+          'Projector images exceed the device storage buffer limit; use fewer or smaller projector images',
+        );
       const buffer = (this.buffer = this.device!.createBuffer({
         size,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,

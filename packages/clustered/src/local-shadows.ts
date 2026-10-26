@@ -181,7 +181,7 @@ export class LocalShadowMaps {
   private readonly depthAttachment = this.depthPass.depthStencilAttachment;
   constructor(options: LocalShadowOptions = {}) {
     if (!options || typeof options !== 'object' || Array.isArray(options))
-      throw new TypeError('Invalid local shadow options');
+      throw new TypeError('Invalid local shadow options; pass an options object such as {maxLights: 8}');
     this.resolution = options.resolution ?? 512;
     this.maxLights = options.maxLights ?? 4;
     if (
@@ -191,7 +191,9 @@ export class LocalShadowMaps {
       this.maxLights < 1 ||
       this.maxLights > 32
     )
-      throw new RangeError('Invalid local shadow options');
+      throw new RangeError(
+        'Invalid local shadow options; set maxLights to an integer from 1 to 32 and resolution to a valid size',
+      );
     this.values = new Float32Array(this.maxLights * 6 * 20);
     this.cameras = new Float32Array(this.maxLights * 6 * 16);
     this.matrices = Array.from({ length: this.maxLights * 6 }, (_, i) => this.cameras.subarray(i * 16, i * 16 + 16));
@@ -208,14 +210,15 @@ export class LocalShadowMaps {
     let slot = 0;
     for (let i = 0; i < lights.length; i++) {
       const light = lights[i];
-      if (!light || typeof light !== 'object') throw new TypeError('Invalid shadow light');
+      if (!light || typeof light !== 'object')
+        throw new TypeError('Invalid shadow light; pass light objects (or null) in the lights array');
       const option = light.shadow;
       if (option === undefined || option === false) {
         indices.push(0);
         continue;
       }
       if (option !== true && (!option || typeof option !== 'object' || Array.isArray(option)))
-        throw new TypeError('Invalid local light shadow');
+        throw new TypeError('Invalid local light shadow; set castShadow to true or to an options object');
       if (slot === this.maxLights) throw new RangeError(`At most ${this.maxLights} lights may cast local shadows`);
       finiteVector(light.position, 3, 'Shadow light position');
       const settings = option === true ? {} : option;
@@ -242,7 +245,9 @@ export class LocalShadowMaps {
         !Number.isFinite(normalBias) ||
         normalBias < 0
       )
-        throw new RangeError('Invalid local light shadow settings');
+        throw new RangeError(
+          'Invalid local light shadow settings; set bias and normalBias to finite numbers of 0 or more',
+        );
       const size = settings.resolution ?? this.resolution,
         pair = Array.isArray(size) && size.length === 2,
         width = typeof size === 'number' ? size : pair ? size[0] : NaN,
@@ -267,7 +272,9 @@ export class LocalShadowMaps {
           light.outerAngle <= 0 ||
           light.outerAngle > Math.PI / 2
         )
-          throw new RangeError('Invalid shadow spot cone');
+          throw new RangeError(
+            'Invalid shadow spot cone; set outerAngle above 0 and at most PI / 2 on a shadow-casting spot light',
+          );
       }
       // One perspective map for a spot cone; a point light or a hemisphere spot gets the six cube faces.
       const cone = spot && !hemisphere(Math.cos(light.outerAngle!));
@@ -314,7 +321,10 @@ export class LocalShadowMaps {
     return this.indices[index] ?? 0;
   }
   add(source: MeshHandle | LocalShadowSource): () => void {
-    if (this.disposed || !source || typeof source !== 'object') throw new TypeError('Invalid local shadow source');
+    if (this.disposed || !source || typeof source !== 'object')
+      throw new TypeError(
+        'Invalid local shadow source; add a core mesh or a model with shadowPrimitives, and only before dispose()',
+      );
     const runtime = 'id' in source ? meshRuntime(source as MeshHandle) : (source as LocalShadowSource);
     this.validateSource(runtime, this.engine);
     if (this.sources.some((record) => record.source === runtime))
@@ -345,7 +355,9 @@ export class LocalShadowMaps {
       throw new TypeError('Local shadows require shadowPrimitives; custom drawShadow sources are unsupported');
     for (const primitive of source.shadowPrimitives) {
       if (!primitive?.node || typeof primitive.node.check !== 'function')
-        throw new TypeError('Invalid local shadow primitive');
+        throw new TypeError(
+          'Invalid local shadow primitive; give every shadowPrimitives entry a shader node with check()',
+        );
       primitive.node.check();
       if (engine && primitive.node.engine !== engine)
         throw new MargoError(
@@ -370,7 +382,7 @@ export class LocalShadowMaps {
       bytes > device.limits.maxStorageBufferBindingSize ||
       bytes > device.limits.maxBufferSize
     )
-      throw new RangeError('Local shadow maps exceed device limits');
+      throw new RangeError('Local shadow maps exceed device limits; lower resolution or maxLights');
     for (const record of this.sources) this.validateSource(record.source, engine);
     let depth: GPUTexture | undefined, white: GPUTexture | undefined, uniform: GPUBuffer | undefined;
     try {
@@ -515,7 +527,8 @@ export class LocalShadowMaps {
       inst = p.instances;
     if (inst && !inst.count) return;
     if (inst && p.stride !== 80) throw new RangeError('Instanced local shadow casters need PBR vertices');
-    if (p.stride !== 24 && p.stride !== 80) throw new RangeError('Unsupported local shadow vertex stride');
+    if (p.stride !== 24 && p.stride !== 80)
+      throw new RangeError('Unsupported local shadow vertex stride; use core (24-byte) or PBR (80-byte) vertices');
     const displacement = p.displacement;
     if (displacement && p.stride !== 80) throw new RangeError('Displaced local shadow casters need PBR vertices');
     if (
@@ -533,7 +546,9 @@ export class LocalShadowMaps {
       !Number.isFinite(Math.fround(p.alpha ?? 1)) ||
       !Number.isFinite(Math.fround(p.cutoff ?? 0))
     )
-      throw new RangeError('Invalid local shadow primitive');
+      throw new RangeError(
+        'Invalid local shadow primitive; set texCoord to 0 or 1 and alpha and cutoff to finite numbers',
+      );
     const lines = p.topology === 'line-list',
       key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0) + (displacement ? 8 : 0);
     let pipeline = this.pipelines.get(key);

@@ -130,7 +130,9 @@ export class DOF implements EnginePlugin {
       r > 32 ||
       (o.enabled !== undefined && typeof o.enabled !== 'boolean')
     )
-      throw new RangeError('Invalid DOF options');
+      throw new RangeError(
+        'Invalid DOF options; use focalLength > 0, focalDistance > focalLength, aperture > 0 and maxRadius from 1 to 32',
+      );
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
@@ -209,7 +211,10 @@ export class DOF implements EnginePlugin {
       v[6] = (v[1] * viewHeight * ortho.sy * v[0]) / (4 * v[2] * (v[0] - v[1]));
       v[8] = 1;
     }
-    if (!Number.isFinite(v[6])) throw new RangeError('DOF lens scale exceeds float32');
+    if (!Number.isFinite(v[6]))
+      throw new RangeError(
+        'DOF lens scale exceeds float32; use a larger aperture or a focalDistance further from focalLength',
+      );
     if (!this.host) {
       if (
         this.engine!.hasPlugin('ssao') ||

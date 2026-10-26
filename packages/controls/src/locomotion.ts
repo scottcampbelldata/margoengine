@@ -1,8 +1,14 @@
+/** Ground height in metres at world `(x, z)`; the same shape as `@margoengine/math`'s `HeightField`. */
 export type HeightField = (x: number, z: number) => number;
+/** Options of `stepLocomotion`; every field is optional. */
 export interface LocomotionOptions {
+  /** World limits `[minX, maxX, minZ, maxZ]` the walker is clamped to. Default: unbounded. */
   bounds?: readonly [minX: number, maxX: number, minZ: number, maxZ: number];
+  /** Lowest height the walker may stand at, in metres. Default: no limit besides the ground. */
   minHeight?: number;
+  /** Walking speed in metres per second. Default 3.4. */
   walkSpeed?: number;
+  /** Sprinting speed in metres per second. Default 7. */
   runSpeed?: number;
 }
 const defaults: LocomotionOptions = {};
@@ -39,7 +45,7 @@ export function stepLocomotion(
         bounds[0] >= bounds[1] ||
         bounds[2] >= bounds[3]))
   )
-    throw new RangeError('Invalid locomotion inputs');
+    throw new RangeError('Invalid locomotion inputs; pass finite numbers and bounds with min below max');
   const dt = Math.min(0.05, delta);
   const yaw = state[4] - actions[2],
     pitch = Math.max(-1.4, Math.min(0.9, state[5] + actions[3]));

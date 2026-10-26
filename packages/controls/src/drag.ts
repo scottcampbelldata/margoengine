@@ -9,6 +9,7 @@ import { basis, intersectPlane } from './view.js';
 
 /** A core mesh, or a gltf-pro `PBRModel` (also @margoengine/materials meshes), which moves by its `root`. */
 export type DragObject = Mesh | ModelLike;
+/** Options of `DragControls`; every field is optional. */
 export interface DragControlsOptions {
   /** World normal of the drag plane through the grab point. Default 'view': the plane facing the camera. */
   plane?: 'view' | readonly [number, number, number];

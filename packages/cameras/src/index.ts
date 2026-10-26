@@ -107,7 +107,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       duration < 0 ||
       padding < 1
     )
-      throw new RangeError('Invalid fit');
+      throw new RangeError('Invalid fit; pass min <= max, aspect > 0, duration >= 0 and padding >= 1, all finite');
     this.animation = undefined;
     if (this.mode === 'perspective') {
       camera.fitToBoundingBox(min, max, { aspect, duration, padding });
@@ -139,9 +139,10 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     } else
       zoom =
         (this.height ?? 2 * length * Math.tan((camera.fov * Math.PI) / 360)) / 2 / Math.max(ey, ex / aspect) / padding;
-    if (!(zoom > 0 && zoom < Infinity) || !side) throw new RangeError('Invalid fit');
+    if (!(zoom > 0 && zoom < Infinity) || !side)
+      throw new RangeError('Invalid fit; the bounds are empty or flat along the view, pass a box with volume');
     if (this.near === undefined && this.far === undefined && Math.hypot(...half) >= camera.far / 2)
-      throw new RangeError('Bounds exceed far');
+      throw new RangeError('Bounds exceed far; raise camera.far or set far on the projection');
     const target = centre.map((v, i) => v - r[i] * offset[0] - u[i] * offset[1]) as unknown as Vec3,
       position = target.map((v, i) => v + back[i]) as unknown as Vec3;
     this.animation = {
@@ -219,7 +220,8 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       z = p[2] - t[2];
     if (Math.hypot(x, z) > VERTICAL * Math.hypot(x, y, z)) return this.worldUp;
     const u = this.up;
-    if (!(Math.hypot(u[0], u[2]) > 0) || !Number.isFinite(u[1])) throw new RangeError('Invalid vertical up');
+    if (!(Math.hypot(u[0], u[2]) > 0) || !Number.isFinite(u[1]))
+      throw new RangeError('Invalid vertical up; set up to a finite vector that is not parallel to the Y axis');
     return u;
   }
   private project(camera: Camera, P: Float64Array, aspect: number, webgpu: boolean): void {
@@ -235,7 +237,8 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       P[14] = webgpu ? (-f * n) / d : (2 * f * n) / d;
       return;
     }
-    if (this.mode !== 'orthographic') throw new RangeError('Invalid projection mode');
+    if (this.mode !== 'orthographic')
+      throw new RangeError("Invalid projection mode; use 'perspective' or 'orthographic'");
     const p = camera.position,
       t = camera.target,
       length = Math.hypot(p[0] - t[0], p[1] - t[1], p[2] - t[2]);
@@ -261,7 +264,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       top <= b ||
       far <= near
     )
-      throw new RangeError('Invalid projection');
+      throw new RangeError('Invalid projection; pass finite bounds with left < right, bottom < top and near < far');
     P[0] = 2 / (r - l);
     P[5] = 2 / (top - b);
     P[10] = webgpu ? 1 / (far - near) : -2 / (far - near);

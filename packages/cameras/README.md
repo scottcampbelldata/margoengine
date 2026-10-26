@@ -48,6 +48,8 @@ projection.fit(model.bounds);                // frame a box: [minX, minY, minZ, 
 - `attach(camera)` drives a camera without an engine; `dispose()` (or `engine.removePlugin('cameras')`) restores core's
   `project` (unset) and a plain `up` field. Attaching to a camera whose `project` is already set throws.
 
+Errors name their fix. Argument problems throw `RangeError` or `TypeError` (for example `Invalid fit; pass min <= max, aspect > 0, duration >= 0 and padding >= 1, all finite`). Branch on `error.code` for the rest: `attached` (a projection or camera already in use) and `state` (a `FloatingOrigin` used before `engine.use(origin)`).
+
 Orthographic-aware (they read `camera.matrix`): SSAO, points, labels, clustered, DOF, splats and lines' world-space
 widths. Shadow cascades are fitted to the perspective frustum, which covers
 the default ortho view; a fixed small `height` far from the target wastes shadow resolution. Cascades stay texel-locked under orthographic pan and

@@ -32,7 +32,9 @@ export type { Controls, OrbitControls };
 
 /** A core mesh or a gltf-pro `PBRModel` (also @margoengine/materials meshes) the walker collides with. */
 export type WalkCollider = Mesh | ModelLike;
+/** `walk` is first-person walking with collision; `dollhouse` is an orbit view over the whole scene. */
 export type WalkMode = 'walk' | 'dollhouse';
+/** Options of `WalkControls`; every field is optional. */
 export interface WalkControlsOptions {
   /** Element for pointer and touch input. Default: the engine canvas. */
   element?: ControlElement | null;
@@ -244,7 +246,8 @@ export class WalkControls extends Controls {
 
   /** Eases to the dollhouse orbit view (framing `dollhouseBounds` or the colliders) or back to the saved walk pose. */
   setMode(mode: WalkMode): this {
-    if (mode !== 'walk' && mode !== 'dollhouse') throw new RangeError(`Unknown walk mode ${mode}`);
+    if (mode !== 'walk' && mode !== 'dollhouse')
+      throw new RangeError(`Unknown walk mode ${mode}; use 'walk' or 'dollhouse'`);
     if (mode === this.modeValue) return this;
     const c = this.camera,
       from = this.current();

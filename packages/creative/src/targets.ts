@@ -44,7 +44,9 @@ export class HDRRenderTarget {
       Math.min(width, height) < 1 ||
       Math.max(width, height) > Math.min(4096, this.device.limits.maxTextureDimension2D)
     )
-      throw new RangeError('HDR target size exceeds limits');
+      throw new RangeError(
+        'HDR target size exceeds limits; use a size between 1 and min(4096, device maxTextureDimension2D)',
+      );
     if (width === this.width && height === this.height) return;
     const color = this.device.createTexture({
       size: [width, height],

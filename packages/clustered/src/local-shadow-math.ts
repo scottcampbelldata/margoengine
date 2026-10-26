@@ -51,7 +51,10 @@ export function localShadowMatrix(
   out[offset + 14] = a * tz + b;
   out[offset + 15] = -tz;
   for (let i = offset; i < offset + 16; i++)
-    if (!Number.isFinite(out[i])) throw new RangeError('Local shadow matrix overflow');
+    if (!Number.isFinite(out[i]))
+      throw new RangeError(
+        'Local shadow matrix overflow; use a finite light position and range, and a far plane that is not extreme',
+      );
 }
 /**
  * `LocalShadows`' settings from a castShadow light's `shadow` object: map width, height, near and far, 0 where unset

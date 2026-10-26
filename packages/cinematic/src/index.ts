@@ -73,8 +73,9 @@ export class Cinematic implements EnginePlugin {
       !Number.isFinite(options.lookDamping ?? 8) ||
       (options.lookDamping ?? 8) <= 0
     )
-      throw new RangeError('Invalid camera damping');
-    if (!Math.hypot(offset[0], offset[1], offset[2])) throw new RangeError('Camera offset cannot be zero');
+      throw new RangeError('Invalid camera damping; pass damping and lookDamping above 0');
+    if (!Math.hypot(offset[0], offset[1], offset[2]))
+      throw new RangeError('Camera offset cannot be zero; pass a non-zero offset such as [0, 2, 6]');
     this.validateGround();
     this.offset = new Float64Array(offset);
   }
@@ -97,7 +98,7 @@ export class Cinematic implements EnginePlugin {
       distance <= 0 ||
       !Number.isFinite(height)
     )
-      throw new RangeError('Invalid camera orbit');
+      throw new RangeError('Invalid camera orbit; pass finite yaw, pitch and height and a distance above 0');
     this.offset[0] = Math.sin(yaw) * Math.cos(pitch) * distance;
     this.offset[1] = Math.sin(pitch) * distance + height;
     this.offset[2] = Math.cos(yaw) * Math.cos(pitch) * distance;
@@ -116,7 +117,8 @@ export class Cinematic implements EnginePlugin {
     } else {
       const mesh = meshRuntime(target as Mesh);
       mesh.check();
-      if (this.engine && mesh.engine !== this.engine) throw new TypeError('Target belongs to another engine');
+      if (this.engine && mesh.engine !== this.engine)
+        throw new TypeError('Target belongs to another engine; follow a mesh of the engine this rig is attached to');
       this.mesh = target as Mesh;
     }
   }
@@ -136,7 +138,7 @@ export class Cinematic implements EnginePlugin {
       !Number.isFinite(frequency) ||
       frequency <= 0
     )
-      throw new RangeError('Invalid camera shake');
+      throw new RangeError('Invalid camera shake; pass amplitude >= 0, duration > 0 and frequency > 0, all finite');
     this.amplitude = amplitude;
     this.remaining = this.shakeDuration = duration;
     this.frequency = frequency;
@@ -147,13 +149,14 @@ export class Cinematic implements EnginePlugin {
    * @throws RangeError for a negative or non-finite delta, invalid options, or non-finite ground or collision results.
    */
   update(delta: number): void {
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid camera delta');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('Invalid camera delta; pass a finite delta of 0 or more seconds');
     valid(this.offset);
     this.validateGround();
     const follow = this.options.damping ?? 6,
       look = this.options.lookDamping ?? 8;
     if (!Number.isFinite(follow) || follow <= 0 || !Number.isFinite(look) || look <= 0)
-      throw new RangeError('Invalid camera damping');
+      throw new RangeError('Invalid camera damping; pass damping and lookDamping above 0');
     if (this.mesh) {
       const mesh = meshRuntime(this.mesh);
       mesh.check();
@@ -246,7 +249,7 @@ export class Cinematic implements EnginePlugin {
       !Number.isFinite(this.options.clearance ?? 0.65) ||
       (this.options.clearance ?? 0.65) < 0
     )
-      throw new RangeError('Invalid camera ground clearance');
+      throw new RangeError('Invalid camera ground clearance; pass a finite clearance of 0 or more');
   }
   private groundOffset(origin: ArrayLike<number>, dx: number, dy: number, dz: number): number {
     const ground = this.options.ground;
@@ -272,7 +275,8 @@ export class Cinematic implements EnginePlugin {
         'attached',
         'Camera rig already attached; dispose() it before attaching it again, or create another rig',
       );
-    if (this.mesh && meshRuntime(this.mesh).engine !== engine) throw new TypeError('Target belongs to another engine');
+    if (this.mesh && meshRuntime(this.mesh).engine !== engine)
+      throw new TypeError('Target belongs to another engine; follow a mesh of the engine this rig is attached to');
     this.engine = engine;
   }
   /** Plugin hook: runs {@link Cinematic.update} with the frame delta in seconds. */

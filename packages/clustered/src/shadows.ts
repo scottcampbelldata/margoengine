@@ -362,17 +362,21 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       size < 16 ||
       [o.bias ?? 1, o.normalBias ?? 1.5].some((v) => !Number.isFinite(Math.fround(v)) || v < 0)
     )
-      throw new RangeError('Invalid local shadow options');
+      throw new RangeError(
+        'Invalid local shadow options; set resolution to an integer of 16 or more and bias and normalBias to finite numbers of 0 or more',
+      );
   }
   /** Adds a caster: a core mesh, or a gltf-pro model / materials mesh (`shadowPrimitives`). `dynamic` re-renders its lights every frame (skinned or morphing geometry). */
   add(source: LocalShadowSource | MeshHandle, { dynamic = false }: { dynamic?: boolean } = {}): () => void {
-    if (this.disposed || !source || typeof dynamic !== 'boolean') throw new TypeError('Invalid shadow caster');
+    if (this.disposed || !source || typeof dynamic !== 'boolean')
+      throw new TypeError('Invalid shadow caster; add a mesh or model before dispose(), with a boolean dynamic');
     const runtime = casterRuntime<object, ReturnType<typeof meshRuntime> | LocalShadowSource>(
       source,
       this.engine,
       'Shadow caster',
     );
-    if (!('id' in runtime) && !('shadowPrimitives' in runtime)) throw new TypeError('Invalid shadow caster');
+    if (!('id' in runtime) && !('shadowPrimitives' in runtime))
+      throw new TypeError('Invalid shadow caster; add a core mesh or a model with shadowPrimitives');
     if (this.sources.some((r) => r.source === runtime))
       throw new MargoError('attached', 'Duplicate shadow caster; add each caster once');
     const r: Source = { source: runtime, dynamic };
@@ -418,7 +422,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     this.engine = engine;
     const device = (this.device = engine.gpu);
     if ((this.options.resolution ?? 512) > device.limits.maxTextureDimension2D)
-      throw new RangeError('Shadow map exceeds device limit');
+      throw new RangeError('Shadow map exceeds device limit; lower resolution to the device maximum texture size');
     for (const r of this.sources)
       if ('id' in r.source && r.source.engine !== engine)
         throw new MargoError(
@@ -880,7 +884,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   }
   private record(p: LocalShadowPrimitive): Draw {
     if (![24, 80].includes(p.stride) || (p.instances && p.stride !== 80))
-      throw new RangeError('Unsupported shadow caster vertex stride');
+      throw new RangeError(
+        'Unsupported shadow caster vertex stride; use core (24-byte) or PBR (80-byte) vertices, with instances only on PBR',
+      );
     const transform = p.alphaTransform;
     if (
       transform !== undefined &&

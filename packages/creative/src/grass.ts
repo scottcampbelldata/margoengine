@@ -126,7 +126,9 @@ export class GrassField implements EnginePlugin {
       !Math.hypot(...windDirection) ||
       typeof spores !== 'boolean'
     )
-      throw new RangeError('Invalid grass options');
+      throw new RangeError(
+        'Invalid grass options; use integer blades 1..16777216, positive area, bladeHeight (max 100) and drawDistance (max 100000), a nonzero windDirection and boolean spores',
+      );
     this.blades = blades;
     this.spores = spores;
     this.windSpeed = windSpeed;
@@ -174,7 +176,9 @@ export class GrassField implements EnginePlugin {
       this.blades * 24 > Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize) ||
       Math.ceil(this.blades / 64) > device.limits.maxComputeWorkgroupsPerDimension
     )
-      throw new RangeError('Grass storage or dispatch exceeds GPU limits');
+      throw new RangeError(
+        'Grass storage or dispatch exceeds GPU limits; lower blades or use a device with larger storage buffers',
+      );
     this.engine = engine;
     this.device = device;
     this.instances = device.createBuffer({

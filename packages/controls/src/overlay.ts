@@ -1,4 +1,5 @@
 import type { PassContext } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import type { Prim } from './gizmo.js';
 import { applyView } from '../../shared/view-rect.js';
 import { alphaBlend } from '../../shared/pass.js';
@@ -180,12 +181,18 @@ export class OverlayRenderer {
           gl.shaderSource(shader, source);
           gl.compileShader(shader);
           if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-            throw new Error(gl.getShaderInfoLog(shader) ?? 'Gizmo shader failed');
+            throw new MargoError(
+              'unsupported',
+              `Gizmo shader failed: ${gl.getShaderInfoLog(shader) ?? 'no log'}; use a WebGL2 context that compiles GLSL ES 3.00`,
+            );
           gl.attachShader(program, shader);
         }
         gl.linkProgram(program);
         if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-          throw new Error(gl.getProgramInfoLog(program) ?? 'Gizmo program failed');
+          throw new MargoError(
+            'unsupported',
+            `Gizmo program failed: ${gl.getProgramInfoLog(program) ?? 'no log'}; use a WebGL2 context that links GLSL ES 3.00`,
+          );
       } catch (error) {
         gl.deleteProgram(program);
         throw error;

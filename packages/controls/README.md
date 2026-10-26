@@ -12,6 +12,18 @@ are angular deltas; pitch stays between -1.4 (look up) and 0.9 radians (look dow
 Use `Cinematic` ground clearance to keep upward-looking cameras above terrain. Height samples must
 be finite. The caller owns input bindings, character meshes and gait animation.
 
+```ts
+import {stepLocomotion} from 'margoengine/controls';
+
+const state = new Float32Array(8);                    // x, y, z, heading, cameraYaw, cameraPitch, gaitPhase, speed
+const actions = new Float32Array([0, 1, 0, 0, 0]);    // strafe, forward, lookX, lookY, sprint: walk forward
+const ground = (x: number, z: number) => 0.1 * Math.sin(x) * Math.cos(z); // any finite height sampler
+for (let frame = 0; frame < 60; frame++) stepLocomotion(state, actions, 1 / 60, ground, {bounds: [-50, 50, -50, 50]});
+console.log(state[0], state[2]);                      // where the walker is after one second
+```
+
+Bad inputs throw a `RangeError` that says what to pass (finite numbers, bounds with min below max).
+
 Orbit, map, trackball, arcball, fly, first-person and pointer-lock camera controls plus an interactive transform gizmo and drag controls for Margo Engine, each tree-shakable on its own. `DragControls` uses `@margoengine/bvh` (a peer dependency) for its hits.
 
 Build from source with `npm run build` in `packages/controls`.

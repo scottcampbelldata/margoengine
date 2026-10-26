@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { margoError } from '../../shared/errors.js';
 import type { EngineKernel, Mesh } from '@margoengine/core';
 import {
   engineRuntime,
@@ -42,7 +43,7 @@ export class FloatingOrigin implements EnginePlugin {
     return value;
   }
   constructor({ ratio = 1000 }: FloatingOriginOptions = {}) {
-    if (!(ratio > 0)) throw new RangeError('Invalid ratio');
+    if (!(ratio > 0)) throw new RangeError('Invalid ratio; pass a number above 0');
     this.ratio = ratio;
   }
   setup(engine: EngineKernel): void {
@@ -53,15 +54,17 @@ export class FloatingOrigin implements EnginePlugin {
     return [...this.value];
   }
   private get camera(): Camera {
-    if (!this.engine) throw new Error('FloatingOrigin not attached');
+    if (!this.engine) throw margoError('state', 'FloatingOrigin is not attached; call engine.use(origin) first');
     return this.engine.camera;
   }
   /** Places a root mesh (or a gltf-pro `model.root`) at a float64 world position and keeps it there across rebases. */
   place(mesh: Mesh, world: ArrayLike<number>): void {
     const m = meshRuntime(mesh);
     m.check();
-    if (m.engine !== this.engine) throw new TypeError('Foreign mesh');
-    if (m.engine.store.parents[m.id] !== -1) throw new TypeError('place() takes root meshes');
+    if (m.engine !== this.engine)
+      throw new TypeError('Foreign mesh; place meshes created by the engine this origin is attached to');
+    if (m.engine.store.parents[m.id] !== -1)
+      throw new TypeError('place() takes root meshes; place the root of the hierarchy, not a child');
     const p = vector(world, 'Invalid world position'),
       entry = this.roots.get(m) ?? new Float64Array(6);
     entry.set(p);

@@ -191,12 +191,20 @@ test('Creative option bounds, unknown finite fields and Toon shader variants sta
       TypeError,
       'PostProcessing has no bloom: put Bloom from @margoengine/post/bloom before it in a PostStack',
     ],
-    [{ unknown: Infinity }, RangeError, 'Invalid post unknown'],
-    [{ atmosphere: { density: NaN } }, RangeError, 'Invalid post or atmosphere options'],
+    [{ unknown: Infinity }, RangeError, 'Invalid post unknown; use a finite number'],
+    [
+      { atmosphere: { density: NaN } },
+      RangeError,
+      'Invalid post or atmosphere options; keep each value inside its documented range',
+    ],
     [{ atmosphere: { sky: false } }, TypeError, 'PostProcessing draws no sky: attach Sky from @margoengine/sky'],
-    [{ lift: [0, -5, 0] }, RangeError, 'Post color vector exceeds limits'],
-    [{ gain: [1, 1] }, RangeError, 'Invalid post vector'],
-    [{ gain: [1, NaN, 1] }, RangeError, 'Invalid post vector'],
+    [
+      { lift: [0, -5, 0] },
+      RangeError,
+      'Post color vector exceeds limits; keep gain in 0..16, lift in -4..4 and colour in 0..1',
+    ],
+    [{ gain: [1, 1] }, RangeError, 'Invalid post vector; use finite numbers'],
+    [{ gain: [1, NaN, 1] }, RangeError, 'Invalid post vector; use finite numbers'],
     [{ atmosphere: { sun: [0, 0, 0] } }, RangeError, 'Sun direction must be nonzero'],
   ])
     assert.throws(

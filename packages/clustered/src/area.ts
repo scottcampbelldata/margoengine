@@ -140,7 +140,9 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
           !(0.2126 * light.color[0] + 0.7152 * light.color[1] + 0.0722 * light.color[2] >= 0)) ||
         typeof (light.twoSided ?? false) !== 'boolean'
       )
-        throw new RangeError('Invalid area light size/color/intensity/direction');
+        throw new RangeError(
+          'Invalid area light size/color/intensity/direction; give positive finite sizes, a colour with luminance of 0 or more, a finite intensity of 0 or more and a non-zero direction',
+        );
       if (light.up) finiteVector(light.up, 3, 'Area light up');
       const { normal: n, right, up } = rectFrame(f, light.up, 'Area light'),
         color: ArrayLike<number> = light.color ?? [1, 1, 1];

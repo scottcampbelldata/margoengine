@@ -197,7 +197,11 @@ export class Planet implements EnginePlugin {
           pass = undefined;
           continue;
         }
-        if (error) throw new MargoError('failed', `Planet GPU initialization failed: ${error.message}`);
+        if (error)
+          throw new MargoError(
+            'failed',
+            `Planet GPU initialization failed: ${error.message}; check the maps against the device limits and attach again`,
+          );
         const previousPass = this.pass;
         for (const name of Object.keys(this.images) as Array<keyof PlanetImages>) delete this.images[name];
         Object.assign(this.images, next);
@@ -263,7 +267,11 @@ export class Planet implements EnginePlugin {
       const error = await device.popErrorScope();
       signal.throwIfAborted();
       this.check();
-      if (error) throw new MargoError('failed', `Planet GPU initialization failed: ${error.message}`);
+      if (error)
+        throw new MargoError(
+          'failed',
+          `Planet GPU initialization failed: ${error.message}; check the maps against the device limits and attach again`,
+        );
       if (this.engine!.gpu === device) this.pass = pass;
       else if (!this.pass) this.pass = this.createPass();
     } finally {
@@ -303,7 +311,7 @@ export class Planet implements EnginePlugin {
           image.height > limit ||
           decodedBytes > 256 * 1024 * 1024
         )
-          throw new RangeError('Planet maps exceed GPU dimensions or 256 MiB decoded budget');
+          throw new RangeError('Planet maps exceed GPU dimensions or the 256 MiB decoded budget; use smaller maps');
         decoded.add(image);
         images[name] = image;
       } catch (error) {

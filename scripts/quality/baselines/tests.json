@@ -1,7 +1,7 @@
 {
   "gate": "tests",
   "about": "packages with no test in verify; public entries no test imports",
-  "total": 4,
+  "total": 0,
   "history": [
     {
       "date": "2026-10-24",
@@ -10,10 +10,5 @@
       "grew": 51
     }
   ],
-  "items": {
-    "unimported @margoengine/creative/grass": 1,
-    "unimported @margoengine/creative/planet": 1,
-    "unimported @margoengine/creative/stars": 1,
-    "unimported @margoengine/creative/targets": 1
-  }
+  "items": {}
 }

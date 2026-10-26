@@ -32,7 +32,7 @@ const positive = (value: number, label: string): number => {
 export function lightSolidAngle(cone?: SpotCone): number {
   if (cone === undefined) return 4 * Math.PI;
   if (typeof cone !== 'object' || cone === null)
-    throw new TypeError('A spot cone is an object: {outerAngle, innerAngle?} or {angle, penumbra?}');
+    throw new TypeError('A spot cone is an object: {outerAngle, innerAngle?} or {angle, penumbra?}; pass one of those');
   const outer = cone.angle ?? cone.outerAngle,
     inner = cone.angle !== undefined ? cone.angle * (1 - (cone.penumbra ?? 0)) : (cone.innerAngle ?? 0);
   if (

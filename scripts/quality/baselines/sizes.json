@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3230086,
+  "total": 3231029,
   "history": [
     {
       "date": "2026-10-24",
@@ -320,6 +320,12 @@
       "commit": "4cdbfba0",
       "reason": "sciviz: time series timeline with slider and figure.play()",
       "grew": 1
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "743f0635",
+      "reason": "DX pass A-L batch 2: throw messages now name their fix (clustered, creative/post), a few hundred gzip bytes of message text",
+      "grew": 2
     }
   ],
   "items": {
@@ -340,7 +346,7 @@
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/origin": 1514,
     "@margoengine/cinematic": 2076,
-    "@margoengine/clustered": 12963,
+    "@margoengine/clustered": 13573,
     "@margoengine/clustered/area": 10461,
     "@margoengine/clustered/directional": 2563,
     "@margoengine/clustered/ies": 3953,
@@ -369,7 +375,7 @@
     "@margoengine/creative/grass": 6122,
     "@margoengine/creative/particles": 759,
     "@margoengine/creative/planet": 7174,
-    "@margoengine/creative/post": 6803,
+    "@margoengine/creative/post": 7136,
     "@margoengine/creative/stars": 2909,
     "@margoengine/creative/targets": 2821,
     "@margoengine/creative/toon": 1188,

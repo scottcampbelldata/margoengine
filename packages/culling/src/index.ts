@@ -147,7 +147,7 @@ export class CulledInstances implements EnginePlugin {
   }
   constructor(batches: readonly CulledBatch[], { culling = 'frustum', occluderSize = 8 }: CulledInstancesOptions = {}) {
     if (!Array.isArray(batches) || !batches.length) throw new TypeError('Expected culled batches');
-    if (!modes.includes(culling)) throw new TypeError('Invalid culling mode');
+    if (!modes.includes(culling)) throw new TypeError('Invalid culling mode; use "none", "frustum" or "occlusion"');
     this.culling = culling;
     this.occluderSize = occluderSize;
     const starts: number[] = [];
@@ -160,7 +160,9 @@ export class CulledInstances implements EnginePlugin {
         !b.transforms.length ||
         b.transforms.length % 16
       )
-        throw new TypeError('Invalid culled batch');
+        throw new TypeError(
+          'Invalid culled batch; give each batch a geometry, a PbrMaterial and a non-empty Float32Array of 16-float matrices',
+        );
       starts.push(count);
       count += b.transforms.length / 16;
     }
@@ -204,7 +206,7 @@ export class CulledInstances implements EnginePlugin {
   /** Hides or shows one part (uploaded with the next frame, like {@link setTransform}). */
   setVisible(batch: number, index: number, visible: boolean): void {
     const i = this.index(batch, index);
-    if (typeof visible !== 'boolean') throw new TypeError('Invalid visibility');
+    if (typeof visible !== 'boolean') throw new TypeError('Invalid visibility; pass true or false');
     this.hidden[i] = +!visible;
     if (i < this.hiddenLow) this.hiddenLow = i;
     if (i >= this.hiddenHigh) this.hiddenHigh = i + 1;
@@ -240,7 +242,9 @@ export class CulledInstances implements EnginePlugin {
       B = this.batches.length,
       buffer = (name: string, size: number, usage: number, data?: ArrayBufferView): GPUBuffer => {
         if (size > d.limits.maxStorageBufferBindingSize)
-          throw new RangeError('Culled instances exceed GPU buffer limits');
+          throw new RangeError(
+            'Culled instances exceed GPU buffer limits; split the instances across fewer or smaller batches',
+          );
         const b = (this.buffers[name] = d.createBuffer({
           size: Math.max(16, Math.ceil(size / 4) * 4),
           usage: usage | GPUBufferUsage.COPY_DST,
@@ -311,7 +315,7 @@ export class CulledInstances implements EnginePlugin {
       index < 0 ||
       start + index >= end
     )
-      throw new RangeError('Invalid culled instance');
+      throw new RangeError('Invalid culled instance; pass a batch index and an instance index inside that batch');
     return start + index;
   }
   private dirty(i: number): void {
@@ -515,7 +519,8 @@ export class CulledInstances implements EnginePlugin {
     this.pyramid(width, height);
     const occlusion = this.culling === 'occlusion' && exactShader(c.shader),
       mode = occlusion ? 2 : this.culling === 'none' ? 0 : 1;
-    if (!(this.occluderSize >= 0)) throw new RangeError('Invalid occluder size');
+    if (!(this.occluderSize >= 0))
+      throw new RangeError('Invalid occluder size; set occluderSize to a number of 0 or more');
     const m = c.camera.matrix,
       f = this.floats;
     f.set(m);

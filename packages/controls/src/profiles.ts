@@ -77,6 +77,7 @@ export const INVENTOR: NavigationProfile = {
   zoomToCursor: true,
   fitClick: 1,
 };
+/** Fusion uses the same navigation as {@link INVENTOR}; this is the same object under the name Fusion users search for. */
 export const FUSION = INVENTOR;
 
 /** Blender: middle orbits, Shift + middle pans, Ctrl + middle zooms, wheel zooms to the view centre, numpad views. */

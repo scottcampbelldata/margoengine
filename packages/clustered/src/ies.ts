@@ -52,14 +52,17 @@ const ROWS = 181,
   BINDING = 142;
 
 const fail = (message: string): never => {
-  throw new RangeError(`Invalid IES file: ${message}`);
+  throw new RangeError(`Invalid IES file: ${message}; pass the text of a valid IES LM-63 photometric file`);
 };
 /**
  * Parses an IES LM-63 photometric file (text). Type C photometry only (luminaires: vertical angle 0 is nadir); types A
  * and B (floodlights, automotive) throw a TypeError. Lamp tilt data (`TILT=INCLUDE`) is read past and not applied.
  */
 export function parseIES(text: string): IESProfile {
-  if (typeof text !== 'string') throw new TypeError('parseIES takes the text of an .ies file');
+  if (typeof text !== 'string')
+    throw new TypeError(
+      'parseIES takes the text of an .ies file; read the file as a string (await response.text()) and pass that',
+    );
   const lines = text.replace(/^﻿/, '').split(/\r\n|\r|\n/);
   let line = 0,
     format = 'LM-63-1986';
