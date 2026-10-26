@@ -601,6 +601,11 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   | `p-stl` (`parseSTL`, plain) | 28.7 (`parseCAD`) | 4.9 | 2.8, still 1.7x slower |
   | `p-stl-cad` (`parseCAD`) | 28.7 | 29.4 | no equivalent |
 
+- **Accepted difference in work (Scott, 2026-10-26):** the `p-stl` gap is kept listed (4.7 against 2.7 ms, 1.7x) but
+  accepted: `parseSTL` returns a render-ready mesh with flat face normals computed, while three's `STLLoader` copies the
+  file's zero normals, which light wrongly until `computeVertexNormals()` is called. The scene `p-stl-normals` times the
+  full job on both sides (run `20261026-211213`, diagnostic, 5 runs): three 8.7 ms (WebGPU build) / 8.7 (WebGL),
+  `parseSTL` 4.7 ms, so Margo is about 1.9x faster; `p-stl-cad` (`parseCAD`) 32 ms, no three.js equivalent.
 - **What is left in `p-stl`:** `parseSTL` computes the flat normal of every facet whose stored normal is zero (this
   file's writer leaves them zero, as most do), about 1.3 ms in Node (the profile shows `flatNormal` as the largest
   share), where three copies the zeros; it also writes an identity index array and zero-fills a third array. It is
@@ -811,7 +816,8 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
     instances. Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
   - [claims.md](claims.md) records that there is no publishable result yet.
 - **STL import and USDZ export against three.js: partly closed (entries 26 and 31).** `p-stl` (the plain `parseSTL`)
-  4.9 ms against 2.8: it computes the flat normals the file leaves zero, where three copies the zeros. The CAD path
+  4.7 ms against 2.7 (accepted difference in work, see entry 31; with three's `computeVertexNormals()` on both sides,
+  `p-stl-normals`, Margo is 4.7 against 8.7 ms, faster): it computes the flat normals the file leaves zero, where three copies the zeros. The CAD path
   `p-stl-cad` (`parseCAD`, which welds, builds parts and creates GPU meshes) is 29.4 ms with no three.js equivalent.
   `p-export-usdz` 16.0 ms against 2.5 (run `20261026-165034`, diagnostic): `exportUSDZ` writes every mesh in world
   space (2.46 MB) where three's archive is 444 KB. Causes and plans:

@@ -966,6 +966,16 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       params: {},
       data: () => ({ bytes: stlBytes(grid(320)) }),
     },
+    'p-stl-normals': {
+      area: 'loaders',
+      kind: 'task',
+      rows: ['10.11'],
+      title: 'STL parse with normals',
+      draws:
+        'One call: parse a binary STL of the 320 x 320 grid (204,800 triangles) into a mesh that lights correctly: the file stores zero normals, so three.js calls computeVertexNormals() after STLLoader.parse; parseSTL computes its flat normals itself.',
+      params: {},
+      data: () => ({ bytes: stlBytes(grid(320)) }),
+    },
     'p-stl-cad': {
       area: 'loaders',
       kind: 'task',
@@ -1658,7 +1668,7 @@ export const ROWS = {
   '10.8': { scenes: ['p-fbx'] },
   '10.9': { scenes: ['p-obj'] },
   '10.10': { scenes: ['p-mtl'] },
-  '10.11': { scenes: ['p-stl', 'p-stl-cad'] },
+  '10.11': { scenes: ['p-stl', 'p-stl-normals', 'p-stl-cad'] },
   '10.12': { scenes: ['p-ply'] },
   '10.13': { scenes: ['p-3mf'] },
   '10.14': { scenes: ['p-usdz'] },

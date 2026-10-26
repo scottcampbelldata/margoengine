@@ -14877,6 +14877,94 @@
       "margo": 87486,
       "three": 1607
      }
+    },
+    {
+     "run": "20261026-211213-83c79d15-dev",
+     "date": "2026-10-26T21:12:13.755Z",
+     "commit": "83c79d15",
+     "label": "dev",
+     "valid": false,
+     "kind": "task",
+     "verdict": "slower",
+     "margo": {
+      "loadMs": {
+       "median": 285.8,
+       "spread": 0.0619
+      },
+      "buildMs": {
+       "median": 4.8,
+       "spread": 0.0833
+      },
+      "taskMs": {
+       "median": 4.715,
+       "spread": 0.0159
+      },
+      "coldMs": {
+       "median": 8.845,
+       "spread": 0.0577
+      },
+      "jsHeapMB": {
+       "median": 44.55,
+       "spread": 0
+      }
+     },
+     "three": {
+      "engine": "three-webgpu-parity",
+      "metrics": {
+       "loadMs": {
+        "median": 231.4,
+        "spread": 0.124
+       },
+       "buildMs": {
+        "median": 1.8,
+        "spread": 0.1667
+       },
+       "taskMs": {
+        "median": 2.7,
+        "spread": 0.0204
+       },
+       "coldMs": {
+        "median": 3.755,
+        "spread": 0.3169
+       },
+       "jsHeapMB": {
+        "median": 85.01,
+        "spread": 0
+       }
+      }
+     },
+     "others": [
+      {
+       "engine": "three-webgl-parity",
+       "metrics": {
+        "loadMs": {
+         "median": 230,
+         "spread": 0.8691
+        },
+        "buildMs": {
+         "median": 1.7,
+         "spread": 0.2353
+        },
+        "taskMs": {
+         "median": 2.8,
+         "spread": 0.3429
+        },
+        "coldMs": {
+         "median": 3.645,
+         "spread": 0.0658
+        },
+        "jsHeapMB": {
+         "median": 97.37,
+         "spread": 0
+        }
+       }
+      }
+     ],
+     "image": null,
+     "bytes": {
+      "margo": 87678,
+      "three": 1613
+     }
     }
    ]
   },
@@ -24234,13 +24322,151 @@
     ],
     "image": null,
     "bytes": null
+   },
+   "later": [
+    {
+     "run": "20261026-211213-83c79d15-dev",
+     "date": "2026-10-26T21:12:13.755Z",
+     "commit": "83c79d15",
+     "label": "dev",
+     "valid": false,
+     "kind": "task",
+     "verdict": "three missing",
+     "margo": {
+      "loadMs": {
+       "median": 1301.6,
+       "spread": 0.0096
+      },
+      "buildMs": {
+       "median": 3,
+       "spread": 0.3333
+      },
+      "taskMs": {
+       "median": 32.18,
+       "spread": 0.0148
+      },
+      "coldMs": {
+       "median": 44.495,
+       "spread": 0.117
+      },
+      "jsHeapMB": {
+       "median": 77.46,
+       "spread": 0
+      }
+     },
+     "three": null,
+     "others": [
+      {
+       "engine": "three-webgpu-parity",
+       "metrics": {},
+       "error": "unsupported: not implemented by three-webgpu-parity"
+      },
+      {
+       "engine": "three-webgl-parity",
+       "metrics": {},
+       "error": "unsupported: not implemented by three-webgl-parity"
+      }
+     ],
+     "image": null,
+     "bytes": null
+    }
+   ]
+  },
+  "p-stl-normals": {
+   "first": {
+    "run": "20261026-211213-83c79d15-dev",
+    "date": "2026-10-26T21:12:13.755Z",
+    "commit": "83c79d15",
+    "label": "dev",
+    "valid": false,
+    "kind": "task",
+    "verdict": "faster",
+    "margo": {
+     "loadMs": {
+      "median": 291.2,
+      "spread": 0.0649
+     },
+     "buildMs": {
+      "median": 5.1,
+      "spread": 0.3137
+     },
+     "taskMs": {
+      "median": 4.715,
+      "spread": 0.0255
+     },
+     "coldMs": {
+      "median": 8.78,
+      "spread": 0.1156
+     },
+     "jsHeapMB": {
+      "median": 44.55,
+      "spread": 0
+     }
+    },
+    "three": {
+     "engine": "three-webgpu-parity",
+     "metrics": {
+      "loadMs": {
+       "median": 462.7,
+       "spread": 0.0182
+      },
+      "buildMs": {
+       "median": 1.8,
+       "spread": 0.1667
+      },
+      "taskMs": {
+       "median": 8.7,
+       "spread": 0.0264
+      },
+      "coldMs": {
+       "median": 15.42,
+       "spread": 0.1164
+      },
+      "jsHeapMB": {
+       "median": 197.55,
+       "spread": 0
+      }
+     }
+    },
+    "others": [
+     {
+      "engine": "three-webgl-parity",
+      "metrics": {
+       "loadMs": {
+        "median": 447.6,
+        "spread": 0.242
+       },
+       "buildMs": {
+        "median": 1.8,
+        "spread": 0.8333
+       },
+       "taskMs": {
+        "median": 8.745,
+        "spread": 0.0194
+       },
+       "coldMs": {
+        "median": 15.475,
+        "spread": 0.2679
+       },
+       "jsHeapMB": {
+        "median": 238.04,
+        "spread": 0
+       }
+      }
+     }
+    ],
+    "image": null,
+    "bytes": {
+     "margo": 87678,
+     "three": 1613
+    }
    }
   }
  },
  "engines": {
   "margo": {
    "version": "1.0.0",
-   "commit": "907e13a5"
+   "commit": "83c79d15"
   },
   "three-webgpu-parity": {
    "version": "0.186.1",

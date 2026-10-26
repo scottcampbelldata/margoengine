@@ -258,6 +258,20 @@ export const builders = {
     };
   },
 
+  async 'p-stl-normals'(canvas, data, marks) {
+    const { parseSTL } = await timed(marks, () => import('@margoengine/loaders'));
+    let out;
+    return {
+      task() {
+        out = parseSTL(data.bytes);
+      },
+      output: () => geometryCounts([out]),
+      info: () => ({
+        note: 'parseSTL: its normals are already computed (flat, where the file stores zero), so the mesh lights correctly with no further call; three needs computeVertexNormals() after STLLoader.parse',
+      }),
+    };
+  },
+
   async 'p-stl-cad'(canvas, data, marks) {
     const engine = await engineFor(canvas, CAMERA, 64, marks),
       { parseCAD } = await timed(marks, () => import('@margoengine/machinery/cad'));
