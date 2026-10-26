@@ -103,7 +103,8 @@
     "packages/mesh-edit",
     "packages/compute",
     "packages/sciviz",
-    "packages/mcp"
+    "packages/mcp",
+    "packages/rigging"
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",

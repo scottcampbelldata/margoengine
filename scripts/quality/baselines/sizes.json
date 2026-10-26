@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3140782,
+  "total": 3148661,
   "history": [
     {
       "date": "2026-10-24",
@@ -254,6 +254,12 @@
       "commit": "804d2dea",
       "reason": "controls: scale plane handles, free-rotation snap, held-key snap, gizmo shortcuts, drag cancel, orbit targetBounds (item 21.5)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-26",
+      "commit": "804d2dea",
+      "reason": "new optional package @margoengine/rigging: bone heat weights, weight painting, skin checks (queue item 23, milestone 1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -479,6 +485,7 @@
     "@margoengine/react/physics": 5943,
     "@margoengine/react/post": 3770,
     "@margoengine/react/xr": 3429,
+    "@margoengine/rigging": 7879,
     "@margoengine/road": 1171,
     "@margoengine/scatter": 11893,
     "@margoengine/scenery": 474,

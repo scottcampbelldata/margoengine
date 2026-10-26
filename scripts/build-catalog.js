@@ -88,6 +88,7 @@ const layers = {
     'animation',
     'animator',
     'kinematics-constraints',
+    'rigging',
     'tween',
     'cinematic',
     'controls',

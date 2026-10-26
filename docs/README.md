@@ -41,7 +41,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-81 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+82 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -129,13 +129,14 @@ node --test tests/catalog.test.js
 | [`@margoengine/wfc`](../packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |
 | [`@margoengine/splines`](../packages/splines/README.md) | 3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup. |
 
-### Animation and interaction (11)
+### Animation and interaction (12)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/animation`](../packages/animation/README.md) | Storage-buffer skinning and compute morph targets for Margo Engine. |
 | [`@margoengine/animator`](../packages/animator/README.md) | Blend trees, additive layers, animation states, foot IK and CCD IK chains. |
 | [`@margoengine/kinematics-constraints`](../packages/kinematics-constraints/README.md) | Standalone analytical capsule and sphere constraints for IK target and arm clearance. |
+| [`@margoengine/rigging`](../packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting and skin checks before export. |
 | [`@margoengine/tween`](../packages/tween/README.md) | Allocation-free numeric tween updates and easing timelines. |
 | [`@margoengine/cinematic`](../packages/cinematic/README.md) | Critically damped camera follow, look-at and screen shake. |
 | [`@margoengine/controls`](../packages/controls/README.md) | Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine. |

@@ -585,3 +585,16 @@ Written clean room; no source of ipywidgets' widget implementations, anywidget, 
 | Jupyter widget | The Jupyter widgets messaging protocol 2.1 (ipywidgets documentation) and the Jupyter messaging specification (comms); the JupyterLab extension guide (prebuilt extensions, shared modules); webpack's Module Federation documentation (the container's `init`/`get` interface) |
 | PNG export (`Figure.to_png`) | RFC 6455 "The WebSocket Protocol" (opening handshake, framing, client masking); the Chrome DevTools Protocol documentation (`Target.attachToTarget` flat sessions, `SystemInfo.getProcessInfo`, `Emulation.setDeviceMetricsOverride`, `Page.navigate`, `Runtime.evaluate`, `Page.captureScreenshot`, `Browser.close`; the `DevToolsActivePort` file) |
 | Polars and xarray inputs | The Polars and xarray user guides (DataFrame and LazyFrame `select` and `collect`, `Series.to_numpy`; DataArray `dims`, `coords` and `attrs`) and the CF conventions (`long_name`, `units`) |
+
+## Rigging: `@margoengine/rigging`
+
+Written clean room from the papers and specifications below. No source code of rigging tools or engines (Blender,
+Maya, Pinocchio, libigl, three.js, Babylon, Godot, Unity, Unreal and the like) was read.
+
+| Area | Source |
+| --- | --- |
+| Bone heat weights | I. Baran and J. Popović, "Automatic rigging and animation of 3D characters", ACM SIGGRAPH 2007 (the equilibrium (−Δ + H) w = H p, heat c / d² from the nearest visible bone, shared heat at equidistant bones) |
+| Cotangent Laplacian and vertex areas | U. Pinkall and K. Polthier, "Computing discrete minimal surfaces and their conjugates", Experimental Mathematics 2(1), 1993; M. Meyer, M. Desbrun, P. Schröder and A. H. Barr, "Discrete differential-geometry operators for triangulated 2-manifolds", VisMath 2002 (published 2003) |
+| Conjugate gradients, Jacobi preconditioning | M. R. Hestenes and E. Stiefel, J. Res. NBS 49(6), 1952; Y. Saad, "Iterative Methods for Sparse Linear Systems", 2nd ed., SIAM 2003, algorithm 9.1 |
+| Skin data rules (checks) | The Khronos glTF 2.0 specification, section 3.7.3.3 (skinned mesh attributes: JOINTS_n / WEIGHTS_n, weights summing to 1, joint indices within the skin) |
+| Brush falloff | The smoothstep polynomial 3t² − 2t³ (Hermite interpolation, standard numerical analysis) |

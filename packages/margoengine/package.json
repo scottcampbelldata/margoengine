@@ -903,6 +903,10 @@
       "types": "./dist/react/xr.d.ts",
       "import": "./dist/react/xr.js"
     },
+    "./rigging": {
+      "types": "./dist/rigging.d.ts",
+      "import": "./dist/rigging.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"
@@ -1285,6 +1289,7 @@
     "@margoengine/procedural": "^1.0.0",
     "@margoengine/quality": "^1.0.0",
     "@margoengine/react": "^1.0.0",
+    "@margoengine/rigging": "^1.0.0",
     "@margoengine/road": "^1.0.0",
     "@margoengine/scatter": "^1.0.0",
     "@margoengine/scenery": "^1.0.0",

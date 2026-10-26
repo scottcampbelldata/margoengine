@@ -1539,6 +1539,28 @@
     "category": "Animation and interaction"
   },
   {
+    "id": "rigging",
+    "title": "Rigging",
+    "category": "Animation and interaction",
+    "package": "@margoengine/rigging",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Rigging and animation authoring: automatic skin weights, weight painting and skin checks before export.",
+    "requirements": "See the package guide for requirements",
+    "keywords": "rigging",
+    "install": "npm install @margoengine/rigging@1.0.0",
+    "imports": "import { WeightMap } from '@margoengine/rigging';",
+    "exports": [
+      "WeightMap",
+      "WeightPainter",
+      "assertSkin",
+      "boneHeatWeights",
+      "checkRig",
+      "checkSkin",
+      "rigJoints"
+    ]
+  },
+  {
     "id": "tween",
     "title": "Tween",
     "package": "@margoengine/tween",

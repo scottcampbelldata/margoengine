@@ -1,0 +1,50 @@
+{
+  "name": "@margoengine/rigging",
+  "version": "1.0.0",
+  "description": "Rigging and animation authoring: automatic skin weights, weight painting and skin checks before export.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "rigging",
+    "skinning",
+    "weights"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/rigging"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/bvh": "^1.0.0",
+    "@margoengine/math": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js rigging",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:browser": "npm run build && node tests/rigging-browser.mjs",
+    "prepack": "npm run build"
+  }
+}
