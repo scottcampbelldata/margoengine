@@ -604,3 +604,17 @@ Maya, Pinocchio, libigl, three.js, Babylon, Godot, Unity, Unreal and the like) w
 | Root motion (`animator`) | Integration of a sampled track over an interval split into whole loop cycles and partial ones (elementary); the travel carried through the node hierarchy's local rotations and scales (glTF 2.0 section 3.5.3, transformations) |
 | Look-at and aim (`animator`) | Shortest-arc turns of the look axis toward the target shared along a bone chain, a roll about the look axis taking the up axis's projection to world up's (vector rejection), and slerp (K. Shoemake, "Animating rotation with quaternion curves", SIGGRAPH 1985) for weights |
 | Retarget presets (`rigging/retarget`) | Bone names from public documentation only: the VRM 1.0 humanoid bone list (VRM Consortium specification, `VRMC_vrm` humanoid), Godot's documented `SkeletonProfileHumanoid` bone names, Roblox's documented R15 body parts, and the bone names visible in Mixamo-exported files; rest-pose alignment is a shortest-arc turn per bone (quaternion algebra above), parents first |
+
+## Game AI: `@margoengine/behavior`
+
+Written clean room from the papers, talks and textbook descriptions below. No source code of behaviour-tree, utility-AI
+or steering libraries or engines (Unreal, Unity, Godot, BehaviorTree.CPP, OpenSteer, three.js, Babylon, Yuka and the
+like) was read.
+
+| Area | Source |
+| --- | --- |
+| Behaviour trees (sequence, selector, parallel policies, decorators, reactive re-checks, halting) | M. Colledanchise and P. Ögren, "Behavior Trees in Robotics and AI: An Introduction", CRC Press 2018 (arXiv:1709.00084), chapters 1-3; D. Isla, "Handling complexity in the Halo 2 AI", GDC 2005 |
+| Utility scoring, response curves, compensation factor | D. Mark, "Behavioral Mathematics for Game AI", Course Technology 2009; D. Mark and K. Dill, "Improving AI decision modeling through utility theory", GDC AI Summit 2010; "Building a better centaur: AI at massive scale", GDC 2015 (`score + (1 - score)(1 - 1/n) score`) |
+| Steering (seek, flee, arrive, pursue, evade, wander, obstacle avoidance, path following, priorities) | C. W. Reynolds, "Steering Behaviors For Autonomous Characters", Game Developers Conference 1999 |
+| Flocking (separation, alignment, cohesion) | C. W. Reynolds, "Flocks, herds and schools: a distributed behavioral model", ACM SIGGRAPH 1987 |
+| Seeded random stream | `@margoengine/math`'s `createRandom` (mulberry32) |

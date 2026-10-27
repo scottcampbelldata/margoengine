@@ -67,6 +67,14 @@
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"
     },
+    "./behavior": {
+      "types": "./dist/behavior.d.ts",
+      "import": "./dist/behavior.js"
+    },
+    "./behavior/steering": {
+      "types": "./dist/behavior/steering.d.ts",
+      "import": "./dist/behavior/steering.js"
+    },
     "./blender": {
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"
@@ -1292,6 +1300,7 @@
     "@margoengine/animation": "^1.0.0",
     "@margoengine/animator": "^1.0.0",
     "@margoengine/audio": "^1.0.0",
+    "@margoengine/behavior": "^1.0.0",
     "@margoengine/blender": "^1.0.0",
     "@margoengine/bvh": "^1.0.0",
     "@margoengine/cache": "^1.0.0",

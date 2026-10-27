@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3460385,
+  "total": 3473215,
   "history": [
     {
       "date": "2026-10-24",
@@ -542,6 +542,12 @@
       "commit": "30bea6fa",
       "reason": "precise f32 transcendental functions in WGSL (packages/shared/precise-math.js) give the same results on every GPU; the Intel Arc 140V failed CPU parity and fisheye depth with the builtins",
       "grew": 4
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "46b4df25",
+      "reason": "new optional package @margoengine/behavior: behaviour trees, utility AI, steering and flocking (item 28.5, first batch)",
+      "grew": 2
     }
   ],
   "items": {
@@ -552,6 +558,8 @@
     "@margoengine/animation/vat": 8130,
     "@margoengine/animator": 17372,
     "@margoengine/audio": 7716,
+    "@margoengine/behavior": 9000,
+    "@margoengine/behavior/steering": 3830,
     "@margoengine/blender": 4000,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/bake": 2583,

@@ -1,0 +1,60 @@
+{
+  "name": "@margoengine/behavior",
+  "version": "1.0.0",
+  "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and flocking behaviours.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "behavior-tree",
+    "behaviour-tree",
+    "game-ai",
+    "utility-ai",
+    "steering",
+    "flocking",
+    "boids"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/behavior"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./steering": {
+      "types": "./dist/steering.d.ts",
+      "import": "./dist/steering.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
+  "devDependencies": {
+    "@margoengine/ecs": "^1.0.0",
+    "@margoengine/navmesh": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js behavior",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  }
+}
