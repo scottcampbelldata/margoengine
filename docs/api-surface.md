@@ -59,7 +59,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/netcode | `.` 47, `./rollback` 4 | 11 |  | 12,601 |
 | @margoengine/oit | `.` 2 |  |  | 2,962 |
 | @margoengine/physics | `.` 43 | 22 |  | 15,773 |
-| @margoengine/points | `.` 54, `./las` 16, `./octree` 10 | 18 |  | 19,544 |
+| @margoengine/points | `.` 54, `./las` 16, `./octree` 10 | 18 |  | 20,919 |
 | @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2, `./mrt` 4, `./depth` 2 | 21 |  | 39,189 |
 | @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 8,649 |
 | @margoengine/quality | `.` 22, `./warm` 3 | 1 |  | 2,449 |
@@ -81,7 +81,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/taa | `.` 7 |  |  | 10,163 |
 | @margoengine/terrain | `.` 13 | 2 |  | 10,289 |
 | @margoengine/text | `.` 35 | 2 |  | 15,673 |
-| @margoengine/tiles | `.` 72 | 1 |  | 14,335 |
+| @margoengine/tiles | `.` 72 | 1 |  | 14,336 |
 | @margoengine/tonemap | `.` 7 |  |  | 10,825 |
 | @margoengine/toon | `.` 2 |  |  | 1,484 |
 | @margoengine/transitions | `.` 2 |  |  | 4,083 |

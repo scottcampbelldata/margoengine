@@ -1,5 +1,5 @@
 {
-  "commit": "d851ed3b",
+  "commit": "787205bb",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1130,8 +1130,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 37659,
-        "gzip": 13324
+        "raw": 39621,
+        "gzip": 13926
       }
     },
     "@margoengine/sky": {
@@ -1545,9 +1545,9 @@
       "brotli": 26186
     },
     "packages/shadows/dist/index.js": {
-      "raw": 37659,
-      "gzip": 13324,
-      "brotli": 11894
+      "raw": 39621,
+      "gzip": 13926,
+      "brotli": 12446
     },
     "packages/machinery/dist/workers/cad-runtime.js": {
       "raw": 20052,
