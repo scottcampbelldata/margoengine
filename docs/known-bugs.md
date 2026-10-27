@@ -90,6 +90,19 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### `npm run dev:examples` refuses every page from a checkout reached through an 8.3 short path
+
+- **Repro (Windows):** open a terminal in the repository through its short name (`cd C:\DEVELO~1\Projects\MARGOE~1`,
+  or any clone under `os.tmpdir()`, which is `C:\Users\\...` on this PC), run `npm run dev:examples` and open
+  any page, for example `/packages/netcode/examples/arena/`: Vite answers 403 "outside of Vite serving allow list".
+  The same command from the long path serves 200 (measured with both paths on the same worktree).
+- **Cause:** with no Vite config at the repository root, Vite's file-serving allow list holds the working directory
+  as given (the short name) and compares it with each file's real long path, so no file matches.
+- **Fix needed:** a root `server.fs.allow` built from `realpathSync.native(process.cwd())` (a root `vite.config.js`, or
+  the same option passed by a small `dev:examples` wrapper), with a check that serves a page from a short-path cwd.
+  Not done in the netcode landing because a root Vite config changes every root `vite` command; the arena test runs
+  the README command from the canonical path meanwhile (`packages/netcode/tests/arena.test.js`).
+
 ### Pinned proofs: nine historical claims no longer run against today's core
 
 - **What:** `npm run proofs` (pinned, every proof; not part of `verify` or `check:merge`) fails color-output,
