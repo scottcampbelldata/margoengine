@@ -486,7 +486,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 ## Roadmap
 
 - Publish 1.0.0 to npm.
-- A fuller WebGL2 fallback ([docs/webgl2-compat-roadmap.md](docs/webgl2-compat-roadmap.md)).
+- A fuller WebGL2 fallback: in development as an optional package that WebGPU users never load ([docs/webgl2-compat-roadmap.md](docs/webgl2-compat-roadmap.md)). Today `@margoengine/webgl` is the basic preview, and `loadFallback` and `fallbackContent` are the supported way to degrade.
 - Testing on more hardware: Apple silicon, AMD, Android, Firefox and macOS Safari.
 - Published benchmark comparisons with their method and raw results.
 

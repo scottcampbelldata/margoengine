@@ -16,8 +16,7 @@ Margo replaces three.js.
 That is a closed decision for v1.0: WebGL beyond core was closed as won't-do on 2026-10-14.
 `@margoengine/webgl` implements one `Renderer` that draws core meshes (constant colours, one directional light, no
 textures or effects); an app opts in with `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`. A full
-WebGL2 path at zero core bytes is planned for the next version in
-[webgl2-compat-roadmap.md](webgl2-compat-roadmap.md).
+WebGL2 path: `@margoengine/webgl` is the basic preview; `loadFallback` and `fallbackContent` are the supported way to degrade today; a fuller WebGL2 compatibility package is in development as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)).
 
 ## The 4 MISSING rows
 

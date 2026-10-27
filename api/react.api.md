@@ -22,6 +22,10 @@ export interface CanvasProps extends EngineOptions {
     onCreated?: (stage: StageFacade) => void;
     onError?: (error: unknown) => void;
     frameloop?: 'always' | 'demand';
+    loadFallback?: (signal: AbortSignal) => Promise<RendererFactory | {
+        webglRenderer: RendererFactory;
+    }>;
+    fallbackContent?: ReactNode;
 }
 
 export const Center: import("react").ForwardRefExoticComponent<CenterProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
@@ -58,7 +62,7 @@ export interface LoaderContext {
     fetch: typeof fetch;
 }
 
-export function MargoCanvas({ children, style, className, label, capacity, backend, camera, fallback, frameloop, onCreated, onError }: CanvasProps): import("react").JSX.Element;
+export function MargoCanvas({ children, style, className, label, capacity, backend, camera, fallback, loadFallback, fallbackContent, frameloop, onCreated, onError }: CanvasProps): import("react").JSX.Element;
 
 export type MargoCanvasProps = CanvasProps;
 
@@ -131,6 +135,8 @@ export interface RenderViewProps {
     id?: string;
     order?: number;
 }
+
+export type RendererFactory = NonNullable<EngineOptions['fallback']>;
 
 export function Scene({ name, background, children }: SceneProps): import("react").JSX.Element | null;
 

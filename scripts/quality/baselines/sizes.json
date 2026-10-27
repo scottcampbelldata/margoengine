@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3995743,
+  "total": 3996109,
   "history": [
     {
       "date": "2026-10-24",
@@ -788,6 +788,12 @@
       "commit": "d1d4998c",
       "reason": "Bug 53: asset-url refuses an encoded separator or dot segment after repeated percent-decoding (a bounded decode loop in shared/asset-url.js, which gltf, gltf-pro prepare and the gltf-pro progressive worker bundle)",
       "grew": 3
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "9247d10f",
+      "reason": "react Canvas loadFallback and fallbackContent: WebGPU precheck, loader resolution, coded unsupported error (+110 B gzip, zero core bytes)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1041,7 +1047,7 @@
     "@margoengine/quality": 2705,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 6511,
-    "@margoengine/react": 7058,
+    "@margoengine/react": 7424,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/controls": 4346,
     "@margoengine/react/dof": 1157,

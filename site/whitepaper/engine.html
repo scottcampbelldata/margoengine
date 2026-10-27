@@ -46,7 +46,7 @@
   <h2 id="status-h">Where it stands today</h2>
   <ul>
     <li><strong>Coming soon.</strong> The packages are not on npm yet, and the source repository stays private while we finish the launch checklist.</li>
-    <li><strong>WebGPU only, for now.</strong> About 88% of browsers in use support WebGPU: 85.8% fully and 2.02% partly (caniuse.com/webgpu, StatCounter data for September 2026). A WebGL2 fallback for the optional packages is planned. Today an optional package draws basic meshes on WebGL2.</li>
+    <li><strong>WebGPU only, for now.</strong> About 88% of browsers in use support WebGPU: 85.8% fully and 2.02% partly (caniuse.com/webgpu, StatCounter data for September 2026). A fuller WebGL2 compatibility package is in development as an optional download that WebGPU users never load. Today the basic WebGL2 package draws core meshes, and the React Canvas takes loadFallback and fallbackContent.</li>
     <li><strong>Few browsers verified.</strong> Real-GPU results come from Edge and Chrome on Windows 11 (NVIDIA, Intel and AMD GPUs) and from Chromium on one Linux machine with an Intel GPU, where three suites have not finished (section 10). Firefox, Safari, macOS and phones are not verified yet.</li>
     <li><strong>No speed claims against other engines.</strong> The same-scene comparison tool exists, but no quiet-machine run has been made. The numbers on this page are our own internal measurements, and each names its hardware.</li>
   </ul>
@@ -301,7 +301,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 
 <h2 id="limits"><span class="n">11</span>Honest limits</h2>
 <ul>
-  <li><strong>WebGPU only today.</strong> PBR, shadows, image-based lighting and most packages need WebGPU, which about 88% of browsers in use support (caniuse.com/webgpu, September 2026). A WebGL2 fallback for the optional packages is planned; today WebGL2 draws basic meshes only.</li>
+  <li><strong>WebGPU only today.</strong> PBR, shadows, image-based lighting and most packages need WebGPU, which about 88% of browsers in use support (caniuse.com/webgpu, September 2026). A fuller WebGL2 compatibility package is in development as an optional download that WebGPU users never load; today WebGL2 draws basic meshes only.</li>
   <li><strong>Not yet verified</strong> on Firefox, Safari, macOS, Android or iPhone. Real-GPU results come from Edge and Chrome on Windows 11 (an NVIDIA RTX A6000 desktop, Intel Arc 140V laptops and an AMD Radeon 680M mini PC) and from Chromium on one Ubuntu machine with an Intel UHD GPU, where the voxel, path tracer and root browser suites have not yet run to the end (section 10).</li>
   <li><strong>CAD import is tessellation only.</strong> STEP and IGES become triangle meshes through OpenCascade; the exact geometry is not kept, and the 3.1 MB (gzip) OpenCascade download comes with the first CAD file.</li>
   <li><strong>No editor yet.</strong> Scenes are built in code or imported from files.</li>

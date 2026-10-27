@@ -20,6 +20,19 @@ Without a `fallback`, `backend: 'auto'` requires WebGPU and `Engine.create` reje
 core, so apps that target WebGPU only do not load its 3,021 B min+gzip
 ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)).
 
+Without React, load it only when WebGPU is missing (needs no core change; WebGPU users download nothing of
+this package, because the dynamic import is a separate chunk that never runs for them):
+
+```ts
+import {Engine} from 'margoengine/core';
+
+const fallback = navigator.gpu ? undefined : (await import('margoengine/webgl')).webglRenderer;
+const engine = await Engine.create(canvas, {fallback});
+```
+
+In React, use the Canvas props `loadFallback={() => import('margoengine/webgl')}` and `fallbackContent`
+(see the [React README](../react/README.md)).
+
 `fallback: canvas => webglRenderer(canvas, {transparent: true})` gives the WebGL2 canvas `alpha: true`
 (premultiplied) and a transparent clear: the WebGL side of `TransparentCanvas` from
 `@margoengine/environment`, which only acts on WebGPU (core passes nothing to the fallback).

@@ -456,6 +456,31 @@ commits per second for each. The canvas serialises initialisation, disposes supe
 `capacity` and `backend` changes. Camera changes update the existing engine. Errors reach `onError` and an accessible
 alert.
 
+## Browsers without WebGPU
+
+`loadFallback` fetches the WebGL2 renderer only when the browser has no WebGPU, and `fallbackContent` is what the
+canvas shows when no renderer is usable (like a Suspense fallback, it can be an SVG, a skeleton or a pre-rendered image).
+WebGPU visitors never run the loader, so they download none of `@margoengine/webgl`.
+
+```tsx
+import { Canvas } from '@margoengine/react';
+
+export function Viewer() {
+  return (
+    <Canvas
+      loadFallback={() => import('@margoengine/webgl')}
+      fallbackContent={<img src="/scene.png" alt="Pre-rendered view of the scene" />}
+      onError={(error) => console.warn(error)}
+    />
+  );
+}
+```
+
+| Prop | Default | Effect |
+| --- | --- | --- |
+| `loadFallback` | none | `(signal: AbortSignal) => Promise<factory \| { webglRenderer }>`. Called once per engine, only without WebGPU (or with `backend="webgl2"`); `signal` aborts on unmount. A rejection reaches `onError` as a `MargoError` with code `unsupported`. Ignored when `fallback` or `backend="webgpu"` is set. |
+| `fallbackContent` | the plain "needs a browser with WebGPU" text | Shown in place of the text for the `unsupported` error; `onError` still receives it. |
+
 ## Build warnings
 
 A production Vite build of the cube page prints no warnings; `npm run modern:test:bundlers` checks it from the installed packages on every merge check and fails on any warning. Only the generated `rsc/` entries carry `'use client'` (the
@@ -487,6 +512,7 @@ The measured breakdown of a React build, package by package, is in [docs/limits.
 ## Troubleshooting
 
 - **The canvas is blank and has no height.** Give `<Canvas>` a height: `style={{ height: 400 }}`.
+- **No WebGPU, graceful fallback.** `<Canvas loadFallback={() => import('margoengine/webgl')} fallbackContent={<img src="/scene.png" alt="Scene preview" />}>`: the Canvas checks `navigator.gpu` and `requestAdapter()` itself before creating the engine and calls `loadFallback` only when WebGPU is missing, so WebGPU visitors download none of `@margoengine/webgl` (it is a separate chunk). The loader gets an `AbortSignal` (aborted on unmount) and may resolve the renderer factory or a module with `webglRenderer`; a rejection reaches `onError` as a `MargoError` with code `unsupported`. When no renderer is usable, `fallbackContent` (an SVG, skeleton or image) replaces the default text, a bit like a Suspense fallback, and `onError` still gets the coded error. `fallback` (a factory you import yourself) works as before and wins over `loadFallback`.
 - **"WebGPU unavailable".** The browser has no WebGPU. Pass an `onError` handler to show your own message.
 - **A component does nothing.** React treats a bare lowercase `<mesh>` as a DOM element. Use `<Mesh>`, or the
   namespace form `<Margo.mesh>`.

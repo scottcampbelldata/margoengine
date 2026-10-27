@@ -163,7 +163,7 @@ function Spinner() {
   });
   return <Mesh ref={mesh}><BoxGeometry /><PbrMaterial color="#84d6bd" /></Mesh>;
 }
-createRoot(document.getElementById('root')).render(<Canvas label="cube"><Spinner /><OrbitControls /></Canvas>);
+createRoot(document.getElementById('root')).render(<Canvas label="cube" loadFallback={() => import('${specifier === '@margoengine/react' ? '@margoengine/webgl' : 'margoengine/webgl'}')}><Spinner /><OrbitControls /></Canvas>);
 `,
     );
     const { build } = await load('vite');
@@ -254,6 +254,7 @@ createRoot(document.getElementById('root')).render(<Canvas label="cube"><Spinner
             dependencies: {
               '@margoengine/react': packed['@margoengine/react'],
               '@margoengine/controls': packed['@margoengine/controls'],
+              '@margoengine/webgl': packed['@margoengine/webgl'],
               react: installed('react'),
               'react-dom': installed('react-dom'),
               // The strict type check below: the repository's TypeScript and React types.
@@ -386,6 +387,18 @@ ${result.stdout}${result.stderr}`,
           ['react alone', scoped],
           ['margoengine', umbrella],
         ]) {
+          // `loadFallback={() => import('.../webgl')}`: the WebGL fallback is its own chunk, outside the initial load, so a
+          // WebGPU visitor downloads none of it (the loader runs only without WebGPU).
+          const webgl = /node_modules\/@margoengine\/webgl\//;
+          assert.ok(
+            app.modules.some((id) => webgl.test(id)),
+            `${label}: the lazy webgl import is emitted`,
+          );
+          assert.deepEqual(
+            app.initialModules.filter((id) => webgl.test(id)),
+            [],
+            `${label}: the webgl fallback is a separate chunk, not in the initial load`,
+          );
           assert.ok(
             app.initial <= REACT_BUDGET.initial,
             `${label}: ${app.initial} B gzip at load > ${REACT_BUDGET.initial}`,

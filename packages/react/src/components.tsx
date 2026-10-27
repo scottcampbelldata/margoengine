@@ -74,11 +74,54 @@ export interface CanvasProps extends EngineOptions {
   onCreated?: (stage: StageFacade) => void;
   onError?: (error: unknown) => void;
   frameloop?: 'always' | 'demand';
+  /**
+   * Loads the renderer factory for browsers without WebGPU, for example `() => import('margoengine/webgl')`. The Canvas
+   * checks for WebGPU itself (`navigator.gpu` and a successful `requestAdapter()`) before it creates the engine and
+   * calls this only when WebGPU is missing (or `backend` is `'webgl2'`), so WebGPU visitors download none of the
+   * fallback package. It resolves to the factory (`webglRenderer`) or to a module exporting it as `webglRenderer`.
+   * `signal` aborts when the Canvas unmounts or recreates its engine while the load is still pending. A rejection
+   * becomes a `MargoError` with code `unsupported`, sent to `onError` and shown as `fallbackContent` or the plain
+   * message. Ignored when `fallback` is given or `backend` is `'webgpu'`; read when the engine is created, so a new
+   * function does not recreate the engine. Default: none.
+   */
+  loadFallback?: (signal: AbortSignal) => Promise<RendererFactory | { webglRenderer: RendererFactory }>;
+  /**
+   * Shown in place of the default text when the browser has no WebGPU and no usable renderer fallback: an SVG, a
+   * skeleton or a pre-rendered image. `onError` still receives the coded `unsupported` error. Default: the plain
+   * message "This 3D scene needs a browser with WebGPU, such as a current Chrome, Edge or Safari."
+   */
+  fallbackContent?: ReactNode;
 }
+/** A renderer factory for `fallback`, such as `webglRenderer` from `@margoengine/webgl`. */
+export type RendererFactory = NonNullable<EngineOptions['fallback']>;
 /** Props of the MargoCanvas component; every prop is optional unless noted. */
 export type MargoCanvasProps = CanvasProps;
 // Shown in place of the scene when the browser has no WebGPU (and no `fallback`); `onError` still gets the coded error.
 const unsupportedMessage = 'This 3D scene needs a browser with WebGPU, such as a current Chrome, Edge or Safari.';
+// True when the browser exposes WebGPU and an adapter answers; the same test the engine's own WebGPU start makes.
+async function hasWebGPU(): Promise<boolean> {
+  try {
+    const gpu = (globalThis.navigator as { gpu?: { requestAdapter(): Promise<unknown> } } | undefined)?.gpu;
+    return gpu !== undefined && (await gpu.requestAdapter()) != null;
+  } catch {
+    return false;
+  }
+}
+async function resolveFallback(load: NonNullable<CanvasProps['loadFallback']>, signal: AbortSignal) {
+  let loaded: Awaited<ReturnType<typeof load>>;
+  try {
+    loaded = await load(signal);
+  } catch (cause) {
+    throw Object.assign(
+      new MargoError('unsupported', `loadFallback failed (${String(cause)}); check the import path or the network.`),
+      { cause },
+    );
+  }
+  const factory = typeof loaded === 'function' ? loaded : loaded?.webglRenderer;
+  if (typeof factory !== 'function')
+    throw new MargoError('unsupported', 'loadFallback must resolve to a renderer factory or { webglRenderer }.');
+  return factory;
+}
 /** The margo canvas component. */
 export function MargoCanvas({
   children,
@@ -89,6 +132,8 @@ export function MargoCanvas({
   backend = 'auto',
   camera,
   fallback,
+  loadFallback,
+  fallbackContent,
   frameloop = 'always',
   onCreated,
   onError,
@@ -96,7 +141,8 @@ export function MargoCanvas({
   const canvas = useRef<HTMLCanvasElement>(null),
     queue = useRef<Promise<void>>(Promise.resolve()),
     created = useRef(onCreated),
-    errorHandler = useRef(onError);
+    errorHandler = useRef(onError),
+    fallbackLoader = useRef(loadFallback);
   const [stage, setStage] = useState<StageFacade | null>(null),
     [error, setError] = useState<unknown>(null),
     [shadow, setShadow] = useState<Shadows | null>(null);
@@ -130,6 +176,7 @@ export function MargoCanvas({
     engineMode = useRef(frameloop);
   created.current = onCreated;
   errorHandler.current = onError;
+  fallbackLoader.current = loadFallback;
   cameraOptions.current = camera;
   frameloopOptions.current = frameloop;
   const advance = useMemo(
@@ -168,6 +215,7 @@ export function MargoCanvas({
   }, [engine, frames]);
   useEffect(() => {
     const element = canvas.current!;
+    const abort = new AbortController();
     let cancelled = false,
       current: Engine | undefined,
       observer: ResizeObserver | undefined;
@@ -183,7 +231,19 @@ export function MargoCanvas({
       .catch(() => {})
       .then(async () => {
         if (cancelled) return;
-        const instance = await Engine.create(element, { capacity, backend, camera: cameraOptions.current, fallback });
+        let renderer = fallback;
+        const load = fallbackLoader.current;
+        if (!renderer && load && backend !== 'webgpu' && (backend === 'webgl2' || !(await hasWebGPU()))) {
+          if (cancelled) return;
+          renderer = await resolveFallback(load, abort.signal);
+          if (cancelled) return;
+        }
+        const instance = await Engine.create(element, {
+          capacity,
+          backend,
+          camera: cameraOptions.current,
+          fallback: renderer,
+        });
         if (cancelled) {
           instance.dispose();
           return;
@@ -215,6 +275,7 @@ export function MargoCanvas({
       .catch(report);
     return () => {
       cancelled = true;
+      abort.abort();
       observer?.disconnect();
       current?.dispose();
     };
@@ -453,11 +514,14 @@ export function MargoCanvas({
         role="img"
         aria-label={label}
       />
-      {error !== null && (
-        <p role="alert">
-          {(error as { code?: string } | undefined)?.code === 'unsupported' ? unsupportedMessage : String(error)}
-        </p>
-      )}
+      {error !== null &&
+        ((error as { code?: string } | undefined)?.code === 'unsupported' && fallbackContent != null ? (
+          <div role="alert">{fallbackContent}</div>
+        ) : (
+          <p role="alert">
+            {(error as { code?: string } | undefined)?.code === 'unsupported' ? unsupportedMessage : String(error)}
+          </p>
+        ))}
       {scene && !engine?.disposed && <Context.Provider value={scene}>{children}</Context.Provider>}
     </MargoContext.Provider>
   );

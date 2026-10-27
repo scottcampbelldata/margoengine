@@ -408,7 +408,7 @@ and M3's device work, M4 and M5 (compute) have landed (core, the materials check
 PBR review, lod, lines, text, single-sample points, the skinned shadows check, the voxel render check, the environment
 check and the post-effects suite run on the layer with the same results as native WebGPU; compute runs as fragment
 draws, point draws or on the CPU, whichever the shader allows; M6, the package compat paths, is next), see
-[webgl2-compat-roadmap.md](webgl2-compat-roadmap.md), which also records what visitors without WebGPU see today (every site demo: a needs-WebGPU message, `check:no-webgpu`).
+[webgl2-compat-roadmap.md](webgl2-compat-roadmap.md), which also records what visitors without WebGPU see today (every site demo: a needs-WebGPU message, `check:no-webgpu`). `loadFallback` and `fallbackContent` in the React Canvas are how the layer is loaded and how pages degrade today.
 
 ## Landed 2026-10-24: Codex's mesh-edit engine work (codex/mesh-rotation-visibility)
 
