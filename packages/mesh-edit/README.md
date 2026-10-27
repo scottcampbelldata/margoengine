@@ -152,6 +152,44 @@ console.log(triangles.length, pieces.length, imported.mesh.faces.length, cut.cut
   face). Because faces stay planar, curved quads are split into two triangles; flat areas keep quads. Up to 4 levels
   and 200000 output faces.
 
+## Booleans
+
+Union, difference and intersection of two closed solids:
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { booleanMeshes } from 'margoengine/mesh-edit/modeling';
+
+const box = createPrimitiveMesh('cube', 'box');
+const peg = createPrimitiveMesh('cylinder', 'peg');
+// A thinner, taller peg, so it passes through the box without touching its sides.
+peg.vertices = peg.vertices.map(([x, y, z]): [number, number, number] => [x * 0.6, y * 1.5, z * 0.6]);
+// Drill it through the box: one closed solid with a hole (genus 1).
+const drilled = booleanMeshes(box, peg, 'difference');
+console.log(drilled.mesh.faces.length, drilled.nonManifoldEdges, drilled.faceMap.a['box-face-0']);
+```
+
+- `booleanMeshes(a, b, operation, {tolerance, createId, signal})` with `operation` `'union'`, `'difference'` (`a`
+  minus `b`) or `'intersection'`. Both inputs must be closed, consistently wound and outward facing (`TypeError`
+  otherwise). They may overlap, share coplanar faces, touch along faces or edges, nest or lie apart.
+- Output faces keep their source face IDs where free and interpolate UVs; `sources` maps each output face to its
+  input face and `faceMap.a` / `faceMap.b` list each input face's pieces. Pieces of one source face that form a convex
+  face again are merged back.
+
+### Limits: tolerance, not exact arithmetic
+
+The boolean uses floating point with a tolerance, not exact (rational or adaptive-precision) arithmetic. Faces are
+clipped against the other solid's planes with solid BSP trees (Thibault and Naylor, 1987); a point within `tolerance`
+of a plane counts as on it (default 1e-9 of the largest input coordinate, at least 1e-12 units). Each split point is
+computed from the same end of its edge on both sides, so neighbors agree exactly; then vertices within the tolerance
+are welded, T-junctions are closed and slivers with no area are dropped. Before returning, the result is checked to be
+closed (every half-edge matched by its reverse); if a configuration finer than the tolerance (nearly but not exactly
+coincident faces or vertices) would leave a crack, it throws `MargoError` code `failed` instead of returning a broken
+mesh: nudge one input or raise `tolerance`. Exact coplanar contact (shared faces, edges, vertices) is handled.
+Shapes that only touch along an edge or at a vertex give a closed result whose touching edges join four faces; their
+count is `nonManifoldEdges`. Features thinner than the tolerance are merged away. Work grows with the number of faces
+times the BSP depth (typically n log n, n squared at worst); pass `signal` to stop a long run.
+
 ## Pixel painting and UVs
 
 `meshUVTopology(mesh)` identifies islands through opposite two-face geometric edges whose UVs match exactly at both endpoints. Point contacts, disconnected overlapping atlas regions, nonmanifold edges and inconsistent winding do not connect islands. It returns stable face/corner references and explicit seam reasons. `meshSelectionUVCorners` resolves corner, face, island-seed or whole-mesh intent to deduplicated source-order corners; stale identities reject.
