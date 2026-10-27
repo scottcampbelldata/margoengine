@@ -29,6 +29,37 @@ export async function listenWhenFree(start, { port, waitMs = 20 * 60_000, poll =
   }
 }
 
+/**
+ * Page init script for a slow shader compiler: `createRenderPipelineAsync` and `createComputePipelineAsync` resolve
+ * `ms` later than the GPU finishes them, and `createRenderPipeline` and `createComputePipeline` hold the calling thread
+ * `ms` longer (the real pipelines, unchanged; errors pass through). An integrated GPU's driver can take far longer
+ * than this PC's to compile, so a check that waits a fixed time or number of frames for a pipeline, instead of its
+ * readiness, fails here too. `openBrowser({ pipelineDelayMs })`, MARGO_PIPELINE_DELAY_MS or `--pipeline-delay=<ms>` on
+ * the suite's command line (the `test:gpu:slow-compile` scripts).
+ */
+export function delayPipelines(ms) {
+  if (typeof GPUDevice === 'undefined') return;
+  for (const name of ['createRenderPipelineAsync', 'createComputePipelineAsync']) {
+    const original = GPUDevice.prototype[name];
+    GPUDevice.prototype[name] = function (...args) {
+      return original
+        .apply(this, args)
+        .then((pipeline) => new Promise((resolve) => setTimeout(() => resolve(pipeline), ms)));
+    };
+  }
+  for (const name of ['createRenderPipeline', 'createComputePipeline']) {
+    const original = GPUDevice.prototype[name];
+    GPUDevice.prototype[name] = function (...args) {
+      const pipeline = original.apply(this, args),
+        until = performance.now() + ms;
+      while (performance.now() < until) {
+        // Busy: a synchronous compile blocks the thread that asked for it.
+      }
+      return pipeline;
+    };
+  }
+}
+
 export async function openBrowser({
   browserName = 'chromium',
   channel = process.env.BROWSER_CHANNEL ?? 'msedge',
@@ -40,6 +71,11 @@ export async function openBrowser({
   plugins = [],
   headless = true,
   port = 5193,
+  pipelineDelayMs = Number(
+    process.env.MARGO_PIPELINE_DELAY_MS ??
+      process.argv.find((a) => a.startsWith('--pipeline-delay='))?.slice('--pipeline-delay='.length) ??
+      0,
+  ),
 } = {}) {
   await mkdir('test-results', { recursive: true });
   const server = await createServer({
@@ -71,6 +107,7 @@ export async function openBrowser({
     page.setDefaultTimeout(30000);
     // Every shader module the page creates is compiled for diagnostics; close() fails on a WGSL error.
     await page.addInitScript(wgslGuard);
+    if (pipelineDelayMs > 0) await page.addInitScript(delayPipelines, pipelineDelayMs);
     const wgsl = watchWgsl(page);
     let reloads = 0,
       handledReloads = 0;
@@ -129,6 +166,7 @@ export async function openBrowser({
     hardware.powerPreference = powerPreference;
     hardware.hostPlatform = process.platform;
     hardware.headless = headless;
+    if (pipelineDelayMs > 0) hardware.pipelineDelayMs = pipelineDelayMs;
     if (browserName === 'firefox') hardware.firefoxUserPrefs = firefoxUserPrefs;
     if (process.env.GPU_VENDOR) {
       assert.ok(
