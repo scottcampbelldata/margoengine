@@ -1723,6 +1723,30 @@
     "category": "Animation and interaction"
   },
   {
+    "id": "cutscene",
+    "title": "Cutscene",
+    "category": "Animation and interaction",
+    "package": "@margoengine/cutscene",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing and a player that fires events in order.",
+    "requirements": "See the package guide for requirements",
+    "keywords": "cutscene",
+    "install": "npm install @margoengine/cutscene@1.0.0",
+    "imports": "import { BASIC_EASINGS } from '@margoengine/cutscene';",
+    "exports": [
+      "BASIC_EASINGS",
+      "Cutscene",
+      "CutscenePlayer",
+      "EASING_NAMES",
+      "MAX_CUTSCENE_ITEMS",
+      "MAX_TIMELINE_DEPTH",
+      "evaluate",
+      "parseCutscene",
+      "validateCutscene"
+    ]
+  },
+  {
     "id": "controls",
     "title": "Controls",
     "package": "@margoengine/controls",

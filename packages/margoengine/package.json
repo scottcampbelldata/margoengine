@@ -251,6 +251,10 @@
       "types": "./dist/culling.d.ts",
       "import": "./dist/culling.js"
     },
+    "./cutscene": {
+      "types": "./dist/cutscene.d.ts",
+      "import": "./dist/cutscene.js"
+    },
     "./decoders": {
       "types": "./dist/decoders.d.ts",
       "import": "./dist/decoders.js"
@@ -1372,6 +1376,7 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/creative": "^1.0.0",
     "@margoengine/culling": "^1.0.0",
+    "@margoengine/cutscene": "^1.0.0",
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/dof": "^1.0.0",
     "@margoengine/ecs": "^1.0.0",

@@ -667,3 +667,16 @@ Written clean room from the specifications and papers below. No source code of p
 | Nested-sample octree | Grid subsampling per node as described in M. Schütz, "Potree: Rendering Large Point Clouds in Web Browsers", diploma thesis, TU Wien, 2016 (the idea only); budget-ordered node selection by projected size |
 | Seeded shuffle | Fisher-Yates (Knuth, TAOCP vol. 2, algorithm P) with the mulberry32 generator |
 | Polygon area | Newell's method for a polygon's normal (M. E. Newell, 1972, as in F. S. Hill, "Computer Graphics", 1990) |
+
+## Cutscenes: `@margoengine/cutscene`
+
+Written clean room from the public descriptions below. No source code of sequencers or engines (Unity Timeline, Unreal
+Sequencer, Godot AnimationPlayer, Theatre.js, GSAP, three.js, Babylon and the like) was read.
+
+| Area | Source |
+| --- | --- |
+| Camera paths | E. Catmull and R. Rom, "A class of local interpolating splines", Computer Aided Geometric Design, 1974 (uniform Catmull-Rom segments) |
+| Rotation keys | K. Shoemake, "Animating rotation with quaternion curves", ACM SIGGRAPH 1985 (slerp), through `@margoengine/math`'s `interpolateQuaternions` |
+| Roll | Rodrigues' rotation formula (standard linear algebra) |
+| Easing | `@margoengine/tween`'s easings (Penner's equations, CSS Easing Functions Level 1 cubic-bezier) |
+| Instants and ordering | Our own design: half-open clip spans, instants sorted once by time, kind and document order |

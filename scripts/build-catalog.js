@@ -92,6 +92,7 @@ const layers = {
     'rigging',
     'tween',
     'cinematic',
+    'cutscene',
     'controls',
     'cameras',
     'input',

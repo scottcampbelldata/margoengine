@@ -1,0 +1,51 @@
+{
+  "name": "@margoengine/cutscene",
+  "version": "1.0.0",
+  "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing and a player that fires events in order.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "cutscene",
+    "timeline",
+    "sequencer",
+    "cinematics",
+    "keyframes"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/cutscene"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/tween": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js cutscene",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  }
+}

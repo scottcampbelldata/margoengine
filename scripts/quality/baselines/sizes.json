@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3536835,
+  "total": 3543680,
   "history": [
     {
       "date": "2026-10-24",
@@ -596,6 +596,12 @@
       "commit": "75960205",
       "reason": "netcode landing 3: ./websocket, ./webrtc and ./node (RFC 6455 server and serve) transports (item 30)",
       "grew": 3
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "a5d57adb",
+      "reason": "new optional package @margoengine/cutscene: timeline sequencer and player (item 28.5, first batch)",
+      "grew": 1
     }
   ],
   "items": {
@@ -652,6 +658,7 @@
     "@margoengine/creative/targets": 2821,
     "@margoengine/creative/toon": 1188,
     "@margoengine/culling": 9572,
+    "@margoengine/cutscene": 6845,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,
     "@margoengine/decoders/ktx": 2851,
