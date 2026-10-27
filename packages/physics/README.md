@@ -6,7 +6,7 @@ Rigid-body physics for Margo Engine on [Rapier](https://rapier.rs): a fixed-step
 
 Build from source with `npm run build` in `packages/physics`.
 
-Covers what Babylon.js offers with its Havok plugin (`HavokPlugin`, `PhysicsAggregate`, `PhysicsBody`, `PhysicsShape*`, `Physics6DoFConstraint` and friends) and the usual React physics components (`<Physics>`, `<RigidBody>`, collider components, joints, `useRapier` queries and events). Rapier is not bundled: you install `@dimforge/rapier3d-compat` (Apache-2.0) yourself and pass the initialized module in.
+Covers the plugin-style physics API developers know from other engines (`HavokPlugin`, `PhysicsAggregate`, `PhysicsBody`, `PhysicsShape*`, `Physics6DoFConstraint` and friends) and the usual React physics components (`<Physics>`, `<RigidBody>`, collider components, joints, `useRapier` queries and events). Rapier is not bundled: you install `@dimforge/rapier3d-compat` (Apache-2.0) yourself and pass the initialized module in.
 
 ```ts
 import RAPIER from '@dimforge/rapier3d-compat';

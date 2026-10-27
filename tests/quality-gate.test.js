@@ -2,10 +2,10 @@
 // and each detector sees what it claims to see.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ENGINES } from '../scripts/quality/clean-room.js';
+import { cleanRoomGate, ENGINES } from '../scripts/quality/clean-room.js';
 import { FAMILIES, normalise } from '../scripts/quality/duplicates.js';
 import { BASELINES, compare, readBaseline, updateBaseline } from '../scripts/quality/ratchet.js';
 import { headroom } from '../scripts/quality/sizes.js';
@@ -54,6 +54,50 @@ test('clean-room patterns catch engines and libraries, not the word three', () =
   assert.deepEqual(hits('like three.js and Babylon.js, ThreeJS'), ['three.js', 'Babylon', 'ThreeJS']);
   assert.deepEqual(hits("import { mat4 } from 'gl-matrix'; import 'pixi.js'"), ["'gl-matrix'", "'pixi.js'"]);
   assert.deepEqual(hits('three vertices per triangle; Three cameras'), []);
+});
+
+test('clean-room gate allows only noticed optional peers and absence-asserting tests', () => {
+  const root = mkdtempSync(join(tmpdir(), 'quality-cr-'));
+  try {
+    writeFileSync(
+      join(root, 'THIRD-PARTY-NOTICES.md'),
+      [
+        '| Package | Version (lock) | Licence | Kind | Used by | Why |',
+        '| --- | --- | --- | --- | --- | --- |',
+        '| `rapier` | 1.0.0 | Apache-2.0 | optional peer | @margoengine/physics, margoengine | solver |',
+        '| `lodash` | 1.0.0 | MIT | dependency | @margoengine/physics | helpers |',
+      ].join('\r\n'),
+    );
+    const pkg = (name, manifest) => ({ name, manifest });
+    const peerMeta = { rapier: { optional: true } };
+    const run = (packages, files = []) => cleanRoomGate({ root, files, packages }).items;
+    // Optional peer with a notices row for this package: allowed.
+    assert.deepEqual(
+      run([pkg('@margoengine/physics', { peerDependencies: { rapier: '1' }, peerDependenciesMeta: peerMeta })]),
+      {},
+    );
+    // Same peer, not optional / not noticed for this package / a runtime dependency / not in the notices: all counted.
+    assert.deepEqual(run([pkg('@margoengine/physics', { peerDependencies: { rapier: '1' } })]), {
+      'dependency @margoengine/physics rapier': 1,
+    });
+    assert.deepEqual(
+      run([pkg('@margoengine/other', { peerDependencies: { rapier: '1' }, peerDependenciesMeta: peerMeta })]),
+      { 'dependency @margoengine/other rapier': 1 },
+    );
+    assert.deepEqual(run([pkg('@margoengine/physics', { dependencies: { rapier: '1', lodash: '1' } })]), {
+      'dependency @margoengine/physics rapier': 1,
+      'dependency @margoengine/physics lodash': 1,
+    });
+    // A mention is counted, except in the one test that asserts the engine is absent.
+    const file = 'packages/react/tests/subpaths.test.js';
+    mkdirSync(join(root, 'packages/react/tests'), { recursive: true });
+    mkdirSync(join(root, 'packages/other'), { recursive: true });
+    writeFileSync(join(root, file), "assert.equal(name === 'three', false);");
+    writeFileSync(join(root, 'packages/other/a.js'), "import 'three';");
+    assert.deepEqual(run([], [file, 'packages/other/a.js']), { 'mention packages/other/a.js': 1 });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('normalise drops comments, blank lines, imports and dispose boilerplate', () => {
