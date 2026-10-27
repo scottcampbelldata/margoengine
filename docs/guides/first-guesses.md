@@ -77,13 +77,13 @@ status.textContent = hit
 
 Each post effect alone owns the scene capture, so effects attached on their own reject each other (the [post README](../../packages/post/README.md#combining-effects-poststack) says so). `PostStack.attach(engine,
 effects)` captures the scene once and runs the effects in array order. Do not call `attach` on the effects: the stack
-does. Keep a reference to an effect to change its options later. Put `Tonemap` after effects that work in HDR. Disposing
+does. Keep a reference to an effect to change its `options` later. Put `Tonemap` after effects that work in HDR. Disposing
 the stack disposes its effects.
 
 ```ts
 const bloom = new Bloom({ strength: 0.4 });
 const stack = PostStack.attach(engine, [bloom, new Tonemap({ curve: 'neutral' })]);
-bloom.strength = 0.6; // an option of the effect you kept
+bloom.options.strength = 0.6; // the effect keeps its live options in `options`
 window.addEventListener('pagehide', () => (stopClock(), stage.dispose()), { once: true });
 ```
 
