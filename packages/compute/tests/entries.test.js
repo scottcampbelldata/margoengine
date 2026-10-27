@@ -14,11 +14,16 @@ test('each entry exports its kernels with the bindings the code binds by name', 
   const names = (code) => reflectWGSL(code).bindings.map((b) => b.name);
   assert.deepEqual(names(matmulShader('f32', 'f32', 'f32')), ['left', 'right', 'product', 'shape']);
   assert.deepEqual(reflectWGSL(matmulShader('i32', 'i32', 'i32')).entryPoints[0].workgroupSize, [16, 16, 1]);
-  assert.deepEqual(names(stockhamShader), ['reIn', 'imIn', 'reOut', 'imOut', 'pass_']);
+  assert.deepEqual(names(stockhamShader), ['reIn', 'imIn', 'reOut', 'imOut', 'pass_', 'twiddle']);
   assert.deepEqual(names(convolve1dShader), ['signal', 'taps', 'out', 'conv']);
   assert.deepEqual(names(convolve2dShader), ['image', 'taps', 'out', 'conv']);
   assert.deepEqual(names(randomShader('f32')), ['out', 'draw']);
   assert.match(randomShader('f16'), /^enable f16;/);
+});
+
+test('the Stockham pass reads host twiddles and calls no GPU sin or cos (WGSL allows them 2^-11 of error)', () => {
+  assert.doesNotMatch(stockhamShader, /\b(sin|cos|sincos)\s*\(/);
+  assert.match(stockhamShader, /twiddle\[k \* \(half \/ pass_\.l\)\]/);
 });
 
 test('chunks splits TypedArrays into subarray views and plain arrays into slices', () => {

@@ -24,13 +24,19 @@ export interface FFTOptions {
   readonly axis?: number;
 }
 
-/** WGSL for one radix-2 Stockham pass over `lines` lines of length `n`; `l` is the current sub-transform length. */
+/**
+ * WGSL for one radix-2 Stockham pass over `lines` lines of length `n`; `l` is the current sub-transform length.
+ * `twiddle` holds exp(-2 pi i k / n) for k < n/2, computed in double precision on the host and rounded to f32
+ * (`twiddleTable`): WGSL lets `sin` and `cos` be off by up to 2^-11, and GPUs differ (about 3e-7 on an NVIDIA
+ * Ampere, enough on an Intel Arc 140V to put an n = 1024 round trip 1.4e-5 off), so no transcendental runs here.
+ */
 export const stockhamShader = /* wgsl */ `struct Pass { n: u32, l: u32, lines: u32, inverse: u32 }
 @group(0) @binding(0) var<storage, read> reIn: array<f32>;
 @group(0) @binding(1) var<storage, read> imIn: array<f32>;
 @group(0) @binding(2) var<storage, read_write> reOut: array<f32>;
 @group(0) @binding(3) var<storage, read_write> imOut: array<f32>;
 @group(0) @binding(4) var<uniform> pass_: Pass;
+@group(0) @binding(5) var<storage, read> twiddle: array<vec2f>;
 @compute @workgroup_size(256)
 fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, @builtin(local_invocation_index) lid: u32) {
   let t = (wid.x + wid.y * nwg.x) * 256u + lid;
@@ -40,10 +46,9 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
   let j = t % half;
   let base = line * pass_.n;
   let k = j % pass_.l;
-  // Twiddle exp(-+ 2 pi i k / (2l)); k / (2l) is exact in f32 for power-of-two l.
-  var angle = -6.283185307179586 * f32(k) / f32(2u * pass_.l);
-  if (pass_.inverse == 1u) { angle = -angle; }
-  let w = vec2f(cos(angle), sin(angle));
+  // Twiddle exp(-+ 2 pi i k / (2l)) = table[k n / (2l)] (conjugated for the inverse); n / (2l) is a power of two.
+  var w = twiddle[k * (half / pass_.l)];
+  if (pass_.inverse == 1u) { w.y = -w.y; }
   let a = vec2f(reIn[base + j], imIn[base + j]);
   let b0 = vec2f(reIn[base + j + half], imIn[base + j + half]);
   let b = vec2f(w.x * b0.x - w.y * b0.y, w.x * b0.y + w.y * b0.x);
@@ -55,6 +60,43 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
 }`;
 
 const isPow2 = (n: number) => n > 0 && (n & (n - 1)) === 0;
+
+/**
+ * The forward twiddle factors of an n-point transform, exp(-2 pi i k / n) for k < n/2, interleaved (re, im), each
+ * computed in double precision and rounded once to f32; k = 0 and k = n/4 are exactly 1 and -i.
+ * For n = 8: [1, 0, 0.70710677, -0.70710677, 0, -1, -0.70710677, -0.70710677].
+ */
+function twiddleTable(n: number): Float32Array {
+  if (!isPow2(n) || n < 2) throw rangeError(`twiddleTable needs a power of two of at least 2, got ${n}`, 'compute');
+  const half = n / 2,
+    table = new Float32Array(n);
+  for (let k = 0; k < half; k++) {
+    // cos(pi/2) is 6e-17 in double precision, not 0: k = n/4 is set exactly.
+    const angle = (2 * Math.PI * k) / n,
+      quarter = 4 * k === n;
+    table[2 * k] = quarter ? 0 : Math.cos(angle);
+    table[2 * k + 1] = quarter ? -1 : -Math.sin(angle);
+  }
+  return table;
+}
+
+// Twiddle tables kept per context, the most recently used last; the context frees them on dispose.
+const TWIDDLE_CACHE = 8;
+const twiddles = new WeakMap<ComputeContext, Map<number, GpuArray>>();
+function twiddlesOf(ctx: ComputeContext, n: number): GpuArray {
+  let cache = twiddles.get(ctx);
+  if (!cache) twiddles.set(ctx, (cache = new Map()));
+  let table = cache.get(n);
+  if (table && !table.disposed) cache.delete(n);
+  else table = ctx.array(twiddleTable(n));
+  cache.set(n, table);
+  if (cache.size > TWIDDLE_CACHE) {
+    const [oldest, old] = cache.entries().next().value!;
+    cache.delete(oldest);
+    old.dispose();
+  }
+  return table;
+}
 
 // Power-of-two transform of `lines` contiguous lines of length n; returns new arrays.
 function pow2(ctx: ComputeContext, re: GpuArray, im: GpuArray, n: number, lines: number, inverse: boolean): Complex {
@@ -78,6 +120,7 @@ function pow2(ctx: ComputeContext, re: GpuArray, im: GpuArray, n: number, lines:
     );
     return { re: bRe as GpuArray<'f32'>, im: bIm as GpuArray<'f32'> };
   }
+  const twiddle = twiddlesOf(ctx, n);
   let target = 0;
   for (let l = 1; l < n; l *= 2) {
     const [outRe, outIm] = target === 0 ? [bRe, bIm] : [cRe, cIm];
@@ -89,6 +132,7 @@ function pow2(ctx: ComputeContext, re: GpuArray, im: GpuArray, n: number, lines:
         reOut: outRe,
         imOut: outIm,
         pass_: new Uint32Array([n, l, lines, inverse ? 1 : 0]),
+        twiddle,
       },
       workgroups: ctx.grid(Math.ceil(size / 2 / 256)),
     });

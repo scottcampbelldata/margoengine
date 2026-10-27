@@ -177,6 +177,65 @@ window.runExtrasTests = async () => {
     },
   );
 
+  // The Stockham passes against the same radix-2 Stockham done here in f32 with twiddles rounded once from double
+  // precision. WGSL lets GPU sin and cos be off by up to 2^-11; twiddles computed on the GPU put the n = 1024 round trip
+  // 1.4e-5 off on an Intel Arc 140V, and this check 5.0 u (u = 2^-24) off on an NVIDIA RTX A6000 (host twiddles: 0 u,
+  // bit for bit). The GPU may still fuse a multiply and an add in each complex product: 1.8 u at n = 1024 and 2.7 u at
+  // 65536 in a simulation with every product fused, so the bound is 1.5 sqrt(log2 n) u (4.7 u at 1024, 6 u at 65536).
+  await check('fft: Stockham passes use correctly rounded twiddles (norm-wise within 1.5 sqrt(log2 n) u)', async () => {
+    const f = Math.fround,
+      u = 2 ** -24;
+    const stockham = (re, im) => {
+      const n = re.length,
+        half = n / 2;
+      let aRe = Float32Array.from(re),
+        aIm = Float32Array.from(im);
+      for (let l = 1; l < n; l *= 2) {
+        const oRe = new Float32Array(n),
+          oIm = new Float32Array(n);
+        for (let j = 0; j < half; j++) {
+          const k = j % l,
+            angle = (2 * Math.PI * k * (half / l)) / n,
+            quarter = 2 * k === l,
+            wr = f(quarter ? 0 : Math.cos(angle)),
+            wi = f(quarter ? -1 : -Math.sin(angle)),
+            br = f(f(wr * aRe[j + half]) - f(wi * aIm[j + half])),
+            bi = f(f(wr * aIm[j + half]) + f(wi * aRe[j + half])),
+            d = 2 * j - k;
+          oRe[d] = f(aRe[j] + br);
+          oIm[d] = f(aIm[j] + bi);
+          oRe[d + l] = f(aRe[j] - br);
+          oIm[d + l] = f(aIm[j] - bi);
+        }
+        aRe = oRe;
+        aIm = oIm;
+      }
+      return [aRe, aIm];
+    };
+    const measured = [];
+    for (const n of [1024, 65536]) {
+      const re = floats(n, 3 * n),
+        im = floats(n, 3 * n + 1),
+        [wantRe, wantIm] = stockham(re, im),
+        got = fft({ re: gpu.array(re), im: gpu.array(im) }),
+        gotRe = await got.re.read(),
+        gotIm = await got.im.read();
+      let error = 0,
+        norm = 0;
+      for (let i = 0; i < n; i++) {
+        error += (gotRe[i] - wantRe[i]) ** 2 + (gotIm[i] - wantIm[i]) ** 2;
+        norm += wantRe[i] ** 2 + wantIm[i] ** 2;
+      }
+      const ulps = Math.sqrt(error / norm) / u,
+        bound = 1.5 * Math.sqrt(Math.log2(n));
+      measured.push(`n=${n} ${ulps.toFixed(2)} u`);
+      assert(ulps <= bound, `n=${n}: ${ulps.toFixed(2)} u from the host-twiddle reference, over ${bound.toFixed(2)} u`);
+      got.re.dispose();
+      got.im.dispose();
+    }
+    checks.push(`fft Stockham against the host-twiddle f32 reference: ${measured.join(', ')}`);
+  });
+
   await check(
     'convolve (full, same, valid; direct and FFT) and correlate against NumPy-style references; convolve2d',
     async () => {

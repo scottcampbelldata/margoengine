@@ -605,22 +605,18 @@ const KERNELS: Record<string, (r: Resources) => void> = {
       imIn = bound(r.imIn),
       reOut = bound(r.reOut),
       imOut = bound(r.imOut),
+      twiddle = bound(r.twiddle),
       half = n / 2,
-      f = Math.fround,
-      // The twiddle depends only on k = j % l: computed once per pass, with the shader's f32 angle.
-      cos = new Float32Array(l),
-      sin = new Float32Array(l);
-    for (let k = 0; k < l; k++) {
-      const angle = f(((inverse ? 1 : -1) * f(6.283185307179586) * k) / (2 * l));
-      cos[k] = Math.cos(angle);
-      sin[k] = Math.sin(angle);
-    }
+      stride = half / l,
+      f = Math.fround;
     for (let line = 0; line < lines; line++) {
       const base = line * n;
       for (let j = 0; j < half; j++) {
+        // The shader's twiddle: table entry k n / (2l), conjugated for the inverse.
         const k = j % l,
-          wr = cos[k],
-          wi = sin[k],
+          at = twiddle.offset + 2 * k * stride,
+          wr = twiddle.data[at],
+          wi = inverse ? -twiddle.data[at + 1] : twiddle.data[at + 1],
           ar = reIn.data[reIn.offset + base + j],
           ai = imIn.data[imIn.offset + base + j],
           br0 = reIn.data[reIn.offset + base + j + half],
