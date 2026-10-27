@@ -237,6 +237,101 @@ setTimeout(() => {
 Behind TLS: run it on a private port behind a reverse proxy (nginx, Caddy) that terminates `wss://` and forwards the
 upgrade; set `origins` to your site's origin so other pages cannot open sockets to it.
 
+## Rooms and matchmaking
+
+`@margoengine/netcode/rooms` has the room API shape that web game servers commonly use, for games that want rooms,
+messages and a synced state rather than tick-based prediction (turn-based games, lobbies, card games): a `Room`
+subclass with `onCreate`, `onAuth`, `onJoin`, `onLeave`, `onDispose`, `onMessage(type, handler)`, `setState`,
+`broadcast`, `setPatchRate`, `setSimulationInterval`, `lock` and `unlock`; a `RoomServer` that defines rooms by name and
+matches clients into them (`joinOrCreate`, `create`, `join`, `joinById`); and a `RoomsClient` whose joined room has
+`state`, `onStateChange`, `onMessage`, `send`, `leave` and `states()` (an async iterator). Written from public
+descriptions of that API shape, not from any library's source. The state is a schema struct sent in full once, then as
+deltas at the patch rate (default every 50 ms); messages are JSON with a size limit (default 4096 bytes), and anything
+malformed closes the connection.
+
+```ts
+import { defineSchema, LoopbackNetwork } from '@margoengine/netcode';
+import { Room, type RoomClient, RoomServer, RoomsClient } from '@margoengine/netcode/rooms';
+
+const schema = defineSchema({
+  types: {
+    Player: { name: { type: 'string', maxLength: 32 }, score: 'uint' },
+    State: { players: { type: 'map', of: 'Player', maxSize: 8 } },
+  },
+} as const);
+type State = { players: Map<number, { name: string; score: number }> };
+
+class Quiz extends Room<State> {
+  schema = schema;
+  stateType = 'State';
+  maxClients = 8;
+  onCreate() {
+    this.setState({ players: new Map() });
+    this.onMessage('answer', (client, answer: string) => {
+      const player = this.state.players.get(this.idOf(client));
+      if (player && answer === '42') player.score++;
+    });
+  }
+  onJoin(client: RoomClient, options: { name?: string }) {
+    this.state.players.set(this.idOf(client), { name: String(options.name ?? 'guest'), score: 0 });
+  }
+  onLeave(client: RoomClient) {
+    this.state.players.delete(this.idOf(client));
+  }
+}
+
+// Server and client in one page over the loopback; with Node, use listenWebSocket and openWebSocket instead.
+const network = new LoopbackNetwork({ latency: 20 });
+const rooms = new RoomServer().define('quiz', Quiz);
+network.listen().onconnection = (connection) => rooms.accept(connection);
+const client = new RoomsClient(async () => network.connect());
+const joining = client.joinOrCreate<State>('quiz', { name: 'Ada' }, { schema, stateType: 'State' });
+const tick = setInterval(() => network.advance(10), 10);
+const room = await joining;
+room.onStateChange((state) => console.log([...state.players.values()]));
+room.send('answer', '42');
+setTimeout(() => {
+  clearInterval(tick);
+  room.leave();
+  rooms.close();
+}, 300);
+```
+
+## One schema, generated code
+
+`@margoengine/netcode/generate` turns a schema into a standalone TypeScript module: an interface per struct and
+`encode<Name>`, `decode<Name>`, `encode<Name>Delta`, `decode<Name>Delta` and `same<Name>` functions that write and check
+exactly the bytes `schema.encode` does, with no import at all (it runs in Node as is, since it uses only erasable
+syntax). Use it where loading the runtime schema compiler is not wanted, or as the reference for a generator in
+another language: `schema.json` is the normalized definition, and README "Wire format" says how each field is written.
+A Rust generator would read the same JSON and produce the same bytes; the tests compare the generated module with the
+runtime codec on random values, deltas and corrupted input.
+
+```ts
+import { defineSchema } from '@margoengine/netcode';
+import { generateTypeScript } from '@margoengine/netcode/generate';
+
+const schema = defineSchema({ types: { Ping: { at: 'f64', from: { type: 'string', maxLength: 16 } } } });
+const source = generateTypeScript(schema, { source: 'ping schema' });
+console.log(source.length, 'characters; write it to ping.protocol.ts');
+console.log(JSON.stringify(schema.json)); // what a Rust generator reads
+```
+
+## The arena demo
+
+`examples/arena/` (in this package's folder, not in the published tarball) is a small multiplayer arena of boxes: the
+game definition the tests use (`game.js`), a Node server and a browser page that draws each player's own box predicted
+(solid) and the others interpolated (outlined). From the repository folder:
+
+1. Start the arena server: `node packages/netcode/examples/arena/server.mjs` (it prints the address it listens on).
+2. In a second terminal, start the dev server: `npm run dev:examples`, and open
+   `http://127.0.0.1:5173/packages/netcode/examples/arena/?server=ws://127.0.0.1:8787` (if Vite prints another port,
+   use that one). Arrow keys or WASD move your box; a bot drives the second view.
+
+Without `?server=` the page runs its own server in the page over a simulated network, with latency and loss sliders.
+Opened straight from disk (`file://`) the page cannot run modules and says so, with these commands.
+`tests/arena.test.js` runs both commands as written and checks the server accepts a client and the page is served.
+
 ## Security
 
 - **The server trusts nothing but inputs.** Clients never send state; the server applies only decoded inputs, through
@@ -276,8 +371,10 @@ upgrade; set `origins` to your site's origin so other pages cannot open sockets 
   spectator or relay mode yet. Lag compensation tests circles and spheres only (no capsules or boxes).
 - The WebSocket server has no compression extension (snapshots are small and already delta coded) and no TLS of its
   own (use a reverse proxy). The WebRTC transport is tested here with stand-in channels; signalling is not included.
-- Coming in later landings of this package: a room API, a TypeScript (and later Rust) code generator for the schema
-  and the demo.
+- Rooms send the state to each client at the patch rate as a delta against the last state that client got (reliable
+  channel), so a room's cost grows with clients times state size; rooms have no reconnection or seat reservation yet.
+- The Rust generator is not written yet: `schema.json`, the wire format above and the TypeScript generator (with its
+  tests against the runtime codec) are the contract it will follow.
 
 ## Wire format
 

@@ -42,6 +42,14 @@
     "./node": {
       "types": "./dist/node.d.ts",
       "import": "./dist/node.js"
+    },
+    "./rooms": {
+      "types": "./dist/rooms.d.ts",
+      "import": "./dist/rooms.js"
+    },
+    "./generate": {
+      "types": "./dist/generate.d.ts",
+      "import": "./dist/generate.js"
     }
   },
   "files": [

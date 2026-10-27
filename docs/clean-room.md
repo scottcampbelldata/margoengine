@@ -635,6 +635,8 @@ engines (Colyseus, Photon, Mirror, GGPO, Rapier, Unity Netcode, Unreal and the l
 | Ray against circle and sphere | The quadratic of \|o + s d - c\|² = r² (elementary geometry) |
 | WebSocket server | RFC 6455, "The WebSocket Protocol" (handshake 4.2, framing 5.2, masking 5.3, fragmentation 5.4, control frames 5.5, close codes 7.4) |
 | WebRTC data channels | W3C "WebRTC: Real-Time Communication in Browsers" (RTCDataChannelInit: ordered, maxRetransmits, negotiated, id) |
+| Room API shape (`./rooms`) | Public documentation of the room-and-matchmaking API shape common to web game servers (lifecycle hook names, joinOrCreate and friends, state patches at a patch rate); the wire format, matchmaking and state sync are this package's own |
+| Code generator (`./generate`) | This package's own wire format (packages/netcode/README.md, "Wire format") |
 | Varints, zigzag | LEB128 as specified in DWARF 4 section 7.6; zigzag as described in the Protocol Buffers encoding documentation |
 | Schema hash | FNV-1a 32-bit as published by G. Fowler, L. C. Noll and K.-P. Vo |
 

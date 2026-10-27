@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Netcode arena</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f6f4;
+        --ink: #1d1d1b;
+        --muted: #6b6b66;
+        --line: #d9d9d4;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #161615;
+          --ink: #ececea;
+          --muted: #9a9a94;
+          --line: #33332f;
+        }
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--ink);
+        font: 14px/1.4 system-ui, sans-serif;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+      }
+      .views {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+      }
+      canvas {
+        width: 100%;
+        aspect-ratio: 1;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: block;
+      }
+      label {
+        margin-right: 16px;
+        white-space: nowrap;
+      }
+      .status:empty {
+        display: none;
+      }
+      .status {
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Netcode arena</h1>
+      <p class="muted">
+        Arrow keys or WASD move the left player, Shift boosts. Two clients and a server run in this page over a simulated
+        network; each view draws its own box predicted (solid) and the others interpolated (outlined). Pass
+        <code>?server=ws://host:port</code> to play against <code>examples/arena/server.mjs</code> instead.
+      </p>
+      <p>
+        <label>Latency <input id="latency" type="range" min="0" max="300" value="80" /> <span id="latencyText"></span> ms</label>
+        <label>Loss <input id="loss" type="range" min="0" max="30" value="5" /> <span id="lossText"></span> %</label>
+      </p>
+      <p id="status" role="status" class="status"></p>
+      <div class="views">
+        <figure><canvas id="a" width="480" height="480"></canvas><figcaption id="aText"></figcaption></figure>
+        <figure><canvas id="b" width="480" height="480"></canvas><figcaption id="bText"></figcaption></figure>
+      </div>
+    </main>
+    <script>
+      // Shown when the page cannot run: opened from disk (module scripts and bare imports need http), or the module
+      // never started. client.js clears it once both views are running, and replaces it when ?server= fails.
+      (function () {
+        var help =
+          'Serve this page over http and start the arena server: in the repository run ' +
+          '"node packages/netcode/examples/arena/server.mjs", then "npm run dev:examples" and open ' +
+          'http://127.0.0.1:5173/packages/netcode/examples/arena/?server=ws://127.0.0.1:8787';
+        var status = document.getElementById('status');
+        if (location.protocol === 'file:') status.textContent = 'This page was opened from a file. ' + help;
+        else
+          setTimeout(function () {
+            if (!document.body.dataset.running) status.textContent = 'The arena did not start. ' + help;
+          }, 5000);
+      })();
+    </script>
+    <script type="module" src="./client.js"></script>
+  </body>
+</html>

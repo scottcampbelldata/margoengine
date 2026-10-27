@@ -819,6 +819,14 @@
       "types": "./dist/netcode/node.d.ts",
       "import": "./dist/netcode/node.js"
     },
+    "./netcode/rooms": {
+      "types": "./dist/netcode/rooms.d.ts",
+      "import": "./dist/netcode/rooms.js"
+    },
+    "./netcode/generate": {
+      "types": "./dist/netcode/generate.d.ts",
+      "import": "./dist/netcode/generate.js"
+    },
     "./oit": {
       "types": "./dist/oit.d.ts",
       "import": "./dist/oit.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3556007,
+  "total": 3565579,
   "history": [
     {
       "date": "2026-10-24",
@@ -608,6 +608,12 @@
       "commit": "157b6fd8",
       "reason": "React subpaths per optional package (2026-10-27): the bindings moved out of the root and /kit into @margoengine/react/<package> so the root builds without optional peers; /post gained DepthTexture and SceneTargets, each effect component carries its loader",
       "grew": 19
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "a5d57adb",
+      "reason": "netcode landing 4: ./rooms (room API and matchmaking) and ./generate (TypeScript code generator) (item 30)",
+      "grew": 2
     }
   ],
   "items": {
@@ -808,8 +814,10 @@
     "@margoengine/navmesh/build": 11794,
     "@margoengine/net": 1371,
     "@margoengine/netcode": 12975,
+    "@margoengine/netcode/generate": 5154,
     "@margoengine/netcode/node": 6102,
     "@margoengine/netcode/rollback": 3471,
+    "@margoengine/netcode/rooms": 4418,
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/oit": 3199,
