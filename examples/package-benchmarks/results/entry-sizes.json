@@ -1,5 +1,5 @@
 {
-  "commit": "bcdcddb2",
+  "commit": "fed490a0",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -848,8 +848,8 @@
         "gzip": 29560
       },
       "./modeling": {
-        "raw": 89982,
-        "gzip": 29693
+        "raw": 93841,
+        "gzip": 31119
       }
     },
     "@margoengine/navmesh": {
