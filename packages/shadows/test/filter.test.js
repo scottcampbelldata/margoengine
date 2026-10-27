@@ -7,7 +7,7 @@ import { Engine, TransformStore } from '../../core/dist/extension.js';
 
 // Lines other packages repeat or rely on (environment/volumetric selects cascades the same way).
 const contract = [
-  'struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f}',
+  'struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f,nearest:vec4f}',
   'fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {',
   'let depth=-(shadowFrame.view*vec4f(position,1)).z;',
   'let cascade=u32(depth>shadowFrame.splits.x)+u32(depth>shadowFrame.splits.y)+u32(depth>shadowFrame.splits.z);',

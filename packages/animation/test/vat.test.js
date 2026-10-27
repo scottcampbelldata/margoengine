@@ -242,7 +242,9 @@ test('VATCrowd casts into Shadows per cascade and composes shadow and IBL hooks 
   const lit = gpu.record(() => frame(0)),
     steady = gpu.record(() => frame(1));
   const draws = (log) => log.filter((e) => e[0] === 'pass.drawIndexed').map((e) => e.slice(1, 3)),
-    code = (log) => log.filter((e) => e[0] === 'module').map((e) => e[2].code);
+    // Shadows' nearest-depth reduction is a module of its own, not part of the crowd's passes.
+    code = (log) =>
+      log.filter((e) => e[0] === 'module' && !e[2].code.includes('atomicMin(&nearest[id.z]')).map((e) => e[2].code);
   assert.deepEqual(draws(lit), Array(5).fill([24, 2]), 'four cascade depth draws, then the beauty draw');
   const frames = steady.filter((e) => e[0] === 'writeBuffer' && e[3].length === 320),
     slots = frames.filter((e) => e[1] === frames.find((x) => x[2] === 256)[1]);

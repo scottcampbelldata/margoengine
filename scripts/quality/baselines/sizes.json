@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3525215,
+  "total": 3525910,
   "history": [
     {
       "date": "2026-10-24",
@@ -578,6 +578,12 @@
       "commit": "c94eeee4",
       "reason": "points: LAS 1.0-1.4 reader/writer (/las), octree LOD streaming (/octree), classification and ramp colours and measures in the root (queue item 31, landing 2)",
       "grew": 3
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "df630879",
+      "reason": "shadows: the PCSS blocker search now spans to each cascade's nearest caster (a compute reduction of the map, its WGSL and dispatch, +277 B gzip); fixes the speckled soft shadows of the animation guide (known bug closed 2026-10-27)",
+      "grew": 1
     }
   ],
   "items": {
@@ -831,7 +837,7 @@
     "@margoengine/shader/noise": 4753,
     "@margoengine/shader/raw": 9906,
     "@margoengine/shader/readback": 7620,
-    "@margoengine/shadows": 13649,
+    "@margoengine/shadows": 14344,
     "@margoengine/sky": 15740,
     "@margoengine/sky/base": 6699,
     "@margoengine/sky/bruneton": 2627,

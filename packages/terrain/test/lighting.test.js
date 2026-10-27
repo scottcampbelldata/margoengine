@@ -324,11 +324,12 @@ test('terrain reuses real shadow and clustered bindings and follows restored pro
     clustered.onDeviceRestored(h.engine);
     const restored = h.counts.groups;
     render();
-    assert.equal(h.counts.groups, restored + 1);
+    // Two new groups: the terrain's and Shadows' nearest-depth reduction (the restored map is reduced once).
+    assert.equal(h.counts.groups, restored + 2);
     assert.notEqual(h.bound.at(-1), first);
     const group = h.bound.at(-1);
     render();
-    assert.equal(h.counts.groups, restored + 1);
+    assert.equal(h.counts.groups, restored + 2);
     assert.equal(h.bound.at(-1), group);
   } finally {
     clustered.dispose();

@@ -3,7 +3,7 @@
   "night-citadel-high": {
    "url": "night-citadel/?quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -19,8 +19,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T18:54:18.206Z",
-    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "date": "2026-10-27T11:31:15.557Z",
+    "commit": "2434db027dd1f5e49e5ea7997e6ccb1278794e2f",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -81,15 +81,15 @@
   "gameplay-sandbox-high": {
    "url": "gameplay-sandbox/?quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
-    "changed": 0.0000477,
+    "changed": 0.0000694,
     "hot": 0,
-    "mean": 0.0000477,
+    "mean": 0.0000694,
     "max": 1
    },
    "tolerance": {
-    "changed": 0.000643,
+    "changed": 0.000708,
     "hot": 0.0002
    },
    "environment": {
@@ -97,8 +97,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T18:54:18.206Z",
-    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "date": "2026-10-27T11:31:15.557Z",
+    "commit": "2434db027dd1f5e49e5ea7997e6ccb1278794e2f",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -341,7 +341,7 @@
   "character-animation-high": {
    "url": "demos/character-animation.html?quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -357,8 +357,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T18:54:18.206Z",
-    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "date": "2026-10-27T11:31:15.557Z",
+    "commit": "2434db027dd1f5e49e5ea7997e6ccb1278794e2f",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1875,7 +1875,7 @@
   "batched-mesh-high": {
    "url": "demos/batched-mesh.html?quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1891,24 +1891,17 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T21:51:04.348Z",
-    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "date": "2026-10-27T11:31:15.557Z",
+    "commit": "2434db027dd1f5e49e5ea7997e6ccb1278794e2f",
     "packagesDirty": false,
-    "renderedInputsDirty": true,
-    "renderedInputChanges": [
-     "examples/animation-formats.html",
-     "examples/animation-formats.ts",
-     "examples/texture-formats.html",
-     "examples/texture-formats.ts",
-     "site/index.html",
-     "site/sitemap.xml"
-    ]
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "batched-mesh-phone": {
    "url": "demos/batched-mesh.html",
    "size": "195x422",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1924,24 +1917,17 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T21:51:04.348Z",
-    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "date": "2026-10-27T11:31:15.557Z",
+    "commit": "2434db027dd1f5e49e5ea7997e6ccb1278794e2f",
     "packagesDirty": false,
-    "renderedInputsDirty": true,
-    "renderedInputChanges": [
-     "examples/animation-formats.html",
-     "examples/animation-formats.ts",
-     "examples/texture-formats.html",
-     "examples/texture-formats.ts",
-     "site/index.html",
-     "site/sitemap.xml"
-    ]
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "clipping-planes-high": {
    "url": "demos/clipping-planes.html?quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1957,8 +1943,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T23:35:29.197Z",
-    "commit": "7f1ab1921c2681a3977a74d49311f7a748d06bcf",
+    "date": "2026-10-27T11:31:15.557Z",
+    "commit": "2434db027dd1f5e49e5ea7997e6ccb1278794e2f",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1967,7 +1953,7 @@
   "clipping-planes-phone": {
    "url": "demos/clipping-planes.html",
    "size": "195x422",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1983,8 +1969,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T23:35:29.197Z",
-    "commit": "7f1ab1921c2681a3977a74d49311f7a748d06bcf",
+    "date": "2026-10-27T11:31:15.557Z",
+    "commit": "2434db027dd1f5e49e5ea7997e6ccb1278794e2f",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -2261,8 +2247,8 @@
   "gpu": "nvidia ampere",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-25T08:26:37.187Z",
-  "commit": "a78b4c27f4adb1948bbc1e216339da20714b97fe",
+  "date": "2026-10-27T11:31:15.557Z",
+  "commit": "2434db027dd1f5e49e5ea7997e6ccb1278794e2f",
   "packagesDirty": false,
   "renderedInputsDirty": false,
   "renderedInputChanges": []

@@ -21,7 +21,7 @@ import { sectionState, sectionShader } from '../../shared/section.js';
 import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
-import { shadowSampling, shadowDepth, type ShadowFilter } from './shader.js';
+import { shadowSampling, shadowDepth, nearestDepth, type ShadowFilter } from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import {
   casterBuffers,
@@ -35,7 +35,7 @@ import {
 } from '../../shared/caster.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
 export type { ShadowFilter } from './shader.js';
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
   TEXTURE_BINDING: number;
@@ -220,6 +220,14 @@ export class Shadows implements EnginePlugin {
   private engine?: Engine;
   private device?: GPUDevice;
   private uniform?: GPUBuffer;
+  /** Each layer's nearest depth (f32 bits), reduced from the combined map for the PCSS search; copied into `uniform`. */
+  private nearestBuffer?: GPUBuffer;
+  private nearestPipeline?: GPUComputePipeline;
+  private nearestGroup?: GPUBindGroup;
+  /** The map changed since the last reduction (while the filter was not `'soft'`, or before the first frame). */
+  private nearestStale = true;
+  private readonly nearestSeed = new Uint32Array(4).fill(0x3f800000);
+  private combinedView?: GPUTextureView;
   private cached?: GPUTexture;
   private combined?: GPUTexture;
   private white?: GPUTexture;
@@ -549,7 +557,12 @@ export class Shadows implements EnginePlugin {
           'Shadow mesh belongs to another engine; use objects created by the same engine',
         );
     this.textures();
-    this.uniform = this.device.createBuffer({ size: 368, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    // 368 bytes written each frame from `values`, then 16 for `nearest`, which the GPU reduction copies in.
+    this.uniform = this.device.createBuffer({ size: 384, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.nearestBuffer = this.device.createBuffer({
+      size: 16,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
     this.sampler = this.device.createSampler({ compare: 'less-equal', magFilter: 'linear', minFilter: 'linear' });
     this.alphaSampler = this.device.createSampler();
     this.white = this.device.createTexture({
@@ -604,9 +617,10 @@ export class Shadows implements EnginePlugin {
   private bind(): void {
     this.entries = [
       { binding: 1, resource: { buffer: this.uniform! } },
-      { binding: 2, resource: this.combined!.createView({ dimension: '2d-array' }) },
+      { binding: 2, resource: (this.combinedView = this.combined!.createView({ dimension: '2d-array' })) },
       { binding: 3, resource: this.sampler! },
     ];
+    this.nearestGroup = undefined;
     this.dirty = true;
   }
   registerPasses(graph: FrameGraph): void {
@@ -782,6 +796,7 @@ export class Shadows implements EnginePlugin {
     this.values[91] = c.height / (2 * Math.tan((c.camera.fov * Math.PI) / 360));
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.stats.staticDraws = this.stats.dynamicDraws = 0;
+    const rendered = this.dirty;
     if (this.dirty) {
       for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, true);
       this.previous.set(this.matrices);
@@ -793,6 +808,34 @@ export class Shadows implements EnginePlugin {
     this.copySize.height = this.height;
     c.encoder.copyTextureToTexture(this.copySource, this.copyDestination, this.copySize);
     if (moving) for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, false);
+    if ((this.options.filter ?? 'soft') !== 'soft') this.nearestStale ||= rendered || moving;
+    else if (rendered || moving || this.nearestStale) this.nearest(c);
+  }
+  /**
+   * Reduces each layer of the combined map to its nearest depth and copies it into the frame uniform: the PCSS search
+   * spans the receiver's light-space distance to that depth (shader.ts `soft`). Runs when the map changed.
+   */
+  private nearest(c: ShadowPassContext): void {
+    const device = c.device;
+    this.nearestPipeline ??= device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: device.createShaderModule({ code: nearestDepth }), entryPoint: 'main' },
+    });
+    this.nearestGroup ??= device.createBindGroup({
+      layout: this.nearestPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.combinedView! },
+        { binding: 1, resource: { buffer: this.nearestBuffer! } },
+      ],
+    });
+    device.queue.writeBuffer(this.nearestBuffer!, 0, this.nearestSeed);
+    const pass = c.encoder.beginComputePass();
+    pass.setPipeline(this.nearestPipeline);
+    pass.setBindGroup(0, this.nearestGroup);
+    pass.dispatchWorkgroups(Math.ceil(this.width / 32), Math.ceil(this.height / 32), this.cascadeCount);
+    pass.end();
+    c.encoder.copyBufferToBuffer(this.nearestBuffer!, 0, this.uniform!, 368, 16);
+    this.nearestStale = false;
   }
   private fitBounds(): void {
     const { bounds, frustum } = this.options,
@@ -1254,6 +1297,9 @@ export class Shadows implements EnginePlugin {
     this.clearDraws();
     for (const texture of [this.cached, this.combined, this.white]) texture?.destroy();
     this.uniform?.destroy();
+    this.nearestBuffer?.destroy();
+    this.nearestBuffer = this.nearestPipeline = this.nearestGroup = this.combinedView = undefined;
+    this.nearestStale = true;
     this.cached = this.combined = this.white = undefined;
     this.whiteView = undefined;
     this.uniform = undefined;

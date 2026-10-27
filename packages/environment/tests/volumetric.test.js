@@ -245,7 +245,7 @@ test("contract with clustered and shadows: the froxel light loop repeats cluster
     assert.ok(local.includes(line), `volumetric lost: ${line}`);
   }
   for (const text of [
-    'struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f}',
+    'struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f,nearest:vec4f}',
     'var reference=projected.z-shadowFrame.settings.y;',
     'let depth=-(shadowFrame.view*vec4f(position,1)).z;',
     'let cascade=u32(depth>shadowFrame.splits.x)+u32(depth>shadowFrame.splits.y)+u32(depth>shadowFrame.splits.z);',
