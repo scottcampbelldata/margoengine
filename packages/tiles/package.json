@@ -1,0 +1,64 @@
+{
+  "name": "@margoengine/tiles",
+  "version": "1.0.0",
+  "description": "Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf-pro.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "3d-tiles",
+    "ogc",
+    "gis",
+    "digital-twin",
+    "streaming"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/tiles"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/points": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/gltf-pro": {
+      "optional": true
+    },
+    "@margoengine/points": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js tiles",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:browser": "npm run build && node tests/tiles-browser.mjs",
+    "prepack": "npm run build"
+  }
+}

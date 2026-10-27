@@ -632,3 +632,19 @@ engines (Colyseus, Photon, Mirror, GGPO, Rapier, Unity Netcode, Unreal and the l
 | Clock synchronisation | F. Cristian, "Probabilistic clock synchronization", Distributed Computing 3(3), 1989 (the smallest round trip bounds the offset) |
 | Varints, zigzag | LEB128 as specified in DWARF 4 section 7.6; zigzag as described in the Protocol Buffers encoding documentation |
 | Schema hash | FNV-1a 32-bit as published by G. Fowler, L. C. Noll and K.-P. Vo |
+
+## 3D Tiles: `@margoengine/tiles`
+
+Written clean room from the specifications and papers below. No source code of 3D Tiles runtimes or tools (CesiumJS,
+3d-tiles-renderer, three-loader-3dtiles, loaders.gl, 3d-tiles-tools, py3dtiles, iTwin.js and the like) was read.
+
+| Area | Source |
+| --- | --- |
+| Tileset JSON, refinement, geometric and screen-space error, bounding volumes, external tilesets, metadata | OGC 3D Tiles Specification 1.1 (OGC 22-025r4): "Tileset", "Tiles", "Bounding volumes", "Geometric error", "Refinement", "Metadata" |
+| Implicit tiling, subtree files, Morton order | OGC 3D Tiles 1.1, "Implicit Tiling" (subtree binary format, availability bitstreams, template URIs, subdivision of boxes and regions) |
+| b3dm, i3dm, pnts, cmpt, feature and batch tables | OGC 3D Tiles 1.1, "Tile formats" (the 1.0 formats 1.1 keeps) |
+| y-up to z-up for glTF content | OGC 3D Tiles 1.1, "glTF transforms"; Khronos glTF 2.0, "Coordinate system and units" |
+| WGS84, ECEF, east-north-up | NIMA TR8350.2 (WGS84 constants); B. R. Bowring, "Transformation from spatial to geographical coordinates", Survey Review 23 (181), 1976 |
+| Octahedral normals (NORMAL_OCT16P, OCT32P) | Z. H. Cigolle, S. Donow, D. Evangelakos, M. Mara, M. McGuire and Q. Meyer, "A survey of efficient representations for independent unit vectors", JCGT 3(2), 2014 |
+| Quaternion from a rotation matrix | S. W. Shepperd, "Quaternion from rotation matrix", J. Guidance and Control 1(3), 1978 |
+| Oriented-box frustum and distance tests | Separating-axis projection of a box onto a plane normal (C. Ericson, "Real-Time Collision Detection", 2005, ch. 5) |

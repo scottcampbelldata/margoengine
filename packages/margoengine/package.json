@@ -1079,6 +1079,10 @@
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"
     },
+    "./tiles": {
+      "types": "./dist/tiles.d.ts",
+      "import": "./dist/tiles.js"
+    },
     "./tonemap": {
       "types": "./dist/tonemap.d.ts",
       "import": "./dist/tonemap.js"
@@ -1368,6 +1372,7 @@
     "@margoengine/taa": "^1.0.0",
     "@margoengine/terrain": "^1.0.0",
     "@margoengine/text": "^1.0.0",
+    "@margoengine/tiles": "^1.0.0",
     "@margoengine/tonemap": "^1.0.0",
     "@margoengine/toon": "^1.0.0",
     "@margoengine/transitions": "^1.0.0",

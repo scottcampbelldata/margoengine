@@ -46,6 +46,7 @@ const layers = {
     'blender',
     'cache',
     'splats',
+    'tiles',
   ],
   'Rendering and lighting': [
     'materials',

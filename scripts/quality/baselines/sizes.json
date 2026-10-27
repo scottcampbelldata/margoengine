@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3485266,
+  "total": 3500018,
   "history": [
     {
       "date": "2026-10-24",
@@ -554,6 +554,12 @@
       "commit": "46b4df25",
       "reason": "new optional package @margoengine/netcode: schema codec with deltas, authoritative fixed-timestep server, client prediction and interpolation, loopback network (item 30, landing 1)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "46b4df25",
+      "reason": "new optional package @margoengine/tiles: streaming OGC 3D Tiles 1.1 (queue item 31, landing 1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -824,6 +830,7 @@
     "@margoengine/taa": 10390,
     "@margoengine/terrain": 10598,
     "@margoengine/text": 15890,
+    "@margoengine/tiles": 14752,
     "@margoengine/tonemap": 11083,
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4339,
