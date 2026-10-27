@@ -23,9 +23,9 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/cameras | `.` 3, `./origin` 3, `./layers` 8 |  |  | 2,025 |
 | @margoengine/cinematic | `.` 3 |  |  | 1,967 |
 | @margoengine/clustered | `.` 18, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./units` 12 | 80 |  | 13,215 |
-| @margoengine/compute | `.` 35, `./linalg` 5, `./fft` 8, `./signal` 7, `./random` 5, `./autodiff` 3, `./sparse` 13, `./stream` 8, `./frame` 3 | 253 | 18 | 37,825 |
+| @margoengine/compute | `.` 35, `./linalg` 5, `./fft` 8, `./signal` 7, `./random` 5, `./autodiff` 3, `./sparse` 13, `./stream` 8, `./frame` 3 | 253 | 18 | 37,853 |
 | @margoengine/controls | `.` 50, `./orbit` 7, `./arcball` 5, `./transform` 5, `./drag` 3, `./profiles` 13, `./walk` 6 | 63 |  | 23,268 |
-| @margoengine/core | `.` 17, `./extension` 26 | 16 |  | 20,479 |
+| @margoengine/core | `.` 17, `./extension` 26 | 16 |  | 20,495 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 19,004 |
 | @margoengine/culling | `.` 6 |  |  | 9,457 |
 | @margoengine/cutscene | `.` 43 |  |  | 6,589 |
