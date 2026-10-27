@@ -19,7 +19,7 @@ import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { decodePNG } from '../../tests/support/png.js';
 import { killTree, notebookHasKernel, serverPort, startKernel, step } from './jupyter-steps.mjs';
-import { ensureVenv, SETUP, venvDir, venvTools } from './venv.mjs';
+import { compareVersions, ensureVenv, namesToRead, parsePins, requirements, SETUP, venvDir, venvTools } from './venv.mjs';
 
 // Run by a supervisor: this file starts itself as a child under a hard time limit and, on timeout, ends the child and
 // everything it started (the server, kernels, browser) and says so. The child does the work below.
@@ -72,16 +72,23 @@ assert.ok(existsSync(join(extension, 'package.json')), 'the extension is not bui
 // The Python and Jupyter stack the check runs on, at the head of the server log kept on failure and in the success
 // line, so a failure names the versions it ran against. Only the venv's own packages count: the venv excludes the
 // system and user site-packages.
+// The names come from the pinned requirements file: a pinned package that is missing or at another version fails the
+// check by name; the optional extras (such as notebook, which jupyterlab does not need) print "not installed".
+const pins = parsePins(readFileSync(requirements, 'utf8'));
 const stack = spawnSync(
   python,
   [
     '-c',
-    'import sys, site, importlib.metadata as m\nnames = ["jupyterlab", "notebook", "jupyter_server", "jupyter_client", "ipykernel", "ipywidgets", "tornado"]\nprint(f"python {sys.version.split()[0]} {sys.executable}; user site {site.ENABLE_USER_SITE}; " + ", ".join(f"{n} {m.version(n)}" for n in names))',
+    'import sys, site, json, importlib.metadata as m\nout = {}\nfor n in json.loads(sys.argv[1]):\n    try:\n        out[n] = m.version(n)\n    except m.PackageNotFoundError:\n        out[n] = None\nprint(json.dumps({"python": sys.version.split()[0], "exe": sys.executable, "site": site.ENABLE_USER_SITE, "versions": out}))',
+    JSON.stringify(namesToRead(pins)),
   ],
   { encoding: 'utf8', timeout: 60_000 },
 );
 assert.equal(stack.status, 0, `reading the venv's versions failed: ${stack.stderr}`);
-versions = stack.stdout.trim();
+const read = JSON.parse(stack.stdout),
+  { line, problems } = compareVersions(pins, new Map(Object.entries(read.versions)));
+versions = `python ${read.python} ${read.exe}; user site ${read.site}; ${line}`;
+assert.deepEqual(problems, [], `the venv does not match ${requirements}: run ${SETUP}\n${problems.join('\n')}`);
 console.log(`jupyter: runs on ${versions}`);
 
 // The classic AMD module VS Code loads: it asks the loader for @jupyter-widgets/base only and returns the two widget

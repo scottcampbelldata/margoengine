@@ -99,3 +99,39 @@ export function ensureVenv({ venv = venvDir(), env = process.env, exec = run, lo
   }
   return { ok: true, tools: done, made: true };
 }
+
+/** PEP 503 name normalisation: runs of `-`, `_` and `.` become one `-`, lower case. */
+export const normaliseName = (name) => name.replace(/[-_.]+/g, '-').toLowerCase();
+
+/** The `name==version` pins in a requirements text as a Map of normalised name to version (comments and blank lines skipped). */
+export function parsePins(text) {
+  const pins = new Map();
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)/.exec(line);
+    if (match) pins.set(normaliseName(match[1]), match[2]);
+  }
+  return pins;
+}
+
+/** Packages reported when installed though the requirements file may not pin them: a name missing here is not an error. */
+export const OPTIONAL_REPORTED = ['notebook', 'jupyterlab', 'jupyter-server', 'jupyter-client', 'ipykernel', 'ipywidgets', 'tornado'];
+
+/** Every name whose installed version is wanted: the pins plus the optional names (normalised). */
+export const namesToRead = (pins, optional = OPTIONAL_REPORTED) => [...new Set([...pins.keys(), ...optional.map(normaliseName)])];
+
+/**
+ * Compares installed versions (`installed`: normalised name to version or null) with the pins. A pinned package that is
+ * missing or at another version is a problem naming it; an optional name that is not installed is reported as such.
+ * Returns `{ line, problems }`.
+ */
+export function compareVersions(pins, installed, optional = OPTIONAL_REPORTED) {
+  const problems = [];
+  for (const [name, pin] of pins) {
+    const have = installed.get(name) ?? null;
+    if (have === null) problems.push(`${name} ${pin} is pinned but not installed`);
+    else if (have !== pin) problems.push(`${name} is ${have} but pinned to ${pin}`);
+  }
+  const shown = [...new Set(optional.map(normaliseName))];
+  const line = shown.map((n) => `${n} ${installed.get(n) ?? 'not installed'}`).join(', ');
+  return { line, problems };
+}

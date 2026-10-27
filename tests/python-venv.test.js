@@ -8,7 +8,15 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { ensureVenv, findPython, pythonCandidates, SETUP } from '../python/tests/venv.mjs';
+import {
+  compareVersions,
+  ensureVenv,
+  findPython,
+  namesToRead,
+  parsePins,
+  pythonCandidates,
+  SETUP,
+} from '../python/tests/venv.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const scratch = () => mkdtempSync(join(tmpdir(), 'margo-venv-test-'));
@@ -212,4 +220,44 @@ test('MARGO_PYTHON overrides the supported-version filter', () => {
     command: ['my-python'],
     version: '3.15.0',
   });
+});
+
+// Bug 31: the check printed the versions of a hard-coded list that included `notebook`, which the pinned requirements do
+// not contain, so a fresh venv died with PackageNotFoundError. The names now come from the requirements text.
+const pinsText = '# comment\nJupyterLab==4.6.4\nnotebook_shim==0.2.4\n\ntornado==6.6 ; python_version > "3"\n';
+const freshVenv = () =>
+  new Map([
+    ['jupyterlab', '4.6.4'],
+    ['notebook-shim', '0.2.4'],
+    ['tornado', '6.6'],
+  ]);
+
+test('pins are read from the requirements text with PEP 503 names', () => {
+  assert.deepEqual(
+    [...parsePins(pinsText)],
+    [
+      ['jupyterlab', '4.6.4'],
+      ['notebook-shim', '0.2.4'],
+      ['tornado', '6.6'],
+    ],
+  );
+});
+
+test('a fresh venv without the unpinned notebook package passes and reports it as not installed (bug 31)', () => {
+  const pins = parsePins(pinsText);
+  assert.ok(namesToRead(pins).includes('notebook'));
+  const { line, problems } = compareVersions(pins, freshVenv());
+  assert.deepEqual(problems, []);
+  assert.match(line, /notebook not installed/);
+  assert.match(line, /jupyterlab 4\.6\.4/);
+});
+
+test('a missing or different pinned package fails, naming it (bug 31)', () => {
+  const installed = freshVenv();
+  installed.set('jupyterlab', '4.5.0');
+  installed.delete('tornado');
+  const { problems } = compareVersions(parsePins(pinsText), installed);
+  assert.equal(problems.length, 2);
+  assert.match(problems[0], /jupyterlab is 4\.5\.0 but pinned to 4\.6\.4/);
+  assert.match(problems[1], /tornado 6\.6 is pinned but not installed/);
 });
