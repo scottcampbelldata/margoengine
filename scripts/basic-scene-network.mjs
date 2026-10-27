@@ -5,8 +5,11 @@
 // chunk and its static imports, the @margoengine/gltf chunk and the model: no Wasm, no worker, no other pack.
 // Records every request and the bytes transferred to examples/package-benchmarks/results/basic-scene-network.json,
 // which margoengine.com/sizes.html lists (`npm run build:site` runs this). Needs WebGPU, so after build:packages.
-// The GPU lock (test-results/gpu.lock) is taken here, around the browser only (launch to close, a few seconds). The
-// Vite build before it and the hashing after it run without it, so callers do not wrap this script in the lock.
+// The GPU lock (test-results/gpu.lock) is taken here, around the preview server's start and the browser only (a few
+// seconds). The Vite build before it and the hashing after it run without it, so callers do not wrap this script in the
+// lock. The lock comes before the port, as in every GPU suite: a server that held its port while queuing for the GPU
+// (behind an exclusive benchmark) once kept a GPU suite that holds a slot waiting 20 minutes for that port. The port is
+// this script's alone (tests/basic-scene-network-lock.test.js).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -21,7 +24,7 @@ import { acquire } from './gpu-lock.mjs';
 const root = resolve(import.meta.dirname, '..'),
   fixture = resolve(root, 'tests/fixtures/basic-scene');
 const out = resolve(root, 'test-results/basic-scene'),
-  port = 5241;
+  port = 5259;
 
 // A unit cube GLB (24 vertices with face normals, 36 indices), the smallest model that exercises the glTF path.
 function cubeGLB() {
@@ -130,23 +133,29 @@ assert.ok(
   'the build output holds the OCCT .wasm (so not fetching it is a real check)',
 );
 
-const server = await listenWhenFree(
-  () =>
-    preview({
-      configFile: false,
-      root: fixture,
-      logLevel: 'warn',
-      build: { outDir: out },
-      preview: { host: '127.0.0.1', port, strictPort: true },
-    }),
-  { port },
-);
 const release = await acquire({ owner: 'basic-scene-network', poll: 2000 });
 let held = true;
 const releaseGpu = () => {
   if (held) release();
   held = false;
 };
+let server;
+try {
+  server = await listenWhenFree(
+    () =>
+      preview({
+        configFile: false,
+        root: fixture,
+        logLevel: 'warn',
+        build: { outDir: out },
+        preview: { host: '127.0.0.1', port, strictPort: true },
+      }),
+    { port },
+  );
+} catch (error) {
+  releaseGpu();
+  throw error;
+}
 let browser;
 try {
   browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true });
