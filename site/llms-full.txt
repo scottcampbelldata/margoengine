@@ -7741,10 +7741,10 @@ Import it as `margoengine/react` (from the `margoengine` package) or `@margoengi
 the two are the same module. Optional parts load only when a component needs them, so an unused feature costs nothing.
 
 With Vite, installing this package alone (plus the peers your components use, such as `@margoengine/controls` for
-`OrbitControls`) keeps the build to what you import: a cube page with orbit controls loads 95,338 B gzip (70% of it React and React DOM) and emits no
-Wasm. `margoengine` installs every package, so the build also writes the lazy loaders the stage can reach (glTF
-decoders, CAD import with OpenCascade's Wasm) to `dist`; the page never requests them. Webpack and Turbopack (Next.js)
-need `margoengine` ([limits.md](../../docs/limits.md), React app budget).
+`OrbitControls`) keeps the build to what you import. The cube page with orbit controls requests 95,384 B gzip at load
+and 102,335 B once `OrbitControls` mounts, and emits no Wasm. React and React DOM are about 70% of that; Margo's part
+(core, stage, bindings) is 27,028 B gzip. The breakdown is in [limits.md](../../docs/limits.md#react-page). Webpack and
+Turbopack (Next.js) need the `margoengine` package, not this one alone.
 
 
 **What you get from this page:** a React app with a lit mesh in about five minutes, then the components, hooks,
@@ -7781,11 +7781,14 @@ npm install ../margoengine/test-results/*.tgz react react-dom vite @vitejs/plugi
 
 On the machine that wrote this page, packing took about a minute and the install 8 seconds. Add an `index.html` with
 `<div id="root"></div>` and `<script type="module" src="/src/main.tsx"></script>`, put the first scene below in
-`src/main.tsx` (add the `createRoot` line at the end), and run `npx vite`. The test `tests/react-bundle.test.js` builds
-exactly this app for production on every `npm run verify`.
+`src/main.tsx` (add the `createRoot` line at the end), and run `npx vite`.
 
 **Route 2: use the examples inside the clone.** `npm ci`, `npm run build:packages`, then
 `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example.
+
+**TypeScript with this package alone.** Set `"skipLibCheck": true` in `tsconfig.json`. Without it, `tsc` reports
+about 200 errors in the declaration files of the optional peers you did not install. Installing `margoengine` (the
+tarball route above installs it) does not have this problem.
 
 **After 1.0.0 is published**, `npm install margoengine react react-dom` replaces the tarballs and nothing else changes.
 [SCENE.md](SCENE.md) lists the optional peers each component uses.

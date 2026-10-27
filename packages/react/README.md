@@ -8,10 +8,10 @@ Import it as `margoengine/react` (from the `margoengine` package) or `@margoengi
 the two are the same module. Optional parts load only when a component needs them, so an unused feature costs nothing.
 
 With Vite, installing this package alone (plus the peers your components use, such as `@margoengine/controls` for
-`OrbitControls`) keeps the build to what you import: a cube page with orbit controls loads 95,338 B gzip (70% of it React and React DOM) and emits no
-Wasm. `margoengine` installs every package, so the build also writes the lazy loaders the stage can reach (glTF
-decoders, CAD import with OpenCascade's Wasm) to `dist`; the page never requests them. Webpack and Turbopack (Next.js)
-need `margoengine` ([limits.md](../../docs/limits.md), React app budget).
+`OrbitControls`) keeps the build to what you import. The cube page with orbit controls requests 95,384 B gzip at load
+and 102,335 B once `OrbitControls` mounts, and emits no Wasm. React and React DOM are about 70% of that; Margo's part
+(core, stage, bindings) is 27,028 B gzip. The breakdown is in [limits.md](../../docs/limits.md#react-page). Webpack and
+Turbopack (Next.js) need the `margoengine` package, not this one alone.
 
 
 **What you get from this page:** a React app with a lit mesh in about five minutes, then the components, hooks,
@@ -48,11 +48,14 @@ npm install ../margoengine/test-results/*.tgz react react-dom vite @vitejs/plugi
 
 On the machine that wrote this page, packing took about a minute and the install 8 seconds. Add an `index.html` with
 `<div id="root"></div>` and `<script type="module" src="/src/main.tsx"></script>`, put the first scene below in
-`src/main.tsx` (add the `createRoot` line at the end), and run `npx vite`. The test `tests/react-bundle.test.js` builds
-exactly this app for production on every `npm run verify`.
+`src/main.tsx` (add the `createRoot` line at the end), and run `npx vite`.
 
 **Route 2: use the examples inside the clone.** `npm ci`, `npm run build:packages`, then
 `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example.
+
+**TypeScript with this package alone.** Set `"skipLibCheck": true` in `tsconfig.json`. Without it, `tsc` reports
+about 200 errors in the declaration files of the optional peers you did not install. Installing `margoengine` (the
+tarball route above installs it) does not have this problem.
 
 **After 1.0.0 is published**, `npm install margoengine react react-dom` replaces the tarballs and nothing else changes.
 [SCENE.md](SCENE.md) lists the optional peers each component uses.
@@ -367,13 +370,15 @@ it. A complete example is in the [cookbook](../../docs/react-cookbook.md#physics
 
 ## Next.js
 
-Both the App Router and the Pages Router work, with webpack and with Turbopack, and need no `transpilePackages`. Keep the
-page a server component and put the `Canvas` in a small client component:
+Both the App Router and the Pages Router work, with webpack and with Turbopack, and need no `transpilePackages`. Install
+`margoengine` (`npm i margoengine react react-dom next` once it is published) and import from `margoengine/react`.
+`@margoengine/react` alone does not build under Next.js: it fails on its optional peers, which `margoengine` supplies.
+Keep the page a server component and put the `Canvas` in a small client component:
 
 ```tsx
 // app/scene.tsx
 'use client';
-import { Canvas, Box, OrbitControls } from '@margoengine/react';
+import { Canvas, Box, OrbitControls } from 'margoengine/react';
 
 export function Scene() {
   return (
@@ -388,6 +393,9 @@ export function Scene() {
 Import `Scene` from a server `page.tsx` behind `<Suspense fallback={...}>`. Next.js example: `examples/next`. More recipes are
 in the [React cookbook](../../docs/react-cookbook.md); moving from react-three-fiber is in
 [Coming from react-three-fiber](../../docs/react-from-r3f.md).
+
+A Next.js page is larger than the Vite page: about 194 KB gzip of JavaScript. Its build output also holds the OpenCascade
+Wasm (7,604,031 B) and the Basis and Draco decoders; they are emitted but never requested at load or while orbiting.
 
 SSR emits an accessible canvas without accessing GPU APIs. The ESM output preserves `use client` and includes TypeScript declarations. Peer ranges accept core `^1.0.0` and React 18 or 19.
 
@@ -435,34 +443,9 @@ alert.
 
 ## Build warnings
 
-A production build of a clean Vite 8 + React 19 + TypeScript app (the first scene above) prints two kinds of warning.
-Both are harmless, and both come from how the package is built on purpose:
-
-- `MODULE_LEVEL_DIRECTIVE`: the package's client entries start with `'use client'`, which Next.js needs so a server
-  component can import them. A single-page app bundle has no use for the directive, so Vite says it may not be kept.
-- `INEFFECTIVE_DYNAMIC_IMPORT`: optional parts (`<Html>` imports `react-dom`, glTF loading imports its decoders) load
-  with `import()` so an app that does not use them never fetches them. When your app also imports the same module
-  statically, the bundler reports that the `import()` will not make a separate chunk.
-
-To silence them in Vite (other warnings still print):
-
-```js
-// vite.config.ts
-import { defineConfig } from 'vite';
-
-const harmless = new Set(['MODULE_LEVEL_DIRECTIVE', 'INEFFECTIVE_DYNAMIC_IMPORT']);
-export default defineConfig({
-  build: {
-    rollupOptions: {
-      onwarn(warning, warn) {
-        if (!harmless.has(warning.code ?? '')) warn(warning);
-      },
-    },
-  },
-});
-```
-
-`tests/react-bundle.test.js` builds that app on every `npm run verify` and fails on any other warning. The built files keep `'use client'` on every entry, and `sideEffects` is `false`, so unused exports are dropped. Next.js App Router builds with webpack and Turbopack run in `npm run modern:test:bundlers`.
+A production Vite build of the cube page prints no warnings; `npm run modern:test:bundlers` checks it from the installed packages on every merge check and fails on any warning. Only the generated `rsc/` entries carry `'use client'` (the
+`react-server` export condition maps to them), so a server component can import `Canvas`. `sideEffects` is `false`, so
+unused exports are dropped. Next.js builds with webpack and Turbopack run in `npm run modern:test:bundlers`.
 
 ## Testing and size
 
@@ -476,8 +459,11 @@ What the numbers mean, by scope. None of them is "the size of your app":
 
 - **Core and stage together:** 22,781 B gzip (`npm run measure:size`, the entry measurement; the build fails at 25,000 B).
   It does not include React, this package or any optional package.
-- **A React page with PBR models loaded:** about 563 KB decoded, 193 KB gzip, of JavaScript in an independent study of a
-  React app. That includes React and the shared scene infrastructure.
+- **A Vite React page with the cube and orbit controls:** 102,335 B gzip of JavaScript, 70% of it React and React DOM
+  (measured, table in limits.md). `PbrMaterial` is core's material and pulls in no other package. A textured `<Model>`
+  adds 1,750 B to the entry and fetches glTF support (56,074 B gzip) when it mounts.
+- **A React page with PBR models loaded, in an independent study:** about 563 KB decoded, 193 KB gzip, including React and
+  the shared scene infrastructure. A Next.js page is about 194 KB gzip.
 - **The OpenCascade Wasm (7.6 MB):** fetched only by an app that loads STEP or IGES files. In other apps it can be in the
   build output but is never requested.
 
