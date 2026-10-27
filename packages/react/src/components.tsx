@@ -10,6 +10,9 @@ import {
   type ReactNode,
   type CSSProperties,
 } from 'react';
+// Static: every React DOM app has react-dom in its entry (react-dom/client imports it), so a lazy import() of it moved
+// nothing and Vite and Rolldown warned INEFFECTIVE_DYNAMIC_IMPORT for it.
+import { createPortal } from 'react-dom';
 import {
   Engine,
   type Mesh as EngineMesh,
@@ -974,10 +977,7 @@ export function Html({
   onError,
 }: HtmlProps) {
   const { engine, registry } = useScene();
-  const [portal, setPortal] = useState<{
-    element: HTMLElement;
-    create: typeof import('react-dom').createPortal;
-  } | null>(null);
+  const [portal, setPortal] = useState<HTMLElement | null>(null);
   const label = useRef<import('@margoengine/html').Label | null>(null),
     latest = useRef({ position, occlude, onError });
   latest.current = { position, occlude, onError };
@@ -992,8 +992,8 @@ export function Html({
       item?.setMesh(mesh as unknown as MeshHandle);
       item?.setOffset(latest.current.position);
     };
-    Promise.all([entry.promise, optionalPeer('react-dom', () => import('react-dom'))])
-      .then(([overlay, dom]) => {
+    entry.promise
+      .then((overlay) => {
         if (!active || engine.disposed) return;
         current = overlay;
         const mesh = registry?.current,
@@ -1007,7 +1007,7 @@ export function Html({
         occlusion.current = item.occlude;
         if (!latest.current.occlude) item.occlude = () => false;
         registry?.attachments.add(attach);
-        setPortal({ element, create: dom.createPortal });
+        setPortal(element);
       })
       .catch((error) => {
         if (active && !engine.disposed) {
@@ -1040,7 +1040,7 @@ export function Html({
       item.frustumCulling = frustumCulling;
       item.followVisibility = followVisibility;
       item.visible = visible;
-      if (portal) portal.element.style.pointerEvents = pointerEvents;
+      if (portal) portal.style.pointerEvents = pointerEvents;
     }
   }, [
     registry,
@@ -1059,11 +1059,11 @@ export function Html({
     pointerEvents,
   ]);
   return portal
-    ? portal.create(
+    ? createPortal(
         <div className={className} style={style}>
           {children}
         </div>,
-        portal.element,
+        portal,
       )
     : null;
 }
