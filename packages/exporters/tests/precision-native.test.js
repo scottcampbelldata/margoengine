@@ -127,6 +127,9 @@ except ValueError:
   const python = ['python3', 'python'].find((cmd) => spawnSync(cmd, ['--version']).status === 0);
   if (!python) return; // no Python on this machine; the text assertion above still holds
   const run = spawnSync(python, ['-c', script], { encoding: 'utf8' });
+  // A process that never started has no stderr; report the spawn error itself (it once surfaced as an invalid
+  // assert message instead).
+  assert.ifError(run.error);
   assert.equal(run.status, 0, run.stderr);
   assert.equal(run.stdout.trim(), 'OK', 'equal paths pass, a different path still fails');
 });

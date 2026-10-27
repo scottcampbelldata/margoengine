@@ -145,6 +145,9 @@ for path in ["/Game/B", "/Game/None"]:
 print("OK")
 `;
   const run = spawnSync(python, ['-c', script], { encoding: 'utf8' });
+  // A process that never started has no stderr; report the spawn error itself (it once surfaced as an invalid
+  // assert message instead).
+  assert.ifError(run.error);
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stdout, /PIXEL_ART_PASS 2/);
   assert.match(run.stdout, /raised Pixel-art setting did not stick: \/Game\/T filter/);
