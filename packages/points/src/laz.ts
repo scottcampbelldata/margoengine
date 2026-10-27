@@ -678,9 +678,9 @@ class Point10Reader implements ItemReader {
 // double's bits read as a 64-bit integer) times a small multiplier; a jump outside 32 bits starts a new sequence.
 const MULTI = 500,
   MULTI_MINUS = -10,
-  MULTI_UNCHANGED = MULTI - MULTI_MINUS + 1,
-  MULTI_CODE_FULL = MULTI - MULTI_MINUS + 2,
-  MULTI_TOTAL = MULTI - MULTI_MINUS + 6;
+  // Symbol 511 is "unchanged" in GPSTIME11 (516 symbols) and does not exist in point14, where bit 4 of the changed
+  // flags carries it (515 symbols, LAZ specification 1.4, note 6): there 511 starts a new sequence, 512 to 514 switch.
+  MULTI_UNCHANGED = MULTI - MULTI_MINUS + 1;
 
 class GpsTime {
   last = 0;
@@ -689,14 +689,18 @@ class GpsTime {
   readonly high = new Uint32Array(4);
   private readonly diff = new Int32Array(4);
   private readonly extreme = new Int32Array(4);
-  private readonly multi = new SymbolModel(MULTI_TOTAL);
+  private readonly multi: SymbolModel;
   private readonly zero: SymbolModel;
   private readonly ic: IntegerDecompressor;
+  /** Symbol of the multiplier model that starts a new sequence; the sequence switches follow it. */
+  private readonly fullCode: number;
   /** `layered`: the point14 coding, where an unchanged time is flagged by the point and never coded here. */
   constructor(
     private readonly dec: RangeDecoder,
     private readonly layered: boolean,
   ) {
+    this.fullCode = layered ? MULTI_UNCHANGED : MULTI_UNCHANGED + 1;
+    this.multi = new SymbolModel(this.fullCode + 4);
     this.zero = new SymbolModel(layered ? 5 : 6);
     this.ic = new IntegerDecompressor(dec, 32, 9);
   }
@@ -785,9 +789,9 @@ class GpsTime {
           }
         }
         this.add(last, d);
-      } else if (multi === MULTI_CODE_FULL) this.full();
-      else if (multi > MULTI_CODE_FULL) {
-        this.last = (last + multi - MULTI_CODE_FULL) & 3;
+      } else if (multi === this.fullCode) this.full();
+      else if (multi > this.fullCode) {
+        this.last = (last + multi - this.fullCode) & 3;
         continue;
       }
       return;

@@ -201,9 +201,11 @@ its chunk. The chunk table sits after the points, so a cut-short LAZ file cannot
 
 Verification: the decoder was written clean room from the LASzip paper and the public LAZ format description, and was
 tested against an encoder written from the same reading (in `tests/`), with byte-exact round trips of random and
-survey-like points in every supported format, fuzzing and mutation checks. It has NOT been checked against files made
-by the reference LASzip, because no real LAZ file was available. Until it is, treat byte compatibility with LASzip
-files as unverified.
+survey-like points in every supported format, fuzzing and mutation checks. It was then checked against a real USGS 3DEP
+tile (LAS 1.4, point format 6, written by LASzip 3.4.3; `tests/laz-usgs.test.js`): verified against a real USGS file:
+yes. The decoded point count, exact X/Y/Z minimum and maximum and points by return equal the producer's header, and
+return numbers, classes and cross-layer fields are consistent. Not compared point by point with a reference decoder;
+formats 0 to 3, 7 and 8 and files with other producers remain verified only against the test encoder.
 
 ## E57 scans (`margoengine/points/e57`)
 
@@ -298,7 +300,7 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 
 The LAZ tests (`tests/laz.test.js`) compress random, survey-like and mixed points of formats 0 to 3 and 6 to 8 with
 the test-only encoder (`tests/laz-encoder.js`) in fixed and variable chunks, check that decoding returns every record
-byte for byte and that `parseLAS` with the decoder matches the uncompressed file, and fuzz truncated and corrupt
+byte for byte (`tests/laz-usgs.test.js` runs the real USGS tile through the same decoder and checks it against the file's header) and that `parseLAS` with the decoder matches the uncompressed file, and fuzz truncated and corrupt
 files (only coded errors, no hang).
 
 `npm run test:browser` (a real-GPU script, not in CI) renders with a real engine in Chromium (or Edge via `BROWSER_CHANNEL`): exact square coverage at 2 to 16 px, round coverage within 4% of the disc area with empty corners, per-point byte and float colors, depth against a core mesh and between points, attachment to a mesh, size attenuation, a 2,000,000 point cloud culled and drawn within a 500,000 point budget, subrange updates that issue exactly one `writeBuffer` per changed range, sprites that stay square after an orbit with the right atlas cell, rotation, pivot and pixel size, 5000 sprites in one draw call, textured points with alpha test, sphere shading, eye-dome lighting, CPU picking, an orthographic camera (world sizes equal at two depths, sphere impostor depth against a box, EDL at a depth step, nearer-point picking), zero WebGPU validation errors, device restore and dispose. It saves `test-results/points-gallery.png` and `test-results/points-browser.json`.

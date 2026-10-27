@@ -671,8 +671,15 @@ Written clean room from the specifications and papers below. No source code of p
 | Polygon area | Newell's method for a polygon's normal (M. E. Newell, 1972, as in F. S. Hill, "Computer Graphics", 1990) |
 | LAZ decoder (`/laz`) and the test-only encoder | M. Isenburg, "LASzip: lossless compression of LiDAR data", Photogrammetric Engineering and Remote Sensing 79(2), 2013 (item predictors, return contexts, GPS time sequences, integer corrector coding); the public LAZ format description (record "laszip encoded" 22204, compressor and item ids, chunk table, layered point14 chunks); I. H. Witten, R. M. Neal and J. G. Cleary, "Arithmetic coding for data compression", CACM 30(6), 1987, and A. Said, "Introduction to arithmetic coding: theory and practice", HP Labs HPL-2004-76, 2004 (32-bit range coder, adaptive bit and symbol models) |
 
-Verified only against the encoder in `packages/points/tests/laz-encoder.js`, written from the same reading; not yet
-against files made by the reference LASzip (none were available).
+Verified against a real USGS file: yes (2026-10-27). `packages/points/tests/fixtures/USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz`
+(public domain 3DEP tile, LAS 1.4, point format 6, written by LASzip 3.4.3, 54,634 points, two chunks) decodes to the point
+count, the exact X/Y/Z minimum and maximum and the points-by-return array of the producer's header, with valid return
+numbers and classes and layers that agree with each other. Not compared point by point with a reference decoder (none
+is installed), so GPS time values are checked for range, not bit for bit. The file exposed one error that the
+encoder-made files could not: in point14 the GPS time sequence model has 515 symbols (a new sequence is 511, the
+switches 512 to 514), not the 516 of GPSTIME11; the LAZ specification 1.4 says so in note 6 of the point14 item. The
+test encoder follows the corrected reading. Other formats (0 to 3, 7, 8) are still verified only against the encoder.
+The LAZ specification PDF was read from downloads.rapidlasso.de (public format description, no code).
 
 ## Cutscenes: `@margoengine/cutscene`
 

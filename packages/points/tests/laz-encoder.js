@@ -331,7 +331,11 @@ class GpsEncoder {
   constructor(enc, layered, t) {
     this.enc = enc;
     this.layered = layered;
-    this.multi = new SymbolModel(516);
+    // LAZ specification 1.4, note 6 of the point14 item: one symbol fewer than GPSTIME11 (515, not 516), because
+    // "unchanged" (511 there) is bit 4 of the changed flags; a new sequence is 511 and the switches are 512 to 514.
+    // A real USGS file proves it (the 516-symbol reading did not decode it).
+    this.fullCode = layered ? UNCHANGED : FULL;
+    this.multi = new SymbolModel(this.fullCode + 4);
     this.zero = new SymbolModel(layered ? 5 : 6);
     this.ic = new IntegerCompressor(enc, 32, 9);
     this.seq = [t, 0n, 0n, 0n];
@@ -389,11 +393,11 @@ class GpsEncoder {
       if (!fits(d64)) {
         const i = this.other(t);
         if (i) {
-          enc.symbol(this.multi, FULL + i);
+          enc.symbol(this.multi, this.fullCode + i);
           this.last = (last + i) & 3;
           continue;
         }
-        enc.symbol(this.multi, FULL);
+        enc.symbol(this.multi, this.fullCode);
         return this.full(t);
       }
       const d = Number(d64),

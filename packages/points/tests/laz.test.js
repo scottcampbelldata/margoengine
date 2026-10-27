@@ -1,5 +1,4 @@
-// LAZ decoder tests. No LAZ file from the reference LASzip is available here (no downloads approved), so every file
-// comes from tests/laz-encoder.js, a separate encoder written from the same public description. A round trip proves
+// LAZ decoder tests. Every file here comes from tests/laz-encoder.js, a separate encoder written from the same public description. A round trip proves
 // that the decoder inverts that reading of the specification; it does not prove byte compatibility with LASzip.
 import assert from 'node:assert/strict';
 import test from 'node:test';
