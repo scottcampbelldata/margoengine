@@ -6,6 +6,8 @@
 import { EngineKernel, Mesh } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export const ASPRS_CLASSES: Readonly<Record<number, string>>;
+
 export interface BaseMaterialOptions {
     color?: ColorInput;
     opacity?: number;
@@ -21,7 +23,16 @@ export interface BaseMaterialOptions {
     clipIntersection?: boolean;
 }
 
+export const CLASSIFICATION_COLORS: Readonly<Record<number, readonly [number, number, number]>>;
+
+export interface ClassificationColorOptions {
+    palette?: Readonly<Record<number, readonly [number, number, number]>>;
+    hidden?: readonly number[];
+}
+
 export { ColorInput } from "@margoengine/math";
+
+export const ELEVATION_STOPS: readonly (readonly [number, number, number])[];
 
 export interface FogLike {
   readonly color?: ColorInput;
@@ -207,6 +218,13 @@ export interface PointsPluginOptions {
 
 export type PointsTextureSource = GPUTexture | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
 
+export interface RampOptions {
+    min?: number;
+    max?: number;
+    gamma?: number;
+    stops?: readonly (readonly [number, number, number])[];
+}
+
 export const SPRITE_STRIDE = 16;
 
 export class SpriteBatch {
@@ -275,9 +293,21 @@ export function boxScreenRect(box: ArrayLike<number>, viewProj: ArrayLike<number
 
 export function buildBlocks(positions: ArrayLike<number>, count: number, blockSize?: number, seed?: number): PointBlocks;
 
+export function classificationColors(classes: ArrayLike<number>, options?: ClassificationColorOptions): Uint8Array;
+
 export function cullBlocks(blocks: Pick<PointBlocks, 'bounds' | 'counts' | 'length'>, model: ArrayLike<number>, planes: ArrayLike<number>, out: Uint32Array, margin?: number): number;
 
 export function expandBlockBounds(blocks: PointBlocks, positions: ArrayLike<number>, start: number, count: number): number;
+
+export function measureAngle(a: P, b: P, c: P): number;
+
+export function measureArea(points: readonly P[]): number;
+
+export function measureHeight(a: P, b: P, up?: P): number;
+
+export function measurePath(points: readonly P[], closed?: boolean): number;
+
+export function measurePointDistance(a: P, b: P): number;
 
 export function mergeRanges(ranges: Array<[number, number]>): Array<[number, number]>;
 
@@ -289,7 +319,11 @@ export function pickPoint(positions: ArrayLike<number>, order: ArrayLike<number>
 
 export function projectToPixels(mvp: ArrayLike<number>, x: number, y: number, z: number, width: number, height: number, out: Float64Array | number[]): boolean;
 
+export function rampColors(values: ArrayLike<number>, options?: RampOptions): Uint8Array;
+
 export const random: (seed: number) => () => number;
+
+export function rgb16ToRgba8(rgb: ArrayLike<number>): Uint8Array;
 
 export function screenArea(box: ArrayLike<number>, eye: ArrayLike<number>, projScale: number, width: number, height: number, orthographic?: boolean): number;
 
@@ -323,6 +357,8 @@ abstract class BaseMaterial {
 }
 
 type Channel = 'positions' | 'colors' | 'sizes';
+
+type P = ArrayLike<number>;
 
 interface PointOwner {
     remove(item: unknown): void;

@@ -46,7 +46,7 @@ export interface CompositeContent {
     readonly byteLength: number;
 }
 
-export type ContentFactory = (content: TileContent, tile: Tile, signal: AbortSignal) => TileRenderable | Promise<TileRenderable>;
+export type ContentFactory = (content: TileContent, tile: TilesetTile, signal: AbortSignal) => TileRenderable | Promise<TileRenderable>;
 
 export interface ContentJSON {
     uri?: string;
@@ -106,8 +106,6 @@ export interface InstancesContent {
     readonly byteLength: number;
 }
 
-export type Matrix4 = Float64Array;
-
 export interface MetadataEntity {
     class: string;
     properties?: Record<string, unknown>;
@@ -158,61 +156,6 @@ export interface Subtree {
     readonly metadata?: Record<string, unknown>;
 }
 
-export class Tile {
-    readonly id: string;
-    readonly parent: Tile | null;
-    children: Tile[];
-    readonly depth: number;
-    readonly geometricError: number;
-    readonly refine: Refine;
-    readonly transform: Matrix4;
-    readonly bounds: TileBounds;
-    readonly contentBounds?: TileBounds;
-    readonly viewerRequestVolume?: TileBounds;
-    readonly contentUrls: readonly string[];
-    readonly metadata?: MetadataEntity;
-    readonly contentMetadata: readonly (MetadataEntity | undefined)[];
-    readonly contentGroups: readonly (number | undefined)[];
-    readonly implicit?: {
-        readonly level: number;
-        readonly x: number;
-        readonly y: number;
-        readonly z: number;
-    };
-    state: TileState;
-    external: boolean;
-    contents: TileContent[];
-    renderable?: TileRenderable;
-    error?: Error;
-    distance: number;
-    screenSpaceError: number;
-    lastUsed: number;
-    context?: ImplicitContext;
-    expanded: boolean;
-    constructor(init: {
-        id: string;
-        parent: Tile | null;
-        geometricError: number;
-        refine: Refine;
-        transform: Matrix4;
-        bounds: TileBounds;
-        contentBounds?: TileBounds;
-        viewerRequestVolume?: TileBounds;
-        contentUrls: readonly string[];
-        metadata?: MetadataEntity;
-        contentMetadata?: readonly (MetadataEntity | undefined)[];
-        contentGroups?: readonly (number | undefined)[];
-        implicit?: {
-            level: number;
-            x: number;
-            y: number;
-            z: number;
-        };
-        context?: ImplicitContext;
-    });
-    get hasContent(): boolean;
-}
-
 export class TileBounds {
     readonly center: Float64Array;
     readonly halfAxes: Float64Array;
@@ -244,6 +187,8 @@ export interface TileJSON {
     metadata?: MetadataEntity;
 }
 
+export type TileMatrix = Float64Array;
+
 export interface TileRenderable {
     readonly bytes: number;
     visible: boolean;
@@ -253,7 +198,7 @@ export interface TileRenderable {
 export type TileState = 'unloaded' | 'loading' | 'ready' | 'failed';
 
 export interface TilesFrame {
-    readonly selected: readonly Tile[];
+    readonly selected: readonly TilesetTile[];
     readonly pending: number;
 }
 
@@ -282,8 +227,8 @@ export interface TilesProgress {
 export class TilesRenderer implements EnginePlugin {
     readonly name: string;
     readonly tileset: Tileset;
-    readonly frame: Matrix4;
-    readonly inverseFrame: Matrix4;
+    readonly frame: TileMatrix;
+    readonly inverseFrame: TileMatrix;
     last: TilesFrame;
     enabled: boolean;
     disposed: boolean;
@@ -296,8 +241,8 @@ export class TilesRenderer implements EnginePlugin {
     cartographicToWorld(longitude: number, latitude: number, height?: number): Vec3;
     onPreUpdate(): void;
     update(): TilesFrame;
-    contentMatrix(tile: Tile, rtc?: readonly number[], gltf?: boolean): Matrix4;
-    createContent(content: TileContent, tile: Tile, signal: AbortSignal): Promise<TileRenderable>;
+    contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
+    createContent(content: TileContent, tile: TilesetTile, signal: AbortSignal): Promise<TileRenderable>;
     dispose(): void;
     [Symbol.dispose](): void;
 }
@@ -320,7 +265,7 @@ export interface TilesView {
 export class Tileset {
     readonly url: string;
     readonly json: TilesetJSON;
-    readonly root: Tile;
+    readonly root: TilesetTile;
     readonly schema?: MetadataSchema;
     readonly metadata?: MetadataEntity;
     readonly groups: readonly MetadataEntity[];
@@ -336,7 +281,7 @@ export class Tileset {
     private constructor();
     on<K extends keyof TilesetEvents>(type: K, listener: (event: TilesetEvents[K]) => void): () => void;
     get progress(): TilesProgress;
-    tiles(): IterableIterator<Tile>;
+    tiles(): IterableIterator<TilesetTile>;
     properties(entity: MetadataEntity | undefined): Record<string, unknown>;
     static screenSpaceError(geometricError: number, distance: number, view: TilesView): number;
     update(view: TilesView): TilesFrame;
@@ -347,13 +292,13 @@ export class Tileset {
 
 export interface TilesetEvents {
     tileload: {
-        tile: Tile;
+        tile: TilesetTile;
     };
     tileunload: {
-        tile: Tile;
+        tile: TilesetTile;
     };
     error: {
-        tile?: Tile;
+        tile?: TilesetTile;
         error: Error;
     };
     progress: TilesProgress;
@@ -389,15 +334,70 @@ export interface TilesetOptions {
     content?: ContentFactory;
 }
 
+export class TilesetTile {
+    readonly id: string;
+    readonly parent: TilesetTile | null;
+    children: TilesetTile[];
+    readonly depth: number;
+    readonly geometricError: number;
+    readonly refine: Refine;
+    readonly transform: TileMatrix;
+    readonly bounds: TileBounds;
+    readonly contentBounds?: TileBounds;
+    readonly viewerRequestVolume?: TileBounds;
+    readonly contentUrls: readonly string[];
+    readonly metadata?: MetadataEntity;
+    readonly contentMetadata: readonly (MetadataEntity | undefined)[];
+    readonly contentGroups: readonly (number | undefined)[];
+    readonly implicit?: {
+        readonly level: number;
+        readonly x: number;
+        readonly y: number;
+        readonly z: number;
+    };
+    state: TileState;
+    external: boolean;
+    contents: TileContent[];
+    renderable?: TileRenderable;
+    error?: Error;
+    distance: number;
+    screenSpaceError: number;
+    lastUsed: number;
+    context?: ImplicitContext;
+    expanded: boolean;
+    constructor(init: {
+        id: string;
+        parent: TilesetTile | null;
+        geometricError: number;
+        refine: Refine;
+        transform: TileMatrix;
+        bounds: TileBounds;
+        contentBounds?: TileBounds;
+        viewerRequestVolume?: TileBounds;
+        contentUrls: readonly string[];
+        metadata?: MetadataEntity;
+        contentMetadata?: readonly (MetadataEntity | undefined)[];
+        contentGroups?: readonly (number | undefined)[];
+        implicit?: {
+            level: number;
+            x: number;
+            y: number;
+            z: number;
+        };
+        context?: ImplicitContext;
+    });
+    get hasContent(): boolean;
+}
+
 export const WGS84_A = 6378137;
 
 export const WGS84_B: number;
 
 export const WGS84_F: number;
 
-export const Y_UP_TO_Z_UP: Matrix4;
+export const Y_UP_TO_Z_UP: TileMatrix;
 
-export const Z_UP_TO_Y_UP: Matrix4;
+export const Z_UP_TO_Y_UP: TileMatrix;
 
 export function availabilityIndex(localLevel: number, x: number, y: number, z: number | undefined): number;
 
@@ -415,25 +415,25 @@ export function decompose(m: ArrayLike<number>): {
     scale: [number, number, number];
 };
 
-export function eastNorthUpToEcef(x: number, y: number, z: number): Matrix4;
+export function eastNorthUpToEcef(x: number, y: number, z: number): TileMatrix;
 
 export function ecefToCartographic(x: number, y: number, z: number): Cartographic;
 
 export function expandTemplate(template: string, level: number, x: number, y: number, z?: number): string;
 
-export function fromArray(values: ArrayLike<number>): Matrix4;
+export function fromArray(values: ArrayLike<number>): TileMatrix;
 
 export function geodeticNormal(x: number, y: number, z: number): [number, number, number];
 
-export function identity(): Matrix4;
+export function identity(): TileMatrix;
 
 export function implicitBounds(root: TileBounds, scheme: 'QUADTREE' | 'OCTREE', level: number, x: number, y: number, z?: number): TileBounds;
 
-export function invert(m: ArrayLike<number>, out?: Matrix4): Matrix4;
+export function invert(m: ArrayLike<number>, out?: TileMatrix): TileMatrix;
 
 export function mortonIndex(x: number, y: number, z?: number): number;
 
-export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out?: Matrix4): Matrix4;
+export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out?: TileMatrix): TileMatrix;
 
 export function parseB3dm(bytes: Uint8Array): ModelContent;
 
@@ -457,7 +457,7 @@ export function transformDirection(m: ArrayLike<number>, p: ArrayLike<number>): 
 
 export function transformPoint(m: ArrayLike<number>, p: ArrayLike<number>): [number, number, number];
 
-export function translation(x: number, y: number, z: number): Matrix4;
+export function translation(x: number, y: number, z: number): TileMatrix;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -471,7 +471,7 @@ interface ImplicitContext {
     readonly rootBounds: TileBounds;
     readonly rootError: number;
     readonly refine: Refine;
-    readonly transform: Matrix4;
+    readonly transform: TileMatrix;
     readonly subtrees: Map<string, Subtree>;
 }
 ```

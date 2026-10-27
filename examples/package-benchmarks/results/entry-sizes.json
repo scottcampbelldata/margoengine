@@ -1,5 +1,5 @@
 {
-  "commit": "16b14ea0",
+  "commit": "d851ed3b",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -902,8 +902,16 @@
     },
     "@margoengine/points": {
       ".": {
-        "raw": 57291,
-        "gzip": 19544
+        "raw": 60352,
+        "gzip": 20919
+      },
+      "./las": {
+        "raw": 10732,
+        "gzip": 4550
+      },
+      "./octree": {
+        "raw": 20915,
+        "gzip": 7775
       }
     },
     "@margoengine/post": {
@@ -1250,8 +1258,8 @@
     },
     "@margoengine/tiles": {
       ".": {
-        "raw": 41715,
-        "gzip": 14335
+        "raw": 41722,
+        "gzip": 14336
       }
     },
     "@margoengine/tonemap": {
