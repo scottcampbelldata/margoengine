@@ -160,3 +160,44 @@ test('copies of one asset share their baked static batch arrays and its buffers'
   f.engine.use(moved);
   assert.notEqual(moved['staticBatches'][0].primitive.vertices, one.primitive.vertices, 'another pose bakes anew');
 });
+
+test('copies of one textured asset compile the mip pipelines once per device', async (t) => {
+  // p-morph: every cloneModel copy kept its own mip pipelines (gpuCache is per model), so 100 copies created 200
+  // shader modules and pipelines, compiled while the first frame waited (a 300 ms first frame).
+  const f = await fixture(t),
+    device = f.engine.gpu,
+    created = [],
+    createModule = device.createShaderModule,
+    createPipeline = device.createRenderPipeline;
+  device.createShaderModule = (d) => {
+    const m = createModule.call(device, d);
+    created.push(['module', d.code.includes('var imageSampler:sampler') ? 'mip' : 'draw']);
+    return m;
+  };
+  device.createRenderPipeline = (d) => {
+    created.push(['pipeline', d.fragment?.targets?.[0]?.format]);
+    return createPipeline.call(device, d);
+  };
+  device.queue.copyExternalImageToTexture ??= () => {};
+  const encoder = device.createCommandEncoder;
+  device.createCommandEncoder = (d) => {
+    const e = encoder.call(device, d);
+    e.beginRenderPass ??= () => ({ setPipeline() {}, setBindGroup() {}, draw() {}, end() {} });
+    return e;
+  };
+  const doc = structuredClone(f.doc),
+    buffers = [...f.buffers, new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])];
+  doc.buffers.push({ byteLength: 32 });
+  doc.bufferViews.push({ buffer: 3, byteLength: 32 });
+  doc.accessors.push({ bufferView: 3, componentType: 5126, count: 4, type: 'VEC2' });
+  doc.meshes[0].primitives[0].attributes.TEXCOORD_0 = 3;
+  doc.images = [{ uri: 'unused.png' }];
+  doc.textures = [{ source: 0 }];
+  doc.materials = [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }];
+  const image = { width: 4, height: 4, close() {} },
+    a = parseGLTF(f.engine, doc, buffers, [image]);
+  if (f.engine.plugins.get(a.name) !== a) f.engine.use(a);
+  for (let k = 0; k < 3; k++) f.engine.use(new PBRModel(f.engine, a.asset, [image]));
+  const mips = created.filter(([kind, what]) => kind === 'module' && what === 'mip');
+  assert.equal(mips.length, 1, 'one mip shader for the device, not one per copy');
+});

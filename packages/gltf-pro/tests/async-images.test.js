@@ -377,3 +377,54 @@ test('options parser never disposes a caller-owned Basis transcoder', () =>
       [1],
     );
   }));
+
+test('ordinary images decode up to eight at once, in image order, and a failure closes every bitmap', () =>
+  decodedImages(
+    async (images) => {
+      // FlightHelmet's textures decoded one after another (each awaited before the next began), so p-gltf-parse paid
+      // the sum of the decodes; createImageBitmap runs off the main thread, so they now overlap.
+      for (const failAt of [-1, 5]) {
+        const { doc } = fixture(),
+          engine = await headless();
+        images.length = 0;
+        doc.images = Array.from({ length: 12 }, (_, k) => ({
+          uri: dataURI(k === failAt ? Uint8Array.of(0) : Uint8Array.of(...png, k), 'image/png'),
+        }));
+        let model;
+        try {
+          if (failAt >= 0) await assert.rejects(parseGLTFAsync(engine, doc), /glTF image 5.*check the file/);
+          else {
+            model = await parseGLTFAsync(engine, doc);
+            for (let k = 0; k < 12; k++) assert.equal(model.image(k).bytes.at(-1), k);
+          }
+        } finally {
+          model?.dispose();
+          engine.dispose();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        assert.equal(decodedImages.peak, 8);
+        assert.ok(images.length >= (failAt >= 0 ? 5 : 12));
+        assert.ok(images.every((image) => image.closed === 1));
+        decodedImages.peak = 0;
+      }
+    },
+    async (source, _options, images) => {
+      decodedImages.flight = (decodedImages.flight ?? 0) + 1;
+      decodedImages.peak = Math.max(decodedImages.peak ?? 0, decodedImages.flight);
+      const bytes = new Uint8Array(await source.arrayBuffer());
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      decodedImages.flight--;
+      if (bytes.length === 1) throw new DOMException('Invalid PNG', 'InvalidStateError');
+      const image = {
+        width: 128,
+        height: 128,
+        bytes,
+        closed: 0,
+        close() {
+          this.closed++;
+        },
+      };
+      images.push(image);
+      return image;
+    },
+  ));

@@ -898,21 +898,13 @@ export async function loadAsset(
     signal?.throwIfAborted();
     await prepare?.(asset);
     signal?.throwIfAborted();
-    for (let index = 0; index < (doc.images?.length ?? 0); index++) {
-      if (fallbacks.has(index)) continue;
-      const def = entry(doc.images, index, 'image');
-      let data: Uint8Array;
-      if (def.bufferView !== undefined) data = asset.view(def.bufferView);
-      else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {
-        data = embedded(def.uri, limit);
-        total += data.length;
-        if (total > limit) throw overBudget('glTF exceeds download budget', limit);
-      } else if (typeof def.uri === 'string') data = await fetchBytes(resolve(def.uri));
-      else
-        throw new TypeError(
-          'Invalid glTF image; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
-        );
-      const bitmap = sources.has(index) ? await decoder.decode(data) : await decodeImage(data, def.mimeType, index);
+    // Browser images decode off the main thread, so up to IMAGE_DECODES of them run at once (one after another, a
+    // model's decodes added up). Results are taken in image order, so the size limits stop at the same image as
+    // before; at most IMAGE_DECODES - 1 later decodes are then still running, and they are closed when they finish.
+    const running: [number, Promise<NonNullable<GLTFImage>>][] = [];
+    const settle = async () => {
+      const [index, decoding] = running.shift()!,
+        bitmap = await decoding;
       images[index] = bitmap;
       decodedImages += bitmap.width * bitmap.height * 4;
       if (bitmap.width * bitmap.height > 16_777_216 || decodedImages > limit * 4)
@@ -920,6 +912,43 @@ export async function loadAsset(
           'glTF images exceed decoded size limit; load a smaller model, or reduce its textures and meshes',
         );
       signal?.throwIfAborted();
+    };
+    try {
+      for (let index = 0; index < (doc.images?.length ?? 0); index++) {
+        if (fallbacks.has(index)) continue;
+        const def = entry(doc.images, index, 'image');
+        let data: Uint8Array;
+        if (def.bufferView !== undefined) data = asset.view(def.bufferView);
+        else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {
+          data = embedded(def.uri, limit);
+          total += data.length;
+          if (total > limit) throw overBudget('glTF exceeds download budget', limit);
+        } else if (typeof def.uri === 'string') data = await fetchBytes(resolve(def.uri));
+        else
+          throw new TypeError(
+            'Invalid glTF image; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+          );
+        if (sources.has(index)) {
+          // The KTX2 decoder transcodes one image at a time.
+          while (running.length) await settle();
+          running.push([index, decoder.decode(data)]);
+          await settle();
+        } else {
+          const decoding = decodeImage(data, def.mimeType, index);
+          // Its failure is reported when its turn comes in settle(); until then it is not an unhandled rejection.
+          decoding.catch(() => {});
+          running.push([index, decoding]);
+          if (running.length >= IMAGE_DECODES) await settle();
+        }
+      }
+      while (running.length) await settle();
+    } finally {
+      // After a failure: close what the decodes still running produce (images[] is closed by the catch below).
+      for (const [, decoding] of running.splice(0))
+        decoding.then(
+          (bitmap) => closeImages([bitmap]),
+          () => {},
+        );
     }
     return { asset, images };
   } catch (error) {
@@ -929,10 +958,14 @@ export async function loadAsset(
     decoder.close();
   }
 }
+/** Browser image decodes a load keeps running at once (createImageBitmap decodes off the main thread). */
+const IMAGE_DECODES = 8;
 /** Image bytes as an ImageBitmap; bytes the browser cannot decode throw TypeError('glTF image N could not be decoded (...)'). */
 export async function decodeImage(data: Uint8Array, type: string | undefined, index: number): Promise<ImageBitmap> {
   try {
-    return await createImageBitmap(new Blob([new Uint8Array(data)], { type }), {
+    // The Blob copies the bytes; a copy before it is needed only for a SharedArrayBuffer, which a Blob refuses.
+    const part = data.buffer instanceof ArrayBuffer ? (data as Uint8Array<ArrayBuffer>) : new Uint8Array(data);
+    return await createImageBitmap(new Blob([part], { type }), {
       colorSpaceConversion: 'none',
       premultiplyAlpha: 'none',
     });

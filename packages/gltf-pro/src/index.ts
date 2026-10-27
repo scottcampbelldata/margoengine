@@ -133,6 +133,17 @@ import type { TextureTransform } from './texture-coordinates.js';
 export type { TextureTransform } from './texture-coordinates.js';
 
 export type { MaterialExtension, MaterialExtensionTexture } from './material-extension.js';
+
+/**
+ * Mip pipelines per device and format. They are the same for every model, so they are made once: kept per model,
+ * each of p-morph's 100 cloneModel copies compiled its own two (200 shader modules, a 300 ms first frame).
+ */
+const mipCaches = new WeakMap<GPUDevice, Map<unknown, unknown>>();
+function mipPipelines(device: GPUDevice): Map<unknown, unknown> {
+  let cache = mipCaches.get(device);
+  if (!cache) mipCaches.set(device, (cache = new Map()));
+  return cache;
+}
 declare const GPUBufferUsage: {
   UNIFORM: number;
   STORAGE: number;
@@ -2470,7 +2481,7 @@ export class PBRModel implements EnginePlugin {
             { bytesPerRow: 4 },
             [1, 1],
           );
-        if (!compressed) generateMipmaps(device, texture, levels, cache, mipSampler);
+        if (!compressed) generateMipmaps(device, texture, levels, mipPipelines(device), mipSampler);
       }
       let view = textureViews.get(texture);
       if (!view) textureViews.set(texture, (view = texture.createView()));
