@@ -1,10 +1,10 @@
 // Real-GPU measurements for the pipeline toggles. From the repo root after build:packages, under the GPU lock on AC:
 //   node examples/package-benchmarks/pipeline-toggles/toggle.mjs [stall|pixels|gpu|override]...
-import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { writeFile } from 'node:fs/promises';
 import { decodePNG } from '../../../tests/support/png.js';
 import { requireAC } from '../cad/power.mjs';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 
 const which = process.argv.slice(2).length ? process.argv.slice(2) : ['stall', 'pixels', 'gpu', 'override'];
 await writeFile(
@@ -19,11 +19,7 @@ const server = await createServer({
 await server.listen();
 const out = { acPowerAtStart: requireAC(), date: new Date().toISOString() };
 const open = async () => {
-  const browser = await chromium.launch({
-    channel: 'msedge',
-    headless: true,
-    args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'],
-  });
+  const browser = await launchBrowser({ headless: true, args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'] });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   page.setDefaultTimeout(300_000);
   const errors = [];

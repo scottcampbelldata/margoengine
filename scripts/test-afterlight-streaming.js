@@ -1,11 +1,11 @@
 // Functional source test; native cold-load and frame-budget measurements are separate.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { listenWhenFree } from './browser.js';
 import { resolve } from 'node:path';
 import { installDemoLoadAudit } from './demo-load-audit.js';
+import { launchBrowser } from './lib/browser.mjs';
 
 await mkdir('test-results', { recursive: true });
 const root = resolve('examples/gameplay-sandbox');
@@ -19,7 +19,7 @@ await listenWhenFree(() => server.listen(), { port: 5198 });
 let browser, hardware;
 const results = [];
 try {
-  browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true });
+  browser = await launchBrowser({ headless: true });
   for (const mode of ['desktop-default', 'desktop-controls', 'android-layout', 'failed-detail', 'pagehide']) {
     const mobile = mode === 'android-layout';
     const context = await browser.newContext({

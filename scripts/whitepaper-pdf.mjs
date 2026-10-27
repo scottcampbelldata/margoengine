@@ -3,13 +3,12 @@
 //   node scripts/whitepaper-pdf.mjs [page ...]      default: engine
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from './lib/browser.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   pages = process.argv.slice(2).length ? process.argv.slice(2) : ['engine'];
-const browser = await chromium
-  .launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true })
-  .catch(() => chromium.launch({ headless: true }));
+// page.pdf is Chromium-only, so MARGO_BROWSER=firefox skips this step with a message.
+const browser = await launchBrowser({ headless: true, needs: 'chromium' });
 try {
   const page = await browser.newPage();
   await page.emulateMedia({ media: 'print', colorScheme: 'light' });

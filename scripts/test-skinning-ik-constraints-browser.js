@@ -8,7 +8,6 @@ import { mapArmControl, nearestArmControlParameter } from '../examples/skinning-
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const app = await openBrowser({
   startPath: '/tests/modern.html',
-  channel: 'msedge',
   args: [],
   port: 5217,
   aliases: { '@margoengine/kinematics-constraints': resolve('packages/kinematics-constraints/dist/index.js') },

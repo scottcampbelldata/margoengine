@@ -1,11 +1,11 @@
 // Verify complete production subjects and the visible-frame timing audit.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { chromium } from '@playwright/test';
 import { preview } from 'vite';
 import { decodePNG } from '../tests/support/png.js';
 import { installDemoLoadAudit } from './demo-load-audit.js';
 import { submitPrincipalScene } from '../packages/shared/demo-frame.js';
+import { launchBrowser } from './lib/browser.mjs';
 
 await mkdir('test-results', { recursive: true });
 const auditOnly = process.argv.includes('--audit-only');
@@ -21,8 +21,7 @@ const server = await preview({
   logLevel: 'error',
   preview: { host: '127.0.0.1', port: 0 },
 });
-const browser = await chromium.launch({
-    channel: process.env.BROWSER_CHANNEL ?? 'msedge',
+const browser = await launchBrowser({
     args: process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [],
     headless: true,
   }),

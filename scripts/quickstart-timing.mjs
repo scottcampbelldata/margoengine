@@ -36,7 +36,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { chromium } from '@playwright/test';
+import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import sharp from 'sharp';
 import { acquire, killTree, quoteWindows } from './gpu-lock.mjs';
 import { quickstartFiles } from './support/doc-snippets.mjs';
@@ -395,10 +395,8 @@ export async function main() {
     sizes.gpuLockWaitSeconds = Number((waited / 1000).toFixed(1));
     arm();
     mark(`GPU lock held (waited ${sizes.gpuLockWaitSeconds} s behind other jobs; not counted)`);
-    browser = await chromium
-      .launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true })
-      .catch(() => chromium.launch({ headless: true }));
-    notes.push(`browser ${process.env.BROWSER_CHANNEL ?? 'msedge'} ${browser.version()} headless`);
+    browser = await launchBrowser({ headless: true });
+    notes.push(`browser ${browserLabel()} ${browser.version()} headless`);
     const open = async (url, { noGpu = false, noAdapter = false } = {}) => {
       const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
       if (noGpu)

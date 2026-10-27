@@ -23,7 +23,6 @@ for (const path of paths) report.sourceSHA256[path] = hash(await readFile(path))
 let app;
 try {
   app = await openBrowser({
-    channel: 'msedge',
     args: [],
     port: 5270,
     startPath: '/tests/browser/stats-native-passes.html',

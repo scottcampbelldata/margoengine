@@ -57,7 +57,7 @@ Options:
 | `--engine-bench=DIR` | `../engine-bench` next to the main checkout | Where other engines live. |
 | `--no-gate` | | Skip the quiet-machine gate. The run is marked invalid. |
 | `--quiet-max`, `--quiet-hold`, `--gpu-max`, `--timeout` | 20 %, 20 s, 20 %, 1800 s | Gate limits (see below). |
-| `--browser=msedge\|chrome\|bundled` | msedge | The browser for browser suites (`BROWSER_CHANNEL` works too). |
+| `--browser=edge\|chrome\|chromium\|firefox` | edge on Windows, chromium elsewhere | The browser for browser suites (`MARGO_BROWSER` works too; see "Choosing the browser"). |
 | `--no-fail` | | Report regressions without failing. |
 | `--require-valid` | | Exit with code 2 when the run is invalid. |
 
@@ -202,6 +202,24 @@ A number is official only if all of these hold:
 - it was recorded with `--record`.
 
 Everything else is smoke or dev and must say so wherever it is quoted.
+
+## Choosing the browser
+
+Every browser check in `scripts/` and `examples/` launches through `scripts/lib/browser.mjs`, so one set of variables
+works for all of them, on Windows, macOS and Linux:
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `MARGO_BROWSER=edge\|chrome\|chromium\|firefox` | `edge` on Windows, `chromium` elsewhere | The browser to drive. `chromium` is Playwright's own build (`npx playwright install chromium`); `edge` and `chrome` need that browser installed. `--browser=<name>` on a suite's command line does the same. |
+| `BROWSER_CHANNEL=msedge\|chrome\|bundled` | unset | Older spelling of the same choice; `MARGO_BROWSER` wins when both are set. |
+| `BROWSER_EXECUTABLE=<path>` | unset | Launch this binary instead of the browser's normal install. |
+| `MARGO_SOFTWARE_GPU=1` | off | Use SwiftShader as the WebGPU adapter on a machine without a real GPU (a server, a CI runner). Slow, and its pixels differ from a real GPU's, so it proves "runs", never a timing or a pixel baseline. |
+
+Chromium-family browsers get `--enable-unsafe-webgpu` (and `--enable-features=Vulkan --use-angle=vulkan` on Linux, for a real Intel or AMD GPU; `BROWSER_ARGS` adds more) where WebGPU is not
+already on. Edge on Windows gets no extra switch, as before. Firefox has no WebGPU in Playwright's builds: a suite that
+needs WebGPU prints `<suite>: skipped: no WebGPU in firefox` and exits 0 without running, and a Chromium-only step
+(`page.pdf`) prints `skipped: needs a Chromium browser, not firefox`. A skip line is never a pass; read the log. Suites
+that do not need WebGPU (`check:no-webgpu`) run in Firefox.
 
 ## The browser runner
 

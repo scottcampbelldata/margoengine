@@ -5,7 +5,7 @@
 // first unless --no-quiet (then, or if it times out, the numbers are diagnostic). The final frame of each warm sample is compared with the
 // cold sample of the same feature (delta 0 everywhere, so the images should match): `image` = max RGB difference and
 // share of differing pixels. Writes examples/package-benchmarks/results/warm-up-gpu.json.
-import { chromium } from '@playwright/test';
+import { browserLabel, launchBrowser } from '../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -35,7 +35,7 @@ const server = await createServer({
 });
 await server.listen();
 const url = new URL('examples/package-benchmarks/warm-up.html', server.resolvedUrls.local[0]).href;
-const channel = process.env.BROWSER_CHANNEL ?? 'msedge',
+const channel = browserLabel(),
   samples = [],
   shots = new Map();
 let environment;
@@ -44,7 +44,7 @@ try {
   for (let run = 0; run < runs; run++)
     for (const feature of features)
       for (const warm of [false, true]) {
-        const browser = await chromium.launch({ channel, headless: true, args: ['--enable-unsafe-webgpu'] });
+        const browser = await launchBrowser({ headless: true, args: ['--enable-unsafe-webgpu'] });
         try {
           const page = await browser.newPage({ viewport: { width: 1280, height: 720 } }),
             errors = [];

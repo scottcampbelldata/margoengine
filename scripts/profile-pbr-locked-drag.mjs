@@ -6,7 +6,6 @@ import { readFile, writeFile, readdir, mkdir, cp } from 'node:fs/promises';
 import { resolve, relative, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
-import { chromium } from '@playwright/test';
 
 const arg = (name, fallback) =>
   process.argv.find((v) => v.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -70,6 +69,7 @@ await writeFile(resolve(folder, 'cache-source.ts'), cacheSource);
 const observer = `
 import {PBRModel as LockedPBR} from '@margoengine/gltf-pro';
 import {Animation as LockedAnimation} from '@margoengine/animation';
+import { launchBrowser } from './lib/browser.mjs';
 const lockedCounters=globalThis.__lockedCounters={pbrDraws:0,beauty:0,gbuffer:0,ambient:0,transparent:0,transmission:0,capture:0,primitiveDraws:0,deforms:0,unsafe:0};
 const lockedDraw=LockedPBR.prototype.draw,lockedDeform=LockedAnimation.prototype.deform;
 LockedPBR.prototype.draw=function(context,mode,color,depth){
@@ -345,7 +345,7 @@ function project(point, eye, target, bounds) {
   };
 }
 try {
-  browser = await chromium.launch({ channel: 'msedge', headless: true, args: [] });
+  browser = await launchBrowser({ headless: true, args: [] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
   let canonical, expectedWork, expectedPose;
   for (let phaseIndex = 0; phaseIndex < order.length; phaseIndex++) {

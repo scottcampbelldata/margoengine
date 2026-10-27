@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { chromium } from '@playwright/test';
 import { build, preview } from 'vite';
 import { resolve } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   output = resolve(root, '../../test-results/gameplay-sandbox/shared-modules');
@@ -15,8 +15,7 @@ const server = await preview({
   logLevel: 'error',
 });
 const origin = new URL(server.resolvedUrls.local[0]).origin;
-const browser = await chromium.launch({
-  channel: process.env.BROWSER_CHANNEL ?? 'msedge',
+const browser = await launchBrowser({
   headless: true,
   args: process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : ['--enable-unsafe-webgpu'],
 });

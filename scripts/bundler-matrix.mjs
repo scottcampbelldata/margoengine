@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { chromiumLaunchOptions } from './lib/browser.mjs';
 
 // The React cube page's gzip budgets (docs/limits.md, "React app budget"): what the browser loads before the page runs
 // (React, React DOM, core, the stage and the React bindings), and everything a build of it emits with @margoengine/react
@@ -212,10 +213,7 @@ createRoot(document.getElementById('root')).render(<Canvas label="cube"><Spinner
       });
       await new Promise((ready) => server.listen(0, '127.0.0.1', ready));
       const { chromium } = await load('playwright');
-      const browser = await chromium.launch({
-        channel: process.env.BROWSER_CHANNEL ?? 'msedge',
-        args: ['--disable-gpu'],
-      });
+      const browser = await chromium.launch(chromiumLaunchOptions({ args: ['--disable-gpu'], webgpu: false }));
       try {
         const tab = await browser.newPage(),
           paths = [];
@@ -795,10 +793,7 @@ window.result = [typeof createStage, typeof Shadows, typeof OrbitControls].join(
       });
       await new Promise((done) => server.listen(0, '127.0.0.1', done));
       const { chromium } = await load('playwright');
-      const browser = await chromium.launch({
-        channel: process.env.BROWSER_CHANNEL ?? 'msedge',
-        args: ['--disable-gpu'],
-      });
+      const browser = await chromium.launch(chromiumLaunchOptions({ args: ['--disable-gpu'], webgpu: false }));
       try {
         const tab = await browser.newPage();
         const errors = [];

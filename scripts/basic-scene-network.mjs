@@ -17,10 +17,10 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
-import { chromium } from '@playwright/test';
 import { build, preview } from 'vite';
 import { listenWhenFree } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
+import { launchBrowser, browserLabel } from './lib/browser.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   fixture = resolve(root, 'tests/fixtures/basic-scene');
@@ -161,7 +161,7 @@ try {
 }
 let browser;
 try {
-  browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true });
+  browser = await launchBrowser({ headless: true });
   const context = await browser.newContext({ viewport: { width: 800, height: 600 } }),
     page = await context.newPage(),
     requests = [],
@@ -238,7 +238,7 @@ try {
   const result = {
     commit: git('rev-parse', '--short', 'HEAD'),
     dirty: git('status', '--porcelain', '--', 'packages') !== '',
-    browser: `${process.env.BROWSER_CHANNEL ?? 'msedge'} ${browser.version()} headless`,
+    browser: `${browserLabel()} ${browser.version()} headless`,
     adapter,
     method:
       'Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults',

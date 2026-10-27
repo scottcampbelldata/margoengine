@@ -20,7 +20,6 @@
 // sparse particle noise barely moves it) and `hot` = share with d > HOT (local changes). `mean` and `max` are reported.
 // `visual:update` captures each view
 // `runs` times in separate browser launches and stores the worst pairwise run-to-run noise and the tolerance derived from it.
-import { chromium } from '@playwright/test';
 import { preview, createServer } from 'vite';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { mkdir, rm, readFile, writeFile, copyFile } from 'node:fs/promises';
@@ -40,6 +39,7 @@ import {
   assertProfileCreationCoverage,
   renderedInputChanges,
 } from './support/visual-baselines.js';
+import { launchBrowser, browserLabel } from './lib/browser.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   baselineRoot = resolve(root, 'tests/visual'),
@@ -290,13 +290,9 @@ try {
   const devOrigin = devServer && new URL(devServer.resolvedUrls.local[0]).origin;
   const wgslModules = new Set();
   for (let run = 0; run < runs; run++) {
-    const browser = await chromium.launch({
-      channel: process.env.BROWSER_CHANNEL ?? 'msedge',
-      headless: true,
-      args: ['--enable-unsafe-webgpu'],
-    });
+    const browser = await launchBrowser({ headless: true, args: ['--enable-unsafe-webgpu'] });
     try {
-      const browserVersion = `${process.env.BROWSER_CHANNEL ?? 'msedge'} ${browser.version()}`;
+      const browserVersion = `${browserLabel()} ${browser.version()}`;
       for (const { id, demo, view } of cases) {
         const { factor, query, ...options } = view,
           result = results.get(id),

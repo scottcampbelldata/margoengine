@@ -185,7 +185,6 @@ if (sceneURL) {
 }
 const app = await openBrowser({
   startPath: '/tests/modern.html',
-  channel: 'msedge',
   args: [],
   port,
   aliases: { '@margoengine/kinematics-constraints': resolve('packages/kinematics-constraints/dist/index.js') },

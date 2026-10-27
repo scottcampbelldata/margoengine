@@ -8,13 +8,12 @@
 // A "collapsed" pixel stores the same value in its four samples although the CPU's four values differ: its samples
 // were replaced by their mean. Samples within 0.001 px of a rectangle edge are left out (rasterization ties).
 //   node scripts/gpu-lock.mjs run --max=8 --owner=<you> -- node scripts/gpu-blend-passes.mjs [--adapter=d3d11]
-import { chromium } from '@playwright/test';
 import { serve } from '../bench/lib/browser.mjs';
+import { launchBrowser } from './lib/browser.mjs';
 
 const adapterFlag = process.argv.find((a) => a.startsWith('--adapter='))?.slice(10);
 const server = await serve({ port: 0, external: {} }),
-  browser = await chromium.launch({
-    channel: 'msedge',
+  browser = await launchBrowser({
     headless: true,
     args: [
       '--enable-webgpu-developer-features',

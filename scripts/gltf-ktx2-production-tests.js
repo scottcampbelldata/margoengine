@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from './lib/browser.mjs';
 import { build, preview } from 'vite';
 import { basisTextureQuad } from '../tests/support/texture-fixture.js';
 
@@ -90,14 +90,8 @@ const server = await preview({
 });
 let browser;
 try {
-  const channel = process.env.BROWSER_CHANNEL ?? 'msedge',
-    args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [];
-  try {
-    browser = await chromium.launch({ headless: true, channel: channel === 'bundled' ? undefined : channel, args });
-  } catch (error) {
-    if (channel !== 'msedge' || args.length || process.env.BROWSER_CHANNEL) throw error;
-    browser = await chromium.launch({ headless: true });
-  }
+  const args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [];
+  browser = await launchBrowser({ headless: true, args });
   const page = await browser.newPage(),
     errors = [],
     assets = new Set();

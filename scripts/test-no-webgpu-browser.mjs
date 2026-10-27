@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from './lib/browser.mjs';
 import { createServer, preview } from 'vite';
 import { acquire } from './gpu-lock.mjs';
 import { message } from '../examples/needs-webgpu.js';
@@ -47,12 +47,9 @@ async function pages() {
   return found.sort();
 }
 
-async function launch() {
-  try {
-    return await chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: true });
-  } catch {
-    return await chromium.launch({ headless: true });
-  }
+// The page is made WebGPU-less by an init script, so any browser can run this, Firefox included.
+function launch() {
+  return launchBrowser({ headless: true, needs: 'none' });
 }
 
 const release = await acquire({ owner: 'no-webgpu-browser' });

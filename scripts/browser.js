@@ -1,4 +1,5 @@
-import { chromium, firefox, webkit } from '@playwright/test';
+import { firefox, webkit } from '@playwright/test';
+import { launchBrowser, resolveBrowser } from './lib/browser.mjs';
 import { createServer } from 'vite';
 import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -154,7 +155,7 @@ export function delayWorkerMessages(ms) {
 
 export async function openBrowser({
   browserName = 'chromium',
-  channel = process.env.BROWSER_CHANNEL ?? 'msedge',
+  channel,
   args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [],
   powerPreference = process.env.GPU_POWER ?? 'high-performance',
   firefoxUserPrefs = {},
@@ -194,12 +195,8 @@ export async function openBrowser({
   try {
     if (!['chromium', 'firefox', 'webkit'].includes(browserName)) throw new TypeError('Unsupported browser');
     if (browserName === 'chromium') {
-      try {
-        browser = await chromium.launch({ channel: channel === 'bundled' ? undefined : channel, args, headless });
-      } catch (error) {
-        if (channel !== 'msedge' || args.length || process.env.BROWSER_CHANNEL) throw error;
-        browser = await chromium.launch({ headless });
-      }
+      // MARGO_BROWSER / --browser / BROWSER_CHANNEL pick the browser (scripts/lib/browser.mjs); `channel` overrides them.
+      browser = await launchBrowser({ name: channel, args, headless });
     } else
       browser = await { firefox, webkit }[browserName].launch({
         headless,
@@ -267,7 +264,8 @@ export async function openBrowser({
     }
     hardware.browserName = browserName;
     hardware.browserVersion = browser.version();
-    hardware.requestedChannel = browserName === 'chromium' ? channel : null;
+    hardware.requestedChannel =
+      browserName === 'chromium' ? (resolveBrowser({ name: channel }).channel ?? 'bundled') : null;
     hardware.launchArgs = browserName === 'chromium' ? args : [];
     hardware.powerPreference = powerPreference;
     hardware.hostPlatform = process.platform;

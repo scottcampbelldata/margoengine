@@ -19,9 +19,9 @@ import {
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
-import { chromium } from '@playwright/test';
 import { build } from 'vite';
 import { onAC } from './quiet-gate.mjs';
+import { launchBrowser, browserLabel } from './lib/browser.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   out = join(root, 'test-results/csp-check');
@@ -250,12 +250,8 @@ const report = {
   pages: [],
 };
 {
-  const browser = await chromium.launch({
-    channel: process.env.BROWSER_CHANNEL ?? 'msedge',
-    headless: true,
-    args: ['--enable-unsafe-webgpu'],
-  });
-  report.browser = `${process.env.BROWSER_CHANNEL ?? 'msedge'} ${browser.version()}`;
+  const browser = await launchBrowser({ headless: true, args: ['--enable-unsafe-webgpu'] });
+  report.browser = `${browserLabel()} ${browser.version()}`;
   try {
     for (const { name, dist, pages } of builds) {
       const server = await serve(dist),

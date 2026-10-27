@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve, relative, isAbsolute } from 'node:path';
-import { chromium } from '@playwright/test';
+import { launchBrowser, resolveBrowser } from '../lib/browser.mjs';
 import { preview } from 'vite';
 
 /** Static preview only; dependencies and workers are already assembled before any measured context starts. */
 export async function openBrowser({
-  channel = process.env.BROWSER_CHANNEL ?? 'msedge',
+  channel,
   args = [],
   headless = false,
   powerPreference = process.env.GPU_POWER ?? 'high-performance',
@@ -27,7 +27,7 @@ export async function openBrowser({
       preview: { host: '127.0.0.1', port: 0 },
       logLevel: 'error',
     });
-    browser = await chromium.launch({ channel: channel === 'bundled' ? undefined : channel, args, headless });
+    browser = await launchBrowser({ name: channel, args, headless });
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
     await page.goto(new URL('/hardware.html', server.resolvedUrls.local[0]).href);
     const hardware = await page.evaluate(async (powerPreference) => {
@@ -57,7 +57,7 @@ export async function openBrowser({
     Object.assign(hardware, {
       browserName: 'chromium',
       browserVersion: browser.version(),
-      requestedChannel: channel,
+      requestedChannel: resolveBrowser({ name: channel }).channel ?? 'bundled',
       launchArgs: args,
       powerPreference,
       hostPlatform: process.platform,

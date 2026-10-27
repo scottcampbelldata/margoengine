@@ -6,13 +6,13 @@
 // BENCH_CONDITIONS (free text, e.g. machine state) and BENCH_CORE (core commit) are recorded in the JSON when set.
 // Writes examples/package-benchmarks/cad/results-<label>.json. Headless Edge (BROWSER_CHANNEL to override), vsync and the
 // frame-rate limit off so FPS is throughput, cross-origin isolated so performance.now() has 5 µs resolution.
-import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { writeFile, stat } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
 import { cpus, totalmem } from 'node:os';
 import { requireAC } from './power.mjs';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const flag = (name) => process.argv.includes(`--${name}`);
@@ -39,8 +39,7 @@ const server = await createServer({
   ],
 });
 await server.listen();
-const browser = await chromium.launch({
-  channel: process.env.BROWSER_CHANNEL ?? 'msedge',
+const browser = await launchBrowser({
   headless: true,
   args: ['--disable-gpu-vsync', '--disable-frame-rate-limit', '--enable-precise-memory-info'],
 });

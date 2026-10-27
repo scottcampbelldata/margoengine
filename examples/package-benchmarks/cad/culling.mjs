@@ -2,12 +2,12 @@
 //   node examples/package-benchmarks/cad/culling.mjs [--sizes=10000,50000,max] [--modes=core,none,frustum,occlusion] [--views=orbit,still,grazing] [--layouts=sheet,stack] [--check] [--label=culling]
 // Takes test-results/gpu.lock (waits while another GPU run holds it), checks AC power before every run and repeats a run
 // that started or ended on battery. Writes examples/package-benchmarks/cad/results-<label>.json.
-import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { writeFile } from 'node:fs/promises';
 import { cpus, totalmem } from 'node:os';
 import { acPower } from './power.mjs';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const flag = (name) => process.argv.includes(`--${name}`);
@@ -56,8 +56,7 @@ try {
     ],
   });
   await server.listen();
-  browser = await chromium.launch({
-    channel: process.env.BROWSER_CHANNEL ?? 'msedge',
+  browser = await launchBrowser({
     headless: true,
     args: ['--disable-gpu-vsync', '--disable-frame-rate-limit', '--enable-precise-memory-info'],
   });

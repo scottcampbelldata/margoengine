@@ -3,8 +3,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { SourceMap } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { chromium } from '@playwright/test';
 import { build, preview } from 'vite';
+import { launchBrowser } from '../../scripts/lib/browser.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url)),
   output = resolve(root, '../../test-results/gameplay-sandbox');
@@ -17,8 +17,7 @@ const server = await preview({
   logLevel: 'error',
 });
 const origin = new URL(server.resolvedUrls.local[0]).origin;
-const browser = await chromium.launch({
-  channel: process.env.BROWSER_CHANNEL ?? 'msedge',
+const browser = await launchBrowser({
   headless: true,
   args: process.env.BROWSER_ARGS
     ? JSON.parse(process.env.BROWSER_ARGS)

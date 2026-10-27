@@ -113,6 +113,10 @@ try {
   browser = await openBrowser({ startPath: '/tests/wgsl-check.html', port: 5317, plugins: [plugin] });
   const paths = files.map((f) => `/${relative(root, f).replaceAll('\\', '/')}`),
     report = await browser.page.evaluate(async (list) => {
+      if (!navigator.gpu)
+        throw new Error(
+          'navigator.gpu is missing in this browser; try MARGO_BROWSER=chrome, or MARGO_SOFTWARE_GPU=1 on a machine without a GPU',
+        );
       const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }),
         device = await adapter.requestDevice({ requiredFeatures: [...adapter.features] }),
         seen = new Map(),

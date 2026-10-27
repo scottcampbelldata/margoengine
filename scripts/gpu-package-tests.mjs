@@ -49,7 +49,8 @@ const TOOLS = {
   'packages/voxel-pathtracer/tests/magicavoxel/mv-vox.mjs': 'renders .vox files for a side-by-side comparison',
 };
 /** A file that drives a real browser (Playwright, or scripts/browser.js's openBrowser). */
-const DRIVES_BROWSER = /\bopenBrowser\(|\bchromium\.launch\(|from '@playwright\/test'|from 'playwright'/;
+const DRIVES_BROWSER =
+  /\bopenBrowser\(|\bchromium\.launch\(|\blaunchBrowser\(|\bchromiumLaunchOptions\(|from '@playwright\/test'|from 'playwright'/;
 
 /** A package script this check runs: `test:browser`, `test:browser:walk`, `test:probes:browser`, `test:gpu`, ... */
 export const isGpuScript = (name) => /^test:/.test(name) && /(^|:)(browser|gpu)(:|$)/.test(name);

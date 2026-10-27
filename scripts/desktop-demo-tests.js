@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { chromium } from '@playwright/test';
+import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import { preview } from 'vite';
 import { decodePNG } from '../tests/support/png.js';
 import { installDemoLoadAudit } from './demo-load-audit.js';
@@ -20,7 +20,7 @@ const demos = [
 ];
 const viewport = { width: 1440, height: 900 },
   resizedViewport = { width: 1280, height: 800 };
-const channel = process.env.BROWSER_CHANNEL ?? 'msedge';
+const channel = browserLabel();
 const headless = process.env.DEMO_HEADLESS !== 'false';
 const args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [];
 const output = resolve('test-results');
@@ -330,7 +330,7 @@ try {
     recordedAt: new Date().toISOString(),
     results: [],
   };
-  browser = await chromium.launch({ channel: channel === 'bundled' ? undefined : channel, headless, args });
+  browser = await launchBrowser({ headless, args });
   report.browserVersion = browser.version();
   for (const demo of demos) {
     const result = {

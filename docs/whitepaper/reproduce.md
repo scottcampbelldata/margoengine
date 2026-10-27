@@ -8,7 +8,7 @@ want to check. Status of each claim and which command backs it: [claims.md](clai
 ```sh
 git clone https://github.com/scottcampbelldata/margoengine.git && cd margoengine
 npm ci                     # Node 22.12+; installs three@0.186.1, Vite, Playwright and the test tooling
-npx playwright install msedge   # or set BROWSER_CHANNEL=chrome; the real-GPU scripts default to Edge
+npx playwright install msedge   # or set MARGO_BROWSER=chrome; the real-GPU scripts default to Edge
 npm run build:packages     # every package, size gates, catalog (no Rust toolchain needed; the Wasm is checked in)
 ```
 
@@ -119,4 +119,4 @@ route is a clone because 1.0.0 is not on npm yet.
 
 On a discrete-GPU desktop or a Mac: the setup above, then `npm run bench` and `npm run bench -- features`, and
 keep the `benchmarks/runs/` folder. On Linux or macOS the AC check returns `null` (recorded, not enforced). Set
-`BROWSER_CHANNEL=chrome` where Edge is not installed. Phones are not scripted yet.
+`MARGO_BROWSER=chrome` where Edge is not installed. Phones are not scripted yet.

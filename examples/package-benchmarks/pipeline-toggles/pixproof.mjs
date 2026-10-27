@@ -1,10 +1,10 @@
 // From the repo root after build:packages and `node examples/package-benchmarks/pipeline-toggles/old-gltf.mjs`, under the GPU lock on AC:
 // node examples/package-benchmarks/pipeline-toggles/pixproof.mjs - screenshots gltf-pro 15c87f1 vs working tree, same scene, compares bytes.
-import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { writeFile } from 'node:fs/promises';
 import { decodePNG } from '../../../tests/support/png.js';
 import { requireAC } from '../cad/power.mjs';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 await writeFile(
   'test-results/pixproof.html',
   '<!doctype html><meta charset="utf-8"><style>body{margin:0}canvas{display:block;width:1280px;height:720px}</style><canvas id="view"></canvas><script type="module" src="/examples/package-benchmarks/pipeline-toggles/pixproof.js"></script>',
@@ -17,7 +17,7 @@ const server = await createServer({
 await server.listen();
 const out = { acPowerAtStart: requireAC() },
   shots = {};
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await launchBrowser({ headless: true });
 try {
   for (const which of ['before', 'after', 'before']) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 }),

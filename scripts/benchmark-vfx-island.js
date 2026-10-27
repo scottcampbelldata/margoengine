@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { readFile, writeFile, appendFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { resolve } from 'node:path';
+import { launchBrowser } from './lib/browser.mjs';
 
 const baselineRef = process.argv[2];
 assert(baselineRef, 'Pass the explicit baseline Git ref used by scripts/measure-vfx-memory.js');
@@ -534,11 +534,7 @@ try {
     logLevel: 'error',
   });
   await server.listen();
-  browser = await chromium.launch({
-    channel: process.env.BROWSER_CHANNEL ?? 'msedge',
-    headless: false,
-    args: launchArgs,
-  });
+  browser = await launchBrowser({ headless: false, args: launchArgs });
   report.browserVersion = browser.version();
   context = await browser.newContext({ viewport: null, reducedMotion: 'no-preference' });
   page = await context.newPage();

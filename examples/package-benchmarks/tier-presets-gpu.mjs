@@ -10,9 +10,9 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { cpuLoad, onAC, waitForQuiet } from '../../scripts/quiet-gate.mjs';
+import { launchBrowser } from '../../scripts/lib/browser.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
   arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -101,8 +101,7 @@ const report = {
 };
 assert.ok(onAC(), 'On battery: GPU timing is throttled, run on AC power');
 try {
-  if (process.argv.includes('--no-quiet'))
-    throw new Error('--no-quiet: machine busy, quiet gate skipped');
+  if (process.argv.includes('--no-quiet')) throw new Error('--no-quiet: machine busy, quiet gate skipped');
   report.machine = await waitForQuiet({ timeout: 600 });
   report.diagnostic = false;
 } catch (error) {
@@ -114,8 +113,7 @@ try {
 const servers = [];
 let browser;
 try {
-  browser = await chromium.launch({
-    channel: process.env.BROWSER_CHANNEL ?? 'msedge',
+  browser = await launchBrowser({
     headless: false,
     args: [
       '--start-maximized',

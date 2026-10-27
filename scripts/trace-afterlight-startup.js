@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
-import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { installStartupApiTrace } from './support/afterlight-startup-api-trace.js';
 import { installDemoLoadAudit } from './demo-load-audit.js';
+import { launchBrowser } from './lib/browser.mjs';
 
 function installResourceAudit() {
   const buffers = [],
@@ -112,7 +112,7 @@ try {
     server: { host: '127.0.0.1', port: 5231, strictPort: true, watch: null },
   });
   await server.listen();
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await launchBrowser({ headless: true });
   for (const mode of report.profile.contexts) {
     const context = await browser.newContext({ viewport: { width: 1432, height: 768 }, deviceScaleFactor: 2 });
     let release,

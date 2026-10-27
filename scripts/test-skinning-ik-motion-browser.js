@@ -35,7 +35,6 @@ const suffix = label ? `-${label}` : '';
 
 const app = await openBrowser({
   startPath: '/tests/modern.html',
-  channel: 'msedge',
   args: [],
   port: 5227,
   aliases: { '@margoengine/kinematics-constraints': resolve('packages/kinematics-constraints/dist/index.js') },

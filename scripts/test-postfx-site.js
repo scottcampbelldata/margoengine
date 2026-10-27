@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { cp, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { preview } from 'vite';
-import { chromium } from '@playwright/test';
 import { decodePNG } from '../tests/support/png.js';
 import { installDemoLoadAudit } from './demo-load-audit.js';
+import { launchBrowser } from './lib/browser.mjs';
 
 await mkdir('test-results', { recursive: true });
 const snapshot = await mkdtemp(resolve('test-results/postfx-site-'));
@@ -17,8 +17,7 @@ const server = await preview({
     preview: { host: '127.0.0.1', port: 0 },
   }),
   origin = server.resolvedUrls.local[0];
-const browser = await chromium.launch({
-  channel: 'msedge',
+const browser = await launchBrowser({
   headless: false,
   args: [
     '--start-maximized',
