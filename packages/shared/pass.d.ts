@@ -10,6 +10,9 @@ export function overlayDepthPass(): GPURenderPassDescriptor & {
 };
 /** Straight (non-premultiplied) alpha blending. */
 export const alphaBlend: GPUBlendState;
+/** Straight alpha blending that leaves the target's alpha channel unchanged: precipitation and other overlays drawn into a frame. */
+export const overlayBlend: GPUBlendState;
+
 /** `mesh` when it is null or a core mesh handle (checked live); else a TypeError. */
 export function attachableMesh<M extends { check(): void } | null>(mesh: M): M;
 /** The WGSL `make(group)` builds for bind group `group`, made once per group and kept in `cache`. */

@@ -74,6 +74,15 @@ export const demos = [
       views: ['high', 'phone'],
     }),
   ),
+  // Weather (item 28.5): the state machine blends presets; rain, snow and hail are random per frame, so it is checked
+  // for device loss only.
+  {
+    id: 'weather',
+    path: 'demos/weather.html',
+    ready: "document.querySelector('#viewport')?.dataset.ready==='true'",
+    views: ['high'],
+    lossOnly: true,
+  },
   { id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'" },
   { id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo', views: ['high', 'light', 'phone'] },
   { id: 'tonemap', path: 'demos/tonemap/', ready: '!!window.tonemapDemo', views: ['high', 'phone'] },

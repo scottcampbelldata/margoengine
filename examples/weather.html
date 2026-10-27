@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+  <style>
+    .controls{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+    .controls button{font:inherit;padding:8px 14px;min-height:44px;border:1px solid #62718b;border-radius:6px;background:#1c2536;color:#edf2fa;cursor:pointer}
+    .controls button[aria-pressed="true"]{background:#d8e4f5;color:#10141c}
+    .gauges{font-variant-numeric:tabular-nums;color:#b4c2d6}
+  </style>
+</head>
+<body>
+  <h1>Weather states that blend</h1>
+  <p><code>@margoengine/weather</code> runs the state machine, the wind and the ground; <code>@margoengine/sky/weather</code> draws rain, snow and lightning; the hail is <code>@margoengine/weather/hail</code>. Pick a weather and it blends in over a few seconds.</p>
+  <div class="controls" id="presets" role="group" aria-label="Weather presets"></div>
+  <div id="views" class="views">
+    <canvas id="viewport" aria-label="A yard with a wall and posts under changing weather"></canvas>
+  </div>
+  <p id="status" class="gauges" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./weather.ts'));
+  </script>
+</body>
+</html>

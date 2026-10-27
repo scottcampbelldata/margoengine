@@ -56,6 +56,7 @@ const layers = {
     'shadows',
     'lightmap',
     'sky',
+    'weather',
     'toon',
     'oit',
     'lod',

@@ -10,7 +10,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { finiteVector } from '@margoengine/math/validate';
 import type { Vec3 } from '@margoengine/math';
-import { overlayPass } from '../../shared/pass.js';
+import { ParticleOverlay } from '../../shared/particle-overlay.js';
 import { fullscreen } from '../../shared/gpu.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
 
@@ -273,17 +273,12 @@ export class Weather implements EnginePlugin {
   readonly name: string = 'weather';
   /** Where the listener (the ear and the eye) is: strikes are placed around it. The render pass follows the camera. */
   readonly listener = new Float32Array(3);
-  private readonly presentation = overlayPass();
-  private readonly attachment = this.presentation.colorAttachments[0];
-  private readonly depthAttachment = this.presentation.depthStencilAttachment;
+  private readonly overlay = new ParticleOverlay();
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private flashUniform?: GPUBuffer;
-  private pipeline?: GPURenderPipeline;
   private flashPipeline?: GPURenderPipeline;
-  private bind?: GPUBindGroup;
   private flashBind?: GPUBindGroup;
-  private key = '';
   private flashKey = '';
   private readonly values = new Float32Array(44);
   private readonly flashValues = new Float32Array(4);
@@ -571,47 +566,7 @@ export class Weather implements EnginePlugin {
     v[41] = fall;
     v[42] = wind[1];
     v[43] = Math.max(1, (tall / 540) * 1.2);
-    const key = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil!.format;
-    if (this.key !== key) {
-      const module = c.device.createShaderModule({ code: shader });
-      this.pipeline = c.device.createRenderPipeline({
-        layout: 'auto',
-        vertex: { module, entryPoint: 'vertex' },
-        fragment: {
-          module,
-          entryPoint: 'fragment',
-          targets: [
-            {
-              format: c.format,
-              blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
-              },
-            },
-          ],
-        },
-        multisample: c.descriptor.multisample,
-        depthStencil: {
-          format: c.descriptor.depthStencil!.format,
-          depthCompare: 'greater-equal',
-          depthWriteEnabled: false,
-        },
-      });
-      this.bind = c.device.createBindGroup({
-        layout: this.pipeline!.getBindGroupLayout(0),
-        entries: [{ binding: 0, resource: { buffer: this.uniform! } }],
-      });
-      this.key = key;
-    }
-    c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
-    this.attachment.view = c.color;
-    this.depthAttachment.view = c.depth;
-    const pass = c.encoder.beginRenderPass(this.presentation);
-    applyView(pass, c);
-    pass.setPipeline(this.pipeline!);
-    pass.setBindGroup(0, this.bind!);
-    pass.draw(6, count);
-    pass.end();
+    this.overlay.draw(c, shader, this.uniform!, v as Float32Array<ArrayBuffer>, count);
   }
 
   private drawFlash(c: WeatherPassContext): void {
@@ -656,8 +611,9 @@ export class Weather implements EnginePlugin {
     this.uniform?.destroy();
     this.flashUniform?.destroy();
     this.uniform = this.flashUniform = undefined;
-    this.pipeline = this.flashPipeline = this.bind = this.flashBind = undefined;
-    this.key = this.flashKey = '';
+    this.overlay.release();
+    this.flashPipeline = this.flashBind = undefined;
+    this.flashKey = '';
   }
 
   onDeviceRestored(engine: Engine): void {

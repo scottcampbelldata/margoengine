@@ -20,6 +20,12 @@ export const alphaBlend = /* @__PURE__ */ Object.freeze({
   alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
 });
 
+/** Straight alpha blending that leaves the target's alpha channel unchanged: precipitation and other overlays drawn into a frame. */
+export const overlayBlend = /* @__PURE__ */ Object.freeze({
+  color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+  alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
+});
+
 /** `mesh` when it is null or a core mesh handle (checked live), for overlays that follow a mesh; else a TypeError. */
 export function attachableMesh(mesh) {
   if (mesh !== null && (typeof mesh !== 'object' || typeof mesh.check !== 'function'))

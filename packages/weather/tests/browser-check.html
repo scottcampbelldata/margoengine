@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Weather browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/weather: hail draws and moves, leaves no trace once off or at intensity 0, stays
+// deterministic for a given time, and the WGSL surface functions give the same numbers as the JavaScript ones.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Hail} from '/packages/weather/dist/hail.js';
+import {surfaceResponse,surfaceWGSL} from '/packages/weather/dist/index.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,3,12],target:[0,1,-20],near:0.1,far:400}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+engine.createMesh().setGeometry(box(60,0.2,200)).setMaterial(new PbrMaterial({color:'#3a3a32',roughness:0.9})).setPosition([0,-0.1,-60]);
+engine.createMesh().setGeometry(box(30,20,1)).setMaterial(new PbrMaterial({color:'#101010',roughness:0.9})).setPosition([0,10,-8]);
+for(let i=0;i<3;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+async function shot(delta=1/60){engine.render({delta});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);}
+const changed=(a,b)=>{let n=0;for(let p=0;p<a.length;p+=4)if(Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2])>1e-4)n++;return n;};
+// The surface functions on the GPU: a grid of (roughness, normalY, wetness, snow cover) through weather_surface.
+async function surface(){
+ const cases=[];for(const r of [0.1,0.5,0.9])for(const ny of [-0.5,0,0.3,0.6,0.9,1])for(const w of [0,0.4,1])for(const s of [0,0.2,0.6,1])cases.push([r,ny,w,s]);
+ const input=new Float32Array(cases.flat()),code=surfaceWGSL+'@group(0) @binding(0) var<storage,read> inp:array<vec4f>;@group(0) @binding(1) var<storage,read_write> outp:array<vec4f>;@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){if(id.x>=arrayLength(&inp)){return;}let c=inp[id.x];outp[id.x]=weather_surface(c.x,vec3f(0.3,0.25,0.2),c.y,c.z,c.w);}';
+ const m=device.createShaderModule({code}),p=device.createComputePipeline({layout:'auto',compute:{module:m,entryPoint:'main'}});
+ const a=device.createBuffer({size:input.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),b=device.createBuffer({size:input.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),st=device.createBuffer({size:input.byteLength,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ device.queue.writeBuffer(a,0,input);
+ const e=device.createCommandEncoder(),pass=e.beginComputePass();pass.setPipeline(p);pass.setBindGroup(0,device.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:a}},{binding:1,resource:{buffer:b}}]}));pass.dispatchWorkgroups(Math.ceil(cases.length/64));pass.end();e.copyBufferToBuffer(b,0,st,0,input.byteLength);device.queue.submit([e.finish()]);
+ await st.mapAsync(GPUMapMode.READ);const out=new Float32Array(st.getMappedRange()).slice();st.unmap();
+ let worst=0;
+ cases.forEach(([r,ny,w,s],i)=>{const js=surfaceResponse({roughness:r,color:[0.3,0.25,0.2]},ny,w,s);const gpu=[out[i*4],out[i*4+1],out[i*4+2],out[i*4+3]];
+  worst=Math.max(worst,Math.abs(gpu[0]-js.color[0]),Math.abs(gpu[1]-js.color[1]),Math.abs(gpu[2]-js.color[2]),Math.abs(gpu[3]-js.roughness));});
+ return {cases:cases.length,worst};
+}
+window.check={
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const clear=await shot();
+  const hail=new Hail({intensity:1,fadeSeconds:0,particles:20000,opacity:1,brightness:3,wind:[4,0],seed:5});
+  engine.use(hail);
+  await shot();const a=await shot(1/60);
+  out.pixels=clear.length/4;out.hailChanged=changed(clear,a);
+  const b=await shot(0);out.sameTime=changed(a,b);
+  const c=await shot(0.35);out.movesWithTime=changed(a,c);
+  // Same clock, same seed: a second Hail at the same time draws the same frame.
+  hail.options.seed=6;const d=await shot(0);out.seedChanges=changed(c,d);
+  hail.options.seed=5;
+  hail.options.height=3;hail.options.groundY=0;const low=await shot(0.2);out.lowCeiling=changed(clear,low);
+  hail.options.height=30;
+  hail.options.intensity=0;await shot();out.zero=changed(clear,await shot());
+  hail.options.intensity=1;await shot();
+  hail.dispose();await shot();out.afterDispose=changed(clear,await shot());
+  out.surface=await surface();
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

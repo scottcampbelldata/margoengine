@@ -752,3 +752,18 @@ Written clean room from the specifications below. No source code of shader trans
 | Capability probe and tiers | Khronos WebGL 2.0 specification (`getExtension`, `getParameter`, `getShaderPrecisionFormat`) and the WebGL extension registry entries named in the package; OpenGL ES 3.0 and GLSL ES 3.00 specifications (precision qualifiers) |
 | WGSL corpus recorder | W3C WebGPU specification (`GPUDevice` methods, `getCompilationInfo`) |
 | WGSL front end (`/wgsl`: lexer, parser, type checker, constant folding, IR) | W3C WGSL specification (textual structure and template-list discovery, grammar, types and memory layout, expressions, statements and behaviors, built-in functions, entry-point interfaces); IEEE 754 for f32 and f16 rounding; mulberry32 (public domain) in the fuzz tests |
+
+## Weather states and hail: `@margoengine/weather`
+
+Written clean room from the specifications and papers below. No source code of weather systems or particle libraries
+(Unreal weather and Niagara systems, Unity weather assets, three.js and Babylon particle systems, game weather plugins
+and the like) was read. The code of `@margoengine/sky/weather` in this repository was the starting layout for the hail pass.
+
+| Area | Source |
+| --- | --- |
+| Wind noise | Smooth value noise: lattice values from the PCG output hash (O Neill, "PCG: A Family of Simple Fast Space-Efficient Statistically Good Algorithms for Random Number Generation", 2014) blended with the quintic fade of Perlin, "Improving Noise", SIGGRAPH 2002; our own gust, direction and turbulence layout |
+| Random walk | A weighted Markov chain over named presets; mulberry32 pseudo-random generator (public domain) |
+| Blending | Smoothstep (the OpenGL and WGSL `smoothstep` definition); shortest-arc angle interpolation |
+| Hail path | Constant fall speed (terminal velocity under drag, a design choice) and two ballistic bounces: `y = v t - g t^2 / 2` with a coefficient of restitution on the vertical speed |
+| Wet and snowy surfaces | Our own design: roughness and albedo scales for wet surfaces (wet surfaces look darker and shinier) and a slope threshold for snow |
+| Ground wetness and snow cover | First-order exponential approach to a target, with separate rise and fall time constants |

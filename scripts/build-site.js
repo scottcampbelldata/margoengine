@@ -93,6 +93,7 @@ const pages = [
   'sciviz-points',
   'sciviz-surface',
   'ui-game',
+  'weather',
 ];
 await site({
   configFile: false,

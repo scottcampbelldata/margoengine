@@ -112,7 +112,8 @@
     "packages/cutscene",
     "packages/save",
     "packages/mixer",
-    "packages/webgl2-compat"
+    "packages/webgl2-compat",
+    "packages/weather"
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",

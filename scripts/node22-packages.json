@@ -120,6 +120,7 @@
     "@margoengine/viewcube": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/voxel-pathtracer": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/water": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
+    "@margoengine/weather": "renders hail with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/webgl": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/xr": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser"
   }

@@ -1,0 +1,59 @@
+{
+  "name": "@margoengine/weather",
+  "version": "1.0.0",
+  "description": "Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; helpers for the sky's Weather; and bouncing GPU hail.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "weather",
+    "rain",
+    "snow",
+    "hail",
+    "wind",
+    "particles"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/weather"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./hail": {
+      "types": "./dist/hail.d.ts",
+      "import": "./dist/hail.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js weather",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:gpu": "cd ../.. && node packages/weather/tests/browser-check.mjs",
+    "prepack": "npm run build"
+  }
+}

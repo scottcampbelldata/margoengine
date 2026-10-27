@@ -41,7 +41,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-90 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+91 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -79,7 +79,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/splats`](../packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |
 | [`@margoengine/tiles`](../packages/tiles/README.md) | Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf-pro. |
 
-### Rendering and lighting (19)
+### Rendering and lighting (20)
 
 | Package | What it is |
 | --- | --- |
@@ -90,6 +90,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/shadows`](../packages/shadows/README.md) | Four-cascade cached directional shadows with PCSS. |
 | [`@margoengine/lightmap`](../packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
 | [`@margoengine/sky`](../packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning). |
+| [`@margoengine/weather`](../packages/weather/README.md) | Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; helpers for the sky's Weather; and bouncing GPU hail. |
 | [`@margoengine/toon`](../packages/toon/README.md) | Stepped diffuse shading and inverted-hull outlines. |
 | [`@margoengine/oit`](../packages/oit/README.md) | Weighted blended order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: no popping between overlapping transparent parts. |
 | [`@margoengine/lod`](../packages/lod/README.md) | Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas. |
