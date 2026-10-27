@@ -40,7 +40,7 @@ const turn = (a: number[], b: number[], c: number[]) => (b[0] - a[0]) * (c[1] - 
  * Ear-clip a simple polygon loop (concave allowed, collinear corners kept) into triangles of corner indices.
  * Returns null when the loop has no area, is not simple in its own plane, or no ear can be found.
  */
-function triangulateLoop(points: readonly Vec3[]): number[][] | null {
+export function triangulateLoop(points: readonly Vec3[]): number[][] | null {
   const count = points.length;
   if (count < 3 || count > MAX_LOOP_CORNERS) return null;
   const flat = projectLoop(points);
@@ -112,7 +112,7 @@ function triangulateLoop(points: readonly Vec3[]): number[][] | null {
  * Nonplanar loops end as planar pieces (triangles where nothing larger is planar). Null when the loop cannot be
  * split (no area, self-crossing).
  */
-function convexLoopPieces(points: readonly Vec3[]): number[][] | null {
+export function convexLoopPieces(points: readonly Vec3[]): number[][] | null {
   if (points.length <= 64 && polygonGeometryError(points) === null) return [points.map((_, i) => i)];
   const triangles = triangulateLoop(points);
   if (!triangles) return null;

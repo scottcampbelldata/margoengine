@@ -23,7 +23,7 @@ console.log(inset.mesh.faces.length, beveled.mesh.faces.length);
 
 Callers own selection intent, locks, visibility, motion/opacity policy, IDs, undo and texture storage. Margo owns component transform geometry and the UV/paint algorithms below. No engine instance, DOM or GPU is needed. Supply `createId` for deterministic face IDs; otherwise commands call `crypto.randomUUID()` only when creating faces. Empty and duplicate generated IDs reject before exposing output.
 
-The original parity commands retain existing behavior: extrusion acts along the local face normal, inset and whole-mesh bevel use centroid fractions, and `cutMeshFace` bisects one face at opposite-edge midpoints. Cut vertices propagate through neighboring incident edges; each face interpolates its own UVs. Bevel requires closed two-manifold geometry and returns an unchanged owned mesh with a diagnostic for unsupported open/nonmanifold inputs. Supported faces are simple planar convex polygons with 3-64 corners; collinear boundary corners remain valid. Compile produces flat normals and fan triangles, preserving source face and corner-vertex identity. Arbitrary drawn knife paths, equal-width bevel/inset and concave n-gons remain unsupported.
+The original parity commands retain existing behavior: extrusion acts along the local face normal, inset and whole-mesh bevel use centroid fractions, and `cutMeshFace` bisects one face at opposite-edge midpoints. Cut vertices propagate through neighboring incident edges; each face interpolates its own UVs. Bevel requires closed two-manifold geometry and returns an unchanged owned mesh with a diagnostic for unsupported open/nonmanifold inputs. Supported faces are simple planar convex polygons with 3-64 corners; collinear boundary corners remain valid. Compile produces flat normals and fan triangles, preserving source face and corner-vertex identity. Drawn knife cuts, selected-edge bevels and concave n-gons (split into convex faces) are in the `modeling` entry below; equal-width inset is `insetMeshRegion`.
 
 `meshSelectionVertices(mesh, selection)` resolves explicit object, vertex, canonical edge or face selections. `transformMeshComponents(mesh, selection, worldDelta, {worldMatrix, snapStep})` applies a public affine world delta to those shared vertices once. Unselected positions and all corner UVs remain exact; optional snapping affects only selected vertices in world space. Warped convex polygons become persisted deterministic source triangles, retaining the source face ID on one descendant. Collapsed, crossed, concave or folded projections reject atomically. Mirrored object matrices and half-turn rotations work; reflected edit deltas reject explicitly. Results add exact `edgeMap`, created/removed edges and triangulation diagnostics. Geometry-only shaping never repacks or paints an atlas.
 
@@ -97,6 +97,60 @@ console.log(beveled.mesh.faces.length, slid.mesh.faces.length, welded.welded, br
 Every command validates first and never changes its input; results carry `vertexMap`, `faceMap`, `edgeMap` and the
 created/removed components like the commands above. Allocate islands for new faces with `allocateMeshFaceUV` before
 painting them.
+
+## Concave faces, knife and subdivision
+
+Faces stay planar and convex, so imported concave n-gons are split first; a knife cuts along a drawn line seen from
+the camera, and Catmull-Clark subdivision keeps UV seams:
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import {
+  convexPolygonPieces,
+  knifeMeshFaces,
+  splitMeshConcaveFaces,
+  subdivideMesh,
+  triangulatePolygon,
+} from 'margoengine/mesh-edit/modeling';
+
+// An L-shaped outline: 4 triangles, or 2 convex pieces.
+const outline: [number, number, number][] = [
+  [0, 0, 0],
+  [0, 0, 2],
+  [1, 0, 2],
+  [1, 0, 1],
+  [2, 0, 1],
+  [2, 0, 0],
+];
+const triangles = triangulatePolygon(outline);
+const pieces = convexPolygonPieces(outline);
+// An imported concave face becomes editable convex faces; the first keeps the ID.
+const imported = splitMeshConcaveFaces({
+  vertices: outline,
+  faces: [{ id: 'L', vertices: [0, 1, 2, 3, 4, 5], uv: outline.map(([x, , z]): [number, number] => [x / 2, z / 2]) }],
+});
+// Knife straight across a cube, looking down -Y: it cuts through, front and back.
+const cut = knifeMeshFaces(createPrimitiveMesh('cube', 'box'), [[-1, 1, 0.1], [1, 1, 0.1]], [0, -1, 0]);
+// Two levels of Catmull-Clark; UVs are smoothed inside islands and stay exact on seams.
+const smooth = subdivideMesh(createPrimitiveMesh('cube', 'box'), { levels: 2 });
+console.log(triangles.length, pieces.length, imported.mesh.faces.length, cut.cutEdges.length, smooth.mesh.faces.length);
+```
+
+- `triangulatePolygon(points)` ear-clips a simple outline (concave allowed) in its own plane, keeping every corner
+  (collinear ones too) and the winding. `convexPolygonPieces(points)` then removes diagonals while both sides stay
+  convex (Hertel and Mehlhorn, 1983; at most four times the fewest pieces). Both take up to 4096 corners and throw
+  `TypeError` for outlines that cross themselves.
+- `splitMeshConcaveFaces(mesh)` accepts faces of 3 to 64 corners that are concave or slightly nonplanar and returns
+  a valid mesh (pieces keep corners and UVs; `faceMap` names them). Valid faces are untouched.
+- `knifeMeshFaces(mesh, points, direction, {faces, closed = false})`: the polyline swept along `direction` (the view
+  direction) cuts every face it fully crosses, front and back ("cut through"); `faces` limits the cut. New vertices go
+  where the cut crosses edges and where it bends inside a face; neighbors gain the edge vertices, so there are no
+  T-junctions. A cut that stops inside a face adds nothing there. `cutEdges` lists the new edges along the cut.
+- `subdivideMesh(mesh, {levels = 1, uv = 'smooth', boundary = 'smooth', signal})`: Catmull-Clark (1978). Open borders
+  follow the B-spline border rule with corners kept (`'pinned'` fixes every border vertex). UVs subdivide as their own
+  face-varying mesh: smoothed inside each island, linear on seams and island corners (`'linear'` interpolates each
+  face). Because faces stay planar, curved quads are split into two triangles; flat areas keep quads. Up to 4 levels
+  and 200000 output faces.
 
 ## Pixel painting and UVs
 
