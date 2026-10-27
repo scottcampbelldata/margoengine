@@ -126,7 +126,7 @@ test('an abort stops the encode with the signal reason; bad input and limits thr
   await assert.rejects(pending, (e) => e === reason);
   await assert.rejects(encodeEXR(one(new Float32Array(1)), { signal: AbortSignal.abort(reason) }), (e) => e === reason);
   const progress = [];
-  await encodeEXR(big, { onProgress: (done, total) => progress.push([done, total]) });
+  await withClock(1, () => encodeEXR(big, { onProgress: (done, total) => progress.push([done, total]) }));
   assert.deepEqual(progress.at(-1), [4096 * 64, 4096 * 64]);
   assert.ok(progress.length > 1);
   const y = new Float32Array(4);
@@ -152,4 +152,35 @@ test('an abort stops the encode with the signal reason; bad input and limits thr
     [one(y), { nonFinite: 'clamp' }, TypeError],
   ])
     await assert.rejects(encodeEXR(input, options), error);
+});
+
+/** Runs `run` with performance.now() advancing `step` ms on each read (0: a clock that stands still). */
+async function withClock(step, run) {
+  const real = performance.now;
+  let t = 0;
+  performance.now = () => (t += step);
+  try {
+    return await run();
+  } finally {
+    performance.now = real;
+  }
+}
+
+test('yields follow encoding time, not a sample count (a browser clamps each setTimeout yield to 4 ms)', async () => {
+  // p-export-exr's 2048 x 1024 RGBA HALF image yielded every 65,536 samples: 128 yields, about 0.5 s of clamped
+  // timers in a browser against about 0.1 s of encoding. A fast encode now yields once, after the last row.
+  const width = 2048,
+    height = 1024,
+    data = new Float32Array(width * height * 4).map((_, i) => (i % 7) / 7),
+    channels = ['R', 'G', 'B', 'A'].map((name, offset) => ({ name, type: 'HALF', data, offset, stride: 4 })),
+    calls = [];
+  const still = await withClock(0, () => encodeEXR({ width, height, channels }, { onProgress: (d) => calls.push(d) }));
+  assert.deepEqual(calls, [width * height * 4]);
+  calls.length = 0;
+  // A clock at 1 ms a row yields every 10 rows, and the bytes do not depend on where the yields fall.
+  const ticking = await withClock(1, () =>
+    encodeEXR({ width, height, channels }, { onProgress: (d) => calls.push(d) }),
+  );
+  assert.equal(calls.length, Math.ceil(height / 10));
+  assert.deepEqual(ticking, still);
 });

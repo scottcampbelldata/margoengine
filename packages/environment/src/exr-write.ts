@@ -40,7 +40,15 @@ export interface EXRWriteOptions {
   onProgress?: (done: number, total: number) => void;
 }
 
-const YIELD_SAMPLES = 1 << 16;
+/** Milliseconds of encoding between yields to the event loop (well under the 50 ms of a long task). */
+const YIELD_MS = 10;
+const now = () => performance.now();
+// One turn of the event loop. A browser clamps nested setTimeout(0) to 4 ms, so a yield per few rows cost more than
+// the encoding (128 yields, about 0.5 s for 2048 x 1024 RGBA); `scheduler.yield()` has no clamp where it exists.
+const yieldTurn = (): Promise<void> => {
+  const scheduler = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  return scheduler?.yield ? scheduler.yield() : new Promise((resolve) => setTimeout(resolve));
+};
 const printable = (s: unknown, max: number): s is string =>
   typeof s === 'string' && s.length >= 1 && s.length <= max && /^[\x20-\x7e]+$/.test(s);
 const chars = (s: string) => Array.from(s, (c) => c.charCodeAt(0));
@@ -55,7 +63,8 @@ const whole = (value: number, min: number, max: number, label: string) => {
 
 /**
  * Encodes named channels as an uncompressed scanline OpenEXR file that {@link parseEXR} and OpenEXR read.
- * Data and display windows are `[0, 0, width - 1, height - 1]`. Yields to the event loop every 65,536 samples.
+ * Data and display windows are `[0, 0, width - 1, height - 1]`. Yields to the event loop (`scheduler.yield()` where
+ * the runtime has it, else `setTimeout`) after about 10 ms of encoding and after the last row.
  * @throws TypeError for a bad name, type or array; RangeError for a size or offset out of range, a file over
  * `maxBytes`, a nonfinite sample under `nonFinite: 'reject'` or a finite value too large for HALF; the signal's reason
  * when aborted.
@@ -116,7 +125,7 @@ export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions =
   let at = head.length + 8 * height; // past the offset table: one 64-bit file offset per row
   const words = planes.map((c) => new Uint32Array(c.data.buffer, c.data.byteOffset, c.data.length)),
     samples = width * height * planes.length;
-  for (let y = 0, sinceYield = 0; y < height; y++) {
+  for (let y = 0, last = now(); y < height; y++) {
     view.setBigUint64(head.length + 8 * y, BigInt(at), true);
     view.setInt32(at, y, true);
     view.setInt32(at + 4, lineBytes, true);
@@ -140,11 +149,11 @@ export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions =
         }
       }
     });
-    if ((sinceYield += width * planes.length) >= YIELD_SAMPLES || y === height - 1) {
-      sinceYield = 0;
+    if (y === height - 1 || now() - last >= YIELD_MS) {
       onProgress?.((y + 1) * width * planes.length, samples);
-      await new Promise((resolve) => setTimeout(resolve));
+      await yieldTurn();
       signal?.throwIfAborted();
+      last = now();
     }
   }
   return out;

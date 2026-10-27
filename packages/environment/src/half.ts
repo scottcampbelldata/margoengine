@@ -57,7 +57,21 @@ const HALF_MAX = 65504;
  * Converts RGBA float texels to binary16 for an rgba16float upload. Lighting data must be finite and
  * non-negative, so NaN and negatives become 0 and values above 65504 clamp to 65504 instead of infinity.
  */
-export function toHalfLighting(data: Float32Array): Uint16Array {
+export function toHalfLighting(data: Float32Array, native = true): Uint16Array {
+  // The built-in Float16Array store rounds to nearest even like floatToHalf (same bits), about 3x faster than the
+  // bit-twiddling loop (p-pmrem converted its 1024 x 512 HDR in 7.4 ms, half of Environment.create's time).
+  const F16 = native
+    ? (globalThis as { Float16Array?: new (length: number) => ArrayBufferView<ArrayBuffer> & { [i: number]: number } })
+        .Float16Array
+    : undefined;
+  if (F16) {
+    const half = new F16(data.length);
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i];
+      half[i] = v > 0 ? (v < HALF_MAX ? v : HALF_MAX) : 0;
+    }
+    return new Uint16Array(half.buffer);
+  }
   const out = new Uint16Array(data.length);
   for (let i = 0; i < data.length; i++) {
     const v = data[i];
