@@ -61,6 +61,8 @@ export interface PointBlocks {
     readonly finite: number;
 }
 
+export type PointChannel = 'positions' | 'colors' | 'sizes';
+
 export class PointCloud {
     name: string;
     visible: boolean;
@@ -85,14 +87,14 @@ export class PointCloud {
         pointsDrawn: number;
     };
     structure: number;
-    readonly dirty: Record<Channel, Array<[number, number]>>;
+    readonly dirty: Record<PointChannel, Array<[number, number]>>;
     constructor(options: PointCloudOptions);
     get attachedMesh(): Mesh | null;
     attach(mesh: Mesh | null): this;
     updatePositions(start: number, values: ArrayLike<number>): this;
     updateColors(start: number, values: ArrayLike<number>, components?: 3 | 4): this;
     updateSizes(start: number, values: ArrayLike<number>): this;
-    markDirty(channel: Channel, start?: number, count?: number): this;
+    markDirty(channel: PointChannel, start?: number, count?: number): this;
     setColors(values: ArrayLike<number> | null, components?: 3 | 4, notify?: boolean): this;
     setSizes(values: ArrayLike<number> | null, notify?: boolean): this;
     rebuild(): this;
@@ -355,8 +357,6 @@ abstract class BaseMaterial {
     protected apply(options: BaseMaterialOptions): void;
     validate(): void;
 }
-
-type Channel = 'positions' | 'colors' | 'sizes';
 
 type P = ArrayLike<number>;
 

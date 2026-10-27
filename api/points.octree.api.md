@@ -137,8 +137,6 @@ interface BaseMaterialOptions {
     clipIntersection?: boolean;
 }
 
-type Channel = 'positions' | 'colors' | 'sizes';
-
 interface PointBlocks {
     readonly order: Uint32Array;
     readonly starts: Uint32Array;
@@ -148,6 +146,8 @@ interface PointBlocks {
     readonly length: number;
     readonly finite: number;
 }
+
+type PointChannel = 'positions' | 'colors' | 'sizes';
 
 class PointCloud {
     name: string;
@@ -173,14 +173,14 @@ class PointCloud {
         pointsDrawn: number;
     };
     structure: number;
-    readonly dirty: Record<Channel, Array<[number, number]>>;
+    readonly dirty: Record<PointChannel, Array<[number, number]>>;
     constructor(options: PointCloudOptions);
     get attachedMesh(): Mesh | null;
     attach(mesh: Mesh | null): this;
     updatePositions(start: number, values: ArrayLike<number>): this;
     updateColors(start: number, values: ArrayLike<number>, components?: 3 | 4): this;
     updateSizes(start: number, values: ArrayLike<number>): this;
-    markDirty(channel: Channel, start?: number, count?: number): this;
+    markDirty(channel: PointChannel, start?: number, count?: number): this;
     setColors(values: ArrayLike<number> | null, components?: 3 | 4, notify?: boolean): this;
     setSizes(values: ArrayLike<number> | null, notify?: boolean): this;
     rebuild(): this;
