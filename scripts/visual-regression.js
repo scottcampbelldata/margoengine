@@ -30,6 +30,7 @@ import { acPower } from '../examples/package-benchmarks/cad/power.mjs';
 import { acquire } from './gpu-lock.mjs';
 import { clearVisualOutput } from './support/visual-output.js';
 import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
+import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
 import { demos } from './support/visual-demos.js';
 import { margoError } from '../packages/shared/errors.js';
 import {
@@ -303,6 +304,9 @@ try {
         // WGSL errors of any module the view creates fail it, drawn or not.
         await page.addInitScript(wgslGuard);
         const wgsl = watchWgsl(page);
+        // A GPU reset that takes the view's device fails it at once, saying so, instead of at the 120 s ready timeout.
+        await page.addInitScript(deviceLossGuard);
+        watchDeviceLoss(page);
         const capture = async () => {
           // Let late UI text settle (sandbox clock label ticks every 500 ms) and a few frames present.
           await page.waitForTimeout(1000);

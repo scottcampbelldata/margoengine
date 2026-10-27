@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { trackPipelines } from './support/gpu-ready.js';
+import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
 
 /**
  * Starts a server on a fixed port with `start` (for example `() => server.listen()`), waiting while something else holds
@@ -352,6 +353,9 @@ export async function openBrowser({
     page.setDefaultTimeout(30000);
     // Every shader module the page creates is compiled for diagnostics; close() fails on a WGSL error.
     await page.addInitScript(wgslGuard);
+    // A device the driver takes away (a GPU reset) fails the next wait at once, naming the loss (support/device-loss.js).
+    await page.addInitScript(deviceLossGuard);
+    const deviceLoss = watchDeviceLoss(page);
     if (pipelineDelayMs > 0) await page.addInitScript(delayPipelines, pipelineDelayMs);
     if (mathErrorScale > 0) await page.addInitScript(perturbBuiltinMath, mathErrorScale);
     if (reassociate) await page.addInitScript(reassociateMath);
@@ -445,6 +449,7 @@ export async function openBrowser({
       page,
       hardware,
       wgsl,
+      deviceLoss,
       async close() {
         // Compilation info arrives asynchronously: wait for every report (wgsl-guard keeps them) before reading them.
         await page.evaluate(() => Promise.all(globalThis.__margoWgslReports ?? [])).catch(() => {});

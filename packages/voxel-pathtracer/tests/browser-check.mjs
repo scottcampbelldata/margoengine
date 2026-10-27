@@ -619,7 +619,35 @@ try {
     assert.deepEqual(r.errors, []);
   }
   if (wanted('native4k')) {
+    // Bug 25: the 4K viewport traced all 8.3 million pixels in one dispatch (200 ms here, past a GPU watchdog on a
+    // slower GPU). Every trace and preview dispatch now covers at most 2^20 pixels (src/dispatch.ts).
+    await page.evaluate(() => {
+      const log = (window.__traceDispatches = { count: 0, max: 0 }),
+        proto = GPUComputePassEncoder.prototype,
+        { setPipeline, dispatchWorkgroups } = proto,
+        current = new WeakMap();
+      log.restore = () => Object.assign(proto, { setPipeline, dispatchWorkgroups });
+      proto.setPipeline = function (pipeline) {
+        current.set(this, pipeline.label);
+        return setPipeline.call(this, pipeline);
+      };
+      proto.dispatchWorkgroups = function (x, y = 1, z = 1) {
+        if (/^voxel-pathtracer (trace|preview)$/.test(current.get(this) ?? '')) {
+          log.count++;
+          log.max = Math.max(log.max, x * y * z * 64);
+        }
+        return dispatchWorkgroups.call(this, x, y, z);
+      };
+    });
     const r = await run('native4k');
+    const dispatches = await page.evaluate(() => {
+      const { count, max, restore } = window.__traceDispatches;
+      restore();
+      return { count, max };
+    });
+    console.log(`  trace dispatches: ${dispatches.count}, the largest ${dispatches.max} pixels`);
+    assert.ok(dispatches.count > 40, 'the 4K frames were traced');
+    assert.ok(dispatches.max <= 1 << 20, `a trace dispatch of ${dispatches.max} pixels (budget 2^20)`);
     for (const [name, v] of Object.entries(r.results))
       console.log(
         `  ${name} 3840x2160: traced ${v.traced.join('x')} (requested ${v.requested.join('x')}${v.limitedBy ? `, limited by ${v.limitedBy}` : ''}), GPU ${v.gpuMs.toFixed(2)} ms/frame, ${(v.gpuBytes / 2 ** 20).toFixed(1)} MiB; binding limit ${v.limits.binding}, texture ${v.limits.texture}`,

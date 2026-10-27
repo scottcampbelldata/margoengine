@@ -52,6 +52,7 @@ import {
 } from './options.js';
 import { PngWriter } from './png.js';
 import { traceViewportSize } from './viewport.js';
+import { bandRowStep, planTrace, type TraceChunk } from './dispatch.js';
 import {
   buildSnapshot,
   checkNumber,
@@ -219,6 +220,8 @@ interface View extends Targets {
   uniform: GPUBuffer;
   traceGroup?: GPUBindGroup;
   traceKey?: string;
+  /** A frame cut into several dispatches (dispatch.ts): each one's frame uniform (in `frames`) and bind group. */
+  bands?: { key: string; frames: GPUBuffer; groups: GPUBindGroup[] };
   displayRaw?: GPUBindGroup;
   displayDenoised?: GPUBindGroup;
   /** The denoised image blended with its history (in ping), shown when the last denoising kept history. */
@@ -843,7 +846,11 @@ export class VoxelPathTracer implements EnginePlugin {
       tables = device.createShaderModule({ code: TABLES }),
       layout = (l: GPUBindGroupLayout) => device.createPipelineLayout({ bindGroupLayouts: [l] }),
       compute = (module: GPUShaderModule, entryPoint: string, l: GPUBindGroupLayout) =>
-        device.createComputePipelineAsync({ layout: layout(l), compute: { module, entryPoint } });
+        device.createComputePipelineAsync({
+          label: `voxel-pathtracer ${entryPoint}`,
+          layout: layout(l),
+          compute: { module, entryPoint },
+        });
     // The small preview kernel first: the viewport shows a lit image while the full tracer compiles.
     compute(trace, 'preview', traceLayout).then(
       (p) => {
@@ -905,6 +912,7 @@ export class VoxelPathTracer implements EnginePlugin {
     if (gpu.view) {
       this.#destroy(gpu.view.frame);
       this.#destroy(gpu.view.uniform);
+      this.#destroy(gpu.view.bands?.frames);
     }
     gpu.view = undefined;
     this.#samples = 0;
@@ -1091,21 +1099,30 @@ export class VoxelPathTracer implements EnginePlugin {
     return out;
   }
 
-  #traceGroup(gpu: Gpu, frame: GPUBuffer, t: Targets, buffers = gpu.buffers): GPUBindGroup {
+  // `band`: the bindings of one dispatch of a cut frame: its frame uniform `band.frame` bytes into `frame`, the image
+  // buffers from byte `band.at` for `band.size` bytes (its rows).
+  #traceGroup(
+    gpu: Gpu,
+    frame: GPUBuffer,
+    t: Targets,
+    buffers = gpu.buffers,
+    band?: { frame: number; at: number; size: number },
+  ): GPUBindGroup {
+    const image = (buffer: GPUBuffer) => (band ? { buffer, offset: band.at, size: band.size } : { buffer });
     return gpu.device.createBindGroup({
       layout: gpu.traceLayout,
       entries: [
-        { binding: 0, resource: { buffer: frame } },
+        { binding: 0, resource: band ? { buffer: frame, offset: band.frame, size: FRAME_BYTES } : { buffer: frame } },
         { binding: 1, resource: { buffer: buffers.table0 } },
         { binding: 2, resource: { buffer: buffers.voxels } },
         { binding: 3, resource: { buffer: buffers.scene } },
         { binding: 4, resource: { buffer: buffers.materials } },
         { binding: 5, resource: { buffer: buffers.env } },
-        { binding: 6, resource: { buffer: t.accum } },
-        { binding: 7, resource: { buffer: t.albedo } },
-        { binding: 8, resource: { buffer: t.normals } },
+        { binding: 6, resource: image(t.accum) },
+        { binding: 7, resource: image(t.albedo) },
+        { binding: 8, resource: image(t.normals) },
         { binding: 9, resource: { buffer: gpu.tables } },
-        { binding: 10, resource: { buffer: t.caustics ?? gpu.dummy } },
+        { binding: 10, resource: t.caustics ? image(t.caustics) : { buffer: gpu.dummy } },
       ],
     });
   }
@@ -1170,6 +1187,7 @@ export class VoxelPathTracer implements EnginePlugin {
     s: SceneSnapshot,
     wavelength = 0,
     transparent = false,
+    offset = 0,
   ): boolean {
     const o = this.#settings,
       f = new Float32Array(this.#frame),
@@ -1277,7 +1295,7 @@ export class VoxelPathTracer implements EnginePlugin {
     f.set([e.sun[0] * scale, e.sun[1] * scale, e.sun[2] * scale, solid], 64);
     f.set([e.ground?.[0] ?? 0, e.ground?.[1] ?? 0, e.ground?.[2] ?? 0, e.groundHeight], 68);
     f.set([env?.integral ?? 0, env?.rotation ?? 0, o.shutter, o.clamp < Infinity ? o.clamp : 0], 72);
-    device.queue.writeBuffer(target, 0, this.#frame);
+    device.queue.writeBuffer(target, offset, this.#frame);
     return true;
   }
 
@@ -1413,6 +1431,7 @@ export class VoxelPathTracer implements EnginePlugin {
   // A pipeline of the trace module; `tables` reads model material tables from storage (TABLES).
   #traceKernel(gpu: Gpu, entryPoint: string, tables: boolean): Promise<GPUComputePipeline> {
     return gpu.device.createComputePipelineAsync({
+      label: `voxel-pathtracer ${entryPoint}`,
       layout: gpu.device.createPipelineLayout({ bindGroupLayouts: [gpu.traceLayout] }),
       compute: { module: gpu.traceModule!, entryPoint, ...(tables ? { constants: { TABLES: 1 } } : {}) },
     });
@@ -1442,6 +1461,77 @@ export class VoxelPathTracer implements EnginePlugin {
   }
   #tablesNeeded(): boolean {
     return this.#snapshot.materials.length > 256 * MATERIAL_FLOATS;
+  }
+
+  // One frame's trace (or preview) work, samples `s0` to `s0 + count - 1` over the viewport image, as dispatches of at
+  // most DISPATCH_PATHS paths (dispatch.ts): a frame that fits one is traced as before; a larger one in row bands (and
+  // runs of samples), each with its own frame uniform and bindings into the image buffers at its rows. False when the
+  // camera is singular.
+  #traceViewport(
+    gpu: Gpu,
+    view: View,
+    c: Context,
+    pipeline: GPUComputePipeline,
+    width: number,
+    height: number,
+    s0: number,
+    count: number,
+    seed: number,
+    split: boolean,
+  ): boolean {
+    const device = gpu.device,
+      // Bands of whole workgroups (8 rows) whose offsets meet the storage alignment.
+      step = Math.max(8, bandRowStep(width, device.limits.minStorageBufferOffsetAlignment ?? 256)),
+      chunks = planTrace(width, height, s0, count, step),
+      write = (target: GPUBuffer, offset: number, k: TraceChunk) =>
+        this.#writeFrame(
+          device,
+          target,
+          c.camera,
+          [width, height, 0, k.y0],
+          [width, k.rows, k.s0, k.count],
+          seed,
+          true,
+          split,
+          gpu.layout!,
+          this.#snapshot,
+          0,
+          false,
+          offset,
+        );
+    let groups = [view.traceGroup!];
+    if (chunks.length === 1) {
+      if (!write(view.frame, 0, chunks[0])) return false;
+    } else {
+      const align = device.limits.minUniformBufferOffsetAlignment ?? 256,
+        stride = Math.ceil(FRAME_BYTES / align) * align,
+        key = `${view.traceKey}|${width}x${height}|${chunks.map((k) => `${k.y0}+${k.rows}`).join(',')}`;
+      if (view.bands?.key !== key) {
+        this.#destroy(view.bands?.frames);
+        const frames = this.#buffer(gpu, stride * chunks.length, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+        view.bands = {
+          key,
+          frames,
+          groups: chunks.map((k, i) =>
+            this.#traceGroup(gpu, frames, view, gpu.buffers, {
+              frame: i * stride,
+              at: k.y0 * width * 16,
+              size: k.rows * width * 16,
+            }),
+          ),
+        };
+      }
+      for (const [i, k] of chunks.entries()) if (!write(view.bands.frames, i * stride, k)) return false;
+      groups = view.bands.groups;
+    }
+    const pass = c.encoder.beginComputePass();
+    pass.setPipeline(pipeline);
+    for (const [i, k] of chunks.entries()) {
+      pass.setBindGroup(0, groups[i]);
+      pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(k.rows / 8));
+    }
+    pass.end();
+    return true;
   }
 
   #execute(c: Context): void {
@@ -1510,26 +1600,7 @@ export class VoxelPathTracer implements EnginePlugin {
     }
     if (this.#previewing) {
       // Until the full tracer is compiled: one preview sample per frame, written over the image.
-      if (
-        !this.#writeFrame(
-          device,
-          view.frame,
-          c.camera,
-          [width, height, 0, 0],
-          [width, height, 0, 1],
-          o.seed,
-          true,
-          false,
-          gpu.layout!,
-          this.#snapshot,
-        )
-      )
-        return;
-      const pass = c.encoder.beginComputePass();
-      pass.setPipeline(gpu.preview!);
-      pass.setBindGroup(0, view.traceGroup!);
-      pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
-      pass.end();
+      if (!this.#traceViewport(gpu, view, c, gpu.preview!, width, height, 0, 1, o.seed, false)) return;
       this.#samples = 1;
     } else if (!this.#capturing && this.#samples < o.maxSamples) {
       const count = Math.min(
@@ -1537,27 +1608,22 @@ export class VoxelPathTracer implements EnginePlugin {
         o.maxSamples - this.#samples,
       );
       if (
-        !this.#writeFrame(
-          device,
-          view.frame,
-          c.camera,
-          [width, height, 0, 0],
-          [width, height, this.#samples, count],
+        !this.#traceViewport(
+          gpu,
+          view,
+          c,
+          (this.#tablesNeeded() ? gpu.tableKernels : gpu.pipelines)!.trace,
+          width,
+          height,
+          this.#samples,
+          count,
           // With the denoiser's history every camera draws its own sample sequence (the history averages frames, which
           // must not repeat one sequence); a camera's sequence stays the same, so equal inputs still give equal images.
           o.denoise !== false ? (o.seed ^ cameraHash(c.camera.matrix)) >>> 0 : o.seed,
-          true,
           view.caustics !== undefined,
-          gpu.layout!,
-          this.#snapshot,
         )
       )
         return;
-      const pass = c.encoder.beginComputePass();
-      pass.setPipeline((this.#tablesNeeded() ? gpu.tableKernels : gpu.pipelines)!.trace);
-      pass.setBindGroup(0, view.traceGroup!);
-      pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
-      pass.end();
       this.#samples += count;
       const now = performance.now();
       if (this.#lastTrace) {

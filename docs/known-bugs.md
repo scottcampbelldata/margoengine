@@ -132,6 +132,26 @@ does not own. Each entry says exactly what is needed to close it.
   checkout that holds the commits; or retire the nine pinned runs as HISTORICAL with that reason, keeping their
   `--current` guarantees.
 
+### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
+
+- **What:** on 2026-10-27 the Windows System log shows five `nvlddmkm` event 153 entries ("Error occurred on GPUID:
+  100") at 07:42:55, 08:18:47, 08:58:27, 09:37:03 and 09:53:29, while two or three `check:merge` runs shared the GPU.
+  Each one took the WebGPU device of one browser page: a visual view (`dof-phone`, `texture-formats-phone`) or a
+  browser suite then waited out its ready timeout (120 s, 30 s). No Display 4101 or LiveKernelEvent entry was logged.
+- **Repro:** not yet. Four of the five fell while some run's `voxel-pathtracer test:gpu` was going (each at a different
+  case), the first while three visual checks ran and probably no path tracer. Under an exclusive GPU lock the path
+  tracer suite alone (10:13) and beside `visual:check` and `voxel test:gpu:slow-compile` (10:35) gave no reset, and
+  neither did three later shared runs of it. Its longest submission was 200 ms (native4k), 23 ms in denoise.
+- **Cause: open.** Not a single long dispatch of ours on this GPU (none is near the 2 s watchdog). Every page that lost
+  its device was a short one, and the long path tracer run beside it survived each time.
+- **What is done:** a page whose device is lost (any reason but `destroy()`) now fails its next wait at once with a
+  message naming the loss and the GPU reset (`scripts/support/device-loss.js`, in `openBrowser` and every visual view),
+  so a reset costs one clear failure, not a timeout. The path tracer viewport no longer traces a frame in one dispatch:
+  8.3 million paths at 4K, 100 million at 64 samples a frame on a 1440 x 1100 canvas, which is past the watchdog on a
+  slower GPU; every trace dispatch now carries at most 2^20 paths (`packages/voxel-pathtracer/src/dispatch.ts`).
+- **Needed to close:** what runs at the next reset (process list and GPU lock holders at the moment of the event), then
+  the cause fixed where it lives, or shown to be the driver and reported.
+
 ### 4x MSAA blending is not repeatable (RTX A6000 under CPU load, and Intel Arc 140V)
 
 - **What:** the voxel GPU check (`packages/voxel/tests/render-browser-check.mjs`, run by `check:merge`) fails now and
