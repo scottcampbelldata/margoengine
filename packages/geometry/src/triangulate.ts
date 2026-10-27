@@ -26,6 +26,47 @@ import type { MutableVec2 } from './math.js';
 const orient = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number): number =>
   (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
 
+const hashFloat = new Float64Array(1),
+  hashWords = new Uint32Array(hashFloat.buffer);
+/** Hash step for one coordinate: 0 and -0 alike, every NaN alike (as their decimal strings would be). */
+function mix(h: number, v: number): number {
+  if (v !== v) return Math.imul(h ^ 0x7ff80000, 0x01000193);
+  hashFloat[0] = v + 0;
+  return Math.imul(Math.imul(h ^ hashWords[0], 0x01000193) ^ hashWords[1], 0x01000193);
+}
+const sameValue = (a: number, b: number) => a === b || (a !== a && b !== b);
+
+/**
+ * Lists of node ids grouped by exact coordinates (2 or 4 numbers), in insertion order: the grouping a Map keyed by
+ * `${x} ${y}` strings gives (0 and -0 together, every NaN together), without printing numbers to strings.
+ */
+class CoordinateGroups {
+  private readonly buckets = new Map<number, { key: number[]; ids: number[] }[]>();
+  private hash(a: number, b: number, c: number, d: number): number {
+    return mix(mix(mix(mix(0x811c9dc5, a), b), c), d) >>> 0;
+  }
+  private group(a: number, b: number, c: number, d: number, create: boolean): number[] | undefined {
+    const h = this.hash(a, b, c, d);
+    let bucket = this.buckets.get(h);
+    if (bucket)
+      for (const g of bucket) {
+        const k = g.key;
+        if (sameValue(k[0], a) && sameValue(k[1], b) && sameValue(k[2], c) && sameValue(k[3], d)) return g.ids;
+      }
+    if (!create) return undefined;
+    if (!bucket) this.buckets.set(h, (bucket = []));
+    const ids: number[] = [];
+    bucket.push({ key: [a, b, c, d], ids });
+    return ids;
+  }
+  add(id: number, a: number, b: number, c = 0, d = 0): void {
+    this.group(a, b, c, d, true)!.push(id);
+  }
+  get(a: number, b: number, c = 0, d = 0): readonly number[] | undefined {
+    return this.group(a, b, c, d, false);
+  }
+}
+
 /** Edge tests the fallback searches (hole bridging by brute force, diagonal splits) may spend per call. */
 const SEARCH_BUDGET = 2e7;
 
@@ -714,12 +755,12 @@ function bridgeClear(nodes: Nodes, m: number, p: number, rings: readonly number[
  * fits inside the region wedge of one boundary copy of that vertex (and the boundary's edges stay outside the hole).
  * Bridging such a hole elsewhere would leave its copy of the shared vertex claiming the wedges of its neighbours.
  */
-function joinAtPinch(nodes: Nodes, at: Map<string, number[]>, merged: Uint8Array, hole: number): boolean {
+function joinAtPinch(nodes: Nodes, at: CoordinateGroups, merged: Uint8Array, hole: number): boolean {
   const X = nodes.x,
     Y = nodes.y;
   let h = hole;
   do {
-    for (const c of at.get(`${X[h]} ${Y[h]}`) ?? []) {
+    for (const c of at.get(X[h], Y[h]) ?? []) {
       if (!merged[c]) continue;
       const hp = nodes.prev[h],
         hn = nodes.next[h],
@@ -857,14 +898,9 @@ function joinHoles(ctx: { nodes: Nodes; budget: number }, outer: number, holes: 
     Y = nodes.y;
   holes.sort((a, b) => X[b.right] - X[a.right] || a.start - b.start);
   // Nodes by position, and which of them are already on the boundary, for joins at shared vertices.
-  const at = new Map<string, number[]>(),
+  const at = new CoordinateGroups(),
     merged = new Uint8Array(nodes.size + 2 * holes.length),
-    place = (i: number) => {
-      const k = `${X[i]} ${Y[i]}`,
-        list = at.get(k);
-      if (list) list.push(i);
-      else at.set(k, [i]);
-    },
+    place = (i: number) => at.add(i, X[i], Y[i]),
     absorb = (start: number) => {
       let i = start;
       do {
@@ -1145,24 +1181,21 @@ function splitTouchingEdges(ctx: Context, rings: readonly number[]): void {
 function cancelSharedEdges(nodes: Nodes, rings: readonly number[]): number[] {
   const X = nodes.x,
     Y = nodes.y,
-    key = (i: number, j: number) => `${X[i]} ${Y[i]} ${X[j]} ${Y[j]}`,
-    edges = new Map<string, number[]>(),
+    edges = new CoordinateGroups(),
     all: number[] = [];
   for (const start of rings) {
     let e = start;
     do {
       all.push(e);
-      const k = key(e, nodes.next[e]),
-        list = edges.get(k);
-      if (list) list.push(e);
-      else edges.set(k, [e]);
-      e = nodes.next[e];
+      const n = nodes.next[e];
+      edges.add(e, X[e], Y[e], X[n], Y[n]);
+      e = n;
     } while (e !== start);
   }
   for (const e of all) {
     if (!nodes.live[e]) continue;
     const en = nodes.next[e],
-      list = edges.get(key(en, e));
+      list = edges.get(X[en], Y[en], X[e], Y[e]);
     if (!list) continue;
     const f = list.find((c) => nodes.live[c] && c !== en && nodes.next[c] !== e && nodes.same(nodes.next[c], e));
     if (f === undefined) continue;

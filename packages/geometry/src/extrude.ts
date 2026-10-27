@@ -179,19 +179,39 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
   const layerCount = path ? steps + 1 : layers.length;
 
   const list: readonly Shape[] = Array.isArray(shapes) ? shapes : [shapes as Shape],
-    positions: number[] = [],
-    normals: number[] = [],
-    uvs: number[] = [],
     groups: GeometryGroup[] = [];
 
-  /** Appends one triangle with its flat normal. */
+  // Triangulate every shape first, so the output arrays are allocated once at their final size (3 vertices per
+  // triangle: two caps of the fill, two triangles per ring edge per band between layers).
+  const fills = list.map((shape) => {
+    const extracted = shape.extractPoints(curveSegments);
+    orientRings(extracted.shape, extracted.holes);
+    return triangulateShape(
+      mergeOverlappingPoints(extracted.shape),
+      extracted.holes.map((h) => mergeOverlappingPoints(h)),
+    );
+  });
+  let vertexCount = 0;
+  for (const fill of fills) {
+    vertexCount += 2 * fill.indices.length;
+    for (const ring of [fill.contour, ...fill.holes]) vertexCount += 6 * ring.length * (layerCount - 1);
+  }
+  const positions = new Float32Array(vertexCount * 3),
+    normals = new Float32Array(vertexCount * 3),
+    uvs = new Float32Array(vertexCount * 2);
+  let vertex = 0;
+
+  /** Writes one triangle (corners a, b, c with UVs (ua, va), (ub, vb), (uc, vc)) with its flat normal. */
   const triangle = (
     a: MutableVec3,
     b: MutableVec3,
     c: MutableVec3,
-    ua: MutableVec2,
-    ub: MutableVec2,
-    uc: MutableVec2,
+    ua: number,
+    va: number,
+    ub: number,
+    vb: number,
+    uc: number,
+    vc: number,
   ) => {
     const ux = b[0] - a[0],
       uy = b[1] - a[1],
@@ -208,18 +228,32 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
       ny /= length;
       nz /= length;
     } else nx = ny = nz = 0;
-    positions.push(...a, ...b, ...c);
-    for (let k = 0; k < 3; k++) normals.push(nx, ny, nz);
-    uvs.push(...ua, ...ub, ...uc);
+    const p = vertex * 3,
+      t = vertex * 2;
+    positions[p] = a[0];
+    positions[p + 1] = a[1];
+    positions[p + 2] = a[2];
+    positions[p + 3] = b[0];
+    positions[p + 4] = b[1];
+    positions[p + 5] = b[2];
+    positions[p + 6] = c[0];
+    positions[p + 7] = c[1];
+    positions[p + 8] = c[2];
+    for (let k = 0; k < 9; k += 3) {
+      normals[p + k] = nx;
+      normals[p + k + 1] = ny;
+      normals[p + k + 2] = nz;
+    }
+    uvs[t] = ua;
+    uvs[t + 1] = va;
+    uvs[t + 2] = ub;
+    uvs[t + 3] = vb;
+    uvs[t + 4] = uc;
+    uvs[t + 5] = vc;
+    vertex += 3;
   };
 
-  for (const shape of list) {
-    const extracted = shape.extractPoints(curveSegments);
-    orientRings(extracted.shape, extracted.holes);
-    const fill = triangulateShape(
-      mergeOverlappingPoints(extracted.shape),
-      extracted.holes.map((h) => mergeOverlappingPoints(h)),
-    );
+  for (const fill of fills) {
     const rings = [fill.contour, ...fill.holes],
       flat = rings.flat(),
       directions = rings.flatMap(bevelDirections);
@@ -245,23 +279,22 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
     }
 
     // Caps: front (first layer) reversed to face -z, back (last layer) as triangulated, facing +z.
-    const capStart = positions.length / 3,
+    const capStart = vertex,
       front = grid[0],
-      back = grid[layerCount - 1],
-      xy = (p: MutableVec3): MutableVec2 => [p[0], p[1]];
+      back = grid[layerCount - 1];
     for (let t = 0; t < fill.indices.length; t += 3) {
       const a = front[fill.indices[t]],
         b = front[fill.indices[t + 1]],
         c = front[fill.indices[t + 2]];
-      triangle(a, c, b, xy(a), xy(c), xy(b));
+      triangle(a, c, b, a[0], a[1], c[0], c[1], b[0], b[1]);
     }
     for (let t = 0; t < fill.indices.length; t += 3) {
       const a = back[fill.indices[t]],
         b = back[fill.indices[t + 1]],
         c = back[fill.indices[t + 2]];
-      triangle(a, b, c, xy(a), xy(b), xy(c));
+      triangle(a, b, c, a[0], a[1], b[0], b[1], c[0], c[1]);
     }
-    const wallStart = positions.length / 3;
+    const wallStart = vertex;
     groups.push({ start: capStart, count: wallStart - capStart, materialIndex: 0 });
 
     // Walls: per ring edge and per band between layers, a quad wound outward (outward is left of travel).
@@ -279,17 +312,17 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
             B = grid[l][j],
             C = grid[l + 1][j],
             D = grid[l + 1][i];
-          triangle(A, D, B, [u, v0], [u, v1], [u1, v0]);
-          triangle(B, D, C, [u1, v0], [u, v1], [u1, v1]);
+          triangle(A, D, B, u, v0, u, v1, u1, v0);
+          triangle(B, D, C, u1, v0, u, v1, u1, v1);
         }
         u = u1;
       }
       first += ring.length;
     }
-    groups.push({ start: wallStart, count: positions.length / 3 - wallStart, materialIndex: 1 });
+    groups.push({ start: wallStart, count: vertex - wallStart, materialIndex: 1 });
   }
 
-  const data = geometryData(positions, normals, uvs, [], groups);
-  data.indices = sequentialIndices(positions.length / 3);
+  const data: GeometryData = { positions, normals, uvs, indices: sequentialIndices(vertex) };
+  if (groups.length) data.groups = groups;
   return data;
 }

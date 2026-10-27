@@ -373,3 +373,28 @@ test('ring winding does not change the solid', () => {
   near(a.volume, b.volume, 1e-9, 'volume');
   near(a.area, b.area, 1e-9, 'area');
 });
+
+test('extrudeGeometry writes its output arrays in place (no per-triangle pushes; p-text spent a fifth of its time there)', () => {
+  // A 2,000-corner ring over 50 steps: 200,000 wall triangles. Growing JS arrays by push, then copying them into typed
+  // arrays, called push five times per triangle; the arrays are now sized up front and written by index.
+  const shape = new Shape();
+  for (let k = 0; k < 2000; k++) {
+    const a = (k / 2000) * 2 * Math.PI;
+    shape[k ? 'lineTo' : 'moveTo'](Math.cos(a), -Math.sin(a));
+  }
+  const push = Array.prototype.push;
+  let calls = 0;
+  Array.prototype.push = function (...items) {
+    calls++;
+    return push.apply(this, items);
+  };
+  let out;
+  try {
+    out = extrudeGeometry(shape, { depth: 1, steps: 50, bevelEnabled: false });
+  } finally {
+    Array.prototype.push = push;
+  }
+  const wallTriangles = 2000 * 50 * 2;
+  assert.equal(out.indices.length / 3, wallTriangles + 2 * (2000 - 2));
+  assert.ok(calls < wallTriangles, `${calls} pushes for ${wallTriangles} wall triangles`);
+});

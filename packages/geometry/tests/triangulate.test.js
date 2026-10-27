@@ -343,3 +343,15 @@ test('a 100k-point circle and a 65,536-gon cut as fast as a noisy 100k ring (no 
     );
   }
 });
+
+test('coordinates group by value when rings share sides or corners: -0 meets 0 as the same point', () => {
+  // Shared sides and pinch corners are found by exact coordinates (no strings are printed for them); -0 and 0 must
+  // still be one point, so the hole on the outer side x = 0 becomes a notch whatever the sign of its zeros.
+  const plain = [0, 0, 4, 0, 4, 4, 0, 4, 0, 1, 1, 1, 1, 3, 0, 3, 2, 0, 3, 1, 2, 2],
+    signed = plain.map((v, i) => (v === 0 && i >= 8 ? -0 : v)),
+    holes = [4, 8];
+  const a = triangulate(plain, holes),
+    b = triangulate(signed, holes);
+  assert.deepEqual(b, a);
+  relClose(measure(plain, a).area, 16 - 2 - 1, 1e-12, 'notch and side hole');
+});

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3525910,
+  "total": 3528659,
   "history": [
     {
       "date": "2026-10-24",
@@ -584,6 +584,12 @@
       "commit": "df630879",
       "reason": "shadows: the PCSS blocker search now spans to each cascade's nearest caster (a compute reduction of the map, its WGSL and dispatch, +277 B gzip); fixes the speckled soft shadows of the animation guide (known bug closed 2026-10-27)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "46b4df25",
+      "reason": "item 47 speed: extrude writes presized arrays and triangulate groups coordinates without strings (p-text); gltf-pro decodes up to 8 images at once (p-gltf-parse)",
+      "grew": 3
     }
   ],
   "items": {
@@ -688,14 +694,14 @@
     "@margoengine/fsm": 1131,
     "@margoengine/geometry": 20731,
     "@margoengine/geometry/extras": 5843,
-    "@margoengine/geometry/extrude": 8186,
+    "@margoengine/geometry/extrude": 8562,
     "@margoengine/geometry/primitives": 4058,
     "@margoengine/geometry/shapes": 3840,
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 5406,
     "@margoengine/gltf": 5976,
     "@margoengine/gltf-pro": 55036,
-    "@margoengine/gltf-pro dist/workers/gltf.js": 20085,
+    "@margoengine/gltf-pro dist/workers/gltf.js": 20707,
     "@margoengine/gltf-pro dist/workers/progressive.js": 14944,
     "@margoengine/gltf-pro/asset": 5501,
     "@margoengine/gltf-pro/coordinates": 755,
@@ -704,7 +710,7 @@
     "@margoengine/gltf-pro/prepare": 17019,
     "@margoengine/gltf-pro/progressive": 61641,
     "@margoengine/gltf-pro/scene": 1471,
-    "@margoengine/gltf-pro/worker": 55295,
+    "@margoengine/gltf-pro/worker": 57046,
     "@margoengine/html": 5013,
     "@margoengine/ifc": 2819,
     "@margoengine/ifc dist/workers/ifc.js": 3443,
