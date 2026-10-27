@@ -9,7 +9,6 @@ import { ArcballControls, ArcballProjection, ControlEvent, MapControls, Navigati
 import { Camera, EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, RenderView, Vec3 } from "@margoengine/core";
 import { DOF, DOFOptions } from "@margoengine/dof";
 import { AmbientLight, Fog, FogOptions, HemisphereLight } from "@margoengine/environment";
-import { "C:/Development/Projects/margoengine/.claude/worktrees/agent-a2ec0afa729e114bd/packages/geometry/dist/index" } from "@margoengine/geometry"; // not exported by any entry of that package
 import { SectionOptions, SectionPlanes } from "@margoengine/machinery";
 import { Material, MeshGeometry, TransmissionOptions } from "@margoengine/materials";
 import { BatchedMesh, BatchedMeshOptions } from "@margoengine/materials/batched";
@@ -27,6 +26,7 @@ import { VoxelLightingOptions } from "@margoengine/voxel/light";
 import { BlockTextures, VoxelRenderer, VoxelRendererOptions } from "@margoengine/voxel/render";
 import { XR } from "@margoengine/xr";
 import { CSSProperties, ReactNode, RefObject } from "react";
+import * as GeometryModule from "@margoengine/geometry";
 
 export function Afterimage({ onReady, onError, ...options }: AfterimageProps): null;
 

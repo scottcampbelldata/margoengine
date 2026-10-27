@@ -315,7 +315,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-83 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+84 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -421,7 +421,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/selection`](packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
 | [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |
 
-### Simulation and games (6)
+### Simulation and games (7)
 
 | Package | What it is |
 | --- | --- |
@@ -429,6 +429,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/navmesh`](packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build). |
 | [`@margoengine/ecs`](packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |
 | [`@margoengine/fsm`](packages/fsm/README.md) | Hierarchical state transitions with cross-fade progress. |
+| [`@margoengine/behavior`](packages/behavior/README.md) | Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and flocking behaviours. |
 | [`@margoengine/net`](packages/net/README.md) | Hermite and quaternion snapshot interpolation with bounded prediction. |
 | [`@margoengine/voxel-net`](packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
@@ -7121,6 +7122,91 @@ State hooks receive context; update hooks also receive delta seconds. Guards can
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/fsm
+
+=== @margoengine/behavior (packages/behavior/README.md) ===
+
+# @margoengine/behavior
+
+Import `margoengine/behavior` from the `margoengine` package, or `@margoengine/behavior` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+Game AI for agents: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and
+flocking behaviours. No rendering, no globals, nothing runs on import; it works the same in the browser, a worker or
+Node. For states with cross-fades use `@margoengine/fsm`; for walking on a navigation mesh with ORCA avoidance use
+`@margoengine/navmesh`'s `Crowd`. Both work with this package (below).
+
+## Behaviour trees
+
+```ts
+import { BehaviorTree, action, blackboardKey, condition, cooldown, reactiveSelector, sequence, wait } from 'margoengine/behavior';
+
+const enemyNear = blackboardKey('enemyNear', false);
+const tree = new BehaviorTree(
+  reactiveSelector(
+    sequence(condition('enemyNear'), cooldown(1, action('attack'))),
+    sequence(action('walkToNextPoint'), wait(2)),
+  ),
+  {
+    seed: 42,
+    handlers: {
+      conditions: { enemyNear: (tick) => tick.blackboard.get(enemyNear) },
+      actions: {
+        attack: () => 'success',
+        // An async action is a task: it runs over several ticks, and its signal aborts when the branch is halted.
+        walkToNextPoint: async (tick) => {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          return !tick.signal.aborted;
+        },
+      },
+    },
+  },
+);
+tree.blackboard.set(enemyNear, true);
+const status = tree.tick(1 / 60); // 'success' | 'failure' | 'running'
+```
+
+Call `tick(delta)` once per frame or fixed step. Each tick walks the tree from the root, depth first; after the root
+finishes, the next tick starts it again. Nodes:
+
+| Node | Builder | Behaviour |
+| --- | --- | --- |
+| sequence | `sequence(...)`, `reactiveSequence(...)` | children in order until one fails |
+| selector | `selector(...)`, `reactiveSelector(...)` | children in order until one succeeds |
+| random selector | `randomSelector(children, weights?)` | a selector whose order is drawn from the seeded stream (by weight) each time it starts |
+| parallel | `parallel(children, {success, failure})` | ticks every child; `'all'`, `'any'` or a count (defaults `success: 'all'`, `failure: 'any'`) |
+| utility | `utility([{score, child}], {inertia, threshold})` | utility-AI selector: runs the best-scoring option each tick (ties go to the first) |
+| inverter | `inverter(child)` | flips success and failure |
+| repeater | `repeater(child, {count, until})` | runs the child again, one run per tick, `count` times (default forever) or until it returns `until` |
+| cooldown | `cooldown(seconds, child)` | after the child finishes, fails without running it for `seconds` |
+| guard | `guard(condition, child)` | checks a condition every tick and runs the child only while it holds |
+| timeout | `timeout(seconds, child)` | fails, halting the child, when it runs longer than `seconds` |
+| condition | `condition(name)` | a named condition handler: true is success |
+| action | `action(name)` | a named action handler, sync or async |
+| wait | `wait(seconds)` | running for `seconds`, then success |
+
+Plain sequences and selectors have memory: they resume at the child that was running. Reactive ones re-check the
+earlier children every tick and halt the running one when an earlier child decides (the usual "abort lower priority").
+Halting a node aborts the `signal` of every action under it, so `fetch`, timers and loaders stop with the branch.
+
+Handlers receive a `tick` with `blackboard`, `context` (the `context` option: your agent, entity id or world),
+`delta`, `time`, `random` and `signal`. Actions return `'success'`, `'failure'`, `'running'`, a boolean, nothing
+(success) or a promise of one of these. A rejected promise is not swallowed: the next `tick` throws `MargoError`
+`'failed'` with the error as its `cause`; return `'failure'` for an expected failure.
+
+Deterministic: time is the sum of the deltas you pass (durations count from the tick a node starts on), and all
+randomness comes from one mulberry32 stream seeded by `seed` (default 0). The same description, seed, handlers and
+deltas give the same statuses and the same trace on every run and every machine. Promise-based actions settle when
+their work settles, so a replay that must match exactly should resolve them from your own simulation.
+
+### Saving, loading and validating trees
+
+Every node is plain JSON (leaves name their handlers), so a tree is saved with `JSON.stringify` and loaded with
+`parseTree`:
+
+```ts
+import { BehaviorTree, action, parseTree, sequence, treeDocument, validateTree, wait } from 'margoengine/behavior';
+```
+
+[README continues: https://margoengine.com/llms/packages/behavior.md]
 
 === @margoengine/net (packages/net/README.md) ===
 

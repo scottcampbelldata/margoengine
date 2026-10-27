@@ -5,10 +5,10 @@
 ```ts
 import { ControlEvent, NavigationProfile, OrbitControls, PROFILES, PointerLockControls, TransformControls, TransformControlsOptions } from "@margoengine/controls";
 import { Mesh, Vec3 } from "@margoengine/core";
-import { "C:/Development/Projects/margoengine/.claude/worktrees/agent-a2ec0afa729e114bd/packages/geometry/dist/index" } from "@margoengine/geometry"; // not exported by any entry of that package
 import { Sky, SkyOptions } from "@margoengine/sky";
 import { Text, TextOptions } from "@margoengine/text";
 import { CSSProperties, ReactNode, RefObject } from "react";
+import * as GeometryModule from "@margoengine/geometry";
 
 export const Box: import("react").ForwardRefExoticComponent<BoxProps & import("react").RefAttributes<MeshHandle>>;
 
