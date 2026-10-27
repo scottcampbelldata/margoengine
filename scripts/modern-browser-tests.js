@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { preview } from 'vite';
 import { listenWhenFree, openBrowser } from './browser.js';
 import { serverUrl } from './support/server-url.mjs';
+import { closeAll } from './support/shutdown.mjs';
 import { decodePNG } from '../tests/support/png.js';
 const context = await openBrowser({ startPath: '/tests/modern.html' }),
   { page, hardware } = context,
@@ -322,7 +323,7 @@ try {
   await writeFile('test-results/modern-browser.json', JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 } finally {
-  next?.kill();
-  await new Promise((resolve) => (vite ? vite.httpServer.close(resolve) : resolve()));
-  await context.close();
+  // The browser goes first: it holds keep-alive connections to the servers, and closing a server before it never
+  // finishes (bug 30). `context.close()` also closes the dev server `openBrowser` started.
+  await closeAll({ context, servers: vite ? [vite] : [], children: next ? [next] : [] });
 }
