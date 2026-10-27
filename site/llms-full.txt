@@ -7199,9 +7199,11 @@ The original parity commands retain existing behavior: extrusion acts along the 
 
 Tests import the built public package. Run `npm test --workspace @margoengine/mesh-edit` from the engine repository.
 
-## Pixel painting and UVs
+## Modeling: edge bevel, loop slide, dissolve, weld and bridge
 
-`meshUVTopology(mesh)` identifies islands through opposite two-face geometric edges whose UVs match exactly at both endpoints. Point contacts, disconnected overlapping atlas regions, nonmanifold edges and inconsistent winding do not connect islands. It returns stable face/corner references and explicit seam reasons. `meshSelectionUVCorners` resolves corner, face, island-seed or whole-mesh intent to deduplicated source-order corners; stale identities reject.
+Bevel selected edges, cut a loop and slide it, dissolve, merge by distance and bridge two open loops, from the
+`margoengine/mesh-edit/modeling` entry (`@margoengine/mesh-edit/modeling`), so apps that only paint or move components
+never load it. Edge IDs are `"low:high"` vertex pairs (see `polygonMeshEdges`):
 
 [README continues: https://margoengine.com/llms/packages/mesh-edit.md]
 

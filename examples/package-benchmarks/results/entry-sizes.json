@@ -1,5 +1,5 @@
 {
-  "commit": "a90fb753",
+  "commit": "d1c5506d",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -844,8 +844,12 @@
     },
     "@margoengine/mesh-edit": {
       ".": {
-        "raw": 91829,
-        "gzip": 29555
+        "raw": 91833,
+        "gzip": 29560
+      },
+      "./modeling": {
+        "raw": 35549,
+        "gzip": 11739
       }
     },
     "@margoengine/navmesh": {
