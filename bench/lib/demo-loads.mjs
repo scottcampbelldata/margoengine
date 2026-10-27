@@ -5,7 +5,7 @@
 import { cp, mkdtemp, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { preview } from 'vite';
 import { installDemoLoadAudit } from '../../scripts/demo-load-audit.js';
 import { root } from './env.mjs';
@@ -78,8 +78,8 @@ export async function serveSite() {
 
 /** One cold load of `path` under `profile`: first frame, ready and full-scene times (ms from navigation). */
 export async function loadDemo(origin, path, profile) {
-  const browser = await chromium.launch({
-    channel: process.env.BROWSER_CHANNEL ?? profile.channel,
+  const browser = await launchBrowser({
+    name: process.env.MARGO_BROWSER ?? process.env.BROWSER_CHANNEL ?? profile.channel,
     headless: profile.headless,
     args: profile.headless
       ? []

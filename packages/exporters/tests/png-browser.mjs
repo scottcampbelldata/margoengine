@@ -3,7 +3,7 @@
 // Run after building the package: node packages/exporters/tests/png-browser.mjs
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 
 const server = await createServer({
@@ -15,8 +15,7 @@ const server = await createServer({
 await server.listen();
 let browser;
 try {
-  const channel = process.env.BROWSER_CHANNEL ?? 'msedge';
-  browser = await chromium.launch({ headless: true, channel: channel === 'bundled' ? undefined : channel });
+  browser = await launchBrowser({ headless: true });
   const page = await browser.newPage();
   await page.goto(`${server.resolvedUrls.local[0]}package.json`);
   const result = await page.evaluate(async () => {

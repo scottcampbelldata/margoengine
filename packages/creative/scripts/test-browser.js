@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { build, createServer } from 'vite';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -22,14 +22,8 @@ const server = await createServer({
 await server.listen();
 let browser;
 try {
-  const channel = process.env.BROWSER_CHANNEL ?? 'msedge';
   const args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [];
-  try {
-    browser = await chromium.launch({ headless: true, channel: channel === 'bundled' ? undefined : channel, args });
-  } catch (error) {
-    if (channel !== 'msedge' || args.length || process.env.BROWSER_CHANNEL) throw error;
-    browser = await chromium.launch({ headless: true });
-  }
+  browser = await launchBrowser({ headless: true, args });
   const page = await browser.newPage({ viewport: { width: 800, height: 600 }, deviceScaleFactor: 1 });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));

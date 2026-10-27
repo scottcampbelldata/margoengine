@@ -21,6 +21,7 @@ import {
 } from './lib/results.mjs';
 import { metricRecord } from './lib/stats.mjs';
 import { SUITES, loadSuite } from './suites/index.mjs';
+import { browserLabel } from '../scripts/lib/browser.mjs';
 
 const { values: o, positionals } = parseArgs({
   allowPositionals: true,
@@ -46,7 +47,7 @@ const { values: o, positionals } = parseArgs({
     'quiet-hold': { type: 'string', default: '20' },
     'gpu-max': { type: 'string', default: '20' },
     timeout: { type: 'string', default: '1800' },
-    browser: { type: 'string', default: process.env.BROWSER_CHANNEL ?? 'msedge' },
+    browser: { type: 'string', default: browserLabel() },
     port: { type: 'string', default: '0' },
     'no-fail': { type: 'boolean' },
     'require-valid': { type: 'boolean' },

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { request } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../scripts/lib/browser.mjs';
 import { server } from '../scripts/serve-catalog.js';
 
 let url;
@@ -79,11 +79,7 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
   timeout: 15 * 60_000,
 }, async () => {
   let browser;
-  try {
-    browser = await chromium.launch({ channel: 'msedge', headless: true });
-  } catch {
-    browser = await chromium.launch({ headless: true });
-  }
+  browser = await launchBrowser({ headless: true });
   try {
     const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
     context.setDefaultTimeout(0);

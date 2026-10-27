@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { build } from 'vite';
 import { SCENES, STANDARD, caseId, sceneParams } from '../scenes/catalog.js';
 import { root } from './env.mjs';
@@ -128,12 +128,7 @@ const args = [
 export function browserSession({ channel, base, shots, log }) {
   let browser = null,
     hardware = null;
-  const launch = () =>
-    chromium.launch({ channel: channel === 'bundled' ? undefined : channel, headless: true, args }).catch((error) => {
-      if (channel !== 'msedge') throw error;
-      log('bench: msedge not found, using the bundled Chromium');
-      return chromium.launch({ headless: true, args });
-    });
+  const launch = () => launchBrowser({ name: channel, headless: true, args });
   return {
     get hardware() {
       return hardware;

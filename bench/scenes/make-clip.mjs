@@ -3,12 +3,10 @@
 // The content is ours, generated here; rerun this script to rebuild it. Usage: node bench/scenes/make-clip.mjs
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../../scripts/lib/browser.mjs';
 
 const out = resolve(import.meta.dirname, '../../examples/assets/parity-clip.webm');
-const browser = await chromium
-  .launch({ channel: 'msedge', headless: true })
-  .catch(() => chromium.launch({ headless: true }));
+const browser = await launchBrowser({ headless: true, needs: 'none' });
 const page = await browser.newPage();
 const base64 = await page.evaluate(async () => {
   const canvas = Object.assign(document.createElement('canvas'), { width: 1280, height: 720 }),

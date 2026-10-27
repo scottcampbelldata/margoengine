@@ -6,7 +6,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { server } from '../../scripts/serve-catalog.js';
 
 let url;
@@ -23,11 +23,7 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
   timeout: 15 * 60_000,
 }, async () => {
   let browser;
-  try {
-    browser = await chromium.launch({ channel: 'msedge', headless: true });
-  } catch {
-    browser = await chromium.launch({ headless: true });
-  }
+  browser = await launchBrowser({ headless: true });
   try {
     const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
     // No step has a deadline of its own (a loaded machine slows the browser by minutes); the test as a whole has one.

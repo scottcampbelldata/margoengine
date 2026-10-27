@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -18,19 +18,11 @@ let browser;
 const near = (a, b, tolerance, message) =>
   assert.ok(Math.abs(a - b) <= tolerance, `${message}: expected ${b} +/- ${tolerance}, got ${a}`);
 try {
-  const channel = process.env.BROWSER_CHANNEL ?? 'msedge';
   const args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [];
-  try {
-    browser = await chromium.launch({
-      headless: true,
-      channel: channel === 'bundled' ? undefined : channel,
-      executablePath: process.env.BROWSER_EXECUTABLE,
-      args,
-    });
-  } catch (error) {
-    if (channel !== 'msedge' || args.length || process.env.BROWSER_CHANNEL) throw error;
-    browser = await chromium.launch({ headless: true });
-  }
+  browser = await launchBrowser({
+    headless: true,
+    args,
+  });
   const page = await browser.newPage({ viewport: { width: 900, height: 500 }, deviceScaleFactor: 1 });
   const errors = [],
     checks = [],

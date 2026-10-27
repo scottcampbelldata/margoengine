@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { writeFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 import { listenWhenFree } from '../../../scripts/browser.js';
 const server = await createServer({
@@ -13,7 +13,7 @@ const server = await createServer({
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5341 });
-const browser = await chromium.launch({ channel: 'msedge', headless: true }),
+const browser = await launchBrowser({ headless: true }),
   page = await browser.newPage(),
   errors = [];
 const context = {

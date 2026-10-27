@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -17,8 +17,7 @@ const server = await createServer({
 await server.listen();
 let browser;
 try {
-  const channel = process.env.BROWSER_CHANNEL ?? 'msedge';
-  browser = await chromium.launch({ headless: true, channel: channel === 'bundled' ? undefined : channel });
+  browser = await launchBrowser({ headless: true });
   const page = await browser.newPage({ viewport: { width: 320, height: 240 }, deviceScaleFactor: 2 });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));

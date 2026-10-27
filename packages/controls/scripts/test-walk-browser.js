@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { chromium } from '@playwright/test';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 
 const root = fileURLToPath(new URL('..', import.meta.url)),
@@ -22,12 +22,9 @@ const url = `${server.resolvedUrls.local[0]}tests/walk.html`,
   report = { checks: [] };
 let browser;
 try {
-  const channel = process.env.BROWSER_CHANNEL ?? 'msedge',
-    args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [];
-  browser = await chromium.launch({
+  const args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [];
+  browser = await launchBrowser({
     headless: true,
-    channel: channel === 'bundled' ? undefined : channel,
-    executablePath: process.env.BROWSER_EXECUTABLE,
     args,
   });
   const errors = [];
