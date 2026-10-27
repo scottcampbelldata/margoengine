@@ -7,7 +7,7 @@ import { MargoError } from '@margoengine/math/errors';
  * duplicated or reordered, never delayed by an earlier lost message. A transport without an unreliable path (a
  * WebSocket) sends both kinds reliably.
  */
-export type Channel = 'reliable' | 'unreliable';
+export type Delivery = 'reliable' | 'unreliable';
 
 /** Close codes the netcode uses, in the WebSocket application range (4000 to 4999) plus 1000 for a normal close. */
 export const CloseCode = {
@@ -35,11 +35,11 @@ export interface Connection {
   /** False once either end closed. */
   readonly open: boolean;
   /** Sends one message; does nothing once closed. `channel` defaults to `'reliable'`. */
-  send(data: Uint8Array, channel?: Channel): void;
+  send(data: Uint8Array, channel?: Delivery): void;
   /** Closes both ends; the other end's `onclose` gets `code` and `reason`. Closing twice does nothing. */
   close(code?: number, reason?: string): void;
   /** Called for each message that arrives. */
-  onmessage: ((data: Uint8Array, channel: Channel) => void) | null;
+  onmessage: ((data: Uint8Array, channel: Delivery) => void) | null;
   /** Called once when the connection closes, from either end. */
   onclose: ((code: number, reason: string) => void) | null;
 }
@@ -57,7 +57,7 @@ export interface ConnectionMessage {
   /** The message bytes. */
   data: Uint8Array;
   /** The channel it came on. */
-  channel: Channel;
+  channel: Delivery;
 }
 
 /**

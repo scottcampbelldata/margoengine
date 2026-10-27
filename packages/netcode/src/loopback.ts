@@ -1,7 +1,7 @@
 // An in-memory network with a virtual clock and seeded, repeatable bad conditions: latency, jitter, loss,
 // duplication and reordering. Tests and demos drive it with `advance(ms)`; nothing happens between calls.
 import { createRandom } from '@margoengine/math/mathutils';
-import type { Channel, Connection, Listener } from './transport.js';
+import type { Delivery, Connection, Listener } from './transport.js';
 
 /** Conditions of one direction of a loopback link. Every value is checked when the network is made. */
 export interface LinkConditions {
@@ -139,6 +139,20 @@ export class LoopbackNetwork {
   }
 
   /**
+   * Two connected ends without a listener, for peer-to-peer sessions (one pair per two peers). `conditions` override
+   * the network's for this link (both directions).
+   * @throws RangeError for a condition out of range.
+   */
+  pair(conditions: LinkConditions = {}): [Connection, Connection] {
+    const conditionsOfLink = link(conditions, this.conditions),
+      a = new LoopbackEnd(this, conditionsOfLink),
+      b = new LoopbackEnd(this, conditionsOfLink);
+    a.peer = b;
+    b.peer = a;
+    return [a, b];
+  }
+
+  /**
    * Moves the clock forward by `ms` and delivers, in time order, every message due by then (and any message those
    * deliveries send that is also due).
    * @throws RangeError for a negative or non-finite `ms`.
@@ -184,7 +198,7 @@ export class LoopbackNetwork {
 
 class LoopbackEnd implements Connection {
   open = true;
-  onmessage: ((data: Uint8Array, channel: Channel) => void) | null = null;
+  onmessage: ((data: Uint8Array, channel: Delivery) => void) | null = null;
   onclose: ((code: number, reason: string) => void) | null = null;
   peer!: LoopbackEnd;
   /** The time the last reliable message arrives at the peer: reliable messages never overtake each other. */
@@ -194,7 +208,7 @@ class LoopbackEnd implements Connection {
     private readonly link: Link,
   ) {}
 
-  send(data: Uint8Array, channel: Channel = 'reliable'): void {
+  send(data: Uint8Array, channel: Delivery = 'reliable'): void {
     if (!this.open) return;
     if (!(data instanceof Uint8Array)) throw new TypeError('Loopback send needs a Uint8Array; pass the message bytes');
     const net = this.network,

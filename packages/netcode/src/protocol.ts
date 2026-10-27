@@ -3,7 +3,7 @@
 import { Reader, Writer } from './schema.js';
 
 /** Version of the envelope; a server closes connections that say another. */
-export const PROTOCOL_VERSION = 1;
+export const ENVELOPE_VERSION = 1;
 /** Most inputs one `inputs` message may carry. */
 export const MAX_INPUTS_PER_MESSAGE = 32;
 /** Most bytes of one encoded input. */

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3506085,
+  "total": 3510480,
   "history": [
     {
       "date": "2026-10-24",
@@ -566,6 +566,12 @@
       "commit": "df630879",
       "reason": "Stage feature entries (2026-10-27): the optional-package loaders moved out of the Stage class into @margoengine/stage/gltf, /cad, /sky, /particles, /effects, /environment, /shadows; the stage root shrank",
       "grew": 7
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "0fdd1421",
+      "reason": "netcode landing 2: LagCompensation (server-side rewind), LoopbackNetwork.pair, GameClient.viewTick in the root entry; new ./rollback entry (RollbackSession) (item 30)",
+      "grew": 2
     }
   ],
   "items": {
@@ -764,7 +770,8 @@
     "@margoengine/navmesh": 7228,
     "@margoengine/navmesh/build": 11794,
     "@margoengine/net": 1371,
-    "@margoengine/netcode": 12051,
+    "@margoengine/netcode": 12975,
+    "@margoengine/netcode/rollback": 3471,
     "@margoengine/oit": 3199,
     "@margoengine/physics": 16247,
     "@margoengine/points": 19649,

@@ -12,6 +12,7 @@ export const schema = defineSchema({
     Box: { x: coordinate, y: coordinate, vx: speed, vy: speed, owner: 'uint' },
     State: { boxes: { type: 'map', of: 'Box', maxSize: 256 } },
     Chat: { text: { type: 'string', maxLength: 64 } },
+    Shot: { tick: 'f64', x: 'f32', y: 'f32', dx: 'f32', dy: 'f32' },
   },
 });
 

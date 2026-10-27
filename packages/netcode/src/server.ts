@@ -2,8 +2,8 @@
 // server validates them, buffers them by tick, runs every tick once, and sends each client delta-compressed snapshots
 // against the newest one that client confirmed. Nothing a client says changes state except through validated input.
 import type { Game } from './game.js';
-import { decodeEnvelope, encodeEnvelope, PROTOCOL_VERSION, type Envelope } from './protocol.js';
-import { CloseCode, fault, type Channel, type Connection } from './transport.js';
+import { decodeEnvelope, encodeEnvelope, ENVELOPE_VERSION, type Envelope } from './protocol.js';
+import { CloseCode, fault, type Delivery, type Connection } from './transport.js';
 
 /** Limits on what one client may send. */
 export interface RateLimits {
@@ -204,7 +204,7 @@ export class GameServer<State, Input> {
     if (peer.playing) this.leaves.push(peer.player);
   }
 
-  private receive(peer: Peer<State, Input>, data: Uint8Array, _channel: Channel): void {
+  private receive(peer: Peer<State, Input>, data: Uint8Array, _channel: Delivery): void {
     if (!this.peers.has(peer)) return;
     const now = this.now();
     peer.tokens = Math.min(this.burst, peer.tokens + ((now - peer.refilled) * this.rate) / 1000);
@@ -235,7 +235,7 @@ export class GameServer<State, Input> {
     switch (message.kind) {
       case 'hello': {
         if (peer.player) return this.drop(peer, CloseCode.protocol, 'hello twice');
-        if (message.version !== PROTOCOL_VERSION || message.schema !== game.schema.hash)
+        if (message.version !== ENVELOPE_VERSION || message.schema !== game.schema.hash)
           return this.drop(peer, CloseCode.mismatch, 'protocol or schema differs; update the client');
         if (this.players.length + this.joins.length >= this.maxPlayers)
           return this.drop(peer, CloseCode.full, 'server full');

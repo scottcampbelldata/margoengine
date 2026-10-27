@@ -3,7 +3,7 @@
 // seen), and draws everything else interpolated between snapshots a little in the past.
 import { ClockSync } from './clock.js';
 import type { Game } from './game.js';
-import { decodeEnvelope, encodeEnvelope, MAX_INPUTS_PER_MESSAGE, PROTOCOL_VERSION } from './protocol.js';
+import { decodeEnvelope, encodeEnvelope, MAX_INPUTS_PER_MESSAGE, ENVELOPE_VERSION } from './protocol.js';
 import { CloseCode, fault, type Connection } from './transport.js';
 
 /** Options of {@link GameClient.join}. */
@@ -162,7 +162,7 @@ export class GameClient<State, Input> {
         client.ready = null;
         options.onclose?.(code, reason);
       };
-      connection.send(encodeEnvelope({ kind: 'hello', version: PROTOCOL_VERSION, schema: game.schema.hash }));
+      connection.send(encodeEnvelope({ kind: 'hello', version: ENVELOPE_VERSION, schema: game.schema.hash }));
     });
   }
 
@@ -185,6 +185,13 @@ export class GameClient<State, Input> {
   /** Whether the connection is open. */
   get open(): boolean {
     return !this.closed;
+  }
+  /**
+   * The fractional server tick that the last {@link GameClient.interpolated} call showed (NaN before the first): send
+   * it with a shot so the server can check the shot against that moment (`LagCompensation`).
+   */
+  get viewTick(): number {
+    return this.renderTick;
   }
 
   private ping(now: number): void {

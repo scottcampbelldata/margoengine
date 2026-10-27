@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CloseCode, encodeEnvelope, GameClient, LoopbackNetwork, PROTOCOL_VERSION } from '../dist/index.js';
+import { CloseCode, encodeEnvelope, GameClient, LoopbackNetwork, ENVELOPE_VERSION } from '../dist/index.js';
 import { arena, game, schema } from './arena.js';
 
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -122,9 +122,9 @@ test('the server closes clients that send garbage, flood, or speak another schem
   const early = open();
   early.send(encodeEnvelope({ kind: 'ping', time: 1 }));
   const other = open();
-  other.send(encodeEnvelope({ kind: 'hello', version: PROTOCOL_VERSION, schema: (schema.hash ^ 1) >>> 0 }));
+  other.send(encodeEnvelope({ kind: 'hello', version: ENVELOPE_VERSION, schema: (schema.hash ^ 1) >>> 0 }));
   const flood = open();
-  flood.send(encodeEnvelope({ kind: 'hello', version: PROTOCOL_VERSION, schema: schema.hash }));
+  flood.send(encodeEnvelope({ kind: 'hello', version: ENVELOPE_VERSION, schema: schema.hash }));
   for (let i = 0; i < 100; i++) flood.send(encodeEnvelope({ kind: 'ping', time: i }));
   const big = open();
   big.send(new Uint8Array(5000));
@@ -150,7 +150,7 @@ test('inputs out of their schema range close the client; validateInput drops wha
   const bad = world.network.connect();
   let code = 0;
   bad.onclose = (c) => (code = c);
-  bad.send(encodeEnvelope({ kind: 'hello', version: PROTOCOL_VERSION, schema: schema.hash }));
+  bad.send(encodeEnvelope({ kind: 'hello', version: ENVELOPE_VERSION, schema: schema.hash }));
   world.run(100);
   bad.send(encodeEnvelope({ kind: 'inputs', ack: 0, first: world.server.tick + 2, inputs: [new Uint8Array([1, 2])] }));
   world.run(100);

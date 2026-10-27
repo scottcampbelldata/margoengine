@@ -99,6 +99,79 @@ tick under 60 ms latency, 25 ms jitter, 10% loss, duplication and reordering; th
 all once joined; and an 8-client soak for 60 s of game time under loss and jitter in which every client stays joined
 and converges.
 
+## Rollback netcode (peer to peer)
+
+For deterministic games where every peer runs the whole simulation (fighting games, small co-op): `RollbackSession`
+(its own entry, `@margoengine/netcode/rollback`) uses the same `defineGame` definition. Each peer's input is used `inputDelay` frames after it is sampled (default 2),
+inputs of other players that have not arrived are predicted as their last known input, and when the real one arrives
+and differs, the session loads the state saved before that frame and simulates again to the present (at most
+`maxRollback` frames, default 8; past that it waits). Frames whose every input is known are final: `onconfirm(frame,
+checksum)` reports each, and peers exchange a checksum every `checksumEvery` confirmed frames (default 30) so a desync
+calls `ondesync`. A peer that runs ahead of the others waits a frame now and then (half the difference of the two
+sides' frame advantages), so no one rolls back all the time.
+
+```ts
+import { defineGame, defineSchema, LoopbackNetwork } from '@margoengine/netcode';
+import { RollbackSession } from '@margoengine/netcode/rollback';
+
+const schema = defineSchema({
+  types: {
+    Input: { x: { type: 'quantized', min: -1, max: 1, bits: 8 } },
+    Fighter: { x: 'f32' },
+    State: { fighters: { type: 'map', of: 'Fighter', maxSize: 4 } },
+  },
+} as const);
+const game = defineGame({
+  schema,
+  state: 'State',
+  input: 'Input',
+  tickRate: 60,
+  initial: () => ({ fighters: new Map() }),
+  join: (state, id) => void state.fighters.set(id, { x: id * 2 }),
+  step(state, inputs) {
+    for (const [id, input] of inputs) {
+      const fighter = state.fighters.get(id);
+      if (fighter) fighter.x += input.x * 0.1;
+    }
+  },
+});
+
+// Two peers over a simulated 40 ms link; in a game each peer is a different machine with a WebRTC data channel.
+const network = new LoopbackNetwork({ latency: 40, jitter: 10, seed: 2 });
+const [toTwo, toOne] = network.pair();
+const now = () => network.time;
+const one = new RollbackSession(game, { players: [1, 2], local: 1, peers: new Map([[2, toTwo]]), now, input: () => ({ x: 1 }) });
+const two = new RollbackSession(game, { players: [1, 2], local: 2, peers: new Map([[1, toOne]]), now, input: () => ({ x: -1 }) });
+for (let frame = 0; frame < 600; frame++) {
+  network.advance(1000 / 60);
+  one.update();
+  two.update();
+}
+console.log(one.confirmed, one.stats.rollbacks, one.state.fighters.get(1), two.state.fighters.get(1));
+```
+
+The test `tests/rollback.test.js` runs four peers for 20 s under 50 ms latency, 20 ms jitter and 10% loss and checks
+that every confirmed frame of every peer has the same checksum as the game run once offline with every real input.
+
+## Lag compensation (server-side rewind)
+
+`LagCompensation` keeps where every hit shape (circle or sphere) was at each of the last `history` ticks (default 32).
+Record the shapes after each server tick; when a shot arrives, check it against the shapes at the tick the shooter was
+looking at (`client.viewTick`, sent with the shot), blended between the recorded ticks around it. A client cannot rewind
+further than the history. Validate the rest of the shot on the server (that the origin is the shooter's position, the
+rate of fire), as for any input.
+
+```ts
+import { LagCompensation } from '@margoengine/netcode';
+
+const lag = new LagCompensation({ history: 32 });
+lag.record(100, [[7, { position: [0, 0], radius: 0.5 }]]);
+lag.record(101, [[7, { position: [2, 0], radius: 0.5 }]]);
+// A shooter that saw tick 100.5 aimed along +y from (1, -5): the target was at (1, 0) then.
+const hit = lag.raycast(100.5, [1, -5], [0, 1]);
+console.log(hit?.id, hit?.distance); // 7 4.5
+```
+
 ## Security
 
 - **The server trusts nothing but inputs.** Clients never send state; the server applies only decoded inputs, through
@@ -130,8 +203,14 @@ and converges.
 - `interpolated()` holds the newest snapshot when the next one is late; it does not extrapolate.
 - A client more than 8 ticks off its target jumps instead of slewing; a client that falls more than 4 x `history`
   ticks behind skips ticks rather than replaying them.
-- Coming in later landings of this package: rollback netcode, lag compensation, WebSocket and WebRTC transports, a
-  Node server runner, a room API, a TypeScript (and later Rust) code generator for the schema and the demo.
+- Rollback keeps `maxRollback + 2` saved states (encoded bytes) and resimulates at most `maxRollback` frames per
+  rollback; the cost of a rollback is that many calls of your `step`. Measured in the 4-peer test (50 ms latency,
+  20 ms jitter, 10% loss, 30 frames per second, input delay 2): 147 rollbacks in 581 frames, 185 frames resimulated,
+  never more than 3 at once. All peers must use the same `inputDelay`; a mismatch shows up as a desync.
+- Rollback sessions are a full mesh (each peer sends to every other), sensible up to about 8 players; there is no
+  spectator or relay mode yet. Lag compensation tests circles and spheres only (no capsules or boxes).
+- Coming in later landings of this package: WebSocket and WebRTC transports, a Node server runner, a room API, a
+  TypeScript (and later Rust) code generator for the schema and the demo.
 
 ## Wire format
 

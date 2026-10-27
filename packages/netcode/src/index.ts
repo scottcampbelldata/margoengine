@@ -8,12 +8,12 @@ export {
   quantize,
   type FieldType,
   type Infer,
-  type Interpolation,
+  type FieldInterpolation,
   type NormalizedField,
   type NormalizedSchema,
   type NumberKind,
   type ScalarKind,
-  type Schema,
+  type SchemaCodec,
   type SchemaDefinition,
   type SchemaShape,
   type StructDefinition,
@@ -24,7 +24,7 @@ export { defineGame, type Game, type GameDefinition } from './game.js';
 export {
   CloseCode,
   messages,
-  type Channel,
+  type Delivery,
   type Connection,
   type ConnectionMessage,
   type Listener,
@@ -36,8 +36,9 @@ export {
   encodeEnvelope,
   MAX_INPUT_BYTES,
   MAX_INPUTS_PER_MESSAGE,
-  PROTOCOL_VERSION,
+  ENVELOPE_VERSION,
   type Envelope,
 } from './protocol.js';
 export { GameServer, type GameServerOptions, type GameServerStats, type RateLimits } from './server.js';
 export { GameClient, type GameClientOptions, type GameClientStats } from './client.js';
+export { LagCompensation, type Hitbox, type RewindHit } from './lag.js';

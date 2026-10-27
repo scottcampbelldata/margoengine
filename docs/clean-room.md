@@ -630,6 +630,9 @@ engines (Colyseus, Photon, Mirror, GGPO, Rapier, Unity Netcode, Unreal and the l
 | Client prediction, reconciliation, entity interpolation | G. Gambetta, "Fast-Paced Multiplayer" parts I to IV; Y. Bernier, "Latency Compensating Methods in Client/Server In-game Protocol Design and Optimization", GDC 2001 |
 | Client running ahead by the one-way delay, input redundancy | T. Ford, "Overwatch Gameplay Architecture and Netcode", GDC 2017 |
 | Clock synchronisation | F. Cristian, "Probabilistic clock synchronization", Distributed Computing 3(3), 1989 (the smallest round trip bounds the offset) |
+| Rollback (input delay, prediction as the last input, save, load and resimulate, frame-advantage time sync, checksums) | T. Cannon, "Fight the Lag! The Trick Behind GGPO's Low-Latency Netcode", Game Developer magazine, September 2012; M. Stallone, "8 Frames in 16ms: Rollback Networking in Mortal Kombat and Injustice 2", GDC 2018 |
+| Lag compensation (server-side rewind to the shooter's view) | Y. Bernier, GDC 2001 (above) |
+| Ray against circle and sphere | The quadratic of \|o + s d - c\|² = r² (elementary geometry) |
 | Varints, zigzag | LEB128 as specified in DWARF 4 section 7.6; zigzag as described in the Protocol Buffers encoding documentation |
 | Schema hash | FNV-1a 32-bit as published by G. Fowler, L. C. Noll and K.-P. Vo |
 

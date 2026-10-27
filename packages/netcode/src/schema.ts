@@ -7,8 +7,8 @@ import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js'
 export type NumberKind = 'u8' | 'u16' | 'u32' | 'i8' | 'i16' | 'i32' | 'uint' | 'int' | 'f32' | 'f64';
 /** The kinds a field can name directly as a string. */
 export type ScalarKind = NumberKind | 'bool' | 'string' | 'bytes';
-/** How {@link Schema.interpolate} blends a number: straight line, shortest turn in radians, or no blend (step). */
-export type Interpolation = 'linear' | 'angle' | 'none';
+/** How {@link SchemaCodec.interpolate} blends a number: straight line, shortest turn in radians, or no blend (step). */
+export type FieldInterpolation = 'linear' | 'angle' | 'none';
 
 /**
  * One field's type: a {@link ScalarKind}, the name of another struct in the schema, or an object form:
@@ -28,13 +28,13 @@ export type Interpolation = 'linear' | 'angle' | 'none';
 export type FieldType =
   | ScalarKind
   | (string & {})
-  | { readonly type: NumberKind; readonly interpolate?: Interpolation }
+  | { readonly type: NumberKind; readonly interpolate?: FieldInterpolation }
   | {
       readonly type: 'quantized';
       readonly min: number;
       readonly max: number;
       readonly bits: number;
-      readonly interpolate?: Interpolation;
+      readonly interpolate?: FieldInterpolation;
     }
   | { readonly type: 'string' | 'bytes'; readonly maxLength?: number }
   | { readonly type: 'enum'; readonly values: readonly string[] }
@@ -65,7 +65,7 @@ export interface SchemaShape {
   readonly types: { readonly [name: string]: { readonly [field: string]: unknown } };
 }
 
-type Value<T, F> = F extends 'bool'
+type FieldValue<T, F> = F extends 'bool'
   ? boolean
   : F extends NumberKind
     ? number
@@ -82,17 +82,17 @@ type Value<T, F> = F extends 'bool'
               : F extends { type: 'enum'; values: readonly (infer E)[] }
                 ? E
                 : F extends { type: 'array'; of: infer O }
-                  ? Value<T, O>[]
+                  ? FieldValue<T, O>[]
                   : F extends { type: 'optional'; of: infer O }
-                    ? Value<T, O> | undefined
+                    ? FieldValue<T, O> | undefined
                     : F extends { type: 'map'; of: infer O }
-                      ? Map<number, Value<T, O>>
+                      ? Map<number, FieldValue<T, O>>
                       : F extends keyof T
                         ? StructValue<T, T[F]>
                         : unknown;
 type OptionalKeys<S> = { [K in keyof S]: S[K] extends { type: 'optional' } ? K : never }[keyof S];
-type StructValue<T, S> = { -readonly [K in Exclude<keyof S, OptionalKeys<S>>]: Value<T, S[K]> } & {
-  -readonly [K in OptionalKeys<S>]?: Value<T, S[K]>;
+type StructValue<T, S> = { -readonly [K in Exclude<keyof S, OptionalKeys<S>>]: FieldValue<T, S[K]> } & {
+  -readonly [K in OptionalKeys<S>]?: FieldValue<T, S[K]>;
 };
 
 /** Names of the structs of schema definition `S`. */
@@ -100,11 +100,11 @@ export type TypeName<S extends SchemaShape> = keyof S['types'] & string;
 /** The JavaScript value of struct `N` of schema definition `S`, as `encode` takes it and `decode` returns it. */
 export type Infer<S extends SchemaShape, N extends TypeName<S>> = StructValue<S['types'], S['types'][N]>;
 
-/** A normalized field: every shorthand expanded and every default filled in (see {@link Schema.json}). */
+/** A normalized field: every shorthand expanded and every default filled in (see {@link SchemaCodec.json}). */
 export type NormalizedField =
-  | { type: NumberKind; interpolate: Interpolation }
+  | { type: NumberKind; interpolate: FieldInterpolation }
   | { type: 'bool' }
-  | { type: 'quantized'; min: number; max: number; bits: number; interpolate: Interpolation }
+  | { type: 'quantized'; min: number; max: number; bits: number; interpolate: FieldInterpolation }
   | { type: 'string' | 'bytes'; maxLength: number }
   | { type: 'enum'; values: string[] }
   | { type: 'array'; of: NormalizedField; maxLength: number }
@@ -112,7 +112,7 @@ export type NormalizedField =
   | { type: 'map'; of: NormalizedField; maxSize: number }
   | { type: 'struct'; name: string };
 
-/** The normalized schema, the exact input of generators and of {@link Schema.hash}. */
+/** The normalized schema, the exact input of generators and of {@link SchemaCodec.hash}. */
 export interface NormalizedSchema {
   /** The definition's version (default 1). */
   version: number;
@@ -121,7 +121,7 @@ export interface NormalizedSchema {
 }
 
 /** A compiled schema: the codec of every struct it names. */
-export interface Schema<S extends SchemaShape = SchemaDefinition> {
+export interface SchemaCodec<S extends SchemaShape = SchemaDefinition> {
   /** The definition as given. */
   readonly definition: S;
   /** The normalized definition: what a generator in another language reads (`JSON.stringify(schema.json)`). */
@@ -145,7 +145,7 @@ export interface Schema<S extends SchemaShape = SchemaDefinition> {
   /**
    * Bytes of `value` as a change from `baseline` (a value `decode` or `decodeDelta` returned): one bit per field, then
    * only the fields that changed; maps send only removed, added and changed entries.
-   * @throws as {@link Schema.encode}.
+   * @throws as {@link SchemaCodec.encode}.
    */
   encodeDelta<N extends TypeName<S>>(name: N, value: Infer<S, N>, baseline: Infer<S, N>): Uint8Array;
   /**
@@ -159,7 +159,7 @@ export interface Schema<S extends SchemaShape = SchemaDefinition> {
   /** A private deep copy of `value` exactly as the other end decodes it (floats at wire precision, maps sorted by id). */
   clone<N extends TypeName<S>>(name: N, value: Infer<S, N>): Infer<S, N>;
   /**
-   * The blend of `a` and `b` at `t` (0 gives `a`, 1 gives `b`): floats per their {@link Interpolation}, everything
+   * The blend of `a` and `b` at `t` (0 gives `a`, 1 gives `b`): floats per their {@link FieldInterpolation}, everything
    * else steps to `b` at `t >= 1`; a map entry only in `b` is taken from `b`, one only in `a` is dropped.
    */
   interpolate<N extends TypeName<S>>(name: N, a: Infer<S, N>, b: Infer<S, N>, t: number): Infer<S, N>;
@@ -167,25 +167,25 @@ export interface Schema<S extends SchemaShape = SchemaDefinition> {
 
 /** A compiled schema seen without its definition's types: names are strings and values `unknown`. */
 export interface UntypedSchema {
-  /** See {@link Schema.json}. */
+  /** See {@link SchemaCodec.json}. */
   readonly json: NormalizedSchema;
-  /** See {@link Schema.hash}. */
+  /** See {@link SchemaCodec.hash}. */
   readonly hash: number;
-  /** See {@link Schema.names}. */
+  /** See {@link SchemaCodec.names}. */
   readonly names: readonly string[];
-  /** See {@link Schema.encode}. */
+  /** See {@link SchemaCodec.encode}. */
   encode(name: string, value: unknown): Uint8Array;
-  /** See {@link Schema.decode}. */
+  /** See {@link SchemaCodec.decode}. */
   decode(name: string, bytes: Uint8Array): unknown;
-  /** See {@link Schema.encodeDelta}. */
+  /** See {@link SchemaCodec.encodeDelta}. */
   encodeDelta(name: string, value: unknown, baseline: unknown): Uint8Array;
-  /** See {@link Schema.decodeDelta}. */
+  /** See {@link SchemaCodec.decodeDelta}. */
   decodeDelta(name: string, bytes: Uint8Array, baseline: unknown): unknown;
-  /** See {@link Schema.equals}. */
+  /** See {@link SchemaCodec.equals}. */
   equals(name: string, a: unknown, b: unknown): boolean;
-  /** See {@link Schema.clone}. */
+  /** See {@link SchemaCodec.clone}. */
   clone(name: string, value: unknown): unknown;
-  /** See {@link Schema.interpolate}. */
+  /** See {@link SchemaCodec.interpolate}. */
   interpolate(name: string, a: unknown, b: unknown, t: number): unknown;
 }
 
@@ -223,11 +223,11 @@ function normalizeField(
     throw new TypeError(`${where} must be a type name or an object with a 'type'; fix the schema`);
   const f = field as Record<string, unknown>,
     type = f.type as string;
-  const interpolation = (fallback: Interpolation): Interpolation => {
+  const interpolation = (fallback: FieldInterpolation): FieldInterpolation => {
     if (f.interpolate === undefined) return fallback;
     if (typeof f.interpolate !== 'string' || !INTERPOLATIONS.has(f.interpolate))
       throw new TypeError(`${where} interpolate must be 'linear', 'angle' or 'none'; fix the schema`);
-    return f.interpolate as Interpolation;
+    return f.interpolate as FieldInterpolation;
   };
   if (NUMBER_KINDS.has(type)) {
     if (FLOATS.has(type)) return { type: type as NumberKind, interpolate: interpolation('linear') };
@@ -379,7 +379,7 @@ interface Node {
 }
 
 const step = (a: unknown, b: unknown, t: number): unknown => (t >= 1 ? b : a);
-const lerpOf = (mode: Interpolation): ((a: number, b: number, t: number) => number) =>
+const lerpOf = (mode: FieldInterpolation): ((a: number, b: number, t: number) => number) =>
   mode === 'linear'
     ? (a, b, t) => a + (b - a) * t
     : mode === 'angle'
@@ -808,7 +808,7 @@ function compile(json: NormalizedSchema): Map<string, Node> {
  * @throws TypeError for an unknown type, a bad name or a struct that contains itself directly; RangeError for a limit
  * or quantized range out of bounds.
  */
-export function defineSchema<const S extends SchemaDefinition>(definition: S): Schema<S> {
+export function defineSchema<const S extends SchemaDefinition>(definition: S): SchemaCodec<S> {
   const json = normalize(definition),
     structs = compile(json),
     names = Object.keys(json.types) as TypeName<S>[];
@@ -821,7 +821,7 @@ export function defineSchema<const S extends SchemaDefinition>(definition: S): S
     if (!(bytes instanceof Uint8Array)) throw new TypeError(`${name} bytes must be a Uint8Array`);
     return new Reader(bytes, `${name} bytes`, `pass bytes that encode('${name}', ...) returned`);
   };
-  const schema: Schema<S> = {
+  const schema: SchemaCodec<S> = {
     definition,
     json,
     hash: fnv1a(JSON.stringify(json)),
@@ -855,7 +855,7 @@ export function defineSchema<const S extends SchemaDefinition>(definition: S): S
       return schema.decode(name, schema.encode(name, value));
     },
     interpolate(name, a, b, t) {
-      if (!Number.isFinite(t)) throw new RangeError(`Interpolation t is ${t}; pass a finite number from 0 to 1`);
+      if (!Number.isFinite(t)) throw new RangeError(`FieldInterpolation t is ${t}; pass a finite number from 0 to 1`);
       return struct(name).lerp(a, b, t) as never;
     },
   };

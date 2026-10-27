@@ -799,6 +799,10 @@
       "types": "./dist/netcode.d.ts",
       "import": "./dist/netcode.js"
     },
+    "./netcode/rollback": {
+      "types": "./dist/netcode/rollback.d.ts",
+      "import": "./dist/netcode/rollback.js"
+    },
     "./oit": {
       "types": "./dist/oit.d.ts",
       "import": "./dist/oit.js"
