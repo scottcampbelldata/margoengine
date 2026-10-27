@@ -446,7 +446,7 @@ Both are harmless, and both come from how the package is built on purpose:
 
 To silence them in Vite (other warnings still print):
 
-```ts
+```js
 // vite.config.ts
 import { defineConfig } from 'vite';
 
