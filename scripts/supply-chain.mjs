@@ -133,7 +133,7 @@ const ASSETS = [
   ],
   [
     'packages/points/tests/fixtures/NOTICE.md',
-    'test fixture: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan)',
+    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan); USGS 3DEP lidar tile USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz (public domain, rockyweb.usgs.gov, 609,938 bytes, SHA-256 c2804c3827fd6104acf657803f55ed4e5fa9ba83b4ec481888510385a14e31ae, downloaded 2026-10-27)',
   ],
   [
     'packages/decoders/tests/fixtures/NOTICE.md',

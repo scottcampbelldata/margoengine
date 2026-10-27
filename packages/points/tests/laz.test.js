@@ -417,3 +417,5 @@ test('property: random point counts, chunkings and seeds always round-trip byte 
     );
   }
 });
+
+import './laz-usgs.test.js';
