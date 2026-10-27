@@ -1,5 +1,5 @@
 {
-  "commit": "c74cab29",
+  "commit": "3b937af2",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -881,11 +881,23 @@
     "@margoengine/netcode": {
       ".": {
         "raw": 38937,
-        "gzip": 12601
+        "gzip": 12599
       },
       "./rollback": {
         "raw": 8826,
         "gzip": 3215
+      },
+      "./websocket": {
+        "raw": 1640,
+        "gzip": 820
+      },
+      "./webrtc": {
+        "raw": 1574,
+        "gzip": 742
+      },
+      "./node": {
+        "raw": 15963,
+        "gzip": 5846
       }
     },
     "@margoengine/oit": {
