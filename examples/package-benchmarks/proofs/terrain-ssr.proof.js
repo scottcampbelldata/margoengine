@@ -2,13 +2,15 @@
 // `ssr.add(terrain)`) and its `roughness` option: with neither, Terrain makes exactly the GPU calls it made before, over
 // terrain.proof.js's story (format, sample-count and depth-format switches, lighting added, changed and removed, shadows,
 // device restoration, disposal) for three terrains.
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/terrain-ssr.proof.js [ref] [--current]
-// Baseline 6c20076d (before the hook) against the working tree.
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/terrain-ssr.proof.js [ref] [pin] [--current]
+// Pinned: 6c20076d (before the hook) against 49f3e971, the commit that made this claim. --current: 6c20076d against the
+// working tree.
 import assert from 'node:assert/strict';
-import { refs, versions, current, golden } from './compare.js';
+import { refs, versions, current, golden, coreAt } from './compare.js';
 
-const { ref, pin } = refs('6c20076d'),
-  { baseline, candidate } = await versions('terrain', ref, undefined, pin);
+const { ref, pin } = refs('6c20076d', '49f3e971');
+await coreAt(pin); // terrain imports core's extension entry: in a pinned run, core as it was at the pin
+const { baseline, candidate } = await versions('terrain', ref, undefined, pin);
 globalThis.GPUBufferUsage ??= { COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128 };
 globalThis.GPUTextureUsage ??= { TEXTURE_BINDING: 4 };
 globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2 };

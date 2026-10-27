@@ -57,26 +57,28 @@ export function mockGPU() {
     this.destroyed = true;
     if (log) log.push(['destroy', ids.get(this)]);
   };
-  const pass = () =>
-    Object.fromEntries(
-      [
-        'setPipeline',
-        'setBindGroup',
-        'setVertexBuffer',
-        'setIndexBuffer',
-        'setViewport',
-        'setScissorRect',
-        'setStencilReference',
-        'setBlendConstant',
-        'draw',
-        'drawIndexed',
-        'drawIndirect',
-        'drawIndexedIndirect',
-        'dispatchWorkgroups',
-        'dispatchWorkgroupsIndirect',
-        'end',
-      ].map((name) => [name, call('pass.' + name)]),
-    );
+  // Every begin*Pass returns a new pass object (as WebGPU does), holding methods made once: making 15 closures per pass
+  // cost about 19 µs a frame in splats' timing story, which both sides paid and which hid its recorded speed-up.
+  const passMethods = Object.fromEntries(
+    [
+      'setPipeline',
+      'setBindGroup',
+      'setVertexBuffer',
+      'setIndexBuffer',
+      'setViewport',
+      'setScissorRect',
+      'setStencilReference',
+      'setBlendConstant',
+      'draw',
+      'drawIndexed',
+      'drawIndirect',
+      'drawIndexedIndirect',
+      'dispatchWorkgroups',
+      'dispatchWorkgroupsIndirect',
+      'end',
+    ].map((name) => [name, call('pass.' + name)]),
+  );
+  const pass = () => ({ ...passMethods });
   const begin = (name) => {
     const record = call(name);
     return (descriptor) => {

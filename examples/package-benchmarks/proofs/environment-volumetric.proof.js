@@ -10,11 +10,11 @@
 // Pinned: 7c47a09 against 366ebff, the commit that made this claim. --current: 2cd81c1 against the working tree;
 // 56ee987 intentionally made Fog patch core's PBR Neutral display line (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, entryAt, save, golden } from './compare.js';
+import { refs, versions, entryAt, save, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
-import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('7c47a09', '366ebff', '2cd81c1');
+const { ref, pin } = refs('7c47a09', '366ebff', '2cd81c1'),
+  { wgsl } = await coreAt(pin);
 // 1. Root entry at ref vs the candidate (the pin, or the working tree).
 const { baseline, candidate } = await versions('environment', ref, undefined, pin);
 // 2. runs on the candidate's packages.

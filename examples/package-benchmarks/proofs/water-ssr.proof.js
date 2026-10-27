@@ -2,14 +2,16 @@
 // with no capture hook set, Water makes exactly the GPU calls it made before the hook existed, over a story of resizes,
 // canvas-format and sample-count changes, a terrain heightmap (coastal flow and spray), a sky reflection texture, a
 // shadow source, light edits, a wave-height change, device restoration and disposal.
-// Run (after npm run build:packages): node examples/package-benchmarks/proofs/water-ssr.proof.js [ref] [--current]
-// Baseline 6c20076d (before the hook) against the working tree.
+// Run (after npm run build:packages): node examples/package-benchmarks/proofs/water-ssr.proof.js [ref] [pin] [--current]
+// Pinned: 6c20076d (before the hook) against 49f3e971, the commit that made this claim. --current: 57250a49 against the
+// working tree.
 import assert from 'node:assert/strict';
-import { refs, versions, current, golden } from './compare.js';
+import { refs, versions, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('6c20076d', undefined, '57250a49'),
-  { baseline, candidate } = await versions('water', ref, undefined, pin);
+const { ref, pin } = refs('6c20076d', '49f3e971', '57250a49');
+await coreAt(pin); // water imports core's extension entry: in a pinned run, core as it was at the pin
+const { baseline, candidate } = await versions('water', ref, undefined, pin);
 
 function story(m, options) {
   const gpu = mockGPU(),

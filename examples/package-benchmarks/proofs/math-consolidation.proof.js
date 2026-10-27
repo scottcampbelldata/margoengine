@@ -285,9 +285,11 @@ families.push({
           mat4.multiplyMatrices(a, b, new Float64Array(16)),
         ),
       );
+      // `out` left out: math at the pin (4eed254) requires it, and the claim's candidates were bvh's and points'
+      // adapters, which defaulted it; f42270c7 made math default it and removed the adapters.
       for (const module of [bvh, points]) {
         const x = module.baseline.multiply(a, b),
-          y = mat4.multiplyMatrices(a, b);
+          y = pin ? module.candidate.multiply(a, b) : mat4.multiplyMatrices(a, b);
         assert.ok(y instanceof Float64Array && same(x, y));
       }
     }
@@ -372,7 +374,7 @@ families.push({
         assert.equal(mat4.invertMatrix(m, e), result && e);
         assert.ok(same(a, e));
         const x = bvh.baseline.invert(m),
-          y = mat4.invertMatrix(m);
+          y = pin ? bvh.candidate.invert(m) : mat4.invertMatrix(m); // `out` left out: as multiply above
         assert.ok(x === null ? y === null : y instanceof Float64Array && same(x, y));
       }
     return M.length * 3 * 5;

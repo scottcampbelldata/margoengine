@@ -297,11 +297,13 @@ ORCA and funnel). navigation is gone (navmesh/build replaces it), the conveyor s
 Babylon are no longer dev dependencies, and fixtures from other projects are Margo-generated. Follow-ups: afterimage
 `damp` removed; triangulation and extrusion in their own geometry entries (`shapes` 11,030 -> 3,584 B gzip).
 
-**Open for the testing session (tracked in docs/known-bugs.md, "Pinned proofs"):** pinned `npm run proofs` fails 9 historical proofs, identically on main before the
-rewrites (ac465a00) and after: color-output, environment-volumetric, math-consolidation, post-ssr, post-ssr-models,
-post-stack, probes-decals, quality-presets, water-ssr ("story must exercise the GPU", "fog requires the standard core
-PBR shader", "Water GPU calls differ"). `npm run proofs -- --current` passes 20/20. Draco/Basis still to be checked
-against the official releases (needs Scott's OK to download).
+**Pinned proofs (bug 6, closed 2026-10-27):** the 9 pinned proofs that failed against today's core (color-output,
+environment-volumetric, math-consolidation, post-ssr, post-ssr-models, post-stack, probes-decals, quality-presets,
+water-ssr) were rebuilt, none retired: their pinned runs now build core at the claim commit (`coreAt(pin)` in
+`proofs/compare.js`), math-consolidation calls the claim's own candidates, and water-ssr and terrain-ssr are pinned
+to their claim commit `49f3e971`. Every recorded call count reproduces (docs/whitepaper/claims.md, "Pinned runs and
+the core of their time"). Open for the testing session: Draco/Basis still to be checked against the official releases
+(needs Scott's OK to download).
 
 ## Landed 2026-10-24: visual baselines for Edge 156
 

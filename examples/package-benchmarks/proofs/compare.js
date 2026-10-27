@@ -3,9 +3,10 @@
 // was made (`refs`), so a proof reproduces its claim whatever the working tree does later; `--current` checks the working
 // tree instead (ongoing guarantees, `npm run proofs -- --current`). Pinned runs read the compared packages' src and
 // packages/shared at those commits from Git (history.js; a clone without the commit reports the proof HISTORICAL);
-// @margoengine/core (frozen at 1.0.0), the proof script and its test fixtures are today's. --current runs compare the
-// working tree with golden outputs (golden.js: what the baseline emitted, stored in baselines/ with its SHA-256), so
-// every clone runs them; a value goes through `golden(key, () => <the baseline's output>)`.
+// @margoengine/core (frozen at 1.0.0), the proof script and its test fixtures are today's, except in a proof that calls
+// `coreAt(pin)` first: its pinned run imports core as it was at the pin, on both sides, as when the claim was made (old
+// post, environment and tonemap sources patch core's shader text). --current runs compare the working tree with golden
+// outputs (golden.js: what the baseline emitted, stored in baselines/ with its SHA-256), so every clone runs them; a value goes through `golden(key, () => <the baseline's output>)`.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
@@ -25,10 +26,34 @@ const bare = (id) => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.
 /** One package entry bundled by Vite from `ref` (its src and packages/shared), or from the working tree without one; bare
  * imports stay external. Returns the output chunks. */
 export async function bundle(name, entry, ref, minify = false) {
-  // The package's src and packages/shared (inlined into every bundle) both come from the ref.
+  const result = await build({
+    root: resolve(root, 'packages', name),
+    configFile: false,
+    publicDir: false,
+    logLevel: 'silent',
+    plugins: [...gitSource(name, ref), ...pinnedCore()],
+    build: {
+      write: false,
+      minify,
+      target: 'es2022',
+      lib: { entry: resolve(root, 'packages', name, entry), formats: ['es'] },
+      // A lazily imported module (gltf-pro imports its physical shader on first need) is inlined, so the entry still
+      // builds to the one module the comparison loads; the code that runs is the same.
+      // Rollup asks `external` before any plugin, so core's ids stay internal here for pinned-core to resolve.
+      rollupOptions: {
+        external: (id) => bare(id) && !(coreDirectory && coreEntries[id]),
+        output: { inlineDynamicImports: true },
+      },
+    },
+  });
+  return result[0].output.filter((item) => item.type === 'chunk');
+}
+
+/** The Vite plugin that reads package `name`'s src and packages/shared (inlined into every bundle) at `ref`. */
+function gitSource(name, ref) {
   const sources = [slash(resolve(root, 'packages', name, 'src')) + '/', slash(resolve(root, 'packages/shared')) + '/'];
   const show = (file) => showAt(ref, file.slice(slash(root).length + 1));
-  const plugins = ref
+  return ref
     ? [
         {
           name: 'git-source',
@@ -49,23 +74,67 @@ export async function bundle(name, entry, ref, minify = false) {
         },
       ]
     : [];
-  const result = await build({
-    root: resolve(root, 'packages', name),
-    configFile: false,
-    publicDir: false,
-    logLevel: 'silent',
-    plugins,
-    build: {
-      write: false,
-      minify,
-      target: 'es2022',
-      lib: { entry: resolve(root, 'packages', name, entry), formats: ['es'] },
-      // A lazily imported module (gltf-pro imports its physical shader on first need) is inlined, so the entry still
-      // builds to the one module the comparison loads; the code that runs is the same.
-      rollupOptions: { external: bare, output: { inlineDynamicImports: true } },
-    },
-  });
-  return result[0].output.filter((item) => item.type === 'chunk');
+}
+
+// Set by coreAt(pin): the directory holding @margoengine/core built at the pin, which every later bundle imports in
+// place of today's core. Undefined: bundles import today's core.
+let coreDirectory,
+  bundled = false;
+const coreEntries = { '@margoengine/core': 'index.js', '@margoengine/core/extension': 'extension.js' };
+const pinnedCore = () => {
+  bundled = true;
+  return coreDirectory
+    ? [
+        {
+          name: 'pinned-core',
+          enforce: 'pre',
+          resolveId: (id) =>
+            coreEntries[id] && { id: pathToFileURL(resolve(coreDirectory, coreEntries[id])).href, external: true },
+        },
+      ]
+    : [];
+};
+
+/** @margoengine/core for a story. With a `pin` (a pinned run): core's src and packages/shared at the pin, built once,
+ * and every package the proof builds afterwards (baseline and candidate) imports that core instead of today's, as both
+ * did when the claim was made. Without one (--current): today's core. Returns core's root and extension exports and
+ * `wgsl` (shaders.ts). Call it before building any package. */
+export async function coreAt(pin) {
+  assert.ok(!bundled, 'coreAt() must come before the proof builds any package');
+  const exports = async (at) => {
+    const [index, extension, shaders] = await Promise.all(
+      ['index', 'extension', 'shaders'].map((name) => import(pathToFileURL(at(name)).href)),
+    );
+    return { ...index, ...extension, wgsl: shaders.wgsl };
+  };
+  if (!pin)
+    return exports((name) => resolve(root, 'packages/core', name === 'shaders' ? 'src/shaders.ts' : `dist/${name}.js`));
+  const id = commit(pin),
+    result = await build({
+      root: resolve(root, 'packages/core'),
+      configFile: false,
+      publicDir: false,
+      logLevel: 'silent',
+      plugins: gitSource('core', id),
+      build: {
+        write: false,
+        target: 'es2022',
+        lib: {
+          entry: Object.fromEntries(
+            ['index', 'extension', 'shaders'].map((name) => [name, resolve(root, 'packages/core/src', `${name}.ts`)]),
+          ),
+          formats: ['es'],
+          fileName: (_, name) => `${name}.js`,
+        },
+        rollupOptions: { external: bare },
+      },
+    });
+  const directory = resolve(root, 'test-results/proofs-tmp', `core-${id.slice(0, 12)}-${process.pid}`);
+  await mkdir(directory, { recursive: true });
+  for (const chunk of result[0].output.filter((item) => item.type === 'chunk'))
+    await writeFile(resolve(directory, chunk.fileName), chunk.code);
+  coreDirectory = directory;
+  return exports((name) => resolve(directory, `${name}.js`));
 }
 
 /** One package entry built as a single module from `ref` (its src and packages/shared), or from the working tree. */

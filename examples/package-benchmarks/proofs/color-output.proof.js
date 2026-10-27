@@ -7,11 +7,11 @@
 // Pinned: 7dcc958 against 225b1d6, the commit that made this claim. --current: 57250a49 against the working tree;
 // 56ee987 intentionally unified PBR Neutral output and made Tonemap's default curve neutral (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, ignoreAgx, entryAt, golden } from './compare.js';
+import { refs, versions, ignoreAgx, entryAt, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
-import { wgsl } from '../../../packages/core/src/shaders.ts';
 
 const { ref, pin } = refs('7dcc958', '225b1d6', '57250a49'),
+  { wgsl } = await coreAt(pin),
   { PostStack, FXAA, Bloom } = await entryAt('post', 'src/index.ts', pin); // the stack around the effects
 const tonemap = await versions('tonemap', ref, undefined, pin),
   dof = await versions('dof', ref, undefined, pin),

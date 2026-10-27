@@ -5,11 +5,11 @@
 // Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: 151aa744 against the working tree;
 // approved multilevel Bloom, PBR Neutral display and linear HDR handoff changed these calls (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, ignoreAgx, current, golden } from './compare.js';
+import { refs, versions, ignoreAgx, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
-import { wgsl } from '../../../packages/core/src/shaders.ts';
 
 const { ref, pin } = refs('7c47a09', '3cf1453', '151aa744'),
+  { wgsl } = await coreAt(pin),
   post = await versions('post', ref, undefined, pin);
 
 function story(m, make, samples) {

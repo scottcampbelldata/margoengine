@@ -13,14 +13,13 @@
 // that one change (later commits edit these sources for other reasons), so there is no --current mode.
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { refs, versions, bundle, commit, entryAt, announce, fileAt } from './compare.js';
+import { refs, versions, bundle, commit, entryAt, announce, fileAt, coreAt } from './compare.js';
 import { modified } from './history.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
-import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
-import { wgsl } from '../../../packages/core/src/shaders.ts';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
 const { ref, pin } = refs('ecdcb31', '7d144fb'),
+  { Engine, TransformStore, wgsl } = await coreAt(pin),
   root = resolve(import.meta.dirname, '../../..'),
   base = commit(ref),
   now = pin && commit(pin);

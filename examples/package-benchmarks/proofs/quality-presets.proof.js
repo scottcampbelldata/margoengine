@@ -10,12 +10,11 @@
 // Pinned: 96daac7 against 01e5e35, the commit that recorded results/quality-presets.json. --current: 667d1a26 (57250a49 before the PCSS search spanned to the nearest caster) against the
 // working tree, including the approved phone shadows, deterministic/minimum-size VFX and PBR Neutral output (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, entryAt, save, golden } from './compare.js';
+import { refs, versions, entryAt, save, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
-import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
-import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('96daac7', '01e5e35', '667d1a26');
+const { ref, pin } = refs('96daac7', '01e5e35', '667d1a26'),
+  { Engine, TransformStore, wgsl } = await coreAt(pin);
 const [{ Clustered }, { Tonemap }, { QUALITY_PRESETS }] = await Promise.all(
     ['clustered', 'tonemap', 'quality'].map((name) => entryAt(name, 'src/index.ts', pin)),
   ),

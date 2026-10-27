@@ -135,7 +135,8 @@ its claim was made, so later code cannot change the result: `node <proof>` (or `
 proofs` runs all of them pinned, two at a time. The ones marked "current" (the `ongoing` list in `proofs/run.mjs`) are
 ongoing guarantees and are also checked against the working tree with `npm run proofs -- --current` (part of
 `npm run verify`), from the ref given (the last intended change to their output). Pinned runs build the compared packages and packages/shared at
-the pin; `@margoengine/core` (frozen), the proof scripts and their fixtures are today's, so mock-GPU timings recorded
+the pin; `@margoengine/core` (frozen), the proof scripts and their fixtures are today's (except core in the nine
+proofs that call `coreAt(pin)`, "Pinned runs and the core of their time"), so mock-GPU timings recorded
 before the core speed-ups (`0ed56b9`) re-run faster than recorded. The animator proof has no current run: it compares
 every transform write bit for bit, and the animator has skipped unchanged writes since `f33e094` and reads
 `options.speed` since `6a1c6bb`, so only its pinned run can match.
@@ -207,6 +208,46 @@ worktree, so all their dev servers shared one dependency cache and one re-optimi
 worktree now keeps its own tool caches (`tests/worktree-node-modules.test.js`); after the fix the same load ran 10 of
 10, 8 of them beside another suite. A worktree made before the fix keeps the shared link until it runs the script again.
 
+**Pinned runs and the core of their time (bug 6, 2026-10-27).** `npm run proofs` (pinned) failed nine proofs on a
+checkout holding their commits: color-output, environment-volumetric, post-ssr, post-ssr-models, post-stack,
+probes-decals and quality-presets ("story must exercise the GPU", "fog requires the standard core PBR shader"),
+math-consolidation and water-ssr. None was retired; each now reproduces its recorded result:
+
+- **The seven GPU-call proofs:** a pinned run built the old package sources at their claim commits but gave both
+  sides today's `@margoengine/core` and its lit shader text. The old post, environment and tonemap sources patch that
+  text by search and replace (environment at `366ebff`: `if (code === source) throw ... requires the standard core
+  PBR shader`); core's later bug fixes and clean-room rewrites changed the text, so their stories threw on the first
+  frame. When each claim was made, both sides ran on the core of the claim commit. They now call `coreAt(pin)`
+  (`proofs/compare.js`) first: in a pinned run it builds core's src and packages/shared at the pin, returns its
+  exports and shader text to the story, and every package built afterwards, baseline and candidate, imports that
+  core instead of today's (Rollup asks `external` before any plugin, so core's ids are kept internal and resolved to
+  the pinned build). In --current runs it returns today's core, so the golden outputs and their checks are unchanged.
+  The pinned call counts are the recorded ones: color-output 6,174; environment-volumetric 70 root calls and 344/533
+  isolated calls; post-ssr 9,269; post-ssr-models 30,858; post-stack 12,378; probes-decals 15 identical entry bundles,
+  135 + 12,320 calls; quality-presets 292/1,141/757/720/408/360 per package. water-ssr and terrain-ssr call it too
+  now that they are pinned (below): water and terrain import core's extension entry. `tests/proofs-pinned-core.test.js` checks, with HEAD as the pin, that a pinned bundle has no bare
+  core import left and that `coreAt` refuses to come after a package was built (one story never mixes two cores).
+- **math-consolidation:** today's script called `mat4.multiplyMatrices(a, b)` and `mat4.invertMatrix(m)` without
+  `out`, which `@margoengine/math` defaults only since `f42270c7`; the pinned run builds math at `4eed254`, where `out`
+  is required, so the call wrote into `undefined`. The claim's candidates at `4eed254` were bvh's and points' own
+  adapters (they defaulted `out`), so the pinned run now calls those, as the claim did; --current keeps calling math.
+- **water-ssr and terrain-ssr** passed no pin (`refs('6c20076d')`), so their "pinned" run compared the baseline with
+  today's tree, and water's later intended changes (its foam textures, the ripple noise, above) made it fail. Both are
+  pinned to `49f3e971`, the commit that added the capture hook: 2,762 and 6,458 calls, as recorded.
+
+- **splats (found on the way):** its pinned timing failed under load (0.993x and 0.998x against a recorded 2.34x).
+  Since `66d1cb30` the stand-in device (`gpu-recorder.js`) made 15 new closures for every `begin*Pass`, about 19 µs a
+  frame that both sides paid: the 2,000-frame rounds took 43 ms instead of 3-8 ms, and the package's own saving
+  vanished in it. Passes are still new objects, now sharing one set of methods; the rounds take 3.3 / 2.0 ms again
+  (1.60x and 1.64x on Node 26.12) and the recorded calls are unchanged. `tests/proofs-pinned-core.test.js` checks it.
+
+Only `--current` ran in any check, so the pinned failures went unnoticed for days. The nightly job
+(`scripts/nightly-full.mjs`) now runs `npm run proofs` (pinned, about 4.5 minutes on the RTX A6000 PC: 50 pass,
+procedural-deps HISTORICAL as before) after `check:merge:full`, alone under the GPU lock. It stays out of each
+landing's `check:merge` on purpose: about 40 pinned proofs time their claim's speed-up, and the smallest margins on
+2026-10-27 were loaders 1.05x, bvh 1.07x and creative 1.08x, which a busy landing machine can erase. A clone without
+the commits reports them HISTORICAL and passes.
+
 **NaN payloads.** `geometry.proof.js` (pinned) failed at random on its degenerate-input case ("degenerate bounds"):
 baseline and candidate both return NaN for the non-finite vertex, but V8 writes either x86's default NaN (sign bit
 set) or the plain quiet NaN into a typed array depending on the code path and JIT tier, which ECMAScript allows
@@ -239,8 +280,8 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `151aa744`: 12,431 calls (AgX normalised for older refs, see below) |
 | post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `151aa744`: 37,182 calls |
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
-| terrain-ssr | `6c20076d` (before terrain's capture hook) -> the water/terrain SSR commit: terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
-| water-ssr | `6c20076d` (before water's capture hook) -> the water/terrain SSR commit: 2,762 calls in 3 stories | `57250a49` |
+| terrain-ssr | `6c20076d` (before terrain's capture hook) -> `49f3e971` (the water/terrain SSR commit): terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
+| water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `57250a49` |
 | quality-presets | `96daac7` -> `01e5e35` | `667d1a26` |
 | post-ssao-perspective | `9c761d5` -> `9702e57`: 3,282 calls | - |
 | probes-decals | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | - |

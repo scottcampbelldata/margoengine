@@ -6,12 +6,12 @@
 // working tree, including the approved multilevel Bloom, PBR Neutral display and Tonemap default (claims.md).
 // creative's PostProcessing is always 5b1fe66^ against 3319317: it lost bloom and the sky backdrop after 3319317.
 import assert from 'node:assert/strict';
-import { refs, versions, ignoreAgx, golden, fact, readOnly } from './compare.js';
+import { refs, versions, ignoreAgx, golden, fact, readOnly, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
-import { wgsl } from '../../../packages/core/src/shaders.ts';
 
 const before = '5b1fe66^',
-  { ref, pin } = refs(before, '5b1fe66', '57250a49');
+  { ref, pin } = refs(before, '5b1fe66', '57250a49'),
+  { wgsl } = await coreAt(pin);
 const post = await versions('post', ref, undefined, pin),
   dof = await versions('dof', ref, undefined, pin),
   tonemap = await versions('tonemap', ref, undefined, pin);
