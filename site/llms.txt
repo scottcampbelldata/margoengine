@@ -116,6 +116,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/viewcube](https://margoengine.com/llms/packages/viewcube.md): CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle.
 - [@margoengine/selection](https://margoengine.com/llms/packages/selection.md): GPU picking and visible mesh selection outlines.
 - [@margoengine/audio](https://margoengine.com/llms/packages/audio.md): Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine.
+- [@margoengine/mixer](https://margoengine.com/llms/packages/mixer.md): Audio mixing and effects: buses with gain, mute, solo, sends and ducking; equaliser, filter, compressor, limiter, delay and reverb on Web Audio; positional emitters…
 
 ## Packages: Simulation and games
 
@@ -224,6 +225,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/viewcube API](https://margoengine.com/llms/api/viewcube.md): 1 entry point
 - [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 1 entry point
 - [@margoengine/audio API](https://margoengine.com/llms/api/audio.md): 1 entry point
+- [@margoengine/mixer API](https://margoengine.com/llms/api/mixer.md): 1 entry point
 - [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 1 entry point
 - [@margoengine/navmesh API](https://margoengine.com/llms/api/navmesh.md): 2 entry points
 - [@margoengine/ecs API](https://margoengine.com/llms/api/ecs.md): 1 entry point

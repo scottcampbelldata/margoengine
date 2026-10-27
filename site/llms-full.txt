@@ -330,7 +330,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-88 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+89 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -419,7 +419,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/wfc`](packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |
 | [`@margoengine/splines`](packages/splines/README.md) | 3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup. |
 
-### Animation and interaction (14)
+### Animation and interaction (15)
 
 | Package | What it is |
 | --- | --- |
@@ -437,6 +437,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/viewcube`](packages/viewcube/README.md) | CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle. |
 | [`@margoengine/selection`](packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
 | [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |
+| [`@margoengine/mixer`](packages/mixer/README.md) | Audio mixing and effects: buses with gain, mute, solo, sends and ducking; equaliser, filter, compressor, limiter, delay and reverb on Web Audio; positional emitters; deterministic offline rendering. |
 
 ### Simulation and games (9)
 
@@ -7176,6 +7177,65 @@ Errors carry a stable `code` (`error.code`): `disposed` for a sound used after `
 ## How it works
 
 [README continues: https://margoengine.com/llms/packages/audio.md]
+
+=== @margoengine/mixer (packages/mixer/README.md) ===
+
+# @margoengine/mixer
+
+Import `margoengine/mixer` from the `margoengine` package, or `@margoengine/mixer` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+Audio mixing and effects on Web Audio, as a sibling of `@margoengine/audio`: a tree of buses with fader, mute, solo, sends and ducking; an effects chain (equaliser, filter, compressor, limiter, delay, convolution reverb); positional emitters; and deterministic offline rendering so a chain can be rendered and its numbers compared in a test. Nothing touches `AudioContext` at import time, and the package adds nothing to core.
+
+```ts
+import { Mixer, renderOffline, measure } from 'margoengine/mixer';
+
+// Live: mix before the listener, so the camera-following AudioListener from margoengine/audio stays the last stage.
+//   using mixer = new Mixer(listener.context, {destination: listener.input, buses: {...}});
+// Offline (runs in a browser; the same calls work on a live AudioContext):
+const buffer = await renderOffline({ seconds: 2, sampleRate: 48000, mixer: { effects: [{ type: 'limiter', ceiling: -1 }] } }, ({ context, mixer }) => {
+  mixer.createBus('music', { gain: -6, effects: [{ type: 'eq', bands: [{ type: 'lowshelf', frequency: 120, gain: 3 }] }] });
+  mixer.createBus('voice');
+  const reverb = mixer.createBus('room', { effects: [{ type: 'reverb', seconds: 1.5, mix: 1 }], soloSafe: true });
+  mixer.bus('voice').send(reverb, { gain: -9 });
+
+  const tone = new OscillatorNode(context, { frequency: 220 });
+  mixer.route(tone, 'music');
+  tone.start(0);
+  tone.stop(2);
+
+  // Lower the music by 12 dB from 0.5 s to 1.2 s for a line of dialogue.
+  const duck = mixer.bus('music').duck({ amount: 12, attack: 0.05, at: 0.5 });
+  duck.release({ at: 1.2, seconds: 0.3 });
+});
+const { peak, rms } = measure(buffer.getChannelData(0));
+```
+
+## Buses
+
+`new Mixer(context, {destination, gain, effects, buses})` makes a `master` bus and any buses you list. `mixer.createBus(name, {parent, gain, muted, solo, soloSafe, effects})` adds one that feeds its parent (default master). Each bus is `input -> effects -> fader -> duck -> mute/solo gate -> output`.
+
+- **Gain** in dB: `bus.setGain(-6, {at, seconds})`. Changes move smoothly (about 20 ms) unless the context has not started or `seconds` is 0, so there are no clicks and an offline render starts at the right level.
+- **Mute and solo**: `bus.setMuted(true)`, `bus.setSolo(true)`. While anything is soloed, only soloed buses, their ancestors (which carry the sound on), their descendants (which feed them) and `soloSafe` buses such as reverb returns stay audible. `audibleBuses(states)` is that rule as a pure function.
+- **Sends**: `bus.send(other, {gain, pre})` copies part of a bus to another (after the gate by default, so muting the bus mutes the send; `pre` taps before the fader). A send that would make a loop throws `RangeError`.
+- **Ducking**: `bus.duck({amount, attack, at})` lowers a bus and returns a handle; `handle.release({at, seconds})` brings it back. Overlapping ducks hold the deepest one. You decide when to duck (when a voice starts); there is no automatic sidechain.
+- **Routing**: `mixer.route(source, bus)` connects an AudioNode, or anything with `getOutput()` such as `Audio` and `PositionalAudio` from `margoengine/audio`, to a bus after removing its other connections. Configure the sound's filters first.
+- **Scheduling** uses AudioContext time: every `at` is `context.currentTime` seconds (default now), and `mixer.now` reads the clock.
+- `bus.peak()` reads the current output peak (it adds an AnalyserNode on first use).
+
+## Effects
+
+Effects are plain objects, so a chain can be stored as JSON: `bus.setEffects([...])`, or `createEffect(context, spec)` for one effect.
+
+| `type` | Settings (defaults) | Built from |
+| --- | --- | --- |
+| `eq` | `bands: [{type: 'peaking', frequency, q, gain}]`, 1 to 16 bands | one BiquadFilterNode per band |
+| `filter` | `filter`, `frequency`, `q`, `gain` | BiquadFilterNode |
+| `compressor` | `threshold` -24, `knee` 30, `ratio` 4, `attack` 0.003, `release` 0.25 | DynamicsCompressorNode |
+| `limiter` | `ceiling` -1 dB, `release` 0.05 | DynamicsCompressorNode, ratio 20, knee 0 |
+| `delay` | `time` 0.3 s (at least 128 samples), `feedback` 0.35 (at most 0.95), `mix` 0.3 | DelayNode with a feedback loop; echo k lands exactly at k times `time` |
+| `reverb` | `seconds` 2, `decay` seconds/2, `preDelay` 0, `mix` 0.25, `seed` 1, or a recorded `impulse` | ConvolverNode, `normalize = false` |
+
+[README continues: https://margoengine.com/llms/packages/mixer.md]
 
 === @margoengine/physics (packages/physics/README.md) ===
 
