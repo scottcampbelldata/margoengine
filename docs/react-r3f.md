@@ -14,7 +14,7 @@ Add those props on `Mesh` and `Model` in `packages/react/src/components.tsx`. Th
 
 `<Model>` loads inside `useEffect` and returns `null`. An R3F file wraps the model in `<Suspense fallback={...}>` and expects the fallback to stay up until the glTF is ready.
 
-Make `Model` and `Environment` throw the load promise while the file is in flight, and cache that promise by URL on the canvas. `preload(src)` starts the same promise. Unmount still aborts. A failed load still reaches `onError`. This is React's own Suspense, not a new loader.
+Make `Model` and `Environment` throw the load promise while the file is in flight, and cache that promise by URL on the canvas. `Model.preload(src)` and `Environment.preload(src)` start the same promise. Unmount still aborts. A failed load still reaches `onError`. This is React's own Suspense, not a new loader.
 
 ## One hook with the R3F names
 

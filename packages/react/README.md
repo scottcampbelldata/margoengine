@@ -12,9 +12,9 @@ hooks, views, `Sun`, `Center`), and a binding that needs `@margoengine/<name>` c
 unused feature costs nothing.
 
 Installed alone (plus the packages your subpaths name, such as `@margoengine/controls` for `OrbitControls`), it builds
-with Vite, webpack, Turbopack (Next.js), Rollup and esbuild and keeps the build to what you import. The cube page with orbit controls requests 95,384 B gzip at load
-and 102,335 B once `OrbitControls` mounts, and emits no Wasm. React and React DOM are about 70% of that; Margo's part
-(core, stage, bindings) is 27,028 B gzip. The breakdown is in [limits.md](../../docs/limits.md#react-page).
+with Vite, webpack, Turbopack (Next.js), Rollup and esbuild and keeps the build to what you import. The cube page with orbit controls requests 94,251 B gzip at load
+and 101,202 B once `OrbitControls` mounts, and emits no Wasm. React and React DOM are about 66% of that; Margo's part
+(core, stage, bindings) is 25,949 B gzip. The breakdown is in [limits.md](../../docs/limits.md#react-page).
 
 
 **What you get from this page:** a React app with a lit mesh in about five minutes, then the components, hooks,
