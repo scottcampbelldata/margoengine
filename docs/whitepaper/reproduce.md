@@ -45,6 +45,34 @@ run invalid. An official label on an invalid run stays invalid. The head-to-head
 the same scenes from `C:DevelopmentProjectsengine-bench` (`--engines=all`, see docs/benchmarking.md "Comparing
 engines").
 
+## The five-minute quickstart
+
+The launch claim is that a developer builds a textured, lit scene with shadows and picking in under five minutes by
+copy-pasting the README. `npm run check:quickstart` measures the machine part and asserts the result in a real browser:
+
+```sh
+npm run check:quickstart                                   # route 2: an own project from local tarballs
+node scripts/quickstart-timing.mjs --route=1 --keep --dir=<folder>   # route 1 (the clone's page); keep the folder
+```
+
+It clones this checkout (uncommitted work laid over it) into a temp folder with a cold npm cache, then does what the
+README says line by line: `git lfs pull`, `npm ci`, `npm run pack:packages`, a new project, `npm install <tarballs> vite`,
+`index.html` and `main.ts` extracted from the README text itself (never retyped), `npx vite`, and the page in headless
+Edge under one shared GPU slot. The browser asserts, from pixels and handlers:
+
+- a first frame with content, and sharp checker edges on the floor (none in the same scene without the texture);
+- a shadow beside the ball, darker than the same scene without `shadows.add`, also on the shipped page;
+- a click on the ball and on the crate fires the page's pick handler (waited for) and draws the outline, and an orbit
+  drag changes the picture without picking;
+- a console with no warning or error (one recorded Chrome-on-Windows warning is reported, see known-bugs.md);
+- the messages shown with no `navigator.gpu` and with an adapter request that answers null.
+
+It writes `test-results/quickstart-timing.json` (timeline, sizes, notes) and the pictures in
+`test-results/quickstart-timing/`. It fails over 300 s from the first command to the verified interactive frame, and ends
+every process it started at a hard limit of 900 s. It is a step of `check:merge`, so the nightly full run has it too.
+Not measured: reading the page and copying the two files, and anything after the first interactive frame. The install
+route is a clone because 1.0.0 is not on npm yet.
+
 ## Rules for real-GPU numbers
 
 - A quiet machine: on an integrated GPU the CPU and GPU share one power budget, so a build or test running at the same

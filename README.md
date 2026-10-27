@@ -70,6 +70,7 @@ It takes four steps in a new folder (or skip them and use the page from the clon
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
     <title>Margo Engine quickstart</title>
     <style>
       body { margin: 0; font: 16px system-ui, sans-serif }
@@ -110,10 +111,16 @@ for (let y = 0; y < 64; y++)
 const checker = new Texture({ data: pixels, width: 64, height: 64 }, { wrapS: 'repeat', wrapT: 'repeat' });
 
 // The stage mounts a canvas in #scene, adds orbit/pan/zoom with the mouse and starts the render loop.
-const stage = await createStage('#scene', { camera: { position: [4, 3, 6], target: [0, 0.6, 0] } });
+const stage = await createStage('#scene', { camera: { position: [4, 3, 6], target: [0, 0.6, 0] } }).catch((error: Error) => {
+  status.textContent = `Margo could not start: ${error.message}. See "Browser support" in the README.`;
+  throw error;
+});
 const engine = stage.engine;
 
-// Three lit, textured meshes. The default sun comes from the upper right.
+// Aim the sun from the left and above, so the shadows fall to the right, where the camera can see them.
+engine.scene.lighting.direction.set([-4, 4, 2, 3]); // x, y, z point toward the light; the last number is its strength
+
+// Three lit, textured meshes.
 const floor = new PbrMaterial({ map: checker });
 floor.setUVTransform({ scale: [6, 6] }); // repeat the texture 6 times across the floor
 const ground = createMesh(engine, planeGeometry(12, 12), floor);

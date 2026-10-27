@@ -147,6 +147,21 @@ does not own. Each entry says exactly what is needed to close it.
   checkout that holds the commits; or retire the nine pinned runs as HISTORICAL with that reason, keeping their
   `--current` guarantees.
 
+### Chrome on Windows logs a console warning on every Margo page
+
+- **What:** on Chrome and Edge for Windows every page that starts the renderer logs `The powerPreference option is
+  currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127` (a console warning, found
+  2026-10-27 by `npm run check:quickstart`, which expects a quiet console). The scene is not affected.
+- **Repro:** open the README quickstart in Edge on Windows and read the console.
+- **Cause:** `GPURenderer.create` in `packages/core/src/renderer.ts` calls `requestAdapter({ powerPreference:
+  'high-performance' })` on every platform.
+- **Needed to close:** skip the option where the browser ignores it (`/Win/.test(navigator.platform)`). That costs 17 to
+  21 bytes gzip, and core is within 20 bytes of its 20 KiB gzip ceiling in `scripts/build-modern.js`, so the build
+  stops. Either 20 bytes are found elsewhere in core or the ceiling is raised on purpose. The fix and its test are
+  written (a platform table for the adapter request in `tests/core-timestamp-feature.test.js`). `@margoengine/compute`
+  has the same default (`packages/compute/src/context.ts`). Until then `check:quickstart` records this one message
+  as a known issue and fails on any other console output.
+
 ### 4x MSAA blending is not repeatable (RTX A6000 under CPU load, and Intel Arc 140V)
 
 - **What:** the voxel GPU check (`packages/voxel/tests/render-browser-check.mjs`, run by `check:merge`) fails now and
@@ -359,3 +374,12 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   shadows README) shows it up.
 - **Needed to close:** a pixel test of a lit, sun-facing plane and a skinned low-poly mesh with the default settings that
   fails while any lit pixel is shadowed, then the fix in `@margoengine/shadows`.
+- **Update 2026-10-27 (found while timing the quickstart):** the README quickstart's sun pointed away from the camera, so its
+  shadow was hidden behind the ball; the README now aims the sun so the shadow shows, and with it the whole umbra of the
+  ball and crate on the floor shows white speckle (about a third of the pixels lit inside a solid shadow, on a floor that
+  is not a caster either). `Shadows.attach(engine, { filter: 'pcf' })` gives a clean shadow in the same scene;
+  a larger `normalBias` (0.05) does not change the speckle. So the fault is in the `'soft'` (PCSS) path of
+  `packages/shadows/src/shader.ts`, not in cascade selection or receiver bias alone. First suspect: the receiver-plane
+  term `dot(offset, slope)` added to the compared depth in the 32-tap loop, which can pull a tap in front of the blocker
+  when the sun is low. This needs a stronger-model bug hunt; `npm run check:quickstart` shows it in
+  `test-results/quickstart-timing/shipped.png`.
