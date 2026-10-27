@@ -1,6 +1,6 @@
 # @margoengine/water
 
-Install `npm i margoengine` and import `margoengine/water` (or this package alone: `npm i @margoengine/water`, imported as `@margoengine/water`; the two are the same module).
+Import `margoengine/water` from the `margoengine` package, or `@margoengine/water` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 A separate WebGPU water grid evaluates up to eight swell trains with analytical normals. Each train spreads into three Gerstner components with varied directions, wavelengths and gently bending crests. Advected gradient noise (random unit gradients, Perlin's 2002 quintic fade, analytic derivatives) adds wind agitation and micro-ripples, filtered separately by their screen footprint. Fresnel reflection, sun glints and wavelength-dependent absorption shade the surface. Optional terrain coupling adds conservative GPU shallow-water flow, moving breaker foam and a fixed GPU spray pool.
 

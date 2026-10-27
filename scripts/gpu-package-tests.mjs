@@ -27,6 +27,7 @@ export const ROOT = {
   'modern:test:xr:browser': 'simulated XR stereo pixels',
   'modern:test:usdz:browser': 'USDZ textures and the file-picker demo',
   'modern:test:postfx:browser': 'DOF and tonemapping pixels',
+  'test:docs:browser': 'README quickstart and the task guides, run as written',
   'test:modules:browser': 'Margo modules and FBX playback',
   'test:catalog:browser': 'catalog layout, clicks and clipboard',
   'test:python:browser': 'the margoengine Python package in JupyterLab and Notebook 7, camera events and to_png',

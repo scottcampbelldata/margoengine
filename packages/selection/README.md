@@ -1,6 +1,6 @@
 # @margoengine/selection
 
-Install `npm i margoengine` and import `margoengine/selection` (or this package alone: `npm i @margoengine/selection`, imported as `@margoengine/selection`; the two are the same module).
+Import `margoengine/selection` from the `margoengine` package, or `@margoengine/selection` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Visible core and PBR selection outlines using Jump Flood Algorithm distance fields or circular morphological dilation. `Selection.set` discovers glTF Pro/FBX buffers from their loader-owned mesh nodes; no separate outline registration is required.
 

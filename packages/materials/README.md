@@ -1,6 +1,6 @@
 # Margo Engine Materials
 
-Install `npm i margoengine` and import `margoengine/materials` (or this package alone: `npm i @margoengine/materials`, imported as `@margoengine/materials`; the two are the same module).
+Import `margoengine/materials` from the `margoengine` package, or `@margoengine/materials` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional glTF clearcoat, sheen, specular color, anisotropy, iridescence, transmission, IOR, volume, and TypeScript node materials through `@margoengine/gltf-pro`'s material extension slot. This package is separate from the frozen core and stage facade, and importing `gltf-pro` does not import materials.
 

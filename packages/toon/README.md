@@ -1,6 +1,6 @@
 # @margoengine/toon
 
-Install `npm i margoengine` and import `margoengine/toon` (or this package alone: `npm i @margoengine/toon`, imported as `@margoengine/toon`; the two are the same module).
+Import `margoengine/toon` from the `margoengine` package, or `@margoengine/toon` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Stepped diffuse ramps reuse creative/ToonShading. A second front-culled pass expands vertex normals into an inverted hull for silhouette outlines.
 

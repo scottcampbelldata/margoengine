@@ -1,6 +1,6 @@
 # @margoengine/animator
 
-Install `npm i margoengine` and import `margoengine/animator` (or this package alone: `npm i @margoengine/animator`, imported as `@margoengine/animator`; the two are the same module).
+Import `margoengine/animator` from the `margoengine` package, or `@margoengine/animator` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional gameplay animation on the existing `@margoengine/animation` skinning pass. Named states select clips, 1D trees interpolate neighboring samples, and 2D trees use normalized inverse-square distance weights with exact sample reproduction. State transitions crossfade a captured pose into the destination. Masked additive layers apply translation/scale/quaternion and morph deltas relative to a sampled reference pose. A zero reference scale component contributes an identity scale delta on that axis. Primitives sharing a node must have matching morph target counts, as required by glTF.
 

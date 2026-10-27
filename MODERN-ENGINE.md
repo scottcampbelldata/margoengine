@@ -18,13 +18,13 @@ Rust owns transforms and culling. TypeScript owns asset orchestration and browse
 
 ## Install from npm
 
-The renamed libraries use `@margoengine/*` at version `0.1.0`, with `margoengine` as the meta-package. Build from source or install local tarballs until the renamed packages are published. Package names for a React 19 application:
+The renamed libraries use `@margoengine/*` at version `1.0.0`, with `margoengine` as the meta-package. Build from source or install local tarballs until the renamed packages are published. Package names for a React 19 application:
 
 ```sh
-npm install @margoengine/core@0.1.0 @margoengine/gltf@0.1.0 @margoengine/react@0.1.0 @margoengine/machinery@0.1.0 @margoengine/creative@0.1.0 react@^19 react-dom@^19
+npm install @margoengine/core@1.0.0 @margoengine/gltf@1.0.0 @margoengine/react@1.0.0 @margoengine/machinery@1.0.0 @margoengine/creative@1.0.0 react@^19 react-dom@^19
 ```
 
-The React adapter also supports React 18. See [package choices and individual install commands](README.md#install-from-npm).
+The React adapter also supports React 18. See [package choices and individual install commands](README.md#install).
 
 ## Run and build
 
@@ -58,7 +58,7 @@ cargo test --manifest-path packages/kernel/Cargo.toml
 
 The release profile uses speed optimization, fat LTO, one codegen unit, stripped symbols and aborting panics. The no-std Wasm build reserves its memory once without a general allocator. Kernel rebuilds use the pinned Binaryen pipeline below; consumers use the precompiled optimized kernel. A build fails if the Wasm exceeds 30 KiB raw, the core exceeds 20 KiB gzip, or core plus glTF exceeds 30 KiB gzip.
 
-Consumers import the scoped packages below; the root package manages the workspace and its commands. The libraries remain at version `0.1.0` and are [Apache-2.0 licensed](LICENSE); the root and starters remain private. Each library's `prepack` hook builds the workspace using the checked-in Wasm, removes stale distribution files and includes a package README and a copy of the root license. `npm run pack:packages` writes all six archives to `test-results/`. The [benchmark summary](benchmarks/README.md) records the locked core and verification results. Raw captures and recovery archives remain local.
+Consumers import the scoped packages below; the root package manages the workspace and its commands. The libraries remain at version `1.0.0` and are [Apache-2.0 licensed](LICENSE); the root and starters remain private. Each library's `prepack` hook builds the workspace using the checked-in Wasm, removes stale distribution files and includes a package README and a copy of the root license. `npm run pack:packages` writes all six archives to `test-results/`. The [benchmark summary](benchmarks/README.md) records the locked core and verification results. Raw captures and recovery archives remain local.
 
 ## Plain TypeScript
 

@@ -1,10 +1,10 @@
 # @margoengine/kinematics-constraints
 
-Install `npm i margoengine` and import `margoengine/kinematics-constraints` (or this package alone: `npm i @margoengine/kinematics-constraints`, imported as `@margoengine/kinematics-constraints`; the two are the same module).
+Import `margoengine/kinematics-constraints` from the `margoengine` package, or `@margoengine/kinematics-constraints` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Standalone capsule and sphere avoidance for IK targets and two-bone chains. The package projects targets out of proxy volumes, checks elbow and link clearance, and searches a shoulder swivel angle through a caller-supplied IK evaluator. It has no engine, renderer, physics, or Wasm dependency. ESM exports and declarations are tree-shakable; core, stage, animation, and the existing IK kernels remain unchanged.
 
-Version `0.1.0` is source-only and has not been published to npm. From the repository root:
+Version `1.0.0` is source-only and has not been published to npm. From the repository root:
 
 ```sh
 npm ci
@@ -13,7 +13,7 @@ npm run test --workspace @margoengine/kinematics-constraints
 npm pack --workspace @margoengine/kinematics-constraints --pack-destination test-results
 ```
 
-Install the resulting tarball in another project with `npm install ./margoengine-kinematics-constraints-0.1.0.tgz`. No core peer dependency is required. The package is Apache-2.0 licensed.
+Install the resulting tarball in another project with `npm install ./margoengine-kinematics-constraints-1.0.0.tgz`. No core peer dependency is required. The package is Apache-2.0 licensed.
 
 ## Interactive arm demo
 

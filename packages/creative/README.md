@@ -1,12 +1,12 @@
 # @margoengine/creative
 
-Install `npm i margoengine` and import `margoengine/creative` (or this package alone: `npm i @margoengine/creative`, imported as `@margoengine/creative`; the two are the same module).
+Import `margoengine/creative` from the `margoengine` package, or `@margoengine/creative` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 WebGPU grass, a planet renderer, a leaf/weather particle preset, toon shading, HDR targets and a grading post effect (fog, god rays, focus blur, ACES, grain) for Margo Engine.
 
 Each capability has one implementation: `GPUParticles` is a preset over `@margoengine/vfx`, bloom is `Bloom` from `@margoengine/post/bloom`, and sky backdrops are `Sky` from `@margoengine/sky`.
 
-Package name: `@margoengine/creative`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/creative`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/creative@1.0.0
@@ -143,6 +143,6 @@ The demo combines Planet's linear HDR surface/cloud/rim output with optional Blo
 
 The build and prepack commands write only this package's `dist` and license copy. Checks and screenshots write to this package's `test-results`; they use existing core artifacts without rebuilding the base. The browser check uses Edge by default (or installed Playwright Chromium as a fallback); set `BROWSER_CHANNEL` to choose another installed Chromium channel. The unit checks cover loading, lifecycle, validation, resource retention and bundle isolation. The WebGPU checks cover shaders, rendered pixels, depth, HDR and device restoration.
 
-This ESM package includes TypeScript declarations, requires `@margoengine/core` 0.1.0 and depends on `@margoengine/vfx` for particles. See the effect options and limitations.
+This ESM package includes TypeScript declarations, requires `@margoengine/core` 1.0.0 and depends on `@margoengine/vfx` for particles. See the effect options and limitations.
 
 Apache-2.0 licensed.

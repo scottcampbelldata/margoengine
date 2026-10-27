@@ -1,6 +1,6 @@
 # @margoengine/environment
 
-Install `npm i margoengine` and import `margoengine/environment` (or this package alone: `npm i @margoengine/environment`, imported as `@margoengine/environment`; the two are the same module).
+Import `margoengine/environment` from the `margoengine` package, or `@margoengine/environment` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 HDR, EXR and UltraHDR loading, EXR writing, GPU image-based lighting (prefiltered specular, spherical-harmonic irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene-wide fog for Margo Engine on WebGPU.
 

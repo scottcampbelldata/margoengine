@@ -295,3 +295,19 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   4. Test against an analytic bicubic with cross terms (for example x = s, y = t, z = s^2 t^3 over two patches each
      way), comparing sampled points and the meshed area with the exact values, and replace the refusal test in
      `packages/brep/tests/iges.test.js`.
+
+## Shadows
+
+### Speckled shading on lit faces of a skinned model with default shadow settings
+
+- **What:** with `Shadows.attach(engine, { resolution: 2048 })` and the default `'soft'` filter, the upper torso and
+  head of RobotExpressive show a fine pattern of dark dots on faces that face the sun, and the soft edge of the ground
+  shadow looks dotted instead of smooth. It is visible in `docs/images/guide-animation.webp` and, faintly, at the foot
+  of the crate in `docs/images/quickstart.webp`.
+- **Repro:** follow [the animation guide](guides/animation.md) (or `npm run test:docs:browser` with
+  `DOCS_SCREENSHOTS=1`) and look at the robot's chest.
+- **Cause:** not found. The dots are not penumbra (they sit on lit faces), so receiver-plane bias or the cascade
+  selection on a low-poly skinned mesh is the first suspect; the noise term in the PCSS filter (documented in the
+  shadows README) shows it up.
+- **Needed to close:** a pixel test of a lit, sun-facing plane and a skinned low-poly mesh with the default settings that
+  fails while any lit pixel is shadowed, then the fix in `@margoengine/shadows`.

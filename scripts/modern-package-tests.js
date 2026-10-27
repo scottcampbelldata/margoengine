@@ -18,6 +18,7 @@ import { mkdir, mkdtemp, writeFile, readFile, copyFile, readdir, rm, realpath, s
 import { resolve, join, dirname, basename } from 'node:path';
 import { cpus, tmpdir } from 'node:os';
 import { openBrowser } from './browser.js';
+import { pages } from './support/doc-snippets.mjs';
 import { BUNDLED } from './supply-chain.mjs';
 
 const names = [
@@ -327,6 +328,9 @@ try {
     }
     for (const [index, code] of examples.entries()) await writeFile(join(fixture, `${name}-${index}-readme.tsx`), code);
   }
+  // The README quickstart and the task guides (docs/guides) are one program each; their `ts` blocks are type-checked
+  // like a package README, against the packed umbrella. scripts/docs-browser-test.mjs runs the same programs.
+  for (const page of pages()) await writeFile(join(fixture, `docs-${page.slug}-readme.tsx`), page.all ?? page.program);
   // The React cookbook and the react-three-fiber guide are checked like a README. A snippet whose first line is
   // `// path/file.tsx` is written to that path so a second snippet can import it.
   for (const doc of reactScope ? ['react-cookbook', 'react-from-r3f'] : []) {

@@ -1,6 +1,6 @@
 # @margoengine/stats
 
-Install `npm i margoengine` and import `margoengine/stats` (or this package alone: `npm i @margoengine/stats`, imported as `@margoengine/stats`; the two are the same module).
+Import `margoengine/stats` from the `margoengine` package, or `@margoengine/stats` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Zero runtime dependencies. Frame sampling uses a fixed Float64Array ring.
 `tick(milliseconds, drawCalls?, dispatches?)` performs numeric updates only;

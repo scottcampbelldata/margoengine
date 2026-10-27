@@ -1,6 +1,6 @@
 # @margoengine/core
 
-Install `npm i margoengine` and import `margoengine/core` (or this package alone: `npm i @margoengine/core`, imported as `@margoengine/core`; the two are the same module).
+Import `margoengine/core` from the `margoengine` package, or `@margoengine/core` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 WebGPU rendering (WebGL2 fallback via the optional `@margoengine/webgl`), a deterministic Rust/Wasm transform kernel, instanced drawing of one directional GGX light on position and normal, reversed float depth, picking and CAD camera controls. Materials are color, roughness, and metalness.
 

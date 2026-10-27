@@ -1,6 +1,6 @@
 # @margoengine/quality
 
-Install `npm i margoengine` and import `margoengine/quality` (or this package alone: `npm i @margoengine/quality`, imported as `@margoengine/quality`; the two are the same module).
+Import `margoengine/quality` from the `margoengine` package, or `@margoengine/quality` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Measured quality tiers. Desktops start on a light tier (single-sampled, pixel ratio capped, paced to at most about
 60 FPS) and time how long the GPU takes to finish each frame; a browser with clear headroom gets the full 4× MSAA tier

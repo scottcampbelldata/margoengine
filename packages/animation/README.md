@@ -1,6 +1,6 @@
 # Margo Engine Animation
 
-Install `npm i margoengine` and import `margoengine/animation` (or this package alone: `npm i @margoengine/animation`, imported as `@margoengine/animation`; the two are the same module).
+Import `margoengine/animation` from the `margoengine` package, or `@margoengine/animation` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU skeletal animation and morph targets, isolated from core and stage.
 

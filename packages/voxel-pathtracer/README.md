@@ -1,6 +1,6 @@
 # @margoengine/voxel-pathtracer
 
-Install `npm i margoengine` and import `margoengine/voxel-pathtracer` (or this package alone: `npm i @margoengine/voxel-pathtracer`, imported as `@margoengine/voxel-pathtracer`; the two are the same module).
+Import `margoengine/voxel-pathtracer` from the `margoengine` package, or `@margoengine/voxel-pathtracer` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 A progressive WebGPU path tracer for voxel models. Attach it to an engine and, while it is enabled, the frame shows a
 path-traced image of your voxel scene through the engine camera, refining every frame until a sample budget. It also

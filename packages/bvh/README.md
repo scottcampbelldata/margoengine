@@ -1,6 +1,6 @@
 # @margoengine/bvh
 
-Install `npm i margoengine` and import `margoengine/bvh` (or this package alone: `npm i @margoengine/bvh`, imported as `@margoengine/bvh`; the two are the same module).
+Import `margoengine/bvh` from the `margoengine` package, or `@margoengine/bvh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Triangle bounding volume hierarchy (`MeshBVH`, `shapecast`, `intersectsGeometry`), spatial queries and a CPU `Raycaster` for Margo Engine.
 

@@ -1,6 +1,6 @@
 # @margoengine/dof
 
-Install `npm i margoengine` and import `margoengine/dof` (or this package alone: `npm i @margoengine/dof`, imported as `@margoengine/dof`; the two are the same module).
+Import `margoengine/dof` from the `margoengine` package, or `@margoengine/dof` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU depth of field; core and stage are unchanged.
 

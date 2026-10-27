@@ -1,6 +1,6 @@
 # @margoengine/voxel
 
-Install `npm i margoengine` and import `margoengine/voxel` (or this package alone: `npm i @margoengine/voxel`, imported as `@margoengine/voxel`; the two are the same module).
+Import `margoengine/voxel` from the `margoengine` package, or `@margoengine/voxel` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Voxel worlds for Minecraft-style games and voxel editors: a block-type registry, 32 x 32 x 32 palette chunks with a
 light byte per cell, and a chunked world with dirty tracking and change events. This release is the storage layer;

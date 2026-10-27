@@ -1,6 +1,6 @@
 # @margoengine/procedural
 
-Install `npm i margoengine` and import `margoengine/procedural` (or this package alone: `npm i @margoengine/procedural`, imported as `@margoengine/procedural`; the two are the same module).
+Import `margoengine/procedural` from the `margoengine` package, or `@margoengine/procedural` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `generateCabinMesh(height, position = [0,0])` builds a 6 × 8 m timber cabin,
 35° roof, recessed windows/door and terrain-sunk stone/porch supports. `position`

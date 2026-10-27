@@ -141,6 +141,8 @@
     "visual:device-loss": "node scripts/visual-regression.js --device-loss",
     "verify": "node scripts/verify.mjs",
     "hygiene": "node scripts/hygiene.js",
+    "docs:links": "node scripts/docs-links.mjs",
+    "test:docs:browser": "node scripts/docs-browser-test.mjs",
     "quality": "node scripts/quality-gate.mjs",
     "check:parity": "node scripts/check-parity-table.mjs",
     "format": "biome format --write",

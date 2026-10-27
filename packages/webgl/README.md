@@ -1,6 +1,6 @@
 # @margoengine/webgl
 
-Install `npm i margoengine` and import `margoengine/webgl` (or this package alone: `npm i @margoengine/webgl`, imported as `@margoengine/webgl`; the two are the same module).
+Import `margoengine/webgl` from the `margoengine` package, or `@margoengine/webgl` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 WebGL2 fallback renderer for browsers without WebGPU. It draws core meshes with core's PBR
 material, shaded per pixel (GGX metallic-roughness from each mesh's constant colour and factors, one directional

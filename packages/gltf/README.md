@@ -1,10 +1,10 @@
 # @margoengine/gltf
 
-Install `npm i margoengine` and import `margoengine/gltf` (or this package alone: `npm i @margoengine/gltf`, imported as `@margoengine/gltf`; the two are the same module).
+Import `margoengine/gltf` from the `margoengine` package, or `@margoengine/gltf` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Lazy static glTF/GLB loading, named nodes and shared primitive geometry for Margo Engine.
 
-Package name: `@margoengine/gltf`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/gltf`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/gltf@1.0.0
@@ -21,6 +21,6 @@ engine.start();
 // On teardown: model.dispose(); engine.dispose();
 ```
 
-This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the supported glTF subset and lifecycle guide before importing assets.
+This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the supported glTF subset and lifecycle guide before importing assets.
 
 Apache-2.0 licensed.

@@ -1,6 +1,6 @@
 # @margoengine/staging
 
-Install `npm i margoengine` and import `margoengine/staging` (or this package alone: `npm i @margoengine/staging`, imported as `@margoengine/staging`; the two are the same module).
+Import `margoengine/staging` from the `margoengine` package, or `@margoengine/staging` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Product-shot staging. `ContactShadows`: a soft ground-contact shadow.
 The added meshes are drawn from the ground looking up into a small texture (darker the closer to the

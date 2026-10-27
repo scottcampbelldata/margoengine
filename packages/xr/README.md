@@ -1,6 +1,6 @@
 # @margoengine/xr
 
-Install `npm i margoengine` and import `margoengine/xr` (or this package alone: `npm i @margoengine/xr`, imported as `@margoengine/xr`; the two are the same module).
+Import `margoengine/xr` from the `margoengine` package, or `@margoengine/xr` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU WebXR session negotiation, input poses and instanced stereo PBR rendering. XR owns a compatible GPU device and attaches through the existing core extension interface. Core and the stage facade remain frozen.
 

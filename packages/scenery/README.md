@@ -1,6 +1,6 @@
 # @margoengine/scenery
 
-Install `npm i margoengine` and import `margoengine/scenery` (or this package alone: `npm i @margoengine/scenery`, imported as `@margoengine/scenery`; the two are the same module).
+Import `margoengine/scenery` from the `margoengine` package, or `@margoengine/scenery` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 A moonlit night sky for Margo Engine: twinkling stars, a phased moon with glow, and horizon haze. `SkyMoon` is a
 preset of `Sky` from `@margoengine/sky` (Margo's one sky implementation) held at midnight with its stylized

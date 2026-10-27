@@ -1,7 +1,6 @@
 # @margoengine/stage
 
-You normally use this package as [`margoengine`](../margoengine/README.md): `npm i margoengine`, and
-`import {createStage} from 'margoengine'` is this package.
+You normally use this package as [`margoengine`](../margoengine/README.md): `import {createStage} from 'margoengine'` is this package. The packages are not on npm yet; see the [Install](../../README.md#install) section for the routes that work today.
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 

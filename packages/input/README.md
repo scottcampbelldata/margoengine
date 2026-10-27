@@ -1,6 +1,6 @@
 # @margoengine/input
 
-Install `npm i margoengine` and import `margoengine/input` (or this package alone: `npm i @margoengine/input`, imported as `@margoengine/input`; the two are the same module).
+Import `margoengine/input` from the `margoengine` package, or `@margoengine/input` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Semantic actions combine keyboard codes, mouse buttons and relative motion, gamepad axes/buttons, and touch controls.
 

@@ -1,6 +1,6 @@
 # Margo Engine Post
 
-Install `npm i margoengine` and import `margoengine/post` (or this package alone: `npm i @margoengine/post`, imported as `@margoengine/post`; the two are the same module).
+Import `margoengine/post` from the `margoengine` package, or `@margoengine/post` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, lens flare, afterimage trails, SMAA and FXAA, a glitch and an effect stack, separate from the frozen core and stage.
 

@@ -1,6 +1,6 @@
 # @margoengine/terrain
 
-Install `npm i margoengine` and import `margoengine/terrain` (or this package alone: `npm i @margoengine/terrain`, imported as `@margoengine/terrain`; the two are the same module).
+Import `margoengine/terrain` from the `margoengine` package, or `@margoengine/terrain` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `heightfieldGeometry(height, {size, origin?, resolution?})` generates a Y-up mesh
 with recomputed slope normals. `origin` is the minimum world XZ corner; it defaults

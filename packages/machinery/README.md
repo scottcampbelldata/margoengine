@@ -1,13 +1,13 @@
 # @margoengine/machinery
 
-Install `npm i margoengine` and import `margoengine/machinery` (or this package alone: `npm i @margoengine/machinery`, imported as `@margoengine/machinery`; the two are the same module).
+Import `margoengine/machinery` from the `margoengine` package, or `@margoengine/machinery` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Joints and couplings, bounded IK, Wasm surface transport, binary telemetry, worker CAD import, stencil sections, assembly BVH picking and metrology for Margo Engine.
 
-Package name: `@margoengine/machinery`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/machinery`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
-npm install @margoengine/core@0.1.0 @margoengine/machinery@0.1.0
+npm install @margoengine/core@1.0.0 @margoengine/machinery@1.0.0
 ```
 
 ```ts
@@ -166,6 +166,6 @@ CPU machinery tools work with either backend. Section rendering requires WebGPU;
 
 Run `node scripts/section-loaded-asset-tests.js` from the repository root after building packages. The real checked-in `Box.glb` is loaded through `loadGLTF`; at actual 1x and 4x MSAA, the removed beauty matches the empty scene, its removed shadow matches the lit receiver, and the retained half keeps both its beauty and shadow. Core + stage measures 21,107 bytes gzip.
 
-This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the API and supported geometry guide.
+This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the API and supported geometry guide.
 
 Margo Engine code is Apache-2.0 licensed. The separately loaded OCCT assets are LGPL-2.1; notices and the license ship in `dist/workers`. These assets add about 7.7 MB to the package, separate from the machinery runtime JavaScript.

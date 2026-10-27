@@ -1,6 +1,6 @@
 # @margoengine/viewcube
 
-Install `npm i margoengine` and import `margoengine/viewcube` (or this package alone: `npm i @margoengine/viewcube`, imported as `@margoengine/viewcube`; the two are the same module).
+Import `margoengine/viewcube` from the `margoengine` package, or `@margoengine/viewcube` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 A CAD orientation cube for Margo Engine: a small cube in a corner of the view that turns with the camera. Click a face,
 edge or corner and the camera animates around its target to that view (Top, Front, Right, ..., the twelve edge views

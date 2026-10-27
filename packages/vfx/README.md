@@ -1,6 +1,6 @@
 # @margoengine/vfx
 
-Install `npm i margoengine` and import `margoengine/vfx` (or this package alone: `npm i @margoengine/vfx`, imported as `@margoengine/vfx`; the two are the same module).
+Import `margoengine/vfx` from the `margoengine` package, or `@margoengine/vfx` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional GPU particle simulation and indirect billboard rendering, with capacity up to 1,000,000. One storage buffer holds particle position/life, velocity/size, color and rotation (birth angle, angular velocity, initial lifetime); each invocation owns one particle. Workgroups of 256 integrate gravity, analytic curl turbulence and ground-plane collisions, touching only position/life and velocity/size after birth. Atomic counters respawn dead slots, count live particles and compact the ones whose billboard can reach the screen into the indirect draw, one triangle per particle.
 

@@ -1,6 +1,6 @@
 # @margoengine/fsm
 
-Install `npm i margoengine` and import `margoengine/fsm` (or this package alone: `npm i @margoengine/fsm`, imported as `@margoengine/fsm`; the two are the same module).
+Import `margoengine/fsm` from the `margoengine` package, or `@margoengine/fsm` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Hierarchical states preserve common ancestors during transitions, bubble events from leaf to root, and expose previous/state/blend for cross-fades.
 

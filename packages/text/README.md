@@ -1,6 +1,6 @@
 # @margoengine/text
 
-Install `npm i margoengine` and import `margoengine/text` (or this package alone: `npm i @margoengine/text`, imported as `@margoengine/text`; the two are the same module).
+Import `margoengine/text` from the `margoengine` package, or `@margoengine/text` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Crisp GPU text for Margo Engine: signed distance field glyphs generated at runtime from any browser font, with wrapping, alignment, anchors, outlines, soft shadows and billboards, as a WebGPU engine plugin.
 

@@ -1,6 +1,6 @@
 # @margoengine/video
 
-Install `npm i margoengine` and import `margoengine/video` (or this package alone: `npm i @margoengine/video`, imported as `@margoengine/video`; the two are the same module).
+Import `margoengine/video` from the `margoengine` package, or `@margoengine/video` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 WebGPU external video textures from HTMLVideoElement or VideoFrame, imported with `importExternalTexture` (no JS-side copy; whether the browser copies depends on the platform), with a screen-rectangle surface and optional Web Audio frequency sampling.
 

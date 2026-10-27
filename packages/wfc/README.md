@@ -1,6 +1,6 @@
 # @margoengine/wfc
 
-Install `npm i margoengine` and import `margoengine/wfc` (or this package alone: `npm i @margoengine/wfc`, imported as `@margoengine/wfc`; the two are the same module).
+Import `margoengine/wfc` from the `margoengine` package, or `@margoengine/wfc` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Seeded 3D Wave Function Collapse with weighted entropy, six-direction adjacency, pinned cells and bounded restart attempts.
 

@@ -1,6 +1,6 @@
 # Margo Engine glTF Pro
 
-Install `npm i margoengine` and import `margoengine/gltf-pro` (or this package alone: `npm i @margoengine/gltf-pro`, imported as `@margoengine/gltf-pro`; the two are the same module).
+Import `margoengine/gltf-pro` from the `margoengine` package, or `@margoengine/gltf-pro` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `Picking.attach(engine)` from `@margoengine/selection` discovers loader-owned
 primitive nodes automatically. `selection.set([primitive.node])` also discovers

@@ -1,6 +1,6 @@
 # @margoengine/lines
 
-Install `npm i margoengine` and import `margoengine/lines` (or this package alone: `npm i @margoengine/lines`, imported as `@margoengine/lines`; the two are the same module).
+Import `margoengine/lines` from the `margoengine` package, or `@margoengine/lines` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Fat lines with joins, caps, dashes and antialiasing, plus the debug helpers, as a WebGPU engine plugin for Margo Engine.
 

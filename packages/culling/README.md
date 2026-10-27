@@ -1,6 +1,6 @@
 # @margoengine/culling
 
-Install `npm i margoengine` and import `margoengine/culling` (or this package alone: `npm i @margoengine/culling`, imported as `@margoengine/culling`; the two are the same module).
+Import `margoengine/culling` from the `margoengine` package, or `@margoengine/culling` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 GPU-driven static instances for large assemblies. Parts are uploaded once; every frame a compute pass tests each part
 against the view frustum and, optionally, a Hi-Z depth pyramid, compacts the visible parts in their original order and

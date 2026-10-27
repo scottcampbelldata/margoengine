@@ -563,7 +563,7 @@ void water;
   `Fog` (including height fog) today.
 - A glTF material with every lighting package attached (physical material + shadows + IBL + local shadows) uses all
   16 texture slots WebGPU guarantees per shader stage; gltf-pro throws a `RangeError` naming the combination if a
-  further texture would exceed the device limit ([gltf-pro README](../../packages/gltf-pro/README.md#texture-bindings)).
+  further texture would exceed the device limit ([limits](../limits.md)).
 
 ## Quality tiers
 

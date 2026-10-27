@@ -1,6 +1,6 @@
 # @margoengine/tween
 
-Install `npm i margoengine` and import `margoengine/tween` (or this package alone: `npm i @margoengine/tween`, imported as `@margoengine/tween`; the two are the same module).
+Import `margoengine/tween` from the `margoengine` package, or `@margoengine/tween` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Numeric property interpolation and easing; `update` steps the existing tracks in place and creates no per-track objects.
 

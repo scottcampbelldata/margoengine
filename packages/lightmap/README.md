@@ -1,6 +1,6 @@
 # @margoengine/lightmap
 
-Install `npm i margoengine` and import `margoengine/lightmap` (or this package alone: `npm i @margoengine/lightmap`, imported as `@margoengine/lightmap`; the two are the same module).
+Import `margoengine/lightmap` from the `margoengine` package, or `@margoengine/lightmap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Bakes lightmaps on the CPU: one padded UV atlas for a quad mesh with shadowed direct light and ambient occlusion,
 plus matching albedo, emission, normal and ORM textures. Built for exporting lit voxel and block models (each

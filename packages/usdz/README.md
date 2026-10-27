@@ -1,6 +1,6 @@
 # @margoengine/usdz
 
-Install `npm i margoengine` and import `margoengine/usdz` (or this package alone: `npm i @margoengine/usdz`, imported as `@margoengine/usdz`; the two are the same module).
+Import `margoengine/usdz` from the `margoengine` package, or `@margoengine/usdz` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional static USDA, USDC and USDZ ingestion into `@margoengine/gltf-pro`. Core and the stage facade are unchanged. The package uses Margo's shared bounded USDA tokenizer and ZIP reader, plus its native Crate decoder for USDC. Building and using it requires no external renderer or CAD runtime.
 

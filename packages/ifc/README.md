@@ -1,6 +1,6 @@
 # @margoengine/ifc
 
-Install `npm i margoengine` and import `margoengine/ifc` (or this package alone: `npm i @margoengine/ifc`, imported as `@margoengine/ifc`; the two are the same module).
+Import `margoengine/ifc` from the `margoengine` package, or `@margoengine/ifc` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 IFC geometry and BIM identifiers using a caller-owned, initialized `web-ifc` runtime. The IFC Wasm parser stays outside the frozen core and stage facade.
 

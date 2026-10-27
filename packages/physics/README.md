@@ -1,12 +1,12 @@
 # @margoengine/physics
 
-Install `npm i margoengine` and import `margoengine/physics` (or this package alone: `npm i @margoengine/physics`, imported as `@margoengine/physics`; the two are the same module).
+Import `margoengine/physics` from the `margoengine` package, or `@margoengine/physics` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Rigid-body physics for Margo Engine on [Rapier](https://rapier.rs): a fixed-step engine plugin with interpolation, colliders (compound and convex-decomposed ones included), joints (rope and spring included), ropes and chains, ray-cast vehicles, scene queries, collision events and a character controller.
 
 Build from source with `npm run build` in `packages/physics`.
 
-Covers the plugin-style physics API developers know from other engines (`HavokPlugin`, `PhysicsAggregate`, `PhysicsBody`, `PhysicsShape*`, `Physics6DoFConstraint` and friends) and the usual React physics components (`<Physics>`, `<RigidBody>`, collider components, joints, `useRapier` queries and events). Rapier is not bundled: you install `@dimforge/rapier3d-compat` (Apache-2.0) yourself and pass the initialized module in.
+It exports `Physics` (the world: bodies, colliders, joints, queries and events), `PhysicsBody`, `PhysicsJoint`, `CharacterController`, `Vehicle` and `Rope`. The React components in `@margoengine/react/physics` are `<Physics>`, `<RigidBody>`, the collider components (`CuboidCollider`, `BallCollider` and others), `useJoint`, `usePhysics`, `useBeforePhysicsStep` and `useAfterPhysicsStep`. Rapier is not bundled: you install `@dimforge/rapier3d-compat` (Apache-2.0) yourself and pass the initialized module in.
 
 ```ts
 import RAPIER from '@dimforge/rapier3d-compat';

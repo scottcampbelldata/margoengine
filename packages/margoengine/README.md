@@ -4,9 +4,7 @@ Margo Engine in one install. The root is the stage (`createStage`, everything `@
 engine package is a subpath: `margoengine/gltf`, `margoengine/shadows`, `margoengine/physics`, `margoengine/react`,
 including their smaller entries (`margoengine/controls/orbit`, `margoengine/geometry/primitives`, ...).
 
-```bash
-npm i margoengine
-```
+The packages are not on npm yet. Until 1.0.0 is published, use the clone or local-tarball routes in the [Install](../../README.md#install) section; then `npm i margoengine` will install this package.
 
 ```ts
 import {createStage} from 'margoengine';

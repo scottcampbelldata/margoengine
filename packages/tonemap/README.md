@@ -1,6 +1,6 @@
 # @margoengine/tonemap
 
-Install `npm i margoengine` and import `margoengine/tonemap` (or this package alone: `npm i @margoengine/tonemap`, imported as `@margoengine/tonemap`; the two are the same module).
+Import `margoengine/tonemap` from the `margoengine` package, or `@margoengine/tonemap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU HDR presentation and color grading, separate from core and stage.
 

@@ -1,6 +1,6 @@
 # @margoengine/exporters
 
-Install `npm i margoengine` and import `margoengine/exporters` (or this package alone: `npm i @margoengine/exporters`, imported as `@margoengine/exporters`; the two are the same module).
+Import `margoengine/exporters` from the `margoengine` package, or `@margoengine/exporters` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 glTF 2.0 / GLB, STL, OBJ (with MTL), PLY, static USDZ and static COLLADA 1.4.1 (`.dae`) export for Margo Engine scenes
 and plain geometry data, plus SHA-256 for checking exported files.

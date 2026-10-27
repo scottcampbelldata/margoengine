@@ -6,41 +6,183 @@ A small WebGPU engine for the web, with a Rust/Wasm core and CAD tools built on 
 [![npm](https://img.shields.io/npm/v/margoengine.svg)](https://www.npmjs.com/package/margoengine)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-![Tokyo corner diorama rendered by Margo Engine](site/images/tokyo-diorama.jpg)
+![A textured crate and a ball with shadows on a checkered floor, rendered by Margo Engine](docs/images/quickstart.webp)
+
+**[Quickstart: a textured, lit scene with shadows and picking in five minutes](#quickstart)** ·
+[Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
+[Coming from three.js](docs/from-threejs.md)
+
+The core and the stage together are 22,781 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+(glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
+
+## Install
+
+Margo needs WebGPU (see [Browser support](#browser-support)) and Node.js 22.12+ (or 24+) for the tools.
+
+**The packages are not on npm yet.** `npm install margoengine` does not work today; 1.0.0 is the first planned release.
+Two routes work now. Both start from a clone, and you need [Git LFS](https://git-lfs.com) for the test assets:
+
+```sh
+git clone https://github.com/scottcampbelldata/margoengine.git
+cd margoengine
+git lfs install
+git lfs pull
+npm ci
+```
+
+**Route 1: run the quickstart inside the clone.** Nothing to install in a project of your own.
+
+```sh
+npm run build:packages
+npm run dev:examples
+```
+
+Open <http://127.0.0.1:5173/examples/quickstart/>. That page is the quickstart below, saved as
+[examples/quickstart/](examples/quickstart).
+
+**Route 2: use the packages in your own project from local tarballs.** `npm run pack:packages` builds every package and
+writes one `.tgz` file each to `test-results/`. Install them all, plus Vite, in a new folder (shown for a shell that
+expands `*.tgz`, such as Git Bash, macOS or Linux; in PowerShell list the files or use `Get-ChildItem`):
+
+```sh
+npm run pack:packages
+mkdir ../my-scene && cd ../my-scene
+npm init -y
+npm install ../margoengine/test-results/*.tgz vite
+```
+
+On the machine used to write this page, packing took about a minute after `npm ci` and the install took 8 seconds. Then
+follow the Quickstart steps 2 to 4 below in `my-scene`.
+
+**After 1.0.0 is published,** `npm install margoengine vite` in a new folder replaces Route 2 and nothing else changes.
+
+## Quickstart
+
+You will build a floor, a crate and a ball with a texture, sun light, soft shadows, orbit controls and click-to-select.
+It takes four steps in a new folder (or skip them and use the page from the clone above).
+
+1. Install the packages as in Route 2 above (or use Route 1 and skip to step 4).
+2. Save this as `index.html`:
+
+```html index.html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Margo Engine quickstart</title>
+    <style>
+      body { margin: 0; font: 16px system-ui, sans-serif }
+      #scene { height: 100vh }
+      #status { position: fixed; top: 8px; left: 12px; margin: 0; padding: 4px 8px; background: #fffa; border-radius: 4px }
+    </style>
+  </head>
+  <body>
+    <div id="scene"></div>
+    <p id="status">Drag to orbit, scroll to zoom.</p>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
+```
+
+3. Save this as `main.ts`:
+
+```ts main.ts
+import { createStage } from 'margoengine';
+import { boxGeometry, planeGeometry, sphereGeometry } from 'margoengine/geometry';
+import { PbrMaterial, Texture, createMesh } from 'margoengine/materials';
+import { Picking, Selection } from 'margoengine/selection';
+import { Shadows } from 'margoengine/shadows';
+
+const status = document.querySelector('#status')!;
+if (!('gpu' in navigator)) {
+  status.textContent = 'This browser has no WebGPU, which this scene needs. See "Browser support" in the README.';
+  throw new Error('WebGPU unavailable');
+}
+
+// A 64 x 64 checkerboard painted in code, so the example needs no image file.
+const pixels = new Uint8Array(64 * 64 * 4);
+for (let y = 0; y < 64; y++)
+  for (let x = 0; x < 64; x++) {
+    const light = ((x >> 3) + (y >> 3)) % 2 === 0;
+    pixels.set(light ? [235, 235, 225, 255] : [70, 90, 110, 255], (y * 64 + x) * 4);
+  }
+const checker = new Texture({ data: pixels, width: 64, height: 64 }, { wrapS: 'repeat', wrapT: 'repeat' });
+
+// The stage mounts a canvas in #scene, adds orbit/pan/zoom with the mouse and starts the render loop.
+const stage = await createStage('#scene', { camera: { position: [4, 3, 6], target: [0, 0.6, 0] } });
+const engine = stage.engine;
+
+// Three lit, textured meshes. The default sun comes from the upper right.
+const floor = new PbrMaterial({ map: checker });
+floor.setUVTransform({ scale: [6, 6] }); // repeat the texture 6 times across the floor
+const ground = createMesh(engine, planeGeometry(12, 12), floor);
+ground.root.setRotation([-Math.PI / 2, 0, 0]); // planes face +z; lay it flat
+const crate = createMesh(engine, boxGeometry(1, 1, 1), new PbrMaterial({ map: checker, roughness: 0.6 }));
+crate.root.setPosition([-1, 0.5, 0]);
+const ball = createMesh(engine, sphereGeometry(0.6, 48, 24), new PbrMaterial({ color: '#84d6bd', roughness: 0.25 }));
+ball.root.setPosition([1, 0.6, 0]);
+
+// Shadows: tell the shadow package which meshes cast and receive.
+const shadows = Shadows.attach(engine, { resolution: 2048 });
+for (const mesh of [ground, crate, ball]) shadows.add(mesh);
+
+// Click a mesh to outline it; click empty space to clear.
+const picking = Picking.attach(engine);
+const outline = Selection.attach(engine, { color: [1, 0.6, 0] });
+const names = new Map<unknown, string>([
+  [crate, 'crate'],
+  [ball, 'ball'],
+]);
+let pressed = [0, 0];
+let busy = false; // one pick can wait at a time
+engine.canvas.addEventListener('pointerdown', (event) => {
+  pressed = [event.clientX, event.clientY];
+});
+engine.canvas.addEventListener('click', async (event) => {
+  const moved = Math.hypot(event.clientX - pressed[0], event.clientY - pressed[1]);
+  if (busy || moved > 4) return; // ignore the end of an orbit drag
+  busy = true;
+  const hit = await picking.pick(event.offsetX, event.offsetY);
+  busy = false;
+  const name = hit?.model ? names.get(hit.model) : undefined;
+  outline.set(name && hit ? [hit.mesh] : []);
+  status.textContent = name ? `Picked the ${name}.` : 'Click the crate or the ball.';
+});
+
+stage.onTick((delta) => {
+  crate.root.rotation.y += delta * 0.5;
+});
+window.addEventListener('pagehide', () => stage.dispose(), { once: true });
+```
+
+4. Run `npx vite` and open the address it prints. Drag to orbit, scroll to zoom, right-drag to pan, click the crate.
+
+The scene is about 60 lines. Three things to know about it:
+
+- `createStage` mounts the canvas in `#scene`, adds mouse and touch camera controls and starts the render loop.
+- `createMesh` (from `margoengine/materials`) draws a geometry with a `PbrMaterial`. That is how a mesh gets a
+  texture. `stage.box()` and `stage.sphere()` make plain-colour meshes with no texture.
+- Shadows, picking and outlines are separate packages. You import them when you want them and pay nothing when you do not.
+
+**WebGPU and the fallback.** This scene needs WebGPU. Chrome and Edge on desktop are the browsers the engine is tested
+in. Without WebGPU the page shows a message and stops. The optional [`@margoengine/webgl`](packages/webgl/README.md)
+renders plain meshes with flat shading on WebGL2, with no textures, shadows, effects or picking, so it cannot run this
+quickstart. Details are under [Browser support](#browser-support).
+
+Next: [Start here](docs/start-here.md) lists a guide for each goal: [textures and materials](docs/guides/textures-and-materials.md),
+[lights and shadows](docs/guides/lights-and-shadows.md), [camera and controls](docs/guides/camera-and-controls.md),
+[interaction](docs/guides/interaction.md), [loading glTF](docs/guides/loading-gltf.md) and
+[animation](docs/guides/animation.md).
+
+## Demos
 
 | | | |
 | --- | --- | --- |
 | ![Night Citadel](site/images/night-citadel.jpg) | ![Flight Helmet](site/images/flight-helmet.jpg) | ![Gameplay sandbox](site/images/gameplay-sandbox.jpg) |
 | [Night Citadel](apps/showcase-night-citadel/README.md) | [glTF PBR](examples/flight-helmet.html) | [Gameplay sandbox](examples/gameplay-sandbox/README.md) |
 
-Live demos: [margoengine.com](https://margoengine.com)
-
-The core and the stage together are 22,781 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
-(glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
-
-## Quick start
-
-```sh
-npm install margoengine
-```
-
-```html
-<div id="scene" style="height: 400px"></div>
-<script type="module">
-  import { createStage } from 'margoengine';
-
-  const stage = await createStage('#scene');
-  const orb = stage.sphere({ color: '#84d6bd', roughness: 0.25 });
-  stage.onTick((delta) => { orb.rotation.y += delta; });
-  window.addEventListener('pagehide', () => stage.dispose(), { once: true });
-</script>
-```
-
-`createStage` mounts a canvas, adds orbit controls and starts rendering. Load a model with
-`await stage.load('/part.glb')` (glTF, GLB, STL, OBJ, STEP and IGES).
-
-The packages are not on npm yet. Until the first release, build from source as below and install the tarballs from
-`npm run pack:packages`.
+![Tokyo corner diorama rendered by Margo Engine](site/images/tokyo-diorama.jpg)
 
 ## Build from source
 

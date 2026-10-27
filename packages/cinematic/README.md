@@ -1,6 +1,6 @@
 # @margoengine/cinematic
 
-Install `npm i margoengine` and import `margoengine/cinematic` (or this package alone: `npm i @margoengine/cinematic`, imported as `@margoengine/cinematic`; the two are the same module).
+Import `margoengine/cinematic` from the `margoengine` package, or `@margoengine/cinematic` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `rig.setOrbitOffset(yaw, pitch, distance, height = 0)` writes the retained camera
 offset in place from orbit angles (no new vector is created). The sandbox uses this

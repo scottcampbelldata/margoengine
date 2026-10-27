@@ -1,6 +1,6 @@
 # @margoengine/net
 
-Install `npm i margoengine` and import `margoengine/net` (or this package alone: `npm i @margoengine/net`, imported as `@margoengine/net`; the two are the same module).
+Import `margoengine/net` from the `margoengine` package, or `@margoengine/net` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Bounded snapshot interpolation for position, quaternion and velocity, with capped dead reckoning.
 

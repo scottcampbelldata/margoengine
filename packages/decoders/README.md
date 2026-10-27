@@ -1,6 +1,6 @@
 # @margoengine/decoders
 
-Install `npm i margoengine` and import `margoengine/decoders` (or this package alone: `npm i @margoengine/decoders`, imported as `@margoengine/decoders`; the two are the same module).
+Import `margoengine/decoders` from the `margoengine` package, or `@margoengine/decoders` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Worker-pooled Draco geometry decoding, KTX2/Basis Universal texture transcoding and EXT_meshopt_compression decoding, and synchronous PNG, TGA, TIFF, DDS and KTX 1 reading (`@margoengine/decoders/png`, `/tga`, `/tiff`, `/dds`, `/ktx`), for Margo Engine.
 

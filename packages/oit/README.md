@@ -1,6 +1,6 @@
 # @margoengine/oit
 
-Install `npm i margoengine` and import `margoengine/oit` (or this package alone: `npm i @margoengine/oit`, imported as `@margoengine/oit`; the two are the same module).
+Import `margoengine/oit` from the `margoengine` package, or `@margoengine/oit` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Order-independent transparency for glTF Pro BLEND primitives and `@margoengine/materials` transparent meshes:
 weighted blended OIT (McGuire and Bavoil, JCGT 2013). Overlapping transparent parts (a translucent CAD housing over

@@ -1,6 +1,6 @@
 # @margoengine/controls
 
-Install `npm i margoengine` and import `margoengine/controls` (or this package alone: `npm i @margoengine/controls`, imported as `@margoengine/controls`; the two are the same module).
+Import `margoengine/controls` from the `margoengine` package, or `@margoengine/controls` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `stepLocomotion(state, actions, delta, height, options?)` provides ground-following
 character movement with normalized diagonals, damped speed and heading, and a

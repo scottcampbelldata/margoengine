@@ -30,6 +30,7 @@ export const PARALLEL = [
   [
     `node --experimental-test-module-mocks --test --test-concurrency=${TEST_CONCURRENCY} tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js`,
   ],
+  ['npm run docs:links'],
   ['npm run measure:size'],
   ['npm run proofs -- --current'],
 ];

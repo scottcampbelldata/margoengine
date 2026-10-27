@@ -1,6 +1,6 @@
 # @margoengine/blender
 
-Install `npm i margoengine` and import `margoengine/blender` (or this package alone: `npm i @margoengine/blender`, imported as `@margoengine/blender`; the two are the same module).
+Import `margoengine/blender` from the `margoengine` package, or `@margoengine/blender` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional offline Blender `.margo` assets for Margo WebGPU PBR. Core and the stage facade remain unchanged. Geometry is validated and uploaded from views of the original binary buffer without glTF accessor decoding or vertex repacking. Repeated meshes share CPU views and GPU geometry buffers; each object keeps its own transform/material uniforms.
 
