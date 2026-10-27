@@ -85,6 +85,8 @@ writeFileSync(
   }),
 );
 const api = new API({ cwd: root });
+// Entry .d.ts (checker path key) -> its specifier, for namespace imports of a whole entry.
+const entryOf = new Map(packages.flatMap((pkg) => pkg.entries.map((entry) => [key(entry.dts), entry.specifier])));
 const exportedBy = new Map(); // symbol id -> first entry of the declaring package that exports it (for import lines)
 let reports;
 try {
@@ -114,6 +116,7 @@ function report({ program, checker }, pkg, entry) {
   const queue = []; // local declarations whose type references still need a look
   const exported = new Set();
   const imports = new Set();
+  const namespaces = new Set(); // "spec\0localName" of namespace imports (`import * as localName from spec`)
   const counts = { exports: 0, any: 0, unexported: 0 };
 
   const renderModule = (moduleSymbol, indent) => {
@@ -171,6 +174,13 @@ function report({ program, checker }, pkg, entry) {
       }
       seen.set(symbol.id, null);
       const all = symbol.declarations ?? [];
+      // `import type * as Name from 'other-package'` resolves to that module, whose symbol name is its file path: report
+      // it as the namespace import it is, never as a named import of that (machine-specific) path.
+      if (all[0]?.kind === SyntaxKind.SourceFile && !local(all[0].path)) {
+        const spec = entryOf.get(key(all[0].path)) ?? ownerOf(all[0].path);
+        if (spec) namespaces.add(`${spec}\0${references[index].getText()}`);
+        continue;
+      }
       const owner = all.length && !local(all[0].path) ? ownerOf(all[0].path) : undefined;
       const workspace = packages.some((p) => p.name === owner);
       if (owner)
@@ -209,7 +219,12 @@ function report({ program, checker }, pkg, entry) {
     spec.endsWith('#internal')
       ? `import { ${names.join(', ')} } from "${spec.slice(0, -9)}"; // not exported by any entry of that package`
       : `import { ${names.join(', ')} } from "${spec}";`;
-  if (from.size) body = [...from].map(importLine).join('\n') + '\n\n' + body;
+  const lines = [...from].map(importLine);
+  for (const item of [...namespaces].sort(byText)) {
+    const [spec, name] = item.split('\0');
+    lines.push(`import * as ${name} from "${spec}";`);
+  }
+  if (lines.length) body = lines.join('\n') + '\n\n' + body;
 
   // Global augmentations in the package's loaded declaration files (they apply whenever the package's types load).
   const globals = [];
