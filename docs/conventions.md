@@ -89,6 +89,16 @@ itself, as the table above says.
 is fixed in core, with a test, inside the 25,000-byte core + stage gzip gate; record the bytes it costs. New
 capabilities go in optional packages, and a fix that would add a capability is listed for the maintainer instead.
 
+**Exception, the stage facade (Scott, 2026-10-27):** the stage is lifted from the freeze for one restructuring,
+because it broke "pay only for what you import" and nothing is published yet, so no user is broken. Its ten
+optional-package methods (`load`, `gltf`, `machinery`, `creative`, `scenery`, `sky`, `particles`, `effects`,
+`environment`, `shadows`) held `import()`s that every app building a `Stage` reached (class methods are never
+tree-shaken), so webpack and Turbopack failed on uninstalled optional peers. They moved into feature entries that take
+the stage (`@margoengine/stage/gltf` `addGLTF`, `/cad` `addCAD`, `/sky` `addSky`, `/particles` `addParticles`,
+`/effects` `addEffects`, `/environment` `addEnvironment`, `/shadows` `addShadows`; the whole-pack accessors became a
+plain `import()`), and the root gained `stage.signal`. The stage root shrank (core + stage 22,781 -> 21,910 B gzip).
+Core is untouched. The exception covers this one change; the freeze applies again after it.
+
 ## Names exported by more than one package
 
 A name declared and exported by two packages must mean the same thing, or be renamed. Decisions:

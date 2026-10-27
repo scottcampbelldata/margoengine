@@ -67,7 +67,7 @@ Each row is a separate npm package (not published yet: until then, build from so
 
 ```sh
 npm install @margoengine/core                      # engine, camera, meshes, constant PBR material
-npm install margoengine                            # optional facade: createStage('#app'), app.box(), app.load(url)
+npm install margoengine                            # optional facade: createStage('#app'), app.box(), addGLTF(app, url)
 npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @margoengine/controls
 ```
 
@@ -608,8 +608,8 @@ const raw = parseSTL(await (await fetch('/part.stl')).arrayBuffer()); // STL as 
 const scan = createMeshes(engine, parsePLY(await (await fetch('/scan.ply')).arrayBuffer()));
 ```
 
-The stage facade loads by extension: `await app.load('/part.step')` handles glTF (constant colours), STL, OBJ, STEP and
-IGES and frames the result. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. Textured OBJ with its MTL loads in one call with `loadOBJ` from `@margoengine/loaders/mtl`; Collada reads geometry,
+The stage facade frames what it loads: `await addCAD(app, '/part.step')` (`margoengine/stage/cad`) handles STL, OBJ,
+STEP and IGES, and `await addGLTF(app, '/model.glb')` (`margoengine/stage/gltf`) glTF with constant colours. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. Textured OBJ with its MTL loads in one call with `loadOBJ` from `@margoengine/loaders/mtl`; Collada reads geometry,
 materials and the hierarchy (`parseDAE`). For STEP/IGES files you ship yourself, convert them once with
 `npx margo-convert part.step part.glb` ([tools/margo-convert](../tools/margo-convert/README.md)) and load the GLB:
 the page then skips the 3.1 MB OCCT download.

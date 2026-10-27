@@ -18,7 +18,7 @@ export const LAZY_FILES = [
     kind: 'Chunk',
     measure: 'bundle',
     external: core,
-    when: '`app.load()` of a .glb or .gltf URL, first call',
+    when: '`addGLTF(stage, url)` (`margoengine/stage/gltf`), first call',
   },
   {
     package: 'margoengine',
@@ -27,7 +27,7 @@ export const LAZY_FILES = [
     kind: 'Chunk',
     measure: 'bundle',
     external: core,
-    when: '`app.load()` of a .stl, .obj, .step or .iges URL, first call',
+    when: '`addCAD(stage, url)` (`margoengine/stage/cad`) of a .stl, .obj, .step or .iges URL, first call',
   },
   {
     package: 'margoengine',
@@ -36,7 +36,7 @@ export const LAZY_FILES = [
     kind: 'Chunk',
     measure: 'bundle',
     external: core,
-    when: '`app.sky()`, first call',
+    when: '`addSky(stage)` (`margoengine/stage/sky`), first call',
   },
   {
     package: 'margoengine',
@@ -45,7 +45,7 @@ export const LAZY_FILES = [
     kind: 'Chunk',
     measure: 'bundle',
     external: core,
-    when: '`app.particles()`, first call',
+    when: '`addParticles(stage)` (`margoengine/stage/particles`), first call',
   },
   {
     package: 'margoengine',
@@ -54,7 +54,7 @@ export const LAZY_FILES = [
     kind: 'Chunk',
     measure: 'bundle',
     external: core,
-    when: '`app.effects()`, first call',
+    when: '`addEffects(stage)` (`margoengine/stage/effects`), first call',
   },
   {
     package: 'margoengine',
@@ -63,7 +63,7 @@ export const LAZY_FILES = [
     kind: 'Chunk',
     measure: 'bundle',
     external: core,
-    when: '`app.environment(url)`, first call',
+    when: '`addEnvironment(stage, url)` (`margoengine/stage/environment`), first call',
   },
   {
     package: 'margoengine',
@@ -72,7 +72,7 @@ export const LAZY_FILES = [
     kind: 'Chunk',
     measure: 'bundle',
     external: core,
-    when: '`app.shadows()`, first call',
+    when: '`addShadows(stage)` (`margoengine/stage/shadows`), first call',
   },
   // CAD import: one worker per import; OCCT only for B-Rep formats.
   {
@@ -81,7 +81,7 @@ export const LAZY_FILES = [
     label: 'workers/cad-runtime.js',
     kind: 'Worker',
     measure: 'file',
-    when: "Each `loadCAD()` / `parseCADAsync()` (`@margoengine/machinery/cad`, also the stage's `app.load()` of CAD files) where `Worker` exists",
+    when: 'Each `loadCAD()` / `parseCADAsync()` (`@margoengine/machinery/cad`, also `addCAD(stage, url)` from `margoengine/stage/cad`) where `Worker` exists',
   },
   {
     package: '@margoengine/machinery',

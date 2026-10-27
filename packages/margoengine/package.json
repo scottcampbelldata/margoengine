@@ -1059,6 +1059,34 @@
       "types": "./dist/splines.d.ts",
       "import": "./dist/splines.js"
     },
+    "./stage/gltf": {
+      "types": "./dist/stage/gltf.d.ts",
+      "import": "./dist/stage/gltf.js"
+    },
+    "./stage/cad": {
+      "types": "./dist/stage/cad.d.ts",
+      "import": "./dist/stage/cad.js"
+    },
+    "./stage/sky": {
+      "types": "./dist/stage/sky.d.ts",
+      "import": "./dist/stage/sky.js"
+    },
+    "./stage/particles": {
+      "types": "./dist/stage/particles.d.ts",
+      "import": "./dist/stage/particles.js"
+    },
+    "./stage/effects": {
+      "types": "./dist/stage/effects.d.ts",
+      "import": "./dist/stage/effects.js"
+    },
+    "./stage/environment": {
+      "types": "./dist/stage/environment.d.ts",
+      "import": "./dist/stage/environment.js"
+    },
+    "./stage/shadows": {
+      "types": "./dist/stage/shadows.d.ts",
+      "import": "./dist/stage/shadows.js"
+    },
     "./staging": {
       "types": "./dist/staging.d.ts",
       "import": "./dist/staging.js"

@@ -102,7 +102,12 @@ does not own. Each entry says exactly what is needed to close it.
   A plain webpack 5 build of an entry importing those five names fails the same way: 39 module names in 19 packages
   (2026-10-27).
 - **Cause (measured, 2026-10-27):** two sources, each enough on its own.
-  1. The stage facade: `Canvas` constructs a `Stage` (it hands it to `onCreated` and `<Stage>`), and the `Stage` class
+  1. **Fixed (2026-10-27):** the ten loaders moved out of the `Stage` class into feature entries that take the stage
+     (`@margoengine/stage/gltf` `addGLTF`, `/cad` `addCAD`, `/sky` `addSky`, `/particles` `addParticles`, `/effects`
+     `addEffects`, `/environment` `addEnvironment`, `/shadows` `addShadows`); the stage root holds no `import()`
+     (`tests/modern-facade-isolation.test.js` builds a stage-only app and fails on any lazy import). Callers migrate
+     with `node scripts/codemod-stage-loaders.mjs`. Before:
+     The stage facade: `Canvas` constructs a `Stage` (it hands it to `onCreated` and `<Stage>`), and the `Stage` class
      methods `load` (glTF, CAD), `gltf`, `machinery`, `creative`, `scenery`, `sky`, `particles`, `effects`,
      `environment` and `shadows` hold 10 `import()`s of 6 optional packages (`creative`, `creative/particles`,
      `creative/post`, `environment`, `gltf`, `machinery`, `machinery/cad`, `scenery`, `scenery/sky`, `shadows`).

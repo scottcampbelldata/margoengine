@@ -14,7 +14,6 @@ const reviewed = {
   FrameGraph: 'passes owner executing',
   GPURenderer:
     'frame attachments msaa resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings frameId lost deviceLost resources variants groups uniform bindGroup culledGroup culled disposed canvas device context format pipeline descriptor renderFrame attach holdColor clears',
-  Stage: 'imports',
 };
 
 function walk(node, visit) {

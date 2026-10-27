@@ -141,16 +141,15 @@ test('sizes page shows the basic glTF scene network log from the same build: onl
     paths.filter((path) => /\.wasm$|occt|draco|basis|rapier|recast|ifc|worker|cad/i.test(path)),
     [],
   );
-  for (const role of ['Page', 'Entry: core + stage + app', '@margoengine/gltf (app.load)', 'Model'])
+  for (const role of ['Page', 'Entry: core + stage + app', '@margoengine/gltf (addGLTF)', 'Model'])
     assert.equal(network.files.filter((file) => file.role === role).length, 1, role);
   assert.ok(
     network.files.every((file) => file.role),
     'every request is an expected file',
   );
-  assert.ok(
-    network.notFetched.some((file) => /occt-import-js.*\.wasm$/.test(file.path)),
-    'the build held the OCCT .wasm it did not fetch',
-  );
+  // Since the stage feature entries (2026-10-27) the build emits only what the app imports: no OCCT .wasm, CAD
+  // worker or other pack waits unfetched beside it.
+  assert.deepEqual(network.notFetched, [], 'the build emitted no file the page does not fetch');
   for (const key of ['transferred', 'raw', 'gzip', 'brotli'])
     assert.equal(
       network.total[key],

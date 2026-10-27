@@ -78,7 +78,7 @@ window.addEventListener('pagehide', () => stage.dispose(), { once: true });
 | Animation and skins | Played by [the animation package](animation.md). |
 | Required extensions the loader does not know | The load rejects. |
 
-`stage.load(url)` is a shorter call that fits the camera for you, but it uses the basic loader: constant-colour
+`addGLTF(stage, url)` (from `@margoengine/stage/gltf`) is a shorter call that fits the camera for you, but it uses the basic loader: constant-colour
 geometry without textures. Use it for CAD formats (STEP, IGES, STL, OBJ). For textured models, use `loadGLTF`.
 
 ## Common mistakes

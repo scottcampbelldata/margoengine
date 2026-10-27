@@ -10,13 +10,13 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 318,765 B |
-| `margoengine/cad` | CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export | 201,527 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 291,590 B |
-| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 160,399 B |
+| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 317,851 B |
+| `margoengine/cad` | CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export | 188,599 B |
+| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 280,415 B |
+| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 151,721 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
-part of a kit pays for that part; core + stage alone is 22,636 B). Wasm decoders, workers and lazily loaded parts
+part of a kit pays for that part; core + stage alone is 21,910 B). Wasm decoders, workers and lazily loaded parts
 are extra and load only when used. `tests/umbrella.test.js` measures these numbers on every run and fails when one
 moves more than 3%.
 
@@ -45,11 +45,12 @@ shadows.add(crate);
 
 ```ts
 import {SOLIDWORKS, ViewCube, cadControls, createStage} from 'margoengine/cad';
+import { addCAD } from 'margoengine/stage/cad';
 
 const stage = await createStage('#viewport', {controls: false});
 cadControls(stage.engine, {profile: SOLIDWORKS, keys: window});
 ViewCube.attach(stage.engine);
-await stage.load('/bracket.step');
+await addCAD(stage, '/bracket.step');
 ```
 
 ## Which kit

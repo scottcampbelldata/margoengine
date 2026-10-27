@@ -17,6 +17,7 @@ A short tour. Each package README has the full reference. The public API of ever
 
 ```ts
 import { createStage, Geometry } from 'margoengine';
+import { addCAD } from 'margoengine/stage/cad';
 
 const stage = await createStage('#scene', { controls: true, autoStart: true, onError: console.error });
 
@@ -24,7 +25,7 @@ stage.box({ size: [1, 1, 1], color: '#84d6bd', position: [0, 0.5, 0] });
 stage.sphere({ radius: 0.5, metalness: 1, roughness: 0.2 });
 stage.mesh(new Geometry(positions, normals, indices), { color: '#c3c9d0' });
 
-const model = await stage.load('/part.step'); // glTF, GLB, STL, OBJ, STEP, IGES
+const model = await addCAD(stage, '/part.step'); // STL, OBJ, STEP, IGES; addGLTF (margoengine/stage/gltf) for glTF and GLB
 stage.fit(model.meshes);
 
 const off = stage.onTick((delta) => {}); // seconds since the last frame

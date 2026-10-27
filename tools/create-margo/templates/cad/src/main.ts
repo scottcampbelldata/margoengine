@@ -12,6 +12,9 @@ import {
 } from 'margoengine/cad';
 import type { Anchor } from 'margoengine/machinery/dimensions';
 import { Environment } from 'margoengine/environment';
+import type { LoadedModel } from 'margoengine';
+import { addCAD } from 'margoengine/stage/cad';
+import { addGLTF } from 'margoengine/stage/gltf';
 
 // A STEP part (public/plate.step) read with OpenCascade, drawn with CAD navigation, dimensions, a section plane and
 // click-to-measure. Open your own STEP, IGES, STL, OBJ or glTF part with the file picker or by dropping it on the page.
@@ -52,9 +55,10 @@ async function start() {
   });
 
   // The part on screen: STEP and IGES come through OpenCascade in a worker, in meters.
-  let part: Awaited<ReturnType<typeof stage.load>> | null = null;
+  let part: LoadedModel | null = null;
   const show = async (url: string, name: string, format?: 'step' | 'iges' | 'stl' | 'obj' | 'gltf' | 'glb') => {
-    const next = await stage.load(url, { format });
+    const next =
+      format === 'gltf' || format === 'glb' ? await addGLTF(stage, url) : await addCAD(stage, url, { format });
     part?.destroy();
     dimensions.clear();
     part = next;

@@ -1,5 +1,15 @@
 # Margo Engine handoff
 
+## Landed 2026-10-27: stage feature entries (stage freeze exception, part 1 of the React install fix)
+
+- The `Stage` class lost its ten optional-package methods; each is now a function in its own entry that takes the
+  stage: `addGLTF` (`@margoengine/stage/gltf`), `addCAD` (`/cad`), `addSky`, `addParticles`, `addEffects`,
+  `addEnvironment`, `addShadows`; the whole-pack accessors became plain `import()`. Scott lifted the stage from the
+  freeze for this one change (AGENTS.md, docs/conventions.md#core-freeze). Callers: `node scripts/codemod-stage-loaders.mjs`.
+- Size gate: core + stage 22,781 -> 21,910 B gzip (`npm run measure:size`), 3,090 B under the gate. Core untouched.
+- Regression test: `tests/modern-facade-isolation.test.js` builds a stage-only app and fails on any lazy import.
+- Still open: the React root entry (cause 2 in docs/known-bugs.md, "`@margoengine/react` installed alone").
+
 Last updated 2026-10-27. Read this first when starting a new session. Update it whenever work lands.
 
 ## Landed 2026-10-27: unwrap packs around pinned charts (item 24 bug fix)

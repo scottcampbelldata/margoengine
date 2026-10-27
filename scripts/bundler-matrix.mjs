@@ -354,17 +354,20 @@ ${result.stdout}${result.stderr}`,
           scoped.total <= REACT_BUDGET.total,
           `react alone: ${scoped.total} B gzip emitted > ${REACT_BUDGET.total}`,
         );
-        // The one install emits Stage's lazy loaders (stage.load for glTF and CAD, stage.sky, ...): the browser never
-        // fetches them for this page, so the initial graph must hold none of them.
+        // The one install re-exports every binding; the page reaches none of the optional packages, so the initial graph
+        // must hold none of them.
         assert.deepEqual(
           umbrella.initialModules.filter((id) => extra.test(id) || /\.wasm$/.test(id)),
           [],
           'margoengine: the initial load holds no optional engine package',
         );
+        // Regression (2026-10-27): the Stage class's loaders put OpenCascade's .wasm into every build of a Canvas page;
+        // the stage feature entries keep it out. The decoders still come from the React root's glTF bindings
+        // (docs/known-bugs.md, cause 2).
         assert.deepEqual(
           umbrella.files.filter((file) => file.endsWith('.wasm')).map((file) => file.replace(/-[\w-]{8}\.wasm$/, '')),
-          ['assets/basis_transcoder', 'assets/draco_decoder', 'assets/occt-import-js'],
-          'margoengine: only the decoders and CAD import that Stage.load can reach are emitted (docs/limits.md)',
+          ['assets/basis_transcoder', 'assets/draco_decoder'],
+          'margoengine: no OpenCascade .wasm; only the decoders the React root can reach (docs/limits.md)',
         );
         for (const [label, app] of [
           ['react alone', scoped],

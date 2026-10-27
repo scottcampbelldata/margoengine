@@ -103,7 +103,7 @@ try {
     await page.waitForFunction(() => window.scene.app.canvas.width === 500);
     const modelReport = await page.evaluate(async () => {
       const app = window.scene.app,
-        model = await app.load('/wrapper-model.gltf', { fit: false });
+        model = await window.wrapper.addGLTF(app, '/wrapper-model.gltf', { fit: false });
       model.position.set(2, 3, 4);
       model.scale.setAll(2);
       const bounds = [...model.bounds],
@@ -207,7 +207,11 @@ try {
     if (backend === 'webgpu') {
       const attached = await page.evaluate(async () => {
         const app = window.scene.app,
-          plugins = [await app.sky(), await app.particles({ count: 32 }), await app.effects({ grain: 0.01 })];
+          plugins = [
+            await window.wrapper.addSky(app),
+            await window.wrapper.addParticles(app, { count: 32 }),
+            await window.wrapper.addEffects(app, { grain: 0.01 }),
+          ];
         app.engine.render();
         const present = plugins.every((plugin) => app.engine.hasPlugin(plugin.name));
         for (const plugin of plugins) app.engine.removePlugin(plugin.name);
@@ -358,9 +362,9 @@ try {
     for (const action of [
       () => window.wrapper.createStage('#missing'),
       () => window.wrapper.createStage(host, { autoStart: 'yes' }),
-      () => fallback.sky(),
-      () => fallback.particles(),
-      () => fallback.effects(),
+      () => window.wrapper.addSky(fallback),
+      () => window.wrapper.addParticles(fallback),
+      () => window.wrapper.addEffects(fallback),
     ]) {
       try {
         await action();

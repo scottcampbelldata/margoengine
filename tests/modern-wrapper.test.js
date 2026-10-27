@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Stage, sphere } from '../packages/stage/dist/index.js';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
+import { addCAD } from '@margoengine/stage/cad';
+import { addGLTF } from '@margoengine/stage/gltf';
 
 async function scene(capacity = 16) {
   const store = await TransformStore.create(capacity),
@@ -108,7 +110,7 @@ test('model loading infers URL formats, fits imports, rolls back failures and ab
   const obj = 'v 9 -1 0\nv 11 -1 0\nv 10 1 0\nf 1 2 3';
   globalThis.fetch = async () => new Response(obj);
   try {
-    const model = await app.load('https://example.invalid/assembly.OBJ?download=1');
+    const model = await addCAD(app, 'https://example.invalid/assembly.OBJ?download=1');
     assert.equal(model.position, model.root.position);
     model.position.set(2, 0, 0);
     model.scale.setAll(1);
@@ -149,22 +151,24 @@ test('model loading infers URL formats, fits imports, rolls back failures and ab
       nodes: [{ mesh: 0 }],
     };
     globalThis.fetch = async () => new Response(JSON.stringify(gltf));
-    const triangle = await app.load('https://example.invalid/model.gltf');
+    const triangle = await addGLTF(app, 'https://example.invalid/model.gltf');
     assert.equal(triangle.meshes.length, 1);
     triangle.destroy();
     globalThis.fetch = async () => new Response(obj);
-    const copy = await app.load('https://example.invalid/download', { format: 'obj', fit: false });
+    const copy = await addCAD(app, 'https://example.invalid/download', { format: 'obj', fit: false });
     copy.destroy();
-    await assert.rejects(app.load('https://example.invalid/model.fbx'), /Specify/);
+    await assert.rejects(addCAD(app, 'https://example.invalid/model.fbx'), /Specify/);
+    await assert.rejects(addCAD(app, 'https://example.invalid/model.glb'), /Specify/);
+    await assert.rejects(addGLTF(app, 'https://example.invalid/model.gltf', { fit: 'yes' }), /fit: boolean/);
     await assert.rejects(
-      app.load('https://example.invalid/model.obj', { signal: AbortSignal.abort('cancelled') }),
+      addCAD(app, 'https://example.invalid/model.obj', { signal: AbortSignal.abort('cancelled') }),
       (error) => error === 'cancelled',
     );
     const fit = app.fit;
     app.fit = () => {
       throw new Error('fit failed');
     };
-    await assert.rejects(app.load('https://example.invalid/model.obj'), /fit failed/);
+    await assert.rejects(addCAD(app, 'https://example.invalid/model.obj'), /fit failed/);
     assert.equal(engine.meshes.size, 0);
     app.fit = fit;
     let started;
@@ -176,7 +180,7 @@ test('model loading infers URL formats, fits imports, rolls back failures and ab
         signal.addEventListener('abort', () => reject(signal.reason), { once: true });
         started();
       });
-    const pending = app.load('https://example.invalid/slow.obj');
+    const pending = addCAD(app, 'https://example.invalid/slow.obj');
     await ready;
     app.dispose();
     await assert.rejects(pending, (error) => error.name === 'AbortError');

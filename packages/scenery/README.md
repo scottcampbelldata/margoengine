@@ -4,7 +4,7 @@ Import `margoengine/scenery` from the `margoengine` package, or `@margoengine/sc
 
 A moonlit night sky for Margo Engine: twinkling stars, a phased moon with glow, and horizon haze. `SkyMoon` is a
 preset of `Sky` from `@margoengine/sky` (Margo's one sky implementation) held at midnight with its stylized
-`night` options. `stage.sky()` loads it.
+`night` options. `addSky(stage)` (`@margoengine/stage/sky`) loads it.
 
 In this workspace, `npm run modern:dev` opens the starter; click **Toggle moonlit scenery**.
 

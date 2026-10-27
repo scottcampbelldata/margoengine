@@ -51,11 +51,19 @@ mock.module('@margoengine/creative/post', { namedExports: { PostProcessing } });
 mock.module('@margoengine/shadows', { namedExports: { Shadows } });
 mock.module('@margoengine/environment', { namedExports: { EnvironmentLighting } });
 const { Stage } = await import('../packages/stage/dist/index.js');
+// The feature entries import their packages on call, so the mocks above stand in for them.
+const [{ addSky }, { addParticles }, { addEffects }, { addShadows }, { addEnvironment }] = await Promise.all([
+  import('@margoengine/stage/sky'),
+  import('@margoengine/stage/particles'),
+  import('@margoengine/stage/effects'),
+  import('@margoengine/stage/shadows'),
+  import('@margoengine/stage/environment'),
+]);
 const features = [
-  ['sky', SkyMoon],
-  ['particles', GPUParticles],
-  ['effects', PostProcessing],
-  ['shadows', Shadows],
+  ['addSky', addSky, SkyMoon],
+  ['addParticles', addParticles, GPUParticles],
+  ['addEffects', addEffects, PostProcessing],
+  ['addShadows', addShadows, Shadows],
 ];
 
 async function scene() {
@@ -91,9 +99,9 @@ test('facade feature helpers preserve options, plugin identity, passes and owned
   const { app, engine, resources, buffers } = await scene();
   const attached = [];
   try {
-    for (const [method, Class] of features) {
+    for (const [method, add, Class] of features) {
       const options = { label: method },
-        effect = await app[method](options);
+        effect = await add(app, options);
       assert.ok(effect instanceof Class);
       assert.equal(effect.options, options);
       assert.equal(engine.hasPlugin(effect.name), true);
@@ -125,7 +133,7 @@ test('shadows casts from the meshes present when it is called', async () => {
   try {
     const box = app.box(),
       orb = app.sphere();
-    const shadows = await app.shadows();
+    const shadows = await addShadows(app);
     assert.deepEqual(shadows.casters, [box, orb]);
     app.box();
     assert.equal(shadows.casters.length, 2, 'later meshes are added by the caller');
@@ -139,7 +147,7 @@ test('environment hands the stage engine, source and options to EnvironmentLight
     caller = AbortSignal.abort(),
     options = { intensity: 2, signal: caller };
   try {
-    const lighting = await app.environment('/studio.hdr', options);
+    const lighting = await addEnvironment(app, '/studio.hdr', options);
     const forwarded = loads.at(-1);
     assert.equal(forwarded[0], engine);
     assert.equal(forwarded[1], '/studio.hdr');
@@ -156,24 +164,24 @@ test('environment does not call EnvironmentLighting.load when disposal wins the 
   for (const disposeEngine of [false, true]) {
     const { app, engine } = await scene(),
       before = loads.length;
-    const pending = app.environment('/studio.hdr', { intensity: 1 });
+    const pending = addEnvironment(app, '/studio.hdr', { intensity: 1 });
     const rejected = assert.rejects(pending, (error) => error.name === 'AbortError');
     if (disposeEngine) engine.dispose();
     else app.dispose();
     await rejected;
     assert.equal(loads.length, before);
     assert.equal(engine.disposed, true);
-    await assert.rejects(app.environment('/studio.hdr'), (error) => error.name === 'AbortError');
+    await assert.rejects(addEnvironment(app, '/studio.hdr'), (error) => error.name === 'AbortError');
     assert.equal(loads.length, before);
   }
 });
 
-for (const [method, Class] of features) {
+for (const [method, add, Class] of features) {
   test(`${method} does not construct or attach a plugin when disposal wins the import race`, async () => {
     for (const disposeEngine of [false, true]) {
       const { app, engine, resources } = await scene(),
         before = constructed.length;
-      const pending = app[method]({ label: 'pending' });
+      const pending = add(app, { label: 'pending' });
       const rejected = assert.rejects(pending, (error) => error.name === 'AbortError');
       if (disposeEngine) engine.dispose();
       else app.dispose();
@@ -181,7 +189,7 @@ for (const [method, Class] of features) {
       assert.equal(constructed.length, before, 'A disposed stage constructed an orphan plugin');
       assert.equal(resources.size, 0);
       assert.equal(engine.disposed, true);
-      await assert.rejects(app[method](), (error) => error.name === 'AbortError');
+      await assert.rejects(add(app), (error) => error.name === 'AbortError');
       assert.equal(constructed.length, before);
     }
   });
@@ -192,7 +200,7 @@ for (const [method, Class] of features) {
       const error = new Error(`${method} ${failAt} failure`);
       let failed, attached;
       try {
-        await assert.rejects(app[method]({ failAt, error }), (value) => value === error);
+        await assert.rejects(add(app, { failAt, error }), (value) => value === error);
         failed = constructed.at(-1);
         assert.ok(failed instanceof Class);
         assert.equal(failed.disposals, 1);
@@ -202,7 +210,7 @@ for (const [method, Class] of features) {
         engine.frameGraph.execute({ backend: 'webgpu', draw() {} });
         assert.equal(failed.frames, 0, 'A failed plugin retained its frame pass');
 
-        attached = await app[method]();
+        attached = await add(app);
         assert.equal(engine.hasPlugin(attached.name), true);
         assert.equal(resources.size, 1);
         engine.frameGraph.execute({ backend: 'webgpu', draw() {} });

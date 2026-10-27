@@ -1,8 +1,9 @@
 // Launch gate 4: a basic glTF scene fetches only what it needs. tests/fixtures/basic-scene is the README's stage app
-// (`createStage('#scene')`, then `app.load('./model.glb')`), built for production by Vite like any app: the build
-// output also holds the CAD chunk, the CAD worker and the 7.6 MB OCCT .wasm, the sky, particle, effect, environment
-// and shadow packs. In a real browser (Playwright's network log) the page must fetch exactly its HTML, the entry
-// chunk and its static imports, the @margoengine/gltf chunk and the model: no Wasm, no worker, no other pack.
+// (`createStage('#scene')`, then `addGLTF(app, './model.glb')` from margoengine/stage/gltf), built for production by
+// Vite like any app. The build must emit nothing the app does not import: no CAD chunk or worker, no OCCT .wasm, no
+// sky, particle, effect, environment or shadow pack (until 2026-10-27 the Stage class reached them all, so every
+// stage app's build emitted them). In a real browser (Playwright's network log) the page must fetch exactly its HTML,
+// the entry chunk and its static imports, the @margoengine/gltf chunk and the model: no Wasm, no worker, no other pack.
 // Records every request and the bytes transferred to examples/package-benchmarks/results/basic-scene-network.json,
 // which margoengine.com/sizes.html lists (`npm run build:site` runs this). Needs WebGPU, so after build:packages.
 // The GPU lock (test-results/gpu.lock) is taken here, around the preview server's start and the browser only (a few
@@ -121,16 +122,18 @@ const roles = new Map([
   ...entryImports.map((file) => [file, 'Shared chunk']),
   ...gltfImports.map((file) => [file, 'Shared chunk']),
   [entry, 'Entry: core + stage + app'],
-  [gltf, '@margoengine/gltf (app.load)'],
+  [gltf, '@margoengine/gltf (addGLTF)'],
   ['model.glb', 'Model'],
 ]);
 const expected = new Set(roles.keys());
 const built = readdirSync(out, { recursive: true })
   .map((file) => file.replaceAll('\\', '/'))
   .filter((file) => !file.startsWith('.vite') && statSync(join(out, file)).isFile());
-assert.ok(
-  built.some((file) => /occt-import-js.*\.wasm$/.test(file)),
-  'the build output holds the OCCT .wasm (so not fetching it is a real check)',
+// Regression (2026-10-27): the stage's class methods put every optional pack into every stage app's build.
+assert.deepEqual(
+  built.filter((file) => /\.wasm$|occt|worker|cad|sky|particles|post|environment|shadows/i.test(file)),
+  [],
+  'the build emits no Wasm, worker, CAD chunk or optional pack the app does not import',
 );
 
 const release = await acquire({ owner: 'basic-scene-network', poll: 2000 });

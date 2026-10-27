@@ -4,6 +4,7 @@
 
 - Treat `@margoengine/core` and the stage facade as feature-frozen for v1.0.0. Do not add features to either, including material graphs, skinning math, or post-processing passes.
 - Freeze = no new features; core bug fixes go in core (Scott, 2026-10-24). Fix a bug or unsafe API in core itself, with a test, within the size gate; never leave it because core is frozen. Details: `docs/conventions.md#core-freeze`.
+- Exception (Scott, 2026-10-27): the stage facade was lifted from the freeze for ONE restructuring, a bug against "pay only for what you import": its optional-package methods moved out of the `Stage` class into feature entries (`@margoengine/stage/gltf` `addGLTF`, `/cad`, `/sky`, `/particles`, `/effects`, `/environment`, `/shadows`), so the stage root holds no `import()` of an optional package. Core stays untouched; the freeze applies again after this change.
 - CI must automatically fail any pull request that pushes the combined core + stage gzip size to **25,000 bytes or above**. A measured result from 22,000 through 24,999 bytes is inside the allowed band.
 - Build future capabilities strictly in separate, optional, tree-shakable packages:
   - `@margoengine/gltf-pro`: glTF 2.0 PBR.

@@ -7,24 +7,30 @@ import { minifySync } from 'rolldown/utils';
 import { wgsl } from '../packages/core/dist/shaders.js';
 
 test('library compaction preserves public members and foreign this bindings', () => {
-  const source = 'class Stage { private imports = 1; public value() { return this.imports; } }';
+  const source =
+    'class Mesh { private current = 1; private receives = 0; public value() { return [this.current, this.current, this.receives]; } }';
   const output = compactInternals(
     source,
-    `class Stage {
- imports = 1;
- value() { return [this.imports, () => this.imports, function() { return this.imports; }, {run() { return this.imports; }}]; }
+    `class Mesh {
+ current = 1;
+ receives = 0;
+ value() { return [this.current, () => this.current, function() { return this.current; }, {run() { return this.current; }}]; }
  }`,
   );
   assert.ok(output.includes('e = 1'));
+  assert.ok(output.includes('f = 0'));
   assert.ok(
-    output.includes('[this.e, () => this.e, function() { return this.imports; }, {run() { return this.imports; }}]'),
+    output.includes('[this.e, () => this.e, function() { return this.current; }, {run() { return this.current; }}]'),
   );
-  assert.throws(() => compactInternals(source, 'class Stage { e = 2; imports = 1; }'), /collides/);
+  assert.throws(() => compactInternals(source, 'class Mesh { e = 2; current = 1; }'), /collides/);
   assert.throws(
-    () => compactInternals(source, 'class Stage { imports = 1; get() { return this["imports"]; } }'),
+    () => compactInternals(source, 'class Mesh { current = 1; get() { return this["current"]; } }'),
     /computed/,
   );
-  assert.throws(() => compactInternals(source.replace('private', 'public'), 'class Stage {}'), /Review Stage.imports/);
+  assert.throws(
+    () => compactInternals(source.replace('private current', 'public current'), 'class Mesh {}'),
+    /Review Mesh.current/,
+  );
 });
 
 test('production compaction drops debugger and preserves public exports', () => {
@@ -39,9 +45,9 @@ test('production compaction drops debugger and preserves public exports', () => 
 
 test('compaction preserves private defaults and lexical parameter initializers', () => {
   const source =
-    'class Stage { private imports = 7; read(value = this.imports, lazy = () => this.imports) { return [value, lazy()]; } }';
-  const output = compactInternals(source, source.replace('private ', ''));
-  const instance = new (Function(`${output}; return Stage;`)())();
+    'class Mesh { private current = 7; private receives = 0; read(value = this.current, lazy = () => this.current) { return [value, lazy()]; } }';
+  const output = compactInternals(source, source.replaceAll('private ', ''));
+  const instance = new (Function(`${output}; return Mesh;`)())();
   assert.deepEqual(instance.read(), [7, 7]);
 });
 

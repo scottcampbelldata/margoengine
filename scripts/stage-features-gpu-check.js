@@ -1,5 +1,5 @@
 // Real-adapter check of the stage's lazy lighting packs: a stage scene with a loaded glTF model on a floor, then
-// `await app.environment(url)` and `await app.shadows()` must each change the frame, with zero WebGPU validation
+// `await addEnvironment(app, url)` and `await addShadows(app)` must each change the frame, with zero WebGPU validation
 // errors, and `app.dispose()` must release both (and abort an environment load still in flight).
 // Run from the repository root after building packages, with the GPU lock held:
 //   node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/stage-features-gpu-check.js
@@ -92,7 +92,7 @@ try {
       gpuErrors = [];
     device.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
     app.box({ size: [6, 0.2, 6], position: [0, -0.1, 0], color: '#d8d8d8', roughness: 0.9 });
-    const model = await app.load('/stage-cube.gltf', { fit: false });
+    const model = await window.wrapper.addGLTF(app, '/stage-cube.gltf', { fit: false });
     app.engine.camera.fitToBoundingBox([-1.5, 0, -1.5], [1, 1, 1], { aspect: 4 / 3, duration: 0 }); // the cube and the floor its shadow falls on
     const render = async () => {
       device.pushErrorScope('validation');
@@ -131,9 +131,13 @@ try {
 
   const plain = await shot('plain');
   const environment = await page.evaluate(async () => {
-    const lighting = await window.stage.app.environment('/packages/environment/tests/fixtures/sun_sky.hdr', {
-      intensity: 4,
-    });
+    const lighting = await window.wrapper.addEnvironment(
+      window.stage.app,
+      '/packages/environment/tests/fixtures/sun_sky.hdr',
+      {
+        intensity: 4,
+      },
+    );
     window.stage.lighting = lighting;
     await window.stage.render();
     return {
@@ -143,7 +147,7 @@ try {
   });
   const lit = await shot('environment');
   const shadows = await page.evaluate(async () => {
-    const shadows = await window.stage.app.shadows({ resolution: 1024 });
+    const shadows = await window.wrapper.addShadows(window.stage.app, { resolution: 1024 });
     window.stage.shadows = shadows;
     await window.stage.render();
     return { plugin: window.stage.app.engine.hasPlugin('shadows'), draws: { ...shadows.stats } };
@@ -186,7 +190,7 @@ try {
     };
     // A second stage disposed while its environment is still loading: the load rejects with AbortError.
     const other = await window.wrapper.createStage('#stage', { backend: 'webgpu', controls: false, autoStart: false });
-    const pending = other.environment('/packages/environment/tests/fixtures/sun_sky.hdr').then(
+    const pending = window.wrapper.addEnvironment(other, '/packages/environment/tests/fixtures/sun_sky.hdr').then(
       () => 'resolved',
       (error) => error.name,
     );

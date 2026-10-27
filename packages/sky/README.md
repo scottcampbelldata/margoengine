@@ -40,7 +40,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
-summed. `stage.sky()` (base, night) sums to about 6.3 kB and Night Citadel (base, night, fog, reflection) to about 8.9 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
+summed. `addSky(stage)` (base, night) sums to about 6.3 kB and Night Citadel (base, night, fog, reflection) to about 8.9 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
 the shaders leave out the unused functions and branches, and the GPU work, uploads and rendered pixels are the
 same as the root's for that configuration (`test/split.test.js`, and on a real GPU `test/browser-check.mjs`).
 An option or `model` whose feature is missing throws a `TypeError` naming the entry to import. Without a day model

@@ -177,7 +177,7 @@ always serve meshopt `.glb` files compressed. Hosts only compress content types 
 
 ## Pre-convert STEP for production
 
-STEP and IGES import (`loadCAD`, `app.load('/part.step')`) downloads OpenCascade: a 7.6 MB `.wasm` (3.1 MB gzip),
+STEP and IGES import (`loadCAD`, `addCAD(stage, '/part.step')`) downloads OpenCascade: a 7.6 MB `.wasm` (3.1 MB gzip),
 about 150 ms to initialise, then 1.2-1.5 s to tessellate a 442 kB assembly in the browser. Keep that path for files your users drag in. For models you ship, convert once at build
 time and serve a GLB:
 

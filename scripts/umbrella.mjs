@@ -78,7 +78,8 @@ export const KITS = {
     ],
   },
   viz: {
-    about: 'Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text',
+    about:
+      'Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text',
     from: [
       ['@margoengine/stage', ['createStage', 'Stage']],
       ['@margoengine/points', ['PointsPlugin', 'PointCloud', 'PointsMaterial']],
@@ -132,10 +133,10 @@ const manifests = (root) =>
 export function umbrellaEntries(root = repository) {
   const entries = [];
   for (const { manifest } of manifests(root)) {
-    // The stage is the root entry, `margoengine` itself.
-    if (manifest.name === '@margoengine/stage') continue;
     const name = manifest.name.slice('@margoengine/'.length);
     for (const key of Object.keys(manifest.exports ?? {})) {
+      // The stage's root is the root entry, `margoengine` itself; its feature entries are `margoengine/stage/<entry>`.
+      if (manifest.name === '@margoengine/stage' && key === '.') continue;
       const file = key === '.' ? name : `${name}/${key.slice(2)}`;
       entries.push({
         subpath: `./${file}`,

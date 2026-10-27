@@ -4,7 +4,7 @@ You normally use this package as [`margoengine`](../margoengine/README.md): `imp
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
-This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/machinery`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, and `@margoengine/shadows` are optional peers. `load`, `sky`, `particles`, `effects`, `environment`, and `shadows` import them on use and reject with `Install <package>` when they are absent. Dynamic imports keep that runtime code out of the initial scene.
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/machinery`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, and `@margoengine/shadows` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
@@ -29,23 +29,49 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 | `app.sphere({radius, segments, ...options})` | Creates an orb with the same material/transform options as boxes |
 | `app.box({size, color, roughness, metalness, position, rotation, scale, parent, name})` | Creates a box and returns the existing mutable mesh handle |
 | `app.mesh(geometry, options)` | Attaches existing or custom geometry with the same options |
-| `await app.load(url, options)` | Imports `@margoengine/gltf` for glTF/GLB or `@margoengine/machinery/cad` for STL/OBJ/STEP/IGES, then exposes root transforms and fits the imported meshes. A missing pack rejects with `Install @margoengine/<name>` |
 | `app.onTick(delta => { ... })` | Runs once per frame with delta in seconds; returns an unsubscribe function |
 | `app.fit()` / `app.fit(model.meshes)` | Fits visible geometry, including world transforms and hierarchy |
-| `await app.sky(options)` | Loads the scenery `/sky` entry and attaches SkyMoon |
-| `await app.particles(options)` | Loads creative `/particles` and attaches GPU particles |
-| `await app.effects(options)` | Loads creative `/post` and attaches post-processing/atmosphere |
 | `app.use(plugin)` | Attaches an existing plugin and returns it |
-| `await app.gltf()` / `app.machinery()` / `app.creative()` / `app.scenery()` | Loads the full corresponding pack on demand |
+| `app.signal` | An `AbortSignal` that aborts when the stage is disposed; the feature entries combine it with yours |
 | `app.engine` | Existing core API: camera, picking, plugins, manual render, start/stop and recovery |
+
+## Feature entries
+
+Each optional feature is a function in its own entry that takes the stage, so an app bundles (and must install) only
+the ones it imports. With `margoengine` the entries are `margoengine/stage/<entry>`.
+
+| Entry | Function | Package it imports on the first call |
+| --- | --- | --- |
+| `@margoengine/stage/gltf` | `await addGLTF(app, url, {fit, signal})`: loads glTF/GLB, exposes root transforms and fits the camera | `@margoengine/gltf` |
+| `@margoengine/stage/cad` | `await addCAD(app, url, {format, fit, signal, onProgress, smoothing, maxParts, timeoutMs})`: STL, OBJ, STEP, IGES | `@margoengine/machinery/cad` |
+| `@margoengine/stage/sky` | `await addSky(app, options)`: attaches SkyMoon (sun, moon, stars) | `@margoengine/scenery/sky` |
+| `@margoengine/stage/particles` | `await addParticles(app, options)`: attaches GPU particles | `@margoengine/creative/particles` |
+| `@margoengine/stage/effects` | `await addEffects(app, options)`: attaches post-processing and atmosphere | `@margoengine/creative/post` |
+| `@margoengine/stage/environment` | `await addEnvironment(app, source, options)`: image-based lighting from an HDR, EXR or UltraHDR JPEG | `@margoengine/environment` |
+| `@margoengine/stage/shadows` | `await addShadows(app, options)`: cascaded shadows; the meshes present now cast | `@margoengine/shadows` |
+
+```ts
+import {createStage} from 'margoengine';
+import {addCAD} from 'margoengine/stage/cad';
+import {addGLTF} from 'margoengine/stage/gltf';
+import {addShadows} from 'margoengine/stage/shadows';
+
+const app = await createStage('#scene');
+const robot = await addGLTF(app, '/robot.glb');
+const shadows = await addShadows(app, {resolution: 2048});
+shadows.add(app.box({size: [10, 0.1, 10], position: [0, -0.05, 0]}));
+console.log(robot.meshes.length);
+```
+
+For a whole pack, import it yourself: `await import('margoengine/machinery')`.
 
 Loading infers format from the URL pathname, including `.stp` and `.igs`; set `format` for extensionless endpoints. Use `fit: false` to preserve camera framing, `signal` to cancel, and CAD `onProgress`/`smoothing` options as needed. Fits use the world-space AABB of transformed vertices. A failed fit retires the imported model. Existing loader byte limits, rollback and supported model subsets apply: glTF supports static opaque constant-color geometry, without textures, skinning or animation.
 
-`app.fit()` also reads registered meshes from the optional `@margoengine/gltf-pro` and FBX loaders, including their current node world transforms. Pass primitive nodes explicitly to fit a selection; grouping nodes themselves have no geometry. Hidden meshes and their hidden descendants stay excluded from fitting. PBR bounds use CPU bind-pose positions; fitting does not advance animation or read back GPU deformation. These queries leave PBR rendering in its optional package and keep `mesh.geometry` null. `app.load()` continues to use the basic glTF loader.
+`app.fit()` also reads registered meshes from the optional `@margoengine/gltf-pro` and FBX loaders, including their current node world transforms. Pass primitive nodes explicitly to fit a selection; grouping nodes themselves have no geometry. Hidden meshes and their hidden descendants stay excluded from fitting. PBR bounds use CPU bind-pose positions; fitting does not advance animation or read back GPU deformation. These queries leave PBR rendering in its optional package and keep `mesh.geometry` null. `addGLTF` continues to use the basic glTF loader.
 
-Feature helpers load their entry and its required dependencies rather than the entire domain pack. CAD loading uses `@margoengine/machinery/cad`, without kinematics, surface transport or telemetry. Explicit pack accessors keep their complete namespaces for compatibility. A helper whose import finishes after stage disposal rejects with `AbortError` before constructing its plugin; active attached plugins remain owned by the engine and are disposed with it.
+Feature entries load the narrow entry of their package and its required dependencies rather than the entire domain pack. CAD loading uses `@margoengine/machinery/cad`, without kinematics, surface transport or telemetry. A feature whose import finishes after stage disposal rejects with `AbortError` before constructing its plugin; active attached plugins remain owned by the engine and are disposed with it.
 
-`load()` returns the exported `LoadedModel` type:
+`addGLTF` and `addCAD` return the exported `LoadedModel` type:
 
 | Property / method | Contract |
 | --- | --- |
@@ -61,11 +87,11 @@ The bounds array belongs to the model; treat its contents as read-only. Bounds a
 `raw` exposes the actual shared renderer buffers, enabled for read-only storage bindings in custom WGSL compute/render passes. Core vertices use interleaved position/normal floats (24-byte stride), indices use uint32, and packed instances use a 96-byte stride (matrix followed by PBR data). Instance order/count follows the current visible geometry batch and can include other meshes sharing that geometry. Registered PBR records instead borrow the loader's existing 80-byte vertex buffers and uint32 indices, including the current deformed buffer when present, and have no core instance buffer. Raw queries include hidden parts and perform no GPU allocation, rendering, or deformation work. Acquire handles after rendering, do not destroy or overwrite engine-owned buffers, and reacquire `raw` after device recovery. Access after destruction rejects. Core buffer lookup uses its explicit extension API; PBR records come from the existing shared mesh-source registry.
 
 ```ts
-const model = await app.load('/assembly.obj');
+const model = await addCAD(app, '/assembly.obj');
 model.position.set(0, 2.5, 0);
 model.scale.setAll(1.2);
-const {AssemblyIndex} = (await app.machinery()) as typeof import('margoengine/machinery');
-const index = new AssemblyIndex(app.engine);
+const machinery = await import('margoengine/machinery');
+const index = new machinery.AssemblyIndex(app.engine);
 index.tag(model.root, 'assembly');
 model.destroy();
 ```

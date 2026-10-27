@@ -24,7 +24,7 @@ const DEMOS = {
     build: { rollupOptions: { input: resolve(root, 'examples/windy-meadow.html') } },
   },
   earth: { configFile: false, root: 'packages/creative/examples/earth' },
-  // What `await stage.sky()` fetches on top of core + stage.
+  // What `await addSky(stage)` (margoengine/stage/sky) fetches on top of core + stage.
   'stage-sky': {
     configFile: false,
     publicDir: false,

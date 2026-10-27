@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
+import { addShadows } from 'margoengine/stage/shadows';
+import { addEnvironment } from 'margoengine/stage/environment';
+import { addSky } from 'margoengine/stage/sky';
+import { addParticles } from 'margoengine/stage/particles';
+import { addEffects } from 'margoengine/stage/effects';
 
 const normalize = (path) => path.replaceAll('\\', '/');
 const featureMarkers = {
@@ -159,6 +164,7 @@ function productionGraph() {
       rollupOptions: {
         input: {
           stage: resolve('tests/fixtures/modular-stage.js'),
+          bare: resolve('tests/fixtures/stage-only.js'),
           features: resolve('tests/fixtures/modular-features.js'),
         },
       },
@@ -221,13 +227,9 @@ test('initial core + stage consumer keeps every optional pack behind a lazy boun
   const code = payload(initial);
   for (const marker of Object.values(featureMarkers))
     assert.ok(!code.includes(marker), 'Optional feature code entered the initial stage payload: ' + marker);
-  // The facade's existing whole-pack escape hatches must still coexist with its
-  // newly narrow helpers; checking only the fixture's imports would miss this.
+  // Each stage feature entry imports the narrow entry of its package on call, never the whole pack.
   const dynamic = new Set(initial.flatMap((chunk) => chunk.dynamicImports));
   for (const specifier of [
-    '@margoengine/creative',
-    '@margoengine/scenery',
-    '@margoengine/machinery',
     '@margoengine/gltf',
     '@margoengine/creative/particles',
     '@margoengine/creative/post',
@@ -237,8 +239,23 @@ test('initial core + stage consumer keeps every optional pack behind a lazy boun
     '@margoengine/environment',
   ]) {
     const entry = graph.entry(fileURLToPath(import.meta.resolve(specifier)));
-    assert.ok(dynamic.has(entry.fileName), 'Facade lost its actual lazy import for ' + specifier);
+    assert.ok(dynamic.has(entry.fileName), 'A stage feature entry lost its lazy import for ' + specifier);
   }
+});
+
+// Regression (2026-10-27): the Stage class held ten import()s of six optional packages in its methods. Class methods
+// are never tree-shaken, so every app that built a Stage (React's Canvas included) put them in its module graph, and
+// webpack and Turbopack, which resolve every import() they reach, failed on each optional peer not installed.
+test('an app importing only the stage root reaches no optional package, not even through a lazy import', async () => {
+  const graph = await productionGraph();
+  const initial = graph.closure(graph.entry(resolve('tests/fixtures/stage-only.js')));
+  assert.deepEqual(
+    initial.flatMap((chunk) => chunk.dynamicImports),
+    [],
+    'the stage root holds an import(): move it into a feature entry',
+  );
+  for (const id of moduleIds(initial))
+    assert.ok(['core', 'stage', 'margoengine', 'shared'].includes(packageName(id)) || !packageName(id), id);
 });
 
 test('each granular feature consumer excludes unrelated shaders and domain features', async (t) => {
@@ -325,7 +342,21 @@ test('actual root/subpath imports share identities and facade helpers preserve r
       );
     }
   }
-  const prototype = facade.Stage.prototype;
+  void gltf;
+  // The whole-pack accessors are gone: an app imports the package itself.
+  for (const name of [
+    'load',
+    'gltf',
+    'machinery',
+    'creative',
+    'scenery',
+    'sky',
+    'particles',
+    'effects',
+    'environment',
+    'shadows',
+  ])
+    assert.equal(facade.Stage.prototype[name], undefined, 'Stage.' + name + ' is back on the class');
   const attached = [],
     receiver = new facade.Stage({
       use(plugin) {
@@ -334,17 +365,14 @@ test('actual root/subpath imports share identities and facade helpers preserve r
     });
   // The real constructor initializes cancellation state; setup is the GPU boundary.
   attached.length = 0;
-  for (const [helper, namespace] of Object.entries({ creative, scenery, machinery, gltf })) {
-    assert.equal(await prototype[helper].call(receiver), namespace, 'Whole-pack helper changed: ' + helper);
-  }
   // These real imports and constructors need no GPU until setup. They catch a
-  // facade helper accidentally returning a module, losing options or attachment.
+  // feature entry accidentally returning a module, losing options or attachment.
   const particleOptions = { count: 16, size: 0.04 },
     postOptions = { grain: 0.2 },
     skyOptions = { moonPhase: 0.5 };
-  const particle = await prototype.particles.call(receiver, particleOptions);
-  const post = await prototype.effects.call(receiver, postOptions);
-  const sky = await prototype.sky.call(receiver, skyOptions);
+  const particle = await addParticles(receiver, particleOptions);
+  const post = await addEffects(receiver, postOptions);
+  const sky = await addSky(receiver, skyOptions);
   assert.ok(particle instanceof creative.GPUParticles);
   assert.ok(post instanceof creative.PostProcessing);
   assert.ok(sky instanceof scenery.SkyMoon);
@@ -366,13 +394,13 @@ test('stage shadows and environment load the real packs: shadows attaches, envir
     };
   const receiver = new facade.Stage(engine);
   attached.length = 0;
-  const shadows = await receiver.shadows({ resolution: 512 });
+  const shadows = await addShadows(receiver, { resolution: 512 });
   assert.ok(shadows instanceof Shadows);
   assert.equal(shadows.options.resolution, 512);
   assert.deepEqual(attached, [shadows]);
   // The real EnvironmentLighting.load sees the disposed stage engine and attaches nothing (no fetch, no GPU).
   engine.disposed = true;
-  await assert.rejects(receiver.environment({ width: 4, height: 2, data: new Float32Array(32) }), {
+  await assert.rejects(addEnvironment(receiver, { width: 4, height: 2, data: new Float32Array(32) }), {
     name: 'AbortError',
   });
   assert.deepEqual(attached, [shadows]);

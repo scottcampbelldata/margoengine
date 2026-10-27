@@ -52,7 +52,7 @@ scene capture. For bloom, or to combine it with SSAO, DOF or FXAA, add it to a `
 0.3}), new PostProcessing({atmosphere: {density: 0.02}}), new FXAA()])`. In a stack its `target` is undefined.
 For a sky behind the fog, attach `Sky` from `@margoengine/sky`.
 
-Each subpath loads that feature and its dependencies. Existing named imports from `@margoengine/creative` remain available and can be tree-shaken by a bundler. `await stage.creative()` intentionally loads the complete pack namespace; use a subpath when loading one feature independently.
+Each subpath loads that feature and its dependencies. Existing named imports from `@margoengine/creative` remain available and can be tree-shaken by a bundler. `await import('@margoengine/creative')` loads the complete pack namespace; use a subpath when loading one feature independently. The stage's `addParticles` and `addEffects` (`@margoengine/stage/particles`, `/effects`) load only `/particles` and `/post`.
 
 Attach a grass field directly to an existing Stage, without extending the facade:
 

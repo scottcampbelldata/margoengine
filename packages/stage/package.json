@@ -33,6 +33,34 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./gltf": {
+      "types": "./dist/gltf.d.ts",
+      "import": "./dist/gltf.js"
+    },
+    "./cad": {
+      "types": "./dist/cad.d.ts",
+      "import": "./dist/cad.js"
+    },
+    "./sky": {
+      "types": "./dist/sky.d.ts",
+      "import": "./dist/sky.js"
+    },
+    "./particles": {
+      "types": "./dist/particles.d.ts",
+      "import": "./dist/particles.js"
+    },
+    "./effects": {
+      "types": "./dist/effects.d.ts",
+      "import": "./dist/effects.js"
+    },
+    "./environment": {
+      "types": "./dist/environment.d.ts",
+      "import": "./dist/environment.js"
+    },
+    "./shadows": {
+      "types": "./dist/shadows.d.ts",
+      "import": "./dist/shadows.js"
     }
   },
   "files": [
