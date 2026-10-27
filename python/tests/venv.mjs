@@ -4,7 +4,7 @@
 // instead of a hang: every step has a hard time limit.
 //   npm run setup:python-test               make it (or report it ready)
 //   MARGO_JUPYTER_VENV=<dir>                use another folder (default: test-results/.venv-data in the main checkout)
-//   MARGO_PYTHON=<python>                   make it with this Python (default: python, python3, then py -3 on PATH)
+//   MARGO_PYTHON=<python>                   make it with this Python (default: Python 3.12 or 3.13 found by py -3.13 / py -3.12 / python3.13 / python3.12 / python3 / python)
 import { spawnSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -30,14 +30,30 @@ const run = (command, args, ms) =>
   spawnSync(command, args, { encoding: 'utf8', timeout: ms, killSignal: 'SIGKILL', windowsHide: true });
 const tail = (text, lines = 12) => (text ?? '').trim().split('\n').slice(-lines).join('\n');
 
-/** The first working Python 3 as `[command, ...args]` with its version, or undefined. MARGO_PYTHON (one command) wins;
- * otherwise python, python3, py -3. (Windows' python.exe store alias only prints a hint and fails, so it is skipped.) */
-export function findPython({ env = process.env, exec = run } = {}) {
-  const candidates = env.MARGO_PYTHON ? [[env.MARGO_PYTHON]] : [['python'], ['python3'], ['py', '-3']];
+/** The Python minor versions the pinned python/requirements-notebook.txt has wheels for (PyYAML has none for newer ones). */
+export const SUPPORTED_PYTHON = ['3.13', '3.12'];
+export const PYTHON_FIX = 'install Python 3.12 or 3.13 from https://www.python.org/downloads/, or set MARGO_PYTHON to one';
+
+/** Where to look for a supported Python, best first: the py launcher on Windows, python3.13 and python3.12 elsewhere, then plain names. */
+export const pythonCandidates = (platform = process.platform) => [
+  ...SUPPORTED_PYTHON.map((v) => (platform === 'win32' ? ['py', `-${v}`] : [`python${v}`])),
+  ['python3'],
+  ['python'],
+];
+
+/**
+ * The first working supported Python (3.12 or 3.13) as `[command, ...args]` with its version, or undefined.
+ * MARGO_PYTHON (one command) wins and is used as given. Newer Pythons are skipped: the pinned PyYAML has no wheel for
+ * them and the install would die needing a C compiler. (Windows' python.exe store alias only prints a hint and fails,
+ * so it is skipped too.)
+ */
+export function findPython({ env = process.env, exec = run, platform = process.platform } = {}) {
+  const candidates = env.MARGO_PYTHON ? [[env.MARGO_PYTHON]] : pythonCandidates(platform);
   for (const [command, ...args] of candidates) {
     const probe = exec(command, [...args, '-c', 'import sys; print("%d.%d.%d" % sys.version_info[:3])'], 30_000);
     const version = probe.status === 0 && /^3\.\d+\.\d+$/.exec(probe.stdout?.trim() ?? '')?.[0];
-    if (version) return { command: [command, ...args], version };
+    if (version && (env.MARGO_PYTHON || SUPPORTED_PYTHON.includes(version.split('.').slice(0, 2).join('.'))))
+      return { command: [command, ...args], version };
   }
 }
 
@@ -54,7 +70,7 @@ export function ensureVenv({ venv = venvDir(), env = process.env, exec = run, lo
   if (!python)
     return {
       ok: false,
-      reason: `no Python 3 found (${env.MARGO_PYTHON ? `MARGO_PYTHON=${env.MARGO_PYTHON}` : 'python, python3 and py -3 on PATH'}): install Python 3 from https://www.python.org/downloads/ and ${fix}`,
+      reason: `no supported Python found (${env.MARGO_PYTHON ? `MARGO_PYTHON=${env.MARGO_PYTHON}` : 'Python 3.12 or 3.13 via py -3.13, py -3.12, python3.13, python3.12, python3 or python on PATH'}): ${PYTHON_FIX}, then ${fix}`,
     };
   const [command, ...args] = python.command;
   log(`python venv: making ${venv} with ${python.command.join(' ')} (Python ${python.version}), pinned ${requirements}`);

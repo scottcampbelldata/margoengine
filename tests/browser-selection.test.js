@@ -4,6 +4,8 @@ import { spawnSync } from 'node:child_process';
 import {
   browserLabel,
   chromiumLaunchOptions,
+  LAUNCH_FAILED,
+  launchBrowser,
   launchArgs,
   resolveBrowser,
   skipSuite,
@@ -110,4 +112,52 @@ test('a suite that needs WebGPU run with MARGO_BROWSER=firefox prints the skip a
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stdout, /skipped: no WebGPU in firefox/);
   assert.doesNotMatch(run.stdout, /LAUNCHED/);
+});
+
+const missing = (what) => ({
+  launch: async () => {
+    throw new Error(
+      `browserType.launch: Executable doesn't exist at C:\\x\\${what}.exe\n    at stack frame 1\n    at stack frame 2`,
+    );
+  },
+});
+const attempt = async (env, launchers = { chromium: missing('chromium'), firefox: missing('firefox') }) => {
+  const printed = [];
+  let code;
+  await launchBrowser({
+    env,
+    platform: 'linux',
+    argv: [],
+    needs: 'none',
+    launchers,
+    report: (text) => printed.push(text),
+    exit: (c) => {
+      code = c;
+    },
+  });
+  return { text: printed.join('\n'), code };
+};
+
+test('a browser that cannot launch prints the browser, the install command and MARGO_BROWSER, with no stack trace (bug 28)', async () => {
+  for (const [browser, command] of [
+    ['firefox', 'npx playwright install firefox'],
+    ['chromium', 'npx playwright install chromium'],
+  ]) {
+    const { text, code } = await attempt({ MARGO_BROWSER: browser });
+    assert.equal(code, LAUNCH_FAILED);
+    assert.notEqual(code, 0);
+    assert.ok(text.includes(`cannot start ${browser}`), text);
+    assert.ok(text.includes(command), text);
+    assert.ok(text.includes('MARGO_BROWSER'), text);
+    assert.doesNotMatch(text, /at stack frame|browserType\.launch/);
+  }
+  const chrome = await attempt({ MARGO_BROWSER: 'chrome' });
+  assert.match(chrome.text, /install Google Chrome/);
+});
+
+test('a browser that launches is returned and nothing is reported', async () => {
+  const browser = { fake: true };
+  const { text, code } = await attempt({ MARGO_BROWSER: 'chromium' }, { chromium: { launch: async () => browser } });
+  assert.equal(text, '');
+  assert.equal(code, undefined);
 });

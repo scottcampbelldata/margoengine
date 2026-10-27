@@ -126,28 +126,69 @@ export function chromiumLaunchOptions({ name, args = [], webgpu = true, env, pla
   };
 }
 
+/** Exit code when the requested browser cannot be started (not a test failure, not a skip). */
+export const LAUNCH_FAILED = 3;
+
+/** The command or step that makes `browser` available, for the launch-failure message. */
+function installHint(browser) {
+  if (browser.executablePath)
+    return `check that BROWSER_EXECUTABLE=${browser.executablePath} points at a working browser`;
+  if (browser.name === 'firefox') return 'run: npx playwright install firefox';
+  if (browser.name === 'chromium') return 'run: npx playwright install chromium';
+  if (browser.name === 'chrome')
+    return 'install Google Chrome (https://www.google.com/chrome/), or run: npx playwright install chrome';
+  return 'install Microsoft Edge (https://www.microsoft.com/edge), or run: npx playwright install msedge';
+}
+
+/** One short message for a browser that would not start: which browser, how to install it, and how to pick another. No stack trace. */
+export function launchFailureMessage(browser, error, { suite } = {}) {
+  const first = String(error?.message ?? error)
+    .split('\n')[0]
+    .replace(/^browserType\.launch:\s*/, '');
+  return [
+    `${suite ? `${suite}: ` : ''}cannot start ${browser.name}: ${first}`,
+    `To fix it, ${installHint(browser)}. To use another browser, set MARGO_BROWSER to edge, chrome, chromium or firefox (or pass --browser=<name>).`,
+  ].join('\n');
+}
+
 /**
  * Launches the chosen browser. Playwright launch options (headless, args, ...) pass through; the channel, the
  * executable and the WebGPU switches come from {@link resolveBrowser}. A step the browser cannot run is skipped with a
  * clear line (see {@link skipSuite}). Options: `name` (force a browser), `needs` ('webgpu' | 'chromium' | 'none').
  * With nothing chosen on Windows and Edge missing, falls back to Playwright's Chromium as before.
  */
-export async function launchBrowser({ name, needs = 'webgpu', args = [], env, platform, argv, ...options } = {}) {
+export async function launchBrowser({
+  name,
+  needs = 'webgpu',
+  args = [],
+  env,
+  platform,
+  argv,
+  launchers = { chromium, firefox },
+  report = console.error,
+  exit = process.exit,
+  ...options
+} = {}) {
   const browser = resolveBrowser({ name, env, platform, argv }),
     reason = unsupportedReason(browser, needs);
   if (reason) return skipSuite(reason);
-  if (browser.engine === 'firefox') return firefox.launch({ ...options });
-  const launch = (channel) =>
-    chromium.launch({
-      ...options,
-      args: launchArgs(browser, args),
-      ...(channel ? { channel } : {}),
-      ...(browser.executablePath ? { executablePath: browser.executablePath } : {}),
-    });
   try {
-    return await launch(browser.channel);
+    if (browser.engine === 'firefox') return await launchers.firefox.launch({ ...options });
+    const launch = (channel) =>
+      launchers.chromium.launch({
+        ...options,
+        args: launchArgs(browser, args),
+        ...(channel ? { channel } : {}),
+        ...(browser.executablePath ? { executablePath: browser.executablePath } : {}),
+      });
+    try {
+      return await launch(browser.channel);
+    } catch (error) {
+      if (browser.explicit || browser.channel !== 'msedge') throw error;
+      return await launch(undefined);
+    }
   } catch (error) {
-    if (browser.explicit || browser.channel !== 'msedge') throw error;
-    return launch(undefined);
+    report(launchFailureMessage(browser, error, { suite: process.argv[1]?.split(/[\\/]/).pop() }));
+    return exit(LAUNCH_FAILED);
   }
 }

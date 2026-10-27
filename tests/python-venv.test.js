@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { ensureVenv, findPython, SETUP } from '../python/tests/venv.mjs';
+import { ensureVenv, findPython, pythonCandidates, SETUP } from '../python/tests/venv.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const scratch = () => mkdtempSync(join(tmpdir(), 'margo-venv-test-'));
@@ -22,7 +22,7 @@ const fake = (answers) => {
   };
   return { exec, calls };
 };
-const version = (args) => args.includes('-c') && { status: 0, stdout: '3.15.0\n' };
+const version = (args) => args.includes('-c') && { status: 0, stdout: '3.13.0\n' };
 
 test('an existing venv is used as it is, with no process started', () => {
   const venv = scratch();
@@ -46,11 +46,11 @@ test('no Python: the reason names what was tried and the one-command fix, withou
   const { exec, calls } = fake(() => ({ status: null, error: new Error('spawn python ENOENT') }));
   const result = ensureVenv({ venv, env: {}, exec, log: quiet });
   assert.equal(result.ok, false);
-  assert.match(result.reason, /no Python 3 found \(python, python3 and py -3 on PATH\)/);
+  assert.match(result.reason, /no supported Python found .*install Python 3.12 or 3.13.*MARGO_PYTHON/);
   assert.ok(result.reason.includes(SETUP), result.reason);
   assert.deepEqual(
     calls.map((c) => [c.command, ...c.args.slice(0, -2)].join(' ')),
-    ['python', 'python3', 'py -3'],
+    pythonCandidates().map((c) => c.join(' ')),
   );
   assert.ok(
     calls.every((c) => c.ms > 0),
@@ -60,11 +60,11 @@ test('no Python: the reason names what was tried and the one-command fix, withou
 
 test("Windows' python.exe store alias (prints a hint, exits 9009) is not taken for Python", () => {
   const { exec } = fake((command, args) =>
-    command === 'python'
+    command === 'py' && args[0] === '-3.13'
       ? { status: 9009, stdout: 'Python was not found; run without arguments to install' }
       : version(args) || {},
   );
-  assert.deepEqual(findPython({ env: {}, exec }), { command: ['python3'], version: '3.15.0' });
+  assert.deepEqual(findPython({ env: {}, exec, platform: 'win32' }), { command: ['py', '-3.12'], version: '3.13.0' });
 });
 
 test('offline: pip fails, the half-made venv is removed and the reason says so with the fix', () => {
@@ -170,4 +170,46 @@ test('the Python package suite (in verify) with no venv and no Python: loud SKIP
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+const probe = (versions) => (command, args) => {
+  const key = [command, ...args.filter((a) => a !== '-c' && !a.startsWith('import'))].join(' ');
+  return key in versions ? { status: 0, stdout: `${versions[key]}\n` } : { status: 1 };
+};
+
+test('picks 3.13 or 3.12, never a newer Python the pinned PyYAML has no wheel for (bug 24b)', () => {
+  // Python 3.15 is first on PATH, as on the Beelink; the py launcher also has 3.12.
+  const { exec } = fake(probe({ python: '3.15.0', python3: '3.15.0', 'py -3.12': '3.12.7' }));
+  assert.deepEqual(findPython({ env: {}, exec, platform: 'win32' }), { command: ['py', '-3.12'], version: '3.12.7' });
+  const linux = fake(probe({ python3: '3.15.0', 'python3.12': '3.12.4' }));
+  assert.deepEqual(findPython({ env: {}, exec: linux.exec, platform: 'linux' }), {
+    command: ['python3.12'],
+    version: '3.12.4',
+  });
+  const plain = fake(probe({ python3: '3.13.1' }));
+  assert.deepEqual(findPython({ env: {}, exec: plain.exec, platform: 'linux' }), {
+    command: ['python3'],
+    version: '3.13.1',
+  });
+});
+
+test('only Python 3.15 on PATH: stops with one line naming the fix, no venv, no pip (bug 24b)', () => {
+  const venv = join(scratch(), 'venv');
+  const { exec, calls } = fake(probe({ python: '3.15.0', python3: '3.15.0', 'py -3.13': '3.15.0' }));
+  const result = ensureVenv({ venv, env: {}, exec, log: quiet });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /install Python 3.12 or 3.13.*set MARGO_PYTHON/);
+  assert.doesNotMatch(result.reason, /Visual C\+\+/);
+  assert.ok(
+    calls.every((c) => c.args.includes('-c')),
+    'nothing but version probes ran',
+  );
+});
+
+test('MARGO_PYTHON overrides the supported-version filter', () => {
+  const { exec } = fake(probe({ 'my-python': '3.15.0' }));
+  assert.deepEqual(findPython({ env: { MARGO_PYTHON: 'my-python' }, exec }), {
+    command: ['my-python'],
+    version: '3.15.0',
+  });
 });
