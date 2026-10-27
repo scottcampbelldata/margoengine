@@ -1049,7 +1049,7 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | --- | --- | --- |
 | `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 318,765 B |
 | `margoengine/cad` | CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export | 201,527 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 277,396 B |
+| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 291,590 B |
 | `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 160,399 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
@@ -2710,24 +2710,47 @@ does not own. Each entry says exactly what is needed to close it.
   WebGPU XR binding (`XRGPUBinding`), or an AR headset with the same; then a reticle placed on a real floor and a real
   table (viewer source) and by screen tap (transient source), one placement anchored, and the result recorded here.
 
-### Intel Arc 140V: four GPU-suite failures fixed on this PC, not yet rerun on Intel
+### Intel Arc 140V: three new GPU-suite failures fixed on this PC, not yet rerun on Intel
 
-- **What:** a run of every GPU suite on an Intel Core Ultra 7 258V with Arc 140V graphics (driver 32.0.101.8860, Edge
-  155, Windows 11 build 26300, main at d000e4b6, 2026-10-26) failed four that pass on the RTX A6000:
-  1. compute `fft` inverse round trip, n = 1024: 1.43e-5 off (tolerance 1e-5). Cause: twiddles from GPU `cos`/`sin`
-     (WGSL allows 2^-11 of error). Fixed: twiddles from a host table rounded once from double precision; on the A6000
-     the GPU now matches the CPU backend bit for bit, and a new check bounds the Stockham passes at 1.5 sqrt(log2 n) u.
-  2. voxel bevel check, "gbuffer follows the chamfer silhouette"; 3. voxel-pathtracer, "combinedHDR" 226 sRGB levels
-     off; 4. "Next client failed to render mint geometry". Cause of all three: the check waited a fixed time or number
-     of frames for pipelines that compile in the background, and the iGPU compiles more slowly. With every pipeline
-     made 300-500 ms slower (`--pipeline-delay`, scripts/browser.js) the A6000 fails the same three the same way
-     (226 / 0 for 3). Fixed: the checks wait for readiness (`VoxelRenderer.draw`/`drawShadow` return whether they drew,
-     `stats.compiling`; the path tracer's `stats.converged` waits until the frame shows the traced image; the Next check
-     waits for the cube); the `test:gpu:slow-compile` suites keep it so.
-- **Not verified:** that the four now pass on the Intel GPU, and the Stockham bound there (it allows a fused
-  multiply-add in every complex product).
-- **Needed to close:** the steps in `private/handoffs/intel-recheck.md` on the Intel PC: the four suites, their
-  slow-compile twins and the 4x repeat, zipped; then this entry removed or turned into the cause found.
+- **Verified on Intel** (Core Ultra 7 258V, Arc 140V, driver 32.0.101.8860, main at 30bea6fa, recheck of 2026-10-27):
+  the four failures of the first run (main d000e4b6) are fixed there. FFT: the Stockham passes match the host-twiddle
+  f32 reference exactly (0.00 u at n = 1024 and 65536); path tracer `combinedHDR` within 1 sRGB level (was 226),
+  converged after 17 frames; the Next client drew the mint cube after 598 ms (past the old 300 ms fixed wait); the voxel
+  and path-tracer `test:gpu:slow-compile` twins and `modern:test:browser` with its twin pass.
+- **What failed instead** (same run), and the cause and fix of each, measured on the RTX A6000:
+  1. compute CPU/GPU parity, `sin, cos, atan2[16]: cpu -0.4964582920074463, gpu -0.49644696712493896` (1.13e-5 off,
+     tolerance 1e-5). Cause: the WGSL builtins. WGSL allows `sin` and `cos` 2^-11 absolute error inside [-pi, pi] (and
+     none promised outside), `atan2` 4096 ulp, `asin` 6.8e-5; the Arc 140V is 1.1e-5 off near 1.5 where the A6000 is
+     within 3.3e-7 (the A6000 is itself 1e-5 off at |x| near 100, 133 ulp for `tanh`, 114 for `pow`). Fixed: element-wise
+     functions use precise f32 versions (`packages/shared/precise-math.js`: integer Payne-Hanek reduction, minimax
+     polynomials from `scripts/precise-math-coefficients.mjs`), within 1 to 2.5 ulp (pow 5) on every GPU;
+     `createCompute({ fastMath: true })` keeps the builtins. The parity check is tighter now (1e-6, plus each function
+     in ulp) and the fastMath path is checked against the WGSL bounds. Regression tests: `tests/precise-math.test.js`
+     (the bounds over dense inputs with fused and unfused rounding and with division and sqrt at WGSL's limits), the
+     GPU check `compute-precise-browser.js` (the A6000 computes the host mirror's values bit for bit), and
+     `compute test:browser:spec-math`, which moves every builtin result by WGSL's whole allowed error
+     (`--spec-math-error`, scripts/browser.js): the old parity check fails there as on Intel, the new one passes.
+  2. voxel normal suite, `4x four-view blue`: the bottom two views black. Cause: the bevel check took "the quad and
+     triangle counts did not change for 3 frames" for "every chunk is meshed"; with one mesher worker on a slower CPU
+     a bevelled chunk takes several frames, so the last two chunks (the bottom views) were not on the GPU yet. Fixed:
+     `VoxelRenderer.stats.pending` counts the chunks not yet on the GPU (changed, meshing, waiting for upload); the
+     check waits for a frame with `pending` 0, `compiling` false and draws. Regression test: `voxel test:gpu:slow-mesh`
+     delivers every worker message 150 ms late (`--worker-delay`): the old check fails there the same way, the new one
+     passes.
+  3. voxel-pathtracer normal suite, `traversal fisheye: depth`: 1.17e-3 relative depth error against the CPU raycast
+     (assertion < 1e-4), 16379 of 16384 first hits alike. Cause: the fisheye rays came from the builtin `asin`, `sin`
+     and `cos`; a ray that far off grazes a different voxel face. Fixed: the panorama and fisheye rays use the precise
+     functions. Regression test: `voxel-pathtracer test:gpu:spec-math` (the projections check with every builtin at
+     WGSL's error bound) fails with the builtins and passes with the fix.
+- **The class:** five checks have now waited "N frames" or "N ms" for something that takes longer on a slower GPU or
+  CPU. `scripts/check-fixed-waits.mjs` (run by `tests/check-fixed-waits.test.js` in `npm run verify`) fails on any new
+  fixed frame count or sleep in a GPU or browser check unless it carries `// fixed-wait: <reason>`; the ones already
+  there are counted in `scripts/fixed-waits-baseline.json` and only go down. `scripts/support/gpu-ready.js`
+  (`waitForPipelines`) waits for the pipelines themselves.
+- **Not verified:** that the three now pass on the Intel GPU, and the precise functions' bounds on its compiler.
+- **Needed to close:** the steps in `private/handoffs/intel-recheck.md` on the Intel PC (the suites, their
+  slow-compile, slow-mesh and spec-math twins, and the precise maths results in `compute-browser.json`), zipped; then
+  this entry removed or turned into the cause found.
 
 ## Open defects
 
@@ -2761,7 +2784,7 @@ does not own. Each entry says exactly what is needed to close it.
   app did not install anywhere in the graph of `Canvas` and `Stage`; a stage facade change, frozen for 1.0), or the
   README naming `margoengine` as the install for webpack and Turbopack. Until then, install `margoengine`.
 
-### 4x MSAA blending is not repeatable on the RTX A6000 under CPU load
+### 4x MSAA blending is not repeatable (RTX A6000 under CPU load, and Intel Arc 140V)
 
 - **What:** the voxel GPU check (`packages/voxel/tests/render-browser-check.mjs`, run by `check:merge`) fails now and
   then in a busy run at its "tree and overhang" view, at 4x MSAA: "meshes in another order drew {differing:36, max:1}"
@@ -2770,16 +2793,19 @@ does not own. Each entry says exactly what is needed to close it.
   --repeat=450`: one renderer, the still view drawn 450 times while the other cores spin. 1 to 3 frames in 450 differ
   from the first by 1 in 8 bits (1 ulp on rgba16float) on 13 to 82 pixels, then the next frame is back (Edge and
   Chrome, Dawn D3D12, RTX A6000, driver 32.0.16.1742, 2026-10-26).
-- **Cause (measured; below the WebGPU API):** every differing pixel is seen through the glass wall, along glass and
-  terrain edges (pixels whose samples hold more than one surface). Between the frames nothing that Margo hands the GPU
-  changes: no buffer write but the frame uniform and indirect arguments, bit for bit the same each frame; the glass
-  quads in the same order. The frames stay identical at 1x, without the glass, with the glass drawn unblended, with
-  blending on but the destination factor zero, with the glass drawn in the opaque pass, without core's mid-frame
-  resolve and with Dawn's D3D12 render-pass toggle off; they still differ with `max` blending, which does not depend
-  on order. So the GPU's blend unit reads the 4x colour target's destination samples differently from frame to frame
-  at partly covered pixels. Mesh arrival order is not involved: 168 permutations of the mesh replies drew the same
-  pixels on a quiet machine. Another vendor's GPU was not available to compare (the AMD iGPU offers no WebGPU
-  adapter).
+- **Intel Arc 140V** (driver 32.0.101.8860, main at 30bea6fa, recheck of 2026-10-27): the same repro drew 6 of 450
+  frames differently, always the single pixel (101, 72): [109, 107, 104] instead of [100, 99, 96], 9 of 255 (the
+  printed frames: 25, 198, 256, 327, 400), so all 6 also exceed the blended-4x tolerance of 1 below. So it is not
+  NVIDIA-only; the earlier run on main d000e4b6 that drew all 450 alike was not a controlled comparison (another
+  commit and other conditions).
+- **Cause: open, and it may be on Margo's side.** Measured on the A6000 so far: every differing pixel is seen through
+  the glass wall, along glass and terrain edges (pixels whose samples hold more than one surface). Between the frames
+  nothing that Margo hands the GPU changes: no buffer write but the frame uniform and indirect arguments, bit for bit
+  the same each frame; the glass quads in the same order. The frames stay identical at 1x, without the glass, with the
+  glass drawn unblended, with blending on but the destination factor zero, with the glass drawn in the opaque pass,
+  without core's mid-frame resolve and with Dawn's D3D12 render-pass toggle off; they still differ with `max`
+  blending, which does not depend on order. Mesh arrival order is not involved: 168 permutations of the mesh replies
+  drew the same pixels on a quiet machine. The NVIDIA report drafted from this is withdrawn.
 - **What the checks do about it (Scott, 2026-10-26):** the voxel GPU checks allow a difference of at most 1 in 8 bits
   (1 half-float ulp on the rgba16float HDR scene) on views that blend a translucent layer at 4x MSAA, and nowhere else:
   1x views, views with no translucent layer, every other check and every other package stay exact. The rule is the named
@@ -2788,13 +2814,8 @@ does not own. Each entry says exactly what is needed to close it.
   translucent panes in the other order differ by up to 132 of 255 (`swapped layer order` step), and the mesh arrival
   order step stays a pixel comparison with that tolerance only. The check's output prints the exact count next to the
   tolerant one, and `--repeat` reports both (it still fails on any exact difference: it is the repro).
-- **Report:** a factual report with the repro for NVIDIA is drafted in `private/handoffs/nvidia-report.md` (not sent).
-- **Other GPU:** on an Intel Arc 140V (driver 32.0.101.8860, main at d000e4b6, reported by the tester 2026-10-27) the
-  same `--repeat=450` drew all 450 frames exactly alike (0 differ, max 0 of 255), which points at the NVIDIA driver;
-  `private/handoffs/intel-recheck.md` reruns it on current main.
-- **Needed to close:** the same repro on another GPU (AMD, Intel, another NVIDIA driver) to confirm it is this driver,
-  and the report sent to NVIDIA. The entry stays until a driver or GPU that repeats 4x blending exactly is found, or the
-  vendor explains the behaviour; then the tolerance can go.
+- **Needed to close:** the cause found (Margo-side or not) with both GPUs' repro results explained, and the fix or the
+  vendor's explanation recorded here; then the tolerance can go.
 
 ## Performance losses still open
 
