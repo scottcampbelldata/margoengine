@@ -55,7 +55,14 @@ test('run: a command past --max is killed with its children, the lock is freed, 
     const run = spawnSync(
       process.execPath,
       ['scripts/gpu-lock.mjs', 'run', '--max=0.04', '--owner=hang', '--', process.execPath, '-e', hang, pidFile],
-      { encoding: 'utf8', env: { ...process.env, MARGO_GPU_LOCK: lock, MARGO_GPU_LOCK_NESTED: '', ...FAST } },
+      // This test is about the wrapper's own limit. With FAST's 200 ms grace the detached heartbeat process reached
+      // the same deadline while the wrapper was still ending the tree (taskkill can take longer than that on Windows),
+      // killed it too and appended gpu-lock-timeouts.log to this folder during the rmSync below (ENOTEMPTY). A long
+      // grace leaves the kill to the wrapper; the heartbeat's own kill is the next test's subject.
+      {
+        encoding: 'utf8',
+        env: { ...process.env, MARGO_GPU_LOCK: lock, MARGO_GPU_LOCK_NESTED: '', ...FAST, MARGO_GPU_GRACE_MS: '60000' },
+      },
     );
     assert.notEqual(run.status, 0);
     assert.equal(run.status, 124, run.stderr);
@@ -65,6 +72,7 @@ test('run: a command past --max is killed with its children, the lock is freed, 
     await sleep(500);
     assert.equal(alive(child), false, 'the command is gone');
     assert.equal(alive(grandchild), false, "the command's child is gone");
+    assert.ok(!readdirSync(folder).includes('gpu-lock-timeouts.log'), 'the wrapper ended it, not a racing heartbeat');
     // Freed: a new holder gets the lock at once, and nothing is left in the folder.
     const next = spawnSync(process.execPath, ['scripts/gpu-lock.mjs', 'status'], {
       encoding: 'utf8',
