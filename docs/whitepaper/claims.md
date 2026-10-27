@@ -158,7 +158,7 @@ Three proofs needed more than "store the baseline's value":
   copies of the same arguments (aliasing and shared buffers kept) and required the same result, error and every array
   argument afterwards (NaN payloads aside, below); the SHA-256 over all 24 tapes' effects is stored. A current run
   replays the stand-ins and must reproduce every digest. Its text comparisons between old copies are facts about
-  `2484971` alone and are stored as such.
+  `2484971` alone and are stored as such. The digests hold only exactly specified results (host-rounded maths, below).
 - **post-stack**'s creative pair is historical in every mode (`5b1fe66^` -> `3319317`, both old); a current run reads
   its stored result (identical calls, with the count) instead of rebuilding both commits.
 - **ignoreAgx**'s question "does the reference descend from `eaddd64`" is stored as a fact of the reference.
@@ -170,6 +170,32 @@ each such proof prints `HISTORICAL: <proof> is pinned to <commit>, a commit only
 0, while in `--current` a HISTORICAL row is a failure. `npm run check:fresh-clone` (in `check:merge`, so in the
 nightly full run) builds a history-free shallow clone of the working tree and runs `npm run verify` and the proofs in
 it.
+
+**Host-rounded maths (bug 17, 2026-10-27).** math-consolidation passed on the PC that captured it (Node 26.12, V8
+14.6, Windows) and failed on Node 22.22.1 (V8 12.4) on Ubuntu (Intel N100) and on Windows (AMD Ryzen 7735HS): 21 of its
+24 tape digests differed, while every call still matched its old copy when the copies were built from Git on Node 22.
+Cause: ECMAScript specifies `+ - * /`, `%`, `Math.sqrt`, `Math.fround` and the integer and rounding functions exactly,
+but leaves `**`, `Math.pow`, `Math.sin`, `Math.cos`, `Math.hypot` and the other "implementation-approximated"
+functions to the engine. V8 14.6 computes `**` with the C library's pow (`--use-std-math-pow`, on by default), so on
+Windows it differs from V8 12.4's own pow (`10 ** -5` is `0.00001` on one and `0.000009999999999999999` on the
+other; the sRGB decode or encode of 48 of the 256 bytes differs in the last bit). The proof's inputs came from
+`10 ** x`, so every tape saw other inputs, and six tapes stored sRGB results. The engine does not promise the same
+last bit across JavaScript engines for these functions (as the procedural and netcode READMEs say); what it promises is
+that `@margoengine/math` computes exactly what each replaced package copy computed, on the same engine. So the
+engine's maths stays as it is and the proof's digests now hold only exactly specified results: the inputs are built
+from exact operations; while the proof runs, Math.sin, Math.cos and Math.hypot are exact stand-ins written with
+`+ - * /`, `%` and `Math.sqrt` (golden.js `exactMath`; the old copies and today's math both call them, so a different
+expression still gives different bits), and a taped call that uses any other approximated Math function fails the
+proof; the results that go through `**` (the sRGB curves in parseColor, srgbToLinear, encodeSrgb, toSrgb and
+parseSplat) are stored in a canonical form (tape's `canonical`): each value is first checked to be exactly what the
+old copies' own expression (pinned by new text facts) gives on the host running the proof, then recorded as that
+expression or as the sRGB byte it decodes. The golden was captured again at the same reference (`2484971`, every call
+still checked against the old copies) and `<proof>.json` now names the host it was captured on (`capturedOn`).
+`tests/proofs-golden.test.js` replays the proof under the other pow (`--no-use-std-math-pow` on Node 26; Node 22 has
+only V8's own) and fails without the fix; it passes on Node 22.22.1 (Windows x64 and Ubuntu x64) and Node 26.12
+(Windows x64), and CI runs it on Node 22.12.0 and 26 (`node-compat` in `.github/workflows/ci.yml`). The 19 GPU-call
+proofs were not affected: their stored values pass on both pows. They still include results of V8's own sin, cos and
+tan (core's cameras), which were the same on every host checked; ARM builds have not been checked.
 
 **NaN payloads.** `geometry.proof.js` (pinned) failed at random on its degenerate-input case ("degenerate bounds"):
 baseline and candidate both return NaN for the non-finite vertex, but V8 writes either x86's default NaN (sign bit

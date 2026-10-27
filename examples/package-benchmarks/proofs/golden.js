@@ -149,7 +149,116 @@ const state = {
   facts: {},
   used: new Set(),
   finals: [],
+  /** How many taped calls are running (deterministicMath fails an approximated Math function called inside one). */
+  taping: 0,
+  /** Approximated Math functions a taped call used that have no exact stand-in. */
+  approximated: new Set(),
 };
+
+/** The Node, V8 and platform this process runs on (with a V8 pow flag it was given), for the stored meta and messages. */
+const host = () =>
+  `Node ${process.version} (V8 ${process.versions.v8}) ${process.platform}-${process.arch}${process.execArgv
+    .filter((arg) => arg.includes('math-pow'))
+    .map((arg) => ` ${arg}`)
+    .join('')}`;
+
+const taping = (run) => {
+  state.taping++;
+  try {
+    return run();
+  } finally {
+    state.taping--;
+  }
+};
+
+// Exact stand-ins for the Math functions ECMAScript lets each engine round its own way, written with + - * /, % and
+// Math.sqrt (each exactly rounded, so every host gives the same bits). They stay within a few ulp of the true value for
+// moderate arguments; for huge ones sin and cos reduce by the double nearest 2 pi, so they are not the true value there,
+// but they are the same on every host, which is what a stored digest needs. A proof proves that two codes compute the
+// same expression; they call Math at call time, so both call these, and an expression that differs still gives
+// different bits.
+const TWO_PI = 6.283185307179586,
+  PI = 3.141592653589793,
+  HALF_PI = 1.5707963267948966;
+/** sin(t), |t| <= pi/4 or a little more: its Taylor series to t^17, nested (t (1 - t^2/(2*3) (1 - t^2/(4*5) ...))). */
+function sinSeries(t) {
+  const s = t * t;
+  let sum = 1;
+  for (let n = 16; n >= 2; n -= 2) sum = 1 - (s / (n * (n + 1))) * sum;
+  return t * sum;
+}
+/** cos(t), |t| <= pi/4 or a little more: its Taylor series to t^16, nested the same way. */
+function cosSeries(t) {
+  const s = t * t;
+  let sum = 1;
+  for (let n = 15; n >= 1; n -= 2) sum = 1 - (s / (n * (n + 1))) * sum;
+  return sum;
+}
+/** [quadrant 0..3, t] with x = quadrant * pi/2 + t (modulo the double nearest 2 pi), |t| <= pi/4 or a little more. */
+function quadrant(x) {
+  let r = x % TWO_PI; // exact (ECMAScript's % is the exact remainder)
+  if (r > PI) r -= TWO_PI;
+  else if (r < -PI) r += TWO_PI; // both exact: r is within a factor of two of TWO_PI
+  const n = Math.round(r / HALF_PI); // -2 .. 2, so n * HALF_PI is exact
+  return [n & 3, r - n * HALF_PI];
+}
+/** Exact stand-ins (see above), each following its Math function on NaN, the infinities and -0. */
+export const exactMath = Object.freeze({
+  sin(x) {
+    x = Number(x);
+    if (!Number.isFinite(x)) return NaN;
+    if (x === 0) return x;
+    const [q, t] = quadrant(x);
+    return q === 0 ? sinSeries(t) : q === 1 ? cosSeries(t) : q === 2 ? -sinSeries(t) : -cosSeries(t);
+  },
+  cos(x) {
+    x = Number(x);
+    if (!Number.isFinite(x)) return NaN;
+    const [q, t] = quadrant(x);
+    return q === 0 ? cosSeries(t) : q === 1 ? -sinSeries(t) : q === 2 ? -cosSeries(t) : sinSeries(t);
+  },
+  hypot(...args) {
+    const values = args.map(Number);
+    let max = 0,
+      nan = false;
+    for (const v of values) {
+      const a = Math.abs(v);
+      if (a === Infinity) return Infinity;
+      if (a !== a) nan = true;
+      else if (a > max) max = a;
+    }
+    if (nan) return NaN;
+    if (max === 0) return 0;
+    let sum = 0;
+    for (const v of values) {
+      const r = v / max;
+      sum += r * r;
+    }
+    return max * Math.sqrt(sum);
+  },
+});
+/** The Math functions ECMAScript calls "implementation-approximated", besides those exactMath replaces. */
+const APPROXIMATED = ['acos', 'acosh', 'asin', 'asinh', 'atan', 'atanh', 'atan2', 'cbrt', 'cos', 'cosh', 'exp', 'expm1']
+  .concat(['hypot', 'log', 'log1p', 'log10', 'log2', 'pow', 'sin', 'sinh', 'tan', 'tanh'])
+  .filter((name) => !(name in exactMath));
+
+/**
+ * For a --current proof whose stored digests cover function results (tape): replaces Math.sin, Math.cos and Math.hypot
+ * with exactMath for the rest of the process, and fails the proof if a taped call uses another approximated Math
+ * function (it would need an exact stand-in or a `canonical` form). Does nothing outside --current. `**` cannot be
+ * replaced; tape's `canonical` covers it, and tests/proofs-golden.test.js replays the proof under the other pow.
+ */
+export function deterministicMath() {
+  if (state.mode === 'off') return;
+  Object.assign(Math, exactMath);
+  for (const name of APPROXIMATED) {
+    const original = Math[name];
+    Math[name] = function approximated(...args) {
+      if (state.taping) state.approximated.add(name);
+      return original.apply(Math, args);
+    };
+  }
+}
 
 /**
  * Starts golden outputs for a --current proof whose baseline is `ref`. Mode 'read' (PROOFS_GOLDEN=1, or a clone
@@ -183,6 +292,13 @@ export function begin(ref, env = process.env) {
 /** At exit, once the proof passed: finish the tapes, then store (capture) or check that every stored value was used. */
 function finish(code) {
   if (code !== 0 || process.exitCode) return;
+  if (state.approximated.size) {
+    console.error(
+      `golden: ${state.proof}: taped calls used Math.${[...state.approximated].join(', Math.')}, which hosts round differently, so the stored digest would hold for one host only; give it an exact stand-in (golden.js exactMath) or a canonical form (tape)`,
+    );
+    process.exitCode = 1;
+    return;
+  }
   for (const done of state.finals) done();
   if (process.exitCode) return;
   if (state.mode === 'capture') return save();
@@ -308,8 +424,15 @@ const copyArgs = (args) => {
  * argument returned, error thrown, every array argument afterwards); the SHA-256 over all effects in call order is the
  * stored value `key`. In read mode only the stand-in runs, and its digest must equal the stored one at exit. A function
  * a call returns (a seeded generator) is taped the same way, paired with the one the stand-in returned.
+ *
+ * The digest is compared on other machines, so it may only cover results that ECMAScript specifies exactly. `**` and
+ * Math.pow are not: V8 14.6 (Node 26) computes them with the C library's pow (`--use-std-math-pow`), V8 12.4 (Node 22)
+ * with its own, and the two differ in the last bit for 48 of the 256 sRGB bytes. For a function whose result goes through
+ * `**`, `canonical[name](args, value)` (args after the call, value the result or the argument returned) checks the value
+ * against the old copy's own expression evaluated on this host and returns what the digest records instead, the same
+ * on every host. The other approximated Math functions get exact stand-ins during the proof (deterministicMath below).
  */
-export function tape(key, module, standIn) {
+export function tape(key, module, standIn, canonical = {}) {
   if (state.mode === 'off') return module;
   assert.ok(!state.used.has(key), `golden: ${state.proof} tapes "${key}" twice; give each tape its own key`);
   state.used.add(key);
@@ -320,10 +443,10 @@ export function tape(key, module, standIn) {
     function taped(...args) {
       assert.ok(typeof stand === 'function', `golden: ${state.proof} "${key}" has no stand-in for ${name}`);
       const twin = copyArgs(args),
-        other = effect(twin, () => stand(...twin));
+        other = taping(() => effect(twin, () => stand(...twin)));
       let own = other;
       if (!reading) {
-        own = effect(args, () => real(...args));
+        own = taping(() => effect(args, () => real(...args)));
         assert.deepEqual(
           other.record,
           own.record,
@@ -334,7 +457,18 @@ export function tape(key, module, standIn) {
           // The stand-in's effect on the copies, applied to the caller's arguments as the old copy would have.
           if (Array.isArray(arg) || ArrayBuffer.isView(arg)) for (let k = 0; k < arg.length; k++) arg[k] = twin[i][k];
         });
-      hash.update(JSON.stringify([name, own.record]));
+      // A result that goes through `**` is stored in the form `canonical[name]` gives it (see above), so the digest is
+      // the same on every host; the caller's code still gets the real result.
+      const form =
+        canonical[name] && !own.threw
+          ? canonical[name](args, own.record.returned === undefined ? own.result : args[own.record.returned])
+          : undefined;
+      hash.update(
+        JSON.stringify([
+          name,
+          form === undefined ? own.record : { returned: own.record.returned, canonical: encode(canonicalNaN(form)) },
+        ]),
+      );
       calls++;
       if (own.threw) rethrow(own.threw);
       if (own.record.returned === 'function') return wrap(`${name}()`, reading ? undefined : own.result, other.result);
@@ -347,7 +481,7 @@ export function tape(key, module, standIn) {
     const stored = state.data?.outputs[key] && decode(state.data.outputs[key]);
     if (stored && (stored.calls !== value.calls || stored.sha256 !== value.sha256)) {
       console.error(
-        `golden: ${state.proof} "${key}": ${calls} calls, digest ${value.sha256}; stored: ${stored.calls} calls, ${stored.sha256} (${reading ? "today's code no longer computes what the old copies did" : 'capture it again'})`,
+        `golden: ${state.proof} "${key}": ${calls} calls, digest ${value.sha256}; stored: ${stored.calls} calls, ${stored.sha256} (${reading ? "today's code no longer computes what the old copies did" : 'capture it again'}; captured on ${state.data.capturedOn ?? 'an unrecorded host'}, this run on ${host()})`,
       );
       process.exitCode = 1;
     }
@@ -373,6 +507,7 @@ function save() {
     ref: state.ref,
     revision: git('rev-parse', `${state.ref}^{commit}`),
     capturedAt: git('rev-parse', 'HEAD'),
+    capturedOn: host(),
     facts: state.facts,
     outputs: Object.fromEntries(Object.entries(outputs).map(([key, value]) => [key, digest(value)])),
   };

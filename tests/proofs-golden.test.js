@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { canonicalNaN, decode, digest, encode } from '../examples/package-benchmarks/proofs/golden.js';
+import { canonicalNaN, decode, digest, encode, exactMath } from '../examples/package-benchmarks/proofs/golden.js';
 
 const proofs = resolve(import.meta.dirname, '../examples/package-benchmarks/proofs');
 const url = (file) => pathToFileURL(join(proofs, file)).href;
@@ -56,7 +56,10 @@ test('canonicalNaN: NaN payloads compare equal, every other bit still counts', (
 /** Runs a small "proof" in a child with its own baselines folder; returns { status, out }. */
 function proof(dir, body, env = {}) {
   const file = join(dir, 'tiny.proof.js');
-  writeFileSync(file, `import { begin, golden, tape, fact } from ${JSON.stringify(url('golden.js'))};\n${body}\n`);
+  writeFileSync(
+    file,
+    `import { begin, golden, tape, fact, deterministicMath } from ${JSON.stringify(url('golden.js'))};\n${body}\n`,
+  );
   const result = spawnSync(process.execPath, [file], {
     cwd: resolve(proofs, '../../..'),
     encoding: 'utf8',
@@ -168,4 +171,115 @@ test('a pinned run whose commit this clone lacks is HISTORICAL with the commit n
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// Bug 17 (2026-10-27): math-consolidation passed on this PC (Node 26.12, V8 14.6) and failed on Node 22.22.1 (V8 12.4)
+// on Linux and on Windows. Its inputs used `10 ** x` and six of its tapes stored results of the sRGB curves (`**`), and
+// ECMAScript leaves the rounding of `**` to the engine: V8 14.6 computes it with the C library's pow
+// (`--use-std-math-pow`, on by default), V8 12.4 with its own, and 10 ** -5 is 0.00001 in one and
+// 0.000009999999999999999 in the other. A stored digest may only cover exactly specified results.
+
+test('exactMath: sin, cos and hypot from exactly rounded operations, close to Math and with its special cases', () => {
+  for (const [name, x] of [
+    ['sin', -0],
+    ['sin', 0],
+    ['cos', -0],
+  ])
+    assert.ok(Object.is(exactMath[name](x), Math[name](x)), `${name}(${x})`);
+  for (const x of [NaN, Infinity, -Infinity])
+    assert.ok(Number.isNaN(exactMath.sin(x)) && Number.isNaN(exactMath.cos(x)));
+  assert.equal(exactMath.hypot(), 0);
+  assert.ok(Object.is(exactMath.hypot(-0, 0), 0));
+  assert.equal(exactMath.hypot(NaN, -Infinity), Infinity);
+  assert.ok(Number.isNaN(exactMath.hypot(1, NaN)));
+  assert.equal(exactMath.hypot(3e300, 4e300), 5e300, 'no overflow');
+  assert.equal(exactMath.hypot(3, 4), 5);
+  let seed = 3;
+  const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  for (let i = 0; i < 20000; i++) {
+    const x = (random() * 2 - 1) * 100,
+      y = (random() * 2 - 1) * 1e-3;
+    // Close to the host's value (reducing by the double nearest 2 pi costs about 16 periods * 2.4e-16 at |x| = 100).
+    assert.ok(Math.abs(exactMath.sin(x) - Math.sin(x)) < 1e-14, `sin(${x})`);
+    assert.ok(Math.abs(exactMath.cos(x) - Math.cos(x)) < 1e-14, `cos(${x})`);
+    assert.ok(Math.abs(exactMath.hypot(x, y, x) - Math.hypot(x, y, x)) <= 4 * Number.EPSILON * Math.hypot(x, y, x));
+  }
+});
+
+test('a taped call that uses an approximated Math function fails the run; sin, cos and hypot get exact stand-ins', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-golden-'));
+  try {
+    const exact = proof(
+      dir,
+      `import { exactMath } from ${JSON.stringify(url('golden.js'))};
+begin('HEAD');
+deterministicMath();
+if (Math.sin !== exactMath.sin || Math.cos !== exactMath.cos || Math.hypot !== exactMath.hypot) throw new Error('not replaced');
+const old = tape('copies', { f: (x) => Math.sin(x) + Math.hypot(x, 1) }, { f: (x) => Math.sin(x) + Math.hypot(x, 1) });
+old.f(0.5);`,
+      { PROOFS_GOLDEN_CAPTURE: '1' },
+    );
+    assert.equal(exact.status, 0, exact.out);
+    const tan = proof(
+      dir,
+      `begin('HEAD');
+deterministicMath();
+Math.tan(1); // outside a taped call: allowed
+const old = tape('copies', { f: (x) => Math.tan(x) }, { f: (x) => Math.tan(x) });
+old.f(0.5);`,
+      { PROOFS_GOLDEN_CAPTURE: '1' },
+    );
+    assert.notEqual(tan.status, 0);
+    assert.match(tan.out, /taped calls used Math\.tan, which hosts round differently/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a tape's canonical form is what its digest records, so a result through `**` stores the same on every host", () => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-golden-'));
+  try {
+    const stored = (fn, canonical) => {
+      const run = proof(
+        dir,
+        `begin('HEAD');\nconst old = tape('copies', { f: ${fn} }, { f: ${fn} }, ${canonical});\nold.f(0.3); old.f(0.7);`,
+        { PROOFS_GOLDEN_CAPTURE: '1' },
+      );
+      assert.equal(run.status, 0, run.out);
+      return JSON.parse(readFileSync(join(dir, 'baselines/tiny.json'), 'utf8')).outputs.copies;
+    };
+    const form = "{ f: (args, value) => ({ input: args[0], value: value > 0 ? 'positive' : value }) }";
+    // Two different results with one canonical form store one digest; without the form they differ.
+    assert.equal(stored('(x) => x ** 2.4', form), stored('(x) => x * x', form));
+    assert.notEqual(stored('(x) => x ** 2.4', '{}'), stored('(x) => x * x', '{}'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** The V8 flag that picks the other pow implementation, or undefined on a Node without the choice (Node 22). */
+function otherPow() {
+  const options = spawnSync(process.execPath, ['--v8-options'], { encoding: 'utf8', timeout: 30_000 }).stdout ?? '';
+  const flag = /--use-std-math-pow\b[^\n]*\n\s*type: bool\s+default: (--(?:no-)?use-std-math-pow)/.exec(options)?.[1];
+  return flag && (flag === '--use-std-math-pow' ? '--no-use-std-math-pow' : '--use-std-math-pow');
+}
+
+test('math-consolidation replays from its stored digests under another pow (after build:packages)', () => {
+  // Node 26 has both pows: this runs the one `npm run proofs -- --current` does not. Node 22 has only V8's own, which
+  // is not the pow the digests were captured with (Node 26 on Windows: `capturedOn` in baselines/math-consolidation.json).
+  // CI runs this file on Node 22.12.0 and 26 (.github/workflows/ci.yml, node-compat).
+  const flag = otherPow(),
+    run = spawnSync(
+      process.execPath,
+      [...(flag ? [flag] : []), join(proofs, 'math-consolidation.proof.js'), '--current'],
+      {
+        cwd: resolve(proofs, '../../..'),
+        encoding: 'utf8',
+        timeout: 5 * 60_000,
+        killSignal: 'SIGKILL',
+        env: { ...process.env, PROOFS_GOLDEN: '1', PROOFS_GOLDEN_CAPTURE: '', PROOFS_NO_WRITE: '1' },
+      },
+    );
+  assert.equal(run.status, 0, `${flag ?? 'default pow'}:\n${run.stderr.slice(-3000)}`);
+  assert.match(run.stdout, /"outputsIdentical": true/);
 });

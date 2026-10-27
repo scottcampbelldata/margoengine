@@ -17,9 +17,14 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { refs, versions, time, entryAt, fileAt, tape, fact, atRef } from './compare.js';
+import { deterministicMath } from './golden.js';
 
 const timing = process.argv.includes('--time'),
   { ref, pin } = refs('2484971', '4eed254');
+// The stored digests are compared on every host, so they may hold only exactly specified results (golden.js tape):
+// Math.sin, Math.cos and Math.hypot become exact stand-ins (old copies and today's math both call them), and the results
+// that go through `**` (the sRGB curves) are stored in the canonical forms below.
+if (!timing) deterministicMath();
 const root = resolve(import.meta.dirname, '../../..');
 /** An @margoengine/math entry at the candidate (`pin`, else the working tree's build). */
 const math = (entry) => entryAt('math', `src/${entry}.ts`, pin),
@@ -67,6 +72,57 @@ const standIns = {
     finiteVector: validate.finiteVector,
   },
 };
+// The sRGB curves, the one place the copies use `**`, whose rounding ECMAScript leaves to the engine (V8 14.6 on
+// Windows and V8 12.4 differ in the last bit for 48 of the 256 bytes). Every old copy is one of these two expressions
+// (the `textual` facts below), so on any host the copy gives exactly what `decoded` and `encoded` give there.
+const decode = 'v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4',
+  encode = 'v<=0.0031308?v*12.92:1.055*v**(1/2.4)-0.055';
+const decoded = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4),
+  encoded = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
+/** The expression an arrow `(v) => (...)` returns, without whitespace. */
+const expressionOf = (f) =>
+  String(f)
+    .replace(/\s+/g, '')
+    .replace(/^\(?v\)?=>\((.*)\)$/, '$1');
+assert.equal(expressionOf(decoded), decode);
+assert.equal(expressionOf(encoded), encode);
+/** A scalar sRGB result, stored as "the expression's value on this host" once checked to be exactly that. */
+const curve = (expression, label) => (args, value) => {
+  assert.ok(Object.is(value, expression(args[0])), `${label}(${args[0]}) is not the copies' expression on this host`);
+  return label;
+};
+/** The decoded byte k/255 for k = 0..255 on this host, as doubles and as floats (each list has no repeats). */
+const bytes = Array.from({ length: 256 }, (_, k) => decoded(k / 255)),
+  bytes32 = bytes.map(Math.fround);
+assert.ok(new Set(bytes).size === 256 && new Set(bytes32).size === 256);
+/** `{byte: k}` for a value that is exactly the decoded byte k on this host (the copies decode bytes only). */
+const byteOf = (value, float) => {
+  const k = (float ? bytes32 : bytes).indexOf(value);
+  assert.ok(k >= 0, `${value} is not a decoded sRGB byte on this host`);
+  return { byte: k };
+};
+/** parseColor: an sRGB input's three channels as the bytes they decode; a linear input decodes nothing. */
+const colorOf = ([input, , offset = 0], out) =>
+  typeof input === 'number' || typeof input === 'string'
+    ? {
+        type: out.constructor.name,
+        values: Array.from(out, (v, i) => (i >= offset && i < offset + 3 ? byteOf(v, out instanceof Float32Array) : v)),
+      }
+    : undefined;
+/** parseSplat: colours as the bytes they decode (alpha is a plain byte / 255), the rest as it is. */
+const splatOf = (_, data) => ({
+  ...data,
+  colors: Array.from(data.colors, (v, i) => (i % 4 < 3 ? byteOf(v, true) : v)),
+});
+const canonical = {
+  'lines src/color.ts': { parseColor: colorOf },
+  'points src/color.ts': { parseColor: colorOf },
+  'text src/color.ts': { parseColor: colorOf, encodeSrgb: curve(encoded, 'encoded') },
+  'environment src/color.ts': { srgbToLinear: curve(decoded, 'decoded') },
+  'exporters src/scene.ts': { toSrgb: curve(encoded, 'encoded') },
+  'splats src/data.ts': { parseSplat: splatOf },
+};
+
 const taped = new Map();
 /** {baseline, candidate}: one package file at `ref` (taped in --current runs) and at the candidate (now using math). */
 async function both(name, entry) {
@@ -75,7 +131,7 @@ async function both(name, entry) {
     n = (taped.get(id) ?? 0) + 1;
   taped.set(id, n);
   const stand = new Proxy(standIns[id] ?? {}, { get: (own, key) => own[key] ?? pair.candidate[key] });
-  return { baseline: tape(`${id} #${n}`, pair.baseline, stand), candidate: pair.candidate };
+  return { baseline: tape(`${id} #${n}`, pair.baseline, stand, canonical[id]), candidate: pair.candidate };
 }
 const source = (file) => fileAt(file, ref);
 /** A text comparison between copies at `ref`: run where the commit is present, stored as a fact about `ref`. */
@@ -129,13 +185,18 @@ const specials = [
   0.5,
   1e-7,
 ];
+// Inputs come from exactly specified operations only (+ - * /, Math.floor and Math.round, comparisons), so every Node
+// version and platform runs the same inputs. `**` would not do: ECMAScript leaves its rounding to the engine, and V8 12.4
+// (Node 22) gives 10 ** -5 = 0.000009999999999999999 where V8 14.6 (Node 26) gives 0.00001.
+/** 2^-10 .. 2^10 (exact: an integer power of two divided by 1024). */
+const octaves = Array.from({ length: 21 }, (_, i) => (1 << i) / 1024);
 const value = () => {
   const r = random();
   return r < 0.15
     ? specials[Math.floor(random() * specials.length)]
     : r < 0.25
       ? Math.round(random() * 8 - 4)
-      : (random() * 2 - 1) * 10 ** (random() * 6 - 3);
+      : (random() * 2 - 1) * octaves[Math.floor(random() * octaves.length)];
 };
 function matrices(count) {
   const out = [
@@ -454,7 +515,7 @@ families.push({
     const vec = (n) => Array.from({ length: n }, value),
       unit = () => {
         const q = vec(4),
-          l = Math.hypot(...q);
+          l = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]); // not Math.hypot: see `value`
         return l && Number.isFinite(l) && random() < 0.8 ? q.map((v) => v / l) : q;
       };
     let n = 0;
@@ -532,7 +593,6 @@ families.push({
     const environment = (await both('environment', 'src/color.ts')).baseline,
       text = (await both('text', 'src/color.ts')).baseline,
       exporters = (await both('exporters', 'src/scene.ts')).baseline;
-    const decode = 'v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4';
     textual('sRGB decode copies are one expression', () => {
       assert.equal(body('packages/loaders/src/engine.ts', 'toLinear').replace(/^.*=>/, ''), decode + ';');
       for (const name of ['lines', 'points', 'text'])
@@ -540,6 +600,20 @@ families.push({
           body(`packages/${name}/src/color.ts`, 'linear').replace(/^.*=>/, '').replaceAll('value', 'v'),
           decode + ';',
         );
+    });
+    // The other copies the `canonical` forms rely on (their results go through `**`).
+    textual("environment's sRGB decode is the same expression", () =>
+      assert.equal(
+        body('packages/environment/src/color.ts', 'srgbToLinear').replace(/^.*=>/, '').replaceAll('c', 'v'),
+        decode + ';',
+      ),
+    );
+    textual('sRGB encode copies are one expression', () => {
+      assert.equal(
+        body('packages/text/src/color.ts', 'encodeSrgb').replace(/^.*=>/, '').replaceAll('value', 'v'),
+        encode + ';',
+      );
+      assert.equal(body('packages/exporters/src/scene.ts', 'toSrgb').replace(/^.*=>/, ''), encode + ';');
     });
     const outcome = (f, ...args) => {
       try {
