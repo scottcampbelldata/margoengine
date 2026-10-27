@@ -92,3 +92,13 @@ export function assertProfileCreationCoverage(selectedIds, allIds, renderedInput
       'New profile requires a full view capture; capture every view once without empty or duplicate IDs',
     );
 }
+
+/** The failure text when this run's GPU and browser have no committed baseline profile: names the adapter, the committed profiles and the fix. */
+export function missingBaselineMessage(profileId, environment, committedProfiles) {
+  return (
+    `No visual baseline for hardware profile ${profileId}: this run used GPU "${environment.gpu}" in ${environment.browser}, ` +
+    `and the committed profiles are ${committedProfiles.length ? committedProfiles.join(', ') : 'none'}. ` +
+    'On a PC with two GPUs the adapter depends on whether a Remote Desktop session is connected (Windows lists the GPU that drives the display first). Run with MARGO_GPU=nvidia to use the NVIDIA GPU (MARGO_GPU=default leaves the choice to Windows, so unset it). ' +
+    'Only if this hardware is meant to have its own baseline, capture the full committed product reference on it (npm run visual:update)'
+  );
+}

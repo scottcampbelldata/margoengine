@@ -1,4 +1,5 @@
 import { chromium, firefox } from '@playwright/test';
+import { gpuAdapterArg } from './gpu-adapter.mjs';
 
 /**
  * Which browser the repository's browser checks drive, and how it is launched, in one place.
@@ -8,6 +9,9 @@ import { chromium, firefox } from '@playwright/test';
  *   --browser=<name> on a suite's command line   same values; the legacy names msedge and bundled still work
  *   BROWSER_CHANNEL=msedge|chrome|bundled        older spelling, used when MARGO_BROWSER is not set
  *   BROWSER_EXECUTABLE=<path>                    launch this binary instead of the named browser's install
+ *   MARGO_GPU=default|nvidia|amd|intel           which GPU on a Windows PC with two (see gpu-adapter.mjs); unset picks the
+ *                                                hardware adapter with the most video memory, default adds no flag
+ *   MARGO_GPU_LUID=high,low                      use exactly this adapter (decimal)
  *   MARGO_SOFTWARE_GPU=1                         use SwiftShader (a software WebGPU adapter) on a machine without a
  *                                                real GPU; slow, and its pixels differ from a real GPU's
  *
@@ -40,7 +44,7 @@ const SOFTWARE_ARGS = [
  * Picks the browser. `name` overrides the environment (an explicit call such as `openBrowser({ channel: 'chrome' })`).
  * Throws a TypeError naming the accepted values for an unknown name.
  * @returns {{ name: 'edge'|'chrome'|'chromium'|'firefox', engine: 'chromium'|'firefox', channel: string|undefined,
- *   executablePath: string|undefined, webgpu: boolean, software: boolean, explicit: boolean, platform: string }}
+ *   executablePath: string|undefined, webgpu: boolean, chooseGpu: boolean, env: object, software: boolean, explicit: boolean, platform: string }}
  */
 export function resolveBrowser({ name, env = process.env, platform = process.platform, argv = process.argv } = {}) {
   const flag = argv.find((a) => a.startsWith('--browser='))?.slice('--browser='.length),
@@ -62,6 +66,8 @@ export function resolveBrowser({ name, env = process.env, platform = process.pla
     channel: picked === 'edge' ? 'msedge' : picked === 'chrome' ? 'chrome' : undefined,
     executablePath: env.BROWSER_EXECUTABLE || undefined,
     webgpu: engine === 'chromium',
+    chooseGpu: engine === 'chromium' && platform === 'win32',
+    env,
     software: env.MARGO_SOFTWARE_GPU === '1' || env.MARGO_SOFTWARE_GPU === 'true',
     explicit,
     platform,
@@ -69,7 +75,7 @@ export function resolveBrowser({ name, env = process.env, platform = process.pla
 }
 
 /** Command-line switches for the browser: WebGPU on where it is not on already, SwiftShader when asked for, then `extra`. */
-export function launchArgs(browser, extra = [], { webgpu = true } = {}) {
+export function launchArgs(browser, extra = [], { webgpu = true, gpu = gpuAdapterArg } = {}) {
   if (browser.engine !== 'chromium') return [];
   const args = [];
   if (!webgpu) return [...extra];
@@ -77,6 +83,10 @@ export function launchArgs(browser, extra = [], { webgpu = true } = {}) {
   else if (browser.platform !== 'win32' || browser.name !== 'edge') {
     args.push(...WEBGPU_ARGS);
     if (browser.platform === 'linux') args.push(...LINUX_ARGS);
+  }
+  if (browser.chooseGpu && !browser.software) {
+    const arg = gpu({ env: browser.env });
+    if (arg) args.push(arg);
   }
   return [...new Set([...args, ...extra])];
 }

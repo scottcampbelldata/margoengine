@@ -4,6 +4,7 @@ import {
   assertBaselineIdentity,
   assertCaptureEnvironment,
   assertProfileCreationCoverage,
+  missingBaselineMessage,
   renderedInputChanges,
   selectBaselineProfile,
 } from '../scripts/support/visual-baselines.js';
@@ -202,4 +203,20 @@ test('an example-only change blocks creation even when packages are clean', () =
     name: 'MargoError',
     code: 'state',
   });
+});
+
+test('a missing baseline names the adapter it ran on, the committed profiles and the GPU fix (bug 33)', () => {
+  const text = missingBaselineMessage('amd-rdna-2-msedge-156', { gpu: 'amd rdna-2', browser: 'msedge 156.0.1' }, [
+    'nvidia-ampere-msedge-155',
+    'nvidia-ampere-msedge-156',
+  ]);
+  for (const part of [
+    'amd-rdna-2-msedge-156',
+    'amd rdna-2',
+    'nvidia-ampere-msedge-155',
+    'nvidia-ampere-msedge-156',
+    'MARGO_GPU=nvidia',
+    'Remote Desktop',
+  ])
+    assert.ok(text.includes(part), part);
 });

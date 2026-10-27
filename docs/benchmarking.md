@@ -213,10 +213,12 @@ works for all of them, on Windows, macOS and Linux:
 | `MARGO_BROWSER=edge\|chrome\|chromium\|firefox` | `edge` on Windows, `chromium` elsewhere | The browser to drive. `chromium` is Playwright's own build (`npx playwright install chromium`); `edge` and `chrome` need that browser installed. `--browser=<name>` on a suite's command line does the same. |
 | `BROWSER_CHANNEL=msedge\|chrome\|bundled` | unset | Older spelling of the same choice; `MARGO_BROWSER` wins when both are set. |
 | `BROWSER_EXECUTABLE=<path>` | unset | Launch this binary instead of the browser's normal install. |
+| `MARGO_GPU=default\|nvidia\|amd\|intel` | unset (the hardware GPU with the most video memory) | Windows PC with two GPUs only. Headless Chromium uses the first DXGI adapter, and Windows lists first the one that carries the session's display output, so the adapter changes with whether a Remote Desktop session is connected (nvidia while connected, amd after disconnecting on the Scott PC). The shared launcher (`scripts/lib/gpu-adapter.mjs`) looks the adapters up through PowerShell (about 2 s, cached per process and in a temp file for 30 minutes per boot), skips software adapters, and passes `--use-adapter-luid=<high>,<low>` (decimal; LUIDs change every boot, so never write one down) for the largest hardware GPU. `nvidia`, `amd` or `intel` prefers that vendor; `default` adds no flag, so the browser takes whatever Windows lists first. One hardware GPU: no flag. If the lookup fails, one warning line is printed and no flag is added. |
+| `MARGO_GPU_LUID=high,low` | unset | Use exactly this adapter (decimal, as Chromium reads it); wins over `MARGO_GPU`. |
 | `MARGO_SOFTWARE_GPU=1` | off | Use SwiftShader as the WebGPU adapter on a machine without a real GPU (a server, a CI runner). Slow, and its pixels differ from a real GPU's, so it proves "runs", never a timing or a pixel baseline. |
 
 Chromium-family browsers get `--enable-unsafe-webgpu` (and `--enable-features=Vulkan --use-angle=vulkan` on Linux, for a real Intel or AMD GPU; `BROWSER_ARGS` adds more) where WebGPU is not
-already on. Edge on Windows gets no extra switch, as before. Firefox has no WebGPU in Playwright's builds: a suite that
+already on. Chromium-family browsers on a Windows PC with two GPUs also get `--use-adapter-luid` (see `MARGO_GPU`). Firefox has no WebGPU in Playwright's builds: a suite that
 needs WebGPU prints `<suite>: skipped: no WebGPU in firefox` and exits 0 without running, and a Chromium-only step
 (`page.pdf`) prints `skipped: needs a Chromium browser, not firefox`. A skip line is never a pass; read the log. Suites
 that do not need WebGPU (`check:no-webgpu`) run in Firefox.

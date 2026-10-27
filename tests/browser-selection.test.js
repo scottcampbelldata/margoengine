@@ -19,7 +19,7 @@ test('Windows defaults to Edge, as every browser check always did', () => {
   assert.equal(browser.name, 'edge');
   assert.equal(browser.channel, 'msedge');
   assert.equal(browser.explicit, false);
-  assert.deepEqual(launchArgs(browser), []);
+  assert.deepEqual(launchArgs(browser, [], { gpu: () => undefined }), []);
   assert.equal(browserLabel({ env: {}, platform: 'win32', argv: [] }), 'msedge');
 });
 
@@ -48,11 +48,44 @@ test('an unknown browser names the accepted values', () => {
   assert.throws(() => pick({ MARGO_BROWSER: 'safari' }), /MARGO_BROWSER to one of edge, chrome, chromium, firefox/);
 });
 
-test('Edge on Windows adds no WebGPU switch unless asked; Chrome and Chromium get it; BROWSER_EXECUTABLE passes through', () => {
-  assert.deepEqual(launchArgs(pick({ MARGO_BROWSER: 'edge' }), ['--x']), ['--x']);
-  assert.deepEqual(launchArgs(pick({ MARGO_BROWSER: 'chrome' }), ['--x']), ['--enable-unsafe-webgpu', '--x']);
+const LUID = '--use-adapter-luid=0,79477';
+const fakeGpu = () => LUID;
+
+test('Edge on Windows adds only the adapter switch; Chrome and Chromium also get the WebGPU switch; BROWSER_EXECUTABLE passes through', () => {
+  const gpu = fakeGpu;
+  assert.deepEqual(launchArgs(pick({ MARGO_BROWSER: 'edge' }), ['--x'], { gpu }), [LUID, '--x']);
+  assert.deepEqual(launchArgs(pick({ MARGO_BROWSER: 'chrome' }), ['--x'], { gpu }), [
+    '--enable-unsafe-webgpu',
+    LUID,
+    '--x',
+  ]);
+  assert.deepEqual(launchArgs(pick({ MARGO_BROWSER: 'chromium' }), ['--x'], { gpu }), [
+    '--enable-unsafe-webgpu',
+    LUID,
+    '--x',
+  ]);
   assert.equal(pick({ BROWSER_EXECUTABLE: 'C:/b/chrome.exe' }).executablePath, 'C:/b/chrome.exe');
   assert.equal(pick({}).executablePath, undefined);
+});
+
+test('the adapter lookup runs only on Windows Chromium-family launches with WebGPU on and no SwiftShader (bug 33)', () => {
+  let calls = 0;
+  const gpu = () => (calls++, LUID);
+  for (const platform of ['linux', 'darwin'])
+    assert.ok(!launchArgs(pick({}, platform), [], { gpu }).includes(LUID), platform);
+  assert.ok(!launchArgs(pick({ MARGO_SOFTWARE_GPU: '1' }), [], { gpu }).includes(LUID));
+  assert.deepEqual(launchArgs(pick({}), ['--disable-gpu'], { webgpu: false, gpu }), ['--disable-gpu']);
+  assert.deepEqual(launchArgs(pick({ MARGO_BROWSER: 'firefox' }), [], { gpu }), []);
+  assert.equal(calls, 0, 'no lookup was made for any of those');
+  assert.deepEqual(launchArgs(pick({}), [], { gpu: () => undefined }), [], 'no switch when there is nothing to choose');
+  assert.deepEqual(chromiumLaunchOptions({ env: { MARGO_GPU_LUID: '0,79477' }, platform: 'win32', argv: [] }).args, [
+    LUID,
+  ]);
+});
+
+test('MARGO_GPU_LUID and MARGO_GPU=default need no lookup', () => {
+  assert.deepEqual(launchArgs(pick({ MARGO_GPU_LUID: '0,90115' })), ['--use-adapter-luid=0,90115']);
+  assert.deepEqual(launchArgs(pick({ MARGO_GPU: 'default' })), []);
 });
 
 test('MARGO_SOFTWARE_GPU=1 selects SwiftShader as the WebGPU adapter', () => {

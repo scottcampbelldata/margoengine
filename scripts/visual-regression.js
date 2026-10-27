@@ -22,7 +22,7 @@
 // `runs` times in separate browser launches and stores the worst pairwise run-to-run noise and the tolerance derived from it.
 import { preview, createServer } from 'vite';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { mkdir, rm, readFile, writeFile, copyFile } from 'node:fs/promises';
+import { mkdir, rm, readFile, writeFile, copyFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { deflateSync, crc32 } from 'node:zlib';
 import { decodePNG } from '../tests/support/png.js';
@@ -35,12 +35,14 @@ import { demos } from './support/visual-demos.js';
 import { margoError } from '../packages/shared/errors.js';
 import {
   selectBaselineProfile,
+  missingBaselineMessage,
   assertBaselineIdentity,
   assertCaptureEnvironment,
   assertProfileCreationCoverage,
   renderedInputChanges,
 } from './support/visual-baselines.js';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
+import { lastAdapterChoice } from './lib/gpu-adapter.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   baselineRoot = resolve(root, 'tests/visual'),
@@ -294,6 +296,8 @@ try {
     const browser = await launchBrowser({ headless: true, args: ['--enable-unsafe-webgpu'] });
     try {
       const browserVersion = `${browserLabel()} ${browser.version()}`;
+      if (run === 0)
+        console.log(`visual check GPU request: ${lastAdapterChoice() ?? 'browser default'}; browser ${browserVersion}`);
       for (const { id, demo, view } of cases) {
         const { factor, query, ...options } = view,
           result = results.get(id),
@@ -328,7 +332,10 @@ try {
             }),
           };
           assertCaptureEnvironment(environment.gpu ? environment : currentEnvironment, currentEnvironment);
-          if (!environment.gpu) environment = currentEnvironment;
+          if (!environment.gpu) {
+            environment = currentEnvironment;
+            console.log(`visual check ran on GPU: ${environment.gpu}`);
+          }
           // Under load a screenshot can catch the browser mid-raster (a band of CSS gradient or blur 1-4 levels off,
           // gone half a second later; gate 9), so shoot until two in a row match, as Playwright's toHaveScreenshot does.
           const shot = () =>
@@ -418,11 +425,11 @@ try {
     `visual baseline profile ${profile.id}: ${baselines}; reference ${JSON.stringify(manifest?.environment ?? {})}`,
   );
   if (manifest) assertBaselineIdentity(manifest.environment, environment);
-  else if (!update && !loss)
-    throw margoError(
-      'state',
-      `No visual baseline for hardware profile ${profile.id}; capture the full committed product reference on this hardware before checking changes`,
-    );
+  else if (!update && !loss) {
+    const committed = await readdir(resolve(baselineRoot, 'profiles')).catch(() => []);
+    throw margoError('state', missingBaselineMessage(profile.id, environment, committed));
+  }
+
   if (update && !manifest) {
     assertProfileCreationCoverage(
       cases.map((c) => c.id),
