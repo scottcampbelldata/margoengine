@@ -2789,6 +2789,15 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### The packed-browser step of `modern:test:packages` can miss its 30 s page-load limit on a busy machine
+
+- **What:** `scripts/modern-package-tests.js` (`packedBrowser`) waits 30 s for `window.modern` after the first page load,
+  and a cold dev server transforming every package can exceed that when several agents share the CPU and GPU.
+- **Repro:** run `npm run check:merge` while other check:merge runs are active; seen once on 2026-10-27 ("Packed browser
+  failure: state null", `page.waitForFunction` timeout), and the same step passed on a rerun with the machine quieter.
+- **Cause:** a fixed timeout against load, not a wrong result. Fix: wait on the dev server's readiness (as `listenWhenFree`
+  and the pipeline-ready helper do) instead of a fixed time, and add a test that holds the load back.
+
 ### `npm run dev:examples` refuses every page from a checkout reached through an 8.3 short path
 
 - **Repro (Windows):** open a terminal in the repository through its short name (`cd C:\DEVELO~1\Projects\MARGOE~1`,
