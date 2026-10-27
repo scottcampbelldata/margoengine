@@ -309,7 +309,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-84 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+85 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -415,7 +415,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/selection`](packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
 | [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |
 
-### Simulation and games (7)
+### Simulation and games (8)
 
 | Package | What it is |
 | --- | --- |
@@ -425,6 +425,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/fsm`](packages/fsm/README.md) | Hierarchical state transitions with cross-fade progress. |
 | [`@margoengine/behavior`](packages/behavior/README.md) | Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and flocking behaviours. |
 | [`@margoengine/net`](packages/net/README.md) | Hermite and quaternion snapshot interpolation with bounded prediction. |
+| [`@margoengine/netcode`](packages/netcode/README.md) | Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests. |
 | [`@margoengine/voxel-net`](packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
 ### CAD and engineering (4)

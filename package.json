@@ -106,7 +106,8 @@
     "packages/ui",
     "packages/mcp",
     "packages/rigging",
-    "packages/behavior"
+    "packages/behavior",
+    "packages/netcode"
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",

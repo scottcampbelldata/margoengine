@@ -795,6 +795,10 @@
       "types": "./dist/net.d.ts",
       "import": "./dist/net.js"
     },
+    "./netcode": {
+      "types": "./dist/netcode.d.ts",
+      "import": "./dist/netcode.js"
+    },
     "./oit": {
       "types": "./dist/oit.d.ts",
       "import": "./dist/oit.js"
@@ -1339,6 +1343,7 @@
     "@margoengine/mesh-edit": "^1.0.0",
     "@margoengine/navmesh": "^1.0.0",
     "@margoengine/net": "^1.0.0",
+    "@margoengine/netcode": "^1.0.0",
     "@margoengine/oit": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
     "@margoengine/points": "^1.0.0",

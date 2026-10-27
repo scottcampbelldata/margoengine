@@ -1,0 +1,1 @@
+{"extends":"../gltf/tsconfig.json","compilerOptions":{"outDir":"dist","rootDir":"src","lib":["ES2022","ESNext.Disposable","DOM"]},"include":["src"]}

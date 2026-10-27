@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3473215,
+  "total": 3485266,
   "history": [
     {
       "date": "2026-10-24",
@@ -548,6 +548,12 @@
       "commit": "46b4df25",
       "reason": "new optional package @margoengine/behavior: behaviour trees, utility AI, steering and flocking (item 28.5, first batch)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "46b4df25",
+      "reason": "new optional package @margoengine/netcode: schema codec with deltas, authoritative fixed-timestep server, client prediction and interpolation, loopback network (item 30, landing 1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -746,6 +752,7 @@
     "@margoengine/navmesh": 7228,
     "@margoengine/navmesh/build": 11794,
     "@margoengine/net": 1371,
+    "@margoengine/netcode": 12051,
     "@margoengine/oit": 3199,
     "@margoengine/physics": 16247,
     "@margoengine/points": 19649,

@@ -1,0 +1,47 @@
+{
+  "name": "@margoengine/netcode",
+  "version": "1.0.0",
+  "description": "Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests.",
+  "keywords": [
+    "margoengine",
+    "netcode",
+    "multiplayer",
+    "networking",
+    "prediction"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/netcode"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js netcode",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  }
+}

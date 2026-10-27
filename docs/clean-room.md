@@ -618,3 +618,17 @@ like) was read.
 | Steering (seek, flee, arrive, pursue, evade, wander, obstacle avoidance, path following, priorities) | C. W. Reynolds, "Steering Behaviors For Autonomous Characters", Game Developers Conference 1999 |
 | Flocking (separation, alignment, cohesion) | C. W. Reynolds, "Flocks, herds and schools: a distributed behavioral model", ACM SIGGRAPH 1987 |
 | Seeded random stream | `@margoengine/math`'s `createRandom` (mulberry32) |
+## Game networking: `@margoengine/netcode`
+
+Written clean room from the articles, talks and specifications below. No source code of networking libraries or
+engines (Colyseus, Photon, Mirror, GGPO, Rapier, Unity Netcode, Unreal and the like) was read.
+
+| Area | Source |
+| --- | --- |
+| Fixed timestep loop | G. Fiedler, "Fix Your Timestep!" (2004) |
+| Snapshots, deltas against an acknowledged baseline, quantization | G. Fiedler, "Snapshot Compression" and "State Synchronization" (2015); the delta-against-acknowledged-snapshot idea as described in public talks on the Quake 3 network model |
+| Client prediction, reconciliation, entity interpolation | G. Gambetta, "Fast-Paced Multiplayer" parts I to IV; Y. Bernier, "Latency Compensating Methods in Client/Server In-game Protocol Design and Optimization", GDC 2001 |
+| Client running ahead by the one-way delay, input redundancy | T. Ford, "Overwatch Gameplay Architecture and Netcode", GDC 2017 |
+| Clock synchronisation | F. Cristian, "Probabilistic clock synchronization", Distributed Computing 3(3), 1989 (the smallest round trip bounds the offset) |
+| Varints, zigzag | LEB128 as specified in DWARF 4 section 7.6; zigzag as described in the Protocol Buffers encoding documentation |
+| Schema hash | FNV-1a 32-bit as published by G. Fowler, L. C. Noll and K.-P. Vo |

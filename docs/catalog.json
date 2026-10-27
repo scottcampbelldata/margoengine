@@ -2002,6 +2002,37 @@
     "category": "Simulation and games"
   },
   {
+    "id": "netcode",
+    "title": "Netcode",
+    "category": "Simulation and games",
+    "package": "@margoengine/netcode",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests.",
+    "requirements": "See the package guide for requirements",
+    "keywords": "netcode",
+    "install": "npm install @margoengine/netcode@1.0.0",
+    "imports": "import { ClockSync } from '@margoengine/netcode';",
+    "exports": [
+      "ClockSync",
+      "CloseCode",
+      "GameClient",
+      "GameServer",
+      "LoopbackNetwork",
+      "MAX_INPUTS_PER_MESSAGE",
+      "MAX_INPUT_BYTES",
+      "PROTOCOL_VERSION",
+      "decodeEnvelope",
+      "defineGame",
+      "defineSchema",
+      "dequantize",
+      "encodeEnvelope",
+      "fnv1a",
+      "messages",
+      "quantize"
+    ]
+  },
+  {
     "id": "voxel-net",
     "title": "Voxel-net",
     "category": "Simulation and games",
