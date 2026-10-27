@@ -1,5 +1,5 @@
 {
-  "commit": "80a019ab",
+  "commit": "b6bea3e9",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -134,8 +134,8 @@
     },
     "@margoengine/compute": {
       ".": {
-        "raw": 126553,
-        "gzip": 37853
+        "raw": 126981,
+        "gzip": 37897
       },
       "./linalg": {
         "raw": 16217,
@@ -150,8 +150,8 @@
         "gzip": 7456
       },
       "./random": {
-        "raw": 23399,
-        "gzip": 8072
+        "raw": 23725,
+        "gzip": 8084
       },
       "./autodiff": {
         "raw": 16964,
@@ -166,8 +166,8 @@
         "gzip": 1166
       },
       "./frame": {
-        "raw": 103964,
-        "gzip": 30540
+        "raw": 104392,
+        "gzip": 30584
       }
     },
     "@margoengine/controls": {
@@ -1572,8 +1572,8 @@
     },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 220661,
-        "gzip": 77971
+        "raw": 220987,
+        "gzip": 77991
       },
       "./studio": {
         "raw": 2264,
