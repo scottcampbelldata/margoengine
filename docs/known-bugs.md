@@ -287,14 +287,20 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
 ### Morph targets: CPU per Animation per frame
 
 - **What:** `p-morph`, 100 MorphStressTest copies with 8 weights each changing every frame: 0.52 ms CPU a frame
-  against three's WebGL 0.27 (run `20261027-032923`). The GPU half of this entry is fixed (perf-history entry 34:
+  against three's WebGL 0.27 (run `20261027-032923`; 0.52 against 0.29 in run `20261027-103915`). The GPU half of this entry is fixed (perf-history entry 34:
   1.33 -> 0.19 ms, one dispatch per buffer page and pipeline instead of 200); what is left on the GPU is the 0.05 ms
   deform pass, an accepted difference in work recorded in the matrix row 12.5.
-- **Cause (not profiled yet):** the CPU time did not move with the batching (0.51 before, 0.52 after), so it sits in
-  the 100 Animations' per-frame work: each one's checks, weight writes and uploads, and the per-model draw records.
-- **Plan:** take a browser CPU profile of a `p-morph` frame, then write the weights of every Animation of a device
-  in one upload (the weights already sit in one shared buffer per page) and skip per-Animation work for models whose
-  inputs did not change.
+- **Cause (measured, browser CPU profile of 5,000 `p-morph` frames, 2026-10-27):** most of it is not the animation.
+  About 55% of the busy frame time is gltf-pro deriving each of the 200 draws again every frame (`derive`,
+  `derivation`, `draw`, `drawSegment`, `nodeRows`): MorphStressTest has two primitives, so its models never take the
+  run's one-primitive short path (`joinRun`), and a plain glTF material has no steady path (the steady check in
+  `derive` needs a `shading` record's version, which only materials-package materials carry), so every draw rebuilds
+  its uniform rows and its pipeline key strings. The 100 Animations' own work (`setMorph`, validation, weight writes,
+  `upload`, `deformAll`) is about a fifth. The one-upload-per-device plan below would only move that fifth.
+- **Plan:** give `PBRMaterial` a version that its setters and `markDirty()` bump, so a plain glTF material takes the
+  steady path when nothing changed (rows rewritten only for the node matrix, as for materials-package materials),
+  and let a multi-primitive model join a run when each primitive could; then write the weights of every Animation of
+  a device in one upload. Both are gltf-pro and animation changes, no core.
 
 ### cloneModel: two engine-wide ticks per copy
 
@@ -336,6 +342,56 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
 - **Plan:** a cheaper soft filter with the same look: blocker search with `textureGather` on fewer, nearer taps and a
   penumbra radius capped in texels rather than map fractions. It changes the image, so the shadow views of the
   visual check are re-recorded with it.
+
+The entries below are speed-matrix rows diagnosed on 2026-10-27 (item 47 phase 2, round 4; busy machine, RTX A6000,
+diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.json` and perf-history entry 36.
+
+### Raw meshes: native calls per draw
+
+- **What:** `p-custom-shader`, 10,000 `RawMesh`es of one `RawShaderMaterial`: 21.3 ms CPU a frame against three's
+  WebGL 7.6 (three's WebGPU backend 36.8; run `20261027-105724`).
+- **Cause (measured, timing wrapper on the render-pass methods):** of about 2.1 us per mesh, about 1.7 us is the
+  native encoding calls: its own object bind group, its vertex buffer, its index buffer and an indexed draw. The
+  meshes share one geometry's arrays but each uploads and binds its own buffers.
+- **Plan (shader package):** share GPU vertex and index buffers among raw meshes whose packed streams are byte-equal
+  (counted per device, copy on write), so consecutive draws skip rebinding them, and keep the object blocks in one
+  pooled uniform buffer bound with dynamic offsets.
+
+### Motion blur needs TAA for velocity
+
+- **What:** `p-motion-blur`: GPU 0.63 ms a frame against three's WebGPU 0.25 (CPU is faster, 2.3 against 3.2).
+- **Cause (timestamps per pass):** `MotionBlur` reads TAA's velocity, Margo's only motion-vector source, so the frame
+  also runs TAA's velocity and resolve passes (about 0.3 ms); the blur itself is about 0.27 ms.
+- **Plan (taa package):** a velocity-only mode (the velocity pass without the history resolve) for effects that need
+  motion vectors but no anti-aliasing.
+
+### Rect area lights: main pass GPU time
+
+- **What:** `p-rect-area`, 4 area lights on the 1,000-box yard: GPU 0.49 ms against three's WebGL 0.16 (CPU faster).
+- **Cause (timestamps per pass):** all of it is the main pass; the clustered culling pass is 0.003 ms. Clustered
+  lighting integrates each quad under the GGX LTC and the cosine with exact per-edge clipping to the horizon. Which
+  part costs the time is not isolated yet.
+- **Plan:** time the main pass with the area lights off and with the horizon clip replaced by the unclipped integral
+  (a measurement only), then decide between a cheaper equal-looking integral and an accepted difference.
+
+### Environment.create does work three's PMREM does not, and recomputes its BRDF LUT
+
+- **What:** `p-pmrem`: 10.9 ms a call against three's 5.0 (run `20261027-105122`; 14.6 before the half-float fix).
+- **Cause (browser CPU profile: 70% of the call idle, waiting for the GPU):** each call uploads the equirect, builds a
+  source cube with mips, prefilters the specular levels, computes L2 SH and reads it back to the CPU, and computes a
+  128 x 128 BRDF LUT; three's timed call reuses its uploaded texture and computes the specular levels only.
+- **Plan:** the LUT depends only on its size and sample count: share one per device (counted, freed with the last
+  environment). Then time the passes to state the rest as an accepted difference with its parts.
+
+### First frame of 100 morphed copies
+
+- **What:** `p-morph`'s first frame is 304 ms (three's WebGPU backend 294, WebGL 37; run `20261027-103915`); its build
+  is 206 ms. Before perf-history entry 34 the build was 490 ms and the first frame 47.
+- **Cause:** the per-device deformation setup and gltf-pro's render pipelines are created on the first frame, and
+  WebGPU compiles pipelines there. A second cause, every copy compiling its own mip pipelines (200 shader modules),
+  is fixed (entry 36).
+- **Plan (gltf-pro and animation):** create the pipelines a loaded model will draw with
+  (`createRenderPipelineAsync` / `createComputePipelineAsync`) while it loads, so the first frame finds them ready.
 
 ## Unverified against the specification
 

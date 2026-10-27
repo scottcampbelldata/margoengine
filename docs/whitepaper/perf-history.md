@@ -770,6 +770,60 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   scene's 2,000 additive quads in 16 colours, each exactly once, farthest first, with its own world matrix and colour
   and the scene's depth state; shifting the instance colours by one fails it.
 
+### 36. Matrix rows round 4: yields, strings, allocations, serial decodes and per-copy pipelines
+
+- **Loss:** rows the matrix still listed as "not diagnosed" (run `20261027-075302` at `46b4df25`, busy machine, RTX
+  A6000, diagnostic). Each was profiled (browser CPU profiles of the bench page, Node profiles for the CPU-only
+  tasks, timestamps per pass, a timing wrapper on render-pass methods, the harness's shader dump).
+- **Causes and fixes** (same output: hashes of the bytes, geometry and GLB before and after are equal):
+  1. `encodeEXR` yielded every 65,536 samples with `setTimeout`, clamped to 4 ms by the browser (128 yields); it now
+     yields after about 10 ms of work (`scheduler.yield()` where present).
+  2. `extrudeGeometry` pushed every corner into JS arrays with spreads and copied them; the triangulator keyed shared
+     edges and pinch points by printing coordinates to strings. Arrays are presized; coordinates group by value.
+  3. Environment's half-float upload used a bit loop; it now stores through `Float16Array` (same bits).
+  4. The FBX pivot chain rebuilt its fixed matrices for every animation key and allocated every product; the fixed
+     parts are made once per node and the products use scratch matrices, in the same order.
+  5. gltf-pro decoded a model's images one after another; up to 8 now decode at once, results taken in image order.
+     Every `cloneModel` copy also compiled its own mip pipelines (200 shader modules for `p-morph`'s 100 copies); they
+     are now kept per device.
+  6. Raw meshes rebuilt their normal matrix with temporary arrays every frame and re-bound the material group per
+     draw; now only on change, and once per run of one material.
+  7. Each Animation compared its whole bone palette with the uploaded one after the first difference; the
+     comparison stops there.
+- **After** (diagnostic, busy machine; runs `20261027-103915`, `-104327`, `-105122`, `-105432`, `-105724`; ms):
+
+  | Scene | Before | After | three.js (WebGL / WebGPU) |
+  | --- | --- | --- | --- |
+  | `p-export-exr` | 680 | 44.6 | 154 / 153 (ZIP; Margo writes NONE, so it does less) |
+  | `p-text` | 23.6 | 13.4 | 8.0 / 8.1 |
+  | `p-fbx` | 12.6 | 5.8 | 4.7 / 4.4 |
+  | `p-gltf-parse` | 88.7 | 46.3 | 34.0 / 33.0 |
+  | `p-pmrem` | 14.6 | 10.9 | 5.0 / 5.4 |
+  | `p-custom-shader`, CPU a frame | 28.8 | 21.3 | 7.6 / 36.8 |
+  | `p-crossfade`, CPU a frame | 15.7 | 17.5 (noisy run; three's WebGL 7.7 -> 13.3 in the same run) | 13.3 / 22.9 |
+
+- **Accepted differences (rule 12):** `p-text`'s remaining triangulation (quality-ordered ears and robustness for
+  touching rings; no lower-quality Margo triangulator exists for a like-for-like row); `p-crossfade`'s 1.64 ms
+  deform pass (vertices skinned once into a buffer every reader shares; the draw pass, 0.63 ms, is under three's
+  whole WebGPU frame of 1.98), as row 12.5's.
+- **Still open** (each in [known-bugs.md](../known-bugs.md#performance-losses-still-open)): raw meshes' native calls
+  per draw, motion blur's dependency on TAA for velocity, the rect-area main pass, Environment's extra work and its
+  per-environment BRDF LUT, `p-morph`'s per-draw derivation and first frame, and `p-gltf-animated` (3.4 against 1.3
+  ms, not profiled into parts yet). `p-node-material` is no longer slower (0.98 against three's WebGPU 20.3 ms CPU,
+  from the materials draw-path work).
+- **Report tool:** the Feature JS column summed the gzip sizes of a run's scripts from the build folder at report
+  time; every bench run rebuilds that folder with new hashed names, so missing files counted as 0, and three's
+  `.mjs` chunks were never listed (its side was its 5 KB entry). Runs now record each script's gzip size
+  (`info.scriptGzip`) and list `.mjs`; an unmeasurable sum is `n/a`. `p-morph`'s Feature JS is real code, not growth
+  from a missing build: 117 KB was the run-time sum.
+- **Rerun:** the `rerun` commands in `bench/parity-causes.json` (rows 2.5, 4.6, 9.3, 10.1, 10.8, 11.4, 12.2, 12.5).
+- **Guard:** `packages/environment/tests/exr-write.test.js` (yields follow time; bytes do not depend on them),
+  `packages/environment/tests/half-upload.test.js`, `packages/geometry/tests/extrude.test.js` (no per-triangle
+  pushes), `packages/geometry/tests/triangulate.test.js` (-0 meets 0), `packages/fbx/test/geometry.test.js` (the
+  cached chain equals the chain built by hand, bit for bit), `packages/gltf-pro/tests/async-images.test.js` (8 at
+  once, in order, failures close every bitmap), `packages/gltf-pro/tests/model-runs.test.js` (one mip shader per
+  device), `packages/shader/test/raw.test.js` (one material bind per run), `tests/bench-feature-bytes.test.js`.
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks

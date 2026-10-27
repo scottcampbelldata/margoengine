@@ -75,7 +75,7 @@
     ]
   },
   "12.5": {
-    "cause": "100 morphed copies each began a render pass and a compute pass, and every draw rebuilt its shader text each frame; models now draw as one run and the shader text steps are memoised. Then the compute pass held 200 dispatches (2 primitives x 100 copies, 150,000 vertices), each writing its own output buffer and run one after another (1.18 ms GPU); every deformed primitive of a device now shares a few buffers and deforms in one dispatch per buffer page and pipeline (2 here): GPU 1.31 -> 0.19 ms, the deformed vertices bit for bit those of the per-primitive path. What is left on the GPU (timestamps per pass, run 20261027-032923): the draw pass takes 0.14 ms against three.js WebGL's whole 0.15 ms frame, which morphs inside its vertex shader; the 0.05 ms deform pass is an ACCEPTED difference in work: Margo deforms each vertex (position, normal, tangent) once a frame into a buffer that every reader shares (gltf-pro draws, shadow casters, TAA velocity, selection outlines, picking and its CPU readback), where three repeats the morph in every pass that draws the mesh and has no deformed geometry to pick or read back. Still slower on CPU: 0.52 against 0.27 ms, plain overhead (the 100 Animations' per-frame checks and uploads), a loss to fix",
+    "cause": "100 morphed copies each began a render pass and a compute pass, and every draw rebuilt its shader text each frame; models now draw as one run and the shader text steps are memoised. Then the compute pass held 200 dispatches (2 primitives x 100 copies, 150,000 vertices), each writing its own output buffer and run one after another (1.18 ms GPU); every deformed primitive of a device now shares a few buffers and deforms in one dispatch per buffer page and pipeline (2 here): GPU 1.31 -> 0.19 ms, the deformed vertices bit for bit those of the per-primitive path. What is left on the GPU (timestamps per pass, run 20261027-032923): the draw pass takes 0.14 ms against three.js WebGL's whole 0.15 ms frame, which morphs inside its vertex shader; the 0.05 ms deform pass is an ACCEPTED difference in work: Margo deforms each vertex (position, normal, tangent) once a frame into a buffer that every reader shares (gltf-pro draws, shadow casters, TAA velocity, selection outlines, picking and its CPU readback), where three repeats the morph in every pass that draws the mesh and has no deformed geometry to pick or read back. Still slower on CPU: 0.52 against 0.27 ms; measured (browser CPU profile, 5,000 frames): about 55% is gltf-pro re-deriving each of the 200 draws every frame (two-primitive models never join a run, and plain glTF materials have no steady path), about a fifth the Animations' own work; a loss to fix, plan in known-bugs. First frame (run 20261027-103915): 304 ms against three-webgpu 294 and three-webgl 37; every cloneModel copy kept its own mip pipelines (200 shader modules for 100 copies, found with the harness dump); they are now made once per device. The rest of that first frame is WebGPU pipeline compilation and texture upload that the per-primitive path did during the build (build 490 -> 206 ms), open in known-bugs",
     "knownBug": "morph-targets-cpu-per-animation-per-frame",
     "fixes": [
       {
@@ -87,6 +87,11 @@
         "commit": "00dde81a",
         "tradeoff": "+2.8 KB gzip on the animation root entry (the shared-buffer arena and its WGSL); buffers grow geometrically and are compacted on growth, so a page can hold freed space until then",
         "rerun": "npm run bench -- parity --cases=p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=7"
+      },
+      {
+        "commit": "perf(gltf-pro): parallel image decodes",
+        "tradeoff": "mip pipelines live as long as the device",
+        "rerun": "node bench/cli.mjs parity --cases=p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
       }
     ]
   },
@@ -153,7 +158,83 @@
     ]
   },
   "9.3": {
-    "cause": "p-pmrem: not diagnosed yet. helmet, measured (timestamps per pass with each feature switched off): IBL costs nothing measurable; Margo's default shadow filter, PCSS ('soft': 16 blocker reads and 32 comparison taps per lit pixel, spread over a penumbra up to a tenth of the map), is 0.68 of helmet's 0.78 ms GPU, where three's side draws one PCFSoftShadowMap. With the closest setup (helmet-filterpcf-cascades1: filter 'pcf', 1 cascade) Margo draws in 0.08 ms GPU against three's WebGL 0.09 and WebGPU 0.07, the same image (SSIM 0.984); still slower on CPU, 0.11 against 0.07 ms (CPU profile: spread over the frame's four passes, shadow map, core meshes, the model and the MSAA resolve, with core's render the largest share)",
-    "knownBug": "scifihelmet-default-soft-shadows-cost-the-gpu-time"
+    "cause": "p-pmrem (run 20261027-105122): 14.6 -> 10.9 ms against three-webgl's 5.0. Environment.create converted the 1024 x 512 HDR to half floats with a bit-twiddling loop each call (7.4 ms in Node); it now stores through the built-in Float16Array (same bits, about 3x faster). What is left (browser CPU profile: 70% of the call idle, waiting for the GPU and the readback) is work three's PMREMGenerator does not do: Margo also uploads the equirect each call, builds a source cube with its mip chain, computes L2 SH irradiance and reads it back to the CPU (a GPU round trip), and computes a 128 x 128 BRDF LUT (512 samples a texel) per environment; three's timed call reuses its uploaded texture and computes only the specular levels. Open: the BRDF LUT does not depend on the image and can be shared per device (known-bugs). helmet, measured (timestamps per pass with each feature switched off): IBL costs nothing measurable; Margo's default shadow filter, PCSS ('soft': 16 blocker reads and 32 comparison taps per lit pixel, spread over a penumbra up to a tenth of the map), is 0.68 of helmet's 0.78 ms GPU, where three's side draws one PCFSoftShadowMap. With the closest setup (helmet-filterpcf-cascades1: filter 'pcf', 1 cascade) Margo draws in 0.08 ms GPU against three's WebGL 0.09 and WebGPU 0.07, the same image (SSIM 0.984); still slower on CPU, 0.11 against 0.07 ms (CPU profile: spread over the frame's four passes, shadow map, core meshes, the model and the MSAA resolve, with core's render the largest share)",
+    "knownBug": "scifihelmet-default-soft-shadows-cost-the-gpu-time",
+    "fixes": [
+      {
+        "commit": "perf(environment): EXR yields by time",
+        "tradeoff": "none; bit-identical half floats",
+        "rerun": "node bench/cli.mjs parity --cases=p-pmrem --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "11.4": {
+    "cause": "encodeEXR yielded to the event loop every 65,536 samples with setTimeout, which a browser clamps to 4 ms once nested: 128 yields for this 2048 x 1024 RGBA image, about 0.5 s of timers against about 0.05 s of encoding (680 ms against three-webgl's 223). It now yields after about 10 ms of encoding (scheduler.yield() where the browser has it): 44.6 ms against 154 (run 20261027-104327), byte-identical files. Not a like-for-like win: encodeEXR writes NONE (uncompressed, about twice the bytes), three's EXRExporter ZIP-compresses, so Margo does less work here",
+    "fixes": [
+      {
+        "commit": "perf(environment): EXR yields by time",
+        "tradeoff": "onProgress is called at each yield (about every 10 ms) instead of every 65,536 samples",
+        "rerun": "node bench/cli.mjs parity --cases=p-export-exr --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "4.6": {
+    "cause": "Before (Node CPU profile): extrudeGeometry grew JS arrays by push with spread arguments and a new UV array per corner, then copied them (about a fifth), and the triangulator keyed shared edges and pinch points by printing coordinates to strings (cancelSharedEdges, joinHoles: about a third of triangulation). The arrays are now sized up front and written by index, and coordinates are grouped by value (0 and -0 alike, as the strings were). Same bytes (hashes of the text geometry and of 4,000 random touching-ring triangulations unchanged): 23.6 -> 13.4 ms against three-webgl's 8.0 (run 20261027-104327). What is left is the triangulator, about 60% of the call in Node: an ACCEPTED difference in work (rule 12): Margo cuts small, well-shaped ears first (a priority queue with grid ear tests) and survives touching, pinched and self-intersecting rings (Eberly bridges, edge cancellation, FIST-style escalation), where an ear-cutting fast path takes the first ear it finds; no like-for-like row exists, because Margo has no lower-quality triangulator to time",
+    "fixes": [
+      {
+        "commit": "perf(geometry): extrude in place, coordinate groups",
+        "tradeoff": "+376 B gzip on geometry/extrude (the coordinate grouping)",
+        "rerun": "node bench/cli.mjs parity --cases=p-text --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "10.8": {
+    "cause": "Before (Node and browser CPU profiles): about 40% of parseFBX was the FBX pivot chain, 11 matrices composed per node per animation key, each step allocating a new matrix (and identity matrices built from array literals), with the fixed parts (pivots, offsets, pre- and post-rotation) rebuilt every key. Those parts are now made once per node and the product runs through scratch matrices, the same multiplications in the same order (byte-identical GLB): 12.6 -> 5.8 ms against three-webgl's 4.7 (run 20261027-105122). Still slower: parseFBX converts FBX to an in-memory GLB and parses that with gltf-pro (validation, the glTF material model), where three builds its objects directly",
+    "fixes": [
+      {
+        "commit": "perf(fbx): pivot chain once per node",
+        "tradeoff": "a cached pivot chain per FBX node while converting",
+        "rerun": "node bench/cli.mjs parity --cases=p-fbx --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "10.1": {
+    "cause": "Before: every image was decoded one after another (each createImageBitmap awaited before the next began), so the call paid the sum of FlightHelmet's decodes, and each image's bytes were copied once more before the Blob. Browser images now decode up to 8 at once, in image order (the size limits stop at the same image; KTX2 stays one at a time), without the extra copy: 88.7 -> 46.3 ms against three-webgl's 34.0 (run 20261027-105432). Left (CPU profile): native decode and upload work and accessor validation (finite checks on every value), plus closing the previous call's bitmaps inside the timing",
+    "fixes": [
+      {
+        "commit": "perf(gltf-pro): parallel image decodes",
+        "tradeoff": "up to 7 decoded images more in memory at once while a model loads; +1.7 KB gzip on gltf-pro/worker",
+        "rerun": "node bench/cli.mjs parity --cases=p-gltf-parse --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "2.5": {
+    "cause": "10,000 RawMeshes of one material, one draw each. Before: each mesh's frame rebuilt its normal matrix with temporary arrays and re-bound the material's group (CPU profile). Now the object block is recomputed only when the world matrix changed and the material group is bound once per run of draws: 28.8 -> 21.3 ms CPU (run 20261027-105724) against three-webgpu's 36.8 and three-webgl's 7.6. Left (measured with a timing wrapper on the pass methods): the native encoding calls themselves, per mesh a bind group (its own object block), a vertex buffer, an index buffer and an indexed draw, about 1.7 us of every 2.1 us a mesh; three's WebGL backend issues cheaper GL calls. Structural, plan in known-bugs (shared GPU buffers for identical raw geometry, one pooled object buffer with dynamic offsets)",
+    "knownBug": "raw-meshes-native-calls-per-draw",
+    "fixes": [
+      {
+        "commit": "perf(shader): raw object blocks and material group",
+        "tradeoff": "none; the same draws and buffer writes",
+        "rerun": "node bench/cli.mjs parity --cases=p-custom-shader --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "12.2": {
+    "cause": "100 skinned RobotExpressive animators. CPU before (browser profile, 600 frames): each Animation compared its whole new bone palette with the uploaded one even after the first difference (a playing clip changes it every frame), about 1.2 ms a frame; the comparison now stops at the first changed word (same uploads). Left on the CPU: the per-joint palette products (joint x inverse bind, then the inverse node matrix) and the keyframe sampling and node writes, the same work three's skeleton update and mixer do. GPU: Margo's deform pass is 1.64 ms, its draw pass 0.63 ms against three-webgpu's whole 1.98 ms frame; the deform pass is an ACCEPTED difference in work as in row 12.5 (each vertex skinned once a frame into a buffer every reader shares). Run 20261027-103915 (busy machine): CPU 17.5 ms against three-webgl's 13.3 and three-webgpu's 22.9",
+    "fixes": [
+      {
+        "commit": "perf(animation): comparisons stop at the first change",
+        "tradeoff": "none",
+        "rerun": "node bench/cli.mjs parity --cases=p-crossfade --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      }
+    ]
+  },
+  "13.17": {
+    "cause": "Margo's CPU is faster (2.3 against three-webgpu's 3.2 ms). GPU 0.63 against 0.25 ms (timestamps per pass): Margo's only motion-vector source is TAA, so the frame also runs TAA's velocity and resolve passes (about 0.3 ms of the 0.63); MotionBlur itself is about 0.27 ms. Structural: a velocity pass without TAA's resolve is missing (known-bugs)",
+    "knownBug": "motion-blur-needs-taa-for-velocity"
+  },
+  "7.6": {
+    "cause": "CPU faster (0.1 against three-webgl's 0.62 ms). GPU 0.49 against 0.16 ms: all of it is the main pass (the light-culling compute pass is 0.003 ms), where clustered lighting integrates each of the 4 quads under the GGX LTC and the cosine with exact per-edge clipping to the surface's horizon. Not isolated further yet (known-bugs)",
+    "knownBug": "rect-area-lights-main-pass-gpu-time"
   }
 }
