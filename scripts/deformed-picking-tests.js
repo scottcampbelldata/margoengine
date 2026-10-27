@@ -230,7 +230,7 @@ export async function deformedPickingBrowserChecks(page) {
         });
       try {
         const encoder = device.createCommandEncoder();
-        encoder.copyBufferToBuffer(source, 0, read, 0, primitive.vertices.byteLength);
+        encoder.copyBufferToBuffer(source, primitive.deformedOffset ?? 0, read, 0, primitive.vertices.byteLength);
         device.queue.submit([encoder.finish()]);
         await read.mapAsync(GPUMapMode.READ);
         const data = new Float32Array(read.getMappedRange()).slice();
@@ -250,7 +250,13 @@ export async function deformedPickingBrowserChecks(page) {
         });
       try {
         const encoder = device.createCommandEncoder();
-        encoder.copyBufferToBuffer(primitive.deformed, 0, read, 0, primitive.vertices.byteLength);
+        encoder.copyBufferToBuffer(
+          primitive.deformed,
+          primitive.deformedOffset ?? 0,
+          read,
+          0,
+          primitive.vertices.byteLength,
+        );
         device.queue.submit([encoder.finish()]);
         await read.mapAsync(GPUMapMode.READ);
         return new Float32Array(read.getMappedRange()).slice();

@@ -108,5 +108,7 @@ export function sphere(radius?: number, segments?: number): Geometry;
 
 // Not exported from this entry, but used by the exports above:
 
-type RawBuffers = Omit<GeometryBuffers, 'instance'> & Partial<Pick<GeometryBuffers, 'instance'>>;
+type RawBuffers = Omit<GeometryBuffers, 'instance'> & Partial<Pick<GeometryBuffers, 'instance'>> & {
+    readonly vertexOffset?: number;
+};
 ```

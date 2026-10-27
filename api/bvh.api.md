@@ -129,6 +129,7 @@ export interface ModelPrimitiveLike {
   readonly instances?: { readonly count: number; readonly data: Float32Array };
   readonly buffers?: { vertex: GPUBuffer; index: GPUBuffer };
   readonly deformed?: GPUBuffer;
+  readonly deformedOffset?: number;
 }
 
 export { MutableVec3 } from "@margoengine/math";

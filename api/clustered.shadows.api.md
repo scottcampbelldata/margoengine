@@ -19,6 +19,7 @@ export interface LocalShadowPrimitive {
     alphaTransform?: Float32Array;
     node: Mesh;
     vertex: GPUBuffer;
+    vertexOffset?: number;
     index: GPUBuffer;
     count: number;
     stride: number;
@@ -204,6 +205,7 @@ interface LocalShadowPrimitive {
     primitive?: object;
     node: Mesh;
     vertex: GPUBuffer;
+    vertexOffset?: number;
     index: GPUBuffer;
     count: number;
     stride: number;

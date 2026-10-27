@@ -61,6 +61,8 @@ export interface LocalShadowPrimitive {
   alphaTransform?: Float32Array;
   node: Mesh;
   vertex: GPUBuffer;
+  /** Byte offset of the caster's first vertex in `vertex` (a deformer's shared buffer). Default 0. */
+  vertexOffset?: number;
   index: GPUBuffer;
   count: number;
   stride: number;
@@ -836,7 +838,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           pass.setPipeline(this.pipeline(d.key));
           pass.setBindGroup(1, d.group);
           if (d.displaced) pass.setBindGroup(2, d.displaced);
-          pass.setVertexBuffer(0, p.vertex);
+          pass.setVertexBuffer(0, p.vertex, p.vertexOffset || undefined);
           pass.setIndexBuffer(p.index, 'uint32');
           if (p.instances) {
             pass.setVertexBuffer(1, p.instances.upload(c.device));

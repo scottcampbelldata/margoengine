@@ -15,6 +15,8 @@ export interface ModelPrimitiveLike {
   readonly instances?: { readonly count: number; readonly data: Float32Array };
   readonly buffers?: { vertex: GPUBuffer; index: GPUBuffer };
   readonly deformed?: GPUBuffer;
+  /** Byte offset of the primitive's vertices in `deformed`. Default 0. */
+  readonly deformedOffset?: number;
 }
 /** Structural view of a gltf-pro `PBRModel`: its `root` node and `primitives`. */
 export interface ModelLike {

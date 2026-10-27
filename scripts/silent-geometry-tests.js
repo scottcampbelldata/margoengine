@@ -431,14 +431,18 @@ export async function silentGeometryBrowserChecks(page) {
           `${name}: eyes lost independent view uniforms: ${JSON.stringify(eyes)}`,
         );
         if (expectedPose) {
+          // Animation packs the deformed vertices of every primitive on a device into shared buffers: each eye's
+          // renderer owns one pose-sized window, starting on a 256-byte storage offset.
           const outputs = replicaResources.filter(
             (r) =>
               r.resource instanceof GPUBuffer &&
-              r.descriptor.size === expectedPose.byteLength &&
+              !r.destroyed &&
+              r.descriptor.size >= expectedPose.byteLength &&
               (r.descriptor.usage & (GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC)) ===
                 (GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC),
           );
-          check(outputs.length === 2, `${name}: expected one separate deformed buffer per eye, got ${outputs.length}`);
+          let windows = 0,
+            nearest = Infinity;
           for (const { resource } of outputs) {
             const buffer = device.createBuffer({
               size: resource.size,
@@ -450,18 +454,25 @@ export async function silentGeometryBrowserChecks(page) {
               device.queue.submit([copy.finish()]);
               await buffer.mapAsync(GPUMapMode.READ);
               const values = new Float32Array(buffer.getMappedRange());
-              let max = 0;
-              for (let i = 0; i < expectedPose.length; i++) max = Math.max(max, Math.abs(values[i] - expectedPose[i]));
-              check(
-                max < 2e-5,
-                `${name}: independent device deformation differs from current desktop GPU pose by ${max}`,
-              );
-              poses.push({ vertices: values.length / 20, maxDifference: max });
+              for (let start = 0; start + expectedPose.length <= values.length; start += 64) {
+                let max = 0;
+                for (let i = 0; i < expectedPose.length && max < 2e-5; i++)
+                  max = Math.max(max, Math.abs(values[start + i] - expectedPose[i]));
+                nearest = Math.min(nearest, max);
+                if (max < 2e-5) {
+                  windows++;
+                  poses.push({ vertices: expectedPose.length / 20, maxDifference: max });
+                }
+              }
               buffer.unmap();
             } finally {
               buffer.destroy();
             }
           }
+          check(
+            windows === 2,
+            `${name}: expected one deformed pose per eye matching the desktop GPU pose, got ${windows} (closest differs by ${nearest})`,
+          );
         }
         check(animation?.time === beforeTime, 'second-device prepare advanced desktop playback');
         model.destroy();

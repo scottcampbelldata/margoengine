@@ -44,6 +44,8 @@ export interface VelocityPrimitive {
     primitive?: object;
     node: Mesh;
     vertex: GPUBuffer;
+    vertexOffset?: number;
+    vertexSize?: number;
     index: GPUBuffer;
     count: number;
     stride: number;

@@ -42,6 +42,10 @@ export interface VelocityPrimitive {
   node: Mesh;
   /** Current vertex buffer: 24-byte core or 80-byte PBR vertices (PBR: STORAGE or COPY_SRC usage, or CPU vertices). */
   vertex: GPUBuffer;
+  /** Byte offset of the primitive's first vertex in `vertex` (a deformer's shared buffer; a multiple of 256). Default 0. */
+  vertexOffset?: number;
+  /** Byte size of the primitive's vertices from `vertexOffset`. Default: the rest of `vertex`. */
+  vertexSize?: number;
   /** Uint32 triangle indices. */
   index: GPUBuffer;
   /** Index count. */
@@ -96,6 +100,8 @@ interface Draw {
   group: GPUBindGroup;
   pipeline: GPURenderPipeline;
   vertex: GPUBuffer;
+  vertexOffset: number;
+  vertexSize: number;
   alpha?: GPUTextureView;
   sampler?: GPUSampler;
   frame: number;
@@ -605,7 +611,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       });
       this.objectPipelines.set(key, pipeline);
     }
-    const identity = p.primitive ?? p.index;
+    const identity = p.primitive ?? p.index,
+      offset = p.vertexOffset ?? 0,
+      size = p.vertexSize ?? p.vertex.size - offset;
     let records = this.draws.get(p.node);
     if (!records) {
       records = new Map();
@@ -618,6 +626,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       r.camera !== this.objectCamera ||
       r.pipeline !== pipeline ||
       r.vertex !== p.vertex ||
+      r.vertexOffset !== offset ||
+      r.vertexSize !== size ||
       r.alpha !== p.alphaTexture ||
       r.sampler !== p.alphaSampler
     ) {
@@ -636,40 +646,42 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         group: undefined!,
         pipeline,
         vertex: p.vertex,
+        vertexOffset: offset,
+        vertexSize: size,
         alpha: p.alphaTexture,
         sampler: p.alphaSampler,
         frame: -2,
       };
       records.set(identity, r);
       if (pbr) {
-        if (!p.alphaTexture || !p.alphaSampler || p.vertex.size > c.device.limits.maxStorageBufferBindingSize)
+        if (!p.alphaTexture || !p.alphaSampler || size > c.device.limits.maxStorageBufferBindingSize)
           throw new TypeError('TAA PBR source needs alpha bindings and a storage-sized vertex buffer');
-        let source = p.vertex;
+        // A whole buffer binds as before; a deformer's shared buffer binds the primitive's range.
+        let source: GPUBufferBinding =
+          offset || size !== p.vertex.size ? { buffer: p.vertex, offset, size } : { buffer: p.vertex };
         if (p.vertex.usage !== undefined && !(p.vertex.usage & GPUBufferUsage.STORAGE)) {
           const primitive = p.primitive as { vertices?: Float32Array; deformed?: GPUBuffer } | undefined,
             vertices = primitive?.vertices;
           if (
             !(p.vertex.usage & GPUBufferUsage.COPY_SRC) &&
-            (primitive?.deformed === p.vertex ||
-              !(vertices instanceof Float32Array) ||
-              vertices.byteLength !== p.vertex.size)
+            (primitive?.deformed === p.vertex || !(vertices instanceof Float32Array) || vertices.byteLength !== size)
           )
             throw new TypeError(
               'TAA deformed sources require STORAGE or COPY_SRC; static PBR sources need retained CPU vertices',
             );
           r.source = c.device.createBuffer({
-            size: p.vertex.size,
+            size,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
           });
           if (!(p.vertex.usage & GPUBufferUsage.COPY_SRC))
             c.device.queue.writeBuffer(r.source, 0, vertices as Float32Array<ArrayBuffer>);
-          source = r.source;
+          source = { buffer: r.source };
         }
-        r.vertices = c.device.createBuffer({ size: p.vertex.size, usage: GPUBufferUsage.STORAGE });
+        r.vertices = c.device.createBuffer({ size, usage: GPUBufferUsage.STORAGE });
         r.snapshot = c.device.createBindGroup({
           layout: this.snapshotPipeline!.getBindGroupLayout(0),
           entries: [
-            { binding: 0, resource: { buffer: source } },
+            { binding: 0, resource: source },
             { binding: 1, resource: { buffer: r.vertices } },
           ],
         });
@@ -712,7 +724,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     if (transform) for (let i = 0; i < 8; i++) put(40 + i, transform[i]);
     if (changed) c.device.queue.writeBuffer(r.uniform, 0, v as Float32Array<ArrayBuffer>);
     if (r.source && p.vertex.usage & GPUBufferUsage.COPY_SRC)
-      c.encoder.copyBufferToBuffer(p.vertex, 0, r.source, 0, p.vertex.size);
+      c.encoder.copyBufferToBuffer(p.vertex, offset, r.source, 0, size);
     r.previous.set(p.node.matrix);
     r.frame = this.frame;
     out.push({ r, p });
@@ -738,7 +750,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     for (const { r, p } of draws) {
       pass.setPipeline(r.pipeline);
       pass.setBindGroup(0, r.group);
-      pass.setVertexBuffer(0, p.vertex);
+      pass.setVertexBuffer(0, p.vertex, r.vertexOffset || undefined);
       pass.setIndexBuffer(p.index, 'uint32');
       pass.drawIndexed(p.count);
     }
@@ -746,10 +758,10 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     if (!draws.some(({ r }) => r.snapshot)) return;
     const copy = c.encoder.beginComputePass();
     copy.setPipeline(this.snapshotPipeline!);
-    for (const { r, p } of draws)
+    for (const { r } of draws)
       if (r.snapshot) {
         copy.setBindGroup(0, r.snapshot);
-        copy.dispatchWorkgroups(Math.ceil(p.vertex.size / 16 / 256));
+        copy.dispatchWorkgroups(Math.ceil(r.vertexSize / 16 / 256));
       }
     copy.end();
   }

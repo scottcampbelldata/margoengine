@@ -39,3 +39,52 @@ export const deformationShader8 = deformationShader
     'boneMatrices[inf.joints.w]*inf.weights.w;',
     'boneMatrices[inf.joints.w]*inf.weights.w+boneMatrices[inf.jointsExtra.x]*inf.weightsExtra.x+boneMatrices[inf.jointsExtra.y]*inf.weightsExtra.y+boneMatrices[inf.jointsExtra.z]*inf.weightsExtra.z+boneMatrices[inf.jointsExtra.w]*inf.weightsExtra.w;',
   );
+
+/**
+ * Batched deformation (batch.ts): many primitives in one dispatch. Each workgroup deforms 64 vertices of one slot,
+ * named by the work list (`work[0].x` workgroups, then a slot index and first vertex per workgroup); each slot record
+ * gives where its vertices, deltas, weights, bones and influences start in the shared buffers. The per-vertex
+ * arithmetic is the per-primitive shader's, term for term, so the output is the same bits. `extra`: eight influences.
+ */
+export function batchedDeformationShader(extra: boolean): string {
+  return /* wgsl */ `
+struct Vertex {position:vec4f,normal:vec4f,tangent:vec4f,uv:vec4f,color:vec4f}
+struct Morph {position:vec4f,normal:vec4f,tangent:vec4f}
+struct Slot {source:u32,output:u32,count:u32,targets:u32,morphs:u32,weights:u32,bones:u32,joints:u32,influences:u32,pad0:u32,pad1:u32,pad2:u32}
+@group(0) @binding(0) var<storage,read> source:array<Vertex>;
+@group(0) @binding(1) var<storage,read_write> output:array<Vertex>;
+@group(0) @binding(2) var<storage,read> morphs:array<Morph>;
+@group(0) @binding(3) var<storage,read> weights:array<f32>;
+@group(0) @binding(4) var<storage,read> boneMatrices:array<mat4x4f>;
+@group(0) @binding(5) var<storage,read> influences:array<vec4u>;
+@group(0) @binding(6) var<storage,read> slots:array<Slot>;
+@group(0) @binding(7) var<storage,read> work:array<vec2u>;
+@compute @workgroup_size(64) fn main(@builtin(workgroup_id) group:vec3u,@builtin(num_workgroups) groups:vec3u,@builtin(local_invocation_index) lane:u32) {
+  let item=group.y*groups.x+group.x;
+  if(item>=work[0].x){return;}
+  let entry=work[item+1u];let s=slots[entry.x];let i=entry.y+lane;
+  if(i>=s.count){return;}
+  var v=source[s.source+i];
+  for(var morphIndex=0u;morphIndex<s.targets;morphIndex++) {
+    let m=morphs[s.morphs+morphIndex*s.count+i];let w=weights[s.weights+morphIndex];
+    v.position+=vec4f(m.position.xyz*w,0);v.normal+=vec4f(m.normal.xyz*w,0);v.tangent+=vec4f(m.tangent.xyz*w,0);
+  }
+  if(s.joints>0u) {
+    let at=s.influences+i*${extra ? 4 : 2}u;let joints=influences[at];let jointWeights=bitcast<vec4f>(influences[at+1u]);${
+      extra ? 'let jointsExtra=influences[at+2u];let weightsExtra=bitcast<vec4f>(influences[at+3u]);' : ''
+    }
+    let skin=boneMatrices[s.bones+joints.x]*jointWeights.x+boneMatrices[s.bones+joints.y]*jointWeights.y+boneMatrices[s.bones+joints.z]*jointWeights.z+boneMatrices[s.bones+joints.w]*jointWeights.w${
+      extra
+        ? '+boneMatrices[s.bones+jointsExtra.x]*weightsExtra.x+boneMatrices[s.bones+jointsExtra.y]*weightsExtra.y+boneMatrices[s.bones+jointsExtra.z]*weightsExtra.z+boneMatrices[s.bones+jointsExtra.w]*weightsExtra.w'
+        : ''
+    };
+    v.position=skin*vec4f(v.position.xyz,1);
+    let normalMatrix=mat3x3f(cross(skin[1].xyz,skin[2].xyz),cross(skin[2].xyz,skin[0].xyz),cross(skin[0].xyz,skin[1].xyz));
+    let handedness=sign(dot(skin[0].xyz,cross(skin[1].xyz,skin[2].xyz)));
+    v.normal=vec4f(normalMatrix*v.normal.xyz*handedness,0);
+    v.tangent=vec4f((skin*vec4f(v.tangent.xyz,0)).xyz,v.tangent.w*handedness);
+  }
+  v.normal=vec4f(normalize(v.normal.xyz),0);output[s.output+i]=v;
+}
+`;
+}

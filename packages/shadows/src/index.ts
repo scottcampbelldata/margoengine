@@ -112,6 +112,8 @@ export interface ShadowPrimitive {
   node: Mesh;
   /** Vertex buffer: 24-byte core or 80-byte PBR vertices. */
   vertex: GPUBuffer;
+  /** Byte offset of the caster's first vertex in `vertex` (a deformer's shared buffer). Default 0. */
+  vertexOffset?: number;
   /** Uint32 indices. */
   index: GPUBuffer;
   /** Index count. */
@@ -911,6 +913,7 @@ export class Shadows implements EnginePlugin {
   /** Still-caster identity. A changed matrix, buffer, alpha map, or hidden bit redraws the whole cached atlas. */
   private mixStill(hash: number, primitive: ShadowPrimitive): number {
     hash = Math.imul(hash, 16777619) ^ this.identity(primitive.vertex);
+    hash = Math.imul(hash, 16777619) ^ (primitive.vertexOffset ?? 0);
     hash = Math.imul(hash, 16777619) ^ this.identity(primitive.index);
     hash = Math.imul(hash, 16777619) ^ primitive.count;
     hash = Math.imul(hash, 16777619) ^ primitive.stride;

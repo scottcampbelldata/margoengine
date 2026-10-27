@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3421382,
+  "total": 3426202,
   "history": [
     {
       "date": "2026-10-24",
@@ -506,10 +506,22 @@
       "commit": "5ba5a631",
       "reason": "@margoengine/usdz bug fix: the glTF document flips st to uvs (textures drew upside down) and reads UsdTransform2d and UsdUVTexture wrap modes (KHR_texture_transform, samplers); regression tests in packages/usdz/tests/usdz.test.js",
       "grew": 2
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "64d567b9",
+      "reason": "animation: batched deformation, shared buffers and one dispatch per page and pipeline for every skinned or morphed primitive of a device (p-morph, item 47), adds the arena and its WGSL beside the per-primitive shader Skin keeps",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "1f9fd509",
+      "reason": "usdz worker: bundles gltf-pro, whose draws, shadow and picking records now take the shared deformed-buffer offset (batched deformation, p-morph, item 47); +56 B over the limit after 1105fa5c",
+      "grew": 1
     }
   ],
   "items": {
-    "@margoengine/animation": 19751,
+    "@margoengine/animation": 22595,
     "@margoengine/animation/pointer": 6858,
     "@margoengine/animation/sampling": 1177,
     "@margoengine/animation/skeleton-utils": 8966,
@@ -780,7 +792,7 @@
     "@margoengine/ui": 28622,
     "@margoengine/ui/react": 28708,
     "@margoengine/usdz": 8792,
-    "@margoengine/usdz dist/workers/usdz.js": 63933,
+    "@margoengine/usdz dist/workers/usdz.js": 65909,
     "@margoengine/usdz/worker": 9856,
     "@margoengine/vfx": 12721,
     "@margoengine/vfx/base": 7572,

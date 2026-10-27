@@ -6,7 +6,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { ordinaryWeightBuffer } from './weight-buffer.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { sampleTrackInto, type Interpolation } from './sampling.js';
-import { deformationShader, deformationShader8 } from './shader.js';
+import { DeformArena, weightRegion, type DispatchCache, type Slot, type SlotSpec } from './batch.js';
 import type { PointerChannels, PointerPlan } from './pointer.js';
 import { applyKeyframeClip, type KeyframeClip } from './keyframes.js';
 export { createMaterialAnimation } from './material-animation.js';
@@ -81,11 +81,12 @@ interface Clip {
 }
 interface Deformation {
   primitive: PBRPrimitive;
-  buffers: GPUBuffer[];
-  group: GPUBindGroup;
-  output: GPUBuffer;
-  weights: GPUBuffer;
-  bones: GPUBuffer;
+  /** Where the primitive lives in the device's shared deformation buffers (batch.ts). */
+  slot: Slot;
+  /** The shared buffers holding its deformed vertices, morph weights and bone palette (at the slot's offsets). */
+  readonly output: GPUBuffer;
+  readonly weights: GPUBuffer;
+  readonly bones: GPUBuffer;
   palette: Float32Array;
   // These private input buffers keep their last successfully queued upload.
   // The shared deformed output is still dispatched for every render.
@@ -99,7 +100,6 @@ interface Deformation {
   uploadArgs: [GPUBuffer, number, Float32Array<ArrayBuffer>];
   joints: number[];
   inverseBind: Float32Array[];
-  pipeline: GPUComputePipeline;
 }
 /** Options for {@link Animation}. */
 export interface AnimationOptions {
@@ -174,10 +174,12 @@ function writeInput(
   writer: GPUQueue['writeBuffer'],
   r: Deformation,
   buffer: GPUBuffer,
+  offset: number,
   values: Float32Array<ArrayBuffer>,
 ): void {
   const args = r.uploadArgs;
   args[0] = buffer;
+  args[1] = offset;
   args[2] = values;
   try {
     Reflect.apply(writer, queue, args);
@@ -190,8 +192,62 @@ function writeInput(
 interface DeformGroup {
   members: Set<Animation>;
   ran: number;
+  /** The batched dispatches of the members that last deformed together. */
+  cache: DispatchCache;
 }
+const emptyCache = (): DispatchCache => ({ owners: [], version: -1, dispatches: [] });
+const slotsOf = (owner: object): readonly Slot[] => (owner as Animation)['slots'];
 const deformGroups = new WeakMap<FrameGraph, DeformGroup>();
+const morphAttributes = ['POSITION', 'NORMAL', 'TANGENT'] as const;
+/** A primitive's morph deltas, 12 floats per vertex and target (position, normal, tangent at 0, 4, 8). */
+function morphDeltas(
+  asset: PBRModel['asset'],
+  targets: ReturnType<typeof morphDefinition>['targets'],
+  count: number,
+): Float32Array {
+  const deltas = new Float32Array(count * targets.length * 12);
+  targets.forEach((target, t) =>
+    morphAttributes.forEach((name, k) => {
+      if (target[name] === undefined) return;
+      const data = asset.accessor(target[name], 'VEC3');
+      for (let i = 0; i < count; i++) deltas.set(data.subarray(i * 3, i * 3 + 3), (t * count + i) * 12 + k * 4);
+    }),
+  );
+  return deltas;
+}
+/** A deformation record; made outside setup's loop so it holds none of that loop's large temporaries. */
+function deformationRecord(p: PBRPrimitive): Deformation {
+  return {
+    primitive: p,
+    slot: undefined!,
+    get output() {
+      return this.slot.page.output.buffer!;
+    },
+    get weights() {
+      return this.slot.page.weights.buffer!;
+    },
+    get bones() {
+      return this.slot.page.bones.buffer!;
+    },
+    palette: new Float32Array(),
+    paletteBits: new Uint32Array(),
+    uploadedPalette: new Uint32Array(),
+    uploadedWeights: new Float32Array(p.weights.length),
+    bonesUploaded: false,
+    weightsUploaded: false,
+    uploadArgs: [undefined!, 0, undefined!],
+    joints: [],
+    inverseBind: [],
+  };
+}
+function record(
+  pass: GPUComputePassEncoder,
+  d: { pipeline: GPUComputePipeline; group: GPUBindGroup; x: number; y: number },
+): void {
+  pass.setPipeline(d.pipeline);
+  pass.setBindGroup(0, d.group);
+  pass.dispatchWorkgroups(d.x, d.y);
+}
 /**
  * Plays a glTF model's animation clips on the GPU: node translation, rotation and scale, skinning and morph targets. Add it to the engine with {@link Animation.attach}; it advances each frame and removes itself when the model is disposed.
  *
@@ -216,9 +272,12 @@ export class Animation implements EnginePlugin {
   time = 0;
   clip = 0;
   private device?: GPUDevice;
-  private pipeline?: GPUComputePipeline;
-  private pipeline8?: GPUComputePipeline;
+  private arena?: DeformArena;
   private resources: Deformation[] = [];
+  /** The resources' slots, in order (the arena's view of this Animation). */
+  private slots: Slot[] = [];
+  /** This Animation's own dispatches, for deformation outside a shared frame-graph pass. */
+  private readonly cache: DispatchCache = emptyCache();
   private readonly inverse = new Float32Array(16);
   private readonly joint = new Float32Array(16);
   private readonly product = new Float32Array(16);
@@ -445,10 +504,9 @@ export class Animation implements EnginePlugin {
     this.device = device;
     this.unsubscribe?.();
     this.unsubscribe = this.model.onDispose(() => this.destroy());
-    this.pipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: { module: this.device.createShaderModule({ code: deformationShader }), entryPoint: 'main' },
-    });
+    const arena = (this.arena = DeformArena.of(device)),
+      records: Deformation[] = [],
+      specs: SlotSpec[] = [];
     const doc = animationDocument(this.model.asset.doc);
     for (const p of this.model.primitives) {
       const definition = morphDefinition(p.definition),
@@ -461,56 +519,15 @@ export class Animation implements EnginePlugin {
         );
       if (!targets.length && skinId === undefined) continue;
       const count = p.vertices.length / 20,
-        buffers: GPUBuffer[] = [],
-        record: Deformation = {
-          primitive: p,
-          buffers,
-          group: undefined!,
-          output: undefined!,
-          weights: undefined!,
-          bones: undefined!,
-          palette: new Float32Array(),
-          paletteBits: new Uint32Array(),
-          uploadedPalette: new Uint32Array(),
-          uploadedWeights: new Float32Array(p.weights.length),
-          bonesUploaded: false,
-          weightsUploaded: false,
-          uploadArgs: [undefined!, 0, undefined!],
-          joints: [],
-          inverseBind: [],
-          pipeline: this.pipeline,
-        };
-      this.resources.push(record);
-      const upload = (data: Float32Array | Uint32Array, usage = GPUBufferUsage.STORAGE) => {
-        const size = Math.max(16, data.byteLength);
-        if (
-          size > this.device!.limits.maxBufferSize ||
-          (usage & GPUBufferUsage.STORAGE && size > this.device!.limits.maxStorageBufferBindingSize)
-        )
-          throw new RangeError(
-            'Animation buffer exceeds device limit; split the mesh or reduce vertices, joints and morph targets',
-          );
-        const b = this.device!.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST });
-        buffers.push(b);
-        if (data.byteLength) this.device!.queue.writeBuffer(b, 0, data as Float32Array<ArrayBuffer>);
-        return b;
-      };
+        record = deformationRecord(p),
+        asset = this.model.asset;
       if (count * targets.length * 48 > this.device.limits.maxStorageBufferBindingSize)
         throw new RangeError('Morph deltas exceed device limit; reduce the vertex or morph target count');
-      const deltas = new Float32Array(Math.max(12, count * targets.length * 12));
-      targets.forEach((target, t) => {
-        for (const [name, at] of [
-          ['POSITION', 0],
-          ['NORMAL', 4],
-          ['TANGENT', 8],
-        ] as const)
-          if (target[name] !== undefined) {
-            const data = this.model.asset.accessor(target[name], 'VEC3');
-            if (data.length !== count * 3)
-              throw new RangeError('Morph target count mismatch; every morph attribute needs one VEC3 per vertex');
-            for (let i = 0; i < count; i++) deltas.set(data.subarray(i * 3, i * 3 + 3), (t * count + i) * 12 + at);
-          }
-      });
+      // Checked now; packed only for the first copy of the primitive placed on the device (the others share it).
+      for (const target of targets)
+        for (const name of morphAttributes)
+          if (target[name] !== undefined && asset.accessor(target[name], 'VEC3').length !== count * 3)
+            throw new RangeError('Morph target count mismatch; every morph attribute needs one VEC3 per vertex');
       let inverseBind: Float32Array = new Float32Array(identity),
         joints: number[] = [];
       const attributes = definition.attributes,
@@ -590,36 +607,39 @@ export class Animation implements EnginePlugin {
               influenceFloats[base + 4 + c] = weights[at] / sum;
             }
         }
-        if (extra)
-          record.pipeline = this.pipeline8 ??= this.device.createComputePipeline({
-            layout: 'auto',
-            compute: { module: this.device.createShaderModule({ code: deformationShader8 }), entryPoint: 'main' },
-          });
       }
       record.joints = joints;
       record.inverseBind = joints.map((_, i) => inverseBind.subarray(i * 16, i * 16 + 16));
       record.palette = Float32Array.from(joints.length ? joints.flatMap(() => Array.from(identity)) : identity);
       record.paletteBits = new Uint32Array(record.palette.buffer);
       record.uploadedPalette = new Uint32Array(record.palette.length);
-      const source = upload(p.vertices),
-        output = upload(p.vertices, GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC),
-        morph = upload(deltas),
-        weights = upload(p.weights),
-        bones = upload(record.palette),
-        influences = upload(jointIds),
-        counts = upload(new Uint32Array([count, targets.length, joints.length, 0]), GPUBufferUsage.UNIFORM);
-      record.output = output;
-      record.weights = weights;
-      record.bones = bones;
-      record.group = this.device.createBindGroup({
-        layout: record.pipeline.getBindGroupLayout(0),
-        entries: [source, output, morph, weights, bones, influences, counts].map((buffer, binding) => ({
-          binding,
-          resource: { buffer },
-        })),
+      records.push(record);
+      specs.push({
+        primitive: p,
+        count,
+        targets: targets.length,
+        joints: joints.length,
+        extra,
+        asset: this.model.asset,
+        definition: p.definition,
+        skin: skinId,
+        deltas: () => morphDeltas(asset, targets, count),
+        influences: () => jointIds.subarray(0, joints.length ? count * stride : 0),
       });
-      p.deformed = output;
     }
+    // One placement for the whole model, so its primitives grow the shared buffers at most once. The bind-pose
+    // vertices and current weights go up with them; bones are uploaded with the first deformation.
+    const slots = arena.add(specs);
+    this.slots.push(...slots);
+    // Compile the pipelines the model needs while it loads, not on its first frame.
+    for (const slot of slots) arena.pipeline(slot.extra);
+    records.forEach((record, i) => {
+      record.slot = slots[i];
+      const weights = record.primitive.weights;
+      if (weights.length && weights.byteLength <= weightRegion(slots[i].targets) * 4)
+        device.queue.writeBuffer(record.weights, slots[i].weights.offset * 4, weights as Float32Array<ArrayBuffer>);
+    });
+    this.resources.push(...records);
     this.model.prepareDeformation = this.prepareDeformation;
     this.model.createDeformationRenderer = this.createDeformationRenderer;
   }
@@ -640,15 +660,16 @@ export class Animation implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     let group = deformGroups.get(graph);
-    if (!group) deformGroups.set(graph, (group = { members: new Set(), ran: 0 }));
+    if (!group) deformGroups.set(graph, (group = { members: new Set(), ran: 0, cache: emptyCache() }));
     group.members.add(this);
     this.group = group;
     graph.add({ name: this.name, order: -10, execute: (c) => this.deformAll(c) });
   }
   /**
    * Every Animation of a frame graph deforms in one compute pass: the first of their passes in each graph execution
-   * uploads each one's weights and bones and encodes all their dispatches; the rest of that execution's passes skip. (A
-   * compute pass per model cost about 10 us of GPU time each, 100 models 1.3 ms.)
+   * uploads each one's weights and bones and encodes one batched dispatch per buffer page and pipeline for all of
+   * them; the rest of that execution's passes skip. (A compute pass per model cost about 10 us of GPU time each, and a
+   * dispatch per primitive about 6 us: 100 two-primitive models 1.3 ms.)
    */
   private deformAll(context: PassContext): void {
     const group = this.group;
@@ -663,7 +684,8 @@ export class Animation implements EnginePlugin {
       if (!members.length) return;
       const pass = context.encoder.beginComputePass();
       try {
-        for (const a of members) a.encode(pass);
+        // Members of one graph render with one engine, so one device and arena.
+        members[0].arena!.dispatches(members, slotsOf, group.cache).forEach((d) => record(pass, d));
       } finally {
         pass.end();
       }
@@ -675,20 +697,12 @@ export class Animation implements EnginePlugin {
   }
   private deform(context: PassContext | PBRDeformationContext): void {
     if (!this.upload(context)) return;
-    // One pass for every skinned or morphed primitive. Each dispatch writes its own output buffer.
+    // One pass, one batched dispatch per buffer page and pipeline for every skinned or morphed primitive.
     const pass = context.encoder.beginComputePass();
     try {
-      this.encode(pass);
+      this.arena!.dispatches([this], slotsOf, this.cache).forEach((d) => record(pass, d));
     } finally {
       pass.end();
-    }
-  }
-  /** Records one dispatch per deformed primitive into pass. */
-  private encode(pass: GPUComputePassEncoder): void {
-    for (const r of this.resources) {
-      pass.setPipeline(r.pipeline);
-      pass.setBindGroup(0, r.group);
-      pass.dispatchWorkgroups(Math.ceil(r.primitive.vertices.length / 20 / 64));
     }
   }
   /** Checks and uploads this frame's weights and bone palettes; false when there is nothing to dispatch. */
@@ -721,7 +735,7 @@ export class Animation implements EnginePlugin {
           let uploaded = false;
           r.bonesUploaded = false;
           try {
-            writeInput(queue, writer, r, r.bones, r.palette as Float32Array<ArrayBuffer>);
+            writeInput(queue, writer, r, r.bones, r.slot.bones.offset * 64, r.palette as Float32Array<ArrayBuffer>);
             if (reusable) {
               r.uploadedPalette.set(r.paletteBits);
               r.bonesQueue = queue;
@@ -738,7 +752,13 @@ export class Animation implements EnginePlugin {
         const values = r.primitive.weights,
           queue = context.device.queue,
           writer = queue.writeBuffer,
-          reusable = reusableWriter(queue, writer);
+          reusable = reusableWriter(queue, writer),
+          at = r.slot.weights.offset * 4;
+        // The weights share one buffer with other primitives': never write past this primitive's region.
+        if ((values as ArrayBufferView).byteLength > weightRegion(r.slot.targets) * 4)
+          throw new RangeError(
+            'Morph weights longer than the primitive has morph targets; give primitive.weights one value per target',
+          );
         if (
           !reusable ||
           !(values instanceof Float32Array) ||
@@ -750,7 +770,7 @@ export class Animation implements EnginePlugin {
           // Shared memory can change while native writeBuffer copies its input.
           r.weightsUploaded = false;
           try {
-            writeInput(queue, writer, r, r.weights, values as Float32Array<ArrayBuffer>);
+            writeInput(queue, writer, r, r.weights, at, values as Float32Array<ArrayBuffer>);
           } finally {
             r.weightsUploaded = false;
           }
@@ -761,7 +781,7 @@ export class Animation implements EnginePlugin {
             if (!Object.is(values[i], r.uploadedWeights[i])) changed = true;
           if (changed) {
             r.weightsUploaded = false;
-            writeInput(queue, writer, r, r.weights, values as Float32Array<ArrayBuffer>);
+            writeInput(queue, writer, r, r.weights, at, values as Float32Array<ArrayBuffer>);
             r.uploadedWeights.set(values);
             r.weightsQueue = queue;
             r.weightsUploaded = true;
@@ -775,13 +795,15 @@ export class Animation implements EnginePlugin {
     if (this.model.createDeformationRenderer === this.createDeformationRenderer)
       this.model.createDeformationRenderer = undefined;
     if (this.model.prepareDeformation === this.prepareDeformation) this.model.prepareDeformation = undefined;
-    for (const r of this.resources) {
-      if (r.primitive.deformed === r.output) r.primitive.deformed = undefined;
-      for (const b of r.buffers) b.destroy();
+    // The shared caches name this Animation's slots: drop them before the slots go.
+    if (this.arena) {
+      this.arena.drop(this.cache);
+      if (this.group) this.arena.drop(this.group.cache);
+      for (const slot of this.slots) this.arena.remove(slot);
     }
     this.resources = [];
-    this.pipeline = undefined;
-    this.pipeline8 = undefined;
+    this.slots = [];
+    this.arena = undefined;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();
@@ -793,9 +815,9 @@ export class Animation implements EnginePlugin {
     this.model.root.engine.removePlugin(this.name);
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.release();
     this.group?.members.delete(this);
     this.group = undefined;
-    this.release();
     this.device = undefined;
   }
   declare [Symbol.dispose]: () => void;

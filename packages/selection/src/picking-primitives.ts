@@ -13,6 +13,8 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface PickingPrimitive {
   node: Mesh;
   vertex: GPUBuffer;
+  /** Byte offset of the primitive's first vertex in `vertex` (a deformer's shared buffer). Default 0. */
+  vertexOffset?: number;
   index: GPUBuffer;
   count: number;
   stride: 80;
@@ -387,7 +389,7 @@ export class PickingPrimitives {
       for (let index = 0; index < primitives.length; index++) {
         const p = primitives[index];
         pass.setBindGroup(0, draws[index].groups.get(draws[index].slice));
-        pass.setVertexBuffer(0, p.vertex);
+        pass.setVertexBuffer(0, p.vertex, p.vertexOffset || undefined);
         pass.setIndexBuffer(p.index, 'uint32');
         pass.drawIndexed(p.count);
       }

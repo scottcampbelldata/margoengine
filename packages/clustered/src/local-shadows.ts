@@ -74,6 +74,8 @@ export interface LocalShadowPrimitive {
   node: Mesh;
   /** Vertex buffer, position first in each vertex. */
   vertex: GPUBuffer;
+  /** Byte offset of the caster's first vertex in `vertex` (a deformer's shared buffer). Default 0. */
+  vertexOffset?: number;
   /** Index buffer (uint32). */
   index: GPUBuffer;
   /** Index count. */

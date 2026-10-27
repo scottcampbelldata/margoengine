@@ -62,6 +62,8 @@ export interface ContactPrimitive {
   node: Mesh;
   /** Vertex buffer: 24-byte core vertices (position) or 80-byte gltf-pro vertices. */
   vertex: GPUBuffer;
+  /** Byte offset of the caster's first vertex in `vertex` (a deformer's shared buffer). Default 0. */
+  vertexOffset?: number;
   /** `uint32` index buffer. */
   index: GPUBuffer;
   /** Number of indices to draw. */
@@ -511,7 +513,15 @@ export class ContactShadows implements EnginePlugin {
     next.length = 0;
     next.push(s.x, s.ground, s.z, s.width, s.depth, s.height, s.blur, s.resolution, draws.length);
     for (const p of draws) {
-      next.push(p.node, p.vertex, p.index, p.count, p.topology ?? 'triangle-list', p.instances?.count ?? -1);
+      next.push(
+        p.node,
+        p.vertex,
+        p.vertexOffset ?? 0,
+        p.index,
+        p.count,
+        p.topology ?? 'triangle-list',
+        p.instances?.count ?? -1,
+      );
       next.push(p.alpha, p.cutoff, p.texCoord, p.alphaTexture, p.alphaSampler);
       for (let i = 0; i < 16; i++) next.push(p.node.matrix[i]);
     }

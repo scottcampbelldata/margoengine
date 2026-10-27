@@ -120,7 +120,7 @@ try {
           usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
         });
       const encoder = device.createCommandEncoder();
-      encoder.copyBufferToBuffer(output, 0, read, 0, read.size);
+      encoder.copyBufferToBuffer(output, model.primitives[0].deformedOffset ?? 0, read, 0, read.size);
       device.queue.submit([encoder.finish()]);
       await read.mapAsync(GPUMapMode.READ);
       const values = new Float32Array(read.getMappedRange()).slice();
@@ -164,7 +164,13 @@ try {
           usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
         }),
         copy = device.createCommandEncoder();
-      copy.copyBufferToBuffer(many.primitives[0].deformed, 0, check, 0, check.size);
+      copy.copyBufferToBuffer(
+        many.primitives[0].deformed,
+        many.primitives[0].deformedOffset ?? 0,
+        check,
+        0,
+        check.size,
+      );
       device.queue.submit([copy.finish()]);
       await check.mapAsync(GPUMapMode.READ);
       const lastBoneX = new Float32Array(check.getMappedRange())[0];

@@ -9,6 +9,7 @@ import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extens
 export interface ContactPrimitive {
     node: Mesh;
     vertex: GPUBuffer;
+    vertexOffset?: number;
     index: GPUBuffer;
     count: number;
     stride: number;

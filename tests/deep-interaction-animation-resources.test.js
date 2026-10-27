@@ -99,7 +99,7 @@ test('animation retains inverse bind views through 120 moving frames and recreat
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 
-test('Animations of one engine deform in one compute pass a frame, before and after one of them is disposed', () => {
+test('Animations of one engine deform in one compute pass and one dispatch a frame, before and after one of them is disposed', () => {
   const h = optionalGPU(),
     fixture = animatedTriangle(),
     identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -160,12 +160,12 @@ test('Animations of one engine deform in one compute pass a frame, before and af
   };
   try {
     for (let i = 0; i < 3; i++) h.frame();
-    assert.deepEqual(dispatches, [3, 3, 3], 'one pass a frame with every model in it');
+    assert.deepEqual(dispatches, [1, 1, 1], 'one pass and one batched dispatch a frame with every model in it');
     dispatches.length = 0;
     animations[1].dispose();
     h.frame();
     h.frame();
-    assert.deepEqual(dispatches, [2, 2]);
+    assert.deepEqual(dispatches, [1, 1]);
   } finally {
     h.context.encoder.beginComputePass = begin;
     for (const a of animations) a.dispose();

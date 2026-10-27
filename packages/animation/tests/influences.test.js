@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { Animation, sampleTrack } from '../dist/index.js';
-import { deformationShader, deformationShader8 } from '../src/shader.ts';
+import { batchedDeformationShader, deformationShader, deformationShader8 } from '../src/shader.ts';
 import { GLTFAsset } from '../../gltf-pro/dist/index.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
@@ -100,25 +100,35 @@ function harness(f = fixture8(), mixed = false) {
     },
   };
 }
-function influenceBuffer(group) {
-  return group.entries.find((entry) => entry.binding === 5).resource.buffer;
+/** The influence words of primitive `i` in the shared influence buffer (two vec4u per vertex, four with eight). */
+function influences(animation, i = 0) {
+  const slot = animation.resources[i].slot,
+    pool = slot.page.influences;
+  return { buffer: pool.buffer, offset: slot.influences.range.offset * 16, bytes: slot.influences.range.size * 16 };
 }
+const words = ({ buffer, offset, bytes }) => new Uint32Array(buffer.data, offset, bytes / 4);
+const floats = ({ buffer, offset, bytes }) => new Float32Array(buffer.data, offset, bytes / 4);
 
 test('four-influence WGSL remains exact and eight influences use a separate lazy pipeline', () => {
+  // The per-primitive shader stays as Skin's; Animation dispatches the batched one.
   assert.equal(
     createHash('sha256').update(deformationShader).digest('hex'),
     '4999897148b945ab319d961eeb44383ca5e80a9921806564dd315a5c0b9b85fc',
   );
   assert.match(deformationShader8, /jointsExtra:vec4u,weightsExtra:vec4f/);
+  assert.match(batchedDeformationShader(true), /let jointsExtra=influences\[at\+2u\]/);
+  assert.doesNotMatch(batchedDeformationShader(false), /jointsExtra/);
   const f = fixture8();
   delete f.doc.meshes[0].primitives[0].attributes.JOINTS_1;
   delete f.doc.meshes[0].primitives[0].attributes.WEIGHTS_1;
   const h = harness(f),
     animation = h.attach();
   try {
+    assert.equal(h.pipelines.length, 1, 'the pipeline the model needs is compiled while it loads');
+    h.frame();
     assert.equal(h.pipelines.length, 1);
-    assert.equal(h.pipelines[0].compute.module.code, deformationShader);
-    assert.equal(influenceBuffer(h.groups[0]).size, 3 * 32);
+    assert.equal(h.pipelines[0].compute.module.code, batchedDeformationShader(false));
+    assert.equal(influences(animation).bytes, 3 * 32);
   } finally {
     animation.dispose();
   }
@@ -128,10 +138,8 @@ test('mixed four/eight primitives retain their own storage strides and compute p
   const h = harness(fixture8(), true),
     animation = h.attach();
   try {
-    assert.equal(h.pipelines.length, 2);
-    assert.equal(h.pipelines[1].compute.module.code, deformationShader8);
-    assert.equal(influenceBuffer(h.groups[0]).size, 3 * 64);
-    assert.equal(influenceBuffer(h.groups[1]).size, 3 * 32);
+    assert.equal(influences(animation, 0).bytes, 3 * 64);
+    assert.equal(influences(animation, 1).bytes, 3 * 32);
     const selected = [];
     h.context.encoder.beginComputePass = () => ({
       setPipeline(value) {
@@ -142,13 +150,17 @@ test('mixed four/eight primitives retain their own storage strides and compute p
       end() {},
     });
     h.frame();
-    assert.deepEqual(selected, [h.pipelines[1], h.pipelines[0]]);
+    assert.equal(h.pipelines.length, 2);
+    assert.deepEqual(
+      selected.map((p) => p.compute.module.code),
+      [batchedDeformationShader(false), batchedDeformationShader(true)],
+      'one dispatch per pipeline: the four-influence primitive, then the eight-influence one',
+    );
     const old = h.resources.slice();
     animation.onDeviceRestored(h.engine);
     assert.ok(old.every((resource) => resource.destroyed));
-    assert.equal(h.pipelines.length, 4);
-    assert.equal(influenceBuffer(h.groups[2]).size, 3 * 64);
-    assert.equal(influenceBuffer(h.groups[3]).size, 3 * 32);
+    assert.equal(influences(animation, 0).bytes, 3 * 64);
+    assert.equal(influences(animation, 1).bytes, 3 * 32);
   } finally {
     animation.dispose();
   }
@@ -159,9 +171,8 @@ test('eight skin weights normalize across both sets and retain all eight palette
   const h = harness(),
     animation = h.attach();
   try {
-    const buffer = influenceBuffer(h.groups[0]),
-      ids = new Uint32Array(buffer.data),
-      weights = new Float32Array(buffer.data);
+    const ids = words(influences(animation)),
+      weights = floats(influences(animation));
     for (let vertex = 0; vertex < 3; vertex++)
       for (let set = 0; set < 2; set++)
         for (let channel = 0; channel < 4; channel++) {
@@ -183,7 +194,7 @@ test('the secondary set alone can supply the complete positive skin weight', () 
   const h = harness(f),
     animation = h.attach();
   try {
-    const weights = new Float32Array(influenceBuffer(h.groups[0]).data);
+    const weights = floats(influences(animation));
     assert.equal(weights[4], 0);
     assert.equal(weights[15], 1);
   } finally {
@@ -200,7 +211,7 @@ for (const componentType of [5121, 5123])
     const h = harness(f),
       animation = h.attach();
     try {
-      const weights = new Float32Array(influenceBuffer(h.groups[0]).data);
+      const weights = floats(influences(animation));
       assert.ok(Math.abs(weights[4] - 1 / 36) < 1e-7);
       assert.ok(Math.abs(weights[15] - 8 / 36) < 1e-7);
     } finally {
@@ -237,12 +248,9 @@ test('secondary skin attributes reject malformed pairs, unsupported sets, and in
     });
 });
 test('failed eight-influence pipeline allocation releases setup resources', () => {
-  const h = harness(),
-    create = h.engine.gpu.createComputePipeline;
-  let count = 0;
-  h.engine.gpu.createComputePipeline = (descriptor) => {
-    if (++count === 2) throw new Error('Injected eight pipeline');
-    return create(descriptor);
+  const h = harness();
+  h.engine.gpu.createComputePipeline = () => {
+    throw new Error('Injected eight pipeline');
   };
   assert.throws(() => h.attach(), /Injected eight pipeline/);
   assert.equal(h.model.primitives[0].deformed, undefined);
@@ -269,8 +277,10 @@ test('single-clip eight-influence playback creates no typed arrays, quaternion c
   f.doc.animations[0].samplers.push({ input: times, output: rotation });
   f.doc.animations[0].channels.push({ sampler: 1, target: { node: 2, path: 'rotation' } });
   const h = harness(f),
-    animation = h.attach(),
-    counts = { ...h.counts },
+    animation = h.attach();
+  // The first frame builds the batched dispatch (its work list and bind group) once; playback after it allocates nothing.
+  h.frame();
+  const counts = { ...h.counts },
     arrays = { Float32Array, Float64Array, Uint32Array },
     from = Array.from,
     subarray = Float32Array.prototype.subarray;
@@ -287,5 +297,5 @@ test('single-clip eight-influence playback creates no typed arrays, quaternion c
     animation.dispose();
   }
   for (const key of ['buffers', 'textures', 'views', 'groups']) assert.equal(h.counts[key], counts[key]);
-  assert.equal(h.counts.compute, 120);
+  assert.equal(h.counts.compute, 121);
 });

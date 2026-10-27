@@ -17,6 +17,7 @@ export interface PBRSceneBuffers extends SceneBufferBase {
     readonly kind: 'pbr';
     readonly stride: 80;
     readonly primitive?: object;
+    readonly vertexOffset?: number;
     readonly alphaTexture?: GPUTextureView;
     readonly alphaSampler?: GPUSampler;
     readonly alpha?: number;

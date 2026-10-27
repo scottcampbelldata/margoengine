@@ -43,6 +43,8 @@ export interface PBRSceneBuffers extends SceneBufferBase {
   readonly kind: 'pbr';
   readonly stride: 80;
   readonly primitive?: object;
+  /** Byte offset of the primitive's first vertex in `vertex` (a deformer's shared buffer). Default 0. */
+  readonly vertexOffset?: number;
   readonly alphaTexture?: GPUTextureView;
   readonly alphaSampler?: GPUSampler;
   readonly alpha?: number;

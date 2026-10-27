@@ -94,7 +94,8 @@ export function drawCaster(pass, device, pipeline, group, uniform, values, view,
   pass.setPipeline(pipeline);
   pass.setBindGroup(0, group);
   if (displaced) pass.setBindGroup(1, displaced);
-  pass.setVertexBuffer(0, p.vertex);
+  // No offset argument for a caster at its buffer's start: the call stays the one it always was.
+  pass.setVertexBuffer(0, p.vertex, p.vertexOffset || undefined);
   pass.setIndexBuffer(p.index, 'uint32');
   if (instances) {
     pass.setVertexBuffer(1, instances.upload(device));

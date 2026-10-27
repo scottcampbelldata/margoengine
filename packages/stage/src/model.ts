@@ -10,7 +10,9 @@ export interface StageModel {
   dispose(): void;
 }
 
-type RawBuffers = Omit<GeometryBuffers, 'instance'> & Partial<Pick<GeometryBuffers, 'instance'>>;
+/** A draw's buffers; an animated model's deformed vertices start `vertexOffset` bytes into `vertex` (default 0). */
+type RawBuffers = Omit<GeometryBuffers, 'instance'> &
+  Partial<Pick<GeometryBuffers, 'instance'>> & { readonly vertexOffset?: number };
 
 /** What `stage.load(url)` returns: the imported meshes under one root, moved, rotated and scaled as one. */
 export interface LoadedModel extends Pick<Mesh, 'position' | 'rotation' | 'scale'> {

@@ -7,6 +7,8 @@ export interface MeshDraw {
   readonly primitive?: object;
   readonly node: Mesh;
   readonly vertex: GPUBuffer;
+  /** Byte offset of the draw's first vertex in `vertex` (a deformer's shared buffer). Default 0. */
+  readonly vertexOffset?: number;
   readonly index: GPUBuffer;
   readonly count: number;
   readonly stride: 80;

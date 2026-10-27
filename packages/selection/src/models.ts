@@ -188,7 +188,7 @@ export class ModelDraws {
     for (let i = 0; i < this.count; ) {
       const p = this.primitives[i],
         n = this.runs[i] || 1;
-      pass.setVertexBuffer(0, p.deformed ?? p.buffers!.vertex);
+      pass.setVertexBuffer(0, p.deformed ?? p.buffers!.vertex, (p.deformed && p.deformedOffset) || undefined);
       pass.setIndexBuffer(p.buffers!.index, 'uint32');
       pass.drawIndexed(p.indices.length, n, 0, 0, i);
       i += n;

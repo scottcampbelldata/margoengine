@@ -805,6 +805,7 @@ class PBRModel implements EnginePlugin {
         primitive: PBRPrimitive;
         node: Mesh;
         vertex: GPUBuffer;
+        vertexOffset: number;
         index: GPUBuffer;
         count: number;
         stride: 80;
@@ -836,6 +837,7 @@ class PBRModel implements EnginePlugin {
         primitive: PBRPrimitive;
         node: Mesh;
         vertex: GPUBuffer;
+        vertexOffset: number;
         index: GPUBuffer;
         count: number;
         stride: 80;
@@ -889,6 +891,7 @@ interface PBRPrimitive {
     targetNames: string[];
     extension?: MaterialExtension;
     deformed?: GPUBuffer;
+    deformedOffset?: number;
     instances?: PBRInstances;
     buffers?: {
         vertex: GPUBuffer;
@@ -932,6 +935,7 @@ interface PassBindings {
     pipeline?: GPURenderPipeline;
     groups: (GPUBindGroup | undefined)[];
     vertex?: GPUBuffer;
+    vertexOffset?: number;
     instances?: GPUBuffer;
     index?: GPUBuffer;
 }
@@ -991,6 +995,8 @@ interface ShadowCasterRecord {
     primitive: PBRPrimitive;
     node: Mesh;
     vertex: GPUBuffer;
+    vertexOffset: number;
+    vertexSize: number;
     index: GPUBuffer;
     count: number;
     topology?: 'line-list';

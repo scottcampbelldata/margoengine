@@ -73,7 +73,7 @@ try {
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
           }),
           encoder = gpu.createCommandEncoder();
-        encoder.copyBufferToBuffer(primitive.deformed, 0, b, 0, b.size);
+        encoder.copyBufferToBuffer(primitive.deformed, primitive.deformedOffset ?? 0, b, 0, b.size);
         gpu.queue.submit([encoder.finish()]);
         await b.mapAsync(GPUMapMode.READ);
         const result = new Float32Array(b.getMappedRange()).slice();

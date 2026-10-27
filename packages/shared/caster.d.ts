@@ -38,6 +38,8 @@ export function drawCaster(
     cutoff?: number;
     texCoord?: number;
     vertex: GPUBuffer;
+    /** Byte offset of the caster's vertices in `vertex`. Default 0. */
+    vertexOffset?: number;
     index: GPUBuffer;
     count: number;
   },

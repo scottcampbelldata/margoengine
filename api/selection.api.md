@@ -58,6 +58,7 @@ export interface ModelPrimitiveLike {
   readonly instances?: { readonly count: number; readonly data: Float32Array };
   readonly buffers?: { vertex: GPUBuffer; index: GPUBuffer };
   readonly deformed?: GPUBuffer;
+  readonly deformedOffset?: number;
 }
 
 export interface PickHit {
@@ -100,6 +101,7 @@ export class Picking implements EnginePlugin {
 export interface PickingPrimitive {
     node: Mesh;
     vertex: GPUBuffer;
+    vertexOffset?: number;
     index: GPUBuffer;
     count: number;
     stride: 80;

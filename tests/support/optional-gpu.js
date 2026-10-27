@@ -42,6 +42,14 @@ export function optionalGPU() {
     new Uint8Array(b.data).set(new Uint8Array(value.buffer ?? value, start, bytes), offset);
     bufferWrites.push({ buffer: b, offset, bytes });
   };
+  // A standalone encoder (buffer copies run at once) and queue completion, as animation's shared buffers use them.
+  engine.gpu.createCommandEncoder ??= () => ({
+    copyBufferToBuffer: (source, from, target, to, size) =>
+      new Uint8Array(target.data, to, size).set(new Uint8Array(source.data, from, size)),
+    finish: () => ({}),
+  });
+  engine.gpu.queue.submit ??= () => {};
+  engine.gpu.queue.onSubmittedWorkDone ??= () => Promise.resolve();
   engine.gpu.createSampler = () => ({});
   engine.gpu.importExternalTexture = (descriptor) => descriptor;
   const pass = {

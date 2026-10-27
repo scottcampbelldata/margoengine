@@ -673,6 +673,7 @@ interface PassBindings {
   pipeline?: GPURenderPipeline;
   groups: (GPUBindGroup | undefined)[];
   vertex?: GPUBuffer;
+  vertexOffset?: number;
   instances?: GPUBuffer;
   index?: GPUBuffer;
 }
@@ -687,9 +688,17 @@ function setPipeline(bound: PassBindings, pipeline: GPURenderPipeline): void {
 function setGroup(bound: PassBindings, index: number, group: GPUBindGroup): void {
   if (bound.groups[index] !== group) bound.pass!.setBindGroup(index, (bound.groups[index] = group));
 }
-function setBuffers(bound: PassBindings, vertex: GPUBuffer, instances: GPUBuffer | undefined, index: GPUBuffer): void {
+function setBuffers(
+  bound: PassBindings,
+  vertex: GPUBuffer,
+  instances: GPUBuffer | undefined,
+  index: GPUBuffer,
+  offset = 0,
+): void {
   const pass = bound.pass!;
-  if (bound.vertex !== vertex) pass.setVertexBuffer(0, (bound.vertex = vertex));
+  // No offset argument at a buffer's start: the call stays the one it always was.
+  if (bound.vertex !== vertex || bound.vertexOffset !== offset)
+    pass.setVertexBuffer(0, (bound.vertex = vertex), (bound.vertexOffset = offset) || undefined);
   if (instances && bound.instances !== instances) pass.setVertexBuffer(1, (bound.instances = instances));
   if (bound.index !== index) pass.setIndexBuffer((bound.index = index), 'uint32');
 }
@@ -924,7 +933,16 @@ export interface PBRPrimitive {
   targetNames: string[];
   /** Overrides the material's shared extension when supplied. Attach after loading. */
   extension?: MaterialExtension;
+  /**
+   * The current deformed (skinned or morphed) vertices, written each frame by a deformer such as `@margoengine/animation`;
+   * the primitive's 80-byte vertices start `deformedOffset` bytes into it. Unset: draw the bind-pose `buffers.vertex`.
+   */
   deformed?: GPUBuffer;
+  /**
+   * Byte offset of this primitive's first vertex in `deformed`, a multiple of 256 (a storage-binding offset). Default 0.
+   * Deformers that pack many primitives into one buffer set it; read `vertices.byteLength` bytes from there.
+   */
+  deformedOffset?: number;
   /** Draw once per instance (node space) in one instanced draw, see `PBRInstances` (@margoengine/gltf-pro/instancing); set for EXT_mesh_gpu_instancing nodes when `decoders.instancing` is passed. */
   instances?: PBRInstances;
   /** The 80-byte-stride vertex and uint32 index buffers while the model is set up on a device (for picking and outlines). */
@@ -1040,6 +1058,9 @@ interface ShadowCasterRecord {
   primitive: PBRPrimitive;
   node: Mesh;
   vertex: GPUBuffer;
+  /** Byte offset and size of the primitive's vertices in `vertex` (a deformer's shared buffer). */
+  vertexOffset: number;
+  vertexSize: number;
   index: GPUBuffer;
   count: number;
   /** Absent for triangles; line-list when the material draws triangle edges. */
@@ -1118,6 +1139,8 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   value.primitive = p;
   value.node = p.node;
   value.vertex = p.deformed ?? r.vertex;
+  value.vertexOffset = p.deformed ? (p.deformedOffset ?? 0) : 0;
+  value.vertexSize = p.vertices.byteLength;
   value.index = wireframe?.index ?? r.index;
   value.count = wireframe?.count ?? p.indices.length;
   if (wireframe) value.topology = 'line-list';
@@ -2666,6 +2689,7 @@ export class PBRModel implements EnginePlugin {
         primitive: r.primitive,
         node: r.primitive.node,
         vertex: r.primitive.deformed ?? r.vertex,
+        vertexOffset: r.primitive.deformed ? (r.primitive.deformedOffset ?? 0) : 0,
         index: r.index,
         count: r.primitive.indices.length,
         stride: 80 as const,
@@ -2705,6 +2729,7 @@ export class PBRModel implements EnginePlugin {
         primitiveIndex: primitiveIndices.get(resource.primitive),
         nodeIndex: resource.primitive.nodeIndex,
         deformed: resource.primitive.deformed,
+        deformedOffset: resource.primitive.deformedOffset ?? 0,
         matrix: resource.primitive.node.matrix.slice(),
         vertices: resource.primitive.deformed ? undefined : resource.primitive.vertices.slice(),
         indices: resource.primitive.indices.slice(),
@@ -2730,7 +2755,7 @@ export class PBRModel implements EnginePlugin {
               size,
               usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
             });
-            encoder.copyBufferToBuffer(record.deformed, 0, record.read, 0, size);
+            encoder.copyBufferToBuffer(record.deformed, record.deformedOffset, record.read, 0, size);
           }
         device.queue.submit([encoder.finish()]);
         await Promise.all(
@@ -2742,7 +2767,11 @@ export class PBRModel implements EnginePlugin {
         this.engine.disposed ||
         this.engine.gpu !== device ||
         revision !== this.gpuRevision ||
-        records.some((record) => record.primitive.deformed !== record.deformed)
+        records.some(
+          (record) =>
+            record.primitive.deformed !== record.deformed ||
+            (record.deformed && (record.primitive.deformedOffset ?? 0) !== record.deformedOffset),
+        )
       )
         return [];
       return records
@@ -2764,7 +2793,11 @@ export class PBRModel implements EnginePlugin {
         this.engine.disposed ||
         this.engine.gpu !== device ||
         revision !== this.gpuRevision ||
-        records.some((record) => record.primitive.deformed !== record.deformed)
+        records.some(
+          (record) =>
+            record.primitive.deformed !== record.deformed ||
+            (record.deformed && (record.primitive.deformedOffset ?? 0) !== record.deformedOffset),
+        )
       )
         return [];
       throw error;
@@ -3096,7 +3129,8 @@ export class PBRModel implements EnginePlugin {
         if (this.disposed) break;
         if (this.engine.meshes.get(node.id) !== node) continue;
         if (bound.pass !== target) resetBindings(bound, target);
-        const vertex = p.deformed ?? r.vertex;
+        const vertex = p.deformed ?? r.vertex,
+          vertexOffset = p.deformed ? (p.deformedOffset ?? 0) : 0;
         // Transmission first multiplies the background, then adds the lit surface.
         if (d.tint) {
           const tint = d.tint,
@@ -3124,7 +3158,7 @@ export class PBRModel implements EnginePlugin {
               bound.groups[2] = bound.groups[3] = undefined;
             }
           }
-          setBuffers(bound, vertex, instances, index);
+          setBuffers(bound, vertex, instances, index, vertexOffset);
           applyStencilReference(target, state);
           if (inst) target.drawIndexed(count, inst.count);
           else target.drawIndexed(count);
@@ -3137,7 +3171,7 @@ export class PBRModel implements EnginePlugin {
           bindMaterialExtension(c.device, target, pipeline, r.extension!, effectBindings);
           bound.groups[2] = bound.groups[3] = undefined;
         }
-        setBuffers(bound, vertex, instances, index);
+        setBuffers(bound, vertex, instances, index, vertexOffset);
         // A preceding material may have changed the reference on this shared pass.
         applyStencilReference(target, state);
         if (inst) target.drawIndexed(count, inst.count);
@@ -4348,7 +4382,12 @@ export class PBRModel implements EnginePlugin {
       name: this.name + ':device:' + modelId++,
       root: this.root,
       nodes: this.nodes,
-      primitives: this.primitives.map((primitive) => ({ ...primitive, instances: undefined, deformed: undefined })),
+      primitives: this.primitives.map((primitive) => ({
+        ...primitive,
+        instances: undefined,
+        deformed: undefined,
+        deformedOffset: undefined,
+      })),
       asset: this.asset,
       images: this.images,
       disposed: false,
@@ -4570,7 +4609,7 @@ export class PBRModel implements EnginePlugin {
   }
   onDeviceRestored(engine: Engine): void {
     this.releaseGPU();
-    for (const p of this.primitives) p.deformed = undefined;
+    for (const p of this.primitives) p.deformed = p.deformedOffset = undefined;
     this.setup(engine);
   }
   dispose(): void {

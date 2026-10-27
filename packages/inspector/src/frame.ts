@@ -231,6 +231,8 @@ interface RawCommand {
   pipeline: AnyPipeline | null;
   groups: Array<GPUBindGroup | null>;
   vertex?: GPUBuffer;
+  /** Byte offset of slot 0's binding: deformers pack many primitives into one buffer. */
+  vertexOffset?: number;
   args: number[];
   indirect?: { buffer: GPUBuffer; offset: number; slot: number };
 }
@@ -1048,7 +1050,12 @@ export class FrameDebugger implements EnginePlugin {
 
   private wrapPass(session: Session, pass: GPURenderPassEncoder | GPUComputePassEncoder, raw: RawPass): void {
     session.current.passes.push(raw);
-    const state: { pipeline: AnyPipeline | null; groups: Array<GPUBindGroup | null>; vertex?: GPUBuffer } = {
+    const state: {
+        pipeline: AnyPipeline | null;
+        groups: Array<GPUBindGroup | null>;
+        vertex?: GPUBuffer;
+        vertexOffset?: number;
+      } = {
         pipeline: null,
         groups: [],
       },
@@ -1080,6 +1087,7 @@ export class FrameDebugger implements EnginePlugin {
           pipeline: state.pipeline,
           groups: state.groups.slice(),
           vertex: state.vertex,
+          vertexOffset: state.vertexOffset,
           args: [],
         };
         if (kind === 'executeBundles') entry.args = [[...(args[0] as Iterable<GPURenderBundle>)].length];
@@ -1090,8 +1098,11 @@ export class FrameDebugger implements EnginePlugin {
         raw.commands.push(entry);
       });
     if (raw.kind === 'render') {
-      wrap('setVertexBuffer', ([slot, buffer]) => {
-        if (slot === 0) state.vertex = (buffer as GPUBuffer | null) ?? undefined;
+      wrap('setVertexBuffer', ([slot, buffer, offset]) => {
+        if (slot === 0) {
+          state.vertex = (buffer as GPUBuffer | null) ?? undefined;
+          state.vertexOffset = Number(offset ?? 0);
+        }
       });
       for (const kind of ['draw', 'drawIndexed', 'drawIndirect', 'drawIndexedIndirect', 'executeBundles'] as const)
         command(kind);
@@ -1262,18 +1273,19 @@ export class FrameDebugger implements EnginePlugin {
       return report;
     };
     // Current core and PBR vertex buffers -> mesh ids, so a draw can name the objects it drew.
-    let owners: Map<GPUBuffer, number[]> | undefined;
-    const entities = (vertex: GPUBuffer | undefined): number[] => {
+    // Owners by vertex buffer, then by the byte offset a draw binds it at (deformers share one buffer between models).
+    let owners: Map<GPUBuffer, Map<number, number[]>> | undefined;
+    const entities = (vertex: GPUBuffer | undefined, offset = 0): number[] => {
       if (!vertex) return [];
       if (!owners) {
         owners = new Map();
-        const modelBuffers = new Map<MeshSourceOwner, Map<MeshHandle, GPUBuffer[]>>();
+        const modelBuffers = new Map<MeshSourceOwner, Map<MeshHandle, [GPUBuffer, number][]>>();
         for (const mesh of engine.meshes.values()) {
           try {
             const triangles = meshTriangles(mesh);
             if (!triangles) continue;
-            let buffers: (GPUBuffer | undefined)[];
-            if (triangles.kind === 'core') buffers = [engine.geometryBuffers(triangles.geometry)?.vertex];
+            let buffers: [GPUBuffer | undefined, number][];
+            if (triangles.kind === 'core') buffers = [[engine.geometryBuffers(triangles.geometry)?.vertex, 0]];
             else {
               const model = triangles.source.model;
               let nodes = modelBuffers.get(model);
@@ -1281,21 +1293,28 @@ export class FrameDebugger implements EnginePlugin {
                 nodes = new Map();
                 for (const draw of model.pickingPrimitives) {
                   const vertices = nodes.get(draw.node);
-                  if (vertices) vertices.push(draw.vertex);
-                  else nodes.set(draw.node, [draw.vertex]);
+                  const binding: [GPUBuffer, number] = [draw.vertex, draw.vertexOffset ?? 0];
+                  if (vertices) vertices.push(binding);
+                  else nodes.set(draw.node, [binding]);
                 }
                 modelBuffers.set(model, nodes);
               }
               buffers = nodes.get(mesh) ?? [];
             }
-            for (const buffer of new Set(buffers))
-              if (buffer) owners.set(buffer, [...(owners.get(buffer) ?? []), mesh.id].slice(0, 64));
+            for (const [buffer, at] of buffers) {
+              if (!buffer) continue;
+              let byOffset = owners.get(buffer);
+              if (!byOffset) owners.set(buffer, (byOffset = new Map()));
+              const ids = byOffset.get(at) ?? [];
+              if (ids.includes(mesh.id)) continue;
+              byOffset.set(at, [...ids, mesh.id].slice(0, 64));
+            }
           } catch {
             // Draw buffers not on the GPU (device recovery): no owner.
           }
         }
       }
-      return owners.get(vertex) ?? [];
+      return owners.get(vertex)?.get(offset) ?? [];
     };
     const totals: FrameReport['totals'] = {
       draws: 0,
@@ -1325,7 +1344,7 @@ export class FrameDebugger implements EnginePlugin {
         pipeline: pipeline?.id ?? null,
         bindGroups: groups.map((group) => group?.id ?? null),
         triangles: null,
-        entities: entities(raw.vertex),
+        entities: entities(raw.vertex, raw.vertexOffset),
       };
       if (pipeline) {
         let textures = 0,

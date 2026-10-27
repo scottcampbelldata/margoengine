@@ -144,6 +144,7 @@ export interface LocalShadowPrimitive {
     primitive?: object;
     node: Mesh;
     vertex: GPUBuffer;
+    vertexOffset?: number;
     index: GPUBuffer;
     count: number;
     stride: number;

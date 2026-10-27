@@ -157,7 +157,10 @@ try {
         }
       }
       assert(alive === 100, 'Particle lifetimes were not initialized');
-      const skinned = new Float32Array(await readBuffer(model.primitives[0].deformed));
+      const skinned = new Float32Array(
+        await readBuffer(model.primitives[0].deformed),
+        model.primitives[0].deformedOffset ?? 0,
+      );
       assert(Math.abs(skinned[0] + 0.5) < 1e-5, 'Animator did not update the existing skinning palette: ' + skinned[0]);
       const counts = new Uint32Array(await readBuffer(clustered.lightLists.counts)),
         indices = new Uint32Array(await readBuffer(clustered.lightLists.indices));
