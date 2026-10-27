@@ -3,10 +3,19 @@ import { normalizeQuaternion, rotationToQuaternion } from '@margoengine/math/qua
 import { property, objectName, type FBXNode } from './document.js';
 
 /** Column-major matrices and column vectors, evaluated in double precision. */
-export const identity = (): Float64Array => new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+export const identity = (): Float64Array => {
+  // Set by index: building it from an array literal was a sixth of an FBX import (an animated rig makes thousands).
+  const m = new Float64Array(16);
+  m[0] = m[5] = m[10] = m[15] = 1;
+  return m;
+};
 
 export function multiply(a: ArrayLike<number>, b: ArrayLike<number>): Float64Array {
-  const out = new Float64Array(16);
+  return multiplyInto(new Float64Array(16), a, b);
+}
+
+/** a x b into `out` (which must be neither input), the same arithmetic as {@link multiply}. */
+function multiplyInto(out: Float64Array, a: ArrayLike<number>, b: ArrayLike<number>): Float64Array {
   for (let c = 0; c < 4; c++)
     for (let r = 0; r < 4; r++)
       out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
@@ -49,13 +58,17 @@ export function rotationEuler(degrees: ArrayLike<number>, order = 0): Float64Arr
   const v = vector(degrees, 'Euler rotation');
   if (!Number.isInteger(order) || !orders[order])
     throw new RangeError(`FBX unsupported RotationOrder ${order}; bake or remove it in your 3D tool before export`);
-  let out = identity();
-  for (const axis of orders[order]) {
+  // Axis rotations multiply into scratch matrices (the same products as allocating each one), then one copy.
+  let out: Float64Array = identity();
+  for (let k = 0; k < 3; k++) {
+    const axis = orders[order][k];
     const index = axis === 'X' ? 0 : axis === 'Y' ? 1 : 2,
       angle = (v[index] * Math.PI) / 180,
       c = Math.cos(angle),
       s = Math.sin(angle),
-      m = identity();
+      m = eulerAxis;
+    m.fill(0);
+    m[0] = m[5] = m[10] = m[15] = 1;
     if (index === 0) {
       m[5] = c;
       m[6] = s;
@@ -72,10 +85,12 @@ export function rotationEuler(degrees: ArrayLike<number>, order = 0): Float64Arr
       m[4] = -s;
       m[5] = c;
     }
-    out = multiply(m, out);
+    out = multiplyInto(eulerScratch[k & 1], m, out);
   }
-  return out;
+  return Float64Array.from(out);
 }
+const eulerAxis = new Float64Array(16),
+  eulerScratch = [new Float64Array(16), new Float64Array(16)];
 
 export function composeTRS(t: ArrayLike<number>, q: ArrayLike<number>, s: ArrayLike<number>): Float64Array {
   vector(t, 'translation');
@@ -185,8 +200,23 @@ export interface TransformOverrides {
   scale?: ArrayLike<number>;
 }
 
-/** FBX pivot chain. Geometric transforms are deliberately separate: children must not inherit them. */
-export function fbxLocalTransform(node: FBXNode, overrides: TransformOverrides = {}): Float64Array {
+/** The parts of a node's pivot chain that animation does not change, made once per node. */
+interface PivotChain {
+  order: number;
+  rotationOffset: Float64Array;
+  pivot: Float64Array;
+  preRotation: Float64Array;
+  postRotation: Float64Array;
+  unpivot: Float64Array;
+  scalingOffset: Float64Array;
+  scalingPivot: Float64Array;
+  unscalingPivot: Float64Array;
+}
+const chains = new WeakMap<FBXNode, PivotChain>();
+
+function pivotChain(node: FBXNode): PivotChain {
+  let chain = chains.get(node);
+  if (chain) return chain;
   // An explicitly disabled rotation space ignores Euler order and pre/post rotations.
   // Absent flags retain authored rotations; some FBX producers omit the default template values.
   const active = property(node, 'RotationActive', 1),
@@ -203,21 +233,46 @@ export function fbxLocalTransform(node: FBXNode, overrides: TransformOverrides =
     );
   const pivot = pvector(node, 'RotationPivot'),
     spivot = pvector(node, 'ScalingPivot');
-  const matrices = [
-    translation(overrides.translation ?? pvector(node, 'Lcl Translation')),
-    translation(pvector(node, 'RotationOffset')),
-    translation(pivot),
-    rotationActive ? rotationEuler(pvector(node, 'PreRotation')) : identity(),
-    rotationEuler(overrides.rotation ?? pvector(node, 'Lcl Rotation'), order),
-    rotationActive ? inverse(rotationEuler(pvector(node, 'PostRotation'))) : identity(),
-    translation(pivot.map((v) => -v)),
-    translation(pvector(node, 'ScalingOffset')),
-    translation(spivot),
-    scaling(overrides.scale ?? pvector(node, 'Lcl Scaling', [1, 1, 1])),
-    translation(spivot.map((v) => -v)),
-  ];
-  return matrices.reduce((a, b) => multiply(a, b), identity());
+  chain = {
+    order,
+    rotationOffset: translation(pvector(node, 'RotationOffset')),
+    pivot: translation(pivot),
+    preRotation: rotationActive ? rotationEuler(pvector(node, 'PreRotation')) : identity(),
+    postRotation: rotationActive ? inverse(rotationEuler(pvector(node, 'PostRotation'))) : identity(),
+    unpivot: translation(pivot.map((v) => -v)),
+    scalingOffset: translation(pvector(node, 'ScalingOffset')),
+    scalingPivot: translation(spivot),
+    unscalingPivot: translation(spivot.map((v) => -v)),
+  };
+  chains.set(node, chain);
+  return chain;
 }
+
+/**
+ * FBX pivot chain. Geometric transforms are deliberately separate: children must not inherit them. The parts no
+ * animation channel moves are made once per node (pivotChain); animation evaluates this per key and node.
+ */
+export function fbxLocalTransform(node: FBXNode, overrides: TransformOverrides = {}): Float64Array {
+  const chain = pivotChain(node),
+    matrices = [
+      translation(overrides.translation ?? pvector(node, 'Lcl Translation')),
+      chain.rotationOffset,
+      chain.pivot,
+      chain.preRotation,
+      rotationEuler(overrides.rotation ?? pvector(node, 'Lcl Rotation'), chain.order),
+      chain.postRotation,
+      chain.unpivot,
+      chain.scalingOffset,
+      chain.scalingPivot,
+      scaling(overrides.scale ?? pvector(node, 'Lcl Scaling', [1, 1, 1])),
+      chain.unscalingPivot,
+    ];
+  // Left to right from the identity, as a reduce of multiply would, into two scratch matrices instead of 12 new ones.
+  let product = multiplyInto(chainScratch[0], identity(), matrices[0]);
+  for (let i = 1; i < matrices.length; i++) product = multiplyInto(chainScratch[i & 1], product, matrices[i]);
+  return Float64Array.from(product);
+}
+const chainScratch = [new Float64Array(16), new Float64Array(16)];
 
 export function fbxGeometricTransform(node: FBXNode): Float64Array {
   return multiply(

@@ -286,3 +286,40 @@ test('FBX pivots, pre-rotation and inverse post-rotation bake into local TRS', (
   close(transformPoint(fbxGeometricTransform(source), 0, 0, 0), [5, 0, 0]);
   assert.throws(() => fbxLocalTransform(model({ InheritType: 2 })), /InheritType 2 on Fixture/);
 });
+
+test('one node evaluated at many keys: each result is its own matrix, equal to the chain composed from scratch', () => {
+  // Animation evaluates the pivot chain per key and node; its fixed parts are made once per node and the product
+  // goes through scratch matrices, so every call must still return a fresh matrix and match a chain built by hand.
+  const props = {
+      RotationPivot: [0.5, 0, 0],
+      ScalingPivot: [0, 0.5, 0],
+      PreRotation: [0, 90, 0],
+      PostRotation: [5, 0, 0],
+      RotationOffset: [0, 1, 0],
+      ScalingOffset: [0, 0, 2],
+    },
+    node = model(props),
+    results = [];
+  for (let k = 0; k < 4; k++) {
+    const overrides = { translation: [k, 2, 3], rotation: [10 * k, 20, 30], scale: [1, 1 + k, 2] };
+    results.push([overrides, fbxLocalTransform(node, overrides)]);
+  }
+  const product = (list) => list.reduce((a, b) => multiply(a, b), identity());
+  for (const [o, matrix] of results) {
+    const expected = product([
+      translation(o.translation),
+      translation(props.RotationOffset),
+      translation(props.RotationPivot),
+      rotationEuler(props.PreRotation),
+      rotationEuler(o.rotation),
+      inverse(rotationEuler(props.PostRotation)),
+      translation(props.RotationPivot.map((v) => -v)),
+      translation(props.ScalingOffset),
+      translation(props.ScalingPivot),
+      scaling(o.scale),
+      translation(props.ScalingPivot.map((v) => -v)),
+    ]);
+    assert.deepEqual([...matrix], [...expected], 'bit for bit, and untouched by later calls');
+  }
+  assert.notEqual(results[0][1], results[1][1]);
+});
