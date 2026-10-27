@@ -390,6 +390,12 @@ export class Engine {
   };
   /** Return false to skip this display refresh (for example a 60 FPS cap on a 120 Hz screen); delta spans skipped refreshes. */
   pace?: (time: number) => boolean;
+  /**
+   * Longest step in seconds the frame loop (`start`) hands to callbacks and `render`; a longer gap (a slow frame, a
+   * debugger pause) is clamped to it. Default 0.1. Keep it in (0, 1]: `render` rejects a delta above 1. The loop also
+   * restarts its clock when the page becomes visible again, so the first frame after a background tab steps 0.
+   */
+  maxDelta = 0.1;
   /** Views the frame loop draws each frame instead of the full-canvas camera view; list `engine.camera` to keep it. */
   views?: readonly RenderView[];
   private readonly batches = new Map<Geometry, Batch & { references: number }>();
@@ -1071,8 +1077,13 @@ export class Engine {
     if (this.running) return;
     this.running = true;
     this.last = 0;
+    globalThis.document?.addEventListener('visibilitychange', this.wake);
     this.raf = requestAnimationFrame(this.frame);
   }
+  // A page coming back from a background tab restarts the clock: its first frame steps 0, not the time away.
+  private readonly wake = (): void => {
+    this.last = 0;
+  };
   private readonly frame = (time: number): void => {
     this.raf = null;
     if (this.disposed || !this.running) return;
@@ -1080,7 +1091,7 @@ export class Engine {
       this.raf = requestAnimationFrame(this.frame);
       return;
     }
-    const delta = this.last ? Math.min((time - this.last) / 1000, 0.1) : 0;
+    const delta = this.last ? Math.min((time - this.last) / 1000, this.maxDelta) : 0;
     this.last = time;
     try {
       for (const callback of this.callbacks) callback(this, delta);
@@ -1099,6 +1110,7 @@ export class Engine {
     if (this.raf !== null) cancelAnimationFrame(this.raf);
     this.raf = null;
     this.last = 0;
+    globalThis.document?.removeEventListener('visibilitychange', this.wake);
   }
   dispose(): void {
     if (this.disposed || this.disposing) return;

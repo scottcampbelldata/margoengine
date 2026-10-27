@@ -653,6 +653,8 @@ async function boot(): Promise<void> {
       if (!--flight.left) flight.done();
     }
   };
+  // Back from a background tab: restart the clock so the first frame steps 0, not the time away (clamped or not).
+  document.addEventListener('visibilitychange', () => (last = 0), { signal: events.signal });
   requestAnimationFrame(frame);
   setOverlay(deterministic ? 'hidden' : 'loading', online ? `Joining ${serverUrl}` : 'Generating the world');
 

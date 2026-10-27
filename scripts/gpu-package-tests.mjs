@@ -30,6 +30,7 @@ export const ROOT = {
   'test:docs:browser': 'README quickstart and the task guides, run as written',
   'test:modules:browser': 'Margo modules and FBX playback',
   'test:catalog:browser': 'catalog layout, clicks and clipboard',
+  'test:lifecycle:browser': 'background tab, no WebGPU, fractional zoom and device loss on the stage and React',
   'test:python:browser': 'the margoengine Python package in JupyterLab and Notebook 7, camera events and to_png',
 };
 /** Commands a root suite needs first (it reads their output), run once before it. */

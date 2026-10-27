@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>Browser lifecycle checks</title>
+  <style>
+    html,body{margin:0;background:#18222b;color:#fff;font:16px system-ui}
+    #app{position:relative;width:333.3px;height:201.7px;margin:13.4px}
+  </style>
+  <div id="app"></div>
+  <script>
+    // A clock the test moves forward (a tab in the background for 30 s) without waiting: frame timestamps and
+    // performance.now() both read it. visibilityState is the test's too, so it can hide and show the page.
+    {
+      const raf = window.requestAnimationFrame.bind(window),
+        now = performance.now.bind(performance);
+      let offset = 0,
+        state = 'visible';
+      window.requestAnimationFrame = (callback) => raf((time) => callback(time + offset));
+      performance.now = () => now() + offset;
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => state === 'hidden' });
+      window.lifecycleClock = {
+        jump(ms) {
+          offset += ms;
+        },
+        visibility(next) {
+          state = next;
+          document.dispatchEvent(new Event('visibilitychange'));
+        },
+      };
+    }
+  </script>
+  <script type="module" src="./lifecycle-browser.tsx"></script>
+</html>

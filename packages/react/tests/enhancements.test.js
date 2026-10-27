@@ -80,6 +80,7 @@ mock.module('@margoengine/core/extension', {
           picks: [],
           frames: [],
           starts: 0,
+          maxDelta: 0.1,
           stops: 0,
           disposals: 0,
           disposed: false,
@@ -950,9 +951,9 @@ test('useMargo exposes engine aliases, measured size, elapsed clock and one dema
   assert.equal(Margo.useThree, undefined);
   Object.defineProperty(canvas, 'clientWidth', { configurable: true, value: 640 });
   Object.defineProperty(canvas, 'clientHeight', { configurable: true, value: 360 });
+  // On demand a resize draws one frame, at the size the engine gives the canvas, instead of leaving it cleared.
   await act(async () => observers.at(-1).callback());
   assert.deepEqual(context.size, { width: 640, height: 360 });
-  await act(async () => context.invalidate());
   assert.equal(engine.frames.length, 1);
   assert.equal(ticks.length, 1);
   assert.equal(ticks[0].engine, engine);
@@ -960,11 +961,14 @@ test('useMargo exposes engine aliases, measured size, elapsed clock and one dema
   await act(async () => context.invalidate());
   assert.equal(engine.frames.length, 2);
   assert.equal(ticks.length, 2);
+  await act(async () => context.invalidate());
+  assert.equal(engine.frames.length, 3);
+  assert.equal(ticks.length, 3);
   assert.ok(context.clock >= 0);
   const invalidate = context.invalidate;
   view.unmount();
   invalidate();
-  assert.equal(engine.frames.length, 2);
+  assert.equal(engine.frames.length, 3);
 });
 
 test('clock advances once per engine frame and is current inside every useFrame callback', async () => {

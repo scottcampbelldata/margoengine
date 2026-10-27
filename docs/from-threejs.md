@@ -1115,7 +1115,7 @@ renderer.setAnimationLoop(null);
 ```
 
 ```ts
-const stop = engine.onFrame((_, delta) => { mesh.rotation.y += delta; }); // seconds, clamped to 0.1
+const stop = engine.onFrame((_, delta) => { mesh.rotation.y += delta; }); // seconds, clamped to engine.maxDelta (0.1)
 engine.start();                               // requestAnimationFrame loop
 engine.stop();
 stop();                                       // unsubscribes the callback

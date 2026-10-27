@@ -115,6 +115,7 @@ mock.module('@margoengine/core/extension', {
           disposed: false,
           callbacks: new Set(),
           starts: 0,
+          maxDelta: 0.1,
           disposals: 0,
           start() {
             this.starts++;
@@ -512,10 +513,11 @@ test('StrictMode, resize, stable frame callbacks and unmount release resources',
   assert.equal(first, 0);
   assert.equal(second, 1);
   const canvas = view.container.querySelector('canvas');
+  // The engine sizes the canvas on every frame; a second size from React fought it at fractional pixel ratios.
   canvas.getBoundingClientRect = () => ({ width: 410, height: 220 });
+  const size = [canvas.width, canvas.height];
   observers.at(-1).callback();
-  assert.equal(canvas.width, 410);
-  assert.equal(canvas.height, 220);
+  assert.deepEqual([canvas.width, canvas.height], size);
   view.unmount();
   assert.equal(engine.disposals, 1);
   assert.equal(engine.callbacks.size, 0);

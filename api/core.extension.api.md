@@ -71,6 +71,7 @@ export class Engine {
     disposed: boolean;
     onError: (error: unknown) => void;
     pace?: (time: number) => boolean;
+    maxDelta: number;
     views?: readonly RenderView[];
     collected: number;
     unshadowed: number;

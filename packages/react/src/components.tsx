@@ -77,6 +77,8 @@ export interface CanvasProps extends EngineOptions {
 }
 /** Props of the MargoCanvas component; every prop is optional unless noted. */
 export type MargoCanvasProps = CanvasProps;
+// Shown in place of the scene when the browser has no WebGPU (and no `fallback`); `onError` still gets the coded error.
+const unsupportedMessage = 'This 3D scene needs a browser with WebGPU, such as a current Chrome, Edge or Safari.';
 /** The margo canvas component. */
 export function MargoCanvas({
   children,
@@ -141,7 +143,7 @@ export function MargoCanvas({
     () => () => {
       if (!engine || engine.disposed || frameloopOptions.current !== 'demand') return;
       const now = performance.now(),
-        delta = frames.last === null ? 0 : Math.max(0, Math.min((now - frames.last) / 1000, 0.1));
+        delta = frames.last === null ? 0 : Math.max(0, Math.min((now - frames.last) / 1000, engine.maxDelta));
       frames.last = now;
       try {
         advance(delta);
@@ -152,6 +154,18 @@ export function MargoCanvas({
     },
     [engine, frames, advance],
   );
+  const invalidateRef = useRef(invalidate);
+  invalidateRef.current = invalidate;
+  // On demand, a page back from a background tab restarts the clock too (the engine's own loop does so for 'always').
+  useEffect(() => {
+    const page = engine?.canvas.ownerDocument;
+    if (!page) return;
+    const wake = () => {
+      frames.last = null;
+    };
+    page.addEventListener('visibilitychange', wake);
+    return () => page.removeEventListener('visibilitychange', wake);
+  }, [engine, frames]);
   useEffect(() => {
     const element = canvas.current!;
     let cancelled = false,
@@ -177,15 +191,10 @@ export function MargoCanvas({
         current = instance;
         instance.onError = report;
         try {
-          const resize = () => {
-            const bounds = element.getBoundingClientRect(),
-              ratio = element.ownerDocument.defaultView?.devicePixelRatio ?? 1;
-            element.width = Math.max(1, Math.round(bounds.width * ratio));
-            element.height = Math.max(1, Math.round(bounds.height * ratio));
-          };
-          resize();
+          // The engine sizes the canvas itself on every render (whole device pixels, its own pixel-ratio cap). Sizing
+          // it here too fought that size and, on demand, left a cleared canvas until the next frame: a resize redraws.
           if (typeof ResizeObserver !== 'undefined') {
-            observer = new ResizeObserver(resize);
+            observer = new ResizeObserver(() => invalidateRef.current());
             observer.observe(element);
           }
           const next = new StageFacade(instance as unknown as EngineKernel);
@@ -444,7 +453,11 @@ export function MargoCanvas({
         role="img"
         aria-label={label}
       />
-      {error !== null && <p role="alert">{String(error)}</p>}
+      {error !== null && (
+        <p role="alert">
+          {(error as { code?: string } | undefined)?.code === 'unsupported' ? unsupportedMessage : String(error)}
+        </p>
+      )}
       {scene && !engine?.disposed && <Context.Provider value={scene}>{children}</Context.Provider>}
     </MargoContext.Provider>
   );

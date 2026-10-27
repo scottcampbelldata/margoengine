@@ -60,6 +60,47 @@ test('pace skips refreshes and delta spans them; plugins are readable', async ()
   }
 });
 
+test('the built-in loop clamps a long frame to maxDelta and restarts its clock when the page is shown again', async () => {
+  const frames = [],
+    saved = globalThis.requestAnimationFrame,
+    savedDocument = globalThis.document,
+    page = new EventTarget();
+  globalThis.requestAnimationFrame = (callback) => frames.push(callback);
+  globalThis.cancelAnimationFrame = () => {};
+  globalThis.document = page;
+  const engine = new Engine(
+    { width: 4, height: 4, clientWidth: 4, clientHeight: 4 },
+    await TransformStore.create(4),
+    { backend: 'webgpu', add() {}, remove() {}, render() {}, dispose() {} },
+    undefined,
+    null,
+  );
+  try {
+    const deltas = [];
+    engine.onFrame((_, delta) => deltas.push(delta));
+    assert.equal(engine.maxDelta, 0.1, 'default');
+    engine.start();
+    frames.shift()(1000);
+    frames.shift()(1016);
+    frames.shift()(3016); // a 2 s frame
+    engine.maxDelta = 0.05;
+    frames.shift()(4016);
+    // 30 s in the background, then visible: the first frame back steps 0, not the time away.
+    page.dispatchEvent(new Event('visibilitychange'));
+    frames.shift()(34016);
+    frames.shift()(34032);
+    assert.equal(deltas.length, 6);
+    assert.deepEqual(
+      deltas.map((d) => Math.round(d * 1000) / 1000),
+      [0, 0.016, 0.1, 0.05, 0, 0.016],
+    );
+  } finally {
+    engine.dispose();
+    globalThis.requestAnimationFrame = saved;
+    globalThis.document = savedDocument;
+  }
+});
+
 test('start({culling: false}) skips the CPU frustum test in the built-in loop; start() restores it', async () => {
   const frames = [],
     saved = globalThis.requestAnimationFrame;
