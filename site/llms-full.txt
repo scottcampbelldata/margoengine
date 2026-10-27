@@ -315,7 +315,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-84 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+85 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -421,7 +421,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/selection`](packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
 | [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |
 
-### Simulation and games (7)
+### Simulation and games (8)
 
 | Package | What it is |
 | --- | --- |
@@ -431,6 +431,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/fsm`](packages/fsm/README.md) | Hierarchical state transitions with cross-fade progress. |
 | [`@margoengine/behavior`](packages/behavior/README.md) | Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and flocking behaviours. |
 | [`@margoengine/net`](packages/net/README.md) | Hermite and quaternion snapshot interpolation with bounded prediction. |
+| [`@margoengine/netcode`](packages/netcode/README.md) | Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests. |
 | [`@margoengine/voxel-net`](packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
 ### CAD and engineering (4)
@@ -7229,6 +7230,71 @@ Position interpolation is cubic Hermite using endpoint velocities; rotations use
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/net
+
+=== @margoengine/netcode (packages/netcode/README.md) ===
+
+# @margoengine/netcode
+
+Import `margoengine/netcode` from the `margoengine` package, or `@margoengine/netcode` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+Game networking for any game, not only voxels: one schema describes your state and inputs, an authoritative server
+runs the game at a fixed tick rate, and clients predict their own player, reconcile with the server and draw everyone
+else interpolated. It runs in browsers, Node, Deno and workers (no platform APIs), it is optional and tree-shakable,
+and core and the stage never import it. Clean-room code from public descriptions of the techniques (see "Sources").
+
+```ts
+import { defineGame, defineSchema, GameClient, GameServer, LoopbackNetwork } from '@margoengine/netcode';
+
+// One schema for both ends. Quantized floats are small on the wire; maps are entity collections sent as deltas.
+const schema = defineSchema({
+  types: {
+    Input: { x: { type: 'quantized', min: -1, max: 1, bits: 8 }, y: { type: 'quantized', min: -1, max: 1, bits: 8 } },
+    Box: { x: 'f32', y: 'f32' },
+    State: { boxes: { type: 'map', of: 'Box', maxSize: 64 } },
+  },
+} as const);
+
+// One deterministic step for both ends: the server runs it authoritatively, clients run it to predict.
+const game = defineGame({
+  schema,
+  state: 'State',
+  input: 'Input',
+  tickRate: 30,
+  initial: () => ({ boxes: new Map() }),
+  join: (state, id) => void state.boxes.set(id, { x: 0, y: 0 }),
+  leave: (state, id) => void state.boxes.delete(id),
+  step(state, inputs, _tick, dt) {
+    for (const [id, input] of inputs) {
+      const box = state.boxes.get(id);
+      if (box) (box.x += input.x * 5 * dt), (box.y += input.y * 5 * dt);
+    }
+  },
+});
+
+// A simulated network: 60 ms each way, 20 ms of jitter, 5% loss. Swap in a real transport for a real game.
+const network = new LoopbackNetwork({ latency: 60, jitter: 20, loss: 0.05, seed: 1 });
+const now = () => network.time;
+const server = new GameServer(game, { now });
+network.listen().onconnection = (connection) => server.accept(connection);
+
+const joining = GameClient.join(game, network.connect(), { now, input: () => ({ x: 1, y: 0 }) });
+let client: Awaited<typeof joining> | undefined;
+joining.then((joined) => (client = joined));
+for (let frame = 0; frame < 300; frame++) {
+  network.advance(1000 / 60); // one frame of virtual time
+  if (network.time >= (server.tick + 1) * game.tickMs) server.step();
+  client?.update();
+  await null; // let the join promise settle
+}
+console.log('me', client?.predicted.boxes.get(client.player), 'server', server.state.boxes.get(client?.player ?? 0));
+```
+
+In a real game the server calls `server.run({ signal })` (real-time ticks) and the client calls `client.update()` every
+frame; the loop above drives both by hand so the example runs anywhere, at once, the same way every time.
+
+## What it does
+
+[README continues: https://margoengine.com/llms/packages/netcode.md]
 
 === @margoengine/voxel-net (packages/voxel-net/README.md) ===
 

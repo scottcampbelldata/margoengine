@@ -123,6 +123,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/fsm](https://margoengine.com/llms/packages/fsm.md): Hierarchical state transitions with cross-fade progress.
 - [@margoengine/behavior](https://margoengine.com/llms/packages/behavior.md): Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and flocking behaviours.
 - [@margoengine/net](https://margoengine.com/llms/packages/net.md): Hermite and quaternion snapshot interpolation with bounded prediction.
+- [@margoengine/netcode](https://margoengine.com/llms/packages/netcode.md): Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation…
 - [@margoengine/voxel-net](https://margoengine.com/llms/packages/voxel-net.md): Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests.
 
 ## Packages: CAD and engineering
@@ -224,6 +225,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/fsm API](https://margoengine.com/llms/api/fsm.md): 1 entry point
 - [@margoengine/behavior API](https://margoengine.com/llms/api/behavior.md): 2 entry points
 - [@margoengine/net API](https://margoengine.com/llms/api/net.md): 1 entry point
+- [@margoengine/netcode API](https://margoengine.com/llms/api/netcode.md): 1 entry point
 - [@margoengine/voxel-net API](https://margoengine.com/llms/api/voxel-net.md): 3 entry points
 - [@margoengine/machinery API](https://margoengine.com/llms/api/machinery.md): 16 entry points
 - [@margoengine/bvh API](https://margoengine.com/llms/api/bvh.md): 3 entry points
