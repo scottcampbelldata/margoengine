@@ -72,3 +72,16 @@ test('the drift check notices a name that is not exported', () => {
   const names = [...sample.matchAll(/\{([^}]*)\}/g)][0][1].split(',').map((s) => s.trim());
   assert.deepEqual(names, ['Canvas', 'useFrameLoop']);
 });
+
+test('the physics README names only exports that exist', () => {
+  const api = ['physics', 'react.physics'].map((n) => read(`api/${n}.api.md`)).join('\n');
+  const text = read('packages/physics/README.md').split('```')[0];
+  const claimed = [...text.matchAll(/`<?((?:Physics|use|Rigid|Cuboid|Ball|Character|Vehicle|Rope)\w*)/g)].map(
+    (m) => m[1],
+  );
+  assert.ok(claimed.length >= 8, `expected the README to name its exports, found ${claimed.length}`);
+  const missing = [...new Set(claimed)].filter(
+    (n) => !new RegExp(`export (?:declare )?(?:class|function|const) ${n}\\b`).test(api),
+  );
+  assert.deepEqual(missing, [], 'the physics README names exports that api/ does not list');
+});

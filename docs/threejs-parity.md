@@ -43,7 +43,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 | three.js | Status | Margo | Notes |
 | --- | --- | --- | --- |
-| WebGPU renderer | COVERED | core `GPURenderer` (`packages/core/src/renderer.ts`) | Automatic instancing, reversed-Z, device-loss reboot. |
+| WebGPU renderer | COVERED | core `Engine.create` (WebGPU unless `backend` says otherwise; the renderer class is internal, `packages/core/src/renderer.ts`) | Automatic instancing, reversed-Z, device-loss reboot. |
 | WebGL2 fallback (WebGLRenderer, WebGPURenderer's WebGL2 backend) | PARTIAL | webgl `GLRenderer`, `webglRenderer` (`packages/webgl/src/index.ts`), passed as `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})` | Optional since it left core: without `fallback`, `backend: 'auto'` rejects when WebGPU is missing. Draws core meshes with per-pixel PBR (GGX metallic-roughness from each mesh's constant colour and factors, interpolated normals), one directional light plus ambient and the PBR Neutral tone map, instanced, with MSAA and viewport/scissor rectangles: no textures, effects or `engine.pick`. Works on WebGL2: core meshes, gltf (constant colors), bvh, controls, labels, viewcube and lod distance or screen levels. Most other rendering packages (gltf-pro, materials, animation, shadows, clustered, post, taa, dof, tonemap, lines, points, text, environment, selection, sky, water, shader, xr and others) need WebGPU. |
 | MSAA | COVERED | core `sceneSamples()` (`packages/core/src/quality.ts`) | 4x on desktop. 1x on user-agent-detected phones and on the light quality tier. |
 | Reversed-Z / logarithmic depth | COVERED | core reversed-Z (`depthCompare:'greater-equal'`) | |
