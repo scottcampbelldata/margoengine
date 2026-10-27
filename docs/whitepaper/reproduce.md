@@ -7,7 +7,7 @@ want to check. Status of each claim and which command backs it: [claims.md](clai
 
 ```sh
 git clone https://github.com/scottcampbelldata/margoengine.git && cd margoengine
-npm ci                     # Node 22.12+; installs three@0.186.1, Vite, Playwright and the test tooling
+npm ci                     # Node 24.18+; installs three@0.186.1, Vite, Playwright and the test tooling
 npx playwright install msedge   # or set MARGO_BROWSER=chrome; the real-GPU scripts default to Edge
 npm run build:packages     # every package, size gates, catalog (no Rust toolchain needed; the Wasm is checked in)
 ```

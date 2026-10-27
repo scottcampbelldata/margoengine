@@ -4,7 +4,7 @@ A local Margo Engine counterpart to the [Three.js skinning / IK study](https://t
 
 ## Run
 
-From the repository root, with Node 22.12 or newer:
+From the repository root, with Node 24.18 or newer:
 
 ```sh
 npm ci

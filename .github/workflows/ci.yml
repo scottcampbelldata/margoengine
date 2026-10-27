@@ -30,13 +30,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
+      # The repository's minimum Node (root package.json engines; scripts/check-engines.mjs keeps the two equal).
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: '24.18.0'
           cache: npm
       - run: npm ci
       - name: Build packages and check the core + stage size budget
         run: npm run build:packages
+      - name: Every script and test parses on the minimum Node
+        run: node scripts/check-engines.mjs --run=repo
       - name: API reports
         run: npm run api:check
       - name: Quality checks
@@ -44,6 +47,7 @@ jobs:
       - name: Tests
         run: node --experimental-test-module-mocks --test --test-concurrency=4 tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js
 
+  # What users run: the built packages on the packages' minimum Node (their engines field) and on the newest.
   node-compat:
     runs-on: ubuntu-latest
     strategy:
@@ -51,12 +55,21 @@ jobs:
         node: ['22.12.0', '26']
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm test
+      - run: npm run build:packages
+      - name: Every shipped file parses and every package entry imports
+        run: node scripts/check-engines.mjs --run=packages
+      # The golden proof digests must hold on every supported Node (bug 17: Node 22's pow differs from Node 26's).
+      - run: node --test tests/proofs-golden.test.js
+      # The packed-package tests are repository tooling (Node 24.18+: bug 18, mock.module timing on Node 22).
+      - if: matrix.node != '22.12.0'
+        run: npm test
 
   kernel:
     runs-on: ubuntu-latest

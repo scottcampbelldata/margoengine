@@ -4,7 +4,7 @@ Thanks for taking a look. Bug reports, fixes, docs and new examples are all welc
 
 ## Setup
 
-You need Node.js 22.12+ (24 is what CI uses) and [Git LFS](https://git-lfs.com).
+You need Node.js 24.18+ to work in this repository (its tests use `using` declarations; the published packages themselves run on Node 22.12+) and [Git LFS](https://git-lfs.com).
 
 ```sh
 git clone https://github.com/scottcampbelldata/margoengine.git
