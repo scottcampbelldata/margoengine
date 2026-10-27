@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3565579,
+  "total": 3573473,
   "history": [
     {
       "date": "2026-10-24",
@@ -614,6 +614,12 @@
       "commit": "a5d57adb",
       "reason": "netcode landing 4: ./rooms (room API and matchmaking) and ./generate (TypeScript code generator) (item 30)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "3aeb5140",
+      "reason": "new optional package @margoengine/save: save documents, prefabs, migrations, transactional loading, storage adapters (item 28.5, first batch)",
+      "grew": 2
     }
   ],
   "items": {
@@ -874,6 +880,8 @@
     "@margoengine/rigging/ik": 3740,
     "@margoengine/rigging/retarget": 2862,
     "@margoengine/road": 1171,
+    "@margoengine/save": 6955,
+    "@margoengine/save/node": 939,
     "@margoengine/scatter": 12434,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,

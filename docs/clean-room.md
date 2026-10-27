@@ -682,3 +682,18 @@ Sequencer, Godot AnimationPlayer, Theatre.js, GSAP, three.js, Babylon and the li
 | Roll | Rodrigues' rotation formula (standard linear algebra) |
 | Easing | `@margoengine/tween`'s easings (Penner's equations, CSS Easing Functions Level 1 cubic-bezier) |
 | Instants and ordering | Our own design: half-open clip spans, instants sorted once by time, kind and document order |
+
+## Save and load: `@margoengine/save`
+
+Written clean room from the specifications below. No source code of serializers, save systems or engines (Unity
+prefabs and serialization, Godot scenes, Unreal SaveGame, three.js ObjectLoader, Babylon serializers, localForage,
+idb and the like) was read.
+
+| Area | Source |
+| --- | --- |
+| Overrides | RFC 7386, "JSON Merge Patch" (objects merge, null removes, other values replace) |
+| Document format | ECMA-404 / RFC 8259 JSON; our own entity, reference (`{"$ref": id}`) and prefab layout |
+| Compression | RFC 1952 gzip, through the WHATWG Compression Streams standard (`CompressionStream`, `DecompressionStream`) |
+| Web Storage adapter | The HTML Standard, Web Storage (`getItem`, `setItem`, `removeItem`, `key`, `length`); RFC 4648 base64 |
+| IndexedDB adapter | W3C Indexed Database API 3.0 (open and upgradeneeded, object stores, readonly and readwrite transactions, requests) |
+| File adapter | Node.js `fs/promises` documentation (`writeFile` with `signal` and `flush`, `rename` replacing the target) |

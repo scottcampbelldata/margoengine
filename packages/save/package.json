@@ -1,0 +1,58 @@
+{
+  "name": "@margoengine/save",
+  "version": "1.0.0",
+  "description": "Save and load: versioned scene and world documents with stable ids, prefabs with overrides, migrations, all-or-nothing loading and storage adapters.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "save",
+    "load",
+    "serialization",
+    "prefab",
+    "indexeddb",
+    "localstorage"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/save"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
+  "devDependencies": {
+    "@margoengine/ecs": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js save",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  }
+}

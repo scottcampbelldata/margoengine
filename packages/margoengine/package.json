@@ -1043,6 +1043,14 @@
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"
     },
+    "./save": {
+      "types": "./dist/save.d.ts",
+      "import": "./dist/save.js"
+    },
+    "./save/node": {
+      "types": "./dist/save/node.d.ts",
+      "import": "./dist/save/node.js"
+    },
     "./scatter": {
       "types": "./dist/scatter.d.ts",
       "import": "./dist/scatter.js"
@@ -1482,6 +1490,7 @@
     "@margoengine/react": "^1.0.0",
     "@margoengine/rigging": "^1.0.0",
     "@margoengine/road": "^1.0.0",
+    "@margoengine/save": "^1.0.0",
     "@margoengine/scatter": "^1.0.0",
     "@margoengine/scenery": "^1.0.0",
     "@margoengine/sciviz": "^1.0.0",

@@ -109,7 +109,8 @@
     "packages/behavior",
     "packages/netcode",
     "packages/tiles",
-    "packages/cutscene"
+    "packages/cutscene",
+    "packages/save"
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",
