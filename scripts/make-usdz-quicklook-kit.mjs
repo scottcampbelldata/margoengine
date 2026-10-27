@@ -1,4 +1,4 @@
-// Makes the six small textured USDZ files for the Apple Quick Look check in docs/known-bugs.md ("USDZ export with
+// Makes the eight small textured USDZ files for the Apple Quick Look check in docs/known-bugs.md ("USDZ export with
 // textures: never opened in Quick Look"). Each file is a lit sphere (a UV sphere written by this script) with textures
 // drawn in code, so nothing is downloaded and the files are tiny:
 //   01-alpha-mask.usdz         base colour with an alpha mask (alphaMode MASK, opacityThreshold 0.5)
@@ -6,15 +6,19 @@
 //   03-metal-rough-normal-1.usdz  metal-rough map (g = roughness, b = metalness) plus a normal map, normalScale 1
 //   04-metal-rough-normal-2.usdz  the same textures at normalScale 2
 //   05-occlusion-emissive.usdz occlusion map (red channel) plus emissive map
-//   06-texture-transform.usdz  base colour with a texture transform (offset, scale), repeat across u and mirror across v
+//   06-texture-transform.usdz  base colour with a texture transform (offset, scale, rotation +30 degrees), repeat
+//                              across u and mirror across v
+//   07-rotate-plus30.usdz      the same picture, rotation +30 degrees only (repeat both ways): leans clockwise
+//   08-rotate-minus30.usdz     rotation -30 degrees: leans anticlockwise
 // Usage (after `npm run build:packages`):
 //   node scripts/make-usdz-quicklook-kit.mjs [outDir] [--glb]
-// `outDir` defaults to ./usdz-quicklook-kit. `--glb` also writes the same six scenes as .glb files, which the engine
+// `outDir` defaults to ./usdz-quicklook-kit. `--glb` also writes the same eight scenes as .glb files, which the engine
 // loads (with @margoengine/gltf-pro) to draw reference screenshots to compare with Quick Look. Open the .usdz files on
 // an iPhone, iPad or Mac (iOS 17 / macOS 14 or later) and compare them with the references. Optional independent
 // check with OpenUSD, which you install yourself: pip install usd-core, then
 // python packages/exporters/tests/validate-usdz.py <file>.
-// Rotation is not part of the exporter's texture transform data (offset and scale only), so file 06 has none.
+// Texture rotation follows KHR_texture_transform as gltf-pro draws it: a positive angle turns the uvs counter-clockwise
+// (v down), so the picture leans clockwise on the sphere. Apple Quick Look (iOS 27.2) drew file 06 leaning clockwise.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -116,7 +120,7 @@ const metalRough = () =>
     return [255, (0.08 + 0.92 * (column / 7)) * 255, row % 2 === 0 ? 255 : 0, 255];
   });
 
-/** The six scenes: file name, what to look for, and the `exportUSDZ` / `exportGLB` input. */
+/** The eight scenes: file name, what to look for, and the `exportUSDZ` / `exportGLB` input. */
 export async function scenes() {
   const ball = sphere();
   const sphereNode = (material) => ({ name: 'Sphere', geometry: ball, material });
@@ -201,14 +205,29 @@ export async function scenes() {
           roughness: 0.7,
           metalness: 0,
           baseColorTexture: { ...orientation, wrapS: 'repeat', wrapT: 'mirror' },
-          baseColorTextureTransform: { offset: [0.5, 0.1], scale: [4, 2] },
+          baseColorTextureTransform: { offset: [0.5, 0.1], scale: [4, 2], rotation: Math.PI / 6 },
         }),
       ],
+    ),
+    // 07 and 08 tell the rotation's sign apart: the same picture, no offset, no mirror, +30 and -30 degrees.
+    ...[
+      ['07-rotate-plus30', 1, 'the tiles and the white F lean clockwise (tops to the right)'],
+      ['08-rotate-minus30', -1, 'the tiles and the white F lean anticlockwise (tops to the left)'],
+    ].map(([file, sign, look]) =>
+      entry(file, `Texture rotation ${sign > 0 ? '+' : '-'}30 degrees`, look, [
+        sphereNode({
+          color: [1, 1, 1, 1],
+          roughness: 0.7,
+          metalness: 0,
+          baseColorTexture: { ...orientation, wrapS: 'repeat', wrapT: 'repeat' },
+          baseColorTextureTransform: { offset: [0, 0], scale: [4, 2], rotation: (sign * Math.PI) / 6 },
+        }),
+      ]),
     ),
   ];
 }
 
-/** Writes the six `.usdz` files (and `.glb` twins with `glb: true`) into `outDir`; returns the file paths. */
+/** Writes the eight `.usdz` files (and `.glb` twins with `glb: true`) into `outDir`; returns the file paths. */
 export async function writeKit(outDir, { glb = false } = {}) {
   await mkdir(outDir, { recursive: true });
   const written = [];

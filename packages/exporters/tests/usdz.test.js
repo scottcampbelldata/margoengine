@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { box, PbrMaterial } from '@margoengine/core';
 import { exportUSDZ } from '../dist/usdz.js';
+import { exportGLB } from '../dist/index.js';
 import { parseUSDZ, readZipDirectory, readZipEntry } from '@margoengine/loaders';
 import { parseUSDZ as readUSD } from '@margoengine/usdz';
+import { textureTransform } from '@margoengine/gltf-pro';
 import { headlessEngine } from './helpers.js';
 
 // A unit quad in the XY plane with glTF uvs (v down).
@@ -335,4 +337,154 @@ test('USDZ samples texCoord 1 from primvars:st1 and textures engine meshes throu
     'maps/crate.jpg',
   );
   engine.dispose();
+});
+
+// KHR_texture_transform rotation (radians) into UsdTransform2d. gltf-pro's rows are the reference: through the V flip
+// (st = (u, 1 - v)) the USD transform must sample the texel gltf-pro samples at every uv. UsdTransform2d per the
+// UsdPreviewSurface spec: scale, then a counter-clockwise rotation in degrees (t up), then translation.
+const transformInputs = (source) => {
+  const text = shader(source, 'BaseColorTransform'),
+    pair = (name) => {
+      const m = text.match(new RegExp(`float2 inputs:${name} = \\(([^,]+), ([^)]+)\\)`));
+      assert.ok(m, `inputs:${name}`);
+      return [Number(m[1]), Number(m[2])];
+    },
+    rotation = text.match(/float inputs:rotation = (\S+)/);
+  return { rotation: rotation ? Number(rotation[1]) : 0, scale: pair('scale'), translation: pair('translation') };
+};
+const rotatedScene = (transform, wrapT = 'repeat') => ({
+  nodes: [
+    {
+      geometry: quad,
+      material: {
+        baseColorTexture: { image: pngBytes(3), mimeType: 'image/png', name: 'f', wrapS: 'repeat', wrapT },
+        baseColorTextureTransform: transform,
+      },
+    },
+  ],
+});
+/** UsdTransform2d on st, as the spec defines it. */
+const usdST = ({ rotation, scale, translation }, s, t) => {
+  const r = (rotation * Math.PI) / 180,
+    a = scale[0] * s,
+    b = scale[1] * t;
+  return [Math.cos(r) * a - Math.sin(r) * b + translation[0], Math.sin(r) * a + Math.cos(r) * b + translation[1]];
+};
+/** gltf-pro's KHR_texture_transform rows (what its shader reads) applied to a uv. */
+const gltfUV = (rows, u, v) => [rows[0] * u + rows[1] * v + rows[2], rows[4] * u + rows[5] * v + rows[6]];
+const inverse2 = ([a, b, c, d]) => {
+  const det = a * d - b * c;
+  return [d / det, -b / det, -c / det, a / det];
+};
+const glbJSON = (glb) =>
+  JSON.parse(
+    new TextDecoder().decode(glb.subarray(20, 20 + new DataView(glb.buffer, glb.byteOffset).getUint32(12, true))),
+  );
+
+test('USDZ writes texture rotation that samples the texels gltf-pro samples (0, +-30, 90, 180 degrees)', async () => {
+  const offset = [0.25, -0.4],
+    scale = [2, 3];
+  for (const degrees of [0, 30, -30, 90, 180]) {
+    const rotation = (degrees * Math.PI) / 180,
+      source = await usda(exportUSDZ(rotatedScene({ offset, scale, rotation }))),
+      usd = transformInputs(source);
+    // The angle keeps its sign, in degrees; no rotation input at 0.
+    assert.equal(usd.rotation, degrees, `${degrees}: rotation`);
+    if (!degrees) assert.doesNotMatch(source, /inputs:rotation/);
+    assert.deepEqual(usd.scale, scale);
+    // Derived translation: (ox + sin(r) sy, 1 - cos(r) sy - oy), written as Float32 text.
+    const expected = [offset[0] + Math.sin(rotation) * scale[1], 1 - Math.cos(rotation) * scale[1] - offset[1]];
+    for (let k = 0; k < 2; k++)
+      assert.ok(Math.abs(usd.translation[k] - expected[k]) < 1e-6, `${degrees}: translation ${usd.translation}`);
+    // Every sampled coordinate agrees: st' = (u', 1 - v').
+    const rows = textureTransform({ offset, scale, rotation });
+    for (let i = 0; i <= 8; i++)
+      for (let j = 0; j <= 8; j++) {
+        const u = i / 8 - 0.3,
+          v = j / 8 + 0.1,
+          [gu, gv] = gltfUV(rows, u, v),
+          [s, t] = usdST(usd, u, 1 - v);
+        assert.ok(Math.abs(s - gu) < 1e-5 && Math.abs(t - (1 - gv)) < 1e-5, `${degrees} deg at (${u}, ${v})`);
+      }
+    // The image's up (texture -v, st +t) as seen on the surface: a positive angle leans it clockwise (top to the right).
+    const lean = Math.sign(Math.round(Math.sin(rotation) * 1e9)),
+      r = (usd.rotation * Math.PI) / 180,
+      upGLTF = inverse2([rows[0], rows[1], rows[4], rows[5]]),
+      upUSD = inverse2([
+        Math.cos(r) * usd.scale[0],
+        -Math.sin(r) * usd.scale[1],
+        Math.sin(r) * usd.scale[0],
+        Math.cos(r) * usd.scale[1],
+      ]);
+    assert.equal(Math.sign(Math.round(-upGLTF[1] * 1e9)), lean, `${degrees}: glTF lean`); // u of M^-1 (0, -1)
+    assert.equal(Math.sign(Math.round(upUSD[1] * 1e9)), lean, `${degrees}: USD lean`); // s of M^-1 (0, 1)
+  }
+});
+
+test('USDZ rotation with offset, scale and mirror wrap samples the same texels of an F as gltf-pro', async () => {
+  // An 8 x 8 "F" (row 0 at the top, glTF v down): no symmetry, so any turn or flip changes what is sampled.
+  const F = ['........', '.#####..', '.#......', '.####...', '.#......', '.#......', '.#......', '........'];
+  const repeat = (a) => a - Math.floor(a),
+    mirror = (a) => 1 - Math.abs(a - 2 * Math.floor(a / 2) - 1),
+    texel = (x, y) => F[Math.min(7, Math.floor(y * 8))][Math.min(7, Math.floor(x * 8))];
+  const transform = { offset: [0.5, 0.1], scale: [4, 2], rotation: Math.PI / 6 },
+    usd = transformInputs(await usda(exportUSDZ(rotatedScene(transform, 'mirror')))),
+    rows = textureTransform(transform);
+  assert.equal(usd.rotation, 30);
+  let compared = 0;
+  for (let i = 0; i < 64; i++)
+    for (let j = 0; j < 64; j++) {
+      const u = (i + 0.5) / 64,
+        v = (j + 0.5) / 64,
+        [gu, gv] = gltfUV(rows, u, v),
+        [s, t] = usdST(usd, u, 1 - v),
+        gx = repeat(gu),
+        gy = mirror(gv),
+        // USD: st (0, 0) is the image's bottom left, so the image row is 1 - t.
+        ux = repeat(s),
+        uy = 1 - mirror(t);
+      // Skip samples within Float32 text precision of a texel edge.
+      if ([gx, gy, ux, uy].some((c) => Math.abs(c * 8 - Math.round(c * 8)) < 1e-4)) continue;
+      assert.equal(texel(ux, uy), texel(gx, gy), `texel at (${u}, ${v})`);
+      compared++;
+    }
+  assert.ok(compared > 4000, `${compared} samples compared`);
+});
+
+test("USDZ rotation reproduces KHR_texture_transform's own example without gltf-pro: lower-left quarter, turned clockwise", async () => {
+  // The extension's example: offset (0, 1), rotation pi/2, scale 0.5 "utilizes only the lower left quadrant of the
+  // source image, rotated clockwise 90 degrees". Image points below are (x right, y down) fractions of the image.
+  const usd = transformInputs(
+    await usda(exportUSDZ(rotatedScene({ offset: [0, 1], scale: [0.5, 0.5], rotation: Math.PI / 2 }))),
+  );
+  assert.equal(usd.rotation, 90);
+  const imagePoint = (u, v) => {
+    const [s, t] = usdST(usd, u, 1 - v); // the exporter's V flip, then UsdTransform2d per the spec
+    return [s, 1 - t].map((c) => Math.round(c * 1e5) / 1e5 + 0); // st (0, 0) is the image's bottom left
+  };
+  // The quad's top edge shows the quarter's left edge (read bottom to top): a clockwise turn.
+  assert.deepEqual(imagePoint(0, 0), [0, 1]); // surface top left: the image's bottom-left corner
+  assert.deepEqual(imagePoint(1, 0), [0, 0.5]); // surface top right: the quarter's top left
+  assert.deepEqual(imagePoint(0, 1), [0.5, 1]); // surface bottom left: the quarter's bottom right
+  assert.deepEqual(imagePoint(1, 1), [0.5, 0.5]); // surface bottom right: the image's centre
+});
+
+test('texture rotation reaches glTF as given, is validated, and leaves the archive readable', async () => {
+  const transform = { offset: [0.5, 0.1], scale: [4, 2], rotation: -Math.PI / 6 };
+  assert.deepEqual(
+    glbJSON(exportGLB(rotatedScene(transform))).materials[0].pbrMetallicRoughness.baseColorTexture.extensions
+      .KHR_texture_transform,
+    { ...transform, offset: [0.5, Math.fround(0.1)] }, // offset and scale are Float32; the angle is written as given
+  );
+  const plain = glbJSON(exportGLB(rotatedScene({ offset: [0, 0], scale: [1, 1] })));
+  assert.ok(!('rotation' in plain.materials[0].pbrMetallicRoughness.baseColorTexture.extensions.KHR_texture_transform));
+  for (const rotation of [NaN, Infinity, 1e40, '0.5'])
+    assert.throws(
+      () => exportUSDZ(rotatedScene({ offset: [0, 0], scale: [1, 1], rotation })),
+      (e) => e instanceof RangeError && /rotation/.test(e.message),
+      String(rotation),
+    );
+  // Our own USD reader still opens the rotated archive (it does not read texture transforms).
+  const asset = await readUSD(exportUSDZ(rotatedScene(transform)));
+  assert.equal(asset.meshes.length, 1);
 });

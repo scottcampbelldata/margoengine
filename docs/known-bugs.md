@@ -23,12 +23,16 @@ does not own. Each entry says exactly what is needed to close it.
   scale and bias that OpenUSD's validator may flag as non-standard.
 - **Needed to close:**
   1. An iPhone or iPad on iOS 17 or later, or a Mac on macOS 14 or later (Quick Look and AR Quick Look).
-  2. Five exported files opened there, each compared with the same scene drawn by Margo: a base-colour texture with an
+  2. The kit's exported files opened there, each compared with the same scene drawn by Margo: a base-colour texture with an
      alpha mask (`opacityThreshold`), a blended (alpha) texture, a metal-rough map plus a normal map at `normalScale` 1
-     and 2, an occlusion plus emissive map, and a base-colour texture transform (offset and scale; the exporter has no rotation) with
-     repeat and mirror wrapping.
-     `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` writes them (six files: `normalScale` 1 and 2 are separate),
-     with engine-drawn reference twins.
+     and 2, an occlusion plus emissive map, a base-colour texture transform (offset, scale and rotation) with repeat
+     and mirror wrapping, and rotation alone at +30 and -30 degrees.
+     `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` writes them (eight files: `normalScale` 1 and 2 are
+     separate; 07 and 08 are the rotations), with engine-drawn reference twins.
+     Texture rotation (KHR_texture_transform radians, written as `UsdTransform2d` degrees with the same sign) is written
+     but not yet confirmed: Quick Look on iOS 27.2 drew file 06 leaning clockwise, as gltf-pro draws the same glTF
+     transform (the kit's first checklist expected anticlockwise; that expectation was wrong). Files 07 (+30, should
+     lean clockwise) and 08 (-30, anticlockwise) await a device re-check.
   3. `pip install usd-core`, then `python packages/exporters/tests/validate-usdz.py <file>` on the same files.
   4. The result (pass, or the difference seen) recorded here and in `docs/threejs-parity.md` (USDZExporter row).
 

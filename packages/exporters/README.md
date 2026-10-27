@@ -691,7 +691,7 @@ Hierarchy is baked into world-space meshes. Vertex colors (RGB or RGBA, baked AO
 
 Material textures are the same `TextureData` (encoded PNG or JPEG bytes) the glTF writers take, from a data scene or from `materialData` for engine meshes. Each becomes a `UsdUVTexture` reading the mesh's `primvars:st` (its `uvs`, V flipped to USD's bottom-left origin) or `primvars:st1` (`uvs1`, for `texCoord: 1`) through a `UsdPrimvarReader_float2`, with its `wrapS`/`wrapT`:
 
-- `baseColorTexture` drives `diffuseColor` (`inputs:scale` is the color factor, sRGB) and, for BLEND and MASK, `opacity` from its alpha; MASK writes `opacityThreshold = alphaCutoff` (default 0.5). A `baseColorTextureTransform` becomes a `UsdTransform2d`.
+- `baseColorTexture` drives `diffuseColor` (`inputs:scale` is the color factor, sRGB) and, for BLEND and MASK, `opacity` from its alpha; MASK writes `opacityThreshold = alphaCutoff` (default 0.5). A `baseColorTextureTransform` becomes a `UsdTransform2d` that samples the same texels: `rotation` (radians; positive turns the picture clockwise on the surface, as gltf-pro draws KHR_texture_transform) is written in degrees with the same sign, because the V flip also flips the rotation sense, and the translation is re-expressed in st.
 - `metallicRoughnessTexture` drives `roughness` from green and `metallic` from blue, scaled by the factors.
 - `normalTexture` (scale 2, bias -1, with `normalScale` on x and y), `occlusionTexture` red (`occlusionStrength`) and `emissiveTexture` (times `emissive` and `emissiveStrength`) are read as raw, raw and sRGB.
 
@@ -712,12 +712,18 @@ const usdz = exportUSDZ({
         uvs: [0, 1, 1, 1, 1, 0, 0, 0],
         indices: [0, 1, 2, 0, 2, 3],
       },
-      material: { baseColorTexture: albedo, alphaMode: 'MASK', alphaCutoff: 0.5 },
+      material: {
+        baseColorTexture: albedo,
+        // Two tiles each way, turned 30 degrees clockwise on the surface.
+        baseColorTextureTransform: { offset: [0, 0], scale: [2, 2], rotation: Math.PI / 6 },
+        alphaMode: 'MASK',
+        alphaCutoff: 0.5,
+      },
     },
   ],
 });
 // usdz holds scene.usda and textures/albedo.png.
-``` Quick Look presentation remains untested on Apple hardware. `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` (repository root, after `npm run build:packages`) writes the six small textured test scenes for that check (alpha mask, alpha blend, metal-rough with a normal map at scale 1 and 2, occlusion with emissive, texture transform with repeat and mirror wrapping) as `.usdz` files, with `.glb` twins the engine can draw as references; `tests/usdz-quicklook-kit.test.js` checks their layout. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
+``` Quick Look presentation remains untested on Apple hardware. `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` (repository root, after `npm run build:packages`) writes the eight small textured test scenes for that check (alpha mask, alpha blend, metal-rough with a normal map at scale 1 and 2, occlusion with emissive, texture transform with rotation and repeat and mirror wrapping, and rotation +30 and -30 degrees alone) as `.usdz` files, with `.glb` twins the engine can draw as references; `tests/usdz-quicklook-kit.test.js` checks their layout. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
 
 ## Roblox GLB (`@margoengine/exporters/roblox`)
 

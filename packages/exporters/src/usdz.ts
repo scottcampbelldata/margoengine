@@ -112,7 +112,9 @@ const TEXTURES = [
  * `primvars:st` (from `uvs`, V flipped) or `primvars:st1` (from `uvs1`): base color into `diffuseColor` scaled by the
  * color factor (its alpha into `opacity` for BLEND and MASK, with `opacityThreshold` set to `alphaCutoff` for MASK),
  * metal-rough green and blue into `roughness` and `metallic`, `normal`, `occlusion` red and `emissiveColor`. The images
- * are stored as given (PNG or JPEG) under `texturePrefix`. A `baseColorTextureTransform` becomes a `UsdTransform2d`.
+ * are stored as given (PNG or JPEG) under `texturePrefix`. A `baseColorTextureTransform` becomes a `UsdTransform2d`
+ * that samples the same texels as the glTF transform: its rotation in degrees with the same sign (the V flip turns
+ * glTF's counter-clockwise-with-v-down into USD's counter-clockwise-with-t-up), the translation re-expressed in st.
  * @throws TypeError when a textured material's geometry lacks the UV set it samples, or when vertex colors meet a
  * base color texture (USD Preview Surface cannot multiply them); RangeError for an empty scene, a world position
  * outside Float32 range or an archive over 4 GiB.
@@ -195,14 +197,21 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
       const { wrapS, wrapT } = samplerOf(texture);
       let coordinates = uv(texture.texCoord ?? 0);
       if (name === 'BaseColorTexture' && material.baseColorTextureTransform) {
-        // KHR_texture_transform in glTF uv space (v down), re-expressed in st space (t = 1 - v).
-        const { offset, scale: repeat } = material.baseColorTextureTransform;
+        // KHR_texture_transform in glTF uv space (v down): uv' = O + R S uv, R = [[c, s], [-s, c]] (gltf-pro's
+        // reading: the uvs turn counter-clockwise as seen with v down, the image clockwise). With st = F uv + (0, 1),
+        // F = diag(1, -1): st' = (F R F) S st + F O + F R S (0, 1) + (0, 1). F R F = [[c, -s], [s, c]] is
+        // UsdTransform2d's counter-clockwise rotation (t up) by the same angle, so the sign is kept; the translation
+        // picks up the turned v axis: (ox + s sy, 1 - c sy - oy).
+        const { offset, scale: repeat, rotation = 0 } = material.baseColorTextureTransform;
+        const c = Math.cos(rotation),
+          s = Math.sin(rotation);
         shaders.push(
           '    def Shader "BaseColorTransform" {',
           '        uniform token info:id = "UsdTransform2d"',
           `        float2 inputs:in.connect = <${coordinates}>`,
+          ...(rotation ? [`        float inputs:rotation = ${num((rotation * 180) / Math.PI)}`] : []),
           `        float2 inputs:scale = ${tuple(repeat)}`,
-          `        float2 inputs:translation = ${tuple([offset[0], 1 - repeat[1] - offset[1]])}`,
+          `        float2 inputs:translation = ${tuple([offset[0] + s * repeat[1], 1 - c * repeat[1] - offset[1]])}`,
           '        float2 outputs:result',
           '    }',
         );

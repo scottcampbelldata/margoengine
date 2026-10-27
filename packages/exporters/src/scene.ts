@@ -140,10 +140,12 @@ export interface MaterialData {
   alphaCutoff?: number;
   baseColorTexture?: TextureData;
   /**
-   * KHR_texture_transform offset and scale of `baseColorTexture` (required by the file), Float32 values. A target of
-   * `materialAnimations`. glTF writers only.
+   * KHR_texture_transform of `baseColorTexture` (required by the file), Float32 values: uv' = offset + rotation *
+   * scale * uv. `rotation` (radians, default 0) turns the texture coordinates counter-clockwise about the uv origin
+   * (top left, v down), so the image turns clockwise on the surface. glTF writers write it as given; `exportUSDZ`
+   * writes a `UsdTransform2d`. `offset` and `scale` are targets of `materialAnimations`.
    */
-  baseColorTextureTransform?: { offset: Vec2; scale: Vec2 };
+  baseColorTextureTransform?: { offset: Vec2; scale: Vec2; rotation?: number };
   metallicRoughnessTexture?: TextureData;
   normalTexture?: TextureData;
   /** Shade with base color only, ignoring lights: KHR_materials_unlit in glTF. Default false. */
@@ -395,7 +397,7 @@ export interface Mat {
   alphaMode: 'OPAQUE' | 'MASK' | 'BLEND';
   alphaCutoff?: number;
   baseColorTexture?: TextureData;
-  baseColorTextureTransform?: { offset: Vec2; scale: Vec2 };
+  baseColorTextureTransform?: { offset: Vec2; scale: Vec2; rotation?: number };
   metallicRoughnessTexture?: TextureData;
   normalTexture?: TextureData;
   occlusionTexture?: TextureData;
@@ -751,6 +753,12 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
     const offset = floats(transform.offset, 2, 'Texture transform offset'),
       scale = floats(transform.scale, 2, 'Texture transform scale');
     baseColorTextureTransform = { offset: [offset[0], offset[1]], scale: [scale[0], scale[1]] };
+    if (transform.rotation !== undefined) {
+      const rotation = transform.rotation;
+      if (typeof rotation !== 'number' || !Number.isFinite(Math.fround(rotation)))
+        throw new RangeError('Texture transform rotation must be a finite Float32 number of radians');
+      baseColorTextureTransform.rotation = rotation;
+    }
   }
   return {
     name: m.name,

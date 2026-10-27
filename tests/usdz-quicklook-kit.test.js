@@ -14,6 +14,8 @@ const NAMES = [
   '04-metal-rough-normal-2',
   '05-occlusion-emissive',
   '06-texture-transform',
+  '07-rotate-plus30',
+  '08-rotate-minus30',
 ];
 
 test('the sphere faces outward with uvs that run left to right and top to bottom', () => {
@@ -37,12 +39,12 @@ test('the sphere faces outward with uvs that run left to right and top to bottom
   assert.equal(normals.length, positions.length);
 });
 
-test('the Quick Look kit writes six aligned, readable USDZ archives (and GLB twins)', async (t) => {
+test('the Quick Look kit writes eight aligned, readable USDZ archives (and GLB twins)', async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'margo-usdz-kit-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const written = await writeKit(dir, { glb: true });
   assert.deepEqual((await readdir(dir)).sort(), NAMES.flatMap((n) => [`${n}.glb`, `${n}.usdz`]).sort());
-  assert.equal(written.length, 12);
+  assert.equal(written.length, 16);
   const sources = {};
   for (const name of NAMES) {
     const archive = new Uint8Array(await readFile(join(dir, `${name}.usdz`))),
@@ -83,4 +85,15 @@ test('the Quick Look kit writes six aligned, readable USDZ archives (and GLB twi
   assert.match(sources['06-texture-transform'], /UsdTransform2d/);
   assert.match(sources['06-texture-transform'], /token inputs:wrapS = "repeat"/);
   assert.match(sources['06-texture-transform'], /token inputs:wrapT = "mirror"/);
+  // Rotation in degrees with the API's sign (positive leans the picture clockwise; Quick Look drew 06 that way).
+  for (const [name, rotation, translation] of [
+    ['06-texture-transform', 30, '(1.5, -0.8320508)'],
+    ['07-rotate-plus30', 30, '(1, -0.73205084)'],
+    ['08-rotate-minus30', -30, '(-1, -0.73205084)'],
+  ]) {
+    assert.match(sources[name], new RegExp(`float inputs:rotation = ${rotation}$`, 'm'), `${name} rotation`);
+    assert.ok(sources[name].includes(`float2 inputs:translation = ${translation}`), `${name} translation`);
+  }
+  for (const name of ['07-rotate-plus30', '08-rotate-minus30'])
+    assert.match(sources[name], /token inputs:wrapT = "repeat"/);
 });
