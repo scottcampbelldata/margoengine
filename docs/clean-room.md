@@ -651,3 +651,17 @@ Written clean room from the specifications and papers below. No source code of 3
 | Octahedral normals (NORMAL_OCT16P, OCT32P) | Z. H. Cigolle, S. Donow, D. Evangelakos, M. Mara, M. McGuire and Q. Meyer, "A survey of efficient representations for independent unit vectors", JCGT 3(2), 2014 |
 | Quaternion from a rotation matrix | S. W. Shepperd, "Quaternion from rotation matrix", J. Guidance and Control 1(3), 1978 |
 | Oriented-box frustum and distance tests | Separating-axis projection of a box onto a plane normal (C. Ericson, "Real-Time Collision Detection", 2005, ch. 5) |
+
+## Point clouds: LAS, octree and colours in `@margoengine/points`
+
+Written clean room from the specifications and papers below. No source code of point-cloud libraries or viewers
+(LAStools, LASzip, laz-perf, PDAL, libLAS, Potree, CloudCompare, Entwine and the like) was read.
+
+| Area | Source |
+| --- | --- |
+| LAS reader and writer | ASPRS LAS Specification 1.2 (2008), 1.3 R11 (2010) and 1.4 R15 (2019): public header block, VLR and EVLR headers, point data record formats 0 to 10, extra bytes descriptors (LASF_Spec record 4), OGC WKT (LASF_Projection 2112) |
+| GeoTIFF keys of the CRS | OGC GeoTIFF Standard 1.1 (19-008r4): GeoKeyDirectoryTag layout, ProjectedCSTypeGeoKey 3072, GeographicTypeGeoKey 2048, VerticalCSTypeGeoKey 4096 |
+| ASPRS classes | ASPRS LAS 1.4 R15, table 17 (standard point classes) |
+| Nested-sample octree | Grid subsampling per node as described in M. Schütz, "Potree: Rendering Large Point Clouds in Web Browsers", diploma thesis, TU Wien, 2016 (the idea only); budget-ordered node selection by projected size |
+| Seeded shuffle | Fisher-Yates (Knuth, TAOCP vol. 2, algorithm P) with the mulberry32 generator |
+| Polygon area | Newell's method for a polygon's normal (M. E. Newell, 1972, as in F. S. Hill, "Computer Graphics", 1990) |

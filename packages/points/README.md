@@ -137,6 +137,80 @@ const cloud = points.add(new PointCloud({
 cloud.material.clippingPlanes = [[-1, 0, 0, 2]]; // live: drop the z cut
 ```
 
+## LAS and LAZ scans (`margoengine/points/las`)
+
+`parseLAS(bytes)` reads ASPRS LAS 1.0 to 1.4: point formats 0 to 10, extra bytes (scaled, with no-data as NaN), every
+VLR and EVLR, and the CRS (OGC WKT record 2112 and the GeoTIFF keys 34735 to 34737, with the EPSG code). Positions come
+back as float32 relative to `origin` (the bounding box centre by default, float64), so a survey 500 km from the CRS
+origin keeps millimetres. LAS is z-up; the engine is y-up, so swap axes when you place it.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PointCloud, PointsPlugin, classificationColors } from 'margoengine/points';
+import { loadLAS } from 'margoengine/points/las';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+const las = await loadLAS('/scans/site.las', { stride: 1 });
+const positions = new Float32Array(las.count * 3);
+for (let i = 0; i < las.count; i++) // z-up survey to y-up world
+  positions.set([las.positions[i * 3], las.positions[i * 3 + 2], -las.positions[i * 3 + 1]], i * 3);
+points.add(new PointCloud({ positions, colors: classificationColors(las.classification), colorComponents: 4 }));
+console.log(las.crs?.epsg, las.header.pointFormat, Object.keys(las.extra));
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `origin` | box centre | World point positions are stored relative to. |
+| `maxPoints` / `stride` | all / 1 | Read fewer points (a preview). |
+| `partial` | `false` | Read what a cut-short file holds instead of throwing a `RangeError`. |
+| `laz` | none | A LAZ decompressor (see below). |
+| `signal` | none | `AbortSignal`. |
+
+LAZ files (compressed LAS) are recognised by the header's compression bit and need `options.laz`, a function that
+returns the uncompressed point records (`LazDecoder`); without one they throw a `MargoError` with code `unsupported`.
+A decoder written clean room from the LASzip specification is not part of the package yet. `writeLAS` writes
+uncompressed LAS (any format, extra bytes, WKT or EPSG) for tools and tests.
+
+## Large clouds: octree level of detail (`margoengine/points/octree`)
+
+`buildOctree(cloud)` splits a cloud into a nested-sample octree: each node keeps one point per cell of a 128-cell grid
+over its cube (in a seeded shuffle, so the sample is even), and its eight children hold the rest; every point lands in
+exactly one node. `OctreeCloud` draws the nodes the camera needs, largest on screen first, under `pointBudget`, loads
+them from any `OctreeSource` (the built octree, or your own that fetches nodes from a server) and frees the least
+recently used past `maxLoadedPoints`. Refinement is additive, so a parent's points stay drawn under its children and
+nothing ever leaves a hole.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PointsPlugin } from 'margoengine/points';
+import { OctreeCloud, buildOctree } from 'margoengine/points/octree';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine, { pointBudget: 3_000_000 });
+const positions = new Float32Array(3_000_000).map(() => Math.random() * 100);
+const octree = buildOctree({ positions }, { maxPointsPerNode: 20_000 });
+OctreeCloud.attach(engine, points, octree, { pointBudget: 1_000_000, material: { size: 2, edl: true } });
+```
+
+| `OctreeCloud` option | Default | Meaning |
+| --- | --- | --- |
+| `pointBudget` | 2,000,000 | Most points drawn per frame. |
+| `minNodePixels` | 150 | Refine a node while it spans more than this many pixels. |
+| `maxLoadedPoints` | 3 x `pointBudget` | Points kept loaded before eviction. |
+| `maxConcurrentLoads` | 4 | Nodes loading at once (the rest wait; unwanted loads are aborted). |
+| `material`, `cloud` | defaults | `PointsMaterial` and `PointCloud` options of every node. |
+
+A failing node is reported to `onError(listener)` (or `engine.onError`) and skipped until `retry()`.
+
+## Colours and measures
+
+`classificationColors(classes, {palette, hidden})` colours by ASPRS class (`ASPRS_CLASSES` names them; hidden classes
+get alpha 0). `rampColors(values, {min, max, gamma, stops})` maps intensity, height or any attribute through a ramp
+(1st to 99th percentile by default; `ELEVATION_STOPS` is a blue-to-red ramp). `rgb16ToRgba8` turns 16-bit scanner RGB
+into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` hits, `measurePointDistance`, `measurePath`,
+`measureArea` (planar polygon), `measureHeight` (along +y) and `measureAngle` (degrees) give the usual survey measures.
+
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
@@ -146,7 +220,8 @@ cloud.material.clippingPlanes = [[-1, 0, 0, 2]]; // live: drop the z cut
 - Per-point colors are stored as RGBA8, so HDR vertex colors are clamped to 0..1.
 - No mipmaps on maps. A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (with a one-time warning) until you assign a new texture. Uploaded image sources are rebuilt automatically.
 - Transparent points and sprites are not sorted per point. Use `alphaTest` or additive blending for order-independent results. Round antialiased edges of opaque points write depth.
-- No point-size compensation for subsampled blocks yet, and no octree streaming from disk (all points are in memory).
+- No point-size compensation for subsampled blocks yet. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own (COPC is not read).
+- `OctreeCloud` culls in world space and does not follow a mesh transform; place the points in world coordinates.
 
 ## Tests
 

@@ -33,6 +33,20 @@ export {
   NO_BLOCK,
 } from './math.js';
 export type { PointBlocks, PickRange, PointsPickHit } from './math.js';
+export {
+  ASPRS_CLASSES,
+  CLASSIFICATION_COLORS,
+  ELEVATION_STOPS,
+  classificationColors,
+  rampColors,
+  rgb16ToRgba8,
+  measurePointDistance,
+  measurePath,
+  measureArea,
+  measureHeight,
+  measureAngle,
+} from './attributes.js';
+export type { ClassificationColorOptions, RampOptions } from './attributes.js';
 export { parseColor } from './color.js';
 export type { ColorInput } from './color.js';
 export type { FogLike } from '../../shared/fog.js';

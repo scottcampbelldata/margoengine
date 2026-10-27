@@ -17,7 +17,11 @@ await build({
     outDir: resolve(root, 'dist'),
     emptyOutDir: true,
     target: 'es2022',
-    lib: { entry: resolve(root, 'src/index.ts'), formats: ['es'], fileName: 'index' },
+    lib: {
+      entry: Object.fromEntries(['index', 'las', 'octree'].map((name) => [name, resolve(root, `src/${name}.ts`)])),
+      formats: ['es'],
+      fileName: (_format, name) => `${name}.js`,
+    },
     rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
   },
 });

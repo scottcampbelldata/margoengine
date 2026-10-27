@@ -815,6 +815,14 @@
       "types": "./dist/points.d.ts",
       "import": "./dist/points.js"
     },
+    "./points/las": {
+      "types": "./dist/points/las.d.ts",
+      "import": "./dist/points/las.js"
+    },
+    "./points/octree": {
+      "types": "./dist/points/octree.d.ts",
+      "import": "./dist/points/octree.js"
+    },
     "./post": {
       "types": "./dist/post.d.ts",
       "import": "./dist/post.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3510480,
+  "total": 3525215,
   "history": [
     {
       "date": "2026-10-24",
@@ -572,6 +572,12 @@
       "commit": "0fdd1421",
       "reason": "netcode landing 2: LagCompensation (server-side rewind), LoopbackNetwork.pair, GameClient.viewTick in the root entry; new ./rollback entry (RollbackSession) (item 30)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "c94eeee4",
+      "reason": "points: LAS 1.0-1.4 reader/writer (/las), octree LOD streaming (/octree), classification and ramp colours and measures in the root (queue item 31, landing 2)",
+      "grew": 3
     }
   ],
   "items": {
@@ -774,7 +780,9 @@
     "@margoengine/netcode/rollback": 3471,
     "@margoengine/oit": 3199,
     "@margoengine/physics": 16247,
-    "@margoengine/points": 19649,
+    "@margoengine/points": 21547,
+    "@margoengine/points/las": 4806,
+    "@margoengine/points/octree": 8031,
     "@margoengine/post": 40343,
     "@margoengine/post/afterimage": 5661,
     "@margoengine/post/bloom": 6716,

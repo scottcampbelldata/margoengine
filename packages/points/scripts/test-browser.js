@@ -54,6 +54,23 @@ try {
     await page
       .locator('#gallery')
       .screenshot({ path: resolve(results, samples === 4 ? 'points-gallery.png' : 'points-gallery-mobile.png') });
+    if (samples === 4) {
+      // LAS written and read back, classification colours, octree LOD under a 400,000-point budget.
+      const octree = (report.octree = await page.evaluate(() => window.runOctree()));
+      assert.deepEqual(octree.errors, []);
+      assert.equal(octree.count, 1_200_000);
+      for (const view of [octree.far, octree.close]) {
+        assert.ok(view.drawn > 0 && view.drawn <= 400_000, `octree drew ${view.drawn} points`);
+        assert.ok(view.lit > 0.05, `octree view drew too little: ${view.lit}`);
+      }
+      assert.ok(
+        octree.close.depth > octree.far.depth,
+        `flying in refines: ${octree.far.depth} -> ${octree.close.depth}`,
+      );
+      report.checks.push(
+        'LAS round trip, class colours and OctreeCloud LOD stay under the point budget and refine as the camera flies in',
+      );
+    }
     report.browser = browser.version();
     assert.deepEqual(errors, []);
     await writeFile(

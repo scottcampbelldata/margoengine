@@ -804,3 +804,73 @@ window.runGallery = async () => {
   for (let i = 0; i < pixels.length; i += 4) if (pixels[i] + pixels[i + 1] + pixels[i + 2] > 60) litPixels++;
   return { errors, lit: litPixels, stats: { ...points.stats } };
 };
+
+// A synthetic airborne survey end to end: written as LAS, read back, coloured by class, split into an octree and
+// drawn by OctreeCloud under a point budget while the camera flies in.
+window.runOctree = async () => {
+  const { writeLAS, parseLAS } = await import('../dist/las.js');
+  const { buildOctree, OctreeCloud } = await import('../dist/octree.js');
+  const { classificationColors } = await import('@margoengine/points');
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'width:480px;height:320px;display:block';
+  document.body.append(canvas);
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    camera: { position: [0, 400, 900], target: [0, 0, 0], fov: 60, near: 1, far: 5000 },
+  });
+  engine.stop();
+  const runtime = engineRuntime(engine),
+    errors = [];
+  runtime.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+  const n = 1_200_000,
+    world = new Float64Array(n * 3),
+    classification = new Uint8Array(n);
+  let seed = 7;
+  const rand = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  for (let i = 0; i < n; i++) {
+    const x = rand() * 1000 - 500,
+      y = rand() * 1000 - 500,
+      roof = (Math.floor(x / 50) + Math.floor(y / 50)) % 3 === 0 && rand() < 0.7;
+    world.set([600_000 + x, 4_500_000 + y, 50 + (roof ? 20 : Math.sin(x * 0.01) * 5)], i * 3);
+    classification[i] = roof ? 6 : 2;
+  }
+  const las = await parseLAS(writeLAS({ positions: world, classification, pointFormat: 6 }));
+  // LAS is z-up and the engine y-up: (x, y, z) becomes (x, z, -y).
+  const positions = new Float32Array(las.count * 3);
+  for (let i = 0; i < las.count; i++)
+    positions.set([las.positions[i * 3], las.positions[i * 3 + 2], -las.positions[i * 3 + 1]], i * 3);
+  const started = performance.now(),
+    octree = buildOctree({ positions, colors: classificationColors(las.classification), colorComponents: 4 }),
+    buildMs = performance.now() - started;
+  const points = PointsPlugin.attach(engine, { pointBudget: 2_000_000 });
+  const cloud = OctreeCloud.attach(engine, points, octree, { pointBudget: 400_000, material: { size: 2 } });
+  const settle = async () => {
+    // fixed-wait: a cap, not a delay; it returns on the first frame after every octree node load has settled
+    for (let i = 0; i < 300; i++) {
+      engine.render();
+      await runtime.gpu.queue.onSubmittedWorkDone();
+      await new Promise((r) => setTimeout(r, 0));
+      if (cloud.stats.loading === 0 && i > 3) return i;
+    }
+    throw new Error(`octree did not settle: ${JSON.stringify(cloud.stats)}`);
+  };
+  const lit = () => {
+    engine.render();
+    const copy = document.createElement('canvas');
+    copy.width = canvas.width;
+    copy.height = canvas.height;
+    const context = copy.getContext('2d');
+    context.drawImage(canvas, 0, 0);
+    const data = context.getImageData(0, 0, copy.width, copy.height).data;
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] > 60) count++;
+    return count / (copy.width * copy.height);
+  };
+  const depth = () => Math.max(...cloud.visible.map((v) => v.level));
+  const far = { frames: await settle(), ...cloud.stats, nodes: cloud.visible.length, depth: depth(), lit: lit() };
+  engine.camera.position = [-450, 40, 450];
+  engine.camera.target = [-300, 0, 300];
+  const close = { frames: await settle(), ...cloud.stats, nodes: cloud.visible.length, depth: depth(), lit: lit() };
+  cloud.dispose();
+  return { count: las.count, buildMs, far, close, errors };
+};
