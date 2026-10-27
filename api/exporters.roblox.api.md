@@ -242,6 +242,7 @@ interface MaterialData {
     baseColorTextureTransform?: {
         offset: Vec2;
         scale: Vec2;
+        rotation?: number;
     };
     metallicRoughnessTexture?: TextureData;
     normalTexture?: TextureData;

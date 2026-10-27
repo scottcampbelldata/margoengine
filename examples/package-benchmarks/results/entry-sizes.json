@@ -1,5 +1,5 @@
 {
-  "commit": "de74b672",
+  "commit": "66c07ed4",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -318,28 +318,28 @@
     },
     "@margoengine/exporters": {
       ".": {
-        "raw": 98612,
-        "gzip": 33704
+        "raw": 98813,
+        "gzip": 33740
       },
       "./usdz": {
-        "raw": 30563,
-        "gzip": 11010
+        "raw": 30878,
+        "gzip": 11102
       },
       "./model": {
         "raw": 24295,
         "gzip": 9440
       },
       "./dae": {
-        "raw": 27949,
-        "gzip": 10252
+        "raw": 28150,
+        "gzip": 10293
       },
       "./capture": {
         "raw": 18042,
         "gzip": 6985
       },
       "./roblox": {
-        "raw": 56239,
-        "gzip": 18286
+        "raw": 56440,
+        "gzip": 18329
       },
       "./roblox-chunks": {
         "raw": 25454,
@@ -428,8 +428,8 @@
         "gzip": 18301
       },
       "dist/workers/fbx.js": {
-        "raw": 162747,
-        "gzip": 50431
+        "raw": 162948,
+        "gzip": 50471
       }
     },
     "@margoengine/fsm": {
@@ -1236,16 +1236,16 @@
     },
     "@margoengine/usdz": {
       ".": {
-        "raw": 19521,
-        "gzip": 8072
+        "raw": 20731,
+        "gzip": 8535
       },
       "./worker": {
-        "raw": 22399,
-        "gzip": 9110
+        "raw": 23609,
+        "gzip": 9568
       },
       "dist/workers/usdz.js": {
-        "raw": 194999,
-        "gzip": 63454
+        "raw": 196217,
+        "gzip": 63899
       }
     },
     "@margoengine/vfx": {
@@ -1538,14 +1538,14 @@
       "brotli": 13125
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 161572,
-      "gzip": 50328,
-      "brotli": 44071
+      "raw": 161773,
+      "gzip": 50370,
+      "brotli": 44084
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 192640,
-      "gzip": 63281,
-      "brotli": 54693
+      "raw": 193858,
+      "gzip": 63723,
+      "brotli": 55089
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 20114,

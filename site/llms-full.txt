@@ -2507,12 +2507,16 @@ does not own. Each entry says exactly what is needed to close it.
   scale and bias that OpenUSD's validator may flag as non-standard.
 - **Needed to close:**
   1. An iPhone or iPad on iOS 17 or later, or a Mac on macOS 14 or later (Quick Look and AR Quick Look).
-  2. Five exported files opened there, each compared with the same scene drawn by Margo: a base-colour texture with an
+  2. The kit's exported files opened there, each compared with the same scene drawn by Margo: a base-colour texture with an
      alpha mask (`opacityThreshold`), a blended (alpha) texture, a metal-rough map plus a normal map at `normalScale` 1
-     and 2, an occlusion plus emissive map, and a base-colour texture transform (offset and scale; the exporter has no rotation) with
-     repeat and mirror wrapping.
-     `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` writes them (six files: `normalScale` 1 and 2 are separate),
-     with engine-drawn reference twins.
+     and 2, an occlusion plus emissive map, a base-colour texture transform (offset, scale and rotation) with repeat
+     and mirror wrapping, and rotation alone at +30 and -30 degrees.
+     `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` writes them (eight files: `normalScale` 1 and 2 are
+     separate; 07 and 08 are the rotations), with engine-drawn reference twins.
+     Texture rotation (KHR_texture_transform radians, written as `UsdTransform2d` degrees with the same sign, and read
+     back the same way by `@margoengine/usdz`) is written but not yet confirmed on a device: Quick Look on iOS 27.2 drew file 06 leaning clockwise, as gltf-pro draws the same glTF
+     transform (the kit's first checklist expected anticlockwise; that expectation was wrong). Files 07 (+30, should
+     lean clockwise) and 08 (-30, anticlockwise) await a device re-check.
   3. `pip install usd-core`, then `python packages/exporters/tests/validate-usdz.py <file>` on the same files.
   4. The result (pass, or the difference seen) recorded here and in `docs/threejs-parity.md` (USDZExporter row).
 
@@ -3505,7 +3509,7 @@ engine.start();
 
 `parseUSDA(textOrBytes)`, `parseUSDC(bytes)`, and async `parseUSDZ(bytes)` return a `USDAsset` with typed mesh streams, a glTF document/buffers, and async `create(engine)` to attach PBR rendering. `loadUSDZ` fetches with streaming byte bounds and creates the model. Malformed, unsupported or oversized input throws a `LoaderError` (`error.format === 'USD'`; `error.code` is `syntax`, `unsupported` or `limit`). Options: `maxBytes`, `maxVertices`, `maxTriangles`, `maxDepth`, `signal`. Defaults: 64 MiB, one million expanded vertices/triangles, depth 32. The engine grows its store when the hierarchy plus the PBR model root exceed the initial capacity. Texture ownership passes to the PBR model and is released on destruction or failed setup.
 
-Supports stored and Deflate ZIP entries with CRC checks, static ASCII/binary hierarchies, Y/Z up and authored units, ordered translate/scale/rotateXYZ/affine transforms, triangles and convex planar polygons, left-handed winding, authored normals and vertex/face-varying UVs including indices, inherited material bindings, and constant UsdPreviewSurface diffuse/roughness/metallic factors. UsdUVTexture diffuse and normal maps are decoded from the archive. Separate roughness and metallic maps are packed into glTF's green/blue channels during creation.
+Supports stored and Deflate ZIP entries with CRC checks, static ASCII/binary hierarchies, Y/Z up and authored units, ordered translate/scale/rotateXYZ/affine transforms, triangles and convex planar polygons, left-handed winding, authored normals and vertex/face-varying UVs including indices, inherited material bindings, and constant UsdPreviewSurface diffuse/roughness/metallic factors. UsdUVTexture diffuse and normal maps are decoded from the archive. A texture's `wrapS`/`wrapT` (`repeat`, `mirror`, `clamp`; `black` and `useMetadata` fall back to repeat) become a glTF sampler, and a `UsdTransform2d` on its `st` becomes `KHR_texture_transform` (same angle and sign, in radians). `mesh.uvs` holds `st` as authored (origin at the image's bottom left); the glTF document holds them as uvs (s, 1 - t). Separate roughness and metallic maps are packed into glTF's green/blue channels during creation.
 
 Standard USDZ is an uncompressed, aligned archive. Deflate support accepts a broader ZIP envelope for interoperability. Stored entries reuse archive views. Decompression, Crate decoding, topology expansion, texture packing and GPU upload require allocations: this is **not** end-to-end zero-copy. Geometry conversion writes flat typed arrays without allocating an object per output vertex; metadata and hierarchy objects remain necessary.
 
