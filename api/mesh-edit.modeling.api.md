@@ -39,6 +39,21 @@ export interface EdgeSlideOptions extends MeshEditOptions {
     correctUV?: boolean;
 }
 
+export interface ImportMeshOptions {
+    weld?: number;
+    mergeFlat?: boolean;
+    uv?: 'auto' | 'keep' | 'unwrap';
+    unwrap?: Omit<UnwrapOptions, 'signal'>;
+    signal?: AbortSignal;
+}
+
+export interface ImportMeshResult {
+    mesh: PolygonMesh;
+    sourceFaces: Record<string, number[]>;
+    unwrapped: boolean;
+    diagnostics: string[];
+}
+
 export interface KnifeOptions extends MeshEditOptions {
     faces?: readonly string[];
     closed?: boolean;
@@ -58,6 +73,17 @@ export interface LightmapUVResult {
     seams: string[];
     texelsPerUnit: number;
     resolution: number;
+}
+
+export interface MergeFlatOptions {
+    faces?: readonly string[];
+    tolerance?: number;
+    uv?: 'match' | 'ignore';
+    signal?: AbortSignal;
+}
+
+export interface MergeFlatResult extends MeshEditResult {
+    merged: number;
 }
 
 export interface MeshBooleanFaceSource {
@@ -138,6 +164,14 @@ export interface SubdivideOptions extends MeshEditOptions {
     signal?: AbortSignal;
 }
 
+export interface TriangleSource {
+    positions: ArrayLike<number>;
+    indices?: ArrayLike<number>;
+    uvs?: ArrayLike<number>;
+    faceSizes?: ArrayLike<number>;
+    positionIndices?: ArrayLike<number>;
+}
+
 export interface UVChart {
     faces: string[];
     pins: number;
@@ -184,9 +218,13 @@ export function dissolveMeshComponents(mesh: PolygonMesh, selection: DissolveSel
 
 export function knifeMeshFaces(mesh: PolygonMesh, points: readonly Vec3[], direction: Vec3, options?: KnifeOptions): KnifeResult;
 
+export function mergeFlatFaces(mesh: PolygonMesh, options?: MergeFlatOptions): MergeFlatResult;
+
 export function meshLODChain(mesh: PolygonMesh, options?: LODChainOptions): SimplifyResult[];
 
 export function meshLightmapUVs(mesh: PolygonMesh, options?: ChartOptions): LightmapUVResult;
+
+export function polygonMeshFromTriangles(source: TriangleSource, options?: ImportMeshOptions): ImportMeshResult;
 
 export function simplifyMesh(mesh: PolygonMesh, options?: SimplifyOptions): SimplifyResult;
 
