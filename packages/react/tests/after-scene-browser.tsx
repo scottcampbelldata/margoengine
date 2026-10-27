@@ -2,17 +2,11 @@ import React, { StrictMode, Suspense, createRef, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 // Application components all come from the public root. Native types below
 // support inspection only; the test never imperatively installs a scene feature.
-import {
-  Canvas,
-  Gltf,
-  Animation,
-  Box,
-  PbrMaterial,
-  MeshTransmissionMaterial,
-  useMargo,
-  type MeshRef,
-  type MargoContextValue,
-} from '@margoengine/react';
+import { Canvas, PbrMaterial, useMargo, type MeshRef, type MargoContextValue } from '@margoengine/react';
+import { Animation } from '@margoengine/react/animation';
+import { Box } from '@margoengine/react/geometry';
+import { Gltf } from '@margoengine/react/gltf-pro';
+import { MeshTransmissionMaterial } from '@margoengine/react/materials';
 import type { Engine, Mesh as RuntimeMesh, EnginePlugin } from '@margoengine/core/extension';
 import type { PBRModel } from '@margoengine/gltf-pro';
 import type { Animator } from '@margoengine/animator';

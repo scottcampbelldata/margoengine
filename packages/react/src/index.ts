@@ -1,11 +1,8 @@
+// The root entry holds only bindings that need no optional package (core, the stage, math, cache and selection are
+// installed with @margoengine/react), so webpack and Turbopack build it with no optional peer installed. A binding that
+// needs @margoengine/<name> is imported from @margoengine/react/<name>; tests/optional-peer-reach.test.js checks both.
 export * from './components.js';
-export * from './kit.js';
-export * from './post.js';
-export * from './xr.js';
-export { Animation, type AnimationProps, type AnimationHandle } from './animation.js';
-export { MeshTransmissionMaterial, type MeshTransmissionMaterialProps } from './materials.js';
 export * from './hooks.js';
-export * from './extras.js';
 export * from './views.js';
-export * from './lights.js';
-export * from './voxels.js';
+export { Sun, type SunProps } from './sun.js';
+export { Center, type CenterProps } from './center.js';

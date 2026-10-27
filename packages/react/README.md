@@ -4,14 +4,17 @@ React 18 and 19 components and hooks for Margo Engine: a native canvas, pointer 
 frame callbacks. There is no custom reconciler: `<Canvas>` creates one engine, and its children are ordinary React
 components that edit it.
 
-Import it as `margoengine/react` (from the `margoengine` package) or `@margoengine/react` (from this package alone);
-the two are the same module. Optional parts load only when a component needs them, so an unused feature costs nothing.
+Import it as `margoengine/react` (from the `margoengine` package, every binding in one import) or from this package
+alone: `@margoengine/react` holds the bindings that need no optional package (`Canvas`, `Mesh`, geometry, materials,
+hooks, views, `Sun`, `Center`), and a binding that needs `@margoengine/<name>` comes from `@margoengine/react/<name>`
+(`OrbitControls` from `/controls` with `@margoengine/controls` installed, `Gltf` from `/gltf-pro`, `Shadows` from
+`/shadows`; the full list is in [SCENE.md](SCENE.md)). Optional parts load only when a component needs them, so an
+unused feature costs nothing.
 
-With Vite, installing this package alone (plus the peers your components use, such as `@margoengine/controls` for
-`OrbitControls`) keeps the build to what you import. The cube page with orbit controls requests 95,384 B gzip at load
+Installed alone (plus the packages your subpaths name, such as `@margoengine/controls` for `OrbitControls`), it builds
+with Vite, webpack, Turbopack (Next.js), Rollup and esbuild and keeps the build to what you import. The cube page with orbit controls requests 95,384 B gzip at load
 and 102,335 B once `OrbitControls` mounts, and emits no Wasm. React and React DOM are about 70% of that; Margo's part
-(core, stage, bindings) is 27,028 B gzip. The breakdown is in [limits.md](../../docs/limits.md#react-page). Webpack and
-Turbopack (Next.js) need the `margoengine` package, not this one alone.
+(core, stage, bindings) is 27,028 B gzip. The breakdown is in [limits.md](../../docs/limits.md#react-page).
 
 
 **What you get from this page:** a React app with a lit mesh in about five minutes, then the components, hooks,
@@ -121,7 +124,9 @@ the `Mesh` props plus `args`, `color`, `roughness` and `metalness`. `Mesh` with 
 the explicit form.
 
 ```tsx
-import { Box, BoxGeometry, Mesh, MeshTransmissionMaterial } from '@margoengine/react';
+import { BoxGeometry, Mesh } from '@margoengine/react';
+import { Box } from '@margoengine/react/geometry';
+import { MeshTransmissionMaterial } from '@margoengine/react/materials';
 
 export function Both() {
   return (
@@ -172,10 +177,11 @@ A model, its lighting and the orbit controls, directly under the canvas:
 ```tsx
 'use client';
 import { Suspense } from 'react';
-import { MargoCanvas, Model, Environment, OrbitControls } from 'margoengine/react';
+import { MargoCanvas, Model, Environment, OrbitControls, Shadows } from 'margoengine/react';
 
 export default function App() {
-  return <MargoCanvas backend="webgpu" camera={{ position: [0, 2, 5] }} shadows style={{ height: 400 }}>
+  return <MargoCanvas backend="webgpu" camera={{ position: [0, 2, 5] }} style={{ height: 400 }}>
+    <Shadows />
     <Suspense fallback={<span>Loading scene…</span>}>
       <Model src="/model.glb" position={[0, 0, 0]} materials={{ Upper: { baseColor: [0.52, 0.84, 0.74] } }} castShadow receiveShadow />
       <Environment src="/studio.hdr" exposure={1} background />
@@ -189,20 +195,22 @@ export default function App() {
 
 Wrap `Model` and file-backed `Environment` components in React `Suspense` to show a fallback while loading. Loads begin after the first commit so unmount cleanup can abort an unfinished load. The canvas caches pending promises and resolved CPU source data by URL; concurrent mounts and remounts reuse that source while owning independent model transforms, materials and disposable GPU resources. The last pending consumer unmount aborts its request. Canvas teardown releases the cache. Load failures reach the component's optional `onError` and the canvas's `onError`/accessible alert.
 
-`preload(src)` warms the same cache on active canvases. It infers environment assets from `.hdr` and `.exr` URL paths; use `preload(src, 'environment')` for an environment endpoint without that extension. Before a canvas is ready, the returned promise queues until an engine exists, since the optional glTF loader requires an engine. Render the canvas before awaiting a queued preload. A preloaded asset remains hidden until mounted.
+`Model.preload(src)` (also `Gltf.preload`), `Fbx.preload(src)` and `Environment.preload(src)` warm the same cache on active canvases; each belongs to the component that loads that kind of file, so a page that preloads only models never reaches the FBX or environment loaders. Before a canvas is ready, the returned promise queues until an engine exists, since the optional glTF loader requires an engine. Render the canvas before awaiting a queued preload. A preloaded asset remains hidden until mounted.
 
 `Environment` loads HDR/EXR through `@margoengine/environment` and attaches diffuse/specular IBL to sibling `Model` components, regardless of loading order. Exposure is a nonnegative linear lighting multiplier; it also controls HDR background intensity. `background` defaults to true and only affects an HDR background. Without `src`, the component configures neutral studio directional and ambient lighting; teardown restores the previous lighting. Exposure and background changes do not reload the map. Use one `Environment` per canvas.
 
 `Html` dynamically imports optional `@margoengine/html` and `react-dom` peers and projects React DOM children into a shared overlay. Nested inside a `Mesh` or `Group`, its `position` is a local offset; otherwise it is a world position. It accepts `className`, `style`, and an `occlude` boolean (true by default), and removes its label and overlay resources on unmount.
 
-`shadows` opts the canvas into `@margoengine/shadows`; model casting and receiving are independently opt-in. PBR models, HDR IBL and shadows require WebGPU; legacy meshes and neutral studio lighting support the WebGL fallback.
+`<Shadows />` (`margoengine/react/shadows`, or `@margoengine/react/shadows` with `@margoengine/shadows` installed) turns the canvas shadows on; mesh and model casting and receiving are independently opt-in and draw nothing without it. PBR models, HDR IBL and shadows require WebGPU; legacy meshes and neutral studio lighting support the WebGL fallback.
 
 ## Batching, views, lights and voxels
 
 `<BatchedMesh maxItems maxVertices>` draws many different geometries in one draw call per pass; put a `<BatchedItem geometry position rotation scale color visible>` (or `matrix`) per object inside. Moving, tinting or hiding an item updates the batch in place with no React render of the batch; capacity and `material` are fixed. `<SectionPlanes planes={[[1, 0, 0, 0]]}>` cuts the scene with up to six planes and caps closed solids; plane values update live. `<DepthTexture>` and `<SceneTargets outputs={{ albedo: 'albedo', normal: 'normal' }}>` render the scene's depth or several targets in one pass for your own shaders; their ref is the live plugin (`depth.texture`, `targets.texture('normal')`), and the Canvas's PBR models are added for you. All four need WebGPU.
 
 ```tsx
-import { Canvas, BatchedMesh, BatchedItem, SectionPlanes } from '@margoengine/react';
+import { Canvas } from '@margoengine/react';
+import { SectionPlanes } from '@margoengine/react/machinery';
+import { BatchedMesh, BatchedItem } from '@margoengine/react/materials';
 import { boxGeometry } from '@margoengine/geometry';
 
 const cube = boxGeometry();
@@ -224,7 +232,8 @@ export function Crates({ count }: { count: number }) {
 
 ```tsx
 import { Camera } from '@margoengine/core';
-import { Canvas, RenderView, Scene, Box } from '@margoengine/react';
+import { Canvas, RenderView, Scene } from '@margoengine/react';
+import { Box } from '@margoengine/react/geometry';
 
 const top = new Camera({ position: [0, 20, 0.01], target: [0, 0, 0] });
 export function SplitScreen() {
@@ -245,7 +254,9 @@ export function SplitScreen() {
 Lights: `<Sun direction color intensity>` sets the directional sun light every mesh, model and shadow uses (any backend; inside a `<Scene>`, that scene's). `<AmbientLight color intensity>` and `<HemisphereLight sky ground intensity>` light core meshes and models from every direction, and `<Fog color near far density heightFalloff height>` fogs them in their shaders, transparent models included; all three come from `@margoengine/environment`, take live props and need WebGPU. `<Environment>` also takes `rotation` (radians about +Y, lighting and background together) and `blur` (background, 0 to 1). `<Html>` takes the label options `anchor`, `distanceScale`, `sort`, `frustumCulling`, `followVisibility`, `visible` and `pointerEvents`, all live.
 
 ```tsx
-import { Canvas, Sun, HemisphereLight, Fog, Model } from '@margoengine/react';
+import { Canvas, Sun } from '@margoengine/react';
+import { HemisphereLight, Fog } from '@margoengine/react/environment';
+import { Model } from '@margoengine/react/gltf-pro';
 
 export function Valley() {
   return (
@@ -264,7 +275,8 @@ export function Valley() {
 ```tsx
 import { Suspense, useMemo } from 'react';
 import { BlockTypes, VoxelWorld } from '@margoengine/voxel';
-import { Canvas, Voxels, useBlockTextures } from '@margoengine/react';
+import { Canvas } from '@margoengine/react';
+import { Voxels, useBlockTextures } from '@margoengine/react/voxel';
 
 function Island() {
   const textures = useBlockTextures(['/stone.png', '/grass-top.png']);
@@ -317,7 +329,9 @@ function ImperativeCube() {
 `OrbitControls`, `MapControls`, `CadControls` and `ArcballControls` bind the active camera and canvas, update from the Canvas frame loop (so `frameloop="demand"` and `invalidate()` move them too), and remove their listeners on unmount. Every public field of the controls is a prop (`enableDamping`, `dampingFactor`, `rotateSpeed`, `zoomToCursor`, `minDistance`, `maxPolarAngle`, ...); a prop removed again restores the controls' default. `target` sets the orbit point when it changes. `onChange`, `onStart` and `onEnd` receive the controls' events, and the ref is the live controls object. `CadControls` navigates like a CAD tool: `profile` is `'margo'` (default), `'solidworks'`, `'autocad'`, `'inventor'`, `'fusion'`, `'blender'`, `'maya'`, `'onshape'` or `'rhino'`, and keyboard shortcuts are on (`keyEvents={false}` turns them off). `OrbitControls` takes the same `profile` and `keyEvents` props.
 
 ```tsx
-import { Canvas, CadControls, Shadows, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { CadControls } from '@margoengine/react/controls';
+import { Shadows } from '@margoengine/react/shadows';
 
 export function Part({ onViewChanged }: { onViewChanged: () => void }) {
   return (
@@ -364,15 +378,17 @@ it. A complete example is in the [cookbook](../../docs/react-cookbook.md#physics
 
 ## XR
 
-`XR`, `Controller` and `useXR` are exported from the root and from `@margoengine/react/xr`. `useXR` works only inside
+`XR`, `Controller` and `useXR` come from `@margoengine/react/xr` (and `margoengine/react`). `useXR` works only inside
 `<XR>`.
 
 ## Next.js
 
 Both the App Router and the Pages Router work, with webpack and with Turbopack, and need no `transpilePackages`. Install
-`margoengine` (`npm i margoengine react react-dom next` once it is published) and import from `margoengine/react`.
-`@margoengine/react` alone does not build under Next.js: it fails on its optional peers, which `margoengine` supplies.
-Keep the page a server component and put the `Canvas` in a small client component:
+`margoengine` (`npm i margoengine react react-dom next` once it is published) and import from `margoengine/react`,
+the one-install route; or install `@margoengine/react` alone with the packages its subpaths name
+(`npm i @margoengine/react @margoengine/controls react react-dom next`) and import `OrbitControls` from
+`@margoengine/react/controls`. Both build with webpack and Turbopack (the bundler matrix builds the cube page with
+`@margoengine/react` alone, and with `/controls` added). Keep the page a server component and put the `Canvas` in a small client component:
 
 ```tsx
 // app/scene.tsx

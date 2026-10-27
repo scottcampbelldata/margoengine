@@ -3,13 +3,10 @@ import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type { ColorInput, Vec3 } from '@margoengine/math';
 import type { Material, MeshGeometry } from '@margoengine/materials';
 import type { BatchedMesh as Batch, BatchedMeshOptions } from '@margoengine/materials/batched';
-import type { DepthTexture as DepthPlugin, DepthTextureOptions } from '@margoengine/post/depth';
-import type { SceneTargets as TargetsPlugin, SceneTargetsOptions } from '@margoengine/post/mrt';
-import type { SectionOptions, SectionPlanes as SectionPlugin } from '@margoengine/machinery/section';
 import { MargoError } from '@margoengine/math/errors';
 import { composeMatrix } from '@margoengine/math/mat4';
 import { eulerToQuaternion } from '@margoengine/math/quat';
-import { useCommit, useCreated, useModelSources, useScene } from './internal.js';
+import { useCommit, useCreated, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 
 interface ErrorProps {
@@ -22,7 +19,7 @@ const BatchContext = createContext<Batch | null>(null);
 export interface BatchedMeshProps extends BatchedMeshOptions, ErrorProps {
   /** The batch's `@margoengine/materials` material. Default a plain PBR material that shows vertex colours. */
   material?: Material;
-  /** Draw the batch into the Canvas shadows. Default false. */
+  /** Draw the batch into the Canvas shadows, once a `<Shadows>` (`@margoengine/react/shadows`) turns them on. Default false. */
   castShadow?: boolean;
   children?: ReactNode;
 }
@@ -60,9 +57,6 @@ export const BatchedMesh = forwardRef<Batch, BatchedMeshProps>(function BatchedM
     },
     [maxItems, maxVertices, maxIndices, renderOrder, material],
   );
-  useEffect(() => {
-    if (castShadow) return scene.requestShadows();
-  }, [scene.requestShadows, castShadow]);
   useEffect(() => {
     if (castShadow && batch && scene.shadows) return scene.shadows.add(batch.mesh as unknown as MeshHandle);
   }, [batch, scene.shadows, castShadow]);
@@ -118,114 +112,3 @@ export function BatchedItem({
   }, [batch, typeof color === 'object' ? color.join() : color, visible]);
   return null;
 }
-
-/** Props of `<DepthTexture>`. */
-export interface DepthTextureProps extends DepthTextureOptions, ErrorProps {
-  /** Called whenever the textures are replaced (resize, device restore) with the live DepthTexture. */
-  onResize?: (depth: DepthPlugin) => void;
-}
-/**
- * The scene's depth as textures for your own passes and materials (`@margoengine/post`'s DepthTexture): the ref
- * is the live plugin, whose `texture` (reversed-Z depth) and `distance` (world distance) follow resizes. PBR models in
- * the Canvas are added for you. `order` is fixed. WebGPU only.
- */
-export const DepthTexture = forwardRef<DepthPlugin, DepthTextureProps>(function DepthTexture(
-  { order, onResize, onError },
-  ref,
-) {
-  const scene = useScene(),
-    resized = useRef(onResize);
-  resized.current = onResize;
-  const depth = useCreated(
-    scene,
-    {
-      load: () => optionalPeer('@margoengine/post/depth', () => import('@margoengine/post/depth')),
-      create: (api) => api.DepthTexture.attach(scene.engine as unknown as EngineKernel, { order }),
-      dispose: (value) => value.dispose(),
-      ref,
-      onError,
-    },
-    [order],
-  );
-  useModelSources(scene, depth);
-  useCommit(() => {
-    if (depth) return depth.onResize(() => resized.current?.(depth));
-  }, [depth]);
-  return null;
-});
-
-/** Props of `<SceneTargets>`. */
-export interface SceneTargetsProps extends SceneTargetsOptions, ErrorProps {}
-/**
- * Extra render targets written in one scene pass (multiple render targets, `@margoengine/post`'s SceneTargets):
- * `outputs` names each one (`'albedo'`, `'normal'`, `'position'`, `'distance'`, `'emissive'`, `'material'` or your
- * own WGSL). The ref is the live plugin: `texture(name)` and `depth`. PBR models are added for you. Changing `outputs`
- * (by value) or `order` recreates the targets. WebGPU only.
- */
-export const SceneTargets = forwardRef<TargetsPlugin, SceneTargetsProps>(function SceneTargets(
-  { outputs, order, onError },
-  ref,
-) {
-  const scene = useScene(),
-    key = JSON.stringify(outputs),
-    latest = useRef(outputs);
-  latest.current = outputs;
-  const targets = useCreated(
-    scene,
-    {
-      load: () => optionalPeer('@margoengine/post/mrt', () => import('@margoengine/post/mrt')),
-      create: (api) =>
-        api.SceneTargets.attach(scene.engine as unknown as EngineKernel, { outputs: latest.current, order }),
-      dispose: (value) => value.dispose(),
-      ref,
-      onError,
-    },
-    [key, order],
-  );
-  useModelSources(scene, targets);
-  return null;
-});
-
-/** Props of `<SectionPlanes>`. */
-export interface SectionPlanesProps extends SectionOptions, ErrorProps {
-  /** Clip while true; switching does not recompile. Default true. */
-  enabled?: boolean;
-}
-/**
- * Cuts the scene with up to 6 planes `[a, b, c, d]` (points with a x + b y + c z + d < 0 are cut away) and caps the
- * cut faces of closed solids (`@margoengine/machinery`'s SectionPlanes). Plane values update every frame from the
- * props; the number of planes, `cap`, `capOpenShells`, `color` and `hatch` are fixed and recreate it when changed.
- * WebGPU only.
- */
-export const SectionPlanes = forwardRef<SectionPlugin, SectionPlanesProps>(function SectionPlanes(
-  { planes, enabled = true, cap, capOpenShells, color, hatch, onError },
-  ref,
-) {
-  const scene = useScene(),
-    latest = useRef(planes);
-  latest.current = planes;
-  const section = useCreated(
-    scene,
-    {
-      load: () => optionalPeer('@margoengine/machinery', () => import('@margoengine/machinery/section')),
-      create: (api) =>
-        api.SectionPlanes.attach(scene.engine as unknown as EngineKernel, {
-          planes: latest.current,
-          cap,
-          capOpenShells,
-          color,
-          hatch,
-        }),
-      dispose: (value) => value.dispose(),
-      ref,
-      onError,
-    },
-    [planes.length, cap, capOpenShells, typeof color === 'object' ? color?.join() : color, hatch],
-  );
-  useCommit(() => {
-    if (!section) return;
-    section.options.planes = planes;
-    section.enabled = enabled;
-  });
-  return null;
-});

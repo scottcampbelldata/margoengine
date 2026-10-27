@@ -67,7 +67,7 @@ class Session extends EventTarget {
   }
 }
 mock.module('@margoengine/xr', { namedExports: { XR: Manager } });
-const { Canvas, Mesh, BoxGeometry, useFrame, useMargo } = await import('../dist/index.js');
+const { Canvas, Mesh, BoxGeometry, useFrame, useMargo } = await (await import('./entries.js')).allEntries();
 const { XR, Controller, useXR } = await import('../dist/xr.js');
 const { worldPose } = await import('../dist/scene-transform.js');
 const h = React.createElement,

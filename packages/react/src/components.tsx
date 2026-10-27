@@ -10,9 +10,6 @@ import {
   type ReactNode,
   type CSSProperties,
 } from 'react';
-// Static: every React DOM app has react-dom in its entry (react-dom/client imports it), so a lazy import() of it moved
-// nothing and Vite and Rolldown warned INEFFECTIVE_DYNAMIC_IMPORT for it.
-import { createPortal } from 'react-dom';
 import {
   Engine,
   type Mesh as EngineMesh,
@@ -24,16 +21,11 @@ import {
 } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle, FrameCallback } from '@margoengine/core';
 import { Stage as StageFacade } from '@margoengine/stage';
-import { optionalPeer } from './optional.js';
-import { preparePicking, releasePicking } from './picking.js';
-import type { PBRModel, LightingEffect } from '@margoengine/gltf-pro';
 import type { Shadows } from '@margoengine/shadows';
-import type { Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment';
-import { createAssetCache, activateAssetCache, disposeAssetCache, environmentAsset, retainAsset } from './assets.js';
+import { createAssetCache, activateAssetCache, disposeAssetCache } from './assets.js';
 import { MargoError } from '@margoengine/math/errors';
-export { preload } from './assets.js';
-import { MeshShadows } from './shadows.js';
-export { Shadows, type ShadowsProps } from './shadows.js';
+import { MeshShadows } from './mesh-shadows.js';
+import { setRenderLayers } from '../../shared/layers.js';
 
 import {
   Context,
@@ -44,13 +36,13 @@ import {
   zero,
   one,
   useCommit,
-  useResourceEffect,
   createViews,
   type Scene,
   type Registry,
   type Resources,
   type Frames,
   type PointerHandlers,
+  type ShadowsLoader,
 } from './internal.js';
 export type { MargoPointerEvent, PointerHandlers } from './internal.js';
 
@@ -79,7 +71,6 @@ export interface CanvasProps extends EngineOptions {
   style?: CSSProperties;
   className?: string;
   label?: string;
-  shadows?: boolean;
   onCreated?: (stage: StageFacade) => void;
   onError?: (error: unknown) => void;
   frameloop?: 'always' | 'demand';
@@ -96,7 +87,6 @@ export function MargoCanvas({
   backend = 'auto',
   camera,
   fallback,
-  shadows = false,
   frameloop = 'always',
   onCreated,
   onError,
@@ -108,10 +98,14 @@ export function MargoCanvas({
   const [stage, setStage] = useState<StageFacade | null>(null),
     [error, setError] = useState<unknown>(null),
     [shadow, setShadow] = useState<Shadows | null>(null);
+  // `<Shadows>` (and `<ContactShadows>`) from @margoengine/react/shadows turn the shadows on and bring the loader, so the
+  // Canvas itself imports no optional package.
   const [shadowRequests, setShadowRequests] = useState(0),
-    enableShadows = shadows || shadowRequests > 0;
+    shadowLoader = useRef<ShadowsLoader | null>(null),
+    enableShadows = shadowRequests > 0;
   const requestShadows = useMemo(
-    () => () => {
+    () => (load: ShadowsLoader) => {
+      shadowLoader.current ??= load;
       setShadowRequests((count) => count + 1);
       return () => setShadowRequests((count) => count - 1);
     },
@@ -276,7 +270,7 @@ export function MargoCanvas({
       void Promise.resolve()
         .then(async () => {
           if (!active || engine.disposed || !canPick()) return null;
-          if (resources.models.size) await preparePicking(engine, resources, frames);
+          if (resources.models.size) await resources.picking?.prepare(engine, resources, frames);
           return active && !engine.disposed ? engine.pick(request.x, request.y) : null;
         })
         .then((mesh) => {
@@ -349,7 +343,7 @@ export function MargoCanvas({
       hover = null;
       pendingHover = null;
       clicks.length = 0;
-      releasePicking(engine);
+      resources.picking?.release(engine);
       element.removeEventListener('pointerdown', pointerdown);
       element.removeEventListener('pointerup', pointerup);
       element.removeEventListener('pointermove', pointermove);
@@ -380,7 +374,7 @@ export function MargoCanvas({
     if (!engine || !enableShadows) return;
     let cancelled = false,
       effect: Shadows | undefined;
-    optionalPeer('@margoengine/shadows', () => import('@margoengine/shadows'))
+    shadowLoader.current!()
       .then(({ Shadows }) => {
         if (cancelled || engine.disposed) return;
         effect = Shadows.attach(engine as unknown as EngineKernel);
@@ -465,15 +459,13 @@ export function useMargoStage(): EngineKernel {
 /** Props of the Stage component; every prop is optional unless noted. */
 export interface StageProps {
   camera?: EngineOptions['camera'];
-  shadows?: boolean;
   children?: ReactNode;
 }
 /** The stage component. */
-export function Stage({ camera, shadows = false, children }: StageProps) {
+export function Stage({ camera, children }: StageProps) {
   const { stage, ready } = useMargo(),
     scene = useContext(Context);
-  const requestShadows = scene?.requestShadows,
-    cameraOverrides = scene?.cameraOverrides;
+  const cameraOverrides = scene?.cameraOverrides;
   const active = ready && !!stage && !stage.engine.disposed;
   useCommit(() => {
     if (!active || !camera) return;
@@ -500,9 +492,6 @@ export function Stage({ camera, shadows = false, children }: StageProps) {
     camera?.near,
     camera?.far,
   ]);
-  useEffect(() => {
-    if (active && shadows) return requestShadows?.();
-  }, [active, stage, shadows, requestShadows]);
   return active ? <>{children}</> : null;
 }
 
@@ -513,12 +502,12 @@ export interface MeshProps extends PointerHandlers {
   position?: Vec3;
   rotation?: Vec3;
   scale?: Vec3;
-  /** Draw into the Canvas shadow map (turns shadows on; needs WebGPU and `@margoengine/shadows`). Default false. */
+  /** Draw into the Canvas shadow map, once a `<Shadows>` (`@margoengine/react/shadows`) turns it on. Default false. */
   castShadow?: boolean;
   /** Darken where shadows fall. Default true. */
   receiveShadow?: boolean;
   /**
-   * Render-layer mask (`layerMask(...)` from `@margoengine/cameras/layers`): a `<RenderView layers>` draws only meshes
+   * Render-layer mask (`layerMask(...)` from `@margoengine/cameras/layers`, or the number): a `<RenderView layers>` draws only meshes
    * sharing a bit with it. Default: the parent mesh's, else layer 1.
    */
   layers?: number;
@@ -610,26 +599,15 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
     scale[1],
     scale[2],
   ]);
-  // Layers load @margoengine/cameras/layers only when a mesh uses them. Removing the prop sets layer 1, the default
-  // of a mesh with no ancestor mask (the layers registry has no "unset").
+  // The layer registry core reads (shared with @margoengine/cameras/layers), so `layers` needs no package. Removing the
+  // prop sets layer 1, the default of a mesh with no ancestor mask (the layers registry has no "unset").
   const layered = useRef(false);
-  useEffect(() => {
-    const mesh = registry.current;
+  useCommit(() => {
+    const mesh = live(registry);
     if (!mesh || (layers === undefined && !layered.current)) return;
-    let active = true;
-    optionalPeer('@margoengine/cameras', () => import('@margoengine/cameras/layers'))
-      .then(({ setRenderLayers }) => {
-        if (!active || live(registry) !== mesh) return;
-        setRenderLayers(mesh as unknown as MeshHandle, layers ?? 1);
-        layered.current = layers !== undefined;
-      })
-      .catch((error) => {
-        if (active && !engine.disposed) engine.onError(error);
-      });
-    return () => {
-      active = false;
-    };
-  }, [registry, node, layers, engine]);
+    setRenderLayers(mesh as unknown as MeshHandle, layers ?? 1);
+    layered.current = layers !== undefined;
+  }, [registry, node, layers]);
   // The live mesh, not the `node` state: effects that recreate the mesh without a render (StrictMode's replay, a
   // Suspense boundary revealing again) would otherwise hand the ref the disposed one until the next render, and a
   // useFrame callback writing to it throws "Mesh disposed". This runs after the creation effect above.
@@ -736,337 +714,3 @@ export function useFrame(callback: FrameCallback): void {
     };
   }, [frames]);
 }
-
-export { Model } from './model.js';
-export type { ModelProps, MaterialOverride } from './model.js';
-interface Loading {
-  src: string;
-  pending: boolean;
-  promise: Promise<void>;
-}
-function values(value: readonly number[], size: number, label: string, min = 0, max = 1): void {
-  if (
-    !Array.isArray(value) ||
-    value.length !== size ||
-    value.some((v) => typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || v < min || v > max)
-  )
-    throw new RangeError(`Invalid ${label}: pass an array of ${size} finite number(s) between ${min} and ${max}.`);
-}
-
-/** Props of the Environment component; every prop is optional unless noted. */
-export interface EnvironmentProps {
-  src?: string;
-  exposure?: number;
-  background?: boolean;
-  /** Turn the environment about +Y, in radians: its lighting and background together. Default 0. */
-  rotation?: number;
-  /** Background blur: 0 sharp to 1 the roughest prefiltered level. Default 0. */
-  blur?: number;
-  onError?: (error: unknown) => void;
-}
-/** The environment component. */
-export function Environment({
-  src,
-  exposure = 1,
-  background = true,
-  rotation = 0,
-  blur = 0,
-  onError,
-}: EnvironmentProps) {
-  const { engine, resources, assetCache } = useScene(),
-    [environment, setEnvironment] = useState<IBLEnvironment | null>(null);
-  const [loading, setLoading] = useState<Loading | null>(null),
-    errorHandler = useRef(onError);
-  errorHandler.current = onError;
-  const [module, setModule] = useState<typeof import('@margoengine/environment') | null>(null);
-  const previous = useRef<{ direction: Float32Array; radiance: Float32Array } | null>(null);
-  const backdrop = useRef<EnvironmentBackground | null>(null);
-  useCommit(() => {
-    const saved = { direction: engine.lighting.direction.slice(), radiance: engine.lighting.radiance.slice() };
-    previous.current = saved;
-    return () => {
-      engine.lighting.direction.set(saved.direction);
-      engine.lighting.radiance.set(saved.radiance);
-    };
-  }, [engine]);
-  useCommit(() => {
-    values([exposure], 1, 'exposure', 0, Infinity);
-    if (!src) {
-      engine.lighting.direction.set([3, 5, 4, 3]);
-      engine.lighting.radiance.set([exposure, exposure, exposure, 0.15 * exposure]);
-    } else if (previous.current) {
-      engine.lighting.direction.set(previous.current.direction);
-      engine.lighting.radiance.set(previous.current.radiance);
-      for (let i = 0; i < 4; i++) engine.lighting.radiance[i] *= exposure;
-    }
-    if (environment && !environment.disposed) environment.intensity = exposure;
-  }, [engine, src, exposure, environment]);
-  useResourceEffect(
-    (lease) => {
-      setEnvironment(null);
-      setModule(null);
-      if (!src) return;
-      let current: IBLEnvironment | undefined;
-      const asset = environmentAsset(assetCache, src),
-        releaseAsset = retainAsset(assetCache, src, asset, assetCache.environments);
-      const release = () => {
-        if (current) {
-          engine.removePlugin(current.name);
-          current.dispose();
-          current = undefined;
-        }
-      };
-      const request: Loading = { src, pending: asset.status === 'pending', promise: Promise.resolve() };
-      request.promise = (async () => {
-        await asset.promise;
-        if (!lease.active || engine.disposed) return;
-        if (asset.status === 'rejected') throw asset.error;
-        const { api, image } = asset.value!;
-        const loaded = await api.Environment.create(engine as unknown as EngineKernel, image);
-        if (!lease.active || engine.disposed) {
-          loaded.dispose();
-          return;
-        }
-        current = loaded;
-        engine.use(loaded as unknown as import('@margoengine/core/extension').EnginePlugin);
-        setModule(api);
-        setEnvironment(loaded);
-      })()
-        .catch((error) => {
-          release();
-          if (lease.active && !engine.disposed) {
-            try {
-              errorHandler.current?.(error);
-            } finally {
-              engine.onError(error);
-            }
-          }
-        })
-        .finally(() => {
-          request.pending = false;
-        });
-      setLoading(request);
-      return () => {
-        releaseAsset();
-        release();
-      };
-    },
-    [engine, src, assetCache],
-  );
-  useCommit(() => {
-    if (!environment || environment.disposed || !module) return;
-    // The environment package's own lighting: it lights core meshes as a plugin and every PBR model it is added to,
-    // with the bindings and WGSL that package keeps current (a copy here went stale when its BRDF table moved to a
-    // storage buffer and `<Environment>` stopped compiling on gltf-pro models).
-    const lighting = new module.EnvironmentLighting(environment),
-      effect = lighting as unknown as LightingEffect;
-    engine.use(lighting);
-    const models = new Map<PBRModel, () => void>();
-    resources.lighting.set(effect, models);
-    const release = () => {
-      resources.lighting.delete(effect);
-      for (const remove of models.values()) remove();
-      models.clear();
-      if (!engine.disposed && engine.hasPlugin(lighting.name)) engine.removePlugin(lighting.name);
-      lighting.dispose();
-    };
-    try {
-      for (const model of resources.models) models.set(model, model.addLighting(effect));
-    } catch (error) {
-      release();
-      throw error;
-    }
-    return release;
-  }, [engine, resources, environment, module]);
-  useCommit(() => {
-    if (!environment || environment.disposed || !module || !background) return;
-    const effect = new module.EnvironmentBackground(environment);
-    engine.use(effect as unknown as import('@margoengine/core/extension').EnginePlugin);
-    backdrop.current = effect;
-    return () => {
-      backdrop.current = null;
-      engine.removePlugin(effect.name);
-      effect.dispose();
-    };
-  }, [engine, environment, module, background]);
-  useCommit(() => {
-    if (backdrop.current) {
-      backdrop.current.exposure = exposure;
-      backdrop.current.blur = blur;
-    }
-  }, [environment, module, background, exposure, blur]);
-  useCommit(() => {
-    if (environment && !environment.disposed) environment.rotation = rotation;
-  }, [environment, rotation]);
-  if (loading && loading.src === src && loading.pending) throw loading.promise;
-  return null;
-}
-
-type HTMLOverlay = import('@margoengine/html').HTML;
-interface OverlayEntry {
-  users: number;
-  promise: Promise<HTMLOverlay>;
-}
-const overlays = new WeakMap<Engine, OverlayEntry>();
-function acquireOverlay(engine: Engine): OverlayEntry {
-  let entry = overlays.get(engine);
-  if (!entry) {
-    entry = {
-      users: 0,
-      promise: optionalPeer('@margoengine/html', () => import('@margoengine/html')).then(({ HTML }) => {
-        if (engine.disposed)
-          throw new MargoError('disposed', 'Canvas is disposed; render the component inside a live <Canvas>.');
-        return HTML.attach(engine as unknown as EngineKernel);
-      }),
-    };
-    overlays.set(engine, entry);
-  }
-  entry.users++;
-  return entry;
-}
-function releaseOverlay(engine: Engine, entry: OverlayEntry): void {
-  if (--entry.users) return;
-  queueMicrotask(() => {
-    if (entry.users || overlays.get(engine) !== entry) return;
-    overlays.delete(engine);
-    void entry.promise.then(
-      (overlay) => overlay.dispose(),
-      () => {},
-    );
-  });
-}
-/** Props of the Html component; every prop is optional unless noted. */
-export interface HtmlProps {
-  children?: ReactNode;
-  /** World position, or the offset from the enclosing `<Mesh>`. Default [0, 0, 0]. */
-  position?: Vec3;
-  className?: string;
-  style?: CSSProperties;
-  /** Hide the label when scene geometry is in front of it (WebGPU depth). Default true. */
-  occlude?: boolean;
-  /** Point of the label placed on the anchor, in fractions of its size: [0.5, 0.5] centres it. Default [0.5, 0.5]. */
-  anchor?: readonly [number, number];
-  /** Scale with distance: a reference distance in world units (or `{ reference, min, max }`) at which scale is 1. */
-  distanceScale?: number | { reference: number; min?: number; max?: number };
-  /** Stack nearer labels above farther ones. Default false. */
-  sort?: boolean;
-  /** Hide the label when its anchor is outside the view. Default true. */
-  frustumCulling?: boolean;
-  /** Hide with an invisible enclosing mesh. Default true. */
-  followVisibility?: boolean;
-  /** Default true. */
-  visible?: boolean;
-  /** `'auto'` lets the label take clicks; default `'none'` lets them through to the canvas. */
-  pointerEvents?: 'none' | 'auto';
-  onError?: (error: unknown) => void;
-}
-/** Optional projected React DOM content, sharing one HTML plugin per canvas. */
-export function Html({
-  children,
-  position = zero,
-  className,
-  style,
-  occlude = true,
-  anchor = [0.5, 0.5],
-  distanceScale,
-  sort = false,
-  frustumCulling = true,
-  followVisibility = true,
-  visible = true,
-  pointerEvents = 'none',
-  onError,
-}: HtmlProps) {
-  const { engine, registry } = useScene();
-  const [portal, setPortal] = useState<HTMLElement | null>(null);
-  const label = useRef<import('@margoengine/html').Label | null>(null),
-    latest = useRef({ position, occlude, onError });
-  latest.current = { position, occlude, onError };
-  const occlusion = useRef<import('@margoengine/html').Label['occlude']>(null);
-  useEffect(() => {
-    let active = true,
-      current: HTMLOverlay | undefined,
-      item: import('@margoengine/html').Label | undefined;
-    const entry = acquireOverlay(engine),
-      element = engine.canvas.ownerDocument.createElement('div');
-    const attach = (mesh: EngineMesh) => {
-      item?.setMesh(mesh as unknown as MeshHandle);
-      item?.setOffset(latest.current.position);
-    };
-    entry.promise
-      .then((overlay) => {
-        if (!active || engine.disposed) return;
-        current = overlay;
-        const mesh = registry?.current,
-          p = latest.current.position;
-        item = overlay.add(element, {
-          mesh: mesh as unknown as MeshHandle | null,
-          position: p,
-          offset: mesh ? p : zero,
-        });
-        label.current = item;
-        occlusion.current = item.occlude;
-        if (!latest.current.occlude) item.occlude = () => false;
-        registry?.attachments.add(attach);
-        setPortal(element);
-      })
-      .catch((error) => {
-        if (active && !engine.disposed) {
-          try {
-            latest.current.onError?.(error);
-          } finally {
-            engine.onError(error);
-          }
-        }
-      });
-    return () => {
-      active = false;
-      registry?.attachments.delete(attach);
-      if (item) current?.remove(item);
-      label.current = null;
-      element.remove();
-      releaseOverlay(engine, entry);
-    };
-  }, [engine, registry]);
-  useCommit(() => {
-    const item = label.current;
-    if (item) {
-      if (registry?.current) item.setMesh(registry.current as unknown as MeshHandle).setOffset(position);
-      else item.setPosition(position);
-      item.occlude = occlude ? occlusion.current : () => false;
-      // The label's live fields; pointer events are a style on the element this component owns.
-      item.anchor = [anchor[0], anchor[1]];
-      item.distanceScale = distanceScale ?? null;
-      item.sort = sort;
-      item.frustumCulling = frustumCulling;
-      item.followVisibility = followVisibility;
-      item.visible = visible;
-      if (portal) portal.style.pointerEvents = pointerEvents;
-    }
-  }, [
-    registry,
-    portal,
-    position[0],
-    position[1],
-    position[2],
-    occlude,
-    anchor[0],
-    anchor[1],
-    typeof distanceScale === 'object' ? JSON.stringify(distanceScale) : distanceScale,
-    sort,
-    frustumCulling,
-    followVisibility,
-    visible,
-    pointerEvents,
-  ]);
-  return portal
-    ? createPortal(
-        <div className={className} style={style}>
-          {children}
-        </div>,
-        portal,
-      )
-    : null;
-}
-
-export { OrbitControls, MapControls, CadControls, ArcballControls } from './controls.js';
-export type { OrbitControlsProps, ArcballControlsProps, ControlEventProps, ProfileName } from './controls.js';

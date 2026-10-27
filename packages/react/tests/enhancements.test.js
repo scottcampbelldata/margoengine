@@ -362,7 +362,7 @@ mock.module('@margoengine/html', {
   },
 });
 
-const Margo = await import('../dist/index.js');
+const Margo = await (await import('./entries.js')).allEntries();
 const { Canvas, Stage, Mesh, BoxGeometry, Model, Environment, useMargo, useFrame } = Margo;
 const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost' });
 for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'navigator'])
@@ -426,8 +426,8 @@ test('the exact target snippet renders Canvas, Stage, clickable Mesh and suspend
   const source = /```tsx\r?\n([\s\S]*?)```/.exec(documentation)?.[1];
   assert.ok(source);
   const { code } = await transformWithOxc(source, 'react-r3f-example.tsx', { jsx: { runtime: 'automatic' } });
-  const resolved = code
-    .replaceAll('@margoengine/react', new URL('../dist/index.js', import.meta.url).href)
+  const resolved = (await import('./entries.js'))
+    .resolveEntries(code)
     .replaceAll('react/jsx-runtime', import.meta.resolve('react/jsx-runtime'))
     .replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
     .replaceAll('from "react"', `from '${import.meta.resolve('react')}'`);
@@ -705,14 +705,14 @@ test('simultaneous Models share a URL load and retain independent transforms and
   assert.ok(models.filter((model) => loaded.includes(model.root)).every((model) => model.disposals === 1));
 });
 
-test('preload warms the same URL promise consumed by a later Model', async () => {
+test('Model.preload warms the same URL promise consumed by a later Model', async () => {
   deferModels = true;
   const view = render(tree(null));
   await flush();
   const before = modelRequests.length;
   let preloaded;
   await act(async () => {
-    preloaded = Margo.preload('/preloaded.glb');
+    preloaded = Model.preload('/preloaded.glb');
   });
   await flush();
   assert.equal(modelRequests.length, before + 1);
@@ -727,11 +727,11 @@ test('preload warms the same URL promise consumed by a later Model', async () =>
   assert.equal(modelRequests.length, before + 1);
 });
 
-test('preload before Canvas queues one promise and shares its result with a mounted Model', async () => {
+test('Model.preload before Canvas queues one promise and shares its result with a mounted Model', async () => {
   deferModels = true;
   const before = modelRequests.length,
-    preloaded = Margo.preload('/early-preload.glb');
-  assert.equal(Margo.preload('/early-preload.glb'), preloaded);
+    preloaded = Model.preload('/early-preload.glb');
+  assert.equal(Model.preload('/early-preload.glb'), preloaded);
   assert.equal(modelRequests.length, before);
   const view = render(tree(null));
   await flush();
@@ -747,7 +747,7 @@ test('preload before Canvas queues one promise and shares its result with a moun
   assert.equal(view.queryByTestId('loading'), null);
 });
 
-test('preload infers HDR URLs and Environment remounts share the resolved image cache', async () => {
+test('Environment.preload warms an HDR URL and Environment remounts share the resolved image cache', async () => {
   deferImages = true;
   const view = render(tree(null));
   await flush();
@@ -756,7 +756,7 @@ test('preload infers HDR URLs and Environment remounts share the resolved image 
     src = '/cached-environment.HDR?lighting=1';
   let preloaded;
   await act(async () => {
-    preloaded = Margo.preload(src);
+    preloaded = Environment.preload(src);
   });
   await flush();
   assert.equal(imageRequests.length, beforeImages + 1);

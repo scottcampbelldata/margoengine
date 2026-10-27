@@ -251,9 +251,11 @@ mock.module('@margoengine/text', {
   },
 });
 const { Context } = await import('../dist/internal.js');
-const { Mesh } = await import('../dist/components.js');
-const { Box, Sphere, Plane, Sky, ContactShadows, Center, PointerLock, TransformControls, Text, sceneWorldBounds } =
-  await import('../dist/kit-helpers.js');
+const { Mesh } = await (await import('./entries.js')).allEntries();
+const { Box, Sphere, Plane, Sky, ContactShadows, Center, PointerLock, TransformControls, Text } = await (
+  await import('./entries.js')
+).allEntries();
+const { sceneWorldBounds } = await import('../dist/center.js');
 const { ContactGround } = await import('../dist/kit-contact.js');
 const dom = new JSDOM('<!doctype html><html><body></body></html>');
 for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'navigator'])
@@ -464,13 +466,13 @@ test('shape casters register native meshes with shared Shadows and release on pr
   const view = render(tree(scene, content(true, [2, 2, 2])));
   await flush();
   assert.deepEqual([...casters], [ref.current]);
-  assert.equal(scene.shadowUsers, 1);
+  assert.equal(scene.shadowUsers, 0, 'castShadow alone requests no shadows (a <Shadows> does)');
   const first = ref.current.geometry;
   view.rerender(tree(scene, content(true, [3, 3, 3])));
   await flush();
   assert.notEqual(ref.current.geometry, first);
   assert.deepEqual([...casters], [ref.current]);
-  assert.equal(scene.shadowUsers, 1);
+  assert.equal(scene.shadowUsers, 0, 'castShadow alone requests no shadows (a <Shadows> does)');
   view.rerender(tree(scene, content(false, [3, 3, 3])));
   await flush();
   assert.equal(casters.size, 0);

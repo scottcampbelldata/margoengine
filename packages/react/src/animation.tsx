@@ -4,7 +4,7 @@ import type { AdditiveLayer, Animator, BlendTree } from '@margoengine/animator';
 import type { PBRModel } from '@margoengine/gltf-pro';
 import type { Vec3 } from '@margoengine/core/extension';
 import { useCommit, useResourceEffect, useScene } from './internal.js';
-import { ModelContext } from './model.js';
+import { ModelContext } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { MargoError } from '@margoengine/math/errors';
 

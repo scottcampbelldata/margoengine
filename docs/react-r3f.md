@@ -48,7 +48,8 @@ A `react-reconciler` dependency would make a bare `<mesh>` work and would throw 
 ## The snippet this has to render
 
 ```tsx
-import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial, Model } from '@margoengine/react';
+import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { Model } from '@margoengine/react/gltf-pro';
 import { Suspense } from 'react';
 
 export function App() {

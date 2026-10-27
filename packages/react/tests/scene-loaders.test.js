@@ -134,8 +134,9 @@ globalThis.ResizeObserver = class {
   disconnect() {}
 };
 const { render, act, cleanup } = await import('@testing-library/react');
-const { Canvas, Model } = await import('@margoengine/react');
-const { Fbx, Gltf, preload } = await import('@margoengine/react/kit');
+const { Canvas } = await import('@margoengine/react');
+const { Fbx } = await import('@margoengine/react/fbx');
+const { Gltf, Model } = await import('@margoengine/react/gltf-pro');
 const tree = (child) =>
   React.createElement(
     StrictMode,
@@ -156,7 +157,7 @@ afterEach(async () => {
   assert.ok(engines.every((value) => value.disposed && value.meshes.size === 0 && value.plugins.size === 0));
 });
 
-test('kit Gltf keeps the existing Model identity and native FBX loader suspends once in StrictMode', async () => {
+test('Gltf keeps the existing Model identity and native FBX loader suspends once in StrictMode', async () => {
   assert.equal(Gltf, Model);
   deferred = true;
   const before = requests.length,
@@ -192,7 +193,7 @@ test('FBX preload and independent remounts share the native URL cache', async ()
   const before = requests.length;
   const view = render(tree(null));
   await flush();
-  await act(async () => preload('/preloaded.FBX?version=1'));
+  await act(async () => Fbx.preload('/preloaded.FBX?version=1'));
   assert.equal(requests.length, before + 1);
   assert.equal(requests.at(-1).kind, 'fbx');
   assert.ok(models.at(-1).disposed, 'preloading must not display an attached model');

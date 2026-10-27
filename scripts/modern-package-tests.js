@@ -392,7 +392,14 @@ try {
     `import {TransformStore,type PassContext} from '@margoengine/core/extension';
 import {EngineKernel,type Mesh as MeshHandle} from '@margoengine/core';
 import {loadGLTF} from '@margoengine/gltf';
-import {Canvas,Mesh,Box,BoxGeometry,PbrMaterial,MeshTransmissionMaterial,Gltf,Animation,Model,Environment,OrbitControls,useMargo,useMargoStage,type MeshRef} from '@margoengine/react';
+import { Canvas, Mesh, BoxGeometry, PbrMaterial, useMargo, useMargoStage, type MeshRef } from '@margoengine/react';
+import { Animation } from '@margoengine/react/animation';
+import { OrbitControls } from '@margoengine/react/controls';
+import { Environment } from '@margoengine/react/environment';
+import { Box } from '@margoengine/react/geometry';
+import { Gltf, Model } from '@margoengine/react/gltf-pro';
+import { MeshTransmissionMaterial } from '@margoengine/react/materials';
+import { Shadows } from '@margoengine/react/shadows';
 import {Kinematics,ExplodedView,SectionPlanes,EngineeringAnnotations,PartInstancer,parseCAD,parseCADAsync,loadCAD,deduplicateParts,SurfacePhysics,TelemetryChannel,AssemblyBVH,measureClearance} from '@margoengine/machinery';
 import {GPUParticles,PostProcessing,ToonShading,HDRRenderTarget} from '@margoengine/creative';
 import {PostStack,Bloom} from '@margoengine/post';
@@ -408,7 +415,7 @@ model.bounds=new Float32Array(6);
 model.destroy();return {bounds,buffer};}
 const html=renderToString(<Canvas><Mesh><BoxGeometry/><PbrMaterial/></Mesh></Canvas>);
 const afterScene=renderToString(<Canvas><Box color="#84d6bd"/><Mesh><BoxGeometry/><MeshTransmissionMaterial factor={0}/></Mesh><Gltf src="/character.glb"><Animation clip="Walk" blend={0.2}/></Gltf></Canvas>);if(!afterScene.includes('<canvas'))throw new Error('Root scene exports failed');
-const declarative=renderToString(<Canvas shadows onCreated={stage=>stage.engine.camera.position=[1,2,5]}><Model src="/model.glb" materials={{Upper:{baseColor:[0.2,0.8,0.3]}}} onLoad={mesh=>mesh.setPosition([1,0,0])}/><Environment src="/studio.hdr" exposure={1} background/><OrbitControls enableDamping minDistance={1} maxDistance={10}/></Canvas>);
+const declarative=renderToString(<Canvas onCreated={stage=>stage.engine.camera.position=[1,2,5]}><Model src="/model.glb" materials={{Upper:{baseColor:[0.2,0.8,0.3]}}} onLoad={mesh=>mesh.setPosition([1,0,0])}/><Environment src="/studio.hdr" exposure={1} background/><OrbitControls enableDamping minDistance={1} maxDistance={10}/><Shadows/></Canvas>);
 if(!declarative.includes('<canvas')||typeof useMargo!=='function'||typeof useMargoStage!=='function')throw new Error('Declarative exports failed');
 if(!html.includes('<canvas')||typeof loadGLTF!=='function'||!Kinematics||!ExplodedView||new GPUParticles({count:32}).count!==32)throw new Error('Consumer failed');
 new SectionPlanes({planes:[[0,0,1,0]]});new EngineeringAnnotations();new PartInstancer();new ToonShading();new PostStack([new Bloom({strength:0.5}),new PostProcessing({atmosphere:{density:0.01}})]);

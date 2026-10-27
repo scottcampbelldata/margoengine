@@ -7,6 +7,7 @@ import {
   ContactShadows,
   EffectComposer,
   OrbitControls,
+  Shadows,
   Sky,
   Sphere,
   Tonemap,
@@ -30,7 +31,8 @@ function Shapes() {
 
 export function Scene() {
   return (
-    <Canvas shadows style={{ height: '100%' }} label="Three shapes in the sun. Drag to orbit, scroll to zoom.">
+    <Canvas style={{ height: '100%' }} label="Three shapes in the sun. Drag to orbit, scroll to zoom.">
+      <Shadows />
       <Sky hours={16.4} timeScale={0} lighting={{ intensity: 6 }} />
       <Shapes />
       <ContactShadows />

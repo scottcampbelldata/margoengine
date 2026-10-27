@@ -178,7 +178,7 @@ const {
   useMargo,
   useMargoStage,
   useFrame,
-} = await import('../dist/index.js');
+} = await (await import('./entries.js')).allEntries();
 test('SSR renders an accessible native canvas without creating an engine', () => {
   assert.equal(Canvas, MargoCanvas);
   assert.match(renderToString(React.createElement(MargoCanvas)), /aria-label="Interactive 3D scene"/);
@@ -230,8 +230,8 @@ async function loadTsx(source) {
   const { code } = await transformWithOxc(source, 'react-example.tsx', {
     jsx: { runtime: 'automatic' },
   });
-  const resolved = code
-    .replaceAll('@margoengine/react', new URL('../dist/index.js', import.meta.url).href)
+  const resolved = (await import('./entries.js'))
+    .resolveEntries(code)
     .replaceAll('react/jsx-runtime', import.meta.resolve('react/jsx-runtime'));
   return import(`data:text/javascript;base64,${Buffer.from(resolved).toString('base64')}`);
 }
@@ -392,44 +392,40 @@ test('Stage camera props override Canvas defaults and update the existing engine
   assert.equal(engine.starts, 1);
   view.unmount();
 });
-test('Stage shadow requests share the Canvas effect and release the last request', async () => {
+test('Shadows components share the Canvas effect and release it with the last one', async () => {
+  const { Shadows } = await import('../dist/shadows.js');
   const before = shadows.length;
-  const tree = (canvasShadows, first, second) =>
+  const tree = (first, second) =>
     React.createElement(
       StrictMode,
       null,
       React.createElement(
         Canvas,
-        { shadows: canvasShadows },
-        React.createElement(Stage, { key: 'first', shadows: first }),
-        React.createElement(Stage, { key: 'second', shadows: second }),
+        null,
+        first && React.createElement(Shadows, { key: 'first' }),
+        second && React.createElement(Shadows, { key: 'second' }),
+        React.createElement(Stage, { key: 'stage' }),
       ),
     );
-  const view = render(tree(false, true, true));
+  const view = render(tree(true, true));
   await act(async () => {});
   const engine = instances.at(-1),
     effect = shadows.at(-1);
   assert.equal(shadows.length, before + 1);
   assert.equal(engine.plugins.get('shadows'), effect);
-  view.rerender(tree(false, false, true));
+  view.rerender(tree(false, true));
   await act(async () => {});
   assert.equal(engine.plugins.get('shadows'), effect);
   assert.equal(effect.disposals, 0);
-  view.rerender(tree(true, false, false));
-  await act(async () => {});
-  assert.equal(engine.plugins.get('shadows'), effect);
-  view.rerender(tree(false, false, false));
+  view.rerender(tree(false, false));
   await act(async () => {});
   assert.equal(effect.disposals, 1);
   assert.equal(engine.plugins.has('shadows'), false);
-  view.rerender(tree(true, true, false));
+  view.rerender(tree(true, false));
   await act(async () => {});
   assert.equal(shadows.length, before + 2);
   const current = shadows.at(-1);
-  view.rerender(tree(false, true, false));
-  await act(async () => {});
   assert.equal(engine.plugins.get('shadows'), current);
-  assert.equal(current.disposals, 0);
   view.unmount();
   assert.equal(current.disposals, 1);
 });

@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
-import { KITS, umbrellaEntries } from '../scripts/umbrella.mjs';
+import { KITS, umbrellaEntries, aliasSources } from '../scripts/umbrella.mjs';
 
 const root = join(import.meta.dirname, '..');
 const manifest = JSON.parse(readFileSync(join(root, 'packages/margoengine/package.json'), 'utf8'));
@@ -34,7 +34,11 @@ test('margoengine is the stage, and every margoengine/<x> is the same module as 
   const entries = umbrellaEntries(root);
   assert.ok(entries.length > 250);
   for (const { subpath, source } of entries) {
-    const [alias, entry] = await Promise.all([import(`margoengine${subpath.slice(1)}`), import(source)]);
+    const [alias, ...sources] = await Promise.all([
+      import(`margoengine${subpath.slice(1)}`),
+      ...aliasSources(entries, source).map((name) => import(name)),
+    ]);
+    const entry = Object.assign({}, ...sources);
     assert.deepEqual(Object.keys(alias).sort(), Object.keys(entry).sort(), subpath);
     for (const name of Object.keys(entry)) assert.equal(alias[name], entry[name], `${subpath} ${name}`);
   }

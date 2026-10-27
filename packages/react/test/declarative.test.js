@@ -358,13 +358,6 @@ const controlsExports = {
 mock.module('@margoengine/controls/orbit', { namedExports: controlsExports });
 mock.module('@margoengine/controls/profiles', { namedExports: controlsExports });
 mock.module('@margoengine/controls/arcball', { namedExports: controlsExports });
-mock.module('@margoengine/cameras/layers', {
-  namedExports: {
-    setRenderLayers(node, mask) {
-      node.layers = mask;
-    },
-  },
-});
 mock.module('@margoengine/shadows', {
   namedExports: {
     Shadows: class {
@@ -424,7 +417,7 @@ const {
   useProgress,
   Scene,
   RenderView,
-} = await import('../dist/index.js');
+} = await (await import('../tests/entries.js')).allEntries();
 test('SSR skips all optional resources and hooks reject missing canvas providers', () => {
   const result = renderToString(
     React.createElement(
@@ -737,12 +730,14 @@ test('Environment src replacement and unmount destroy environments finishing asy
   assert.equal(late.disposals, 1);
 });
 test('shadow flags update registration independently and HDR composes with the shadow shader', async () => {
-  const children = (castShadow, receiveShadow) => [
+  const children = (castShadow, receiveShadow, lit = true) => [
     React.createElement(Model, { key: 'model', src: '/shadow.glb', castShadow, receiveShadow }),
     React.createElement(Environment, { key: 'env', src: '/studio.hdr', background: false }),
+    lit && React.createElement(Shadows, { key: 'shadows' }),
   ];
-  const view = render(tree(children(true, true), { shadows: true }));
+  const view = render(tree(children(true, true)));
   await flush();
+  await flush(); // <Shadows> requests the shadows once mounted, then the package loads
   const model = models.at(-1),
     effect = shadows.at(-1);
   assert.equal(effect.sources.size, 1);
@@ -755,13 +750,13 @@ test('shadow flags update registration independently and HDR composes with the s
   assert.equal(ibl.constructor.name, 'EnvironmentLighting');
   assert.equal(ibl.environment, environments.at(-1));
   assert.equal(engine.plugins.get('environment:lighting'), ibl);
-  view.rerender(tree(children(false, true), { shadows: true }));
+  view.rerender(tree(children(false, true)));
   assert.equal(effect.sources.size, 0);
   assert.ok(model.lighting.has(effect));
-  view.rerender(tree(children(true, false), { shadows: true }));
+  view.rerender(tree(children(true, false)));
   assert.equal(effect.sources.size, 1);
   assert.equal(model.lighting.has(effect), false);
-  view.rerender(tree(children(true, true), { shadows: false }));
+  view.rerender(tree(children(true, true, false)));
   await flush();
   assert.equal(effect.disposals, 1);
   assert.equal(effect.sources.size, 0);
@@ -1036,11 +1031,13 @@ test('Scene creates its meshes in its own engine scene and View lists the Canvas
 test('Mesh layers set the render-layer mask, and removing the prop sets layer 1', async () => {
   const view = render(tree(React.createElement(Mesh, { layers: 6 })));
   await flush();
-  const [node] = engines.at(-1).meshes.values();
-  assert.equal(node.layers, 6);
+  const [node] = engines.at(-1).meshes.values(),
+    // The registry core reads; <Mesh layers> writes it with no package (packages/shared/layers.js).
+    registry = globalThis[Symbol.for('margoengine.layers')];
+  assert.equal(registry.masks.get(node), 6);
   view.rerender(tree(React.createElement(Mesh, {})));
   await flush();
-  assert.equal(node.layers, 1);
+  assert.equal(registry.masks.get(node), 1);
 });
 
 test('Environment rotation turns the environment and blur softens the background, both live', async () => {

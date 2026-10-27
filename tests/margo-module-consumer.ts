@@ -98,14 +98,9 @@ export async function deformedQueries(engine: import('@margoengine/core').Engine
   picking.dispose();
   return { pose, hits };
 }
-import {
-  preload,
-  Group,
-  Html,
-  type CanvasProps,
-  type PointerHandlers,
-  type MargoContextValue,
-} from '@margoengine/react';
+import { Group, type CanvasProps, type PointerHandlers, type MargoContextValue } from '@margoengine/react';
+import { Html } from '@margoengine/react/html';
+import { Gltf } from '@margoengine/react/gltf-pro';
 
 export const demandCanvas: CanvasProps = { frameloop: 'demand' };
 export const clickHandlers: PointerHandlers = { onClick: (event) => event.mesh.setPosition([1, 0, 0]) };
@@ -115,7 +110,7 @@ export function reactCanvasContext(context: MargoContextValue): number {
     engine = context.gl;
   return context.size.width + context.size.height + context.clock + (camera && engine ? 1 : 0);
 }
-export const optionalReactComponents = [Group, Html, preload];
+export const optionalReactComponents = [Group, Html, Gltf.preload];
 // @ts-expect-error Canvas accepts only the two supported frame loops.
 export const invalidFrameLoop: CanvasProps = { frameloop: 'sometimes' };
 

@@ -180,8 +180,10 @@ for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'na
   Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { Context } = await import('../dist/internal.js');
-const { EffectComposer, Bloom, SSAO, DepthOfField, Tonemap, TAA, GTAO, SSR, MotionBlur, SMAA, FXAA, Glitch } =
-  await import('../dist/post.js');
+const { EffectComposer, Bloom, SSAO, GTAO, SSR, MotionBlur, SMAA, FXAA, Glitch } = await import('../dist/post.js');
+const { DepthOfField } = await import('../dist/dof.js');
+const { Tonemap } = await import('../dist/tonemap.js');
+const { TAA } = await import('../dist/taa.js');
 const { render, act, cleanup } = await import('@testing-library/react');
 const flush = () => act(async () => {});
 const h = React.createElement;
@@ -236,49 +238,57 @@ afterEach(async () => {
   );
 });
 
-test('post subpath has only its effect components and isolates dynamic optional imports', async () => {
-  const api = await import('../dist/post.js');
-  assert.deepEqual(
-    Object.keys(api).sort(),
-    [
-      'Afterimage',
-      'Bloom',
-      'DepthOfField',
-      'EffectComposer',
-      'FXAA',
-      'GTAO',
-      'Glitch',
-      'LensFlare',
-      'MotionBlur',
-      'SMAA',
-      'SSAO',
-      'SSGI',
-      'SSR',
-      'TAA',
-      'Tonemap',
-    ].sort(),
+test('post subpaths hold only their effect components, each importing only its own package', async () => {
+  const entries = {
+    post: {
+      names: [
+        'Afterimage',
+        'Bloom',
+        'DepthTexture',
+        'EffectComposer',
+        'FXAA',
+        'GTAO',
+        'Glitch',
+        'LensFlare',
+        'MotionBlur',
+        'SMAA',
+        'SSAO',
+        'SSGI',
+        'SSR',
+        'SceneTargets',
+      ],
+      imports: [
+        '@margoengine/post/bloom',
+        '@margoengine/post/ssao',
+        '@margoengine/post/gtao',
+        '@margoengine/post/ssr',
+        '@margoengine/post/ssgi',
+        '@margoengine/post/motion-blur',
+        '@margoengine/post/lens-flare',
+        '@margoengine/post/smaa',
+        '@margoengine/post/fxaa',
+        '@margoengine/post/glitch',
+        '@margoengine/post/afterimage',
+      ],
+    },
+    dof: { names: ['DepthOfField'], imports: ['@margoengine/dof'] },
+    tonemap: { names: ['Tonemap'], imports: ['@margoengine/tonemap'] },
+    taa: { names: ['TAA'], imports: ['@margoengine/taa'] },
+  };
+  for (const [entry, { names, imports }] of Object.entries(entries)) {
+    assert.deepEqual(Object.keys(await import(`../dist/${entry}.js`)).sort(), names.sort(), entry);
+    const source = await readFile(new URL(`../dist/${entry}.js`, import.meta.url), 'utf8');
+    for (const name of imports)
+      assert.ok(source.includes(`import('${name}')`) || source.includes(`import("${name}")`), `${entry}: ${name}`);
+    assert.equal(/from ['"]@margoengine\/(?:post|dof|tonemap|taa)/.test(source), false, entry);
+    assert.equal(source.includes('react-reconciler'), false);
+  }
+  // The composer imports the stack and no effect: an effect component brings its own loader.
+  const composer = await readFile(new URL('../dist/composer.js', import.meta.url), 'utf8');
+  assert.ok(
+    composer.includes("import('@margoengine/post/stack')") || composer.includes('import("@margoengine/post/stack")'),
   );
-  const source = await readFile(new URL('../dist/post.js', import.meta.url), 'utf8');
-  for (const name of [
-    '@margoengine/post/bloom',
-    '@margoengine/post/ssao',
-    '@margoengine/post/gtao',
-    '@margoengine/post/ssr',
-    '@margoengine/post/ssgi',
-    '@margoengine/post/motion-blur',
-    '@margoengine/post/lens-flare',
-    '@margoengine/post/smaa',
-    '@margoengine/post/fxaa',
-    '@margoengine/post/glitch',
-    '@margoengine/post/afterimage',
-    '@margoengine/post/stack',
-    '@margoengine/dof',
-    '@margoengine/tonemap',
-    '@margoengine/taa',
-  ])
-    assert.ok(source.includes(`import('${name}')`) || source.includes(`import("${name}")`));
-  assert.equal(/from ['"]@margoengine\/(?:post|dof|tonemap|taa)/.test(source), false);
-  assert.equal(source.includes('react-reconciler'), false);
+  assert.equal(/import\(['"]@margoengine\/(?:dof|tonemap|taa|post\/(?!stack))/.test(composer), false);
 });
 
 test('the documented composer JSX is renderable on the server without loading plugins', () => {

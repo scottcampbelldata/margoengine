@@ -125,9 +125,12 @@ for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'na
   Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { Context } = await import('../dist/internal.js');
-const { BatchedMesh, BatchedItem, DepthTexture, SceneTargets, SectionPlanes } = await import('../dist/extras.js');
-const { Sun, AmbientLight, HemisphereLight, Fog } = await import('../dist/lights.js');
-const { Voxels } = await import('../dist/voxels.js');
+const { BatchedMesh, BatchedItem } = await import('@margoengine/react/materials');
+const { DepthTexture, SceneTargets } = await import('@margoengine/react/post');
+const { SectionPlanes } = await import('@margoengine/react/machinery');
+const { Sun } = await import('@margoengine/react');
+const { AmbientLight, HemisphereLight, Fog } = await import('@margoengine/react/environment');
+const { Voxels } = await import('@margoengine/react/voxel');
 const { render, act, cleanup } = await import('@testing-library/react');
 const flush = () => act(async () => {});
 const h = React.createElement;

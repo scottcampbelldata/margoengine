@@ -3,6 +3,7 @@ import type { Engine, Mesh as EngineMesh, Vec3, Geometry } from '@margoengine/co
 import type { FrameCallback, Mesh as MeshHandle } from '@margoengine/core';
 import type { PBRModel, LightingEffect } from '@margoengine/gltf-pro';
 import type { Shadows } from '@margoengine/shadows';
+import type * as ShadowsModule from '@margoengine/shadows';
 import type { AssetCache } from './assets.js';
 import { MargoError } from '@margoengine/math/errors';
 
@@ -18,7 +19,17 @@ export interface Registry {
 export interface Resources {
   models: Set<PBRModel>;
   lighting: Map<LightingEffect, Map<PBRModel, () => void>>;
+  /** GPU picking of the models, installed by the first model binding (the Canvas itself picks core meshes only). */
+  picking?: {
+    prepare(engine: Engine, resources: Resources, frames: Frames): Promise<void>;
+    release(engine: Engine): void;
+  };
 }
+/** Imports `@margoengine/shadows`; `<Shadows>` and `<ContactShadows>` hand it to the Canvas. */
+export type ShadowsLoader = () => Promise<typeof ShadowsModule>;
+// Optional model behaviours share the instance that this mount owns. The URL
+// cache keeps source data only; animation state is never shared between mounts.
+export const ModelContext = createContext<PBRModel | null | undefined>(undefined);
 /** Pointer event passed to React handlers, with the hit point and mesh. */
 export interface MargoPointerEvent {
   nativeEvent: PointerEvent;
@@ -47,7 +58,8 @@ export interface Scene {
   registry: Registry | null;
   resources: Resources;
   shadows: Shadows | null;
-  requestShadows: () => () => void;
+  /** Turns the Canvas shadows on until the returned function is called; load imports the package. */
+  requestShadows: (load: ShadowsLoader) => () => void;
   cameraOverrides: Set<() => void>;
   pointerHandlers: Map<number, PointerHandlers>;
   frames: Frames;

@@ -7,7 +7,7 @@ const warn = console.warn;
 console.warn = () => {};
 await RAPIER.init();
 console.warn = warn;
-const { Canvas } = await import('../dist/index.js');
+const { Canvas } = await (await import('./entries.js')).allEntries();
 const {
   Physics,
   RigidBody,

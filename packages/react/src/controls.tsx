@@ -238,3 +238,9 @@ export const ArcballControls = forwardRef<ArcballInstance, ArcballControlsProps>
   });
   return null;
 });
+export {
+  PointerLock,
+  TransformControls,
+  type PointerLockProps,
+  type TransformControlsProps,
+} from './controls-helpers.js';

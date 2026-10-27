@@ -23,7 +23,8 @@ test('no API report holds a file path', () => {
 });
 
 test('a namespace type import of another package is reported as `import * as`', () => {
-  const react = readFileSync(join(root, 'api', 'react.api.md'), 'utf8');
+  // The geometry shapes (`Box`, `Sphere`, `Plane`) live in @margoengine/react/geometry since 2026-10-27.
+  const react = readFileSync(join(root, 'api', 'react.geometry.api.md'), 'utf8');
   assert.match(react, /^import \* as GeometryModule from "@margoengine\/geometry";$/m);
   assert.match(react, /type GeometryApi = typeof GeometryModule;/);
 });

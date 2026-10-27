@@ -40,9 +40,10 @@ Geometry and material are child components, as in R3F.
   There is no event bubbling through a scene graph of React elements, and no separate raycaster: picking is a GPU read of
   the pixel.
 - **Refs.** A mesh ref is a stable handle; it never points at a disposed mesh across Strict Mode or Suspense.
-- **Optional features load on demand.** Controls, shadows, post effects and loaders are optional peers that load when
-  their component mounts, so an app only ships what it uses. A missing peer throws an error that names the package to
-  install.
+- **Optional features are subpaths.** Controls, shadows, post effects and loaders are optional packages: import their
+  components from `@margoengine/react/<package>` (`/controls`, `/shadows`, `/post`, `/gltf-pro`, ...) and install that
+  package; each loads when its component mounts, so an app only ships what it uses. `<Canvas shadows>` is
+  `<Shadows />` from `@margoengine/react/shadows`.
 - **No `extend()`.** Use native plugins through `useEngine()` and `engine.use(plugin)`, or write a component with
   `useEffect`.
 
@@ -65,11 +66,15 @@ R3F:
 Margo:
 
 ```tsx
-import { Canvas, AmbientLight, Sun, Mesh, BoxGeometry, PbrMaterial, OrbitControls } from '@margoengine/react';
+import { Canvas, Sun, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { OrbitControls } from '@margoengine/react/controls';
+import { AmbientLight } from '@margoengine/react/environment';
+import { Shadows } from '@margoengine/react/shadows';
 
 export function Scene() {
   return (
-    <Canvas shadows camera={{ position: [0, 2, 5] }}>
+    <Canvas camera={{ position: [0, 2, 5] }}>
+      <Shadows />
       <AmbientLight intensity={0.4} />
       <Sun direction={[3, 5, 4]} intensity={3} />
       <Mesh castShadow position={[0, 1, 0]}>

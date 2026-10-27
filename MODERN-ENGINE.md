@@ -114,8 +114,7 @@ WebGPU uses reversed Z: near=1, far=0, clear=0 and `greater-equal` with `depth32
 
 ```tsx
 import { useRef } from 'react';
-import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame,
-  type MeshRef } from '@margoengine/react';
+import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame, type MeshRef } from '@margoengine/react';
 
 function Cube() {
   const ref = useRef<MeshRef>(null);

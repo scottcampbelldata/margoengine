@@ -14,23 +14,21 @@ import {
   type MeshRef,
   type MargoContextValue,
 } from '@margoengine/react';
-import {
-  Box,
-  Sphere,
-  Plane,
-  Html,
-  Text,
-  Sky,
-  Environment,
-  ContactShadows,
-  Center,
-  TransformControls,
-  PointerLock,
-  Gltf,
-  Fbx,
-} from '@margoengine/react/kit';
+import { Center } from '@margoengine/react';
+import { TransformControls, PointerLock } from '@margoengine/react/controls';
+import { Environment } from '@margoengine/react/environment';
+import { Fbx } from '@margoengine/react/fbx';
+import { Box, Sphere, Plane } from '@margoengine/react/geometry';
+import { Gltf } from '@margoengine/react/gltf-pro';
+import { Html } from '@margoengine/react/html';
+import { ContactShadows } from '@margoengine/react/shadows';
+import { Sky } from '@margoengine/react/sky';
+import { Text } from '@margoengine/react/text';
 import { Physics, RigidBody, CuboidCollider, BallCollider, type PhysicsBody } from '@margoengine/react/physics';
-import { EffectComposer, Bloom, SSAO, DepthOfField, Tonemap, TAA } from '@margoengine/react/post';
+import { EffectComposer, Bloom, SSAO } from '@margoengine/react/post';
+import { DepthOfField } from '@margoengine/react/dof';
+import { TAA } from '@margoengine/react/taa';
+import { Tonemap } from '@margoengine/react/tonemap';
 import { XR, Controller, useXR, type XRContextValue } from '@margoengine/react/xr';
 import { simulatedXR } from './scene-xr-fixture.js';
 

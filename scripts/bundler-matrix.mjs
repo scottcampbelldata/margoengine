@@ -22,6 +22,12 @@ import { gzipSync } from 'node:zlib';
 // (React, React DOM, core, the stage and the React bindings), and everything a build of it emits with @margoengine/react
 // installed alone.
 const REACT_BUDGET = { initial: 100_000, total: 115_000 };
+// Every subpath of @margoengine/react (one per optional package it binds).
+const reactSubpaths = Object.keys(
+  JSON.parse(readFileSync(resolve(import.meta.dirname, '../packages/react/package.json'), 'utf8')).exports,
+)
+  .filter((key) => key !== '.')
+  .map((key) => key.slice(2));
 
 const root = resolve(import.meta.dirname, '..'),
   archives = join(root, 'test-results/modern-packages'),
@@ -132,7 +138,11 @@ try {
   // A Vite browser build of the React cube page importing from `specifier`, in `dir/react-app`. It fails on any
   // warning; it returns the emitted files, the modules of every chunk and of the initial load (the entry and its static
   // imports, what the page requests before it runs), and gzip sizes.
-  const reactApp = async (dir, specifier) => {
+  const reactApp = async (
+    dir,
+    specifier,
+    controls = specifier === '@margoengine/react' ? '@margoengine/react/controls' : specifier,
+  ) => {
     const app = join(dir, 'react-app');
     await mkdir(app, { recursive: true });
     await writeFile(
@@ -143,7 +153,8 @@ try {
       join(app, 'main.jsx'),
       `import { useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BoxGeometry, Canvas, Mesh, OrbitControls, PbrMaterial, useFrame } from '${specifier}';
+import { BoxGeometry, Canvas, Mesh, PbrMaterial, useFrame } from '${specifier}';
+import { OrbitControls } from '${controls}';
 function Spinner() {
   const mesh = useRef(null);
   useFrame((_engine, delta) => {
@@ -268,11 +279,9 @@ createRoot(document.getElementById('root')).render(<Canvas label="cube"><Spinner
             join(alone, 'typed/main.tsx'),
             `import { useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BoxGeometry, Canvas, Mesh, OrbitControls, PbrMaterial, useFrame, type MeshRef } from '@margoengine/react';
-export * as kit from '@margoengine/react/kit';
-export * as post from '@margoengine/react/post';
-export * as physics from '@margoengine/react/physics';
-export * as xr from '@margoengine/react/xr';
+import { BoxGeometry, Canvas, Mesh, PbrMaterial, useFrame, type MeshRef } from '@margoengine/react';
+import { OrbitControls } from '@margoengine/react/controls';
+${reactSubpaths.map((name) => `export * as ${name.replace(/-(\w)/g, (_, c) => c.toUpperCase())} from '@margoengine/react/${name}';`).join('\n')}
 function Spinner() {
   const mesh = useRef<MeshRef>(null);
   useFrame((_engine, delta) => {
@@ -361,13 +370,19 @@ ${result.stdout}${result.stderr}`,
           [],
           'margoengine: the initial load holds no optional engine package',
         );
-        // Regression (2026-10-27): the Stage class's loaders put OpenCascade's .wasm into every build of a Canvas page;
-        // the stage feature entries keep it out. The decoders still come from the React root's glTF bindings
-        // (docs/known-bugs.md, cause 2).
+        // Regression (2026-10-27): the Stage class's loaders put OpenCascade's .wasm into every build of a Canvas page.
+        // margoengine/react re-exports every binding, so its module graph still reaches gltf-pro's decoders, and Vite
+        // copies their .wasm when it reads a module, before tree-shaking; no chunk of them is emitted or fetched
+        // (docs/limits.md). @margoengine/react alone emits none (asserted above).
         assert.deepEqual(
           umbrella.files.filter((file) => file.endsWith('.wasm')).map((file) => file.replace(/-[\w-]{8}\.wasm$/, '')),
           ['assets/basis_transcoder', 'assets/draco_decoder'],
-          'margoengine: no OpenCascade .wasm; only the decoders the React root can reach (docs/limits.md)',
+          'margoengine: no OpenCascade .wasm; only the decoders gltf-pro names (docs/limits.md)',
+        );
+        assert.deepEqual(
+          umbrella.modules.filter((id) => /node_modules\/@margoengine\/(gltf-pro|decoders|machinery)\//.test(id)),
+          [],
+          'margoengine: no chunk of gltf-pro, the decoders or machinery is emitted',
         );
         for (const [label, app] of [
           ['react alone', scoped],
@@ -549,6 +564,202 @@ ${result.stdout}${result.stderr}`,
         done(`next ${flag}: App Router + Pages Router built`);
       })(),
     );
+  // Next.js 16 App Router with @margoengine/react installed alone (npm adds the required peers core and stage), built
+  // with webpack and with Turbopack, each in its own project: the cube page with nothing else, and the same page with
+  // OrbitControls from @margoengine/react/controls and only @margoengine/controls added. Regression (2026-10-27): both
+  // bundlers stopped with "Module not found" for 18 optional peers, reached through the Stage class and the React root.
+  // Each build must resolve every module and emit no OpenCascade, Draco or Basis file.
+  const nextAlone = async (label, extra, scene) => {
+    const app = await mkdtemp(join(temp, `margoengine-bundlers-next-${label}-`));
+    try {
+      const installed = (name) => JSON.parse(readFileSync(join(fixture, 'node_modules', name, 'package.json'))).version;
+      await writeFile(
+        join(app, 'package.json'),
+        JSON.stringify({
+          private: true,
+          type: 'module',
+          dependencies: {
+            '@margoengine/react': packed['@margoengine/react'],
+            ...Object.fromEntries(extra.map((name) => [name, packed[name]])),
+            next: installed('next'),
+            react: installed('react'),
+            'react-dom': installed('react-dom'),
+          },
+          overrides: Object.fromEntries(Object.entries(packed).filter(([name]) => name !== 'margoengine')),
+        }),
+      );
+      await run(process.execPath, [npm, 'install', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: app });
+      const engine = (await readdir(join(app, 'node_modules/@margoengine'))).sort();
+      // What npm must install: @margoengine/react, the packages added, and their dependencies and required peers.
+      const wanted = new Set(),
+        pending = ['@margoengine/react', ...extra];
+      while (pending.length) {
+        const name = pending.pop();
+        if (wanted.has(name) || !name.startsWith('@margoengine/')) continue;
+        wanted.add(name);
+        const m = JSON.parse(readFileSync(join(app, 'node_modules', name, 'package.json'), 'utf8'));
+        pending.push(
+          ...Object.keys(m.dependencies ?? {}),
+          ...Object.keys(m.peerDependencies ?? {}).filter((peer) => !m.peerDependenciesMeta?.[peer]?.optional),
+        );
+      }
+      assert.deepEqual(
+        engine.filter((name) => !wanted.has(`@margoengine/${name}`)),
+        [],
+        `next ${label}: npm installed only @margoengine/react, the added packages and what they require (${engine})`,
+      );
+      assert.equal(engine.includes('gltf-pro') || engine.includes('machinery') || engine.includes('shadows'), false);
+      await mkdir(join(app, 'app'), { recursive: true });
+      await writeFile(join(app, 'next.config.mjs'), 'export default {};\n');
+      await writeFile(
+        join(app, 'app/layout.jsx'),
+        'export default function Layout({ children }) { return <html lang="en"><body>{children}</body></html>; }\n',
+      );
+      await writeFile(join(app, 'app/scene.jsx'), scene);
+      await writeFile(
+        join(app, 'app/page.jsx'),
+        "import { Suspense } from 'react';\nimport { Scene } from './scene';\nexport default function Page() { return <main><h1>Margo</h1><Suspense fallback={<p>Loading</p>}><Scene /></Suspense></main>; }\n",
+      );
+      // Vite, Rollup and esbuild builds of the same cube page in this project: each emits core, the stage and the
+      // React bindings, and no optional engine package (React itself stays external for Rollup and esbuild, which
+      // would need a CommonJS plugin for it).
+      if (!extra.length) {
+        await writeFile(
+          join(app, 'cube.js'),
+          "import { createElement as h } from 'react';\nimport { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';\nexport const page = h(Canvas, { label: 'cube' }, h(Mesh, null, h(BoxGeometry), h(PbrMaterial, { color: '#84d6bd' })));\n",
+        );
+        const cube = join(app, 'cube.js'),
+          react = /^react(-dom)?(\/|$)/;
+        const engine = (ids) =>
+          new Set(ids.map((id) => /node_modules[\\/]@margoengine[\\/]([^\\/]+)/.exec(id)?.[1]).filter(Boolean));
+        const { build } = await load('vite');
+        const vite = await build({
+          root: app,
+          configFile: false,
+          logLevel: 'silent',
+          build: {
+            write: false,
+            lib: { entry: cube, formats: ['es'] },
+            rollupOptions: { external: (id) => react.test(id) },
+          },
+        });
+        const esbuild = await load('esbuild');
+        const es = await esbuild.build({
+          entryPoints: [cube],
+          bundle: true,
+          format: 'esm',
+          splitting: true,
+          outdir: join(app, 'out/esbuild'),
+          metafile: true,
+          logLevel: 'silent',
+          external: ['react', 'react-dom', 'react/*', 'react-dom/*'],
+        });
+        const { rollup } = await load('rollup');
+        const { nodeResolve } = await load('@rollup/plugin-node-resolve');
+        const bundle = await rollup({
+          input: cube,
+          external: (id) => react.test(id),
+          plugins: [nodeResolve({ browser: true, rootDir: app })],
+          logLevel: 'silent',
+        });
+        const rolled = (await bundle.generate({ format: 'es' })).output;
+        const chunkIds = (output) =>
+          output
+            .filter((c) => c.type === 'chunk')
+            .flatMap((c) =>
+              Object.entries(c.modules)
+                .filter(([, m]) => m.renderedLength)
+                .map(([id]) => id),
+            );
+        for (const [bundler, ids, files] of [
+          [
+            'vite',
+            chunkIds([vite].flat().flatMap((o) => o.output)),
+            [vite]
+              .flat()
+              .flatMap((o) => o.output)
+              .map((o) => o.fileName),
+          ],
+          [
+            'esbuild',
+            Object.values(es.metafile.outputs).flatMap((o) =>
+              Object.entries(o.inputs)
+                .filter(([, i]) => i.bytesInOutput)
+                .map(([id]) => id),
+            ),
+            Object.keys(es.metafile.outputs),
+          ],
+          ['rollup', chunkIds(rolled), rolled.map((o) => o.fileName)],
+        ]) {
+          const emitted = engine(ids);
+          for (const name of ['core', 'stage', 'react'])
+            assert.ok(emitted.has(name), `${bundler} react alone: ${name} emitted`);
+          assert.deepEqual(
+            [...emitted].filter((name) => !['core', 'stage', 'react', 'math', 'cache', 'selection'].includes(name)),
+            [],
+            `${bundler} react alone: no optional engine package is emitted`,
+          );
+          assert.deepEqual(
+            files.filter((file) => /\.wasm$|occt|draco|basis/i.test(file)),
+            [],
+            `${bundler} react alone: no Wasm`,
+          );
+          done(`${bundler} react alone: ${files.length} files, engine ${[...engine(ids)].join(', ')}`);
+        }
+      }
+      for (const flag of ['--webpack', '--turbopack']) {
+        await rm(join(app, '.next'), { recursive: true, force: true });
+        const built = await run(process.execPath, [join(app, 'node_modules/next/dist/bin/next'), 'build', flag], {
+          cwd: app,
+          env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
+          maxBuffer: 1 << 28,
+        }).then(
+          (output) => ({ code: 0, ...output }),
+          (failure) => failure,
+        );
+        assert.equal(
+          built.code,
+          0,
+          `next ${label} ${flag}: the build resolves every module\n${built.stdout}${built.stderr}`,
+        );
+        assert.doesNotMatch(
+          `${built.stdout}${built.stderr}`,
+          /Module not found|Can't resolve/,
+          `next ${label} ${flag}`,
+        );
+        assert.ok(
+          readFileSync(join(app, '.next/server/app/index.html'), 'utf8').includes('<h1>Margo</h1>'),
+          `next ${label} ${flag}: the server page renders its heading`,
+        );
+        const emitted = (await readdir(join(app, '.next'), { recursive: true })).map((file) =>
+          file.replaceAll('\\', '/'),
+        );
+        assert.deepEqual(
+          emitted.filter((file) => /occt|draco|basis|\.wasm$/i.test(file)),
+          [],
+          `next ${label} ${flag}: no OpenCascade, Draco or Basis file is emitted`,
+        );
+        done(`next ${label} ${flag}: built with ${engine.length} engine packages installed`);
+      }
+    } finally {
+      spawn(process.execPath, ['-e', 'require("fs").rmSync(process.argv[1],{recursive:true,force:true})', app], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref();
+    }
+  };
+  builds.push(
+    nextAlone(
+      'react-alone',
+      [],
+      '\'use client\';\nimport { Canvas, Mesh, BoxGeometry, PbrMaterial } from \'@margoengine/react\';\nexport function Scene() { return <Canvas label="cube"><Mesh><BoxGeometry /><PbrMaterial color="#84d6bd" /></Mesh></Canvas>; }\n',
+    ),
+    nextAlone(
+      'react-controls',
+      ['@margoengine/controls'],
+      "'use client';\nimport { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';\nimport { OrbitControls } from '@margoengine/react/controls';\nexport function Scene() { return <Canvas label=\"cube\"><Mesh><BoxGeometry /><PbrMaterial color=\"#84d6bd\" /></Mesh><OrbitControls /></Canvas>; }\n",
+    ),
+  );
   // A plain browser import map: margoengine's dist/importmap.json with its CDN base pointed at this server.
   builds.push(
     (async () => {

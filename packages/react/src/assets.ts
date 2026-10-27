@@ -1,5 +1,4 @@
 import type { EngineKernel } from '@margoengine/core';
-import { optionalPeer } from './optional.js';
 import type { GLTFAsset, GLTFImage, PBRModel } from '@margoengine/gltf-pro';
 import type { LoadingManager } from '@margoengine/cache/manager';
 import type * as EnvironmentModule from '@margoengine/environment';
@@ -66,9 +65,9 @@ export interface AssetCache {
 }
 /** Progress before anything loads. */
 export const idleProgress: LoadProgress = { active: false, loaded: 0, total: 0, progress: 0, item: '', errors: [] };
-// One LoadingManager per Canvas, made on the first load. Without the optional @margoengine/cache the loads run on
-// plain fetch and useProgress stays idle: progress is a convenience, never a reason for a load to fail.
-function trackedFetch(cache: AssetCache): Promise<typeof fetch> {
+// One LoadingManager per Canvas, made on the first load (@margoengine/cache, a dependency). If it fails to load, the
+// loads run on plain fetch and useProgress stays idle: progress is a convenience, never a reason for a load to fail.
+export function trackedFetch(cache: AssetCache): Promise<typeof fetch> {
   const tracker = cache.tracker;
   tracker.manager ??= import('@margoengine/cache/manager').then(
     ({ LoadingManager }) => {
@@ -113,9 +112,8 @@ export function subscribeProgress(cache: AssetCache, listener: () => void): () =
 }
 const active = new Set<AssetCache>();
 export type ModelFormat = 'model' | 'fbx';
-type AssetKind = ModelFormat | 'environment';
-// A queued preload carries its own start function, so a Canvas that never calls preload() does not reach the model,
-// FBX and environment loaders: bundlers emit an optional peer only when code that can load it is reachable.
+// A queued preload carries its own start function, given by the binding that owns the URL's loader (`Gltf.preload`,
+// `Fbx.preload`, `Environment.preload`), so this module reaches no optional package.
 const queued = new Map<
   string,
   {
@@ -137,91 +135,17 @@ export function createAssetCache(engine: EngineKernel | null): AssetCache {
   };
 }
 
-function closeImages(images: readonly GLTFImage[]): void {
+export function closeImages(images: readonly GLTFImage[]): void {
   for (const image of images) if (image && 'close' in image) image.close();
 }
-async function copyImages(images: readonly GLTFImage[]): Promise<GLTFImage[]> {
-  const copies: GLTFImage[] = [];
-  try {
-    for (let i = 0; i < images.length; i++) {
-      const image = images[i];
-      if (!image) continue;
-      copies[i] =
-        'ktx2' in image
-          ? { ...image, close() {} }
-          : 'mipmaps' in image
-            ? { ...image }
-            : await createImageBitmap(image, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
-    }
-    return copies;
-  } catch (error) {
-    closeImages(copies);
-    throw error;
-  }
-}
-function disposeSource(source: ModelSource): void {
+export function disposeSource(source: ModelSource): void {
   source.first?.dispose();
   source.first = null;
   closeImages(source.images);
   source.images = [];
 }
-async function loadModel(
-  cache: AssetCache,
-  src: string,
-  signal: AbortSignal,
-  format: ModelFormat,
-): Promise<ModelSource> {
-  const api = await optionalPeer('@margoengine/gltf-pro', () => import('@margoengine/gltf-pro'));
-  signal.throwIfAborted();
-  const loader =
-    format === 'fbx'
-      ? (await optionalPeer('@margoengine/fbx', () => import('@margoengine/fbx'))).loadFBX
-      : api.loadGLTF;
-  const fetch = await trackedFetch(cache);
-  signal.throwIfAborted();
-  const model = await loader(cache.engine!, src, { signal, fetch });
-  model.root.visible = false;
-  let copies: GLTFImage[] = [];
-  try {
-    signal.throwIfAborted();
-    // Retain decoded CPU data, never a shared mutable model instance. Every mount
-    // owns its transforms, materials, GPU resources and disposable image copies.
-    const images: GLTFImage[] = [];
-    for (let i = 0; i < (model.asset.doc.images?.length ?? 0); i++) {
-      try {
-        images[i] = model.image(i);
-      } catch (error) {
-        if (!(error instanceof TypeError) || error.message !== 'Missing decoded glTF image') throw error;
-      }
-    }
-    copies = await copyImages(images);
-    signal.throwIfAborted();
-    return { api, asset: model.asset, images: copies, first: model };
-  } catch (error) {
-    closeImages(copies);
-    model.dispose();
-    throw error;
-  }
-}
-export async function instantiateModel(source: ModelSource, engine: EngineKernel): Promise<PBRModel> {
-  if (source.first) {
-    const model = source.first;
-    source.first = null;
-    return model;
-  }
-  const images = await copyImages(source.images);
-  let model: PBRModel | undefined;
-  try {
-    model = new source.api.PBRModel(engine, source.asset, images);
-    engine.use(model);
-    return model;
-  } catch (error) {
-    if (model) model.dispose();
-    else closeImages(images);
-    throw error;
-  }
-}
-function entry<T>(
+/** The cache entry of `src` in `map`, loading it with `load` on first use. */
+export function entry<T>(
   cache: AssetCache,
   map: Map<string, AssetEntry<T>>,
   src: string,
@@ -251,26 +175,6 @@ function entry<T>(
       result.status = 'rejected';
     });
   return result;
-}
-export function modelAsset(cache: AssetCache, src: string, format: ModelFormat = 'model'): AssetEntry<ModelSource> {
-  return entry(
-    cache,
-    format === 'fbx' ? cache.fbx : cache.models,
-    src,
-    (signal) => loadModel(cache, src, signal, format),
-    disposeSource,
-  );
-}
-export function environmentAsset(cache: AssetCache, src: string): AssetEntry<EnvironmentSource> {
-  return entry(cache, cache.environments, src, async (signal) => {
-    const api = await optionalPeer('@margoengine/environment', () => import('@margoengine/environment'));
-    signal.throwIfAborted();
-    const fetch = await trackedFetch(cache);
-    signal.throwIfAborted();
-    const image = await api.loadEnvironmentImage(src, { signal, fetch });
-    signal.throwIfAborted();
-    return { api, image };
-  });
 }
 /** The entry of `load` for `src` on this Canvas, started on first use, and the map it lives in. */
 export function loaderAsset<T>(
@@ -313,47 +217,6 @@ export function retainAsset<T>(
     if (cache.disposed) asset.abort.abort();
   };
 }
-function warm(cache: AssetCache, src: string, kind: AssetKind): Promise<void> {
-  const asset = kind === 'environment' ? environmentAsset(cache, src) : modelAsset(cache, src, kind);
-  asset.users++;
-  return asset.promise
-    .then(() => {
-      if (asset.status === 'rejected') throw asset.error;
-      // A preloaded model must not appear in the scene before it is mounted.
-      if (kind !== 'environment') {
-        const source = asset.value as ModelSource;
-        if (source.first) {
-          source.first.dispose();
-          source.first = null;
-        }
-      }
-    })
-    .finally(() => {
-      asset.users--;
-    });
-}
-/** Warm the URL cache of active canvases. Before Canvas is ready, queue the same
- * promise until an engine exists. GPU-backed glTF loading requires that engine. */
-export function preload(
-  src: string,
-  kind: AssetKind = /\.(hdr|exr)$/i.test(src.split(/[?#]/, 1)[0])
-    ? 'environment'
-    : /\.fbx$/i.test(src.split(/[?#]/, 1)[0])
-      ? 'fbx'
-      : 'model',
-): Promise<void> {
-  if (active.size) return Promise.all([...active].map((cache) => warm(cache, src, kind))).then(() => {});
-  const key = kind + ':' + src,
-    cached = queued.get(key);
-  if (cached) return cached.promise;
-  let resolve!: () => void, reject!: (error: unknown) => void;
-  const promise = new Promise<void>((yes, no) => {
-    resolve = yes;
-    reject = no;
-  });
-  queued.set(key, { start: (cache) => warm(cache, src, kind), promise, resolve, reject });
-  return promise;
-}
 export function activateAssetCache(cache: AssetCache): void {
   if (!cache.engine) return;
   cache.disposed = false;
@@ -377,4 +240,20 @@ export function disposeAssetCache(cache: AssetCache): void {
   cache.models.clear();
   cache.fbx.clear();
   cache.environments.clear();
+}
+/**
+ * Warms `key` in every active Canvas with `start`, or queues it until a Canvas exists: the shared machinery of
+ * `Gltf.preload`, `Fbx.preload` and `Environment.preload`.
+ */
+export function preloadAsset(key: string, start: (cache: AssetCache) => Promise<void>): Promise<void> {
+  if (active.size) return Promise.all([...active].map((cache) => start(cache))).then(() => {});
+  const cached = queued.get(key);
+  if (cached) return cached.promise;
+  let resolve!: () => void, reject!: (error: unknown) => void;
+  const promise = new Promise<void>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  queued.set(key, { start, promise, resolve, reject });
+  return promise;
 }

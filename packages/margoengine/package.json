@@ -943,13 +943,73 @@
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"
     },
-    "./react/kit": {
-      "types": "./dist/react/kit.d.ts",
-      "import": "./dist/react/kit.js"
+    "./react/controls": {
+      "types": "./dist/react/controls.d.ts",
+      "import": "./dist/react/controls.js"
+    },
+    "./react/gltf-pro": {
+      "types": "./dist/react/gltf-pro.d.ts",
+      "import": "./dist/react/gltf-pro.js"
+    },
+    "./react/fbx": {
+      "types": "./dist/react/fbx.d.ts",
+      "import": "./dist/react/fbx.js"
+    },
+    "./react/animation": {
+      "types": "./dist/react/animation.d.ts",
+      "import": "./dist/react/animation.js"
+    },
+    "./react/environment": {
+      "types": "./dist/react/environment.d.ts",
+      "import": "./dist/react/environment.js"
+    },
+    "./react/html": {
+      "types": "./dist/react/html.d.ts",
+      "import": "./dist/react/html.js"
+    },
+    "./react/shadows": {
+      "types": "./dist/react/shadows.d.ts",
+      "import": "./dist/react/shadows.js"
+    },
+    "./react/sky": {
+      "types": "./dist/react/sky.d.ts",
+      "import": "./dist/react/sky.js"
+    },
+    "./react/text": {
+      "types": "./dist/react/text.d.ts",
+      "import": "./dist/react/text.js"
+    },
+    "./react/geometry": {
+      "types": "./dist/react/geometry.d.ts",
+      "import": "./dist/react/geometry.js"
+    },
+    "./react/materials": {
+      "types": "./dist/react/materials.d.ts",
+      "import": "./dist/react/materials.js"
     },
     "./react/post": {
       "types": "./dist/react/post.d.ts",
       "import": "./dist/react/post.js"
+    },
+    "./react/dof": {
+      "types": "./dist/react/dof.d.ts",
+      "import": "./dist/react/dof.js"
+    },
+    "./react/tonemap": {
+      "types": "./dist/react/tonemap.d.ts",
+      "import": "./dist/react/tonemap.js"
+    },
+    "./react/taa": {
+      "types": "./dist/react/taa.d.ts",
+      "import": "./dist/react/taa.js"
+    },
+    "./react/machinery": {
+      "types": "./dist/react/machinery.d.ts",
+      "import": "./dist/react/machinery.js"
+    },
+    "./react/voxel": {
+      "types": "./dist/react/voxel.d.ts",
+      "import": "./dist/react/voxel.js"
     },
     "./react/physics": {
       "types": "./dist/react/physics.d.ts",

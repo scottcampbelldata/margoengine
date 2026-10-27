@@ -8,7 +8,7 @@ const warn = console.warn;
 console.warn = () => {};
 await RAPIER.init();
 console.warn = warn;
-const { Canvas, Mesh, BoxGeometry, useMargo } = await import('../dist/index.js');
+const { Canvas, Mesh, BoxGeometry, useMargo } = await (await import('./entries.js')).allEntries();
 const { Physics, RigidBody, CuboidCollider, BallCollider, usePhysics } = await import('../dist/physics.js');
 const { useScene, useCommit } = await import('../dist/internal.js');
 const { worldPose } = await import('../dist/scene-transform.js');

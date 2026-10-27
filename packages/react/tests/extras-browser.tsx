@@ -4,20 +4,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { boxGeometry } from '@margoengine/geometry';
 import { BlockTypes, VoxelWorld } from '@margoengine/voxel';
 import { BlockTextures } from '@margoengine/voxel/render';
-import { Sphere, Sky } from '@margoengine/react/kit';
-import {
-  Canvas,
-  Mesh,
-  BoxGeometry,
-  PbrMaterial,
-  Scene,
-  RenderView,
-  BatchedMesh,
-  BatchedItem,
-  SectionPlanes,
-  Voxels,
-  useFrame,
-} from '@margoengine/react';
+import { Sphere } from '@margoengine/react/geometry';
+import { Sky } from '@margoengine/react/sky';
+import { Canvas, Mesh, BoxGeometry, PbrMaterial, Scene, RenderView, useFrame } from '@margoengine/react';
+import { SectionPlanes } from '@margoengine/react/machinery';
+import { BatchedMesh, BatchedItem } from '@margoengine/react/materials';
+import { Voxels } from '@margoengine/react/voxel';
 
 type Mode = 'views' | 'batched' | 'section' | 'voxels' | 'sky-metal' | 'sky-metal-off';
 // A 4 x 4 x 4 block of one red stone type, textured from raw pixels (no image files).

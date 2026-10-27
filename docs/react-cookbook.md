@@ -38,7 +38,9 @@ only when something calls `invalidate()` (from `useMargo()`), so an idle scene c
 ## Light the scene
 
 ```tsx
-import { Canvas, Sun, HemisphereLight, Fog, Box } from '@margoengine/react';
+import { Canvas, Sun } from '@margoengine/react';
+import { HemisphereLight, Fog } from '@margoengine/react/environment';
+import { Box } from '@margoengine/react/geometry';
 
 export function Lit() {
   return (
@@ -58,7 +60,10 @@ Each light component sets its light while mounted and restores the previous one 
 
 ```tsx
 import { Suspense } from 'react';
-import { Canvas, Model, Environment, OrbitControls, useProgress } from '@margoengine/react';
+import { Canvas, useProgress } from '@margoengine/react';
+import { OrbitControls } from '@margoengine/react/controls';
+import { Environment } from '@margoengine/react/environment';
+import { Model } from '@margoengine/react/gltf-pro';
 
 function Loading() {
   const { progress } = useProgress();
@@ -86,7 +91,9 @@ export function Viewer() {
 
 ```tsx
 import { useRef } from 'react';
-import { Canvas, Model, Animation, type AnimationHandle } from '@margoengine/react';
+import { Canvas } from '@margoengine/react';
+import { Animation, type AnimationHandle } from '@margoengine/react/animation';
+import { Model } from '@margoengine/react/gltf-pro';
 
 export function Character() {
   const handle = useRef<AnimationHandle>(null);
@@ -111,7 +118,10 @@ Change `clip` to crossfade over `blend` seconds. `loop={false}` plus `onFinished
 ## Orbit, or navigate like a CAD tool
 
 ```tsx
-import { Canvas, CadControls, Shadows, Box, Plane } from '@margoengine/react';
+import { Canvas } from '@margoengine/react';
+import { CadControls } from '@margoengine/react/controls';
+import { Box, Plane } from '@margoengine/react/geometry';
+import { Shadows } from '@margoengine/react/shadows';
 
 export function Cad() {
   return (
@@ -130,7 +140,8 @@ export function Cad() {
 ## Physics
 
 ```tsx
-import { Canvas, Box } from '@margoengine/react';
+import { Canvas } from '@margoengine/react';
+import { Box } from '@margoengine/react/geometry';
 import { Physics, RigidBody, CuboidCollider, BallCollider } from '@margoengine/react/physics';
 
 export function Pile() {
@@ -157,7 +168,10 @@ export function Pile() {
 ## Post-processing
 
 ```tsx
-import { Canvas, Box, EffectComposer, Bloom, Tonemap } from '@margoengine/react';
+import { Canvas } from '@margoengine/react';
+import { Box } from '@margoengine/react/geometry';
+import { EffectComposer, Bloom } from '@margoengine/react/post';
+import { Tonemap } from '@margoengine/react/tonemap';
 
 export function Glow() {
   return (
@@ -175,7 +189,8 @@ export function Glow() {
 ## Two views of one scene
 
 ```tsx
-import { Canvas, RenderView, Box } from '@margoengine/react';
+import { Canvas, RenderView } from '@margoengine/react';
+import { Box } from '@margoengine/react/geometry';
 
 export function Split() {
   return (
@@ -195,7 +210,9 @@ The page stays a server component; only the file that holds the `Canvas` needs `
 ```tsx
 // app/scene.tsx
 'use client';
-import { Canvas, Box, OrbitControls } from '@margoengine/react';
+import { Canvas } from '@margoengine/react';
+import { OrbitControls } from '@margoengine/react/controls';
+import { Box } from '@margoengine/react/geometry';
 
 export function Scene() {
   return (

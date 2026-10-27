@@ -1,9 +1,11 @@
-import { createContext, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/core/extension';
 import type { PBRModel, PBRMaterial } from '@margoengine/gltf-pro';
-import { useScene, useCommit, useResourceEffect, zero, one, type PointerHandlers } from './internal.js';
-import { modelAsset, retainAsset, instantiateModel, type ModelFormat } from './assets.js';
+import { useScene, useCommit, useResourceEffect, zero, one, ModelContext, type PointerHandlers } from './internal.js';
+import { retainAsset, type ModelFormat } from './assets.js';
+import { instantiateModel, modelAsset, preloadModel, type FormatLoader } from './model-assets.js';
+import { modelPicking } from './picking.js';
 interface Loading {
   src: string;
   pending: boolean;
@@ -33,9 +35,6 @@ export interface ModelProps extends PointerHandlers {
   onLoad?: (mesh: MeshHandle) => void;
   onError?: (error: unknown) => void;
 }
-// Optional model behaviours share the instance that this mount owns. The URL
-// cache keeps source data only; animation state is never shared between mounts.
-export const ModelContext = createContext<PBRModel | null | undefined>(undefined);
 function values(value: readonly number[], size: number, label: string, min = 0, max = 1): void {
   if (
     !Array.isArray(value) ||
@@ -92,8 +91,9 @@ export function ModelResource({
   scale = one,
   castShadow = false,
   receiveShadow = false,
+  load,
   ...props
-}: ModelProps & { format?: ModelFormat }) {
+}: ModelProps & { format?: ModelFormat; load?: FormatLoader }) {
   const { engine, registry, resources, shadows, assetCache, pointerHandlers } = useScene(),
     [model, setModel] = useState<PBRModel | null>(null);
   const [loading, setLoading] = useState<Loading | null>(null);
@@ -104,7 +104,7 @@ export function ModelResource({
     (lease) => {
       let current: PBRModel | undefined;
       const map = format === 'fbx' ? assetCache.fbx : assetCache.models;
-      const asset = modelAsset(assetCache, props.src, format),
+      const asset = modelAsset(assetCache, props.src, format, load),
         releaseAsset = retainAsset(assetCache, props.src, asset, map);
       const handlers: PointerHandlers = {
         get onClick() {
@@ -159,6 +159,7 @@ export function ModelResource({
         applyMaterials(saved, p.materials);
         loaded.root.visible = true;
         registry?.register(loaded.root);
+        resources.picking ??= modelPicking;
         resources.models.add(loaded);
         for (const [effect, models] of resources.lighting) models.set(loaded, loaded.addLighting(effect));
         for (const node of [loaded.root, ...loaded.nodes, ...loaded.primitives.map((primitive) => primitive.node)])
@@ -248,7 +249,18 @@ export function ModelResource({
   );
 }
 
-/** The model component. */
-export function Model(props: ModelProps) {
-  return <ModelResource {...props} />;
-}
+/**
+ * A glTF or GLB model through `@margoengine/gltf-pro` (PBR materials, textures, compression, animation). Suspends while
+ * it loads; `Model.preload(url)` loads it ahead of the first mount. Also exported as `Gltf`.
+ */
+// A pure Object.assign, not `Component.preload = ...`: a module-level assignment is a side effect that keeps the module
+// (and the loaders it imports lazily) in every build that reaches this entry, used or not.
+export const Model = /* @__PURE__ */ Object.assign(
+  function Model(props: ModelProps) {
+    return <ModelResource {...props} />;
+  },
+  {
+    /** Loads `src` into the Canvas cache ahead of the first `<Model src>` (queued until a Canvas exists). */
+    preload: (src: string): Promise<void> => preloadModel(src),
+  },
+);

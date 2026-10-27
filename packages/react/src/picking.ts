@@ -66,6 +66,8 @@ export async function preparePicking(engine: Engine, resources: Resources, frame
   // Assets may have loaded or unmounted since the previous pointer event.
   entry.sync();
 }
+/** Installed in a Canvas's resources by the first model binding: picks core meshes and models together. */
+export const modelPicking = { prepare: preparePicking, release: releasePicking };
 export function releasePicking(engine: Engine): void {
   const entry = pickers.get(engine);
   if (entry) {

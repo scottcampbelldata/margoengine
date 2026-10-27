@@ -165,14 +165,33 @@ export function importMap(root = repository, base = 'https://cdn.jsdelivr.net/np
   return { imports };
 }
 
+/**
+ * The @margoengine entries one alias re-exports: its own, except margoengine/react, the one install, which has every
+ * package and so re-exports every React binding, the root and each @margoengine/react/<package> subpath (which
+ * @margoengine/react keeps apart so it builds without optional peers). Not physics: it needs Rapier, a third-party
+ * library the app installs itself (margoengine/react/physics).
+ */
+export function aliasSources(entries, source) {
+  return source === '@margoengine/react'
+    ? entries
+        .filter(
+          (entry) => entry.source.startsWith('@margoengine/react') && entry.source !== '@margoengine/react/physics',
+        )
+        .map((entry) => entry.source)
+    : [source];
+}
+
 /** The files and package.json the generator writes, as {path: text}. */
 export function umbrellaFiles(root = repository) {
   const files = {},
     exports = { '.': { types: './dist/index.d.ts', import: './dist/index.js' } };
   files['packages/margoengine/src/index.ts'] =
     `${banner}// \`margoengine\` is the stage: createStage, Stage, box, sphere and everything @margoengine/core exports.\nexport * from '@margoengine/stage';\n`;
-  for (const { subpath, file, source } of umbrellaEntries(root)) {
-    files[`packages/margoengine/src/${file}.ts`] = `${banner}export * from '${source}';\n`;
+  const entries = umbrellaEntries(root);
+  for (const { subpath, file, source } of entries) {
+    const all = aliasSources(entries, source);
+    files[`packages/margoengine/src/${file}.ts`] =
+      `${banner}${all.map((name) => `export * from '${name}';`).join('\n')}\n`;
     exports[subpath] = { types: `./dist/${file}.d.ts`, import: `./dist/${file}.js` };
   }
   for (const [kit, { about, from }] of Object.entries(KITS)) {

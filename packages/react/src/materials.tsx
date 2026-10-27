@@ -6,7 +6,10 @@ import type { TransmissionOptions } from '@margoengine/materials';
 import { PbrMaterial, type PbrMaterialProps } from './components.js';
 import { live, useMesh, useResourceEffect, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { modelPicking } from './picking.js';
 import { MargoError } from '@margoengine/math/errors';
+
+export { BatchedMesh, BatchedItem, type BatchedMeshProps, type BatchedItemProps } from './batched.js';
 
 /** Props of the MeshTransmissionMaterial component; every prop is optional unless noted. */
 export interface MeshTransmissionMaterialProps extends PbrMaterialProps, Omit<TransmissionOptions, 'opaqueColor'> {
@@ -142,6 +145,7 @@ function TransmissionBinding(props: MeshTransmissionMaterialProps) {
             materials!.install(model);
             previous = Object.getOwnPropertyDescriptor(target, source);
             Object.defineProperty(target, source, { value: model, configurable: true });
+            scene.resources.picking ??= modelPicking;
             scene.resources.models.add(model);
             for (const [effect, values] of scene.resources.lighting) values.set(model, model.addLighting(effect));
           } catch (error) {

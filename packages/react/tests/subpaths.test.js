@@ -13,58 +13,85 @@ const packageRoot = fileURLToPath(new URL('..', import.meta.url)),
   testsRoot = join(packageRoot, 'tests');
 const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'));
 const specifier = (subpath) => '@margoengine/react' + (subpath === '.' ? '' : subpath.slice(1));
+// Every entry's runtime names. Each binding has one home: the root holds those that need no optional package, and a
+// binding that needs @margoengine/<name> is in @margoengine/react/<name> (2026-10-27).
 const expected = {
-  './kit': [
-    'Fbx',
-    'Gltf',
-    'preload',
-    'Environment',
-    'OrbitControls',
-    'Html',
-    'Box',
-    'Sphere',
-    'Plane',
-    'Sky',
-    'ContactShadows',
+  '.': [
+    'BoxGeometry',
+    'Canvas',
     'Center',
-    'PointerLock',
-    'TransformControls',
-    'Text',
+    'GeometryResource',
+    'Group',
+    'MargoCanvas',
+    'MargoContext',
+    'Mesh',
+    'PbrMaterial',
+    'RenderView',
+    'Scene',
+    'Stage',
+    'Sun',
+    'boxGeometry',
+    'clearLoader',
+    'group',
+    'mesh',
+    'meshStandardMaterial',
+    'useCamera',
+    'useEngine',
+    'useFrame',
+    'useLoader',
+    'useMargo',
+    'useMargoStage',
+    'useProgress',
   ],
+  './controls': ['ArcballControls', 'CadControls', 'MapControls', 'OrbitControls', 'PointerLock', 'TransformControls'],
+  './gltf-pro': ['Gltf', 'Model'],
+  './fbx': ['Fbx'],
+  './animation': ['Animation'],
+  './environment': ['AmbientLight', 'Environment', 'Fog', 'HemisphereLight'],
+  './html': ['Html'],
+  './shadows': ['ContactShadows', 'Shadows'],
+  './sky': ['Sky'],
+  './text': ['Text'],
+  './geometry': ['Box', 'Plane', 'Sphere'],
+  './materials': ['BatchedItem', 'BatchedMesh', 'MeshTransmissionMaterial'],
   './post': [
-    'EffectComposer',
-    'Bloom',
-    'SSAO',
-    'DepthOfField',
-    'Tonemap',
-    'TAA',
-    'GTAO',
-    'SSR',
-    'SSGI',
-    'MotionBlur',
-    'LensFlare',
-    'SMAA',
-    'FXAA',
-    'Glitch',
     'Afterimage',
+    'Bloom',
+    'DepthTexture',
+    'EffectComposer',
+    'FXAA',
+    'GTAO',
+    'Glitch',
+    'LensFlare',
+    'MotionBlur',
+    'SMAA',
+    'SSAO',
+    'SSGI',
+    'SSR',
+    'SceneTargets',
   ],
+  './dof': ['DepthOfField'],
+  './tonemap': ['Tonemap'],
+  './taa': ['TAA'],
+  './machinery': ['SectionPlanes'],
+  './voxel': ['Voxels', 'useBlockTextures'],
   './physics': [
-    'Physics',
-    'RigidBody',
-    'CuboidCollider',
     'BallCollider',
     'CapsuleCollider',
-    'CylinderCollider',
     'ConeCollider',
     'ConvexHullCollider',
-    'TrimeshCollider',
+    'CuboidCollider',
+    'CylinderCollider',
     'HeightfieldCollider',
-    'usePhysics',
-    'useJoint',
-    'useBeforePhysicsStep',
+    'Physics',
+    'RigidBody',
+    'TrimeshCollider',
     'useAfterPhysicsStep',
+    'useBeforePhysicsStep',
+    'useJoint',
+    'usePhysics',
   ],
-  './xr': ['XR', 'Controller', 'useXR'],
+  './xr': ['Controller', 'XR', 'useXR'],
 };
 const optionalPeers = [
   '@margoengine/gltf-pro',
@@ -86,7 +113,9 @@ const optionalPeers = [
   '@margoengine/materials',
   '@margoengine/animation',
   '@margoengine/animator',
-  '@margoengine/selection',
+  '@margoengine/voxel',
+  '@margoengine/machinery',
+  '@margoengine/cameras',
 ];
 async function temporary(run) {
   const directory = await mkdtemp(join(testsRoot, '.subpaths-'));
@@ -106,7 +135,10 @@ async function runNode(args, options = {}) {
 }
 
 test('package exports preserve independent public runtime and declaration paths with optional peers', async () => {
-  assert.deepEqual(Object.keys(manifest.exports).sort(), ['.', './kit', './post', './physics', './xr'].sort());
+  assert.deepEqual(Object.keys(manifest.exports).sort(), Object.keys(expected).sort());
+  // Progress (cache) and model picking (selection) are part of the bindings, installed with them.
+  for (const name of ['@margoengine/cache', '@margoengine/math', '@margoengine/selection'])
+    assert.ok(manifest.dependencies[name], name);
   assert.equal(manifest.sideEffects, false);
   assert.ok(manifest.files.includes('dist'));
   for (const [subpath, entry] of Object.entries(manifest.exports)) {
@@ -131,24 +163,7 @@ test('package exports preserve independent public runtime and declaration paths 
     await access(join(packageRoot, entry.types));
     assert.equal(import.meta.resolve(specifier(subpath)), pathToFileURL(join(packageRoot, entry.import)).href);
     const api = await import(specifier(subpath));
-    if (expected[subpath]) assert.deepEqual(Object.keys(api).sort(), expected[subpath].sort());
-    else
-      for (const name of [
-        'Canvas',
-        'Stage',
-        'Mesh',
-        'Model',
-        'Environment',
-        'OrbitControls',
-        'Html',
-        'Group',
-        'group',
-        'preload',
-        'useFrame',
-        'useMargo',
-        'useMargoStage',
-      ])
-        assert.equal(typeof api[name] === 'function' || typeof api[name] === 'object', true, name + ' is exported');
+    assert.deepEqual(Object.keys(api).sort(), expected[subpath].sort(), subpath);
     assert.equal('useThree' in api, false);
     const emitted = await readFile(join(packageRoot, entry.import), 'utf8');
     assert.equal(/(?:from|import\s*\()\s*['"](?:three|react-reconciler)(?:['"/])/.test(emitted), false);
@@ -161,18 +176,15 @@ test('package exports preserve independent public runtime and declaration paths 
   for (const group of ['dependencies', 'peerDependencies', 'optionalDependencies'])
     for (const name of Object.keys(manifest[group] ?? {}))
       assert.equal(name === 'three' || name === 'react-reconciler', false);
-  const base = await import(specifier('.'));
-  for (const [subpath, names] of Object.entries(expected)) {
-    const subpathApi = await import(specifier(subpath));
-    // Physics stays off the root: its Rapier import() would be a required install for every bundled app.
-    if (subpath === './physics')
-      for (const name of names) assert.equal(base[name], undefined, name + ' is only on the physics subpath');
-    else
-      for (const name of names) assert.equal(base[name], subpathApi[name], name + ' is available from one root import');
-  }
+  // One home per binding: no name is exported by two entries (margoengine/react re-exports them all).
+  const homes = new Map();
+  for (const [subpath, names] of Object.entries(expected))
+    for (const name of names) {
+      assert.equal(homes.get(name), undefined, `${name} is exported by ${homes.get(name)} and ${subpath}`);
+      homes.set(name, subpath);
+    }
   // Animation takes a ref, so it is a forwardRef component object, like Mesh.
-  assert.equal(typeof base.Animation.render, 'function');
-  assert.equal(typeof base.MeshTransmissionMaterial, 'function');
+  assert.equal(typeof (await import(specifier('./animation'))).Animation.render, 'function');
 });
 
 test("only the react-server entries carry 'use client'", async () => {
@@ -189,7 +201,12 @@ test("only the react-server entries carry 'use client'", async () => {
   for (const file of files)
     if (/^\s*(['"])use (?:client|server)\1/.test(await readFile(file, 'utf8')))
       directives.push(relative(join(packageRoot, 'dist'), file).replaceAll('\\', '/'));
-  assert.deepEqual(directives.sort(), ['rsc/index.js', 'rsc/kit.js', 'rsc/physics.js', 'rsc/post.js', 'rsc/xr.js']);
+  assert.deepEqual(
+    directives.sort(),
+    Object.keys(expected)
+      .map((subpath) => `rsc/${subpath === '.' ? 'index' : subpath.slice(2)}.js`)
+      .sort(),
+  );
 });
 
 test('server imports and canonical JSX evaluate no optional peers; a mounted Bloom loads only its own peer', async () =>
@@ -214,8 +231,10 @@ test('server imports and canonical JSX evaluate no optional peers; a mounted Blo
       `import assert from 'node:assert/strict';
     import React from 'react';import {renderToString} from 'react-dom/server';
     import {Canvas,Stage,Mesh} from '@margoengine/react';
-    import {Gltf,Box,Center,Html,Text,Fbx} from '@margoengine/react/kit';
-    import {EffectComposer,Bloom,SSAO,DepthOfField} from '@margoengine/react/post';
+    import {Center} from '@margoengine/react';
+    import {Gltf} from '@margoengine/react/gltf-pro';import {Box} from '@margoengine/react/geometry';import {Html} from '@margoengine/react/html';
+    import {Text} from '@margoengine/react/text';import {Fbx} from '@margoengine/react/fbx';
+    import {EffectComposer,Bloom,SSAO} from '@margoengine/react/post';import {DepthOfField} from '@margoengine/react/dof';
     import {Physics,RigidBody} from '@margoengine/react/physics';
     import {XR,Controller} from '@margoengine/react/xr';
     const h=React.createElement;
@@ -246,7 +265,8 @@ const baseConsumer = `import {createElement as h} from 'react';
   import {Canvas,Stage,Mesh,BoxGeometry,PbrMaterial} from '@margoengine/react';
   export const PickingCube=()=>h(Canvas,{frameloop:'demand'},h(Stage,null,h(Mesh,{onClick:event=>console.log(event.object.name)},h(BoxGeometry),h(PbrMaterial,{color:'#84d6bd'}))));`;
 const optionalConsumer = `import {createElement as h} from 'react';
-  import {Canvas,Box,Text,Gltf,EffectComposer,Bloom,XR,Controller} from '@margoengine/react';
+  import {Canvas} from '@margoengine/react';import {Box} from '@margoengine/react/geometry';import {Text} from '@margoengine/react/text';
+  import {Gltf} from '@margoengine/react/gltf-pro';import {EffectComposer,Bloom} from '@margoengine/react/post';import {XR,Controller} from '@margoengine/react/xr';
   import {Physics,RigidBody} from '@margoengine/react/physics';
   export const OptionalScene=()=>h(Canvas,null,h(Box),h(Text,null,'Margo'),h(Gltf,{src:'/model.glb'}),h(EffectComposer,null,h(Bloom)),h(Physics,null,h(RigidBody,null,h(Box))),h(XR,null,h(Controller)));`;
 function staticChunks(outputs) {
@@ -308,10 +328,12 @@ test('Vite picking-cube initial chunk graph excludes optional React subpaths and
     const modules = initial.flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/'));
     assert.ok(modules.some((id) => id.endsWith('/react/dist/components.js')));
     for (const fragment of [
-      '/react/dist/kit',
+      '/react/dist/model',
+      '/react/dist/composer',
       '/react/dist/post',
       '/react/dist/physics',
       '/react/dist/xr',
+      '/react/dist/picking',
       '/physics/',
       '/post/',
       '/dof/',
@@ -329,18 +351,74 @@ test('Vite picking-cube initial chunk graph excludes optional React subpaths and
         false,
         fragment + ' is absent from the initial graph',
       );
-    // Canvas runs queued preload() calls; it must not reach the model loaders itself, or every Canvas app emits the
-    // FBX loader and its exporters as chunks it never fetches (2026-10-26).
+    // The root reaches no optional package, not even lazily (2026-10-27): the build emits no chunk of one. Before, it
+    // emitted the FBX loader and its exporters (2026-10-26) and, through the stage class, every stage pack.
     const emitted = outputs.flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/'));
-    assert.equal(
-      emitted.some((id) => id.includes('/packages/fbx/')),
-      false,
-      'no FBX chunk is emitted for an app that never loads FBX',
+    assert.deepEqual(
+      [...new Set(emitted.map((id) => /\/packages\/([\w-]+)\//.exec(id)?.[1]).filter(Boolean))].sort(),
+      ['cache', 'core', 'math', 'react', 'shared', 'stage'].filter((name) =>
+        emitted.some((id) => id.includes(`/packages/${name}/`)),
+      ),
+      'only the root, core, the stage and their dependencies are emitted',
     );
+    for (const name of [
+      'fbx',
+      'gltf-pro',
+      'selection',
+      'shadows',
+      'cameras',
+      'gltf',
+      'machinery',
+      'scenery',
+      'creative',
+      'environment',
+    ])
+      assert.equal(
+        emitted.some((id) => id.includes(`/packages/${name}/`)),
+        false,
+        `no ${name} chunk is emitted`,
+      );
     const code = initial.map((chunk) => chunk.code).join('\n');
     assert.match(code, /\.pick\(/, 'Canvas picking survives the base consumer build');
     assert.equal(/EffectComposer|function Physics\(|function XR\(/.test(code), false);
     for (const chunk of outputs) assert.equal(/react-reconciler|from ["']three["']/.test(chunk.code), false);
+  }));
+
+test('an unused binding of the one-install entry emits nothing: preload is not a module-level side effect', async () =>
+  temporary(async (directory) => {
+    // `Model.preload = ...` at module level kept model.js, and its lazy gltf-pro import with the Draco and Basis
+    // decoders, in every margoengine/react build (bundler matrix, 2026-10-27). The components are pure now.
+    const outputs = await bundle(
+      directory,
+      'umbrella-cube',
+      `import {createElement as h} from 'react';
+  import {Canvas,Mesh,BoxGeometry,PbrMaterial} from 'margoengine/react';
+  export const Cube=()=>h(Canvas,null,h(Mesh,null,h(BoxGeometry),h(PbrMaterial)));`,
+    );
+    const emitted = outputs.flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/'));
+    for (const name of [
+      'gltf-pro',
+      'fbx',
+      'environment',
+      'html',
+      'text',
+      'sky',
+      'geometry',
+      'post',
+      'shadows',
+      'decoders',
+    ])
+      assert.equal(
+        emitted.some((id) => id.includes(`/packages/${name}/`)),
+        false,
+        `${name} is emitted`,
+      );
+    for (const file of ['model', 'fbx', 'environment', 'model-assets'])
+      assert.equal(
+        emitted.some((id) => id.endsWith(`/react/dist/${file}.js`)),
+        false,
+        `react/${file} is emitted`,
+      );
   }));
 
 test('OrbitControls loads the orbit controls entry only, never the controls index and its BVH raycaster', async () =>
@@ -351,7 +429,8 @@ test('OrbitControls loads the orbit controls entry only, never the controls inde
       directory,
       'orbit-cube',
       `import {createElement as h} from 'react';
-  import {Canvas,Mesh,BoxGeometry,PbrMaterial,OrbitControls} from '@margoengine/react';
+  import {Canvas,Mesh,BoxGeometry,PbrMaterial} from '@margoengine/react';
+  import {OrbitControls} from '@margoengine/react/controls';
   export const OrbitCube=()=>h(Canvas,null,h(Mesh,null,h(BoxGeometry),h(PbrMaterial)),h(OrbitControls,{profile:'blender'}));`,
     );
     const emitted = outputs.flatMap((chunk) => Object.keys(chunk.modules ?? {})).map((id) => id.replaceAll('\\', '/'));
@@ -370,7 +449,7 @@ test('Vite optional entry includes requested bindings while keeping their native
     const outputs = await bundle(directory, 'optional-scene', optionalConsumer),
       initial = staticChunks(outputs);
     const modules = initial.flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/'));
-    for (const subpath of ['kit-helpers', 'post', 'physics', 'xr'])
+    for (const subpath of ['geometry', 'text', 'model', 'composer', 'physics', 'xr'])
       assert.ok(
         modules.some((id) => id.endsWith('/react/dist/' + subpath + '.js')),
         subpath + ' React binding is present',
@@ -408,9 +487,14 @@ test('strict TypeScript consumers compile every public React subpath, callbacks 
     await writeFile(
       join(directory, 'consumer.tsx'),
       `import React,{Suspense,useRef} from 'react';
-    import {Canvas,Stage,Mesh,Group,Model,BoxGeometry,Animation,MeshTransmissionMaterial,useFrame,useMargo,type MeshRef} from '@margoengine/react';
-    import {Gltf,Fbx,preload,Box,Sphere,Plane,Sky,ContactShadows,Center,PointerLock,TransformControls,Text,Html,Environment,OrbitControls,type GltfProps,type FbxProps,type BoxProps,type TextProps} from '@margoengine/react/kit';
-    import {EffectComposer,Bloom,SSAO,DepthOfField,Tonemap,TAA,type BloomProps,type DepthOfFieldProps,type EffectComposerProps,type TonemapProps,type TAAProps} from '@margoengine/react/post';
+    import {Canvas,Stage,Mesh,Group,BoxGeometry,Center,useFrame,useMargo,type MeshRef} from '@margoengine/react';
+    import {Model,Gltf,type GltfProps} from '@margoengine/react/gltf-pro';import {Fbx,type FbxProps} from '@margoengine/react/fbx';
+    import {Animation} from '@margoengine/react/animation';import {MeshTransmissionMaterial} from '@margoengine/react/materials';
+    import {Box,Sphere,Plane,type BoxProps} from '@margoengine/react/geometry';import {Sky} from '@margoengine/react/sky';
+    import {ContactShadows} from '@margoengine/react/shadows';import {PointerLock,TransformControls,OrbitControls} from '@margoengine/react/controls';
+    import {Text,type TextProps} from '@margoengine/react/text';import {Html} from '@margoengine/react/html';import {Environment} from '@margoengine/react/environment';
+    import {EffectComposer,Bloom,SSAO,type BloomProps,type EffectComposerProps} from '@margoengine/react/post';
+    import {DepthOfField,type DepthOfFieldProps} from '@margoengine/react/dof';import {Tonemap,type TonemapProps} from '@margoengine/react/tonemap';import {TAA,type TAAProps} from '@margoengine/react/taa';
     import {Physics,RigidBody,CuboidCollider,BallCollider,usePhysics,type PhysicsProps,type RigidBodyProps,type PhysicsBody} from '@margoengine/react/physics';
     import {XR,Controller,useXR,type XRProps,type ControllerProps,type XRContextValue} from '@margoengine/react/xr';
     function Hooks(){const state=useMargo(),world=usePhysics(),xr:XRContextValue=useXR();state.invalidate();state.camera?.position;state.size.width;state.gl?.canvas;state.clock.toFixed(2);world?.raycast([0,0,0],[0,-1,0]);void xr.ready;useFrame((engine,delta)=>{engine.camera.fov+=delta;});return null;}
@@ -418,7 +502,7 @@ test('strict TypeScript consumers compile every public React subpath, callbacks 
     const bloom:BloomProps={strength:1,onReady:effect=>{effect.options.strength=0.5;}},dof:DepthOfFieldProps={focalDistance:8},tone:TonemapProps={curve:'agx'},taa:TAAProps={historyWeight:0.9},composer:EffectComposerProps={enabled:true};
     const physics:PhysicsProps={gravity:[0,-9.81,0]},body:RigidBodyProps={type:'dynamic',onReady:(value:PhysicsBody)=>value.wakeUp()},xr:XRProps={mode:'immersive-vr'},controller:ControllerProps={handedness:'left',onSelect:event=>event.controller.source};
     export function App(){const ref=useRef<MeshRef>(null);return <Canvas frameloop="demand"><Stage><Mesh ref={ref} onClick={event=>{event.object.name;}}/><Group><Center><Box {...box}/><Sphere/><Plane/></Center></Group><Suspense fallback={<span>Loading</span>}><Gltf {...loader}/><Model src="/second.glb"/><Fbx {...fbx}/><Environment src="/studio.hdr"/></Suspense><Sky/><ContactShadows/><PointerLock/><TransformControls object={ref}/><Text {...text}/><Html>Label</Html><OrbitControls/><EffectComposer {...composer}><Bloom {...bloom}/><SSAO/><DepthOfField {...dof}/><Tonemap {...tone}/><TAA {...taa}/></EffectComposer><Physics {...physics}><RigidBody {...body}><Mesh/></RigidBody></Physics><XR {...xr}><Controller {...controller}/></XR></Stage></Canvas>;}
-    void preload('/model.glb');void preload('/model.fbx','fbx');void Hooks;
+    void Gltf.preload('/model.glb');void Fbx.preload('/model.fbx');void Environment.preload('/studio.hdr');void Hooks;
     export const materialAndClip=<Canvas><Mesh><BoxGeometry/><MeshTransmissionMaterial factor={0.8} ior={1.5} volume={{thicknessFactor:0.5}}/></Mesh><Gltf src="/character.glb" onClick={event=>event.object.name}><Animation clip="Walk" playing loop blend={0.2}/></Gltf></Canvas>;
     export const assetBodies=<Physics><RigidBody colliders="cuboid"><Fbx src="/asset.fbx"/></RigidBody><RigidBody colliders="hull"><Gltf src="/asset.glb"/></RigidBody><RigidBody colliders="trimesh"><Box/></RigidBody><RigidBody colliders={false}><CuboidCollider args={[0.5,1,0.5]}/><BallCollider args={[0.25]}/><Fbx src="/asset.fbx"/></RigidBody></Physics>;
     // @ts-expect-error Automatic collider modes are explicit and bounded.

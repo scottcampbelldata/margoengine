@@ -90,43 +90,6 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
-### `@margoengine/react` installed alone does not build with webpack or Turbopack
-
-- **What:** the React README offers `npm i @margoengine/react` alone. Vite builds that app (it stands in a stub for an
-  optional peer that is not installed, and the bundler matrix checks it emits no optional package), but Next.js fails:
-  webpack and Turbopack must resolve every string-literal `import()` in every module they reach, called or not.
-- **Repro:** a Next.js 16.4.3 App Router page with a client `Scene` that renders `Canvas`, `Mesh`, `BoxGeometry`,
-  `PbrMaterial` and `OrbitControls` from `@margoengine/react`, installed with only `@margoengine/react`,
-  `@margoengine/controls`, `react` and `react-dom` (npm adds the required peers core and stage). `next build --webpack`
-  and `next build --turbopack` both stop with `Module not found: Can't resolve` for 18 optional peers (2026-10-26).
-  A plain webpack 5 build of an entry importing those five names fails the same way: 39 module names in 19 packages
-  (2026-10-27).
-- **Cause (measured, 2026-10-27):** two sources, each enough on its own.
-  1. **Fixed (2026-10-27):** the ten loaders moved out of the `Stage` class into feature entries that take the stage
-     (`@margoengine/stage/gltf` `addGLTF`, `/cad` `addCAD`, `/sky` `addSky`, `/particles` `addParticles`, `/effects`
-     `addEffects`, `/environment` `addEnvironment`, `/shadows` `addShadows`); the stage root holds no `import()`
-     (`tests/modern-facade-isolation.test.js` builds a stage-only app and fails on any lazy import). Callers migrate
-     with `node scripts/codemod-stage-loaders.mjs`. Before:
-     The stage facade: `Canvas` constructs a `Stage` (it hands it to `onCreated` and `<Stage>`), and the `Stage` class
-     methods `load` (glTF, CAD), `gltf`, `machinery`, `creative`, `scenery`, `sky`, `particles`, `effects`,
-     `environment` and `shadows` hold 10 `import()`s of 6 optional packages (`creative`, `creative/particles`,
-     `creative/post`, `environment`, `gltf`, `machinery`, `machinery/cad`, `scenery`, `scenery/sky`, `shadows`).
-     Class methods are never tree-shaken, so they are reached from every `Canvas`.
-  2. The React package's root entry re-exports every binding, so the modules holding the other 29 `import()`s are in
-     the graph of any import from it: `post` (14 effects and `post/stack`), `extras` (`materials`, `post/depth`,
-     `post/mrt`, `machinery/section`), `assets` (`gltf-pro`, `fbx`, `cache/manager`, `environment`), `components`
-     (`shadows`, `cameras/layers`, `html`), `picking` (`selection`), `lights`, `voxels` and `xr`.
-  Changing only the React package cannot fix it: even with every optional binding behind its own subpath (a breaking
-  change of the root entry's exports), `Canvas` still reaches `Stage`. Bundler hints that skip the `import()`
-  (`webpackIgnore`, `turbopackIgnore`) are not a fix: the bare specifier then reaches the browser, which cannot resolve
-  it without an import map, so those features would break under webpack even with the peer installed.
-- **Needed to close:** (1) a stage facade change, frozen for 1.0: the ten loaders out of the `Stage` class into entries
-  the app imports (for example `@margoengine/stage/gltf` with a `loadGLTF(stage, url)`), so that the root entry holds no
-  `import()` of an optional package; and (2) the React root entry holding only bindings that need no optional peer,
-  with the others behind subpaths (`@margoengine/react/post` already exists; `html`, `xr`, `voxels`, `lights` and the
-  rest would join it). Until then, install `margoengine` for webpack and Turbopack, as the README says; the bundler
-  matrix builds both Next.js bundlers from it.
-
 ### Pinned proofs: nine historical claims no longer run against today's core
 
 - **What:** `npm run proofs` (pinned, every proof; not part of `verify` or `check:merge`) fails color-output,

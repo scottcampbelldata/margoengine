@@ -25,7 +25,7 @@ const walk = (dir, accept, out = []) => {
 /** [{ file, subpath, name }] for each value import from the React package in Markdown blocks and example sources. */
 function imports() {
   const found = [];
-  const pattern = /import\s+(type\s+)?\{([^}]*)\}\s+from\s+'(?:@margoengine|margoengine)\/react(?:\/([\w-]+))?'/g;
+  const pattern = /import\s+(type\s+)?\{([^}]*)\}\s+from\s+'(@margoengine|margoengine)\/react(?:\/([\w-]+))?'/g;
   const texts = [];
   for (const file of [
     'packages/react/README.md',
@@ -40,12 +40,15 @@ function imports() {
   ))
     texts.push([file, read(file)]);
   for (const [file, code] of texts)
-    for (const [, isType, list, subpath] of code.matchAll(pattern)) {
+    for (const [, isType, list, scope, subpath] of code.matchAll(pattern)) {
       if (isType) continue;
       for (const part of list.split(',')) {
         const spec = part.trim();
         if (!spec || spec.startsWith('type ')) continue;
-        found.push({ file, subpath: subpath ?? 'index', name: spec.split(/\s+as\s+/)[0].trim() });
+        // margoengine/react, the one install, is every subpath but physics: its own generated entry.
+        const entry =
+          scope === 'margoengine' ? `margoengine:${subpath ? `react/${subpath}` : 'react'}` : (subpath ?? 'index');
+        found.push({ file, subpath: entry, name: spec.split(/\s+as\s+/)[0].trim() });
       }
     }
   return found;
@@ -58,7 +61,9 @@ test('every value a doc or example imports from the React package is exported', 
   assert.ok(all.length > 50, `expected many React imports in the docs, found ${all.length}`);
   for (const { file, subpath, name } of all) {
     if (!exported.has(subpath)) {
-      const entry = join(root, 'packages/react/dist', `${subpath}.js`);
+      const entry = subpath.startsWith('margoengine:')
+        ? join(root, 'packages/margoengine/dist', `${subpath.slice('margoengine:'.length)}.js`)
+        : join(root, 'packages/react/dist', `${subpath}.js`);
       assert.ok(existsSync(entry), `${subpath} is not an entry of the React package (a doc imports it)`);
       exported.set(subpath, new Set(Object.keys(await import(pathToFileURL(entry).href))));
     }

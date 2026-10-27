@@ -2,7 +2,7 @@
 
 Date: 2026-10-16. Shipped in `@margoengine/react`. Core and the stage facade were not edited. Core plus stage measured 19,999 bytes gzip. The React suite reported 23 passing tests, and the package TypeScript check passed. No `react-reconciler` dependency was added. `sideEffects` stays `false`, and the optional peers stay optional.
 
-`<Stage>` does not construct an engine. `Canvas` still does that, once. `<Stage>` applies the camera, turns shadows on through the canvas's existing shadows request, and renders its children only after that stage is ready. The `Stage` class from `margoengine` is still the object `useMargo()` returns.
+`<Stage>` does not construct an engine. `Canvas` still does that, once. `<Stage>` applies the camera and renders its children only after that stage is ready. Shadows come from `<Shadows />` (`@margoengine/react/shadows`). The `Stage` class from `margoengine` is still the object `useMargo()` returns.
 
 ## The snippet
 
@@ -10,11 +10,13 @@ PascalCase exports:
 
 ```tsx
 import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { Shadows } from '@margoengine/react/shadows';
 
 export function App() {
   return (
     <Canvas style={{ height: 400 }}>
-      <Stage camera={{ position: [0, 2, 5] }} shadows>
+      <Shadows />
+      <Stage camera={{ position: [0, 2, 5] }}>
         <Mesh position={[0, 1, 0]}>
           <BoxGeometry args={[1, 1, 1]} />
           <PbrMaterial color="#84d6bd" />

@@ -6,11 +6,14 @@ Core and the stage facade stay frozen. The layer lives under `@margoengine/react
 
 ## Subpaths
 
+Since 2026-10-27 each optional package has its own subpath, named after it, so `@margoengine/react` installed alone builds
+with every bundler; the full list is in [packages/react/SCENE.md](../packages/react/SCENE.md).
+
 | Subpath | What an R3F app gets from Fiber or Drei | What it binds |
 | --- | --- | --- |
 | `@margoengine/react` | `<Canvas>`, `<Mesh>`, `useFrame`, events, Suspense | The stage the canvas already creates |
-| `@margoengine/react/kit` | Loaders, lights, `<Html>`, `<Text>`, gizmos, environment, sky | `gltf-pro`, `fbx`, `environment`, `html`, `text`, `controls`, `sky`, `shadows` |
-| `@margoengine/react/post` | Effect composer passes | `post`, `dof`, `tonemap`, `taa` |
+| `@margoengine/react/gltf-pro`, `/fbx`, `/environment`, `/html`, `/text`, `/controls`, `/sky`, `/shadows`, `/geometry` | Loaders, lights, `<Html>`, `<Text>`, gizmos, environment, sky, shapes (once the kit) | the package each is named after |
+| `@margoengine/react/post`, `/dof`, `/tonemap`, `/taa` | Effect composer passes | `post`, `dof`, `tonemap`, `taa` |
 | `@margoengine/react/physics` | Rigid bodies | `physics` |
 | `@margoengine/react/xr` | Immersive session | `xr` |
 
@@ -20,7 +23,7 @@ Core and the stage facade stay frozen. The layer lives under `@margoengine/react
 
 The kit is one component per job the engine already implements.
 
-- **Loaders.** `<Gltf>`, `<Fbx>`, `preload(src)`, and a cache keyed by URL. Suspense throws the same promise `preload` starts.
+- **Loaders.** `<Gltf>`, `<Fbx>`, `Gltf.preload(src)`, and a cache keyed by URL. Suspense throws the same promise `preload` starts.
 - **Staging.** `<Environment>`, `<Sky>`, `<ContactShadows>` as a shadow-only ground, and `<Center>` using `worldBounds` from the stage.
 - **Controls.** `<OrbitControls>` exists. Add `<PointerLock>` and `<TransformControls>` from `@margoengine/controls`.
 - **Screen.** `<Html>` from `@margoengine/html`. `<Text>` from `@margoengine/text`.

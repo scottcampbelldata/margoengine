@@ -1116,9 +1116,11 @@ test('Reversed float depth separates sub-millimeter surfaces at industrial range
   assert.equal(industrialMaterial('galvanizedZinc').data[5], Math.fround(0.95));
   assert.ok(Object.isFrozen(industrialMaterials.machinedSteel));
 });
-test('Frozen core entry stays portable and React exposes its complete scene bindings', async () => {
+test('Frozen core entry stays portable and the one-install React entry exposes its complete scene bindings', async () => {
+  // margoengine/react re-exports every @margoengine/react subpath but physics (each binding lives in the subpath named
+  // after the package it needs, so @margoengine/react installed alone builds without optional peers).
   const api = await import('../packages/core/dist/index.js'),
-    react = await import('../packages/react/dist/index.js');
+    react = await import('margoengine/react');
   assert.deepEqual(
     Object.keys(api).sort(),
     ['CADCameraControls', 'Camera', 'Engine', 'EngineKernel', 'Geometry', 'PbrMaterial', 'box'].sort(),
@@ -1191,7 +1193,6 @@ test('Frozen core entry stays portable and React exposes its complete scene bind
       'group',
       'mesh',
       'meshStandardMaterial',
-      'preload',
       'useCamera',
       'useEngine',
       'useBlockTextures',

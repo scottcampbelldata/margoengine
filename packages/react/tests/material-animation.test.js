@@ -295,8 +295,8 @@ mock.module('@margoengine/selection', {
     },
   },
 });
-const { Canvas, Mesh, BoxGeometry, PbrMaterial } = await import('../dist/components.js');
-const { Model } = await import('../dist/model.js');
+const { Canvas, Mesh, BoxGeometry, PbrMaterial } = await (await import('./entries.js')).allEntries();
+const { Model } = await import('../dist/gltf-pro.js');
 const { Animation } = await import('../dist/animation.js');
 const { MeshTransmissionMaterial } = await import('../dist/materials.js');
 const h = React.createElement,

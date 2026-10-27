@@ -1,17 +1,30 @@
 # Optional React scene layer
 
-The existing `@margoengine/react` entry exports all scene components; the four
-subpaths remain available for focused imports. Install only the optional peers
-used by your scene. Every native package is imported lazily;
-importing these components or rendering a Canvas on the server creates no GPU,
-physics world, pointer lock or XR session. `sideEffects` remains `false`.
+`@margoengine/react` holds the bindings that need no optional package, so it builds with Vite, webpack, Turbopack,
+Rollup and esbuild when installed alone. A binding that needs `@margoengine/<name>` is imported from
+`@margoengine/react/<name>`: install that package and import from that subpath (`margoengine/react`, the one
+install, exports them all). Every native package is imported lazily; importing these components or rendering a
+Canvas on the server creates no GPU, physics world, pointer lock or XR session. `sideEffects` remains `false`.
 
-| Entry | Components and hooks | Optional peers |
+| Entry | Components and hooks | Install |
 | --- | --- | --- |
-| `@margoengine/react` | All bindings below, plus `MeshTransmissionMaterial` and `Animation` | Material uses `@margoengine/materials`/`gltf-pro`; animation uses `animation` and optionally `animator`; loaded-model events use `selection`. |
-| `@margoengine/react/kit` | `Gltf`, `Fbx`, `preload`, `Environment`, `Sky`, `ContactShadows`, `Center`, `OrbitControls`, `PointerLock`, `TransformControls`, `Html`, `Text`, `Box`, `Sphere`, `Plane` | Install the corresponding `@margoengine/gltf-pro`, `fbx`, `environment`, `sky`, `shadows`, `controls`, `gizmo`, `html`, `text` or `geometry` package. `Html` also uses `react-dom`. |
-| `@margoengine/react/post` | `EffectComposer`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `DepthOfField`, `Tonemap`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `TAA` | `@margoengine/post`, `dof`, `tonemap`, `taa`, according to the effects used |
-| `@margoengine/react/physics` | `Physics`, `RigidBody`, the collider components (`CuboidCollider`, `BallCollider`, `CapsuleCollider`, `CylinderCollider`, `ConeCollider`, `ConvexHullCollider`, `TrimeshCollider`, `HeightfieldCollider`), `usePhysics`, `useJoint`, `useBeforePhysicsStep`, `useAfterPhysicsStep` | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
+| `@margoengine/react` | `Canvas`, `Stage`, `Mesh`/`Group`, `BoxGeometry`, `PbrMaterial`, `GeometryResource`, `Sun`, `Center`, `Scene`, `RenderView`, `useFrame`, `useMargo`, `useEngine`, `useCamera`, `useLoader`, `useProgress` | nothing more (core, the stage, math, cache and selection come with it) |
+| `@margoengine/react/controls` | `OrbitControls`, `MapControls`, `CadControls`, `ArcballControls`, `PointerLock`, `TransformControls` | `@margoengine/controls` |
+| `@margoengine/react/gltf-pro` | `Gltf` (`Model`), `Gltf.preload` | `@margoengine/gltf-pro` |
+| `@margoengine/react/fbx` | `Fbx`, `Fbx.preload` | `@margoengine/fbx`, `@margoengine/gltf-pro` |
+| `@margoengine/react/animation` | `Animation` | `@margoengine/animation`, `@margoengine/animator` |
+| `@margoengine/react/environment` | `Environment`, `Environment.preload`, `AmbientLight`, `HemisphereLight`, `Fog` | `@margoengine/environment` |
+| `@margoengine/react/shadows` | `Shadows` (turns the Canvas shadows on), `ContactShadows` | `@margoengine/shadows` |
+| `@margoengine/react/html` | `Html` | `@margoengine/html` |
+| `@margoengine/react/text` | `Text` | `@margoengine/text` |
+| `@margoengine/react/sky` | `Sky` | `@margoengine/sky` |
+| `@margoengine/react/geometry` | `Box`, `Sphere`, `Plane` | `@margoengine/geometry` |
+| `@margoengine/react/materials` | `MeshTransmissionMaterial`, `BatchedMesh`, `BatchedItem` | `@margoengine/materials` (and `gltf-pro` for transmission) |
+| `@margoengine/react/post` | `EffectComposer`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `DepthTexture`, `SceneTargets` | `@margoengine/post` |
+| `@margoengine/react/dof`, `/tonemap`, `/taa` | `DepthOfField`, `Tonemap`, `TAA` (inside an `EffectComposer`) | `@margoengine/dof`, `tonemap` or `taa`, and `@margoengine/post` |
+| `@margoengine/react/machinery` | `SectionPlanes` | `@margoengine/machinery` |
+| `@margoengine/react/voxel` | `Voxels`, `useBlockTextures` | `@margoengine/voxel` |
+| `@margoengine/react/physics` | `Physics`, `RigidBody`, the collider components, `usePhysics`, `useJoint`, `useBeforePhysicsStep`, `useAfterPhysicsStep` | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
 | `@margoengine/react/xr` | `XR`, `Controller`, `useXR` | `@margoengine/xr` |
 
 These are Margo components and native plugins. There is no
@@ -23,7 +36,13 @@ bare lowercase JSX still denotes DOM elements.
 
 ```tsx
 import {Suspense} from 'react';
-import {Canvas, Box, Center, ContactShadows, Fbx, Html, OrbitControls, Text} from '@margoengine/react';
+import { Canvas, Center } from '@margoengine/react';
+import { OrbitControls } from '@margoengine/react/controls';
+import { Fbx } from '@margoengine/react/fbx';
+import { Box } from '@margoengine/react/geometry';
+import { Html } from '@margoengine/react/html';
+import { ContactShadows } from '@margoengine/react/shadows';
+import { Text } from '@margoengine/react/text';
 
 export function Scene() {
   return <Canvas backend="webgpu" style={{height:400}}>
@@ -43,9 +62,8 @@ export function Scene() {
 `Gltf` is the existing `Model` component. `Fbx` uses the native FBX loader and the
 same transform, material, shadow, event, `onLoad`, `onError`, abort and Suspense
 contract. Both cache decoded CPU sources per Canvas and create independently
-owned model instances. `preload(src)` selects FBX from `.fbx`, environment images
-from `.hdr`/`.exr`, and glTF otherwise; an explicit second argument can be
-`'fbx'`, `'environment'` or `'model'`. Before Canvas is ready it queues until an
+owned model instances. `Gltf.preload(src)` and `Fbx.preload(src)` (and
+`Environment.preload(src)` for images) warm that cache. Before Canvas is ready they queue until an
 engine exists. Mount Canvas before awaiting such a preload.
 
 Model events call `engine.pick` through the native `@margoengine/selection`
@@ -61,7 +79,7 @@ use `@margoengine/geometry`; Canvas supplies the engine's default lighting.
 `ContactShadows` requests the shared directional shadow map and renders a
 transparent ground showing only its occlusion. Its props are Mesh transforms,
 `width`, `height`, `opacity` and linear RGB `color`; add casters explicitly with
-`castShadow`. It is a shadow receiver, rather than a separate baked AO renderer.
+`castShadow`; mesh `castShadow` draws only while a `<Shadows>` or `<ContactShadows>` is mounted. It is a shadow receiver, rather than a separate baked AO renderer.
 
 `Center` offsets its children to their world-bounds center while retaining its
 outer declared transform. `disableX`, `disableY` and `disableZ` preserve selected
@@ -85,7 +103,10 @@ parent mesh. `Html`, `Environment` and `OrbitControls` retain their existing
 
 ```tsx
 import {Suspense} from 'react';
-import {Canvas, Mesh, BoxGeometry, MeshTransmissionMaterial, Gltf, Animation} from '@margoengine/react';
+import { Canvas, Mesh, BoxGeometry } from '@margoengine/react';
+import { Animation } from '@margoengine/react/animation';
+import { Gltf } from '@margoengine/react/gltf-pro';
+import { MeshTransmissionMaterial } from '@margoengine/react/materials';
 
 <Canvas backend="webgpu">
   <Mesh position={[2,0,0]} onClick={()=>{}}>
@@ -120,7 +141,8 @@ More control, all optional:
 
 ```tsx
 import {useRef} from 'react';
-import {Gltf, Animation, type AnimationHandle} from '@margoengine/react';
+import { Animation, type AnimationHandle } from '@margoengine/react/animation';
+import { Gltf } from '@margoengine/react/gltf-pro';
 
 function Character() {
   const handle = useRef<AnimationHandle>(null);
@@ -147,7 +169,10 @@ resource failures in its alert.
 ## Post effects
 
 ```tsx
-import {EffectComposer, SSAO, DepthOfField, Bloom, Tonemap, TAA} from '@margoengine/react/post';
+import { EffectComposer, SSAO, Bloom } from '@margoengine/react/post';
+import { DepthOfField } from '@margoengine/react/dof';
+import { TAA } from '@margoengine/react/taa';
+import { Tonemap } from '@margoengine/react/tonemap';
 
 <EffectComposer onError={console.error}>
   <SSAO/>
@@ -177,7 +202,7 @@ effect, and MotionBlur with neither TAA nor `velocity`. A lone Tonemap reads its
 ## Physics
 
 ```tsx
-import {Canvas, BoxGeometry, Mesh} from '@margoengine/react';
+import { Canvas, BoxGeometry, Mesh } from '@margoengine/react';
 import {Physics, RigidBody} from '@margoengine/react/physics';
 
 <Canvas>
@@ -212,7 +237,7 @@ present. An explicit collider can exist before a visual
 asset finishes loading:
 
 ```tsx
-import {Fbx} from '@margoengine/react/kit';
+import { Fbx } from '@margoengine/react/fbx';
 import {RigidBody, CuboidCollider} from '@margoengine/react/physics';
 
 <RigidBody colliders={false} position={[0,2,0]}>
@@ -271,7 +296,7 @@ with the step length and always call your latest callback.
 ## XR
 
 ```tsx
-import {Html} from '@margoengine/react/kit';
+import { Html } from '@margoengine/react/html';
 import {XR, Controller, useXR} from '@margoengine/react/xr';
 
 function EnterXR() {

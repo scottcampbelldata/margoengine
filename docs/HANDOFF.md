@@ -1,5 +1,20 @@
 # Margo Engine handoff
 
+## Landed 2026-10-27: React subpaths per optional package (part 2 of the React install fix)
+
+- `@margoengine/react` installed alone now builds with webpack and Turbopack (Next.js 16 App Router), Vite, Rollup
+  and esbuild: the root entry holds only bindings that need no optional package; a binding that needs
+  `@margoengine/<name>` is imported from `@margoengine/react/<name>` (controls, gltf-pro, fbx, animation,
+  environment, html, shadows, sky, text, geometry, materials, post, dof, tonemap, taa, machinery, voxel, physics, xr).
+  `/kit` is gone. `margoengine/react` (the one install) still exports every binding except physics.
+- API: `<Canvas shadows>` / `<Stage shadows>` became `<Shadows />` (`/shadows`); `castShadow` alone no longer turns
+  shadows on. `preload(url)` became `Gltf.preload`, `Fbx.preload`, `Environment.preload`. `<Mesh layers>` needs no
+  package (shared/layers.js). cache and selection are dependencies of @margoengine/react. Callers:
+  `node scripts/codemod-react-subpaths.mjs`.
+- Closes the known bug "`@margoengine/react` installed alone does not build with webpack or Turbopack" (part 1, the stage
+  feature entries, landed as 1c3e6279). Regression tests: `tests/optional-peer-reach.test.js` (no root reaches an
+  optional package; each subpath reaches only its own) and the bundler matrix's Next.js react-alone builds.
+
 ## Landed 2026-10-27: stage feature entries (stage freeze exception, part 1 of the React install fix)
 
 - The `Stage` class lost its ten optional-package methods; each is now a function in its own entry that takes the
