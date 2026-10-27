@@ -768,7 +768,9 @@ class GpsTime {
       let multi = dec.decodeSymbol(this.multi);
       if (multi === 1) {
         const d = ic.decompress(this.diff[last], 1);
-        this.diff[last] = d;
+        // A real point14 file (USGS 3DEP, LASzip 3.4.3) keeps the previous difference after a multiplier 1 point.
+        // The GPSTIME11 reading (formats 0 to 3) is not yet checked against a real file and still stores it.
+        if (!this.layered) this.diff[last] = d;
         this.add(last, d);
         this.extreme[last] = 0;
       } else if (multi < MULTI_UNCHANGED) {

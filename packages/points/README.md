@@ -202,10 +202,11 @@ its chunk. The chunk table sits after the points, so a cut-short LAZ file cannot
 Verification: the decoder was written clean room from the LASzip paper and the public LAZ format description, and was
 tested against an encoder written from the same reading (in `tests/`), with byte-exact round trips of random and
 survey-like points in every supported format, fuzzing and mutation checks. It was then checked against a real USGS 3DEP
-tile (LAS 1.4, point format 6, written by LASzip 3.4.3; `tests/laz-usgs.test.js`): verified against a real USGS file:
-yes. The decoded point count, exact X/Y/Z minimum and maximum and points by return equal the producer's header, and
-return numbers, classes and cross-layer fields are consistent. Not compared point by point with a reference decoder;
-formats 0 to 3, 7 and 8 and files with other producers remain verified only against the test encoder.
+tile (LAS 1.4, point format 6, written by LASzip 3.4.3; `tests/laz-usgs.test.js`): verified against laspy 2.7.0 and
+lazrs 0.8.2 on a real USGS file, field by field identical for all 54,634 points (coordinates, intensity, returns,
+flags, classification, scan angle, user data, point source id and GPS time bit for bit; the reference decoders are not
+part of the repository). The file has no RGB, NIR or extra bytes, and formats 0 to 3, 7 and 8 and files with other
+producers remain verified only against the test encoder.
 
 ## E57 scans (`margoengine/points/e57`)
 

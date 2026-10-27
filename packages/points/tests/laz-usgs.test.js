@@ -2,7 +2,8 @@
 // point format 6, written by "NV5 Geospatial Lidar Suite" with LASzip 3.4.3, 54,634 points in two chunks. Every check
 // compares the decoded points with the header the producer's software wrote (the public header is read by the LAS
 // reader, which does not depend on the LAZ coder), plus plausibility rules of the format. This is the check that found
-// the 515-symbol GPS time model of point14 (the encoder-made files had agreed with a 516-symbol reading).
+// the 515-symbol GPS time model of point14 and the unchanged difference after a multiplier 1 GPS point (the
+// encoder-made files had agreed with the other readings).
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -33,12 +34,14 @@ async function decode() {
       pointSourceId: new Uint16Array(n),
       gps: new Float64Array(n),
     },
-    chunkSizes = [];
+    chunkSizes = [],
+    whole = createHash('sha256');
   let i = 0;
   for await (const c of lazChunks(bytes, header, records)) {
     const dv = new DataView(c.buffer, c.byteOffset, c.byteLength),
       length = header.pointRecordLength;
     chunkSizes.push(c.length / length);
+    whole.update(c);
     for (let o = 0; o < c.length; o += length, i++) {
       f.x[i] = dv.getInt32(o, true);
       f.y[i] = dv.getInt32(o + 4, true);
@@ -54,7 +57,7 @@ async function decode() {
       f.gps[i] = dv.getFloat64(o + 22, true);
     }
   }
-  return { header, info, f, chunkSizes, count: i };
+  return { header, info, f, chunkSizes, count: i, whole: whole.digest('hex') };
 }
 
 const sha = (a) =>
@@ -62,8 +65,11 @@ const sha = (a) =>
     .update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength))
     .digest('hex');
 
-// SHA-256 of each decoded field array (little-endian raw values). These pin the output that the checks below showed
-// to be right; they are not an independent reference.
+// SHA-256 of each decoded field array (little-endian raw values: X, Y, Z, intensity, return number, number of returns,
+// flag byte with scanner channel, classification, user data, scan angle, point source id, GPS time as float64). They
+// were computed from laspy 2.7.0 with lazrs 0.8.2 decoding the same file (a black-box reference decoder, run once
+// outside the repository) and equal this decoder's output field by field; the whole 30-byte record stream also has
+// the SHA-256 in RECORDS. The first GPS checksum pinned our own wrong output, which is why this one comes from laspy.
 const CHECKSUMS = {
   x: '20698a0b55429a81aa1a4a73bd94ed23250d19e9cf4887999e02eea95df0b544',
   y: '56a970fc121f3875eb15f4e7fe67100720f40c0c4c4c5a90e959a433f4cda5ee',
@@ -76,11 +82,13 @@ const CHECKSUMS = {
   userData: '4e0fe87b21fe3ff5b5adf2beddabbae6549c3bcc6946ea61d38f9fc34ef3d542',
   scanAngle: 'a755b30be1cea8f215e1bc02812aaff80ee77d1df8188e8bef11c7b210bfdf05',
   pointSourceId: '7ed32447593cae9d689fbfbf8a253eb7e7ce86b9e2a97d13af3cf01fd9e2b2a8',
-  gps: '09d62ea4b72bff2808cfe4970809273fe2cd939eb4360b95f2b3d6f613300187',
+  gps: '5b9c321debea1d2a260b2e31e004b3ff73dc3ceff91dcf5fa724ea552598ebb5',
 };
 
+const RECORDS = '78e0e96cf554567e2af6ca81083a0da8a3e1a04cbbc0bff3068bb9a2226b5bac';
+
 test('real USGS LAZ file: decoded points agree with the producer header', async () => {
-  const { header, info, f, chunkSizes, count } = await decode(),
+  const { header, info, f, chunkSizes, count, whole } = await decode(),
     n = header.pointCount;
   const table = [];
   const check = (name, ok, detail = '') => {
@@ -191,6 +199,7 @@ test('real USGS LAZ file: decoded points agree with the producer header', async 
   const sums = Object.fromEntries(Object.entries(f).map(([k, a]) => [k, sha(a)]));
   for (const [k, want] of Object.entries(CHECKSUMS))
     check(`SHA-256 of decoded ${k}`, sums[k] === want, sums[k].slice(0, 12));
+  check('SHA-256 of all 30-byte records equals laspy/lazrs', whole === RECORDS, whole.slice(0, 12));
   console.log(table.join('\n'));
 });
 

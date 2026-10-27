@@ -673,12 +673,19 @@ Written clean room from the specifications and papers below. No source code of p
 
 Verified against a real USGS file: yes (2026-10-27). `packages/points/tests/fixtures/USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz`
 (public domain 3DEP tile, LAS 1.4, point format 6, written by LASzip 3.4.3, 54,634 points, two chunks) decodes to the point
-count, the exact X/Y/Z minimum and maximum and the points-by-return array of the producer's header, with valid return
-numbers and classes and layers that agree with each other. Not compared point by point with a reference decoder (none
-is installed), so GPS time values are checked for range, not bit for bit. The file exposed one error that the
+count, the exact X/Y/Z minimum and maximum and the points-by-return array of the producer's header. It was also decoded
+once by laspy 2.7.0 with lazrs 0.8.2 (installed in a throwaway virtual environment outside the repository and used only
+through their public Python API as a black box; nothing from them is in the repository, package.json or the lock file).
+Verified against laspy 2.7.0 / lazrs 0.8.2 on a real USGS file: all 54,634 points are field by field identical (raw
+integer X, Y and Z, intensity, return number, number of returns, flag byte with scanner channel, classification, user
+data, scan angle, point source id and the GPS time bit for bit; the 1,639,020 record bytes are equal). The file has no
+RGB, NIR or extra bytes, so those are still verified only against the encoder. It exposed two errors that the
 encoder-made files could not: in point14 the GPS time sequence model has 515 symbols (a new sequence is 511, the
-switches 512 to 514), not the 516 of GPSTIME11; the LAZ specification 1.4 says so in note 6 of the point14 item. The
-test encoder follows the corrected reading. Other formats (0 to 3, 7, 8) are still verified only against the encoder.
+switches 512 to 514), not the 516 of GPSTIME11 (LAZ specification 1.4, note 6 of the point14 item); and a multiplier 1
+GPS point leaves the stored difference unchanged (the file is the authority; the specification text is silent). The
+test encoder follows both readings. Formats 0 to 3, 7 and 8 and RGB, NIR and extra bytes are still verified only
+against the encoder; the GPSTIME11 coding of formats 0 to 3 keeps its own reading until a real file of those formats is
+checked.
 The LAZ specification PDF was read from downloads.rapidlasso.de (public format description, no code).
 
 ## Cutscenes: `@margoengine/cutscene`
