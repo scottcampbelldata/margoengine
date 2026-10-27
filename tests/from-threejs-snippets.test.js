@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { GUIDES, program } from '../scripts/support/doc-snippets.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const guides = [
@@ -14,13 +15,20 @@ const guides = [
     .map((name) => `docs/guides/${name}`),
 ];
 
+// The task guides (scripts/support/doc-snippets.mjs GUIDES) are one program each: their blocks build on one another,
+// so they are checked joined, as TSX when the guide is a React one. Every other page is checked block by block.
+const taskGuides = new Map(GUIDES.map((guide) => [guide.file, guide]));
+
 for (const file of guides)
   test(`${file} Margo snippets type-check against the built packages`, () => {
     const doc = readFileSync(resolve(root, file), 'utf8');
-    const snippets = [...doc.matchAll(/```ts\r?\n([\s\S]*?)```/g)].map((match) => ({
-      code: match[1],
-      line: doc.slice(0, match.index).split('\n').length + 1,
-    }));
+    const task = taskGuides.get(file);
+    const snippets = task
+      ? [{ code: program(doc, { all: true }), line: 1 }]
+      : [...doc.matchAll(/```ts\r?\n([\s\S]*?)```/g)].map((match) => ({
+          code: match[1],
+          line: doc.slice(0, match.index).split('\n').length + 1,
+        }));
     assert.ok(
       snippets.length >= (file === 'docs/from-threejs.md' ? 20 : 1),
       `expected the guide's snippets, found ${snippets.length}`,
@@ -29,7 +37,9 @@ for (const file of guides)
       for (const [, from] of code.matchAll(/from '([^']+)'/g))
         assert.match(
           from,
-          /^(margoengine(\/[a-z0-9-]+){0,2}|@margoengine\/[a-z0-9-]+(\/[a-z0-9-]+)?|@dimforge\/rapier3d-compat)$/,
+          task?.react
+            ? /^(margoengine\/react|react|react-dom\/client)$/
+            : /^(margoengine(\/[a-z0-9-]+){0,2}|@margoengine\/[a-z0-9-]+(\/[a-z0-9-]+)?|@dimforge\/rapier3d-compat)$/,
           `snippet at line ${line} imports ${from}`,
         );
     // Inside the repository so package resolution finds node_modules; test-results is git-ignored.
@@ -47,7 +57,9 @@ for (const file of guides)
         '',
       ].join('\n'),
     );
-    snippets.forEach(({ code, line }) => writeFileSync(resolve(dir, `line-${line}.ts`), code + 'export {};\n'));
+    snippets.forEach(({ code, line }) =>
+      writeFileSync(resolve(dir, `line-${line}.${task?.react ? 'tsx' : 'ts'}`), code + 'export {};\n'),
+    );
     writeFileSync(
       resolve(dir, 'tsconfig.json'),
       JSON.stringify({
@@ -60,8 +72,9 @@ for (const file of guides)
           types: [],
           noEmit: true,
           skipLibCheck: true,
+          jsx: 'react-jsx',
         },
-        include: ['*.ts'],
+        include: ['*.ts', '*.tsx'],
       }),
     );
     try {
