@@ -172,6 +172,42 @@ returns the uncompressed point records (`LazDecoder`); without one they throw a 
 A decoder written clean room from the LASzip specification is not part of the package yet. `writeLAS` writes
 uncompressed LAS (any format, extra bytes, WKT or EPSG) for tools and tests.
 
+## E57 scans (`margoengine/points/e57`)
+
+`parseE57(bytes)` reads ASTM E57 files from terrestrial scanners: the 1024-byte pages (each CRC-32C checked), the XML
+section, and every `data3D` scan's compressed vector (bitPack codec: Float, ScaledInteger and Integer fields packed into
+bytestreams across data packets). Cartesian or spherical coordinates, each scan's pose (quaternion and translation),
+`cartesianInvalidState` / `sphericalInvalidState` (invalid points dropped unless `keepInvalid`), intensity normalised by
+`intensityLimits`, colour by `colorLimits`, and any other field (return index, time stamp, row and column) by name.
+All scans land in one world frame, float32 relative to `origin`.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PointCloud, PointsPlugin } from 'margoengine/points';
+import { loadE57 } from 'margoengine/points/e57';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+const e57 = await loadE57('/scans/plant-room.e57');
+for (const scan of e57.scans) {
+  const positions = new Float32Array(scan.count * 3);
+  for (let i = 0; i < scan.count; i++) // z-up scan to y-up world
+    positions.set([scan.positions[i * 3], scan.positions[i * 3 + 2], -scan.positions[i * 3 + 1]], i * 3);
+  points.add(new PointCloud({ positions, colors: scan.colors, colorComponents: 4 }));
+}
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `origin` | centre of all scans | World point positions are stored relative to. |
+| `verifyChecksums` | `true` | Check every page's CRC-32C (a failure is a `RangeError` naming the page). |
+| `keepInvalid` | `false` | Keep points flagged invalid. |
+| `signal` | none | `AbortSignal`. |
+
+Codecs other than bitPack, String and Blob prototype fields, and `images2D` are not read (codes `unsupported` or
+skipped). `writeE57` writes double, scaled-integer or spherical scans with intensity, colour, pose and invalid flags,
+for tools and round-trip tests.
+
 ## Large clouds: octree level of detail (`margoengine/points/octree`)
 
 `buildOctree(cloud)` splits a cloud into a nested-sample octree: each node keeps one point per cell of a 128-cell grid

@@ -843,6 +843,10 @@
       "types": "./dist/points/las.d.ts",
       "import": "./dist/points/las.js"
     },
+    "./points/e57": {
+      "types": "./dist/points/e57.d.ts",
+      "import": "./dist/points/e57.js"
+    },
     "./points/octree": {
       "types": "./dist/points/octree.d.ts",
       "import": "./dist/points/octree.js"

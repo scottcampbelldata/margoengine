@@ -697,3 +697,15 @@ idb and the like) was read.
 | Web Storage adapter | The HTML Standard, Web Storage (`getItem`, `setItem`, `removeItem`, `key`, `length`); RFC 4648 base64 |
 | IndexedDB adapter | W3C Indexed Database API 3.0 (open and upgradeneeded, object stores, readonly and readwrite transactions, requests) |
 | File adapter | Node.js `fs/promises` documentation (`writeFile` with `signal` and `flush`, `rename` replacing the target) |
+
+## E57 reader and writer in `@margoengine/points/e57`
+
+Written clean room from the standard below. No source code of E57 libraries (libE57, libE57Format, PDAL, pye57,
+CloudCompare and the like) was read.
+
+| Area | Source |
+| --- | --- |
+| File header, pages, XML section, data3D scans, prototype fields, compressed vectors, bitPack bytestreams | ASTM E2807-11, "Standard Specification for 3D Imaging Data Exchange, Version 1.0" |
+| Page checksum | CRC-32C: G. Castagnoli, S. Bräuer and M. Herrmann, "Optimization of cyclic redundancy-check codes with 24 and 32 parity bits", IEEE Trans. Communications 41(6), 1993 (reflected polynomial 0x82F63B78) |
+| XML subset | W3C XML 1.0 (elements, attributes, character references, CDATA, comments) |
+| Pose rotation | Rotation matrix of a unit quaternion (Hamilton's quaternion algebra) |

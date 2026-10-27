@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3573473,
+  "total": 3580018,
   "history": [
     {
       "date": "2026-10-24",
@@ -620,6 +620,12 @@
       "commit": "3aeb5140",
       "reason": "new optional package @margoengine/save: save documents, prefabs, migrations, transactional loading, storage adapters (item 28.5, first batch)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "5fc5a668",
+      "reason": "points: ASTM E57 reader and writer (/e57) (queue item 31, landing 3)",
+      "grew": 1
     }
   ],
   "items": {
@@ -829,6 +835,7 @@
     "@margoengine/oit": 3199,
     "@margoengine/physics": 16247,
     "@margoengine/points": 21547,
+    "@margoengine/points/e57": 6545,
     "@margoengine/points/las": 4806,
     "@margoengine/points/octree": 8031,
     "@margoengine/post": 40343,
