@@ -315,7 +315,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-85 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+86 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -335,7 +335,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/stats`](packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling. |
 | [`@margoengine/inspector`](packages/inspector/README.md) | Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger. |
 
-### Loading and formats (11)
+### Loading and formats (12)
 
 | Package | What it is |
 | --- | --- |
@@ -350,6 +350,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/blender`](packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |
 | [`@margoengine/cache`](packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin, textures and STEP files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |
 | [`@margoengine/splats`](packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |
+| [`@margoengine/tiles`](packages/tiles/README.md) | Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf-pro. |
 
 ### Rendering and lighting (19)
 
@@ -4122,6 +4123,60 @@ Base GPU allocations are approximately 128 bytes per splat (384 MB at three mill
 `cloud.setFog(fog)` fogs the cloud with `@margoengine/environment`'s `Fog` or any object with its fields (`color`, `near`, `far`, `density`, `heightFalloff`, `height`, `enabled`), read every frame with Fog's maths. Each splat's colour fades toward the fog colour by the fog at its centre, in the projection pass and in linear before the display encoding; opacity is unchanged. The package does not import environment. `fog.enabled = false` clears it without recompiling; `cloud.setFog(null)` (the default) draws exactly as before.
 
 [README continues: https://margoengine.com/llms/packages/splats.md]
+
+=== @margoengine/tiles (packages/tiles/README.md) ===
+
+# @margoengine/tiles
+
+Import `margoengine/tiles` from the `margoengine` package, or `@margoengine/tiles` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+Streaming [OGC 3D Tiles 1.1](https://docs.ogc.org/cs/22-025r4/22-025r4.html) for engineering, GIS and digital-twin scenes: city models, photogrammetry, BIM and scanned sites far bigger than memory. Tiles load by screen-space error as the camera moves, coarse first, from a priority queue with a concurrency limit, and are evicted least recently used past a memory budget. glTF and b3dm tiles are drawn by [`@margoengine/gltf-pro`](../gltf-pro/README.md), pnts tiles by [`@margoengine/points`](../points/README.md); both are optional peers loaded with `import()` on the first tile that needs them. Core is not changed, and an app that does not import this package ships none of it.
+
+## Quick start
+
+```ts
+import { Engine } from 'margoengine/core';
+import { TilesRenderer } from 'margoengine/tiles';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { camera: { position: [0, 400, 600], target: [0, 0, 0], far: 50_000 } });
+
+// The tileset's centre lands at the world origin, x east, y up, -z north (the default 'enu' frame).
+const tiles = await TilesRenderer.load(engine, 'https://example.com/city/tileset.json', {
+  maximumScreenSpaceError: 16, // pixels; lower is sharper and loads more
+  memoryBudget: 256 * 1024 * 1024, // bytes of tile content kept
+});
+tiles.tileset.on('progress', ({ queued, loading, ready }) => console.log(`${ready} ready, ${loading + queued} to go`));
+tiles.tileset.on('error', ({ error }) => console.warn(error.message)); // MargoError, code 'failed', names the fix
+
+// Place a marker by longitude, latitude (degrees) and height (metres).
+console.log(tiles.cartographicToWorld(-75.6, 40.04, 120));
+engine.start();
+```
+
+The renderer updates selection every frame from `engine.camera`. `tiles.dispose()` (or `using tiles = ...`) aborts every request and frees every tile.
+
+## What it reads
+
+| Part of the specification | Support |
+| --- | --- |
+| Tileset JSON | `asset`, `geometricError`, `root`, `children`, `transform` (composed in float64), `refine` (inherited), `content` / `contents` (several per tile), `viewerRequestVolume`, `content.boundingVolume`, `properties`, `extensionsRequired` (unknown required extensions fail with code `unsupported`) |
+| Bounding volumes | `box`, `region` (always in EPSG:4979, ignores transforms), `sphere`; S2 is not supported |
+| Refinement | `REPLACE` (children drawn only once every visible child is ready, so no holes and no overlap) and `ADD` |
+| Implicit tiling | `QUADTREE` and `OCTREE`, `subtreeLevels`, `availableLevels` (or the 1.0 extension's `maximumLevel`), binary and JSON subtree files, constant and bitstream availability, child subtrees, `{level}` `{x}` `{y}` `{z}` templates |
+| External tilesets | content that is tileset JSON becomes the tile's child; its transforms continue from the tile |
+| Content | glTF and GLB, b3dm (with `RTC_CENTER` and the batch table), pnts (`POSITION`, `POSITION_QUANTIZED`, `RGBA`, `RGB`, `RGB565`, `NORMAL`, `NORMAL_OCT16P`, `BATCH_ID`, `CONSTANT_RGBA`), cmpt (nested); i3dm is parsed (one matrix per instance) but not drawn yet |
+| Metadata | `schema` / `schemaUri`, `metadata` on the tileset, tiles and contents, `groups`; `tileset.properties(entity)` fills in schema defaults |
+
+## Selection
+
+Each update measures every visible tile's screen-space error, `geometricError x screenHeight / (2 x distance x tan(fov / 2))` (perspective) or `geometricError x screenHeight / orthographicHeight`, and refines while it is above `maximumScreenSpaceError`. Tiles outside the camera frustum (or a `viewerRequestVolume` the camera is outside) are skipped. An empty tile always refines. Requests are prioritised in two groups: tiles that fill holes (REPLACE parents still standing in for children, ADD parents) first, coarsest first, then the final tiles nearest first. Requests no longer wanted are dropped from the queue or aborted in flight. With `skipLevelOfDetail`, parents whose error is more than `skipScreenSpaceErrorFactor` times the target are not loaded at all, so a close view fills in at full detail sooner.
+
+## Options
+
+`TilesRenderer.load(engine, url, options)` and `Tileset.load(url, options)`:
+
+[README continues: https://margoengine.com/llms/packages/tiles.md]
 
 === @margoengine/materials (packages/materials/README.md) ===
 

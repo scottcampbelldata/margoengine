@@ -52,6 +52,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/blender](https://margoengine.com/llms/packages/blender.md): Optional offline Blender .margo assets using Margo's WebGPU PBR renderer.
 - [@margoengine/cache](https://margoengine.com/llms/packages/cache.md): Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin, textures and STEP files with ETag/Last-Modified revalidation, app versioning, range…
 - [@margoengine/splats](https://margoengine.com/llms/packages/splats.md): Optional Gaussian splats with GPU covariance projection and stable compute radix sorting.
+- [@margoengine/tiles](https://margoengine.com/llms/packages/tiles.md): Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf-pro.
 
 ## Packages: Rendering and lighting
 
@@ -169,6 +170,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/blender API](https://margoengine.com/llms/api/blender.md): 1 entry point
 - [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 2 entry points
 - [@margoengine/splats API](https://margoengine.com/llms/api/splats.md): 2 entry points
+- [@margoengine/tiles API](https://margoengine.com/llms/api/tiles.md): 1 entry point
 - [@margoengine/materials API](https://margoengine.com/llms/api/materials.md): 4 entry points
 - [@margoengine/shader API](https://margoengine.com/llms/api/shader.md): 7 entry points
 - [@margoengine/environment API](https://margoengine.com/llms/api/environment.md): 7 entry points
