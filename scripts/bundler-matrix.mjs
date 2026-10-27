@@ -42,7 +42,8 @@ for (const dir of (await readdir(join(root, 'packages'))).filter((d) =>
   assert.ok(tarballs.includes(file), `${file} missing; run npm run modern:test:packages`);
   packed[name] = `file:${join(archives, file).replaceAll('\\', '/')}`;
 }
-const run = promisify(execFile);
+const run = promisify(execFile),
+  rootManifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
 const version = async (name) =>
   JSON.parse((await run(process.execPath, [npm, 'view', name, 'version', '--json'], { encoding: 'utf8' })).stdout);
 
@@ -246,14 +247,85 @@ createRoot(document.getElementById('root')).render(<Canvas label="cube"><Spinner
               '@margoengine/controls': packed['@margoengine/controls'],
               react: installed('react'),
               'react-dom': installed('react-dom'),
+              // The strict type check below: the repository's TypeScript and React types.
+              ...Object.fromEntries(
+                ['typescript', '@types/react', '@types/react-dom'].map((name) => [
+                  name,
+                  rootManifest.devDependencies[name],
+                ]),
+              ),
             },
             overrides: Object.fromEntries(Object.entries(packed).filter(([name]) => name !== 'margoengine')),
           }),
         );
         await run(process.execPath, [npm, 'install', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: alone });
+        // A strict TypeScript app (skipLibCheck: false, the Vite template's other options) that imports every entry of
+        // @margoengine/react, installed without its optional peers: the published declarations must type-check
+        // (they once failed with TS2307 for each of the 30 optional peer modules they named; known-bugs.md).
+        const typed = (async () => {
+          await mkdir(join(alone, 'typed'), { recursive: true });
+          await writeFile(
+            join(alone, 'typed/main.tsx'),
+            `import { useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BoxGeometry, Canvas, Mesh, OrbitControls, PbrMaterial, useFrame, type MeshRef } from '@margoengine/react';
+export * as kit from '@margoengine/react/kit';
+export * as post from '@margoengine/react/post';
+export * as physics from '@margoengine/react/physics';
+export * as xr from '@margoengine/react/xr';
+function Spinner() {
+  const mesh = useRef<MeshRef>(null);
+  useFrame((_engine, delta) => {
+    if (mesh.current) mesh.current.rotation.y += delta;
+  });
+  return <Mesh ref={mesh}><BoxGeometry /><PbrMaterial color="#84d6bd" /></Mesh>;
+}
+createRoot(document.getElementById('root')!).render(<Canvas label="cube"><Spinner /><OrbitControls /></Canvas>);
+`,
+          );
+          await writeFile(
+            join(alone, 'typed/tsconfig.json'),
+            JSON.stringify({
+              compilerOptions: {
+                target: 'ES2022',
+                lib: ['ES2022', 'DOM', 'DOM.Iterable'],
+                module: 'ESNext',
+                moduleResolution: 'bundler',
+                verbatimModuleSyntax: true,
+                moduleDetection: 'force',
+                noEmit: true,
+                jsx: 'react-jsx',
+                strict: true,
+                skipLibCheck: false,
+                noUnusedLocals: true,
+                noUnusedParameters: true,
+                erasableSyntaxOnly: true,
+                noUncheckedSideEffectImports: true,
+              },
+              include: ['main.tsx'],
+            }),
+          );
+          // tsc exits non-zero with its diagnostics on stdout; the assertion prints them.
+          const result = await run(
+            process.execPath,
+            [join(alone, 'node_modules/typescript/bin/tsc'), '-p', join(alone, 'typed/tsconfig.json')],
+            { cwd: alone, encoding: 'utf8' },
+          ).then(
+            (output) => ({ code: 0, ...output }),
+            (failure) => failure,
+          );
+          assert.equal(
+            result.code,
+            0,
+            `react alone: strict tsc (skipLibCheck: false) failed:
+${result.stdout}${result.stderr}`,
+          );
+          done('react alone: strict tsc clean');
+        })();
         const [umbrella, scoped] = await Promise.all([
           reactApp(fixture, 'margoengine/react'),
           reactApp(alone, '@margoengine/react'),
+          typed,
         ]);
         // Only what the page imports: no package outside its graph is emitted, and nothing larger than JavaScript.
         // Installed code only: Vite stands in a three-line module for an optional peer that is not installed.

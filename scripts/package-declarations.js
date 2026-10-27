@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseSync } from 'rolldown/utils';
@@ -41,11 +42,90 @@ function references(filename, text) {
   return out.sort((a, b) => a.start - b.start);
 }
 
+/** The comment that marks a declaration import of an optional engine peer (see {@link guardOptionalPeers}). */
+export const OPTIONAL_PEER_GUARD = '// @ts-ignore optional peer: its types apply when it is installed';
+const packageOf = (specifier) => specifier.split('/', specifier.startsWith('@') ? 2 : 1).join('/');
+
+/**
+ * Makes a published declaration file type-check when an optional engine peer is not installed (a strict consumer,
+ * `skipLibCheck: false`, otherwise gets TS2307 for every peer it left out). Each module-level `import`/`export ... from`
+ * of an optional `@margoengine/*` peer gets {@link OPTIONAL_PEER_GUARD} on the line before its module name: installed,
+ * the peer's own types apply; absent, its names are `any`, the same as the feature that needs it. Throws for what a
+ * guard cannot cover: a bare module the package does not declare as a dependency or peer (never installed for its
+ * users), and an inline `import('peer')` type of an optional engine peer (write it as a module-level `import type`).
+ * Third-party optional peers are left alone: `react` is optional only so that the one-install package does not install
+ * React for apps without it, and the React bindings' declarations are React types.
+ */
+export function guardOptionalPeers(filename, text, manifest) {
+  const declared = new Set([
+      manifest.name,
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.peerDependencies ?? {}),
+    ]),
+    optional = new Set(
+      Object.entries(manifest.peerDependenciesMeta ?? {})
+        .filter(([name, meta]) => meta?.optional && name.startsWith('@margoengine/'))
+        .map(([name]) => name),
+    );
+  const parsed = parseSync(filename, text);
+  if (parsed.errors.length) throw new Error(`Cannot guard declarations in ${filename}: ${parsed.errors[0].message}`);
+  const bare = (node) =>
+    typeof node?.value === 'string' && !node.value.startsWith('.') && !node.value.startsWith('node:') ? node : null;
+  const check = (source) => {
+    const name = packageOf(source.value);
+    if (!declared.has(name))
+      throw new Error(
+        `${filename} imports types from ${source.value}, but ${manifest.name} does not declare ${name} as a dependency or peer: its users never get it installed`,
+      );
+    return optional.has(name);
+  };
+  const guarded = new Set();
+  for (const statement of parsed.program.body) {
+    const source = ['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(statement.type)
+      ? bare(statement.source)
+      : null;
+    if (source && check(source)) guarded.add(source);
+  }
+  (function walk(node) {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'TSImportType') {
+      const source = bare(node.source ?? node.argument?.literal ?? node.argument);
+      if (source && check(source))
+        throw new Error(
+          `${filename} names optional peer ${source.value} in an inline import() type; use a module-level \`import type\` so the published declarations can guard it`,
+        );
+    }
+    for (const [key, value] of Object.entries(node))
+      if (key !== 'comments') {
+        if (Array.isArray(value)) value.forEach(walk);
+        else if (value && typeof value === 'object') walk(value);
+      }
+  })(parsed.program);
+  // TypeScript reports a missing module at its name, and @ts-ignore covers the line after the comment.
+  const lines = new Set(
+    [...guarded]
+      .map((source) => text.lastIndexOf('\n', source.start - 1) + 1)
+      .filter((start) => {
+        const before = text.slice(0, Math.max(0, start - 1));
+        return !before.slice(before.lastIndexOf('\n') + 1).startsWith(OPTIONAL_PEER_GUARD);
+      }),
+  );
+  let output = '',
+    end = 0;
+  for (const start of [...lines].sort((a, b) => a - b)) {
+    output += `${text.slice(end, start)}${OPTIONAL_PEER_GUARD}\n`;
+    end = start;
+  }
+  return output + text.slice(end);
+}
+
 /** Keep shared type dependencies inside the files shipped by an individual npm package. Runtime modules are untouched. */
 export async function packageDeclarations(root) {
   const dist = resolve(root, 'dist'),
     shared = resolve(root, '../shared'),
     visited = new Set();
+  const manifestFile = join(root, 'package.json'),
+    manifest = existsSync(manifestFile) ? JSON.parse(await readFile(manifestFile, 'utf8')) : null;
   async function visit(source, destination) {
     if (visited.has(source)) return;
     visited.add(source);
@@ -68,6 +148,7 @@ export async function packageDeclarations(root) {
       end = reference.end;
     }
     output += text.slice(end);
+    if (manifest) output = guardOptionalPeers(source, output, manifest);
     if (source !== destination || output !== text) {
       await mkdir(dirname(destination), { recursive: true });
       await writeFile(destination, output);

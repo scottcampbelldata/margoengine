@@ -9,6 +9,7 @@ import type {
 } from '@margoengine/controls';
 import type { Sky as SkyPlugin, SkyOptions } from '@margoengine/sky';
 import type { Text as TextBlock, TextOptions, TextRenderer, Font } from '@margoengine/text';
+import type * as GeometryModule from '@margoengine/geometry';
 import { Mesh, PbrMaterial, type PbrMaterialProps, type MeshProps, type MeshRef } from './components.js';
 import {
   useScene,
@@ -32,7 +33,7 @@ interface ErrorProps {
   onError?: (error: unknown) => void;
 }
 
-type GeometryApi = typeof import('@margoengine/geometry');
+type GeometryApi = typeof GeometryModule;
 type ShapeKind = 'boxGeometry' | 'sphereGeometry' | 'planeGeometry';
 function ShapeGeometry({
   kind,

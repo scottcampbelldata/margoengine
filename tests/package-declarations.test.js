@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
-import { packageDeclarations } from '../scripts/package-declarations.js';
+import { OPTIONAL_PEER_GUARD, guardOptionalPeers, packageDeclarations } from '../scripts/package-declarations.js';
 
 const compiler = resolve(import.meta.dirname, '../node_modules/typescript/bin/tsc');
 
@@ -80,6 +80,88 @@ test('declaration packaging leaves documentation and literal types containing im
   assert.equal(await readFile(join(root, 'dist/index.d.ts'), 'utf8'), text);
 });
 
+// A strict consumer (skipLibCheck: false) of a package whose declarations import an optional engine peer got TS2307
+// for every peer it had not installed (@margoengine/react alone: 41 errors, 2026-10-27).
+const peerFixture = {
+  'packages/sample/package.json': JSON.stringify({
+    name: '@margoengine/sample',
+    dependencies: { '@margoengine/math': '^1.0.0' },
+    peerDependencies: { '@margoengine/peer': '^1.0.0', react: '^19.0.0' },
+    peerDependenciesMeta: { '@margoengine/peer': { optional: true }, react: { optional: true } },
+  }),
+  'packages/sample/dist/index.d.ts': [
+    "import type { PeerOptions } from '@margoengine/peer/options';",
+    'export interface SampleProps extends PeerOptions { label?: string }',
+    'export type {',
+    '  PeerOptions,',
+    "} from '@margoengine/peer/options';",
+    '',
+  ].join('\n'),
+  'consumer.ts': [
+    "import type { SampleProps } from './packages/sample/dist/index.js';",
+    "export const props: SampleProps = { label: 'cube' };",
+    '',
+  ].join('\n'),
+};
+// The strict compiler's diagnostics ('' when the consumer type-checks).
+const strict = (cwd) =>
+  spawnSync(
+    process.execPath,
+    [compiler, '--noEmit', '--strict', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', 'consumer.ts'],
+    { cwd, encoding: 'utf8' },
+  ).stdout.trim();
+
+test('declarations importing an optional engine peer type-check strictly without it and use its types with it', async (t) => {
+  const { repository, root } = await fixture(t, peerFixture);
+  assert.match(strict(repository), /TS2307: Cannot find module '@margoengine\/peer\/options'/);
+  await packageDeclarations(root);
+  await packageDeclarations(root);
+  const text = await readFile(join(root, 'dist/index.d.ts'), 'utf8');
+  // Both the import and the multi-line re-export are guarded at the line of their module name, once.
+  assert.equal(text.split(OPTIONAL_PEER_GUARD).length - 1, 2);
+  assert.match(text, new RegExp(`${OPTIONAL_PEER_GUARD}\\n\\} from '@margoengine/peer/options'`));
+  assert.equal(strict(repository), '');
+  // Installed, the peer's own types apply: a wrong option is an error again.
+  await mkdir(join(repository, 'node_modules/@margoengine/peer'), { recursive: true });
+  await writeFile(
+    join(repository, 'node_modules/@margoengine/peer/package.json'),
+    JSON.stringify({ name: '@margoengine/peer', exports: { './options': { types: './options.d.ts' } } }),
+  );
+  await writeFile(
+    join(repository, 'node_modules/@margoengine/peer/options.d.ts'),
+    'export interface PeerOptions { strength?: number }\n',
+  );
+  const consumer = (strength) =>
+    writeFile(
+      join(repository, 'consumer.ts'),
+      `import type { SampleProps } from './packages/sample/dist/index.js';\nexport const props: SampleProps = { strength: ${strength} };\n`,
+    );
+  await consumer('2');
+  assert.equal(strict(repository), '');
+  await consumer("'high'");
+  assert.match(strict(repository), /TS2322/);
+});
+
+test('declaration packaging rejects types from an undeclared package and inline import() of an optional peer', async (t) => {
+  const undeclared = await fixture(t, {
+    ...peerFixture,
+    'packages/sample/dist/index.d.ts': "export type { Backend } from '@margoengine/missing/mat4';\n",
+  });
+  await assert.rejects(
+    packageDeclarations(undeclared.root),
+    /imports types from @margoengine\/missing\/mat4, but @margoengine\/sample does not declare/,
+  );
+  const inline = await fixture(t, {
+    ...peerFixture,
+    'packages/sample/dist/index.d.ts': "export type PeerApi = typeof import('@margoengine/peer');\n",
+  });
+  await assert.rejects(packageDeclarations(inline.root), /inline import\(\) type/);
+  // Declared dependencies, the package itself and third-party optional peers (react) are left as they are.
+  const text =
+    "import type { Backend } from '@margoengine/math/mat4';\nimport type { ReactNode } from 'react';\nexport type Node = ReactNode | import('react').JSX.Element | Backend;\n";
+  assert.equal(guardOptionalPeers('index.d.ts', text, JSON.parse(peerFixture['packages/sample/package.json'])), text);
+});
+
 // `npm pack` runs each package's own prepack build, not build:packages, so that build must package declarations too
 // (environment once shipped dist/capture.d.ts importing ../../shared/msaa.js).
 const repository = resolve(import.meta.dirname, '..');
@@ -127,4 +209,25 @@ test('built declarations import nothing outside their package', async () => {
     }
   }
   assert.deepEqual(escapes, []);
+});
+
+test('built declarations name only declared packages and guard every optional engine peer', async () => {
+  const unguarded = [];
+  for (const name of packages) {
+    const root = join(repository, 'packages', name),
+      dist = join(root, 'dist');
+    let files, manifest;
+    try {
+      manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
+      files = await readdir(dist, { recursive: true });
+    } catch {
+      continue;
+    }
+    for (const file of files.filter((f) => /\.d\.[mc]?ts$/.test(f))) {
+      const path = join(dist, file),
+        text = await readFile(path, 'utf8');
+      if (guardOptionalPeers(path, text, manifest) !== text) unguarded.push(`${name}/dist/${file}`);
+    }
+  }
+  assert.deepEqual(unguarded, []);
 });

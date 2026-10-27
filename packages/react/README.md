@@ -53,9 +53,8 @@ On the machine that wrote this page, packing took about a minute and the install
 **Route 2: use the examples inside the clone.** `npm ci`, `npm run build:packages`, then
 `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example.
 
-**TypeScript with this package alone.** Set `"skipLibCheck": true` in `tsconfig.json`. Without it, `tsc` reports
-about 200 errors in the declaration files of the optional peers you did not install. Installing `margoengine` (the
-tarball route above installs it) does not have this problem.
+**TypeScript with this package alone.** The types check under a strict `tsconfig.json` (`"skipLibCheck": false`)
+without the optional peers; options typed by a peer you have not installed are `any` until you install it.
 
 **After 1.0.0 is published**, `npm install margoengine react react-dom` replaces the tarballs and nothing else changes.
 [SCENE.md](SCENE.md) lists the optional peers each component uses.

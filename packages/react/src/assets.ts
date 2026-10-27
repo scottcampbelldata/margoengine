@@ -2,10 +2,12 @@ import type { EngineKernel } from '@margoengine/core';
 import { optionalPeer } from './optional.js';
 import type { GLTFAsset, GLTFImage, PBRModel } from '@margoengine/gltf-pro';
 import type { LoadingManager } from '@margoengine/cache/manager';
+import type * as EnvironmentModule from '@margoengine/environment';
+import type * as GltfProModule from '@margoengine/gltf-pro';
 
-type EnvironmentAPI = typeof import('@margoengine/environment');
+type EnvironmentAPI = typeof EnvironmentModule;
 export interface ModelSource {
-  api: typeof import('@margoengine/gltf-pro');
+  api: typeof GltfProModule;
   asset: GLTFAsset;
   images: GLTFImage[];
   first: PBRModel | null;
