@@ -970,19 +970,42 @@ export class RawMesh {
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         }),
       };
-    const o = this.object;
-    o.set(world);
-    // Normal matrix: inverse transpose of the upper 3x3, the cofactor columns over the determinant.
-    const [a0, a1, a2, , b0, b1, b2, , c0, c1, c2] = world,
-      x = [b1 * c2 - b2 * c1, b2 * c0 - b0 * c2, b0 * c1 - b1 * c0],
-      y = [c1 * a2 - c2 * a1, c2 * a0 - c0 * a2, c0 * a1 - c1 * a0],
-      z = [a1 * b2 - a2 * b1, a2 * b0 - a0 * b2, a0 * b1 - a1 * b0],
-      det = a0 * x[0] + a1 * x[1] + a2 * x[2],
-      inv = det ? 1 / det : 0;
-    [x, y, z].forEach((col, i) => col.forEach((v, k) => (o[16 + i * 4 + k] = v * inv)));
-    if (!g.written || g.written.some((v, i) => !Object.is(v, o[i]))) {
-      device.queue.writeBuffer(g.object, 0, o as Float32Array<ArrayBuffer>);
-      (g.written ??= new Float32Array(28)).set(o);
+    // The object block (world matrix, then its normal matrix) is rewritten only when the world matrix changed: the
+    // normal matrix follows from it, so equal world words mean equal blocks.
+    const written = g.written;
+    let same = !!written;
+    for (let i = 0; same && i < 16; i++) same = Object.is(written![i], world[i]);
+    if (!same) {
+      const o = this.object;
+      o.set(world);
+      // Normal matrix: inverse transpose of the upper 3x3, the cofactor columns over the determinant.
+      const a0 = world[0],
+        a1 = world[1],
+        a2 = world[2],
+        b0 = world[4],
+        b1 = world[5],
+        b2 = world[6],
+        c0 = world[8],
+        c1 = world[9],
+        c2 = world[10],
+        x0 = b1 * c2 - b2 * c1,
+        x1 = b2 * c0 - b0 * c2,
+        x2 = b0 * c1 - b1 * c0,
+        det = a0 * x0 + a1 * x1 + a2 * x2,
+        inv = det ? 1 / det : 0;
+      o[16] = x0 * inv;
+      o[17] = x1 * inv;
+      o[18] = x2 * inv;
+      o[20] = (c1 * a2 - c2 * a1) * inv;
+      o[21] = (c2 * a0 - c0 * a2) * inv;
+      o[22] = (c0 * a1 - c1 * a0) * inv;
+      o[24] = (a1 * b2 - a2 * b1) * inv;
+      o[25] = (a2 * b0 - a0 * b2) * inv;
+      o[26] = (a0 * b1 - a1 * b0) * inv;
+      if (!written || written.some((v, i) => !Object.is(v, o[i]))) {
+        device.queue.writeBuffer(g.object, 0, o as Float32Array<ArrayBuffer>);
+        (g.written ??= new Float32Array(28)).set(o);
+      }
     }
     if (g.camera !== camera || !g.group) {
       g.camera = camera;
@@ -1242,11 +1265,12 @@ export class RawShaders implements EnginePlugin {
           ...(stencil ? { stencilReadOnly: true } : {}),
         },
       });
-    let current: GPURenderPipeline | undefined;
+    let current: GPURenderPipeline | undefined, materialGroup: GPUBindGroup | undefined;
     for (const d of draws) {
       if (d.pipeline !== current) pass.setPipeline((current = d.pipeline));
       pass.setBindGroup(0, d.mesh.gpu!.group!);
-      if (d.group) pass.setBindGroup(1, d.group);
+      // A bound group stays bound across draws and pipelines of one pass, so meshes of one material bind it once.
+      if (d.group && d.group !== materialGroup) pass.setBindGroup(1, (materialGroup = d.group));
       d.mesh.draw(pass, d.call[0], d.call[1], d.call[2]);
       this.stats.meshes++;
       this.stats.drawCalls++;

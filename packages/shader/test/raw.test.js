@@ -501,3 +501,36 @@ test('arguments and values are checked with messages that name the fix', () => {
   assert.throws(() => new RawShaders().setup({ gpu: null }), { code: 'unsupported' });
   assert.throws(() => new RawShaders({ opaqueOrder: Number.NaN }), RangeError);
 });
+
+test('meshes of one material bind its group once a pass; each mesh binds its own object group', () => {
+  // p-custom-shader draws 10,000 raw meshes of one material: every draw re-bound the same material group, a native
+  // call per mesh. A bound group stays bound across draws and pipelines of a pass, so it is bound when it changes.
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    a = material(),
+    b = material();
+  for (const [m, order] of [
+    [a, 0],
+    [a, 0],
+    [a, 0],
+    [b, 1],
+    [a, 2],
+  ])
+    raw.add(new RawMesh({ material: m, attributes: quad(), index: [0, 1, 2, 0, 2, 3], renderOrder: order }));
+  h.frame();
+  const log = h.gpu.record(() => h.frame()),
+    binds = named(log, 'pass.setBindGroup'),
+    draws = named(log, 'pass.drawIndexed').length;
+  assert.equal(draws, 5);
+  assert.equal(binds.filter((c) => c[1] === 0).length, 5, 'one object group per mesh');
+  const material1 = binds.filter((c) => c[1] === 1).map((c) => c[2]);
+  assert.equal(material1.length, 3, 'material a, then b, then a again');
+  assert.notEqual(material1[0], material1[1]);
+  assert.equal(material1[0], material1[2]);
+  // Group 1 is bound before the first draw of each run of its material.
+  const order = log.filter((c) => c[0] === 'pass.drawIndexed' || (c[0] === 'pass.setBindGroup' && c[1] === 1));
+  assert.deepEqual(
+    order.map((c) => (c[0] === 'pass.drawIndexed' ? 'draw' : 'bind')),
+    ['bind', 'draw', 'draw', 'draw', 'bind', 'draw', 'bind', 'draw'],
+  );
+});
