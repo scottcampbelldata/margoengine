@@ -6,6 +6,8 @@
 // runs anything, naming the script.
 // Options: --no-build (dist is current), --only=<substring> (run matching tests), --select=<id>,<id> (run exactly these:
 // `<dir>/<script>` or `root/<script>`, see testId; check:merge passes the ones a change affects), --list (print the plan).
+// Every test has a hard time limit (10 min; MARGO_GPU_TEST_TIMEOUT_MIN, or "margo": { "gpuTestTimeoutMinutes": n } in the
+// package's package.json): a hung test has its whole process tree killed, is named in the output and fails the step.
 // Holds one shared slot of the GPU lock (scripts/gpu-lock.mjs, up to 3 at once) for the whole run; each test's result and time go to
 // test-results/gpu-packages.json.
 import { spawnSync } from 'node:child_process';
@@ -13,6 +15,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { acquire, lockDir } from './gpu-lock.mjs';
+import { runLimited, testLimitMs } from './support/run-limited.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const json = (file) => JSON.parse(readFileSync(join(root, file), 'utf8'));
@@ -59,7 +62,12 @@ export function plan() {
       const command = script.replace(/^npm run build && /, '');
       if (/\bnpm run build\b/.test(command))
         throw new Error(`${file} "${name}" builds after its start (${script}); begin it with "npm run build && "`);
-      tests.push({ label: `${dir} ${name}`, cwd: `packages/${dir}`, command });
+      tests.push({
+        label: `${dir} ${name}`,
+        cwd: `packages/${dir}`,
+        command,
+        minutes: json(file).margo?.gpuTestTimeoutMinutes,
+      });
     }
   }
   const scripts = json('package.json').scripts;
@@ -172,7 +180,14 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
       for (const command of PREPARE[test.name] ?? [])
         if (!run(command, '.').ok) throw new Error(`${command} failed (needed by ${test.label}); fix it first`);
       console.log(`\n=== ${test.label}`);
-      results.push({ ...test, ...run(test.command, test.cwd) });
+      const result = await runLimited(test.command, {
+        cwd: join(root, test.cwd),
+        env,
+        limitMs: testLimitMs(test.minutes),
+        label: test.label,
+      });
+      if (result.message) console.error(`\nHUNG: ${result.message}`);
+      results.push({ ...test, ...result });
     }
   } finally {
     release();

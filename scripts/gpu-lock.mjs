@@ -99,7 +99,7 @@ const freshMs = () => Number(process.env.MARGO_GPU_FRESH_MS ?? 5_000);
  * Ends a process and everything it started. On Windows `taskkill /T /F` (a plain kill stops only the shell or launcher
  * and leaves browsers, servers and kernels running); elsewhere the process group, which `spawnLimited` makes.
  */
-function killTree(pid) {
+export function killTree(pid) {
   if (!pid) return;
   if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
   else
