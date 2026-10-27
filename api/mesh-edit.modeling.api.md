@@ -4,10 +4,18 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
-import { MutableVec2, MutableVec3 } from "@margoengine/math";
+import { MutableVec2, MutableVec3, Vec2 } from "@margoengine/math";
 
 export interface BridgeOptions extends MeshEditOptions {
     segments?: number;
+}
+
+export interface ChartOptions {
+    seams?: readonly string[];
+    angle?: number;
+    resolution?: number;
+    padding?: number;
+    signal?: AbortSignal;
 }
 
 export interface ComponentEditResult extends MeshEditResult {
@@ -42,6 +50,14 @@ export interface KnifeResult extends ComponentEditResult {
 
 export interface LODChainOptions extends Omit<SimplifyOptions, 'ratio' | 'targetTriangles'> {
     ratios?: readonly number[];
+}
+
+export interface LightmapUVResult {
+    uv: MutableVec2[][];
+    charts: UVChart[];
+    seams: string[];
+    texelsPerUnit: number;
+    resolution: number;
 }
 
 export interface MeshBooleanFaceSource {
@@ -122,6 +138,31 @@ export interface SubdivideOptions extends MeshEditOptions {
     signal?: AbortSignal;
 }
 
+export interface UVChart {
+    faces: string[];
+    pins: number;
+    bounds: [number, number, number, number];
+    area: number;
+    stretch: number;
+}
+
+export interface UVPin {
+    vertex: number;
+    uv: Vec2;
+}
+
+export interface UnwrapOptions extends ChartOptions {
+    pins?: readonly UVPin[];
+}
+
+export interface UnwrapResult {
+    mesh: PolygonMesh;
+    charts: UVChart[];
+    seams: string[];
+    texelsPerUnit: number;
+    diagnostics: string[];
+}
+
 export interface WeldOptions extends MeshEditOptions {
     distance?: number;
     vertices?: readonly number[];
@@ -145,6 +186,8 @@ export function knifeMeshFaces(mesh: PolygonMesh, points: readonly Vec3[], direc
 
 export function meshLODChain(mesh: PolygonMesh, options?: LODChainOptions): SimplifyResult[];
 
+export function meshLightmapUVs(mesh: PolygonMesh, options?: ChartOptions): LightmapUVResult;
+
 export function simplifyMesh(mesh: PolygonMesh, options?: SimplifyOptions): SimplifyResult;
 
 export function slideMeshEdges(mesh: PolygonMesh, edges: readonly string[], factor: number, options?: EdgeSlideOptions): ComponentEditResult;
@@ -154,6 +197,8 @@ export function splitMeshConcaveFaces(mesh: PolygonMesh, options?: MeshEditOptio
 export function subdivideMesh(mesh: PolygonMesh, options?: SubdivideOptions): MeshEditResult;
 
 export function triangulatePolygon(points: readonly Vec3[]): number[][];
+
+export function unwrapMesh(mesh: PolygonMesh, options?: UnwrapOptions): UnwrapResult;
 
 export function weldMeshVertices(mesh: PolygonMesh, options?: WeldOptions): WeldResult;
 ```
