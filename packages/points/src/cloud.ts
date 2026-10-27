@@ -46,7 +46,8 @@ export interface PointCloudOptions extends PointCloudData {
   name?: string;
 }
 
-type Channel = 'positions' | 'colors' | 'sizes';
+/** A per-point data stream of a PointCloud that can be marked dirty. */
+export type PointChannel = 'positions' | 'colors' | 'sizes';
 
 /** Owner interface the plugin implements, so `dispose()` can detach the cloud. */
 export interface PointOwner {
@@ -87,7 +88,7 @@ export class PointCloud {
   /** Bumped when GPU buffers must be recreated (colors or sizes added or removed, rebuild). @internal */
   structure = 0;
   /** Pending `[start, end)` point ranges per channel. @internal */
-  readonly dirty: Record<Channel, Array<[number, number]>> = { positions: [], colors: [], sizes: [] };
+  readonly dirty: Record<PointChannel, Array<[number, number]>> = { positions: [], colors: [], sizes: [] };
   private mesh: Mesh | null = null;
   private owner?: PointOwner;
 
@@ -187,7 +188,7 @@ export class PointCloud {
    * Marks points `start .. start + count` of a channel as changed after you wrote into `positions`, `colors`
    * (packed) or `sizes` directly. Position edits also grow the block bounds.
    */
-  markDirty(channel: Channel, start = 0, count = this.count - start): this {
+  markDirty(channel: PointChannel, start = 0, count = this.count - start): this {
     this.range(start, count, 1);
     if (channel === 'positions') expandBlockBounds(this.blocks, this.positions, start, count);
     this.dirty[channel].push([start, start + count]);

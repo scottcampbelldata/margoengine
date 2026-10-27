@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/points.test.js tests/fog.test.js tests/clipping.test.js tests/las.test.js tests/e57.test.js tests/octree.test.js",
+    "test": "npm run build && node --test tests/points.test.js tests/fog.test.js tests/clipping.test.js tests/las.test.js tests/e57.test.js tests/octree.test.js tests/api-names.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   },

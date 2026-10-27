@@ -2,7 +2,7 @@ export { PointsPlugin } from './plugin.js';
 
 export type { PointsPluginOptions, PointsPickOptions, PointsPickResult } from './plugin.js';
 export { PointCloud } from './cloud.js';
-export type { PointCloudData, PointCloudOptions } from './cloud.js';
+export type { PointCloudData, PointCloudOptions, PointChannel } from './cloud.js';
 export { SpriteBatch, SPRITE_STRIDE } from './sprites.js';
 export type { SpriteOptions, SpriteBatchOptions } from './sprites.js';
 export { PointsMaterial, SpriteMaterial } from './material.js';
