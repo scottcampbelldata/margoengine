@@ -330,7 +330,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-86 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+87 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -419,7 +419,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/wfc`](packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |
 | [`@margoengine/splines`](packages/splines/README.md) | 3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup. |
 
-### Animation and interaction (13)
+### Animation and interaction (14)
 
 | Package | What it is |
 | --- | --- |
@@ -429,6 +429,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/rigging`](packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets. |
 | [`@margoengine/tween`](packages/tween/README.md) | Allocation-free numeric tween updates and easing timelines. |
 | [`@margoengine/cinematic`](packages/cinematic/README.md) | Critically damped camera follow, look-at and screen shake. |
+| [`@margoengine/cutscene`](packages/cutscene/README.md) | Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing and a player that fires events in order. |
 | [`@margoengine/controls`](packages/controls/README.md) | Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine. |
 | [`@margoengine/cameras`](packages/cameras/README.md) | Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking. |
 | [`@margoengine/input`](packages/input/README.md) | Semantic keyboard, pointer, gamepad and touch actions with haptics. |
@@ -6591,6 +6592,100 @@ starts at the target, usually the character's feet).
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cinematic
+
+=== @margoengine/cutscene (packages/cutscene/README.md) ===
+
+# @margoengine/cutscene
+
+Import `margoengine/cutscene` from the `margoengine` package, or `@margoengine/cutscene` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+A timeline sequencer for cutscenes and in-game cinematics: tracks of keys and clips in a JSON document, a pure
+`evaluate(t)` that gives the whole scene state at any time, and a player with play, pause, reverse, speed, scrubbing,
+skip and fast-forward that fires every event in order. It renders nothing itself and imports nothing heavy: apply the
+state to your camera, objects, animation mixer, audio and UI.
+
+```ts
+import { Camera } from 'margoengine/core';
+import { CutscenePlayer, type CutsceneDocument } from 'margoengine/cutscene';
+
+const intro: CutsceneDocument = {
+  format: 'margo-cutscene',
+  version: 1,
+  duration: 6,
+  markers: [{ time: 3, name: 'reveal' }],
+  tracks: [
+    {
+      type: 'camera',
+      id: 'cam',
+      keys: [
+        { time: 0, position: [0, 2, 8], target: [0, 1, 0] },
+        { time: 3, position: [5, 3, 4], target: [0, 1, 0], ease: 'easeInOutCubic' },
+        { time: 4, position: [0, 1.6, 2], target: [0, 1.5, 0], fov: 35, cut: true },
+      ],
+    },
+    { type: 'transform', id: 'door', target: 'door', keys: [{ time: 3, rotation: [0, 0, 0, 1] }, { time: 4, rotation: [0, 0.7071, 0, 0.7071] }] },
+    { type: 'animation', id: 'hero', target: 'hero', clips: [{ start: 0, duration: 6, clip: 'Walk', loop: true, length: 1.2 }] },
+    { type: 'audio', id: 'music', clips: [{ start: 0, duration: 6, sound: 'theme', fadeIn: 1 }] },
+    { type: 'subtitle', id: 'subs', clips: [{ start: 1, duration: 2, text: 'Someone left the door open.', speaker: 'Ada' }] },
+    { type: 'event', id: 'cues', events: [{ time: 3.5, name: 'spawnBats', data: { count: 12 } }] },
+  ],
+};
+
+const camera = new Camera();
+const player = new CutscenePlayer(intro);
+player.on('event', (event) => console.log('event', event.name, event.data));
+player.on('marker', (marker) => console.log('marker', marker.name));
+const done = player.play();
+
+// Each frame:
+player.update(1 / 60);
+const state = player.state;
+if (state.camera) {
+  camera.position = state.camera.position;
+  camera.target = state.camera.target;
+  camera.fov = state.camera.fov;
+  camera.up = state.camera.up;
+}
+// state.transforms.door.rotation, state.animations, state.audio, state.subtitles: apply them the same way.
+
+player.skip(); // "Skip cutscene": jumps to the end and still fires spawnBats and the marker, in order.
+await done; // true: it finished
+```
+
+## Tracks
+
+Every track has an `id` (unique in its timeline) and may be `muted`. Key tracks interpolate between keys sorted by
+`time`, holding the first value before the first key and the last after the last; `ease` on a key shapes the move into
+it (`'linear'` default, `'step'`, `'smoothstep'`, any `ease*` easing of `@margoengine/tween` such as
+`'easeOutBack'`, or cubic-bezier points `[x1, y1, x2, y2]`). Clip tracks hold spans `start` + `duration` (start
+inclusive, end exclusive) that may overlap.
+
+| Track | Fields | State |
+| --- | --- | --- |
+| `camera` | `keys: [{time, position, target, fov?, roll?, ease?, cut?}]`, `path` (`'catmull-rom'` default, `'linear'`) | `camera`: `position`, `target`, `fov` (degrees, default 60), `roll`, `up` |
+| `transform` | `target`, `keys: [{time, position?, rotation?, scale?, ease?}]` | `transforms[target]`; each channel among the keys that set it; rotations slerp |
+| `property` | `target`, `property`, `keys: [{time, value, ease?}]` (a number or an array) | `properties[target][property]` |
+| `animation` | `target`, `clips: [{start, duration, clip, speed?, offset?, loop?, length?, blendIn?, blendOut?}]` | `animations`: clip name, clip time and blend weight |
+| `audio` | `clips: [{start, duration, sound, volume?, offset?, fadeIn?, fadeOut?}]` | `audio`: sound, time into it, volume |
+| `subtitle` | `clips: [{start, duration, text, speaker?}]` | `subtitles` |
+| `event` | `events: [{time, name, data?}]` | fired by the player |
+| `timeline` | `clips: [{start, duration, timeline, speed?, offset?}]` naming one of the document's `timelines` | the nested timeline's state, merged in |
+
+Camera keys with `cut: true` jump instead of moving there, and the Catmull-Rom path never bends across a cut, so one
+track holds a whole edit. The first unmuted camera track wins; a later transform or property track wins a channel two
+tracks key. Markers name points in time; `state.marker` is the last one passed.
+
+Nested timelines live under `timelines` and are placed by timeline clips with their own speed and offset; they may
+nest (up to 16 levels, no cycles). Their tracks report paths like `intro/sfx`. A nested clip cut by the window of
+its timeline clip still enters and exits, at the window's edges.
+
+## Evaluating, scrubbing and seeking
+
+```ts
+import { Cutscene } from 'margoengine/cutscene';
+```
+
+[README continues: https://margoengine.com/llms/packages/cutscene.md]
 
 === @margoengine/controls (packages/controls/README.md) ===
 
