@@ -22,9 +22,19 @@
 // instead of a cold one (the default, which is what a first-time reader has; downloaded bytes are the cold cache's size).
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  realpathSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
@@ -35,6 +45,24 @@ const root = resolve(import.meta.dirname, '..');
 const windows = process.platform === 'win32';
 
 /** Starts a program the way a terminal would: through cmd.exe on Windows (npm and npx are .cmd files there). */
+/**
+ * The environment of a reader's terminal: this process's, without what `npm run` adds (npm_* variables and the repo's
+ * node_modules/.bin on PATH). Inherited, they make `npx vite` in the new project run the repo's Vite, and the page
+ * answers 403.
+ */
+const readerEnv = () => {
+  const env = {};
+  for (const [key, value] of Object.entries(process.env))
+    if (!/^npm_/i.test(key) && key !== 'INIT_CWD') env[key] = value;
+  const pathKey = Object.keys(env).find((k) => k.toLowerCase() === 'path');
+  if (pathKey)
+    env[pathKey] = env[pathKey]
+      .split(delimiter)
+      .filter((p) => !/node_modules[\\/]\.bin$/.test(p))
+      .join(delimiter);
+  return env;
+};
+
 const launch = (command, args, options) =>
   windows
     ? spawn([command, ...args].map(quoteWindows).join(' '), { ...options, shell: true })
@@ -143,7 +171,7 @@ export async function main() {
     source = arg('source', root),
     gate = Number(arg('max', 300)),
     limit = Number(arg('limit', 900)),
-    dir = resolve(arg('dir', join(tmpdir(), `margo-quickstart-timing-${Date.now()}`))),
+    dir = resolve(arg('dir', join(realpathSync.native(tmpdir()), `margo-quickstart-timing-${Date.now()}`))),
     warm = flag('warm-cache'),
     reuse = flag('reuse');
   assert.ok(['1', '2'].includes(route), '--route must be 1 or 2');
@@ -198,7 +226,7 @@ export async function main() {
     new Promise((done, fail) => {
       const logFile = join(dir, `${name}.log`);
       let out = '';
-      const child = launch(command, args, { cwd, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = launch(command, args, { cwd, env: { ...readerEnv(), ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
       children.add(child.pid);
       for (const s of [child.stdout, child.stderr]) s.on('data', (c) => (out += c));
       child.once('error', fail);
@@ -326,11 +354,22 @@ export async function main() {
     mark('index.html and main.ts written from the README');
 
     // 4. Dev server: the README says `npx vite` (route 2) or `npm run dev:examples` (route 1).
-    const command = route === '2' ? ['npx', ['vite']] : ['npm', ['run', 'dev:examples']];
+    // A free port of our own: other dev servers on this machine may hold 5173 on the other loopback address (IPv4 vs
+    // IPv6), where Vite would not notice and the browser would reach them instead (a 403 page).
+    const port = await new Promise((done) => {
+      const probe = createServer().listen(0, () => {
+        const { port: free } = probe.address();
+        probe.close(() => done(free));
+      });
+    });
+    const command =
+      route === '2'
+        ? ['npx', ['vite', '--port', String(port), '--strictPort']]
+        : ['npm', ['run', 'dev:examples', '--', '--port', String(port), '--strictPort']];
     let output = '';
     dev = launch(command[0], command[1], {
       cwd: project,
-      env: { ...process.env, ...env, FORCE_COLOR: '0' },
+      env: { ...readerEnv(), ...env, FORCE_COLOR: '0' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     children.add(dev.pid);
@@ -400,7 +439,15 @@ export async function main() {
     // 5a. The shipped page: first frame = the first screenshot that is not one colour.
     const page = await open(pageUrl('readme'));
     for (let tries = 0; ; tries++) {
-      assert.ok(tries < 300, `no frame with content in 30 s; problems: ${page.problems.join(' | ')}`);
+      if (tries >= 300) {
+        const answer = await fetch(page.url()).then(
+          async (r) => `${r.status} ${(await r.text()).slice(0, 300)}`,
+          (e) => String(e),
+        );
+        assert.fail(
+          `no frame with content in 30 s; problems: ${page.problems.join(' | ')}; the server answers a plain request with: ${answer}`,
+        );
+      }
       const shot = await pixels(await shoot(page));
       if (findBall(shot) && sharpEdges(shot, 560, 700, 20) > 300) break;
       await page.waitForTimeout(100);
