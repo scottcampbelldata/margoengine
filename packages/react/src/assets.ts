@@ -112,9 +112,16 @@ export function subscribeProgress(cache: AssetCache, listener: () => void): () =
 const active = new Set<AssetCache>();
 export type ModelFormat = 'model' | 'fbx';
 type AssetKind = ModelFormat | 'environment';
+// A queued preload carries its own start function, so a Canvas that never calls preload() does not reach the model,
+// FBX and environment loaders: bundlers emit an optional peer only when code that can load it is reachable.
 const queued = new Map<
   string,
-  { src: string; kind: AssetKind; promise: Promise<void>; resolve: () => void; reject: (error: unknown) => void }
+  {
+    start: (cache: AssetCache) => Promise<void>;
+    promise: Promise<void>;
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  }
 >();
 export function createAssetCache(engine: EngineKernel | null): AssetCache {
   return {
@@ -342,7 +349,7 @@ export function preload(
     resolve = yes;
     reject = no;
   });
-  queued.set(key, { src, kind, promise, resolve, reject });
+  queued.set(key, { start: (cache) => warm(cache, src, kind), promise, resolve, reject });
   return promise;
 }
 export function activateAssetCache(cache: AssetCache): void {
@@ -351,7 +358,7 @@ export function activateAssetCache(cache: AssetCache): void {
   active.add(cache);
   for (const [key, request] of queued) {
     queued.delete(key);
-    warm(cache, request.src, request.kind).then(request.resolve, request.reject);
+    request.start(cache).then(request.resolve, request.reject);
   }
 }
 export function disposeAssetCache(cache: AssetCache): void {

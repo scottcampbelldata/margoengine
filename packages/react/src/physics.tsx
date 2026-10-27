@@ -1,4 +1,3 @@
-'use client';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel } from '@margoengine/core';
 import type { Mesh as EngineMesh } from '@margoengine/core/extension';

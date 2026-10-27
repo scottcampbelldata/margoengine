@@ -19,6 +19,7 @@ import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
 import { COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
 export type { GLTFDocument } from '../../shared/gltf.js';
 import { withMaterials } from './default-materials.js';
+import { hasDraco } from './draco-state.js';
 /** Retained mip bytes let compressed textures upload again after device restoration. */
 export interface KTX2Image {
   readonly ktx2: TranscodedKTX2Result;
@@ -500,6 +501,8 @@ export class GLTFAsset {
     this.cache.set(index, values);
   }
   async decode(signal?: AbortSignal): Promise<void> {
+    // The Draco module (and its decoder) loads only for files that use KHR_draco_mesh_compression.
+    if (!hasDraco(this)) return signal?.throwIfAborted();
     const { decompressPrimitives } = await import('./compression.js');
     const hook = this.hooks.draco;
     // The retained structural hook permits omitted derived metadata; the built-in decoder's strict contract remains unchanged.

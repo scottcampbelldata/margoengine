@@ -1,4 +1,3 @@
-'use client';
 export * from './components.js';
 export * from './kit.js';
 export * from './post.js';

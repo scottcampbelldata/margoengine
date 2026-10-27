@@ -67,6 +67,23 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### `@margoengine/react` installed alone does not build with webpack or Turbopack
+
+- **What:** the React README offers `npm i @margoengine/react` alone. Vite builds that app (it stands in a stub for an
+  optional peer that is not installed, and the bundler matrix checks it emits no optional package), but Next.js fails:
+  webpack and Turbopack must resolve every string-literal `import()` they reach, used or not.
+- **Repro:** a Next.js 16.4.3 App Router page with a client `Scene` that renders `Canvas`, `Mesh`, `BoxGeometry`,
+  `PbrMaterial` and `OrbitControls` from `@margoengine/react`, installed with only `@margoengine/react`,
+  `@margoengine/controls`, `react` and `react-dom` (npm adds the required peers core and stage). `next build --webpack`
+  and `next build --turbopack` both stop with `Module not found: Can't resolve` for 18 optional peers (2026-10-26).
+- **Cause:** the reachable `import()`s of optional peers: the stage facade's methods (`load` for glTF and CAD, `gltf`,
+  `machinery`, `creative`, `scenery`, `sky`, `particles`, `effects`, `environment`, `shadows`: class methods, never
+  tree-shaken) and the props `Canvas` supports (`shadows`, layers, picking, progress, `Html`, `preload`). With
+  `npm i margoengine` every peer is installed and both bundlers build (the bundler matrix's Next.js pages).
+- **Needed to close:** either every optional feature behind an entry the app imports (no `import()` of a package the
+  app did not install anywhere in the graph of `Canvas` and `Stage`; a stage facade change, frozen for 1.0), or the
+  README naming `margoengine` as the install for webpack and Turbopack. Until then, install `margoengine`.
+
 ### 4x MSAA blending is not repeatable on the RTX A6000 under CPU load
 
 - **What:** the voxel GPU check (`packages/voxel/tests/render-browser-check.mjs`, run by `check:merge`) fails now and

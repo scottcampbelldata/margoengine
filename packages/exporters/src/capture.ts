@@ -4,7 +4,6 @@
 import type { Camera, EngineKernel, RenderView } from '@margoengine/core';
 import { LinearToSRGB, parseColor, type ColorInput } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
-import { png } from './png.js';
 export {
   encodeAtlasZIP,
   encodeSequenceZIP,
@@ -25,6 +24,9 @@ export type {
   ZIPEntry,
   ZIPOptions,
 } from './archive.js';
+
+// The PNG encoder loads on first use, as in model.js, so no module of this package imports it both ways.
+const png: typeof import('./png.js').png = async (...args) => (await import('./png.js')).png(...args);
 
 /** RGBA8 pixels, 4 bytes per pixel, top row first, not premultiplied: an `ImageData` or a {@link capture} result. */
 export interface Pixels {

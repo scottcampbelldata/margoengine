@@ -1,4 +1,3 @@
-'use client';
 import { forwardRef } from 'react';
 import type { EngineKernel } from '@margoengine/core';
 import type { ColorInput, Vec3 } from '@margoengine/math';

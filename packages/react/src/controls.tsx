@@ -1,4 +1,3 @@
-'use client';
 import { forwardRef, useRef, type Ref } from 'react';
 import type { FrameCallback } from '@margoengine/core';
 import type {

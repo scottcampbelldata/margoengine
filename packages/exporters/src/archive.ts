@@ -2,8 +2,10 @@
 // atlas ZIPs with a manifest the caller can extend. Every step can report progress and stop on an AbortSignal; a
 // cancelled call throws the signal's reason and returns nothing partial. Re-exported by `@margoengine/exporters/capture`.
 import { crc32 } from '../../shared/crc32.js';
-import { png } from './png.js';
 import type { FrameSource, Pixels } from './capture.js';
+
+// The PNG encoder loads on first use, as in model.js, so no module of this package imports it both ways.
+const png: typeof import('./png.js').png = async (...args) => (await import('./png.js')).png(...args);
 
 /** Progress and cancellation for the archive functions. */
 export interface ArchiveProgress {

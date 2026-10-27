@@ -35,22 +35,27 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "react-server": "./dist/rsc/index.js",
       "import": "./dist/index.js"
     },
     "./kit": {
       "types": "./dist/kit.d.ts",
+      "react-server": "./dist/rsc/kit.js",
       "import": "./dist/kit.js"
     },
     "./post": {
       "types": "./dist/post.d.ts",
+      "react-server": "./dist/rsc/post.js",
       "import": "./dist/post.js"
     },
     "./physics": {
       "types": "./dist/physics.d.ts",
+      "react-server": "./dist/rsc/physics.js",
       "import": "./dist/physics.js"
     },
     "./xr": {
       "types": "./dist/xr.d.ts",
+      "react-server": "./dist/rsc/xr.js",
       "import": "./dist/xr.js"
     }
   },

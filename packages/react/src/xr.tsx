@@ -1,4 +1,3 @@
-'use client';
 import { optionalPeer } from './optional.js';
 import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel } from '@margoengine/core';

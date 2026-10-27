@@ -1,4 +1,3 @@
-'use client';
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Camera, RenderView as CoreView } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';

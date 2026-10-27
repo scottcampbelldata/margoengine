@@ -1,4 +1,3 @@
-'use client';
 import { ModelResource, type ModelProps } from './model.js';
 /** Props of the Fbx component; every prop is optional unless noted. */
 export type FbxProps = ModelProps;

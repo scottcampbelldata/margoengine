@@ -1,5 +1,5 @@
 import type { GLTFPrimitive } from '../../shared/gltf.js';
-import { compressedIndices } from './compression.js';
+import { compressedIndices } from './draco-state.js';
 import { entry, type GLTFAsset } from './asset.js';
 import type { PreparedGeometry } from './index.js';
 /** Geometry already packed by a parse worker, keyed by primitive definition; PBRModel then skips decoding it. */

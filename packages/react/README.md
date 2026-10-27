@@ -2,6 +2,12 @@
 
 Install `npm i margoengine` and import `margoengine/react` (or this package alone: `npm i @margoengine/react`, imported as `@margoengine/react`; the two are the same module).
 
+With Vite, installing this package alone (plus the peers your components use, such as `@margoengine/controls` for
+`OrbitControls`) keeps the build to what you import: a cube page with orbit controls loads 95,133 B gzip and emits no
+Wasm. `margoengine` installs every package, so the build also writes the lazy loaders the stage can reach (glTF
+decoders, CAD import with OpenCascade's Wasm) to `dist`; the page never requests them. Webpack and Turbopack (Next.js)
+need `margoengine` ([limits.md](../../docs/limits.md), React app budget).
+
 React 18/19 integration with a native canvas, pointer events, Suspense, stable mesh refs and frame callbacks. There is no custom reconciler.
 
 Scene helpers, controls, post effects and XR are available from one

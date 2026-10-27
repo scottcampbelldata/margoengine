@@ -1,4 +1,3 @@
-'use client';
 import { forwardRef, useEffect, useRef, useState, type Ref, type RefObject } from 'react';
 import type { EngineKernel, FrameCallback, Mesh as MeshHandle } from '@margoengine/core';
 import type { Geometry, Mesh as EngineMesh } from '@margoengine/core/extension';

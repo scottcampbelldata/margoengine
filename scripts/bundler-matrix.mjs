@@ -16,6 +16,12 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { gzipSync } from 'node:zlib';
+
+// The React cube page's gzip budgets (docs/limits.md, "React app budget"): what the browser loads before the page runs
+// (React, React DOM, core, the stage and the React bindings), and everything a build of it emits with @margoengine/react
+// installed alone.
+const REACT_BUDGET = { initial: 100_000, total: 145_000 };
 
 const root = resolve(import.meta.dirname, '..'),
   archives = join(root, 'test-results/modern-packages'),
@@ -122,7 +128,150 @@ try {
     );
   };
 
+  // A Vite browser build of the React cube page importing from `specifier`, in `dir/react-app`. It fails on any
+  // warning; it returns the emitted files, the modules of every chunk and of the initial load (the entry and its static
+  // imports, what the page requests before it runs), and gzip sizes.
+  const reactApp = async (dir, specifier) => {
+    const app = join(dir, 'react-app');
+    await mkdir(app, { recursive: true });
+    await writeFile(
+      join(app, 'index.html'),
+      '<!doctype html><div id="root"></div><script type="module" src="./main.jsx"></script>\n',
+    );
+    await writeFile(
+      join(app, 'main.jsx'),
+      `import { useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BoxGeometry, Canvas, Mesh, OrbitControls, PbrMaterial, useFrame } from '${specifier}';
+function Spinner() {
+  const mesh = useRef(null);
+  useFrame((_engine, delta) => {
+    if (mesh.current) mesh.current.rotation.y += delta;
+  });
+  return <Mesh ref={mesh}><BoxGeometry /><PbrMaterial color="#84d6bd" /></Mesh>;
+}
+createRoot(document.getElementById('root')).render(<Canvas label="cube"><Spinner /><OrbitControls /></Canvas>);
+`,
+    );
+    const { build } = await load('vite');
+    const warnings = [],
+      record = (message) => warnings.push(String(message?.message ?? message));
+    const result = await build({
+      root: app,
+      configFile: false,
+      logLevel: 'warn',
+      customLogger: {
+        info() {},
+        warn: record,
+        warnOnce: record,
+        error: record,
+        clearScreen() {},
+        hasErrorLogged: () => false,
+        hasWarned: false,
+      },
+      build: { write: false, rollupOptions: { onwarn: record } },
+    });
+    assert.deepEqual(warnings, [], `vite react (${specifier}): the build prints no warnings`);
+    const output = [result].flat().flatMap((item) => item.output),
+      chunks = new Map(output.filter((item) => item.type === 'chunk').map((chunk) => [chunk.fileName, chunk])),
+      initial = new Set();
+    const visit = (chunk) => {
+      if (!chunk || initial.has(chunk)) return;
+      initial.add(chunk);
+      for (const name of chunk.imports) visit(chunks.get(name));
+    };
+    for (const chunk of chunks.values()) if (chunk.isEntry) visit(chunk);
+    const ids = (list) =>
+      [...list].flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/'));
+    const gzip = (list) =>
+      list.reduce((sum, item) => sum + gzipSync(item.type === 'chunk' ? item.code : item.source).length, 0);
+    return {
+      files: output.map((item) => item.fileName).sort(),
+      modules: ids(chunks.values()),
+      initialModules: ids(initial),
+      initial: gzip([...initial]),
+      total: gzip(output.filter((item) => !item.fileName.endsWith('.html'))),
+    };
+  };
   const builds = [];
+  // The React page a developer writes first (a spinning cube with orbit controls), built by Vite for the browser twice:
+  // from the one-install `margoengine` (this fixture) and from `@margoengine/react` installed alone with the controls
+  // it uses (a sibling folder, so nothing resolves from this fixture's node_modules). Vite builds the JSX itself, without
+  // @vitejs/plugin-react, whose log filter would hide 'use client' warnings. docs/limits.md, "React app budget".
+  builds.push(
+    (async () => {
+      const alone = await mkdtemp(join(temp, 'margoengine-bundlers-react-'));
+      try {
+        const installed = (name) =>
+          JSON.parse(readFileSync(join(fixture, 'node_modules', name, 'package.json'))).version;
+        await writeFile(
+          join(alone, 'package.json'),
+          JSON.stringify({
+            private: true,
+            type: 'module',
+            dependencies: {
+              '@margoengine/react': packed['@margoengine/react'],
+              '@margoengine/controls': packed['@margoengine/controls'],
+              react: installed('react'),
+              'react-dom': installed('react-dom'),
+            },
+            overrides: Object.fromEntries(Object.entries(packed).filter(([name]) => name !== 'margoengine')),
+          }),
+        );
+        await run(process.execPath, [npm, 'install', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: alone });
+        const [umbrella, scoped] = await Promise.all([
+          reactApp(fixture, 'margoengine/react'),
+          reactApp(alone, '@margoengine/react'),
+        ]);
+        // Only what the page imports: no package outside its graph is emitted, and nothing larger than JavaScript.
+        // Installed code only: Vite stands in a three-line module for an optional peer that is not installed.
+        const extra =
+          /node_modules\/@margoengine\/(machinery|gltf|gltf-pro|decoders|fbx|creative|scenery|sky|environment|geometry)\//;
+        assert.deepEqual(
+          scoped.files.filter((file) => !file.endsWith('.js') && !file.endsWith('.html')),
+          [],
+          'react alone: no wasm or other asset',
+        );
+        assert.deepEqual(
+          scoped.modules.filter((id) => extra.test(id)),
+          [],
+          'react alone: no optional engine package',
+        );
+        assert.ok(
+          scoped.total <= REACT_BUDGET.total,
+          `react alone: ${scoped.total} B gzip emitted > ${REACT_BUDGET.total}`,
+        );
+        // The one install emits Stage's lazy loaders (stage.load for glTF and CAD, stage.sky, ...): the browser never
+        // fetches them for this page, so the initial graph must hold none of them.
+        assert.deepEqual(
+          umbrella.initialModules.filter((id) => extra.test(id) || /\.wasm$/.test(id)),
+          [],
+          'margoengine: the initial load holds no optional engine package',
+        );
+        assert.deepEqual(
+          umbrella.files.filter((file) => file.endsWith('.wasm')).map((file) => file.replace(/-[\w-]{8}\.wasm$/, '')),
+          ['assets/basis_transcoder', 'assets/draco_decoder', 'assets/occt-import-js'],
+          'margoengine: only the decoders and CAD import that Stage.load can reach are emitted (docs/limits.md)',
+        );
+        for (const [label, app] of [
+          ['react alone', scoped],
+          ['margoengine', umbrella],
+        ])
+          assert.ok(
+            app.initial <= REACT_BUDGET.initial,
+            `${label}: ${app.initial} B gzip at load > ${REACT_BUDGET.initial}`,
+          );
+        done(
+          `vite react: ${scoped.initial} B gzip at load, ${scoped.total} B emitted (react alone); ${umbrella.initial} B at load, ${umbrella.files.length} files (margoengine)`,
+        );
+      } finally {
+        spawn(process.execPath, ['-e', 'require("fs").rmSync(process.argv[1],{recursive:true,force:true})', alone], {
+          detached: true,
+          stdio: 'ignore',
+        }).unref();
+      }
+    })(),
+  );
   // Vite (Rolldown).
   builds.push(
     (async () => {
@@ -239,6 +388,13 @@ try {
           join(app, 'app/page.jsx'),
           "import { Suspense } from 'react';\nimport { Scene } from './scene';\nexport default function Page() { return <main><h1>Margo</h1><Suspense fallback={<p>Loading</p>}><Scene /></Suspense></main>; }\n",
         );
+        // A server component rendering Canvas straight from the package: its "react-server" entry is the client
+        // boundary ('use client' lives only there; the plain entries carry no directive).
+        await mkdir(join(app, 'app/direct'), { recursive: true });
+        await writeFile(
+          join(app, 'app/direct/page.jsx'),
+          'import { Canvas } from \'margoengine/react\';\nexport default function Page() { return <main><h1>Direct</h1><Canvas label="direct" /></main>; }\n',
+        );
         // Pages Router: the same Scene.
         await writeFile(
           join(app, 'pages/pages-router.jsx'),
@@ -255,6 +411,11 @@ try {
           `next ${flag}: the server page renders its heading`,
         );
         assert.ok(existsSync(join(app, '.next/server/pages/pages-router.html')), `next ${flag}: Pages Router page`);
+        assert.match(
+          readFileSync(join(app, '.next/server/app/direct.html'), 'utf8'),
+          /<h1>Direct<\/h1>.*<canvas/s,
+          `next ${flag}: a server component renders Canvas imported from margoengine/react`,
+        );
         done(`next ${flag}: App Router + Pages Router built`);
       })(),
     );

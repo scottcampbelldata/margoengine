@@ -1,4 +1,3 @@
-'use client';
 import { forwardRef, useContext, useImperativeHandle, useRef } from 'react';
 import type { Animation as ClipAnimation } from '@margoengine/animation';
 import type { AdditiveLayer, Animator, BlendTree } from '@margoengine/animator';

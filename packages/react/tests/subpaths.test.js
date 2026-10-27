@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'vite';
 
@@ -113,6 +113,20 @@ test('package exports preserve independent public runtime and declaration paths 
     const filename = subpath === '.' ? 'index' : subpath.slice(2);
     assert.equal(entry.import, `./dist/${filename}.js`);
     assert.equal(entry.types, `./dist/${filename}.d.ts`);
+    // React Server Components resolve "react-server": the same exports behind 'use client'. Every other bundler loads
+    // the plain entry, which carries no module-level directive to warn about.
+    assert.deepEqual(Object.keys(entry), ['types', 'react-server', 'import']);
+    assert.equal(entry['react-server'], `./dist/rsc/${filename}.js`);
+    // Next.js rejects `export *` in a client boundary: the server entry names every export of the plain entry.
+    assert.match(
+      await readFile(join(packageRoot, entry['react-server']), 'utf8'),
+      new RegExp(`^'use client';\\n(?://.*\\n)*export \\{ [\\w, ]+ \\} from '\\.\\./${filename}\\.js';\\n$`),
+    );
+    assert.deepEqual(
+      Object.keys(await import(pathToFileURL(join(packageRoot, entry['react-server'])).href)),
+      Object.keys(await import(pathToFileURL(join(packageRoot, entry.import)).href)),
+      `${subpath}: the react-server entry exports exactly the plain entry's names`,
+    );
     await access(join(packageRoot, entry.import));
     await access(join(packageRoot, entry.types));
     assert.equal(import.meta.resolve(specifier(subpath)), pathToFileURL(join(packageRoot, entry.import)).href);
@@ -159,6 +173,23 @@ test('package exports preserve independent public runtime and declaration paths 
   // Animation takes a ref, so it is a forwardRef component object, like Mesh.
   assert.equal(typeof base.Animation.render, 'function');
   assert.equal(typeof base.MeshTransmissionMaterial, 'function');
+});
+
+test("only the react-server entries carry 'use client'", async () => {
+  // A module-level directive in a bundled file makes Vite and Rollup warn once per file ("Module level directives
+  // cause errors when bundled") in every app built without @vitejs/plugin-react: 17 warnings per build (2026-10-26).
+  const files = [];
+  const walk = async (directory) => {
+    for (const entry of await readdir(directory, { withFileTypes: true }))
+      if (entry.isDirectory()) await walk(join(directory, entry.name));
+      else if (entry.name.endsWith('.js')) files.push(join(directory, entry.name));
+  };
+  await walk(join(packageRoot, 'dist'));
+  const directives = [];
+  for (const file of files)
+    if (/^\s*(['"])use (?:client|server)\1/.test(await readFile(file, 'utf8')))
+      directives.push(relative(join(packageRoot, 'dist'), file).replaceAll('\\', '/'));
+  assert.deepEqual(directives.sort(), ['rsc/index.js', 'rsc/kit.js', 'rsc/physics.js', 'rsc/post.js', 'rsc/xr.js']);
 });
 
 test('server imports and canonical JSX evaluate no optional peers; a mounted Bloom loads only its own peer', async () =>
@@ -235,10 +266,23 @@ function staticChunks(outputs) {
 async function bundle(directory, name, source) {
   const entry = join(directory, name + '.js');
   await writeFile(entry, source);
+  // Every warning the build prints, Vite's own and the bundler's. The packages resolve to their workspace folders,
+  // outside node_modules, so Vite also reports ineffective dynamic imports inside them, as it does for a linked install.
+  const warnings = [],
+    record = (message) => warnings.push(String(message?.message ?? message));
   const result = await build({
     configFile: false,
     root: repository,
-    logLevel: 'silent',
+    logLevel: 'warn',
+    customLogger: {
+      info() {},
+      warn: record,
+      warnOnce: record,
+      error: record,
+      clearScreen() {},
+      hasErrorLogged: () => false,
+      hasWarned: false,
+    },
     build: {
       write: false,
       minify: false,
@@ -247,9 +291,11 @@ async function bundle(directory, name, source) {
       rollupOptions: {
         external: (id) =>
           id === 'react' || id.startsWith('react/') || id === 'react-dom' || id.startsWith('react-dom/'),
+        onwarn: record,
       },
     },
   });
+  assert.deepEqual(warnings, [], `${name}: the build prints no warnings`);
   return (Array.isArray(result) ? result.flatMap((output) => output.output) : result.output).filter(
     (item) => item.type === 'chunk',
   );
@@ -283,6 +329,14 @@ test('Vite picking-cube initial chunk graph excludes optional React subpaths and
         false,
         fragment + ' is absent from the initial graph',
       );
+    // Canvas runs queued preload() calls; it must not reach the model loaders itself, or every Canvas app emits the
+    // FBX loader and its exporters as chunks it never fetches (2026-10-26).
+    const emitted = outputs.flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/'));
+    assert.equal(
+      emitted.some((id) => id.includes('/packages/fbx/')),
+      false,
+      'no FBX chunk is emitted for an app that never loads FBX',
+    );
     const code = initial.map((chunk) => chunk.code).join('\n');
     assert.match(code, /\.pick\(/, 'Canvas picking survives the base consumer build');
     assert.equal(/EffectComposer|function Physics\(|function XR\(/.test(code), false);

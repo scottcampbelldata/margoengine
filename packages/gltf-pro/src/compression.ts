@@ -1,7 +1,7 @@
 import { margoError } from '../../shared/errors.js';
-import type { GLTFPrimitive } from '../../shared/gltf.js';
 import type { DracoDecoder, KTX2Decoder } from '@margoengine/decoders';
 import { type GLTFAsset, entry, integer, assetLimit } from './asset.js';
+import { decoded } from './draco-state.js';
 
 /**
  * Options for loading compressed glTF: an AbortSignal and optional reusable Draco, meshopt and KTX2 decoders the caller owns.
@@ -19,18 +19,9 @@ export interface GLTFLoadOptions {
   ktx2?: Pick<KTX2Decoder, 'transcode'>;
 }
 
-const decoded = new WeakMap<GLTFAsset, Map<object, Float32Array>>();
 const widths: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 const fields = { POSITION: 'positions', NORMAL: 'normals', TEXCOORD_0: 'uvs', COLOR_0: 'colors' } as const;
 const scales: Record<number, number> = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 };
-
-/** Draco topology belongs to the primitive, including when no index accessor is declared. */
-export function compressedIndices(asset: GLTFAsset, primitive: GLTFPrimitive): Float32Array | undefined {
-  if (!primitive.extensions?.KHR_draco_mesh_compression) return;
-  const indices = decoded.get(asset)?.get(primitive);
-  if (!indices) throw margoError('state', 'Draco geometry requires parseGLTFAsync or loadGLTF');
-  return indices;
-}
 
 export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: GLTFLoadOptions = {}): Promise<void> {
   signal?.throwIfAborted();

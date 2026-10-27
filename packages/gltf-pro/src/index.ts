@@ -96,7 +96,8 @@ import {
   type MaterialExtension,
   type MaterialExtensionResource,
 } from './material-extension.js';
-import { decompressPrimitives, type GLTFLoadOptions as CompressionOptions } from './compression.js';
+import type { GLTFLoadOptions as CompressionOptions } from './compression.js';
+import { hasDraco } from './draco-state.js';
 import {
   textureCoordinates,
   coordinateExtension,
@@ -4762,7 +4763,13 @@ export async function parseGLTFAsync(
       options.maxDownloadBytes,
       options.maxNodes,
     );
-  await decompressPrimitives(asset, { ...options, draco: options.draco ?? options.decoders?.draco });
+  // The Draco module (and its decoder) loads only for files that use KHR_draco_mesh_compression.
+  if (hasDraco(asset))
+    await (await import('./compression.js')).decompressPrimitives(asset, {
+      ...options,
+      draco: options.draco ?? options.decoders?.draco,
+    });
+  else options.signal?.throwIfAborted();
   images = await decodeKTX2Images(asset, images ?? [], {
     ...options,
     ktx2: options.ktx2 ?? options.decoders?.ktx2,

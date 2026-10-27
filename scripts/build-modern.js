@@ -10,6 +10,7 @@ import { packageOrder } from './package-order.js';
 import { buildWorkers, restoreWorkerUrls } from './build-workers.js';
 import { staticEmbind } from './static-embind.js';
 import { packageDeclarations, packageRuntime } from './package-declarations.js';
+import { writeServerEntries } from './react-server-entries.js';
 import { importMap } from './umbrella.mjs';
 import { copyLegal } from './package-legal.js';
 const precompiled = process.argv.includes('--precompiled');
@@ -158,6 +159,7 @@ for (const name of packageOrder(manifests)) {
   if (name === 'react') {
     await tsc(name);
     await packageRuntime(resolve('packages/react'));
+    await writeServerEntries(resolve('packages/react'));
     continue;
   }
   const entry = Object.fromEntries(

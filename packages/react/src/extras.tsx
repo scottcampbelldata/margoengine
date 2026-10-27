@@ -1,4 +1,3 @@
-'use client';
 import { createContext, forwardRef, useContext, useEffect, useRef, type ReactNode } from 'react';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type { ColorInput, Vec3 } from '@margoengine/math';

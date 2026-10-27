@@ -1,4 +1,3 @@
-'use client';
 export { Model as Gltf, Environment, OrbitControls, Html } from './components.js';
 export type { ModelProps as GltfProps, EnvironmentProps, OrbitControlsProps, HtmlProps } from './components.js';
 export { Fbx } from './kit-loaders.js';

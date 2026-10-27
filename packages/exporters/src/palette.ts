@@ -1,7 +1,9 @@
 // Indexed palette textures: one texel per palette colour, sampled NEAREST, so voxel or pixel-art models can colour
 // each face by pointing its UVs at a texel centre.
-import { png } from './png.js';
 import type { TextureData } from './scene.js';
+
+// The PNG encoder loads on first use, as in model.js, so no module of this package imports it both ways.
+const png: typeof import('./png.js').png = async (...args) => (await import('./png.js')).png(...args);
 
 /** A palette laid out one colour per texel: {@link paletteTexture}'s result. */
 export interface PaletteTexture {

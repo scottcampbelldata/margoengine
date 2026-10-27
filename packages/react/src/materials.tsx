@@ -1,4 +1,3 @@
-'use client';
 import { useRef } from 'react';
 import { PbrMaterial as CoreMaterial, type Geometry, type Mesh as EngineMesh } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';

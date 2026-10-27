@@ -1,4 +1,3 @@
-'use client';
 import { forwardRef } from 'react';
 import type { EngineKernel, FrameCallback } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/math';

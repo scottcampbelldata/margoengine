@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useSyncExternalStore } from 'react';
 import type { EngineKernel } from '@margoengine/core';
 import {

@@ -1,4 +1,3 @@
-'use client';
 import { createContext, useContext, useMemo, useRef, type ReactNode } from 'react';
 import type { EngineKernel } from '@margoengine/core';
 import type { Bloom as BloomEffect, BloomOptions } from '@margoengine/post/bloom';
