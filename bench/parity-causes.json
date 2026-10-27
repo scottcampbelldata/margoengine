@@ -75,13 +75,18 @@
     ]
   },
   "12.5": {
-    "cause": "100 morphed copies each began a render pass and a compute pass, and every draw rebuilt its shader text each frame; models now draw as one run, Animations deform in one compute pass and the shader text steps are memoised. Still slower: that pass holds 200 dispatches (2 primitives x 100 copies, 150,000 vertices in all), each writing its own output buffer, and they run one after another (1.18 ms GPU); three morphs in each draw's vertex shader",
-    "knownBug": "morph-targets-one-compute-dispatch-per-primitive",
+    "cause": "100 morphed copies each began a render pass and a compute pass, and every draw rebuilt its shader text each frame; models now draw as one run and the shader text steps are memoised. Then the compute pass held 200 dispatches (2 primitives x 100 copies, 150,000 vertices), each writing its own output buffer and run one after another (1.18 ms GPU); every deformed primitive of a device now shares a few buffers and deforms in one dispatch per buffer page and pipeline (2 here): GPU 1.31 -> 0.19 ms, the deformed vertices bit for bit those of the per-primitive path. What is left on the GPU (timestamps per pass, run 20261027-032923): the draw pass takes 0.14 ms against three.js WebGL's whole 0.15 ms frame, which morphs inside its vertex shader; the 0.05 ms deform pass is an ACCEPTED difference in work: Margo deforms each vertex (position, normal, tangent) once a frame into a buffer that every reader shares (gltf-pro draws, shadow casters, TAA velocity, selection outlines, picking and its CPU readback), where three repeats the morph in every pass that draws the mesh and has no deformed geometry to pick or read back. Still slower on CPU: 0.52 against 0.27 ms, plain overhead (the 100 Animations' per-frame checks and uploads), a loss to fix",
+    "knownBug": "morph-targets-cpu-per-animation-per-frame",
     "fixes": [
       {
         "commit": "63a7edec",
         "tradeoff": "models share a run only when their passes were added back to back; others draw alone as before",
         "rerun": "npm run bench -- parity --cases=p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5"
+      },
+      {
+        "commit": "00dde81a",
+        "tradeoff": "+2.8 KB gzip on the animation root entry (the shared-buffer arena and its WGSL); buffers grow geometrically and are compacted on growth, so a page can hold freed space until then",
+        "rerun": "npm run bench -- parity --cases=p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=7"
       }
     ]
   },

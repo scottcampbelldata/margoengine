@@ -169,20 +169,17 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   its transform that references it, with `orientation = "leftHanded"` for mirrored nodes. It changes the archive's
   layout, so it waits for the Quick Look check of the entry at the top of this page.
 
-### Morph targets: one compute dispatch per primitive
+### Morph targets: CPU per Animation per frame
 
-- **What:** `p-morph`, 100 MorphStressTest copies with 8 weights each changing every frame: 0.51 ms CPU and 1.31 ms
-  GPU a frame against three's WebGL 0.27 and 0.15 (1.06 / 1.57 before entry 28).
-- **Cause (measured, timestamp per pass):** the models draw in one render pass and deform in one compute pass, and
-  that compute pass is 1.18 of the 1.31 ms: 200 small dispatches (MorphStressTest has two primitives, 24 and 1,504
-  vertices; 150,000 vertices in all, a few MB of reads), each writing its own output buffer, which the GPU runs one
-  after another. three applies morph targets in the vertex shader of each draw.
-- **Plan:** dispatch the copies of one primitive together: one dispatch over (vertex, copy) reading each copy's
-  weights and bones, writing one output buffer. Every reader of `PBRPrimitive.deformed` binds it at offset 0 today
-  (gltf-pro draws, shadow caster records, TAA snapshots, selection, the CPU readback), so the copies need a deformed
-  buffer offset in all of them; copying each slice back into its own buffer instead would keep one command per copy
-  and move the cost out of the measured passes, so it is not a fix. The CPU half is the 100 Animations' per-frame
-  checks and uploads.
+- **What:** `p-morph`, 100 MorphStressTest copies with 8 weights each changing every frame: 0.52 ms CPU a frame
+  against three's WebGL 0.27 (run `20261027-032923`). The GPU half of this entry is fixed (perf-history entry 34:
+  1.33 -> 0.19 ms, one dispatch per buffer page and pipeline instead of 200); what is left on the GPU is the 0.05 ms
+  deform pass, an accepted difference in work recorded in the matrix row 12.5.
+- **Cause (not profiled yet):** the CPU time did not move with the batching (0.51 before, 0.52 after), so it sits in
+  the 100 Animations' per-frame work: each one's checks, weight writes and uploads, and the per-model draw records.
+- **Plan:** take a browser CPU profile of a `p-morph` frame, then write the weights of every Animation of a device
+  in one upload (the weights already sit in one shared buffer per page) and skip per-Animation work for models whose
+  inputs did not change.
 
 ### cloneModel: two engine-wide ticks per copy
 

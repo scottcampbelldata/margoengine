@@ -685,6 +685,48 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   sampled sphere points), `tests/shared-sphere.test.js`, and `tests/bench.test.js` (row 17.11 keeps the dense case,
   every label names a case).
 
+### 34. Every deformed primitive of a device in one dispatch
+
+- **Loss:** `p-morph` (100 MorphStressTest copies, 8 weights each changing every frame) 0.51 / 1.31 ms CPU / GPU a
+  frame against three.js WebGL's 0.27 / 0.15 after entry 28.
+- **Cause, measured** (timestamps per pass): the compute pass was 1.18 of the 1.31 ms: 200 small dispatches (two
+  primitives, 24 and 1,504 vertices, times 100 copies), each writing its own output buffer, run one after another.
+- **Fix** (`00dde81a`): animation keeps every skinned or morphed primitive of a device in a few shared storage
+  buffers (bind-pose source, deformed output on 256-byte offsets, morph deltas and skin influences once per asset
+  primitive and shared by its clones, weights, bone palettes) and deforms them all with one dispatch per buffer page
+  and pipeline (four or eight influences) from a per-workgroup work list; the per-vertex arithmetic is the
+  per-primitive shader's, term for term. Every reader of `PBRPrimitive.deformed` takes the new `deformedOffset` (or a
+  record's `vertexOffset`): gltf-pro draws, shadow casters, TAA velocity and snapshots, selection, picking and its CPU
+  readback, the inspector. A buffer bound at offset 0 is bound with the same call as before, so the feature-off
+  proofs are unchanged. Same work and same output: no copy back into per-primitive buffers, nothing moved out of the
+  measured passes. Trade-off: about 2.8 KB more gzip on the animation root entry; buffers grow geometrically (old
+  contents copied on the GPU), holes from disposed models are compacted on the next growth. Setup moved from the
+  build to the first frame (build 490 -> 190 ms, first frame 47 -> 373 ms, together 27 ms more).
+- **Image:** the same against three.js as before, SSIM 0.99, mean delta E 1.67; the deformed vertices are bit for bit
+  those of the per-primitive path.
+- **After** (diagnostic, busy machine, RTX A6000; before run `20261027-033656` at the parent `88e02fb2`, after run
+  `20261027-032923`; rows in [perf-vs-threejs.md](perf-vs-threejs.md)):
+
+  | Scene | Before | After | three.js |
+  | --- | --- | --- | --- |
+  | `p-morph`, CPU / GPU ms a frame | 0.51 / 1.33 | 0.52 / 0.19 | 0.27 / 0.15 (WebGL), slower |
+  | `p-morph` GPU, deform pass | 1.18 | 0.05 | none (morphs in its vertex shader) |
+  | `p-morph` GPU, draw pass (like for like with three's whole frame) | 0.14 | 0.14 | 0.15 |
+
+  Accepted difference in work (rule 12): the 0.05 ms deform pass. Margo deforms each vertex (position, normal,
+  tangent) once a frame into a buffer every reader shares (draws, shadow casters, TAA velocity, selection, picking and
+  the CPU readback); three repeats the morph in every pass that draws the mesh and has no deformed geometry to pick or
+  read back. The draw pass alone, the like-for-like part, is 0.14 against three's 0.15 for the whole frame.
+  Still open, in [known-bugs.md](../known-bugs.md#morph-targets-cpu-per-animation-per-frame): the CPU time, 0.52
+  against 0.27 ms, which the batching did not move.
+- **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity --cases=p-morph
+  --runs=7`, then `node bench/parity-report.mjs <run.json> --partial`.
+- **Guard:** `scripts/animation-batched-deformation-tests.js` (animation `test:gpu`, real GPU: every primitive bit for
+  bit against the per-primitive shaders for random weights and poses while models with different vertex and target
+  counts, skinned, morphed, skinned and morphed, four and eight influences are added, cloned and disposed; one
+  dispatch per page and pipeline), `packages/animation/tests/batch.test.js` (offsets, growth, holes, compaction,
+  shared deltas, release), `tests/deep-interaction-animation-resources.test.js` (one dispatch).
+
 ## Size of the frozen core
 
 ### 10. Core grows from error handling, then shrinks
