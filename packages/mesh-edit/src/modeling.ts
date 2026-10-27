@@ -1,6 +1,6 @@
 // @margoengine/mesh-edit/modeling: topology modelling on the same editable polygon meshes as the root entry. Edge
-// bevel, edge slide, dissolve, merge by distance, bridge, concave faces, knife, subdivision and booleans; its own
-// entry so editors that only paint or move components never load it.
+// bevel, edge slide, dissolve, merge by distance, bridge, concave faces, knife, subdivision, booleans and
+// simplification; its own entry so editors that only paint or move components never load it.
 export type {
   PolygonFace,
   PolygonMesh,
@@ -23,3 +23,10 @@ export {
   type MeshBooleanResult,
   type MeshBooleanFaceSource,
 } from './boolean.js';
+export {
+  simplifyMesh,
+  meshLODChain,
+  type SimplifyOptions,
+  type SimplifyResult,
+  type LODChainOptions,
+} from './simplify.js';

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3417636,
+  "total": 3420087,
   "history": [
     {
       "date": "2026-10-24",
@@ -494,6 +494,12 @@
       "commit": "c7483a46",
       "reason": "mesh-edit/modeling: mesh booleans (union, difference, intersection) on solid BSP trees with welding, T-junction repair and a closure check (item 24)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "d7d88bbd",
+      "reason": "mesh-edit/modeling: quadric error simplification and LOD chains that keep UV seams and borders (item 24)",
+      "grew": 1
     }
   ],
   "items": {
@@ -686,7 +692,7 @@
     "@margoengine/math/vector4": 925,
     "@margoengine/mcp": 8664,
     "@margoengine/mesh-edit": 30203,
-    "@margoengine/mesh-edit/modeling": 19634,
+    "@margoengine/mesh-edit/modeling": 22085,
     "@margoengine/navmesh": 7228,
     "@margoengine/navmesh/build": 11794,
     "@margoengine/net": 1371,

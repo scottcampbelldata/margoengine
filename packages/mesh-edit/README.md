@@ -190,6 +190,34 @@ Shapes that only touch along an edge or at a vertex give a closed result whose t
 count is `nonManifoldEdges`. Features thinner than the tolerance are merged away. Work grows with the number of faces
 times the BSP depth (typically n log n, n squared at worst); pass `signal` to stop a long run.
 
+## Simplification and levels of detail
+
+Quadric error edge collapse that keeps UV seams and open borders:
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { meshLODChain, simplifyMesh, subdivideMesh } from 'margoengine/mesh-edit/modeling';
+
+const smooth = subdivideMesh(createPrimitiveMesh('cube', 'box'), { levels: 3 }).mesh;
+// Half the triangles, never moving a seam.
+const half = simplifyMesh(smooth, { ratio: 0.5 });
+// Three nested levels: 50%, 25% and 12.5% of the input's triangles.
+const lods = meshLODChain(smooth, { ratios: [0.5, 0.25, 0.125] });
+console.log(half.triangles, half.error, lods.map((level) => level.triangles.after));
+```
+
+- `simplifyMesh(mesh, {ratio = 0.5, targetTriangles, maxError, mergeCoplanar = true, createId, signal})` follows
+  Garland and Heckbert (1997): face planes summed into per-vertex quadrics, cheapest collapse first. Each collapse
+  moves one end of an edge onto the other (the paper's vertex-subset placement), so output positions and corner UVs
+  are input values and textures never swim; the trade is a slightly larger error than optimal placement. Border and
+  UV-seam vertices slide only along their own border or seam (with the paper's perpendicular constraint planes), and
+  corners where seams meet stay. Collapses that would fold a triangle, flip its UVs, pinch the surface (the link
+  condition) or leave a sliver are skipped, so the target is a ceiling. `maxError` is a squared distance in local
+  units. Coplanar triangles of one source face merge back into convex polygons; `faceMap` and `sourceVertices`
+  give provenance.
+- `meshLODChain(mesh, {ratios = [0.5, 0.25, 0.125]})` simplifies each level from the previous one, so levels nest and
+  seams match between them.
+
 ## Pixel painting and UVs
 
 `meshUVTopology(mesh)` identifies islands through opposite two-face geometric edges whose UVs match exactly at both endpoints. Point contacts, disconnected overlapping atlas regions, nonmanifold edges and inconsistent winding do not connect islands. It returns stable face/corner references and explicit seam reasons. `meshSelectionUVCorners` resolves corner, face, island-seed or whole-mesh intent to deduplicated source-order corners; stale identities reject.

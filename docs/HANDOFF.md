@@ -2,6 +2,18 @@
 
 Last updated 2026-10-26. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-27: mesh-edit modeling depth (item 24), part 2
+
+- In `@margoengine/mesh-edit/modeling`: `triangulatePolygon` / `convexPolygonPieces` / `splitMeshConcaveFaces`
+  (concave and nonplanar n-gons), `knifeMeshFaces` (polyline cut through along the view direction, no T-junctions),
+  `subdivideMesh` (Catmull-Clark with border rules and face-varying UVs), `booleanMeshes` (union, difference,
+  intersection of closed solids on solid BSP trees with a plane tolerance, welding, T-junction repair and a closure
+  check; README limits explain the tolerance), `simplifyMesh` / `meshLODChain` (Garland-Heckbert quadric collapses
+  with vertex-subset placement; UV seams and borders kept, nested levels).
+- Tests: golden shapes, seeded fuzz for closure, Euler characteristic, no slivers, inclusion-exclusion volumes.
+  Left for item 24: rounded bevels, auto UV unwrap with seams and pins, lightmap UVs and baking, OBJ/GLB import to
+  editable meshes, flat-tile merging.
+
 ## Landed 2026-10-26: mesh-edit modeling depth (item 24), part 1
 
 - New optional entry `@margoengine/mesh-edit/modeling` (root entry unchanged): `bevelMeshEdges` (selected edges, one
