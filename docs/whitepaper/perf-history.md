@@ -658,7 +658,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   byte-identical files (the dense marching cubes among them); six differ by at most one level in a channel
   (`p-alpha-test`, `p-canvas-texture`, `p-double-sided`, `p-matcap`, `p-phong`, `p-physical`); three differ in a few
   edge pixels, SSIM 1.0 and mean delta E 0.001 or less: `p-blending` (90 pixels, up to 29 levels, where neighbouring
-  blended quads meet; not traced to one commit), `p-transparency` (up to 4 levels) and `p-wireframe` (7 pixels, up
+  blended quads meet; traced in entry 35), `p-transparency` (up to 4 levels, entry 35) and `p-wireframe` (7 pixels, up
   to 8 levels; each edge is now drawn once, in one direction). The current build renders the same pixels on a second run, so these come from the changes, not
   from noise, and all sit far inside the matrix's tolerance (SSIM >= 0.9, mean delta E <= 6).
 - **Bytes:** OBJ, STL and PLY (binary and ASCII), GLB and USDZ exports, EXR writing, all 32 EXR and HDR fixtures and
@@ -726,6 +726,49 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   counts, skinned, morphed, skinned and morphed, four and eight influences are added, cloned and disposed; one
   dispatch per page and pipeline), `packages/animation/tests/batch.test.js` (offsets, growth, holes, compaction,
   shared deltas, release), `tests/deep-interaction-animation-resources.test.js` (one dispatch).
+
+### 35. Blended pixels that moved in entry 33: same draws; the GPU stores some samples as their mean
+
+- **What changed:** `p-blending` and `p-transparency` rendered with only the packages swapped (bench at the current
+  commit, 1280 x 720, 4x MSAA), one commit at a time: `b953071e` (a run's blended draws continue its pass: one
+  render pass instead of one per blended mesh) moved 80 `p-blending` pixels; `e2cb3815` (consecutive blended draws
+  batch as instanced draws) moved 186 against the old image (up to 29 levels) and `p-transparency` (58 pixels, up to
+  4 levels). A camera held still for every frame gives the same images.
+- **The draws are the same.** A WebGPU capture shows one pipeline in both builds (bgra8unorm, 4x, `src-alpha` +
+  `one`, depth write off, `greater-equal`, polygon offset 1, 1) and 2,000 quads, each once, farthest first, with its
+  own matrix and colour (the guard below); only the pass boundaries (2,000 passes, then one) and, from `e2cb3815`,
+  instancing differ. On SwiftShader (Chrome's CPU implementation of WebGPU) the instanced build and `b953071e` render
+  `p-blending` byte for byte alike and `p-transparency` within 1 level at 2 pixels; the old build's 2,000 passes a
+  frame did not finish there within the bench's 10 minutes.
+- **The GPU, measured without Margo:** `scripts/gpu-blend-passes.mjs` draws 2,000 rectangles with edges inside pixels
+  into the same targets (1280 x 720, 4x bgra8unorm, depth32float-stencil8, depth write off), split three ways, reads
+  every stored sample back and compares it with the value WebGPU defines, computed on the CPU per sample. On the RTX
+  A6000 (Edge) every split misses it, by up to 201 levels, and almost always the same way: a pixel's four samples
+  hold one value, their mean, where the CPU's four differ (the pixel's resolved colour is right until a later draw
+  blends onto the averaged samples). How many pixels this hits depends on the split, so moving the same draws between
+  passes or into one instanced draw moves pixels:
+
+  | Pixels collapsed to their mean | One pass per draw | One pass, a draw per rectangle | One instanced draw |
+  | --- | --- | --- | --- |
+  | Additive, D3D12 | 28,267 | 28,029 | 27,070 |
+  | Additive, D3D11 | 28,267 | 26,186 | 18,986 |
+  | Alpha (0.5, in order), D3D12 | 37,344 | 36,947 | 35,684 |
+  | Alpha (0.5, in order), D3D11 | 37,344 | 34,339 | 24,727 |
+
+  The engine images agree: the old build renders `p-blending` byte for byte alike on D3D12 and D3D11, the instanced
+  build differs between the two backends at 1,795 pixels, which inputs alone cannot do.
+- **Correction:** the CPU reference this entry first cited (old image within 2 levels at 185 of the 186 pixels) added
+  colours read from single-quad pixels and is not exact: away from any edge it misses both images by more than 2
+  levels at about 1,300 pixels each, so it cannot tell the two apart and is no longer cited.
+- **Verdict:** no engine bug. The speed work sends the same draws in the same order; neither image is the spec's,
+  because this GPU averages some pixels' samples, and the split only changes which. Restoring a pass per blended mesh
+  would cost 2,000 passes a frame and still not give the spec's result, so the engine keeps one pass and instancing.
+  The images stay within the matrix's tolerance (SSIM 1.0).
+- **Rerun:** `node scripts/gpu-lock.mjs run --max=8 --owner=<you> -- node scripts/gpu-blend-passes.mjs` (add
+  `--adapter=d3d11` for D3D11).
+- **Guard:** `packages/materials/tests/steady-batches.test.js` ("the p-blending quads reach the GPU once each"): the
+  scene's 2,000 additive quads in 16 colours, each exactly once, farthest first, with its own world matrix and colour
+  and the scene's depth state; shifting the instance colours by one fails it.
 
 ## Size of the frozen core
 

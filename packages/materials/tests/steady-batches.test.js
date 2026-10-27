@@ -173,6 +173,94 @@ test('a blended mesh of another blending between them ends the batch, and the or
   }
 });
 
+// perf-history entry 35: the p-blending image changed after these batches landed although the draws did not. Locks
+// what the GPU is given for that scene (2,000 camera-facing additive quads in 16 colours, depth write off, polygon
+// offset 1, 1): every quad exactly once, farthest first, with its own world matrix and its own colour, in additive
+// draws with the scene's depth state. Any reorder, drop, duplicate or wrong tint fails here.
+test('the p-blending quads reach the GPU once each, back to front, with their own matrix and colour', async () => {
+  const w = await world();
+  try {
+    const eye = [26, 10.4, 0];
+    w.engine.camera.position = eye;
+    w.engine.camera.update(128 / 96, true);
+    const palette = Array.from({ length: 16 }, (_, i) => [
+        0.2 + (i % 4) * 0.2,
+        0.2 + ((i >> 2) % 4) * 0.2,
+        0.9 - i * 0.04,
+      ]),
+      paints = palette.map(
+        (color) =>
+          new UnlitMaterial({
+            color,
+            transparent: true,
+            blending: 'additive',
+            depthTest: true,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1,
+          }),
+      ),
+      quad = {
+        positions: [-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0],
+        normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+        indices: [0, 1, 2, 0, 2, 3],
+      },
+      // Camera-facing: yaw about y, then pitch about x (bench/scenes/parity/margo-materials.js facing()).
+      yaw = Math.atan2(eye[0], eye[2]) / 2,
+      pitch = -Math.atan2(eye[1], Math.hypot(eye[0], eye[2])) / 2,
+      facing = [
+        Math.cos(yaw) * Math.sin(pitch),
+        Math.sin(yaw) * Math.cos(pitch),
+        -Math.sin(yaw) * Math.sin(pitch),
+        Math.cos(yaw) * Math.cos(pitch),
+      ],
+      // The bench catalog's boxes(2000) grid: 13 x 13 x 12, 1 m apart, colour i % 16, all facing the camera.
+      meshes = Array.from({ length: 2000 }, (_, i) => {
+        const mesh = createMesh(w.engine, quad, paints[i % 16]);
+        mesh.root.setPosition([(i % 13) - 6, (Math.floor(i / 13) % 13) - 6, Math.floor(i / 169) - 6]);
+        mesh.root.setQuaternion(facing);
+        return mesh;
+      });
+    w.frame();
+    await null; // the next frame: steady batches
+    w.frame();
+    const key = (m) => `${Math.fround(m[12])},${Math.fround(m[13])},${Math.fround(m[14])}`,
+      byPosition = new Map(meshes.map((mesh, i) => [key(mesh.root.matrix), i])),
+      seen = new Set();
+    let last = Infinity,
+      total = 0;
+    for (const draw of w.draws) {
+      const target = draw.pipeline.fragment.targets[0];
+      assert.deepEqual(target.blend.color, { srcFactor: 'src-alpha', dstFactor: 'one' }, 'additive');
+      assert.equal(draw.pipeline.depthStencil.depthWriteEnabled, false);
+      // Polygon offset (1, 1), pushed away from the camera (negative under the engine's reverse-Z).
+      assert.equal(Math.abs(draw.pipeline.depthStencil.depthBiasSlopeScale), 1);
+      assert.equal(Math.abs(draw.pipeline.depthStencil.depthBias), 1);
+      // A batch: its instance rows (world matrix, tint). A quad drawn on its own: its uniform's model rows and base colour.
+      const block = draw.n > 1 ? undefined : new Float32Array(uniformBytes(draw.uniform).slice().buffer),
+        rows = block ? [[...block.slice(16, 32), ...block.slice(76, 80)]] : w.rows(draw);
+      for (let k = 0; k < draw.n; k++) {
+        const row = rows[k],
+          i = byPosition.get(key(row));
+        assert.notEqual(i, undefined, `instance row ${k} is one of the quads`);
+        assert.ok(!seen.has(i), `quad ${i} drawn twice`);
+        seen.add(i);
+        assert.deepEqual(row.slice(0, 16), f32(meshes[i].root.matrix), `quad ${i} keeps its own world matrix`);
+        assert.deepEqual(row.slice(16, 20), f32([...palette[i % 16], 1]), `quad ${i} keeps its own colour`);
+        const d = (row[12] - eye[0]) ** 2 + (row[13] - eye[1]) ** 2 + (row[14] - eye[2]) ** 2;
+        assert.ok(d <= last, `quad ${i} drawn after a nearer one`);
+        last = d;
+      }
+      total += draw.n;
+    }
+    assert.equal(total, 2000, 'every quad drawn');
+    assert.equal(seen.size, 2000);
+  } finally {
+    w.destroy();
+  }
+});
+
 test('a steady material composes no shader and runs no bindings; shader inputs and rows still show next frame', async () => {
   const w = await world();
   const shader = Material.prototype.shader,
