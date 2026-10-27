@@ -350,6 +350,11 @@ export interface VoxelRendererStats {
   readonly bytes: number;
   /** Draw calls: one per visible chunk layer with quads or triangles. */
   readonly draws: number;
+  /**
+   * True while the pipelines of the current composition (target, lightmap, lighting effects) compile in the
+   * background; the previous ones keep drawing meanwhile, or nothing on the first frames (`draws` is 0).
+   */
+  readonly compiling: boolean;
 }
 
 // First fit over runs of free pages: [start, length] pairs sorted by start, neighbours merged.
@@ -556,7 +561,7 @@ export class VoxelRenderer implements EnginePlugin {
   #postView = new Float32Array(16);
   #frustum = new Frustum();
   #box = { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } };
-  #stats = { chunks: 0, visible: 0, quads: 0, triangles: 0, bytes: 0, draws: 0 };
+  #stats = { chunks: 0, visible: 0, quads: 0, triangles: 0, bytes: 0, draws: 0, compiling: false };
   #effects = new Set<VoxelRendererEffect>();
   #capture?: VoxelCapture;
   #disposeListeners = new Set<() => void>();
@@ -696,7 +701,9 @@ export class VoxelRenderer implements EnginePlugin {
    * cutout geometry keep the beauty shader's texture, alpha, liquid normals and lighting hooks; with a bevel the
    * chamfer triangles replay the same way. Capture excludes translucent surfaces. `occlusion` needs the post owner's
    * two-target external pass; external/capture passes remain open for their owner. GPU state is allocated only on the
-   * first replay, and pipelines compile asynchronously.
+   * first replay, and pipelines compile asynchronously: until they are ready nothing is drawn. Returns true when the
+   * replay was recorded, false when there was nothing to draw yet (no chunks, or pipelines still compiling), so an
+   * owner that needs the replay in a frame can wait for it rather than for a number of frames.
    */
   draw(
     c: Extract<PassContext, { backend: 'webgpu' }>,
@@ -705,11 +712,11 @@ export class VoxelRenderer implements EnginePlugin {
     depth: GPUTextureView,
     phase: 'all' | 'opaque' | 'blend' = 'all',
     external?: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction },
-  ): void {
+  ): boolean {
     const gpu = this.#gpu,
       hook = mode === 'capture' ? this.#capture : undefined;
     if (this.#disposed || !gpu || gpu.device !== c.device || !this.#chunks.size || (mode === 'capture' && !hook))
-      return;
+      return false;
     if (mode === 'occlusion' && !external)
       throw new TypeError("VoxelRenderer occlusion needs the post owner's two-target external pass");
     const { code, bevel, effects, id, lit } = this.#composition(),
@@ -764,7 +771,7 @@ export class VoxelRenderer implements EnginePlugin {
         .catch((error) => this.#engine?.onError(error));
     }
     const p = state.ready;
-    if (!p) return;
+    if (!p) return false;
     const view = external?.view ?? viewMatrix(this.#postView, c.camera);
     if (viewed) gpu.device.queue.writeBuffer(post.view, 0, Float32Array.from(view));
     this.#bind(gpu, p, viewed ? [{ binding: 7, resource: { buffer: post.view } }] : []);
@@ -791,6 +798,7 @@ export class VoxelRenderer implements EnginePlugin {
       this.#drawBevel(pass, p, layer);
     }
     if (!hook && !external) pass.end();
+    return true;
   }
 
   /**
@@ -857,13 +865,14 @@ export class VoxelRenderer implements EnginePlugin {
   /**
    * `Shadows` calls this per cascade (add the renderer with `shadows.add(voxels, {static: true})`): the opaque and
    * cutout chunks inside the cascade, culled on the CPU, into its depth pass. Translucent blocks cast no shadow. With a
-   * bevel the chamfer triangles cast.
+   * bevel the chamfer triangles cast. Returns true when the casters were recorded, false while there are none or the
+   * shadow pipelines still compile (asynchronously, on the first call).
    */
-  drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): void {
+  drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): boolean {
     const gpu = this.#gpu;
-    if (this.#disposed || !gpu || gpu.device !== context.device || !this.#chunks.size) return;
+    if (this.#disposed || !gpu || gpu.device !== context.device || !this.#chunks.size) return false;
     const s = this.#shadowState(gpu);
-    if (!s.ready) return;
+    if (!s.ready) return false;
     const frustum = (this.#shadowFrusta[cascade] ??= new Frustum()).setFromProjectionMatrix({ elements: matrix });
     s.values.set(matrix);
     s.values[16] = this.#time;
@@ -913,6 +922,7 @@ export class VoxelRenderer implements EnginePlugin {
         if (mesh && frustum.intersectsBox(this.#chunkBox(chunk))) this.#drawMesh(pass, mesh);
       }
     }
+    return true;
   }
 
   /** @internal Engine plugin hook. */
@@ -1619,6 +1629,7 @@ export class VoxelRenderer implements EnginePlugin {
         })
         .catch((error) => this.#engine?.onError(error));
     }
+    this.#stats.compiling = !entry.ready;
     if (entry.ready) return entry.ready;
     const last = this.#ready;
     return last?.target === target && last.lit === lit && last.effects.every((e) => this.#effects.has(e) && e.pbr(1))

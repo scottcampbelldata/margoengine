@@ -591,7 +591,7 @@ engine.onFrame(() => lighting.update());
 world.setBlock(x, y, z, stone); // drawn two frames later
 textures.set(3, canvas); // live
 voxels.daylight = 0.3; // dusk: sky light dims, block light (torches) does not
-voxels.stats; // {chunks, visible, quads, triangles, bytes, draws} of the last frame
+voxels.stats; // {chunks, visible, quads, triangles, bytes, draws, compiling} of the last frame
 voxels.dispose(); // workers and GPU buffers; textures.dispose() separately
 ```
 
@@ -679,12 +679,12 @@ voxels.blockLightColor = [1, 0.7, 0.45]; // torches warmer
 
 - **Effects.** `addLighting(effect)` takes any object with glTF-pro's lighting hooks (`pbr(group)`, `bindings()`):
   `Shadows`, `Clustered`, `Fog` and `EnvironmentLighting` call it from their `add`. The shader is composed again and
-  compiled in the background; until it is ready the previous pipelines keep drawing. Each effect's remover takes it
-  out again. Effects' bindings are group 1 (shadows 1-3, clustered 4-7, IBL 20-24, fog 25).
+  compiled in the background; until it is ready the previous pipelines keep drawing (`stats.compiling` is true
+  meanwhile). Each effect's remover takes it out again. Effects' bindings are group 1 (shadows 1-3, clustered 4-7, IBL 20-24, fog 25).
 - **Shadows.** `drawShadow` draws the opaque and cutout chunks inside each cascade (CPU-culled per cascade) into the
   map, cutout blocks alpha tested at their texture's level 0; translucent blocks cast none. Every quad reaches 1/64
   block past its edges in the map, so T-junction slivers cannot let light through and merged and unit quads cast the
-  same shadow. With `{static: true}` the map is redrawn only when `shadowVersion` changes (chunks with opaque or cutout
+  same shadow. It returns false while its pipelines still compile (the first call starts them). With `{static: true}` the map is redrawn only when `shadowVersion` changes (chunks with opaque or cutout
   quads arriving, changing or leaving inside the last map's cascades, new textures or buffers) or the cascades move.
 - **Sun and sky.** Without a shadow map the sun reaches a face as far as the open sky does (sky light squared, so
   caves stay dark). Inside a shadow map's range the map decides alone (an overhang's shadow is the map's, not a dimmed
@@ -717,7 +717,8 @@ one-quad-per-face with soft shadows, a point light, fog and the waving pool: 141
 `VoxelRenderer.attach(engine, { world, textures, bevel: voxelBevel(0.15) })` (`voxelBevel` from `./bevel`, its own
 entry: worlds without a bevel carry none of it) chamfers exposed cube faces by 0.15 blocks: each chunk layer's cube
 faces become a triangle mesh (`bevelQuads`, one 48-byte vertex buffer and an index buffer per layer), lit by the same shader end as the quads (sky light, sun, AO, block light, maps and lighting
-effects), cast into shadow maps and replayed by post (gbuffer, ambient, occlusion, capture). Crosses and liquids stay
+effects), cast into shadow maps and replayed by post (gbuffer, ambient, occlusion, capture; `draw` returns false until
+the replay's pipelines, compiled in the background on its first call, are ready). Crosses and liquids stay
 quads (a chamfer has no lowered liquid top). Translucent chamfers and quads of a chunk are sorted together, back to
 front, within the same distance and per-frame budget as quads. Without `bevel` nothing changes.
 

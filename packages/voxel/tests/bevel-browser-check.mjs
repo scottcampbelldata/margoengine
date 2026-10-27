@@ -138,7 +138,8 @@ try {
     }
     for (let i = 0; i < 4; i++)
       for (let c = 0; c < 3; c++) assert.ok(Math.abs(gaps.ao[i][c] - gaps.seam[i][c]) < 0.02, 'chunk seam keeps AO');
-    console.log(`ok ${samples}x lightmaps, bevel replay, shadows and AO`);
+    const replayFrames = ['hard', 'bevel', 'cutout', 'liquid'].map((k) => `${k} ${gaps[k].frames}`).join(', ');
+    console.log(`ok ${samples}x lightmaps, bevel replay, shadows and AO (replay drawn after ${replayFrames} frames)`);
   }
   assert.deepEqual(pageErrors, []);
 } finally {
