@@ -1,0 +1,11 @@
+{
+ "proof": "lines-perspective",
+ "ref": "2d192a71",
+ "revision": "2d192a712d5cb235eba0101642e0974a41bc8ed2",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {},
+ "outputs": {
+  "1x": "4d1d7918fb18437f76e36c26ced2acf521327c73b5d59918ae7f94b0160459b0",
+  "4x": "8fff36f36365c697619c7f3ccca8a8271d3b32b4c551677a4ff94e1ead7162e2"
+ }
+}

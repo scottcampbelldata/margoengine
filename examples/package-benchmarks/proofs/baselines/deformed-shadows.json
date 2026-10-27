@@ -1,0 +1,14 @@
+{
+ "proof": "deformed-shadows",
+ "ref": "2cd81c1",
+ "revision": "2cd81c1303f21bd5e21fc7b2ec6c26a507d871af",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {},
+ "outputs": {
+  "vat": "8c057f0f96cd12feaae6557abd8568185d96580b5893d8cda817746d5986d88d",
+  "distance500": "35acab4f4ffdd4505ee085637b4b56d8435b19072327324b2c2a4091cc7f1e29",
+  "distance40": "753f17183729c4eba1812f243570279283310cf42e2abe029990c0d6c030cd1e",
+  "customSource": "61a284a9368da574cb0dffc0a7038b4bf903e7aab94bcea17c3bff2d5c3cd61d",
+  "fitted": "94e966a5ff49fd69dded569b6f296758f1add954c6984419110b1e6851cfb232"
+ }
+}

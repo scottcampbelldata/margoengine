@@ -12,9 +12,9 @@
 // Pinned: ecdcb31 against 7d144fb, the commit that added probes and decals ("now" above). Part 1 is a statement about
 // that one change (later commits edit these sources for other reasons), so there is no --current mode.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { refs, versions, bundle, commit, entryAt, announce } from './compare.js';
+import { refs, versions, bundle, commit, entryAt, announce, fileAt } from './compare.js';
+import { modified } from './history.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
@@ -24,8 +24,7 @@ const { ref, pin } = refs('ecdcb31', '7d144fb'),
   root = resolve(import.meta.dirname, '../../..'),
   base = commit(ref),
   now = pin && commit(pin);
-const show = (file) =>
-  execFileSync('git', ['show', `${base}:${file}`], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 });
+const show = (file) => fileAt(file, base);
 const code = async (name, entry, at) => (await bundle(name, entry, at, true)).map((chunk) => chunk.code).join('\n');
 const gltf = await entryAt('gltf-pro', 'src/index.ts', pin),
   { LightProbes } = await entryAt('environment', 'src/probes.ts', pin),
@@ -33,24 +32,10 @@ const gltf = await entryAt('gltf-pro', 'src/index.ts', pin),
 // Existing sources edited: environment's lighting.ts (`export`), and the SSR off-screen fallback: post's ssr.ts and
 // gltf-pro's capture hook (shader.ts) emit new text only when the shader holds LightProbes' `probeSpecular`.
 announce('entry bundles of environment, post, clustered, gltf-pro, materials, terrain', ref, pin);
-const changed = execFileSync(
-  'git',
-  [
-    'diff',
-    '--name-only',
-    '--diff-filter=M',
-    base,
-    ...(now ? [now] : []),
-    '--',
-    ...['environment', 'post', 'clustered', 'gltf-pro', 'materials', 'terrain', 'shared'].map(
-      (n) => `packages/${n}/src`,
-    ),
-    'packages/shared',
-  ],
-  { cwd: root, encoding: 'utf8' },
-)
-  .split('\n')
-  .filter(Boolean);
+const changed = modified(base, now, [
+  ...['environment', 'post', 'clustered', 'gltf-pro', 'materials', 'terrain'].map((n) => `packages/${n}/src`),
+  'packages/shared',
+]);
 assert.deepEqual(
   changed,
   ['packages/environment/src/lighting.ts', 'packages/gltf-pro/src/shader.ts', 'packages/post/src/ssr.ts'],

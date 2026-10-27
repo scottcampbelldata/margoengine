@@ -272,7 +272,7 @@ ORCA and funnel). navigation is gone (navmesh/build replaces it), the conveyor s
 Babylon are no longer dev dependencies, and fixtures from other projects are Margo-generated. Follow-ups: afterimage
 `damp` removed; triangulation and extrusion in their own geometry entries (`shapes` 11,030 -> 3,584 B gzip).
 
-**Open for the testing session:** pinned `npm run proofs` fails 9 historical proofs, identically on main before the
+**Open for the testing session (tracked in docs/known-bugs.md, "Pinned proofs"):** pinned `npm run proofs` fails 9 historical proofs, identically on main before the
 rewrites (ac465a00) and after: color-output, environment-volumetric, math-consolidation, post-ssr, post-ssr-models,
 post-stack, probes-decals, quality-presets, water-ssr ("story must exercise the GPU", "fog requires the standard core
 PBR shader", "Water GPU calls differ"). `npm run proofs -- --current` passes 20/20. Draco/Basis still to be checked

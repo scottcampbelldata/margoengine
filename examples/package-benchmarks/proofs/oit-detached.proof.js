@@ -7,7 +7,7 @@
 // Pinned: b803d56 against 0e02ead, the commit that made this claim. --current: 641246d3 against the working tree (b953071e before views and samplers were cached; 57250a49 before the materials draw work);
 // this includes the approved cotangent frame, compact discard guards and PBR Neutral output (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions } from './compare.js';
+import { refs, versions, golden } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
@@ -94,7 +94,7 @@ async function story(gltf, samples) {
 let calls = 0,
   modules = 0;
 for (const samples of [1, 4]) {
-  const expected = await story(baseline, samples),
+  const expected = await golden(`${samples}x`, () => story(baseline, samples)),
     actual = await story(candidate, samples);
   assert.ok(expected.filter((e) => e[0] === 'beginRenderPass').length > 20, 'story must draw');
   assert.deepEqual(actual, expected, `gltf-pro GPU calls differ at ${samples}x without a transparency hook`);

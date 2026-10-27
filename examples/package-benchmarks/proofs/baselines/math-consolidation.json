@@ -1,0 +1,41 @@
+{
+ "proof": "math-consolidation",
+ "ref": "2484971",
+ "revision": "2484971448620c82563057d3b467f879433a1634",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {
+  "textual: mat4 multiply copies share bvh's loop": true,
+  "textual: environment's invert is lines'": true,
+  "textual: controls' quatMul is animator's quaternionMultiply": true,
+  "textual: sRGB decode copies are one expression": true,
+  "textual: splats' decode is the same expression": true,
+  "textual: grass and scatter LCG expressions": true,
+  "textual: machinery's vector copies are controls'": true
+ },
+ "outputs": {
+  "bvh src/math.ts #1": "eeaf474dc1b5aa8ff1c40b2a1ab231257fd1e5e720fa2a5606b24a6a772ae564",
+  "points src/math.ts #1": "eeaf474dc1b5aa8ff1c40b2a1ab231257fd1e5e720fa2a5606b24a6a772ae564",
+  "text src/math.ts #1": "cc4734b96058115260ffb2f8b1c1ebd11d6e26d2f157898661e95829f8d4eb2c",
+  "animation src/sampling.ts #1": "b7393f77c7d34a73b0759889421e357b75241659bfcdb1a93d5c692258f76de7",
+  "exporters src/scene.ts #1": "e6643e1f5cf36f1ec4f7e940b9e9b840de09e6055e3c7ff470a4bdf8947976fc",
+  "bvh src/math.ts #2": "7e9620c12f1bfb77333e3248ff805bd6e325b733c66d4f8b0bb7d0fa4840e4ef",
+  "lines src/math.ts #1": "ac14d16fb52150434eb2a0db3907ee520d1480ff7e55bd56ead6ad51db97a061",
+  "environment src/background.ts #1": "609f2f6b4ea8084f204e0f58f12ea4c4a6bfd9f6d12689da94ccc40474d7cc87",
+  "shared/math.js": "190a1dafd20177dbe1c5a1c4d5cb883bc6e6ea29b42c9efa68d05acac689942a",
+  "exporters src/scene.ts #2": "34d517bb4d2c27661d80aa192c33443870225787f0fc818c2303f3207bde476c",
+  "labels src/projection.ts #1": "1b0fd376b61796579de7d3236dda3ff5fc3504e14b14167351f62a17321ea431",
+  "physics src/math.ts #1": "54080a5c75d6b8463b7e2e62489030d4708dbd17daa2f5e7d6586ad225e30bad",
+  "text src/math.ts #2": "e2412d1df4ce0dde318ff571a91aec28c4557c2a4a3880714583670b5502050b",
+  "animator src/blend.ts #1": "33cb2f404bf9f4ffe0d6fb713dfc348a8fd76891915171580b642ba6ed201926",
+  "lines src/color.ts #1": "50efb569450af35e02ee838c80d3fde56efd7976301182793c6e0a2c086ecc84",
+  "points src/color.ts #1": "50efb569450af35e02ee838c80d3fde56efd7976301182793c6e0a2c086ecc84",
+  "text src/color.ts #1": "50efb569450af35e02ee838c80d3fde56efd7976301182793c6e0a2c086ecc84",
+  "environment src/color.ts #1": "a51b5212b3c872cf4c464a4c4dd7245e3fe7e3ee4d95fc5918eafcf6ba660196",
+  "text src/color.ts #2": "7076f778ad97f9f33bf509412c5a56c994f4eb64993636736055c5c0fd723359",
+  "exporters src/scene.ts #3": "eaa522e9aca90d9a15e6ec31013f1ffed8df42be3d43e8915df780125637123c",
+  "splats src/data.ts #1": "16e5d82ed8e4cdaa9ba0171760c178d35bd96b9a4cd9d0a2b7dd15b8568e7dcf",
+  "points src/math.ts #2": "60a67321c6aeba8057b6cb77623a4d7168d69dd80f7eac4c3a129c9b0041dec1",
+  "scatter src/candidates.ts #1": "18cd94afe0a48dd38feeb31a0ff6581165ad35b19c014a9b3523bf4e2cc48817",
+  "controls src/math.ts #1": "8c4db6f44504958c78d4cc474aea7ee560441a6fc6b8eef13d656822cdd2df0d"
+ }
+}

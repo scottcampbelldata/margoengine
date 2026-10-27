@@ -1,0 +1,13 @@
+{
+ "proof": "selection-xray-off",
+ "ref": "b3ed8ac",
+ "revision": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {},
+ "outputs": {
+  "1x xray undefined": "344abacd7e562617f0637a78b73256f9bbc5d3ea93c1a9fafc6644ef4804b3b7",
+  "1x xray false": "344abacd7e562617f0637a78b73256f9bbc5d3ea93c1a9fafc6644ef4804b3b7",
+  "4x xray undefined": "142cdb757c92d99abd8c1e5dbbf64f851c717cb19780ead87bc93d87c9575c7e",
+  "4x xray false": "142cdb757c92d99abd8c1e5dbbf64f851c717cb19780ead87bc93d87c9575c7e"
+ }
+}

@@ -2,7 +2,12 @@
 //   npm run proofs                      every proof, pinned: its baseline ref against the commit where its claim was made
 //   npm run proofs -- --current         the proofs of an ongoing guarantee, against the working tree
 //   npm run proofs -- --only=post-ssr,splats
-// A proof that can no longer run prints `HISTORICAL: <commit and reason>` and exits 0; it is reported, not failed.
+// --current compares the working tree with golden outputs stored in baselines/ (golden.js, PROOFS_GOLDEN=1) and reads
+// nothing from Git, so every clone, shallow or fresh, runs exactly what this checkout runs (it is part of verify); a
+// value the store lacks fails its proof by name, and a --current proof is never HISTORICAL.
+// Pinned runs rebuild old commits from Git. A proof that cannot run prints `HISTORICAL: <commit and reason>` and exits
+// 0; it is reported, not failed: a clone without the pre-rewrite commits (history.js), or procedural-deps' npm packages
+// that a fresh install lacks.
 // Run after `npm run build:packages` (proofs import @margoengine/core and some package builds from dist).
 import { spawn } from 'node:child_process';
 import { readdirSync } from 'node:fs';
@@ -54,7 +59,7 @@ function run(name) {
       [resolve(import.meta.dirname, `${name}.proof.js`), ...(current ? ['--current'] : [])],
       {
         cwd: resolve(import.meta.dirname, '../../..'),
-        env: { ...process.env, PROOFS_NO_WRITE: '1' },
+        env: { ...process.env, PROOFS_NO_WRITE: '1', ...(current ? { PROOFS_GOLDEN: '1' } : {}) },
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     );
@@ -76,7 +81,8 @@ function run(name) {
       done({
         name,
         refs: pairs.join(', ') || '-',
-        result: code ? 'FAIL' : historical ? 'HISTORICAL' : 'PASS',
+        // An ongoing guarantee always runs (from baselines/), so HISTORICAL in --current is a failure.
+        result: code || (current && historical) ? 'FAIL' : historical ? 'HISTORICAL' : 'PASS',
         seconds: ((performance.now() - start) / 1000).toFixed(0),
         note: historical ?? failure.slice(0, 160),
         log: code ? err.slice(-4000) : '',

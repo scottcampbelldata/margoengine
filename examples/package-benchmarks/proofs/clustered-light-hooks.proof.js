@@ -8,7 +8,7 @@
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/clustered-light-hooks.proof.js [ref] [pin] [--current]
 // Pinned: 6c20076d against b4700864, the series' last code commit; --current: 57250a49 against the working tree.
 import assert from 'node:assert/strict';
-import { refs, versions, entryAt } from './compare.js';
+import { refs, versions, entryAt, golden } from './compare.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
@@ -110,7 +110,7 @@ async function story(clustered, mode, samples) {
 let calls = 0,
   modules = 0;
 for (const samples of [1, 4]) {
-  const expected = await story(baseline, false, samples);
+  const expected = await golden(`${samples}x`, () => story(baseline, false, samples));
   assert.ok(
     expected.some((e) => e[0] === 'module' && /clusterLighting\(/.test(e[2].code)) &&
       expected.some((e) => e[0] === 'context' && /clusterLighting\(i\.clip/.test(e[1])),

@@ -1,11 +1,11 @@
 // Byte cost of each proven optimization: minified + gzip size of a package entry at the baseline ref and now.
 // Run: node examples/package-benchmarks/proofs/size.js [ref]
-import { execFileSync } from 'node:child_process';
 import { readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
+import { show } from './history.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/'),
@@ -21,16 +21,7 @@ async function size(name, from) {
           load(id) {
             const file = slash(id.split('?')[0]);
             if (!file.startsWith(source) || id.includes('?')) return;
-            try {
-              return execFileSync('git', ['show', `${from}:${file.slice(slash(root).length + 1)}`], {
-                cwd: root,
-                encoding: 'utf8',
-                stdio: ['ignore', 'pipe', 'ignore'],
-                maxBuffer: 1 << 26,
-              });
-            } catch {
-              return;
-            }
+            return show(from, file.slice(slash(root).length + 1));
           },
         },
       ]

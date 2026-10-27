@@ -1,0 +1,11 @@
+{
+ "proof": "environment-hemisphere",
+ "ref": "57250a49",
+ "revision": "57250a49e64ab686b6dd992751d092e19433fcb3",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {},
+ "outputs": {
+  "texts": "cf99c630185ba263756374636f8ff7b17751f2dea920018b71d315ba0eec2701",
+  "calls": "03c6e52af7f2afb3255faf21dbcbb465512a1b6d42bf3c6f9524c760720d937a"
+ }
+}

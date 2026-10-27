@@ -1,5 +1,5 @@
 # Everything to run examples/notebooks/margo-data.ipynb in JupyterLab (Python 3.15), as installed and checked on 2026-10-25.
-# Install: python -m pip install -r python/requirements-notebook.txt
+# Install: python -m pip install -r python/requirements-notebook.txt (the notebook check's venv: npm run setup:python-test)
 anyio==4.15.1
 argon2-cffi==25.1.0
 argon2-cffi-bindings==26.1.0

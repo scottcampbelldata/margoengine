@@ -4,7 +4,7 @@
 // Run: node examples/package-benchmarks/proofs/geometry.proof.js [ref] [pin]
 // Pinned: f05414a against f47ff3f, the commit that recorded results/geometry.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import { refs, versions, time, record } from './compare.js';
+import { refs, versions, time, record, canonicalNaN } from './compare.js';
 
 const { ref, pin } = refs('f05414a', 'f47ff3f'),
   { baseline, candidate } = await versions('geometry', ref, undefined, pin);
@@ -15,11 +15,13 @@ const outcome = (run) => {
     return `${error.constructor.name}: ${error.message}`;
   }
 };
-/** Runs the same expression against both builds and requires identical results (typed arrays compare by bits). */
+/** Runs the same expression against both builds and requires identical results (typed arrays compare by bits, except
+ * a NaN's payload: V8 writes x86's sign-set default NaN or the plain quiet NaN depending on the code path and JIT tier,
+ * which ECMAScript allows, so the same build gave either from run to run; canonicalNaN). */
 const same = (label, run) =>
   assert.deepStrictEqual(
-    outcome(() => run(candidate)),
-    outcome(() => run(baseline)),
+    canonicalNaN(outcome(() => run(candidate))),
+    canonicalNaN(outcome(() => run(baseline))),
     label,
   );
 

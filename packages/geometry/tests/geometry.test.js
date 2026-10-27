@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
+import { fileURLToPath } from 'node:url';
 import { Geometry } from '@margoengine/core';
 import * as G from '../dist/index.js';
 
@@ -1126,7 +1127,9 @@ test('module is side-effect free, SSR safe and small', async () => {
 
 test('consumers tree-shake to what they import', async (t) => {
   const { build } = await import('vite');
-  const entry = new URL('../dist/index.js', import.meta.url).pathname;
+  // A file path, not URL.pathname: that is percent-encoded ('/C:/Users/%7E1/...' under an 8.3 or spaced folder)
+  // and resolves nowhere (found by the fresh-clone check, which clones into os.tmpdir()).
+  const entry = fileURLToPath(new URL('../dist/index.js', import.meta.url)).replaceAll('\\', '/');
   const { mkdtemp, writeFile, rm } = await import('node:fs/promises'),
     { tmpdir } = await import('node:os'),
     { join } = await import('node:path');

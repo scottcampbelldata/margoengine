@@ -140,6 +140,43 @@ before the core speed-ups (`0ed56b9`) re-run faster than recorded. The animator 
 every transform write bit for bit, and the animator has skipped unchanged writes since `f33e094` and reads
 `options.speed` since `6a1c6bb`, so only its pinned run can match.
 
+**Baselines: golden outputs, not commits (2026-10-27).** A fresh clone of main failed `npm run verify`: 14 of the 20
+current proofs rebuilt their baselines with `git rev-parse` / `git show` on commits (`57250a49`, `2d192a71`, `2cd81c1`,
+`2484971`, `b3ed8ac`, `6c20076d`) that exist only in one checkout's pre-rewrite history, and the history scrub before
+the repository goes public rewrites every commit id again. A current run now compares the working tree with golden
+outputs in `proofs/baselines/` (`golden.js`) and reads nothing from Git: per proof, every value the baseline emitted
+and the proof compares with (the GPU call logs with every buffer byte, shader texts, function results), stored
+losslessly with its SHA-256 in `<proof>.json` and the values in `<proof>.json.gz`. Each was captured once by
+`proofs/capture.mjs` on a checkout that holds the reference commit, only after the proof passed against it, so the
+stored value is exactly what the reference emitted with today's core and fixtures, and the commit id stays in the
+table above and in `<proof>.json` as documentation. No old package source is stored: only output, which the working
+tree must still produce. No reference moved and no assertion changed, so every number in the table above stands.
+Three proofs needed more than "store the baseline's value":
+
+- **math-consolidation** calls the old copies directly, interleaved with today's math. Each old copy is taped
+  (`tape`): at capture every call ran the copy and a stand-in, today's math called with the copy's signature, on
+  copies of the same arguments (aliasing and shared buffers kept) and required the same result, error and every array
+  argument afterwards (NaN payloads aside, below); the SHA-256 over all 24 tapes' effects is stored. A current run
+  replays the stand-ins and must reproduce every digest. Its text comparisons between old copies are facts about
+  `2484971` alone and are stored as such.
+- **post-stack**'s creative pair is historical in every mode (`5b1fe66^` -> `3319317`, both old); a current run reads
+  its stored result (identical calls, with the count) instead of rebuilding both commits.
+- **ignoreAgx**'s question "does the reference descend from `eaddd64`" is stored as a fact of the reference.
+
+When a deliberate change alters what a current proof's feature-off path emits, advance its reference as before and
+run `node examples/package-benchmarks/proofs/capture.mjs --only=<proof>` on a checkout with that commit; it stores the
+new values and replays them from the store. Pinned runs still rebuild their commits from Git; in a clone without them
+each such proof prints `HISTORICAL: <proof> is pinned to <commit>, a commit only in the pre-rewrite history` and exits
+0, while in `--current` a HISTORICAL row is a failure. `npm run check:fresh-clone` (in `check:merge`, so in the
+nightly full run) builds a history-free shallow clone of the working tree and runs `npm run verify` and the proofs in
+it.
+
+**NaN payloads.** `geometry.proof.js` (pinned) failed at random on its degenerate-input case ("degenerate bounds"):
+baseline and candidate both return NaN for the non-finite vertex, but V8 writes either x86's default NaN (sign bit
+set) or the plain quiet NaN into a typed array depending on the code path and JIT tier, which ECMAScript allows
+(SetValueInBuffer may store any NaN encoding). Its bit-for-bit comparison and the math tapes now compare NaN payloads
+as one value (`canonicalNaN`); every other bit, -0 included, still counts.
+
 | Proof | Pinned: baseline -> claim commit | Current: ref -> working tree |
 | --- | --- | --- |
 | animation | `59350fc` -> `f47ff3f` | - |

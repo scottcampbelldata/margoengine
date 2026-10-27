@@ -166,8 +166,14 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     for (const t of tests) console.log(`${t.label}: (${t.cwd}) ${t.command}`);
     process.exit(0);
   }
-  // Children taking this same lock run inside it; any other lock they take is still taken.
-  const env = { ...process.env, MARGO_GPU_LOCK_NESTED: join(lockDir, 'nested'), MARGO_GPU_LOCK_NESTED_MODE: 'shared' };
+  // Children taking this same lock run inside it; any other lock they take is still taken. In this gate a Jupyter check
+  // that cannot run (no Python, no network to make its venv) fails instead of printing SKIP (python/tests/venv.mjs).
+  const env = {
+    ...process.env,
+    MARGO_GPU_LOCK_NESTED: join(lockDir, 'nested'),
+    MARGO_GPU_LOCK_NESTED_MODE: 'shared',
+    MARGO_REQUIRE_JUPYTER: process.env.MARGO_REQUIRE_JUPYTER ?? '1',
+  };
   const run = (command, cwd) => {
     const t0 = performance.now();
     const { status } = spawnSync(command, { cwd: join(root, cwd), shell: true, stdio: 'inherit', env });

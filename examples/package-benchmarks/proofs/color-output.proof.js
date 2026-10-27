@@ -7,7 +7,7 @@
 // Pinned: 7dcc958 against 225b1d6, the commit that made this claim. --current: 57250a49 against the working tree;
 // 56ee987 intentionally unified PBR Neutral output and made Tonemap's default curve neutral (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, ignoreAgx, entryAt } from './compare.js';
+import { refs, versions, ignoreAgx, entryAt, golden } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
@@ -111,7 +111,7 @@ for (const [label, make] of Object.entries(cases))
       );
       return ignoreAgx(expected, ref);
     };
-    const expected = run('baseline');
+    const expected = await golden(`${label} ${samples}x`, () => run('baseline'));
     assert.ok(expected.length > 100, `${label} story must exercise the GPU`);
     assert.deepEqual(run('candidate'), expected, `${label} GPU calls differ at ${samples}x`);
     calls += expected.length;

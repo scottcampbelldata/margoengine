@@ -9,7 +9,7 @@
 // working tree, including the approved cotangent frame, IBL energy, phone shadows and PBR Neutral output (claims.md).
 // f8a36ca's IBL BRDF LUT storage-buffer change is mapped back by binding-limit.proof.js for its older pinned refs.
 import assert from 'node:assert/strict';
-import { refs, versions } from './compare.js';
+import { refs, versions, golden } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
@@ -141,7 +141,7 @@ const plain = (log) =>
 let calls = 0,
   modules = 0;
 for (const samples of [1, 4]) {
-  const expected = plain(await story(baseline, samples)),
+  const expected = await golden(`${samples}x`, async () => plain(await story(baseline, samples))),
     actual = plain(await story(candidate, samples));
   const shaders = expected.filter((entry) => entry[0] === 'module');
   assert.ok(

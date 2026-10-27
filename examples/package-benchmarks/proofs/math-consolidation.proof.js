@@ -9,11 +9,14 @@
 //     (fresh process, so each side's type feedback is only its own, as in an app)
 // Pinned: 2484971 (before 1/n) against 4eed254 (9/n, the last step): @margoengine/math and the package files are built at
 // 4eed254 (their own @margoengine/math imports resolve to the working tree's build). --current: 2484971 against the
-// working tree, since the guarantee is that math stays bit-identical to the copies it replaced.
+// working tree, since the guarantee is that math stays bit-identical to the copies it replaced. In --current runs the
+// old copies are taped (golden.js `tape`): at capture each call ran the copy and a stand-in (today's math called with
+// the copy's signature, below) and required the same effect, and the digest of every effect is stored; a --current run
+// replays the stand-ins and must reproduce that digest, so a fresh clone checks the same guarantee without the copies.
+// The text comparisons between copies are facts about `ref` alone, stored as such (`textual`).
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { refs, versions, time, entryAt } from './compare.js';
+import { refs, versions, time, entryAt, fileAt, tape, fact, atRef } from './compare.js';
 
 const timing = process.argv.includes('--time'),
   { ref, pin } = refs('2484971', '4eed254');
@@ -21,10 +24,66 @@ const root = resolve(import.meta.dirname, '../../..');
 /** An @margoengine/math entry at the candidate (`pin`, else the working tree's build). */
 const math = (entry) => entryAt('math', `src/${entry}.ts`, pin),
   mat4 = await math('mat4');
-/** {baseline, candidate}: one package file at `ref` and at the candidate (now using math). */
-const both = (name, entry) => versions(name, ref, entry, pin);
-const source = (file) =>
-  execFileSync('git', ['show', `${ref}:${file}`], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 });
+const [color, quat, vec3, utils, validate] = await Promise.all(
+  ['color', 'quat', 'vec3', 'mathutils', 'validate'].map(math),
+);
+/** Today's math called with each old copy's signature (a copy not listed here is stood in for by the same name in the
+ * candidate file). Capture checks every call against the copy itself. */
+const standIns = {
+  'bvh src/math.ts': {
+    multiply: (a, b, out = new Float64Array(16)) => mat4.multiplyMatrices(a, b, out),
+    invert: (m, out = new Float64Array(16)) => mat4.invertMatrix(m, out),
+  },
+  'points src/math.ts': {
+    multiply: (a, b, out = new Float64Array(16)) => mat4.multiplyMatrices(a, b, out),
+    random: (seed) => utils.createRandom(seed),
+  },
+  'text src/math.ts': {
+    multiply: (out, a, b) => mat4.multiplyMatrices(a, b, out),
+    eulerToQuaternion: (e) => quat.eulerToQuaternion(e[0], e[1], e[2]),
+  },
+  'animation src/sampling.ts': {
+    multiplyMatrices: (out, a, b) => void mat4.multiplyMatrices(a, b, out),
+  },
+  'exporters src/scene.ts': {
+    multiply: (a, b) => mat4.multiplyMatrices(a, b, new Float64Array(16)),
+    compose: (t, q, s) => mat4.composeMatrix(t, q, s, new Float64Array(16)),
+    toSrgb: (v) => color.LinearToSRGB(v),
+  },
+  'lines src/math.ts': { invert: (out, m) => mat4.invertMatrix(m, out) !== null },
+  'environment src/background.ts': { invert: (m, out) => mat4.invertMatrix(m, out) !== null },
+  'environment src/color.ts': { srgbToLinear: (v) => color.SRGBToLinear(v) },
+  'text src/color.ts': { encodeSrgb: (v) => color.LinearToSRGB(v) },
+  'animator src/blend.ts': { quaternionMultiply: (a, b) => quat.multiplyQuaternions(a, b) },
+  'controls src/math.ts': {
+    ...Object.fromEntries(['add', 'sub', 'dot', 'cross', 'scale', 'length', 'normalize'].map((n) => [n, vec3[n]])),
+    clamp: utils.clamp,
+  },
+  'shared/math.js': {
+    invert: (out, m, offset = 0, workspace) => {
+      assert.equal(offset, 0, 'the stand-in covers offset 0, the only one the proof uses');
+      return mat4.invertMatrixStable(m, out, workspace) !== null;
+    },
+    finiteVector: validate.finiteVector,
+  },
+};
+const taped = new Map();
+/** {baseline, candidate}: one package file at `ref` (taped in --current runs) and at the candidate (now using math). */
+async function both(name, entry) {
+  const pair = await versions(name, ref, entry, pin),
+    id = `${name} ${entry}`,
+    n = (taped.get(id) ?? 0) + 1;
+  taped.set(id, n);
+  const stand = new Proxy(standIns[id] ?? {}, { get: (own, key) => own[key] ?? pair.candidate[key] });
+  return { baseline: tape(`${id} #${n}`, pair.baseline, stand), candidate: pair.candidate };
+}
+const source = (file) => fileAt(file, ref);
+/** A text comparison between copies at `ref`: run where the commit is present, stored as a fact about `ref`. */
+const textual = (label, check) =>
+  assert.ok(
+    fact(`textual: ${label}`, () => (check(), true)),
+    label,
+  );
 /** Source of `function name(...) {...}` or `const name = ...;` in `file` at `ref`, without whitespace and simple type annotations. */
 function body(file, name) {
   const text = source(file),
@@ -119,18 +178,20 @@ families.push({
     const animation = await both('animation', 'src/sampling.ts'),
       exporters = (await both('exporters', 'src/scene.ts')).baseline;
     // Same loops and the same element expression as bvh's; only how `out` is obtained and returned differs.
-    const core = (code) => /for\(letc=0;c<4;c\+\+\)for\(letr=0;r<4;r\+\+\)\{?(out\[c\*4\+r\]=[^;]+;)/.exec(code)?.[1],
-      reference = core(body('packages/bvh/src/math.ts', 'multiply'));
-    assert.ok(reference);
-    for (const [file, name] of [
-      ['packages/points/src/math.ts', 'multiply'],
-      ['packages/text/src/math.ts', 'multiply'],
-      ['packages/animation/src/sampling.ts', 'multiplyMatrices'],
-      ['packages/exporters/src/scene.ts', 'multiply'],
-      ['packages/loaders/src/usdz.ts', 'multiply'],
-      ['packages/usdz/src/index.ts', 'multiply'],
-    ])
-      assert.equal(core(body(file, name)), reference, `${file} ${name}`);
+    const core = (code) => /for\(letc=0;c<4;c\+\+\)for\(letr=0;r<4;r\+\+\)\{?(out\[c\*4\+r\]=[^;]+;)/.exec(code)?.[1];
+    textual("mat4 multiply copies share bvh's loop", () => {
+      const reference = core(body('packages/bvh/src/math.ts', 'multiply'));
+      assert.ok(reference);
+      for (const [file, name] of [
+        ['packages/points/src/math.ts', 'multiply'],
+        ['packages/text/src/math.ts', 'multiply'],
+        ['packages/animation/src/sampling.ts', 'multiplyMatrices'],
+        ['packages/exporters/src/scene.ts', 'multiply'],
+        ['packages/loaders/src/usdz.ts', 'multiply'],
+        ['packages/usdz/src/index.ts', 'multiply'],
+      ])
+        assert.equal(core(body(file, name)), reference, `${file} ${name}`);
+    });
     for (let i = 0; i + 1 < M.length; i++) {
       const a = M[i],
         b = M[M.length - 1 - i];
@@ -223,9 +284,11 @@ families.push({
       environment = (await both('environment', 'src/background.ts')).baseline;
     // environment's copy is the same text as lines' (both return a boolean); bvh's returns out/null with `inv` for `d`.
     const inner = (code) => code.slice(code.indexOf('{'));
-    assert.equal(
-      inner(body('packages/environment/src/background.ts', 'invert')),
-      inner(body('packages/lines/src/math.ts', 'invert')),
+    textual("environment's invert is lines'", () =>
+      assert.equal(
+        inner(body('packages/environment/src/background.ts', 'invert')),
+        inner(body('packages/lines/src/math.ts', 'invert')),
+      ),
     );
     for (const m of M)
       for (const make of [
@@ -299,8 +362,7 @@ async function sharedAtRef() {
 families.push({
   name: 'shared/math invert + finiteVector',
   async verify() {
-    const shared = await sharedAtRef(),
-      validate = await math('validate'),
+    const shared = tape('shared/math.js', await atRef('shared/math.js', ref, sharedAtRef), standIns['shared/math.js']),
       M = matrices(6000);
     let n = 0;
     for (const m of M)
@@ -431,9 +493,11 @@ families.push({
       const start = code.indexOf('[a[3]*b[0]');
       return code.slice(start, code.indexOf(']', code.lastIndexOf('a[2]*b[2]')) + 1).replace(/,\]$/, ']');
     };
-    assert.equal(
-      rows(body('packages/controls/src/math.ts', 'quatMul')),
-      rows(body('packages/animator/src/blend.ts', 'quaternionMultiply')),
+    textual("controls' quatMul is animator's quaternionMultiply", () =>
+      assert.equal(
+        rows(body('packages/controls/src/math.ts', 'quatMul')),
+        rows(body('packages/animator/src/blend.ts', 'quaternionMultiply')),
+      ),
     );
     const animator = (await both('animator', 'src/blend.ts')).baseline;
     let n = 0;
@@ -469,12 +533,14 @@ families.push({
       text = (await both('text', 'src/color.ts')).baseline,
       exporters = (await both('exporters', 'src/scene.ts')).baseline;
     const decode = 'v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4';
-    assert.equal(body('packages/loaders/src/engine.ts', 'toLinear').replace(/^.*=>/, ''), decode + ';');
-    for (const name of ['lines', 'points', 'text'])
-      assert.equal(
-        body(`packages/${name}/src/color.ts`, 'linear').replace(/^.*=>/, '').replaceAll('value', 'v'),
-        decode + ';',
-      );
+    textual('sRGB decode copies are one expression', () => {
+      assert.equal(body('packages/loaders/src/engine.ts', 'toLinear').replace(/^.*=>/, ''), decode + ';');
+      for (const name of ['lines', 'points', 'text'])
+        assert.equal(
+          body(`packages/${name}/src/color.ts`, 'linear').replace(/^.*=>/, '').replaceAll('value', 'v'),
+          decode + ';',
+        );
+    });
     const outcome = (f, ...args) => {
       try {
         return f(...args);
@@ -553,7 +619,12 @@ families.push({
         n += copies.length;
       }
     // splats' decode lives inside parseSplat: same text, and every byte value decodes the same through the old and new parser.
-    assert.equal(body('packages/splats/src/data.ts', 'linear').replace(/^.*=>/, '').replaceAll('c', 'v'), decode + ';');
+    textual("splats' decode is the same expression", () =>
+      assert.equal(
+        body('packages/splats/src/data.ts', 'linear').replace(/^.*=>/, '').replaceAll('c', 'v'),
+        decode + ';',
+      ),
+    );
     const splats = await both('splats', 'src/data.ts'),
       file = new Uint8Array(256 * 32),
       view = new DataView(file.buffer);
@@ -617,16 +688,18 @@ families.push({
       }
     }
     // grass's closure has math's expression (state named seed); scatter's is the |0 form, compared through its public API.
-    assert.ok(
-      body('packages/creative/src/grass.ts', 'random').includes(
-        'seed=(Math.imul(seed,1664525)+1013904223)>>>0;returnseed/4294967296;',
-      ),
-    );
-    assert.ok(
-      body('packages/scatter/src/candidates.ts', 'random').includes(
-        'seed=Math.imul(seed,1664525)+1013904223|0;return(seed>>>0)/4294967296;',
-      ),
-    );
+    textual('grass and scatter LCG expressions', () => {
+      assert.ok(
+        body('packages/creative/src/grass.ts', 'random').includes(
+          'seed=(Math.imul(seed,1664525)+1013904223)>>>0;returnseed/4294967296;',
+        ),
+      );
+      assert.ok(
+        body('packages/scatter/src/candidates.ts', 'random').includes(
+          'seed=Math.imul(seed,1664525)+1013904223|0;return(seed>>>0)/4294967296;',
+        ),
+      );
+    });
     for (const seed of [
       0,
       1,
@@ -684,17 +757,19 @@ families.push({
       controls = (await both('controls', 'src/math.ts')).baseline;
     // machinery's copies differ from controls' only in parameter types.
     const expression = (code) => code.replace(/^const\w+=\([^)]*\)(:\w+)?=>/, '');
-    for (const [file, names] of [
-      ['packages/machinery/src/metrology.ts', ['sub', 'dot', 'cross']],
-      ['packages/machinery/src/clearance.ts', ['dot', 'sub', 'cross']],
-      ['packages/machinery/src/dimensions.ts', ['sub']],
-    ])
-      for (const name of names)
-        assert.equal(
-          expression(body(file, name)),
-          expression(body('packages/controls/src/math.ts', name).replace(/\s/g, '')),
-          `${file} ${name}`,
-        );
+    textual("machinery's vector copies are controls'", () => {
+      for (const [file, names] of [
+        ['packages/machinery/src/metrology.ts', ['sub', 'dot', 'cross']],
+        ['packages/machinery/src/clearance.ts', ['dot', 'sub', 'cross']],
+        ['packages/machinery/src/dimensions.ts', ['sub']],
+      ])
+        for (const name of names)
+          assert.equal(
+            expression(body(file, name)),
+            expression(body('packages/controls/src/math.ts', name).replace(/\s/g, '')),
+            `${file} ${name}`,
+          );
+    });
     let n = 0;
     for (let i = 0; i < 100000; i++) {
       const a = [value(), value(), value()],

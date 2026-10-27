@@ -7,7 +7,7 @@
 // Pinned: 46f9484 against 80d4cfb, the commit that made this claim. --current: b3ed8ac against the working tree;
 // 6a57389 added the approved ambient uniform and 95b4eae added back-side-only model culling (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, current } from './compare.js';
+import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 
 const { ref, pin } = refs('46f9484', '80d4cfb', 'b3ed8ac'),
@@ -85,7 +85,7 @@ function story(module, samples, xray) {
 let entries = 0;
 for (const samples of [1, 4])
   for (const xray of [undefined, false]) {
-    const expected = story(baseline, samples, xray),
+    const expected = await golden(`${samples}x xray ${xray}`, () => story(baseline, samples, xray)),
       actual = story(candidate, samples, xray);
     assert.ok(
       expected.length > 400 &&

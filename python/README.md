@@ -168,4 +168,8 @@ Checks done by hand (no automated VS Code or Colab session here):
    like the specification.
 
 Run the tests with `python -m unittest discover -s python/tests` or `pytest python/tests`, and the notebook check
-(JupyterLab, Notebook 7, camera, `to_png`; GPU lock) with `npm run test:python:browser`.
+(JupyterLab, Notebook 7, camera, `to_png`; GPU lock) with `npm run test:python:browser`. That check runs Jupyter from
+its own virtual environment, `test-results/.venv-data` (or `MARGO_JUPYTER_VENV`), with the versions pinned in
+`python/requirements-notebook.txt`; `npm run setup:python-test` makes it once (Python 3 on PATH or `MARGO_PYTHON`, and
+network access to PyPI), and the check makes it itself when it is missing. Without Python or the network it prints a
+loud `SKIP` naming that command and exits 0, or fails with `MARGO_REQUIRE_JUPYTER=1` (as `check:gpu-packages` sets it).

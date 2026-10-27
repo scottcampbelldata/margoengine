@@ -29,7 +29,7 @@ export const GPU_STEPS = [
   'check:no-webgpu',
 ];
 /** Steps known to need no GPU narrowing; a step in neither list fails the unit test so someone decides. */
-export const PLAIN_STEPS = ['verify', 'build:site'];
+export const PLAIN_STEPS = ['verify', 'check:fresh-clone', 'build:site'];
 /** Package-level steps (no GPU) that always run in some form and are narrowed by packageScopes. */
 export const SCOPED_STEPS = ['modern:test:packages', 'modern:test:bundlers'];
 

@@ -5,7 +5,7 @@
 // Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: 151aa744 against the working tree;
 // approved multilevel Bloom, PBR Neutral display and linear HDR handoff changed these calls (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, ignoreAgx, current } from './compare.js';
+import { refs, versions, ignoreAgx, current, golden } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
@@ -76,7 +76,7 @@ const lists = {
 let calls = 0;
 for (const [label, make] of Object.entries(lists))
   for (const samples of [1, 4]) {
-    const expected = ignoreAgx(story(post.baseline, make, samples), ref),
+    const expected = await golden(`${label} ${samples}x`, () => ignoreAgx(story(post.baseline, make, samples), ref)),
       actual = ignoreAgx(story(post.candidate, make, samples), ref);
     assert.ok(expected.length > 300, `${label} story must exercise the GPU`);
     assert.deepEqual(actual, expected, `PostStack [${label}] GPU calls differ at ${samples}x`);

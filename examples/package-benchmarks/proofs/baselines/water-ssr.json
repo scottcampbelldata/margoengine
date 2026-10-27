@@ -1,0 +1,12 @@
+{
+ "proof": "water-ssr",
+ "ref": "57250a49",
+ "revision": "57250a49e64ab686b6dd992751d092e19433fcb3",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {},
+ "outputs": {
+  "{}": "bfaec7583d1c2fd88983efdf2da4b0437978074953e19781b6678ad6801c376c",
+  "{\"terrain\":true}": "458bd25422eaeccf01506c42c2847f7d5d948f914f6f7ef81b19a91271d6e5f0",
+  "{\"reflection\":true,\"shadows\":true}": "b17dc28ec1fbaf513eded30e0e366e6393cf86686bd99db6dd042f6136c8a9b4"
+ }
+}

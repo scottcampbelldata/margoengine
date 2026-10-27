@@ -8,13 +8,13 @@
 // Pinned: ed53ec5 against fff47af, the commit that recorded results/procedural-deps.json. Without the two old packages the
 // run reports HISTORICAL (exit 0) instead: nothing in the repository can rebuild the baseline without an install.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
 import { compactOutput } from '../../../scripts/measure-size.js';
 import { refs, versions, time, save, announce } from './compare.js';
+import { list, show } from './history.js';
 
 const { ref, pin } = refs('ed53ec5', 'fff47af'),
   root = resolve(import.meta.dirname, '../../..');
@@ -72,16 +72,8 @@ async function sizeAt(at) {
   if (!at) return bytes(resolve(root, 'packages/procedural/src/index.ts'));
   const folder = resolve(root, 'test-results/proofs-tmp', `procedural-${at.replace(/\W/g, '_')}-${process.pid}`);
   await mkdir(resolve(folder, 'src'), { recursive: true });
-  for (const file of execFileSync('git', ['ls-tree', '--name-only', `${at}:packages/procedural/src`], {
-    cwd: root,
-    encoding: 'utf8',
-  })
-    .split('\n')
-    .filter(Boolean))
-    await writeFile(
-      resolve(folder, 'src', file),
-      execFileSync('git', ['show', `${at}:packages/procedural/src/${file}`], { cwd: root, encoding: 'utf8' }),
-    );
+  for (const file of list(at, 'packages/procedural/src'))
+    await writeFile(resolve(folder, 'src', file), show(at, `packages/procedural/src/${file}`));
   try {
     return await bytes(resolve(folder, 'src/index.ts'));
   } finally {

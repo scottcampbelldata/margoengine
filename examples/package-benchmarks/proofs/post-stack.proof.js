@@ -6,7 +6,7 @@
 // working tree, including the approved multilevel Bloom, PBR Neutral display and Tonemap default (claims.md).
 // creative's PostProcessing is always 5b1fe66^ against 3319317: it lost bloom and the sky backdrop after 3319317.
 import assert from 'node:assert/strict';
-import { refs, versions, ignoreAgx } from './compare.js';
+import { refs, versions, ignoreAgx, golden, fact, readOnly } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
@@ -15,7 +15,9 @@ const before = '5b1fe66^',
 const post = await versions('post', ref, undefined, pin),
   dof = await versions('dof', ref, undefined, pin),
   tonemap = await versions('tonemap', ref, undefined, pin);
-const creative = await versions('creative', before, 'src/post.ts', '3319317');
+// creative's pair is historical in every mode (5b1fe66^ -> 3319317); a --current run reading golden outputs has neither
+// commit, so it reads the pair's stored result, a fact about those two commits.
+const creative = readOnly() ? {} : await versions('creative', before, 'src/post.ts', '3319317');
 
 /** Runs `effects` (made by `make(gpu)`) with the core main pass for 24 frames, applying `edit(frame, effects, state)` first. */
 function story(make, samples, edit) {
@@ -107,9 +109,34 @@ let calls = 0;
 for (const [label, [make, edit, module]] of Object.entries(cases))
   for (const samples of [1, 4]) {
     const base = module === creative ? before : ref;
-    const expected = ignoreAgx(
-        story(() => make(module.baseline), samples, edit),
-        base,
+    const compare = (expected, actual) => {
+      assert.ok(
+        expected.length > 300 && expected.some((entry) => entry[0] === 'throw'),
+        `${label} story must exercise the GPU and an error path`,
+      );
+      assert.deepEqual(actual, expected, `${label} GPU calls differ at ${samples}x`);
+      return expected.length;
+    };
+    if (module === creative) {
+      calls += fact(`${label} ${samples}x: ${before} -> 3319317 identical calls`, () =>
+        compare(
+          ignoreAgx(
+            story(() => make(module.baseline), samples, edit),
+            base,
+          ),
+          ignoreAgx(
+            story(() => make(module.candidate), samples, edit),
+            base,
+          ),
+        ),
+      );
+      continue;
+    }
+    const expected = await golden(`${label} ${samples}x`, () =>
+        ignoreAgx(
+          story(() => make(module.baseline), samples, edit),
+          base,
+        ),
       ),
       actual = ignoreAgx(
         story(() => make(module.candidate), samples, edit),
@@ -136,7 +163,7 @@ for (const samples of [1, 4]) {
       ),
       ref,
     );
-  const expected = chain('baseline');
+  const expected = await golden(`DOF -> Tonemap ${samples}x`, () => chain('baseline'));
   assert.deepEqual(chain('candidate'), expected, `DOF -> Tonemap chain differs at ${samples}x`);
   calls += expected.length;
 }

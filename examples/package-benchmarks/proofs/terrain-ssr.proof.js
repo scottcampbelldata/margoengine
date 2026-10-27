@@ -5,7 +5,7 @@
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/terrain-ssr.proof.js [ref] [--current]
 // Baseline 6c20076d (before the hook) against the working tree.
 import assert from 'node:assert/strict';
-import { refs, versions, current } from './compare.js';
+import { refs, versions, current, golden } from './compare.js';
 
 const { ref, pin } = refs('6c20076d'),
   { baseline, candidate } = await versions('terrain', ref, undefined, pin);
@@ -14,7 +14,10 @@ globalThis.GPUTextureUsage ??= { TEXTURE_BINDING: 4 };
 globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2 };
 
 for (const resolution of [8, 12, 64, 128, 256])
-  assert.deepEqual(candidate.clipmapGrid(resolution), baseline.clipmapGrid(resolution));
+  assert.deepEqual(
+    candidate.clipmapGrid(resolution),
+    await golden(`clipmapGrid ${resolution}`, () => baseline.clipmapGrid(resolution)),
+  );
 for (const resolution of [4, 10, 260, 8.5, NaN])
   assert.throws(() => candidate.clipmapGrid(resolution), {
     name: 'RangeError',
@@ -200,17 +203,21 @@ function script(module, options) {
   w.terrain.drawShadow({ context: w.context, pass: w.pass, matrix: new Float32Array(16), cascade: 0 });
   return w.summary();
 }
-for (const options of [
+const scripts = [
   {},
   {
     normalmap: true,
     terrain: { origin: [-2048, 512.5], resolution: 32, levels: 3, cellSize: 0.5, heightScale: 250, heightOffset: -20 },
   },
   { terrain: { levels: 12, resolution: 8 } },
-])
-  assert.deepEqual(script(candidate, options), script(baseline, options));
+];
+const expected = [];
+for (const [i, options] of scripts.entries()) {
+  expected[i] = await golden(`script ${JSON.stringify(options)}`, () => script(baseline, options));
+  assert.deepEqual(script(candidate, options), expected[i]);
+}
 let calls = 0;
-for (const options of [{}, { terrain: { levels: 12, resolution: 8 } }]) calls += script(baseline, options).log.length;
+for (const i of [0, 2]) calls += expected[i].log.length; // {} and { terrain: { levels: 12, resolution: 8 } }
 assert.ok(calls > 500, 'story must exercise the GPU');
 assert.equal(typeof candidate.Terrain.prototype.setCapture, 'function', 'candidate has the capture hook');
 if (!current) assert.equal(baseline.Terrain.prototype.setCapture, undefined, 'baseline does not');

@@ -1,0 +1,17 @@
+{
+ "proof": "terrain-ssr",
+ "ref": "6c20076d",
+ "revision": "6c20076df3bbf30aeaa437657694edf9a0c66e58",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {},
+ "outputs": {
+  "clipmapGrid 8": "f58ee7201906f152f51afc93c21e7fbf22c77c42bef0fbf6595983a3eaf3fdae",
+  "clipmapGrid 12": "360fd5d6eb5c1b10a1bea282a6928ce3234260947c99528308b530e20dc01f33",
+  "clipmapGrid 64": "c48812e0208b49132b2fb944d63fdc96fd76cd532cf782389875e21b6078a415",
+  "clipmapGrid 128": "71fac6941aeedbf69839aa59b264d01b8c6e3b7d2fcf9f483aa96781a291227a",
+  "clipmapGrid 256": "02e385168df28404482337aea803bb22a1d2a5570c9eeac28231ebd5bda79efc",
+  "script {}": "38568508774673686f080db9a2ddc1dc91371f8258bd943fa1ed45ff40205205",
+  "script {\"normalmap\":true,\"terrain\":{\"origin\":[-2048,512.5],\"resolution\":32,\"levels\":3,\"cellSize\":0.5,\"heightScale\":250,\"heightOffset\":-20}}": "1a92217216be4eadbf8ea9a56141469fda82f2175ac0d6d901787c9fb4717069",
+  "script {\"terrain\":{\"levels\":12,\"resolution\":8}}": "70dbc4353aa3823ca55a3325f0657ea0108c895e959144d4ecd5c6897f21681e"
+ }
+}

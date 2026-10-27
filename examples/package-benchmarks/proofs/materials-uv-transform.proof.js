@@ -11,31 +11,22 @@
 // approved cotangent frame (and 44592a3's +b on normal-mapped materials meshes), compact discard guards, PBR Neutral
 // output and the earlier normal-frame, topology, uniform and batching changes (claims.md).
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
 import { Engine, TransformStore } from '@margoengine/core/extension';
-import { refs, announce } from './compare.js';
+import { refs, announce, atRef, golden } from './compare.js';
+import { show as showAt } from './history.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/'),
   { ref, pin } = refs('1970fda', '700838e', '641246d3');
 const sources = ['materials/src', 'gltf-pro/src', 'shared'].map((name) => slash(resolve(root, 'packages', name)) + '/');
-const show = (from, file) => {
-  try {
-    return execFileSync('git', ['show', `${from}:${file.slice(slash(root).length + 1)}`], {
-      cwd: root,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-  } catch {
-    return;
-  }
-};
+// A revision this clone lacks is HISTORICAL (history.js); only a file the revision lacks reads the working tree.
+const show = (from, file) => showAt(from, file.slice(slash(root).length + 1));
 /** materials with gltf-pro (every entry) bundled in (core stays external), both read from `from` or the working tree. */
 async function load(from) {
   const plugins = [
@@ -86,7 +77,7 @@ async function load(from) {
   return import(pathToFileURL(file).href);
 }
 announce('materials + gltf-pro src/index.ts', ref, pin);
-const baseline = await load(ref),
+const baseline = await atRef('materials + gltf-pro', ref, () => load(ref)),
   candidate = await load(pin);
 
 const box = (() => {
@@ -204,7 +195,7 @@ async function story(api) {
     model.destroy();
   });
 }
-const expected = await story(baseline),
+const expected = await golden('story', () => story(baseline)),
   actual = await story(candidate);
 assert.ok(expected.filter((e) => e[0] === 'pass.drawIndexed').length >= 12 * 7, 'every mesh drew every frame');
 assert.ok(

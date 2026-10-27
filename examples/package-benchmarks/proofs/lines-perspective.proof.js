@@ -4,7 +4,7 @@
 // Run: node examples/package-benchmarks/proofs/lines-perspective.proof.js [ref] [pin] [--current]
 // Pinned: 96edc75 against 6da7f7e, the commit that made this claim. --current: 2d192a71 (lines clipping planes, then clipIntersection's plane-count test) against the working tree.
 import assert from 'node:assert/strict';
-import { refs, versions } from './compare.js';
+import { refs, versions, golden } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 
 const { ref, pin } = refs('96edc75', '6da7f7e', '2d192a71'),
@@ -68,7 +68,7 @@ function story(module, samples) {
 }
 let entries = 0;
 for (const samples of [1, 4]) {
-  const expected = story(baseline, samples),
+  const expected = await golden(`${samples}x`, () => story(baseline, samples)),
     actual = story(candidate, samples);
   assert.ok(
     expected.length > 300 && expected.filter((entry) => entry[0] === 'pass.draw').length > 60,

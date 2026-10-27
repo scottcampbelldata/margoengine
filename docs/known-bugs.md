@@ -120,6 +120,26 @@ does not own. Each entry says exactly what is needed to close it.
   app did not install anywhere in the graph of `Canvas` and `Stage`; a stage facade change, frozen for 1.0), or the
   README naming `margoengine` as the install for webpack and Turbopack. Until then, install `margoengine`.
 
+### Pinned proofs: nine historical claims no longer run against today's core
+
+- **What:** `npm run proofs` (pinned, every proof; not part of `verify` or `check:merge`) fails color-output,
+  environment-volumetric, math-consolidation, post-ssr, post-ssr-models, post-stack, probes-decals, quality-presets
+  and water-ssr ("story must exercise the GPU", "fog requires the standard core PBR shader", "Water GPU calls
+  differ", math-consolidation's `multiplyMatrices` writing into `undefined`), on this PC, which holds their commits, on
+  main before the 2026-10-24 rewrites and after (a clone without the commits reports them HISTORICAL instead).
+  `npm run proofs -- --current` (the ongoing guarantees, in `verify`, read from `proofs/baselines/`) passes 20/20.
+- **Repro:** `npm run build:packages && npm run proofs -- --only=environment-volumetric`.
+- **Cause:** a pinned run builds the old package sources at their claim commits but imports today's
+  `@margoengine/core` (compare.js: "core (frozen at 1.0.0) ... today's"). Core has had bug fixes and clean-room
+  rewrites since, so old sources that patch core's WGSL text by search and replace no longer find it
+  (environment at `366ebff`, `lighting.ts`: `if (code === source) throw ... requires the standard core PBR shader`),
+  their stories throw on the first frame (hence "must exercise the GPU"). math-consolidation is the same mismatch the
+  other way round: today's proof script calls `mat4.multiplyMatrices(a, b)` without `out` (optional in today's math),
+  but the pinned run builds math at `4eed254`, where `out` is required.
+- **Needed to close:** build `packages/core/src` (and the proof script's own calls) at the pin as well, from Git, on a
+  checkout that holds the commits; or retire the nine pinned runs as HISTORICAL with that reason, keeping their
+  `--current` guarantees.
+
 ### 4x MSAA blending is not repeatable (RTX A6000 under CPU load, and Intel Arc 140V)
 
 - **What:** the voxel GPU check (`packages/voxel/tests/render-browser-check.mjs`, run by `check:merge`) fails now and

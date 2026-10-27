@@ -1,0 +1,11 @@
+{
+ "proof": "taa-velocity",
+ "ref": "8149bf4e",
+ "revision": "8149bf4e8d5694b3c69a38072525e45f7003195c",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {},
+ "outputs": {
+  "1x": "82d563219ec21a131a1f31ddac1362852be959a1824502bd66771225139fd7ae",
+  "4x": "78d79ee4d0d570cfeff47f9b6671809fe21fa84690d33d14cfdfa14d7987716f"
+ }
+}

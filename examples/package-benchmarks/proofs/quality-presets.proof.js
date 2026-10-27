@@ -10,7 +10,7 @@
 // Pinned: 96daac7 against 01e5e35, the commit that recorded results/quality-presets.json. --current: 57250a49 against the
 // working tree, including the approved phone shadows, deterministic/minimum-size VFX and PBR Neutral output (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, entryAt, save } from './compare.js';
+import { refs, versions, entryAt, save, golden } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
@@ -115,7 +115,7 @@ for (const [key, [name, entry, make, base, explicit]] of Object.entries(cases)) 
     row = (report.packages[key] = { package: name, entry, calls: 0 });
   for (const samples of [1, 4]) {
     const run = (module, options, preset) => story(() => make(module, options), samples, preset);
-    const defaults = await run(baseline, base);
+    const defaults = await golden(`${key} ${samples}x`, () => run(baseline, base));
     assert.ok(
       defaults.length > 30 && !defaults.some((e) => e[0] === 'throw'),
       `${key} story must exercise the GPU without errors`,

@@ -5,7 +5,7 @@
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/water-ssr.proof.js [ref] [--current]
 // Baseline 6c20076d (before the hook) against the working tree.
 import assert from 'node:assert/strict';
-import { refs, versions, current } from './compare.js';
+import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
 const { ref, pin } = refs('6c20076d', undefined, '57250a49'),
@@ -87,7 +87,7 @@ function story(m, options) {
 }
 let calls = 0;
 for (const options of [{}, { terrain: true }, { reflection: true, shadows: true }]) {
-  const expected = story(baseline, options),
+  const expected = await golden(JSON.stringify(options), () => story(baseline, options)),
     actual = story(candidate, options);
   assert.ok(expected.length > 300, 'story must exercise the GPU');
   assert.ok(

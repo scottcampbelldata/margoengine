@@ -10,7 +10,7 @@
 // Pinned: 7c47a09 against 366ebff, the commit that made this claim. --current: 2cd81c1 against the working tree;
 // 56ee987 intentionally made Fog patch core's PBR Neutral display line (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, entryAt, save } from './compare.js';
+import { refs, versions, entryAt, save, golden } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
@@ -51,7 +51,7 @@ const rootStory = (module) => {
     background.dispose();
   });
 };
-const rootCalls = rootStory(baseline);
+const rootCalls = await golden('root', () => rootStory(baseline));
 assert.deepEqual(rootStory(candidate), rootCalls, 'environment root entry changed');
 
 // 2. Full story with and without VolumetricFog.

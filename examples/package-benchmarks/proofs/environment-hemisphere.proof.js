@@ -10,7 +10,7 @@
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/environment-hemisphere.proof.js [ref] [pin] [--current]
 // Pinned: 6c20076d against b4700864, the series' last code commit; --current: 57250a49 against the working tree.
 import assert from 'node:assert/strict';
-import { refs, versions, load as loadAt, commit, announce } from './compare.js';
+import { refs, versions, load as loadAt, commit, announce, atRef, golden } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
@@ -23,7 +23,10 @@ const gltfAt = async (at) => ({
   ...(await loadAt('gltf-pro', 'src/shader.ts', at)),
   ...(await loadAt('gltf-pro', '../shared/pbr-hooks.js', at)),
 });
-const shaders = { baseline: await gltfAt(commit(ref)), candidate: await gltfAt(pin && commit(pin)) };
+const shaders = {
+  baseline: await atRef('gltf-pro shaders', ref, () => gltfAt(commit(ref))),
+  candidate: await gltfAt(pin && commit(pin)),
+};
 
 const variants = {
   core: wgsl,
@@ -114,13 +117,15 @@ function calls(env, probe) {
   });
 }
 const pairs = ['baseline', 'candidate'].map((k) => [root[k], probes[k], shaders[k]]);
-const [expectedText, gotText] = pairs.map(([env, probe, gltf]) => texts(env, probe, gltf));
+const expectedText = await golden('texts', () => texts(...pairs[0])),
+  gotText = texts(...pairs[1]);
 let compared = 0;
 for (const key of Object.keys(expectedText)) {
   assert.equal(gotText[key], expectedText[key], `${key} differs without a hemisphere`);
   compared++;
 }
-const [expectedCalls, gotCalls] = pairs.map(([env, probe]) => calls(env, probe));
+const expectedCalls = await golden('calls', () => calls(pairs[0][0], pairs[0][1])),
+  gotCalls = calls(pairs[1][0], pairs[1][1]);
 assert.deepEqual(gotCalls, expectedCalls, 'environment GPU calls differ without a hemisphere');
 // The candidate's hemisphere does reach both shader kinds once attached.
 const sky = new root.candidate.HemisphereLight({ sky: '#bcd', ground: '#432' });

@@ -7,7 +7,7 @@
 // 8149bf4e against the working tree (one velocity pass and a shared camera block, speed matrix row 13.7;
 // docs/whitepaper/claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, current } from './compare.js';
+import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
@@ -119,7 +119,9 @@ function story(module, samples) {
 }
 let calls = 0;
 for (const samples of [1, 4]) {
-  const expected = story(baseline, samples).filter((entry) => entry[0] !== 'velocity'),
+  const expected = await golden(`${samples}x`, () =>
+      story(baseline, samples).filter((entry) => entry[0] !== 'velocity'),
+    ),
     recorded = story(candidate, samples),
     actual = recorded.filter((entry) => entry[0] !== 'velocity');
   assert.ok(expected.length > 2000 && expected.some((entry) => entry[0] === 'throw'), 'story must exercise the GPU');

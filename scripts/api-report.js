@@ -6,12 +6,24 @@
 // `typescript/unstable/sync` API (no extra dependency); that API is marked unstable, so a TypeScript bump may need edits.
 import { API, SymbolFlags } from 'typescript/unstable/sync';
 import { SyntaxKind } from 'typescript/unstable/ast';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { isUmbrellaAlias } from './umbrella.mjs';
 
-const root = resolve(import.meta.dirname, '..');
+// The canonical path: the checker reports files by their real long path, so a checkout reached through a Windows 8.3
+// name (C:\Users\\..., what os.tmpdir() gives) matched no package and every cross-package import line
+// vanished from the reports (found by the fresh-clone check).
+const root = realpathSync.native(resolve(import.meta.dirname, '..'));
 const update = process.argv.includes('--update');
 const apiDir = join(root, 'api');
 const slash = (p) => p.replaceAll('\\', '/');

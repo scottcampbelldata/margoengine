@@ -1,5 +1,7 @@
 // End-to-end check of the margoengine Python package in real notebooks: starts a Jupyter server from the data venv
-// (test-results/.venv-data in the main checkout, python/requirements-notebook.txt), opens the same notebook in
+// (test-results/.venv-data in the main checkout, python/requirements-notebook.txt; python/tests/venv.mjs makes it from
+// the pinned file when it is missing, as `npm run setup:python-test` does, and when that cannot work, no Python or no
+// network, the check prints a loud SKIP naming the fix and exits 0, or 1 with MARGO_REQUIRE_JUPYTER=1), opens the same notebook in
 // JupyterLab 4 and in Notebook 7 in headless Edge, runs it, and checks that each figure's widget view appears and draws
 // (non-background pixels in its canvas) with no errors in the page. In JupyterLab it also checks the camera both ways:
 // the camera the kernel sets is where the view starts, and dragging in the view reaches the kernel's `camera` trait,
@@ -17,10 +19,25 @@ import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { decodePNG } from '../../tests/support/png.js';
 import { killTree, notebookHasKernel, serverPort, startKernel, step } from './jupyter-steps.mjs';
+import { ensureVenv, SETUP, venvDir, venvTools } from './venv.mjs';
 
 // Run by a supervisor: this file starts itself as a child under a hard time limit and, on timeout, ends the child and
 // everything it started (the server, kernels, browser) and says so. The child does the work below.
 if (!process.env.MARGO_JUPYTER_CHILD) {
+  // The venv first (its own time limits; making it can take minutes, outside the check's limit below).
+  const venv = ensureVenv();
+  if (!venv.ok) {
+    const strict = process.env.MARGO_REQUIRE_JUPYTER === '1';
+    console.error(
+      `
+==== ${strict ? 'FAIL' : 'SKIP'}: test:python:browser did not run (this is not a pass) ====
+jupyter: ${venv.reason}
+Fix: ${SETUP}
+====
+`,
+    );
+    process.exit(strict ? 1 : 0);
+  }
   const limit = 10 * 60_000;
   const child = spawn(process.execPath, [import.meta.filename], {
     stdio: 'inherit',
@@ -46,12 +63,10 @@ process.on('uncaughtException', (error) => {
 });
 
 const root = resolve(import.meta.dirname, '../..'),
-  main = root.replace(/[\\/]\.[\w-]+[\\/]worktrees[\\/][^\\/]+$/, ''),
-  venv = join(main, 'test-results/.venv-data'),
-  jupyter = ['Scripts/jupyter.exe', 'bin/jupyter'].map((p) => join(venv, p)).find(existsSync),
-  python = ['Scripts/python.exe', 'bin/python'].map((p) => join(venv, p)).find(existsSync),
+  venv = venvDir(),
+  { jupyter, python } = venvTools(venv) ?? {},
   extension = join(root, 'python/margoengine/labextension');
-assert.ok(jupyter && python, `no jupyter in ${venv}: install python/requirements-notebook.txt there`);
+assert.ok(jupyter && python, `no jupyter in ${venv}: run ${SETUP}`);
 assert.ok(existsSync(join(extension, 'package.json')), 'the extension is not built: run node python/build-frontend.mjs');
 
 // The Python and Jupyter stack the check runs on, at the head of the server log kept on failure and in the success

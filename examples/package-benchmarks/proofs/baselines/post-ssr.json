@@ -1,0 +1,19 @@
+{
+ "proof": "post-ssr",
+ "ref": "151aa744",
+ "revision": "151aa744510282c7915c10a7d98decb662d53f9c",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {
+  "151aa744 descends from eaddd64": false
+ },
+ "outputs": {
+  "SSAO, Bloom, FXAA 1x": "c3e539230248cd7bf8f3c5bf88a1ee84c523be0ea6d527c7a2d4b16139787759",
+  "SSAO, Bloom, FXAA 4x": "cf464a67d8ea2b7d11e77fdc57be9a226c578d546996bfd0f44130f616d06a0a",
+  "SSAO 1x": "7a8c8592fb02f62cdd10df99f925705e8cb37688a43eba7ebe10e567137feb8e",
+  "SSAO 4x": "32c49dc6aff58639417ce9ce108279454e5ffe4b4995256198cf65f5189156e3",
+  "Bloom, FXAA 1x": "3c43e0b6f6534aff09a171dfc18813932d6f738d4dc86eb7e661c1c357f38069",
+  "Bloom, FXAA 4x": "3b8b3f28d05ffd70714b0cb134b53224a0dabcb691c795386a57f314f5ef5c35",
+  "FXAA 1x": "05fe20adc384f18177e66c48aa6b95717337c3ffd19cccb93d90944ed4c8c11c",
+  "FXAA 4x": "55eb0fb07ebfcd6c8824036303942739bd4e34bd16ca46c74f638625bf93384c"
+ }
+}

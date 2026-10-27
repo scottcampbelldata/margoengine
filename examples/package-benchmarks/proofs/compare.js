@@ -2,15 +2,21 @@
 // answers on a real workload, then time them in interleaved rounds. The candidate is pinned to the commit where the claim
 // was made (`refs`), so a proof reproduces its claim whatever the working tree does later; `--current` checks the working
 // tree instead (ongoing guarantees, `npm run proofs -- --current`). Pinned runs read the compared packages' src and
-// packages/shared from Git; @margoengine/core (frozen at 1.0.0), the proof script and its test fixtures are today's.
+// packages/shared at those commits from Git (history.js; a clone without the commit reports the proof HISTORICAL);
+// @margoengine/core (frozen at 1.0.0), the proof script and its test fixtures are today's. --current runs compare the
+// working tree with golden outputs (golden.js: what the baseline emitted, stored in baselines/ with its SHA-256), so
+// every clone runs them; a value goes through `golden(key, () => <the baseline's output>)`.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { build } from 'vite';
+import { isAncestor, revision, show as showAt } from './history.js';
+import { begin, canonicalNaN, fact, golden, readOnly, reading, tape } from './golden.js';
+
+export { canonicalNaN, golden, fact, readOnly, tape };
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/');
@@ -21,18 +27,7 @@ const bare = (id) => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.
 export async function bundle(name, entry, ref, minify = false) {
   // The package's src and packages/shared (inlined into every bundle) both come from the ref.
   const sources = [slash(resolve(root, 'packages', name, 'src')) + '/', slash(resolve(root, 'packages/shared')) + '/'];
-  const show = (file) => {
-    try {
-      return execFileSync('git', ['show', `${ref}:${file.slice(slash(root).length + 1)}`], {
-        cwd: root,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-        maxBuffer: 1 << 26,
-      });
-    } catch {
-      return;
-    }
-  };
+  const show = (file) => showAt(ref, file.slice(slash(root).length + 1));
   const plugins = ref
     ? [
         {
@@ -86,8 +81,8 @@ export async function load(name, entry, ref) {
 }
 
 const argv = process.argv.slice(2);
-export const commit = (value) =>
-  execFileSync('git', ['rev-parse', '--verify', `${value}^{commit}`], { cwd: root, encoding: 'utf8' }).trim();
+/** The full commit id of a baseline ref (HISTORICAL when this clone does not hold it, history.js). */
+export const commit = (value) => revision(value);
 /** `--current`: compare with the working tree instead of the pinned candidate (proofs of an ongoing guarantee). */
 export const current = argv.includes('--current');
 /** Refs for `node <proof> [ref] [pin] [--current]`. By default the baseline `ref` against `pin`, the commit where the claim
@@ -95,14 +90,34 @@ export const current = argv.includes('--current');
  * output, else `ref`) against the working tree (`pin` undefined). */
 export function refs(ref, pin, currentRef = ref) {
   const [a, b] = argv.filter((arg) => !arg.startsWith('--'));
-  return current ? { ref: a ?? currentRef, pin: undefined } : { ref: a ?? ref, pin: b ?? pin };
+  if (!current) return { ref: a ?? ref, pin: b ?? pin };
+  begin(a ?? currentRef);
+  return { ref: a ?? currentRef, pin: undefined };
 }
 
+/** `build()`, the baseline built at `ref`, except in a --current run reading golden outputs: then a stand-in that throws
+ * when used outside `golden()`. */
+export const atRef = async (name, ref, build) => (reading(ref) ? unbuilt(name, ref) : build());
+
+/** Stands in for a package built at a ref whose outputs come from golden.js: any use outside `golden()` is a bug. */
+const unbuilt = (name, ref) =>
+  new Proxy(
+    {},
+    {
+      get(_, key) {
+        if (key === 'then' || typeof key === 'symbol') return;
+        throw new Error(`${name} at ${ref} is not built in a --current run: read its output through golden()`);
+      },
+    },
+  );
+
 /** A repository file's text at `ref` (the fixtures a pinned claim was made with), or in the working tree without one. */
-export const fileAt = (path, ref) =>
-  ref
-    ? execFileSync('git', ['show', `${commit(ref)}:${path}`], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 })
-    : readFileSync(resolve(root, path), 'utf8');
+export function fileAt(path, ref) {
+  if (!ref) return readFileSync(resolve(root, path), 'utf8');
+  const text = showAt(ref, path);
+  assert.ok(text !== undefined, `${path} does not exist at ${ref}`);
+  return text;
+}
 
 /** Logs what a proof compares, one `[proof]` line on stderr (the runner's table reads them). */
 export const announce = (what, ref, pin) => console.error(`[proof] ${what}: ${ref} -> ${pin ?? 'working tree'}`);
@@ -119,7 +134,7 @@ export const entryAt = (name, entry, pin) =>
 export async function versions(name, ref, entry = 'src/index.ts', candidateRef) {
   announce(`${name} ${entry}`, ref, candidateRef);
   return {
-    baseline: await load(name, entry, commit(ref)),
+    baseline: await atRef(`${name} ${entry}`, ref, () => load(name, entry, commit(ref))),
     candidate: await load(name, entry, candidateRef && commit(candidateRef)),
   };
 }
@@ -180,14 +195,7 @@ export async function record(name, ref, cases, notes = '', pin) {
 }
 
 const agxRederived = new Map(),
-  descends = (ancestor, ref) => {
-    try {
-      execFileSync('git', ['merge-base', '--is-ancestor', ancestor, commit(ref)], { cwd: root, stdio: 'ignore' });
-      return true;
-    } catch {
-      return false;
-    }
-  };
+  descends = (ancestor, ref) => fact(`${ref} descends from ${ancestor}`, () => isAncestor(ancestor, ref));
 /** Recorded GPU calls with the `agx()` WGSL body blanked: eaddd64 re-derived AgX from primary sources (same constants to
  * 1.2e-8, full-precision Rec.709/Rec.2020 matrices), an intended change that proofs against older refs must not flag.
  * Only when the baseline `ref` predates eaddd64; against a later ref the calls are returned unchanged. */

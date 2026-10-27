@@ -1,0 +1,11 @@
+{
+ "proof": "gltf-pro-lighting-hooks",
+ "ref": "641246d3",
+ "revision": "641246d3590412843ccbfe055045fd7fd6d98da2",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {},
+ "outputs": {
+  "1x": "9c1c36113d2f99d3ff835b0770f22de567f8ca96a754ad8eda40cc7bad5b7af7",
+  "4x": "da21c905a108836d857aecc0385dae7fd2a057e2c406a55f3eff6d0f02067f15"
+ }
+}

@@ -11,7 +11,7 @@
 // Pinned: 38d448e against 282e751, the commit that made this claim. --current: 2cd81c1 against the working tree;
 // 56ee987 changed VAT to PBR Neutral; a126213/43aa191 changed shadow sampling and its pixel-scale uniform (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, current } from './compare.js';
+import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { box } from '../../../packages/core/dist/index.js';
@@ -140,7 +140,7 @@ const [animation, shadowsModule] = await Promise.all([
   versions('shadows', ref, undefined, pin),
 ]);
 const result = { baseline: ref };
-const vatBaseline = await vatStory(animation.baseline),
+const vatBaseline = await golden('vat', () => vatStory(animation.baseline)),
   vatCandidate = await vatStory(animation.candidate);
 assert.ok(
   vatBaseline.some((entry) => entry[0] === 'pass.drawIndexed'),
@@ -153,7 +153,7 @@ for (const [name, options, custom] of [
   ['distance40', { distance: 40 }, false],
   ['customSource', {}, true],
 ]) {
-  const expected = await shadowStory(shadowsModule.baseline, options, custom),
+  const expected = await golden(name, () => shadowStory(shadowsModule.baseline, options, custom)),
     actual = await shadowStory(shadowsModule.candidate, options, custom);
   assert.ok(
     expected.some((entry) => entry[0] === 'pass.drawIndexed'),
@@ -168,7 +168,7 @@ const lastSplit = (log) =>
     .map(
       (entry) => +new Float32Array(Uint8Array.from(Buffer.from(entry[1].split(':')[1], 'hex')).buffer)[3].toFixed(2),
     );
-const before = await shadowStory(shadowsModule.baseline, {}, false),
+const before = await golden('fitted', () => shadowStory(shadowsModule.baseline, {}, false)),
   after = await shadowStory(shadowsModule.candidate, {}, false);
 if (!current) assert.notDeepEqual(after, before, 'core meshes without distance: cascades are fitted');
 result.fitted = { lastSplitBefore: lastSplit(before), lastSplitAfter: lastSplit(after) };

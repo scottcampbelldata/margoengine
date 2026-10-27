@@ -1,0 +1,24 @@
+{
+ "proof": "post-stack",
+ "ref": "57250a49",
+ "revision": "57250a49e64ab686b6dd992751d092e19433fcb3",
+ "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "facts": {
+  "57250a49 descends from eaddd64": true,
+  "5b1fe66^ descends from eaddd64": false,
+  "creative PostProcessing 1x: 5b1fe66^ -> 3319317 identical calls": 1813,
+  "creative PostProcessing 4x: 5b1fe66^ -> 3319317 identical calls": 1840
+ },
+ "outputs": {
+  "post Bloom 1x": "2d7b5c87b83e7d0989139d04fc34fcfb2ce4772c288af0ef63fea2a047907bda",
+  "post Bloom 4x": "d7c0384d9bfdf021875128f1bc242d72acc69f9723a50ea38b6d7431a5429767",
+  "post SSAO 1x": "84c256e615938bd96fe02118b3bc5ced27fb5e7ad901d88fe3ec99926d6a1257",
+  "post SSAO 4x": "ac6119e085c300b25403f37d9adf9e5a994755515e9783bd3ea099178e6f5506",
+  "dof DOF 1x": "ed501b833904122a81c408e6c751a86d4bed7463c99d93cffda8a5cfc32e6ba5",
+  "dof DOF 4x": "30a23981e6f5f626509cd9ed354ac9f96424162023ad3a145b3c96580135b078",
+  "tonemap Tonemap 1x": "a45c3ed3c966b176a3b7163ac4ef0fee745ad309d8d02b709ce348bb0c6f57e6",
+  "tonemap Tonemap 4x": "2b794ee811575739125b925837c35949c545423caee902be2178ff423aeaaab6",
+  "DOF -> Tonemap 1x": "d957abf6a6dfcf1a54ebcfd66e86bb9e95301a4180b5146f7e12df9020dc2e49",
+  "DOF -> Tonemap 4x": "03c02c4511eecd6d56ebf7364e4c55c1700bdfaac1fe0f2c89c5c078e3e47399"
+ }
+}
