@@ -26,13 +26,13 @@ The core and the stage together are 21,910 bytes gzip, Wasm kernel and WebGPU ba
 Margo needs WebGPU (see [Browser support](#browser-support)) and Node.js 22.12+ (or 24+) for the tools.
 
 **The packages are not on npm yet.** `npm install margoengine` does not work today; 1.0.0 is the first planned release.
-Two routes work now. Both start from a clone, and you need [Git LFS](https://git-lfs.com) for the test assets:
+Two routes work now. Both start from a clone. The quickstart does not need the [Git LFS](https://git-lfs.com) test
+assets (about 270 MB), so skip them: if Git LFS is installed, set `GIT_LFS_SKIP_SMUDGE=1` for the clone (in PowerShell,
+`$env:GIT_LFS_SKIP_SMUDGE=1`). You need the assets only to run the tests, see [Build from source](#build-from-source).
 
 ```sh
-git clone https://github.com/scottcampbelldata/margoengine.git
+GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/scottcampbelldata/margoengine.git
 cd margoengine
-git lfs install
-git lfs pull
 npm ci
 ```
 
@@ -57,8 +57,9 @@ npm init -y
 npm install ../margoengine/test-results/*.tgz vite
 ```
 
-On the machine used to write this page, packing took about a minute after `npm ci` and the install took 8 seconds. Then
-follow the Quickstart steps 2 to 4 below in `my-scene`.
+On the machine used to write this page, `npm ci` took 15 seconds, packing 35 and the install 8; from the first command
+to a rendered, verified page took 76 seconds (`npm run check:quickstart` repeats the whole run and fails above 300).
+Then follow the Quickstart steps 2 to 4 below in `my-scene`.
 
 **After 1.0.0 is published,** `npm install margoengine vite` in a new folder replaces Route 2 and nothing else changes.
 
@@ -76,6 +77,7 @@ It takes four steps in a new folder (or skip them and use the page from the clon
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
     <title>Margo Engine quickstart</title>
     <style>
       body { margin: 0; font: 16px system-ui, sans-serif }
@@ -116,10 +118,16 @@ for (let y = 0; y < 64; y++)
 const checker = new Texture({ data: pixels, width: 64, height: 64 }, { wrapS: 'repeat', wrapT: 'repeat' });
 
 // The stage mounts a canvas in #scene, adds orbit/pan/zoom with the mouse and starts the render loop.
-const stage = await createStage('#scene', { camera: { position: [4, 3, 6], target: [0, 0.6, 0] } });
+const stage = await createStage('#scene', { camera: { position: [4, 3, 6], target: [0, 0.6, 0] } }).catch((error: Error) => {
+  status.textContent = `Margo could not start: ${error.message}. See "Browser support" in the README.`;
+  throw error;
+});
 const engine = stage.engine;
 
-// Three lit, textured meshes. The default sun comes from the upper right.
+// Aim the sun from the left and above, so the shadows fall to the right, where the camera can see them.
+engine.scene.lighting.direction.set([-4, 4, 2, 3]); // x, y, z point toward the light; the last number is its strength
+
+// Three lit, textured meshes.
 const floor = new PbrMaterial({ map: checker });
 floor.setUVTransform({ scale: [6, 6] }); // repeat the texture 6 times across the floor
 const ground = createMesh(engine, planeGeometry(12, 12), floor);
@@ -163,6 +171,13 @@ window.addEventListener('pagehide', () => stage.dispose(), { once: true });
 ```
 
 4. Run `npx vite` and open the address it prints. Drag to orbit, scroll to zoom, right-drag to pan, click the crate.
+
+If the page is blank or shows an error:
+
+- Vite says `Failed to resolve import "margoengine"`: step 1 did not run in this folder. Run the `npm install` line from
+  Route 2 again in the folder that holds `index.html` (and use `npx vite` there, not in the clone).
+- The status line says `This browser has no WebGPU` or `Margo could not start`: use desktop Chrome or Edge, or see
+  [Browser support](#browser-support).
 
 The scene is about 60 lines. Three things to know about it:
 
@@ -2826,6 +2841,21 @@ does not own. Each entry says exactly what is needed to close it.
   checkout that holds the commits; or retire the nine pinned runs as HISTORICAL with that reason, keeping their
   `--current` guarantees.
 
+### Chrome on Windows logs a console warning on every Margo page
+
+- **What:** on Chrome and Edge for Windows every page that starts the renderer logs `The powerPreference option is
+  currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127` (a console warning, found
+  2026-10-27 by `npm run check:quickstart`, which expects a quiet console). The scene is not affected.
+- **Repro:** open the README quickstart in Edge on Windows and read the console.
+- **Cause:** `GPURenderer.create` in `packages/core/src/renderer.ts` calls `requestAdapter({ powerPreference:
+  'high-performance' })` on every platform.
+- **Needed to close:** skip the option where the browser ignores it (`/Win/.test(navigator.platform)`). That costs 17 to
+  21 bytes gzip, and core is within 20 bytes of its 20 KiB gzip ceiling in `scripts/build-modern.js`, so the build
+  stops. Either 20 bytes are found elsewhere in core or the ceiling is raised on purpose. The fix and its test are
+  written (a platform table for the adapter request in `tests/core-timestamp-feature.test.js`). `@margoengine/compute`
+  has the same default (`packages/compute/src/context.ts`). Until then `check:quickstart` records this one message
+  as a known issue and fails on any other console output.
+
 ### 4x MSAA blending is not repeatable (RTX A6000 under CPU load, and Intel Arc 140V)
 
 - **What:** the voxel GPU check (`packages/voxel/tests/render-browser-check.mjs`, run by `check:merge`) fails now and
@@ -3038,6 +3068,15 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   shadows README) shows it up.
 - **Needed to close:** a pixel test of a lit, sun-facing plane and a skinned low-poly mesh with the default settings that
   fails while any lit pixel is shadowed, then the fix in `@margoengine/shadows`.
+- **Update 2026-10-27 (found while timing the quickstart):** the README quickstart's sun pointed away from the camera, so its
+  shadow was hidden behind the ball; the README now aims the sun so the shadow shows, and with it the whole umbra of the
+  ball and crate on the floor shows white speckle (about a third of the pixels lit inside a solid shadow, on a floor that
+  is not a caster either). `Shadows.attach(engine, { filter: 'pcf' })` gives a clean shadow in the same scene;
+  a larger `normalBias` (0.05) does not change the speckle. So the fault is in the `'soft'` (PCSS) path of
+  `packages/shadows/src/shader.ts`, not in cascade selection or receiver bias alone. First suspect: the receiver-plane
+  term `dot(offset, slope)` added to the compared depth in the 32-tap loop, which can pull a tap in front of the blocker
+  when the sun is low. This needs a stronger-model bug hunt; `npm run check:quickstart` shows it in
+  `test-results/quickstart-timing/shipped.png`.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
