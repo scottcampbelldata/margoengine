@@ -30,6 +30,18 @@
     "./rollback": {
       "types": "./dist/rollback.d.ts",
       "import": "./dist/rollback.js"
+    },
+    "./websocket": {
+      "types": "./dist/websocket.d.ts",
+      "import": "./dist/websocket.js"
+    },
+    "./webrtc": {
+      "types": "./dist/webrtc.d.ts",
+      "import": "./dist/webrtc.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
     }
   },
   "files": [

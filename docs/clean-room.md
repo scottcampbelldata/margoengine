@@ -633,6 +633,8 @@ engines (Colyseus, Photon, Mirror, GGPO, Rapier, Unity Netcode, Unreal and the l
 | Rollback (input delay, prediction as the last input, save, load and resimulate, frame-advantage time sync, checksums) | T. Cannon, "Fight the Lag! The Trick Behind GGPO's Low-Latency Netcode", Game Developer magazine, September 2012; M. Stallone, "8 Frames in 16ms: Rollback Networking in Mortal Kombat and Injustice 2", GDC 2018 |
 | Lag compensation (server-side rewind to the shooter's view) | Y. Bernier, GDC 2001 (above) |
 | Ray against circle and sphere | The quadratic of \|o + s d - c\|² = r² (elementary geometry) |
+| WebSocket server | RFC 6455, "The WebSocket Protocol" (handshake 4.2, framing 5.2, masking 5.3, fragmentation 5.4, control frames 5.5, close codes 7.4) |
+| WebRTC data channels | W3C "WebRTC: Real-Time Communication in Browsers" (RTCDataChannelInit: ordered, maxRetransmits, negotiated, id) |
 | Varints, zigzag | LEB128 as specified in DWARF 4 section 7.6; zigzag as described in the Protocol Buffers encoding documentation |
 | Schema hash | FNV-1a 32-bit as published by G. Fowler, L. C. Noll and K.-P. Vo |
 

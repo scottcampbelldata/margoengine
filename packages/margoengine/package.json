@@ -803,6 +803,18 @@
       "types": "./dist/netcode/rollback.d.ts",
       "import": "./dist/netcode/rollback.js"
     },
+    "./netcode/websocket": {
+      "types": "./dist/netcode/websocket.d.ts",
+      "import": "./dist/netcode/websocket.js"
+    },
+    "./netcode/webrtc": {
+      "types": "./dist/netcode/webrtc.d.ts",
+      "import": "./dist/netcode/webrtc.js"
+    },
+    "./netcode/node": {
+      "types": "./dist/netcode/node.d.ts",
+      "import": "./dist/netcode/node.js"
+    },
     "./oit": {
       "types": "./dist/oit.d.ts",
       "import": "./dist/oit.js"

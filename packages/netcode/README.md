@@ -172,6 +172,71 @@ const hit = lag.raycast(100.5, [1, -5], [0, 1]);
 console.log(hit?.id, hit?.distance); // 7 4.5
 ```
 
+## Transports and the Node server
+
+Each transport is its own entry, so an app loads only the one it uses.
+
+- `@margoengine/netcode/websocket`: `openWebSocket(url, { signal, protocols })` resolves with a `Connection` over
+  the standard WebSocket class (browsers, Deno, Bun, Node 22+). A WebSocket is one ordered reliable stream, so
+  'unreliable' messages go reliably too, except that they are dropped while more than 64 KiB is buffered
+  (`dropUnreliableAbove`): a stale snapshot queued behind others is worse than none.
+- `@margoengine/netcode/webrtc`: `createDataChannels(peer)` makes two pre-negotiated data channels on an
+  `RTCPeerConnection` (ordered reliable, and unordered with `maxRetransmits: 0`) and `dataChannelConnection(channels)`
+  wraps them as a `Connection`, so snapshots and inputs really are unreliable and never wait behind a lost packet.
+  Signalling (offer, answer, ICE candidates) is yours to carry, over any channel. Works for client-server and for
+  `RollbackSession` peers.
+- `@margoengine/netcode/node` (Node only): `listenWebSocket({ port, host, path, origins, maxPayload })` is a WebSocket
+  server written here from RFC 6455 on `node:http` and `node:crypto` (no dependency): binary messages only (text
+  closes with 1003), client frames must be masked (1002), messages over `maxPayload` (default 64 KiB) close with 1009,
+  fragmentation and ping are handled, unknown origins get 403, a client more than 8 MiB behind is closed as too slow.
+  `serve(game, options)` runs a `GameServer` on it in real time: the self-hosted server in one call.
+
+```ts
+// Server and client in one file for the example; in a game, put the schema and game in a module both import.
+import { defineGame, defineSchema } from '@margoengine/netcode';
+import { serve } from '@margoengine/netcode/node';
+import { openWebSocket } from '@margoengine/netcode/websocket';
+import { GameClient } from '@margoengine/netcode';
+
+const schema = defineSchema({
+  types: {
+    Input: { x: { type: 'quantized', min: -1, max: 1, bits: 8 } },
+    Player: { x: 'f32' },
+    State: { players: { type: 'map', of: 'Player', maxSize: 16 } },
+  },
+} as const);
+const game = defineGame({
+  schema,
+  state: 'State',
+  input: 'Input',
+  initial: () => ({ players: new Map() }),
+  join: (state, id) => void state.players.set(id, { x: 0 }),
+  leave: (state, id) => void state.players.delete(id),
+  step(state, inputs, _tick, dt) {
+    for (const [id, input] of inputs) {
+      const player = state.players.get(id);
+      if (player) player.x += input.x * 4 * dt;
+    }
+  },
+});
+
+const stop = new AbortController();
+const { port } = await serve(game, { port: 0, signal: stop.signal }); // pass host: '0.0.0.0' to accept other machines
+
+// A client (in a browser it is the same code with your server's wss:// URL).
+const client = await GameClient.join(game, await openWebSocket(`ws://127.0.0.1:${port}`), { input: () => ({ x: 1 }) });
+const frames = setInterval(() => client.update(), 1000 / 60);
+setTimeout(() => {
+  clearInterval(frames);
+  console.log('moved to', client.predicted.players.get(client.player)?.x);
+  client.close();
+  stop.abort();
+}, 1000);
+```
+
+Behind TLS: run it on a private port behind a reverse proxy (nginx, Caddy) that terminates `wss://` and forwards the
+upgrade; set `origins` to your site's origin so other pages cannot open sockets to it.
+
 ## Security
 
 - **The server trusts nothing but inputs.** Clients never send state; the server applies only decoded inputs, through
@@ -209,8 +274,10 @@ console.log(hit?.id, hit?.distance); // 7 4.5
   never more than 3 at once. All peers must use the same `inputDelay`; a mismatch shows up as a desync.
 - Rollback sessions are a full mesh (each peer sends to every other), sensible up to about 8 players; there is no
   spectator or relay mode yet. Lag compensation tests circles and spheres only (no capsules or boxes).
-- Coming in later landings of this package: WebSocket and WebRTC transports, a Node server runner, a room API, a
-  TypeScript (and later Rust) code generator for the schema and the demo.
+- The WebSocket server has no compression extension (snapshots are small and already delta coded) and no TLS of its
+  own (use a reverse proxy). The WebRTC transport is tested here with stand-in channels; signalling is not included.
+- Coming in later landings of this package: a room API, a TypeScript (and later Rust) code generator for the schema
+  and the demo.
 
 ## Wire format
 
