@@ -1,7 +1,9 @@
 import { firefox, webkit } from '@playwright/test';
 import { launchBrowser, resolveBrowser } from './lib/browser.mjs';
 import { createServer } from 'vite';
-import { mkdir } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { trackPipelines } from './support/gpu-ready.js';
@@ -28,6 +30,69 @@ export async function listenWhenFree(start, { port, waitMs = 20 * 60_000, poll =
       told = true;
       await new Promise((resolve) => setTimeout(resolve, poll));
     }
+  }
+}
+
+/** Folder holding each running dev server's own dependency cache (`startDevServer`), one `<pid>-<random>` folder each. */
+export const DEV_CACHE_ROOT = 'test-results/vite-cache';
+
+/**
+ * Starts the Vite dev server a browser suite loads `startPath` from, on `port` (waiting while another suite holds it,
+ * listenWhenFree), with a dependency optimizer cache of its own: a fresh folder under DEV_CACHE_ROOT that `close()`
+ * removes. Vite's default cache (node_modules/.vite) is shared by every server of a checkout, and by every worktree
+ * whose node_modules/.vite links to the main checkout's; a server with another root or other aliases re-optimizes into
+ * it and replaces the files a second server's page is importing, which then answers 504 "Outdated Optimize Dep" and
+ * the page never finishes loading (bug 26). Folders left by a killed run (their process is gone) are removed here.
+ */
+export async function startDevServer({
+  startPath = '/tests/modern.html',
+  aliases = {},
+  plugins = [],
+  port = 5193,
+} = {}) {
+  // The working directory's real path: Vite refuses to serve a file named by a Windows short (8.3) path, so a checkout
+  // reached through one (os.tmpdir() is C:\Users\\... here, where check:fresh-clone clones) would answer every
+  // page with 403 "outside of Vite serving allow list".
+  const root = realpathSync.native(process.cwd()),
+    caches = join(root, DEV_CACHE_ROOT);
+  await mkdir(caches, { recursive: true });
+  for (const name of await readdir(caches)) {
+    const pid = Number(name.split('-')[0]);
+    if (Number.isInteger(pid) && pid > 0 && !alive(pid)) await rm(join(caches, name), { recursive: true, force: true });
+  }
+  const cacheDir = await mkdtemp(join(caches, `${process.pid}-`));
+  let server;
+  const close = async () => {
+    await server?.close();
+    await rm(cacheDir, { recursive: true, force: true });
+  };
+  try {
+    server = await createServer({
+      root,
+      resolve: { alias: aliases },
+      plugins,
+      cacheDir,
+      optimizeDeps: { entries: [startPath.replace(/^\//, '')] },
+      // No file watcher: its first crawl of the repository (and every worktree under it) blocked this process for
+      // 30-140 s on a busy machine, so the first page load timed out ("Preparing the citadel...", gate 9).
+      server: { host: '127.0.0.1', port, strictPort: true, watch: null },
+      logLevel: 'error',
+    });
+    await listenWhenFree(() => server.listen(), { port });
+  } catch (error) {
+    await close();
+    throw error;
+  }
+  return { server, cacheDir, close };
+}
+
+/** True while process `pid` runs (signal 0 tests for it; EPERM means it runs as another user). */
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
   }
 }
 
@@ -265,16 +330,13 @@ export async function openBrowser({
   reassociate = process.env.MARGO_REASSOCIATE_MATH === '1' || process.argv.includes('--reassociate-math'),
 } = {}) {
   await mkdir('test-results', { recursive: true });
-  const server = await createServer({
-    resolve: { alias: aliases },
-    plugins,
-    optimizeDeps: { entries: [startPath.replace(/^\//, '')] },
-    // No file watcher: its first crawl of the repository (and every worktree under it) blocked this process for
-    // 30-140 s on a busy machine, so the first page load timed out ("Preparing the citadel...", gate 9).
-    server: { host: '127.0.0.1', port, strictPort: true, watch: null },
-    logLevel: 'error',
-  });
-  await listenWhenFree(() => server.listen(), { port });
+  const { server, close: stopServer } = await startDevServer({ startPath, aliases, plugins, port }),
+    serverErrors = [];
+  const closeServer = async () => {
+    await stopServer();
+    if (serverErrors.length)
+      console.error(`dev server errors the page received:\n  ${serverErrors.slice(0, 20).join('\n  ')}`);
+  };
   let browser;
   try {
     if (!['chromium', 'firefox', 'webkit'].includes(browserName)) throw new TypeError('Unsupported browser');
@@ -308,7 +370,14 @@ export async function openBrowser({
         }
       }),
     );
-    await page.goto(`http://127.0.0.1:${server.config.server.port}${startPath}`);
+    // A module the dev server fails to serve stops the page's imports with no page error, and the suite only sees a
+    // wait time out (bug 26): every 5xx the dev server answers is printed when the suite closes.
+    const origin = `http://127.0.0.1:${server.config.server.port}`;
+    page.on('response', (response) => {
+      if (response.status() >= 500 && response.url().startsWith(origin))
+        serverErrors.push(`${response.status()} ${response.statusText()} ${response.url()}`);
+    });
+    await page.goto(`${origin}${startPath}`);
     const probeHardware = () =>
       page.evaluate(async (powerPreference) => {
         const canvas = document.createElement('canvas'),
@@ -380,7 +449,7 @@ export async function openBrowser({
         // Compilation info arrives asynchronously: wait for every report (wgsl-guard keeps them) before reading them.
         await page.evaluate(() => Promise.all(globalThis.__margoWgslReports ?? [])).catch(() => {});
         await browser.close();
-        await server.close();
+        await closeServer();
         if (wgsl.modules.size)
           console.log(`WGSL: ${wgsl.modules.size} distinct shader modules compiled, ${wgsl.errors.length} errors`);
         if (wgsl.errors.length) throw new Error(`WGSL compile errors:\n${wgsl.errors.slice(0, 20).join('\n')}`);
@@ -390,7 +459,7 @@ export async function openBrowser({
     };
   } catch (error) {
     await browser?.close();
-    await server.close();
+    await closeServer();
     throw error;
   }
 }

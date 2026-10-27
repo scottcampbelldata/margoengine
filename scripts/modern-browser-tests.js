@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { preview } from 'vite';
 import { listenWhenFree, openBrowser } from './browser.js';
+import { serverUrl } from './support/server-url.mjs';
 import { decodePNG } from '../tests/support/png.js';
 const context = await openBrowser({ startPath: '/tests/modern.html' }),
   { page, hardware } = context,
@@ -284,31 +285,20 @@ try {
   assert.equal(await scenery.getAttribute('aria-pressed'), 'false');
   assert.ok(!requests.has(chunks.scenery), 'Unsupported backend fetched scenery');
   result.checks.push({ name: 'Vite scenery: WebGL2 fallback reports WebGPU requirement before fetching the pack' });
+  // Port 0 and the URL Next prints: on a fixed port another worktree's Next answers too (serverUrl).
   next = spawn(
     process.execPath,
-    [resolve('node_modules/next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', '5195'],
+    [resolve('node_modules/next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', '0'],
     { cwd: resolve('examples/next'), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
   );
-  let nextLog = '';
-  next.stdout.on('data', (data) => {
-    nextLog += data;
+  const { url: nextUrl, output: nextLog } = await serverUrl(next, {
+    name: 'next start',
+    pattern: /- Local:\s+(http:\/\/\S+)[\s\S]*\bReady\b/,
   });
-  next.stderr.on('data', (data) => {
-    nextLog += data;
-  });
-  const deadline = Date.now() + 30_000;
-  let ready = false;
-  while (Date.now() < deadline) {
-    try {
-      ready = (await fetch('http://127.0.0.1:5195')).ok;
-      if (ready) break;
-    } catch {}
-    if (next.exitCode !== null) throw new Error(`Next exited: ${nextLog}`);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  assert.ok(ready, `Next server failed to start: ${nextLog}`);
+  const nextHome = await fetch(nextUrl);
+  assert.ok(nextHome.ok, `Next answered ${nextHome.status} at ${nextUrl}: ${nextLog()}`);
   await page.setViewportSize({ width: 1100, height: 800 });
-  await page.goto('http://127.0.0.1:5195');
+  await page.goto(nextUrl);
   await page.getByRole('heading', { name: 'Margo Engine / Next.js' }).waitFor();
   await page.waitForFunction(() => document.querySelector('canvas')?.width > 1);
   // The cube shows once the first frame's pipelines are compiled: 180-280 ms after the canvas is sized on the RTX A6000,
