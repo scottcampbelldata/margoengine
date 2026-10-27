@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3586985,
+  "total": 3595394,
   "history": [
     {
       "date": "2026-10-24",
@@ -632,6 +632,12 @@
       "commit": "1d09914a",
       "reason": "new optional package @margoengine/mixer: buses, effects chain, emitters and offline rendering (item 28.5, second batch)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "f81a7870",
+      "reason": "points: LAZ decoder (/laz) and chunk-at-a-time LAZ decoding into the LAS point arrays (queue item 31 leftover)",
+      "grew": 2
     }
   ],
   "items": {
@@ -843,7 +849,8 @@
     "@margoengine/physics": 16247,
     "@margoengine/points": 21547,
     "@margoengine/points/e57": 6545,
-    "@margoengine/points/las": 4806,
+    "@margoengine/points/las": 5116,
+    "@margoengine/points/laz": 8099,
     "@margoengine/points/octree": 8031,
     "@margoengine/post": 40343,
     "@margoengine/post/afterimage": 5661,

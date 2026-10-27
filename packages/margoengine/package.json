@@ -847,6 +847,10 @@
       "types": "./dist/points/las.d.ts",
       "import": "./dist/points/las.js"
     },
+    "./points/laz": {
+      "types": "./dist/points/laz.d.ts",
+      "import": "./dist/points/laz.js"
+    },
     "./points/e57": {
       "types": "./dist/points/e57.d.ts",
       "import": "./dist/points/e57.js"

@@ -2,7 +2,7 @@
 // extra bytes (the LASF_Spec record 4 descriptors) and the coordinate reference system records (OGC WKT 2112 and the
 // GeoTIFF keys 34735 to 34737). Written from the ASPRS LAS specifications 1.2 (2008), 1.3 R11 (2010) and 1.4 R15
 // (2019). Every offset is checked against the bytes: truncated or corrupt files throw a TypeError or RangeError that
-// names the problem, and never read out of bounds. LAZ (compressed) files need a decoder: see `LazDecoder`.
+// names the problem, and never read out of bounds. LAZ (compressed) files need a decoder: see `LazDecoder` and `margoengine/points/laz`.
 import { MargoError } from '@margoengine/math/errors';
 
 /** One variable length record (VLR) or extended VLR (EVLR). */
@@ -100,13 +100,17 @@ export interface LASPoints {
   readonly extra: Readonly<Record<string, Float64Array>>;
 }
 
-/** Decompresses LAZ point data into uncompressed LAS records (the decoder is not part of this package yet). */
+/**
+ * Decompresses LAZ point data into uncompressed LAS records: all at once (a `Uint8Array`), or one chunk at a time (an
+ * async iterable of record blocks, decoded into the point arrays as they arrive, so the whole uncompressed file is
+ * never held). `createLazDecoder()` from `margoengine/points/laz` is one.
+ */
 export type LazDecoder = (
   file: Uint8Array,
   header: LASHeader,
   records: readonly LASRecord[],
   signal?: AbortSignal,
-) => Uint8Array | Promise<Uint8Array>;
+) => Uint8Array | Promise<Uint8Array> | AsyncIterable<Uint8Array>;
 
 /** Options of `parseLAS`. */
 export interface LASOptions {
@@ -116,7 +120,7 @@ export interface LASOptions {
   maxPoints?: number;
   /** Keep every n-th point (a quick preview). Default 1. */
   stride?: number;
-  /** Decompressor for LAZ files. Without it a LAZ file throws a MargoError with code `unsupported`. */
+  /** Decompressor for LAZ files (`createLazDecoder()` from `margoengine/points/laz`). Without it a LAZ file throws a MargoError with code `unsupported`. */
   laz?: LazDecoder;
   /** Accept a file whose point data is cut short (decode what is there). Default false: throw a RangeError. */
   partial?: boolean;
@@ -331,17 +335,35 @@ export async function parseLAS(input: ArrayBuffer | Uint8Array, options: LASOpti
   options.signal?.throwIfAborted();
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
   const { header, records } = readLASHeader(bytes);
-  let data: Uint8Array;
-  if (header.compressed) {
-    if (!options.laz)
-      throw new MargoError(
-        'unsupported',
-        'LAZ (compressed LAS) needs a decoder; pass options.laz, or decompress the file to LAS first',
-      );
-    data = await options.laz(bytes, header, records, options.signal);
+  if (!header.compressed) return decodePoints(header, records, bytes.subarray(header.pointDataOffset), options);
+  if (!options.laz)
+    throw new MargoError(
+      'unsupported',
+      'LAZ (compressed LAS) needs a decoder; pass options.laz (createLazDecoder from margoengine/points/laz)',
+    );
+  const decoded = await options.laz(bytes, header, records, options.signal);
+  options.signal?.throwIfAborted();
+  if (decoded instanceof Uint8Array) return decodePoints(header, records, decoded, options);
+  // One block of records at a time: only the points kept (stride, maxPoints) are decoded into the arrays.
+  const sink = pointSink(header, records, options),
+    length = header.pointRecordLength,
+    stride = sink.stride;
+  let first = 0,
+    written = 0;
+  for await (const block of decoded) {
     options.signal?.throwIfAborted();
-  } else data = bytes.subarray(header.pointDataOffset);
-  return decodePoints(header, records, data, options);
+    const view = new DataView(block.buffer, block.byteOffset, block.byteLength),
+      n = Math.floor(block.byteLength / length);
+    for (let j = (stride - (first % stride)) % stride; j < n && written < sink.count; j += stride)
+      sink.put(view, j * length, written++);
+    first += n;
+    if (written >= sink.count) break;
+  }
+  if (written < sink.count && !options.partial)
+    throw new RangeError(
+      `LAZ decoder returned ${first} of ${header.pointCount} records; the file is truncated (pass partial: true to read what is there)`,
+    );
+  return sink.finish(written);
 }
 
 /** Decodes uncompressed point records (what a LAZ decoder returns, or the file after the point data offset). */
@@ -352,18 +374,25 @@ export function decodePoints(
   options: LASOptions = {},
 ): LASPoints {
   const length = header.pointRecordLength,
-    format = header.pointFormat,
-    stride = options.stride ?? 1,
-    max = options.maxPoints ?? Infinity;
-  if (!Number.isInteger(stride) || stride < 1) throw new RangeError('Invalid stride; pass a whole number of 1 or more');
-  if (!(max >= 0)) throw new RangeError('Invalid maxPoints; pass a number of 0 or more');
-  const available = Math.floor(data.byteLength / length);
+    available = Math.floor(data.byteLength / length);
+  const sink = pointSink(header, records, options, Math.min(header.pointCount, available));
   if (available < header.pointCount && !options.partial)
     throw new RangeError(
       `LAS point data holds ${available} of ${header.pointCount} records; the file is truncated (pass partial: true to read what is there)`,
     );
-  const total = Math.min(header.pointCount, available),
-    count = Math.min(Math.ceil(total / stride), max);
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  for (let i = 0; i < sink.count; i++) sink.put(view, i * sink.stride * length, i);
+  return sink.finish(sink.count);
+}
+
+/** The point arrays of the points kept (stride, maxPoints) out of `total`, filled one record at a time. */
+function pointSink(header: LASHeader, records: readonly LASRecord[], options: LASOptions, total = header.pointCount) {
+  const format = header.pointFormat,
+    stride = options.stride ?? 1,
+    max = options.maxPoints ?? Infinity;
+  if (!Number.isInteger(stride) || stride < 1) throw new RangeError('Invalid stride; pass a whole number of 1 or more');
+  if (!(max >= 0)) throw new RangeError('Invalid maxPoints; pass a number of 0 or more');
+  const count = Math.min(Math.ceil(total / stride), max);
   const extraBytes = lasExtraBytes(records, header),
     crs = lasCrs(records),
     origin = options.origin ?? ([0, 1, 2].map((i) => (header.min[i] + header.max[i]) / 2) as [number, number, number]);
@@ -371,7 +400,7 @@ export function decodePoints(
     hasGps = GPS_OFFSET[format] >= 0,
     hasRgb = RGB_OFFSET[format] >= 0,
     hasNir = format === 8 || format === 10;
-  const positions = new Float32Array(count * 3),
+  let positions = new Float32Array(count * 3),
     intensity = new Uint16Array(count),
     returnNumber = new Uint8Array(count),
     numberOfReturns = new Uint8Array(count),
@@ -385,15 +414,13 @@ export function decodePoints(
     scannerChannel = extended ? new Uint8Array(count) : undefined,
     gpsTime = hasGps ? new Float64Array(count) : undefined,
     rgb = hasRgb ? new Uint16Array(count * 3) : undefined,
-    nir = hasNir ? new Uint16Array(count) : undefined,
-    extra: Record<string, Float64Array> = {};
+    nir = hasNir ? new Uint16Array(count) : undefined;
+  const extra: Record<string, Float64Array> = {};
   for (const e of extraBytes) if (e.dataType) extra[e.name] = new Float64Array(count);
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength),
-    [sx, sy, sz] = header.scale,
+  const [sx, sy, sz] = header.scale,
     [ox, oy, oz] = header.offset,
     base = LAS_RECORD_SIZES[format];
-  for (let i = 0; i < count; i++) {
-    const at = i * stride * length;
+  const put = (view: DataView, at: number, i: number) => {
     positions[i * 3] = view.getInt32(at, true) * sx + ox - origin[0];
     positions[i * 3 + 1] = view.getInt32(at + 4, true) * sy + oy - origin[1];
     positions[i * 3 + 2] = view.getInt32(at + 8, true) * sz + oz - origin[2];
@@ -468,31 +495,55 @@ export function decodePoints(
       }
       extra[e.name][i] = v === e.noData ? Number.NaN : v * e.scale + e.addOffset;
     }
-  }
-  return {
-    header,
-    records,
-    crs,
-    extraBytes,
-    count,
-    origin,
-    positions,
-    intensity,
-    returnNumber,
-    numberOfReturns,
-    classification,
-    classificationFlags,
-    scanDirection,
-    edgeOfFlightLine,
-    scanAngle,
-    userData,
-    pointSourceId,
-    scannerChannel,
-    gpsTime,
-    rgb,
-    nir,
-    extra,
   };
+  /** The points, cut to the `n` written (fewer than `count` when a LAZ stream ended early). */
+  const finish = (n: number): LASPoints => {
+    if (n < count) {
+      const cut = <T extends Float32Array | Float64Array | Uint8Array | Uint16Array>(a: T, k = 1) =>
+        a.subarray(0, n * k) as T;
+      positions = cut(positions, 3);
+      intensity = cut(intensity);
+      returnNumber = cut(returnNumber);
+      numberOfReturns = cut(numberOfReturns);
+      classification = cut(classification);
+      classificationFlags = cut(classificationFlags);
+      scanDirection = cut(scanDirection);
+      edgeOfFlightLine = cut(edgeOfFlightLine);
+      scanAngle = cut(scanAngle);
+      userData = cut(userData);
+      pointSourceId = cut(pointSourceId);
+      scannerChannel = scannerChannel && cut(scannerChannel);
+      gpsTime = gpsTime && cut(gpsTime);
+      rgb = rgb && cut(rgb, 3);
+      nir = nir && cut(nir);
+      for (const name of Object.keys(extra)) extra[name] = cut(extra[name]);
+    }
+    return {
+      header,
+      records,
+      crs,
+      extraBytes,
+      count: n,
+      origin,
+      positions,
+      intensity,
+      returnNumber,
+      numberOfReturns,
+      classification,
+      classificationFlags,
+      scanDirection,
+      edgeOfFlightLine,
+      scanAngle,
+      userData,
+      pointSourceId,
+      scannerChannel,
+      gpsTime,
+      rgb,
+      nir,
+      extra,
+    };
+  };
+  return { count, stride, put, finish };
 }
 
 /** Fetches and parses a LAS file. Aborts with `options.signal`. */

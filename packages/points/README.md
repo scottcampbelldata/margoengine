@@ -169,8 +169,41 @@ console.log(las.crs?.epsg, las.header.pointFormat, Object.keys(las.extra));
 
 LAZ files (compressed LAS) are recognised by the header's compression bit and need `options.laz`, a function that
 returns the uncompressed point records (`LazDecoder`); without one they throw a `MargoError` with code `unsupported`.
-A decoder written clean room from the LASzip specification is not part of the package yet. `writeLAS` writes
-uncompressed LAS (any format, extra bytes, WKT or EPSG) for tools and tests.
+`margoengine/points/laz` has one (below). `writeLAS` writes uncompressed LAS (any format, extra bytes, WKT or EPSG)
+for tools and tests.
+
+## LAZ decoder (`margoengine/points/laz`)
+
+`createLazDecoder()` reads LASzip compressed files through `parseLAS` and `loadLAS`. It decodes one chunk at a time
+straight into the point arrays, so the uncompressed file is never held in memory, and `signal` stops it between
+chunks. `lazChunks(bytes, header, records, {signal})` is the same decoder as an async iterator of uncompressed record
+blocks, one per chunk, for streaming tools; `lazInfo(records)` reads the LASzip record (compressor, chunk size, items).
+
+```ts
+import { loadLAS } from 'margoengine/points/las';
+import { createLazDecoder } from 'margoengine/points/laz';
+
+const controller = new AbortController();
+const scan = await loadLAS('/scans/site.laz', { laz: createLazDecoder(), stride: 4, signal: controller.signal });
+console.log(scan.count, scan.header.pointFormat, scan.gpsTime?.[0], scan.rgb?.length);
+```
+
+| Point formats | LASzip items read |
+| --- | --- |
+| 0 to 3 | POINT10, GPSTIME11, RGB12 and extra bytes (BYTE), version 2, pointwise chunks |
+| 6 to 8 | POINT14, RGB14, RGBNIR14 and extra bytes (BYTE14), version 3, layered chunks with per-scanner-channel contexts |
+
+Fixed and variable chunk sizes are read, and a chunk table whose offset was written at the end of the file. Anything
+else throws a `MargoError` with code `unsupported` that names it: waveform packets (formats 4, 5, 9 and 10), the
+unchunked compressor of LASzip 1.x, item versions other than 2 (formats 0 to 5) and 3 (formats 6 to 10), and coders
+other than arithmetic. Corrupt data throws a `RangeError` or `TypeError` that names the chunk; every read stays inside
+its chunk. The chunk table sits after the points, so a cut-short LAZ file cannot be read, even with `partial`.
+
+Verification: the decoder was written clean room from the LASzip paper and the public LAZ format description, and was
+tested against an encoder written from the same reading (in `tests/`), with byte-exact round trips of random and
+survey-like points in every supported format, fuzzing and mutation checks. It has NOT been checked against files made
+by the reference LASzip, because no real LAZ file was available. Until it is, treat byte compatibility with LASzip
+files as unverified.
 
 ## E57 scans (`margoengine/points/e57`)
 
@@ -262,6 +295,11 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 ## Tests
 
 `npm test` in `packages/points` runs Node checks: chunking (coverage, block sizes, bounds, determinism, non-finite points) on random data and the real PCL `bunny.pcd` scan, even subsampling of shuffled prefixes, bounds growth, frustum culling against core `Camera.planes` with a randomized no-false-negative check, screen area, budget water-filling invariants, projection and picking against brute force, orthographic screen area and picking, color packing, ranges, atlas cells, `PointCloud` and `SpriteBatch` bookkeeping, materials, SSR safety and the WebGL2 warning.
+
+The LAZ tests (`tests/laz.test.js`) compress random, survey-like and mixed points of formats 0 to 3 and 6 to 8 with
+the test-only encoder (`tests/laz-encoder.js`) in fixed and variable chunks, check that decoding returns every record
+byte for byte and that `parseLAS` with the decoder matches the uncompressed file, and fuzz truncated and corrupt
+files (only coded errors, no hang).
 
 `npm run test:browser` (a real-GPU script, not in CI) renders with a real engine in Chromium (or Edge via `BROWSER_CHANNEL`): exact square coverage at 2 to 16 px, round coverage within 4% of the disc area with empty corners, per-point byte and float colors, depth against a core mesh and between points, attachment to a mesh, size attenuation, a 2,000,000 point cloud culled and drawn within a 500,000 point budget, subrange updates that issue exactly one `writeBuffer` per changed range, sprites that stay square after an orbit with the right atlas cell, rotation, pivot and pixel size, 5000 sprites in one draw call, textured points with alpha test, sphere shading, eye-dome lighting, CPU picking, an orthographic camera (world sizes equal at two depths, sphere impostor depth against a box, EDL at a depth step, nearer-point picking), zero WebGPU validation errors, device restore and dispose. It saves `test-results/points-gallery.png` and `test-results/points-browser.json`.
 
