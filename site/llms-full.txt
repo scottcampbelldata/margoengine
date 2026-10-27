@@ -12,41 +12,183 @@ A small WebGPU engine for the web, with a Rust/Wasm core and CAD tools built on 
 [![npm](https://img.shields.io/npm/v/margoengine.svg)](https://www.npmjs.com/package/margoengine)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-![Tokyo corner diorama rendered by Margo Engine](site/images/tokyo-diorama.jpg)
+![A textured crate and a ball with shadows on a checkered floor, rendered by Margo Engine](docs/images/quickstart.webp)
+
+**[Quickstart: a textured, lit scene with shadows and picking in five minutes](#quickstart)** ·
+[Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
+[Coming from three.js](docs/from-threejs.md)
+
+The core and the stage together are 22,781 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+(glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
+
+## Install
+
+Margo needs WebGPU (see [Browser support](#browser-support)) and Node.js 22.12+ (or 24+) for the tools.
+
+**The packages are not on npm yet.** `npm install margoengine` does not work today; 1.0.0 is the first planned release.
+Two routes work now. Both start from a clone, and you need [Git LFS](https://git-lfs.com) for the test assets:
+
+```sh
+git clone https://github.com/scottcampbelldata/margoengine.git
+cd margoengine
+git lfs install
+git lfs pull
+npm ci
+```
+
+**Route 1: run the quickstart inside the clone.** Nothing to install in a project of your own.
+
+```sh
+npm run build:packages
+npm run dev:examples
+```
+
+Open <http://127.0.0.1:5173/examples/quickstart/>. That page is the quickstart below, saved as
+[examples/quickstart/](examples/quickstart).
+
+**Route 2: use the packages in your own project from local tarballs.** `npm run pack:packages` builds every package and
+writes one `.tgz` file each to `test-results/`. Install them all, plus Vite, in a new folder (shown for a shell that
+expands `*.tgz`, such as Git Bash, macOS or Linux; in PowerShell list the files or use `Get-ChildItem`):
+
+```sh
+npm run pack:packages
+mkdir ../my-scene && cd ../my-scene
+npm init -y
+npm install ../margoengine/test-results/*.tgz vite
+```
+
+On the machine used to write this page, packing took about a minute after `npm ci` and the install took 8 seconds. Then
+follow the Quickstart steps 2 to 4 below in `my-scene`.
+
+**After 1.0.0 is published,** `npm install margoengine vite` in a new folder replaces Route 2 and nothing else changes.
+
+## Quickstart
+
+You will build a floor, a crate and a ball with a texture, sun light, soft shadows, orbit controls and click-to-select.
+It takes four steps in a new folder (or skip them and use the page from the clone above).
+
+1. Install the packages as in Route 2 above (or use Route 1 and skip to step 4).
+2. Save this as `index.html`:
+
+```html index.html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Margo Engine quickstart</title>
+    <style>
+      body { margin: 0; font: 16px system-ui, sans-serif }
+      #scene { height: 100vh }
+      #status { position: fixed; top: 8px; left: 12px; margin: 0; padding: 4px 8px; background: #fffa; border-radius: 4px }
+    </style>
+  </head>
+  <body>
+    <div id="scene"></div>
+    <p id="status">Drag to orbit, scroll to zoom.</p>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
+```
+
+3. Save this as `main.ts`:
+
+```ts main.ts
+import { createStage } from 'margoengine';
+import { boxGeometry, planeGeometry, sphereGeometry } from 'margoengine/geometry';
+import { PbrMaterial, Texture, createMesh } from 'margoengine/materials';
+import { Picking, Selection } from 'margoengine/selection';
+import { Shadows } from 'margoengine/shadows';
+
+const status = document.querySelector('#status')!;
+if (!('gpu' in navigator)) {
+  status.textContent = 'This browser has no WebGPU, which this scene needs. See "Browser support" in the README.';
+  throw new Error('WebGPU unavailable');
+}
+
+// A 64 x 64 checkerboard painted in code, so the example needs no image file.
+const pixels = new Uint8Array(64 * 64 * 4);
+for (let y = 0; y < 64; y++)
+  for (let x = 0; x < 64; x++) {
+    const light = ((x >> 3) + (y >> 3)) % 2 === 0;
+    pixels.set(light ? [235, 235, 225, 255] : [70, 90, 110, 255], (y * 64 + x) * 4);
+  }
+const checker = new Texture({ data: pixels, width: 64, height: 64 }, { wrapS: 'repeat', wrapT: 'repeat' });
+
+// The stage mounts a canvas in #scene, adds orbit/pan/zoom with the mouse and starts the render loop.
+const stage = await createStage('#scene', { camera: { position: [4, 3, 6], target: [0, 0.6, 0] } });
+const engine = stage.engine;
+
+// Three lit, textured meshes. The default sun comes from the upper right.
+const floor = new PbrMaterial({ map: checker });
+floor.setUVTransform({ scale: [6, 6] }); // repeat the texture 6 times across the floor
+const ground = createMesh(engine, planeGeometry(12, 12), floor);
+ground.root.setRotation([-Math.PI / 2, 0, 0]); // planes face +z; lay it flat
+const crate = createMesh(engine, boxGeometry(1, 1, 1), new PbrMaterial({ map: checker, roughness: 0.6 }));
+crate.root.setPosition([-1, 0.5, 0]);
+const ball = createMesh(engine, sphereGeometry(0.6, 48, 24), new PbrMaterial({ color: '#84d6bd', roughness: 0.25 }));
+ball.root.setPosition([1, 0.6, 0]);
+
+// Shadows: tell the shadow package which meshes cast and receive.
+const shadows = Shadows.attach(engine, { resolution: 2048 });
+for (const mesh of [ground, crate, ball]) shadows.add(mesh);
+
+// Click a mesh to outline it; click empty space to clear.
+const picking = Picking.attach(engine);
+const outline = Selection.attach(engine, { color: [1, 0.6, 0] });
+const names = new Map<unknown, string>([
+  [crate, 'crate'],
+  [ball, 'ball'],
+]);
+let pressed = [0, 0];
+let busy = false; // one pick can wait at a time
+engine.canvas.addEventListener('pointerdown', (event) => {
+  pressed = [event.clientX, event.clientY];
+});
+engine.canvas.addEventListener('click', async (event) => {
+  const moved = Math.hypot(event.clientX - pressed[0], event.clientY - pressed[1]);
+  if (busy || moved > 4) return; // ignore the end of an orbit drag
+  busy = true;
+  const hit = await picking.pick(event.offsetX, event.offsetY);
+  busy = false;
+  const name = hit?.model ? names.get(hit.model) : undefined;
+  outline.set(name && hit ? [hit.mesh] : []);
+  status.textContent = name ? `Picked the ${name}.` : 'Click the crate or the ball.';
+});
+
+stage.onTick((delta) => {
+  crate.root.rotation.y += delta * 0.5;
+});
+window.addEventListener('pagehide', () => stage.dispose(), { once: true });
+```
+
+4. Run `npx vite` and open the address it prints. Drag to orbit, scroll to zoom, right-drag to pan, click the crate.
+
+The scene is about 60 lines. Three things to know about it:
+
+- `createStage` mounts the canvas in `#scene`, adds mouse and touch camera controls and starts the render loop.
+- `createMesh` (from `margoengine/materials`) draws a geometry with a `PbrMaterial`. That is how a mesh gets a
+  texture. `stage.box()` and `stage.sphere()` make plain-colour meshes with no texture.
+- Shadows, picking and outlines are separate packages. You import them when you want them and pay nothing when you do not.
+
+**WebGPU and the fallback.** This scene needs WebGPU. Chrome and Edge on desktop are the browsers the engine is tested
+in. Without WebGPU the page shows a message and stops. The optional [`@margoengine/webgl`](packages/webgl/README.md)
+renders plain meshes with flat shading on WebGL2, with no textures, shadows, effects or picking, so it cannot run this
+quickstart. Details are under [Browser support](#browser-support).
+
+Next: [Start here](docs/start-here.md) lists a guide for each goal: [textures and materials](docs/guides/textures-and-materials.md),
+[lights and shadows](docs/guides/lights-and-shadows.md), [camera and controls](docs/guides/camera-and-controls.md),
+[interaction](docs/guides/interaction.md), [loading glTF](docs/guides/loading-gltf.md) and
+[animation](docs/guides/animation.md).
+
+## Demos
 
 | | | |
 | --- | --- | --- |
 | ![Night Citadel](site/images/night-citadel.jpg) | ![Flight Helmet](site/images/flight-helmet.jpg) | ![Gameplay sandbox](site/images/gameplay-sandbox.jpg) |
 | [Night Citadel](apps/showcase-night-citadel/README.md) | [glTF PBR](examples/flight-helmet.html) | [Gameplay sandbox](examples/gameplay-sandbox/README.md) |
 
-Live demos: [margoengine.com](https://margoengine.com)
-
-The core and the stage together are 22,781 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
-(glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
-
-## Quick start
-
-```sh
-npm install margoengine
-```
-
-```html
-<div id="scene" style="height: 400px"></div>
-<script type="module">
-  import { createStage } from 'margoengine';
-
-  const stage = await createStage('#scene');
-  const orb = stage.sphere({ color: '#84d6bd', roughness: 0.25 });
-  stage.onTick((delta) => { orb.rotation.y += delta; });
-  window.addEventListener('pagehide', () => stage.dispose(), { once: true });
-</script>
-```
-
-`createStage` mounts a canvas, adds orbit controls and starts rendering. Load a model with
-`await stage.load('/part.glb')` (glTF, GLB, STL, OBJ, STEP and IGES).
-
-The packages are not on npm yet. Until the first release, build from source as below and install the tarballs from
-`npm run pack:packages`.
+![Tokyo corner diorama rendered by Margo Engine](site/images/tokyo-diorama.jpg)
 
 ## Build from source
 
@@ -2452,7 +2594,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
 | One directional light in core | Enforced by design: core's lighting is one direction and one radiance, plus a colourless scalar ambient. | Every light model beyond one sun is an optional package, so apps that need one sun pay for one sun. | No API for a second sun in core; core's own ambient does not light metals. | `@margoengine/clustered`: up to 1,024 point and spot lights (`RangeError: Expected at most 1,024 lights` past that). `@margoengine/clustered/shadows`: shadows for up to 16 of them ([local-shadows-gpu.json](../examples/package-benchmarks/results/local-shadows-gpu.json)). `@margoengine/clustered/area` (8,946 B gzip): up to 64 rectangle area lights (`RangeError: Expected at most 64 area lights`), unshadowed, no texture bindings ([area-lights-gpu.json](../examples/package-benchmarks/results/area-lights-gpu.json)). More directional lights: `@margoengine/clustered/directional` (1,563 B gzip), up to 16 (`RangeError: Expected an array of at most 16 directional lights`), unshadowed. IES profiles: `@margoengine/clustered/ies` (3,697 B gzip), at most 16 distinct profiles, type C files only. Projector spots: `@margoengine/clustered/projector` (2,618 B gzip), at most 16 images of up to 4,096 texels a side. Physical units: `@margoengine/clustered/units` (833 B gzip). All three light entries use storage buffers, no texture bindings ([light-features-gpu.json](../examples/package-benchmarks/results/light-features-gpu.json)). Configurable ambient: `@margoengine/environment` `HemisphereLight` and `AmbientLight`, one per engine. Image-based lighting: `@margoengine/environment`. |
-| 16 sampled textures and 16 samplers per shader stage | Enforced by WebGPU's guaranteed minimum; Margo's device asks for no more. gltf-pro's physical material with directional shadows, IBL and local shadows uses exactly 16 (table in the [gltf-pro README](../packages/gltf-pro/README.md#texture-bindings); asserted in [instancing.test.js](../packages/gltf-pro/tests/instancing.test.js)). | Every adapter, phones included, supports 16. Requiring more would make the same app fail on some devices. | A `RangeError` naming the combination, e.g. `gltf-pro: physical material + shadows + environment:lighting + clustered + clustered:shadows + shader patch needs 17 sampled textures per shader stage; this device allows 16`. | Drop one lighting feature for that material, or use the standard material (8 of 16 with everything attached). `VolumetricFog`, SSAO, clustered lights, area lights and light probes (`@margoengine/environment/probes`: one storage buffer; with an environment fallback they take EnvironmentLighting's place and its bindings) add no textures. Texture arrays are planned after 1.0. |
+| 16 sampled textures and 16 samplers per shader stage | Enforced by WebGPU's guaranteed minimum; Margo's device asks for no more. gltf-pro's physical material with directional shadows, IBL and local shadows uses exactly 16 (asserted in [instancing.test.js](../packages/gltf-pro/tests/instancing.test.js)). | Every adapter, phones included, supports 16. Requiring more would make the same app fail on some devices. | A `RangeError` naming the combination, e.g. `gltf-pro: physical material + shadows + environment:lighting + clustered + clustered:shadows + shader patch needs 17 sampled textures per shader stage; this device allows 16`. | Drop one lighting feature for that material, or use the standard material (8 of 16 with everything attached). `VolumetricFog`, SSAO, clustered lights, area lights and light probes (`@margoengine/environment/probes`: one storage buffer; with an environment fallback they take EnvironmentLighting's place and its bindings) add no textures. Texture arrays are planned after 1.0. |
 | float32 coordinates | Measured on the GPU ([large-coordinates-gpu.json](../examples/package-benchmarks/results/large-coordinates-gpu.json), 10 mm part, camera 50 mm away): core alone jitters 0.38 px at 1 km and 42 px at 100 km; at 6,000 km the part is not drawn. Per-stage CPU breakdown in [large-coordinates.md](large-coordinates.md). | Core and its kernel store positions and matrices in float32: half the memory and bandwidth of float64, and the format GPUs consume. | No error. Parts shake while the camera moves, small features collapse, specular shifts (2.8° at 100 km), and far enough out geometry disappears. | `FloatingOrigin` in `@margoengine/cameras/origin` (1,258 B gzip, 0 core bytes): 0.019 px jitter at every distance up to 6,000 km, and `engine.pick` hits the part at every distance ([large-coordinates.md](large-coordinates.md#the-plugin)). Vertices or child offsets that are already kilometres from their root inside one asset must be re-centred at export. |
 | Transparency | Default: transparent materials and gltf-pro `BLEND` primitives are sorted back to front per mesh; core meshes are opaque. Measured ([oit-gpu.json](../examples/package-benchmarks/results/oit-gpu.json), a 50 % housing over gears orbited 360 × 1°): 13 steps with more than 1 % of covered pixels popping. | Sorting is exact for separate objects and needs no extra targets. | Popping where transparent parts interpenetrate or nest, as the camera moves. | `@margoengine/oit` (2,210 B gzip): 0 popping steps on the same orbit. Weighted blended OIT is an approximation: colour error against exact blending 0.5 / 4.6 / 8.7 (0-255) for 1 / 2 / 4 layers. Transmission and custom blending keep the sorted path; limits in its [README](../packages/oit/README.md#limits-the-wboit-approximation). |
 | Screen-space reflections | Enforced by method: only what is on screen reflects. Core meshes and models passed to `ssr.add(model)` (gltf-pro, materials, terrain, water) show reflections; other custom shaders are reflected but do not reflect. Cost measured on a worst-case glossy floor ([ssr-gpu.json](../examples/package-benchmarks/results/ssr-gpu.json), quiet-gated): 2.2-2.3 ms at 1280×720, 5.8-5.9 ms at 1920×1080. | Reusing depth and colour that are already rendered avoids a second scene pass. Each custom pipeline needs its own capture into SSR's targets. | Reflections fade at screen edges and miss off-screen objects (reflection probes fill in where attached); water and terrain not added keep their own sky reflection. | `@margoengine/post/ssr` (9,068 B gzip) is itself the opt-in. Off-screen reflections: reflection probes in `@margoengine/environment/probes`; SSR removes the probes' own specular only where its ray hits on screen and keeps the probe's reflection elsewhere ([probes-gpu.json](../examples/package-benchmarks/results/probes-gpu.json): off screen the floor equals the frame without SSR, 95th percentile 0/255). Limits in the [post README](../packages/post/README.md). |
@@ -2818,6 +2960,22 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
      way), comparing sampled points and the meshed area with the exact values, and replace the refusal test in
      `packages/brep/tests/iges.test.js`.
 
+## Shadows
+
+### Speckled shading on lit faces of a skinned model with default shadow settings
+
+- **What:** with `Shadows.attach(engine, { resolution: 2048 })` and the default `'soft'` filter, the upper torso and
+  head of RobotExpressive show a fine pattern of dark dots on faces that face the sun, and the soft edge of the ground
+  shadow looks dotted instead of smooth. It is visible in `docs/images/guide-animation.webp` and, faintly, at the foot
+  of the crate in `docs/images/quickstart.webp`.
+- **Repro:** follow [the animation guide](guides/animation.md) (or `npm run test:docs:browser` with
+  `DOCS_SCREENSHOTS=1`) and look at the robot's chest.
+- **Cause:** not found. The dots are not penumbra (they sit on lit faces), so receiver-plane bias or the cascade
+  selection on a low-poly skinned mesh is the first suspect; the noise term in the PCSS filter (documented in the
+  shadows README) shows it up.
+- **Needed to close:** a pixel test of a lit, sun-facing plane and a skinned low-poly mesh with the default settings that
+  fails while any lit pixel is shadowed, then the fix in `@margoengine/shadows`.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -2909,9 +3067,7 @@ Margo Engine in one install. The root is the stage (`createStage`, everything `@
 engine package is a subpath: `margoengine/gltf`, `margoengine/shadows`, `margoengine/physics`, `margoengine/react`,
 including their smaller entries (`margoengine/controls/orbit`, `margoengine/geometry/primitives`, ...).
 
-```bash
-npm i margoengine
-```
+The packages are not on npm yet. Until 1.0.0 is published, use the clone or local-tarball routes in the [Install](../../README.md#install) section; then `npm i margoengine` will install this package.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -2973,8 +3129,7 @@ Without them nothing else changes; the package that needs one says which to inst
 
 # @margoengine/stage
 
-You normally use this package as [`margoengine`](../margoengine/README.md): `npm i margoengine`, and
-`import {createStage} from 'margoengine'` is this package.
+You normally use this package as [`margoengine`](../margoengine/README.md): `import {createStage} from 'margoengine'` is this package. The packages are not on npm yet; see the [Install](../../README.md#install) section for the routes that work today.
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
@@ -3019,7 +3174,7 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 
 # @margoengine/core
 
-Install `npm i margoengine` and import `margoengine/core` (or this package alone: `npm i @margoengine/core`, imported as `@margoengine/core`; the two are the same module).
+Import `margoengine/core` from the `margoengine` package, or `@margoengine/core` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 WebGPU rendering (WebGL2 fallback via the optional `@margoengine/webgl`), a deterministic Rust/Wasm transform kernel, instanced drawing of one directional GGX light on position and normal, reversed float depth, picking and CAD camera controls. Materials are color, roughness, and metalness.
 
@@ -3051,7 +3206,7 @@ engine.start();
 
 # @margoengine/math
 
-Install `npm i margoengine` and import `margoengine/math` (or this package alone: `npm i @margoengine/math`, imported as `@margoengine/math`; the two are the same module).
+Import `margoengine/math` from the `margoengine` package, or `@margoengine/math` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, Sphere, Plane, Ray, Frustum, Spherical and MathUtils. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
 
@@ -3075,7 +3230,7 @@ Checked contracts for saved data (each reproduces Margo Voxel Studio's saved ari
 
 # @margoengine/quality
 
-Install `npm i margoengine` and import `margoengine/quality` (or this package alone: `npm i @margoengine/quality`, imported as `@margoengine/quality`; the two are the same module).
+Import `margoengine/quality` from the `margoengine` package, or `@margoengine/quality` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Measured quality tiers. Desktops start on a light tier (single-sampled, pixel ratio capped, paced to at most about
 60 FPS) and time how long the GPU takes to finish each frame; a browser with clear headroom gets the full 4× MSAA tier
@@ -3141,7 +3296,7 @@ packages never import this package: the global is the whole contract, so an app 
 
 # @margoengine/webgl
 
-Install `npm i margoengine` and import `margoengine/webgl` (or this package alone: `npm i @margoengine/webgl`, imported as `@margoengine/webgl`; the two are the same module).
+Import `margoengine/webgl` from the `margoengine` package, or `@margoengine/webgl` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 WebGL2 fallback renderer for browsers without WebGPU. It draws core meshes with core's PBR
 material, shaded per pixel (GGX metallic-roughness from each mesh's constant colour and factors, one directional
@@ -3173,7 +3328,7 @@ Build and unit tests: npm test --workspace @margoengine/webgl
 
 # @margoengine/stats
 
-Install `npm i margoengine` and import `margoengine/stats` (or this package alone: `npm i @margoengine/stats`, imported as `@margoengine/stats`; the two are the same module).
+Import `margoengine/stats` from the `margoengine` package, or `@margoengine/stats` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Zero runtime dependencies. Frame sampling uses a fixed Float64Array ring.
 `tick(milliseconds, drawCalls?, dispatches?)` performs numeric updates only;
@@ -3250,7 +3405,7 @@ and those passes are excluded from this profiler.
 
 # @margoengine/inspector
 
-Install `npm i margoengine` and import `margoengine/inspector` (or this package alone: `npm i @margoengine/inspector`, imported as `@margoengine/inspector`; the two are the same module).
+Import `margoengine/inspector` from the `margoengine` package, or `@margoengine/inspector` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional DOM inspector for core entities, including `stage.engine`. The hierarchy
 updates as entities are added, renamed, reparented or disposed. Arrow keys select,
@@ -3268,6 +3423,27 @@ function attach(engine: EngineKernel, effects: {exposure: number; bloom: number}
 
 Pass the mutable options object of your attached post-processing effect to
 `effects`; exposure/bloom controls bind directly to it. Unbound controls are disabled.
+
+## Place the panel in your page layout
+
+By default the panel is a `position: fixed` element at the top right of the page with a high `z-index`. In an app with
+its own buttons in that corner it sits on top of them and takes their clicks. Give it a container with `parent`, and
+override its position with a style on `inspector.element` (a style set there wins over the panel's built-in one):
+
+```ts
+import {Inspector} from 'margoengine/inspector';
+import type {EngineKernel} from 'margoengine/core';
+function attachInSidebar(engine: EngineKernel, sidebar: HTMLElement) {
+  const inspector = Inspector.attach(engine, {parent: sidebar});
+  Object.assign(inspector.element.style, {
+    position: 'relative', top: 'auto', right: 'auto', width: '100%', maxHeight: '70vh', overflow: 'auto',
+  });
+  return inspector;
+}
+```
+
+The panel then sits in the flow of `sidebar` with a bounded height and scrolls inside it. The
+[debugging guide](../../docs/guides/debugging.md) runs this in a real browser and clicks the button next to the panel.
 
 ## Edit, undo, search, pick, save
 
@@ -3304,30 +3480,17 @@ shader shows the WGSL of the latest WebGPU frame; both build their text only whi
 Not included: creating or deleting entities, reparenting, shader editing, a GPU memory view (WebGPU does not report
 resource sizes) and editing materials other than core's PBR values.
 
-WebGPU wireframe edges, world-space vertex normals and AABB boxes use the existing
-`@margoengine/lines` helpers. These overlays apply to core meshes and loaded glTF/FBX
-PBR nodes, including every primitive on a node, and honor inherited visibility.
-PBR wireframes, normals and bounds show the retained CPU bind pose with the current
-world transform. They do not read animated vertex buffers back from the GPU.
-The loader keeps ownership of its geometry, and no duplicate core draw is created.
-Disposing a model removes its overlays. "Light helpers" draws the lights the engine has, found by shape without
-importing their packages: core's sun, every `clustered*` plugin's `list` (point and spot, directional and area lights)
-and an environment hemisphere or ambient light (lines' `LightsHelper`). Debug drawing is disabled on WebGL2. The hierarchy and property
-editor still work there. Neither core nor the stage facade is modified.
-
-With engine views, the debug helpers show in each view for the meshes that view draws (its culling and layers), the tree lists the meshes of the inspector's scene (`scene.use(inspector)` for another scene), and a frame capture lists every pass once per view with `view` (id, rectangle, scene); scenes created after a capture starts appear from the next capture. `select(mesh)` selects an entity. `setDebug('wireframe' | 'normals' | 'bounds' | 'lights', true)`
-toggles a scene overlay. `dispose()` releases the DOM, timer, GPU resources and
-registered passes; engine disposal also performs this cleanup.
+[README continues: https://margoengine.com/llms/packages/inspector.md]
 
 === @margoengine/gltf (packages/gltf/README.md) ===
 
 # @margoengine/gltf
 
-Install `npm i margoengine` and import `margoengine/gltf` (or this package alone: `npm i @margoengine/gltf`, imported as `@margoengine/gltf`; the two are the same module).
+Import `margoengine/gltf` from the `margoengine` package, or `@margoengine/gltf` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Lazy static glTF/GLB loading, named nodes and shared primitive geometry for Margo Engine.
 
-Package name: `@margoengine/gltf`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/gltf`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/gltf@1.0.0
@@ -3344,7 +3507,7 @@ engine.start();
 // On teardown: model.dispose(); engine.dispose();
 ```
 
-This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the supported glTF subset and lifecycle guide before importing assets.
+This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the supported glTF subset and lifecycle guide before importing assets.
 
 Apache-2.0 licensed.
 
@@ -3352,7 +3515,7 @@ Apache-2.0 licensed.
 
 # Margo Engine glTF Pro
 
-Install `npm i margoengine` and import `margoengine/gltf-pro` (or this package alone: `npm i @margoengine/gltf-pro`, imported as `@margoengine/gltf-pro`; the two are the same module).
+Import `margoengine/gltf-pro` from the `margoengine` package, or `@margoengine/gltf-pro` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `Picking.attach(engine)` from `@margoengine/selection` discovers loader-owned
 primitive nodes automatically. `selection.set([primitive.node])` also discovers
@@ -3409,7 +3572,7 @@ in `@margoengine/exporters` bakes back-only winding and normals into glTF-compat
 
 # @margoengine/loaders
 
-Install `npm i margoengine` and import `margoengine/loaders` (or this package alone: `npm i @margoengine/loaders`, imported as `@margoengine/loaders`; the two are the same module).
+Import `margoengine/loaders` from the `margoengine` package, or `@margoengine/loaders` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 PLY, STL, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own, plus three optional entries: TrueType fonts and extruded 3D text (`@margoengine/loaders/font`), SVG (`@margoengine/loaders/svg`) and OBJ meshes with their MTL materials and textures (`@margoengine/loaders/mtl`).
 
@@ -3468,7 +3631,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 
 # @margoengine/decoders
 
-Install `npm i margoengine` and import `margoengine/decoders` (or this package alone: `npm i @margoengine/decoders`, imported as `@margoengine/decoders`; the two are the same module).
+Import `margoengine/decoders` from the `margoengine` package, or `@margoengine/decoders` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Worker-pooled Draco geometry decoding, KTX2/Basis Universal texture transcoding and EXT_meshopt_compression decoding, and synchronous PNG, TGA, TIFF, DDS and KTX 1 reading (`@margoengine/decoders/png`, `/tga`, `/tiff`, `/dds`, `/ktx`), for Margo Engine.
 
@@ -3536,7 +3699,7 @@ Four small synchronous readers, each its own entry and each written from its pub
 
 # @margoengine/fbx
 
-Install `npm i margoengine` and import `margoengine/fbx` (or this package alone: `npm i @margoengine/fbx`, imported as `@margoengine/fbx`; the two are the same module).
+Import `margoengine/fbx` from the `margoengine` package, or `@margoengine/fbx` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Native binary and ASCII FBX import through Margo's first-party glTF exporter and optional PBR/animation pipeline. Core, stage, and the animation runtime are unchanged.
 
@@ -3577,7 +3740,7 @@ Array decompression requires platform `DecompressionStream('deflate')`. Image de
 
 # @margoengine/usdz
 
-Install `npm i margoengine` and import `margoengine/usdz` (or this package alone: `npm i @margoengine/usdz`, imported as `@margoengine/usdz`; the two are the same module).
+Import `margoengine/usdz` from the `margoengine` package, or `@margoengine/usdz` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional static USDA, USDC and USDZ ingestion into `@margoengine/gltf-pro`. Core and the stage facade are unchanged. The package uses Margo's shared bounded USDA tokenizer and ZIP reader, plus its native Crate decoder for USDC. Building and using it requires no external renderer or CAD runtime.
 
@@ -3610,7 +3773,7 @@ Build the workspace independently with `npm run build --workspace @margoengine/u
 
 # @margoengine/exporters
 
-Install `npm i margoengine` and import `margoengine/exporters` (or this package alone: `npm i @margoengine/exporters`, imported as `@margoengine/exporters`; the two are the same module).
+Import `margoengine/exporters` from the `margoengine` package, or `@margoengine/exporters` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 glTF 2.0 / GLB, STL, OBJ (with MTL), PLY, static USDZ and static COLLADA 1.4.1 (`.dae`) export for Margo Engine scenes
 and plain geometry data, plus SHA-256 for checking exported files.
@@ -3693,7 +3856,7 @@ model's UVs are glTF's (`1 - v` of the source).
 
 # @margoengine/ifc
 
-Install `npm i margoengine` and import `margoengine/ifc` (or this package alone: `npm i @margoengine/ifc`, imported as `@margoengine/ifc`; the two are the same module).
+Import `margoengine/ifc` from the `margoengine` package, or `@margoengine/ifc` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 IFC geometry and BIM identifiers using a caller-owned, initialized `web-ifc` runtime. The IFC Wasm parser stays outside the frozen core and stage facade.
 
@@ -3736,7 +3899,7 @@ The bytes must be well-formed ISO 10303-21 before web-ifc sees them (web-ifc 0.0
 
 # @margoengine/blender
 
-Install `npm i margoengine` and import `margoengine/blender` (or this package alone: `npm i @margoengine/blender`, imported as `@margoengine/blender`; the two are the same module).
+Import `margoengine/blender` from the `margoengine` package, or `@margoengine/blender` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional offline Blender `.margo` assets for Margo WebGPU PBR. Core and the stage facade remain unchanged. Geometry is validated and uploaded from views of the original binary buffer without glTF accessor decoding or vertex repacking. Repeated meshes share CPU views and GPU geometry buffers; each object keeps its own transform/material uniforms.
 
@@ -3791,15 +3954,13 @@ stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]], {durati
 window.addEventListener('pagehide', () => stage.dispose(), {once:true});
 ```
 
-`loadMargo` attaches the existing glTF Pro model plugin directly. `stage.dispose()` releases every imported GPU buffer/texture and decoded image; call it on application unmount. Use `model.dispose()` to unload an asset earlier. Loading/uploading and the existing PBR render loop allocate memory; zero steady-state heap churn has not been established.
-
 [README continues: https://margoengine.com/llms/packages/blender.md]
 
 === @margoengine/cache (packages/cache/README.md) ===
 
 # @margoengine/cache
 
-Install `npm i margoengine` and import `margoengine/cache` (or this package alone: `npm i @margoengine/cache`, imported as `@margoengine/cache`; the two are the same module).
+Import `margoengine/cache` from the `margoengine` package, or `@margoengine/cache` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Opt-in offline asset cache. Heavy GLB, .bin, texture and STEP files are kept in IndexedDB, so repeat visits load them
 from disk and the viewer keeps working with bad or no Wi-Fi (a factory floor). `cache.fetch` is fetch-compatible and
@@ -3884,7 +4045,7 @@ const [model, chair] = await Promise.all([
 
 # @margoengine/splats
 
-Install `npm i margoengine` and import `margoengine/splats` (or this package alone: `npm i @margoengine/splats`, imported as `@margoengine/splats`; the two are the same module).
+Import `margoengine/splats` from the `margoengine` package, or `@margoengine/splats` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Use `@margoengine/splats/data` for `parseSplat`, `validateSplats` and the
 `SplatData` type without loading GPU rendering or radix-sort shaders. Root
@@ -3921,7 +4082,7 @@ Base GPU allocations are approximately 128 bytes per splat (384 MB at three mill
 
 # Margo Engine Materials
 
-Install `npm i margoengine` and import `margoengine/materials` (or this package alone: `npm i @margoengine/materials`, imported as `@margoengine/materials`; the two are the same module).
+Import `margoengine/materials` from the `margoengine` package, or `@margoengine/materials` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional glTF clearcoat, sheen, specular color, anisotropy, iridescence, transmission, IOR, volume, and TypeScript node materials through `@margoengine/gltf-pro`'s material extension slot. This package is separate from the frozen core and stage facade, and importing `gltf-pro` does not import materials.
 
@@ -3987,7 +4148,7 @@ primitive.extension = materialLobes({
 
 # @margoengine/shader
 
-Install `npm i margoengine` and import `margoengine/shader` (or this package alone: `npm i @margoengine/shader`, imported as `@margoengine/shader`; the two are the same module).
+Import `margoengine/shader` from the `margoengine` package, or `@margoengine/shader` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Typed shader nodes that compile to readable WGSL. One graph API drives three hosts: `NodeMaterial` (a `@margoengine/materials` Material whose colour, normal, roughness, metalness, emissive, opacity and vertex position come from nodes), `NodePass` (a full-screen effect inside `@margoengine/post`'s PostStack) and `ComputePass` (a compute shader over a storage buffer, dispatched by the frame graph). Two more entries skip the graph: `@margoengine/shader/raw` draws your own WGSL with your own vertex layout, and `@margoengine/shader/effects` has ready-made screen effects. WebGPU only.
 
@@ -4049,7 +4210,7 @@ ComputePass.attach(stage.engine, n, i => {
 
 # @margoengine/environment
 
-Install `npm i margoengine` and import `margoengine/environment` (or this package alone: `npm i @margoengine/environment`, imported as `@margoengine/environment`; the two are the same module).
+Import `margoengine/environment` from the `margoengine` package, or `@margoengine/environment` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 HDR, EXR and UltraHDR loading, EXR writing, GPU image-based lighting (prefiltered specular, spherical-harmonic irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene-wide fog for Margo Engine on WebGPU.
 
@@ -4108,7 +4269,7 @@ box.filter = 'linear';                                         // filter, rotati
 
 # @margoengine/clustered
 
-Install `npm i margoengine` and import `margoengine/clustered` (or this package alone: `npm i @margoengine/clustered`, imported as `@margoengine/clustered`; the two are the same module).
+Import `margoengine/clustered` from the `margoengine` package, or `@margoengine/clustered` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional clustered forward GGX lighting for up to 1,024 point/spot lights. A compute pass builds logarithmic-depth frustum AABBs and tests view-space light spheres and conservative spot-cone bounds. Fragment shaders calculate their screen/depth cluster and evaluate only its light list. This preserves forward alpha blending and does not require a deferred G-buffer.
 
@@ -4174,7 +4335,7 @@ suns.setLights([{direction: [-1, -2, 0.5], color: [1, 0.9, 0.8], intensity: 3}])
 
 # @margoengine/shadows
 
-Install `npm i margoengine` and import `margoengine/shadows` (or this package alone: `npm i @margoengine/shadows`, imported as `@margoengine/shadows`; the two are the same module).
+Import `margoengine/shadows` from the `margoengine` package, or `@margoengine/shadows` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Cascade descriptors, attachments and matrix views are retained between frames.
 Custom `drawShadow` callbacks receive a borrowed context reused for that cascade;
@@ -4226,7 +4387,7 @@ covering a square region, so a non-square map there just gives the two axes diff
 
 # @margoengine/lightmap
 
-Install `npm i margoengine` and import `margoengine/lightmap` (or this package alone: `npm i @margoengine/lightmap`, imported as `@margoengine/lightmap`; the two are the same module).
+Import `margoengine/lightmap` from the `margoengine` package, or `@margoengine/lightmap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Bakes lightmaps on the CPU: one padded UV atlas for a quad mesh with shadowed direct light and ambient occlusion,
 plus matching albedo, emission, normal and ORM textures. Built for exporting lit voxel and block models (each
@@ -4286,18 +4447,13 @@ atlas.textures.lightmap; // RGBA8, irradiance / atlas.lightmapScale
 
 ## Caustics: `@margoengine/lightmap/refracted`
 
-`bakeRefractedLightmap(quads, {glassVolumes, emitters})` traces photons from point lights, finite directional beams and
-rectangle lights through ideal smooth convex glass (Snell refraction, Fresnel reflection, total internal reflection,
-Beer absorption, nested volumes) and deposits them at the first receiver they reach after touching glass. It returns
-the native atlas with physical irradiance in its lightmap, the irradiance and hit counts per pixel, and `diagnostics`
-that account for every emitted watt (deposited, escaped, absorbed, truncated, unrefracted, blocked). Receivers are
-opaque; there is no diffuse bounce, rough glass or dispersion.
+[README continues: https://margoengine.com/llms/packages/lightmap.md]
 
 === @margoengine/sky (packages/sky/README.md) ===
 
 # @margoengine/sky
 
-Install `npm i margoengine` and import `margoengine/sky` (or this package alone: `npm i @margoengine/sky`, imported as `@margoengine/sky`; the two are the same module).
+Import `margoengine/sky` from the `margoengine` package, or `@margoengine/sky` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 WebGPU atmospheric background with an analytical Preetham/Perez daytime sky and an Earth-based Bruneton-style precomputed Rayleigh/Mie model, an optional stylized night (stars, phased moon) and distance or height fog, plus optional weather (rain, snow, lightning and thunder timing). This is Margo's one sky: scenery's `SkyMoon` is a midnight preset of it.
 
@@ -4358,7 +4514,7 @@ described below; caller exposure and bloom strength still affect its glow.
 
 # @margoengine/toon
 
-Install `npm i margoengine` and import `margoengine/toon` (or this package alone: `npm i @margoengine/toon`, imported as `@margoengine/toon`; the two are the same module).
+Import `margoengine/toon` from the `margoengine` package, or `@margoengine/toon` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Stepped diffuse ramps reuse creative/ToonShading. A second front-culled pass expands vertex normals into an inverted hull for silhouette outlines.
 
@@ -4385,7 +4541,7 @@ Build and unit tests: npm test --workspace @margoengine/toon
 
 # @margoengine/oit
 
-Install `npm i margoengine` and import `margoengine/oit` (or this package alone: `npm i @margoengine/oit`, imported as `@margoengine/oit`; the two are the same module).
+Import `margoengine/oit` from the `margoengine` package, or `@margoengine/oit` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Order-independent transparency for glTF Pro BLEND primitives and `@margoengine/materials` transparent meshes:
 weighted blended OIT (McGuire and Bavoil, JCGT 2013). Overlapping transparent parts (a translucent CAD housing over
@@ -4455,18 +4611,13 @@ MSAA 4x, against a reference that sorts every translucent triangle separately. A
 GPU time (Stats timestamp profiler, median, MSAA 4x, the same scene; diagnostic, measured while other jobs kept the
 CPU at 45-100 %):
 
-| Resolution | Opaque only | + sorted transparency | + OIT | OIT accumulate pass | OIT composite pass |
-| --- | --- | --- | --- | --- | --- |
-| 1280×720 | 0.07 ms | 0.39 ms (+0.33) | 0.62 ms (+0.56) | 0.33 ms | 0.23 ms |
-| 1920×1080 | 0.13 ms | 0.72 ms (+0.59) | 1.41 ms (+1.28) | 0.79 ms | 0.49 ms |
-
 [README continues: https://margoengine.com/llms/packages/oit.md]
 
 === @margoengine/lod (packages/lod/README.md) ===
 
 # @margoengine/lod
 
-Install `npm i margoengine` and import `margoengine/lod` (or this package alone: `npm i @margoengine/lod`, imported as `@margoengine/lod`; the two are the same module).
+Import `margoengine/lod` from the `margoengine` package, or `@margoengine/lod` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Level of detail for scenes with thousands of objects (CAD assemblies, simulators, forests, cities), plus
 GPU-baked octahedral imposters for the farthest level. Core is unchanged.
@@ -4516,8 +4667,7 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   (alpha-to-coverage under MSAA, a fixed per-pixel dither at 1x) instead of a hard cut at 0.5. Each tile is sampled
   with its mip level computed from the smooth coordinate and clamped half a texel of the coarser level read, so
   trilinear filtering never reaches a neighbouring view. Bounding-sphere frustum culling on the CPU, hidden anchors (or hidden
-  ancestors) are skipped, and all instances of one atlas are one instanced draw (order 1.5, after opaque meshes).
-- **Picking**: an imposter has no
+  ancestors) are skipped, and a
 
 [README continues: https://margoengine.com/llms/packages/lod.md]
 
@@ -4525,7 +4675,7 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
 
 # @margoengine/culling
 
-Install `npm i margoengine` and import `margoengine/culling` (or this package alone: `npm i @margoengine/culling`, imported as `@margoengine/culling`; the two are the same module).
+Import `margoengine/culling` from the `margoengine` package, or `@margoengine/culling` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 GPU-driven static instances for large assemblies. Parts are uploaded once; every frame a compute pass tests each part
 against the view frustum and, optionally, a Hi-Z depth pyramid, compacts the visible parts in their original order and
@@ -4599,7 +4749,7 @@ Per frame, inside one plugin pass after core's main pass:
 
 # @margoengine/points
 
-Install `npm i margoengine` and import `margoengine/points` (or this package alone: `npm i @margoengine/points`, imported as `@margoengine/points`; the two are the same module).
+Import `margoengine/points` from the `margoengine` package, or `@margoengine/points` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Large point clouds and instanced sprites for Margo Engine, WebGPU, built for big scans: the browser test culls and draws a 2,000,000-point cloud under a 500,000-point budget.
 
@@ -4643,7 +4793,7 @@ canvas.addEventListener('click', event => {
 - **Depth.** Points test against the scene with reversed-Z `greater-equal` and opaque points write depth, so they hide behind meshes and occlude each other. Transparent materials blend without writing depth.
 - **Engine views.** Point sizes and level of detail follow the view being drawn. `pick(x, y)` picks through the canvas view under the point with that view's camera; `pick(x, y, {view: id})` through a named one (`RenderView.id`). A view not drawn for a frame is forgotten.
 - **Orthographic cameras.** Everything is read from `camera.matrix`, so any projection whose clip w is constant (such as `CameraProjection` from `@margoengine/cameras`) works without a dependency on it: world-unit sizes use the matrix's pixels per world unit and stay the same at every depth, sphere impostors write linear depth, eye-dome lighting shades linear depth steps (scaled like the log steps a perspective camera with the same zoom would give), block budgets ignore distance, and picking breaks ties by distance from the near plane (`depth` is then measured from the near plane).
-- **Sprites.** A `SpriteBatch` keeps 16 floats per sprite (position, rotation, size, pivot, atlas UV rectangle, color) in one storage buffer and draws every sprite with one instanced call. Quads face the camera using the camera's right an
+- **Sprites.** A `SpriteBatch` keeps 16 floats per sprite (position, rotation, size, pivot, atlas UV rectangle, color) in one
 
 [README continues: https://margoengine.com/llms/packages/points.md]
 
@@ -4651,7 +4801,7 @@ canvas.addEventListener('click', event => {
 
 # @margoengine/lines
 
-Install `npm i margoengine` and import `margoengine/lines` (or this package alone: `npm i @margoengine/lines`, imported as `@margoengine/lines`; the two are the same module).
+Import `margoengine/lines` from the `margoengine` package, or `@margoengine/lines` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Fat lines with joins, caps, dashes and antialiasing, plus the debug helpers, as a WebGPU engine plugin for Margo Engine.
 
@@ -4704,15 +4854,13 @@ dashed.dashOffset += 0.01;
 
 ## Options
 
-`Line` takes the geometry options below plus any `LineMaterial` option. Material fields can also be changed directly at any time (`line.material.width = 3`).
-
 [README continues: https://margoengine.com/llms/packages/lines.md]
 
 === @margoengine/text (packages/text/README.md) ===
 
 # @margoengine/text
 
-Install `npm i margoengine` and import `margoengine/text` (or this package alone: `npm i @margoengine/text`, imported as `@margoengine/text`; the two are the same module).
+Import `margoengine/text` from the `margoengine` package, or `@margoengine/text` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Crisp GPU text for Margo Engine: signed distance field glyphs generated at runtime from any browser font, with wrapping, alignment, anchors, outlines, soft shadows and billboards, as a WebGPU engine plugin.
 
@@ -4761,9 +4909,7 @@ title.layout.bounds;                  // {left, right, top, bottom}
 - **One draw call per block.** Glyph quads live in a storage buffer and are expanded in the vertex shader. Shadow, outline and fill are layers of the same instanced draw (instance `i` draws glyph `i % n` in layer `i / n`), so every fill is drawn over every neighbour's outline. Antialiasing uses screen-space derivatives of the atlas coordinates, so edges stay one pixel wide at any scale or angle.
 - **Blending and depth.** Premultiplied alpha blending, reversed-Z depth test (`greater-equal`) without depth writes, so overlapping glyph quads never z-fight. Blocks are sorted back to front; `onTop` blocks draw last with the depth test off.
 - **Placement.** World-oriented text uses its local matrix, times the attached mesh's world matrix from `engineRuntime(engine).store.matrices`. Billboard text keeps the model's origin and scale and spans the camera's right and up vectors. Text attached to a hidden or disposed mesh is skipped.
-- **Lifecycle.** `onDeviceRestored` rebuilds pipelines, buffers and atlases; `dispose` (via `removePlugin`) releases them. Texts stay registered.
-
-## Options
+- **Lifecycle.** `onDeviceRestored` rebuilds pipelines, buffers and atlases; `dispose` (via `removePlugi
 
 [README continues: https://margoengine.com/llms/packages/text.md]
 
@@ -4771,7 +4917,7 @@ title.layout.bounds;                  // {left, right, top, bottom}
 
 # @margoengine/labels
 
-Install `npm i margoengine` and import `margoengine/labels` (or this package alone: `npm i @margoengine/labels`, imported as `@margoengine/labels`; the two are the same module).
+Import `margoengine/labels` from the `margoengine` package, or `@margoengine/labels` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 HTML labels and CSS 3D objects kept in register with a Margo Engine canvas.
 
@@ -4820,7 +4966,7 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 
 # @margoengine/html
 
-Install `npm i margoengine` and import `margoengine/html` (or this package alone: `npm i @margoengine/html`, imported as `@margoengine/html`; the two are the same module).
+Import `margoengine/html` from the `margoengine` package, or `@margoengine/html` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 World-space DOM anchors reuse labels' projection, frustum clipping, inherited visibility and CSS3D placement. 2D anchors additionally use asynchronous scene-depth occlusion.
 
@@ -4840,7 +4986,7 @@ Build and unit tests: npm test --workspace @margoengine/html
 
 # @margoengine/video
 
-Install `npm i margoengine` and import `margoengine/video` (or this package alone: `npm i @margoengine/video`, imported as `@margoengine/video`; the two are the same module).
+Import `margoengine/video` from the `margoengine` package, or `@margoengine/video` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 WebGPU external video textures from HTMLVideoElement or VideoFrame, imported with `importExternalTexture` (no JS-side copy; whether the browser copies depends on the platform), with a screen-rectangle surface and optional Web Audio frequency sampling.
 
@@ -4862,7 +5008,7 @@ Build and unit tests: npm test --workspace @margoengine/video
 
 # @margoengine/xr
 
-Install `npm i margoengine` and import `margoengine/xr` (or this package alone: `npm i @margoengine/xr`, imported as `@margoengine/xr`; the two are the same module).
+Import `margoengine/xr` from the `margoengine` package, or `@margoengine/xr` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU WebXR session negotiation, input poses and instanced stereo PBR rendering. XR owns a compatible GPU device and attaches through the existing core extension interface. Core and the stage facade remain frozen.
 
@@ -4913,7 +5059,7 @@ Build with root `npm run build:packages` or local `npm run build`. Apache-2.0 li
 
 # @margoengine/staging
 
-Install `npm i margoengine` and import `margoengine/staging` (or this package alone: `npm i @margoengine/staging`, imported as `@margoengine/staging`; the two are the same module).
+Import `margoengine/staging` from the `margoengine` package, or `@margoengine/staging` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Product-shot staging. `ContactShadows`: a soft ground-contact shadow.
 The added meshes are drawn from the ground looking up into a small texture (darker the closer to the
@@ -4968,7 +5114,7 @@ Build and unit tests: npm test --workspace @margoengine/staging. Real GPU: `node
 
 # Margo Engine Post
 
-Install `npm i margoengine` and import `margoengine/post` (or this package alone: `npm i @margoengine/post`, imported as `@margoengine/post`; the two are the same module).
+Import `margoengine/post` from the `margoengine` package, or `@margoengine/post` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, lens flare, afterimage trails, SMAA and FXAA, a glitch and an effect stack, separate from the frozen core and stage.
 
@@ -5044,7 +5190,7 @@ stack.dispose(); // also disposes its effects
 
 # @margoengine/tonemap
 
-Install `npm i margoengine` and import `margoengine/tonemap` (or this package alone: `npm i @margoengine/tonemap`, imported as `@margoengine/tonemap`; the two are the same module).
+Import `margoengine/tonemap` from the `margoengine` package, or `@margoengine/tonemap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU HDR presentation and color grading, separate from core and stage.
 
@@ -5096,19 +5242,13 @@ wrong counts, non-finite values and invalid domains reject. Input text is capped
 The result contains explicit `size`, Float32Array RGBA data and Float32Array domains. Manually constructed legacy
 objects that omit `size` still mean 33³; other sizes require it.
 
-`setLUT` accepts that object, raw `.cube` text or `null` and snapshots the size, samples and domains for restoration.
-Replacement checks the device's 3D texture limit; failed validation or upload preserves the previous LUT. A
-`rgba32float` 3D GPU texture uses eight explicit texture loads and trilinear interpolation, requiring no optional
-float32 filtering feature. Non-33 sizes share a dimension-aware shader; 33³ and no-LUT inputs retain their existing
-shader and rendering behavior. `setLUT(null)` clears grading by the LUT while retaining the selected tone curve.
-
 [README continues: https://margoengine.com/llms/packages/tonemap.md]
 
 === @margoengine/dof (packages/dof/README.md) ===
 
 # @margoengine/dof
 
-Install `npm i margoengine` and import `margoengine/dof` (or this package alone: `npm i @margoengine/dof`, imported as `@margoengine/dof`; the two are the same module).
+Import `margoengine/dof` from the `margoengine` package, or `@margoengine/dof` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU depth of field; core and stage are unchanged.
 
@@ -5159,7 +5299,7 @@ npm --prefix packages/dof run build:demo
 
 # @margoengine/taa
 
-Install `npm i margoengine` and import `margoengine/taa` (or this package alone: `npm i @margoengine/taa`, imported as `@margoengine/taa`; the two are the same module).
+Import `margoengine/taa` from the `margoengine` package, or `@margoengine/taa` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU temporal anti-aliasing. Eight Halton (2,3) projection offsets move raster samples by fractions of a pixel. An `rg16float` velocity buffer stores current minus previous UV coordinates. History is reprojected with bilinear depth-tested taps, clamped to the current 3×3 neighborhood in YCoCg, and blended in linear RGB. Two HDR color histories and two `r32float` depth histories alternate without GPU readback.
 
@@ -5197,7 +5337,7 @@ picture after TAA must not write `resolved`: TAA reads it as history next frame.
 
 # @margoengine/transitions
 
-Install `npm i margoengine` and import `margoengine/transitions` (or this package alone: `npm i @margoengine/transitions`, imported as `@margoengine/transitions`; the two are the same module).
+Import `margoengine/transitions` from the `margoengine` package, or `@margoengine/transitions` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 WebGPU scene-to-scene wipes, seeded pixel-noise dissolves, radial clock wipes and chromatic displacement.
 
@@ -5219,7 +5359,7 @@ Build and unit tests: npm test --workspace @margoengine/transitions
 
 # @margoengine/terrain
 
-Install `npm i margoengine` and import `margoengine/terrain` (or this package alone: `npm i @margoengine/terrain`, imported as `@margoengine/terrain`; the two are the same module).
+Import `margoengine/terrain` from the `margoengine` package, or `@margoengine/terrain` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `heightfieldGeometry(height, {size, origin?, resolution?})` generates a Y-up mesh
 with recomputed slope normals. `origin` is the minimum world XZ corner; it defaults
@@ -5290,7 +5430,7 @@ and one GPU copy per frame. Terrain owns that snapshot, not the provider texture
 
 # @margoengine/voxel
 
-Install `npm i margoengine` and import `margoengine/voxel` (or this package alone: `npm i @margoengine/voxel`, imported as `@margoengine/voxel`; the two are the same module).
+Import `margoengine/voxel` from the `margoengine` package, or `@margoengine/voxel` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Voxel worlds for Minecraft-style games and voxel editors: a block-type registry, 32 x 32 x 32 palette chunks with a
 light byte per cell, and a chunked world with dirty tracking and change events. This release is the storage layer;
@@ -5353,8 +5493,7 @@ worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data)
   `waterlogState(state)` waterlogs a slab or stair: the liquid its type names (`waterlog`, a defined liquid's id or
   name) fills the rest of the cell, meshed, lit and swum in like that liquid, while the block keeps colliding.
   `shapeOctants(type, state)` gives the half cells a state fills as an 8-bit mask (bit `x + 2y + 4z`, 255 for a cube).
-  They mesh, shade, cast and receive shadows, pass light, collide and pick as those boxes (the sections below), and
-  their states go through the codecs unchan
+  They mesh, shade, cast and receive shadows,
 
 [README continues: https://margoengine.com/llms/packages/voxel.md]
 
@@ -5362,7 +5501,7 @@ worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data)
 
 # @margoengine/voxel-pathtracer
 
-Install `npm i margoengine` and import `margoengine/voxel-pathtracer` (or this package alone: `npm i @margoengine/voxel-pathtracer`, imported as `@margoengine/voxel-pathtracer`; the two are the same module).
+Import `margoengine/voxel-pathtracer` from the `margoengine` package, or `@margoengine/voxel-pathtracer` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 A progressive WebGPU path tracer for voxel models. Attach it to an engine and, while it is enabled, the frame shows a
 path-traced image of your voxel scene through the engine camera, refining every frame until a sample budget. It also
@@ -5424,8 +5563,7 @@ Everything is in Margo's **Y-up** world. Convert MagicaVoxel's Z-up `.vox` data 
   one is light-sampled as quarter faces, mid-cell ones included.
 - **Model material tables** (addition). A model's own `materials` replace `scene.materials` for its voxels, so a scene
   holds any number of distinct materials (255 per table), as model banks of an editor do: two models may give palette 1
-  different materials. Tables equal in content are stored once; at most 4096 per scene, 32 KiB each, within the
-  storage binding size. Picks and AOVs still report palette indices. Scenes
+  different materials. Tables equal in content are stored once; at most 4096 per scen
 
 [README continues: https://margoengine.com/llms/packages/voxel-pathtracer.md]
 
@@ -5433,7 +5571,7 @@ Everything is in Margo's **Y-up** world. Convert MagicaVoxel's Z-up `.vox` data 
 
 # @margoengine/voxel-edit
 
-Install `npm i margoengine` and import `margoengine/voxel-edit` (or this package alone: `npm i @margoengine/voxel-edit`, imported as `@margoengine/voxel-edit`; the two are the same module).
+Import `margoengine/voxel-edit` from the `margoengine` package, or `@margoengine/voxel-edit` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Editing voxel models for voxel editors and tools: dense and sparse grids, modeling operations, brushes and
 selections, picking, export meshing, `.vox` scene editing and frame animation. CPU only, no renderer, no DOM: every
@@ -5487,7 +5625,7 @@ corner coordinates.
 
 # @margoengine/water
 
-Install `npm i margoengine` and import `margoengine/water` (or this package alone: `npm i @margoengine/water`, imported as `@margoengine/water`; the two are the same module).
+Import `margoengine/water` from the `margoengine` package, or `@margoengine/water` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 A separate WebGPU water grid evaluates up to eight swell trains with analytical normals. Each train spreads into three Gerstner components with varied directions, wavelengths and gently bending crests. Advected gradient noise (random unit gradients, Perlin's 2002 quintic fade, analytic derivatives) adds wind agitation and micro-ripples, filtered separately by their screen footprint. Fresnel reflection, sun glints and wavelength-dependent absorption shade the surface. Optional terrain coupling adds conservative GPU shallow-water flow, moving breaker foam and a fixed GPU spray pool.
 
@@ -5532,21 +5670,13 @@ and `radiance` (three nonnegative RGB numbers), updated before each render. An e
 array disables direct glints. Omitting `lights` retains engine lighting behavior;
 the application must synchronize that direction with its sun clock.
 
-Foam is lit like the scene's diffuse surfaces: the engine light's N·L over π plus
-the ambient level, so it dims with the light angle instead of glowing at full light
-strength. Pass `shadows: shadows` (a `Shadows` from `@margoengine/shadows` attached
-to the same engine) to darken glints and foam where the engine light is blocked.
-Water binds the cascades at group 1 and samples them with the same PCSS filter as
-the scene, only where a glint or foam shows. All glint lights take that one shadow
-map, as the scene's single blended light does.
-
 [README continues: https://margoengine.com/llms/packages/water.md]
 
 === @margoengine/scenery (packages/scenery/README.md) ===
 
 # @margoengine/scenery
 
-Install `npm i margoengine` and import `margoengine/scenery` (or this package alone: `npm i @margoengine/scenery`, imported as `@margoengine/scenery`; the two are the same module).
+Import `margoengine/scenery` from the `margoengine` package, or `@margoengine/scenery` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 A moonlit night sky for Margo Engine: twinkling stars, a phased moon with glow, and horizon haze. `SkyMoon` is a
 preset of `Sky` from `@margoengine/sky` (Margo's one sky implementation) held at midnight with its stylized
@@ -5596,7 +5726,7 @@ WebGPU hardware on HTTPS or localhost. Apache-2.0 licensed.
 
 # @margoengine/scatter
 
-Install `npm i margoengine` and import `margoengine/scatter` (or this package alone: `npm i @margoengine/scatter`, imported as `@margoengine/scatter`; the two are the same module).
+Import `margoengine/scatter` from the `margoengine` package, or `@margoengine/scatter` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `randomPlacements(count, bounds, [minScale,maxScale], seed)` generates seeded
 rectangle candidates. `radialPlacements(centers, perCenter, [minDistance,maxDistance],
@@ -5656,7 +5786,7 @@ then yaw, the ground normal's X and Z packed into one float, and the LOD fade.
 
 # @margoengine/road
 
-Install `npm i margoengine` and import `margoengine/road` (or this package alone: `npm i @margoengine/road`, imported as `@margoengine/road`; the two are the same module).
+Import `margoengine/road` from the `margoengine` package, or `@margoengine/road` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Arc-length spline sweeps generate a road surface, raised curbs, hard cross-section normals and tiled UV coordinates.
 
@@ -5676,7 +5806,7 @@ Build and unit tests: npm test --workspace @margoengine/road
 
 # @margoengine/vfx
 
-Install `npm i margoengine` and import `margoengine/vfx` (or this package alone: `npm i @margoengine/vfx`, imported as `@margoengine/vfx`; the two are the same module).
+Import `margoengine/vfx` from the `margoengine` package, or `@margoengine/vfx` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional GPU particle simulation and indirect billboard rendering, with capacity up to 1,000,000. One storage buffer holds particle position/life, velocity/size, color and rotation (birth angle, angular velocity, initial lifetime); each invocation owns one particle. Workgroups of 256 integrate gravity, analytic curl turbulence and ground-plane collisions, touching only position/life and velocity/size after birth. Atomic counters respawn dead slots, count live particles and compact the ones whose billboard can reach the screen into the indirect draw, one triangle per particle.
 
@@ -5729,13 +5859,13 @@ and make the same GPU calls:
 
 # @margoengine/creative
 
-Install `npm i margoengine` and import `margoengine/creative` (or this package alone: `npm i @margoengine/creative`, imported as `@margoengine/creative`; the two are the same module).
+Import `margoengine/creative` from the `margoengine` package, or `@margoengine/creative` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 WebGPU grass, a planet renderer, a leaf/weather particle preset, toon shading, HDR targets and a grading post effect (fog, god rays, focus blur, ACES, grain) for Margo Engine.
 
 Each capability has one implementation: `GPUParticles` is a preset over `@margoengine/vfx`, bloom is `Bloom` from `@margoengine/post/bloom`, and sky backdrops are `Sky` from `@margoengine/sky`.
 
-Package name: `@margoengine/creative`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/creative`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/creative@1.0.0
@@ -5808,7 +5938,7 @@ meadow.dispose();
 
 # @margoengine/procedural
 
-Install `npm i margoengine` and import `margoengine/procedural` (or this package alone: `npm i @margoengine/procedural`, imported as `@margoengine/procedural`; the two are the same module).
+Import `margoengine/procedural` from the `margoengine` package, or `@margoengine/procedural` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `generateCabinMesh(height, position = [0,0])` builds a 6 × 8 m timber cabin,
 35° roof, recessed windows/door and terrain-sunk stone/porch supports. `position`
@@ -5883,7 +6013,7 @@ const bush = generateShrubMesh();
 
 # @margoengine/wfc
 
-Install `npm i margoengine` and import `margoengine/wfc` (or this package alone: `npm i @margoengine/wfc`, imported as `@margoengine/wfc`; the two are the same module).
+Import `margoengine/wfc` from the `margoengine` package, or `@margoengine/wfc` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Seeded 3D Wave Function Collapse with weighted entropy, six-direction adjacency, pinned cells and bounded restart attempts.
 
@@ -5927,7 +6057,7 @@ Build and unit tests: npm test --workspace @margoengine/wfc
 
 # @margoengine/splines
 
-Install `npm i margoengine` and import `margoengine/splines` (or this package alone: `npm i @margoengine/splines`, imported as `@margoengine/splines`; the two are the same module).
+Import `margoengine/splines` from the `margoengine` package, or `@margoengine/splines` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Piecewise 3D Catmull-Rom, cubic Bezier and cubic Hermite curves, with a cached arc-length lookup.
 
@@ -5949,7 +6079,7 @@ Build and unit tests: npm test --workspace @margoengine/splines
 
 # Margo Engine Animation
 
-Install `npm i margoengine` and import `margoengine/animation` (or this package alone: `npm i @margoengine/animation`, imported as `@margoengine/animation`; the two are the same module).
+Import `margoengine/animation` from the `margoengine` package, or `@margoengine/animation` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional WebGPU skeletal animation and morph targets, isolated from core and stage.
 
@@ -5991,15 +6121,13 @@ the playback path.
 
 Run the character demo at `/examples/robot-expressive.html` (also `character-animation.html`). RobotExpressive is by Tomás Laulhé with morphs by Don McCurdy (CC0). It is not a Khronos sample.
 
-The demo leaves facial weights under the sliders' control by removing weight tracks from its clips. Expressions persist while playing, pausing and switching clips. Presets include a neutral reset; playback speed and a reset-view button accompany touch-enabled orbit controls. The studio floor uses the optional shadows and tone-mapping packages.
-
 [README continues: https://margoengine.com/llms/packages/animation.md]
 
 === @margoengine/animator (packages/animator/README.md) ===
 
 # @margoengine/animator
 
-Install `npm i margoengine` and import `margoengine/animator` (or this package alone: `npm i @margoengine/animator`, imported as `@margoengine/animator`; the two are the same module).
+Import `margoengine/animator` from the `margoengine` package, or `@margoengine/animator` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional gameplay animation on the existing `@margoengine/animation` skinning pass. Named states select clips, 1D trees interpolate neighboring samples, and 2D trees use normalized inverse-square distance weights with exact sample reproduction. State transitions crossfade a captured pose into the destination. Masked additive layers apply translation/scale/quaternion and morph deltas relative to a sampled reference pose. A zero reference scale component contributes an identity scale delta on that axis. Primitives sharing a node must have matching morph target counts, as required by glTF.
 
@@ -6057,11 +6185,11 @@ const remove = addCCDChain(animator, reach);
 
 # @margoengine/kinematics-constraints
 
-Install `npm i margoengine` and import `margoengine/kinematics-constraints` (or this package alone: `npm i @margoengine/kinematics-constraints`, imported as `@margoengine/kinematics-constraints`; the two are the same module).
+Import `margoengine/kinematics-constraints` from the `margoengine` package, or `@margoengine/kinematics-constraints` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Standalone capsule and sphere avoidance for IK targets and two-bone chains. The package projects targets out of proxy volumes, checks elbow and link clearance, and searches a shoulder swivel angle through a caller-supplied IK evaluator. It has no engine, renderer, physics, or Wasm dependency. ESM exports and declarations are tree-shakable; core, stage, animation, and the existing IK kernels remain unchanged.
 
-Version `0.1.0` is source-only and has not been published to npm. From the repository root:
+Version `1.0.0` is source-only and has not been published to npm. From the repository root:
 
 ```sh
 npm ci
@@ -6070,7 +6198,7 @@ npm run test --workspace @margoengine/kinematics-constraints
 npm pack --workspace @margoengine/kinematics-constraints --pack-destination test-results
 ```
 
-Install the resulting tarball in another project with `npm install ./margoengine-kinematics-constraints-0.1.0.tgz`. No core peer dependency is required. The package is Apache-2.0 licensed.
+Install the resulting tarball in another project with `npm install ./margoengine-kinematics-constraints-1.0.0.tgz`. No core peer dependency is required. The package is Apache-2.0 licensed.
 
 ## Interactive arm demo
 
@@ -6100,7 +6228,7 @@ For a motion report, expand **Record a problem**, click **Start recording**, rep
 
 # @margoengine/rigging
 
-Install `npm i margoengine` and import `margoengine/rigging` (or this package alone: `npm i @margoengine/rigging`, imported as `@margoengine/rigging`; the two are the same module).
+Import `margoengine/rigging` from the `margoengine` package, or `@margoengine/rigging` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Rigging and animation authoring for characters made in Margo or anywhere else: smooth automatic skin weights, weight painting with undo, the skin checks game engines need before export, IK chains with poles and retarget presets that play Mixamo, Godot and Roblox clips on any humanoid. Everything here is plain data in, plain data out: no engine, renderer or GPU is needed, core is never imported, and an app that does not import this package ships none of it.
 
@@ -6171,7 +6299,7 @@ painter.normalize();
 
 # @margoengine/tween
 
-Install `npm i margoengine` and import `margoengine/tween` (or this package alone: `npm i @margoengine/tween`, imported as `@margoengine/tween`; the two are the same module).
+Import `margoengine/tween` from the `margoengine` package, or `@margoengine/tween` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Numeric property interpolation and easing; `update` steps the existing tracks in place and creates no per-track objects.
 
@@ -6222,7 +6350,7 @@ Build and unit tests: npm test --workspace @margoengine/tween
 
 # @margoengine/cinematic
 
-Install `npm i margoengine` and import `margoengine/cinematic` (or this package alone: `npm i @margoengine/cinematic`, imported as `@margoengine/cinematic`; the two are the same module).
+Import `margoengine/cinematic` from the `margoengine` package, or `@margoengine/cinematic` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `rig.setOrbitOffset(yaw, pitch, distance, height = 0)` writes the retained camera
 offset in place from orbit angles (no new vector is created). The sandbox uses this
@@ -6284,7 +6412,7 @@ Build and unit tests: npm test --workspace @margoengine/cinematic
 
 # @margoengine/controls
 
-Install `npm i margoengine` and import `margoengine/controls` (or this package alone: `npm i @margoengine/controls`, imported as `@margoengine/controls`; the two are the same module).
+Import `margoengine/controls` from the `margoengine` package, or `@margoengine/controls` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `stepLocomotion(state, actions, delta, height, options?)` provides ground-following
 character movement with normalized diagonals, damped speed and heading, and a
@@ -6373,7 +6501,7 @@ import {WalkControls} from 'margoengine/controls/walk';
 
 # @margoengine/cameras
 
-Install `npm i margoengine` and import `margoengine/cameras` (or this package alone: `npm i @margoengine/cameras`, imported as `@margoengine/cameras`; the two are the same module).
+Import `margoengine/cameras` from the `margoengine` package, or `@margoengine/cameras` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Orthographic projection and exactly vertical (top-down and bottom-up) views for core's camera, for CAD, plans, maps
 and isometric views. Culling, `engine.pick`, selection, bvh rays, TAA and every pass that reads `camera.matrix` see the
@@ -6429,7 +6557,7 @@ Errors name their fix. Argument problems throw `RangeError` or `TypeError` (for 
 
 # @margoengine/input
 
-Install `npm i margoengine` and import `margoengine/input` (or this package alone: `npm i @margoengine/input`, imported as `@margoengine/input`; the two are the same module).
+Import `margoengine/input` from the `margoengine` package, or `@margoengine/input` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Semantic actions combine keyboard codes, mouse buttons and relative motion, gamepad axes/buttons, and touch controls.
 
@@ -6489,8 +6617,7 @@ Build and unit tests: npm test --workspace @margoengine/input
 
 # @margoengine/ui
 
-Install `npm i margoengine` and import `margoengine/ui` (or this package alone: `npm i @margoengine/ui`, imported as
-`@margoengine/ui`; the two are the same module).
+Import `margoengine/ui` from the `margoengine` package, or `@margoengine/ui` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Game UI that is drawn inside the engine, so it works in fullscreen and in exported games, with no DOM on top of the
 canvas:
@@ -6581,17 +6708,13 @@ Sizes are UI units. By default one unit is one CSS pixel; see Scaling.
 
 The screen layer is a stack, so a widget with an `anchor` sits at that corner or edge of the screen, inside the safe area:
 
-```ts
-import { Ui, Panel, Label } from '@margoengine/ui';
-```
-
 [README continues: https://margoengine.com/llms/packages/ui.md]
 
 === @margoengine/viewcube (packages/viewcube/README.md) ===
 
 # @margoengine/viewcube
 
-Install `npm i margoengine` and import `margoengine/viewcube` (or this package alone: `npm i @margoengine/viewcube`, imported as `@margoengine/viewcube`; the two are the same module).
+Import `margoengine/viewcube` from the `margoengine` package, or `@margoengine/viewcube` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 A CAD orientation cube for Margo Engine: a small cube in a corner of the view that turns with the camera. Click a face,
 edge or corner and the camera animates around its target to that view (Top, Front, Right, ..., the twelve edge views
@@ -6654,7 +6777,7 @@ out leaves controls' bundle and dependencies unchanged.
 
 # @margoengine/selection
 
-Install `npm i margoengine` and import `margoengine/selection` (or this package alone: `npm i @margoengine/selection`, imported as `@margoengine/selection`; the two are the same module).
+Import `margoengine/selection` from the `margoengine` package, or `@margoengine/selection` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Visible core and PBR selection outlines using Jump Flood Algorithm distance fields or circular morphological dilation. `Selection.set` discovers glTF Pro/FBX buffers from their loader-owned mesh nodes; no separate outline registration is required.
 
@@ -6726,7 +6849,7 @@ Loader-owned PBR nodes are discovered automatically. Explicit `add(model)` regis
 
 # @margoengine/audio
 
-Install `npm i margoengine` and import `margoengine/audio` (or this package alone: `npm i @margoengine/audio`, imported as `@margoengine/audio`; the two are the same module).
+Import `margoengine/audio` from the `margoengine` package, or `@margoengine/audio` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Web Audio listener, global and positional sounds, encoded-file loading and a frequency analyser for Margo Engine.
 
@@ -6785,13 +6908,13 @@ Errors carry a stable `code` (`error.code`): `disposed` for a sound used after `
 
 # @margoengine/physics
 
-Install `npm i margoengine` and import `margoengine/physics` (or this package alone: `npm i @margoengine/physics`, imported as `@margoengine/physics`; the two are the same module).
+Import `margoengine/physics` from the `margoengine` package, or `@margoengine/physics` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Rigid-body physics for Margo Engine on [Rapier](https://rapier.rs): a fixed-step engine plugin with interpolation, colliders (compound and convex-decomposed ones included), joints (rope and spring included), ropes and chains, ray-cast vehicles, scene queries, collision events and a character controller.
 
 Build from source with `npm run build` in `packages/physics`.
 
-Covers the plugin-style physics API developers know from other engines (`HavokPlugin`, `PhysicsAggregate`, `PhysicsBody`, `PhysicsShape*`, `Physics6DoFConstraint` and friends) and the usual React physics components (`<Physics>`, `<RigidBody>`, collider components, joints, `useRapier` queries and events). Rapier is not bundled: you install `@dimforge/rapier3d-compat` (Apache-2.0) yourself and pass the initialized module in.
+It exports `Physics` (the world: bodies, colliders, joints, queries and events), `PhysicsBody`, `PhysicsJoint`, `CharacterController`, `Vehicle` and `Rope`. The React components in `@margoengine/react/physics` are `<Physics>`, `<RigidBody>`, the collider components (`CuboidCollider`, `BallCollider` and others), `useJoint`, `usePhysics`, `useBeforePhysicsStep` and `useAfterPhysicsStep`. Rapier is not bundled: you install `@dimforge/rapier3d-compat` (Apache-2.0) yourself and pass the initialized module in.
 
 ```ts
 import RAPIER from '@dimforge/rapier3d-compat';
@@ -6864,7 +6987,7 @@ physics.addJoint(hook, bob, {type: 'spring', restLength: 1, stiffness: 50, dampi
 
 # @margoengine/navmesh
 
-Install `npm i margoengine` and import `margoengine/navmesh` (or this package alone: `npm i @margoengine/navmesh`, imported as `@margoengine/navmesh`; the two are the same module).
+Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, and `@margoengine/navmesh/build` generates the walkable polygons from level triangles.
 
@@ -6913,7 +7036,7 @@ console.log(nav.route([1,0,1], [8,0,1])?.offMesh, removeCrate);
 
 # @margoengine/ecs
 
-Install `npm i margoengine` and import `margoengine/ecs` (or this package alone: `npm i @margoengine/ecs`, imported as `@margoengine/ecs`; the two are the same module).
+Import `margoengine/ecs` from the `margoengine` package, or `@margoengine/ecs` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 A bounded sparse-set ECS with packed Float32, Float64, Int32, Uint32 and Uint8 component fields.
 
@@ -6937,7 +7060,7 @@ Build and unit tests: npm test --workspace @margoengine/ecs
 
 # @margoengine/fsm
 
-Install `npm i margoengine` and import `margoengine/fsm` (or this package alone: `npm i @margoengine/fsm`, imported as `@margoengine/fsm`; the two are the same module).
+Import `margoengine/fsm` from the `margoengine` package, or `@margoengine/fsm` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Hierarchical states preserve common ancestors during transitions, bubble events from leaf to root, and expose previous/state/blend for cross-fades.
 
@@ -6960,7 +7083,7 @@ Build and unit tests: npm test --workspace @margoengine/fsm
 
 # @margoengine/net
 
-Install `npm i margoengine` and import `margoengine/net` (or this package alone: `npm i @margoengine/net`, imported as `@margoengine/net`; the two are the same module).
+Import `margoengine/net` from the `margoengine` package, or `@margoengine/net` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Bounded snapshot interpolation for position, quaternion and velocity, with capped dead reckoning.
 
@@ -6982,7 +7105,7 @@ Build and unit tests: npm test --workspace @margoengine/net
 
 # @margoengine/voxel-net
 
-Install `npm i margoengine` and import `margoengine/voxel-net` (or this package alone: `npm i @margoengine/voxel-net`, imported as `@margoengine/voxel-net`; the two are the same module).
+Import `margoengine/voxel-net` from the `margoengine` package, or `@margoengine/voxel-net` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Multiplayer for `@margoengine/voxel` worlds: an authoritative Node server, a client that runs in browsers and Node,
 and headless bots for load tests. Clean-room code with no third-party runtime package: the WebSocket server (RFC 6455)
@@ -7051,14 +7174,14 @@ Apache-2.0. Build and tests: `npm test --workspace @margoengine/voxel-net`.
 
 # @margoengine/machinery
 
-Install `npm i margoengine` and import `margoengine/machinery` (or this package alone: `npm i @margoengine/machinery`, imported as `@margoengine/machinery`; the two are the same module).
+Import `margoengine/machinery` from the `margoengine` package, or `@margoengine/machinery` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Joints and couplings, bounded IK, Wasm surface transport, binary telemetry, worker CAD import, stencil sections, assembly BVH picking and metrology for Margo Engine.
 
-Package name: `@margoengine/machinery`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/machinery`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
-npm install @margoengine/core@0.1.0 @margoengine/machinery@0.1.0
+npm install @margoengine/core@1.0.0 @margoengine/machinery@1.0.0
 ```
 
 ```ts
@@ -7110,7 +7233,7 @@ const model = await loadCAD(engine, '/part.step', {
 
 # @margoengine/bvh
 
-Install `npm i margoengine` and import `margoengine/bvh` (or this package alone: `npm i @margoengine/bvh`, imported as `@margoengine/bvh`; the two are the same module).
+Import `margoengine/bvh` from the `margoengine` package, or `@margoengine/bvh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Triangle bounding volume hierarchy (`MeshBVH`, `shapecast`, `intersectsGeometry`), spatial queries and a CPU `Raycaster` for Margo Engine.
 
@@ -7179,7 +7302,7 @@ corrupt node links throw instead of looping.
 
 # @margoengine/geometry
 
-Install `npm i margoengine` and import `margoengine/geometry` (or this package alone: `npm i @margoengine/geometry`, imported as `@margoengine/geometry`; the two are the same module).
+Import `margoengine/geometry` from the `margoengine` package, or `@margoengine/geometry` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `wireframePositions(data, offsetY = 0)` expands distinct triangle edges into a
 contiguous line-position stream with an optional vertical lift for terrain debug views.
@@ -7264,7 +7387,7 @@ const wave = parametricGeometry((u, v) => [u * 4 - 2, Math.sin(u * 6) * 0.2, v *
 
 # @margoengine/mesh-edit
 
-Install `npm i margoengine` and import `margoengine/mesh-edit` (or this package alone: `npm i @margoengine/mesh-edit`, imported as `@margoengine/mesh-edit`; the two are the same module).
+Import `margoengine/mesh-edit` from the `margoengine` package, or `@margoengine/mesh-edit` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Optional, tree-shakable CPU polygon editing, UV allocation and pixel painting for Margo. Input meshes retain indexed positions, caller face IDs and independent normalized top-left UVs at every polygon corner. Commands return owned geometry and explicit old-to-new component provenance; caller document metadata is excluded.
 
@@ -7309,8 +7432,7 @@ never load it. Edge IDs are `"low:high"` vertex pairs (see `polygonMeshEdges`):
 
 # @margoengine/compute
 
-Install `npm i margoengine` and import `margoengine/compute` (or this package alone: `npm i @margoengine/compute`,
-imported as `@margoengine/compute`; the two are the same module).
+Import `margoengine/compute` from the `margoengine` package, or `@margoengine/compute` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 GPU compute without the WebGPU boilerplate, for data science and for engine work. It feels like NumPy: N-dimensional
 typed arrays with views and broadcasting, element-wise expressions that fuse into a single kernel, reductions and
@@ -7391,13 +7513,6 @@ The element-wise methods:
 
 ```ts
 import { createCompute } from '@margoengine/compute';
-
-using gpu = await createCompute();
-const x = gpu.array(new Float32Array([-2, -1, 0, 1, 2]));
-const relu = gpu.where(x.gt(0), x, 0); // [0, 0, 0, 1, 2]
-const table = gpu.arange(1, 4, 1, 'f32').reshape(3, 1).mul(gpu.arange(1, 4, 1, 'f32')); // 3 x 3 broadcast
-const custom = gpu.map(x, 'x * x * sign(x)');
-console.log(await relu.read(), await table.read(), await custom.read());
 ```
 
 [README continues: https://margoengine.com/llms/packages/compute.md]
@@ -7406,8 +7521,7 @@ console.log(await relu.read(), await table.read(), await custom.read());
 
 # @margoengine/sciviz
 
-Install `npm i margoengine` and import `margoengine/sciviz` (or this package alone: `npm i @margoengine/sciviz`,
-imported as `@margoengine/sciviz`; the two are the same module).
+Import `margoengine/sciviz` from the `margoengine` package, or `@margoengine/sciviz` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Scientific visualisation for Margo Engine, WebGPU:
 
@@ -7619,7 +7733,12 @@ Options and defaults:
 
 # @margoengine/react
 
-Install `npm i margoengine` and import `margoengine/react` (or this package alone: `npm i @margoengine/react`, imported as `@margoengine/react`; the two are the same module).
+React 18 and 19 components and hooks for Margo Engine: a native canvas, pointer events, Suspense, stable mesh refs and
+frame callbacks. There is no custom reconciler: `<Canvas>` creates one engine, and its children are ordinary React
+components that edit it.
+
+Import it as `margoengine/react` (from the `margoengine` package) or `@margoengine/react` (from this package alone);
+the two are the same module. Optional parts load only when a component needs them, so an unused feature costs nothing.
 
 With Vite, installing this package alone (plus the peers your components use, such as `@margoengine/controls` for
 `OrbitControls`) keeps the build to what you import: a cube page with orbit controls loads 95,338 B gzip (70% of it React and React DOM) and emits no
@@ -7627,23 +7746,57 @@ Wasm. `margoengine` installs every package, so the build also writes the lazy lo
 decoders, CAD import with OpenCascade's Wasm) to `dist`; the page never requests them. Webpack and Turbopack (Next.js)
 need `margoengine` ([limits.md](../../docs/limits.md), React app budget).
 
-React 18/19 integration with a native canvas, pointer events, Suspense, stable mesh refs and frame callbacks. There is no custom reconciler.
 
-Scene helpers, controls, post effects and XR are available from one
-`@margoengine/react` import; physics comes from `@margoengine/react/physics`, so an app without it never needs
-Rapier installed (bundlers resolve every `import()` they reach). The [`kit`, `post`, `physics` and `xr` subpaths](SCENE.md)
-remain available. Unused bindings are tree-shaken, and optional native peers
-load only when their components need them.
+**What you get from this page:** a React app with a lit mesh in about five minutes, then the components, hooks,
+controls, physics, XR and Next.js notes, the rule for React state against the frame loop, and a troubleshooting list.
+For a textured, shadowed scene with click-to-select, follow the [React first scene guide](../../docs/guides/react-first-scene.md).
 
-Package name: `@margoengine/react`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
+Contents: [Install](#install), [First scene](#first-scene), [Components](#components), [Models and environment](#models-and-environment),
+[Batching, views, lights and voxels](#batching-views-lights-and-voxels), [Hooks](#hooks), [Controls](#controls),
+[Physics](#physics), [XR](#xr), [Next.js](#nextjs), [State vs the frame loop](#state-vs-the-frame-loop),
+[Build warnings](#build-warnings), [Testing and size](#testing-and-size), [Troubleshooting](#troubleshooting).
 
-From a repository checkout, run `npm ci` and `npm run build:packages`.
-`npm run pack:packages` creates local tarballs in `test-results/` for use outside
-the workspace. See [SCENE.md](SCENE.md) for the optional peers each component
-uses. Registry installation commands will accompany a verified release.
+## Install
+
+Package name: `@margoengine/react`, version `1.0.0`. **It is not on npm yet**, so `npm install @margoengine/react` does
+not work today. Two routes do. Both start from a clone of the repository (see [Install](../../README.md#install) in the
+main README for Git LFS and Node.js 22.12+).
+
+**Route 1: a Vite app of your own, from local tarballs.** In the clone:
+
+```sh
+npm ci
+npm run pack:packages
+```
+
+`pack:packages` builds every package and writes one `.tgz` file each to `test-results/`. Then, in a new folder next to
+the clone (shown for a shell that expands `*.tgz`, such as Git Bash, macOS or Linux):
+
+```sh
+mkdir my-react-app && cd my-react-app
+npm init -y
+npm pkg set type=module
+npm install ../margoengine/test-results/*.tgz react react-dom vite @vitejs/plugin-react typescript @types/react @types/react-dom
+```
+
+On the machine that wrote this page, packing took about a minute and the install 8 seconds. Add an `index.html` with
+`<div id="root"></div>` and `<script type="module" src="/src/main.tsx"></script>`, put the first scene below in
+`src/main.tsx` (add the `createRoot` line at the end), and run `npx vite`. The test `tests/react-bundle.test.js` builds
+exactly this app for production on every `npm run verify`.
+
+**Route 2: use the examples inside the clone.** `npm ci`, `npm run build:packages`, then
+`npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example.
+
+**After 1.0.0 is published**, `npm install margoengine react react-dom` replaces the tarballs and nothing else changes.
+[SCENE.md](SCENE.md) lists the optional peers each component uses.
+
+## First scene
+
+A box lit by the default sun, with a click handler:
 
 ```tsx
 import { Suspense } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial, Model } from 'margoengine/react';
 
 export function App() {
@@ -7661,48 +7814,15 @@ export function App() {
     </Canvas>
   );
 }
+
+createRoot(document.getElementById('root')!).render(<App />);
 ```
+
+The `Model` line needs a `.glb` file at `public/model.glb`; delete it for a scene with only the box.
+
+## Components
 
 `Stage` configures the existing canvas stage and renders its children once that stage is available. Its `camera` prop updates the active camera; `shadows` uses the canvas's existing optional `@margoengine/shadows` lifecycle. Install that peer when enabling shadows. Canvas still creates and disposes the single engine and stage.
-
-`Mesh` and `Model` accept `onClick`, `onPointerOver`, and `onPointerOut`. The canvas dispatches hits from its existing `engine.pick`; a click requires no more than three CSS pixels of total pointer movement, so OrbitControls drags do not click. Handlers receive `nativeEvent`, the hit mesh as `object`, `mesh`, and `target`, canvas-local `x`/`y`, and `clientX`/`clientY`.
-
-`Group` is a geometry-free `Mesh` for parent transforms. Lowercase exports are aliases of the same hook-based components: `mesh === Mesh`, `group === Group`, `boxGeometry === BoxGeometry`, and `meshStandardMaterial === PbrMaterial`. Use a namespace in JSX:
-
-```tsx
-import * as Margo from 'margoengine/react';
-
-<Margo.Canvas style={{ height: 400 }}>
-  <Margo.Stage camera={{ position: [0, 2, 5] }}>
-    <Margo.group position={[0, 1, 0]}>
-      <Margo.mesh>
-        <Margo.boxGeometry args={[1, 1, 1]} />
-        <Margo.meshStandardMaterial color="#84d6bd" />
-      </Margo.mesh>
-    </Margo.group>
-  </Margo.Stage>
-</Margo.Canvas>;
-```
-
-React treats bare lowercase tags such as `<mesh>` and `<group>` as DOM elements, even when their names are imported. Namespace members such as `<Margo.mesh>` and `<Margo.group>` (or uppercase import bindings) invoke these components. All existing PascalCase exports remain available.
-
-Optional model, lighting and control components can be used directly under the canvas:
-
-```tsx
-'use client';
-import { Suspense } from 'react';
-import { MargoCanvas, Model, Environment, OrbitControls } from 'margoengine/react';
-
-export default function App() {
-  return <MargoCanvas backend="webgpu" camera={{ position: [0, 2, 5] }} shadows style={{ height: 400 }}>
-    <Suspense fallback={<span>Loading scene…</span>}>
-      <Model src="/model.glb" position={[0, 0, 0]} materials={{ Upper: { baseColor: [0.52, 0.84, 0.74] } }} castShadow receiveShadow />
-      <Environment src="/studio.hdr" exposure={1} background />
-    </Suspense>
-    <OrbitControls enableDamping minDistance={1} maxDistance={20} />
-  </MargoCanvas>;
-}
-```
 
 [README continues: https://margoengine.com/llms/packages/react.md]
 

@@ -481,7 +481,7 @@ What the numbers mean, by scope. None of them is "the size of your app":
 - **The OpenCascade Wasm (7.6 MB):** fetched only by an app that loads STEP or IGES files. In other apps it can be in the
   build output but is never requested.
 
-Other limits, each with its measured cost, are in [docs/limits.md](../../docs/limits.md). A per-dependency breakdown of a React build is not published yet.
+The measured breakdown of a React build, package by package, is in [docs/limits.md](../../docs/limits.md#react-page).
 
 ## Troubleshooting
 
