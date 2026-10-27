@@ -2790,6 +2790,20 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### VoxelRenderer draws nothing for a few frames after an effect is taken out of the middle
+
+- **Repro:** add two lighting effects to a `VoxelRenderer` (`shadows.add(voxels)`, then `clustered.add(voxels)`), let
+  both compile, then call the shadows remover: `voxels.stats.compiling` is true and `draws` 0 until the composition
+  with the clustered light alone has compiled (about 2 frames on an Intel UHD, 1 on an RTX A6000), so the clear colour
+  shows through for those frames.
+- **Cause:** the pipelines with the removed effect cannot keep drawing (they bind its resources, which its owner may
+  dispose right away), and a composition never drawn before has nothing compiled. Since bug 29 the last four
+  compositions stay compiled, so taking effects out in the reverse order they were added, or putting one back, draws
+  at once (`packages/voxel/tests/render.test.js` "addLighting", `render-lighting-browser-check.mjs` clustered).
+- **Fix needed:** draw with the remaining effects' last pipelines and a neutral stand-in for the removed effect's
+  bindings while the new composition compiles, or compile the compositions without each effect ahead of time; either
+  with a check that the frame right after an out-of-order removal is drawn.
+
 ### The packed-browser step of `modern:test:packages` can miss its 30 s page-load limit on a busy machine
 
 - **What:** `scripts/modern-package-tests.js` (`packedBrowser`) waits 30 s for `window.modern` after the first page load,
