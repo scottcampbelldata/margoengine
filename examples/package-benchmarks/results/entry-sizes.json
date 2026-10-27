@@ -1,5 +1,5 @@
 {
-  "commit": "dca4d667",
+  "commit": "05e6228b",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -994,24 +994,24 @@
     },
     "@margoengine/react": {
       ".": {
-        "raw": 71277,
-        "gzip": 24092
+        "raw": 71207,
+        "gzip": 24074
       },
       "./kit": {
-        "raw": 31613,
-        "gzip": 11233
+        "raw": 31542,
+        "gzip": 11208
       },
       "./post": {
         "raw": 10058,
         "gzip": 3608
       },
       "./physics": {
-        "raw": 15110,
-        "gzip": 5752
+        "raw": 15128,
+        "gzip": 5757
       },
       "./xr": {
-        "raw": 7909,
-        "gzip": 3338
+        "raw": 7927,
+        "gzip": 3343
       }
     },
     "@margoengine/rigging": {
