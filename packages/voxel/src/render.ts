@@ -355,6 +355,12 @@ export interface VoxelRendererStats {
    * background; the previous ones keep drawing meanwhile, or nothing on the first frames (`draws` is 0).
    */
   readonly compiling: boolean;
+  /**
+   * Chunks still on their way to the GPU: changed and not yet sent to the mesher, being meshed in a worker, or meshed
+   * and waiting for their upload (about 4 MiB a frame). 0 once the frame shows every chunk the world holds. Wait for
+   * it rather than for a number of frames: how long meshing takes depends on the CPU.
+   */
+  readonly pending: number;
 }
 
 // First fit over runs of free pages: [start, length] pairs sorted by start, neighbours merged.
@@ -561,7 +567,10 @@ export class VoxelRenderer implements EnginePlugin {
   #postView = new Float32Array(16);
   #frustum = new Frustum();
   #box = { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } };
-  #stats = { chunks: 0, visible: 0, quads: 0, triangles: 0, bytes: 0, draws: 0, compiling: false };
+  #stats = { chunks: 0, visible: 0, quads: 0, triangles: 0, bytes: 0, draws: 0, compiling: false, pending: 0 };
+  // Mesher jobs in flight: chunk key -> the job's number (a newer job for a key supersedes the older one).
+  #meshing = new Map<string, number>();
+  #jobs = 0;
   #effects = new Set<VoxelRendererEffect>();
   #capture?: VoxelCapture;
   #disposeListeners = new Set<() => void>();
@@ -1170,12 +1179,21 @@ export class VoxelRenderer implements EnginePlugin {
         this.#finished.set(key, { mesh: AIR, priority, eye });
         continue;
       }
+      const job = ++this.#jobs;
+      this.#meshing.set(key, job);
+      const settled = () => {
+        if (this.#meshing.get(key) === job) this.#meshing.delete(key);
+      };
       this.#mesher.mesh(world, key, priority, eye).then(
         (mesh) => {
+          settled();
           if (mesh && generation === this.#generation && !this.#disposed)
             this.#finished.set(key, { mesh, priority, eye });
         },
-        (error) => this.#engine?.onError(error),
+        (error) => {
+          settled();
+          this.#engine?.onError(error);
+        },
       );
     }
   }
@@ -1538,6 +1556,7 @@ export class VoxelRenderer implements EnginePlugin {
     }
     stats.bytes = this.#pages.used * PAGE_BYTES;
     stats.draws += list.length;
+    stats.pending = this.world.dirty.size + this.#meshing.size + this.#finished.size;
     if (this.#slotTop) gpu.device.queue.writeBuffer(gpu.args, 0, args, 0, this.#slotTop * 10);
     list.sort((a, b) => distance(b) - distance(a));
     // Quad (and triangle) order inside near chunks, from the camera's position, when it moved RESORT blocks since the

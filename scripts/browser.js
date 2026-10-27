@@ -3,6 +3,7 @@ import { createServer } from 'vite';
 import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
+import { trackPipelines } from './support/gpu-ready.js';
 
 /**
  * Starts a server on a fixed port with `start` (for example `() => server.listen()`), waiting while something else holds
@@ -120,6 +121,37 @@ export function perturbBuiltinMath(scale) {
   };
 }
 
+/**
+ * Page init script for a slow CPU: every message a Worker posts to the page arrives `ms` later (the `onmessage` and
+ * `addEventListener('message')` handlers run late; the messages are unchanged). A check that waits a fixed number of
+ * frames for meshes or decodes from workers fails here as it would on a slower machine. `openBrowser({
+ * workerDelayMs })`, MARGO_WORKER_DELAY_MS or `--worker-delay=<ms>` (the `:slow-mesh` scripts).
+ */
+export function delayWorkerMessages(ms) {
+  if (typeof Worker === 'undefined') return;
+  const proto = Worker.prototype,
+    property = Object.getOwnPropertyDescriptor(proto, 'onmessage'),
+    handlers = new WeakMap(),
+    late = (target, handler) => (event) => setTimeout(() => handler.call(target, event), ms);
+  if (property?.set)
+    Object.defineProperty(proto, 'onmessage', {
+      configurable: true,
+      enumerable: property.enumerable,
+      get() {
+        return handlers.get(this) ?? null;
+      },
+      set(handler) {
+        handlers.set(this, handler);
+        property.set.call(this, typeof handler === 'function' ? late(this, handler) : handler);
+      },
+    });
+  const add = proto.addEventListener;
+  proto.addEventListener = function (type, listener, options) {
+    if (type !== 'message' || typeof listener !== 'function') return add.call(this, type, listener, options);
+    return add.call(this, type, late(this, listener), options);
+  };
+}
+
 export async function openBrowser({
   browserName = 'chromium',
   channel = process.env.BROWSER_CHANNEL ?? 'msedge',
@@ -134,6 +166,11 @@ export async function openBrowser({
   pipelineDelayMs = Number(
     process.env.MARGO_PIPELINE_DELAY_MS ??
       process.argv.find((a) => a.startsWith('--pipeline-delay='))?.slice('--pipeline-delay='.length) ??
+      0,
+  ),
+  workerDelayMs = Number(
+    process.env.MARGO_WORKER_DELAY_MS ??
+      process.argv.find((a) => a.startsWith('--worker-delay='))?.slice('--worker-delay='.length) ??
       0,
   ),
   mathErrorScale = Number(
@@ -174,6 +211,9 @@ export async function openBrowser({
     await page.addInitScript(wgslGuard);
     if (pipelineDelayMs > 0) await page.addInitScript(delayPipelines, pipelineDelayMs);
     if (mathErrorScale > 0) await page.addInitScript(perturbBuiltinMath, mathErrorScale);
+    if (workerDelayMs > 0) await page.addInitScript(delayWorkerMessages, workerDelayMs);
+    // After the delay, so the count of pipelines in flight includes it (scripts/support/gpu-ready.js).
+    await page.addInitScript(trackPipelines);
     const wgsl = watchWgsl(page);
     let reloads = 0,
       handledReloads = 0;
@@ -234,6 +274,7 @@ export async function openBrowser({
     hardware.headless = headless;
     if (pipelineDelayMs > 0) hardware.pipelineDelayMs = pipelineDelayMs;
     if (mathErrorScale > 0) hardware.mathErrorScale = mathErrorScale;
+    if (workerDelayMs > 0) hardware.workerDelayMs = workerDelayMs;
     if (browserName === 'firefox') hardware.firefoxUserPrefs = firefoxUserPrefs;
     if (process.env.GPU_VENDOR) {
       assert.ok(
@@ -252,8 +293,8 @@ export async function openBrowser({
       hardware,
       wgsl,
       async close() {
-        // Compilation info arrives asynchronously: let the last reports in before reading them.
-        await page.evaluate(() => new Promise((r) => setTimeout(r, 200))).catch(() => {});
+        // Compilation info arrives asynchronously: wait for every report (wgsl-guard keeps them) before reading them.
+        await page.evaluate(() => Promise.all(globalThis.__margoWgslReports ?? [])).catch(() => {});
         await browser.close();
         await server.close();
         if (wgsl.modules.size)

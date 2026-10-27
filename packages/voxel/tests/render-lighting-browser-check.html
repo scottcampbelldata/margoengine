@@ -93,7 +93,7 @@ window.check={
   const shadows=Shadows.attach(engine,{distance:60,cascades:1,filter:'hard',resolution:2048}),remove=shadows.add(renderer,{static:true});
   const {img,frames}=await until((i)=>at(i,P.under)[0]<1e-4&&at(i,P.square)[0]<1e-4);
   const after=probe(img,P);
-  // Still frames: the static map is reused, nothing redrawn.
+  // Still frames: the static map is reused, nothing redrawn. fixed-wait: five still frames are what the check counts.
   const hits=shadows.stats.cacheHits;for(let i=0;i<5;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();}
   const still={cacheHits:shadows.stats.cacheHits-hits};
   // Removing the slab: frames (60 Hz) until the floor under it is lit again.

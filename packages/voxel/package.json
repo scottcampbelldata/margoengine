@@ -98,6 +98,7 @@
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
     "test:gpu": "cd ../.. && node packages/voxel/tests/render-browser-check.mjs && node packages/voxel/tests/bevel-browser-check.mjs && node packages/voxel/tests/render-lighting-browser-check.mjs",
-    "test:gpu:slow-compile": "cd ../.. && node packages/voxel/tests/bevel-browser-check.mjs --pipeline-delay=500"
+    "test:gpu:slow-compile": "cd ../.. && node packages/voxel/tests/bevel-browser-check.mjs --pipeline-delay=500",
+    "test:gpu:slow-mesh": "cd ../.. && node packages/voxel/tests/bevel-browser-check.mjs --worker-delay=150"
   }
 }

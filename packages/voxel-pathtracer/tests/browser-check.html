@@ -6,14 +6,14 @@ import {Engine} from '/packages/core/dist/index.js';
 import {Camera,box,engineRuntime} from '/packages/core/dist/extension.js';
 import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
 import {motionCheck} from './motion-browser.js';
-const canvas=document.querySelector('canvas'),errors=[],messages=[];
+const canvas=document.querySelector('canvas'),errors=[],messages=[],reports=[];
 const runtime=()=>engineRuntime(engine);
 const device=()=>runtime().gpu;
 // Shader diagnostics: every module the page creates reports its compilation messages.
 const watch=(d)=>{
  d.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
  const create=d.createShaderModule.bind(d);
- d.createShaderModule=(desc)=>{const m=create(desc);m.getCompilationInfo().then((info)=>{for(const x of info.messages)messages.push(`${x.type} ${x.lineNum}:${x.linePos} ${x.message}`);});return m;};
+ d.createShaderModule=(desc)=>{const m=create(desc);reports.push(m.getCompilationInfo().then((info)=>{for(const x of info.messages)messages.push(`${x.type} ${x.lineNum}:${x.linePos} ${x.message}`);}));return m;};
 };
 const engine=await Engine.create(canvas,{backend:'webgpu',features:['timestamp-query'],camera:{position:[20,14,24],target:[4,3,4],near:0.1,far:2000}});
 watch(device());
@@ -307,8 +307,9 @@ window.check={
  },
  async compile(){
   const scene=scenes.materials();
-  const r=await withTracer(scene,{denoise:true},async(tracer)=>{await frames(4);await new Promise((r)=>setTimeout(r,300));await frames(4);return {status:tracer.status,stats:tracer.stats};});
-  await new Promise((r)=>setTimeout(r,300));
+  // Frames until the tracer is ready and has traced (a slow driver compiles for seconds), then every compilation report.
+  const r=await withTracer(scene,{denoise:true},async(tracer)=>{const t0=performance.now();while(tracer.status!=='ready'||!(tracer.stats.samples>0)){if(performance.now()-t0>60000)throw new Error(`tracer ${tracer.status} after 60 s`);await frames(1);await new Promise((r)=>setTimeout(r,1));}return {status:tracer.status,stats:tracer.stats};});
+  await Promise.all(reports.splice(0));
   return {...r,messages:messages.splice(0),errors:errors.splice(0)};
  },
  // The preview kernel: while the full tracer compiles (about 2 s), frames already show the lit scene.
@@ -1160,9 +1161,11 @@ window.check={
    look([18,14,26],[-3,3,-2]);
    const tracer=VoxelPathTracer.attach(engine,{scene:scenes.materials(),maxSamples:Infinity,...options});
    await tracer.ready;
+   // fixed-wait: warm-up frames before the GPU timing below (the tracer is ready: await tracer.ready above)
    for(let i=0;i<5;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();}
    const gpu=[];
    // The camera moves a little every frame: the denoiser reprojects its history each time.
+   // fixed-wait: 20 timed frames of a moving camera (a measurement, not a wait)
    for(let i=0;i<20;i++){look([18+0.05*i,14,26-0.04*i],[-3,3,-2]);engine.render({delta:0});await read.mapAsync(GPUMapMode.READ);const s=new BigInt64Array(read.getMappedRange().slice(0));read.unmap();gpu.push(Number(s[1]-s[0])/1e6);}
    const st=tracer.stats;
    results[name]={canvas:[canvas.width,canvas.height],traced:[st.width,st.height],requested:[st.requestedWidth,st.requestedHeight],limitedBy:st.limitedBy??null,gpuMs:[...gpu].sort((x,y)=>x-y)[gpu.length>>1],gpuBytes:st.gpuBytes,limits:{binding:d.limits.maxStorageBufferBindingSize,texture:d.limits.maxTextureDimension2D}};
@@ -1200,6 +1203,7 @@ window.check={
    look(...camera);
    const a0=performance.now(),tracer=VoxelPathTracer.attach(engine,{scene,maxSamples:Infinity,...options}),attachMs=performance.now()-a0;
    await tracer.ready;
+   // fixed-wait: warm-up frames before the GPU timing below (the tracer is ready: await tracer.ready above)
    for(let i=0;i<10;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();}
    const gpu=[],cpu=[];
    for(let i=0;i<40;i++){const c0=performance.now();engine.render({delta:0});cpu.push(performance.now()-c0);await read.mapAsync(GPUMapMode.READ);const s=new BigInt64Array(read.getMappedRange().slice(0));read.unmap();gpu.push(Number(s[1]-s[0])/1e6);}

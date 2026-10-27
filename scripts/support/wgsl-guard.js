@@ -29,7 +29,8 @@ export function wgslGuard() {
     if (!seen.has(key) && !label.startsWith('check-wgsl:')) {
       seen.add(key);
       console.debug(`[wgsl] module ${key}`);
-      module.getCompilationInfo().then((info) => {
+      // Kept until settled, so a harness can wait for every report (scripts/browser.js close()).
+      const report = module.getCompilationInfo().then((info) => {
         const lines = code.split('\n'),
           errors = info.messages.filter((m) => m.type === 'error');
         if (label.startsWith('expect-error:')) {
@@ -41,6 +42,7 @@ export function wgslGuard() {
             `[wgsl] error ${descriptor.label ?? key} ${m.lineNum}:${m.linePos} ${m.message} | ${(lines[m.lineNum - 1] ?? '').trim().slice(0, 160)}`,
           );
       });
+      (globalThis.__margoWgslReports ??= []).push(report.catch(() => {}));
     }
     return module;
   };

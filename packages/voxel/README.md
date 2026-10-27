@@ -591,7 +591,7 @@ engine.onFrame(() => lighting.update());
 world.setBlock(x, y, z, stone); // drawn two frames later
 textures.set(3, canvas); // live
 voxels.daylight = 0.3; // dusk: sky light dims, block light (torches) does not
-voxels.stats; // {chunks, visible, quads, triangles, bytes, draws, compiling} of the last frame
+voxels.stats; // {chunks, visible, quads, triangles, bytes, draws, compiling, pending} of the last frame
 voxels.dispose(); // workers and GPU buffers; textures.dispose() separately
 ```
 
@@ -680,7 +680,8 @@ voxels.blockLightColor = [1, 0.7, 0.45]; // torches warmer
 - **Effects.** `addLighting(effect)` takes any object with glTF-pro's lighting hooks (`pbr(group)`, `bindings()`):
   `Shadows`, `Clustered`, `Fog` and `EnvironmentLighting` call it from their `add`. The shader is composed again and
   compiled in the background; until it is ready the previous pipelines keep drawing (`stats.compiling` is true
-  meanwhile). Each effect's remover takes it out again. Effects' bindings are group 1 (shadows 1-3, clustered 4-7, IBL 20-24, fog 25).
+  meanwhile). `stats.pending` counts the chunks not yet on the GPU (changed, meshing or waiting for upload): a frame
+  with `pending` 0, `compiling` false and `draws` above 0 shows the whole world. Each effect's remover takes it out again. Effects' bindings are group 1 (shadows 1-3, clustered 4-7, IBL 20-24, fog 25).
 - **Shadows.** `drawShadow` draws the opaque and cutout chunks inside each cascade (CPU-culled per cascade) into the
   map, cutout blocks alpha tested at their texture's level 0; translucent blocks cast none. Every quad reaches 1/64
   block past its edges in the map, so T-junction slivers cannot let light through and merged and unit quads cast the

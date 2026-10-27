@@ -74,10 +74,11 @@ test('startup hardware probing waits through a confirmed Vite dependency reload'
   assert.equal(state.probes, 2);
   assert.equal(state.waits, 1);
   assert.equal(session.page, state.page);
-  // The WGSL compile guard is installed before the first navigation.
+  // The WGSL compile guard and the pipeline counter (scripts/support/gpu-ready.js) are installed before the first
+  // navigation.
   assert.deepEqual(
     state.initScripts.map((f) => f.name),
-    ['wgslGuard'],
+    ['wgslGuard', 'trackPipelines'],
   );
   await session.close();
   assert.equal(state.browserCloses, 1);

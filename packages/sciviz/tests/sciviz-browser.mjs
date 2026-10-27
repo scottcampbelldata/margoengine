@@ -52,7 +52,9 @@ try {
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.ready === 'true', null, {
       timeout: 120_000,
     });
-    await page.waitForTimeout(500);
+    // Settled: no pipeline still compiling (scripts/support/gpu-ready.js counts them) and every WGSL report in.
+    await page.waitForFunction(() => (globalThis.__margoPipelines?.pending ?? 0) === 0, null, { timeout: 120_000 });
+    await page.evaluate(() => Promise.all(globalThis.__margoWgslReports ?? []));
     const status = await page.evaluate(() => document.querySelector('#status')?.textContent ?? '');
     assert.deepEqual(errors, [], `${demo}: ${status}`);
     assert.doesNotMatch(status, /Could not/, `${demo}: ${status}`);
