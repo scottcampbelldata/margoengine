@@ -2653,20 +2653,17 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   its transform that references it, with `orientation = "leftHanded"` for mirrored nodes. It changes the archive's
   layout, so it waits for the Quick Look check of the entry at the top of this page.
 
-### Morph targets: one compute dispatch per primitive
+### Morph targets: CPU per Animation per frame
 
-- **What:** `p-morph`, 100 MorphStressTest copies with 8 weights each changing every frame: 0.51 ms CPU and 1.31 ms
-  GPU a frame against three's WebGL 0.27 and 0.15 (1.06 / 1.57 before entry 28).
-- **Cause (measured, timestamp per pass):** the models draw in one render pass and deform in one compute pass, and
-  that compute pass is 1.18 of the 1.31 ms: 200 small dispatches (MorphStressTest has two primitives, 24 and 1,504
-  vertices; 150,000 vertices in all, a few MB of reads), each writing its own output buffer, which the GPU runs one
-  after another. three applies morph targets in the vertex shader of each draw.
-- **Plan:** dispatch the copies of one primitive together: one dispatch over (vertex, copy) reading each copy's
-  weights and bones, writing one output buffer. Every reader of `PBRPrimitive.deformed` binds it at offset 0 today
-  (gltf-pro draws, shadow caster records, TAA snapshots, selection, the CPU readback), so the copies need a deformed
-  buffer offset in all of them; copying each slice back into its own buffer instead would keep one command per copy
-  and move the cost out of the measured passes, so it is not a fix. The CPU half is the 100 Animations' per-frame
-  checks and uploads.
+- **What:** `p-morph`, 100 MorphStressTest copies with 8 weights each changing every frame: 0.52 ms CPU a frame
+  against three's WebGL 0.27 (run `20261027-032923`). The GPU half of this entry is fixed (perf-history entry 34:
+  1.33 -> 0.19 ms, one dispatch per buffer page and pipeline instead of 200); what is left on the GPU is the 0.05 ms
+  deform pass, an accepted difference in work recorded in the matrix row 12.5.
+- **Cause (not profiled yet):** the CPU time did not move with the batching (0.51 before, 0.52 after), so it sits in
+  the 100 Animations' per-frame work: each one's checks, weight writes and uploads, and the per-model draw records.
+- **Plan:** take a browser CPU profile of a `p-morph` frame, then write the weights of every Animation of a device
+  in one upload (the weights already sit in one shared buffer per page) and skip per-Animation work for models whose
+  inputs did not change.
 
 ### cloneModel: two engine-wide ticks per copy
 
@@ -5878,11 +5875,13 @@ stage.dispose();
 
 Parses glTF skins, joint hierarchies and inverse bind matrices. Samples STEP, LINEAR (quaternion slerp), and CUBICSPLINE tracks. Animation advances in seconds before the engine updates world matrices. A compute pass blends position/normal/tangent morphs before skinning and writes the vertex draw buffer. Bone matrices use read-only storage buffers, bounded by the GPU's storage limits rather than a fixed bone count.
 
+Every skinned or morphed primitive of a device, across all its Animations, lives in a few shared storage buffers and deforms in one compute dispatch per buffer page and influence format (100 morphed models with two primitives each: one dispatch, not 200). Copies of one asset primitive (`cloneModel`) share one copy of its morph deltas and skin influences. A primitive's deformed vertices start `primitive.deformedOffset` bytes (a multiple of 256) into `primitive.deformed`; gltf-pro, shadows, TAA, selection and picking read them there, and a custom reader binds or copies from that offset.
+
 Use `animation.setMorph(nodeIndex, targetIndex, weight)` for manual expressions. Play a clip by name/index; set `loop:false` for one-shot playback. Up to eight influences per vertex are supported through paired `JOINTS_0`/`WEIGHTS_0` and optional `JOINTS_1`/`WEIGHTS_1`. Higher sets reject explicitly. No blending between clips is included.
 
-Four-influence primitives keep their existing 32-byte influence records and exact compute shader. An eight-influence primitive uses a separate 64-byte record and lazily creates its compute pipeline; both formats can coexist in one model. Weights normalize across all present sets, including assets whose positive weights are entirely in the secondary set. Joint indices accept unsigned 8-bit or 16-bit accessors; weights accept Float32 or normalized unsigned 8-bit/16-bit accessors. Both sets require matching vertex counts, valid palette indices, nonnegative weights, and a positive combined sum.
+Four-influence primitives keep their 32-byte influence records and the arithmetic of the per-primitive shader, bit for bit. An eight-influence primitive uses a 64-byte record and a second, lazily created compute pipeline; both formats can coexist in one model. Weights normalize across all present sets, including assets whose positive weights are entirely in the secondary set. Joint indices accept unsigned 8-bit or 16-bit accessors; weights accept Float32 or normalized unsigned 8-bit/16-bit accessors. Both sets require matching vertex counts, valid palette indices, nonnegative weights, and a positive combined sum.
 
-Single-clip playback reuses sample buffers, quaternion arrays, palette matrices, and inverse-bind views. The animation hot path allocates no new typed arrays, quaternion copies, or GPU resources. Device restoration recreates both pipeline variants and their owned buffers. `sampleTrack()` retains its independently owned return value by default; an optional seventh `target: Float32Array` argument lets other consumers reuse their own output storage.
+Single-clip playback reuses sample buffers, quaternion arrays, palette matrices, and inverse-bind views. The animation hot path allocates no new typed arrays, quaternion copies, or GPU resources. Device restoration recreates both pipeline variants and the shared buffers. `sampleTrack()` retains its independently owned return value by default; an optional seventh `target: Float32Array` argument lets other consumers reuse their own output storage.
 
 `createMaterialAnimation(model, {clip?, loop?})` plays a clip's `KHR_animation_pointer` STEP tracks on base-color `KHR_texture_transform` offset and scale (what `@margoengine/exporters` writes from `materialAnimations`): `seek(seconds)` writes the sampled UV transform into every primitive material of the targeted glTF material, and `dispose()` releases its claim on those properties. Given the opt-in `pointers` option, `Animation` also plays those channels, with every other `KHR_animation_pointer` channel it supports (see below); without it, it skips them and counts them in the clip's duration.
 
