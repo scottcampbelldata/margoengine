@@ -8,7 +8,7 @@ import type { EnginePlugin } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { TileContent } from './formats.js';
 import {
-  type Matrix4,
+  type TileMatrix,
   Y_UP_TO_Z_UP,
   Z_UP_TO_Y_UP,
   decompose,
@@ -17,7 +17,7 @@ import {
   transformPoint,
   translation,
 } from './matrix.js';
-import { type Tile, type TileRenderable, Tileset, type TilesetOptions, type TilesFrame } from './tileset.js';
+import { type TilesetTile, type TileRenderable, Tileset, type TilesetOptions, type TilesFrame } from './tileset.js';
 import { cartographicToEcef, eastNorthUpToEcef } from './wgs84.js';
 
 /** A floating origin (such as `FloatingOrigin` from `@margoengine/cameras/origin`): float64 placement around the camera. */
@@ -68,9 +68,9 @@ export class TilesRenderer implements EnginePlugin {
   readonly name: string;
   readonly tileset: Tileset;
   /** Tileset to world (float64, column-major). */
-  readonly frame: Matrix4;
+  readonly frame: TileMatrix;
   /** World to tileset. */
-  readonly inverseFrame: Matrix4;
+  readonly inverseFrame: TileMatrix;
   /** The last update's selection. */
   last: TilesFrame = { selected: [], pending: 0 };
   /** Set false to freeze the selection (tiles stay as they are while the camera moves). */
@@ -176,12 +176,12 @@ export class TilesRenderer implements EnginePlugin {
     return this.last;
   }
   /** World matrix (float64) of a tile's glTF content: frame x tile transform x RTC x y-up to z-up. */
-  contentMatrix(tile: Tile, rtc?: readonly number[], gltf = true): Matrix4 {
+  contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf = true): TileMatrix {
     let m = multiply(this.frame, tile.transform);
     if (rtc) m = multiply(m, translation(rtc[0], rtc[1], rtc[2]));
     return gltf ? multiply(m, Y_UP_TO_Z_UP) : m;
   }
-  private place(mesh: Mesh, matrix: Matrix4): void {
+  private place(mesh: Mesh, matrix: TileMatrix): void {
     const { translation: t, rotation, scale } = decompose(matrix);
     mesh.setQuaternion(rotation);
     mesh.setScale(scale);
@@ -189,7 +189,7 @@ export class TilesRenderer implements EnginePlugin {
     else mesh.setPosition(t);
   }
   /** @internal The content factory: models for glTF and b3dm, clouds for pnts, groups for cmpt. */
-  async createContent(content: TileContent, tile: Tile, signal: AbortSignal): Promise<TileRenderable> {
+  async createContent(content: TileContent, tile: TilesetTile, signal: AbortSignal): Promise<TileRenderable> {
     const engine = this.engine;
     if (!engine)
       throw new MargoError('state', 'TilesRenderer is not attached; create it with TilesRenderer.load(engine, url)');

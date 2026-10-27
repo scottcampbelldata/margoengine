@@ -1,6 +1,6 @@
 // WGS84 ellipsoid (NIMA TR8350.2, "Department of Defense World Geodetic System 1984") and the ECEF / geodetic
 // conversions 3D Tiles uses: tileset coordinates are ECEF metres (EPSG:4978), regions are geodetic radians (EPSG:4979).
-import type { Matrix4 } from './matrix.js';
+import type { TileMatrix } from './matrix.js';
 
 /** WGS84 semi-major axis, metres. */
 export const WGS84_A = 6378137;
@@ -72,7 +72,7 @@ export function geodeticNormal(x: number, y: number, z: number): [number, number
  * The local east-north-up frame at an ECEF point as a matrix from ENU metres to ECEF: columns east, north, up and the
  * point. At the poles, where east is undefined, east is taken as +y (longitude 0's east).
  */
-export function eastNorthUpToEcef(x: number, y: number, z: number): Matrix4 {
+export function eastNorthUpToEcef(x: number, y: number, z: number): TileMatrix {
   const { longitude, latitude } = ecefToCartographic(x, y, z);
   const so = Math.sin(longitude),
     co = Math.cos(longitude),

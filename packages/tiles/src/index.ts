@@ -3,7 +3,7 @@
 // @margoengine/points, both optional peers loaded on first use. Core is not modified.
 export {
   Tileset,
-  Tile,
+  TilesetTile,
   type TilesetOptions,
   type TilesView,
   type TilesFrame,
@@ -71,5 +71,5 @@ export {
   fromArray,
   Y_UP_TO_Z_UP,
   Z_UP_TO_Y_UP,
-  type Matrix4,
+  type TileMatrix,
 } from './matrix.js';

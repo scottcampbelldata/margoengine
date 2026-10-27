@@ -2,22 +2,26 @@
 // of metres; float32 would lose centimetres). Only the few operations the tiles package needs.
 
 /** A column-major 4x4 matrix in float64 (16 numbers, translation in elements 12 to 14). */
-export type Matrix4 = Float64Array;
+export type TileMatrix = Float64Array;
 
 /** A new identity matrix. */
-export function identity(): Matrix4 {
+export function identity(): TileMatrix {
   const m = new Float64Array(16);
   m[0] = m[5] = m[10] = m[15] = 1;
   return m;
 }
 
 /** Copies 16 numbers (a tileset `transform` array) into a new float64 matrix. */
-export function fromArray(values: ArrayLike<number>): Matrix4 {
+export function fromArray(values: ArrayLike<number>): TileMatrix {
   return Float64Array.from({ length: 16 }, (_, i) => values[i]);
 }
 
 /** out = a * b (column-major), safe when out aliases a or b. */
-export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out: Matrix4 = new Float64Array(16)): Matrix4 {
+export function multiply(
+  a: ArrayLike<number>,
+  b: ArrayLike<number>,
+  out: TileMatrix = new Float64Array(16),
+): TileMatrix {
   const r = new Float64Array(16);
   for (let c = 0; c < 4; c++)
     for (let row = 0; row < 4; row++)
@@ -28,7 +32,7 @@ export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out: Matrix
 }
 
 /** Inverse of a general 4x4 matrix; throws RangeError when it is singular. */
-export function invert(m: ArrayLike<number>, out: Matrix4 = new Float64Array(16)): Matrix4 {
+export function invert(m: ArrayLike<number>, out: TileMatrix = new Float64Array(16)): TileMatrix {
   const [a00, a01, a02, a03, a10, a11, a12, a13, a20, a21, a22, a23, a30, a31, a32, a33] = Array.from(m);
   const b00 = a00 * a11 - a01 * a10,
     b01 = a00 * a12 - a02 * a10,
@@ -86,7 +90,7 @@ export function transformDirection(m: ArrayLike<number>, p: ArrayLike<number>): 
 }
 
 /** A translation matrix. */
-export function translation(x: number, y: number, z: number): Matrix4 {
+export function translation(x: number, y: number, z: number): TileMatrix {
   const m = identity();
   m[12] = x;
   m[13] = y;
@@ -98,9 +102,43 @@ export function translation(x: number, y: number, z: number): Matrix4 {
  * glTF is y-up and 3D Tiles is z-up: tile content in glTF is rotated +90 degrees about x before the tile transform
  * (3D Tiles 1.1, "glTF transforms"). Maps (x, y, z) to (x, -z, y).
  */
-export const Y_UP_TO_Z_UP: Matrix4 = /* @__PURE__ */ Float64Array.of(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
+export const Y_UP_TO_Z_UP: TileMatrix = /* @__PURE__ */ Float64Array.of(
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  -1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+);
 /** The inverse of `Y_UP_TO_Z_UP`: z-up tileset coordinates to the engine's y-up world. Maps (x, y, z) to (x, z, -y). */
-export const Z_UP_TO_Y_UP: Matrix4 = /* @__PURE__ */ Float64Array.of(1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1);
+export const Z_UP_TO_Y_UP: TileMatrix = /* @__PURE__ */ Float64Array.of(
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  -1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+);
 
 /**
  * Splits an affine matrix without shear into translation, rotation quaternion [x, y, z, w] and scale. A mirrored

@@ -15,7 +15,7 @@ import {
   mortonIndex,
   parseSubtree,
 } from './implicit.js';
-import { type Matrix4, fromArray, identity, multiply } from './matrix.js';
+import { type TileMatrix, fromArray, identity, multiply } from './matrix.js';
 import { FetchQueue, type Priority } from './queue.js';
 
 /** How a tile's children add detail: ADD draws them on top of it, REPLACE draws them instead of it. */
@@ -36,7 +36,7 @@ export interface TileRenderable {
 /** Turns parsed content into a renderable. Throw (or reject) to fail the tile; honour `signal`. */
 export type ContentFactory = (
   content: TileContent,
-  tile: Tile,
+  tile: TilesetTile,
   signal: AbortSignal,
 ) => TileRenderable | Promise<TileRenderable>;
 
@@ -98,23 +98,23 @@ interface ImplicitContext {
   readonly rootBounds: TileBounds;
   readonly rootError: number;
   readonly refine: Refine;
-  readonly transform: Matrix4;
+  readonly transform: TileMatrix;
   readonly subtrees: Map<string, Subtree>;
 }
 
 /** One tile of the tree. Explicit tiles come from JSON; implicit ones are created as their subtrees arrive. */
-export class Tile {
+export class TilesetTile {
   /** Unique within the tileset: the content URL, or the JSON path / implicit coordinates. */
   readonly id: string;
-  readonly parent: Tile | null;
+  readonly parent: TilesetTile | null;
   /** Children known so far (implicit and external children appear once their subtree or tileset has loaded). */
-  children: Tile[] = [];
+  children: TilesetTile[] = [];
   /** Depth from the tileset root (external tileset roots continue the count). */
   readonly depth: number;
   readonly geometricError: number;
   readonly refine: Refine;
   /** Computed transform: every ancestor's `transform` times this one's, float64, tileset coordinates. */
-  readonly transform: Matrix4;
+  readonly transform: TileMatrix;
   readonly bounds: TileBounds;
   readonly contentBounds?: TileBounds;
   readonly viewerRequestVolume?: TileBounds;
@@ -145,10 +145,10 @@ export class Tile {
   expanded = false;
   constructor(init: {
     id: string;
-    parent: Tile | null;
+    parent: TilesetTile | null;
     geometricError: number;
     refine: Refine;
-    transform: Matrix4;
+    transform: TileMatrix;
     bounds: TileBounds;
     contentBounds?: TileBounds;
     viewerRequestVolume?: TileBounds;
@@ -237,9 +237,9 @@ export interface TilesProgress {
 
 /** Events of a `Tileset`. */
 export interface TilesetEvents {
-  tileload: { tile: Tile };
-  tileunload: { tile: Tile };
-  error: { tile?: Tile; error: Error };
+  tileload: { tile: TilesetTile };
+  tileunload: { tile: TilesetTile };
+  error: { tile?: TilesetTile; error: Error };
   progress: TilesProgress;
   /** After an update that left nothing queued or loading (the view is complete). */
   idle: TilesProgress;
@@ -248,7 +248,7 @@ export interface TilesetEvents {
 /** Result of `tileset.update`. */
 export interface TilesFrame {
   /** Tiles drawn this update, in traversal order. */
-  readonly selected: readonly Tile[];
+  readonly selected: readonly TilesetTile[];
   /** Tiles wanted but not ready (queued or loading). */
   readonly pending: number;
 }
@@ -275,7 +275,7 @@ function checkNumber(value: unknown, what: string): number {
 export class Tileset {
   readonly url: string;
   readonly json: TilesetJSON;
-  readonly root: Tile;
+  readonly root: TilesetTile;
   /** Tileset metadata schema, when the tileset has one (inline or from `schemaUri`). */
   readonly schema?: MetadataSchema;
   /** `tileset.metadata`. */
@@ -296,11 +296,11 @@ export class Tileset {
   private readonly controller = new AbortController();
   private readonly factory?: ContentFactory;
   private readonly listeners = new Map<keyof TilesetEvents, Set<(event: never) => void>>();
-  private readonly ready = new Set<Tile>();
-  private readonly failed = new Set<Tile>();
+  private readonly ready = new Set<TilesetTile>();
+  private readonly failed = new Set<TilesetTile>();
   private readonly failedSubtrees = new Map<string, Error>();
   private frame = 0;
-  private shown: Tile[] = [];
+  private shown: TilesetTile[] = [];
   private pending = 0;
   private wasIdle = false;
 
@@ -373,7 +373,7 @@ export class Tileset {
   }
 
   /** Every tile known so far, depth first. */
-  *tiles(): IterableIterator<Tile> {
+  *tiles(): IterableIterator<TilesetTile> {
     const stack = [this.root];
     while (stack.length) {
       const tile = stack.pop()!;
@@ -413,7 +413,7 @@ export class Tileset {
     this.frame++;
     this.queue.begin();
     this.pending = 0;
-    const selected: Tile[] = [];
+    const selected: TilesetTile[] = [];
     this.visit(this.root, view, selected);
     const drawn = new Set(selected);
     for (const tile of this.shown) if (!drawn.has(tile) && tile.renderable) tile.renderable.visible = false;
@@ -454,7 +454,7 @@ export class Tileset {
   }
 
   // Returns true when the tile's part of the view is covered: drawn by it or its descendants, or nothing to draw.
-  private visit(tile: Tile, view: TilesView, selected: Tile[]): boolean {
+  private visit(tile: TilesetTile, view: TilesView, selected: TilesetTile[]): boolean {
     const distance = tile.bounds.distanceTo(view.position);
     tile.distance = distance;
     if (view.planes && !tile.bounds.intersectsFrustum(view.planes)) return true;
@@ -507,19 +507,19 @@ export class Tileset {
     return false;
   }
 
-  private mightBeTileset(tile: Tile): boolean {
+  private mightBeTileset(tile: TilesetTile): boolean {
     // Content URIs ending in .json are tilesets (the specification's convention); others are sniffed after fetching.
     return tile.contentUrls.length === 1 && /\.json($|[?#])/i.test(tile.contentUrls[0]);
   }
 
   // Drawn and wanted tiles are "used" this update and never evicted by it; ready tiles merely passed through (a
   // REPLACE parent whose children all drew) are not, so LRU eviction can free them first.
-  private draw(tile: Tile, selected: Tile[]): void {
+  private draw(tile: TilesetTile, selected: TilesetTile[]): void {
     tile.lastUsed = this.frame;
     selected.push(tile);
   }
 
-  private want(tile: Tile, priority: Priority): void {
+  private want(tile: TilesetTile, priority: Priority): void {
     tile.lastUsed = this.frame;
     if (tile.state === 'ready') return;
     if (tile.state === 'failed') return;
@@ -529,7 +529,7 @@ export class Tileset {
     this.queue.want(tile.id, priority, (signal) => this.loadTile(tile, signal));
   }
 
-  private async loadTile(tile: Tile, signal: AbortSignal): Promise<void> {
+  private async loadTile(tile: TilesetTile, signal: AbortSignal): Promise<void> {
     tile.state = 'loading';
     const created: TileRenderable[] = [];
     try {
@@ -571,7 +571,7 @@ export class Tileset {
     }
   }
 
-  private fail(tile: Tile, error: unknown): void {
+  private fail(tile: TilesetTile, error: unknown): void {
     const cause = error instanceof Error ? error.message : String(error);
     // An unsupported format keeps its own fix; anything else (network, parse, factory) names the retry.
     const failure =
@@ -587,14 +587,14 @@ export class Tileset {
     this.emit('error', { tile, error: failure });
   }
 
-  private attachExternal(tile: Tile, json: unknown, url: string): void {
+  private attachExternal(tile: TilesetTile, json: unknown, url: string): void {
     const external = checkTileset(json, url);
     tile.children = [this.buildTile(external.root, tile, tile.transform, url, `${url}#root`, tile.refine)];
     tile.external = true;
     tile.state = 'ready';
   }
 
-  private unload(tile: Tile): void {
+  private unload(tile: TilesetTile): void {
     if (!tile.renderable) return;
     this.bytes -= tile.renderable.bytes;
     tile.renderable.dispose();
@@ -617,12 +617,12 @@ export class Tileset {
 
   private buildTile(
     json: TileJSON,
-    parent: Tile | null,
-    parentTransform: Matrix4,
+    parent: TilesetTile | null,
+    parentTransform: TileMatrix,
     base: string,
     path: string,
     inherited: Refine,
-  ): Tile {
+  ): TilesetTile {
     if (!json || typeof json !== 'object') throw new TypeError(`Invalid tile at ${path}; it must be an object`);
     const geometricError = checkNumber(json.geometricError, `${path}.geometricError`);
     if (json.refine !== undefined && json.refine !== 'ADD' && json.refine !== 'REPLACE')
@@ -669,7 +669,7 @@ export class Tileset {
         transform,
         subtrees: new Map(),
       };
-      return new Tile({
+      return new TilesetTile({
         id: `${base}#${path}/0/0/0/0`,
         parent,
         geometricError,
@@ -682,7 +682,7 @@ export class Tileset {
         context,
       });
     }
-    const tile = new Tile({
+    const tile = new TilesetTile({
       id: urls.length ? resolveUrl(urls[0], base) : `${base}#${path}`,
       parent,
       geometricError,
@@ -706,7 +706,7 @@ export class Tileset {
 
   // Implicit tiles: ensures the tile's subtree is loaded (requesting it if not), then fills in its content URLs
   // and children once. Returns false while the subtree is missing.
-  private expand(tile: Tile): boolean {
+  private expand(tile: TilesetTile): boolean {
     if (tile.expanded) return true;
     const context = tile.context!,
       { level, x, y, z } = tile.implicit!,
@@ -753,7 +753,7 @@ export class Tileset {
       .map((template) => resolveUrl(expandTemplate(template, level, x, y, z), context.base));
     (tile as { contentUrls: readonly string[] }).contentUrls = urls;
     if (urls.length) (tile as { id: string }).id = urls[0];
-    const children: Tile[] = [];
+    const children: TilesetTile[] = [];
     if (level + 1 < context.availableLevels) {
       for (let i = 0; i < (octree ? 8 : 4); i++) {
         const cx = 2 * x + (i & 1),
@@ -778,7 +778,7 @@ export class Tileset {
               );
         if (!available) continue;
         children.push(
-          new Tile({
+          new TilesetTile({
             id: `${context.base}#implicit/${level + 1}/${cx}/${cy}/${cz}`,
             parent: tile,
             geometricError: context.rootError / 2 ** (level + 1),
