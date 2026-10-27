@@ -197,6 +197,16 @@ only V8's own) and fails without the fix; it passes on Node 22.22.1 (Windows x64
 proofs were not affected: their stored values pass on both pows. They still include results of V8's own sin, cos and
 tan (core's cameras), which were the same on every host checked; ARM builds have not been checked.
 
+**Intermittent browser-suite timeouts (bug 26, 2026-10-27).** modern:test:browser and its slow-compile run sometimes
+failed with "page.waitForFunction: Timeout 30000ms exceeded" waiting for `window.modern`, in check:merge in two
+worktrees, with no GPU reset in the window. Under load with another suite running it failed 3 times in about 24 runs.
+Each time the page had loaded its modules within 0.5 s, the dev server had no request pending, and
+`node_modules/.vite/deps/react_jsx-runtime.js` had answered 504 (Vite's "Outdated Optimize Dep"), so the module graph
+never ran. Cause: `scripts/worktree-node-modules.mjs` linked the main checkout's `node_modules/.vite` into every
+worktree, so all their dev servers shared one dependency cache and one re-optimized what another was serving. Each
+worktree now keeps its own tool caches (`tests/worktree-node-modules.test.js`); after the fix the same load ran 10 of
+10, 8 of them beside another suite. A worktree made before the fix keeps the shared link until it runs the script again.
+
 **NaN payloads.** `geometry.proof.js` (pinned) failed at random on its degenerate-input case ("degenerate bounds"):
 baseline and candidate both return NaN for the non-finite vertex, but V8 writes either x86's default NaN (sign bit
 set) or the plain quiet NaN into a typed array depending on the code path and JIT tier, which ECMAScript allows
