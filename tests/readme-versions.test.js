@@ -28,3 +28,30 @@ test('package READMEs name the version in their package.json', () => {
   assert.ok(checked >= 1, 'expected at least one README to name its version');
   assert.deepEqual(wrong, [], 'update the README text to the package.json version');
 });
+
+test('the React README keeps its sections in reader order and names only npm scripts that exist', () => {
+  const text = readFileSync(join(root, 'packages/react/README.md'), 'utf8'),
+    headings = [...text.matchAll(/^## (.+)$/gm)].map((m) => m[1]),
+    wanted = [
+      'Install',
+      'First scene',
+      'Components',
+      'Hooks',
+      'Controls',
+      'Physics',
+      'XR',
+      'Next.js',
+      'State vs the frame loop',
+      'Troubleshooting',
+    ];
+  let last = -1;
+  for (const name of wanted) {
+    const at = headings.indexOf(name);
+    assert.ok(at > last, `packages/react/README.md needs the heading "## ${name}" after the previous one`);
+    last = at;
+  }
+  const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts;
+  for (const [, name] of text.matchAll(/npm run ([\w:.-]+)/g))
+    assert.ok(scripts[name], `packages/react/README.md names "npm run ${name}", which is not in package.json`);
+  assert.match(text, /\*\*It is not on npm yet\*\*/, 'the install section must say the package is not published');
+});

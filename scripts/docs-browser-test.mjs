@@ -164,7 +164,7 @@ async function main() {
     async interaction() {
       await wait(1000);
       await find(/Picked cube/);
-      assert.match(await status(), /Picked cube \d\./);
+      assert.match(await status(), /Picked cube \d./);
       const before = await snap();
       const [fx, fy] = await find(/Picked cube/);
       await drag([fx, fy], [fx + 0.1, fy + 0.12]);
@@ -174,12 +174,25 @@ async function main() {
       await page.keyboard.up('Shift');
       assert.match(
         await status(),
-        /^[1-9]\d* selected\.$/,
+        /^[1-9]\d* selected.$/,
         `the drag box must select; the page said "${await status()}"`,
       );
       await page.mouse.move(2, 2);
       await wait(400);
       return snap();
+    },
+    async 'react-first'() {
+      await wait(4000); // the helmet downloads and decodes
+      const before = await snap();
+      await find(/Picked the (helmet|ball)/);
+      await page.mouse.move(2, 2);
+      await wait(300);
+      const picked = await snap();
+      await drag([0.5, 0.35], [0.62, 0.3]);
+      assert.match(await status(), /Picked the/, 'an orbit drag must not clear or change the selection');
+      assert.ok(!(await same(picked, await snap())), 'an orbit drag must change the picture');
+      assert.ok(!(await same(before, picked)), 'a pick must change the status line');
+      return picked;
     },
     async react() {
       await wait(2500);
@@ -227,6 +240,34 @@ async function main() {
       await find(/Selected \d/);
       await page.mouse.move(2, 2);
       await wait(300);
+      return snap();
+    },
+    async guesses() {
+      await page.waitForFunction(() =>
+        /^Ray from above hit/.test(document.querySelector('#status')?.textContent ?? ''),
+      );
+      assert.match(
+        await status(),
+        /y = 1.\d\d/,
+        `the ray must hit the top of the blob; the page said "${await status()}"`,
+      );
+      await wait(1200);
+      return snap();
+    },
+    async debugging() {
+      await page.waitForSelector('button:text-is("Reset camera")');
+      await wait(800);
+      const geometry = await page.evaluate(() => {
+        const panel = document.querySelector('[data-margo-inspector]')?.getBoundingClientRect(),
+          button = document.querySelector('button')?.getBoundingClientRect();
+        return panel && button ? { panel: panel.toJSON(), button: button.toJSON() } : null;
+      });
+      assert.ok(geometry, 'the inspector element and the button must exist');
+      assert.ok(geometry.panel.top >= geometry.button.bottom, 'the panel must sit below the button, not over it');
+      assert.ok(geometry.panel.width <= 300, 'the panel must stay inside the 300 px sidebar');
+      await page.click('button:text-is("Reset camera")'); // a real click at the button: nothing may cover it
+      assert.match(await status(), /^Camera reset./, 'the inspector must not intercept the click');
+      assert.match(await page.textContent('#status'), /Camera reset/);
       return snap();
     },
     async gltf() {

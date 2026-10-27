@@ -19,6 +19,27 @@ function attach(engine: EngineKernel, effects: {exposure: number; bloom: number}
 Pass the mutable options object of your attached post-processing effect to
 `effects`; exposure/bloom controls bind directly to it. Unbound controls are disabled.
 
+## Place the panel in your page layout
+
+By default the panel is a `position: fixed` element at the top right of the page with a high `z-index`. In an app with
+its own buttons in that corner it sits on top of them and takes their clicks. Give it a container with `parent`, and
+override its position with a style on `inspector.element` (a style set there wins over the panel's built-in one):
+
+```ts
+import {Inspector} from 'margoengine/inspector';
+import type {EngineKernel} from 'margoengine/core';
+function attachInSidebar(engine: EngineKernel, sidebar: HTMLElement) {
+  const inspector = Inspector.attach(engine, {parent: sidebar});
+  Object.assign(inspector.element.style, {
+    position: 'relative', top: 'auto', right: 'auto', width: '100%', maxHeight: '70vh', overflow: 'auto',
+  });
+  return inspector;
+}
+```
+
+The panel then sits in the flow of `sidebar` with a bounded height and scrolls inside it. The
+[debugging guide](../../docs/guides/debugging.md) runs this in a real browser and clicks the button next to the panel.
+
 ## Edit, undo, search, pick, save
 
 Every change made in the panel (name, visibility, position, rotation, scale, colour, double sided, roughness, metallic,

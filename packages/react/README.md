@@ -1,6 +1,11 @@
 # @margoengine/react
 
-Import `margoengine/react` from the `margoengine` package, or `@margoengine/react` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+React 18 and 19 components and hooks for Margo Engine: a native canvas, pointer events, Suspense, stable mesh refs and
+frame callbacks. There is no custom reconciler: `<Canvas>` creates one engine, and its children are ordinary React
+components that edit it.
+
+Import it as `margoengine/react` (from the `margoengine` package) or `@margoengine/react` (from this package alone);
+the two are the same module. Optional parts load only when a component needs them, so an unused feature costs nothing.
 
 With Vite, installing this package alone (plus the peers your components use, such as `@margoengine/controls` for
 `OrbitControls`) keeps the build to what you import: a cube page with orbit controls loads 95,338 B gzip (70% of it React and React DOM) and emits no
@@ -8,27 +13,57 @@ Wasm. `margoengine` installs every package, so the build also writes the lazy lo
 decoders, CAD import with OpenCascade's Wasm) to `dist`; the page never requests them. Webpack and Turbopack (Next.js)
 need `margoengine` ([limits.md](../../docs/limits.md), React app budget).
 
-React 18/19 integration with a native canvas, pointer events, Suspense, stable mesh refs and frame callbacks. There is no custom reconciler.
 
-Scene helpers, controls, post effects and XR are available from one
-`@margoengine/react` import; physics comes from `@margoengine/react/physics`, so an app without it never needs
-Rapier installed (bundlers resolve every `import()` they reach). The [`kit`, `post`, `physics` and `xr` subpaths](SCENE.md)
-remain available. Unused bindings are tree-shaken, and optional native peers
-load only when their components need them.
+**What you get from this page:** a React app with a lit mesh in about five minutes, then the components, hooks,
+controls, physics, XR and Next.js notes, the rule for React state against the frame loop, and a troubleshooting list.
+For a textured, shadowed scene with click-to-select, follow the [React first scene guide](../../docs/guides/react-first-scene.md).
+
+Contents: [Install](#install), [First scene](#first-scene), [Components](#components), [Models and environment](#models-and-environment),
+[Batching, views, lights and voxels](#batching-views-lights-and-voxels), [Hooks](#hooks), [Controls](#controls),
+[Physics](#physics), [XR](#xr), [Next.js](#nextjs), [State vs the frame loop](#state-vs-the-frame-loop),
+[Build warnings](#build-warnings), [Testing and size](#testing-and-size), [Troubleshooting](#troubleshooting).
 
 ## Install
 
-Package name: `@margoengine/react`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/react`, version `1.0.0`. **It is not on npm yet**, so `npm install @margoengine/react` does
+not work today. Two routes do. Both start from a clone of the repository (see [Install](../../README.md#install) in the
+main README for Git LFS and Node.js 22.12+).
 
-From a repository checkout, run `npm ci` and `npm run build:packages`.
-`npm run pack:packages` creates local tarballs in `test-results/` for use outside
-the workspace. See [SCENE.md](SCENE.md) for the optional peers each component
-uses. Registry installation commands will accompany a verified release.
+**Route 1: a Vite app of your own, from local tarballs.** In the clone:
+
+```sh
+npm ci
+npm run pack:packages
+```
+
+`pack:packages` builds every package and writes one `.tgz` file each to `test-results/`. Then, in a new folder next to
+the clone (shown for a shell that expands `*.tgz`, such as Git Bash, macOS or Linux):
+
+```sh
+mkdir my-react-app && cd my-react-app
+npm init -y
+npm pkg set type=module
+npm install ../margoengine/test-results/*.tgz react react-dom vite @vitejs/plugin-react typescript @types/react @types/react-dom
+```
+
+On the machine that wrote this page, packing took about a minute and the install 8 seconds. Add an `index.html` with
+`<div id="root"></div>` and `<script type="module" src="/src/main.tsx"></script>`, put the first scene below in
+`src/main.tsx` (add the `createRoot` line at the end), and run `npx vite`. The test `tests/react-bundle.test.js` builds
+exactly this app for production on every `npm run verify`.
+
+**Route 2: use the examples inside the clone.** `npm ci`, `npm run build:packages`, then
+`npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example.
+
+**After 1.0.0 is published**, `npm install margoengine react react-dom` replaces the tarballs and nothing else changes.
+[SCENE.md](SCENE.md) lists the optional peers each component uses.
 
 ## First scene
 
+A box lit by the default sun, with a click handler:
+
 ```tsx
 import { Suspense } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial, Model } from 'margoengine/react';
 
 export function App() {
@@ -46,7 +81,11 @@ export function App() {
     </Canvas>
   );
 }
+
+createRoot(document.getElementById('root')!).render(<App />);
 ```
+
+The `Model` line needs a `.glb` file at `public/model.glb`; delete it for a scene with only the box.
 
 ## Components
 
@@ -98,20 +137,35 @@ export function Both() {
 Use `Box`, `Sphere` and `Plane` for floors, blocks and prototypes with a plain colour. Use `Mesh` with children when you
 need a material component other than the standard one (as above) or a geometry other than a box, sphere or plane.
 
-### Picking is asynchronous
+### Pointer events and picking
 
-`onClick`, `onPointerOver` and `onPointerOut` come from GPU picking, which answers a frame or two after the pointer
-event. The handler runs after the pick finishes, so UI code and tests must wait for the state your handler sets; reading
-it straight after a click sees the old value. In a Playwright test:
+`onClick`, `onPointerOver` and `onPointerOut` on `Mesh`, `Model`, `Box`, `Sphere` and `Plane` come from GPU picking, not
+from the DOM. These rules come from the code in `src/components.tsx` and apply to every handler:
+
+- **Picking is asynchronous.** The pointer event asks the GPU which mesh is under the pixel, and the handler runs after
+  the answer, a frame or two later. Code and tests that read the state your handler sets must wait for it. Clicks keep
+  their order. A burst of hover events collapses to the latest one.
+- **The mesh in front gets the event.** If two meshes overlap under the pointer, the one drawn nearest the camera is
+  hit. A child that overlaps its parent wins over the parent. A mesh in front with no handlers blocks the mesh behind
+  it: nothing fires.
+- **Events do not bubble.** A `Group` or parent `Mesh` does not receive the click of its children. Put the handler on
+  the mesh that is drawn, and use one handler function for several meshes if they share behaviour.
+- **An orbit drag is not a click.** A click needs the pointer to move no more than 3 CSS pixels between press and
+  release, and only the primary button counts.
+- **WebGPU only.** On the WebGL2 fallback no handler fires.
+- **Handlers get** `nativeEvent`, `object` (also `mesh` and `target`: the hit mesh), `x` and `y` (canvas pixels) and
+  `clientX` and `clientY`.
+
+In a Playwright test, click and then wait for the state:
 
 ```js
 await page.mouse.click(x, y);
 await page.waitForFunction(() => document.querySelector('#selected').textContent === 'crate');
 ```
 
-## Models, environment and controls
+## Models and environment
 
-Optional model, lighting and control components can be used directly under the canvas:
+A model, its lighting and the orbit controls, directly under the canvas:
 
 ```tsx
 'use client';
@@ -129,30 +183,6 @@ export default function App() {
 }
 ```
 
-## Hooks
-
-`Canvas` remains an alias for `MargoCanvas`; existing geometry components and mesh refs remain available. `useMargo()` returns `{ stage, ready, canvas, camera, size, gl, clock, invalidate }`. `camera` and `gl` are the stage's camera and engine; `size` reads the canvas client width and height; `clock` is elapsed frame time in seconds as a number. `onCreated(stage)` receives the existing `Stage` facade from `margoengine` after sizing and camera setup, before rendering starts.
-
-With `<Canvas frameloop="demand">`, the engine does not start an animation loop. Each `invalidate()` call advances `useFrame` and OrbitControls and renders exactly one frame. The default `frameloop="always"` renders continuously. Read `clock` from the hook value when needed; its getter advances without causing React renders.
-
-`useMargoStage()` retains its existing portable `EngineKernel` return value (`createMesh`, `camera`, frame callbacks and plugins). Children mount after asynchronous stage creation. Hooks outside the provider throw. Use an effect to create imperative objects and return their disposal function:
-
-```tsx
-import { useEffect } from 'react';
-import { box, PbrMaterial as Material } from 'margoengine/core';
-import { useMargoStage } from 'margoengine/react';
-
-function ImperativeCube() {
-  const engine = useMargoStage();
-  useEffect(() => {
-    const mesh = engine.createMesh();
-    mesh.setGeometry(box()).setMaterial(new Material({ color: '#84d6bd' }));
-    return () => mesh.dispose();
-  }, [engine]);
-  return null;
-}
-```
-
 `Model` loads glTF/GLB through `@margoengine/gltf-pro`. Position, Euler rotation (radians), scale and named material overrides update the existing model; removing an override restores the loaded material. Supported shallow overrides are `baseColor` (linear RGB or RGBA), `roughness`, `metalness`, `emissive`, `normalScale`, `occlusionStrength`, `alphaCutoff` and `doubleSided`. `onLoad(mesh)` receives the model's root mesh after initial props have been applied. Only changing `src` selects another asset. Unmount unregisters lighting and shadows and disposes the instance's PBR plugin, meshes, textures and buffers.
 
 Wrap `Model` and file-backed `Environment` components in React `Suspense` to show a fallback while loading. Loads begin after the first commit so unmount cleanup can abort an unfinished load. The canvas caches pending promises and resolved CPU source data by URL; concurrent mounts and remounts reuse that source while owning independent model transforms, materials and disposable GPU resources. The last pending consumer unmount aborts its request. Canvas teardown releases the cache. Load failures reach the component's optional `onError` and the canvas's `onError`/accessible alert.
@@ -163,46 +193,7 @@ Wrap `Model` and file-backed `Environment` components in React `Suspense` to sho
 
 `Html` dynamically imports optional `@margoengine/html` and `react-dom` peers and projects React DOM children into a shared overlay. Nested inside a `Mesh` or `Group`, its `position` is a local offset; otherwise it is a world position. It accepts `className`, `style`, and an `occlude` boolean (true by default), and removes its label and overlay resources on unmount.
 
-## Controls
-
-`OrbitControls`, `MapControls`, `CadControls` and `ArcballControls` bind the active camera and canvas, update from the Canvas frame loop (so `frameloop="demand"` and `invalidate()` move them too), and remove their listeners on unmount. Every public field of the controls is a prop (`enableDamping`, `dampingFactor`, `rotateSpeed`, `zoomToCursor`, `minDistance`, `maxPolarAngle`, ...); a prop removed again restores the controls' default. `target` sets the orbit point when it changes. `onChange`, `onStart` and `onEnd` receive the controls' events, and the ref is the live controls object. `CadControls` navigates like a CAD tool: `profile` is `'margo'` (default), `'solidworks'`, `'autocad'`, `'inventor'`, `'fusion'`, `'blender'`, `'maya'`, `'onshape'` or `'rhino'`, and keyboard shortcuts are on (`keyEvents={false}` turns them off). `OrbitControls` takes the same `profile` and `keyEvents` props.
-
-```tsx
-import { Canvas, CadControls, Shadows, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
-
-export function Part({ onViewChanged }: { onViewChanged: () => void }) {
-  return (
-    <Canvas>
-      <CadControls profile="solidworks" enableDamping onEnd={onViewChanged} />
-      <Shadows distance={60} filter="pcf" />
-      <Mesh castShadow position={[0, 1, 0]}>
-        <BoxGeometry />
-        <PbrMaterial color="#84d6bd" />
-      </Mesh>
-    </Canvas>
-  );
-}
-```
-
-`<Shadows>` turns on the Canvas's cascaded shadows while it is mounted and sets their live options (`resolution`, `distance`, `lambda`, `lightSize`, `bias`, `normalBias`, `casterMargin`, `filter`, `bounds` or `frustum`). `<Mesh castShadow>` (and `receiveShadow={false}`) adds a mesh to them, like `Box`, `Sphere`, `Plane` and `Model`.
-
-Hooks: `useEngine()` returns the Canvas engine and `useCamera()` its camera. `useLoader(loader, url)` loads any file and suspends until it is ready: the loader is `(url, { engine, signal, fetch }) => Promise<T>`, each Canvas shares one load per loader and URL, and a failed load throws to the nearest error boundary (call `clearLoader(loader, url)` before retrying). `useProgress()` reports `{ active, loaded, total, progress, item, errors }` across `Model`, `Fbx`, `Environment` and `useLoader` loads for a loading bar; it needs the optional `@margoengine/cache`.
-
-```tsx
-import { load, parsePLY, type LoadedGeometry } from '@margoengine/loaders';
-import { useLoader, useProgress, type Loader } from '@margoengine/react';
-
-// Defined once, outside components: the loader is the cache key.
-const ply: Loader<LoadedGeometry> = (url, { fetch, signal }) => load(url, parsePLY, { fetch, signal });
-function ScanInfo() {
-  const scan = useLoader(ply, '/scan.ply');
-  return <p>{scan.positions.length / 3} points</p>;
-}
-function LoadingBar() {
-  const { active, progress } = useProgress();
-  return active ? <progress max={100} value={progress} /> : null;
-}
-``` `shadows` opts the canvas into `@margoengine/shadows`; model casting and receiving are independently opt-in. PBR models, HDR IBL and shadows require WebGPU; legacy meshes and neutral studio lighting support the WebGL fallback.
+`shadows` opts the canvas into `@margoengine/shadows`; model casting and receiving are independently opt-in. PBR models, HDR IBL and shadows require WebGPU; legacy meshes and neutral studio lighting support the WebGL fallback.
 
 ## Batching, views, lights and voxels
 
@@ -295,39 +286,84 @@ export function Game() {
 }
 ```
 
-## State vs the frame loop: the rule
+## Hooks
 
-- **Per-frame motion, mouse tracking and transforms:** write to a ref inside `useFrame`. No `setState` there: every
-  state change re-renders the component, and a re-render every frame costs frames.
-- **UI toggles, colour choices, loading flags and inspector values:** keep them in React state.
+`Canvas` remains an alias for `MargoCanvas`; existing geometry components and mesh refs remain available. `useMargo()` returns `{ stage, ready, canvas, camera, size, gl, clock, invalidate }`. `camera` and `gl` are the stage's camera and engine; `size` reads the canvas client width and height; `clock` is elapsed frame time in seconds as a number. `onCreated(stage)` receives the existing `Stage` facade from `margoengine` after sizing and camera setup, before rendering starts.
 
-Bad (state-driven, re-renders every frame) and good (ref and `useFrame`, one render):
+With `<Canvas frameloop="demand">`, the engine does not start an animation loop. Each `invalidate()` call advances `useFrame` and OrbitControls and renders exactly one frame. The default `frameloop="always"` renders continuously. Read `clock` from the hook value when needed; its getter advances without causing React renders.
+
+`useMargoStage()` retains its existing portable `EngineKernel` return value (`createMesh`, `camera`, frame callbacks and plugins). Children mount after asynchronous stage creation. Hooks outside the provider throw. Use an effect to create imperative objects and return their disposal function:
 
 ```tsx
-import { useRef, useState } from 'react';
-import { BoxGeometry, Mesh, type MeshRef, PbrMaterial, useFrame } from '@margoengine/react';
+import { useEffect } from 'react';
+import { box, PbrMaterial as Material } from 'margoengine/core';
+import { useMargoStage } from 'margoengine/react';
 
-function Bad() {
-  const [angle, setAngle] = useState(0);
-  useFrame((_, delta) => setAngle((a) => a + delta)); // React re-renders every frame
-  return <Mesh rotation={[0, angle, 0]}><BoxGeometry /><PbrMaterial /></Mesh>;
-}
-
-function Good() {
-  const mesh = useRef<MeshRef>(null);
-  useFrame((_, delta) => { if (mesh.current) mesh.current.rotation.y += delta; }); // no render
-  return <Mesh ref={mesh}><BoxGeometry /><PbrMaterial /></Mesh>;
+function ImperativeCube() {
+  const engine = useMargoStage();
+  useEffect(() => {
+    const mesh = engine.createMesh();
+    mesh.setGeometry(box()).setMaterial(new Material({ color: '#84d6bd' }));
+    return () => mesh.dispose();
+  }, [engine]);
+  return null;
 }
 ```
 
-The [state vs frame loop guide](../../docs/guides/react-state-vs-frame-loop.md) runs both and counts React commits per
-second for each.
+## Controls
 
-`useFrame((engine, deltaSeconds) => ...)` updates meshes without React renders or re-subscribing when the callback changes. The canvas serializes initialization, disposes superseded engines, and disconnects ResizeObserver during cleanup. It handles StrictMode, HMR effect replacement, late initialization after unmount, and `capacity`/`backend` changes. Camera changes update the existing engine. Errors reach `onError` and an accessible alert.
+`OrbitControls`, `MapControls`, `CadControls` and `ArcballControls` bind the active camera and canvas, update from the Canvas frame loop (so `frameloop="demand"` and `invalidate()` move them too), and remove their listeners on unmount. Every public field of the controls is a prop (`enableDamping`, `dampingFactor`, `rotateSpeed`, `zoomToCursor`, `minDistance`, `maxPolarAngle`, ...); a prop removed again restores the controls' default. `target` sets the orbit point when it changes. `onChange`, `onStart` and `onEnd` receive the controls' events, and the ref is the live controls object. `CadControls` navigates like a CAD tool: `profile` is `'margo'` (default), `'solidworks'`, `'autocad'`, `'inventor'`, `'fusion'`, `'blender'`, `'maya'`, `'onshape'` or `'rhino'`, and keyboard shortcuts are on (`keyEvents={false}` turns them off). `OrbitControls` takes the same `profile` and `keyEvents` props.
 
-## Physics and XR
+```tsx
+import { Canvas, CadControls, Shadows, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
 
-Physics is a separate entry so an app without it never needs Rapier: `import { Physics, RigidBody, CuboidCollider } from '@margoengine/react/physics'`. A complete example is in the [cookbook](../../docs/react-cookbook.md#physics). XR (`XR`, `Controller`, `useXR`) is exported from the root and from `@margoengine/react/xr`.
+export function Part({ onViewChanged }: { onViewChanged: () => void }) {
+  return (
+    <Canvas>
+      <CadControls profile="solidworks" enableDamping onEnd={onViewChanged} />
+      <Shadows distance={60} filter="pcf" />
+      <Mesh castShadow position={[0, 1, 0]}>
+        <BoxGeometry />
+        <PbrMaterial color="#84d6bd" />
+      </Mesh>
+    </Canvas>
+  );
+}
+```
+
+`<Shadows>` turns on the Canvas's cascaded shadows while it is mounted and sets their live options (`resolution`, `distance`, `lambda`, `lightSize`, `bias`, `normalBias`, `casterMargin`, `filter`, `bounds` or `frustum`). `<Mesh castShadow>` (and `receiveShadow={false}`) adds a mesh to them, like `Box`, `Sphere`, `Plane` and `Model`.
+
+Hooks: `useEngine()` returns the Canvas engine and `useCamera()` its camera. `useLoader(loader, url)` loads any file and suspends until it is ready: the loader is `(url, { engine, signal, fetch }) => Promise<T>`, each Canvas shares one load per loader and URL, and a failed load throws to the nearest error boundary (call `clearLoader(loader, url)` before retrying). `useProgress()` reports `{ active, loaded, total, progress, item, errors }` across `Model`, `Fbx`, `Environment` and `useLoader` loads for a loading bar; it needs the optional `@margoengine/cache`.
+
+```tsx
+import { load, parsePLY, type LoadedGeometry } from '@margoengine/loaders';
+import { useLoader, useProgress, type Loader } from '@margoengine/react';
+
+// Defined once, outside components: the loader is the cache key.
+const ply: Loader<LoadedGeometry> = (url, { fetch, signal }) => load(url, parsePLY, { fetch, signal });
+function ScanInfo() {
+  const scan = useLoader(ply, '/scan.ply');
+  return <p>{scan.positions.length / 3} points</p>;
+}
+function LoadingBar() {
+  const { active, progress } = useProgress();
+  return active ? <progress max={100} value={progress} /> : null;
+}
+```
+
+## Physics
+
+Physics is a separate entry, so an app without it never needs Rapier. Import it from `@margoengine/react/physics`:
+`Physics`, `RigidBody`, the colliders (`CuboidCollider`, `BallCollider`, `CapsuleCollider`, `CylinderCollider`,
+`ConeCollider`, `ConvexHullCollider`, `TrimeshCollider`, `HeightfieldCollider`), `useJoint`, `usePhysics`,
+`useBeforePhysicsStep` and `useAfterPhysicsStep`. `Physics` creates the world; each `RigidBody` owns the meshes inside
+it. A complete example is in the [cookbook](../../docs/react-cookbook.md#physics). `usePhysics` works only inside
+`<Physics>`.
+
+## XR
+
+`XR`, `Controller` and `useXR` are exported from the root and from `@margoengine/react/xr`. `useXR` works only inside
+`<XR>`.
 
 ## Next.js
 
@@ -353,11 +389,49 @@ Import `Scene` from a server `page.tsx` behind `<Suspense fallback={...}>`. Next
 in the [React cookbook](../../docs/react-cookbook.md); moving from react-three-fiber is in
 [Coming from react-three-fiber](../../docs/react-from-r3f.md).
 
-SSR emits an accessible canvas without accessing GPU APIs. The ESM output preserves `use client` and includes TypeScript declarations. Peer ranges accept the current core 0.1.x workspace and the requested core 1.x release, plus React 18/19.
+SSR emits an accessible canvas without accessing GPU APIs. The ESM output preserves `use client` and includes TypeScript declarations. Peer ranges accept core `^1.0.0` and React 18 or 19.
 
-Run `npm run build:packages` followed by `npm run modern:test:react` for React Testing Library/JSDOM lifecycle tests, including the canonical target snippet, StrictMode events, Suspense, cancellation, cache reuse and demand rendering. `npm run typecheck`, `npm run test:modules:packages`, and `npm run measure:size` verify package types, imports, and the core + stage ceiling of 25,000 bytes gzip; the current measurement is 22,781 bytes gzip. Run `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example. The adapter uses standard hooks, never `react-reconciler`. Frame dispatch forwards `(engine, deltaSeconds)` without building per-frame state objects or callback arrays.
+## State vs the frame loop
 
-See the React API and lifecycle guide.
+Pick the home for each value by how often it changes. Motion that changes every frame belongs in the frame loop. Values
+a person reads or edits belong in React state.
+
+| Value | Where it lives | Why |
+| --- | --- | --- |
+| Initial position, rotation, colour (JSX props) | Props | React sets them once and when they change. |
+| Running motion: spin, follow the mouse, a physics step | A ref written in `useFrame` | No React render per frame. |
+| UI: selected item, a colour picker, a loading flag, inspector fields | `useState` or your store | The UI must re-render when they change. |
+| Anything you save or send | A plain document in state (see the [scene document guide](../../docs/guides/react-scene-document.md)) | Engine objects cannot be serialised. |
+
+The hooks for this are public: `useFrame((engine, deltaSeconds) => ...)` runs once per rendered frame and re-renders
+nothing, `useEngine()` returns the engine, and a `ref` on `Mesh` is the live mesh (`MeshRef`) you move. The package also
+uses internal helpers (`useLiveRef`, `useCommit`, `useResourceEffect`, `useMesh`) to keep refs and GPU objects correct
+through StrictMode; they are not exported, so build on `useFrame`, `useEngine` and refs.
+
+Bad: `setState` every frame. Good: a ref and `useFrame`.
+
+```tsx
+import { useRef, useState } from 'react';
+import { BoxGeometry, Mesh, type MeshRef, PbrMaterial, useFrame } from '@margoengine/react';
+
+function Bad() {
+  const [angle, setAngle] = useState(0);
+  useFrame((_, delta) => setAngle((a) => a + delta)); // React re-renders every frame
+  return <Mesh rotation={[0, angle, 0]}><BoxGeometry /><PbrMaterial /></Mesh>;
+}
+
+function Good() {
+  const mesh = useRef<MeshRef>(null);
+  useFrame((_, delta) => { if (mesh.current) mesh.current.rotation.y += delta; }); // no render
+  return <Mesh ref={mesh}><BoxGeometry /><PbrMaterial /></Mesh>;
+}
+```
+
+The [state vs frame loop guide](../../docs/guides/react-state-vs-frame-loop.md) runs both in a browser and counts React
+commits per second for each. The canvas serialises initialisation, disposes superseded engines and disconnects its
+`ResizeObserver` on cleanup. It handles StrictMode, HMR effect replacement, late initialisation after unmount, and
+`capacity` and `backend` changes. Camera changes update the existing engine. Errors reach `onError` and an accessible
+alert.
 
 ## Build warnings
 
@@ -390,6 +464,25 @@ export default defineConfig({
 
 `tests/react-bundle.test.js` builds that app on every `npm run verify` and fails on any other warning. The built files keep `'use client'` on every entry, and `sideEffects` is `false`, so unused exports are dropped. Next.js App Router builds with webpack and Turbopack run in `npm run modern:test:bundlers`.
 
+## Testing and size
+
+Run `npm run build:packages`, then `npm run modern:test:react` for the React Testing Library and JSDOM lifecycle tests:
+the first-scene snippet, StrictMode events, Suspense, cancellation, cache reuse and demand rendering. `npm run typecheck`
+and `npm run test:modules:packages` check the package types and imports. `npm run test:docs:browser` runs the React guides
+in a real WebGPU browser. The adapter uses standard hooks, never `react-reconciler`. Frame dispatch forwards
+`(engine, deltaSeconds)` without building per-frame state objects or callback arrays.
+
+What the numbers mean, by scope. None of them is "the size of your app":
+
+- **Core and stage together:** 22,781 B gzip (`npm run measure:size`, the entry measurement; the build fails at 25,000 B).
+  It does not include React, this package or any optional package.
+- **A React page with PBR models loaded:** about 563 KB decoded, 193 KB gzip, of JavaScript in an independent study of a
+  React app. That includes React and the shared scene infrastructure.
+- **The OpenCascade Wasm (7.6 MB):** fetched only by an app that loads STEP or IGES files. In other apps it can be in the
+  build output but is never requested.
+
+The measured breakdown of a React build is in [docs/limits.md](../../docs/limits.md).
+
 ## Troubleshooting
 
 - **The canvas is blank and has no height.** Give `<Canvas>` a height: `style={{ height: 400 }}`.
@@ -397,7 +490,9 @@ export default defineConfig({
 - **A component does nothing.** React treats a bare lowercase `<mesh>` as a DOM element. Use `<Mesh>`, or the
   namespace form `<Margo.mesh>`.
 - **A hook throws a `state` error.** `useMargo`, `usePhysics` and `useXR` work only inside their provider (`<Canvas>`, `<Physics>`, `<XR>`).
-- **The scene re-renders constantly.** See the rule above: per-frame values belong in refs.
+- **The scene re-renders constantly.** Per-frame values belong in refs: see [State vs the frame loop](#state-vs-the-frame-loop).
+- **A click handler never runs, or a test sees the old state.** Picking is asynchronous and does not bubble: see [Pointer events and picking](#pointer-events-and-picking). Handlers need WebGPU.
+- **Textures on `Box` or `Sphere`.** They take a colour only. Use a glTF `Model`, or `createMesh` from `margoengine/materials` in an effect.
 - **Next.js error about hooks in a server component.** Put the `Canvas` in a file that starts with `'use client'`.
 
 Apache-2.0 licensed.

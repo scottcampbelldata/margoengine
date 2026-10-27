@@ -19,8 +19,11 @@ export const GUIDES = [
   { file: 'docs/guides/lights-and-shadows.md', slug: 'lights', image: 'guide-lights' },
   { file: 'docs/guides/camera-and-controls.md', slug: 'camera', image: 'guide-camera' },
   { file: 'docs/guides/interaction.md', slug: 'interaction', image: 'guide-interaction' },
+  { file: 'docs/guides/first-guesses.md', slug: 'guesses', image: 'guide-first-guesses' },
+  { file: 'docs/guides/debugging.md', slug: 'debugging', image: 'guide-debugging' },
   { file: 'docs/guides/loading-gltf.md', slug: 'gltf', image: 'guide-gltf' },
   { file: 'docs/guides/animation.md', slug: 'animation', image: 'guide-animation' },
+  { file: 'docs/guides/react-first-scene.md', slug: 'react-first', image: 'guide-react-first-scene', react: true },
   { file: 'docs/guides/react-state-vs-frame-loop.md', slug: 'react', image: 'guide-react-state', react: true },
   { file: 'docs/guides/react-scene-document.md', slug: 'react-document', image: 'guide-react-document', react: true },
 ];

@@ -26,8 +26,11 @@ lit scene with shadows, orbit controls and click-to-select.
 | Plot data or volumes | [sciviz](../packages/sciviz/README.md), [compute](../packages/compute/README.md) |
 | Save a scene as glTF, STL or USDZ | [exporters](../packages/exporters/README.md) |
 | Use React | [React package README](../packages/react/README.md), [cookbook](react-cookbook.md) and [integration](react-integration.md) |
+| Build your first React scene (texture, shadows, click) | [React: your first scene](guides/react-first-scene.md) |
 | Build an editor with save, load and undo in React | [React: build the scene from a document](guides/react-scene-document.md) |
 | Decide what goes in React state and what in the frame loop | [React: state or the frame loop?](guides/react-state-vs-frame-loop.md) |
+| Fix a first guess about frame callbacks, `marchingCubes`, ray input or `PostStack` | [Four calls people guess wrong](guides/first-guesses.md) |
+| See what the engine draws; keep the inspector from covering your buttons | [Debugging with the inspector](guides/debugging.md) |
 | Move a three.js project over | [Coming from three.js](from-threejs.md) |
 | Ship a smaller or faster app | [Quality tiers](guides/quality-tiers.md), [limits](limits.md), [deploying](deploying.md) |
 | Find a package | [Package list](../README.md#packages) and the [catalog](README.md) |
@@ -41,7 +44,7 @@ to be written.
 
 - **WebGPU.** The engine draws with WebGPU. Chrome and Edge on desktop are the tested browsers. The optional WebGL2
   fallback draws plain meshes only. See [Browser support](../README.md#browser-support).
-- **Small core, optional packages.** The core and the stage are under 25,000 bytes gzip. Shadows, glTF, physics and the
+- **Small core, optional packages.** The core and the stage together are 22,781 bytes gzip (not your whole app: React, models and optional packages add to it; see [limits](limits.md)). Shadows, glTF, physics and the
   rest are packages you import when you need them: `import { Shadows } from 'margoengine/shadows'`.
 - **Not on npm yet.** 1.0.0 is the first planned release. Run examples from a clone until then.
 - **Units are metres, Y is up.** The same as glTF.
