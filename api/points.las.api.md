@@ -106,7 +106,7 @@ export interface LASWriteInput {
 
 export const LAS_RECORD_SIZES: readonly number[];
 
-export type LazDecoder = (file: Uint8Array, header: LASHeader, records: readonly LASRecord[], signal?: AbortSignal) => Uint8Array | Promise<Uint8Array>;
+export type LazDecoder = (file: Uint8Array, header: LASHeader, records: readonly LASRecord[], signal?: AbortSignal) => Uint8Array | Promise<Uint8Array> | AsyncIterable<Uint8Array>;
 
 export function decodePoints(header: LASHeader, records: readonly LASRecord[], data: Uint8Array, options?: LASOptions): LASPoints;
 
