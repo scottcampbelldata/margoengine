@@ -314,6 +314,8 @@ export class VoxelPathTracer implements EnginePlugin {
   #ready!: Promise<void>;
   #settle?: [() => void, (error: unknown) => void];
   #samples = 0;
+  // Whether the last frame drew the traced image (false while the display pipeline for its target compiles).
+  #shown = false;
   #key = new Float64Array(30);
   #frameMs = 0;
   #lastTrace = 0;
@@ -365,6 +367,7 @@ export class VoxelPathTracer implements EnginePlugin {
   set enabled(value: boolean) {
     flag(value, 'enabled');
     if (value && !this.#enabled) this.#restart();
+    if (!value) this.#shown = false;
     this.#enabled = value;
   }
 
@@ -374,7 +377,7 @@ export class VoxelPathTracer implements EnginePlugin {
       samples: this.#previewing ? 0 : this.#samples,
       frameMs: this.#frameMs,
       gpuBytes: this.#bytes,
-      converged: this.#samples >= this.#settings.maxSamples,
+      converged: this.#shown && !this.#previewing && this.#samples >= this.#settings.maxSamples,
       width: this.#width,
       height: this.#height,
       requestedWidth: this.#requested[0],
@@ -1442,6 +1445,7 @@ export class VoxelPathTracer implements EnginePlugin {
   }
 
   #execute(c: Context): void {
+    this.#shown = false;
     const gpu = this.#state(c.device);
     if ((!gpu.pipelines && !gpu.preview) || gpu.lost) return;
     // A scene with model material tables waits for its kernels (the raster frame shows meanwhile).
@@ -1618,6 +1622,7 @@ export class VoxelPathTracer implements EnginePlugin {
     pass.setBindGroup(0, denoised ? (view.resolved ? view.displayResolved! : view.displayDenoised!) : view.displayRaw!);
     pass.draw(3);
     pass.end();
+    this.#shown = true;
   }
 
   #enqueue<T>(run: () => Promise<T>): Promise<T> {

@@ -50,6 +50,7 @@
     "build": "node ../../scripts/build-optional.js voxel-pathtracer",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs"
+    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs",
+    "test:gpu:slow-compile": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs agx --pipeline-delay=500"
   }
 }

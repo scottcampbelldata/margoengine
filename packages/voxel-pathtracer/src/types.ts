@@ -563,7 +563,12 @@ export interface VoxelPathTracerStats {
   frameMs: number;
   /** Bytes of GPU buffers and textures the tracer holds (scene, accumulation, denoiser, captures in progress). */
   gpuBytes: number;
-  /** True once `samples` reached `maxSamples`; tracing pauses until something changes. */
+  /**
+   * True once `samples` reached `maxSamples` and the last frame showed that image; tracing pauses until something
+   * changes. False while the display pipeline for a new target (an HDR post chain such as ImagePost, another MSAA count)
+   * compiles in the background (the raster frame shows meanwhile), and while the quick preview stands in for the
+   * full tracer.
+   */
   converged: boolean;
   /** Compatible addition: traced viewport width in pixels (0 before the first frame). */
   width: number;

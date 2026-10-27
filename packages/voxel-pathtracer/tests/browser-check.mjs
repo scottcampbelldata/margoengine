@@ -74,6 +74,11 @@ try {
   if (wanted('agx')) {
     const r = await run('agx');
     console.log(JSON.stringify(r));
+    assert.equal(
+      r.combinedHDR.converged,
+      true,
+      `combinedHDR: no traced image on the HDR target after ${r.combinedHDR.frames} frames`,
+    );
     for (const mode of [
       'capture',
       'viewport',

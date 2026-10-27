@@ -161,6 +161,22 @@ test('maxSamples stops tracing (converged) while the image is still drawn', asyn
   tracer.dispose();
 });
 
+test('converged waits for the image to show on a new target: its display pipeline compiles first', async () => {
+  // An HDR post chain (ImagePost) moves the tracer to an rgba16float target: the samples are there, the image is not.
+  const { tracer, frame, context } = await ready({ maxSamples: 1 });
+  assert.deepEqual(kinds(frame()), ['1 dispatch', 'draw3']);
+  assert.ok(tracer.stats.converged);
+  context.format = 'rgba16float';
+  assert.deepEqual(kinds(frame()), [], 'compiling: the raster frame shows');
+  assert.equal(tracer.stats.converged, false, 'not converged while the frame shows no traced image');
+  await settle();
+  assert.deepEqual(kinds(frame()), ['draw3']);
+  assert.ok(tracer.stats.converged);
+  tracer.enabled = false;
+  assert.equal(tracer.stats.converged, false, 'a disabled tracer shows nothing');
+  tracer.dispose();
+});
+
 test('denoising adds a prepare, five regular wavelet levels and a combine when new samples arrive', async () => {
   const { tracer, frame, device } = await ready({ denoise: true, maxSamples: 2 });
   assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3']);

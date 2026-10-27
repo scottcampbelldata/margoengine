@@ -143,7 +143,8 @@ window.check={
    await tracer.ready;for(let i=0;i<300&&!tracer.stats.converged;i++){en.render();await new Promise(r=>setTimeout(r,10));}en.render();out.viewport=measure(pixels());out.viewport.samples=tracer.stats.samples;
    const old=gpu;await en.rebootDevice();gpu=engineRuntime(en).gpu;watch(gpu);await tracer.ready;
    for(let i=0;i<300&&!tracer.stats.converged;i++){en.render();await new Promise(r=>setTimeout(r,10));}en.render();out.restored=measure(pixels());out.restored.replaced=gpu!==old;
-   post=ImagePost.attach(en,{toneMapping:'agx',bloom:{strength:0}});for(let i=0;i<20;i++){en.render();await new Promise(r=>setTimeout(r,10));}en.render();out.combinedHDR=measure(pixels());post.dispose();post=undefined;
+   // ImagePost moves the tracer to an HDR target whose display pipeline compiles in the background: converged waits for it.
+   post=ImagePost.attach(en,{toneMapping:'agx',bloom:{strength:0}});en.render();let shown=0;for(;shown<1000&&!tracer.stats.converged;shown++){en.render();await new Promise(r=>setTimeout(r,10));}const converged=tracer.stats.converged;en.render();out.combinedHDR={...measure(pixels()),converged,frames:shown};post.dispose();post=undefined;
    tracer.dispose();tracer=undefined;
    source=gpu.createTexture({size:[W,H],format:'rgba32float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
    const rgba=new Float32Array(W*H*4);for(let i=0;i<samples.length;i++){rgba.set(samples[i].input.map(x=>x/2),i*4);rgba[i*4+3]=1;}
