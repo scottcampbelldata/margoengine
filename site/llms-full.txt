@@ -2648,7 +2648,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | --- | --- | --- | --- | --- |
 | WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl/test/webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 21,910 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) gets, on every live demo, "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no engine code; the landing page draws no scene. No demo runs on the WebGL2 preview: each needs effects, particles, skinning or compute. | `@margoengine/webgl` (3,021 B gzip, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo shows the message with no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). Most rendering packages stay WebGPU-only; the full fallback is paused ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). |
 | Content Security Policy | Enforced by the browser: core compiles its Wasm kernel, so `script-src` needs `'wasm-unsafe-eval'` (as do the machinery kernel, OCCT, Draco and Basis). Nothing needs `'unsafe-eval'`, workers included: the Draco/KTX2 decoder worker and the STEP/IGES CAD worker load their Emscripten code with `importScripts`, and the build replaces the `new Function` wrapper generators in the Basis and OCCT glue with closures, output byte-identical ([no-eval-workers.test.js](../tests/no-eval-workers.test.js)). No COOP/COEP. Checked with zero violations on Edge, one policy on the page and every worker ([csp-check.json](../examples/package-benchmarks/results/csp-check.json)). | Wasm is how the kernel stays small and fast. | Without `'wasm-unsafe-eval'`, `Engine.create` rejects ("Compiling or instantiating WebAssembly module violates the following Content Security policy directive") ([csp-check-negative.json](../examples/package-benchmarks/results/csp-check-negative.json)). | Headers for Cloudflare Pages, Netlify, Vercel and Nginx in [deploying.md](deploying.md). A Draco, Basis or OCCT build you substitute for the bundled one may still call `new Function` (three.js's Basis transcoder does) and then needs `'unsafe-eval'` for its worker. |
-| React app budget (what a bundler emits and the browser loads) | Measured and enforced by the bundler matrix (`npm run modern:test:bundlers`, part of `check:merge`): a Vite 8 build of the React cube page (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `OrbitControls`, `useFrame`; React 19) loads 95,338 B gzip before it runs (React, React DOM, core, the stage and the React bindings; budget 100,000 B), and with `@margoengine/react` installed alone the whole build emits 107,027 B gzip of JavaScript and no Wasm (budget 115,000 B). The matrix loads the built page in Edge and fails if it requests Wasm, an optional engine package or the BVH raycaster. With the GPU (Intel Arc 140V) the page requests that entry, then the orbit controls (7.0 KB gzip) when `OrbitControls` mounts, and nothing more while orbiting. Breakdown: [React page](#react-page). The build prints no warnings, without `@vitejs/plugin-react` too: `'use client'` is only on the `react-server` entries. | With `npm i margoengine` every optional package is installed, and bundlers emit a chunk for every `import()` that code reachable from the page can run. Stage methods are never tree-shaken, so `stage.load` (glTF with Draco and KTX2, STL, OBJ, STEP and IGES), `stage.sky`, `stage.particles` and the rest stay reachable from every `Canvas` (its `onCreated` hands the app that stage). | A one-install build also writes OCCT's 7,604,031 B Wasm (3.1 MB gzip), Basis's 527,333 B, Draco's 192,420 B and their loader chunks to `dist`. The page never requests them (95,596 B gzip at load, the same budget). Webpack and Turbopack need every one of those packages installed ([known-bugs.md](known-bugs.md)). | Vite: install `@margoengine/react` alone, plus the peers your components use (`@margoengine/controls` for `OrbitControls`); none of the others are emitted. |
+| React app budget (what a bundler emits and the browser loads) | Measured and enforced by the bundler matrix (`npm run modern:test:bundlers`, part of `check:merge`): a Vite 8 build of the React cube page (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `OrbitControls` from `@margoengine/react/controls`, `useFrame`; React 19) loads 94,216 B gzip before it runs (React, React DOM, core, the stage and the React bindings; budget 100,000 B), and with `@margoengine/react` installed alone the whole build emits 104,197 B gzip of JavaScript and no Wasm (budget 115,000 B). The matrix loads the built page in Edge and fails if it requests Wasm, an optional engine package or the BVH raycaster, and builds the same page with `@margoengine/react` alone in Next.js 16 (webpack and Turbopack), Rollup and esbuild: every module resolves and no optional package is emitted. Breakdown: [React page](#react-page). The build prints no warnings, without `@vitejs/plugin-react` too: `'use client'` is only on the `react-server` entries. | `@margoengine/react`'s root holds only bindings that need no optional package; each optional one is a subpath named after its package (`/controls`, `/gltf-pro`, `/shadows`, ...), and the stage's features are entries of their own (`@margoengine/stage/gltf`, ...), so no root reaches an optional package, not even through a lazy `import()` (`tests/optional-peer-reach.test.js`). | With `npm i margoengine`, `margoengine/react` re-exports every binding, so its module graph reaches gltf-pro's decoders: Vite copies the Basis (527,333 B) and Draco (192,420 B) `.wasm` to `dist` when it reads those modules, before tree-shaking. No chunk of them is emitted and the page never requests them (94,222 B gzip at load). | Install `@margoengine/react` alone, plus the packages its subpaths name (`@margoengine/controls` for `OrbitControls`): nothing else is installed or emitted. |
 | No visual editor | By design: Margo is code-first. | An editor is a product of its own; the engine stays a library. | Scenes are built in code or authored in another tool. | Author in Blender and export glTF or `.margo` (`@margoengine/blender`, `tools/blender-addon`, [guides/blender-game.md](guides/blender-game.md)); inspect at runtime with `@margoengine/inspector` and its `/frame` debugger; move objects with `@margoengine/controls`'s TransformControls. A Margo Studio editor is planned after 1.0. |
 | Tested hardware | Committed real-GPU results come from two Windows 11 machines in Edge 155: the Intel Arc 140V laptop above and an NVIDIA RTX A6000 desktop (its own visual-baseline profile, `nvidia-ampere-msedge-155`; the voxel results above come from it). Phones: the demos were run by hand on an iPhone (Safari), with no scripted run or committed result; a Galaxy S23 Ultra report of a slow island demo is unresolved. | One developer, two machines so far. | Behaviour elsewhere follows WebGPU's guarantees but is unverified. | Untested: AMD GPUs, NVIDIA GPUs other than the A6000, Apple silicon Macs, Android devices other than the S23 report, Linux, ChromeOS. Results from these are welcome; [reproduce.md](whitepaper/reproduce.md) has the commands. |
 | Browsers | Verified: Edge 155 (Chromium) on Windows, automated (real-GPU suites, visual regression, CSP). iPhone Safari: run by hand only (above). Firefox: not verified. macOS Safari: not verified. | Same as above. | Where a browser lacks WebGPU, `Engine.create` reports it (see "WebGPU first"). | Chrome uses the same Chromium engine as Edge; the automated suites run in Edge. CSP behaviour in Firefox and Safari is unverified. |
@@ -2657,24 +2657,26 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 ### React page
 
 What a minimal React page downloads, and why it is larger than core + stage (21,910 B gzip). The cube page of the
-bundler matrix (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `OrbitControls`, `useFrame`), built by Vite 8.3.5 with
-`@vitejs/plugin-react`, React 19.2 and `@margoengine/react` installed alone, measured from the build's source maps
-(minified bytes per package; gzip is each package's share of the chunk's gzip size). Core lights every scene by default
+bundler matrix (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `useFrame`, and `OrbitControls` from
+`@margoengine/react/controls`), built by Vite 8.3.4, React 19.3 and `@margoengine/react` installed alone with
+`@margoengine/controls` (2026-10-27), measured from the build's source maps (minified bytes per package; gzip is each
+package's own gzip size, scaled so the parts add up to the chunk's). Core lights every scene by default
 (a sun and an ambient term), so this is also the minimal lit page.
 
 | Part | Minified B | Gzip B | Needed for a lit scene? |
 | --- | ---: | ---: | --- |
-| `react-dom` (client) | 206,926 | 62,259 | Yes: the app's own UI runtime, not Margo's |
-| `react` + `scheduler` | 11,644 | 4,427 | Yes: the app's own |
-| `@margoengine/core` (engine 17.7 K, renderer 16.9 K, Wasm kernel 4.6 K, camera, shaders, geometry) | 49,497 | 19,084 | Yes |
-| `@margoengine/react` (components 7.9 K, controls hook 2.5 K, internal 1.9 K, assets, picking, shadows hook) | 14,657 | 5,523 | Yes: `Canvas`, `Mesh` and the hooks |
-| `@margoengine/stage` | 5,860 | 2,421 | Not to draw (core draws and lights the cube); `Canvas` wraps its engine in the stage it hands to `onCreated` and `<Stage>` |
-| Vite runtime (preload helper, module preload polyfill), app code and `@margoengine/math` (169 B) | 3,206 | 1,670 | The build's own |
-| **Entry, requested before the page runs** | **291,790** | **95,384** | Budget 100,000 B gzip |
+| `react-dom` (client) | 206,925 | 62,263 | Yes: the app's own UI runtime, not Margo's |
+| `react` + `scheduler` | 11,635 | 4,430 | Yes: the app's own |
+| `@margoengine/core` (engine, renderer, Wasm kernel, camera, shaders, geometry) | 49,485 | 19,056 | Yes |
+| `@margoengine/react` (components, internal, assets, the shadows hook) | 14,241 | 5,488 | Yes: `Canvas`, `Mesh` and the hooks |
+| `@margoengine/stage` | 2,771 | 1,405 | Not to draw (core draws and lights the cube); `Canvas` wraps its engine in the stage it hands to `onCreated` and `<Stage>` |
+| Vite runtime (preload helper, module preload polyfill), app code and `@margoengine/math` (170 B) | 3,135 | 1,609 | The build's own |
+| **Entry, requested before the page runs** | **288,234** | **94,251** | Budget 100,000 B gzip |
 | `@margoengine/controls/orbit` + its view helpers + profiles, when `OrbitControls` mounts | 17,999 | 6,951 | Yes, for orbiting |
-| **Everything the page fetches** | **309,789** | **102,335** | |
+| **Everything the page fetches** | **306,233** | **101,202** | |
 
-React and React DOM are 70% of the page; Margo's part (core, stage, bindings) is 27,028 B gzip. Nothing optional is in
+React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
+stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in
 the entry: `PbrMaterial` is core's material and pulls in no other package.
 
 - **Fixed (2026-10-26):** `OrbitControls`, `MapControls` and `CadControls` loaded the `@margoengine/controls` index,
@@ -2682,13 +2684,14 @@ the entry: `PbrMaterial` is core's material and pulls in no other package.
   112,655 B (39,072 B gzip) chunk. They now load `@margoengine/controls/orbit` and `/profiles`, `ArcballControls`
   loads `/arcball` and `TransformControls` loads `/transform`: the mount costs 6,951 B gzip, and a Vite build emits
   107,027 B gzip in all instead of 135,875 B.
-- **Emitted, never fetched:** the arcball chunk (3,192 B gzip) and one 0.2 KB stub per optional peer that is not
-  installed (Vite's stand-in), reachable from `Canvas` and the stage but never run by this page.
-- **A textured model** (`<Model src="BoxTextured.glb">`, with `@margoengine/gltf-pro` installed): the entry grows by
+- **Emitted, never fetched:** the arcball chunk (3,192 B gzip). Nothing else: since 2026-10-27 neither `Canvas` nor
+  the stage reaches an optional package, so there are no stand-in stubs either.
+- **A textured model** (`<Gltf src="BoxTextured.glb">` from `@margoengine/react/gltf-pro`, with `@margoengine/gltf-pro`
+  installed): the entry grows by
   1,750 B gzip (the `Model` binding), and mounting it fetches gltf-pro (175,257 B, 56,074 B gzip: glTF parsing, the
   PBR material and shader, compression hooks) plus the model. The Draco and Basis Wasm are emitted for files that use
   them; this one does not, and the page does not request them.
-- Still on the controls index: `PointerLock` (from `@margoengine/react/kit`), because `@margoengine/controls` has no
+- Still on the controls index: `PointerLock` (from `@margoengine/react/controls`), because `@margoengine/controls` has no
   pointer-lock entry; a page that does not use it never emits it.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
@@ -2784,43 +2787,6 @@ does not own. Each entry says exactly what is needed to close it.
   this entry removed or turned into the cause found.
 
 ## Open defects
-
-### `@margoengine/react` installed alone does not build with webpack or Turbopack
-
-- **What:** the React README offers `npm i @margoengine/react` alone. Vite builds that app (it stands in a stub for an
-  optional peer that is not installed, and the bundler matrix checks it emits no optional package), but Next.js fails:
-  webpack and Turbopack must resolve every string-literal `import()` in every module they reach, called or not.
-- **Repro:** a Next.js 16.4.3 App Router page with a client `Scene` that renders `Canvas`, `Mesh`, `BoxGeometry`,
-  `PbrMaterial` and `OrbitControls` from `@margoengine/react`, installed with only `@margoengine/react`,
-  `@margoengine/controls`, `react` and `react-dom` (npm adds the required peers core and stage). `next build --webpack`
-  and `next build --turbopack` both stop with `Module not found: Can't resolve` for 18 optional peers (2026-10-26).
-  A plain webpack 5 build of an entry importing those five names fails the same way: 39 module names in 19 packages
-  (2026-10-27).
-- **Cause (measured, 2026-10-27):** two sources, each enough on its own.
-  1. **Fixed (2026-10-27):** the ten loaders moved out of the `Stage` class into feature entries that take the stage
-     (`@margoengine/stage/gltf` `addGLTF`, `/cad` `addCAD`, `/sky` `addSky`, `/particles` `addParticles`, `/effects`
-     `addEffects`, `/environment` `addEnvironment`, `/shadows` `addShadows`); the stage root holds no `import()`
-     (`tests/modern-facade-isolation.test.js` builds a stage-only app and fails on any lazy import). Callers migrate
-     with `node scripts/codemod-stage-loaders.mjs`. Before:
-     The stage facade: `Canvas` constructs a `Stage` (it hands it to `onCreated` and `<Stage>`), and the `Stage` class
-     methods `load` (glTF, CAD), `gltf`, `machinery`, `creative`, `scenery`, `sky`, `particles`, `effects`,
-     `environment` and `shadows` hold 10 `import()`s of 6 optional packages (`creative`, `creative/particles`,
-     `creative/post`, `environment`, `gltf`, `machinery`, `machinery/cad`, `scenery`, `scenery/sky`, `shadows`).
-     Class methods are never tree-shaken, so they are reached from every `Canvas`.
-  2. The React package's root entry re-exports every binding, so the modules holding the other 29 `import()`s are in
-     the graph of any import from it: `post` (14 effects and `post/stack`), `extras` (`materials`, `post/depth`,
-     `post/mrt`, `machinery/section`), `assets` (`gltf-pro`, `fbx`, `cache/manager`, `environment`), `components`
-     (`shadows`, `cameras/layers`, `html`), `picking` (`selection`), `lights`, `voxels` and `xr`.
-  Changing only the React package cannot fix it: even with every optional binding behind its own subpath (a breaking
-  change of the root entry's exports), `Canvas` still reaches `Stage`. Bundler hints that skip the `import()`
-  (`webpackIgnore`, `turbopackIgnore`) are not a fix: the bare specifier then reaches the browser, which cannot resolve
-  it without an import map, so those features would break under webpack even with the peer installed.
-- **Needed to close:** (1) a stage facade change, frozen for 1.0: the ten loaders out of the `Stage` class into entries
-  the app imports (for example `@margoengine/stage/gltf` with a `loadGLTF(stage, url)`), so that the root entry holds no
-  `import()` of an optional package; and (2) the React root entry holding only bindings that need no optional peer,
-  with the others behind subpaths (`@margoengine/react/post` already exists; `html`, `xr`, `voxels`, `lights` and the
-  rest would join it). Until then, install `margoengine` for webpack and Turbopack, as the README says; the bundler
-  matrix builds both Next.js bundlers from it.
 
 ### Pinned proofs: nine historical claims no longer run against today's core
 
@@ -8166,14 +8132,17 @@ React 18 and 19 components and hooks for Margo Engine: a native canvas, pointer 
 frame callbacks. There is no custom reconciler: `<Canvas>` creates one engine, and its children are ordinary React
 components that edit it.
 
-Import it as `margoengine/react` (from the `margoengine` package) or `@margoengine/react` (from this package alone);
-the two are the same module. Optional parts load only when a component needs them, so an unused feature costs nothing.
+Import it as `margoengine/react` (from the `margoengine` package, every binding in one import) or from this package
+alone: `@margoengine/react` holds the bindings that need no optional package (`Canvas`, `Mesh`, geometry, materials,
+hooks, views, `Sun`, `Center`), and a binding that needs `@margoengine/<name>` comes from `@margoengine/react/<name>`
+(`OrbitControls` from `/controls` with `@margoengine/controls` installed, `Gltf` from `/gltf-pro`, `Shadows` from
+`/shadows`; the full list is in [SCENE.md](SCENE.md)). Optional parts load only when a component needs them, so an
+unused feature costs nothing.
 
-With Vite, installing this package alone (plus the peers your components use, such as `@margoengine/controls` for
-`OrbitControls`) keeps the build to what you import. The cube page with orbit controls requests 95,384 B gzip at load
-and 102,335 B once `OrbitControls` mounts, and emits no Wasm. React and React DOM are about 70% of that; Margo's part
-(core, stage, bindings) is 27,028 B gzip. The breakdown is in [limits.md](../../docs/limits.md#react-page). Webpack and
-Turbopack (Next.js) need the `margoengine` package, not this one alone.
+Installed alone (plus the packages your subpaths name, such as `@margoengine/controls` for `OrbitControls`), it builds
+with Vite, webpack, Turbopack (Next.js), Rollup and esbuild and keeps the build to what you import. The cube page with orbit controls requests 94,251 B gzip at load
+and 101,202 B once `OrbitControls` mounts, and emits no Wasm. React and React DOM are about 66% of that; Margo's part
+(core, stage, bindings) is 25,949 B gzip. The breakdown is in [limits.md](../../docs/limits.md#react-page).
 
 
 **What you get from this page:** a React app with a lit mesh in about five minutes, then the components, hooks,
@@ -8252,8 +8221,6 @@ createRoot(document.getElementById('root')!).render(<App />);
 The `Model` line needs a `.glb` file at `public/model.glb`; delete it for a scene with only the box.
 
 ## Components
-
-`Stage` configures the existing canvas stage and renders its children once that stage is available. Its `camera` prop updates the active camera; `shadows` uses the canvas's existing optional `@margoengine/shadows` lifecycle. Install that peer when enabling shadows. Canvas still creates and disposes the single engine and stage.
 
 [README continues: https://margoengine.com/llms/packages/react.md]
 

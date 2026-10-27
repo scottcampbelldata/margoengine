@@ -1,5 +1,5 @@
 {
-  "commit": "6f16c36d",
+  "commit": "51f33f02",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -92,8 +92,8 @@
         "gzip": 1369
       },
       "./layers": {
-        "raw": 1781,
-        "gzip": 886
+        "raw": 1841,
+        "gzip": 903
       }
     },
     "@margoengine/cinematic": {
@@ -1040,24 +1040,84 @@
     },
     "@margoengine/react": {
       ".": {
-        "raw": 71207,
-        "gzip": 24074
+        "raw": 17275,
+        "gzip": 6802
       },
-      "./kit": {
-        "raw": 31542,
-        "gzip": 11208
+      "./controls": {
+        "raw": 10811,
+        "gzip": 4090
+      },
+      "./gltf-pro": {
+        "raw": 8343,
+        "gzip": 3561
+      },
+      "./fbx": {
+        "raw": 8441,
+        "gzip": 3592
+      },
+      "./animation": {
+        "raw": 7443,
+        "gzip": 2759
+      },
+      "./environment": {
+        "raw": 7047,
+        "gzip": 2897
+      },
+      "./html": {
+        "raw": 2474,
+        "gzip": 1273
+      },
+      "./shadows": {
+        "raw": 8187,
+        "gzip": 3583
+      },
+      "./sky": {
+        "raw": 1515,
+        "gzip": 796
+      },
+      "./text": {
+        "raw": 2783,
+        "gzip": 1409
+      },
+      "./geometry": {
+        "raw": 5341,
+        "gzip": 2147
+      },
+      "./materials": {
+        "raw": 9941,
+        "gzip": 4060
       },
       "./post": {
-        "raw": 10058,
-        "gzip": 3608
+        "raw": 11013,
+        "gzip": 3987
+      },
+      "./dof": {
+        "raw": 1653,
+        "gzip": 901
+      },
+      "./tonemap": {
+        "raw": 1672,
+        "gzip": 900
+      },
+      "./taa": {
+        "raw": 1644,
+        "gzip": 897
+      },
+      "./machinery": {
+        "raw": 2132,
+        "gzip": 1057
+      },
+      "./voxel": {
+        "raw": 4326,
+        "gzip": 1944
       },
       "./physics": {
-        "raw": 15128,
-        "gzip": 5757
+        "raw": 15551,
+        "gzip": 5969
       },
       "./xr": {
-        "raw": 7927,
-        "gzip": 3343
+        "raw": 8342,
+        "gzip": 3562
       }
     },
     "@margoengine/rigging": {
