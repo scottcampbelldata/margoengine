@@ -346,17 +346,18 @@ const profiles = {
   margo: { name: 'margo', zoomToCursor: false },
   solidworks: { name: 'solidworks', zoomToCursor: true },
 };
-mock.module('@margoengine/controls', {
-  namedExports: {
-    OrbitControls: class OrbitControls extends MockControls {},
-    MapControls: class MapControls extends MockControls {},
-    ArcballControls: class ArcballControls extends MockControls {
-      minZoom = 0;
-      maxZoom = Infinity;
-    },
-    PROFILES: profiles,
+const controlsExports = {
+  OrbitControls: class OrbitControls extends MockControls {},
+  MapControls: class MapControls extends MockControls {},
+  ArcballControls: class ArcballControls extends MockControls {
+    minZoom = 0;
+    maxZoom = Infinity;
   },
-});
+  PROFILES: profiles,
+};
+mock.module('@margoengine/controls/orbit', { namedExports: controlsExports });
+mock.module('@margoengine/controls/profiles', { namedExports: controlsExports });
+mock.module('@margoengine/controls/arcball', { namedExports: controlsExports });
 mock.module('@margoengine/cameras/layers', {
   namedExports: {
     setRenderLayers(node, mask) {

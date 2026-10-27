@@ -13,7 +13,18 @@ import type {
 import { useCommit, useCreated, useScene, type Scene } from './internal.js';
 import { optionalPeer } from './optional.js';
 
-type ControlsApi = typeof import('@margoengine/controls');
+// Each component loads only the controls entry it uses (`@margoengine/controls/orbit`, `/arcball`), never the package
+// index, so a page with OrbitControls does not also fetch TransformControls, DragControls and their BVH raycaster.
+type OrbitApi = typeof import('@margoengine/controls/orbit') & typeof import('@margoengine/controls/profiles');
+type ArcballApi = typeof import('@margoengine/controls/arcball');
+const loadOrbit = (): Promise<OrbitApi> =>
+  optionalPeer('@margoengine/controls', () =>
+    Promise.all([import('@margoengine/controls/orbit'), import('@margoengine/controls/profiles')]).then(
+      ([orbit, profiles]) => ({ ...orbit, ...profiles }),
+    ),
+  );
+const loadArcball = (): Promise<ArcballApi> =>
+  optionalPeer('@margoengine/controls', () => import('@margoengine/controls/arcball'));
 /** A CAD tool's navigation profile by name; the props also take a custom `NavigationProfile`. */
 export type ProfileName = keyof typeof PROFILES;
 /** Event props every camera controls component takes. */
@@ -30,17 +41,18 @@ export interface ControlEventProps {
 const handlers = { change: 'onChange', start: 'onStart', end: 'onEnd' } as const;
 const unsubscribe = new WeakMap<Controls, () => void>();
 // Drives the controls from the Canvas frame loop, so `frameloop="demand"` and `invalidate()` move them too.
-function useControls<T extends Controls>(
+function useControls<A, T extends Controls>(
   scene: Scene,
-  make: (api: ControlsApi, scene: Scene) => T,
+  load: () => Promise<A>,
+  make: (api: A, scene: Scene) => T,
   ref: Ref<T> | undefined,
   events: ControlEventProps,
   keys: readonly unknown[] = [],
 ): T | null {
-  const controls = useCreated<ControlsApi, T>(
+  const controls = useCreated<A, T>(
     scene,
     {
-      load: () => optionalPeer('@margoengine/controls', () => import('@margoengine/controls')),
+      load,
       create: (api) => {
         const instance = make(api, scene),
           frame: FrameCallback = (_, delta) => {
@@ -130,10 +142,11 @@ function useOrbit(
   ref: Ref<OrbitInstance> | undefined,
 ): void {
   const scene = useScene(),
-    api = useRef<ControlsApi | null>(null),
+    api = useRef<OrbitApi | null>(null),
     { onChange, onStart, onEnd, onError, profile, keyEvents, target: center, ...options } = props;
-  const controls = useControls<OrbitInstance>(
+  const controls = useControls<OrbitApi, OrbitInstance>(
     scene,
+    loadOrbit,
     (loaded, { engine }) => {
       api.current = loaded;
       return new loaded[kind](engine.camera, engine.canvas);
@@ -209,8 +222,9 @@ export interface ArcballControlsProps extends ControlEventProps {
 export const ArcballControls = forwardRef<ArcballInstance, ArcballControlsProps>(function ArcballControls(props, ref) {
   const scene = useScene(),
     { onChange, onStart, onEnd, onError, projection, ...options } = props;
-  const controls = useControls<ArcballInstance>(
+  const controls = useControls<ArcballApi, ArcballInstance>(
     scene,
+    loadArcball,
     (api, { engine }) =>
       new api.ArcballControls(engine.camera, engine.canvas, projection === undefined ? {} : { projection }),
     ref,

@@ -3,7 +3,7 @@
 Install `npm i margoengine` and import `margoengine/react` (or this package alone: `npm i @margoengine/react`, imported as `@margoengine/react`; the two are the same module).
 
 With Vite, installing this package alone (plus the peers your components use, such as `@margoengine/controls` for
-`OrbitControls`) keeps the build to what you import: a cube page with orbit controls loads 95,133 B gzip and emits no
+`OrbitControls`) keeps the build to what you import: a cube page with orbit controls loads 95,338 B gzip (70% of it React and React DOM) and emits no
 Wasm. `margoengine` installs every package, so the build also writes the lazy loaders the stage can reach (glTF
 decoders, CAD import with OpenCascade's Wasm) to `dist`; the page never requests them. Webpack and Turbopack (Next.js)
 need `margoengine` ([limits.md](../../docs/limits.md), React app budget).
@@ -273,7 +273,7 @@ in the [React cookbook](../../docs/react-cookbook.md); moving from react-three-f
 
 SSR emits an accessible canvas without accessing GPU APIs. The ESM output preserves `use client` and includes TypeScript declarations. Peer ranges accept the current core 0.1.x workspace and the requested core 1.x release, plus React 18/19.
 
-Run `npm run build:packages` followed by `npm run modern:test:react` for React Testing Library/JSDOM lifecycle tests, including the canonical target snippet, StrictMode events, Suspense, cancellation, cache reuse and demand rendering. `npm run typecheck`, `npm run test:modules:packages`, and `npm run measure:size` verify package types, imports, and the core + stage ceiling of 25,000 bytes gzip; the current measurement is 21,107 bytes gzip. Run `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example. The adapter uses standard hooks, never `react-reconciler`. Frame dispatch forwards `(engine, deltaSeconds)` without building per-frame state objects or callback arrays.
+Run `npm run build:packages` followed by `npm run modern:test:react` for React Testing Library/JSDOM lifecycle tests, including the canonical target snippet, StrictMode events, Suspense, cancellation, cache reuse and demand rendering. `npm run typecheck`, `npm run test:modules:packages`, and `npm run measure:size` verify package types, imports, and the core + stage ceiling of 25,000 bytes gzip; the current measurement is 22,781 bytes gzip. Run `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example. The adapter uses standard hooks, never `react-reconciler`. Frame dispatch forwards `(engine, deltaSeconds)` without building per-frame state objects or callback arrays.
 
 See the React API and lifecycle guide.
 

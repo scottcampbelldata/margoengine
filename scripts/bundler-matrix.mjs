@@ -21,7 +21,7 @@ import { gzipSync } from 'node:zlib';
 // The React cube page's gzip budgets (docs/limits.md, "React app budget"): what the browser loads before the page runs
 // (React, React DOM, core, the stage and the React bindings), and everything a build of it emits with @margoengine/react
 // installed alone.
-const REACT_BUDGET = { initial: 100_000, total: 145_000 };
+const REACT_BUDGET = { initial: 100_000, total: 115_000 };
 
 const root = resolve(import.meta.dirname, '..'),
   archives = join(root, 'test-results/modern-packages'),
@@ -185,7 +185,39 @@ createRoot(document.getElementById('root')).render(<Canvas label="cube"><Spinner
       [...list].flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/'));
     const gzip = (list) =>
       list.reduce((sum, item) => sum + gzipSync(item.type === 'chunk' ? item.code : item.source).length, 0);
+    // What the browser requests: the built page served from memory in Edge (no GPU, as the import-map page below), until
+    // the network is idle. Canvas reports the missing WebGPU through onError; everything the page imports eagerly has
+    // been requested by then.
+    const requested = await (async () => {
+      const files = new Map(
+        output.map((item) => [`/${item.fileName}`, item.type === 'chunk' ? item.code : item.source]),
+      );
+      const server = createServer((request, response) => {
+        const path = new URL(request.url, 'http://x').pathname,
+          body = files.get(path === '/' ? '/index.html' : path);
+        if (body === undefined) return response.writeHead(404).end();
+        response.writeHead(200, { 'content-type': path.endsWith('.js') ? 'text/javascript' : 'text/html' }).end(body);
+      });
+      await new Promise((ready) => server.listen(0, '127.0.0.1', ready));
+      const { chromium } = await load('playwright');
+      const browser = await chromium.launch({
+        channel: process.env.BROWSER_CHANNEL ?? 'msedge',
+        args: ['--disable-gpu'],
+      });
+      try {
+        const tab = await browser.newPage(),
+          paths = [];
+        tab.on('request', (request) => paths.push(new URL(request.url()).pathname));
+        await tab.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'networkidle' });
+        return paths.filter((path) => path !== '/' && path !== '/favicon.ico').map((path) => path.slice(1));
+      } finally {
+        await browser.close();
+        server.close();
+      }
+    })();
     return {
+      requested,
+      requestedModules: ids(requested.map((name) => chunks.get(name)).filter(Boolean)),
       files: output.map((item) => item.fileName).sort(),
       modules: ids(chunks.values()),
       initialModules: ids(initial),
@@ -237,6 +269,15 @@ createRoot(document.getElementById('root')).render(<Canvas label="cube"><Spinner
           [],
           'react alone: no optional engine package',
         );
+        // OrbitControls loads @margoengine/controls/orbit, not the controls index: no TransformControls, DragControls
+        // or the BVH raycaster they use (a 39 KB gzip chunk when it loaded the index).
+        assert.deepEqual(
+          scoped.modules.filter((id) =>
+            /node_modules\/@margoengine\/(bvh\/|controls\/dist\/(index|transform|drag)[.-])/.test(id),
+          ),
+          [],
+          'react alone: OrbitControls emits only the orbit controls entry',
+        );
         assert.ok(
           scoped.total <= REACT_BUDGET.total,
           `react alone: ${scoped.total} B gzip emitted > ${REACT_BUDGET.total}`,
@@ -256,13 +297,27 @@ createRoot(document.getElementById('root')).render(<Canvas label="cube"><Spinner
         for (const [label, app] of [
           ['react alone', scoped],
           ['margoengine', umbrella],
-        ])
+        ]) {
           assert.ok(
             app.initial <= REACT_BUDGET.initial,
             `${label}: ${app.initial} B gzip at load > ${REACT_BUDGET.initial}`,
           );
+          // The browser fetches JavaScript only, nothing from an optional family (CAD, decoders, glTF, sky, ...), and
+          // no part of the controls index the page does not use (TransformControls, DragControls and the BVH raycaster).
+          assert.deepEqual(
+            app.requested.filter((file) => !file.endsWith('.js')),
+            [],
+            `${label}: the page requests no Wasm or other asset (${app.requested})`,
+          );
+          assert.deepEqual(
+            app.requestedModules.filter((id) => extra.test(id) || /node_modules\/@margoengine\/bvh\//.test(id)),
+            [],
+            `${label}: the page requests no optional engine package`,
+          );
+          assert.ok(app.requested.length > 0, `${label}: the page requested its entry`);
+        }
         done(
-          `vite react: ${scoped.initial} B gzip at load, ${scoped.total} B emitted (react alone); ${umbrella.initial} B at load, ${umbrella.files.length} files (margoengine)`,
+          `vite react: ${scoped.initial} B gzip at load, ${scoped.total} B emitted, ${scoped.requested.length} files requested (react alone); ${umbrella.initial} B at load, ${umbrella.files.length} files, ${umbrella.requested.length} requested (margoengine)`,
         );
       } finally {
         spawn(process.execPath, ['-e', 'require("fs").rmSync(process.argv[1],{recursive:true,force:true})', alone], {

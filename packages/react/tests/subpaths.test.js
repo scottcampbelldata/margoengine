@@ -343,6 +343,28 @@ test('Vite picking-cube initial chunk graph excludes optional React subpaths and
     for (const chunk of outputs) assert.equal(/react-reconciler|from ["']three["']/.test(chunk.code), false);
   }));
 
+test('OrbitControls loads the orbit controls entry only, never the controls index and its BVH raycaster', async () =>
+  temporary(async (directory) => {
+    // It loaded @margoengine/controls (index): every OrbitControls page fetched TransformControls, DragControls and
+    // @margoengine/bvh as one 39 KB gzip chunk when the controls mounted (2026-10-26).
+    const outputs = await bundle(
+      directory,
+      'orbit-cube',
+      `import {createElement as h} from 'react';
+  import {Canvas,Mesh,BoxGeometry,PbrMaterial,OrbitControls} from '@margoengine/react';
+  export const OrbitCube=()=>h(Canvas,null,h(Mesh,null,h(BoxGeometry),h(PbrMaterial)),h(OrbitControls,{profile:'blender'}));`,
+    );
+    const emitted = outputs.flatMap((chunk) => Object.keys(chunk.modules ?? {})).map((id) => id.replaceAll('\\', '/'));
+    assert.ok(emitted.some((id) => id.endsWith('/controls/src/orbit.ts') || id.endsWith('/controls/dist/orbit.js')));
+    assert.deepEqual(
+      emitted.filter((id) =>
+        /\/bvh\/|\/controls\/(src|dist)\/(index|transform|drag|gizmo|pointer-lock|fly|walk)\.(ts|js)$/.test(id),
+      ),
+      [],
+      'no controls index, gizmo, drag or BVH module is emitted for OrbitControls',
+    );
+  }));
+
 test('Vite optional entry includes requested bindings while keeping their native peers off the initial graph', async () =>
   temporary(async (directory) => {
     const outputs = await bundle(directory, 'optional-scene', optionalConsumer),

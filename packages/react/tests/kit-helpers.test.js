@@ -97,81 +97,81 @@ class Events {
     this.events.clear();
   }
 }
-mock.module('@margoengine/controls', {
-  namedExports: {
-    PointerLockControls: class extends Events {
-      constructor(engine, canvas) {
-        super();
-        this.engine = engine;
-        this.canvas = canvas;
-        this.enabled = true;
-        this.isLocked = false;
-        this.updates = [];
-        pointers.push(this);
-        if (engine.use) {
-          this.pluginName = 'test-pointer-' + pointers.length;
-          engine.use({
-            name: this.pluginName,
-            onPreUpdate: (delta) => this.update(delta),
-            dispose: () => this.dispose(),
-          });
-        }
+const controlsExports = {
+  PointerLockControls: class extends Events {
+    constructor(engine, canvas) {
+      super();
+      this.engine = engine;
+      this.canvas = canvas;
+      this.enabled = true;
+      this.isLocked = false;
+      this.updates = [];
+      pointers.push(this);
+      if (engine.use) {
+        this.pluginName = 'test-pointer-' + pointers.length;
+        engine.use({
+          name: this.pluginName,
+          onPreUpdate: (delta) => this.update(delta),
+          dispose: () => this.dispose(),
+        });
       }
-      dispose() {
-        if (this.disposals) return;
-        super.dispose();
-        if (this.pluginName) this.engine.removePlugin(this.pluginName);
-      }
-      lock() {
-        this.isLocked = true;
-        this.emit('lock');
-      }
-      unlock() {
-        this.isLocked = false;
-        this.emit('unlock');
-      }
-      update(delta) {
-        this.updates.push(delta);
-      }
-    },
-    TransformControls: class extends Events {
-      constructor(engine, options) {
-        super();
-        this.engine = engine;
-        this.options = options;
-        this.object = null;
-        gizmos.push(this);
-      }
-      attach(mesh) {
-        mesh.check();
-        this.object = mesh;
-        return this;
-      }
-      detach() {
-        this.object = null;
-        return this;
-      }
-      setMode(value) {
-        this.mode = value;
-      }
-      setSpace(value) {
-        this.space = value;
-      }
-      setSize(value) {
-        this.size = value;
-      }
-      setTranslationSnap(value) {
-        this.translationSnap = value;
-      }
-      setRotationSnap(value) {
-        this.rotationSnap = value;
-      }
-      setScaleSnap(value) {
-        this.scaleSnap = value;
-      }
-    },
+    }
+    dispose() {
+      if (this.disposals) return;
+      super.dispose();
+      if (this.pluginName) this.engine.removePlugin(this.pluginName);
+    }
+    lock() {
+      this.isLocked = true;
+      this.emit('lock');
+    }
+    unlock() {
+      this.isLocked = false;
+      this.emit('unlock');
+    }
+    update(delta) {
+      this.updates.push(delta);
+    }
   },
-});
+  TransformControls: class extends Events {
+    constructor(engine, options) {
+      super();
+      this.engine = engine;
+      this.options = options;
+      this.object = null;
+      gizmos.push(this);
+    }
+    attach(mesh) {
+      mesh.check();
+      this.object = mesh;
+      return this;
+    }
+    detach() {
+      this.object = null;
+      return this;
+    }
+    setMode(value) {
+      this.mode = value;
+    }
+    setSpace(value) {
+      this.space = value;
+    }
+    setSize(value) {
+      this.size = value;
+    }
+    setTranslationSnap(value) {
+      this.translationSnap = value;
+    }
+    setRotationSnap(value) {
+      this.rotationSnap = value;
+    }
+    setScaleSnap(value) {
+      this.scaleSnap = value;
+    }
+  },
+};
+mock.module('@margoengine/controls', { namedExports: controlsExports });
+mock.module('@margoengine/controls/transform', { namedExports: controlsExports });
 mock.module('@margoengine/sky', {
   namedExports: {
     Sky: class {

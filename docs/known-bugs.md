@@ -67,6 +67,19 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### `@margoengine/react` installed alone fails `tsc` with `skipLibCheck: false`
+
+- **What:** with only `@margoengine/react`, `@margoengine/controls`, React and its types installed, `tsc` on a Vite +
+  React 19 + TypeScript app with `"skipLibCheck": false` reports 202 errors in `@margoengine/react`'s `.d.ts` files
+  (`TS2307: Cannot find module '@margoengine/post/bloom'`, `'@margoengine/environment'`, `'@margoengine/shadows'`, ...;
+  2026-10-26). With `skipLibCheck: true` (the Vite and Next.js templates' default) it compiles, but props typed from an
+  uninstalled peer become `any`.
+- **Cause:** the declarations import the types of every optional peer (post effects, environment, shadows, sky, text,
+  geometry, materials, animation, XR, voxels, cache, machinery sections) from those packages.
+- **Needed to close:** declarations that do not name a peer the app did not install (the option types written in
+  `@margoengine/react`, or each optional binding behind its own subpath), checked by a strict `tsc` in the packed-package
+  tests with the React package alone. Until then, keep `skipLibCheck: true` or install `margoengine`.
+
 ### `@margoengine/react` installed alone does not build with webpack or Turbopack
 
 - **What:** the React README offers `npm i @margoengine/react` alone. Vite builds that app (it stands in a stub for an

@@ -225,28 +225,28 @@ mock.module('@margoengine/selection', {
     },
   },
 });
-mock.module('@margoengine/controls', {
-  namedExports: {
-    OrbitControls: class {
-      enabled = true;
-      constructor(camera, canvas) {
-        this.camera = camera;
-        this.canvas = canvas;
-        this.updates = [];
-        this.disposals = 0;
-        controls.push(this);
-      }
-      addEventListener() {}
-      removeEventListener() {}
-      update(delta) {
-        this.updates.push(delta);
-      }
-      dispose() {
-        if (!this.disposals) this.disposals++;
-      }
-    },
+const orbitExports = {
+  OrbitControls: class {
+    enabled = true;
+    constructor(camera, canvas) {
+      this.camera = camera;
+      this.canvas = canvas;
+      this.updates = [];
+      this.disposals = 0;
+      controls.push(this);
+    }
+    addEventListener() {}
+    removeEventListener() {}
+    update(delta) {
+      this.updates.push(delta);
+    }
+    dispose() {
+      if (!this.disposals) this.disposals++;
+    }
   },
-});
+};
+mock.module('@margoengine/controls/orbit', { namedExports: orbitExports });
+mock.module('@margoengine/controls/profiles', { namedExports: { PROFILES: {} } });
 mock.module('@margoengine/environment', {
   namedExports: {
     async loadEnvironmentImage(src, { signal }) {
