@@ -255,6 +255,44 @@ console.log(unwrapped.charts.length, unwrapped.seams.length, lightmap.texelsPerU
   charts. Too many charts for the resolution throws a RangeError naming the fix. Baking light into it is the
   `@margoengine/lightmap` package's job (quads today).
 
+## Import to editable meshes and flat-tile merging
+
+Turn a glTF primitive, an OBJ or any indexed triangles into polygons you can edit:
+
+```ts
+import { readAccessor, splitGLB } from 'margoengine/exporters';
+import { mergeFlatFaces, polygonMeshFromTriangles } from 'margoengine/mesh-edit/modeling';
+
+const parts = splitGLB(new Uint8Array(await (await fetch('/models/crate.glb')).arrayBuffer()));
+const gltf = parts.json as { meshes: { primitives: { attributes: Record<string, number>; indices: number }[] }[] };
+const primitive = gltf.meshes[0].primitives[0];
+// Seams rejoin, coplanar triangles merge back into quads, UVs are kept (or unwrapped when missing).
+const { mesh, diagnostics } = polygonMeshFromTriangles({
+  positions: readAccessor(parts, primitive.attributes.POSITION).values,
+  uvs: readAccessor(parts, primitive.attributes.TEXCOORD_0).values,
+  indices: readAccessor(parts, primitive.indices).values,
+});
+// Flat-tile merging on any mesh: coplanar neighbors with one UV map become one face.
+const tiles = mergeFlatFaces(mesh);
+console.log(mesh.faces.length, tiles.merged, diagnostics);
+```
+
+- `polygonMeshFromTriangles({positions, indices, uvs, faceSizes, positionIndices}, {weld = 0, mergeFlat = true,
+  uv = 'auto', unwrap, signal})`. For an OBJ, pass `parseOBJ`'s (`margoengine/loaders`) `positions`, `uvs`,
+  `indices`, `faceSizes` and `positionIndices`: polygons are rebuilt from their fans and positions rejoined exactly.
+  Otherwise positions within `weld` (default 0, identical only) are joined, which rejoins vertices split at UV seams;
+  corner UVs never weld. Polygons with repeated or crossing corners or no area are dropped, concave or nonplanar ones
+  split into convex faces (both counted in `diagnostics`). `uv: 'auto'` keeps the source UVs when all are within 0 to
+  1 and unwraps with `unwrapMesh` otherwise (missing or tiling UVs); `'keep'` throws instead; `'unwrap'` always
+  unwraps. Face IDs are `f<index>` of the source polygon, so they are stable between imports; `sourceFaces` maps each
+  output face to the source polygons it covers.
+- `mergeFlatFaces(mesh, {faces, tolerance, uv = 'match', signal})` joins neighboring faces across any shared run of
+  edges when the union is one planar convex polygon of at most 64 corners and, with `uv: 'match'`, their UVs are one
+  affine map of position, so the result renders exactly as before (`'ignore'` merges on geometry alone, for meshes you
+  will unwrap). Corners left in the middle of a straight edge drop out from every face that uses them at once, so no
+  T-junction appears; unused vertices are removed. `tolerance` defaults to 1e-6 of the bounding-box diagonal. The
+  merged face keeps its first face's ID; `faceMap` names it for every input face.
+
 ## Pixel painting and UVs
 
 `meshUVTopology(mesh)` identifies islands through opposite two-face geometric edges whose UVs match exactly at both endpoints. Point contacts, disconnected overlapping atlas regions, nonmanifold edges and inconsistent winding do not connect islands. It returns stable face/corner references and explicit seam reasons. `meshSelectionUVCorners` resolves corner, face, island-seed or whole-mesh intent to deduplicated source-order corners; stale identities reject.

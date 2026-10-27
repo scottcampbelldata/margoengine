@@ -14,8 +14,10 @@ Last updated 2026-10-26. Read this first when starting a new session. Update it 
 - `unwrapMesh` (least squares conformal maps, Lévy et al. 2002; seams by edge list and angle, pins, charts split
   until each is a disk with no fold or self-overlap, rotated and shelf-packed with texel padding) and
   `meshLightmapUVs` (same charts as a second UV set, one texel density, texel-aligned with padding).
-  Left for item 24: rounded bevels, light baking on general meshes (lightmap bakes quads only), OBJ/GLB import to
-  editable meshes, flat-tile merging.
+- `polygonMeshFromTriangles` (glTF/OBJ/STL triangles to editable polygons: fans rebuilt, seams rejoined, degenerate
+  dropped, concave split, flat merged, UVs kept or unwrapped) and `mergeFlatFaces` (flat-tile merging: coplanar
+  neighbors with one affine UV map join into convex polygons, straight corners dropped without T-junctions).
+  Left for item 24: rounded (multi-segment) bevels, light baking on general meshes (lightmap bakes quads only).
 
 ## Landed 2026-10-26: mesh-edit modeling depth (item 24), part 1
 

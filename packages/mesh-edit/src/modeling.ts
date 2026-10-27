@@ -1,6 +1,6 @@
 // @margoengine/mesh-edit/modeling: topology modelling on the same editable polygon meshes as the root entry. Edge
 // bevel, edge slide, dissolve, merge by distance, bridge, concave faces, knife, subdivision, booleans,
-// simplification, UV unwrap and lightmap UVs; its own entry so editors that only paint or move components never
+// simplification, UV unwrap, lightmap UVs, flat-tile merging and import from triangles; its own entry so editors that only paint or move components never
 // load it.
 export type {
   PolygonFace,
@@ -41,3 +41,10 @@ export {
   type UnwrapResult,
   type LightmapUVResult,
 } from './unwrap.js';
+export { mergeFlatFaces, type MergeFlatOptions, type MergeFlatResult } from './flat.js';
+export {
+  polygonMeshFromTriangles,
+  type TriangleSource,
+  type ImportMeshOptions,
+  type ImportMeshResult,
+} from './import.js';
