@@ -123,21 +123,6 @@ does not own. Each entry says exactly what is needed to close it.
   checkout that holds the commits; or retire the nine pinned runs as HISTORICAL with that reason, keeping their
   `--current` guarantees.
 
-### Chrome on Windows logs a console warning on every Margo page
-
-- **What:** on Chrome and Edge for Windows every page that starts the renderer logs `The powerPreference option is
-  currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127` (a console warning, found
-  2026-10-27 by `npm run check:quickstart`, which expects a quiet console). The scene is not affected.
-- **Repro:** open the README quickstart in Edge on Windows and read the console.
-- **Cause:** `GPURenderer.create` in `packages/core/src/renderer.ts` calls `requestAdapter({ powerPreference:
-  'high-performance' })` on every platform.
-- **Needed to close:** skip the option where the browser ignores it (`/Win/.test(navigator.platform)`). That costs 17 to
-  21 bytes gzip, and core is within 20 bytes of its 20 KiB gzip ceiling in `scripts/build-modern.js`, so the build
-  stops. Either 20 bytes are found elsewhere in core or the ceiling is raised on purpose. The fix and its test are
-  written (a platform table for the adapter request in `tests/core-timestamp-feature.test.js`). `@margoengine/compute`
-  has the same default (`packages/compute/src/context.ts`). Until then `check:quickstart` records this one message
-  as a known issue and fails on any other console output.
-
 ### 4x MSAA blending is not repeatable (RTX A6000 under CPU load, and Intel Arc 140V)
 
 - **What:** the voxel GPU check (`packages/voxel/tests/render-browser-check.mjs`, run by `check:merge`) fails now and

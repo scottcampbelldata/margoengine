@@ -218,7 +218,9 @@ export class GPURenderer implements Renderer {
     features: GPUFeatureName[] = [],
     samples: number = sceneSamples(),
   ): Promise<GPURenderer> {
-    const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
+    const adapter = await navigator.gpu?.requestAdapter(
+      /Win/.test(navigator.userAgent) ? {} : { powerPreference: 'high-performance' },
+    );
     if (!adapter) throw fault('unsupported', 'WebGPU adapter unavailable', 'webgpu');
     const device = await adapter.requestDevice({
       requiredLimits: { maxTextureArrayLayers: adapter.limits?.maxTextureArrayLayers },

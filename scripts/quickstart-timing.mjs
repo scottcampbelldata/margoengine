@@ -556,14 +556,7 @@ export async function main() {
     assert.ok(moved > 1500, `an orbit drag must change the picture (${moved} sampled pixels changed)`);
     assert.doesNotMatch(await status(), /Picked/, 'an orbit drag must not pick');
     const secondsToInteractive = mark('interaction verified (pick handler, outline, orbit)');
-    // Chrome on Windows warns that powerPreference is ignored: a recorded bug (docs/known-bugs.md), reported here, not hidden.
-    const known = (p) => /powerPreference option is currently ignored/.test(p);
-    for (const p of page.problems.filter(known)) notes.push(`KNOWN BUG (docs/known-bugs.md): ${p}`);
-    assert.deepEqual(
-      page.problems.filter((p) => !known(p)),
-      [],
-      'the shipped page logs no warning, error or failed request',
-    );
+    assert.deepEqual(page.problems, [], 'the shipped page logs no warning, error or failed request');
 
     // FAILURE PATH: no WebGPU shows the README's own message and then stops.
     const none = await open(pageUrl('readme'), { noGpu: true });

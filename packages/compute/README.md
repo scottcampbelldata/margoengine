@@ -377,7 +377,7 @@ mistakes throw `TypeError` or `RangeError` at once, naming the fix, and every me
 | `createCompute({ device })` | none | share a GPUDevice you made |
 | `createCompute({ backend })` | `'auto'` | `'auto'`, `'webgpu'` or `'cpu'` (see [CPU fallback](#cpu-fallback)) |
 | `createCompute({ fastMath })` | `false` | WGSL builtins for the transcendental functions (see [Precision](#precision)) |
-| `createCompute({ powerPreference })` | `'high-performance'` | adapter choice for a device of its own |
+| `createCompute({ powerPreference })` | `'high-performance'` (none on Windows, where browsers ignore it) | adapter choice for a device of its own |
 | `createCompute({ signal })` | none | abandon device creation |
 | `array(data, { dtype })` | from the TypedArray, else `'f32'` | element type |
 | `array(data, { shape })` | `[data.length]` | dimensions |

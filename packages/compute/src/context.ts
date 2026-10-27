@@ -32,7 +32,7 @@ export interface CreateComputeOptions {
   readonly engine?: EngineKernel;
   /** Reuse this GPU device. Takes precedence over `engine`. */
   readonly device?: GPUDevice;
-  /** Adapter choice for a device of the context's own. Default `'high-performance'`. */
+  /** Adapter choice for a device of the context's own. Default `'high-performance'`, except on Windows where browsers ignore it (and warn), so none is sent. */
   readonly powerPreference?: GPUPowerPreference;
   /** Abandons device creation: the promise rejects with the signal's reason. */
   readonly signal?: AbortSignal;
@@ -1015,15 +1015,16 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
     return new ComputeContext(device, false, fast);
   }
   if (backend === 'cpu') return cpu(options.signal);
-  const gpu = (globalThis.navigator as Navigator | undefined)?.gpu;
+  const nav = globalThis.navigator as Navigator | undefined,
+    gpu = nav?.gpu;
   if (!gpu) {
     if (backend === 'auto') return cpu(options.signal);
     throw fault('unsupported', "WebGPU unavailable; use a runtime with WebGPU, or backend: 'cpu'", 'compute');
   }
-  const adapter = await abortable(
-    gpu.requestAdapter({ powerPreference: options.powerPreference ?? 'high-performance' }),
-    options.signal,
-  );
+  // Windows browsers ignore the hint and warn in the console, so the default skips it there; an explicit choice is passed.
+  const powerPreference =
+    options.powerPreference ?? (/Win/.test(nav?.userAgent ?? '') ? undefined : 'high-performance');
+  const adapter = await abortable(gpu.requestAdapter(powerPreference ? { powerPreference } : {}), options.signal);
   if (!adapter) {
     if (backend === 'auto') return cpu(options.signal);
     throw fault(

@@ -111,6 +111,38 @@ function harness(t, offered) {
   return { adapter, canvas, requests, devices, pipelines, limitsRequests, restore };
 }
 
+test('renderer asks for the high-performance adapter except on Windows, where browsers ignore it and warn', async (t) => {
+  const table = [
+    ['Windows Chrome', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36', {}],
+    ['Windows Edge', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0 Safari/537.36 Edg/130.0', {}],
+    [
+      'macOS Chrome',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130.0 Safari/537.36',
+      { powerPreference: 'high-performance' },
+    ],
+    [
+      'Linux Chrome',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36',
+      { powerPreference: 'high-performance' },
+    ],
+    ['Node', 'Node.js/26', { powerPreference: 'high-performance' }],
+  ];
+  for (const [name, userAgent, expected] of table) {
+    const h = harness(t, []);
+    const asked = [];
+    const request = navigator.gpu.requestAdapter;
+    navigator.gpu.requestAdapter = (options) => (asked.push(options), request());
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: userAgent });
+    const renderer = await GPURenderer.create(h.canvas);
+    try {
+      assert.deepEqual(asked, [expected], name);
+    } finally {
+      renderer.dispose();
+      h.restore();
+    }
+  }
+});
+
 test('renderer preserves the adapter texture-array capability for optional packages', async (t) => {
   for (const maxTextureArrayLayers of [256, 2048]) {
     const h = harness(t, []);
