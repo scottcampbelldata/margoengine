@@ -17,7 +17,7 @@
 // Gate: first command to verified interactive frame in under 300 s of machine time. Writes
 // test-results/quickstart-timing.json. Hard time limit for the whole run (default 900 s) with process-tree cleanup.
 //   node scripts/quickstart-timing.mjs [--route=1|2] [--source=<repo or url>] [--dir=<folder>] [--keep]
-//     [--warm-cache] [--max=300] [--limit=900]
+//     [--warm-cache] [--lfs] [--max=300] [--limit=900]
 // --source defaults to this checkout (its committed HEAD is cloned, with uncommitted work laid over it). --warm-cache uses your npm cache
 // instead of a cold one (the default, which is what a first-time reader has; downloaded bytes are the cold cache's size).
 import assert from 'node:assert/strict';
@@ -223,7 +223,7 @@ export async function main() {
   let dev, browser, release;
   try {
     mark('start (first command)');
-    // 1. Obtain: the README's "git clone ... && git lfs install && git lfs pull" from the local checkout.
+    // 1. Obtain: the README's "GIT_LFS_SKIP_SMUDGE=1 git clone" from the local checkout (--lfs fetches the test assets too).
     const clone = join(dir, 'margoengine');
     let project,
       origin,
@@ -235,9 +235,18 @@ export async function main() {
       files = quickstartFiles(readFileSync(join(root, 'README.md'), 'utf8'));
       notes.push('REUSED an earlier install: the timings are not a measurement');
     } else {
-      await run('clone', 'git', ['clone', '--quiet', String(source), clone], dir);
-      await run('lfs-install', 'git', ['lfs', 'install', '--local'], clone);
-      await run('lfs-pull', 'git', ['lfs', 'pull'], clone);
+      // The README tells the reader to skip the Git LFS test assets (pointer files): the quickstart does not need them.
+      await run(
+        'clone',
+        'git',
+        ['clone', '--quiet', String(source), clone],
+        dir,
+        flag('lfs') ? {} : { GIT_LFS_SKIP_SMUDGE: '1' },
+      );
+      if (flag('lfs')) {
+        await run('lfs-install', 'git', ['lfs', 'install', '--local'], clone);
+        await run('lfs-pull', 'git', ['lfs', 'pull'], clone);
+      } else notes.push('Git LFS test assets skipped, as the README says');
       // A clone has the committed state only. When the source is this checkout, lay its uncommitted work over it, so
       // the check run before a commit tests what is about to be committed.
       if (resolve(String(source)) === root) {
@@ -255,7 +264,7 @@ export async function main() {
         if (changed.length) notes.push(`uncommitted files laid over the clone: ${changed.length}`);
       }
       sizes.cloneBytes = folderBytes(clone);
-      mark('clone + git lfs pull done');
+      mark('clone done');
 
       // 2. Install: `npm ci` (cold npm cache by default, so the cache's size is what the reader downloads).
       const cache = join(dir, 'npm-cache');

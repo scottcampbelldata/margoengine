@@ -20,13 +20,13 @@ The core and the stage together are 21,910 bytes gzip, Wasm kernel and WebGPU ba
 Margo needs WebGPU (see [Browser support](#browser-support)) and Node.js 22.12+ (or 24+) for the tools.
 
 **The packages are not on npm yet.** `npm install margoengine` does not work today; 1.0.0 is the first planned release.
-Two routes work now. Both start from a clone, and you need [Git LFS](https://git-lfs.com) for the test assets:
+Two routes work now. Both start from a clone. The quickstart does not need the [Git LFS](https://git-lfs.com) test
+assets (about 270 MB), so skip them: if Git LFS is installed, set `GIT_LFS_SKIP_SMUDGE=1` for the clone (in PowerShell,
+`$env:GIT_LFS_SKIP_SMUDGE=1`). You need the assets only to run the tests, see [Build from source](#build-from-source).
 
 ```sh
-git clone https://github.com/scottcampbelldata/margoengine.git
+GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/scottcampbelldata/margoengine.git
 cd margoengine
-git lfs install
-git lfs pull
 npm ci
 ```
 

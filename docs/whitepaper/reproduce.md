@@ -56,7 +56,7 @@ node scripts/quickstart-timing.mjs --route=1 --keep --dir=<folder>   # route 1 (
 ```
 
 It clones this checkout (uncommitted work laid over it) into a temp folder with a cold npm cache, then does what the
-README says line by line: `git lfs pull`, `npm ci`, `npm run pack:packages`, a new project, `npm install <tarballs> vite`,
+README says line by line: `npm ci`, `npm run pack:packages`, a new project, `npm install <tarballs> vite`,
 `index.html` and `main.ts` extracted from the README text itself (never retyped), `npx vite`, and the page in headless
 Edge under one shared GPU slot. The browser asserts, from pixels and handlers:
 
