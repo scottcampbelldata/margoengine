@@ -23,6 +23,7 @@ const json = (file) => JSON.parse(readFileSync(join(root, file), 'utf8'));
 /** Root suites run here. */
 export const ROOT = {
   'modern:test:browser': 'WebGL2 and WebGPU modern pages, starters and wrappers',
+  'modern:test:browser:slow-compile': 'the same with every pipeline 300 ms slower (a slow driver compiler)',
   'modern:test:xr:browser': 'simulated XR stereo pixels',
   'modern:test:usdz:browser': 'USDZ textures and the file-picker demo',
   'modern:test:postfx:browser': 'DOF and tonemapping pixels',
@@ -33,6 +34,10 @@ export const ROOT = {
 /** Commands a root suite needs first (it reads their output), run once before it. */
 const PREPARE = {
   'modern:test:browser': [
+    'npm run build --workspace @margoengine/starter-vite',
+    'npm run build --workspace @margoengine/starter-next',
+  ],
+  'modern:test:browser:slow-compile': [
     'npm run build --workspace @margoengine/starter-vite',
     'npm run build --workspace @margoengine/starter-next',
   ],
@@ -174,11 +179,16 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   // Held for the whole run (about 10 min alone, 15 with another run beside it), so the hold limit is 60 min.
   const release = await acquire({ owner: 'check:gpu-packages', mode: 'shared', max: 60, poll: 2000 });
   const started = performance.now();
-  const results = [];
+  const results = [],
+    prepared = new Set();
   try {
     for (const test of tests) {
-      for (const command of PREPARE[test.name] ?? [])
+      // Each preparing command once, however many suites need it.
+      for (const command of PREPARE[test.name] ?? []) {
+        if (prepared.has(command)) continue;
         if (!run(command, '.').ok) throw new Error(`${command} failed (needed by ${test.label}); fix it first`);
+        prepared.add(command);
+      }
       console.log(`\n=== ${test.label}`);
       const result = await runLimited(test.command, {
         cwd: join(root, test.cwd),

@@ -311,13 +311,21 @@ try {
   await page.goto('http://127.0.0.1:5195');
   await page.getByRole('heading', { name: 'Margo Engine / Next.js' }).waitFor();
   await page.waitForFunction(() => document.querySelector('canvas')?.width > 1);
-  await page.waitForTimeout(300);
+  // The cube shows once the first frame's pipelines are compiled: 180-280 ms after the canvas is sized on the RTX A6000,
+  // later on an integrated GPU (an Intel Arc 140V missed the fixed 300 ms this used to wait). Wait for the geometry.
+  const mintPixels = async () => {
+    const image = await decodePNG(await page.locator('canvas').screenshot({ path: 'test-results/modern-next.png' }));
+    let lit = 0;
+    for (let i = 0; i < image.data.length; i += 4)
+      if (image.data[i + 1] > 80 && image.data[i + 1] > image.data[i] + 10) lit++;
+    return lit;
+  };
+  const shown = Date.now();
+  let lit = await mintPixels();
+  while (lit <= 500 && Date.now() - shown < 20_000) lit = await mintPixels();
   assert.deepEqual(await page.locator('p[role="alert"]').allTextContents(), []);
-  const nextImage = await decodePNG(await page.locator('canvas').screenshot({ path: 'test-results/modern-next.png' }));
-  let lit = 0;
-  for (let i = 0; i < nextImage.data.length; i += 4)
-    if (nextImage.data[i + 1] > 80 && nextImage.data[i + 1] > nextImage.data[i] + 10) lit++;
-  assert.ok(lit > 500, 'Next client failed to render mint geometry');
+  assert.ok(lit > 500, `Next client failed to render mint geometry within 20 s (${lit} mint pixels)`);
+  result.checks.push({ name: 'Next first frame', mintPixels: lit, milliseconds: Date.now() - shown });
   result.checks.push({ name: 'Next production: SSR, client hydration, rendered geometry' });
   assert.deepEqual(errors, []);
   await mkdir('test-results', { recursive: true });

@@ -160,6 +160,7 @@
     "modern:build": "node scripts/build-modern.js",
     "modern:test": "node --experimental-test-module-mocks --test tests/modern*.test.js",
     "modern:test:browser": "node scripts/modern-browser-tests.js",
+    "modern:test:browser:slow-compile": "node scripts/modern-browser-tests.js --pipeline-delay=300",
     "modern:test:domains": "node scripts/modern-domain-tests.js",
     "modern:test:sky": "node scripts/modern-sky-fog-tests.js",
     "modern:test:citadel": "node scripts/modern-night-citadel-tests.js",
