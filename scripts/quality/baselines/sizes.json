@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3426202,
+  "total": 3431260,
   "history": [
     {
       "date": "2026-10-24",
@@ -518,6 +518,12 @@
       "commit": "1f9fd509",
       "reason": "usdz worker: bundles gltf-pro, whose draws, shadow and picking records now take the shared deformed-buffer offset (batched deformation, p-morph, item 47); +56 B over the limit after 1105fa5c",
       "grew": 1
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "f41621a0",
+      "reason": "mesh-edit/modeling: UV unwrap (least squares conformal maps, chart splitting, seams and pins, packing) and lightmap UVs (item 24)",
+      "grew": 1
     }
   ],
   "items": {
@@ -710,7 +716,7 @@
     "@margoengine/math/vector4": 925,
     "@margoengine/mcp": 8664,
     "@margoengine/mesh-edit": 30203,
-    "@margoengine/mesh-edit/modeling": 22085,
+    "@margoengine/mesh-edit/modeling": 27143,
     "@margoengine/navmesh": 7228,
     "@margoengine/navmesh/build": 11794,
     "@margoengine/net": 1371,

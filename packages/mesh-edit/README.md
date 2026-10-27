@@ -218,6 +218,43 @@ console.log(half.triangles, half.error, lods.map((level) => level.triangles.afte
 - `meshLODChain(mesh, {ratios = [0.5, 0.25, 0.125]})` simplifies each level from the previous one, so levels nest and
   seams match between them.
 
+## UV unwrap and lightmap UVs
+
+Automatic charts, flattened with least squares conformal maps, with seams and pins:
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { meshLightmapUVs, subdivideMesh, unwrapMesh } from 'margoengine/mesh-edit/modeling';
+
+const smooth = subdivideMesh(createPrimitiveMesh('cube', 'box'), { levels: 2 }).mesh;
+// New corner UVs: charts cut at edges sharper than 60 degrees, 4 texels apart at 1024.
+const unwrapped = unwrapMesh(smooth, { angle: 60, padding: 4 });
+// A second UV set for baked light: every chart in its own texels of a 256 x 256 lightmap.
+const lightmap = meshLightmapUVs(smooth, { resolution: 256, padding: 2 });
+console.log(unwrapped.charts.length, unwrapped.seams.length, lightmap.texelsPerUnit);
+```
+
+- `unwrapMesh(mesh, {seams = [], angle = 66, pins = [], resolution = 1024, padding = 4, signal})` cuts along `seams`
+  (edge IDs), open borders, nonmanifold or inconsistently wound edges and edges whose faces meet at more than `angle`
+  degrees (180 turns this off). Each chart is flattened by least squares conformal maps (Lévy, Petitjean, Ray and
+  Maillot, 2002), so angles are kept as well as a flat map allows. A chart that is not a topological disk (a closed
+  surface, a handle), or whose map would fold a triangle or let its border touch itself, is split in two where regions
+  grown from its two farthest-apart faces meet, and again until none does; every chart is then a disk with
+  no folds and no self-overlap. Charts are scaled to their true surface area (one texel density for all), rotated to
+  their smallest bounding box and shelf-packed into the unit square with `padding` texels around each at
+  `resolution`. Input UVs may be missing (draft UVs); positions, faces, IDs and winding are unchanged.
+- Pins (`{vertex, uv}`, normalized top-left) fix every corner of that vertex. A chart with two or more pins is solved
+  through them and stays where they put it; one pin places its chart at the packed density. Pinned charts are not
+  packed, so keep them clear of the packed area yourself; a pin set that would fold its chart is reported in
+  `diagnostics`, and one that pushes a chart outside the unit square throws.
+- The result has `charts` (faces, pins, bounds, surface area and `stretch`, the largest over smallest triangle scale),
+  `seams` (edges whose output UVs are discontinuous) and `texelsPerUnit`.
+- `meshLightmapUVs(mesh, {seams, angle, resolution = 256, padding = 2, signal})` makes the same charts without pins as
+  a separate UV set (`uv[face][corner]`, for glTF `TEXCOORD_1`): one texel density, each chart starting on a texel
+  corner with `padding` empty texels to its neighbors and the border, so bilinear filtering never bleeds between
+  charts. Too many charts for the resolution throws a RangeError naming the fix. Baking light into it is the
+  `@margoengine/lightmap` package's job (quads today).
+
 ## Pixel painting and UVs
 
 `meshUVTopology(mesh)` identifies islands through opposite two-face geometric edges whose UVs match exactly at both endpoints. Point contacts, disconnected overlapping atlas regions, nonmanifold edges and inconsistent winding do not connect islands. It returns stable face/corner references and explicit seam reasons. `meshSelectionUVCorners` resolves corner, face, island-seed or whole-mesh intent to deduplicated source-order corners; stale identities reject.

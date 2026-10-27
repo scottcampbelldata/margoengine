@@ -1,6 +1,7 @@
 // @margoengine/mesh-edit/modeling: topology modelling on the same editable polygon meshes as the root entry. Edge
-// bevel, edge slide, dissolve, merge by distance, bridge, concave faces, knife, subdivision, booleans and
-// simplification; its own entry so editors that only paint or move components never load it.
+// bevel, edge slide, dissolve, merge by distance, bridge, concave faces, knife, subdivision, booleans,
+// simplification, UV unwrap and lightmap UVs; its own entry so editors that only paint or move components never
+// load it.
 export type {
   PolygonFace,
   PolygonMesh,
@@ -30,3 +31,13 @@ export {
   type SimplifyResult,
   type LODChainOptions,
 } from './simplify.js';
+export {
+  unwrapMesh,
+  meshLightmapUVs,
+  type UVPin,
+  type ChartOptions,
+  type UnwrapOptions,
+  type UVChart,
+  type UnwrapResult,
+  type LightmapUVResult,
+} from './unwrap.js';

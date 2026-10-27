@@ -11,7 +11,10 @@ Last updated 2026-10-26. Read this first when starting a new session. Update it 
   check; README limits explain the tolerance), `simplifyMesh` / `meshLODChain` (Garland-Heckbert quadric collapses
   with vertex-subset placement; UV seams and borders kept, nested levels).
 - Tests: golden shapes, seeded fuzz for closure, Euler characteristic, no slivers, inclusion-exclusion volumes.
-  Left for item 24: rounded bevels, auto UV unwrap with seams and pins, lightmap UVs and baking, OBJ/GLB import to
+- `unwrapMesh` (least squares conformal maps, Lévy et al. 2002; seams by edge list and angle, pins, charts split
+  until each is a disk with no fold or self-overlap, rotated and shelf-packed with texel padding) and
+  `meshLightmapUVs` (same charts as a second UV set, one texel density, texel-aligned with padding).
+  Left for item 24: rounded bevels, light baking on general meshes (lightmap bakes quads only), OBJ/GLB import to
   editable meshes, flat-tile merging.
 
 ## Landed 2026-10-26: mesh-edit modeling depth (item 24), part 1
