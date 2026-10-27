@@ -36,7 +36,10 @@ export interface USDMesh {
   positions: Float32Array;
   /** Vertex normals, three floats each; authored, or computed when the layer has none. */
   normals: Float32Array;
-  /** Texture coordinates, two floats per vertex, when authored. */
+  /**
+   * USD `st` texture coordinates as authored (origin at the image's bottom left, t up), two floats per vertex, when
+   * authored. The glTF `document` holds them as uvs (s, 1 - t).
+   */
   uvs?: Float32Array;
   /** Triangle corner indices into the vertex streams. */
   indices: Uint32Array;
@@ -65,7 +68,16 @@ type USDDocument = Required<
     | 'scenes'
     | 'scene'
   >
->;
+> &
+  Pick<GLTFDocument, 'samplers' | 'extensionsUsed'>;
+/** glTF sampler wrap modes for UsdUVTexture's `wrapS`/`wrapT`; `black` and `useMetadata` keep glTF's default (repeat). */
+const WRAP: Record<string, number> = { repeat: 10497, mirror: 33648, clamp: 33071 };
+/** Where a texture is sampled: KHR_texture_transform values (glTF uv space, v down) and glTF wrap modes. */
+interface Placement {
+  transform?: { offset: [number, number]; rotation: number; scale: [number, number] };
+  wrapS: number;
+  wrapT: number;
+}
 const identity = () => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 function fail(message: string): never {
   // Malformed input is a LoaderError, like every other loader; the code is taken from the wording.
@@ -337,7 +349,36 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     return (value as string[])[0];
   };
   const connection = (path: string, name: string) => firstPath(specs[path + '.' + name]?.fields.connectionPaths);
-  const texture = (path: string, name: string): { path: string; channel: number } | undefined => {
+  /**
+   * A UsdUVTexture's wrap modes and, when its `st` comes through a UsdTransform2d, that transform as
+   * KHR_texture_transform. UsdTransform2d (UsdPreviewSurface spec) maps st to scale, then a counter-clockwise rotation
+   * in degrees (t up), then translation. The document's uvs are (s, 1 - t), so the glTF transform keeps the angle's
+   * sign (in radians) and its offset is (tx - sin(r) sy, 1 - cos(r) sy - ty): the inverse of exportUSDZ's mapping.
+   */
+  const placement = (shader: string): Placement => {
+    const wrap = (name: string) => {
+      const mode = attrs(shader, name);
+      return typeof mode === 'string' && mode in WRAP ? WRAP[mode] : WRAP.repeat;
+    };
+    const result: Placement = { wrapS: wrap('inputs:wrapS'), wrapT: wrap('inputs:wrapT') },
+      node = connection(shader, 'inputs:st')?.split('.outputs:')[0];
+    if (node && attrs(node, 'info:id') === 'UsdTransform2d') {
+      const degrees = attrs(node, 'inputs:rotation') ?? 0;
+      if (typeof degrees !== 'number' || !Number.isFinite(degrees)) fail('invalid texture rotation');
+      const scale = numeric(attrs(node, 'inputs:scale') ?? [1, 1], 2),
+        translation = numeric(attrs(node, 'inputs:translation') ?? [0, 0], 2),
+        rotation = (degrees * Math.PI) / 180,
+        c = Math.cos(rotation),
+        s = Math.sin(rotation);
+      result.transform = {
+        offset: [translation[0] - s * scale[1], 1 - c * scale[1] - translation[1]],
+        rotation,
+        scale: [scale[0], scale[1]],
+      };
+    }
+    return result;
+  };
+  const texture = (path: string, name: string): { path: string; channel: number; placement: Placement } | undefined => {
     const target = connection(path, name);
     if (!target) return;
     const shader = target.split('.outputs:')[0];
@@ -347,14 +388,23 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     const channel = target.split('.outputs:')[1],
       index = 'rgba'.indexOf(channel);
     if (index < 0 && channel !== 'rgb') fail('unsupported texture channel');
-    return { path: pathName(file, root), channel: Math.max(0, index) };
+    return { path: pathName(file, root), channel: Math.max(0, index), placement: placement(shader) };
   };
-  const image = (source: ImageSource): number => {
+  /** A texture for `source` and its glTF texture info, with the sampler and KHR_texture_transform `where` needs. */
+  const image = (source: ImageSource, where: Placement): { index: number; extensions?: Record<string, unknown> } => {
     const index = sources.length;
     sources.push(source);
     doc.images.push({});
-    doc.textures.push({ source: index });
-    return index;
+    let sampler: number | undefined;
+    if (where.wrapS !== WRAP.repeat || where.wrapT !== WRAP.repeat) {
+      doc.samplers ??= [];
+      sampler = doc.samplers.push({ wrapS: where.wrapS, wrapT: where.wrapT }) - 1;
+    }
+    doc.textures.push(sampler === undefined ? { source: index } : { source: index, sampler });
+    if (!where.transform) return { index };
+    doc.extensionsUsed ??= [];
+    if (!doc.extensionsUsed.includes('KHR_texture_transform')) doc.extensionsUsed.push('KHR_texture_transform');
+    return { index, extensions: { KHR_texture_transform: where.transform } };
   };
   const materialIds = new Map<string, number>();
   function material(path: string): number {
@@ -387,18 +437,22 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         metal = texture(shader, 'inputs:metallic');
       if (diffuse) {
         p.baseColorFactor = [1, 1, 1, opacity];
-        p.baseColorTexture = { index: image({ path: diffuse.path }) };
+        p.baseColorTexture = image({ path: diffuse.path }, diffuse.placement);
       }
-      if (normal) definition.normalTexture = { index: image({ path: normal.path }) };
+      if (normal) definition.normalTexture = image({ path: normal.path }, normal.placement);
       if (rough || metal) {
-        p.metallicRoughnessTexture = {
-          index: image({
-            roughness: rough,
-            metallic: metal,
+        // One packed glTF texture: both maps must be sampled the same way.
+        if (rough && metal && JSON.stringify(rough.placement) !== JSON.stringify(metal.placement))
+          fail('unsupported roughness and metallic textures with different transforms or wrap modes');
+        p.metallicRoughnessTexture = image(
+          {
+            roughness: rough && { path: rough.path, channel: rough.channel },
+            metallic: metal && { path: metal.path, channel: metal.channel },
             roughnessValue: roughness,
             metallicValue: metallic,
-          }),
-        };
+          },
+          (rough ?? metal)!.placement,
+        );
         p.roughnessFactor = 1;
         p.metallicFactor = 1;
       }
@@ -594,7 +648,12 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
           POSITION: accessor(positions, 'VEC3'),
           NORMAL: accessor(normals, 'VEC3'),
         };
-      if (uvs) attributes.TEXCOORD_0 = accessor(uvs, 'VEC2');
+      // USD st has its origin at the image's bottom left (t up); glTF uvs at its top left (v down): v = 1 - t.
+      if (uvs)
+        attributes.TEXCOORD_0 = accessor(
+          Float32Array.from(uvs, (x, i) => (i % 2 ? 1 - x : x)),
+          'VEC2',
+        );
       const mesh = doc.meshes.length;
       doc.meshes.push({
         primitives: [

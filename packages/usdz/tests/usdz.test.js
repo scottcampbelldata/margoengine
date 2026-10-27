@@ -148,6 +148,76 @@ test('PreviewSurface texture channels map to glTF and missing assets fail', asyn
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/usdz-textured.usdz', archive);
 });
+// Regression: the glTF document took st as uvs unflipped (textures drew upside down) and ignored UsdTransform2d and
+// wrap modes. st (0, 0) is the image's bottom left; glTF uv (0, 0) its top left.
+test('the glTF document flips st to uvs and keeps UsdTransform2d and wrap modes', async () => {
+  const placed = (rotation) =>
+    source
+      .replace(
+        'color3f inputs:diffuseColor = (0.2, 0.4, 0.6)',
+        'color3f inputs:diffuseColor.connect = </Root/Material/Diffuse.outputs:rgb>',
+      )
+      .replace(
+        '    def Material "Material"\n    {\n',
+        '    def Material "Material"\n    {\n' +
+          '        def Shader "UV"\n        {\n            uniform token info:id = "UsdPrimvarReader_float2"\n' +
+          '            string inputs:varname = "st"\n            float2 outputs:result\n        }\n' +
+          '        def Shader "Place"\n        {\n            uniform token info:id = "UsdTransform2d"\n' +
+          '            float2 inputs:in.connect = </Root/Material/UV.outputs:result>\n' +
+          (rotation === undefined ? '' : `            float inputs:rotation = ${rotation}\n`) +
+          '            float2 inputs:scale = (4, 2)\n            float2 inputs:translation = (1, -0.5)\n' +
+          '            float2 outputs:result\n        }\n' +
+          '        def Shader "Diffuse"\n        {\n            uniform token info:id = "UsdUVTexture"\n' +
+          '            asset inputs:file = @color.png@\n' +
+          '            float2 inputs:st.connect = </Root/Material/Place.outputs:result>\n' +
+          '            token inputs:wrapS = "mirror"\n            token inputs:wrapT = "clamp"\n        }\n',
+      );
+  const read = (layer) =>
+    parseUSDZ(
+      zip([
+        ['scene.usda', Buffer.from(layer)],
+        ['color.png', png(0, 255, 0)],
+      ]),
+    );
+  const asset = await read(placed(30)),
+    doc = asset.document,
+    accessor = doc.meshes[0].primitives[0].attributes.TEXCOORD_0,
+    uvs = asset.buffers[doc.accessors[accessor].bufferView];
+  // st [(0, 0), (1, 0), (0, 1)] stays as authored on the mesh; the document's uvs are (s, 1 - t).
+  assert.deepEqual(Array.from(asset.meshes[0].uvs), [0, 0, 1, 0, 0, 1]);
+  assert.deepEqual(Array.from(uvs), [0, 1, 1, 1, 0, 0]);
+  const info = doc.materials[0].pbrMetallicRoughness.baseColorTexture,
+    t = info.extensions.KHR_texture_transform,
+    r = Math.PI / 6;
+  assert.deepEqual(doc.extensionsUsed, ['KHR_texture_transform']);
+  assert.ok(Math.abs(t.rotation - r) < 1e-12);
+  assert.deepEqual(t.scale, [4, 2]);
+  // Offset (tx - sin(r) sy, 1 - cos(r) sy - ty), so glTF uv' = O + R S uv, R = [[c, s], [-s, c]], equals
+  // (s', 1 - t') of UsdTransform2d's st' = R_ccw S st + T at every point.
+  for (const [s0, t0] of [
+    [0, 0],
+    [1, 0],
+    [0.3, 0.8],
+    [-2, 5],
+  ]) {
+    const c = Math.cos(r),
+      n = Math.sin(r),
+      st = [c * 4 * s0 - n * 2 * t0 + 1, n * 4 * s0 + c * 2 * t0 - 0.5],
+      u = s0,
+      v = 1 - t0,
+      uv = [c * 4 * u + n * 2 * v + t.offset[0], -n * 4 * u + c * 2 * v + t.offset[1]];
+    assert.ok(Math.abs(uv[0] - st[0]) < 1e-9 && Math.abs(uv[1] - (1 - st[1])) < 1e-9, `at (${s0}, ${t0})`);
+  }
+  assert.deepEqual(doc.samplers[doc.textures[info.index].sampler], { wrapS: 33648, wrapT: 33071 });
+  // No rotation authored: rotation 0, offset (tx, 1 - sy - ty).
+  const plain = (await read(placed())).document.materials[0].pbrMetallicRoughness.baseColorTexture.extensions
+    .KHR_texture_transform;
+  assert.deepEqual(plain, { offset: [1, 1 - 2 + 0.5], rotation: 0, scale: [4, 2] });
+  // Untransformed, repeat-wrapped textures stay plain glTF texture infos.
+  const untouched = parseUSDA(source).document;
+  assert.equal(untouched.samplers, undefined);
+  assert.equal(untouched.extensionsUsed, undefined);
+});
 test('malformed streams, unsupported USD features and Crate table bounds fail explicitly', async () => {
   assert.throws(() => parseUSDA(source.replace('[0, 1, 2]', '[0, 1, 9]')), /index/);
   assert.throws(() => parseUSDA(source, { maxVertices: 2 }), /limit/);

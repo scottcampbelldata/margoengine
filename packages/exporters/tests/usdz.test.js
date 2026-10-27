@@ -484,7 +484,31 @@ test('texture rotation reaches glTF as given, is validated, and leaves the archi
       (e) => e instanceof RangeError && /rotation/.test(e.message),
       String(rotation),
     );
-  // Our own USD reader still opens the rotated archive (it does not read texture transforms).
-  const asset = await readUSD(exportUSDZ(rotatedScene(transform)));
-  assert.equal(asset.meshes.length, 1);
+});
+
+test('texture offset, scale, rotation and wrap modes round-trip through @margoengine/usdz', async () => {
+  for (const degrees of [0, 30, -30, 90, 180]) {
+    const transform = { offset: [0.25, -0.4], scale: [2, 3], rotation: (degrees * Math.PI) / 180 },
+      asset = await readUSD(exportUSDZ(rotatedScene(transform, 'mirror'))),
+      doc = asset.document,
+      info = doc.materials[0].pbrMetallicRoughness.baseColorTexture,
+      back = info.extensions.KHR_texture_transform;
+    // The written values are Float32 text, so they come back within Float32 precision.
+    for (const [a, b] of [
+      [back.offset, transform.offset],
+      [back.scale, transform.scale],
+      [[back.rotation], [transform.rotation]],
+    ])
+      for (let k = 0; k < a.length; k++) assert.ok(Math.abs(a[k] - b[k]) < 1e-6, `${degrees}: ${a} vs ${b}`);
+    assert.deepEqual(doc.samplers[doc.textures[info.index].sampler], { wrapS: 10497, wrapT: 33648 });
+    // The document's uvs are the exporter's input uvs again (st flipped back).
+    const uvs = asset.buffers[doc.accessors[doc.meshes[0].primitives[0].attributes.TEXCOORD_0].bufferView];
+    const [mesh] = asset.meshes;
+    for (let corner = 0; corner < 6; corner++) {
+      const p = Array.from(mesh.positions.subarray(corner * 3, corner * 3 + 3)),
+        v = [0, 1, 2, 3].find((i) => p.every((x, k) => x === quad.positions[i * 3 + k]));
+      assert.ok(Math.abs(uvs[corner * 2] - quad.uvs[v * 2]) < 1e-6);
+      assert.ok(Math.abs(uvs[corner * 2 + 1] - quad.uvs[v * 2 + 1]) < 1e-6);
+    }
+  }
 });

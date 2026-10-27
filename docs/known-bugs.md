@@ -29,8 +29,8 @@ does not own. Each entry says exactly what is needed to close it.
      and mirror wrapping, and rotation alone at +30 and -30 degrees.
      `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` writes them (eight files: `normalScale` 1 and 2 are
      separate; 07 and 08 are the rotations), with engine-drawn reference twins.
-     Texture rotation (KHR_texture_transform radians, written as `UsdTransform2d` degrees with the same sign) is written
-     but not yet confirmed: Quick Look on iOS 27.2 drew file 06 leaning clockwise, as gltf-pro draws the same glTF
+     Texture rotation (KHR_texture_transform radians, written as `UsdTransform2d` degrees with the same sign, and read
+     back the same way by `@margoengine/usdz`) is written but not yet confirmed on a device: Quick Look on iOS 27.2 drew file 06 leaning clockwise, as gltf-pro draws the same glTF
      transform (the kit's first checklist expected anticlockwise; that expectation was wrong). Files 07 (+30, should
      lean clockwise) and 08 (-30, anticlockwise) await a device re-check.
   3. `pip install usd-core`, then `python packages/exporters/tests/validate-usdz.py <file>` on the same files.
