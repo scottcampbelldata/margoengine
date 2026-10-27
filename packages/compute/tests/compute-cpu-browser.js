@@ -58,7 +58,75 @@ window.runCpuParityTests = async () => {
   await parity('integer wrap and floor division', (c, x) => x.mul(1e9).astype('i32').mul(3).floorDiv(7), 0);
   await parity('comparisons and where', (c, x, y) => c.where(x.gt(y), x, y.neg()), 0);
   await parity('exp, log1p, sqrt of |x|', (c, x) => x.exp().add(x.abs().log1p()).add(x.abs().sqrt()), 2e-6);
-  await parity('sin, cos, atan2', (c, x, y) => x.mul(3).sin().add(y.mul(3).cos()).add(x.atan2(y)), 1e-5);
+  // The precise functions are within 2 ulp of the exact value on every GPU, the CPU within half an ulp: 1e-6 is
+  // about 8 ulp of the sum's scale. (The builtins failed this on an Intel Arc 140V: sin and cos 1.1e-5 off.)
+  await parity('sin, cos, atan2', (c, x, y) => x.mul(3).sin().add(y.mul(3).cos()).add(x.atan2(y)), 1e-6);
+  // Each precise function alone, in ulp of the CPU's value: its bound (packages/shared/precise-math.js) plus the
+  // CPU's half ulp and the input's f32 rounding of x * k.
+  const sameUlp = (cpuValues, gpuValues, ulps, label) => {
+    assert(cpuValues.length === gpuValues.length, `${label}: length`);
+    for (let i = 0; i < gpuValues.length; i++) {
+      const a = cpuValues[i],
+        b = gpuValues[i];
+      if (Number.isNaN(a) && Number.isNaN(b)) continue;
+      if (Object.is(a, b) || a === b) continue;
+      const scale = Math.max(Math.abs(a), 2 ** -126),
+        ulp = 2 ** (Math.floor(Math.log2(scale)) - 23);
+      assert(Math.abs(a - b) <= ulps * ulp, `${label}[${i}]: cpu ${a}, gpu ${b} (${Math.abs(a - b) / ulp} ulp)`);
+    }
+  };
+  for (const [label, op, ulps] of [
+    ['sin(100 x)', (c, x) => x.mul(100).sin(), 1.5],
+    ['cos(100 x)', (c, x) => x.mul(100).cos(), 1.5],
+    ['tan(3 x)', (c, x) => x.mul(3).tan(), 3],
+    ['asin(1.99 x)', (c, x) => x.mul(1.99).asin(), 2],
+    ['acos(1.99 x)', (c, x) => x.mul(1.99).acos(), 1.5],
+    ['atan(20 x)', (c, x) => x.mul(20).atan(), 2.5],
+    ['atan2(x, y)', (c, x, y) => x.atan2(y), 2.5],
+    ['exp(100 x)', (c, x) => x.mul(100).exp(), 1.5],
+    ['exp2(100 x)', (c, x) => x.mul(100).exp2(), 1.5],
+    ['expm1(10 x)', (c, x) => x.mul(10).expm1(), 2],
+    ['log(|x|)', (c, x) => x.abs().log(), 1.5],
+    ['log2(|x|)', (c, x) => x.abs().log2(), 2],
+    ['log1p(1.99 x)', (c, x) => x.mul(1.99).log1p(), 2],
+    ['sinh(20 x)', (c, x) => x.mul(20).sinh(), 2.5],
+    ['cosh(20 x)', (c, x) => x.mul(20).cosh(), 2.5],
+    ['tanh(20 x)', (c, x) => x.mul(20).tanh(), 2.5],
+    ['pow(10 |x|, 10 y)', (c, x, y) => x.abs().mul(10).pow(y.mul(10)), 2.5],
+    ['pow(-4 x, round(6 y))', (c, x, y) => x.mul(-4).pow(y.mul(6).round()), 2.5],
+    ['sqrt(|x|)', (c, x) => x.abs().sqrt(), 1],
+  ]) {
+    const [a, b] = both((ctx) => op(ctx, ctx.array(raw), ctx.array(rawB)));
+    sameUlp(await a.read(), await b.read(), ulps, label);
+    checks.push(`cpu = gpu within ${ulps} ulp: ${label}`);
+  }
+  // fastMath: the WGSL builtins, which only promise WGSL's bounds. For |3x|, |3y| <= 1.5 < pi: sin and cos 2^-11
+  // absolute each, atan2 4096 ulp of at most pi (2^-10); with the sum's own rounding, 2e-3.
+  {
+    const fast = await createCompute({ backend: 'webgpu', device: gpu.device, fastMath: true });
+    assert(fast.fastMath === true && gpu.fastMath === false, 'fastMath flag');
+    const op = (c) =>
+      c
+        .array(raw)
+        .mul(3)
+        .sin()
+        .add(c.array(rawB).mul(3).cos())
+        .add(c.array(raw).atan2(c.array(rawB)));
+    const want = Array.from(await op(cpu).read()),
+      got = Array.from(await op(fast).read());
+    same(want, got, 2e-3, 'fastMath sin, cos, atan2');
+    checks.push('cpu = gpu with fastMath: sin, cos, atan2 within the WGSL bounds');
+    // Under the spec-math stand-in (every builtin as far off as WGSL allows) the builtins miss the strict tolerance
+    // the precise functions passed above, as they did on an Intel Arc 140V: the stand-in is live and the check would
+    // have caught it.
+    if (globalThis.__margoSpecMathError >= 1) {
+      const off = Math.max(...want.map((v, i) => Math.abs(v - got[i]) / Math.max(1, Math.abs(got[i]))));
+      assert(off > 1e-5, `spec-math stand-in: the builtins are only ${off} off`);
+      checks.push(
+        `spec-math stand-in: the builtins are ${off.toExponential(2)} off, past the 1e-6 the precise path keeps`,
+      );
+    }
+  }
   await parity('sum along an axis', (c, x) => x.slice([0, 100_000]).reshape(400, 250).sum({ axis: 0 }), 1e-4);
   for (const [name, reduce] of [
     ['mean', (x) => x.mean()],

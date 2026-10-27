@@ -4,6 +4,7 @@
 // (transpose, slices, broadcasts) are read through their strides inside the same kernel, so they cost no copy.
 // Plain numbers travel in a uniform, so changing a constant does not recompile; shapes are compiled in.
 import { rangeError, typeError } from '../../shared/errors.js';
+import { preciseMathWgsl } from '../../shared/precise-math.js';
 import { bitsOf, fromBits, isFloat, promote, scalarType, type DType } from './dtype.js';
 import type { ComputeContext, WaitOptions } from './context.js';
 import type { GpuArray, ReadOptions } from './array.js';
@@ -459,13 +460,49 @@ const strideOf = (shape: readonly number[]) => {
   return strides;
 };
 
-/** WGSL for one op applied to argument expressions already of `t` (the promoted input type). */
-function opCode(op: string, args: string[], t: DType, out: DType): string {
+// The precise f32 functions (packages/shared/precise-math.js) for each element-wise op that uses one.
+const PRECISE_OPS: Record<string, string> = {
+  pow: 'precisePow',
+  atan2: 'preciseAtan2',
+  sqrt: 'preciseSqrt',
+  exp: 'preciseExp',
+  exp2: 'preciseExp2',
+  expm1: 'preciseExpm1',
+  log: 'preciseLog',
+  log2: 'preciseLog2',
+  log1p: 'preciseLog1p',
+  sin: 'preciseSin',
+  cos: 'preciseCos',
+  tan: 'preciseTan',
+  asin: 'preciseAsin',
+  acos: 'preciseAcos',
+  atan: 'preciseAtan',
+  sinh: 'preciseSinh',
+  cosh: 'preciseCosh',
+  tanh: 'preciseTanh',
+};
+
+/**
+ * WGSL for one op applied to argument expressions already of `t` (the promoted input type). `precise` collects the
+ * precise functions used; undefined (the context's `fastMath`) uses the WGSL builtins instead.
+ */
+function opCode(op: string, args: string[], t: DType, out: DType, precise?: Set<string>): string {
   const [a, b, c] = args,
     zero = `${t}(0)`,
     flag = (cond: string) => `select(0u, 1u, ${cond})`;
   // Float functions on integer inputs run in f32 (the result type already says f32).
   const fl = (x: string) => (isFloat(t) ? x : `f32(${x})`);
+  const name = precise && PRECISE_OPS[op];
+  if (name) {
+    // In f32 (an f16 value is widened and the result narrowed back), the same on every GPU.
+    precise.add(name);
+    const f = (x: string) => (t === 'f32' ? x : `f32(${x})`),
+      call = `${name}(${args
+        .slice(0, op === 'pow' || op === 'atan2' ? 2 : 1)
+        .map(f)
+        .join(', ')})`;
+    return out === 'f32' ? call : `${out}(${call})`;
+  }
   switch (op) {
     case 'add':
       return `(${a} + ${b})`;
@@ -651,6 +688,7 @@ export function fuse(operand: Operand, binding: number, maxStorage: number, temp
   let declarations = '',
     next = binding,
     f16 = false;
+  const precise = operand.context.fastMath ? undefined : new Set<string>();
   const outStrides = strideOf(shape);
   const cast = (v: string, from: DType, to: DType) => (from === to ? v : `${to}(${v})`);
   // Emits one `let` per node (shared subtrees once) and returns the name holding the node's value in its own type.
@@ -706,6 +744,7 @@ export function fuse(operand: Operand, binding: number, maxStorage: number, temp
         node.args.map((arg) => cast(visit(arg), dtypeOfNode(arg), t)),
         t,
         node.dtype,
+        precise,
       );
     }
     const own = dtypeOfNode(node);
@@ -721,7 +760,8 @@ export function fuse(operand: Operand, binding: number, maxStorage: number, temp
   values.set(consts);
   declarations += `@group(0) @binding(${next++}) var<uniform> fused: array<vec4u, ${slots}>;\n`;
   resources.fused = values;
-  const fn = `fn value(i: u32) -> ${operand.dtype} {\n  ${lets.join('\n  ')}\n  return ${result};\n}`;
+  const helpers = precise?.size ? preciseMathWgsl([...precise]) : '';
+  const fn = `${helpers}fn value(i: u32) -> ${operand.dtype} {\n  ${lets.join('\n  ')}\n  return ${result};\n}`;
   return {
     enables: f16 ? 'enable f16;\n' : '',
     declarations,

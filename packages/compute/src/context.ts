@@ -43,6 +43,13 @@ export interface CreateComputeOptions {
    * `engine`, which are WebGPU.
    */
   readonly backend?: 'auto' | 'webgpu' | 'cpu';
+  /**
+   * Use the WGSL builtins for `sin`, `exp`, `pow` and the other transcendental functions. Default `false`: precise
+   * f32 versions within 1-2.5 ulp (pow up to 5) that give the same results on every GPU. The builtins are faster but
+   * only as accurate as the WGSL specification asks (sin and cos 2^-11 absolute in [-pi, pi], atan2 4096 ulp, pow
+   * undefined for negative bases) and differ from GPU to GPU. The CPU backend ignores it.
+   */
+  readonly fastMath?: boolean;
 }
 
 /** Waiting options: an AbortSignal. */
@@ -173,11 +180,15 @@ export class ComputeContext {
   // While profiling: the timestamps of each timed submit, read once the submits' error scopes have resolved.
   #timings: { staging: GPUBuffer; queries: GPUQuerySet; labels: string[] }[] | undefined;
 
+  /** True when element-wise functions use the WGSL builtins (`createCompute({ fastMath })`). */
+  readonly fastMath: boolean;
+
   /** @internal Use {@link createCompute}. */
-  constructor(device: GPUDevice, ownsDevice: boolean) {
+  constructor(device: GPUDevice, ownsDevice: boolean, fastMath = false) {
     this.device = device;
     this.ownsDevice = ownsDevice;
     this.lost = device.lost;
+    this.fastMath = fastMath;
   }
 
   /** True after `dispose()`. */
@@ -989,7 +1000,10 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
   const backend = options.backend ?? 'auto';
   if (backend !== 'auto' && backend !== 'webgpu' && backend !== 'cpu')
     throw typeError(`createCompute backend must be 'auto', 'webgpu' or 'cpu', got ${String(backend)}`, 'compute');
-  if (options.device) return new ComputeContext(options.device, false);
+  if (options.fastMath !== undefined && typeof options.fastMath !== 'boolean')
+    throw typeError(`createCompute fastMath must be true or false, got ${String(options.fastMath)}`, 'compute');
+  const fast = options.fastMath === true;
+  if (options.device) return new ComputeContext(options.device, false, fast);
   if (options.engine) {
     const device = (options.engine as unknown as { gpu: GPUDevice | null }).gpu;
     if (!device)
@@ -998,7 +1012,7 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
         'Engine has no WebGPU device (WebGL2 fallback); create the context without an engine',
         'compute',
       );
-    return new ComputeContext(device, false);
+    return new ComputeContext(device, false, fast);
   }
   if (backend === 'cpu') return cpu(options.signal);
   const gpu = (globalThis.navigator as Navigator | undefined)?.gpu;
@@ -1032,5 +1046,5 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
     device.destroy();
     throw options.signal.reason;
   }
-  return new ComputeContext(device, true);
+  return new ComputeContext(device, true, fast);
 }

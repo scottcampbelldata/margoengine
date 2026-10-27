@@ -34,6 +34,7 @@
 // Material flags and record sizes must match scene.ts and layout.ts.
 import { displayShader } from '../../shared/display.js';
 import { agxShader } from '../../shared/agx.js';
+import { preciseMathWgsl } from '../../shared/precise-math.js';
 import { acesNarkowiczShader } from '../../shared/aces.js';
 import {
   ADDITIVE,
@@ -218,7 +219,7 @@ fn albedoGlass(mu:f32,r:f32,eta:f32)->f32 {
 `;
 
 /** The path tracer: entry points `trace` (accumulate samples) and `ids` (pixel-centre instance and palette ids). */
-export const TRACE: string = /* wgsl */ `${FRAME}${COMMON}${SPECTRUM}
+export const TRACE: string = /* wgsl */ `${FRAME}${COMMON}${SPECTRUM}${preciseMathWgsl(['preciseSin', 'preciseCos', 'preciseAsin', 'preciseAtan'])}
 const INF=3.0e38;
 const NONE=0xffffffffu;
 const GROUND=0xfffffffeu;
@@ -813,7 +814,10 @@ fn undistort(px:vec2f)->vec2f {
  return vec2f(u.x*0.5*H+0.5*W,0.5*H-u.y*0.5*H);
 }
 // Panorama and fisheye rays from the eye along the camera's axes (interpolated with camera motion); d = 0 outside a
-// fisheye's circle (the stereographic mapping fills the frame).
+// fisheye's circle (the stereographic mapping fills the frame). The angles go through the precise functions
+// (packages/shared/precise-math.js), not the builtins: WGSL lets asin be 6.8e-5 off and sin and cos 2^-11, and a ray
+// that far off can hit a different voxel than VoxelPathTracer.raycast on the CPU (an Intel Arc 140V drew fisheye
+// depths 1.2e-3 off where the RTX A6000 is within 1e-6).
 fn wideRay(px:vec2f)->Ray {
  var eye=f.eye.xyz;var fw=f.forward.xyz;var rt=f.right.xyz;var up=f.up.xyz;
  if((f.config.z&CAMERA_MOTION)!=0u&&motion<1.0){
@@ -824,16 +828,16 @@ fn wideRay(px:vec2f)->Ray {
  if(f.projection.x==1u){
   // Fitted to the width (360 degrees across) or to the height (the same angle per pixel across as down).
   let phi=select((px.x/W-0.5)*TAU,(px.x-0.5*W)/H*PI,f.projection.w==1u);let el=(0.5-px.y/H)*PI;
-  return Ray(eye,normalize(cos(el)*(sin(phi)*rt+cos(phi)*fw)+sin(el)*up));
+  return Ray(eye,normalize(preciseCos(el)*(preciseSin(phi)*rt+preciseCos(phi)*fw)+preciseSin(el)*up));
  }
  let p=vec2f(px.x-0.5*W,0.5*H-px.y)/(0.5*H);
  let r=length(p);
  var th=r*0.5*f.lensFov.x;
- if(f.projection.y==1u){let s=r*f.lensFov.y;if(s>1.0){return Ray(eye,vec3f(0.0));}th=2.0*asin(s);}
- if(f.projection.y==2u){th=2.0*atan(r*f.lensFov.y);}
+ if(f.projection.y==1u){let s=r*f.lensFov.y;if(s>1.0){return Ray(eye,vec3f(0.0));}th=2.0*preciseAsin(s);}
+ if(f.projection.y==2u){th=2.0*preciseAtan(r*f.lensFov.y);}
  else if(th>0.5*f.lensFov.x+1e-6){return Ray(eye,vec3f(0.0));}
  let a=select(vec2f(0.0),p/r,r>0.0);
- return Ray(eye,normalize(cos(th)*fw+sin(th)*(a.x*rt+a.y*up)));
+ return Ray(eye,normalize(preciseCos(th)*fw+preciseSin(th)*(a.x*rt+a.y*up)));
 }
 // The ray through pixel position px without the lens: the projection's, distortion applied.
 fn viewRay(px:vec2f)->Ray {

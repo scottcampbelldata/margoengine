@@ -26,15 +26,19 @@ try {
     () =>
       typeof window.runComputeTests === 'function' &&
       typeof window.runExtrasTests === 'function' &&
-      typeof window.runCpuParityTests === 'function',
+      typeof window.runCpuParityTests === 'function' &&
+      typeof window.runPreciseTests === 'function',
   );
+  // The precise maths first: every other check of a transcendental function rests on it.
+  const precise = await page.evaluate(() => window.runPreciseTests());
   const core = await page.evaluate(() => window.runComputeTests());
   const extras = await page.evaluate(() => window.runExtrasTests());
   const cpu = await page.evaluate(() => window.runCpuParityTests());
   const report = {
-    checks: [...core.checks, ...extras.checks, ...cpu.checks],
+    checks: [...precise.checks, ...core.checks, ...extras.checks, ...cpu.checks],
     timings: { ...core.timings, ...extras.timings, ...cpu.timings },
     adapter: core.adapter,
+    preciseMath: precise.results,
   };
   assert.deepEqual(errors, []);
   // The two shaders broken on purpose must have failed (their labels are excused only when they do).

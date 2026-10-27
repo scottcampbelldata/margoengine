@@ -60,6 +60,66 @@ export function delayPipelines(ms) {
   }
 }
 
+/**
+ * Page init script for a GPU whose builtin maths is as far off as WGSL allows: every shader module's calls of the
+ * builtins below are rewritten to return a value off by `scale` times the specification's error bound (WGSL 15.8,
+ * "Floating point accuracy"), deterministically: sin and cos 2^-11 absolute, tan the same relatively (within the bound
+ * it inherits from sin / cos), asin and acos 6.77e-5 absolute, atan and atan2 4095 ulp, exp and exp2 3 ulp, log and
+ * log2 2^-23 absolute, sqrt and inverseSqrt 4 and 2 ulp. An Intel Arc 140V is 1.1e-5 off for sin near 1.5
+ * where this PC's RTX A6000 is within 3e-7, so a check that leans on one GPU's builtins passes here and fails there;
+ * with this it fails here too. `openBrowser({ mathErrorScale })`, MARGO_SPEC_MATH_ERROR or `--spec-math-error=<scale>`
+ * (the `:spec-math` scripts; 1 = the bound).
+ */
+export function perturbBuiltinMath(scale) {
+  if (typeof GPUDevice === 'undefined') return;
+  globalThis.__margoSpecMathError = scale;
+  const u = 2 ** -24,
+    // name -> [factor, absolute term]: the result becomes builtin * factor + absolute.
+    rules = {
+      sin: [1 - scale * 2 ** -11, 0],
+      cos: [1 - scale * 2 ** -11, 0],
+      tan: [1 + scale * 2 ** -11, 0],
+      asin: [1 - (scale * 6.77e-5) / (Math.PI / 2), 0],
+      acos: [1 - (scale * 6.77e-5) / Math.PI, 0],
+      atan: [1 + scale * 4095 * u, 0],
+      atan2: [1 + scale * 4095 * u, 0],
+      exp: [1 + scale * 3 * u, 0],
+      exp2: [1 + scale * 3 * u, 0],
+      // 2^-23 absolute: inside 2^-21 on [0.5, 2] and inside 3 ulp elsewhere (|log x| >= 0.69 there).
+      log: [1, scale * 2 ** -23],
+      log2: [1, scale * 2 ** -23],
+      sqrt: [1 + scale * 4 * u, 0],
+      inverseSqrt: [1 + scale * 2 * u, 0],
+    };
+  const pattern = new RegExp(`(?<![\\w.])(${Object.keys(rules).join('|')})\\s*\\(`, 'g');
+  const literal = (v) => (Number.isInteger(v) ? `${v}.0` : String(v));
+  const rewrite = (code) => {
+    // Comments go first, so a parenthesis in one cannot pair with code.
+    const src = code.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, '');
+    let out = '',
+      last = 0;
+    pattern.lastIndex = 0;
+    for (let m = pattern.exec(src); m; m = pattern.exec(src)) {
+      if (/\bfn\s+$/.test(src.slice(Math.max(0, m.index - 8), m.index))) continue;
+      let depth = 1,
+        j = m.index + m[0].length;
+      for (; j < src.length && depth > 0; j++) depth += src[j] === '(' ? 1 : src[j] === ')' ? -1 : 0;
+      const call = src.slice(m.index, j),
+        [factor, absolute] = rules[m[1]],
+        // The call's arguments are rewritten too (nested builtins).
+        inner = rewrite(call.slice(m[0].length, -1));
+      out += `${src.slice(last, m.index)}(${m[1]}(${inner}) * ${literal(factor)}${absolute ? ` + ${literal(absolute)}` : ''})`;
+      last = j;
+      pattern.lastIndex = j;
+    }
+    return out + src.slice(last);
+  };
+  const original = GPUDevice.prototype.createShaderModule;
+  GPUDevice.prototype.createShaderModule = function (descriptor) {
+    return original.call(this, { ...descriptor, code: rewrite(descriptor.code) });
+  };
+}
+
 export async function openBrowser({
   browserName = 'chromium',
   channel = process.env.BROWSER_CHANNEL ?? 'msedge',
@@ -74,6 +134,11 @@ export async function openBrowser({
   pipelineDelayMs = Number(
     process.env.MARGO_PIPELINE_DELAY_MS ??
       process.argv.find((a) => a.startsWith('--pipeline-delay='))?.slice('--pipeline-delay='.length) ??
+      0,
+  ),
+  mathErrorScale = Number(
+    process.env.MARGO_SPEC_MATH_ERROR ??
+      process.argv.find((a) => a.startsWith('--spec-math-error='))?.slice('--spec-math-error='.length) ??
       0,
   ),
 } = {}) {
@@ -108,6 +173,7 @@ export async function openBrowser({
     // Every shader module the page creates is compiled for diagnostics; close() fails on a WGSL error.
     await page.addInitScript(wgslGuard);
     if (pipelineDelayMs > 0) await page.addInitScript(delayPipelines, pipelineDelayMs);
+    if (mathErrorScale > 0) await page.addInitScript(perturbBuiltinMath, mathErrorScale);
     const wgsl = watchWgsl(page);
     let reloads = 0,
       handledReloads = 0;
@@ -167,6 +233,7 @@ export async function openBrowser({
     hardware.hostPlatform = process.platform;
     hardware.headless = headless;
     if (pipelineDelayMs > 0) hardware.pipelineDelayMs = pipelineDelayMs;
+    if (mathErrorScale > 0) hardware.mathErrorScale = mathErrorScale;
     if (browserName === 'firefox') hardware.firefoxUserPrefs = firefoxUserPrefs;
     if (process.env.GPU_VENDOR) {
       assert.ok(

@@ -4,6 +4,7 @@
 // seed gives the same stream on every device. Each draw advances the generator's counter past the blocks it used.
 // Normals use the Box-Muller transform (G. E. P. Box and M. E. Muller, Ann. Math. Statist. 29(2), 1958).
 import { rangeError, typeError } from '../../shared/errors.js';
+import { preciseMathWgsl } from '../../shared/precise-math.js';
 import { checkShape, type GpuArray } from './array.js';
 import type { DType } from './dtype.js';
 import type { ComputeContext } from './context.js';
@@ -63,6 +64,7 @@ export function randomShader(dtype: DType): string {
 @group(0) @binding(0) var<storage, read_write> out: array<${dtype}>;
 @group(0) @binding(1) var<uniform> draw: Draw;
 ${wgslPhilox}
+${preciseMathWgsl(['preciseSqrt', 'preciseLog', 'preciseSin', 'preciseCos'])}
 fn unit(x: u32) -> f32 { return f32(x >> 8u) * 5.9604644775390625e-8; }
 @compute @workgroup_size(256)
 fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, @builtin(local_invocation_index) lid: u32) {
@@ -81,9 +83,10 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
     let pair = lane & 2u;
     let u1 = f32((r[pair] >> 8u) + 1u) * 5.9604644775390625e-8;
     let u2 = unit(r[pair + 1u]);
-    let radius = sqrt(-2.0 * log(u1));
+    // The precise functions, so every GPU draws the same numbers as the CPU backend.
+    let radius = preciseSqrt(-2.0 * preciseLog(u1));
     let angle = 6.283185307179586 * u2;
-    let z = select(radius * cos(angle), radius * sin(angle), (lane & 1u) == 1u);
+    let z = select(radius * preciseCos(angle), radius * preciseSin(angle), (lane & 1u) == 1u);
     out[i] = ${dtype}(draw.a + draw.b * z);
   } else if (draw.kind == 3u) {
     let m = mulhilo(word, draw.range);

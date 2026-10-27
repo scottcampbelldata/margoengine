@@ -185,7 +185,9 @@ console.log(await dst.read({ length: 4 })); // [0, 2, 4, 6]
 Each picks the direct or the FFT method by kernel size.
 
 `@margoengine/compute/random` provides `new Random(gpu, { seed, stream })`, a Philox4x32-10 generator with
-`uniform`, `normal`, `integers`, `bits`, `permutation` and `choice`. Its output is bit-identical on every device.
+`uniform`, `normal`, `integers`, `bits`, `permutation` and `choice`. Every draw except `normal` is bit-identical on
+every device and on the CPU backend; `normal` uses the precise functions ([Precision](#precision)), so it agrees with
+the CPU backend to a few ulp on every GPU.
 
 ```ts
 import { createCompute } from '@margoengine/compute';
@@ -374,6 +376,7 @@ mistakes throw `TypeError` or `RangeError` at once, naming the fix, and every me
 | `createCompute({ engine })` | none | share the engine's WebGPU device |
 | `createCompute({ device })` | none | share a GPUDevice you made |
 | `createCompute({ backend })` | `'auto'` | `'auto'`, `'webgpu'` or `'cpu'` (see [CPU fallback](#cpu-fallback)) |
+| `createCompute({ fastMath })` | `false` | WGSL builtins for the transcendental functions (see [Precision](#precision)) |
 | `createCompute({ powerPreference })` | `'high-performance'` | adapter choice for a device of its own |
 | `createCompute({ signal })` | none | abandon device creation |
 | `array(data, { dtype })` | from the TypedArray, else `'f32'` | element type |
@@ -391,3 +394,37 @@ mistakes throw `TypeError` or `RangeError` at once, naming the fix, and every me
 
 Integer sums wrap at 32 bits. GPU float arithmetic is f32 (f16 for `f16` arrays). Results agree with NumPy's float64
 to f32 rounding, not bit for bit.
+
+## Precision
+
+The WGSL builtins for `sin`, `exp`, `pow` and the other transcendental functions are only as accurate as the WGSL
+specification asks, and GPUs differ: `sin` and `cos` may be 2^-11 off inside [-pi, pi] and anything outside it, `atan2`
+4096 ulp, `asin` 6.8e-5, `log` 2^-21 near 1, and `pow` is undefined for a negative base. An Intel Arc 140V is 1.1e-5
+off for `sin` near 1.5 where an RTX A6000 is within 3e-7; the A6000's `tanh` is 133 ulp off and its `pow` 114. So
+element-wise functions use precise f32 versions by default, the same on every GPU, within these bounds of the exact
+value (in ulp of the result):
+
+| Functions | Bound |
+| --- | --- |
+| `sin`, `cos`, `acos`, `exp`, `exp2`, `log`, `sqrt` | 1 |
+| `asin`, `log2` | 1.5 |
+| `atan`, `atan2`, `expm1`, `log1p`, `sinh`, `cosh`, `tanh` | 2 |
+| `tan` | 2.5 |
+| `pow` | 2 while `|y log2 x| < 16`, 5 up to the ends of the f32 range |
+
+`sin`, `cos` and `tan` reduce any argument exactly, so `sin(1e6)` is as accurate as `sin(1)`. `pow` of a negative base
+and an integer exponent works as in NumPy (`(-2) ** 3` is -8). Division is the builtin (WGSL allows 2.5 ulp).
+
+`createCompute({ fastMath: true })` uses the builtins instead: faster for arithmetic-bound kernels, with the bounds
+above only as good as the GPU's. The CPU backend computes every function in double precision and rounds to f32 either
+way.
+
+```ts
+import { createCompute } from '@margoengine/compute';
+
+using gpu = await createCompute();
+using fast = await createCompute({ fastMath: true });
+const x = gpu.array([1e6, -2]);
+console.log(await x.sin().read(), await x.pow(3).read()); // the same on every GPU: [-0.34999, -0.90930], [1e18, -8]
+console.log(fast.fastMath, (await fast.array([1.5]).sin().read())[0]); // true, within 2^-11 of 0.99749
+```

@@ -81,6 +81,7 @@
     "build": "node ../../scripts/build-optional.js compute",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node tests/compute-browser.mjs",
+    "test:browser:spec-math": "npm run build && node tests/compute-browser.mjs --spec-math-error=1",
     "prepack": "npm run build"
   }
 }
