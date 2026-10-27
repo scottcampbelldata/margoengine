@@ -412,7 +412,9 @@ value (in ulp of the result):
 | `tan` | 2.5 |
 | `pow` | 2 while `|y log2 x| < 16`, 5 up to the ends of the f32 range |
 
-`sin`, `cos` and `tan` reduce any argument exactly, so `sin(1e6)` is as accurate as `sin(1)`. `pow` of a negative base
+The bounds hold on NVIDIA, AMD and Intel GPUs, whose shader compilers reorder floating-point sums as WGSL allows:
+AMD's and Intel's fold `(1 + x) - 1` to `x`, so the precise functions rebuild the operands of each exact step from
+their bits, where the compiler cannot rearrange them. `sin`, `cos` and `tan` reduce any argument exactly, so `sin(1e6)` is as accurate as `sin(1)`. `pow` of a negative base
 and an integer exponent works as in NumPy (`(-2) ** 3` is -8). Division is the builtin (WGSL allows 2.5 ulp).
 
 `createCompute({ fastMath: true })` uses the builtins instead: faster for arithmetic-bound kernels, with the bounds

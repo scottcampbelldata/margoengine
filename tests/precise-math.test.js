@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PRECISE, PRECISE_FUNCTIONS, preciseMathWgsl } from '../packages/shared/precise-math.js';
 import { derive, PI_FIXED } from '../scripts/precise-math-coefficients.mjs';
-import { perturbBuiltinMath } from '../scripts/browser.js';
+import { perturbBuiltinMath, reassociateMath } from '../scripts/browser.js';
 import { bitsOf, preciseCases, preciseReference, reduceHalfPi, worstError } from './precise-math-reference.js';
 
 test('every constant is what scripts/precise-math-coefficients.mjs derives from pi, ln 2 and 2/pi', () => {
@@ -178,6 +178,54 @@ test('the spec-math stand-in moves each builtin result by the WGSL bound and lea
     assert.match(code, /\(atan2\(x, 1\.0\) \* 1\.00024408\d*\)/);
     assert.match(code, /fn sin2\(a: f32\)/);
     assert.doesNotMatch(code, /\/\/ sin\(/);
+  } finally {
+    globalThis.GPUDevice = previous;
+  }
+});
+
+test('no sum in the precise maths is cancelled by its own operand, which WGSL lets a compiler fold (bug 22)', () => {
+  const previous = globalThis.GPUDevice;
+  try {
+    globalThis.GPUDevice = class {
+      createShaderModule(descriptor) {
+        return descriptor.code;
+      }
+    };
+    reassociateMath();
+    const fold = (code) => new globalThis.GPUDevice().createShaderModule({ code });
+    // The stand-in folds what the AMD (D3D12) and Intel (Mesa) compilers fold: preciseLog1p's correction
+    // x - ((1 + x) - 1) became 0, so preciseLog1p(5.963922e-8) was 2^-23, and on Intel 14 of the 17 functions were
+    // out of bound. Before the fix it changed seven sums (log1p, cos, sqrt, pow).
+    assert.equal(
+      fold('fn f(x: f32) -> f32 { let u = 1.0 + x; let c = select(1.0 - (u - x), x - (u - 1.0), abs(x) <= 1.0); }'),
+      'fn f(x: f32) -> f32 { let u = 1.0 + x; let c = select(1.0 - ((1.0)), x - ((x)), abs(x) <= 1.0); }',
+    );
+    assert.match(
+      fold('fn s(a: f32, b: f32) -> vec2f { let s = a + b; return vec2f(s, b - (s - a)); }'),
+      /b - \(\(b\)\)/,
+    );
+    assert.match(
+      fold('fn s(a: f32, b: f32) -> f32 { let d = a - b; return (a - d) + (d + b); }'),
+      /\(\(b\)\) \+ \(\(a\)\)/,
+    );
+    assert.match(
+      fold('fn g(w: f32) -> f32 { let hw = 0.5 * w; let t = 1.0 - hw; return ((1.0 - t) - hw); }'),
+      /return \(\(\(hw\)\) - hw\);/,
+    );
+    assert.match(fold('fn h(f: f32) -> f32 { let dh = 2.0 + f; let dl = f - (dh - 2.0); }'), /dl = f - \(\(f\)\);/);
+    assert.match(fold('fn k(v0: f32) -> f32 { return v0 * log(1.0 + v0) / ((1.0 + v0) - 1.0); }'), /\/ \(\(v0\)\);/);
+    // Only whole operands, the same constant or name, in the same function.
+    for (const code of [
+      'fn a(x: f32) -> f32 { let u = 1.0 + x; return u - 1.0 * x; }',
+      'fn a(x: f32) -> f32 { let u = 1.0 + x; return 2.0 * u - 1.0; }',
+      'fn a(x: f32) -> f32 { let u = 1.0 + x; return (u - 2.0); }',
+      'fn a(x: f32) -> f32 { let u = 1.0 + x; }\nfn b(u: f32) -> f32 { return (u - 1.0); }',
+      'fn a(x: f32, y: f32) -> f32 { let s = x + y; return (s - x.y) + (s - xx) + (pmHide(s) - x); }',
+    ])
+      assert.equal(fold(code), code);
+    // The precise maths: every function and helper, unchanged.
+    const all = preciseMathWgsl(PRECISE_FUNCTIONS);
+    assert.equal(fold(all), all);
   } finally {
     globalThis.GPUDevice = previous;
   }

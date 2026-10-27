@@ -567,8 +567,15 @@ function opCode(op: string, args: string[], t: DType, out: DType, precise?: Set<
       return `(1.0 / ${fl(a)})`;
     // log1p and expm1: the classic correction for a rounded 1 + x (D. Goldberg, "What every computer scientist should
     // know about floating-point arithmetic", ACM Computing Surveys 23(1), 1991, theorem 4).
-    case 'log1p':
-      return `select(${fl(a)} * log(1.0 + ${fl(a)}) / ((1.0 + ${fl(a)}) - 1.0), ${fl(a)}, (1.0 + ${fl(a)}) == 1.0)`;
+    // u - 1 subtracts 1 from u rebuilt from its bits: WGSL lets a compiler reassociate, and (1.0 + x) - 1.0 written
+    // out is folded to x on AMD and Intel GPUs, which leaves log(u) (bug 22; precise-math.js pmHide).
+    case 'log1p': {
+      const x = fl(a),
+        u = `(1.0 + ${x})`,
+        bits = `bitcast<u32>(${u})`,
+        d = `(ldexp(f32(i32((${bits} & 0x7fffffu) | 0x800000u)), i32((${bits} >> 23u) & 0xffu) - 150i) - 1.0)`;
+      return `select(${x} * log(${u}) / ${d}, ${x}, ${d} == 0.0)`;
+    }
     case 'expm1': {
       const x = fl(a),
         u = `exp(${x})`;

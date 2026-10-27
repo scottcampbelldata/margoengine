@@ -150,17 +150,16 @@ export function preciseReference({ fused = false, divUlps = 0, sqrtUlps = 0 } = 
   function preciseDiv(a, b) {
     const q = div(a, b);
     if (exponentOf(a) === 255 || exponentOf(b) === 255 || exponentOf(q) === 255 || exponentOf(q) === 0) return q;
-    const [qh, ql] = split(q),
-      [bh, bl] = split(b);
-    const r = F(F(F(F(a - F(qh * bh)) - F(qh * bl)) - F(ql * bh)) - F(ql * bl));
+    const p = F(q * b),
+      r = F(F(a - p) - productError(q, b, p));
     return F(q + div(r, b));
   }
   /** sqrt(a) as [hi, lo]: hi the corrected root, lo what is left. */
   function sqrt2(a) {
     const s = sqrt(a);
     if (!(a > 0) || exponentOf(a) === 255 || exponentOf(s) === 0) return [s, 0];
-    const [h, l] = split(s);
-    const r = F(F(F(a - F(h * h)) - F(F(2 * h) * l)) - F(l * l));
+    const p = F(s * s),
+      r = F(F(a - p) - productError(s, s, p));
     const c = div(r, F(2 * s)),
       hi = F(s + c);
     return [hi, F(c - F(hi - s))];
@@ -182,9 +181,8 @@ export function preciseReference({ fused = false, divUlps = 0, sqrtUlps = 0 } = 
     const w = F(h * h),
       hw = F(0.5 * w),
       t = F(1 - hw);
-    const [sh, sl] = split(h);
     // h * h - w, exactly: what rounding w lost.
-    const ew = F(F(F(sh * sh) - w) + F(F(2 * sh) * sl)) + F(sl * sl);
+    const ew = productError(h, h, w);
     const p = ma(w, ma(w, ma(w, Q[3], Q[2]), Q[1]), Q[0]);
     const tail = F(F(F(F(1 - t) - hw) - F(0.5 * F(ew))) + F(F(F(w * w) * p) - F(h * l)));
     return F(t + tail);
@@ -230,7 +228,7 @@ export function preciseReference({ fused = false, divUlps = 0, sqrtUlps = 0 } = 
   function atanK(u) {
     const w = F(u * u);
     const p = ma(w, ma(w, ma(w, ma(w, ma(w, ma(w, At[6], At[5]), At[4]), At[3]), At[2]), At[1]), At[0]);
-    return ma(F(u * w), p, u);
+    return F(u + F(F(u * w) * p));
   }
   const [PIO2_HI, PIO2_LO] = C.halfPi,
     [PIO4_HI, PIO4_LO] = C.quarterPi,
@@ -301,7 +299,7 @@ export function preciseReference({ fused = false, divUlps = 0, sqrtUlps = 0 } = 
 
   // e^r - 1 for |r| <= ln2 / 2.
   const expm1P = (r) => ma(r, ma(r, ma(r, ma(r, ma(r, E[5], E[4]), E[3]), E[2]), E[1]), E[0]);
-  const expm1K = (r) => ma(F(r * r), expm1P(r), r);
+  const expm1K = (r) => F(r + F(F(r * r) * expm1P(r)));
   const [LN2_HI, LN2_LO] = C.ln2,
     [LOG2E, LOG2E_LO] = C.log2e,
     [LN2, LN2_TAIL] = C.ln2Pair;
@@ -348,14 +346,14 @@ export function preciseReference({ fused = false, divUlps = 0, sqrtUlps = 0 } = 
     const T = F(F(r * r) * expm1P(r)),
       p = F(2 ** k);
     if (k > 0) return F(F(F(p - 1) + F(p * rh)) + F(p * F(rl + T)));
-    return ma(p, F(rh + F(rl + T)), F(p - 1));
+    return F(F(p * F(rh + F(rl + T))) + F(p - 1));
   }
   /** x + x^3 P(x^2), |x| <= 1 (or 0.55 for tanh): the odd series fitted directly. */
   const oddK = (x, c) => {
     const w = F(x * x);
     let p = c[c.length - 1];
     for (let i = c.length - 2; i >= 0; i--) p = ma(w, p, c[i]);
-    return ma(F(x * w), p, x);
+    return F(x + F(F(x * w) * p));
   };
   function sinh(x) {
     const a = Math.abs(x);
@@ -552,6 +550,7 @@ export function preciseReference({ fused = false, divUlps = 0, sqrtUlps = 0 } = 
     pow,
     preciseDiv,
     preciseSqrt,
+    log2Pair,
   };
 }
 

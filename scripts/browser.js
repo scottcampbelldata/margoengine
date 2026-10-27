@@ -123,6 +123,89 @@ export function perturbBuiltinMath(scale) {
 }
 
 /**
+ * Page init script for a compiler that reassociates floating-point sums, which WGSL allows ("An implementation may
+ * reassociate operations", 15.7.5): every shader module's code has each sum that one of its own operands cancels
+ * folded, as AMD's D3D12 compiler (Radeon 680M) does with (1.0 + x) - 1.0 and Mesa's Intel compiler with (a + b) - a.
+ * After `let u = 1.0 + x;` `u - 1.0` becomes `x`; after `let s = a + b;` `s - a` becomes `b`; after `let t = 1.0 - h;`
+ * `1.0 - t` becomes `h`; an inline `(1.0 + x) - 1.0` becomes `x`. An error-free transform written that way loses its
+ * error term here as on those GPUs. Comments are dropped.
+ * `openBrowser({ reassociate: true })`, MARGO_REASSOCIATE_MATH=1 or `--reassociate-math` (the `:reassociate` scripts).
+ */
+export function reassociateMath() {
+  if (typeof GPUDevice === 'undefined') return;
+  globalThis.__margoReassociateMath = true;
+  const num = String.raw`(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?f?`,
+    literal = new RegExp(`^${num}$`),
+    value = (s) => Number(s.replace(/f$/, '')),
+    simple = /^[A-Za-z_][\w.]*$/,
+    same = (a, b) => (literal.test(a) && literal.test(b) ? value(a) === value(b) : a === b),
+    token = (s) => (literal.test(s) ? num : simple.test(s) ? s.replace(/\./g, '\\.') : '(?!)'),
+    // A whole operand: after `(`, `,`, `=` or `return`, before `)`, `,` or `;`.
+    before = String.raw`(?<=(?:[(,=]|\breturn)\s*)`,
+    after = String.raw`(?=\s*[),;])`;
+  /** [left, op, right] at the last top-level + or - of an expression, or null. */
+  const splitSum = (e) => {
+    let depth = 0,
+      at = -1;
+    for (let i = 0; i < e.length; i++) {
+      const ch = e[i];
+      if (ch === '(' || ch === '[') depth++;
+      else if (ch === ')' || ch === ']') depth--;
+      else if (
+        depth === 0 &&
+        (ch === '+' || ch === '-') &&
+        /[\w.)\]]\s*$/.test(e.slice(0, i)) &&
+        !/(?<![\w.])[\d.]+[eE]$/.test(e.slice(0, i))
+      )
+        at = i;
+    }
+    return at < 0 ? null : [e.slice(0, at).trim(), e[at], e.slice(at + 1).trim()];
+  };
+  const foldFunction = (code) => {
+    let out = code;
+    for (const m of code.matchAll(/\blet\s+(\w+)\s*(?::\s*\w+)?\s*=\s*([^;]+);/g)) {
+      const sum = splitSum(m[2]);
+      if (!sum) continue;
+      const [l, op, r] = sum,
+        name = m[1];
+      // n = a + b: n - a is b and n - b is a. n = a - b: a - n is b and n + b is a. The operand that cancels is a
+      // constant or a name; the other may be any expression.
+      const rules = [];
+      if (op === '+')
+        rules.push([`\\b${name}\\s*-\\s*(${token(l)})`, l, r], [`\\b${name}\\s*-\\s*(${token(r)})`, r, l]);
+      else rules.push([`(${token(l)})\\s*-\\s*${name}\\b`, l, r], [`\\b${name}\\s*\\+\\s*(${token(r)})`, r, l]);
+      const start = out.indexOf(m[0]) + m[0].length;
+      let rest = out.slice(start);
+      for (const [pattern, cancelled, kept] of rules)
+        if (literal.test(cancelled) || simple.test(cancelled))
+          rest = rest.replace(new RegExp(`${before}${pattern}${after}`, 'g'), (whole, c) =>
+            same(c, cancelled) ? `(${kept})` : whole,
+          );
+      out = out.slice(0, start) + rest;
+    }
+    // Inline: (L + e) - L and (e + L) - L for a name or literal e.
+    return out.replace(
+      new RegExp(
+        String.raw`${before}\(\s*(?:(${num})\s*\+\s*([\w.]+)|([\w.]+)\s*\+\s*(${num}))\s*\)\s*-\s*(${num})${after}`,
+        'g',
+      ),
+      (whole, l1, e1, e2, l2, c) => (value(l1 ?? l2) === value(c) ? `(${e1 ?? e2})` : whole),
+    );
+  };
+  const fold = (code) =>
+    code
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/\/\/[^\n]*/g, '')
+      .split(/(?=\bfn\s)/)
+      .map(foldFunction)
+      .join('');
+  const original = GPUDevice.prototype.createShaderModule;
+  GPUDevice.prototype.createShaderModule = function (descriptor) {
+    return original.call(this, { ...descriptor, code: fold(descriptor.code) });
+  };
+}
+
+/**
  * Page init script for a slow CPU: every message a Worker posts to the page arrives `ms` later (the `onmessage` and
  * `addEventListener('message')` handlers run late; the messages are unchanged). A check that waits a fixed number of
  * frames for meshes or decodes from workers fails here as it would on a slower machine. `openBrowser({
@@ -179,6 +262,7 @@ export async function openBrowser({
       process.argv.find((a) => a.startsWith('--spec-math-error='))?.slice('--spec-math-error='.length) ??
       0,
   ),
+  reassociate = process.env.MARGO_REASSOCIATE_MATH === '1' || process.argv.includes('--reassociate-math'),
 } = {}) {
   await mkdir('test-results', { recursive: true });
   const server = await createServer({
@@ -208,6 +292,7 @@ export async function openBrowser({
     await page.addInitScript(wgslGuard);
     if (pipelineDelayMs > 0) await page.addInitScript(delayPipelines, pipelineDelayMs);
     if (mathErrorScale > 0) await page.addInitScript(perturbBuiltinMath, mathErrorScale);
+    if (reassociate) await page.addInitScript(reassociateMath);
     if (workerDelayMs > 0) await page.addInitScript(delayWorkerMessages, workerDelayMs);
     // After the delay, so the count of pipelines in flight includes it (scripts/support/gpu-ready.js).
     await page.addInitScript(trackPipelines);
@@ -272,6 +357,7 @@ export async function openBrowser({
     hardware.headless = headless;
     if (pipelineDelayMs > 0) hardware.pipelineDelayMs = pipelineDelayMs;
     if (mathErrorScale > 0) hardware.mathErrorScale = mathErrorScale;
+    if (reassociate) hardware.reassociateMath = true;
     if (workerDelayMs > 0) hardware.workerDelayMs = workerDelayMs;
     if (browserName === 'firefox') hardware.firefoxUserPrefs = firefoxUserPrefs;
     if (process.env.GPU_VENDOR) {

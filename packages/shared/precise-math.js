@@ -22,6 +22,21 @@
 // Only exactly rounded WGSL operations are relied on (+, -, *, comparisons, integer and bit operations, ldexp, floor,
 // round); a fused multiply-add anywhere is allowed. The builtin division and sqrt are used only where their error is
 // corrected or scaled away. Infinities and NaN follow Math.* where the GPU keeps them (WGSL may assume there are none).
+//
+// WGSL also lets a compiler reassociate (15.7.5), and real ones undo the classic tricks, which are zero in exact
+// arithmetic: AMD's D3D12 compiler (Radeon 680M) folds (1 + x) - 1 to x, which took the correction out of log1p
+// (preciseLog1p(5.963922e-8) gave 2^-23), adds the constants of (x + C1) + C2 and C1 + (x + C2) first and leaves
+// fma unfused about half the time; Mesa on an Intel UHD (ADL-N, Vulkan) also folds (a + b) - a to b, adds the
+// constants of C1 + (x + C2) first (pi/2 high and low words), factors a c + b c (a / b + r / b, which undid the
+// division's correction) and regroups sums of differences, and there 14 of the 17 functions were out of bound
+// (probes of 2026-10-27: what those drivers did then, not a promise either way). So every
+// step whose rounding error matters takes its operands through pmHide, which rebuilds a value from its bits in
+// integers: a compiler cannot see what a hidden value is made of, so the step is one operation it can only commute.
+// The error terms (pmFastTwoSum, pmProductError) are hidden on the way out too, so they are not regrouped with the
+// large terms they came from. A bitcast round trip does not hide anything (compilers see through it). What is left
+// to the compiler are the polynomials and the small correction terms, where a regrouping moves a result by a small
+// fraction of an ulp. `test:browser:reassociate` (compute) runs the GPU check with every self-cancelling sum folded
+// (scripts/browser.js reassociateMath), and tests/precise-math.test.js checks that the WGSL here has none.
 
 /** The constants of the WGSL below, for the host reference (tests/precise-math-reference.js). */
 export const PRECISE = /* @__PURE__ */ Object.freeze({
@@ -90,6 +105,10 @@ const hex = (v) => `0x${v.toString(16)}u`;
 let built;
 const pieces = () =>
   (built ??= {
+    // pmHide(v) is v, rebuilt from its bits in integers, so the compiler cannot see what it is made of (a bitcast
+    // round trip it sees through): an exact step whose operands are hidden is one operation that no reassociation,
+    // factoring or contraction can change. pmFastTwoSum(a, b), |a| >= |b| or a = 0: s + e = a + b exactly.
+    // pmProductError(a, b, p): a b - p exactly for p = fl(a b), hidden (the products of 12-bit halves are exact).
     pmBits: [
       [],
       `fn pmExponent(x: f32) -> u32 { return (bitcast<u32>(x) >> 23u) & 0xffu; }
@@ -100,6 +119,17 @@ fn pmNan(x: f32) -> f32 { return bitcast<f32>(bitcast<u32>(x) | 0x7fc00000u); }
 fn pmInfinity(negative: bool, x: f32) -> f32 { return bitcast<f32>((bitcast<u32>(x) & 0u) | select(0x7f800000u, 0xff800000u, negative)); }
 fn pmWithSign(v: f32, x: f32) -> f32 { return select(v, -v, pmNegative(x)); }
 fn pmSplit(v: f32) -> vec2f { let h = bitcast<f32>(bitcast<u32>(v) & 0xfffff000u); return vec2f(h, v - h); }
+fn pmHide(v: f32) -> f32 {
+ let b = bitcast<u32>(v);
+ let e = (b >> 23u) & 0xffu;
+ let m = i32((b & 0x7fffffu) | select(0x800000u, 0u, e == 0u));
+ return ldexp(f32(select(m, -m, (b >> 31u) == 1u)), max(i32(e), 1) - 150);
+}
+fn pmFastTwoSum(a: f32, b: f32) -> vec2f { let s = a + b; return vec2f(s, pmHide(b - pmHide(pmHide(s) - a))); }
+fn pmProductError(a: f32, b: f32, p: f32) -> f32 {
+ let x = pmSplit(a); let y = pmSplit(b);
+ return pmHide((((pmHide(x.x * y.x) - p) + pmHide(x.x * y.y)) + pmHide(x.y * y.x)) + x.y * y.y);
+}
 const PM_PIO2_HI: f32 = ${lit(P.halfPi[0])};
 const PM_PIO2_LO: f32 = ${lit(P.halfPi[1])};
 const PM_PIO4_HI: f32 = ${lit(P.quarterPi[0])};
@@ -120,10 +150,9 @@ const PM_LOG2E_LO: f32 = ${lit(P.log2e[1])};
       `fn preciseDiv(a: f32, b: f32) -> f32 {
  let q = a / b;
  if (pmExponent(a) == 255u || pmExponent(b) == 255u || pmExponent(q) == 255u || pmExponent(q) == 0u) { return q; }
- let qs = pmSplit(q);
- let bs = pmSplit(b);
- let r = (((a - qs.x * bs.x) - qs.x * bs.y) - qs.y * bs.x) - qs.y * bs.y;
- return q + r / b;
+ let p = pmHide(q * b);
+ let r = (a - p) - pmProductError(q, b, p);
+ return q + pmHide(r / b);
 }
 `,
     ],
@@ -133,11 +162,9 @@ const PM_LOG2E_LO: f32 = ${lit(P.log2e[1])};
       `fn pmSqrt2(a: f32) -> vec2f {
  let s = sqrt(a);
  if (a <= 0.0 || pmIsNan(a) || pmExponent(a) == 255u || pmExponent(s) == 0u) { return vec2f(s, 0.0); }
- let h = pmSplit(s);
- let r = ((a - h.x * h.x) - (2.0 * h.x) * h.y) - h.y * h.y;
- let c = r / (2.0 * s);
- let hi = s + c;
- return vec2f(hi, c - (hi - s));
+ let p = pmHide(s * s);
+ let r = (a - p) - pmProductError(s, s, p);
+ return pmFastTwoSum(s, r / (2.0 * s));
 }
 fn preciseSqrt(a: f32) -> f32 { return pmSqrt2(a).x; }
 `,
@@ -219,14 +246,13 @@ fn pmReduce(a: f32) -> PmReduced {
       `fn pmSinK(h: f32, l: f32) -> f32 {
  let w = h * h;
  let p = ${horner('w', P.sin)};
- return h + (l * (1.0 - 0.5 * w) + (h * w) * p);
+ return h + pmHide(l * (1.0 - 0.5 * w) + (h * w) * p);
 }
 fn pmCosK(h: f32, l: f32) -> f32 {
- let w = h * h; let hw = 0.5 * w; let t = 1.0 - hw;
- let s = pmSplit(h);
- let ew = ((s.x * s.x - w) + (2.0 * s.x) * s.y) + s.y * s.y;
+ let w = pmHide(h * h); let hw = 0.5 * w; let t = pmFastTwoSum(1.0, -hw);
+ let ew = pmProductError(h, h, w);
  let p = ${horner('w', P.cos)};
- return t + ((((1.0 - t) - hw) - 0.5 * ew) + ((w * w) * p - h * l));
+ return t.x + pmHide((t.y - 0.5 * ew) + ((w * w) * p - h * l));
 }
 fn pmReduceTrig(a: f32) -> PmReduced {
  if (a <= 0.78125) { return PmReduced(a, 0.0, 0u); }
@@ -279,7 +305,7 @@ fn pmReduceTrig(a: f32) -> PmReduced {
       `fn pmAtanK(u: f32) -> f32 {
  let w = u * u;
  let p = ${horner('w', P.atan)};
- return (u * w) * p + u;
+ return u + pmHide((u * w) * p);
 }
 `,
     ],
@@ -290,8 +316,8 @@ fn pmReduceTrig(a: f32) -> PmReduced {
  if (pmIsNan(x)) { return x; }
  var r: f32;
  if (a <= 0.5) { r = pmAtanK(a); }
- else if (a <= 2.0) { r = PM_PIO4_HI + (pmAtanK(preciseDiv(a - 1.0, a + 1.0)) + PM_PIO4_LO); }
- else { r = PM_PIO2_HI + (PM_PIO2_LO - pmAtanK(preciseDiv(1.0, a))); }
+ else if (a <= 2.0) { r = PM_PIO4_HI + pmHide(pmAtanK(preciseDiv(a - 1.0, a + 1.0)) + PM_PIO4_LO); }
+ else { r = PM_PIO2_HI + pmHide(PM_PIO2_LO - pmAtanK(preciseDiv(1.0, a))); }
  return pmWithSign(r, x);
 }
 `,
@@ -310,10 +336,10 @@ fn pmReduceTrig(a: f32) -> PmReduced {
   if (big == 0.0) { t = 0.0; }
   else if (small <= 0.5 * big) {
    let k = pmAtanK(preciseDiv(small, big));
-   t = select(k, PM_PIO2_HI + (PM_PIO2_LO - k), ay > ax);
-  } else { t = PM_PIO4_HI + (pmAtanK(preciseDiv(ay - ax, ay + ax)) + PM_PIO4_LO); }
+   t = select(k, PM_PIO2_HI + pmHide(PM_PIO2_LO - k), ay > ax);
+  } else { t = PM_PIO4_HI + pmHide(pmAtanK(preciseDiv(ay - ax, ay + ax)) + PM_PIO4_LO); }
  }
- if (pmNegative(x) && (!pmIsZero(x) || pmIsZero(y))) { t = PM_PI_HI + (PM_PI_LO - t); }
+ if (pmNegative(x) && (!pmIsZero(x) || pmIsZero(y))) { t = PM_PI_HI + pmHide(PM_PI_LO - t); }
  return pmWithSign(t, y);
 }
 `,
@@ -342,7 +368,7 @@ fn pmAsinTail(a: f32) -> vec2f {
  if (a < 0.000244140625) { return x; }
  var r: f32;
  if (a < 0.5) { r = a + pmAsinK(a); }
- else { let t = pmAsinTail(a); r = PM_PIO2_HI - (t.x - (PM_PIO2_LO - t.y)); }
+ else { let t = pmAsinTail(a); r = PM_PIO2_HI - pmHide(t.x - pmHide(PM_PIO2_LO - t.y)); }
  return pmWithSign(r, x);
 }
 `,
@@ -352,9 +378,9 @@ fn pmAsinTail(a: f32) -> vec2f {
       `fn preciseAcos(x: f32) -> f32 {
  let a = abs(x);
  if (pmIsNan(x) || a > 1.0) { return pmNan(x); }
- if (a < 0.5) { return PM_PIO2_HI - (x - (PM_PIO2_LO - pmAsinK(x))); }
+ if (a < 0.5) { return PM_PIO2_HI - pmHide(x - pmHide(PM_PIO2_LO - pmAsinK(x))); }
  let t = pmAsinTail(a);
- if (pmNegative(x)) { return PM_PI_HI - (t.x - (PM_PI_LO - t.y)); }
+ if (pmNegative(x)) { return PM_PI_HI - pmHide(t.x - pmHide(PM_PI_LO - t.y)); }
  return t.x + t.y;
 }
 `,
@@ -365,10 +391,10 @@ fn pmAsinTail(a: f32) -> vec2f {
     pmExp: [
       ['pmBits'],
       `fn pmExpm1P(r: f32) -> f32 { return ${horner('r', P.expm1)}; }
-fn pmExpm1K(r: f32) -> f32 { return (r * r) * pmExpm1P(r) + r; }
+fn pmExpm1K(r: f32) -> f32 { return r + pmHide((r * r) * pmExpm1P(r)); }
 fn pmReduceLn2(x: f32) -> vec4f {
  let k = round(x * PM_LOG2E);
- let hi = x - k * PM_LN2_HI;
+ let hi = pmHide(x - k * PM_LN2_HI);
  let lo = -k * PM_LN2_LO;
  return vec4f(k, hi + lo, hi, lo);
 }
@@ -383,7 +409,7 @@ fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(ldexp(v, k - h),
  if (x < -103.97208) { return 0.0; }
  if (abs(x) < 2.9802322387695312e-8) { return 1.0 + x; }
  let k = pmReduceLn2(x);
- return pmScale(1.0 + pmExpm1K(k.y), i32(k.x));
+ return pmScale(1.0 + pmHide(pmExpm1K(k.y)), i32(k.x));
 }
 `,
     ],
@@ -394,7 +420,7 @@ fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(ldexp(v, k - h),
  if (x >= 128.0) { return pmInfinity(false, x); }
  if (x < -150.0) { return 0.0; }
  let k = round(x);
- return pmScale(1.0 + pmExpm1K((x - k) * PM_LN2), i32(k));
+ return pmScale(1.0 + pmHide(pmExpm1K((x - k) * PM_LN2)), i32(k));
 }
 `,
     ],
@@ -413,8 +439,8 @@ fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(ldexp(v, k - h),
  if (k.x > 24.0) { return preciseExp(x) - 1.0; }
  let T = (k.y * k.y) * pmExpm1P(k.y);
  let p = ldexp(1.0, i32(k.x));
- if (k.x > 0.0) { return ((p - 1.0) + p * k.z) + p * (k.w + T); }
- return p * (k.z + (k.w + T)) + (p - 1.0);
+ if (k.x > 0.0) { return pmHide((p - 1.0) + pmHide(p * k.z)) + pmHide(p * (k.w + T)); }
+ return pmHide(p * (k.z + (k.w + T))) + (p - 1.0);
 }
 `,
     ],
@@ -425,7 +451,7 @@ fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(ldexp(v, k - h),
  if (pmIsNan(x)) { return x; }
  if (a < 0.000244140625) { return x; }
  var r: f32;
- if (a <= 1.0) { let w = a * a; r = (a * w) * ${horner('w', P.sinh)} + a; }
+ if (a <= 1.0) { let w = a * a; r = a + pmHide((a * w) * ${horner('w', P.sinh)}); }
  else if (a > 88.72284) { let t = preciseExp(0.5 * a); r = (0.5 * t) * t; }
  else if (a > 9.0) { r = 0.5 * preciseExp(a); }
  else { let e = preciseExpm1(a); r = 0.5 * (e + preciseDiv(e, e + 1.0)); }
@@ -439,7 +465,7 @@ fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(ldexp(v, k - h),
  let a = abs(x);
  if (pmIsNan(x)) { return x; }
  if (a < 0.000244140625) { return 1.0; }
- if (a <= 1.0) { let w = a * a; return 1.0 + ((w * w) * ${horner('w', P.cosh)} + 0.5 * w); }
+ if (a <= 1.0) { let w = a * a; return 1.0 + pmHide((w * w) * ${horner('w', P.cosh)} + 0.5 * w); }
  if (a > 88.72284) { let t = preciseExp(0.5 * a); return (0.5 * t) * t; }
  let t = preciseExp(a);
  return 0.5 * (t + preciseDiv(1.0, t));
@@ -453,7 +479,7 @@ fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(ldexp(v, k - h),
  if (pmIsNan(x)) { return x; }
  if (a < 0.000244140625) { return x; }
  if (a > 9.1) { return pmWithSign(1.0, x); }
- if (a <= 0.55) { let w = a * a; return pmWithSign((a * w) * ${horner('w', P.tanh)} + a, x); }
+ if (a <= 0.55) { let w = a * a; return pmWithSign(a + pmHide((a * w) * ${horner('w', P.tanh)}), x); }
  let e = preciseExpm1(2.0 * a);
  return pmWithSign(preciseDiv(e, e + 2.0), x);
 }
@@ -498,7 +524,7 @@ fn pmLogSpecialValue(kind: u32, x: f32) -> f32 {
  if (special != 0u) { return pmLogSpecialValue(special, x); }
  let d = pmDecompose(x);
  let k = pmLogK(d.y);
- return d.x * PM_LN2_HI + (d.y - (k.hfsq - (k.t + d.x * PM_LN2_LO)));
+ return d.x * PM_LN2_HI + pmHide(d.y - pmHide(k.hfsq - (k.t + d.x * PM_LN2_LO)));
 }
 `,
     ],
@@ -510,11 +536,10 @@ fn pmLogSpecialValue(kind: u32, x: f32) -> f32 {
  if (special != 0u) { return pmLogSpecialValue(special, x); }
  let d = pmDecompose(x);
  let k = pmLogK(d.y);
- let fs = pmSplit(d.y); let ls = pmSplit(PM_LOG2E);
- let ah = d.y * PM_LOG2E;
- let al = (((fs.x * ls.x - ah) + fs.x * ls.y) + fs.y * ls.x) + fs.y * ls.y;
+ let ah = pmHide(d.y * PM_LOG2E);
+ let al = pmProductError(d.y, PM_LOG2E, ah);
  let tail = (al + d.y * PM_LOG2E_LO) - (k.hfsq - k.t) * PM_LOG2E;
- return (d.x + ah) + tail;
+ return pmHide(d.x + ah) + tail;
 }
 `,
     ],
@@ -527,13 +552,11 @@ fn pmLogSpecialValue(kind: u32, x: f32) -> f32 {
  if (pmExponent(x) == 255u) { return x; }
  let u = 1.0 + x;
  if (u == 1.0) { return x; }
- let c = select(1.0 - (u - x), x - (u - 1.0), abs(x) <= 1.0);
+ let c = select(pmFastTwoSum(x, 1.0).y, pmFastTwoSum(1.0, x).y, abs(x) <= 1.0);
  return preciseLog(u) + preciseDiv(c, u);
 }
 `,
     ],
-    // a b - fl(a b), exactly (the products of 12-bit halves are exact).
-    // s + e = a + b exactly (TwoSum, additions only).
     // log2(x) for finite x > 0 as hi + lo, to about 2^-30 relative.
     // s = f / (2 + f) as s + sl.
     // t = s hh (exact pair) + (s hl + sl hh + s R).
@@ -541,36 +564,26 @@ fn pmLogSpecialValue(kind: u32, x: f32) -> f32 {
     // 2^f = e^(f ln2), f ln2 = r + rl to about 2^-40.
     precisePow: [
       ['pmLog', 'pmExp'],
-      `fn pmProductError(a: f32, b: f32, p: f32) -> f32 {
- let x = pmSplit(a); let y = pmSplit(b);
- return (((x.x * y.x - p) + x.x * y.y) + x.y * y.x) + x.y * y.y;
-}
-fn pmTwoSum(a: f32, b: f32) -> vec2f {
- let s = a + b; let bb = s - a;
- return vec2f(s, (a - (s - bb)) + (b - bb));
-}
-fn pmLog2Pair(x: f32) -> vec2f {
+      `fn pmLog2Pair(x: f32) -> vec2f {
  let d = pmDecompose(x);
  let e = d.x; let f = d.y;
  let k = pmLogK(f);
- let q = f * f;
+ let q = pmHide(f * f);
  let hh = 0.5 * q;
  let hl = 0.5 * pmProductError(f, f, q);
- let dh = 2.0 + f;
- let dl = f - (dh - 2.0);
- let sd = k.s * dh;
+ let d2 = pmFastTwoSum(2.0, f); let dh = d2.x; let dl = d2.y;
+ let sd = pmHide(k.s * dh);
  let rho = (f - sd) - pmProductError(k.s, dh, sd);
  let sl = (rho - k.s * dl) / dh;
- let th = k.s * hh;
+ let th = pmHide(k.s * hh);
  let tl = ((pmProductError(k.s, hh, th) + k.s * hl) + sl * hh) + k.s * k.R;
- let ah = f * PM_LOG2E; let al = pmProductError(f, PM_LOG2E, ah);
- let bh = hh * PM_LOG2E; let bl = pmProductError(hh, PM_LOG2E, bh);
- let ch = th * PM_LOG2E; let cl = pmProductError(th, PM_LOG2E, ch);
- let s1 = pmTwoSum(e, ah); let s2 = pmTwoSum(s1.x, -bh); let s3 = pmTwoSum(s2.x, ch);
+ let ah = pmHide(f * PM_LOG2E); let al = pmProductError(f, PM_LOG2E, ah);
+ let bh = pmHide(hh * PM_LOG2E); let bl = pmProductError(hh, PM_LOG2E, bh);
+ let ch = pmHide(th * PM_LOG2E); let cl = pmProductError(th, PM_LOG2E, ch);
+ let s1 = pmFastTwoSum(e, ah); let s2 = pmFastTwoSum(s1.x, -bh); let s3 = pmFastTwoSum(s2.x, ch);
  let small = ((f - hh) + th) * PM_LOG2E_LO;
  let tail = (((s1.y + s2.y) + s3.y) + ((al - bl) + cl)) + ((tl - hl) * PM_LOG2E + small);
- let hi = s3.x + tail;
- return vec2f(hi, tail - (hi - s3.x));
+ return pmFastTwoSum(s3.x, tail);
 }
 fn pmIsOdd(y: f32) -> bool { return abs(y) < 16777216.0 && floor(y) == y && (i32(y) & 1) == 1; }
 fn precisePow(x: f32, y: f32) -> f32 {
@@ -587,15 +600,15 @@ fn precisePow(x: f32, y: f32) -> f32 {
  if (pmIsZero(ax)) { return select(pmInfinity(negative, x), select(0.0, -0.0, negative), y > 0.0); }
  if (pmNegative(x) && floor(y) != y) { return pmNan(x); }
  let L = pmLog2Pair(ax);
- let ph = y * L.x;
+ let ph = pmHide(y * L.x);
  let pl = pmProductError(y, L.x, ph) + y * L.y;
  if (ph > 128.0 || (ph == 128.0 && pl >= 0.0)) { return pmInfinity(negative, x); }
  if (ph < -151.0) { return select(0.0, -0.0, negative); }
  let k = round(ph);
  let f = (ph - k) + pl;
- let r = f * PM_LN2;
+ let r = pmHide(f * PM_LN2);
  let rl = pmProductError(f, PM_LN2, r) + f * PM_LN2_TAIL;
- let v = pmScale(1.0 + (pmExpm1K(r) + rl), i32(k));
+ let v = pmScale(1.0 + pmHide(pmExpm1K(r) + rl), i32(k));
  return select(v, -v, negative);
 }
 `,

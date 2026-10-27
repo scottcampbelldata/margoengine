@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { broadcastShapes, createCompute } from '@margoengine/compute';
 import { philox4x32, PHILOX } from '@margoengine/compute/random';
+import { reassociateMath } from '../../../scripts/browser.js';
 
 // A device stand-in with what array creation, views and fusion use (no GPU work is submitted by these tests).
 globalThis.GPUBufferUsage ??= {
@@ -118,4 +119,71 @@ test('Philox4x32-10 matches the known-answer vectors of Salmon et al. (Random123
     'd16cfe09 94fdcceb 5001e420 24126ea1',
   );
   assert.equal(PHILOX.M0, 0xd2511f53);
+});
+
+test('no element-wise kernel holds a sum cancelled by its own operand, which WGSL lets a compiler fold (bug 22)', async () => {
+  // fastMath log1p was x log(1 + x) / ((1 + x) - 1): AMD and Intel compilers fold (1 + x) - 1 to x, which leaves log(u)
+  // (log1p(1e-6) came out 9.54e-7). scripts/browser.js reassociateMath folds such sums as they do; the code must not
+  // change under it, in either mode.
+  globalThis.GPUMapMode ??= { READ: 1, WRITE: 2 };
+  globalThis.GPUShaderStage ??= { COMPUTE: 4 };
+  const codes = [];
+  const pass = {
+    setPipeline() {},
+    setBindGroup() {},
+    dispatchWorkgroups() {},
+    dispatchWorkgroupsIndirect() {},
+    end() {},
+  };
+  const stand = {
+    ...device(),
+    createBuffer: ({ size }) => ({
+      size,
+      destroy() {},
+      mapAsync: async () => {},
+      getMappedRange: () => new ArrayBuffer(size),
+      unmap() {},
+    }),
+    queue: { writeBuffer() {}, submit() {}, onSubmittedWorkDone: async () => {} },
+    pushErrorScope() {},
+    popErrorScope: async () => null,
+    createShaderModule: ({ code }) => (codes.push(code), {}),
+    createBindGroupLayout: () => ({}),
+    createPipelineLayout: () => ({}),
+    createComputePipeline: () => ({}),
+    createBindGroup: () => ({}),
+    createCommandEncoder: () => ({
+      beginComputePass: () => pass,
+      copyBufferToBuffer() {},
+      clearBuffer() {},
+      finish: () => ({}),
+    }),
+  };
+  const kernels = [];
+  for (const fastMath of [true, false]) {
+    const gpu = await createCompute({ device: stand, fastMath });
+    const x = gpu.array([1e-6, 0.5, 3]);
+    codes.length = 0;
+    for (const op of ['log1p', 'expm1', 'exp', 'log', 'sin', 'cos', 'tanh', 'sqrt']) await x[op]().read();
+    await x.pow(x).read();
+    assert.ok(
+      codes.some((c) => (fastMath ? /log\(/ : /preciseLog1p/).test(c)),
+      'the kernels were built',
+    );
+    kernels.push(...codes);
+  }
+  const previous = globalThis.GPUDevice;
+  globalThis.GPUDevice = class {
+    createShaderModule(descriptor) {
+      return descriptor.code;
+    }
+  };
+  try {
+    reassociateMath();
+    const fold = (code) => new globalThis.GPUDevice().createShaderModule({ code });
+    const uncommented = (code) => code.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, '');
+    for (const code of kernels) assert.equal(fold(code), uncommented(code));
+  } finally {
+    globalThis.GPUDevice = previous;
+  }
 });

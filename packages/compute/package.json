@@ -82,6 +82,7 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node tests/compute-browser.mjs",
     "test:browser:spec-math": "npm run build && node tests/compute-browser.mjs --spec-math-error=1",
+    "test:browser:reassociate": "npm run build && node tests/compute-browser.mjs --reassociate-math",
     "prepack": "npm run build"
   }
 }
