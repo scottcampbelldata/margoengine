@@ -230,3 +230,40 @@ test('no sum in the precise maths is cancelled by its own operand, which WGSL le
     globalThis.GPUDevice = previous;
   }
 });
+
+test('no sum in the precise maths can be factored by a term of its own, as Mesa factors h + h w p (bug 29)', () => {
+  const previous = globalThis.GPUDevice;
+  try {
+    globalThis.GPUDevice = class {
+      createShaderModule(descriptor) {
+        return descriptor.code;
+      }
+    };
+    reassociateMath();
+    const fold = (code) => new globalThis.GPUDevice().createShaderModule({ code });
+    // Mesa on an Intel UHD (ADL-N, Vulkan) turned the sine kernel's h + (l (1 - w / 2) + (h w) p) into
+    // h (1 + w p) + l (1 - w / 2): preciseSin(3.907435372766365e27) came out 1.46 ulp off (bound 1), and 1,791 of
+    // 573,720 inputs over every binade were out of bound for sin, 1,785 for cos (the reduction itself was exact). The
+    // stand-in factors the same way, so the GPU check fails on any GPU for code written like that.
+    assert.equal(
+      fold('fn k(h: f32, l: f32, w: f32, p: f32) -> f32 { return h + (l * (1.0 - 0.5 * w) + (h * w) * p); }'),
+      'fn k(h: f32, l: f32, w: f32, p: f32) -> f32 { return h * (1.0 + w * p) + l * (1.0 - 0.5 * w); }',
+    );
+    assert.equal(
+      fold('fn k(x: f32, y: f32) -> f32 { let a = x - x * y; return f((x * y) * 2.0 + x, a); }'),
+      'fn k(x: f32, y: f32) -> f32 { let a = x * (1.0 - y); return f(x * (1.0 + y * 2.0), a); }',
+    );
+    // A hidden operand is one value, integers and comparisons are left alone, and so is a term that is not a factor.
+    for (const code of [
+      'fn k(h: f32, y: f32) -> f32 { return h + pmHide((h * y) * 2.0); }',
+      'fn k(x: u32, y: u32) -> u32 { return x + x * 3u; }',
+      'fn k(x: f32, y: f32) -> bool { return x + x * y < 1.0; }',
+      'fn k(x: f32, y: f32) -> f32 { return x + (x + y) * y; }',
+    ])
+      assert.equal(fold(code), code);
+    const all = preciseMathWgsl(PRECISE_FUNCTIONS);
+    assert.equal(fold(all), all);
+  } finally {
+    globalThis.GPUDevice = previous;
+  }
+});

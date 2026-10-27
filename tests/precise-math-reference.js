@@ -581,10 +581,21 @@ export function preciseCases(n) {
     return [a, b];
   };
   const one = (ref, bound, ...sets) => ({ ref, bound, sets: sets.map((x) => [x]) });
+  // n / 128 random f32 per binade from 2^-12 to 2^127 (both signs): every exponent the pi/2 reduction handles, with mantissas
+  // dense enough that a kernel rounding 1 ulp off for a few percent of reduced arguments shows (bug 29).
+  const binades = (seed) => {
+    const out = [];
+    for (let e = 115, k = 0; e <= 254; e++)
+      for (let i = 0; i < Math.ceil(n / 128); i++, k++) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        out.push(fromBits(((k & 1) << 31) | (e << 23) | (seed >>> 9)));
+      }
+    return out;
+  };
   return {
-    sin: one(Math.sin, 1, lin(-4, 4), lin(-1e4, 1e4), sym(1e-8, 3e38)),
-    cos: one(Math.cos, 1, lin(-4, 4), lin(-1e4, 1e4), sym(1e-8, 3e38)),
-    tan: one(Math.tan, 2.5, lin(-1.6, 1.6), sym(1e-8, 3e38)),
+    sin: one(Math.sin, 1, lin(-4, 4), lin(-1e4, 1e4), sym(1e-8, 3e38), binades(11)),
+    cos: one(Math.cos, 1, lin(-4, 4), lin(-1e4, 1e4), sym(1e-8, 3e38), binades(12)),
+    tan: one(Math.tan, 2.5, lin(-1.6, 1.6), sym(1e-8, 3e38), binades(13)),
     asin: one(Math.asin, 1.5, lin(-1, 1), sym(1e-10, 1)),
     acos: one(Math.acos, 1, lin(-1, 1), sym(1e-10, 1)),
     atan: one(Math.atan, 2, lin(-4, 4), sym(1e-10, 3e38)),
@@ -613,6 +624,8 @@ export function preciseCases(n) {
         pairs(() => [10 ** (random() * 8 - 4), (random() * 2 - 1) * 10 ** (random() * 3)]),
         pairs(() => [0.7 + random() * 0.72, (random() * 2 - 1) * 400]),
         pairs(() => [-random() * 10, Math.round(random() * 20 - 10)]),
+        // Extreme exponents: x within 2^-23 to 1/2 of 1 and |y| up to 2^30, where log2 x must be good to 2^-30.
+        pairs(() => [1 + (random() * 2 - 1) * 2 ** -(1 + random() * 22), (random() * 2 - 1) * 2 ** (random() * 30)]),
       ],
     },
   };

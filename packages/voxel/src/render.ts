@@ -504,6 +504,35 @@ interface Gpu {
 }
 
 let serial = 0;
+const effectSerials = new WeakMap<object, number>();
+let effectSerial = 0;
+/** A number for each effect object, for composition names. */
+const serialOf = (effect: object): number => {
+  let n = effectSerials.get(effect);
+  if (n === undefined) effectSerials.set(effect, (n = ++effectSerial));
+  return n;
+};
+/**
+ * Compiled compositions kept per target. Taking out the effect added last goes back to a composition drawn before,
+ * which draws at once; dropping it as soon as a newer one was ready left the world undrawn for the frames its
+ * pipelines took to compile again (bug 29).
+ */
+const KEPT = 4;
+type PipelineCache = Map<string, { ready?: Pipelines }>;
+/** Marks `key` as the most recently used entry of `cache` (Map order is use order). */
+function touch(cache: PipelineCache, key: string, entry: { ready?: Pipelines }): void {
+  let last: string | undefined;
+  for (const k of cache.keys()) last = k;
+  if (last === key) return;
+  cache.delete(key);
+  cache.set(key, entry);
+}
+/** Drops all but the `KEPT` most recently used compiled entries for `target`, `key` (just compiled) among them. */
+function retain(cache: PipelineCache, target: string, key: string): void {
+  let kept = 1;
+  for (const [k, e] of [...cache].reverse())
+    if (k !== key && e.ready?.target === target && ++kept > KEPT) cache.delete(k);
+}
 const isNumber = (value: unknown, name: string, fix: string): number => {
   if (typeof value !== 'number') throw new TypeError(`VoxelRenderer ${name} must be a number; ${fix}`);
   return value;
@@ -574,8 +603,20 @@ export class VoxelRenderer implements EnginePlugin {
   #effects = new Set<VoxelRendererEffect>();
   #capture?: VoxelCapture;
   #disposeListeners = new Set<() => void>();
-  /** The composed shaders, `id` changing with them (pipeline keys). */
-  #composed = { from: '', lit: false, id: 0, code: SHADER, bevel: '' };
+  /**
+   * The composed shaders and the effects in them. `id` names the composition in pipeline keys: the same shaders with
+   * the same effect objects get the same id again (`ids` remembers the last few), so their pipelines are reused.
+   */
+  #composed = {
+    from: '',
+    lit: false,
+    id: 0,
+    next: 0,
+    code: SHADER,
+    bevel: '',
+    effects: [] as VoxelRendererEffect[],
+    ids: new Map<string, number>(),
+  };
   #lightVersion = 0;
   #shadowVersion = 0;
   #shadowResources = -1;
@@ -774,13 +815,13 @@ export class VoxelRenderer implements EnginePlugin {
         .then(([layers, bevelLayers]) => {
           if (this.#gpu !== gpu) return;
           pending.ready = { target, layers, bevel: bevelLayers, effects, lit };
-          for (const [old, value] of post.states)
-            if (old !== key && value.ready?.target === target) post.states.delete(old);
+          retain(post.states, target, key);
         })
         .catch((error) => this.#engine?.onError(error));
     }
     const p = state.ready;
     if (!p) return false;
+    touch(post.states, key, state);
     const view = external?.view ?? viewMatrix(this.#postView, c.camera);
     if (viewed) gpu.device.queue.writeBuffer(post.view, 0, Float32Array.from(view));
     this.#bind(gpu, p, viewed ? [{ binding: 7, resource: { buffer: post.view } }] : []);
@@ -1514,16 +1555,27 @@ export class VoxelRenderer implements EnginePlugin {
       if (bevel) bevel = lightPBR(bevel, hooks);
       effects.push(effect);
     }
-    if (c.from !== code || c.lit !== lit) {
-      const finish = (text: string) => {
-        const baked = lit ? this.#lightmap!.shader(text) : text;
-        return baked.includes('var<uniform> shadowFrame') ? baked.replace(SUN, SHADOWED_SUN) : baked;
-      };
-      c.from = code;
-      c.lit = lit;
-      c.id++;
-      c.code = finish(code);
-      c.bevel = bevel && finish(bevel);
+    const shaders = c.from !== code || c.lit !== lit;
+    if (shaders || effects.length !== c.effects.length || effects.some((e, i) => e !== c.effects[i])) {
+      if (shaders) {
+        const finish = (text: string) => {
+          const baked = lit ? this.#lightmap!.shader(text) : text;
+          return baked.includes('var<uniform> shadowFrame') ? baked.replace(SUN, SHADOWED_SUN) : baked;
+        };
+        c.from = code;
+        c.lit = lit;
+        c.code = finish(code);
+        c.bevel = bevel && finish(bevel);
+      }
+      // The effect objects are part of the name: two effects with the same hooks (one Clustered taken out, another
+      // added) compose the same shader but bind different resources.
+      c.effects = effects;
+      const identity = `${effects.map(serialOf).join(',')}|${lit}|${c.code}|${c.bevel}`,
+        known = c.ids.get(identity);
+      c.id = known ?? ++c.next;
+      c.ids.delete(identity);
+      c.ids.set(identity, c.id);
+      for (const old of c.ids.keys()) if (c.ids.size > 4 * KEPT) c.ids.delete(old);
     }
     return { code: c.code, bevel: c.bevel, effects, id: c.id, lit };
   }
@@ -1610,7 +1662,8 @@ export class VoxelRenderer implements EnginePlugin {
 
   // The pipelines for this target (format, samples, depth format) and composition, compiled asynchronously. While a
   // new composition compiles, the last pipelines for the target keep drawing as long as their effects are still added
-  // and the lightmap is still on or off as they were built; undefined when there are none.
+  // and the lightmap is still on or off as they were built; undefined when there are none. The last KEPT compositions
+  // stay compiled, so taking out the effect added last draws the composition from before it at once.
   #pipelines(c: Context, gpu: Gpu): Pipelines | undefined {
     const samples = c.descriptor.multisample?.count ?? 1,
       depth = c.descriptor.depthStencil!.format,
@@ -1642,14 +1695,15 @@ export class VoxelRenderer implements EnginePlugin {
         .then(([layers, bevelLayers]) => {
           if (this.#gpu !== gpu) return;
           pending.ready = { target, layers, bevel: bevelLayers, effects, lit };
-          // Older compositions for this target are dropped once a newer one is ready.
-          for (const [k, e] of gpu.pipelines)
-            if (e.ready && e !== pending && e.ready.target === target) gpu.pipelines.delete(k);
+          retain(gpu.pipelines, target, key);
         })
         .catch((error) => this.#engine?.onError(error));
     }
     this.#stats.compiling = !entry.ready;
-    if (entry.ready) return entry.ready;
+    if (entry.ready) {
+      touch(gpu.pipelines, key, entry);
+      return entry.ready;
+    }
     const last = this.#ready;
     return last?.target === target && last.lit === lit && last.effects.every((e) => this.#effects.has(e) && e.pbr(1))
       ? last

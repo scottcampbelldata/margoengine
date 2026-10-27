@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { broadcastShapes, createCompute } from '@margoengine/compute';
-import { philox4x32, PHILOX } from '@margoengine/compute/random';
+import { philox4x32, PHILOX, randomShader } from '@margoengine/compute/random';
 import { reassociateMath } from '../../../scripts/browser.js';
 
 // A device stand-in with what array creation, views and fusion use (no GPU work is submitted by these tests).
@@ -185,5 +185,34 @@ test('no element-wise kernel holds a sum cancelled by its own operand, which WGS
     for (const code of kernels) assert.equal(fold(code), uncommented(code));
   } finally {
     globalThis.GPUDevice = previous;
+  }
+});
+
+test('uniform draws round the product and the sum apart on every GPU, so no compiler can fuse them (bug 29)', () => {
+  // draw.a + (draw.b - draw.a) * unit(word) was fused into one multiply-add by Mesa on an Intel UHD: uniform(10_001,
+  // { low: -2, high: 3 }) gave -0.10521036386489868 where the CPU backend (and NVIDIA) give -0.1052103042602539,
+  // though the README promises the same bits on every device. A product that is a whole term of a sum may be fused;
+  // one inside pmHide is a value the compiler cannot see into.
+  const terms = (e) => {
+    const out = [];
+    let depth = 0,
+      start = 0;
+    for (let i = 0; i < e.length; i++) {
+      if (e[i] === '(') depth++;
+      else if (e[i] === ')') depth--;
+      else if (depth === 0 && (e[i] === '+' || e[i] === '-') && /[\w)]\s*$/.test(e.slice(0, i))) {
+        out.push(e.slice(start, i));
+        start = i + 1;
+      }
+    }
+    return [...out, e.slice(start)].map((t) => t.trim());
+  };
+  const topLevel = (t) => t.replace(/\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)/g, '()');
+  for (const dtype of ['f32', 'f16']) {
+    const uniform = randomShader(dtype).match(/draw\.kind == 1u\) \{[^}]*?out\[i\] = \w+\(([^\n]*)\);\n/)?.[1];
+    assert.ok(uniform, `${dtype}: the uniform draw is found`);
+    const sum = terms(uniform);
+    assert.ok(sum.length > 1, uniform);
+    for (const t of sum) assert.doesNotMatch(topLevel(t), /\*/, `${dtype}: ${t} can be fused with the sum`);
   }
 });

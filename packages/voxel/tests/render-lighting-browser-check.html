@@ -120,8 +120,21 @@ window.check={
   const P={under:[32,1,10],d2:[34,1,10],d4:[36,1,10],out:[32,1,22]},before=probe(await shot(),P);
   const clustered=Clustered.attach(engine);clustered.setLights([{position:[32,4,10],range:8,intensity:30,color:[1,1,1]}]);
   const remove=clustered.add(renderer),{img,frames}=await until((i)=>at(i,P.under)[0]>0);const after=probe(img,P);
-  remove();const removed=probe(await shot(),P);drop(clustered);renderer.dispose();
-  return {before,after,removed,frames,errors:errors.splice(0)};
+  // The first frame after the remover: the composition from before the light, still compiled, draws at once.
+  remove();const removed=probe(await shot(0),P),removedStats={...renderer.stats};drop(clustered);renderer.dispose();
+  return {before,after,removed,removedStats,frames,errors:errors.splice(0)};
+ },
+ // One clustered light taken out and disposed, another added: the same shader, the second one's resources bound.
+ async swap(){
+  lights(0,0);const {w,keys}=floorWorld();renderer=attach(w,keys);await ready(renderer,w,keys);look([32,14,-4],[32,1,14]);
+  const P={a:[28,1,10],b:[36,1,10]};
+  const a=Clustered.attach(engine);a.setLights([{position:[28,4,10],range:6,intensity:30,color:[1,1,1]}]);
+  const removeA=a.add(renderer),first=await until((i)=>at(i,P.a)[0]>0.05),withA=probe(first.img,P);
+  removeA();a.dispose();
+  const b=Clustered.attach(engine);b.setLights([{position:[36,4,10],range:6,intensity:30,color:[1,1,1]}]);
+  const removeB=b.add(renderer),second=await until((i)=>at(i,P.b)[0]>0.05),withB=probe(second.img,P);
+  removeB();b.dispose();renderer.dispose();
+  return {withA,withB,frames:[first.frames,second.frames],errors:errors.splice(0)};
  },
  // Linear fog from 0 to 40 blocks toward a blue: a floor point's colour moves toward it by distance / 40.
  async fog(){

@@ -36,7 +36,8 @@
 // large terms they came from. A bitcast round trip does not hide anything (compilers see through it). What is left
 // to the compiler are the polynomials and the small correction terms, where a regrouping moves a result by a small
 // fraction of an ulp. `test:browser:reassociate` (compute) runs the GPU check with every self-cancelling sum folded
-// (scripts/browser.js reassociateMath), and tests/precise-math.test.js checks that the WGSL here has none.
+// and every sum factored by a term of its own (h + h w p to h (1 + w p), which Mesa did to the sine kernel: bug 29)
+// by scripts/browser.js reassociateMath, and tests/precise-math.test.js checks that the WGSL here has neither.
 
 /** The constants of the WGSL below, for the host reference (tests/precise-math-reference.js). */
 export const PRECISE = /* @__PURE__ */ Object.freeze({

@@ -5,7 +5,8 @@
 //   black with the sun straight down and no ambient, the floor beside them and under the square's transparent border is
 //   unchanged; still frames reuse the cached map; removing the slab lights the floor again within a few frames;
 // - the sun inside the shadow range ignores sky visibility (the map decides), beyond it is scaled by it;
-// - a clustered point light lights the floor inside its range only, falling off with distance, and stops on removal;
+// - a clustered point light lights the floor inside its range only, falling off with distance, and stops on removal
+//   from the very next frame, which is drawn; a light taken out and another added lights from the new one;
 // - fog mixes toward its colour by distance over its range; IBL ambient is scaled by the voxel occlusion (daylight 0
 //   over 1 is 0.03 / 1.03), as is the hemisphere ambient without it; block light is exactly `blockLightColor`;
 // - texture animation shows frame 0, then frame 1 after a second; a liquid's surface rises and falls 0.08 blocks;
@@ -83,10 +84,25 @@ try {
     const u = c.after;
     assert.ok(u.under[0] > u.d2[0] && u.d2[0] > u.d4[0] && u.d4[0] > 0, `falloff: ${JSON.stringify(u)}`);
     dark(u.out, 'beyond the light range');
+    // The frame right after the remover is drawn (the composition from before the light stays compiled) and dark. On
+    // an Intel UHD the light was gone but so was the floor for 2 frames: the pipelines without the light were dropped
+    // when the light's were ready and compiled again, and the pixel was the clear colour (bug 29).
+    assert.ok(
+      !c.removedStats.compiling && c.removedStats.draws > 0,
+      `light removed: drawn at once: ${JSON.stringify(c.removedStats)}`,
+    );
     dark(c.removed.under, 'light removed');
     console.log(
-      `ok ${samples}x clustered: ${fixed(u.under)} under, ${fixed(u.d2)} at 2, ${fixed(u.d4)} at 4, 0 outside`,
+      `ok ${samples}x clustered: ${fixed(u.under)} under, ${fixed(u.d2)} at 2, ${fixed(u.d4)} at 4, 0 outside; ` +
+        'dark the first frame after removal',
     );
+
+    // A light swapped for another of the same kind: the shader is the same, the bindings must be the new light's.
+    const sw = await run('swap');
+    assert.ok(sw.withA.a[0] > 0.05, `first light: ${JSON.stringify(sw.withA)}`);
+    dark(sw.withB.a, 'first light taken out');
+    assert.ok(sw.withB.b[0] > 0.05, `second light: ${JSON.stringify(sw.withB)}`);
+    console.log(`ok ${samples}x swapped light: ${fixed(sw.withB.b)} from the second, the first gone`);
 
     const f = await run('fog');
     const a = f.distance / f.far,

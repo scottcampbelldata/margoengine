@@ -772,7 +772,21 @@ test('addLighting: hooks composed into every pipeline, group 1 bound in the bund
     );
     unshadow();
     remove();
-    await settle(frame, () => !lit(device.bundles.at(-1)), 'unlit bundle');
+    // The composition from before the effects is still compiled: the very next frame draws it, unlit (bug 29: it was
+    // dropped once the lit one was ready, so the world went undrawn while it compiled again).
+    frame();
+    const executed = () => passes[0].commands.find(([name]) => name === 'executeBundles')?.[1][0];
+    assert.equal(renderer.stats.compiling, false);
+    assert.ok(executed() && !lit(executed()), 'the first frame after removal draws the unlit bundle');
+    // An effect with the same hooks but other resources composes the same shader: its own bindings are bound.
+    const light2 = device.createBuffer({ size: 16, usage: 64 }),
+      other = { ...effect, bindings: () => [{ binding: 9, resource: { buffer: light2 } }] };
+    const removeOther = renderer.addLighting(other);
+    await settle(frame, () => executed() && lit(executed()), 'second lit bundle');
+    const group2 = executed().commands.find(([name, index]) => name === 'setBindGroup' && index === 1)[2];
+    assert.deepEqual(group2.entries, other.bindings());
+    removeOther();
+    await settle(frame, () => executed() && !lit(executed()), 'unlit bundle');
     assert.throws(() => renderer.addLighting({}), TypeError);
     assert.throws(
       () => renderer.addLighting({ ...effect, owner: {} }),

@@ -77,7 +77,9 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
   let lane = i % 4u;
   let word = r[lane];
   if (draw.kind == 1u) {
-    out[i] = ${dtype}(draw.a + (draw.b - draw.a) * unit(word));
+    // The product hidden (pmHide), so no compiler fuses it with the sum (Mesa on an Intel UHD did): the same bits on
+    // every device and on the CPU backend, which rounds the product and the sum apart.
+    out[i] = ${dtype}(draw.a + pmHide((draw.b - draw.a) * unit(word)));
   } else if (draw.kind == 2u) {
     // Box-Muller on the lane pair (0,1) or (2,3): u1 in (0, 1] keeps log finite.
     let pair = lane & 2u;

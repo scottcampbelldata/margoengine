@@ -194,7 +194,8 @@ export function perturbBuiltinMath(scale) {
  * folded, as AMD's D3D12 compiler (Radeon 680M) does with (1.0 + x) - 1.0 and Mesa's Intel compiler with (a + b) - a.
  * After `let u = 1.0 + x;` `u - 1.0` becomes `x`; after `let s = a + b;` `s - a` becomes `b`; after `let t = 1.0 - h;`
  * `1.0 - t` becomes `h`; an inline `(1.0 + x) - 1.0` becomes `x`. An error-free transform written that way loses its
- * error term here as on those GPUs. Comments are dropped.
+ * error term here as on those GPUs. Each sum is also factored by a term of its own, as Mesa's Intel compiler does:
+ * `h + (l * c + (h * w) * p)` becomes `h * (1.0 + w * p) + l * c`. Comments are dropped.
  * `openBrowser({ reassociate: true })`, MARGO_REASSOCIATE_MATH=1 or `--reassociate-math` (the `:reassociate` scripts).
  */
 export function reassociateMath() {
@@ -258,12 +259,122 @@ export function reassociateMath() {
       (whole, l1, e1, e2, l2, c) => (value(l1 ?? l2) === value(c) ? `(${e1 ?? e2})` : whole),
     );
   };
+  // Factoring: a sum with a term that is a name x and another term that is a product with x as a factor becomes
+  // x * (1.0 + the rest of the product), as Mesa's Intel compiler factored h + (l (1 - w / 2) + (h w) p) in
+  // preciseSin's kernel into h (1 + w p) + l (1 - w / 2) and so lost the low bits of the polynomial term (bug 29).
+  // Sums in parentheses are flattened first (the compiler reassociates them), every parenthesised group and call
+  // argument is factored too, and only one pair per sum. Sums with an integer literal, or with a comparison, logical,
+  // bitwise or select operator at their level, are left alone.
+  const binary = (e, i) => /[\w.)\]]\s*$/.test(e.slice(0, i)) && !/(?<![\w.])[\d.]+[eE]$/.test(e.slice(0, i));
+  /** The top-level pieces of `e` between the operators in `ops`: [operator ('' first), text]. */
+  const pieces = (e, ops) => {
+    const out = [];
+    let depth = 0,
+      start = 0,
+      op = '';
+    for (let i = 0; i < e.length; i++) {
+      const ch = e[i];
+      if (ch === '(' || ch === '[') depth++;
+      else if (ch === ')' || ch === ']') depth--;
+      else if (depth === 0 && ops.includes(ch) && binary(e, i)) {
+        out.push([op, e.slice(start, i).trim()]);
+        op = ch;
+        start = i + 1;
+      }
+    }
+    out.push([op, e.slice(start).trim()]);
+    return out;
+  };
+  /** `e` without the parentheses around all of it, or `e`. */
+  const unwrap = (e) => {
+    if (e[0] !== '(') return e;
+    let depth = 0;
+    for (let i = 0; i < e.length; i++) {
+      depth += e[i] === '(' ? 1 : e[i] === ')' ? -1 : 0;
+      if (depth === 0) return i === e.length - 1 ? e.slice(1, -1).trim() : e;
+    }
+    return e;
+  };
+  const topLevel = (e) => {
+    let depth = 0,
+      s = '';
+    for (const ch of e) {
+      if (ch === '(' || ch === '[') depth++;
+      else if (ch === ')' || ch === ']') depth--;
+      else if (depth === 0) s += ch;
+    }
+    return s;
+  };
+  /** The factors of a product term (products in parentheses flattened), or [] when it is not one. */
+  const factorsOf = (t) => {
+    const parts = pieces(unwrap(t), '*');
+    if (parts.length < 2) return [];
+    return parts.flatMap(([, p]) => {
+      const inner = unwrap(p);
+      return inner !== p && pieces(inner, '+-').length === 1 && pieces(inner, '*').length > 1 ? factorsOf(inner) : [p];
+    });
+  };
+  const name = /^[A-Za-z_][\w.]*$/;
+  const factorSum = (e) => {
+    if (/[<>=!&|^%?]/.test(topLevel(e)) || /(?<![\w.])\d+[ui]\b/.test(e)) return e;
+    const terms = [];
+    for (const [op, t] of pieces(e, '+-')) {
+      const inner = unwrap(t),
+        sum = inner !== t && op !== '-' ? pieces(inner, '+-') : [];
+      if (sum.length > 1) terms.push(...sum.map(([o, s], k) => [k ? o : op, s]));
+      else terms.push([op, t]);
+    }
+    for (let i = 0; i < terms.length; i++) {
+      if (terms[i][0] === '-' || !name.test(terms[i][1])) continue;
+      for (let j = 0; j < terms.length; j++) {
+        const factors = j === i ? [] : factorsOf(terms[j][1]),
+          k = factors.indexOf(terms[i][1]);
+        if (k < 0) continue;
+        const rest = factors.filter((_, n) => n !== k).join(' * '),
+          sign = terms[j][0] === '-' ? '-' : '+',
+          at = Math.min(i, j);
+        terms[at] = [terms[at][0], `${terms[i][1]} * (1.0 ${sign} ${rest})`];
+        terms.splice(Math.max(i, j), 1);
+        return terms.map(([op, t], n) => (n ? ` ${op} ${t}` : op === '-' ? `-${t}` : t)).join('');
+      }
+    }
+    return e;
+  };
+  /** `e` with every parenthesised group (each call argument alone) factored, then its own sum. */
+  const factorExpression = (e) => {
+    let out = '',
+      last = 0;
+    for (let i = 0; i < e.length; i++) {
+      if (e[i] !== '(') continue;
+      let depth = 0,
+        j = i;
+      for (; j < e.length; j++) {
+        depth += e[j] === '(' ? 1 : e[j] === ')' ? -1 : 0;
+        if (depth === 0) break;
+      }
+      const inner = e.slice(i + 1, j),
+        args = pieces(inner, ',').map(([, a]) => a),
+        done = args.map(factorExpression);
+      if (done.some((a, n) => a !== args[n])) {
+        out += `${e.slice(last, i)}(${done.join(', ')})`;
+        last = j + 1;
+      }
+      i = j;
+    }
+    const nested = out ? out + e.slice(last) : e;
+    return factorSum(nested.trim()) === nested.trim() ? nested : factorSum(nested.trim());
+  };
+  const factor = (code) =>
+    code.replace(/(\breturn\b|(?<![<>=!+\-*/%&|^])=(?!=))([^;{}]+);/g, (whole, head, e) => {
+      const done = factorExpression(e.trim());
+      return done === e.trim() ? whole : `${head} ${done};`;
+    });
   const fold = (code) =>
     code
       .replace(/\/\*[\s\S]*?\*\//g, ' ')
       .replace(/\/\/[^\n]*/g, '')
       .split(/(?=\bfn\s)/)
-      .map(foldFunction)
+      .map((f) => factor(foldFunction(f)))
       .join('');
   const original = GPUDevice.prototype.createShaderModule;
   GPUDevice.prototype.createShaderModule = function (descriptor) {
