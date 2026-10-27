@@ -26,6 +26,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./modeling": {
+      "types": "./dist/modeling.d.ts",
+      "import": "./dist/modeling.js"
     }
   },
   "files": [

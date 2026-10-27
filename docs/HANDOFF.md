@@ -1,6 +1,17 @@
 # Margo Engine handoff
 
-Last updated 2026-10-25. Read this first when starting a new session. Update it whenever work lands.
+Last updated 2026-10-26. Read this first when starting a new session. Update it whenever work lands.
+
+## Landed 2026-10-26: mesh-edit modeling depth (item 24), part 1
+
+- New optional entry `@margoengine/mesh-edit/modeling` (root entry unchanged): `bevelMeshEdges` (selected edges, one
+  flat row, corner faces where three or more meet), `slideMeshEdges` (edge/loop slide with UV correction; with
+  `cutMeshQuadRing` this is loop cut and slide), `dissolveMeshComponents` (edges, vertices, faces; only coplanar faces
+  merge, so the shape never changes), `weldMeshVertices` (merge by distance, no chaining) and `bridgeMeshEdgeLoops`.
+- Shared splitter: concave or nonplanar rebuilt loops become convex planar pieces (ear clipping plus Hertel-Mehlhorn).
+- Tests: golden shapes (cube bevel volumes, bridged box) and seeded fuzz checking closure, winding, Euler
+  characteristic, no degenerate faces and exact volume. Left for item 24: rounded bevels, concave faces and knife,
+  subdivision, booleans, UV unwrap and lightmaps, simplification and LODs, OBJ/GLB import, flat-tile merging.
 
 ## Landed 2026-10-25: every package GPU test in check:merge (`npm run check:gpu-packages`)
 

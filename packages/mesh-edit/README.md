@@ -33,6 +33,71 @@ The original parity commands retain existing behavior: extrusion acts along the 
 
 Tests import the built public package. Run `npm test --workspace @margoengine/mesh-edit` from the engine repository.
 
+## Modeling: edge bevel, loop slide, dissolve, weld and bridge
+
+Bevel selected edges, cut a loop and slide it, dissolve, merge by distance and bridge two open loops, from the
+`margoengine/mesh-edit/modeling` entry (`@margoengine/mesh-edit/modeling`), so apps that only paint or move components
+never load it. Edge IDs are `"low:high"` vertex pairs (see `polygonMeshEdges`):
+
+```ts
+import { createPrimitiveMesh, cutMeshQuadRing } from 'margoengine/mesh-edit';
+import {
+  bevelMeshEdges,
+  bridgeMeshEdgeLoops,
+  dissolveMeshComponents,
+  slideMeshEdges,
+  weldMeshVertices,
+} from 'margoengine/mesh-edit/modeling';
+
+const cube = createPrimitiveMesh('cube', 'box');
+// Chamfer one edge 0.1 wide: a strip face, and the two end faces become pentagons.
+const beveled = bevelMeshEdges(cube, ['0:1'], 0.1);
+// Loop cut halfway round a ring of quads, then slide the new loop a quarter of the way along its rails.
+const cut = cutMeshQuadRing(cube, { faceId: 'box-face-0', corner: 0 }, 0.5);
+const slid = slideMeshEdges(cut.mesh, cut.ring.edges, 0.25);
+// Dissolve the new loop again: its coplanar faces merge back into the cube's six.
+const dissolved = dissolveMeshComponents(cut.mesh, { mode: 'edge', edges: cut.ring.edges });
+// Merge vertices within 0.0001 (the default distance); corner UVs never weld.
+const welded = weldMeshVertices(dissolved.mesh, { distance: 0.0001 });
+// Two square sheets one unit apart (the lower one facing down), bridged into a closed box with 2 rows of faces.
+const sheet = createPrimitiveMesh('plane', 'sheet');
+const sheets = {
+  vertices: [...sheet.vertices, ...sheet.vertices.map(([x, y, z]): [number, number, number] => [x, y + 1, z])],
+  faces: [
+    { id: 'bottom', vertices: [3, 2, 1, 0], uv: [...sheet.faces[0].uv].reverse() },
+    { id: 'top', vertices: [4, 5, 6, 7], uv: sheet.faces[0].uv },
+  ],
+};
+const bridged = bridgeMeshEdgeLoops(sheets, ['0:1', '1:2', '2:3', '0:3'], ['4:5', '5:6', '6:7', '4:7'], {
+  segments: 2,
+});
+console.log(beveled.mesh.faces.length, slid.mesh.faces.length, welded.welded, bridged.mesh.faces.length);
+```
+
+- `bevelMeshEdges(mesh, edges, width)`: one flat row per edge. Faces beside a beveled edge are cut back `width`
+  (local units, measured inside each face) and keep their IDs and interpolated UVs; strips and the corner faces where
+  three or more beveled edges meet get default tile UVs. A chain end slides along the neighboring edges. Edges must
+  lie between two faces, their vertices must be interior, and a width that reaches past a neighboring edge or folds
+  a face throws `RangeError`. Rounded (multi-segment) bevels are not built yet.
+- `slideMeshEdges(mesh, edges, factor, {correctUV = true})`: `factor` in (-1, 1) moves every vertex of a loop or chain
+  along its rail edge (positive: toward the faces whose winding runs with the chain). Loop vertices need one free rail
+  per side, as in quad loops. Corner UVs follow their vertex; a UV extended past the atlas is clamped and reported.
+  `cutMeshQuadRing` (above) is the loop cut; its `fraction` places the cut anywhere along the ring.
+- `dissolveMeshComponents(mesh, {mode: 'edge' | 'vertex' | 'face', ...})`: merges faces across the selection without
+  leaving a hole. Because faces stay planar, only coplanar faces merge; an edge on a fold is kept and reported, so the
+  shape never changes. A two-edge vertex is removed from its faces. A region that would enclose a hole or touch
+  itself throws `MargoError` code `unsupported`. Concave merges are split into convex pieces (the first keeps the ID).
+- `weldMeshVertices(mesh, {distance = 0.0001, vertices})`: merge by distance without chaining (each kept vertex
+  absorbs later ones within `distance` of itself). Collapsed faces are removed and named in `diagnostics`; faces made
+  nonplanar or concave are split into valid pieces.
+- `bridgeMeshEdgeLoops(mesh, first, second, {segments = 1})`: joins two open boundary loops (or chains) with the same
+  edge count, pairing closed loops at the rotation with the least squared distance. The band follows the loops'
+  winding, so the result stays consistently oriented. Band faces get default tile UVs.
+
+Every command validates first and never changes its input; results carry `vertexMap`, `faceMap`, `edgeMap` and the
+created/removed components like the commands above. Allocate islands for new faces with `allocateMeshFaceUV` before
+painting them.
+
 ## Pixel painting and UVs
 
 `meshUVTopology(mesh)` identifies islands through opposite two-face geometric edges whose UVs match exactly at both endpoints. Point contacts, disconnected overlapping atlas regions, nonmanifold edges and inconsistent winding do not connect islands. It returns stable face/corner references and explicit seam reasons. `meshSelectionUVCorners` resolves corner, face, island-seed or whole-mesh intent to deduplicated source-order corners; stale identities reject.

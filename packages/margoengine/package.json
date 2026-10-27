@@ -771,6 +771,10 @@
       "types": "./dist/mesh-edit.d.ts",
       "import": "./dist/mesh-edit.js"
     },
+    "./mesh-edit/modeling": {
+      "types": "./dist/mesh-edit/modeling.d.ts",
+      "import": "./dist/mesh-edit/modeling.js"
+    },
     "./navmesh": {
       "types": "./dist/navmesh.d.ts",
       "import": "./dist/navmesh.js"
