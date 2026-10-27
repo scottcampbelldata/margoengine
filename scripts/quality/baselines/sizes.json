@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3436170,
+  "total": 3436107,
   "history": [
     {
       "date": "2026-10-24",
@@ -607,7 +607,7 @@
     "@margoengine/environment/reflector": 10886,
     "@margoengine/environment/refractor": 10843,
     "@margoengine/environment/volumetric": 8462,
-    "@margoengine/exporters": 34716,
+    "@margoengine/exporters": 34679,
     "@margoengine/exporters/capture": 7241,
     "@margoengine/exporters/dae": 10560,
     "@margoengine/exporters/godot": 10258,
@@ -810,7 +810,7 @@
     "@margoengine/ui": 28622,
     "@margoengine/ui/react": 28708,
     "@margoengine/usdz": 8792,
-    "@margoengine/usdz dist/workers/usdz.js": 65909,
+    "@margoengine/usdz dist/workers/usdz.js": 65883,
     "@margoengine/usdz/worker": 9856,
     "@margoengine/vfx": 12721,
     "@margoengine/vfx/base": 7572,
