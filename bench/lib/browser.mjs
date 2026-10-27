@@ -4,6 +4,7 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { chromium } from '@playwright/test';
 import { build } from 'vite';
 import { SCENES, STANDARD, caseId, sceneParams } from '../scenes/catalog.js';
@@ -213,6 +214,26 @@ const METRICS = {
   drawCalls: { unit: '', better: 'lower', exact: true, read: (r) => r.info?.drawCalls },
 };
 
+/** Script paths a page fetched: .js and .mjs (three's engine-bench builds split into .mjs chunks). */
+const scriptsOf = (r) => r.resources?.filter((x) => /\.m?js$/.test(x.name)).map((x) => x.name);
+
+/** The served file behind a script path: /bench/ from the scene build, /ext/<engine>/ from that engine's build. */
+export function scriptFile(name, external) {
+  const ext = /^\/ext\/([^/]+)\/(.*)$/.exec(name);
+  if (ext) return external[ext[1]] ? join(external[ext[1]].dir, 'dist', ext[1], ext[2]) : null;
+  return /^\/bench\//.test(name) ? join(distDir, name.replace(/^\/bench\//, '')) : null;
+}
+
+/** {path: gzip bytes} of each script, measured now; a script whose file is not found is left out. */
+function scriptGzip(names = [], external) {
+  const out = {};
+  for (const name of names) {
+    const file = scriptFile(name, external);
+    if (file && existsSync(file)) out[name] = gzipSync(readFileSync(file), { level: 9 }).length;
+  }
+  return out;
+}
+
 /**
  * The cases of a browser suite: STANDARD[suite] (or `list`) for every engine. `primary` names the metrics that decide
  * validity for this suite; `keep` limits the metrics recorded (default: all of METRICS).
@@ -260,7 +281,10 @@ export function sceneCases(suite, { primary, list = STANDARD[suite], keep } = {}
                 gpuMethod: r.gpu?.method ?? 'none (no timestamp-query)',
                 passes: r.gpu?.passes,
                 ...(r.task ? { output: r.task.output } : {}),
-                scripts: r.resources?.filter((x) => x.name.endsWith('.js')).map((x) => x.name),
+                scripts: scriptsOf(r),
+                // gzip bytes of each script as built for this run: the build folder is replaced by the next build, so
+                // a report made later cannot measure the files again (bench/parity-report.mjs featureBytes).
+                scriptGzip: scriptGzip(scriptsOf(r), ctx.external),
                 ...(errors.length ? { errors: errors.slice(0, 5) } : {}),
               },
             };

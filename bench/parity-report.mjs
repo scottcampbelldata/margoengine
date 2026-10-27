@@ -5,9 +5,9 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { gzipSync } from 'node:zlib';
 import sharp from 'sharp';
 import { mainRoot, root } from './lib/env.mjs';
+import { featureCell, featureGzip } from './lib/feature-bytes.mjs';
 import { dirs } from './lib/results.mjs';
 import { SCENES, caseId } from './scenes/catalog.js';
 import { LABELS, ROWS } from './scenes/parity.js';
@@ -135,20 +135,13 @@ async function imageDiff(a, b) {
   };
 }
 
-/** gzip bytes of the scripts a case fetched that the other engine's page did not (the feature's own JavaScript). */
-function featureBytes(entry, other) {
-  const mine = entry?.info?.scripts ?? [],
-    shared = new Set(other?.info?.scripts ?? []);
-  let total = 0;
-  for (const name of mine) {
-    if (shared.has(name)) continue;
-    const ext = /^\/ext\/([^/]+)\/(.*)$/.exec(name),
-      path = ext
-        ? join(o['engine-bench'], 'margo-bench', 'dist', ext[1], ext[2])
-        : join(root, 'test-results/bench/dist', name.replace(/^\/bench\//, ''));
-    if (existsSync(path)) total += gzipSync(readFileSync(path), { level: 9 }).length;
-  }
-  return total;
+/** gzip bytes of the scripts a case fetched that the other engine's page did not (lib/feature-bytes.mjs). */
+const featureBytes = (entry, other) => featureGzip(entry, other, defaultFile);
+function defaultFile(name) {
+  const ext = /^\/ext\/([^/]+)\/(.*)$/.exec(name);
+  return ext
+    ? join(o['engine-bench'], 'margo-bench', 'dist', ext[1], ext[2])
+    : join(root, 'test-results/bench/dist', name.replace(/^\/bench\//, ''));
 }
 
 const med = (entry, m) => entry?.metrics?.[m]?.median;
@@ -452,7 +445,7 @@ lines.push(
         b = slot.later?.at(-1),
         img = (b ?? a).image,
         bytes = (b ?? a).bytes;
-      return `| ${named(key)} | ${describe(a)} (\`${a.run}\`) | ${a.verdict} | ${b ? `${describe(b)} (\`${b.run}\`)` : ''} | ${b?.verdict ?? ''} | ${img ? (img.error ?? `${img.ssim}, ${img.meanDeltaE}${img.match ? '' : ' (differs)'}`) : ''} | ${bytes ? `${bytes.margo.toLocaleString('en-US')} / ${bytes.three.toLocaleString('en-US')}` : ''} |`;
+      return `| ${named(key)} | ${describe(a)} (\`${a.run}\`) | ${a.verdict} | ${b ? `${describe(b)} (\`${b.run}\`)` : ''} | ${b?.verdict ?? ''} | ${img ? (img.error ?? `${img.ssim}, ${img.meanDeltaE}${img.match ? '' : ' (differs)'}`) : ''} | ${bytes ? `${featureCell(bytes.margo)} / ${featureCell(bytes.three)}` : ''} |`;
     }),
   '',
 );
