@@ -47,7 +47,8 @@ export class ComputeContext {
     readonly device: GPUDevice;
     readonly ownsDevice: boolean;
     readonly lost: Promise<GPUDeviceLostInfo>;
-    constructor(device: GPUDevice, ownsDevice: boolean);
+    readonly fastMath: boolean;
+    constructor(device: GPUDevice, ownsDevice: boolean, fastMath?: boolean);
     get disposed(): boolean;
     get backend(): 'webgpu' | 'cpu';
     get f16(): boolean;
@@ -174,6 +175,7 @@ export interface CreateComputeOptions {
     readonly powerPreference?: GPUPowerPreference;
     readonly signal?: AbortSignal;
     readonly backend?: 'auto' | 'webgpu' | 'cpu';
+    readonly fastMath?: boolean;
 }
 
 export type DType = 'f32' | 'f16' | 'i32' | 'u32';
