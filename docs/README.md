@@ -2,14 +2,13 @@
 
 [Browse the searchable catalog](https://scottcampbelldata.github.io/margoengine/).
 
-Search all 74 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the five standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
+Search all 83 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the five standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
 
 The [release notes](../CHANGELOG.md#unreleased) cover standalone USDZ parsing,
-Draco/Meshopt support in glTF Pro and synchronous parsing behavior. The current
-consolidated build measures **18,876 bytes gzip** for core and **50,207 bytes raw /
-21,107 bytes gzip** for core + stage, below the 25,000-byte combined gzip ceiling.
-Package versions and npm availability remain independent of these source changes.
-The optional React entry measures **20,966 bytes gzip**, with React and optional package peers external; those peers and application code are additional. See the [entry measurements](../examples/package-benchmarks/results/entry-sizes.json) and 74-package consolidation record.
+Draco/Meshopt support in glTF Pro and synchronous parsing behavior. The core and the stage
+together measure **57,729 bytes raw / 22,781 bytes gzip**, below the 25,000-byte combined gzip ceiling. That figure is the engine, not an app: React, models and optional packages add to it. The
+[entry measurements](../examples/package-benchmarks/results/entry-sizes.json) list every package entry, and the measured size of a React page is in
+[limits](limits.md).
 
 Margo is written clean room: the rule, the process and the source of every lighting and post-processing formula
 are in [clean-room.md](clean-room.md).
