@@ -18,7 +18,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core and CAD tools built on 
 [Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 22,781 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 21,910 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
 
 ## Install
@@ -282,7 +282,7 @@ meshes (no textures, effects or picking).
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 22,781 B | 57,729 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 21,910 B | 54,659 B |
 
 Recorded at commit `454df8f3` in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
@@ -506,6 +506,7 @@ A short tour. Each package README has the full reference. The public API of ever
 
 ```ts
 import { createStage, Geometry } from 'margoengine';
+import { addCAD } from 'margoengine/stage/cad';
 
 const stage = await createStage('#scene', { controls: true, autoStart: true, onError: console.error });
 
@@ -513,7 +514,7 @@ stage.box({ size: [1, 1, 1], color: '#84d6bd', position: [0, 0.5, 0] });
 stage.sphere({ radius: 0.5, metalness: 1, roughness: 0.2 });
 stage.mesh(new Geometry(positions, normals, indices), { color: '#c3c9d0' });
 
-const model = await stage.load('/part.step'); // glTF, GLB, STL, OBJ, STEP, IGES
+const model = await addCAD(stage, '/part.step'); // STL, OBJ, STEP, IGES; addGLTF (margoengine/stage/gltf) for glTF and GLB
 stage.fit(model.meshes);
 
 const off = stage.onTick((delta) => {}); // seconds since the last frame
@@ -669,6 +670,16 @@ itself, as the table above says.
 2026-10-24). A bug, an unsafe API (a throw that cannot be branched on, a race, a leak) or a message that names no fix
 is fixed in core, with a test, inside the 25,000-byte core + stage gzip gate; record the bytes it costs. New
 capabilities go in optional packages, and a fix that would add a capability is listed for the maintainer instead.
+
+**Exception, the stage facade (Scott, 2026-10-27):** the stage is lifted from the freeze for one restructuring,
+because it broke "pay only for what you import" and nothing is published yet, so no user is broken. Its ten
+optional-package methods (`load`, `gltf`, `machinery`, `creative`, `scenery`, `sky`, `particles`, `effects`,
+`environment`, `shadows`) held `import()`s that every app building a `Stage` reached (class methods are never
+tree-shaken), so webpack and Turbopack failed on uninstalled optional peers. They moved into feature entries that take
+the stage (`@margoengine/stage/gltf` `addGLTF`, `/cad` `addCAD`, `/sky` `addSky`, `/particles` `addParticles`,
+`/effects` `addEffects`, `/environment` `addEnvironment`, `/shadows` `addShadows`; the whole-pack accessors became a
+plain `import()`), and the root gained `stage.signal`. The stage root shrank (core + stage 22,781 -> 21,910 B gzip).
+Core is untouched. The exception covers this one change; the freeze applies again after it.
 
 ## Names exported by more than one package
 
@@ -1050,13 +1061,13 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 318,765 B |
-| `margoengine/cad` | CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export | 201,527 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 291,590 B |
-| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 160,399 B |
+| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 317,851 B |
+| `margoengine/cad` | CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export | 188,599 B |
+| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 280,415 B |
+| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 151,721 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
-part of a kit pays for that part; core + stage alone is 22,636 B). Wasm decoders, workers and lazily loaded parts
+part of a kit pays for that part; core + stage alone is 21,910 B). Wasm decoders, workers and lazily loaded parts
 are extra and load only when used. `tests/umbrella.test.js` measures these numbers on every run and fails when one
 moves more than 3%.
 
@@ -1085,11 +1096,12 @@ shadows.add(crate);
 
 ```ts
 import {SOLIDWORKS, ViewCube, cadControls, createStage} from 'margoengine/cad';
+import { addCAD } from 'margoengine/stage/cad';
 
 const stage = await createStage('#viewport', {controls: false});
 cadControls(stage.engine, {profile: SOLIDWORKS, keys: window});
 ViewCube.attach(stage.engine);
-await stage.load('/bracket.step');
+await addCAD(stage, '/bracket.step');
 ```
 
 ## Which kit
@@ -1422,7 +1434,7 @@ Each row is a separate npm package (not published yet: until then, build from so
 
 ```sh
 npm install @margoengine/core                      # engine, camera, meshes, constant PBR material
-npm install margoengine                            # optional facade: createStage('#app'), app.box(), app.load(url)
+npm install margoengine                            # optional facade: createStage('#app'), app.box(), addGLTF(app, url)
 npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @margoengine/controls
 ```
 
@@ -1963,8 +1975,8 @@ const raw = parseSTL(await (await fetch('/part.stl')).arrayBuffer()); // STL as 
 const scan = createMeshes(engine, parsePLY(await (await fetch('/scan.ply')).arrayBuffer()));
 ```
 
-The stage facade loads by extension: `await app.load('/part.step')` handles glTF (constant colours), STL, OBJ, STEP and
-IGES and frames the result. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. Textured OBJ with its MTL loads in one call with `loadOBJ` from `@margoengine/loaders/mtl`; Collada reads geometry,
+The stage facade frames what it loads: `await addCAD(app, '/part.step')` (`margoengine/stage/cad`) handles STL, OBJ,
+STEP and IGES, and `await addGLTF(app, '/model.glb')` (`margoengine/stage/gltf`) glTF with constant colours. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. Textured OBJ with its MTL loads in one call with `loadOBJ` from `@margoengine/loaders/mtl`; Collada reads geometry,
 materials and the hierarchy (`parseDAE`). For STEP/IGES files you ship yourself, convert them once with
 `npx margo-convert part.step part.glb` ([tools/margo-convert](../tools/margo-convert/README.md)) and load the GLB:
 the page then skips the 3.1 MB OCCT download.
@@ -2565,7 +2577,7 @@ features add no core or stage functionality.
 
 # Design envelope
 
-Margo is a small WebGPU engine: core plus the stage facade is 22,781 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes), and every
+Margo is a small WebGPU engine: core plus the stage facade is 21,910 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -2618,7 +2630,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
-| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl/test/webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 22,781 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) gets, on every live demo, "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no engine code; the landing page draws no scene. No demo runs on the WebGL2 preview: each needs effects, particles, skinning or compute. | `@margoengine/webgl` (3,021 B gzip, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo shows the message with no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). Most rendering packages stay WebGPU-only; the full fallback is paused ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). |
+| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl/test/webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 21,910 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) gets, on every live demo, "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no engine code; the landing page draws no scene. No demo runs on the WebGL2 preview: each needs effects, particles, skinning or compute. | `@margoengine/webgl` (3,021 B gzip, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo shows the message with no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). Most rendering packages stay WebGPU-only; the full fallback is paused ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). |
 | Content Security Policy | Enforced by the browser: core compiles its Wasm kernel, so `script-src` needs `'wasm-unsafe-eval'` (as do the machinery kernel, OCCT, Draco and Basis). Nothing needs `'unsafe-eval'`, workers included: the Draco/KTX2 decoder worker and the STEP/IGES CAD worker load their Emscripten code with `importScripts`, and the build replaces the `new Function` wrapper generators in the Basis and OCCT glue with closures, output byte-identical ([no-eval-workers.test.js](../tests/no-eval-workers.test.js)). No COOP/COEP. Checked with zero violations on Edge, one policy on the page and every worker ([csp-check.json](../examples/package-benchmarks/results/csp-check.json)). | Wasm is how the kernel stays small and fast. | Without `'wasm-unsafe-eval'`, `Engine.create` rejects ("Compiling or instantiating WebAssembly module violates the following Content Security policy directive") ([csp-check-negative.json](../examples/package-benchmarks/results/csp-check-negative.json)). | Headers for Cloudflare Pages, Netlify, Vercel and Nginx in [deploying.md](deploying.md). A Draco, Basis or OCCT build you substitute for the bundled one may still call `new Function` (three.js's Basis transcoder does) and then needs `'unsafe-eval'` for its worker. |
 | React app budget (what a bundler emits and the browser loads) | Measured and enforced by the bundler matrix (`npm run modern:test:bundlers`, part of `check:merge`): a Vite 8 build of the React cube page (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `OrbitControls`, `useFrame`; React 19) loads 95,338 B gzip before it runs (React, React DOM, core, the stage and the React bindings; budget 100,000 B), and with `@margoengine/react` installed alone the whole build emits 107,027 B gzip of JavaScript and no Wasm (budget 115,000 B). The matrix loads the built page in Edge and fails if it requests Wasm, an optional engine package or the BVH raycaster. With the GPU (Intel Arc 140V) the page requests that entry, then the orbit controls (7.0 KB gzip) when `OrbitControls` mounts, and nothing more while orbiting. Breakdown: [React page](#react-page). The build prints no warnings, without `@vitejs/plugin-react` too: `'use client'` is only on the `react-server` entries. | With `npm i margoengine` every optional package is installed, and bundlers emit a chunk for every `import()` that code reachable from the page can run. Stage methods are never tree-shaken, so `stage.load` (glTF with Draco and KTX2, STL, OBJ, STEP and IGES), `stage.sky`, `stage.particles` and the rest stay reachable from every `Canvas` (its `onCreated` hands the app that stage). | A one-install build also writes OCCT's 7,604,031 B Wasm (3.1 MB gzip), Basis's 527,333 B, Draco's 192,420 B and their loader chunks to `dist`. The page never requests them (95,596 B gzip at load, the same budget). Webpack and Turbopack need every one of those packages installed ([known-bugs.md](known-bugs.md)). | Vite: install `@margoengine/react` alone, plus the peers your components use (`@margoengine/controls` for `OrbitControls`); none of the others are emitted. |
 | No visual editor | By design: Margo is code-first. | An editor is a product of its own; the engine stays a library. | Scenes are built in code or authored in another tool. | Author in Blender and export glTF or `.margo` (`@margoengine/blender`, `tools/blender-addon`, [guides/blender-game.md](guides/blender-game.md)); inspect at runtime with `@margoengine/inspector` and its `/frame` debugger; move objects with `@margoengine/controls`'s TransformControls. A Margo Studio editor is planned after 1.0. |
@@ -2628,7 +2640,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ### React page
 
-What a minimal React page downloads, and why it is larger than core + stage (22,781 B gzip). The cube page of the
+What a minimal React page downloads, and why it is larger than core + stage (21,910 B gzip). The cube page of the
 bundler matrix (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `OrbitControls`, `useFrame`), built by Vite 8.3.5 with
 `@vitejs/plugin-react`, React 19.2 and `@margoengine/react` installed alone, measured from the build's source maps
 (minified bytes per package; gzip is each package's share of the chunk's gzip size). Core lights every scene by default
@@ -2769,7 +2781,12 @@ does not own. Each entry says exactly what is needed to close it.
   A plain webpack 5 build of an entry importing those five names fails the same way: 39 module names in 19 packages
   (2026-10-27).
 - **Cause (measured, 2026-10-27):** two sources, each enough on its own.
-  1. The stage facade: `Canvas` constructs a `Stage` (it hands it to `onCreated` and `<Stage>`), and the `Stage` class
+  1. **Fixed (2026-10-27):** the ten loaders moved out of the `Stage` class into feature entries that take the stage
+     (`@margoengine/stage/gltf` `addGLTF`, `/cad` `addCAD`, `/sky` `addSky`, `/particles` `addParticles`, `/effects`
+     `addEffects`, `/environment` `addEnvironment`, `/shadows` `addShadows`); the stage root holds no `import()`
+     (`tests/modern-facade-isolation.test.js` builds a stage-only app and fails on any lazy import). Callers migrate
+     with `node scripts/codemod-stage-loaders.mjs`. Before:
+     The stage facade: `Canvas` constructs a `Stage` (it hands it to `onCreated` and `<Stage>`), and the `Stage` class
      methods `load` (glTF, CAD), `gltf`, `machinery`, `creative`, `scenery`, `sky`, `particles`, `effects`,
      `environment` and `shadows` hold 10 `import()`s of 6 optional packages (`creative`, `creative/particles`,
      `creative/post`, `environment`, `gltf`, `machinery`, `machinery/cad`, `scenery`, `scenery/sky`, `shadows`).
@@ -3138,7 +3155,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 23,271 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 21,910 B gzip.
 
 Use either name; they are interchangeable. Each package is still published on its own (`@margoengine/shadows`) for
 apps that want a smaller install.
@@ -3179,7 +3196,7 @@ You normally use this package as [`margoengine`](../margoengine/README.md): `imp
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
-This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/machinery`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, and `@margoengine/shadows` are optional peers. `load`, `sky`, `particles`, `effects`, `environment`, and `shadows` import them on use and reject with `Install <package>` when they are absent. Dynamic imports keep that runtime code out of the initial scene.
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/machinery`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, and `@margoengine/shadows` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
@@ -3204,15 +3221,16 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 | `app.sphere({radius, segments, ...options})` | Creates an orb with the same material/transform options as boxes |
 | `app.box({size, color, roughness, metalness, position, rotation, scale, parent, name})` | Creates a box and returns the existing mutable mesh handle |
 | `app.mesh(geometry, options)` | Attaches existing or custom geometry with the same options |
-| `await app.load(url, options)` | Imports `@margoengine/gltf` for glTF/GLB or `@margoengine/machinery/cad` for STL/OBJ/STEP/IGES, then exposes root transforms and fits the imported meshes. A missing pack rejects with `Install @margoengine/<name>` |
 | `app.onTick(delta => { ... })` | Runs once per frame with delta in seconds; returns an unsubscribe function |
 | `app.fit()` / `app.fit(model.meshes)` | Fits visible geometry, including world transforms and hierarchy |
-| `await app.sky(options)` | Loads the scenery `/sky` entry and attaches SkyMoon |
-| `await app.particles(options)` | Loads creative `/particles` and attaches GPU particles |
-| `await app.effects(options)` | Loads creative `/post` and attaches post-processing/atmosphere |
 | `app.use(plugin)` | Attaches an existing plugin and returns it |
-| `await app.gltf()` / `app.machinery()` / `app.creative()` / `app.scenery()` | Loads the full corresponding pack on demand |
+| `app.signal` | An `AbortSignal` that aborts when the stage is disposed; the feature entries combine it with yours |
 | `app.engine` | Existing core API: camera, picking, plugins, manual render, start/stop and recovery |
+
+## Feature entries
+
+Each optional feature is a function in its own entry that takes the stage, so an app bundles (and must install) only
+the ones it imports. With `margoengine` the entries are `margoengine/stage/<entry>`.
 
 [README continues: https://margoengine.com/llms/packages/stage.md]
 
@@ -4593,7 +4611,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
-summed. `stage.sky()` (base, night) sums to about 6.3 kB and Night Citadel (base, night, fog, reflection) to about 8.9 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
+summed. `addSky(stage)` (base, night) sums to about 6.3 kB and Night Citadel (base, night, fog, reflection) to about 8.9 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
 the shaders leave out the unused functions and branches, and the GPU work, uploads and rendered pixels are the
 same as the root's for that configuration (`test/split.test.js`, and on a real GPU `test/browser-check.mjs`).
 An option or `model` whose feature is missing throws a `TypeError` naming the entry to import. Without a day model
@@ -5780,7 +5798,7 @@ Import `margoengine/scenery` from the `margoengine` package, or `@margoengine/sc
 
 A moonlit night sky for Margo Engine: twinkling stars, a phased moon with glow, and horizon haze. `SkyMoon` is a
 preset of `Sky` from `@margoengine/sky` (Margo's one sky implementation) held at midnight with its stylized
-`night` options. `stage.sky()` loads it.
+`night` options. `addSky(stage)` (`@margoengine/stage/sky`) loads it.
 
 In this workspace, `npm run modern:dev` opens the starter; click **Toggle moonlit scenery**.
 
@@ -6011,7 +6029,7 @@ scene capture. For bloom, or to combine it with SSAO, DOF or FXAA, add it to a `
 0.3}), new PostProcessing({atmosphere: {density: 0.02}}), new FXAA()])`. In a stack its `target` is undefined.
 For a sky behind the fog, attach `Sky` from `@margoengine/sky`.
 
-Each subpath loads that feature and its dependencies. Existing named imports from `@margoengine/creative` remain available and can be tree-shaken by a bundler. `await stage.creative()` intentionally loads the complete pack namespace; use a subpath when loading one feature independently.
+Each subpath loads that feature and its dependencies. Existing named imports from `@margoengine/creative` remain available and can be tree-shaken by a bundler. `await import('@margoengine/creative')` loads the complete pack namespace; use a subpath when loading one feature independently. The stage's `addParticles` and `addEffects` (`@margoengine/stage/particles`, `/effects`) load only `/particles` and `/post`.
 
 Attach a grass field directly to an existing Stage, without extending the facade:
 
@@ -6029,8 +6047,6 @@ meadow.dispose();
 ```
 
 `GrassField.attach(engine, options)` takes any core engine (`new GrassField({engine}, options)` is the older form). It advances `windTime` by the frame delta, supports multiple fields, and rebuilds GPU resources after device restoration. Do not add a second time increment in `onTick`. All roots lie on Y=0 in a rectangle centered on the origin.
-
-`meadow.dispose()` (and its deprecated alias `meadow.destroy()`) is an idempotent teardown: remove the field's compute, grass and optional spore passes before destroying its GPU buffers. The field registers no tick listeners. Both indirect instance counters are cleared with `encoder.clearBuffer()` before each culling dispatch; the compute pass ends before the separate render passes read the compacted lists and indirect arguments.
 
 [README continues: https://margoengine.com/llms/packages/creative.md]
 

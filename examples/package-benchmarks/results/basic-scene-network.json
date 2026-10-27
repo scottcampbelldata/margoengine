@@ -1,5 +1,5 @@
 {
-  "commit": "643b8cbb",
+  "commit": "1c3e6279",
   "dirty": false,
   "browser": "msedge 156.0.4314.42 headless",
   "adapter": "nvidia ampere",
@@ -24,31 +24,22 @@
       "brotli": 1049
     },
     {
-      "path": "assets/index-TgsHp261.js",
+      "path": "assets/index-BN6xsAmx.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 23737,
-      "raw": 58174,
-      "gzip": 23356,
-      "brotli": 20569
+      "transferred": 23161,
+      "raw": 55937,
+      "gzip": 22780,
+      "brotli": 20074
     },
     {
-      "path": "assets/dist-CrUIs_hV.js",
-      "role": "@margoengine/gltf (app.load)",
+      "path": "assets/dist-U9caKLXI.js",
+      "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 6103,
-      "raw": 14873,
-      "gzip": 5731,
-      "brotli": 5156
-    },
-    {
-      "path": "assets/extension-DuYhGmhk.js",
-      "role": "Shared chunk",
-      "encoding": "identity",
-      "transferred": 359,
-      "raw": 40,
-      "gzip": 54,
-      "brotli": 44
+      "transferred": 6088,
+      "raw": 14836,
+      "gzip": 5716,
+      "brotli": 5141
     },
     {
       "path": "model.glb",
@@ -61,80 +52,11 @@
     }
   ],
   "total": {
-    "requests": 6,
-    "transferred": 34147,
-    "raw": 77266,
-    "gzip": 31130,
-    "brotli": 27404
+    "requests": 5,
+    "transferred": 33197,
+    "raw": 74952,
+    "gzip": 30485,
+    "brotli": 26850
   },
-  "notFetched": [
-    {
-      "path": "assets/cad-BPviLi3h-McfAKAaB.js",
-      "raw": 34818
-    },
-    {
-      "path": "assets/cad-Bu8yVR_C.js",
-      "raw": 108
-    },
-    {
-      "path": "assets/cad-runtime-m0V0f4CW.js",
-      "raw": 20052
-    },
-    {
-      "path": "assets/dist-BkCLcav_.js",
-      "raw": 66834
-    },
-    {
-      "path": "assets/dist-CLOTj5hW.js",
-      "raw": 42050
-    },
-    {
-      "path": "assets/dist-CQ14jebv.js",
-      "raw": 88879
-    },
-    {
-      "path": "assets/dist-CuR1U322.js",
-      "raw": 37196
-    },
-    {
-      "path": "assets/dist-W6dnKV-W.js",
-      "raw": 44
-    },
-    {
-      "path": "assets/occt-import-js-BhHfLpto.wasm",
-      "raw": 7604031
-    },
-    {
-      "path": "assets/occt-import-js-Wz-Kjijs.js",
-      "raw": 97856
-    },
-    {
-      "path": "assets/particles-BYaji0pQ.js",
-      "raw": 30369
-    },
-    {
-      "path": "assets/particles-DJO_LMVS.js",
-      "raw": 55
-    },
-    {
-      "path": "assets/post-BX0aJvz_.js",
-      "raw": 18940
-    },
-    {
-      "path": "assets/post-DvBdE4-V.js",
-      "raw": 52
-    },
-    {
-      "path": "assets/sky-CD_jrrx4.js",
-      "raw": 21585
-    },
-    {
-      "path": "assets/sky-W6dnKV-W.js",
-      "raw": 44
-    },
-    {
-      "path": "assets/validate-DE7v94fO.js",
-      "raw": 439
-    }
-  ]
+  "notFetched": []
 }

@@ -1,10 +1,10 @@
 {
-  "commit": "643b8cbb",
+  "commit": "1c3e6279",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 57729,
-    "gzip": 22781,
+    "raw": 54659,
+    "gzip": 21910,
     "limit": 25000
   },
   "packages": {
@@ -1182,8 +1182,36 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7009,
-        "gzip": 2941
+        "raw": 3942,
+        "gzip": 1984
+      },
+      "./gltf": {
+        "raw": 2763,
+        "gzip": 1365
+      },
+      "./cad": {
+        "raw": 2987,
+        "gzip": 1480
+      },
+      "./sky": {
+        "raw": 714,
+        "gzip": 463
+      },
+      "./particles": {
+        "raw": 733,
+        "gzip": 468
+      },
+      "./effects": {
+        "raw": 728,
+        "gzip": 471
+      },
+      "./environment": {
+        "raw": 794,
+        "gzip": 491
+      },
+      "./shadows": {
+        "raw": 787,
+        "gzip": 494
       }
     },
     "@margoengine/staging": {

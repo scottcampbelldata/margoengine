@@ -21,8 +21,6 @@ export { FrameCallback } from "@margoengine/core";
 
 export { Geometry } from "@margoengine/core";
 
-export { LoadOptions } from "@margoengine/stage";
-
 export { LoadedModel } from "@margoengine/stage";
 
 export { Mesh } from "@margoengine/core";

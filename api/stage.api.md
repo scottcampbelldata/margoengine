@@ -23,16 +23,6 @@ export { FrameCallback } from "@margoengine/core";
 
 export { Geometry } from "@margoengine/core";
 
-export interface LoadOptions {
-    signal?: AbortSignal;
-    onProgress?: (percent: number) => void;
-    smoothing?: boolean;
-    maxParts?: number;
-    timeoutMs?: number;
-    format?: 'gltf' | 'glb' | 'stl' | 'obj' | 'step' | 'iges';
-    fit?: boolean;
-}
-
 export interface LoadedModel extends Pick<Mesh, 'position' | 'rotation' | 'scale'> {
     readonly root: Mesh;
     readonly meshes: readonly Mesh[];
@@ -63,6 +53,7 @@ export { Scene } from "@margoengine/core";
 
 export class Stage {
     readonly engine: EngineKernel;
+    readonly signal: AbortSignal;
     constructor(engine: EngineKernel);
     get canvas(): HTMLCanvasElement;
     onTick(callback: (delta: number) => void): () => void;
@@ -77,16 +68,6 @@ export class Stage {
         segments?: number;
     }): Mesh;
     fit(meshes?: Iterable<Mesh>): void;
-    load(url: string | URL, { format, fit, signal, ...options }?: LoadOptions): Promise<LoadedModel>;
-    gltf(): Promise<object>;
-    machinery(): Promise<object>;
-    creative(): Promise<object>;
-    scenery(): Promise<object>;
-    sky(options?: object): Promise<object>;
-    particles(options?: object): Promise<object>;
-    effects(options?: object): Promise<object>;
-    environment(source: string | URL | object, options?: object): Promise<object>;
-    shadows(options?: object): Promise<object>;
 }
 
 export interface StageOptions extends EngineOptions {
