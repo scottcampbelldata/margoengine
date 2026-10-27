@@ -8,15 +8,15 @@
 // Skinned and morphed gltf-pro casters needed no change (Shadows reads `primitive.deformed`); gltf-pro-lighting-hooks.proof.js
 // still records gltf-pro + shadows identical, and gltf-pro now takes lightPBR from packages/shared.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/deformed-shadows.proof.js [ref] [pin] [--current]
-// Pinned: 38d448e against 282e751, the commit that made this claim. --current: 2cd81c1 against the working tree;
-// 56ee987 changed VAT to PBR Neutral; a126213/43aa191 changed shadow sampling and its pixel-scale uniform (claims.md).
+// Pinned: 38d448e against 282e751, the commit that made this claim. --current: 667d1a26 against the working tree (2cd81c1
+// before the PCSS search spanned to the nearest caster, claims.md); 56ee987 changed VAT to PBR Neutral; a126213/43aa191 changed shadow sampling and its pixel-scale uniform (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { box } from '../../../packages/core/dist/index.js';
 
-const { ref, pin } = refs('38d448e', '282e751', '2cd81c1'); // 38d448e: the commit before 5l.j
+const { ref, pin } = refs('38d448e', '282e751', '667d1a26'); // 38d448e: the commit before 5l.j
 async function rig() {
   const gpu = mockGPU(),
     store = await TransformStore.create(32),

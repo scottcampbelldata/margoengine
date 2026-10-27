@@ -3053,31 +3053,6 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
      way), comparing sampled points and the meshed area with the exact values, and replace the refusal test in
      `packages/brep/tests/iges.test.js`.
 
-## Shadows
-
-### Speckled shading on lit faces of a skinned model with default shadow settings
-
-- **What:** with `Shadows.attach(engine, { resolution: 2048 })` and the default `'soft'` filter, the upper torso and
-  head of RobotExpressive show a fine pattern of dark dots on faces that face the sun, and the soft edge of the ground
-  shadow looks dotted instead of smooth. It is visible in `docs/images/guide-animation.webp` and, faintly, at the foot
-  of the crate in `docs/images/quickstart.webp`.
-- **Repro:** follow [the animation guide](guides/animation.md) (or `npm run test:docs:browser` with
-  `DOCS_SCREENSHOTS=1`) and look at the robot's chest.
-- **Cause:** not found. The dots are not penumbra (they sit on lit faces), so receiver-plane bias or the cascade
-  selection on a low-poly skinned mesh is the first suspect; the noise term in the PCSS filter (documented in the
-  shadows README) shows it up.
-- **Needed to close:** a pixel test of a lit, sun-facing plane and a skinned low-poly mesh with the default settings that
-  fails while any lit pixel is shadowed, then the fix in `@margoengine/shadows`.
-- **Update 2026-10-27 (found while timing the quickstart):** the README quickstart's sun pointed away from the camera, so its
-  shadow was hidden behind the ball; the README now aims the sun so the shadow shows, and with it the whole umbra of the
-  ball and crate on the floor shows white speckle (about a third of the pixels lit inside a solid shadow, on a floor that
-  is not a caster either). `Shadows.attach(engine, { filter: 'pcf' })` gives a clean shadow in the same scene;
-  a larger `normalBias` (0.05) does not change the speckle. So the fault is in the `'soft'` (PCSS) path of
-  `packages/shadows/src/shader.ts`, not in cascade selection or receiver bias alone. First suspect: the receiver-plane
-  term `dot(offset, slope)` added to the compared depth in the 32-tap loop, which can pull a tap in front of the blocker
-  when the sun is low. This needs a stronger-model bug hunt; `npm run check:quickstart` shows it in
-  `test-results/quickstart-timing/shipped.png`.
-
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -4498,7 +4473,7 @@ Cascade descriptors, attachments and matrix views are retained between frames.
 Custom `drawShadow` callbacks receive a borrowed context reused for that cascade;
 consume it synchronously rather than retaining it after the pass.
 
-Optional WebGPU directional shadows. Four practical/logarithmic frustum splits (fewer with `cascades`) render to a `depth32float` 2D texture array. Stable spherical extents and world-space texel snapping limit edge swimming. PCSS searches 16 blockers and filters 32 comparison samples using directional-light angular size and blocker/receiver separation. The samples follow a golden-angle spiral that each pixel turns by interleaved gradient noise of its screen position, so penumbrae show fine noise instead of steps; there is no time term, so a still view renders the same pixels every frame. The last tenth of each cascade's depth range dithers into the next cascade with a second noise pattern, so a cascade switch shows no hard seam and still costs one map lookup per tap.
+Optional WebGPU directional shadows. Four practical/logarithmic frustum splits (fewer with `cascades`) render to a `depth32float` 2D texture array. Stable spherical extents and world-space texel snapping limit edge swimming. PCSS searches 16 blockers and filters 32 comparison samples using directional-light angular size and blocker/receiver separation. The blocker search reaches from the receiver to the nearest caster in its cascade (a compute pass reduces each changed map to its nearest depth), so its samples stay where blockers can be, however far `casterMargin` puts the map's near plane; its first sample is the receiver's own texel, and a surface behind the receiver never counts as a blocker. The reduction reads the whole map once per frame in which a caster moved (0.11 ms GPU at 2048 with four cascades on an RTX A6000; nothing while the map is unchanged), and the tighter search makes the receiving passes cheaper (0.12 to 0.09 ms in the animation guide's scene). The samples follow a golden-angle spiral that each pixel turns by interleaved gradient noise of its screen position, so penumbrae show fine noise instead of steps; there is no time term, so a still view renders the same pixels every frame. The last tenth of each cascade's depth range dithers into the next cascade with a second noise pattern, so a cascade switch shows no hard seam and still costs one map lookup per tap.
 
 ```ts
 import {EngineKernel,box} from 'margoengine/core';
@@ -4535,8 +4510,6 @@ between them live is fine, switching to cascades needs a new `Shadows`. With a n
 x and y map to texels at different scales, so receivers take a per-axis variant of the filter (receiver-plane slope and
 PCSS radii per axis); a square map without a frustum keeps the shaders above byte for byte. Cascades and `bounds` keep
 covering a square region, so a non-square map there just gives the two axes different texel sizes.
-
-`lambda:0` gives uniform splits; `lambda:1` gives logarithmic splits. `lightSize` is the tangent of the sun's angular radius; `bias` is normalized depth and `normalBias` is world distance. `casterMargin` extends the depth bounds to include casters outside the camera slice. Shadows follow the engine's directional light.
 
 [README continues: https://margoengine.com/llms/packages/shadows.md]
 

@@ -186,7 +186,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | animation-vat (measurement, no baseline) | gltf-pro + animation at `700838e` | - |
 | materials-atlas (measurement, no baseline) | geometry + materials at `700838e` | - |
 | binding-limit | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | - |
-| gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `641246d3`: 4,112 calls |
+| gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `667d1a26` |
 | materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `641246d3`: 1,085 calls |
 | lines-perspective | `96edc75` -> `6da7f7e`: 946 calls | `2d192a71` (per-line clipping planes at `86063c47`: the style uniform grew from 128 to 224 bytes and the shader gained a world-position varying and a zero-count plane loop; then `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose both times) |
 | math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
@@ -197,7 +197,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | clustered-light-hooks | `6c20076d` -> `b4700864`: 482 calls without the directional, IES and projector entries and with each attached but empty | `57250a49` |
 | environment-hemisphere | `6c20076d` -> `b4700864`: 53 shader texts (IBL, Fog, LightProbes on six core variants, gltf-pro's four shader kinds) and 23 calls without a HemisphereLight | `57250a49` |
 | color-output | `7dcc958` -> `225b1d6`: 6,174 calls | `57250a49` |
-| deformed-shadows | `38d448e` -> `282e751` | `2cd81c1` |
+| deformed-shadows | `38d448e` -> `282e751` | `667d1a26` |
 | environment-volumetric | `7c47a09` -> `366ebff` | `2cd81c1`: 70 root calls; 344/533 isolated calls |
 | oit-detached | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until a later change replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `641246d3`: 2,392 calls |
 | post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `151aa744`: 12,431 calls (AgX normalised for older refs, see below) |
@@ -205,7 +205,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
 | terrain-ssr | `6c20076d` (before terrain's capture hook) -> the water/terrain SSR commit: terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
 | water-ssr | `6c20076d` (before water's capture hook) -> the water/terrain SSR commit: 2,762 calls in 3 stories | `57250a49` |
-| quality-presets | `96daac7` -> `01e5e35` | `57250a49` |
+| quality-presets | `96daac7` -> `01e5e35` | `667d1a26` |
 | post-ssao-perspective | `9c761d5` -> `9702e57`: 3,282 calls | - |
 | probes-decals | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | - |
 | procedural-deps | HISTORICAL: `ed53ec5` -> `fff47af`; the baseline imports simplex-noise and isosurface, since removed from the lockfile, so the runner reports it instead of failing | - |
@@ -330,6 +330,19 @@ renumbered, every remaining call is identical, in the same order (first sample c
 gltf-pro-lighting-hooks 2,090 -> 2,056 calls (samplers 23 -> 4, views 34 -> 19), oit-detached 1,250 -> 1,196 (samplers
 31 -> 2, views 36 -> 11), materials-uv-transform 1,117 -> 1,085 (samplers 40 -> 11, views 69 -> 66). Bind groups bind
 the shared view or sampler with the same descriptor in place of a fresh one. The full traces match `641246d3`.
+
+**deformed-shadows, gltf-pro-lighting-hooks and quality-presets, advanced to `667d1a26` on 2026-10-27 (shadows bug fix):**
+the soft filter's blocker search reached the cascade's near plane, `casterMargin` past the scene, and left the
+animation guide's robot with bright dots in the head's shadow and a dotted ground-shadow edge (known bug closed; regression
+test `packages/shadows/test/lit-faces-browser.mjs`). `Shadows` now reduces each changed map to each layer's nearest
+depth and the search spans to it. The calls differ in exactly that, and only in the `Shadows` calls of each story: the
+frame uniform is 384 bytes instead of 368 (`nearest:vec4f` appended to `ShadowFrame`), one 16-byte storage buffer, the
+reduction's shader module, compute pipeline and bind group, and, after the depth passes of a frame whose map changed
+under the default `'soft'` filter, a `writeBuffer` seeding the buffer with 1.0, one compute pass and a
+`copyBufferToBuffer` into the uniform; object ids after the new buffer are renumbered. The receiver WGSL of `'soft'` reads
+the nearest depth, takes its first search read at the receiver's texel and compares with `min(plane offset, 0)`;
+`'pcf'` and `'hard'` receivers change only by the appended struct member. Against the old references the first
+difference in each story is the uniform's size and the new buffer.
 
 **taa-velocity, advanced to `8149bf4e` on 2026-10-26 (speed matrix row 13.7):** TAA's object velocities, a render pass per mesh before,
 now draw in one render pass, the PBR snapshots in one compute pass after it, and the camera rows moved out of each
