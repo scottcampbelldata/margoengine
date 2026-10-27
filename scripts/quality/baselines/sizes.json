@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3580018,
+  "total": 3586985,
   "history": [
     {
       "date": "2026-10-24",
@@ -626,6 +626,12 @@
       "commit": "5fc5a668",
       "reason": "points: ASTM E57 reader and writer (/e57) (queue item 31, landing 3)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "1d09914a",
+      "reason": "new optional package @margoengine/mixer: buses, effects chain, emitters and offline rendering (item 28.5, second batch)",
+      "grew": 1
     }
   ],
   "items": {
@@ -822,6 +828,7 @@
     "@margoengine/mcp": 8664,
     "@margoengine/mesh-edit": 30203,
     "@margoengine/mesh-edit/modeling": 32053,
+    "@margoengine/mixer": 6967,
     "@margoengine/navmesh": 7228,
     "@margoengine/navmesh/build": 11794,
     "@margoengine/net": 1371,

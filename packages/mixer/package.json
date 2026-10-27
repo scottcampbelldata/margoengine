@@ -1,0 +1,52 @@
+{
+  "name": "@margoengine/mixer",
+  "version": "1.0.0",
+  "description": "Audio mixing and effects: buses with gain, mute, solo, sends and ducking; equaliser, filter, compressor, limiter, delay and reverb on Web Audio; positional emitters; deterministic offline rendering.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "audio",
+    "mixer",
+    "web-audio",
+    "reverb",
+    "equalizer",
+    "ducking"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/mixer"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js mixer",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:browser": "npm run build && node scripts/test-browser.js",
+    "prepack": "npm run build"
+  }
+}

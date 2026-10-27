@@ -787,6 +787,10 @@
       "types": "./dist/mesh-edit/modeling.d.ts",
       "import": "./dist/mesh-edit/modeling.js"
     },
+    "./mixer": {
+      "types": "./dist/mixer.d.ts",
+      "import": "./dist/mixer.js"
+    },
     "./navmesh": {
       "types": "./dist/navmesh.d.ts",
       "import": "./dist/navmesh.js"
@@ -1482,6 +1486,7 @@
     "@margoengine/math": "^1.0.0",
     "@margoengine/mcp": "^1.0.0",
     "@margoengine/mesh-edit": "^1.0.0",
+    "@margoengine/mixer": "^1.0.0",
     "@margoengine/navmesh": "^1.0.0",
     "@margoengine/net": "^1.0.0",
     "@margoengine/netcode": "^1.0.0",

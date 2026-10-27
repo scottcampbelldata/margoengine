@@ -100,6 +100,7 @@ const layers = {
     'viewcube',
     'selection',
     'audio',
+    'mixer',
   ],
   'Simulation and games': ['physics', 'navmesh', 'ecs', 'fsm', 'behavior', 'save', 'net', 'netcode', 'voxel-net'],
   'CAD and engineering': ['machinery', 'bvh', 'geometry', 'mesh-edit'],

@@ -709,3 +709,17 @@ CloudCompare and the like) was read.
 | Page checksum | CRC-32C: G. Castagnoli, S. Bräuer and M. Herrmann, "Optimization of cyclic redundancy-check codes with 24 and 32 parity bits", IEEE Trans. Communications 41(6), 1993 (reflected polynomial 0x82F63B78) |
 | XML subset | W3C XML 1.0 (elements, attributes, character references, CDATA, comments) |
 | Pose rotation | Rotation matrix of a unit quaternion (Hamilton's quaternion algebra) |
+
+## Audio mixing and effects: `@margoengine/mixer`
+
+Written clean room from the specifications below. No source code of audio engines, mixers or effect libraries (Tone.js,
+Howler, Web Audio API implementations in browsers, FMOD, Wwise, JUCE and the like) was read.
+
+| Area | Source |
+| --- | --- |
+| Web Audio graph, parameters and timing | W3C Web Audio API specification (AudioContext and OfflineAudioContext, AudioParam automation, GainNode, DelayNode, ConvolverNode, PannerNode, AnalyserNode, DynamicsCompressorNode) |
+| Biquad filters | The BiquadFilterNode section of the Web Audio API specification, which states the public RBJ "Audio EQ Cookbook" formulas |
+| Compressor curve | Giannoulis, Massberg and Reiss, "Digital Dynamic Range Compressor Design: A Tutorial and Analysis", JAES 60(6), 2012 (static soft-knee curve) |
+| Reverb impulse | Exponentially decaying white noise at an RT60 (the definition of reverberation time); mulberry32 pseudo-random generator (public domain) |
+| Loop delay | The Web Audio API specification's rules for cycles in the graph (a loop needs a DelayNode and costs one render quantum of 128 frames) |
+| Mute, solo and sends | Common mixing-desk behaviour (solo-in-place, solo-safe returns, pre and post fader sends); our own tree rule in `audibleBuses` |
