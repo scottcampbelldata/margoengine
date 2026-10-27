@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3434701,
+  "total": 3436170,
   "history": [
     {
       "date": "2026-10-24",
@@ -530,6 +530,12 @@
       "commit": "3d59ed88",
       "reason": "mesh-edit/modeling: flat-tile merging and import of glTF/OBJ triangles into editable polygons (item 24)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-27",
+      "commit": "30bea6fa",
+      "reason": "mesh-edit unwrap: packs free charts around pinned charts (obstacle-aware shelf packer, pinned-chart overlap checks); fixes overlapping UVs",
+      "grew": 1
     }
   ],
   "items": {
@@ -722,7 +728,7 @@
     "@margoengine/math/vector4": 925,
     "@margoengine/mcp": 8664,
     "@margoengine/mesh-edit": 30203,
-    "@margoengine/mesh-edit/modeling": 30584,
+    "@margoengine/mesh-edit/modeling": 32053,
     "@margoengine/navmesh": 7228,
     "@margoengine/navmesh/build": 11794,
     "@margoengine/net": 1371,

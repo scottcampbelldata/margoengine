@@ -1,4 +1,4 @@
-import type { MutableVec2, Vec2 } from '@margoengine/math';
+import { MargoError, type MutableVec2, type Vec2 } from '@margoengine/math';
 import { assertOptions } from './edit-support.js';
 import { assertPolygonMesh, collectPolygonEdges, newellNormal } from './polygon.js';
 import { triangulateLoop } from './polygon-split.js';
@@ -26,8 +26,10 @@ export interface ChartOptions {
 
 /** Options for {@link unwrapMesh}. */
 export interface UnwrapOptions extends ChartOptions {
-  /** Fixed corners. A chart with two or more pins is solved through them and stays where they put it; one pin only
-   * places its chart (unpacked, at the packed charts' texel density). Default none. */
+  /** Fixed corners. A chart with two or more pins is solved through them and stays exactly where they put it; one pin
+   * anchors its chart at the packed charts' texel density (rotated to its smallest box). Unpinned charts are packed
+   * around every pinned chart's bounding box with `padding`; pinned charts may touch (reported in `diagnostics`) but
+   * never overlap. Default none. */
   pins?: readonly UVPin[];
 }
 
@@ -35,7 +37,7 @@ export interface UnwrapOptions extends ChartOptions {
 export interface UVChart {
   /** Face IDs, in mesh order. */
   faces: string[];
-  /** Number of pins in the chart (pinned charts are not packed). */
+  /** Number of pins in the chart (pinned charts are not packed; the packed ones keep clear of them). */
   pins: number;
   /** Normalized top-left bounds: [uMin, vMin, uMax, vMax]. */
   bounds: [number, number, number, number];
@@ -54,7 +56,8 @@ export interface UnwrapResult {
   seams: string[];
   /** Texels per local unit of the packed charts at `resolution`. */
   texelsPerUnit: number;
-  /** Notes about charts that could not be laid out without folds (only possible with conflicting pins). */
+  /** Notes about pins: charts that fold under their pins, pinned charts closer than `padding` texels (or touching),
+   * and single-pin charts that lower the shared texel density to fit. Empty without pins. */
   diagnostics: string[];
 }
 
@@ -637,8 +640,24 @@ function bestRotation(uv: Float64Array): number {
   return best;
 }
 
-/** Shelf-pack rectangles (texels) with `padding` between them and at the border; null when they do not fit. */
-function shelfPack(sizes: [number, number][], order: number[], resolution: number, padding: number) {
+/** Normalized UV error of the pinned solve that still counts as on the unit square's border (far below a texel). */
+const ROUNDING = 1e-9;
+
+/** A box `[x0, y0, x1, y1]` in texels (top-left origin) that packed rectangles keep `padding` away from. */
+type Obstacle = readonly [number, number, number, number];
+
+/**
+ * Shelf-pack rectangles (texels) with `padding` between them, at the border and around each obstacle (the boxes of
+ * pinned charts); null when they do not fit. Positions stay on whole texels. Without obstacles this is the plain
+ * shelf packer, position for position.
+ */
+function shelfPack(
+  sizes: [number, number][],
+  order: number[],
+  resolution: number,
+  padding: number,
+  obstacles: readonly Obstacle[] = [],
+) {
   const at: [number, number][] = new Array(sizes.length);
   let x = 0,
     y = 0,
@@ -646,16 +665,115 @@ function shelfPack(sizes: [number, number][], order: number[], resolution: numbe
   for (const i of order) {
     const [w, h] = sizes[i];
     if (w + 2 * padding > resolution) return null;
-    if (x + w + 2 * padding > resolution) {
-      y += shelf;
-      x = 0;
-      shelf = 0;
+    for (;;) {
+      if (x + w + 2 * padding > resolution) {
+        if (shelf) y += shelf;
+        else {
+          // An empty row the obstacles block: restart it below the highest obstacle bottom that blocks it.
+          let below = Infinity;
+          for (const o of obstacles)
+            if (o[3] > y && o[1] < y + h + 2 * padding) below = Math.min(below, Math.ceil(o[3]));
+          if (below === Infinity) return null;
+          y = below;
+        }
+        x = 0;
+        shelf = 0;
+      }
+      if (y + h + 2 * padding > resolution) return null;
+      let hit: Obstacle | undefined;
+      for (const o of obstacles)
+        if (x < o[2] && o[0] < x + w + 2 * padding && y < o[3] && o[1] < y + h + 2 * padding) {
+          hit = o;
+          break;
+        }
+      if (!hit) break;
+      x = Math.ceil(hit[2]);
     }
     at[i] = [x + padding, y + padding];
     x += w + padding;
     shelf = Math.max(shelf, h + padding);
   }
   return y + shelf + padding <= resolution ? at : null;
+}
+
+const cross2 = (a: Float64Array, i: number, b: Float64Array, j: number, k: number, c: Float64Array) =>
+  (b[j] - a[i]) * (c[k + 1] - a[i + 1]) - (b[j + 1] - a[i + 1]) * (c[k] - a[i]);
+
+/** Distance from point `p[i]` to segment `a[j]..a[k]` (flat u, v arrays). */
+function pointSegment(p: Float64Array, i: number, a: Float64Array, j: number, k: number) {
+  const dx = a[k] - a[j],
+    dy = a[k + 1] - a[j + 1],
+    len = dx * dx + dy * dy,
+    t = len > 0 ? Math.max(0, Math.min(1, ((p[i] - a[j]) * dx + (p[i + 1] - a[j + 1]) * dy) / len)) : 0;
+  return Math.hypot(p[i] - a[j] - t * dx, p[i + 1] - a[j + 1] - t * dy);
+}
+
+/** Crossing-number point-in-polygon test for `p[i]`; false on the boundary. */
+function strictlyInside(p: Float64Array, i: number, poly: Float64Array) {
+  let inside = false;
+  for (let a = 0, b = poly.length - 2; a < poly.length; b = a, a += 2) {
+    if (pointSegment(p, i, poly, b, a) === 0) return false;
+    if (
+      poly[b + 1] > p[i + 1] !== poly[a + 1] > p[i + 1] &&
+      p[i] < poly[b] + ((p[i + 1] - poly[b + 1]) * (poly[a] - poly[b])) / (poly[a + 1] - poly[b + 1])
+    )
+      inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Two face polygons (flat u, v loops): -1 when their interiors overlap (edges cross, a corner or an inner point lies
+ * strictly inside the other), else the smallest distance between them (0 when they only touch).
+ */
+function faceGap(a: Float64Array, b: Float64Array): number {
+  const na = a.length,
+    nb = b.length;
+  for (let i = 0; i < na; i += 2)
+    for (let j = 0; j < nb; j += 2) {
+      const i2 = (i + 2) % na,
+        j2 = (j + 2) % nb;
+      if (
+        cross2(a, i, a, i2, j, b) * cross2(a, i, a, i2, j2, b) < 0 &&
+        cross2(b, j, b, j2, i, a) * cross2(b, j, b, j2, i2, a) < 0
+      )
+        return -1;
+    }
+  for (let i = 0; i < na; i += 2) if (strictlyInside(a, i, b)) return -1;
+  for (let j = 0; j < nb; j += 2) if (strictlyInside(b, j, a)) return -1;
+  const mid = (p: Float64Array) => Float64Array.of((p[0] + p[2] + p[4]) / 3, (p[1] + p[3] + p[5]) / 3);
+  if (strictlyInside(mid(a), 0, b) || strictlyInside(mid(b), 0, a)) return -1;
+  let best = Infinity;
+  for (let i = 0; i < na; i += 2)
+    for (let j = 0; j < nb; j += 2) {
+      best = Math.min(best, pointSegment(a, i, b, j, (j + 2) % nb), pointSegment(b, j, a, i, (i + 2) % na));
+    }
+  return best;
+}
+
+/** A placed pinned chart: its face loops and normalized box. */
+interface PinnedShape {
+  loops: Float64Array[];
+  box: [number, number, number, number];
+}
+
+/** Gap between two placed charts as {@link faceGap}, checked only where their boxes come within `reach`. */
+function chartGap(a: PinnedShape, b: PinnedShape, reach: number): number {
+  if (
+    a.box[2] + reach < b.box[0] ||
+    b.box[2] + reach < a.box[0] ||
+    a.box[3] + reach < b.box[1] ||
+    b.box[3] + reach < a.box[1]
+  )
+    return Infinity;
+  let best = Infinity;
+  for (const p of a.loops)
+    for (const q of b.loops) {
+      const g = faceGap(p, q);
+      if (g < 0) return g;
+      best = Math.min(best, g);
+    }
+  return best;
 }
 
 /** Scale, rotate, pack and write charts; returns corner UVs per face and chart summaries. */
@@ -718,8 +836,99 @@ function place(
     }
     return [u0, v0, u1, v1];
   });
+  const fixed: number[] = [],
+    single: number[] = [],
+    diagnostics: string[] = [],
+    near = padding / resolution,
+    outside = (out: Float64Array) => out.some((x) => !(x >= 0 && x <= 1)),
+    faceId = (k: number) => F[charts[k].faces[0]].id;
+  charts.forEach((chart, k) => {
+    if (chart.pins >= 2) fixed.push(k);
+    else if (chart.pins === 1) single.push(k);
+  });
+  // Normalized top-left UVs of a pinned chart: two or more pins put it where they say; one pin anchors it at density s.
+  const placeFixed = (k: number) => {
+    const uv = charts[k].uv,
+      out = new Float64Array(uv.length);
+    for (let i = 0; i < uv.length; i += 2) [out[i], out[i + 1]] = [uv[i], -uv[i + 1]];
+    // The solve puts the corners of an edge pinned along the border a rounding error past it (1e-16, not 1e-9).
+    for (let i = 0; i < out.length; i++)
+      out[i] = out[i] < 0 && out[i] > -ROUNDING ? 0 : out[i] > 1 && out[i] < 1 + ROUNDING ? 1 : out[i];
+    return out;
+  };
+  const anchors = new Map(
+    single.map((k) => {
+      const anchor = charts[k].vertexOf.findIndex((v) => pins.has(v));
+      return [k, { anchor, target: pins.get(charts[k].vertexOf[anchor])! }];
+    }),
+  );
+  const placeSingle = (k: number, s: number) => {
+    const uv = charts[k].uv,
+      { anchor, target } = anchors.get(k)!,
+      out = new Float64Array(uv.length);
+    for (let i = 0; i < uv.length; i += 2) {
+      out[i] = target[0] + ((uv[i] - uv[2 * anchor]) * s) / resolution;
+      out[i + 1] = target[1] - ((uv[i + 1] - uv[2 * anchor + 1]) * s) / resolution;
+    }
+    return out;
+  };
+  const shape = (k: number, out: Float64Array): PinnedShape => {
+    const box: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < out.length; i += 2) {
+      box[0] = Math.min(box[0], out[i]);
+      box[1] = Math.min(box[1], out[i + 1]);
+      box[2] = Math.max(box[2], out[i]);
+      box[3] = Math.max(box[3], out[i + 1]);
+    }
+    return {
+      loops: charts[k].local.map((loop) => Float64Array.from(loop.flatMap((l) => [out[2 * l], out[2 * l + 1]]))),
+      box,
+    };
+  };
+  const texels = (shape: PinnedShape): Obstacle => [
+    shape.box[0] * resolution,
+    shape.box[1] * resolution,
+    shape.box[2] * resolution,
+    shape.box[3] * resolution,
+  ];
+  // Charts held by two or more pins stay exactly where the pins put them: inside the unit square, over no other.
+  const fixedShapes = fixed.map((k) => {
+    const out = placeFixed(k);
+    if (outside(out)) throw new RangeError(`${label} pins put a chart outside the unit square; move the pins inward.`);
+    return shape(k, out);
+  });
+  const note = (a: number, b: number) =>
+    diagnostics.push(
+      `${label} pinned charts with faces ${faceId(a)} and ${faceId(b)} are closer than ${padding} texels; move their pins apart.`,
+    );
+  for (let i = 0; i < fixed.length; i++)
+    for (let j = i + 1; j < fixed.length; j++) {
+      const gap = chartGap(fixedShapes[i], fixedShapes[j], near);
+      if (gap < 0)
+        throw new MargoError(
+          'failed',
+          `${label} pinned charts with faces ${faceId(fixed[i])} and ${faceId(fixed[j])} overlap; move their pins apart.`,
+        );
+      if (gap < near) note(fixed[i], fixed[j]);
+    }
+  // Single-pin charts at density s: inside the unit square and over no other pinned chart, or why not.
+  const singleShapes = (s: number): PinnedShape[] | 'outside' | 'overlap' => {
+    const shapes: PinnedShape[] = [];
+    for (const k of single) {
+      const out = placeSingle(k, s);
+      if (outside(out)) return 'outside';
+      const mine = shape(k, out);
+      for (const other of fixedShapes) if (chartGap(mine, other, 0) < 0) return 'overlap';
+      for (const other of shapes) if (chartGap(mine, other, 0) < 0) return 'overlap';
+      shapes.push(mine);
+    }
+    return shapes;
+  };
+  // Free charts are packed around every pinned chart's box; without free charts, single-pin charts set the density.
   let packed = charts.map((_, k) => k).filter((k) => charts[k].pins === 0);
-  if (!packed.length) packed = charts.map((_, k) => k).filter((k) => charts[k].pins === 1);
+  const free = packed.length > 0,
+    fixedObstacles = free ? fixedShapes.map(texels) : [];
+  if (!free) packed = single;
   const order = [...packed].sort(
       (a, b) =>
         boxes[b][3] - boxes[b][1] - (boxes[a][3] - boxes[a][1]) ||
@@ -733,7 +942,13 @@ function place(
         Math.max(1, Math.ceil((boxes[k][2] - boxes[k][0]) * s)),
         Math.max(1, Math.ceil((boxes[k][3] - boxes[k][1]) * s)),
       ];
-    return shelfPack(sizes, order, resolution, padding);
+    let obstacles = fixedObstacles;
+    if (single.length) {
+      const shapes = singleShapes(s);
+      if (typeof shapes === 'string') return null;
+      if (free) obstacles = obstacles.concat(shapes.map(texels));
+    }
+    return shelfPack(sizes, order, resolution, padding, obstacles);
   };
   let largest = 0;
   for (const k of packed) largest = Math.max(largest, boxes[k][2] - boxes[k][0], boxes[k][3] - boxes[k][1]);
@@ -741,47 +956,82 @@ function place(
     hi = packed.length ? (resolution - 2 * padding) / largest : 0,
     at = packed.length ? attempt(hi) : [];
   if (!at) {
-    if (!attempt(1e-12 / (largest || 1)))
-      throw new RangeError(
-        `${label} has ${packed.length} charts, too many for ${resolution} texels with ${padding} padding; raise resolution, lower padding or angle-cut less.`,
+    const least = 1e-12 / (largest || 1);
+    if (!attempt(least)) {
+      if (!shelfPack(sizes, order, resolution, padding))
+        throw new RangeError(
+          `${label} has ${packed.length} charts, too many for ${resolution} texels with ${padding} padding; raise resolution, lower padding or angle-cut less.`,
+        );
+      const shapes = single.length ? singleShapes(least) : [];
+      if (shapes === 'outside')
+        throw new RangeError(`${label} pins put a chart outside the unit square; move the pins inward.`);
+      if (shapes === 'overlap')
+        throw new MargoError('failed', `${label} pinned charts overlap at any density; move their pins apart.`);
+      throw new MargoError(
+        'failed',
+        `${label} pinned charts leave no room for the ${packed.length} other charts; move the pins closer together or toward a side, or raise resolution.`,
       );
-    lo = 1e-12 / (largest || 1);
+    }
+    lo = least;
     for (let i = 0; i < 48; i++) {
       const mid = (lo + hi) / 2;
       if (attempt(mid)) lo = mid;
       else hi = mid;
     }
     at = attempt(lo)!;
-    // The largest density that keeps every chart inside the texels it was given.
+    // The largest density that keeps every chart inside the texels it was given (and single-pin charts clear).
     hi = Infinity;
     for (const k of packed)
       hi = Math.min(hi, sizes[k][0] / (boxes[k][2] - boxes[k][0]), sizes[k][1] / (boxes[k][3] - boxes[k][1]));
+    if (single.length) {
+      const shapes = singleShapes(hi),
+        clear =
+          typeof shapes !== 'string' &&
+          (!free ||
+            shapes.every((shape) => {
+              const o = texels(shape);
+              return packed.every((k) => {
+                const [x, y] = at![k];
+                return !(
+                  x - padding < o[2] &&
+                  o[0] < x + sizes[k][0] + padding &&
+                  y - padding < o[3] &&
+                  o[1] < y + sizes[k][1] + padding
+                );
+              });
+            }));
+      if (!clear) hi = lo;
+    }
   }
   const s = hi,
     corner: MutableVec2[][] = F.map((face) => face.vertices.map(() => [0, 0] as MutableVec2)),
     summaries: UVChart[] = [];
-  const packedSet = new Set(charts[packed[0]]?.pins === 0 ? packed : []);
+  // Pinned charts that touch or sit closer than padding are allowed, and reported.
+  const placedSingles = single.length ? singleShapes(s) : [];
+  if (typeof placedSingles !== 'string')
+    placedSingles.forEach((mine, i) => {
+      fixedShapes.forEach((other, j) => chartGap(mine, other, near) < near && note(fixed[j], single[i]));
+      for (let j = 0; j < i; j++) if (chartGap(mine, placedSingles[j], near) < near) note(single[j], single[i]);
+    });
+  // A single-pin chart by the border or another pinned chart lowers the one density all charts share: say so.
+  if (single.length && s > 0 && typeof singleShapes(s * (1 + 1e-6)) === 'string')
+    diagnostics.push(
+      `${label} single-pin charts limit the texel density to ${s.toPrecision(4)} texels per unit; move their pins away from the border and other pinned charts.`,
+    );
+  const packedSet = new Set(free ? packed : []);
   charts.forEach((chart, k) => {
     const uv = chart.uv,
-      out = new Float64Array(uv.length),
       [u0, , , v1] = boxes[k];
+    let out: Float64Array;
     if (packedSet.has(k)) {
       const [x, y] = at![k];
+      out = new Float64Array(uv.length);
       for (let i = 0; i < uv.length; i += 2) {
         out[i] = (x + (uv[i] - u0) * s) / resolution;
         out[i + 1] = (y + (v1 - uv[i + 1]) * s) / resolution;
       }
-    } else if (chart.pins === 1) {
-      const anchor = chart.vertexOf.findIndex((v) => pins.has(v)),
-        target = pins.get(chart.vertexOf[anchor])!;
-      for (let i = 0; i < uv.length; i += 2) {
-        out[i] = target[0] + ((uv[i] - uv[2 * anchor]) * s) / resolution;
-        out[i + 1] = target[1] - ((uv[i + 1] - uv[2 * anchor + 1]) * s) / resolution;
-      }
-    } else for (let i = 0; i < uv.length; i += 2) [out[i], out[i + 1]] = [uv[i], -uv[i + 1]];
-    for (let i = 0; i < out.length; i++)
-      if (!(out[i] >= 0 && out[i] <= 1))
-        throw new RangeError(`${label} pins put a chart outside the unit square; move the pins inward.`);
+    } else out = chart.pins === 1 ? placeSingle(k, s) : placeFixed(k);
+    if (outside(out)) throw new RangeError(`${label} pins put a chart outside the unit square; move the pins inward.`);
     let small = Infinity,
       large = 0,
       b0 = Infinity,
@@ -819,7 +1069,7 @@ function place(
       stretch: small > 0 && large > 0 ? large / small : 1,
     });
   });
-  return { corner, summaries, texelsPerUnit: s };
+  return { corner, summaries, texelsPerUnit: s, diagnostics };
 }
 
 /** Edges whose two corner UV pairs differ: the seams of a layout. */
@@ -852,9 +1102,10 @@ function seamList(mesh: PolygonMesh, corner: MutableVec2[][]): string[] {
  * flatten each chart with least squares conformal maps (Lévy et al., 2002), split any chart that is not a disk or
  * that would fold or overlap itself until none does, then rotate each to its smallest box and shelf-pack them in the
  * unit square with `padding` texels around each at `resolution`, at one texel density for all. Pinned charts keep the
- * pins' placement. Positions, faces and IDs are unchanged; input UVs may be missing (draft) and are ignored.
+ * pins' placement and the packed charts are placed around them. Positions, faces and IDs are unchanged; input UVs may be missing (draft) and are ignored.
  * @throws TypeError for bad structure, options, seams or pins; RangeError for a bad angle, resolution or padding,
- * pins outside the unit square or too many charts for the resolution; the signal's reason when aborted.
+ * pins that put a chart outside the unit square or too many charts for the resolution; MargoError `failed` when
+ * pinned charts overlap or leave no room for the other charts; the signal's reason when aborted.
  */
 export function unwrapMesh(mesh: PolygonMesh, options: UnwrapOptions = {}): UnwrapResult {
   const resolution = options?.resolution ?? 1024,
@@ -879,13 +1130,24 @@ export function unwrapMesh(mesh: PolygonMesh, options: UnwrapOptions = {}): Unwr
   }
   options.signal?.throwIfAborted();
   const { charts, diagnostics } = layout(mesh, angle, options.seams ?? [], pins, 'Unwrap', options.signal),
-    { corner, summaries, texelsPerUnit } = place(mesh, charts, pins, resolution, padding, 'Unwrap'),
+    {
+      corner,
+      summaries,
+      texelsPerUnit,
+      diagnostics: packing,
+    } = place(mesh, charts, pins, resolution, padding, 'Unwrap'),
     output: PolygonMesh = {
       vertices: mesh.vertices.map((p) => [p[0], p[1], p[2]]),
       faces: mesh.faces.map((face, f) => ({ id: face.id, vertices: [...face.vertices], uv: corner[f] })),
     };
   assertPolygonMesh(output);
-  return { mesh: output, charts: summaries, seams: seamList(mesh, corner), texelsPerUnit, diagnostics };
+  return {
+    mesh: output,
+    charts: summaries,
+    seams: seamList(mesh, corner),
+    texelsPerUnit,
+    diagnostics: [...diagnostics, ...packing],
+  };
 }
 
 /**

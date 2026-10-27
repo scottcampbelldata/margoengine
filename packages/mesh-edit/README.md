@@ -244,16 +244,32 @@ console.log(unwrapped.charts.length, unwrapped.seams.length, lightmap.texelsPerU
   their smallest bounding box and shelf-packed into the unit square with `padding` texels around each at
   `resolution`. Input UVs may be missing (draft UVs); positions, faces, IDs and winding are unchanged.
 - Pins (`{vertex, uv}`, normalized top-left) fix every corner of that vertex. A chart with two or more pins is solved
-  through them and stays where they put it; one pin places its chart at the packed density. Pinned charts are not
-  packed, so keep them clear of the packed area yourself; a pin set that would fold its chart is reported in
-  `diagnostics`, and one that pushes a chart outside the unit square throws.
+  through them and stays exactly where they put it (no rotation or rescale); one pin anchors its chart at the packed
+  density, rotated to its smallest box. The other charts are packed around the bounding box of every pinned chart,
+  `padding` texels clear of it, so no two charts ever overlap. A pinned vertex on a seam pins each chart that holds it.
+- Pin errors are reported, never laid out as overlaps: pinned charts that overlap each other, or that leave the other
+  charts no room at any density, throw a `MargoError` with code `failed`; two or more pins that put a chart outside the
+  unit square throw a `RangeError`. Pinned charts that touch or sit closer than `padding` are allowed and listed in
+  `diagnostics`, as are pin sets that fold their chart. A single-pin chart near the border or another pinned chart
+  lowers the one texel density all charts share until it fits (listed in `diagnostics`); when it cannot fit at any
+  density (a pin on the border with the chart past it) it throws a `RangeError`.
 - The result has `charts` (faces, pins, bounds, surface area and `stretch`, the largest over smallest triangle scale),
   `seams` (edges whose output UVs are discontinuous) and `texelsPerUnit`.
 - `meshLightmapUVs(mesh, {seams, angle, resolution = 256, padding = 2, signal})` makes the same charts without pins as
   a separate UV set (`uv[face][corner]`, for glTF `TEXCOORD_1`): one texel density, each chart starting on a texel
   corner with `padding` empty texels to its neighbors and the border, so bilinear filtering never bleeds between
-  charts. Too many charts for the resolution throws a RangeError naming the fix. Baking light into it is the
-  `@margoengine/lightmap` package's job (quads today).
+  charts. Too many charts for the resolution throws a RangeError naming the fix.
+
+### Limits: unwrap and lightmap UVs
+
+- Charts are packed by their bounding boxes on shelves, not by their outlines, so an L-shaped or diagonal chart wastes
+  the empty corners of its box. Pinned charts are obstacles by their bounding boxes too.
+- Pins are checked against each other by their face outlines (overlap throws, touching is reported), but the packed
+  charts keep `padding` from a pinned chart's whole box.
+- One texel density for every unpinned and single-pin chart; there is no per-chart weighting.
+- `meshLightmapUVs` takes no pins. Its UV set is ready for a general-mesh baker, but `@margoengine/lightmap` does not
+  read it today: `bakeLightmap` bakes quads only (12 floats per quad in `positions`, each quad a parallelogram) and
+  makes its own UVs, one chart per quad. Triangles, n-gons and these charts are not baked yet.
 
 ## Import to editable meshes and flat-tile merging
 

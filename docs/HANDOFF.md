@@ -1,6 +1,20 @@
 # Margo Engine handoff
 
-Last updated 2026-10-26. Read this first when starting a new session. Update it whenever work lands.
+Last updated 2026-10-27. Read this first when starting a new session. Update it whenever work lands.
+
+## Landed 2026-10-27: unwrap packs around pinned charts (item 24 bug fix)
+
+- Bug: `unwrapMesh` packed only unpinned charts, from the top left, and left pinned charts where the pins put them,
+  so packed charts could sit on top of pinned ones (overlapping UVs: texture bleeding, lightmap artifacts). Now every
+  pinned chart's bounding box is an obstacle for the shelf packer (with `padding`); single-pin charts are checked at
+  each density tried. Pinned charts that overlap each other, or leave no room, throw `MargoError` `failed`; touching
+  or under-padding pinned charts and single pins that lower the density are listed in `diagnostics`. A chart pinned
+  along the border no longer throws for a 1e-16 solver rounding past it. No-pin and single-chart layouts are
+  byte-identical (golden hashes); `tests/unwrap-pins.test.js` has the arrangements and a seeded fuzz.
+- Open, after launch: rounded (multi-segment) bevels in `bevelMeshEdges`. Intended approach: replace each beveled
+  edge's single strip with `segments` strips whose new edges lie on a circular arc between the two offset lines
+  (profile sampled in the plane perpendicular to the edge), and fill each corner where three or more beveled edges
+  meet with a patch subdivided from the same arc samples so neighbouring strips share vertices without T-junctions.
 
 ## Landed 2026-10-27: mesh-edit modeling depth (item 24), part 2
 

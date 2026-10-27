@@ -38,6 +38,11 @@ atlas.textures.lightmap; // RGBA8, irradiance / atlas.lightmapScale
 - **Budgets.** Quads (32,768), texels (262,144 by default, up to 1,048,576), rays (16,777,216, up to 67,108,864), an
   estimate of bytes (192 MiB, up to 256 MiB) and the atlas side (2,048) are checked before any texture is allocated.
   Inputs are copied before the first await; `signal` and `onProgress` run every 256 texels.
+- **Quads only.** `bakeLightmap` accepts quads and nothing else: `positions` is a `Float32Array` of 12 floats per quad,
+  each a parallelogram with its corners counterclockwise (anything else throws a `RangeError` naming the fix), and the
+  atlas UVs are its own, one chart per quad. It does not read triangles, n-gons or a mesh's existing UVs, including the
+  lightmap UVs `@margoengine/mesh-edit/modeling`'s `meshLightmapUVs` makes; those are ready for a future general-mesh
+  baker but cannot be baked here today.
 - **Asset record.** `lightingAsset(lightmap, terms)` returns a small record (scales, size, radiometry, baked terms) to
   store next to the textures, for example in glTF extras.
 
