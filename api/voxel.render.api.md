@@ -64,12 +64,12 @@ export class VoxelRenderer implements EnginePlugin {
         pass: GPURenderPassEncoder;
         view: ArrayLike<number>;
         depthCompare: GPUCompareFunction;
-    }): void;
+    }): boolean;
     get shadowVersion(): number;
     get lightmap(): VoxelLightmap | undefined;
     set lightmap(lightmap: VoxelLightmap | undefined);
     addLighting(effect: VoxelRendererEffect): () => void;
-    drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): void;
+    drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): boolean;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
@@ -106,6 +106,7 @@ export interface VoxelRendererStats {
     readonly triangles: number;
     readonly bytes: number;
     readonly draws: number;
+    readonly compiling: boolean;
 }
 
 export interface VoxelShadowContext {

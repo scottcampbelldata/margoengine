@@ -2530,6 +2530,25 @@ does not own. Each entry says exactly what is needed to close it.
   WebGPU XR binding (`XRGPUBinding`), or an AR headset with the same; then a reticle placed on a real floor and a real
   table (viewer source) and by screen tap (transient source), one placement anchored, and the result recorded here.
 
+### Intel Arc 140V: four GPU-suite failures fixed on this PC, not yet rerun on Intel
+
+- **What:** a run of every GPU suite on an Intel Core Ultra 7 258V with Arc 140V graphics (driver 32.0.101.8860, Edge
+  155, Windows 11 build 26300, main at d000e4b6, 2026-10-26) failed four that pass on the RTX A6000:
+  1. compute `fft` inverse round trip, n = 1024: 1.43e-5 off (tolerance 1e-5). Cause: twiddles from GPU `cos`/`sin`
+     (WGSL allows 2^-11 of error). Fixed: twiddles from a host table rounded once from double precision; on the A6000
+     the GPU now matches the CPU backend bit for bit, and a new check bounds the Stockham passes at 1.5 sqrt(log2 n) u.
+  2. voxel bevel check, "gbuffer follows the chamfer silhouette"; 3. voxel-pathtracer, "combinedHDR" 226 sRGB levels
+     off; 4. "Next client failed to render mint geometry". Cause of all three: the check waited a fixed time or number
+     of frames for pipelines that compile in the background, and the iGPU compiles more slowly. With every pipeline
+     made 300-500 ms slower (`--pipeline-delay`, scripts/browser.js) the A6000 fails the same three the same way
+     (226 / 0 for 3). Fixed: the checks wait for readiness (`VoxelRenderer.draw`/`drawShadow` return whether they drew,
+     `stats.compiling`; the path tracer's `stats.converged` waits until the frame shows the traced image; the Next check
+     waits for the cube); the `test:gpu:slow-compile` suites keep it so.
+- **Not verified:** that the four now pass on the Intel GPU, and the Stockham bound there (it allows a fused
+  multiply-add in every complex product).
+- **Needed to close:** the steps in `private/handoffs/intel-recheck.md` on the Intel PC: the four suites, their
+  slow-compile twins and the 4x repeat, zipped; then this entry removed or turned into the cause found.
+
 ## Open defects
 
 ### 4x MSAA blending is not repeatable on the RTX A6000 under CPU load
@@ -2560,6 +2579,9 @@ does not own. Each entry says exactly what is needed to close it.
   order step stays a pixel comparison with that tolerance only. The check's output prints the exact count next to the
   tolerant one, and `--repeat` reports both (it still fails on any exact difference: it is the repro).
 - **Report:** a factual report with the repro for NVIDIA is drafted in `private/handoffs/nvidia-report.md` (not sent).
+- **Other GPU:** on an Intel Arc 140V (driver 32.0.101.8860, main at d000e4b6, reported by the tester 2026-10-27) the
+  same `--repeat=450` drew all 450 frames exactly alike (0 differ, max 0 of 255), which points at the NVIDIA driver;
+  `private/handoffs/intel-recheck.md` reruns it on current main.
 - **Needed to close:** the same repro on another GPU (AMD, Intel, another NVIDIA driver) to confirm it is this driver,
   and the report sent to NVIDIA. The entry stays until a driver or GPU that repeats 4x blending exactly is found, or the
   vendor explains the behaviour; then the tolerance can go.
