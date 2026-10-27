@@ -730,7 +730,10 @@ export class Animation implements EnginePlugin {
           writer = queue.writeBuffer,
           reusable = reusableWriter(queue, writer);
         let changed = !reusable || !r.bonesUploaded || r.bonesQueue !== queue;
-        for (let i = 0; i < r.paletteBits.length; i++) if (r.paletteBits[i] !== r.uploadedPalette[i]) changed = true;
+        // Stop at the first changed word: a playing clip changes the palette every frame, and comparing all of it
+        // anyway was most of p-crossfade's upload time (100 RobotExpressive palettes, 1.2 ms a frame).
+        for (let i = 0; !changed && i < r.paletteBits.length; i++)
+          if (r.paletteBits[i] !== r.uploadedPalette[i]) changed = true;
         if (changed) {
           let uploaded = false;
           r.bonesUploaded = false;
@@ -776,7 +779,7 @@ export class Animation implements EnginePlugin {
           }
         } else {
           let changed = !r.weightsUploaded || r.weightsQueue !== queue;
-          for (let i = 0; i < values.length; i++)
+          for (let i = 0; !changed && i < values.length; i++)
             // Finite Float32 values differ in bits exactly when SameValue differs.
             if (!Object.is(values[i], r.uploadedWeights[i])) changed = true;
           if (changed) {
