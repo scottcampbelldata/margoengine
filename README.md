@@ -51,8 +51,9 @@ npm init -y
 npm install ../margoengine/test-results/*.tgz vite
 ```
 
-On the machine used to write this page, packing took about a minute after `npm ci` and the install took 8 seconds. Then
-follow the Quickstart steps 2 to 4 below in `my-scene`.
+On the machine used to write this page, `npm ci` took 15 seconds, packing 35 and the install 8; from the first command
+to a rendered, verified page took 76 seconds (`npm run check:quickstart` repeats the whole run and fails above 300).
+Then follow the Quickstart steps 2 to 4 below in `my-scene`.
 
 **After 1.0.0 is published,** `npm install margoengine vite` in a new folder replaces Route 2 and nothing else changes.
 
@@ -164,6 +165,13 @@ window.addEventListener('pagehide', () => stage.dispose(), { once: true });
 ```
 
 4. Run `npx vite` and open the address it prints. Drag to orbit, scroll to zoom, right-drag to pan, click the crate.
+
+If the page is blank or shows an error:
+
+- Vite says `Failed to resolve import "margoengine"`: step 1 did not run in this folder. Run the `npm install` line from
+  Route 2 again in the folder that holds `index.html` (and use `npx vite` there, not in the clone).
+- The status line says `This browser has no WebGPU` or `Margo could not start`: use desktop Chrome or Edge, or see
+  [Browser support](#browser-support).
 
 The scene is about 60 lines. Three things to know about it:
 
