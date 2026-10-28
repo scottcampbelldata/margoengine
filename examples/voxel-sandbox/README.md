@@ -168,7 +168,9 @@ Every tab that opens the sandbox with `?server=` joins one shared world on
 [`@margoengine/voxel-net`](../../packages/voxel-net/README.md). The server generates the same terrain and plants as
 single player (`src/plants.ts` runs in both), holds the world and checks every edit; the page draws what it is sent,
 moves its own player at once and is corrected if the server disagrees, and shows the other players as coloured boxes
-(`src/multiplayer.ts`). Flying is allowed. Nothing is saved: the world lasts as long as the server process, and the
+(`src/multiplayer.ts`). Flying is allowed. The server lets on only pages from the dev server (`http://127.0.0.1:5173`
+and `http://localhost:5173`); for a page served elsewhere pass its origin, `--origins=https://my.site`, or `--origins=*`
+for any page. Nothing is saved: the world lasts as long as the server process, and the
 render distance (`rd`, 2-8 on the server) is fixed when joining.
 
 ## Tests

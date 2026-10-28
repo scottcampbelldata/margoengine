@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### voxel-net server limits (breaking default)
+
+- **Breaking:** `VoxelServer` `origins` (and `acceptWebSocket`) now default to the server's own host: a browser page
+  must come from `http://` or `https://` plus the request's `Host`. Pages on another origin get HTTP 403 with a message
+  naming the option; pass `origins: ['https://your.page']`, or `origins: '*'` for the old behaviour. Clients that send
+  no Origin (Node, bots) still connect. The sandbox's `server.mjs` allows its dev server and takes `--origins`.
+- `maxPending` (64) and `maxPerAddress` (8) cap connections that have not joined, checked before the 101 answer (HTTP
+  503 and 429); `helloTimeout` is now 3,000 ms (was 10 s).
+- `authenticate(req, hello)` checks the upgrade request and the hello; a string becomes `player.identity`;
+  `authTimeout` (5,000 ms) bounds each call.
+- `maxEditedChunks` (65,536) bounds edited chunks in memory; past it the least recently edited ones go to a
+  `VoxelEditStore` (`save`, `load`), which `close()` also fills. `connectWebSocket` takes `headers`, and a refused
+  upgrade's error now holds the server's reason.
+
 ### Added
 
 - `@margoengine/shader/editor`: `NodeEditor`, a visual node editor for the portable surface graph (palette, wires, typed

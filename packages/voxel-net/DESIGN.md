@@ -60,7 +60,10 @@ Depends on `@margoengine/voxel` and `@margoengine/net`; no other runtime depende
 
 ## Transport: hand-written WebSocket (RFC 6455)
 
-- `node:http` `upgrade` event; accept key = base64(SHA-1(key + RFC GUID)) from `node:crypto`; optional allowed origins.
+- `node:http` `upgrade` event; accept key = base64(SHA-1(key + RFC GUID)) from `node:crypto`. The Origin must be the
+  server's own host unless `origins` says otherwise; connections that have not joined are capped (`maxPending`,
+  `maxPerAddress`) before the 101 answer, so a flood of sockets costs no player objects or timers (README,
+  "Connections, login and saved edits").
 - Binary messages only. Client frames must be masked; fragmentation, ping/pong and close are handled; text frames close
   with 1003, protocol errors with 1002, messages over the limit (default 4 KiB from clients) with 1009.
 - Backpressure: chunk sends stop while a socket holds more than 256 KiB unsent; a client more than 8 MiB behind is

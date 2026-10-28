@@ -277,21 +277,53 @@ export class WebSocketConnection {
 
 const ignore = (): void => {};
 
-const bad = (socket: Duplex, status: string): undefined => {
-  socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+const bad = (socket: Duplex, status: string, message = ''): undefined => {
+  socket.end(
+    `HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Type: text/plain; charset=utf-8\r\n` +
+      `Content-Length: ${Buffer.byteLength(message)}\r\n\r\n${message}`,
+  );
   return undefined;
 };
 
+/** Options of {@link acceptWebSocket}. */
+export interface AcceptWebSocketOptions extends WebSocketOptions {
+  /**
+   * Which pages may connect, by their `Origin` header. Default: only pages served from this server's own host (the
+   * Origin must be `http://` or `https://` plus the request's `Host` header). `'*'` allows any origin; a list allows
+   * exactly those origins (and then a request without an Origin is refused too). Without a list, a request that sends
+   * no Origin (Node, bots, native clients; browsers always send one) is accepted.
+   */
+  origins?: readonly string[] | '*';
+  /**
+   * Called after the request checks pass and before the 101 answer, so a refusal costs no connection object: return
+   * `[status, message]` (for example `['429 Too Many Requests', 'too many connections']`) to answer with that HTTP
+   * status and plain-text message instead, or undefined to accept. Default: accept.
+   */
+  admit?: (req: IncomingMessage) => readonly [status: string, message: string] | undefined;
+}
+
+/** Whether `req` comes from an origin that `origins` allows (see {@link AcceptWebSocketOptions.origins}). */
+export function originAllowed(req: IncomingMessage, origins?: readonly string[] | '*'): boolean {
+  const origin = req.headers.origin;
+  if (origins === '*') return true;
+  if (origins) return origins.includes(String(origin ?? ''));
+  if (origin === undefined) return true;
+  const host = String(req.headers.host ?? '').toLowerCase(),
+    from = origin.toLowerCase();
+  return host !== '' && (from === `http://${host}` || from === `https://${host}`);
+}
+
 /**
  * Answers a `node:http` server's `'upgrade'` event: checks the request (GET, `Upgrade: websocket`, version 13, a
- * 16-byte key, an allowed `Origin` when `origins` is given), writes the 101 response and returns the connection.
- * A bad request gets 400 (403 for an origin not allowed) and returns undefined.
+ * 16-byte key, an allowed `Origin`), asks `admit`, writes the 101 response and returns the connection. A bad request
+ * gets 400, an origin not allowed 403 with a message that names the `origins` option, a refusal by `admit` its own
+ * status; each returns undefined.
  */
 export function acceptWebSocket(
   req: IncomingMessage,
   socket: Duplex,
   head: Buffer,
-  options: WebSocketOptions & { origins?: readonly string[] } = {},
+  options: AcceptWebSocketOptions = {},
 ): WebSocketConnection | undefined {
   const key = req.headers['sec-websocket-key'],
     upgrade = String(req.headers.upgrade ?? '').toLowerCase(),
@@ -305,20 +337,41 @@ export function acceptWebSocket(
     Buffer.from(key, 'base64').length !== 16
   )
     return bad(socket, '400 Bad Request');
-  if (options.origins && !options.origins.includes(String(req.headers.origin ?? '')))
-    return bad(socket, '403 Forbidden');
+  if (!originAllowed(req, options.origins)) {
+    const origin = req.headers.origin ?? '(none)';
+    return bad(
+      socket,
+      '403 Forbidden',
+      options.origins
+        ? `origin-refused: Origin ${origin} is not in the origins option; add it to origins`
+        : `origin-refused: Origin ${origin} is not this server's own host (${req.headers.host ?? 'no Host'}); ` +
+            `pass origins: ['${origin}'], or '*' for any page, to allow it`,
+    );
+  }
+  const refused = options.admit?.(req);
+  if (refused) return bad(socket, refused[0], refused[1]);
   socket.write(
     `HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${acceptKey(key)}\r\n\r\n`,
   );
   return new WebSocketConnection(socket, false, options, head);
 }
 
+/** Options of {@link connectWebSocket}. */
+export interface ConnectWebSocketOptions extends WebSocketOptions {
+  /** Extra request headers, such as `Authorization` or `Cookie` for a server's `authenticate` hook. Default none. */
+  headers?: Record<string, string>;
+}
+
 /**
  * Opens a WebSocket to a `ws://host:port/path` URL from Node (bots and tests; browsers have their own WebSocket).
  * @throws TypeError (rejects) when `url` is not a ws:// URL.
- * @throws MargoError `'failed'` (rejects) when the server refuses the upgrade or answers with a wrong accept key.
+ * @throws MargoError `'failed'` (rejects) when the server refuses the upgrade (the message holds the server's reason)
+ * or answers with a wrong accept key.
  */
-export function connectWebSocket(url: string | URL, options: WebSocketOptions = {}): Promise<WebSocketConnection> {
+export function connectWebSocket(
+  url: string | URL,
+  options: ConnectWebSocketOptions = {},
+): Promise<WebSocketConnection> {
   const target = new URL(url);
   if (target.protocol !== 'ws:')
     return Promise.reject(
@@ -330,7 +383,13 @@ export function connectWebSocket(url: string | URL, options: WebSocketOptions = 
       host: target.hostname,
       port: target.port || 80,
       path: target.pathname + target.search,
-      headers: { Connection: 'Upgrade', Upgrade: 'websocket', 'Sec-WebSocket-Key': key, 'Sec-WebSocket-Version': '13' },
+      headers: {
+        ...options.headers,
+        Connection: 'Upgrade',
+        Upgrade: 'websocket',
+        'Sec-WebSocket-Key': key,
+        'Sec-WebSocket-Version': '13',
+      },
     });
     req.on('upgrade', (res, socket, head) => {
       if (res.headers['sec-websocket-accept'] !== acceptKey(key)) {
@@ -338,13 +397,24 @@ export function connectWebSocket(url: string | URL, options: WebSocketOptions = 
         reject(
           new MargoError('failed', `WebSocket server at ${target} sent a wrong accept key; is it a WebSocket server?`),
         );
-      } else resolve(new WebSocketConnection(socket, true, { maxMessage: 1 << 24, ...options }, head));
+      } else resolve(new WebSocketConnection(socket, true, { maxMessage: options.maxMessage ?? 1 << 24 }, head));
     });
     req.on('response', (res) => {
-      res.resume();
-      reject(
-        new MargoError('failed', `WebSocket upgrade to ${target} was refused with ${res.statusCode}; check the URL`),
-      );
+      let text = '';
+      res.setEncoding('utf8');
+      res.on('data', (part: string) => {
+        if (text.length < 1024) text += part;
+      });
+      const refused = () =>
+        reject(
+          new MargoError(
+            'failed',
+            `WebSocket upgrade to ${target} was refused with ${res.statusCode}` +
+              (text ? ` (${text.slice(0, 1024)})` : '; check the URL'),
+          ),
+        );
+      res.on('end', refused);
+      res.on('error', refused);
     });
     req.on('error', (error) =>
       reject(new MargoError('failed', `WebSocket connection to ${target} failed (${error.message}); start the server`)),

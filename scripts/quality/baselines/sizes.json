@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3877021,
+  "total": 3878681,
   "history": [
     {
       "date": "2026-10-24",
@@ -752,6 +752,12 @@
       "commit": "8dac0c01",
       "reason": "biomes step 0: root trimmed 20,516 -> 15,9xx B by moving optional parts into entries loaded on use (toolkit, relief, digest, zones); the layer descriptions moved from the root's LAYERS to the editor entry (LAYER_ABOUT), root -515 B, editor +127 B",
       "grew": 5
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "d57df6d9",
+      "reason": "voxel-net server limits (bugs 44, 50): pre-hello connection caps, own-host origin check, authenticate hook with a time limit, bounded edit store with LRU eviction to a VoxelEditStore; Node-only server entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -1106,7 +1112,7 @@
     "@margoengine/voxel-edit/vox": 12202,
     "@margoengine/voxel-net": 5532,
     "@margoengine/voxel-net/bot": 7624,
-    "@margoengine/voxel-net/server": 11421,
+    "@margoengine/voxel-net/server": 13081,
     "@margoengine/voxel-pathtracer": 80311,
     "@margoengine/voxel-pathtracer/studio": 1313,
     "@margoengine/voxel/bevel": 2457,

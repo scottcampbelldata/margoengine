@@ -33,7 +33,7 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
   (default 256 MiB). Worker threads run the generator (`noiseTerrain` options, or your own `VoxelGenerate` module) and
   `encodeChunk` in one job. A chunk whose generation fails goes to `server.onError` and is tried again after 250 ms,
   then 500 ms; after 3 failures the players who need it are closed with 1011 and a reason naming the chunk. Edited
-  chunks stay in memory for the life of the process.
+  chunks stay in memory, up to `maxEditedChunks`; past it they go to your `store` (see below).
 - **Tick**, 20 per second: each player's queued movement steps and edits in the order they came, then each client's
   view, then one corked write per client: corrections, block changes in chunks it has, nearby players (within 96
   blocks, `EntityCodec` deltas against the last message), and up to 64 chunks or 128 KiB, nearest first.
@@ -52,11 +52,57 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
 - **Bots** (`./bot`): `VoxelBot.connect({url, blocks})` joins with the same client, walks, jumps, swims and edits;
   it decodes only the chunks within one chunk of itself.
 
+## Connections, login and saved edits
+
+Every limit has a safe default; set them on `new VoxelServer({...})`.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `origins` | the server's own host | Which web pages may connect, by their `Origin` header: by default only a page whose origin is `http://` or `https://` plus the request's `Host`. `'*'` allows any page; a list allows exactly those origins. Clients that send no Origin (Node, bots) connect unless you pass a list. A refused page gets HTTP 403 with a message naming `origins`. |
+| `maxPending` | 64 | Connections that have not joined yet (no hello, or still in `authenticate`), all together. The next upgrade gets HTTP 503 before any player object or timer exists. |
+| `maxPerAddress` | 8 | The same, per IP address; the next gets HTTP 429. Behind a reverse proxy every client has the proxy's address: raise it there. |
+| `helloTimeout` | 3,000 ms | Time a new connection has to send its hello; then it is closed with 1008. |
+| `authenticate` | none | `(req, hello) => boolean \| string \| Promise<...>`, called on the upgrade request (`hello` undefined: read a cookie or token header) and again on the hello (`{ name }`). `true` lets the client on, a non-empty string too and becomes `player.identity`, anything else closes it with 1008 `'not authorized'`. A throw, or a call longer than `authTimeout`, closes it with 1011 (reason `auth-failed...` or `auth-timeout...`) and goes to `onError`. |
+| `authTimeout` | 5,000 ms | Time each `authenticate` call may take. |
+| `maxEditedChunks` | 65,536 | Edited chunks held in memory. Past it the least recently edited one is saved to `store` and dropped, and read back when needed. Without a store, a player edit to one more chunk is refused and `onError` gets a MargoError `'failed'` naming the option. |
+| `store` | none | A `VoxelEditStore` (`save(key, chunk)`, `load(key)`, either may be async) for disk or a database. It is also read when a chunk loads, and `server.close()` saves every edited chunk still in memory to it, so a world persists across restarts. |
+
+Breaking change (2026-10-28): `origins` used to default to any page. A browser client served from another origin (a
+dev server on another port, say) now gets 403; pass that origin, for example `origins: ['http://127.0.0.1:5173']`.
+
+```ts
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { deserialize, serialize } from 'node:v8';
+import { BlockTypes } from 'margoengine/voxel';
+import { type VoxelEditStore, VoxelServer } from 'margoengine/voxel-net/server';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand']) blocks.define(name);
+await mkdir('world', { recursive: true });
+// Edited chunks on disk, one file each: they survive a restart.
+const store: VoxelEditStore = {
+  save: (key, chunk) => writeFile(`world/${key}.chunk`, serialize(chunk)),
+  load: (key) => readFile(`world/${key}.chunk`).then(deserialize, () => undefined),
+};
+const server = new VoxelServer({
+  blocks,
+  origins: ['https://game.example.com'],
+  // Your login: a session cookie on the upgrade request, then the chosen name on the hello.
+  authenticate: (req, hello) => {
+    const session = /session=(\w+)/.exec(req.headers.cookie ?? '')?.[1];
+    if (!session) return false;
+    return hello ? `account-${session}` : true;
+  },
+  store,
+});
+await server.listen(8787, '0.0.0.0');
+```
+
 ## Limits of the prototype
 
-No accounts or login, no saving to disk, no mobs, chat or inventories, no TLS (put `wss://` behind a reverse proxy), one
-process per world. The server trusts nothing from clients but rate-limits only edits and inputs; it has no protection
-against many connections from one address.
+No mobs, chat or inventories, no TLS (put `wss://` behind a reverse proxy), one process per world. The server trusts
+nothing from clients and rate-limits edits and inputs; connections that have not joined are capped as above, but a
+flood at the network level needs a proxy or firewall in front.
 
 ## Bench
 

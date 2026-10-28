@@ -24,6 +24,9 @@ const server = new VoxelServer({
   generator: { seed: 1, seaLevel: 0, height: 8, amplitude: 32, scale: 192, caves: 0.3, trees: 0.012 },
   spawn,
   maxPlayers: 5000,
+  // Every bot connects from 127.0.0.1, so the per-address cap on joining connections would throttle the join rate.
+  maxPerAddress: 1000,
+  maxPending: 1000,
   ...(workers ? { workers } : {}),
 });
 let errors = 0;
