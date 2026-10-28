@@ -2,56 +2,11 @@
 // the signed distance to each envelope bound (Wendland 1995), the climate inputs are warped by low-frequency value
 // noise so borders wander like real ecotones, a 3x3 box blur removes salt-and-pepper, paint layers compose in a fixed
 // order, a cell outside every envelope falls back to the nearest one (ties by priority, then id), and the top 4
-// biomes are stored with weights that sum to exactly 255 (largest remainder, ties by priority, then id).
-// Whittaker classes: our own rectangles in (mean annual temperature, rainfall) approximated from the published diagram
-// (Whittaker 1975). Holdridge life zones: nearest hexagon centre in log2 biotemperature, log2 rainfall and log2 PET
-// ratio (Holdridge 1947, 1967), biotemperature as the year mean of temperatures clamped to 0..30 C.
-import { degreeDays } from './climate.js';
-import { type BiomeDefinition, type Dimension, dimension, envelopeOf } from './define.js';
-import { clampInt, divFloor, ONE, qlog2, qsqrt, wendland } from './fixed.js';
+// biomes are stored with weights that sum to exactly 255 (largest remainder, ties by priority, then id). The
+// Whittaker and Holdridge classifiers live in the zones entry and plug in through `ZoneClassifier`.
+import { type BiomeDefinition, type Dimension, envelopeOf } from './define.js';
+import { clampInt, divFloor, ONE, wendland } from './fixed.js';
 import { fbm } from './hash.js';
-
-/** Whittaker's nine biome classes as envelopes over mean annual temperature (C) and rainfall (mm): our rectangles. */
-export const WHITTAKER: Readonly<
-  Record<
-    string,
-    {
-      readonly temperature: readonly [number | null, number | null];
-      readonly rainfall: readonly [number | null, number | null];
-    }
-  >
-> = Object.freeze({
-  tundra: { temperature: [null, -5], rainfall: [null, null] },
-  'boreal-forest': { temperature: [-5, 5], rainfall: [300, null] },
-  'temperate-grassland-desert': { temperature: [-5, 20], rainfall: [null, 300] },
-  'woodland-shrubland': { temperature: [5, 20], rainfall: [300, 900] },
-  'temperate-seasonal-forest': { temperature: [5, 20], rainfall: [900, 2200] },
-  'temperate-rainforest': { temperature: [5, 20], rainfall: [2200, null] },
-  'subtropical-desert': { temperature: [20, null], rainfall: [null, 500] },
-  'tropical-seasonal-forest-savanna': { temperature: [20, null], rainfall: [500, 2500] },
-  'tropical-rainforest': { temperature: [20, null], rainfall: [2500, null] },
-});
-
-/** Holdridge biotemperature belts, coldest first (bounds at 1.5, 3, 6, 12 and 24 C). */
-export const HOLDRIDGE_BELTS = Object.freeze([
-  'polar',
-  'subpolar',
-  'boreal',
-  'cool-temperate',
-  'warm-temperate',
-  'tropical',
-]);
-/** Holdridge humidity provinces, wettest first (PET ratio bands doubling from below 0.25 to 16 and more). */
-export const HOLDRIDGE_HUMIDITY = Object.freeze([
-  'superhumid',
-  'perhumid',
-  'humid',
-  'subhumid',
-  'semiarid',
-  'arid',
-  'perarid',
-  'superarid',
-]);
 
 /** Paint layer composition modes, applied in the world's paint order. */
 export type PaintMode = 'replace' | 'add' | 'multiply' | 'max';
@@ -64,26 +19,78 @@ export interface PaintLayer {
   readonly mask?: string;
 }
 
-/** The classifier a world builds from its biomes. */
+/**
+ * A classifier that weights biomes by named zones instead of their envelopes: `whittaker` and `holdridge` from
+ * `@margoengine/biomes/zones`, passed as `BiomeWorld.create({ classifier })`.
+ */
+export interface ZoneClassifier {
+  readonly kind: 'whittaker' | 'holdridge';
+  /**
+   * Builds the per-tile scorer for a biome list: it adds each biome's zone weight (Q16, at most 1.0) into `member`
+   * (one plane of `cells` per biome) from `warped` (one plane per input slot; `slotOf` names the slots).
+   */
+  scorer(
+    biomes: readonly BiomeDefinition[],
+    slotOf: (layer: string) => number,
+  ): (warped: Int32Array, cells: number, member: Int32Array) => void;
+}
+
+/** The classifier a world builds from its biomes: everything per cell is an integer slot or a typed array. */
 export interface Classifier {
-  readonly kind: 'envelopes' | 'whittaker' | 'holdridge';
+  readonly kind: 'envelopes' | ZoneClassifier['kind'];
   readonly ids: readonly string[];
-  readonly dims: readonly (readonly Dimension[])[];
   /** Tie order: higher priority first, then id; rank[b] is b's place in it. */
   readonly rank: Int32Array;
-  readonly zones: readonly (readonly string[])[];
-  readonly whittaker: readonly (readonly [string, readonly Dimension[]])[];
-  readonly paint: readonly { readonly biome: number; readonly mode: PaintMode; readonly mask?: string }[];
-  /** Layers the classifier reads. */
+  /** Layers the classifier reads, in slot order. */
   readonly inputs: readonly string[];
+  /** Per input slot, how the ecotone warp moves it (see `classify`). */
+  readonly modes: Int32Array;
+  /** Envelope dimensions of every biome, flattened: biome b owns dims start[b]..start[b + 1] - 1. */
+  readonly envelopes: Dims;
+  /** A zone classifier's scorer; envelopes weight the biomes when there is none. */
+  readonly score?: (warped: Int32Array, cells: number, member: Int32Array) => void;
+  /** Paint layers: biome index (-1 = unknown), mode (0 replace, 1 add, 2 multiply, 3 max), user layer names. */
+  readonly paint: readonly {
+    readonly biome: number;
+    readonly mode: number;
+    readonly layer: string;
+    readonly mask?: string;
+  }[];
+}
+
+/** Envelope dimensions flattened into typed arrays. */
+export interface Dims {
+  readonly start: Int32Array;
+  readonly slot: Int32Array;
+  readonly lo: Float64Array;
+  readonly hi: Float64Array;
+  readonly width: Int32Array;
 }
 
 const MODES = ['replace', 'add', 'multiply', 'max'];
+const BASE = ['temperature', 'rainfall', 'coldest', 'warmest', 'alpha', 'moisture', 'gdd5', 'season', 'treeline'];
+const TEMPERATURE_LIKE = ['temperature', 'coldest', 'warmest', 'treeline'];
+
+/** Flattens groups of dimensions (one group per envelope) over input slots. */
+export function flatten(groups: readonly (readonly Dimension[])[], slotOf: (layer: string) => number): Dims {
+  const all = groups.flat(),
+    start = new Int32Array(groups.length + 1);
+  groups.forEach((g, b) => {
+    start[b + 1] = start[b] + g.length;
+  });
+  return {
+    start,
+    slot: Int32Array.from(all, (d) => slotOf(d.layer)),
+    lo: Float64Array.from(all, (d) => d.lo),
+    hi: Float64Array.from(all, (d) => d.hi),
+    width: Int32Array.from(all, (d) => d.width),
+  };
+}
 
 /** Builds a classifier. Ids must be unique; at most 255 biomes. */
 export function classifier(
   biomes: readonly BiomeDefinition[],
-  kind: Classifier['kind'],
+  kind: 'envelopes' | ZoneClassifier,
   paint: readonly PaintLayer[],
 ): Classifier {
   const ids = biomes.map((b) => b.id),
@@ -98,34 +105,36 @@ export function classifier(
     rank[b] = place;
   });
   const dims = biomes.map(envelopeOf),
-    whittaker = Object.entries(WHITTAKER).map(
-      ([name, e]) =>
-        [name, [dimension('temperature', e.temperature, 0.15), dimension('rainfall', e.rainfall, 0.15)]] as const,
-    );
-  const inputs = new Set<string>([
-    'temperature',
-    'rainfall',
-    'coldest',
-    'warmest',
-    'alpha',
-    'moisture',
-    'gdd5',
-    'season',
-    'treeline',
-  ]);
-  for (const d of dims) for (const dim of d) inputs.add(dim.layer);
+    inputs = [...new Set([...BASE, ...dims.flat().map((d) => d.layer)])],
+    slotOf = (layer: string) => inputs.indexOf(layer);
   return {
-    kind,
+    kind: kind === 'envelopes' ? kind : kind.kind,
     ids,
-    dims,
     rank,
-    zones: biomes.map((b) => b.zones ?? []),
-    whittaker,
-    paint: paint.map((p) => {
-      const biome = ids.indexOf(p.biome);
-      return { biome, mode: p.mode ?? 'replace', mask: p.mask };
-    }),
-    inputs: [...inputs],
+    inputs,
+    modes: Int32Array.from(inputs, (name) =>
+      name.startsWith('mask/')
+        ? 0
+        : TEMPERATURE_LIKE.includes(name)
+          ? 1
+          : name === 'gdd5'
+            ? 2
+            : name === 'season'
+              ? 3
+              : name === 'rainfall'
+                ? 4
+                : name === 'alpha' || name === 'moisture'
+                  ? 5
+                  : 6,
+    ),
+    envelopes: flatten(dims, slotOf),
+    score: kind === 'envelopes' ? undefined : kind.scorer(biomes, slotOf),
+    paint: paint.map((p) => ({
+      biome: ids.indexOf(p.biome),
+      mode: MODES.indexOf(p.mode ?? 'replace'),
+      layer: `paint/${p.biome}`,
+      mask: p.mask,
+    })),
   };
 }
 
@@ -143,75 +152,43 @@ export function checkPaint(paint: readonly PaintLayer[], ids: readonly string[])
   );
 }
 
-/** Membership of one envelope (Q16) and its largest normalised signed distance (Q16) at a cell. */
-function membership(dims: readonly Dimension[], value: (layer: string) => number, out: Int32Array): void {
-  let m = ONE,
-    far = -2147483647;
-  for (const d of dims) {
-    const v = value(d.layer),
-      dist = Math.max(d.lo - v, v - d.hi), // negative inside
-      half = d.width >> 1;
-    far = Math.max(far, clampInt(divFloor(dist * ONE, d.width), -1048576, 1048576));
-    if (m) m = Math.floor((m * wendland(clampInt(divFloor((dist + half) * ONE, d.width), 0, ONE))) / ONE);
-  }
-  out[0] = m;
-  out[1] = far;
-}
-
-/** The Holdridge life zone (`'<belt>-<humidity>'`) of a biotemperature (cK) and rainfall (mm). */
-export function holdridgeZone(biotemperature: number, rainfall: number): string {
-  const centres = new Int32Array(8);
-  holdridgeCentres(biotemperature, rainfall, centres);
-  return zoneName(centres[0], centres[1]);
-}
-
-// Belt j covers biotemperatures 1.5 x 2^j..1.5 x 2^(j+1) C (j = -1 is polar); humidity band m covers PET ratios
-// 2^m..2^(m+1) (m <= -3 is superhumid, m >= 4 superarid).
-const zoneName = (j: number, m: number) =>
-  `${HOLDRIDGE_BELTS[clampInt(j + 1, 0, 5)]}-${HOLDRIDGE_HUMIDITY[clampInt(m + 3, 0, 7)]}`;
-
 /**
- * The four hexagon centres around a climate point in Holdridge's lattice, nearest first: writes
- * `[belt, humidity band, distance^2 (Q16), ...]` pairs as (j, r, d2) triples for the nearest and the others.
- * u = log2(rain / 62.5 mm), v = log2(biotemperature / 1.5 C); centres sit at half-integer u and v, and the PET ratio
- * band is floor(v - u + 0.5), so belts, rainfall and humidity bounds all fall on hexagon edges.
+ * Memberships (Q16) of envelope `b` of `d` over a grid of `cells` cells into `m`, and the envelope's largest normalised
+ * signed distance (Q16) into `far`; `values` holds one plane of warped values per input slot.
  */
-function holdridgeCentres(bio: number, rain: number, out: Int32Array): number[][] {
-  const v = Math.max(-ONE, qlog2(Math.max(1, divFloor(Math.max(0, bio) * ONE, 150)))),
-    u = Math.max(-ONE, qlog2(Math.max(1, divFloor(Math.max(0, rain) * 2 * ONE, 125)))), // rain / 62.5 mm
-    k0 = (u - ONE / 2) >> 16,
-    j0 = (v - ONE / 2) >> 16,
-    list: number[][] = [];
-  for (let dj = 0; dj <= 1; dj++)
-    for (let dk = 0; dk <= 1; dk++) {
-      const k = k0 + dk,
-        j = j0 + dj,
-        du = u - (k * ONE + ONE / 2),
-        dv = v - (j * ONE + ONE / 2),
-        d2 = Math.floor((du * du - du * dv + dv * dv) / ONE);
-      list.push([d2, j, j - k]);
+export function membership(
+  d: Dims,
+  b: number,
+  values: Int32Array,
+  cells: number,
+  m: Int32Array,
+  far: Int32Array,
+): void {
+  m.fill(ONE);
+  far.fill(-2147483647);
+  for (let q = d.start[b], end = d.start[b + 1]; q < end; q++) {
+    const v = values.subarray(d.slot[q] * cells, (d.slot[q] + 1) * cells),
+      lo = d.lo[q],
+      hi = d.hi[q],
+      width = d.width[q],
+      half = width >> 1;
+    for (let k = 0; k < cells; k++) {
+      const x = v[k],
+        dist = Math.max(lo - x, x - hi), // negative inside
+        f = clampInt(divFloor(dist * ONE, width), -1048576, 1048576),
+        mk = m[k];
+      if (f > far[k]) far[k] = f;
+      if (mk) m[k] = Math.floor((mk * wendland(clampInt(divFloor((dist + half) * ONE, width), 0, ONE))) / ONE);
     }
-  list.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
-  out[0] = list[0][1];
-  out[1] = list[0][2];
-  return list;
-}
-
-/** Biotemperature in cK: the year mean of max(0, min(30, T)) for a sinusoidal year (mean and half swing in cK). */
-export function biotemperature(mean: number, half: number): number {
-  const a = [0, 0],
-    b = [0, 0];
-  degreeDays(mean, half, 0, a);
-  degreeDays(mean, half, 3000, b);
-  return divFloor((a[0] - b[0]) * 100, 365);
+  }
 }
 
 /** Inputs of a classification: layer getters over an n x n grid (the tile plus a 1-cell margin). */
 export interface ClassifyInput {
   readonly n: number;
   layer(name: string): ArrayLike<number>;
-  /** User layer value 0..255 at grid cell k, or undefined when unpainted. */
-  user(name: string, k: number): number | undefined;
+  /** A user layer over the grid (0..255 per cell, -1 where unpainted), or undefined when nothing is painted. */
+  user(name: string): ArrayLike<number> | undefined;
   /** Global cell of grid cell (0, 0). */
   readonly gx: number;
   readonly gz: number;
@@ -235,119 +212,97 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     nearest = new Int32Array(cells),
     // Normalised distance of every envelope at every cell, for the fallback after paint.
     farAll = new Int32Array(count * cells),
-    scratch = new Int32Array(2),
-    centres = new Int32Array(8),
-    warped: Record<string, number> = {},
-    layers: Record<string, ArrayLike<number>> = {};
-  for (const name of c.inputs) if (!name.startsWith('mask/')) layers[name] = input.layer(name);
+    slots = c.inputs.length,
+    modes = c.modes,
+    { rank, envelopes } = c,
+    // Every step below runs over whole planes of cells (one input, one envelope bound at a time), in the same order
+    // per cell as a cell-by-cell loop, so the integers are the same and the loops stay small and monomorphic.
+    warped = new Int32Array(slots * cells),
+    dT = new Int32Array(cells),
+    n2 = new Int32Array(cells);
   // Warp noise on the 8-cell lattice covering this grid: lattice point (a, b) is global cell (8 (a0 + a), 8 (b0 + b)).
+  // The lattice spans both axes on their own: a point's grid (sample) need not start at the same lattice phase in x
+  // and z (a tile's always does).
   const a0 = input.gx >> 3,
     b0 = input.gz >> 3,
     span = ((input.gx + n) >> 3) - a0 + 2,
-    warpA = new Int32Array(span * span),
-    warpB = new Int32Array(span * span);
-  for (let b = 0; b < span; b++)
+    rows = ((input.gz + n) >> 3) - b0 + 2,
+    warpA = new Int32Array(span * rows),
+    warpB = new Int32Array(span * rows);
+  for (let b = 0; b < rows; b++)
     for (let a = 0; a < span; a++) {
       const lx = divFloor((a0 + a) * 8 * input.cell * ONE, WARP),
         lz = divFloor((b0 + b) * 8 * input.cell * ONE, WARP);
       warpA[b * span + a] = fbm(input.seed ^ 0x5eed, lx, lz, 2);
       warpB[b * span + a] = fbm(input.seed ^ 0x7a1e, lz, lx, 2);
     }
-  const warpAt = (grid: Int32Array, i: number, j: number) => {
-    const gx = input.gx + i - a0 * 8,
-      gz = input.gz + j - b0 * 8,
-      a = gx >> 3,
-      b = gz >> 3,
-      fx = (gx & 7) << 13,
+  for (let j = 0; j < n; j++) {
+    const gz = input.gz + j - b0 * 8,
       fz = (gz & 7) << 13,
-      at = b * span + a,
-      top = grid[at] + Math.floor(((grid[at + 1] - grid[at]) * fx) / ONE),
-      bottom = grid[at + span] + Math.floor(((grid[at + span + 1] - grid[at + span]) * fx) / ONE);
-    return top + Math.floor(((bottom - top) * fz) / ONE);
-  };
-  const temperatureLike = ['temperature', 'coldest', 'warmest', 'treeline'],
-    inputs = c.inputs.map((name) => ({
-      name,
-      mode: name.startsWith('mask/')
-        ? 0
-        : temperatureLike.includes(name)
-          ? 1
-          : name === 'gdd5'
-            ? 2
-            : name === 'season'
-              ? 3
-              : name === 'rainfall'
-                ? 4
-                : name === 'alpha' || name === 'moisture'
-                  ? 5
-                  : 6,
-      data: name.startsWith('mask/') ? undefined : layers[name],
-    }));
-  for (let j = 0; j < n; j++)
+      row = (gz >> 3) * span;
     for (let i = 0; i < n; i++) {
       const k = j * n + i,
+        gx = input.gx + i - a0 * 8,
+        fx = (gx & 7) << 13,
+        at = row + (gx >> 3),
         // The warp is smooth (700 m): noise on a global 8-cell lattice, bilinear between lattice points.
-        n1 = warpAt(warpA, i, j) - 32768, // -0.5..0.5 in Q16
-        n2 = warpAt(warpB, i, j) - 32768,
-        dT = divFloor(n1 * 160, 32768); // +-1.6 K at the extremes, cK
-      for (const { name, mode, data } of inputs) {
-        if (mode === 0) {
-          warped[name] = input.user(name, k) ?? 0;
-          continue;
-        }
-        const v = data![k];
-        warped[name] =
-          mode === 1
-            ? v + dT
-            : mode === 2
-              ? Math.max(0, v + 2 * dT)
-              : mode === 3
-                ? clampInt(v + divFloor(dT, 10), 0, 365)
-                : mode === 4
-                  ? Math.max(0, v + divFloor(v * n2 * 16, 6553600))
-                  : mode === 5
-                    ? clampInt(v + divFloor(n2 * 10, 32768), 0, 255)
-                    : v;
+        topA = warpA[at] + Math.floor(((warpA[at + 1] - warpA[at]) * fx) / ONE),
+        bottomA = warpA[at + span] + Math.floor(((warpA[at + span + 1] - warpA[at + span]) * fx) / ONE),
+        topB = warpB[at] + Math.floor(((warpB[at + 1] - warpB[at]) * fx) / ONE),
+        bottomB = warpB[at + span] + Math.floor(((warpB[at + span + 1] - warpB[at + span]) * fx) / ONE),
+        n1 = topA + Math.floor(((bottomA - topA) * fz) / ONE) - 32768; // -0.5..0.5 in Q16
+      n2[k] = topB + Math.floor(((bottomB - topB) * fz) / ONE) - 32768;
+      dT[k] = Math.floor((n1 * 160) / 32768); // +-1.6 K at the extremes, cK
+    }
+  }
+  // The warped inputs, one plane per input.
+  for (let s = 0; s < slots; s++) {
+    const mode = modes[s],
+      name = c.inputs[s],
+      source = mode ? input.layer(name) : input.user(name),
+      out = warped.subarray(s * cells, (s + 1) * cells);
+    if (!source) out.fill(0);
+    else if (mode === 0) for (let k = 0; k < cells; k++) out[k] = Math.max(0, source[k]);
+    else if (mode === 1) for (let k = 0; k < cells; k++) out[k] = source[k] + dT[k];
+    else if (mode === 2) for (let k = 0; k < cells; k++) out[k] = Math.max(0, source[k] + 2 * dT[k]);
+    else if (mode === 3) for (let k = 0; k < cells; k++) out[k] = clampInt(source[k] + divFloor(dT[k], 10), 0, 365);
+    else if (mode === 4)
+      for (let k = 0; k < cells; k++) {
+        const v = source[k];
+        out[k] = Math.max(0, v + divFloor(v * n2[k] * 16, 6553600));
       }
-      const value = (layer: string) => warped[layer];
-      let best = -1,
-        bestFar = 2147483647;
-      for (let b = 0; b < count; b++) {
-        membership(c.dims[b], value, scratch);
-        farAll[b * cells + k] = scratch[1];
-        if (scratch[1] < bestFar || (scratch[1] === bestFar && c.rank[b] < c.rank[best])) {
-          best = b;
-          bestFar = scratch[1];
-        }
-        if (c.kind === 'envelopes') member[b * cells + k] = scratch[0];
-      }
-      nearest[k] = best;
-      if (c.kind === 'whittaker') {
-        for (const [name, dims] of c.whittaker) {
-          membership(dims, value, scratch);
-          if (!scratch[0]) continue;
-          for (let b = 0; b < count; b++)
-            if (c.zones[b].includes(name)) member[b * cells + k] = Math.min(ONE, member[b * cells + k] + scratch[0]);
-        }
-      } else if (c.kind === 'holdridge') {
-        const half = divFloor((value('warmest') - value('coldest')) * 32768, 64790),
-          list = holdridgeCentres(biotemperature(value('temperature'), half), value('rainfall'), centres);
-        for (const [d2, jj, r] of list) {
-          // Weight 1 within 0.35 of a centre, 0 beyond 0.65 (hexagon edges at 0.5).
-          const d = qsqrt(d2),
-            w = wendland(clampInt(divFloor((d - 22938) * ONE, 19661), 0, ONE));
-          if (!w) continue;
-          const name = zoneName(jj, r);
-          for (let b = 0; b < count; b++)
-            if (c.zones[b].includes(name)) member[b * cells + k] = Math.min(ONE, member[b * cells + k] + w);
-        }
+    else if (mode === 5)
+      for (let k = 0; k < cells; k++) out[k] = clampInt(source[k] + divFloor(n2[k] * 10, 32768), 0, 255);
+    else out.set(source);
+  }
+  // Envelope memberships and distances; the nearest envelope per cell in biome order (ties by rank).
+  const bestFar = new Int32Array(cells).fill(2147483647),
+    // With a zone classifier the envelope memberships only find the nearest envelope; zones fill `member`.
+    zones = !!c.score,
+    scratch = zones ? new Int32Array(cells) : member;
+  nearest.fill(-1);
+  for (let b = 0; b < count; b++) {
+    const m = scratch.subarray(zones ? 0 : b * cells, zones ? cells : (b + 1) * cells),
+      far = farAll.subarray(b * cells, (b + 1) * cells);
+    membership(envelopes, b, warped, cells, m, far);
+    for (let k = 0; k < cells; k++) {
+      const f = far[k];
+      if (f < bestFar[k] || (f === bestFar[k] && rank[b] < rank[nearest[k]])) {
+        nearest[k] = b;
+        bestFar[k] = f;
       }
     }
+  }
+  c.score?.(warped, cells, member);
   const inner = n - 2,
     w = new Int32Array(count),
     pick = new Int32Array(count),
     blocked = new Uint8Array(count),
-    share = new Int32Array(4);
+    share = new Int32Array(4),
+    order = new Int32Array(4),
+    paint = c.paint,
+    paintGrid = paint.map((p) => (p.biome < 0 ? undefined : input.user(p.layer))),
+    maskGrid = paint.map((p) => (p.mask ? input.user(p.mask) : undefined));
   for (let j = 0; j < inner; j++)
     for (let i = 0; i < inner; i++) {
       const k = (j + 1) * n + i + 1;
@@ -366,17 +321,20 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
       for (let b = 0; b < count; b++) w[b] = divFloor(w[b] * ONE, total);
       // Paint layers, in order.
       blocked.fill(0);
-      for (const p of c.paint) {
-        if (p.biome < 0) continue;
-        const raw = input.user(`paint/${c.ids[p.biome]}`, k);
-        if (raw === undefined) continue;
+      for (let q = 0; q < paint.length; q++) {
+        const grid = paintGrid[q],
+          raw = grid ? grid[k] : -1;
+        if (raw < 0) continue;
+        const p = paint[q],
+          mask = maskGrid[q],
+          mv = mask ? mask[k] : -1;
         let amount = divFloor(raw * ONE, 255);
-        if (p.mask) amount = divFloor(amount * (input.user(p.mask, k) ?? 0), 255);
-        if (p.mode === 'replace') {
+        if (p.mask) amount = divFloor(amount * (mv < 0 ? 0 : mv), 255);
+        if (p.mode === 0) {
           for (let b = 0; b < count; b++) w[b] = Math.floor((w[b] * (ONE - amount)) / ONE);
           w[p.biome] += amount;
-        } else if (p.mode === 'add') w[p.biome] += amount;
-        else if (p.mode === 'multiply') {
+        } else if (p.mode === 1) w[p.biome] += amount;
+        else if (p.mode === 2) {
           w[p.biome] = Math.floor((w[p.biome] * amount) / ONE);
           if (!amount) blocked[p.biome] = 1;
         } else w[p.biome] = Math.max(w[p.biome], amount);
@@ -390,7 +348,7 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
         for (let b = 0; b < count; b++) {
           if (blocked[b]) continue;
           const f = farAll[b * cells + k];
-          if (f < pickFar || (f === pickFar && c.rank[b] < c.rank[pickB])) {
+          if (f < pickFar || (f === pickFar && rank[b] < rank[pickB])) {
             pickB = b;
             pickFar = f;
           }
@@ -403,7 +361,7 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
       for (let b = 0; b < count; b++) {
         if (!w[b]) continue;
         let at = used++;
-        while (at > 0 && (w[pick[at - 1]] < w[b] || (w[pick[at - 1]] === w[b] && c.rank[pick[at - 1]] > c.rank[b]))) {
+        while (at > 0 && (w[pick[at - 1]] < w[b] || (w[pick[at - 1]] === w[b] && rank[pick[at - 1]] > rank[b]))) {
           pick[at] = pick[at - 1];
           at--;
         }
@@ -432,33 +390,20 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
         // Spent: its remainder drops below every other one.
         w[pick[top]] -= sum;
       }
-      // Sort slots by final weight (stable over the rank order they are already in).
+      // Slots by final weight, ties by slot (stable over the rank order they are already in).
+      for (let s = 0; s < used; s++) {
+        let at = s;
+        while (at > 0 && share[order[at - 1]] < share[s]) {
+          order[at] = order[at - 1];
+          at--;
+        }
+        order[at] = s;
+      }
       const out = (j * inner + i) * 4;
-      const order = [0, 1, 2, 3].slice(0, used).sort((a, b) => share[b] - share[a] || a - b);
       for (let s = 0; s < 4; s++) {
         const live = s < used && share[order[s]] > 0;
         ids[out + s] = live ? pick[order[s]] : 255;
         weights[out + s] = live ? share[order[s]] : 0;
       }
     }
-}
-
-/** The Whittaker class with the largest membership at a mean annual temperature (C) and rainfall (mm). */
-export function whittakerClass(temperature: number, rainfall: number): string {
-  const values: Record<string, number> = { temperature: Math.round(temperature * 100), rainfall: Math.round(rainfall) },
-    scratch = new Int32Array(2);
-  let best = '',
-    top = -1,
-    nearest = '',
-    far = 2147483647;
-  for (const [name, e] of Object.entries(WHITTAKER)) {
-    membership(
-      [dimension('temperature', e.temperature, 0.15), dimension('rainfall', e.rainfall, 0.15)],
-      (l) => values[l],
-      scratch,
-    );
-    if (scratch[0] > top) [best, top] = [name, scratch[0]];
-    if (scratch[1] < far) [nearest, far] = [name, scratch[1]];
-  }
-  return top > 0 ? best : nearest;
 }

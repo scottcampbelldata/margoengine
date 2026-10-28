@@ -1,4 +1,5 @@
-// A seeded procedural landscape in integer millimetres: fractal lowlands, ridged mountains under a mountain mask, an
+// A seeded procedural landscape in integer millimetres (entry `@margoengine/biomes/relief`, loaded by BiomeWorld.create
+// only when a world uses it): fractal lowlands, ridged mountains under a mountain mask, an
 // optional coast and river valleys. It is the default height of a BiomeWorld and the terrain of the reference world
 // R16. Every step works on integers below 2^53 with plain arithmetic, floors and integer square roots (value noise from
 // hash.ts), which every JavaScript engine computes identically, so the same options give the same heights everywhere. Our own layout; the noise is cited in hash.ts.
@@ -37,6 +38,11 @@ export interface Relief {
   readonly rivers: readonly RiverLine[];
   /** River valley half width in millimetres. */
   readonly valleyWidth: number;
+  /**
+   * The cells of a grid (`nx` x `nz` corner samples `step` mm apart from world `origin` in mm) along the river centre
+   * lines, within half a cell: 1 for water, 0 elsewhere. Worlds take them as water sources.
+   */
+  waterCells(origin: readonly [number, number], step: number, nx: number, nz: number): Uint8Array;
   /** The options, with defaults filled in and every length in millimetres. */
   readonly settings: Readonly<{
     seed: number;
@@ -195,6 +201,7 @@ export function createRelief(options: ReliefOptions = {}): Relief {
     height,
     rivers,
     valleyWidth: VALLEY,
+    waterCells: (at, step, nx, nz) => riverCells(rivers, at, step, nx, nz),
     settings: Object.freeze({
       seed,
       origin: [ox, oz] as const,
@@ -207,23 +214,27 @@ export function createRelief(options: ReliefOptions = {}): Relief {
   };
 }
 
-/**
- * Quantises float heights once to integer millimetres (`Math.round(h * 1000 / unit)` per sample, plain arithmetic, so
- * every engine rounds the same way). `unit` is metres per input unit, default 1.
- * @throws TypeError when `samples` is not a Float32Array or Float64Array; RangeError for a non-finite or out-of-range
- * sample (beyond +-2,000 km).
- */
-export function quantizeHeights(samples: Float32Array | Float64Array, unit = 1): Int32Array {
-  if (!(samples instanceof Float32Array || samples instanceof Float64Array))
-    throw typeError('quantizeHeights needs a Float32Array or Float64Array of heights', 'biomes');
-  if (!(unit > 0 && Number.isFinite(unit)))
-    throw rangeError('quantizeHeights unit must be a positive number', 'biomes');
-  const out = new Int32Array(samples.length);
-  for (let i = 0; i < samples.length; i++) {
-    const v = Math.round(samples[i] * unit * 1000);
-    if (!(Math.abs(v) <= 2e9))
-      throw rangeError(`Height sample ${i} is not finite or beyond 2,000 km; fix the input`, 'biomes');
-    out[i] = v;
-  }
-  return out;
+/** Region cells along river centre lines (within half a cell), as water sources. */
+function riverCells(
+  rivers: readonly Int32Array[],
+  origin: readonly [number, number],
+  step: number,
+  nx: number,
+  nz: number,
+): Uint8Array {
+  const mask = new Uint8Array(nx * nz);
+  for (const line of rivers)
+    for (let k = 0; k + 3 < line.length; k += 2) {
+      const ax = line[k] - origin[0],
+        az = line[k + 1] - origin[1],
+        bx = line[k + 2] - origin[0],
+        bz = line[k + 3] - origin[1],
+        n = Math.max(1, divFloor(2 * Math.max(Math.abs(bx - ax), Math.abs(bz - az)), step));
+      for (let s = 0; s <= n; s++) {
+        const x = divFloor(2 * (ax + divFloor((bx - ax) * s, n)) + step, 2 * step),
+          z = divFloor(2 * (az + divFloor((bz - az) * s, n)) + step, 2 * step);
+        if (x >= 0 && z >= 0 && x < nx && z < nz) mask[z * nx + x] = 1;
+      }
+    }
+  return mask;
 }

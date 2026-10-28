@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3873628,
+  "total": 3877021,
   "history": [
     {
       "date": "2026-10-24",
@@ -701,12 +701,6 @@
     },
     {
       "date": "2026-10-28",
-      "commit": "65e92afc",
-      "reason": "new optional entry @margoengine/sky/sun: typed angles, named sun and ambient setters, sunlitSky (lighting API usability fix; core and stage unchanged)",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-28",
       "commit": "cdcf5065",
       "reason": "@margoengine/biomes B3 (item 27.4): /view draws a biome world through @margoengine/terrain (loaded with import()): overview, streamed 1 m tiles, ground weights, generated materials; terrain gains the optional weights textures (decision D4)",
       "grew": 1
@@ -715,6 +709,12 @@
       "date": "2026-10-28",
       "commit": "e4a2e5d0",
       "reason": "bug 46: loadOBJ checks mtllib and texture URLs with the shared asset URL policy, keeps init on the OBJ origin and budgets the material libraries (security fix, +376 B in loaders/mtl)",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "65e92afc",
+      "reason": "new optional entry @margoengine/sky/sun: typed angles, named sun and ambient setters, sunlitSky (lighting API usability fix; core and stage unchanged)",
       "grew": 1
     },
     {
@@ -746,6 +746,12 @@
       "commit": "94dce6c6",
       "reason": "bug 43: WebSocketConnection keeps messages and a close that arrive before its handlers are set; the server retries a failed chunk generation and closes its players with 1011 after 3 tries",
       "grew": 2
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "8dac0c01",
+      "reason": "biomes step 0: root trimmed 20,516 -> 15,9xx B by moving optional parts into entries loaded on use (toolkit, relief, digest, zones); the layer descriptions moved from the root's LAYERS to the editor entry (LAYER_ABOUT), root -515 B, editor +127 B",
+      "grew": 5
     }
   ],
   "items": {
@@ -759,11 +765,15 @@
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
-    "@margoengine/biomes": 20752,
-    "@margoengine/biomes/editor": 3261,
+    "@margoengine/biomes": 16459,
+    "@margoengine/biomes/digest": 894,
+    "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/koppen": 1231,
-    "@margoengine/biomes/presets": 4407,
-    "@margoengine/biomes/view": 5860,
+    "@margoengine/biomes/presets": 2024,
+    "@margoengine/biomes/relief": 2825,
+    "@margoengine/biomes/toolkit": 2880,
+    "@margoengine/biomes/view": 5072,
+    "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4000,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/bake": 2583,

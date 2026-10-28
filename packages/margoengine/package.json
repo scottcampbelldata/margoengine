@@ -83,13 +83,29 @@
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"
     },
+    "./biomes/toolkit": {
+      "types": "./dist/biomes/toolkit.d.ts",
+      "import": "./dist/biomes/toolkit.js"
+    },
     "./biomes/presets": {
       "types": "./dist/biomes/presets.d.ts",
       "import": "./dist/biomes/presets.js"
     },
+    "./biomes/relief": {
+      "types": "./dist/biomes/relief.d.ts",
+      "import": "./dist/biomes/relief.js"
+    },
+    "./biomes/digest": {
+      "types": "./dist/biomes/digest.d.ts",
+      "import": "./dist/biomes/digest.js"
+    },
     "./biomes/koppen": {
       "types": "./dist/biomes/koppen.d.ts",
       "import": "./dist/biomes/koppen.js"
+    },
+    "./biomes/zones": {
+      "types": "./dist/biomes/zones.d.ts",
+      "import": "./dist/biomes/zones.js"
     },
     "./biomes/view": {
       "types": "./dist/biomes/view.d.ts",

@@ -4,8 +4,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { BiomeWorld, WHITTAKER, defineBiome, holdridgeZone, whittakerClass } from '../dist/index.js';
+import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { presets, presetWorlds } from '../dist/presets.js';
+import { WHITTAKER, holdridge, holdridgeZone, whittaker, whittakerClass } from '../dist/zones.js';
 import { KOPPEN, koppen, koppenClass } from '../dist/koppen.js';
 import { random } from './random.js';
 
@@ -192,7 +193,7 @@ test('Holdridge zones of known climates, and the holdridge classifier uses zones
   const w = await BiomeWorld.create({
     size: [512, 512],
     biomes: ALL,
-    classifier: 'holdridge',
+    classifier: holdridge,
     climate: presetWorlds.tropical.climate,
   });
   const t = await w.tile(0, 0);
@@ -200,7 +201,7 @@ test('Holdridge zones of known climates, and the holdridge classifier uses zones
   const wh = await BiomeWorld.create({
     size: [512, 512],
     biomes: ALL,
-    classifier: 'whittaker',
+    classifier: whittaker,
     climate: presetWorlds.desert.climate,
   });
   assert.equal(wh.biomes[top(await wh.tile(1, 1), 50, 50)[0]].id, 'desert');
@@ -309,6 +310,34 @@ test('sample returns the biomes of the tile cell, and region samples classify to
     [id, weight] = top(t, 3, 4);
   assert.equal(s.biomes[0], w.biomes[id].id);
   assert.equal(s.weights[0], weight / 255);
+});
+
+test('regression: a region sample whose 3 x 3 grid crosses an ecotone-warp lattice row equals the tile cell', async () => {
+  // Bug: classify sized the 8-cell warp lattice from x alone, so a point grid starting at a different lattice phase in
+  // z read past it (NaN warp, then zeros) on its last row. On a flat world split on temperature only, the warp is
+  // the only thing that varies, so the region sample and the finished tile's cell must agree exactly everywhere.
+  const make = (biomes) =>
+      BiomeWorld.create({
+        size: [512, 512],
+        biomes,
+        height: { field: () => 100 },
+        climate: { latitude: 30, coldAir: 0 },
+      }),
+    // The plane's temperature (20 C here): the +-1.6 K warp moves cells across the split, so both biomes blend.
+    t = (await make(ALL)).sample(0, 0).temperature,
+    warm = defineBiome({ id: 'warm', climate: { temperature: [t, null] }, ground: [{ material: 'grass' }] }),
+    cold = defineBiome({ id: 'cold', climate: { temperature: [null, t] }, ground: [{ material: 'rock' }] }),
+    w = await make([warm, cold]);
+  const points = [];
+  for (let z = 1; z < 250; z += 3) for (let x = 2; x < 250; x += 31) points.push([w.bounds[0] + x, w.bounds[1] + z]);
+  const before = points.map(([x, z]) => JSON.stringify(w.sample(x, z)));
+  await w.tile(0, 0);
+  const after = points.map(([x, z]) => JSON.stringify(w.sample(x, z)));
+  assert.ok(
+    after.some((s) => JSON.parse(s).biomes.length === 2),
+    'some points blend both biomes',
+  );
+  assert.deepEqual(before, after);
 });
 
 test('defineBiome validates shape and values and freezes a copy', () => {

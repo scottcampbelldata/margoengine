@@ -30,13 +30,29 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./toolkit": {
+      "types": "./dist/toolkit.d.ts",
+      "import": "./dist/toolkit.js"
+    },
     "./presets": {
       "types": "./dist/presets.d.ts",
       "import": "./dist/presets.js"
     },
+    "./relief": {
+      "types": "./dist/relief.d.ts",
+      "import": "./dist/relief.js"
+    },
+    "./digest": {
+      "types": "./dist/digest.d.ts",
+      "import": "./dist/digest.js"
+    },
     "./koppen": {
       "types": "./dist/koppen.d.ts",
       "import": "./dist/koppen.js"
+    },
+    "./zones": {
+      "types": "./dist/zones.d.ts",
+      "import": "./dist/zones.js"
     },
     "./view": {
       "types": "./dist/view.d.ts",

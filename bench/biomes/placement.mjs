@@ -7,15 +7,17 @@
 import { pathToFileURL } from 'node:url';
 import { median } from '../lib/node.mjs';
 
-const dist = new URL('../../packages/biomes/dist/index.js', import.meta.url).href;
+const dist = (entry) => new URL(`../../packages/biomes/dist/${entry}.js`, import.meta.url).href;
 
 /** One 256 m tile of R16 near its centre, so mountains, lowland and a river valley are all in the sample. */
 export const TILE = Object.freeze({ x: 2, z: -3, size: 256 });
 
 /** The measured stages: `{id, title, run()}`, each run() doing one tile's work at 1 m. */
 export async function stages() {
-  const biomes = await import(dist);
-  const relief = biomes.createRelief(biomes.R16.relief),
+  const biomes = await import(dist('index')),
+    { R16 } = await import(dist('presets')),
+    { createRelief } = await import(dist('relief'));
+  const relief = createRelief(R16.relief),
     x0 = TILE.x * TILE.size * 1000,
     z0 = TILE.z * TILE.size * 1000,
     heights = new Int32Array(TILE.size * TILE.size);
@@ -35,11 +37,11 @@ export async function stages() {
       title: 'Climate fields of one R16 tile at 1 m (17 layers, heights from the procedural relief)',
       async setup() {
         world ??= await biomes.BiomeWorld.create({
-          seed: biomes.R16.seed,
-          origin: biomes.R16.origin,
-          size: biomes.R16.size,
-          height: { relief: biomes.R16.relief },
-          climate: biomes.R16.climate,
+          seed: R16.seed,
+          origin: R16.origin,
+          size: R16.size,
+          height: { relief: R16.relief },
+          climate: R16.climate,
         });
       },
       async run() {

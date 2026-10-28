@@ -8,18 +8,17 @@ import {
   BiomeWorld,
   DEFAULT_LAYERS,
   LAYERS,
-  ONE,
   degreeDays,
   distanceTransform,
   moistureIndex,
   priorityFlood,
-  qacos,
   quantizeClimate,
   evapotranspiration,
   halfAmplitude,
   continentality,
   treelineMargin,
 } from '../dist/index.js';
+import { ONE, qacos } from '../dist/toolkit.js';
 import { random } from './random.js';
 
 const golden = JSON.parse(readFileSync(new URL('./golden/fields.json', import.meta.url), 'utf8'));
@@ -368,7 +367,7 @@ test('validation, abort, update, onChange and dispose', async () => {
   assert.throws(() => w.sample(0, 0), { name: 'MargoError', code: 'disposed' });
 });
 
-test('time budget: one default 256 m tile at 1 m in under 400 ms (measured about 50 ms on the reference PC)', async () => {
+test('time budget: one default 256 m tile at 1 m in under 400 ms (measured about 40 ms on the reference PC)', async () => {
   const w = await BiomeWorld.create({ seed: 5 });
   await w.tile(0, 0);
   const start = performance.now();

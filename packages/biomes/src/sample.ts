@@ -152,7 +152,7 @@ export function samplePoint(
       seed: context.seed,
       cell: context.cell,
       layer: (name) => new Int32Array(9).fill(values[name] ?? 0),
-      user: (name) => context.user(name),
+      user: (name) => new Int16Array(9).fill(context.user(name) ?? -1),
     },
     ids,
     weights,

@@ -18,7 +18,7 @@ import {
 import { atan2, clampInt, divFloor, isqrt, ONE, qexp2, qlog2 } from './fixed.js';
 import type { Heights } from './height.js';
 import { LAYERS, type RasterLayer } from './layers.js';
-import { bilinear, type Region } from './region.js';
+import type { Region } from './region.js';
 
 /** The geometry a tile kernel needs. */
 export interface TileFrame {
@@ -39,6 +39,9 @@ const POOL_DEPTH = 30_000;
 const MONTH = 64790;
 /** log2 of the soil convexity scale 0.08 per metre, Q16. */
 const LOG_CONVEX = qlog2(5243);
+
+/** The season cache of cellClimate (made on first use): 4,096 (mean, half) keys and their three stored values. */
+let seasonKeys: Float64Array | undefined, seasonValues: Int32Array;
 
 const ARRAYS = { i32: Int32Array, i16: Int16Array, u16: Uint16Array, u8: Uint8Array, rgba8: Uint8Array } as const;
 
@@ -119,8 +122,27 @@ export function tileFields(
     dd = [0, 0],
     c9 = new Int32Array(9),
     // Q16 region cells per tile cell: exact, the region step is a power-of-two multiple of the cell.
-    toRegion = divFloor(cell * ONE, region.step);
-  for (let j = 0; j < cells; j++)
+    toRegion = divFloor(cell * ONE, region.step),
+    { nx, nz } = region,
+    // Bilinear lookups of the region grids (region.ts `bilinear`), split per column and per row once per tile: every
+    // grid shares the cell's corner index and Q16 fractions.
+    colIndex = new Int32Array(cells),
+    colFrac = new Int32Array(cells);
+  for (let i = 0; i < cells; i++) {
+    const fx = clampInt((tx * frame.cells + first + i) * toRegion, 0, (nx - 1) * ONE),
+      ix = Math.min(nx - 2, fx >> 16);
+    colIndex[i] = ix;
+    colFrac[i] = fx - ix * ONE;
+  }
+  const lerp = (grid: Int32Array, at: number, fx: number, fz: number) => {
+    const a = grid[at] + Math.floor(((grid[at + 1] - grid[at]) * fx) / ONE),
+      b = grid[at + nx] + Math.floor(((grid[at + nx + 1] - grid[at + nx]) * fx) / ONE);
+    return a + Math.floor(((b - a) * fz) / ONE);
+  };
+  for (let j = 0; j < cells; j++) {
+    const fz0 = clampInt((tz * frame.cells + first + j) * toRegion, 0, (nz - 1) * ONE),
+      iz = Math.min(nz - 2, fz0 >> 16),
+      fz = fz0 - iz * ONE;
     for (let i = 0; i < cells; i++) {
       const k = j * cells + i,
         g = (j + apron) * side + i + apron,
@@ -184,14 +206,14 @@ export function tileFields(
         total = sat[z1 * w + x1] - sat[z0 * w + x1] - sat[z1 * w + x0] + sat[z0 * w + x0],
         position = e - divFloor(total, box); // mm
       tpi[k] = clampInt(Math.floor(position / 100), -32768, 32767);
-      // Region fields at this cell, Q16 region coordinates.
-      const rx = (tx * frame.cells + first + i) * toRegion,
-        rz = (tz * frame.cells + first + j) * toRegion,
-        rain = Math.max(0, bilinear(region.rain, region.nx, region.nz, rx, rz)),
-        cont = clampInt(bilinear(region.continentality, region.nx, region.nz, rx, rz), 0, ONE),
-        expo = clampInt(bilinear(region.exposure, region.nx, region.nz, rx, rz), 0, 255),
-        dist = clampInt(bilinear(region.water, region.nx, region.nz, rx, rz), 0, 65535),
-        fill = Math.max(0, bilinear(region.fill, region.nx, region.nz, rx, rz));
+      // Region fields at this cell.
+      const at = iz * nx + colIndex[i],
+        fx = colFrac[i],
+        rain = Math.max(0, lerp(region.rain, at, fx, fz)),
+        cont = clampInt(lerp(region.continentality, at, fx, fz), 0, ONE),
+        expo = clampInt(lerp(region.exposure, at, fx, fz), 0, 255),
+        dist = clampInt(lerp(region.water, at, fx, fz), 0, 65535),
+        fill = Math.max(0, lerp(region.fill, at, fx, fz));
       rainfall[k] = Math.min(65535, rain);
       exposure[k] = expo;
       water[k] = dist;
@@ -206,6 +228,7 @@ export function tileFields(
       moisture[k] = c9[7];
       soil[k] = c9[8];
     }
+  }
   return out;
 }
 
@@ -263,10 +286,28 @@ export function cellClimate(
   out[0] = clampInt(mean, -32768, 32767);
   out[1] = clampInt(mean - monthly, -32768, 32767);
   out[2] = clampInt(mean + monthly, -32768, 32767);
-  out[3] = Math.min(65535, degreeDays(mean, half, 500, dd)[0]);
-  degreeDays(mean, half, 90, dd);
-  out[4] = dd[1];
-  out[5] = clampInt(treelineMargin(seasonMean(dd[0], dd[1], 90), dd[1]), -32768, 32767);
+  // GDD5, season and treeline depend on (mean, half) only, and a tile has few distinct pairs: a direct-mapped cache of
+  // these pure functions (the result is the same with or without it).
+  if (!seasonKeys) {
+    seasonKeys = new Float64Array(4096).fill(Number.NaN);
+    seasonValues = new Int32Array(3 * 4096);
+  }
+  const key = mean * 8192 + half, // half is 0..2,400 cK
+    slot = (Math.imul(mean, -1640531535) ^ Math.imul(half, 40503)) >>> 20;
+  if (seasonKeys[slot] === key) {
+    out[3] = seasonValues[3 * slot];
+    out[4] = seasonValues[3 * slot + 1];
+    out[5] = seasonValues[3 * slot + 2];
+  } else {
+    out[3] = Math.min(65535, degreeDays(mean, half, 500, dd)[0]);
+    degreeDays(mean, half, 90, dd);
+    out[4] = dd[1];
+    out[5] = clampInt(treelineMargin(seasonMean(dd[0], dd[1], 90), dd[1]), -32768, 32767);
+    seasonKeys[slot] = key;
+    seasonValues[3 * slot] = out[3];
+    seasonValues[3 * slot + 1] = out[4];
+    seasonValues[3 * slot + 2] = out[5];
+  }
   // Moisture index from Hargreaves PET (sunnier slopes evaporate more) and Fu-Budyko.
   const pet = Math.floor(
       (evapotranspiration(climate, mean, half, range) * (ONE + Math.floor((heat * 19661) / ONE))) / ONE,

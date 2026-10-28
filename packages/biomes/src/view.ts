@@ -7,9 +7,9 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Terrain, TerrainColorOptions } from '@margoengine/terrain';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import { type BiomeDefinition, dimension, type Dimension } from './define.js';
-import { clampInt, divFloor, ONE, wendland } from './fixed.js';
-import { hash3 } from './hash.js';
+import { type BiomeDefinition, type Dimension, groundDimension } from './define.js';
+// The toolkit comes through the package name, so the view shares the root's copy (a view always has a world).
+import { clampInt, divFloor, hash3, ONE, wendland } from '@margoengine/biomes/toolkit';
 import type { BiomeTile, BiomeWorld } from './world.js';
 
 /** The look of a ground material: sRGB colour 0..1 and the contrast of its generated detail 0..1. */
@@ -71,7 +71,7 @@ function rulesOf(biomes: readonly BiomeDefinition[], materials: readonly string[
       material: Math.max(0, materials.indexOf(g.material)),
       dims: (['slope', 'height', 'moisture', 'curvature'] as const)
         .filter((k) => g[k] !== undefined)
-        .map((k) => dimension(k, g[k]!, 0.15)),
+        .map((k) => groundDimension(k, g[k]!)),
       weight: Math.round((g.weight ?? 1) * ONE),
     })),
   );

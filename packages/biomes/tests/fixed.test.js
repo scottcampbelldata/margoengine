@@ -7,10 +7,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import {
   ONE,
-  R16,
   atan2,
   clampInt,
-  createRelief,
   degreesToAngle,
   divFloor,
   divWide,
@@ -40,7 +38,9 @@ import {
   umod,
   valueNoise,
   wendland,
-} from '../dist/index.js';
+} from '../dist/toolkit.js';
+import { R16 } from '../dist/presets.js';
+import { createRelief } from '../dist/relief.js';
 import { random } from './random.js';
 
 const golden = JSON.parse(readFileSync(new URL('./golden/relief.json', import.meta.url), 'utf8'));

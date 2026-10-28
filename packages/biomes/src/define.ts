@@ -177,12 +177,21 @@ const isRange = (r: unknown): r is Range =>
 
 /** Quantises one range on a field (plain units) to a stored-unit dimension. */
 export function dimension(field: string, range: Range, blend: number): Dimension {
-  let layer: string, toStored: number | 'slope', open: number;
-  if (field in FIELDS) [layer, toStored, open] = FIELDS[field];
-  else if (field.startsWith('mask/')) [layer, toStored, open] = [field, 255, 0.06];
-  else if (field in LAYERS)
-    [layer, toStored, open] = [field, 1 / LAYERS[field].scale, 3 * LAYERS[field].scale]; // float division: option units
-  else throw rangeError('Unknown envelope field; use a ClimateEnvelope field, a LAYERS name or mask/<name>', 'biomes');
+  if (field in FIELDS) return quantize(FIELDS[field], range, blend);
+  if (field.startsWith('mask/')) return quantize([field, 255, 0.06], range, blend);
+  if (field in LAYERS) return quantize([field, 1 / LAYERS[field].scale, 3 * LAYERS[field].scale], range, blend); // float division: option units
+  throw rangeError('Unknown envelope field; use a ClimateEnvelope field, a LAYERS name or mask/<name>', 'biomes');
+}
+
+/** A ground layer rule's dimension (slope, height, moisture or curvature): the envelope fields without the layer table. */
+export const groundDimension = (field: 'slope' | 'height' | 'moisture' | 'curvature', range: Range): Dimension =>
+  quantize(FIELDS[field], range, 0.15);
+
+function quantize(
+  [layer, toStored, open]: readonly [layer: string, toStored: number | 'slope', open: number],
+  range: Range,
+  blend: number,
+): Dimension {
   const store = (v: number) =>
     toStored === 'slope' ? slopeTan(v) : clampInt(Math.round(v * toStored), -2147483647, 2147483647);
   const [min, max] = range,

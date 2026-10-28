@@ -3,9 +3,22 @@
 // BIOME1 and BIOME4 style of screening (Prentice et al. 1992; Kaplan et al. 2003): tropical trees need a coldest month
 // of about 15.5 C, temperate broadleaf trees about 1,200 degree days, boreal conifers about 350 (background values from
 // that literature, rounded; the per-preset numbers are ours). Meshes are the procedural ones (decision D5).
-import { type BiomeDefinition, defineBiome, type SpeciesRule } from './define.js';
-import type { ReliefOptions } from './relief.js';
+// Plain data: the presets are frozen here and checked with defineBiome by the package tests, so this entry carries no
+// validation code (a world validates every definition it is given, presets included).
 import type { ClimateOptions } from './climate.js';
+import type { BiomeDefinition, SpeciesRule } from './define.js';
+import type { ReliefOptions } from './relief.js';
+
+export { R16 } from './r16.js';
+
+/** Deep-freezes plain data. */
+function freeze<T>(value: T): T {
+  if (value && typeof value === 'object') {
+    for (const v of Object.values(value)) freeze(v);
+    Object.freeze(value);
+  }
+  return value;
+}
 
 const tree = (id: string, mesh: string, density: number, radius: number, shade: number): SpeciesRule => ({
   id,
@@ -36,7 +49,7 @@ const rock = (density: number): SpeciesRule => ({
 export const presets: Readonly<
   Record<'temperate' | 'desert' | 'tundra' | 'tropical' | 'alpine' | 'wetland' | 'savanna' | 'boreal', BiomeDefinition>
 > = Object.freeze({
-  temperate: defineBiome({
+  temperate: freeze<BiomeDefinition>({
     id: 'temperate',
     climate: { coldest: [-15, 8], gdd5: [1200, null], moistureIndex: [0.6, null], treeline: [0, null] },
     zones: ['temperate-seasonal-forest', 'cool-temperate-humid', 'cool-temperate-subhumid', 'warm-temperate-humid'],
@@ -56,7 +69,7 @@ export const presets: Readonly<
       { id: 'fern', mesh: 'procedural:fern', density: 4, light: [0, 0.5] },
     ],
   }),
-  boreal: defineBiome({
+  boreal: freeze<BiomeDefinition>({
     id: 'boreal',
     climate: { gdd5: [350, 1200], moistureIndex: [0.45, null], treeline: [0, null] },
     zones: ['boreal-forest', 'boreal-humid', 'boreal-perhumid', 'boreal-subhumid'],
@@ -73,7 +86,7 @@ export const presets: Readonly<
     rocks: [rock(10)],
     details: [{ id: 'moss', mesh: 'procedural:grass', density: 20, light: [0, 0.6] }],
   }),
-  alpine: defineBiome({
+  alpine: freeze<BiomeDefinition>({
     id: 'alpine',
     climate: { treeline: [null, 0], coldest: [-15, null] },
     zones: ['tundra', 'subpolar-humid', 'subpolar-perhumid', 'subpolar-subhumid'],
@@ -87,7 +100,7 @@ export const presets: Readonly<
     rocks: [rock(40)],
     details: [{ id: 'alpine-grass', mesh: 'procedural:grass', density: 25 }],
   }),
-  wetland: defineBiome({
+  wetland: freeze<BiomeDefinition>({
     id: 'wetland',
     climate: { moisture: [0.8, null], slope: [null, 3], treeline: [0, null] },
     priority: 1,
@@ -96,7 +109,7 @@ export const presets: Readonly<
     plants: [tree('alder', 'broadleaf', 90, 3, 0.5), shrub('willow', 'shrub', 300, 1.5)],
     details: [{ id: 'reeds', mesh: 'procedural:grass', density: 60, blades: true }],
   }),
-  tundra: defineBiome({
+  tundra: freeze<BiomeDefinition>({
     id: 'tundra',
     climate: { treeline: [null, 0], coldest: [null, -15] },
     zones: ['tundra', 'polar-humid', 'polar-perhumid', 'polar-subhumid', 'subpolar-semiarid'],
@@ -109,7 +122,7 @@ export const presets: Readonly<
     rocks: [rock(25)],
     details: [{ id: 'sedge', mesh: 'procedural:grass', density: 15 }],
   }),
-  desert: defineBiome({
+  desert: freeze<BiomeDefinition>({
     id: 'desert',
     climate: { moistureIndex: [null, 0.2] },
     zones: [
@@ -128,7 +141,7 @@ export const presets: Readonly<
     plants: [shrub('creosote', 'shrub', 60, 0.8), { ...shrub('cactus', 'cactus', 15, 0.5), shade: 0 }],
     rocks: [rock(30)],
   }),
-  savanna: defineBiome({
+  savanna: freeze<BiomeDefinition>({
     id: 'savanna',
     climate: { moistureIndex: [0.2, 0.6], coldest: [8, null] },
     zones: ['tropical-seasonal-forest-savanna', 'woodland-shrubland', 'tropical-semiarid', 'warm-temperate-semiarid'],
@@ -140,7 +153,7 @@ export const presets: Readonly<
     rocks: [rock(4)],
     details: [{ id: 'tall-grass', mesh: 'procedural:grass', density: 50, blades: true }],
   }),
-  tropical: defineBiome({
+  tropical: freeze<BiomeDefinition>({
     id: 'tropical',
     climate: { coldest: [15.5, null], moistureIndex: [0.6, null] },
     zones: ['tropical-rainforest', 'tropical-humid', 'tropical-perhumid', 'tropical-subhumid'],

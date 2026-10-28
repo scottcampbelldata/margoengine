@@ -2,12 +2,13 @@
 // BiomeWorld: a finite world (decision D1, up to 64 km) of tiles with climate fields, built on the CPU in integers.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type Climate, type ClimateOptions, quantizeClimate } from './climate.js';
-import { checkPaint, type Classifier, classifier, classify, type PaintLayer } from './classify.js';
+import { checkPaint, type Classifier, classifier, classify, type PaintLayer, type ZoneClassifier } from './classify.js';
 import { type BiomeDefinition, defineBiome } from './define.js';
 import { tileFields } from './fields.js';
-import { divFloor, idiv, imod } from './fixed.js';
+import { divFloor, imod } from './fixed.js';
 import { type Heights, type HeightSource, heightsOf } from './height.js';
-import { canonicalBytes, DEFAULT_LAYERS, LAYERS, type RasterLayer, sha256 } from './layers.js';
+import { DEFAULT_LAYERS, LAYERS, type RasterLayer } from './layers.js';
+import type { createRelief } from './relief.js';
 import { buildRegion, type Region } from './region.js';
 import { type BiomeSample, readCell, samplePoint } from './sample.js';
 
@@ -47,9 +48,9 @@ export interface BiomeWorldOptions {
   readonly backend?: 'auto' | 'gpu' | 'cpu';
   /** Biomes to classify into, at most 254. Default: the temperate preset and its neighbours (alpine, wetland, boreal). */
   readonly biomes?: readonly BiomeDefinition[];
-  /** `'envelopes'` (each biome's climate envelope), `'whittaker'` or `'holdridge'` (each biome's `zones`). Default
-   * `'envelopes'`. */
-  readonly classifier?: 'envelopes' | 'whittaker' | 'holdridge';
+  /** `'envelopes'` (each biome's climate envelope), or `whittaker` or `holdridge` from `@margoengine/biomes/zones`
+   * (each biome's `zones`). Default `'envelopes'`. */
+  readonly classifier?: 'envelopes' | ZoneClassifier;
   /** Paint layers in composition order (the editor appends one per biome it paints). Default none. */
   readonly paint?: readonly PaintLayer[];
   /** Rejects `create` with the signal's reason when aborted. */
@@ -87,6 +88,9 @@ const TILE_SIZES = [128, 256, 512],
 const CACHE = 256;
 
 type Rect = readonly [number, number, number, number];
+
+/** createRelief from the relief entry, once a world has loaded it. */
+let relief: typeof createRelief | undefined;
 
 const aborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw signal.reason;
@@ -127,7 +131,7 @@ export class BiomeWorld implements Disposable {
   /** User layers (`paint/<biome>`, `mask/<name>`): one u8 raster per tile, keyed `x,z`. */
   readonly #user = new Map<string, Map<string, Uint8Array>>();
   #biomes: readonly BiomeDefinition[];
-  #kind: Classifier['kind'];
+  #kind: 'envelopes' | ZoneClassifier;
   #paint: readonly PaintLayer[];
   #classifier: Classifier;
   #notifying = false;
@@ -183,7 +187,7 @@ export class BiomeWorld implements Disposable {
     this.#kind = options.classifier ?? 'envelopes';
     this.#paint = options.paint ?? [];
     this.#classifier = this.#buildClassifier();
-    this.#heights = heightsOf(options.height, this.#origin, this.#size, this.seed);
+    this.#heights = heightsOf(options.height, this.#origin, this.#size, this.seed, relief);
     this.#region = this.#buildRegion();
   }
 
@@ -195,7 +199,11 @@ export class BiomeWorld implements Disposable {
     if (typeof options !== 'object' || options === null)
       throw typeError('BiomeWorld options must be an object; pass {} for the defaults', 'biomes');
     aborted(options.signal);
-    const biomes = options.biomes ?? (await defaultBiomes());
+    const biomes = options.biomes ?? (await defaultBiomes()),
+      h = options.height;
+    // The procedural relief is its own entry, loaded only for worlds that use it (the default height).
+    if (h === undefined || (typeof h === 'object' && h !== null && 'relief' in h))
+      relief ??= (await import('@margoengine/biomes/relief')).createRelief;
     aborted(options.signal);
     return new BiomeWorld(options, biomes);
   }
@@ -207,8 +215,11 @@ export class BiomeWorld implements Disposable {
     const checked = biomes.map((b) => defineBiome(b)),
       ids = checked.map((b) => b.id);
     if (new Set(ids).size !== ids.length) throw rangeError('BiomeWorld biome ids must be unique', 'biomes');
-    if (!['envelopes', 'whittaker', 'holdridge'].includes(this.#kind))
-      throw rangeError("BiomeWorld classifier must be 'envelopes', 'whittaker' or 'holdridge'", 'biomes');
+    if (this.#kind !== 'envelopes' && typeof (this.#kind as ZoneClassifier)?.scorer !== 'function')
+      throw rangeError(
+        "BiomeWorld classifier is 'envelopes' or whittaker or holdridge from '@margoengine/biomes/zones'",
+        'biomes',
+      );
     if (!checkPaint(this.#paint, ids))
       throw rangeError('A paint layer names a biome of this world, an optional mode and an optional mask', 'biomes');
     this.#biomes = checked;
@@ -230,7 +241,7 @@ export class BiomeWorld implements Disposable {
       nx = divFloor(this.#size[0], step) + 1,
       nz = divFloor(this.#size[1], step) + 1,
       height = this.#heights.grid(0, 0, nx, nz, step),
-      water = this.#heights.relief ? riverCells(this.#heights.relief.rivers, this.#origin, step, nx, nz) : undefined;
+      water = this.#heights.relief?.waterCells(this.#origin, step, nx, nz);
     return buildRegion(height, nx, nz, step, this.#climate, water);
   }
 
@@ -327,7 +338,7 @@ export class BiomeWorld implements Disposable {
           seed: this.seed,
           cell,
           layer: (name) => wide.get(name)!.data,
-          user: (name, k) => this.#userAt(name, gx + imod(k, n), gz + idiv(k, n), cells),
+          user: (name) => this.#userGrid(name, gx, gz, n, cells),
         },
         ids,
         weights,
@@ -361,14 +372,25 @@ export class BiomeWorld implements Disposable {
     });
   }
 
-  /** A user layer's value at a global cell, or undefined where nothing is painted. */
-  #userAt(name: string, gx: number, gz: number, cells: number): number | undefined {
+  /** A user layer over an n x n grid of global cells from (gx, gz): 0..255, -1 where unpainted; undefined when the
+   * layer holds nothing. */
+  #userGrid(name: string, gx: number, gz: number, n: number, cells: number): Int16Array | undefined {
     const tiles = this.#user.get(name);
-    if (!tiles) return undefined;
-    const tx = divFloor(gx, cells),
-      tz = divFloor(gz, cells),
-      data = tiles.get(`${tx},${tz}`);
-    return data ? data[(gz - tz * cells) * cells + gx - tx * cells] : undefined;
+    if (!tiles?.size) return undefined;
+    const out = new Int16Array(n * n).fill(-1);
+    for (let j = 0; j < n; j++) {
+      const tz = divFloor(gz + j, cells),
+        row = (gz + j - tz * cells) * cells;
+      for (let i = 0; i < n; ) {
+        const tx = divFloor(gx + i, cells),
+          x = gx + i - tx * cells,
+          run = Math.min(n - i, cells - x),
+          data = tiles.get(`${tx},${tz}`);
+        if (data) out.set(data.subarray(row + x, row + x + run), j * n + i);
+        i += run;
+      }
+    }
+    return out;
   }
 
   /**
@@ -529,7 +551,7 @@ export class BiomeWorld implements Disposable {
       this.#climate,
       this.#region,
       this.#classifier,
-      { seed: this.seed, cell: this.resolution * 1000, user: (name) => this.#userAt(name, gx, gz, cells) },
+      { seed: this.seed, cell: this.resolution * 1000, user: (name) => this.#userGrid(name, gx, gz, 1, cells)?.[0] },
       this.#origin,
       x,
       z,
@@ -571,7 +593,7 @@ export class BiomeWorld implements Disposable {
   }
 
   #replaceHeights(source: HeightSource): void {
-    this.#heights = heightsOf(source, this.#origin, this.#size, this.seed);
+    this.#heights = heightsOf(source, this.#origin, this.#size, this.seed, relief);
   }
 
   #emit(rect: Rect): void {
@@ -597,7 +619,7 @@ export class BiomeWorld implements Disposable {
    */
   async digest(x: number, z: number, options: { readonly signal?: AbortSignal } = {}): Promise<string> {
     const tile = await this.tile(x, z, { signal: options.signal });
-    return sha256(canonicalBytes(tile.layers.map((name) => tile.layer(name)!)));
+    return (await import('@margoengine/biomes/digest')).tileDigest(tile);
   }
 
   /** Frees the cache and listeners; later calls throw MargoError `'disposed'`. */
@@ -614,31 +636,6 @@ export class BiomeWorld implements Disposable {
   }
 }
 
-/** Region cells along river centre lines (within half a cell), as water sources. */
-function riverCells(
-  rivers: readonly Int32Array[],
-  origin: readonly [number, number],
-  step: number,
-  nx: number,
-  nz: number,
-): Uint8Array {
-  const mask = new Uint8Array(nx * nz);
-  for (const line of rivers)
-    for (let k = 0; k + 3 < line.length; k += 2) {
-      const ax = line[k] - origin[0],
-        az = line[k + 1] - origin[1],
-        bx = line[k + 2] - origin[0],
-        bz = line[k + 3] - origin[1],
-        n = Math.max(1, divFloor(2 * Math.max(Math.abs(bx - ax), Math.abs(bz - az)), step));
-      for (let s = 0; s <= n; s++) {
-        const x = divFloor(2 * (ax + divFloor((bx - ax) * s, n)) + step, 2 * step),
-          z = divFloor(2 * (az + divFloor((bz - az) * s, n)) + step, 2 * step);
-        if (x >= 0 && z >= 0 && x < nx && z < nz) mask[z * nx + x] = 1;
-      }
-    }
-  return mask;
-}
-
 /** The interior `cells` x `cells` of a layer computed with a 1-cell margin. */
 function crop(layer: RasterLayer, cells: number): RasterLayer {
   const n = cells + 2,
@@ -649,6 +646,6 @@ function crop(layer: RasterLayer, cells: number): RasterLayer {
 
 /** The default biomes: the temperate preset and its neighbours, loaded from the presets entry on first use. */
 async function defaultBiomes(): Promise<readonly BiomeDefinition[]> {
-  const { presets } = await import('./presets.js');
+  const { presets } = await import('@margoengine/biomes/presets');
   return [presets.temperate, presets.alpine, presets.wetland, presets.boreal];
 }

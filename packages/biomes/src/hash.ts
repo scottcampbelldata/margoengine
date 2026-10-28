@@ -40,10 +40,13 @@ export function valueNoise(seed: number, x: number, z: number): number {
     iz = z >> 16,
     fx = fade(x & 0xffff),
     fz = fade(z & 0xffff),
-    a = hash3(seed, ix, iz) >>> 16,
-    b = hash3(seed, ix + 1, iz) >>> 16,
-    c = hash3(seed, ix, iz + 1) >>> 16,
-    d = hash3(seed, ix + 1, iz + 1) >>> 16,
+    // hash3(seed, ix + i, iz + j) with the inner pcg of each row shared.
+    z0 = pcg(iz),
+    z1 = pcg(iz + 1),
+    a = pcg((seed | 0) + pcg(ix + z0)) >>> 16,
+    b = pcg((seed | 0) + pcg(ix + 1 + z0)) >>> 16,
+    c = pcg((seed | 0) + pcg(ix + z1)) >>> 16,
+    d = pcg((seed | 0) + pcg(ix + 1 + z1)) >>> 16,
     top = a + qmul(b - a, fx),
     bottom = c + qmul(d - c, fx);
   return top + qmul(bottom - top, fz);

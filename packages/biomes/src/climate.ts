@@ -75,6 +75,19 @@ export interface Climate {
 }
 
 const SEASONS = ['auto', 'uniform', 'summer', 'winter'];
+/** Each numeric climate option: default, minimum and maximum. */
+const RANGES = {
+  latitude: [45, -89, 89],
+  seaLevel: [0, -11000, 9000],
+  lapseRate: [5, 0, 12],
+  lapseSplit: [3, 0, 8],
+  equatorTemperature: [27, -60, 60],
+  poleTemperature: [-20, -90, 60],
+  rainfall: [900, 0, 12000],
+  rainShadow: [0.6, 0, 1],
+  inland: [500, 0, 5000],
+  coldAir: [3, 0, 10],
+} as const;
 
 /**
  * Validates and quantises climate settings (plain arithmetic and CORDIC, so every engine gets the same integers).
@@ -83,37 +96,30 @@ const SEASONS = ['auto', 'uniform', 'summer', 'winter'];
 export function quantizeClimate(options: ClimateOptions = {}): Climate {
   if (typeof options !== 'object' || options === null)
     throw typeError('Climate options must be an object; pass {} for the defaults', 'biomes');
-  const lat = options.latitude ?? 45,
-    lapse = options.lapseRate ?? 5,
-    split = options.lapseSplit ?? 3,
-    teq = options.equatorTemperature ?? 27,
-    tpole = options.poleTemperature ?? -20,
-    rain = options.rainfall ?? 900,
-    shadow = options.rainShadow ?? 0.6,
-    inland = options.inland ?? 500,
-    cold = options.coldAir ?? 3,
-    season = options.rainSeason ?? 'auto',
-    sea = options.seaLevel ?? 0;
-  const inRange = (v: number, lo: number, hi: number) => typeof v === 'number' && v >= lo && v <= hi;
-  if (
-    !inRange(lat, -89, 89) ||
-    !inRange(lapse, 0, 12) ||
-    !inRange(split, 0, 8) ||
-    split / 2 > lapse ||
-    !inRange(teq, -60, 60) ||
-    !inRange(tpole, -90, 60) ||
-    tpole > teq ||
-    !inRange(rain, 0, 12000) ||
-    !inRange(shadow, 0, 1) ||
-    !inRange(inland, 0, 5000) ||
-    !inRange(cold, 0, 10) ||
-    !inRange(sea, -11000, 9000) ||
-    !SEASONS.includes(season)
-  )
-    throw rangeError(
-      'Invalid climate options; latitude -89..89, lapseRate 0..12 with lapseSplit 0..8 at most twice it, equator and pole temperatures with the pole colder, rainfall 0..12,000, rainShadow 0..1, inland 0..5,000 km, coldAir 0..10 K and rainSeason auto/uniform/summer/winter',
-      'biomes',
-    );
+  const v = {} as Record<keyof typeof RANGES, number>;
+  for (const [key, [fallback, lo, hi]] of Object.entries(RANGES) as [keyof typeof RANGES, readonly number[]][]) {
+    const value = options[key] ?? fallback;
+    if (!(typeof value === 'number' && value >= lo && value <= hi))
+      throw rangeError(`Climate ${key} must be a number in ${lo}..${hi}`, 'biomes');
+    v[key] = value;
+  }
+  const {
+      latitude: lat,
+      lapseRate: lapse,
+      lapseSplit: split,
+      equatorTemperature: teq,
+      poleTemperature: tpole,
+      rainfall: rain,
+      rainShadow: shadow,
+      inland,
+      coldAir: cold,
+      seaLevel: sea,
+    } = v,
+    season = options.rainSeason ?? 'auto';
+  if (split / 2 > lapse) throw rangeError('Climate lapseSplit must be at most twice lapseRate', 'biomes');
+  if (tpole > teq) throw rangeError('Climate poleTemperature must not be above equatorTemperature', 'biomes');
+  if (!SEASONS.includes(season))
+    throw rangeError("Climate rainSeason must be 'auto', 'uniform', 'summer' or 'winter'", 'biomes');
   const latitude = degreesToAngle(lat),
     sc = sincos(latitude, [0, 0]),
     s = Math.abs(sc[1]),

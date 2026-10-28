@@ -9,6 +9,12 @@ that terrain, scatter and a terrain editor read. This package is optional and tr
 and the stage. It is built in milestones: this release has the integer foundation, climate fields, biome classification with
 presets, a terrain view and editor hooks; placement of trees, rocks and props comes next.
 
+Entries, each loaded only when used: the root (`BiomeWorld`, fields, classification), `/presets` (eight biomes, their
+worlds and the reference world `R16`), `/relief` (the procedural landscape; `BiomeWorld.create` loads it only for a
+relief height, the default), `/digest` (canonical bytes and SHA-256, loaded by `world.digest`), `/zones` (Whittaker and
+Holdridge classifiers), `/koppen` (Koppen-Geiger labels), `/toolkit` (the integer helpers), `/view` and `/editor`. The
+lazily loaded ones come through the package name, so an app holds one copy of each module.
+
 ## A world in three lines
 
 ```ts
@@ -33,7 +39,7 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 | `seed` | 1 | u32 seed |
 | `size` | [4096, 4096] | world extent in metres, 256..65,536, multiples of `regionResolution` |
 | `origin` | `-size / 2` | minimum corner in metres |
-| `height` | `{ relief: {} }` | `{ samples, width, depth, unit? }` (Int32Array mm or Float32Array m, corners on the world's corners), `{ field: (x, z) => metres }` or `{ relief: ReliefOptions }` |
+| `height` | `{ relief: {} }` | `{ samples, width, depth, unit? }` (Int32Array mm or Float32Array m, corners on the world's corners), `{ field: (x, z) => metres }` or `{ relief: ReliefOptions }` (loads `/relief`; `update` to a relief height needs it loaded, by a relief world or `import('@margoengine/biomes/relief')`) |
 | `climate` | see below | climate settings |
 | `tileSize` | 256 | 128, 256 or 512 m |
 | `resolution` | 1 | tile cell size: 0.5, 1, 2 or 4 m |
@@ -72,7 +78,8 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 | `soil` | u8 | cm | soil depth proxy, 0 to 2.55 m |
 | `profile`, `plan` | i16 | 1e-4 / m | profile and plan curvature, only when a request names them |
 
-`LAYERS` lists every layer with its format, scale and unit; `value = data[z * width + x] * scale`.
+`LAYERS` lists every layer with its format, scale and unit; `value = data[z * width + x] * scale`. `LAYER_ABOUT` from
+`@margoengine/biomes/editor` describes each one in a short phrase, for layer pickers and tooltips.
 
 ### How the climate is made
 
@@ -87,8 +94,10 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
   grows with latitude and continentality, closed-form growing degree days and season length, Korner's treeline
   margin, Hargreaves potential evapotranspiration with FAO-56 radiation, and the moisture index from Fu's form of the
   Budyko curve. Formulas, constants and sources are in `docs/clean-room.md`.
-- Tile cost: about 50 ms per 256 m tile at 1 m on one thread of the reference PC for the 17 climate layers, about
-  85 ms with classification, checked in the package test against a 400 ms budget.
+- Tile cost on one thread of the reference PC (R16 mountain tiles, `bench/biomes/placement.mjs`): about 25 ms per
+  256 m tile at 1 m for the 17 climate layers and about 42 ms with classification (650 ms per km2; it was 1,350 before
+  the kernels were rewritten over typed planes with identical bytes), checked in the package test against a 400 ms
+  budget.
 
 ## Biomes, presets and blends
 
@@ -121,14 +130,16 @@ console.log(world.biomes[first].id, tile.layer('biomeWeight')!.data[0] / 255, wo
   slopes.
 - **Nothing is ever empty**: a cell outside every envelope gets the nearest one by normalised distance (ties: higher
   `priority`, then id).
-- **Whittaker and Holdridge**: `classifier: 'whittaker'` weights each biome by the Whittaker classes in its `zones`
-  (`WHITTAKER`, our rectangles over mean temperature and rainfall from the published diagram); `'holdridge'` by
-  Holdridge life zones (`holdridgeZone(biotemperature, rainfall)`, nearest hexagon in log biotemperature, rainfall and
-  PET ratio, such as `'cool-temperate-perhumid'`).
+- **Whittaker and Holdridge** (entry `/zones`): `classifier: whittaker` weights each biome by the Whittaker classes in
+  its `zones` (`WHITTAKER`, our rectangles over mean temperature and rainfall from the published diagram); `holdridge`
+  by Holdridge life zones (`holdridgeZone(biotemperature, rainfall)`, nearest hexagon in log biotemperature, rainfall
+  and PET ratio, such as `'cool-temperate-perhumid'`). `import { whittaker } from '@margoengine/biomes/zones'`, then
+  `BiomeWorld.create({ classifier: whittaker })`.
 
 `presets` holds `temperate`, `boreal`, `alpine`, `wetland`, `tundra`, `desert`, `savanna` and `tropical`, written as
 plant functional type limits over the coldest month, growing degree days and the moisture index, with Korner's
-treeline for forests, so belts move with latitude, aspect and cold air instead of fixed heights. `presetWorlds` holds
+treeline for forests, so belts move with latitude, aspect and cold air instead of fixed heights. They are plain frozen
+data (the package tests check each one with `defineBiome`), so the entry is small. `presetWorlds` holds
 a climate and relief where each one is common, used by the golden digests. The default world uses `temperate` with
 its neighbours `alpine`, `wetland` and `boreal`. Every definition is plain JSON: `defineBiome` validates it and returns
 a frozen copy.
@@ -192,7 +203,7 @@ slope, height, moisture and curvature rules; `groundWeights(world, tile, materia
 | `clipmap` | cell 1 m, 64 cells, 6 rings | `cellSize`, `resolution` and `levels` of the terrain |
 | `signal` | none | rejects `attach` and stops streaming |
 
-WebGPU only. Tiles are made on the page's thread for now (about 85 ms each; the worker pool is a later milestone),
+WebGPU only. Tiles are made on the page's thread for now (about 42 ms each; the worker pool is a later milestone),
 with a pause between tiles so frames keep drawing.
 
 ## Editing: paint, undo and dirty rectangles
@@ -234,10 +245,10 @@ editor.undo(); // the exact bytes from before the erase
 Everything that decides the output is integer arithmetic: fixed-point values, integer square roots, CORDIC
 trigonometry, table logarithms and PCG hashes. No `Math.sin`, `Math.exp` or float rounding decides anything, so a world
 gives byte-identical layers in every browser, in Node, on the main thread or in a worker. The helpers are public, so
-your own rules can follow the same contract.
+your own rules can follow the same contract (entry `/toolkit`).
 
 ```ts
-import { ONE, atan2, hash3, qexp2, qlog2, qmul, sincos } from '@margoengine/biomes';
+import { ONE, atan2, hash3, qexp2, qlog2, qmul, sincos } from '@margoengine/biomes/toolkit';
 
 const half = ONE / 2; // 0.5 in Q16.16
 const quarter = qmul(half, half); // 16384, exactly 0.25
@@ -269,11 +280,11 @@ algorithm and against float references in the package tests.
 
 ## Procedural relief
 
-`createRelief(options)` is a seeded landscape in integer millimetres: fractal lowlands, ridged mountains under a
-mountain mask, an optional coast and river valleys. It is the default height of a biome world.
+`createRelief(options)` (entry `/relief`) is a seeded landscape in integer millimetres: fractal lowlands, ridged
+mountains under a mountain mask, an optional coast and river valleys. It is the default height of a biome world.
 
 ```ts
-import { createRelief } from '@margoengine/biomes';
+import { createRelief } from '@margoengine/biomes/relief';
 
 const relief = createRelief({ seed: 7, coast: 'west', rivers: 2 });
 const metres = relief.height(120_000, -340_000) / 1000; // world x 120 m, z -340 m
@@ -291,12 +302,12 @@ console.log(metres, relief.rivers.length);
 | `rivers` | 0 | 0..8 river valleys (250 m half width) toward the coast |
 | `seaDepth` | 40 | sea floor depth in metres |
 
-`quantizeHeights(floats, unit?)` turns float heights (metres times `unit`) into integer millimetres once, so a
+`quantizeHeights(floats, unit?)` (in `/toolkit`) turns float heights (metres times `unit`) into integer millimetres once, so a
 heightmap from any source enters the integer world the same way everywhere.
 
 ## The reference world R16
 
-`R16` is the fixed scene of every biomes benchmark and quality report: 16 km by 16 km at 1 m, a western coast, two
+`R16` (in `/presets`) is the fixed scene of every biomes benchmark and quality report: 16 km by 16 km at 1 m, a western coast, two
 river valleys, the temperate, alpine, wetland and boreal presets, about 25 million stored objects at full density. It
 is plain frozen data, so the same world can be rebuilt anywhere, `createRelief(R16.relief)` included. The package test
 locks its heights with a committed SHA-256 digest.

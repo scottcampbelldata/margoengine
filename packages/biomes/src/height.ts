@@ -1,9 +1,9 @@
 // Height sources of a biome world, sampled in integer millimetres. Coarse inputs are interpolated with Catmull-Rom
 // cubic convolution (Keys, "Cubic convolution interpolation for digital image processing", IEEE TASSP 1981, a = -0.5)
 // in Q16 weights, so slope and curvature stay continuous across sample lines and every machine gets the same heights.
-import { rangeError, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { divFloor, ONE } from './fixed.js';
-import { createRelief, type Relief, type ReliefOptions } from './relief.js';
+import type { createRelief, Relief, ReliefOptions } from './relief.js';
 
 /**
  * Where a world's heights come from.
@@ -121,17 +121,24 @@ export function heightsOf(
   origin: readonly [number, number],
   size: readonly [number, number],
   seed: number,
+  relief?: typeof createRelief,
 ): Heights {
   if (source === undefined || 'relief' in source) {
-    const relief = createRelief({
+    if (!relief)
+      throw fault(
+        'state',
+        "A relief height needs the relief entry; pass it to BiomeWorld.create or await import('@margoengine/biomes/relief') first",
+        'biomes',
+      );
+    const made = relief({
       seed,
       origin: [origin[0] / 1000, origin[1] / 1000],
       size: [size[0] / 1000, size[1] / 1000],
       ...(source?.relief ?? {}),
     });
-    const at = (i: number, j: number) => relief.height(origin[0] + i * LATTICE, origin[1] + j * LATTICE);
+    const at = (i: number, j: number) => made.height(origin[0] + i * LATTICE, origin[1] + j * LATTICE);
     return {
-      relief,
+      relief: made,
       grid(gx, gz, count, rows, step) {
         const out = new Int32Array(count * rows);
         if (step % LATTICE === 0) {
@@ -205,4 +212,25 @@ export function heightsOf(
       return out;
     },
   };
+}
+
+/**
+ * Quantises float heights once to integer millimetres (`Math.round(h * 1000 / unit)` per sample, plain arithmetic, so
+ * every engine rounds the same way). `unit` is metres per input unit, default 1.
+ * @throws TypeError when `samples` is not a Float32Array or Float64Array; RangeError for a non-finite or out-of-range
+ * sample (beyond +-2,000 km).
+ */
+export function quantizeHeights(samples: Float32Array | Float64Array, unit = 1): Int32Array {
+  if (!(samples instanceof Float32Array || samples instanceof Float64Array))
+    throw typeError('quantizeHeights needs a Float32Array or Float64Array of heights', 'biomes');
+  if (!(unit > 0 && Number.isFinite(unit)))
+    throw rangeError('quantizeHeights unit must be a positive number', 'biomes');
+  const out = new Int32Array(samples.length);
+  for (let i = 0; i < samples.length; i++) {
+    const v = Math.round(samples[i] * unit * 1000);
+    if (!(Math.abs(v) <= 2e9))
+      throw rangeError(`Height sample ${i} is not finite or beyond 2,000 km; fix the input`, 'biomes');
+    out[i] = v;
+  }
+  return out;
 }

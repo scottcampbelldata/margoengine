@@ -5,10 +5,35 @@
 // rectangles cover every cell an edit can change, grown by the placement margin (K rounds of 2 x the largest species
 // radius plus the widest cluster spread, research notes 2026-10-28) so later milestones stay inside them.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import { clampInt, divFloor, fade, isqrt, ONE } from './fixed.js';
+import { clampInt, divFloor, fade, isqrt, ONE } from '@margoengine/biomes/toolkit';
 import type { BiomeWorld, LayerWrite } from './world.js';
 
 type Rect = readonly [number, number, number, number];
+
+/** What each built-in tile layer holds, by name: for layer pickers and tooltips in editors. */
+export const LAYER_ABOUT: Readonly<Record<string, string>> = Object.freeze({
+  height: 'terrain height',
+  slope: 'gradient magnitude (rise over run), Horn 3x3',
+  aspect: 'downslope direction, clockwise from north (-Z); east (+X) is 90',
+  curvature: 'general curvature of the 3x3 quadratic fit, positive on convex ground',
+  tpi: 'topographic position: height minus the 49 m box mean',
+  temperature: 'mean annual air temperature',
+  coldest: 'mean temperature of the coldest month',
+  warmest: 'mean temperature of the warmest month',
+  gdd5: 'growing degree days above 5 C',
+  season: 'days with a mean above 0.9 C (growing season)',
+  treeline: 'Korner thermal treeline margin: trees grow where it is 0 or more',
+  rainfall: 'annual rainfall with orography and rain shadow',
+  alpha: 'moisture index AET / PET (Fu-Budyko)',
+  moisture: 'soil moisture: moisture index plus topographic wetness and nearness to water',
+  exposure: 'wind exposure (Winstral Sx), 0.5 on flat ground',
+  waterDistance: 'distance to the sea or a river',
+  soil: 'soil depth proxy, 0 to 2.55 m',
+  biome: 'the 4 strongest biomes per cell, as indices into the world biome list (255 = none)',
+  biomeWeight: 'their weights, in the same order, summing to exactly 255',
+  profile: 'profile curvature (on request)',
+  plan: 'plan curvature (on request)',
+});
 
 /** How a dab changes a layer: raise, lower, move toward, or keep the larger or smaller of the value and the brush. */
 export type BrushMode = 'add' | 'subtract' | 'set' | 'max' | 'min';

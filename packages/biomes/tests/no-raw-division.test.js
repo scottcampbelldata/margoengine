@@ -9,7 +9,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { parseSync } from 'rolldown/utils';
 
 const src = new URL('../src/', import.meta.url);
-const HELPERS = new Set(['idiv', 'imod', 'udiv', 'umod', 'divWide']);
+const HELPERS = new Set(['idiv', 'imod', 'udiv', 'umod', 'divWide', 'divWider', 'divFloor']);
 
 /** A divisor that is a non-zero constant. */
 function constant(node) {

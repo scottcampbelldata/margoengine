@@ -55,7 +55,9 @@ export function mulShift(a: number, b: number, shift: number): number {
 
 /** Q16.16 product, `floor(a * b / 65536)`, exact, wrapped to i32. */
 export function qmul(a: number, b: number): number {
-  return mulShift(a, b, 16);
+  // mulShift(a, b, 16) with the shift folded in: the hot path of noise and kernels.
+  const p = (a | 0) * (b | 0);
+  return p < 9007199254740992 && p > -9007199254740992 ? Math.floor(p / 65536) | 0 : mulShift(a, b, 16);
 }
 
 // Division follows WGSL's integer rules exactly (WGSL section 8.8), so the CPU and a GPU kernel give the same bytes
@@ -99,6 +101,15 @@ export function umod(a: number, b: number): number {
  * correction step makes it exact.
  */
 export function divWide(n: number, d: number): number {
+  // Below 2^52 over a non-zero divisor below 2^31 the double quotient is never within rounding of the next integer (its
+  // distance to one is at least 1 / |d|, the rounding at most |q| 2^-53 < 1 / |d|), so truncating it is exact. Kept
+  // this small so engines inline it; the wide case is a separate function.
+  return n < 4503599627370496 && n > -4503599627370496 && d < 2147483648 && d > -2147483648 && d !== 0
+    ? Math.trunc(n / d) + 0
+    : divWider(n, d);
+}
+
+function divWider(n: number, d: number): number {
   if (d === 0) return n;
   let q = Math.trunc(n / d);
   const r = n - q * d,
@@ -114,6 +125,13 @@ export function divWide(n: number, d: number): number {
 
 /** Floor division of integers below 2^53 in magnitude, exact, with WGSL's zero rule (`n / 0` is `n`). CPU only. */
 export function divFloor(n: number, d: number): number {
+  // Exact for the same reason as divWide's fast path.
+  return n < 4503599627370496 && n > -4503599627370496 && d < 2147483648 && d > -2147483648 && d !== 0
+    ? Math.floor(n / d) + 0
+    : divFloorWide(n, d);
+}
+
+function divFloorWide(n: number, d: number): number {
   const q = divWide(n, d);
   return d !== 0 && q * d !== n && n < 0 !== d < 0 ? q - 1 : q;
 }
@@ -153,16 +171,28 @@ export function qlog2(x: number): number {
   x |= 0;
   if (x <= 0) return -2147483648;
   const e = 31 - Math.clz32(x);
-  let m = e >= 15 ? x >>> (e - 15) : x << (15 - e),
-    frac = 0;
-  for (let bit = 1 << 15; bit; bit >>>= 1) {
-    m = ((Math.imul(m, m) >>> 0) + 16384) >>> 15; // m < 2^16, so m^2 + 2^14 < 2^32: exact
-    if (m >= 65536) {
-      m >>>= 1;
-      frac |= bit;
+  // The fraction depends only on the 16-bit mantissa (2^15..2^16 - 1): looked up in a table of the same squarings.
+  return ((e - 16) * ONE + (LOG2 ??= log2Table())[(e >= 15 ? x >>> (e - 15) : x << (15 - e)) - 32768]) | 0;
+}
+
+let LOG2: Uint16Array | undefined;
+
+/** The 16 squarings of qlog2 for every mantissa, built once on first use (32,768 entries). */
+function log2Table(): Uint16Array {
+  const table = new Uint16Array(32768);
+  for (let i = 0; i < 32768; i++) {
+    let m = i + 32768,
+      frac = 0;
+    for (let bit = 1 << 15; bit; bit >>>= 1) {
+      m = ((Math.imul(m, m) >>> 0) + 16384) >>> 15; // m < 2^16, so m^2 + 2^14 < 2^32: exact
+      if (m >= 65536) {
+        m >>>= 1;
+        frac |= bit;
+      }
     }
+    table[i] = frac;
   }
-  return ((e - 16) * ONE + frac) | 0;
+  return table;
 }
 
 // round(2^(j/16) * 2^24), j = 0..16.
@@ -185,8 +215,9 @@ export function qexp2(x: number): number {
     t2 = Math.floor((t * t) / 33554432), // t^2 / 2
     t3 = Math.floor((t2 * t) / 50331648), // t^3 / 6
     m = Math.floor((EXP2[f >>> 12] * (16777216 + t + t2 + t3)) / 4294967296); // Q16
-  if (n >= 0) return Math.min(2147483647, m * 2 ** n) | 0;
-  return n <= -18 ? 0 : Math.floor(m / 2 ** -n);
+  // m < 2^17 and n <= 14, so the shifts are exact: m * 2^n and floor(m / 2^-n).
+  if (n >= 0) return m << n;
+  return n <= -18 ? 0 : m >> -n;
 }
 
 /** `qexp2(qmul(y, qlog2(x)))`: a positive Q16.16 value to a Q16.16 power. */
@@ -195,10 +226,10 @@ export function qpow(x: number, y: number): number {
 }
 
 // round(atan(2^-i) / 2 pi * 2^32): CORDIC angles as 32-bit binary angles.
-const ATAN = [
+const ATAN = new Int32Array([
   536870912, 316933406, 167458907, 85004756, 42667331, 21354465, 10679838, 5340245, 2670163, 1335087, 667544, 333772,
   166886, 83443, 41722, 20861, 10430, 5215, 2608, 1304, 652, 326, 163, 81, 41, 20, 10, 5, 3, 1,
-];
+]);
 // round(prod cos(atan(2^-i)) * 2^29): the inverse CORDIC gain in Q29.
 const GAIN = 326016437;
 
@@ -216,23 +247,29 @@ export function atan2(y: number, x: number): number {
   }
   // Scale so the larger magnitude is in [2^28, 2^29): the CORDIC gain (1.65) then stays below 2^31.
   const m = Math.max(Math.abs(x), Math.abs(y));
-  let shift = m < 2147483648 ? Math.clz32(m) - 3 : 28 - Math.floor(Math.log2(m));
-  while (m * 2 ** shift >= 536870912) shift--;
-  while (m * 2 ** shift < 268435456) shift++;
-  let px = Math.floor(x * 2 ** shift) | 0,
+  let px: number, py: number;
+  if (m < 2147483648 && x === (x | 0) && y === (y | 0)) {
+    // An i32 pair (the common case): the shift that puts m in [2^28, 2^29) is 3 - clz32 away, done with integer shifts
+    // (the same floor(v 2^shift) as below, exactly).
+    const shift = Math.clz32(m) - 3;
+    px = shift >= 0 ? x << shift : x >> -shift;
+    py = shift >= 0 ? y << shift : y >> -shift;
+  } else {
+    let shift = m < 2147483648 ? Math.clz32(m) - 3 : 28 - Math.floor(Math.log2(m));
+    while (m * 2 ** shift >= 536870912) shift--;
+    while (m * 2 ** shift < 268435456) shift++;
+    px = Math.floor(x * 2 ** shift) | 0;
     py = Math.floor(y * 2 ** shift) | 0;
-  for (let i = 0; i < ATAN.length; i++) {
+  }
+  // Branch-free steps (the sign of py picks the direction): t is 0 when py > 0 and -1 otherwise, and (v ^ t) - t is v
+  // or -v, so each step is exactly `py > 0 ? (px += dy, py -= dx, z += a) : (px -= dy, py += dx, z -= a)`.
+  for (let i = 0; i < 30; i++) {
     const dx = px >> i,
-      dy = py >> i;
-    if (py > 0) {
-      px += dy;
-      py -= dx;
-      z = (z + ATAN[i]) | 0;
-    } else {
-      px -= dy;
-      py += dx;
-      z = (z - ATAN[i]) | 0;
-    }
+      dy = py >> i,
+      t = ~(-py >> 31);
+    px += (dy ^ t) - t;
+    py -= (dx ^ t) - t;
+    z = (z + ((ATAN[i] ^ t) - t)) | 0;
   }
   return z;
 }

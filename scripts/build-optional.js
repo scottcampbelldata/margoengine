@@ -43,9 +43,12 @@ await build({
     emptyOutDir: true,
     target: 'es2022',
     lib: { entry: entries, formats: ['es'], fileName: (_format, name) => name + '.js' },
-    // Node built-ins stay imports too (voxel-net's server entry runs in Node).
+    // Node built-ins stay imports too (voxel-net's server entry runs in Node). So does the package's own name: an
+    // entry that loads a sibling entry lazily (`import('@margoengine/biomes/presets')`) shares that entry's module
+    // with the app instead of inlining a copy.
     rollupOptions: {
-      external: (id) => id.startsWith('node:') || peers.some((peer) => id === peer || id.startsWith(peer + '/')),
+      external: (id) =>
+        id.startsWith('node:') || [...peers, manifest.name].some((peer) => id === peer || id.startsWith(peer + '/')),
     },
   },
 });
