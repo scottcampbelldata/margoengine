@@ -10,13 +10,15 @@
 // package's package.json): a hung test has its whole process tree killed, is named in the output and fails the step.
 // Holds one shared slot of the GPU lock (scripts/gpu-lock.mjs, up to 3 at once) for the whole run; each test's result and time go to
 // test-results/gpu-packages.json. A test that fails while the Windows event log shows a GPU driver reset runs once more
-// (scripts/support/driver-resets.mjs, bug 25); the reset and the rerun are printed and kept in that file, never hidden.
+// (scripts/support/driver-resets.mjs, bug 25); the reset and the rerun are printed and kept in that file, never hidden:
+// a run that passed only that way ends with a "PASSED WITH A DRIVER RESET" line per test and the file's top-level
+// `passedAfterDriverReset` is true (the file is `{ passedAfterDriverReset, results }`).
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { acquire, lockDir } from './gpu-lock.mjs';
-import { describeResets, retryAfterDriverReset } from './support/driver-resets.mjs';
+import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { runLimited, testLimitMs } from './support/run-limited.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -161,6 +163,16 @@ function browserFiles() {
   return found.sort();
 }
 
+/**
+ * What a run writes to test-results/gpu-packages.json and the warning lines it ends with. A run in which every test
+ * passed, but some only on their rerun after a logged GPU driver reset, has `passedAfterDriverReset: true` and one
+ * "PASSED WITH A DRIVER RESET" line per such test; a clean pass or a failed run has false and no lines.
+ */
+export function report(results) {
+  const warnings = results.every((r) => r.ok) ? passedAfterResetLines(results) : [];
+  return { json: { passedAfterDriverReset: warnings.length > 0, results }, warnings };
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
   const select = process.argv.find((a) => a.startsWith('--select='))?.slice(9);
@@ -221,13 +233,15 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   }
   const failed = results.filter((r) => !r.ok);
   mkdirSync(join(root, 'test-results'), { recursive: true });
-  writeFileSync(join(root, 'test-results/gpu-packages.json'), JSON.stringify(results, null, 2) + '\n');
+  const { json, warnings } = report(results);
+  writeFileSync(join(root, 'test-results/gpu-packages.json'), JSON.stringify(json, null, 2) + '\n');
   console.log('\nGPU package tests:');
   for (const r of results)
     console.log(
       `  ${r.ok ? 'PASS' : 'FAIL'}  ${r.label}  ${r.seconds} s${r.driverReset ? `  (run again after a ${describeResets(r.driverReset.resets)})` : ''}`,
     );
   console.log(`  total ${Math.round((performance.now() - started) / 1000)} s`);
+  for (const line of warnings) console.log(`\n${line}`);
   if (failed.length) {
     console.error(`${failed.length} of ${results.length} failed: ${failed.map((r) => r.label).join(', ')}`);
     process.exitCode = 1;

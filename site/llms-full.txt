@@ -2869,7 +2869,9 @@ does not own. Each entry says exactly what is needed to close it.
   "nvlddmkm event 153 at 01:21:49") or says that none was logged (`scripts/support/device-loss.js`,
   `scripts/support/driver-resets.mjs`). A `check:gpu-packages` test, or any other `check:merge` step, that fails while
   the log shows a GPU driver reset runs once more; the reset and the rerun are printed and kept in
-  `test-results/gpu-packages.json` and `test-results/check-merge.json`, and a second failure fails the check. The path
+  `test-results/gpu-packages.json` and `test-results/check-merge.json`, and a second failure fails the check. A run
+  that passed only on such a rerun ends with a "PASSED WITH A DRIVER RESET: <step>, <reset and time>" line per step
+  and sets `passedAfterDriverReset: true` at the top of both files, so it never reads like a clean pass. The path
   tracer viewport traces at most 2^20 paths a dispatch (`packages/voxel-pathtracer/src/dispatch.ts`).
 - **Needed to close:** run the checks with the Remote Desktop session disconnected (or with Remote Desktop not using the
   GPU) for a day and count resets; if 153 still comes, a per-second recorder (GPU engine use and memory per process,

@@ -151,3 +151,20 @@ export async function retryAfterDriverReset(
   log(`GPU RESET: the rerun of ${label} ${second.ok ? 'passed' : 'failed too'}.`);
   return { ...second, driverReset: { resets, firstRun: first, rerunOk: second.ok } };
 }
+
+/**
+ * The warning lines for a run whose steps (or tests) passed only on their rerun after a logged GPU driver reset, one per
+ * step: "PASSED WITH A DRIVER RESET: <step>, <the reset and its time>". Empty for a clean pass, so a pass after a rerun
+ * never reads like one. Each result is `{ ok, command | label, driverReset? }`; `nested` adds the lines of a step that
+ * reruns its own tests (check:gpu-packages), as `{ step, results }`.
+ */
+export function passedAfterResetLines(results, nested = []) {
+  const lines = [];
+  for (const r of results)
+    if (r.ok && r.driverReset?.rerunOk)
+      lines.push(`PASSED WITH A DRIVER RESET: ${r.command ?? r.label}, ${describeResets(r.driverReset.resets)}`);
+  for (const { step, results: inner } of nested)
+    for (const line of passedAfterResetLines(inner))
+      lines.push(line.replace('PASSED WITH A DRIVER RESET: ', `PASSED WITH A DRIVER RESET: ${step} > `));
+  return lines;
+}

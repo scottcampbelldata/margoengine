@@ -11,12 +11,13 @@
 // one it builds or imports (scripts/support/affected-packages.mjs); the full run keeps both whole. The mode and the
 // reason are printed first and written to test-results/check-merge.json. A step that fails while the Windows event log
 // shows a GPU driver reset (scripts/support/driver-resets.mjs, bug 25) runs once more; the reset is printed and recorded
-// with the step, and a second failure fails the run.
+// with the step, and a second failure fails the run. A run that passed only that way says so: a "PASSED WITH A DRIVER
+// RESET" line per step or GPU test, and `passedAfterDriverReset: true` in check-merge.json.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { describeResets, retryAfterDriverReset } from './support/driver-resets.mjs';
+import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { analyse, buildFootprints, loadWorkspaces, scan, visualIds, wgslPackages } from './support/affected-gpu.mjs';
 import { matrixClosure, packageScopes } from './support/affected-packages.mjs';
 
@@ -165,30 +166,70 @@ async function main() {
       { ok, driverReset } =
         name === 'check:gpu-packages' ? await runStep() : await retryAfterDriverReset(command, runStep);
     if (name === 'verify' && ok) built = true;
+    // The tests check:gpu-packages ran again after a reset, from the file it just wrote, so the summary names them.
+    const resetTests =
+      name === 'check:gpu-packages' && ok
+        ? JSON.parse(readFileSync(join(root, 'test-results/gpu-packages.json'), 'utf8')).results.filter(
+            (r) => r.driverReset,
+          )
+        : [];
     results.push({
       command,
       ok,
       seconds: Math.round((performance.now() - t0) / 100) / 10,
       ...(driverReset && { driverReset: { resets: driverReset.resets, rerunOk: driverReset.rerunOk } }),
+      ...(resetTests.length && {
+        driverResetTests: resetTests.map(({ label, ok, driverReset }) => ({
+          label,
+          ok,
+          driverReset: { resets: driverReset.resets, rerunOk: driverReset.rerunOk },
+        })),
+      }),
     });
     if (!ok) {
       failed = command;
       break;
     }
   }
-  const seconds = Math.round((performance.now() - started) / 1000);
+  const seconds = Math.round((performance.now() - started) / 1000),
+    { passedAfterDriverReset, lines } = summary({ results, failed, seconds });
   mkdirSync(join(root, 'test-results'), { recursive: true });
   writeFileSync(
     join(root, 'test-results/check-merge.json'),
-    `${JSON.stringify({ mode: decision.mode, reason: decision.reason, affected: decision.affected, seconds, results }, null, 2)}\n`,
+    `${JSON.stringify({ mode: decision.mode, reason: decision.reason, affected: decision.affected, passedAfterDriverReset, seconds, results }, null, 2)}\n`,
   );
+  console.log(`\n${describe(decision, base)}\n${lines.join('\n')}`);
+  if (failed) process.exitCode = 1;
+}
+
+/**
+ * The end of a run: the GPU resets it met, then "PASSED", "FAILED at <step>", or, when it passed only because a step
+ * or a check:gpu-packages test passed on its rerun after a logged GPU driver reset, one "PASSED WITH A DRIVER RESET"
+ * warning per such step and a last line that says so; `passedAfterDriverReset` is then true (check-merge.json). The
+ * exit code does not change: a pass after a rerun passes, a failed rerun has already failed the run.
+ */
+export function summary({ results, failed, seconds }) {
+  const lines = [];
   for (const { command, driverReset } of results)
     if (driverReset)
-      console.log(
-        `\nGPU RESET during ${command}: ${describeResets(driverReset.resets)}; the rerun ${driverReset.rerunOk ? 'passed' : 'failed'}`,
+      lines.push(
+        `GPU RESET during ${command}: ${describeResets(driverReset.resets)}; the rerun ${driverReset.rerunOk ? 'passed' : 'failed'}`,
       );
-  console.log(`\n${describe(decision, base)}\n${failed ? `FAILED at ${failed}` : 'PASSED'} in ${seconds} s`);
-  if (failed) process.exitCode = 1;
+  const warnings = failed
+    ? []
+    : passedAfterResetLines(
+        results,
+        results.filter((r) => r.driverResetTests).map((r) => ({ step: r.command, results: r.driverResetTests })),
+      );
+  lines.push(...warnings);
+  lines.push(
+    failed
+      ? `FAILED at ${failed} in ${seconds} s`
+      : warnings.length
+        ? `PASSED WITH A DRIVER RESET in ${seconds} s: ${warnings.length} rerun${warnings.length > 1 ? 's' : ''} after a GPU driver reset, see above`
+        : `PASSED in ${seconds} s`,
+  );
+  return { passedAfterDriverReset: warnings.length > 0, lines };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();

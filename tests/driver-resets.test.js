@@ -143,3 +143,69 @@ test('the lookup covers the whole step, from just before it started', async () =
   assert.ok(window.since <= start && start - window.since <= 10_000);
   assert.equal(window.until.getTime(), end.getTime());
 });
+
+// A run that passed only on a rerun after a reset read exactly like a clean pass (coordinator, 2026-10-28): the summary
+// now ends with a marked warning per rerun step, and both result files carry `passedAfterDriverReset`.
+test('a check:merge pass after a reset rerun is marked in the summary and the JSON flag; a clean pass is not', async () => {
+  const { summary } = await import('../scripts/check-merge.mjs');
+  const reset = { resets: [nvidia], rerunOk: true };
+  const clean = summary({ results: [{ command: 'npm run verify', ok: true }], seconds: 9 });
+  assert.equal(clean.passedAfterDriverReset, false);
+  assert.deepEqual(clean.lines, ['PASSED in 9 s']);
+  const rerun = summary({
+    results: [
+      { command: 'npm run verify', ok: true },
+      { command: 'npm run visual:check', ok: true, driverReset: reset },
+      {
+        command: 'npm run check:gpu-packages -- --no-build',
+        ok: true,
+        driverResetTests: [{ label: 'sciviz test:browser', ok: true, driverReset: reset }],
+      },
+    ],
+    seconds: 12,
+  });
+  assert.equal(rerun.passedAfterDriverReset, true);
+  const at = new Date(nvidia.at).toLocaleTimeString('en-GB', { hour12: false });
+  assert.ok(rerun.lines.includes(`PASSED WITH A DRIVER RESET: npm run visual:check, ${describeResets([nvidia])}`));
+  assert.ok(
+    rerun.lines.includes(
+      `PASSED WITH A DRIVER RESET: npm run check:gpu-packages -- --no-build > sciviz test:browser, ${describeResets([nvidia])}`,
+    ),
+  );
+  assert.match(rerun.lines.join('\n'), new RegExp(`nvlddmkm event 153 at ${at}`));
+  assert.match(rerun.lines.at(-1), /^PASSED WITH A DRIVER RESET in 12 s: 2 reruns after a GPU driver reset/);
+  // A failed rerun fails the run: no pass warning and no flag, only the reset and the failure.
+  const failed = summary({
+    results: [{ command: 'npm run visual:check', ok: false, driverReset: { resets: [nvidia], rerunOk: false } }],
+    failed: 'npm run visual:check',
+    seconds: 5,
+  });
+  assert.equal(failed.passedAfterDriverReset, false);
+  assert.ok(!failed.lines.some((l) => l.startsWith('PASSED')));
+  assert.equal(failed.lines.at(-1), 'FAILED at npm run visual:check in 5 s');
+});
+
+test('check:gpu-packages writes passedAfterDriverReset and a warning per test that passed only on its rerun', async () => {
+  const { report } = await import('../scripts/gpu-package-tests.mjs');
+  const reset = { resets: [nvidia], rerunOk: true };
+  const clean = report([{ label: 'sciviz test:browser', ok: true }]);
+  assert.deepEqual(clean.json, {
+    passedAfterDriverReset: false,
+    results: [{ label: 'sciviz test:browser', ok: true }],
+  });
+  assert.deepEqual(clean.warnings, []);
+  const rerun = report([
+    { label: 'scatter test:browser', ok: true },
+    { label: 'sciviz test:browser', ok: true, driverReset: reset },
+  ]);
+  assert.equal(rerun.json.passedAfterDriverReset, true);
+  assert.equal(rerun.json.results.length, 2);
+  assert.deepEqual(rerun.warnings, [`PASSED WITH A DRIVER RESET: sciviz test:browser, ${describeResets([nvidia])}`]);
+  // Any failure: the run failed, so nothing is marked as passed.
+  const failed = report([
+    { label: 'sciviz test:browser', ok: true, driverReset: reset },
+    { label: 'text test:browser', ok: false },
+  ]);
+  assert.equal(failed.json.passedAfterDriverReset, false);
+  assert.deepEqual(failed.warnings, []);
+});
