@@ -154,6 +154,54 @@ export function webgl2Capabilities(gl: WebGL2ProbeContext): WebGL2Capabilities {
   };
 }
 
+/** Options for {@link install}. */
+export interface InstallOptions {
+  /** Install even where WebGPU works (for testing the layer on a WebGPU browser). Default false. */
+  readonly force?: boolean;
+  /**
+   * Makes each device's WebGL2 context. Default: a new `OffscreenCanvas` (or detached `<canvas>`) context with
+   * `antialias: false`, so exact-pixel rendering stays exact.
+   */
+  readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
+}
+
+/** What {@link install} did. */
+export interface InstallResult {
+  /** True when the layer now answers `navigator.gpu` and `getContext('webgpu')`. */
+  readonly installed: boolean;
+  /** `installed`; `already` (an earlier call installed it); `webgpu` (the browser's own WebGPU works: nothing done). */
+  readonly reason: 'installed' | 'already' | 'webgpu';
+  /** The layer's `navigator.gpu`, when installed. */
+  readonly gpu?: unknown;
+}
+
+let device: typeof import('./device.js') | undefined;
+
+/**
+ * Installs the WebGL2 compatibility layer: `navigator.gpu` becomes a WebGPU-shaped GPU on WebGL2, `getContext('webgpu')`
+ * on canvases returns its canvas context, and the `GPUBufferUsage`-style flag objects are defined where missing. Core
+ * and the packages then run their WebGPU code unchanged. Does nothing where the browser's own WebGPU has an adapter,
+ * unless `force` is set. The device, back end and WGSL front end load here, on first call, so a page that only probes
+ * never downloads them.
+ * @param options See {@link InstallOptions}.
+ * @returns What was done; see {@link InstallResult}.
+ * @throws MargoError code `unsupported` when the browser has no WebGL2 at the `full` tier (the message names what is
+ *   missing); keep the `@margoengine/webgl` preview for those browsers.
+ */
+export async function install(options: InstallOptions = {}): Promise<InstallResult> {
+  device ??= await import('./device.js');
+  return device.installCompat(options);
+}
+
+/**
+ * Removes what {@link install} put in place (`navigator.gpu`, the canvas `getContext` patch and the flag objects).
+ * Devices made while it was installed keep working.
+ * @returns True when the layer was installed.
+ */
+export function uninstall(): boolean {
+  return device?.uninstallCompat() ?? false;
+}
+
 /** What {@link probeWebGL2} needs to make a context; `OffscreenCanvas` by default. */
 export interface ProbeOptions {
   /** A canvas to make the probe context on. Default: a new 1 x 1 `OffscreenCanvas`, or a `<canvas>` without one. */

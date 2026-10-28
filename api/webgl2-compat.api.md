@@ -13,6 +13,17 @@ export type CompatLimit = (typeof COMPAT_LIMITS)[number];
 
 export type CompatTier = 'full' | 'half-float' | 'ldr';
 
+export interface InstallOptions {
+    readonly force?: boolean;
+    readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
+}
+
+export interface InstallResult {
+    readonly installed: boolean;
+    readonly reason: 'installed' | 'already' | 'webgpu';
+    readonly gpu?: unknown;
+}
+
 export interface ProbeOptions {
     readonly canvas?: {
         getContext(type: 'webgl2', options?: WebGLContextAttributes): unknown;
@@ -49,7 +60,11 @@ export interface WebGL2ProbeContext {
     readonly SHADING_LANGUAGE_VERSION: number;
 }
 
+export function install(options?: InstallOptions): Promise<InstallResult>;
+
 export function probeWebGL2(options?: ProbeOptions): WebGL2Capabilities | null;
+
+export function uninstall(): boolean;
 
 export function webgl2Capabilities(gl: WebGL2ProbeContext): WebGL2Capabilities;
 ```

@@ -11,8 +11,9 @@ import { dirname, join, resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..', '..', '..');
 const NAME = '@margoengine/webgl2-compat';
 /** The umbrella's generated alias of each entry, and what each one re-exports. */
-const UMBRELLA = ['packages/margoengine/src/webgl2-compat.ts', 'packages/margoengine/src/webgl2-compat/wgsl.ts'];
-const ALIASED = [NAME, `${NAME}/wgsl`];
+const ENTRIES = ['', '/device', '/glsl', '/wgsl'];
+const UMBRELLA = ENTRIES.map((e) => `packages/margoengine/src/webgl2-compat${e}.ts`);
+const ALIASED = ENTRIES.map((e) => NAME + e);
 
 test('no other package source names the compatibility layer', () => {
   let out = '';
@@ -46,8 +47,11 @@ test('only the umbrella depends on it', () => {
     );
 });
 
-/** Every specifier the dist modules reachable from `entry` import, statically or with a literal import(). */
-function distReach(entry) {
+/**
+ * Every specifier the dist modules reachable from `entry` import, statically or (unless `staticOnly`) with a literal
+ * import().
+ */
+function distReach(entry, staticOnly = false) {
   const seen = new Set(),
     specifiers = new Set(),
     queue = [entry];
@@ -58,7 +62,10 @@ function distReach(entry) {
     seen.add(file);
     const text = readFileSync(file, 'utf8');
     all += text;
-    for (const m of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["']([^"']+)["']/g)) {
+    const pattern = staticOnly
+      ? /(?:\bfrom\s*|\bimport\s+)["']([^"']+)["']/g
+      : /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["']([^"']+)["']/g;
+    for (const m of text.matchAll(pattern)) {
       const s = m[1];
       if (s.startsWith('.')) {
         const next = resolve(dirname(file), s);
@@ -79,8 +86,8 @@ test('the built core, stage, React and umbrella roots reach no module of the lay
   }
 });
 
-test('importing either entry touches no global and imports nothing else; the root never loads the WGSL front end', async () => {
-  for (const entry of ['index.js', 'wgsl.js']) {
+test('importing any entry touches no global and imports nothing else; the root loads the layer only in install()', async () => {
+  for (const entry of ['index.js', 'wgsl.js', 'glsl.js', 'device.js']) {
     const before = new Set(Object.getOwnPropertyNames(globalThis));
     await import(`../dist/${entry}`);
     const added = Object.getOwnPropertyNames(globalThis).filter((k) => !before.has(k));
@@ -88,6 +95,10 @@ test('importing either entry touches no global and imports nothing else; the roo
     const { specifiers } = distReach(join(import.meta.dirname, '..', 'dist', entry));
     assert.deepEqual([...specifiers], [], entry);
   }
-  const front = distReach(join(import.meta.dirname, '..', 'dist', 'index.js'));
+  // The root's static graph is the probe and install() alone: the device, back end and front end load by import()
+  // inside install(), so a page that only probes downloads none of them.
+  const front = distReach(join(import.meta.dirname, '..', 'dist', 'index.js'), true);
+  assert.equal(front.files, 1, 'the root entry statically imports another module');
   assert.ok(!front.text.includes('WGSLError'), 'the root entry reaches the WGSL front end');
+  assert.match(front.text, /import\(\s*["']\.\/device\.js["']\s*\)/, 'install() loads ./device.js on demand');
 });

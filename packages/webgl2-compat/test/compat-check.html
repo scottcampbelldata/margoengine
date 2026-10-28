@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>WebGL2 compatibility check</title>
+<style>body{margin:0;background:#000}canvas{display:block;width:400px;height:300px}</style>
+</head>
+<body>
+<canvas></canvas>
+<script type="module">
+// One scene per page load: ?mode=native|compat &scene=basic|views &exact=1 (exactSize, no MSAA).
+// Core's own WebGPU renderer draws it; in compat mode on the WebGL2 layer (install({force: true})).
+import { Engine, PbrMaterial, box, Geometry } from '/packages/core/dist/index.js';
+import { install } from '/packages/webgl2-compat/dist/index.js';
+
+const q = new URLSearchParams(location.search);
+const mode = q.get('mode') ?? 'native',
+  sceneName = q.get('scene') ?? 'basic',
+  exact = q.get('exact') === '1';
+const errors = [];
+addEventListener('error', (e) => errors.push(String(e.message)));
+addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.message ?? e.reason)));
+
+function sphere(rings = 24, segments = 32) {
+  const p = [], n = [], idx = [];
+  for (let r = 0; r <= rings; r++) {
+    const v = r / rings, phi = v * Math.PI;
+    for (let s = 0; s <= segments; s++) {
+      const u = s / segments, theta = u * 2 * Math.PI;
+      const x = Math.sin(phi) * Math.cos(theta), y = Math.cos(phi), z = Math.sin(phi) * Math.sin(theta);
+      p.push(x * 0.5, y * 0.5, z * 0.5);
+      n.push(x, y, z);
+    }
+  }
+  for (let r = 0; r < rings; r++)
+    for (let s = 0; s < segments; s++) {
+      const a = r * (segments + 1) + s, b = a + segments + 1;
+      idx.push(a, a + 1, b, b, a + 1, b + 1);
+    }
+  return new Geometry(p, n, idx);
+}
+
+async function main() {
+  const canvas = document.querySelector('canvas');
+  if (mode === 'compat') {
+    const result = await install({ force: true });
+    if (!result.installed) throw new Error('install() did not install: ' + result.reason);
+  }
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    ...(exact ? { exactSize: [400, 300] } : {}),
+    camera: { position: [0, 4.5, 9], target: [0, 0.5, 0], near: 0.1, far: 100 },
+  });
+  const ball = sphere(), cube = box(1, 1, 1);
+  const meshes = new Map();
+  // A grid of instanced cubes and spheres: colour, roughness and metalness vary over the grid.
+  for (let i = 0; i < 6; i++)
+    for (let j = 0; j < 4; j++) {
+      const m = engine.createMesh()
+        .setGeometry((i + j) % 2 ? ball : cube)
+        .setMaterial(new PbrMaterial({ color: [0.2 + i * 0.13, 0.9 - j * 0.2, 0.3 + ((i * j) % 5) * 0.12], roughness: 0.1 + j * 0.25, metalness: i / 5 }))
+        .setPosition([(i - 2.5) * 1.4, 0.5, (j - 1.5) * 1.4])
+        .setRotation([0.3 * j, 0.4 * i, 0]);
+      meshes.set(m, `grid ${i} ${j}`);
+    }
+  // A mirrored (negative scale) cube and a single-sided material: the back-face and winding paths.
+  meshes.set(engine.createMesh().setGeometry(cube).setMaterial(new PbrMaterial({ color: '#d04020', roughness: 0.3 })).setPosition([0, 2.2, -2]).setScale([-1.5, 0.6, 1]), 'mirrored');
+  meshes.set(engine.createMesh().setGeometry(ball).setMaterial(new PbrMaterial({ color: '#30a0e0', doubleSided: false, metalness: 1, roughness: 0.2 })).setPosition([2.6, 2.4, -1]).setScale([1.6, 1.6, 1.6]), 'one-sided');
+  meshes.set(engine.createMesh().setGeometry(cube).setMaterial(new PbrMaterial({ color: '#808080', roughness: 0.9 })).setPosition([0, -0.1, 0]).setScale([12, 0.2, 9]), 'floor');
+
+  const device = () => engine.gpu;
+  const frame = async () => {
+    if (sceneName === 'views') {
+      const [l, r] = [engine.camera, engine.camera];
+      engine.render({
+        delta: 1 / 60,
+        views: [
+          { camera: l, viewport: [0, 0, 0.5, 1] },
+          { camera: r, viewport: [0.5, 0.25, 0.5, 0.5], clear: { color: '#203040' } },
+        ],
+      });
+    } else engine.render({ delta: 1 / 60 });
+    await device().queue.onSubmittedWorkDone();
+  };
+  await frame(); // core creates its pipelines before Engine.create resolves: one frame is the whole picture
+  window.check = {
+    info: () => ({ vendor: device().adapterInfo?.vendor ?? null, backend: engine.backend, width: canvas.width, height: canvas.height, errors: errors.splice(0) }),
+    glError: () => (device().gl ? device().gl.getError() : 0),
+    async pick(points) {
+      const out = [];
+      for (const [x, y] of points) out.push(meshes.get(await engine.pick(x, y)) ?? null);
+      return out;
+    },
+    async lose() {
+      const before = device();
+      before.destroy();
+      const until = performance.now() + 20000;
+      while (device() === before || !device()) {
+        if (performance.now() > until) throw new Error('no restored device within 20 s');
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      await frame(); // core creates its pipelines before Engine.create resolves: one frame is the whole picture
+      return { restored: device() !== before, vendor: device().adapterInfo?.vendor ?? null };
+    },
+    frame,
+  };
+  window.ready = true;
+}
+main().catch((e) => {
+  errors.push(String(e?.stack ?? e));
+  window.check = { info: () => ({ errors }) };
+  window.ready = true;
+});
+</script>
+</body>
+</html>

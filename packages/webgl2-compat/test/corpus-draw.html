@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>WGSL corpus draw check</title></head>
+<body>
+<script type="module">
+// Draws every recorded render pipeline of the corpus once through the WebGL2 compatibility device, with stand-in
+// resources of the kinds its bind group layouts name, into targets of its recorded formats. ANGLE's Direct3D back end
+// compiles pixel shaders at the first draw (for the output formats bound then), so a shader that links can still fail
+// here; the context is lost or the draw reports a GL error. Called by test/corpus-draw-browser.mjs.
+import { createCompatGPU } from '/packages/webgl2-compat/dist/device.js';
+
+const FORMAT = { float: 'rgba8unorm', 'unfilterable-float': 'rgba32float', depth: 'depth32float', sint: 'rgba32sint', uint: 'rgba32uint' };
+const BLEND = { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } };
+
+window.drawAll = async (records, sources) => {
+  const gpu = createCompatGPU();
+  const failures = [],
+    waiting = {};
+  let device, modules;
+  const fresh = async () => {
+    device?.destroy();
+    device = await (await gpu.requestAdapter()).requestDevice();
+    modules = new Map();
+  };
+  await fresh();
+  let drawn = 0;
+  for (const rec of records) {
+    const module = (key) => {
+      if (!modules.has(key)) modules.set(key, device.createShaderModule({ code: sources[key] }));
+      return modules.get(key);
+    };
+    const samples = rec.multisample?.count ?? 1;
+    try {
+      device.pushErrorScope('validation');
+      const pipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module: module(rec.vertex.module), entryPoint: rec.vertex.entryPoint, constants: rec.vertex.constants, buffers: rec.vertex.buffers ?? [] },
+        fragment: rec.fragment && {
+          module: module(rec.fragment.module),
+          entryPoint: rec.fragment.entryPoint,
+          constants: rec.fragment.constants,
+          targets: rec.fragment.targets.map((t) => t && { format: t.format, writeMask: t.writeMask, blend: t.blend ? BLEND : undefined }),
+        },
+        primitive: rec.primitive,
+        depthStencil: rec.depthStencil && {
+          format: rec.depthStencil.format,
+          depthWriteEnabled: !!rec.depthStencil.depthWriteEnabled,
+          depthCompare: rec.depthStencil.depthCompare ?? 'always',
+          depthBias: rec.depthStencil.depthBias,
+        },
+        multisample: rec.multisample,
+      });
+      const groups = [];
+      for (let g = 0; g < 4; g++) {
+        const layout = pipeline.getBindGroupLayout(g);
+        if (!layout.entries.length) continue;
+        const entries = layout.entries.map((e) => {
+          if (e.buffer) return { binding: e.binding, resource: { buffer: device.createBuffer({ size: Math.ceil((e.buffer.minBindingSize + 256) / 256) * 256, usage: 64 | 8 }) } };
+          if (e.sampler) return { binding: e.binding, resource: device.createSampler(e.sampler.type === 'comparison' ? { compare: 'less' } : { magFilter: 'linear', minFilter: 'linear' }) };
+          const t = e.texture,
+            dim = t.viewDimension;
+          const tex = device.createTexture({
+            size: [2, 2, dim === 'cube' ? 6 : dim === '2d-array' ? 2 : dim === '3d' ? 2 : 1],
+            dimension: dim === '3d' ? '3d' : dim === '1d' ? '1d' : '2d',
+            format: FORMAT[t.sampleType],
+            sampleCount: t.multisampled ? 4 : 1,
+            usage: 4 | (t.multisampled ? 16 : 2),
+            textureBindingViewDimension: dim,
+          });
+          return { binding: e.binding, resource: tex.createView({ dimension: dim }) };
+        });
+        groups[g] = device.createBindGroup({ layout, entries });
+      }
+      const colors = (rec.fragment?.targets ?? []).map((t) =>
+        t ? device.createTexture({ size: [4, 4], format: t.format, sampleCount: samples, usage: 16 }) : null,
+      );
+      const depth = rec.depthStencil && device.createTexture({ size: [4, 4], format: rec.depthStencil.format, sampleCount: samples, usage: 16 });
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginRenderPass({
+        colorAttachments: colors.map((c) => c && { view: c.createView(), loadOp: 'clear', storeOp: 'store' }),
+        depthStencilAttachment: depth && {
+          view: depth.createView(),
+          depthLoadOp: 'clear',
+          depthStoreOp: 'store',
+          depthClearValue: 0,
+          ...(rec.depthStencil.format.includes('stencil') ? { stencilLoadOp: 'clear', stencilStoreOp: 'store' } : {}),
+        },
+      });
+      pass.setPipeline(pipeline);
+      groups.forEach((group, g) => group && pass.setBindGroup(g, group));
+      for (const [slot, b] of (rec.vertex.buffers ?? []).entries())
+        if (b) pass.setVertexBuffer(slot, device.createBuffer({ size: b.arrayStride * 4 + 256, usage: 32 | 8 }));
+      pass.draw(3);
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+      const scoped = await device.popErrorScope();
+      const gl = device.gl,
+        error = gl.getError();
+      if (scoped || error || gl.isContextLost()) {
+        failures.push(`${rec.id}: ${scoped?.message ?? ''} GL error ${error}${gl.isContextLost() ? ', context lost' : ''}`.slice(0, 1500));
+        // ANGLE may lose the context only some calls after a failed draw-time compile: start over either way.
+        await fresh();
+      } else drawn++;
+    } catch (error) {
+      await device.popErrorScope().catch(() => null);
+      const message = String(error?.message ?? error);
+      if (/milestone M[3-6]|has no subgroups/.test(message)) {
+        const reason = message.replace(/; see .*/, '').replace(/'[^']*'/g, "'...'");
+        waiting[reason] = (waiting[reason] ?? 0) + 1;
+      } else failures.push(`${rec.id}: ${message}`.slice(0, 1500));
+    }
+  }
+  device.destroy();
+  return { drawn, failures, waiting };
+};
+window.ready = true;
+</script>
+</body>
+</html>

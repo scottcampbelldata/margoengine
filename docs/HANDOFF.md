@@ -369,8 +369,9 @@ stage 22,253 B) and the root entries of the other packages total 30 B less than 
 depends on nothing), `margoengine` re-exports core (it is the stage facade), and lines/text share a 12-line method
 shape. navigation (a Recast wrapper) is removed: its API is `@margoengine/navmesh/build`, a clean-room generator, with
 ORCA and the funnel rewritten clean room too (78 packages). Renames: [renames-2026-10-24.md](renames-2026-10-24.md).
-The full WebGL2 fallback is paused by Scott (2026-10-24) until his apps ship: [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md),
-which also records what visitors without WebGPU see today (every site demo: a needs-WebGPU message, `check:no-webgpu`).
+The full WebGL2 fallback was paused by Scott (2026-10-24) and is active again since 2026-10-27: milestones M0 to M2 are done
+(core renders on the layer with the same pixels as native WebGPU; storage and compute wait for M4 and M5), see
+[webgl2-compat-roadmap.md](webgl2-compat-roadmap.md), which also records what visitors without WebGPU see today (every site demo: a needs-WebGPU message, `check:no-webgpu`).
 
 ## Landed 2026-10-24: Codex's mesh-edit engine work (codex/mesh-rotation-visibility)
 

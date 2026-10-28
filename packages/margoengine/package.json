@@ -1431,6 +1431,14 @@
       "types": "./dist/webgl2-compat.d.ts",
       "import": "./dist/webgl2-compat.js"
     },
+    "./webgl2-compat/device": {
+      "types": "./dist/webgl2-compat/device.d.ts",
+      "import": "./dist/webgl2-compat/device.js"
+    },
+    "./webgl2-compat/glsl": {
+      "types": "./dist/webgl2-compat/glsl.d.ts",
+      "import": "./dist/webgl2-compat/glsl.js"
+    },
     "./webgl2-compat/wgsl": {
       "types": "./dist/webgl2-compat/wgsl.d.ts",
       "import": "./dist/webgl2-compat/wgsl.js"

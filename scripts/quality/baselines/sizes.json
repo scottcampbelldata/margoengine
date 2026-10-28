@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3636202,
+  "total": 3801831,
   "history": [
     {
       "date": "2026-10-24",
@@ -662,6 +662,12 @@
       "commit": "91f90178",
       "reason": "new optional package @margoengine/weather: weather state machine, wind field, surface hooks and bouncing GPU hail (item 28.5, second batch)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "b92998d6",
+      "reason": "webgl2-compat milestone M2: GLSL ES 3.00 back end (/glsl) and the WebGPU-shaped device on WebGL2 (/device); the root's install() loads them by import(), its static part stays the probe",
+      "grew": 3
     }
   ],
   "items": {
@@ -1022,7 +1028,9 @@
     "@margoengine/weather": 5252,
     "@margoengine/weather/hail": 4287,
     "@margoengine/webgl": 3277,
-    "@margoengine/webgl2-compat": 1528,
+    "@margoengine/webgl2-compat": 62663,
+    "@margoengine/webgl2-compat/device": 62454,
+    "@margoengine/webgl2-compat/glsl": 42040,
     "@margoengine/webgl2-compat/wgsl": 27240,
     "@margoengine/wfc": 1878,
     "@margoengine/wfc/overlapping": 2259,

@@ -323,6 +323,13 @@
         "react"
       ],
       "reason": "One thing, two forms: @margoengine/environment's Fog plugin and @margoengine/react's <Fog> JSX component that attaches it with the same options. Decision in docs/conventions.md."
+    },
+    "install": {
+      "packages": [
+        "materials",
+        "webgl2-compat"
+      ],
+      "reason": "Same verb, two domains: @margoengine/materials install(model) puts a material model on a PBR model; @margoengine/webgl2-compat install() puts the WebGL2 compatibility layer into the page (the name the roadmap and the usual polyfill vocabulary use)."
     }
   }
 }

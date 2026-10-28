@@ -873,6 +873,14 @@ class Checker {
     );
     if (r.stage) this.state?.fn.stages.add(r.stage);
     const span = { start: e.start, end: e.end };
+    // extractBits and insertBits: constant offset + count past the bit width is a shader-creation error (WGSL 17.4).
+    if (name === 'extractBits' || name === 'insertBits') {
+      const k = name === 'extractBits' ? 1 : 2,
+        offset = args[k]?.value,
+        count = args[k + 1]?.value;
+      if (typeof offset === 'number' && typeof count === 'number' && offset + count > 32)
+        throw this.fail(`${name}: offset ${offset} + count ${count} is more than 32 bits`, e.args[k]);
+    }
     if (name === 'bitcast') {
       const arg = args[0];
       const value =

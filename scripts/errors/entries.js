@@ -423,6 +423,15 @@ export const entries = [
     fix: 'Read the message: it names the fix. Pass sizes as numbers of UI units, "auto", "fill" or "50%", colours as hex strings, themes made with createTheme(overrides, themes.dark), and widgets made with the classes of @margoengine/ui. After ui.dispose() make a new Ui. Branch on error.code, not on the message.',
   },
   {
+    id: 'compatibility-layer',
+    title: 'compatibility-layer: the WebGL2 compatibility layer cannot do this (@margoengine/webgl2-compat)',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A MargoError with code `unsupported` from the WebGL2 compatibility layer: a shader or a call needs something the layer does not map onto WebGL2 yet, and the message names it and the milestone that brings it (storage buffers M4; compute, storage textures and atomics M5; texture views, render bundles and occlusion queries M3), or something WebGL2 cannot do at all (subgroups, cube array textures, vertex strides above 255 bytes). `install()` throws the same code when the browser has no WebGL2 at the full tier, naming what is missing. Code `failed` with "a bug: report it" is an internal fault of the layer.',
+    fix: 'On a browser with WebGPU, do not install the layer (install() leaves WebGPU alone unless `force` is set). Without WebGPU, keep the feature off on compatibility devices (`isCompatDevice(engine.gpu)` from `@margoengine/webgl2-compat/device`), or use the `@margoengine/webgl` preview below the full tier. Report a `failed` error with the shader that caused it.',
+  },
+  {
     id: 'wgsl-syntax',
     title: 'wgsl-syntax: the text is not WGSL (@margoengine/webgl2-compat/wgsl)',
     kind: 'family',

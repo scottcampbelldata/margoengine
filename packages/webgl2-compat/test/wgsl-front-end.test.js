@@ -550,3 +550,19 @@ test('parseWGSL keeps every declaration with spans; non-string input is a TypeEr
   assert.throws(() => parseWGSL(42), TypeError);
   assert.throws(() => checkWGSL(undefined), TypeError);
 });
+
+test('extractBits and insertBits: a constant offset + count past 32 bits is a shader-creation error', () => {
+  // Regression (found by the M2 semantics probe, 2026-10-28): the front end accepted insertBits(x, y, 30u, 8u), which
+  // Chrome's WGSL compiler rejects as the specification requires; a runtime offset or count stays valid (clamped).
+  bad(
+    'fn f(x: u32) -> u32 { return insertBits(x, x, 30u, 8u); }',
+    'type',
+    1,
+    47,
+    /offset 30 \+ count 8 is more than 32 bits/,
+  );
+  bad('fn f(x: i32) -> i32 { return extractBits(x, 16u, 17u); }', 'type', 1, 45, /offset 16 \+ count 17/);
+  ok(
+    'fn f(x: u32, o: u32) -> u32 { return insertBits(x, x, o, 8u) + extractBits(x, 0u, 32u) + extractBits(x, o, 32u); }',
+  );
+});

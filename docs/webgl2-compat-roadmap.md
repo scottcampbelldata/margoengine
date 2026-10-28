@@ -6,7 +6,9 @@ slowdown: the layer is a separate optional package, loaded by dynamic import onl
 `requestAdapter()` answers null, and the WebGPU path of core and every package is byte-identical with and without it;
 (3) the exact-pixel mode (no context antialiasing) is honoured. Milestones M0 (`@margoengine/webgl2-compat`
 reports WebGL2 capabilities and tiers; the WGSL corpus is recorded) and M1 (the WGSL front end: the whole corpus
-parses and type-checks, [below](#wgsl-front-end-m1-2026-10-27)) are done; M2 (the GLSL back end) is next. It was paused
+parses and type-checks, [below](#wgsl-front-end-m1-2026-10-27)) and M2 (the GLSL back end and the device: core renders on
+WebGL2 with the same pixels as native WebGPU, [below](#glsl-back-end-and-device-m2-2026-10-28)) are done; M3 (textures, views, copies
+and readbacks for the packages) is next. It was paused
 on 2026-10-24 (the apps built on Margo so far run on Electron, which has WebGPU) and planned for after v1.0.0 before
 that.
 
@@ -363,3 +365,42 @@ budgets and GPU-driven culling on WebGL2.
   ignored (the front end emits no warnings). Built-ins that do not fold yet (`refract`, the bit and pack functions)
   give runtime values, so a `const` that uses one fails with a clear message; none is used that way in the packages. Abstract integers are evaluated exactly up to 2^53, not the specification's
   64 bits; a larger one fails with code `limit` and asks for a concrete type.
+
+## GLSL back end and device (M2, 2026-10-28)
+
+Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL2, Dawn for WebGPU).
+
+- **What landed.** `@margoengine/webgl2-compat/glsl` (the GLSL ES 3.00 back end), `/device` (GPU, adapter, device,
+  queue, resources, render pipelines, command encoding and replay, canvas context) and `install()` / `uninstall()` in
+  the root entry, which loads the device by `import()` only when called. Core is unchanged: `npm run measure:size`
+  reports the same core + stage bytes.
+- **Parity (decision 4 confirmed, not loosened).** Core drawn natively and on the layer, read back as 8-bit RGBA: the
+  basic scene (instanced cubes and spheres, a mirrored mesh, a one-sided mesh, a floor) with 4x MSAA and in exact-pixel
+  mode, and two views with a partial clear: 0.000% of pixels with d > 2, mean d 0.000, max d 0 in all three. Run-to-run
+  noise of both paths: 0. Picking returns the same mesh at all 100 grid points; a destroyed compat device is restored
+  by core and draws the same picture (max d 0). WebGL2 reports no GL error. The tolerance stays as proposed.
+- **Semantics.** 32 probe cases computed from runtime inputs are bit-identical to native WebGPU. One difference was
+  found and kept: `pack4x8snorm(-0.5)` packs -63 on the layer (the WGSL specification's floor(0.5 + v)) and -64 natively
+  (Chrome rounds the tie); the probe stays off exact ties.
+- **Corpus.** 881 vertex and fragment entry points without storage resources translate and compile; the 257 distinct
+  stage pairs of the recorded pipelines link; all 347 recorded pipelines without storage draw once through the device.
+  Waiting for M4 and M5: 231 recorded pipelines that read storage buffers, 45 that call `arrayLength`, and every compute
+  pipeline. The counts are printed by `npm run test:browser`.
+- **Sizes (gzip).** Root static part (probe and install): about 1.9 KB. `install()` loads 60,837 B in all (the sizes
+  gate counts the lazy chunk with the root): `/device` 60,634 B, of which `/glsl` 40,815 B, of which the `/wgsl` front
+  end. Against the 60 KB target the root with install is 60,837 B, 837 B over 60,000 (under 60 KiB, 61,440 B); nothing
+  was cut to fit.
+- **What the checks found and fixed.** (1) ANGLE's Direct3D back end compiles a pixel shader at its first draw, so a
+  shader that links can still fail: uniform reads addressed by word made it emulate a dynamic vector index per read,
+  and a large shader failed to compile; reads now index 16-byte rows with static components. (2) The same compiler
+  could not build a call of a function that may discard inside a larger expression (selection's pick shader); such
+  calls are evaluated into a temporary when that keeps WGSL's order exact. (3) The front end accepted `insertBits` and
+  `extractBits` with constant offset + count past 32 bits, a shader-creation error in WGSL. (4) Pointer `let`s failed
+  to translate. Each has a regression test; the corpus draw check (`corpus-draw-browser.mjs`) now catches the class of
+  draw-time compile failures.
+- **Choices M3 onward build on.** Uniform buffers are blocks of `uvec4` rows read back in WGSL's layout; one GL texture
+  unit per (texture, sampler) pair; multisampled textures are renderbuffers with a resolved copy for sampling; every
+  device owns its own WebGL2 context on an `OffscreenCanvas` and presents through an `ImageBitmap` (a detached canvas
+  and `drawImage` where OffscreenCanvas is missing); vertex strides above 255 bytes, texture views of another format or
+  of one layer of an array, render bundles, queries, gather and cube arrays are refused with code `unsupported`, each
+  naming its milestone.
