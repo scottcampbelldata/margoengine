@@ -163,6 +163,26 @@
     ]
   },
   {
+    "id": "webgl2-compat",
+    "title": "Webgl2-compat",
+    "category": "Setup and diagnostics",
+    "package": "@margoengine/webgl2-compat",
+    "version": "1.0.0",
+    "published": false,
+    "description": "In development: the WebGL2 compatibility layer for browsers without WebGPU. Today it reports a browser's WebGL2 capabilities and the compatibility tier they reach; no rendering yet.",
+    "requirements": "See the package guide for requirements",
+    "keywords": "webgl2 compat",
+    "install": "npm install @margoengine/webgl2-compat@1.0.0",
+    "imports": "import { COMPAT_EXTENSIONS } from '@margoengine/webgl2-compat';",
+    "exports": [
+      "COMPAT_EXTENSIONS",
+      "COMPAT_LIMITS",
+      "REQUIRED_EXTENSIONS",
+      "probeWebGL2",
+      "webgl2Capabilities"
+    ]
+  },
+  {
     "id": "stats",
     "title": "Stats",
     "package": "@margoengine/stats",

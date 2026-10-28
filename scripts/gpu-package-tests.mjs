@@ -48,6 +48,8 @@ const PREPARE = {
 /** Browser scripts under packages/ that are tools, not tests (the guard below skips them). */
 const TOOLS = {
   'packages/voxel-pathtracer/tests/magicavoxel/mv-vox.mjs': 'renders .vox files for a side-by-side comparison',
+  'packages/webgl2-compat/scripts/capabilities.mjs':
+    'prints the WebGL2 report of every installed browser and ANGLE back end (test:browser checks the default one)',
 };
 /** A file that drives a real browser (Playwright, or scripts/browser.js's openBrowser). */
 const DRIVES_BROWSER =

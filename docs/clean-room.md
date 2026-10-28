@@ -727,3 +727,13 @@ Howler, Web Audio API implementations in browsers, FMOD, Wwise, JUCE and the lik
 | Reverb impulse | Exponentially decaying white noise at an RT60 (the definition of reverberation time); mulberry32 pseudo-random generator (public domain) |
 | Loop delay | The Web Audio API specification's rules for cycles in the graph (a loop needs a DelayNode and costs one render quantum of 128 frames) |
 | Mute, solo and sends | Common mixing-desk behaviour (solo-in-place, solo-safe returns, pre and post fader sends); our own tree rule in `audibleBuses` |
+
+## WebGL2 compatibility layer: `@margoengine/webgl2-compat`
+
+Written clean room from the specifications below. No source code of shader translators or WebGPU-on-WebGL layers
+(Tint, Naga, SPIRV-Cross, ANGLE's translator, Dawn, wgpu, three.js and the like) was read.
+
+| Area | Source |
+| --- | --- |
+| Capability probe and tiers | Khronos WebGL 2.0 specification (`getExtension`, `getParameter`, `getShaderPrecisionFormat`) and the WebGL extension registry entries named in the package; OpenGL ES 3.0 and GLSL ES 3.00 specifications (precision qualifiers) |
+| WGSL corpus recorder | W3C WebGPU specification (`GPUDevice` methods, `getCompilationInfo`) |

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3595394,
+  "total": 3596922,
   "history": [
     {
       "date": "2026-10-24",
@@ -638,6 +638,12 @@
       "commit": "f81a7870",
       "reason": "points: LAZ decoder (/laz) and chunk-at-a-time LAZ decoding into the LAS point arrays (queue item 31 leftover)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "89e899aa",
+      "reason": "new optional package @margoengine/webgl2-compat: WebGL2 capability tiers (compatibility layer milestone M0)",
+      "grew": 1
     }
   ],
   "items": {
@@ -996,6 +1002,7 @@
     "@margoengine/voxel/vox": 12969,
     "@margoengine/water": 19258,
     "@margoengine/webgl": 3277,
+    "@margoengine/webgl2-compat": 1528,
     "@margoengine/wfc": 1878,
     "@margoengine/wfc/overlapping": 2259,
     "@margoengine/xr": 6757,

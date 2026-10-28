@@ -39,3 +39,7 @@ site/llms-full.txt merge=margo-derived
 examples/package-benchmarks/results/entry-sizes.json merge=margo-derived
 examples/package-benchmarks/results/basic-scene-network.json merge=margo-derived
 scripts/quality/baselines/*.json merge=margo-ratchet
+
+# WGSL corpus of @margoengine/webgl2-compat: the manifest pins the SHA-256 of the decompressed sources
+packages/webgl2-compat/test/corpus/manifest.json text eol=lf
+packages/webgl2-compat/test/corpus/*.br binary

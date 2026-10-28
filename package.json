@@ -111,7 +111,8 @@
     "packages/tiles",
     "packages/cutscene",
     "packages/save",
-    "packages/mixer"
+    "packages/mixer",
+    "packages/webgl2-compat"
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",
@@ -142,6 +143,7 @@
     "api:update": "node scripts/api-report.js --update",
     "measure:size": "node scripts/measure-size.js",
     "proofs": "node examples/package-benchmarks/proofs/run.mjs",
+    "record:wgsl-corpus": "node scripts/record-wgsl-corpus.mjs",
     "visual:check": "node scripts/visual-regression.js",
     "visual:update": "node scripts/visual-regression.js --update",
     "visual:device-loss": "node scripts/visual-regression.js --device-loss",

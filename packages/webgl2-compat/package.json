@@ -1,0 +1,47 @@
+{
+  "name": "@margoengine/webgl2-compat",
+  "version": "1.0.0",
+  "description": "In development: the WebGL2 compatibility layer for browsers without WebGPU. Today it reports a browser's WebGL2 capabilities and the compatibility tier they reach; no rendering yet.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "webgl2",
+    "wgsl",
+    "compatibility"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/webgl2-compat"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js webgl2-compat",
+    "test": "npm run build && node --test test/*.test.js",
+    "test:browser": "npm run build && node test/browser-check.mjs",
+    "capabilities": "npm run build && node scripts/capabilities.mjs",
+    "prepack": "npm run build"
+  }
+}

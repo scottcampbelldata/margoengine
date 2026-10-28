@@ -1,6 +1,13 @@
 # WebGL2 compatibility layer: roadmap for the next version
 
-Date: 2026-10-21. Status: PAUSED on 2026-10-24 (the apps built on Margo so far run on Electron, which has WebGPU). Before that it was planned for the version after v1.0.0. Nothing here is implemented yet.
+Date: 2026-10-21. Status: ACTIVE since 2026-10-27 (Scott), on three conditions: (1) zero core bytes, so core + stage
+stay under the 25,000-byte gzip gate and neither is touched; (2) browsers with WebGPU download nothing and see no
+slowdown: the layer is a separate optional package, loaded by dynamic import only when `navigator.gpu` is missing or
+`requestAdapter()` answers null, and the WebGPU path of core and every package is byte-identical with and without it;
+(3) the exact-pixel mode (no context antialiasing) is honoured. Milestone M0 is done (`@margoengine/webgl2-compat`
+reports WebGL2 capabilities and tiers; the WGSL corpus is recorded); M1 (the WGSL front end) is next. It was paused
+on 2026-10-24 (the apps built on Margo so far run on Electron, which has WebGPU) and planned for after v1.0.0 before
+that.
 
 ## What visitors without WebGPU see today (2026-10-24)
 
@@ -277,9 +284,50 @@ of native frame time on the desktop GPU. M7 replaces these with measured numbers
 WebXR on WebGL2, the voxel path tracer, GPU timestamps, zero-copy video, per-sample MSAA effects, 1,000,000-particle
 budgets and GPU-driven culling on WebGL2.
 
-## Open decisions
+## Decisions (M0, 2026-10-27)
 
-1. Package name (`@margoengine/webgl2-compat` proposed) and whether `@margoengine/webgl` stays as the small preview.
-2. Minimum browser tier: require `EXT_color_buffer_float` (full HDR), or also support half-float-only and LDR devices.
-3. Whether to measure how many visitors lack WebGPU before M1 (it needs a counter on the site).
-4. The pixel-parity tolerance that counts as "same" in M2.
+1. **Name.** The package is `@margoengine/webgl2-compat` (`margoengine/webgl2-compat` in the umbrella, like every
+   package). It names what it does, WebGL2 compatibility for the WebGPU API, and stays apart from `@margoengine/webgl`,
+   which is a different thing: a second, small renderer. **`@margoengine/webgl` stays** as the preview until the layer
+   replaces it: it is 3,021 B gzip and draws plain meshes on any WebGL2, including devices below the layer's minimum
+   tier. M8 decides its retirement, once every page that uses the preview draws the same through the layer.
+2. **Minimum tier: `EXT_color_buffer_float` and `highp` fragment shaders are required** (the `full` tier of
+   `webgl2Capabilities`). Below it, `install()` (M2) will reject with `MargoError` code `unsupported` naming what is
+   missing, and the app keeps the `@margoengine/webgl` preview. Reasons: Margo's HDR path renders to `rgba16float`
+   (91 mentions in the packages) and float data targets (`r32float`, `rgba32float`), so a half-float or LDR tier would
+   need a second render path in many packages and double the test matrix; and every WebGL2 configuration this PC can
+   run reaches `full`. Measured with `npm run capabilities --workspace @margoengine/webgl2-compat` (2026-10-27):
+
+   | Browser and back end | GPU | Tier | Missing optional extensions |
+   | --- | --- | --- | --- |
+   | Chrome 156, ANGLE D3D11 (default) | AMD Radeon (integrated) | full | `WEBGL_draw_instanced_base_vertex_base_instance`, ETC2, ASTC |
+   | Edge 156, ANGLE D3D11 (default) | AMD Radeon (integrated) | full | the same |
+   | Chrome 156, ANGLE OpenGL | AMD Radeon (integrated) | full | base vertex/instance, `OES_draw_buffers_indexed`, ETC2 |
+   | Chrome 156, ANGLE Vulkan | NVIDIA RTX A6000 | full | base vertex/instance, `KHR_parallel_shader_compile`, ETC2, ASTC |
+   | Chrome 156, SwiftShader (CPU) | none | full | base vertex/instance, `KHR_parallel_shader_compile`, `EXT_texture_norm16` |
+
+   After a reboot the same five ran on the NVIDIA RTX A6000 (D3D11 and OpenGL rows too) and again all reached `full`;
+   ANGLE OpenGL on NVIDIA has `OES_draw_buffers_indexed` but lacks ASTC as well as ETC2.
+   `npm run test:browser --workspace @margoengine/webgl2-compat` (in `check:merge`) asserts the `full` tier in the
+   default test browser. All five have `EXT_clip_control`, `EXT_float_blend`, `OES_texture_float_linear`, 8 draw buffers, a 65,536-byte
+   uniform block and 16 (D3D11) or 32 fragment texture units; MSAA is 8 samples (SwiftShader 4). What this changes in
+   the plan: no configuration has `WEBGL_draw_instanced_base_vertex_base_instance`, so the base-instance uniform path
+   is the main path from M2, not a fallback; pipeline creation must not depend on `KHR_parallel_shader_compile`; OIT's
+   split pass is needed on ANGLE OpenGL. Not measured: Safari without WebGPU, Firefox and phones (no such device here);
+   the browser matrix of M7 covers them, and a half-float tier can be reconsidered with that data.
+3. **No visitor counter** (Scott, 2026-10-27). The layer is built without measuring how many visitors lack WebGPU.
+4. **Pixel parity for M2 (proposed; M2 confirms it).** Native WebGPU and forced-compat render the same scene on the
+   same GPU and browser in exact-pixel mode (`antialias: false`), read back as 8-bit RGBA. Per pixel, d is the largest
+   RGB channel difference (0 to 255), the visual check's metric. "Same" means: at most 0.1% of pixels with d > 2,
+   and a mean d of at most 0.25. Reasons: the two paths go through different shader compilers (Dawn's WGSL to HLSL and
+   ANGLE's GLSL to HLSL), which may order float operations differently, so a one- or two-level difference after the
+   sRGB encode is expected and is not a bug; the 0.1% allows depth ties along silhouettes; the mean catches a small
+   shift over the whole image (a wrong light colour or exposure), which a share-of-pixels gate alone would miss. M2
+   measures the run-to-run noise of both paths first; the tolerance may tighten, and it never loosens without Scott.
+5. **Corpus storage.** The corpus is in the repository: 786 distinct modules with entry points (3,405,543 bytes of
+   WGSL) from 41 packages plus bundled site pages, recorded from `check:wgsl`, every package GPU test, `check:views`,
+   `check:depth` and the visual check (the path tracer's suite in Chrome, see `docs/known-bugs.md`). It is kept small enough by storing the sources, pipeline layouts and pipelines
+   Brotli-compressed (`corpus.json.br`, about 166 KB) beside a plain-text manifest (about 226 KB, one line per
+   module); the manifest pins the SHA-256 of the data, and `npm run record:wgsl-corpus` rebuilds both. The corpus test
+   fails when a package with WGSL in its source has no module in the corpus. Shaders created inside workers are not
+   recorded (the hook runs in pages only); none of the packages compiles WGSL in a worker today.

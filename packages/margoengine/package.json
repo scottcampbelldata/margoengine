@@ -1419,6 +1419,10 @@
       "types": "./dist/webgl.d.ts",
       "import": "./dist/webgl.js"
     },
+    "./webgl2-compat": {
+      "types": "./dist/webgl2-compat.d.ts",
+      "import": "./dist/webgl2-compat.js"
+    },
     "./wfc": {
       "types": "./dist/wfc.d.ts",
       "import": "./dist/wfc.js"
@@ -1535,6 +1539,7 @@
     "@margoengine/voxel-pathtracer": "^1.0.0",
     "@margoengine/water": "^1.0.0",
     "@margoengine/webgl": "^1.0.0",
+    "@margoengine/webgl2-compat": "^1.0.0",
     "@margoengine/wfc": "^1.0.0",
     "@margoengine/xr": "^1.0.0"
   },
