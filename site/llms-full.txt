@@ -5764,7 +5764,8 @@ work today (run in a clone, or install local tarballs).
 
 A biome map turns a heightmap and a few climate settings into tiled layers: climate fields, biome weights and masks
 that terrain, scatter and a terrain editor read. This package is optional and tree-shakable and adds 0 bytes to core
-and the stage. It is built in milestones: this release has the integer foundation and the climate fields.
+and the stage. It is built in milestones: this release has the integer foundation, climate fields, biome classification with
+presets, a terrain view and editor hooks; placement of trees, rocks and props comes next.
 
 ## A world in three lines
 
@@ -5813,23 +5814,6 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 | `rainSeason` | `'auto'` | when the rain falls, for the Koppen label view: `'uniform'`, `'summer'` or `'winter'` |
 
 ### The layers of a tile
-
-| Layer | Format | Unit | What it holds |
-| --- | --- | --- | --- |
-| `height` | i32 | mm | terrain height |
-| `slope`, `aspect` | i16 | tan / 256, degrees x 360 / 65536 | Horn 3x3 gradient; aspect is the downslope direction clockwise from north (-Z) |
-| `curvature`, `tpi` | i16 | 1e-4 / m, 0.1 m | general curvature (positive on convex ground), height minus the 49 m box mean |
-| `temperature`, `coldest`, `warmest` | i16 | 0.01 C | mean annual, coldest-month and warmest-month air temperature |
-| `gdd5`, `season` | u16 | C day, days | growing degree days above 5 C; days with a mean above 0.9 C |
-| `treeline` | i16 | 0.01 K | Korner's thermal treeline margin: trees grow where it is 0 or more |
-| `rainfall` | u16 | mm per year | rain with orography, downwind drift and rain shadow |
-| `alpha`, `moisture` | u8 | 1/255 | moisture index AET / PET; soil moisture (that index, topographic wetness, nearness to water) |
-| `exposure` | u8 | 1/255 | wind exposure (Winstral's Sx), 0.5 on flat ground |
-| `waterDistance` | u16 | 0.1 m | distance to the sea or a river |
-| `soil` | u8 | cm | soil depth proxy, 0 to 2.55 m |
-| `profile`, `plan` | i16 | 1e-4 / m | profile and plan curvature, only when a request names them |
-
-`LAYERS` lists every layer with its format, scale and unit; `value = data[z * width + x] * scale`.
 
 [README continues: https://margoengine.com/llms/packages/biomes.md]
 
