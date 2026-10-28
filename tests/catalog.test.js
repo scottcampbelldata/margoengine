@@ -73,19 +73,33 @@ test('preview serves static files and rejects escaped paths and unsupported meth
   }
 });
 
-// No step has a deadline of its own (a loaded machine slows the browser by minutes, see tests/browser/catalog.test.js);
-// the test as a whole has one.
+// A loaded machine slows the browser by minutes (see tests/browser/catalog.test.js), so every browser step may take up
+// to STEP_TIMEOUT before it fails naming the step; the test as a whole has a hard limit of 15 minutes.
+const STEP_TIMEOUT = 5 * 60_000;
 test('catalog searches, copies exact text, links examples, and handles clipboard denial', {
   timeout: 15 * 60_000,
 }, async () => {
   let browser;
   browser = await launchBrowser({ headless: true });
   try {
-    const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
-    context.setDefaultTimeout(0);
+    const context = await browser.newContext();
+    context.setDefaultTimeout(STEP_TIMEOUT);
     // The page clears #copy-status 7 s after each copy, so reading it later fails on a slow machine: record every
     // message it shows instead.
+    // The Windows system clipboard is shared by every process, so any other browser or app can overwrite it between a
+    // write and a read. Each page gets its own clipboard that records every writeText call; the copy buttons still call
+    // navigator.clipboard.writeText and the test reads back exactly what they wrote.
     await context.addInitScript(() => {
+      const written = [];
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async (text) => {
+            written.push(String(text));
+          },
+          readText: async () => written.at(-1) ?? '',
+        },
+      });
       window.statuses = [];
       addEventListener('DOMContentLoaded', () => {
         const status = document.querySelector('#copy-status');
@@ -102,6 +116,7 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
       page.waitForFunction(
         async (expected) => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n') === expected,
         expected,
+        { timeout: STEP_TIMEOUT },
       );
     const errors = [];
     const requests = [];

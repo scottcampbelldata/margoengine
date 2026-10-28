@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import v8 from 'node:v8';
-import vm from 'node:vm';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { Engine, TransformStore, box, PbrMaterial } from '../../core/dist/extension.js';
 import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
 import {
@@ -301,39 +301,30 @@ test('screen-size levels follow the bounding radius and world scale', async () =
   e.dispose();
 });
 
-test('per-frame selection allocates nothing, including level switches, for 3,000 objects', async () => {
-  v8.setFlagsFromString('--expose-gc');
-  const gc = vm.runInNewContext('gc');
-  const e = await plain(8192),
-    lods = new LODSystem();
-  e.use(lods);
-  const a = box(),
-    b = box(0.5, 0.5, 0.5),
-    imposterLike = null;
-  for (let i = 0; i < 3000; i++) {
-    const anchor = e.createMesh().setPosition([(i % 60) * 4, 0, -Math.floor(i / 60) * 4]),
-      child = e.createMesh(anchor).setGeometry(a);
-    lods.add(anchor, [{ object: child }, { object: b, distance: 40 }, { object: imposterLike, distance: 120 }]);
-  }
-  const near = [0, 0, 0.001],
-    far = [60, 0, -60],
-    run = (frames) => {
-      for (let f = 0; f < frames; f++) {
-        e.camera.position = f % 2 ? near : far;
-        lods.update();
-      }
-    };
-  run(4000);
-  gc();
-  const before = v8.getHeapStatistics().used_heap_size;
-  run(1000);
-  const grown = v8.getHeapStatistics().used_heap_size - before;
-  assert.ok(grown < 64 * 1024, `selection allocated ${grown} bytes over 1000 frames with switches`);
-  e.camera.position = [60, 0, -60];
-  lods.update();
-  const levels = new Set(lods.handles.map((l) => l.level));
-  assert.deepEqual([...levels].sort(), [0, 1, 2], 'all levels in use');
-  e.dispose();
+// Heap growth is measured in a fresh process with --expose-gc: inside the test runner other tests' timers, promises and
+// JIT work share the heap and once added 5.9 MB to a window in which selection itself allocates nothing.
+const heapProbe = (...args) =>
+  JSON.parse(
+    execFileSync(
+      process.execPath,
+      ['--expose-gc', fileURLToPath(new URL('./support/selection-heap-probe.mjs', import.meta.url)), ...args],
+      {
+        encoding: 'utf8',
+        timeout: 120000,
+      },
+    ),
+  );
+
+test('per-frame selection allocates nothing, including level switches, for 3,000 objects', () => {
+  const { growth, levels } = heapProbe();
+  for (const grown of growth)
+    assert.ok(grown < 64 * 1024, `selection allocated ${grown} bytes over 1000 frames with switches`);
+  assert.deepEqual(levels, [0, 1, 2], 'all levels in use');
+});
+
+test('the allocation probe fails when selection allocates', () => {
+  const { growth } = heapProbe('--allocate');
+  assert.ok(Math.min(...growth) >= 64 * 1024, `probe saw only ${growth} bytes from a deliberately allocating loop`);
 });
 
 test('bakeShader adds an early return to the gltf-pro beauty fragment only', () => {
