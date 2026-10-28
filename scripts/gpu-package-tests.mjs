@@ -9,12 +9,14 @@
 // Every test has a hard time limit (10 min; MARGO_GPU_TEST_TIMEOUT_MIN, or "margo": { "gpuTestTimeoutMinutes": n } in the
 // package's package.json): a hung test has its whole process tree killed, is named in the output and fails the step.
 // Holds one shared slot of the GPU lock (scripts/gpu-lock.mjs, up to 3 at once) for the whole run; each test's result and time go to
-// test-results/gpu-packages.json.
+// test-results/gpu-packages.json. A test that fails while the Windows event log shows a GPU driver reset runs once more
+// (scripts/support/driver-resets.mjs, bug 25); the reset and the rerun are printed and kept in that file, never hidden.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { acquire, lockDir } from './gpu-lock.mjs';
+import { describeResets, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { runLimited, testLimitMs } from './support/run-limited.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -201,13 +203,17 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
         prepared.add(command);
       }
       console.log(`\n=== ${test.label}`);
-      const result = await runLimited(test.command, {
-        cwd: join(root, test.cwd),
-        env,
-        limitMs: testLimitMs(test.minutes),
-        label: test.label,
+      // A test that fails while the GPU driver resets (bug 25) runs once more; the reset and the rerun are printed.
+      const result = await retryAfterDriverReset(test.label, async () => {
+        const run = await runLimited(test.command, {
+          cwd: join(root, test.cwd),
+          env,
+          limitMs: testLimitMs(test.minutes),
+          label: test.label,
+        });
+        if (run.message) console.error(`\nHUNG: ${run.message}`);
+        return run;
       });
-      if (result.message) console.error(`\nHUNG: ${result.message}`);
       results.push({ ...test, ...result });
     }
   } finally {
@@ -217,7 +223,10 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   mkdirSync(join(root, 'test-results'), { recursive: true });
   writeFileSync(join(root, 'test-results/gpu-packages.json'), JSON.stringify(results, null, 2) + '\n');
   console.log('\nGPU package tests:');
-  for (const r of results) console.log(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.label}  ${r.seconds} s`);
+  for (const r of results)
+    console.log(
+      `  ${r.ok ? 'PASS' : 'FAIL'}  ${r.label}  ${r.seconds} s${r.driverReset ? `  (run again after a ${describeResets(r.driverReset.resets)})` : ''}`,
+    );
   console.log(`  total ${Math.round((performance.now() - started) / 1000)} s`);
   if (failed.length) {
     console.error(`${failed.length} of ${results.length} failed: ${failed.map((r) => r.label).join(', ')}`);

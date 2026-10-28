@@ -10,6 +10,11 @@ mock.module('@playwright/test', {
     webkit: {},
   },
 });
+// The event log lookup of scripts/support/driver-resets.mjs, replaced: these runs must not read this PC's real log.
+const resets = await import('../scripts/support/driver-resets.mjs');
+mock.module('../scripts/support/driver-resets.mjs', {
+  namedExports: { ...resets, driverResets: () => current.resets ?? [] },
+});
 const { openBrowser } = await import('../scripts/browser.js');
 
 function fixture(failures) {
@@ -121,6 +126,10 @@ test('repeated Vite reloads cannot hide a permanently unstable startup', async (
 // 120 s for a site view) with no word about the GPU. Now the page's report of the loss ends the wait at once.
 test('a WebGPU device the driver takes away fails the page wait at once, naming the loss', async () => {
   const state = fixture([]);
+  // What the Windows event log holds two seconds later: the NVIDIA driver's reset.
+  state.resets = [
+    { at: '2026-10-27T13:53:31.000Z', source: 'nvlddmkm', id: '153', detail: 'Error occurred on GPUID: 100' },
+  ];
   const session = await openBrowser();
   const t0 = performance.now(),
     waiting = session.page.waitForFunction(() => window.ready, null, { timeout: 30000 });
@@ -135,7 +144,10 @@ test('a WebGPU device the driver takes away fails the page wait at once, naming 
       error.message,
       /WebGPU device was lost at .* \(reason "unknown": D3D12 device removed \(DXGI_ERROR_DEVICE_HUNG\)\)/,
     );
-    assert.match(error.message, /nvlddmkm event 153/);
+    // Windows: the reset itself is named, from the event log. Elsewhere there is no such log to read.
+    if (process.platform === 'win32')
+      assert.match(error.message, /the GPU driver reset the GPU \(.*nvlddmkm event 153 at \d\d:\d\d:31\)/);
+    else assert.match(error.message, /a GPU reset/);
     return true;
   });
   assert.ok(performance.now() - t0 < 1000, 'failed at once, not at the 30 s timeout');

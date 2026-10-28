@@ -9,11 +9,14 @@
 // (visual demos, GPU test ids, WGSL package directories). The package tarball test always runs, on the affected
 // packages' README examples (the umbrella smoke test every time), and the bundler matrix runs when a changed package is
 // one it builds or imports (scripts/support/affected-packages.mjs); the full run keeps both whole. The mode and the
-// reason are printed first and written to test-results/check-merge.json.
+// reason are printed first and written to test-results/check-merge.json. A step that fails while the Windows event log
+// shows a GPU driver reset (scripts/support/driver-resets.mjs, bug 25) runs once more; the reset is printed and recorded
+// with the step, and a second failure fails the run.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { describeResets, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { analyse, buildFootprints, loadWorkspaces, scan, visualIds, wgslPackages } from './support/affected-gpu.mjs';
 import { matrixClosure, packageScopes } from './support/affected-packages.mjs';
 
@@ -153,11 +156,22 @@ async function main() {
     if (name === 'verify' && planned.some((p) => stepName(p.command) === 'modern:test:packages'))
       env.MARGOENGINE_PLANT_STALE = '1';
     if (name === 'modern:test:packages' && built) env.MARGOENGINE_PACKAGE_TEST_PREBUILT = '1';
+    // A step that fails while the Windows event log shows a GPU driver reset runs once more, printed and recorded
+    // (bug 25). check:gpu-packages does this per test itself, so a reset there costs one test, not the whole step.
     const t0 = performance.now(),
-      { status } = spawnSync(command, { cwd: root, shell: true, stdio: 'inherit', env });
-    if (name === 'verify' && status === 0) built = true;
-    results.push({ command, ok: status === 0, seconds: Math.round((performance.now() - t0) / 100) / 10 });
-    if (status !== 0) {
+      runStep = async () => ({
+        ok: spawnSync(command, { cwd: root, shell: true, stdio: 'inherit', env }).status === 0,
+      }),
+      { ok, driverReset } =
+        name === 'check:gpu-packages' ? await runStep() : await retryAfterDriverReset(command, runStep);
+    if (name === 'verify' && ok) built = true;
+    results.push({
+      command,
+      ok,
+      seconds: Math.round((performance.now() - t0) / 100) / 10,
+      ...(driverReset && { driverReset: { resets: driverReset.resets, rerunOk: driverReset.rerunOk } }),
+    });
+    if (!ok) {
       failed = command;
       break;
     }
@@ -168,6 +182,11 @@ async function main() {
     join(root, 'test-results/check-merge.json'),
     `${JSON.stringify({ mode: decision.mode, reason: decision.reason, affected: decision.affected, seconds, results }, null, 2)}\n`,
   );
+  for (const { command, driverReset } of results)
+    if (driverReset)
+      console.log(
+        `\nGPU RESET during ${command}: ${describeResets(driverReset.resets)}; the rerun ${driverReset.rerunOk ? 'passed' : 'failed'}`,
+      );
   console.log(`\n${describe(decision, base)}\n${failed ? `FAILED at ${failed}` : 'PASSED'} in ${seconds} s`);
   if (failed) process.exitCode = 1;
 }
