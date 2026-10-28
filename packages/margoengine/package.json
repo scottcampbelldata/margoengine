@@ -79,6 +79,14 @@
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"
     },
+    "./biomes/presets": {
+      "types": "./dist/biomes/presets.d.ts",
+      "import": "./dist/biomes/presets.js"
+    },
+    "./biomes/koppen": {
+      "types": "./dist/biomes/koppen.d.ts",
+      "import": "./dist/biomes/koppen.js"
+    },
     "./blender": {
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"

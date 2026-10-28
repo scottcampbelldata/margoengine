@@ -1,4 +1,5 @@
 // Point queries for gameplay (`BiomeWorld.sample`): the same per-cell climate as the tiles, from region data.
+import { type Classifier, classify } from './classify.js';
 import type { Climate } from './climate.js';
 import { cellClimate, TPI_RADIUS } from './fields.js';
 import { atan2, clampInt, divFloor, isqrt, ONE } from './fixed.js';
@@ -31,12 +32,45 @@ export interface BiomeSample {
   waterDistance: number;
   /** Soil depth in metres. */
   soil: number;
+  /** The strongest biomes here (ids, strongest first, up to 4) and their weights (0..1, summing to 1). */
+  biomes: string[];
+  weights: number[];
+}
+
+/** What a point classification needs from the world. */
+export interface PointContext {
+  readonly seed: number;
+  /** Cell size, mm. */
+  readonly cell: number;
+  /** User layer value (0..255) at the point's cell, or undefined. */
+  user(name: string): number | undefined;
+}
+
+/** Writes the top-4 biomes of an rgba8 id and weight pair into `out`. */
+function biomesOf(
+  ids: ArrayLike<number>,
+  weights: ArrayLike<number>,
+  at: number,
+  names: readonly string[],
+  out: BiomeSample,
+): void {
+  out.biomes = out.biomes ?? [];
+  out.weights = out.weights ?? [];
+  out.biomes.length = 0;
+  out.weights.length = 0;
+  for (let s = 0; s < 4; s++)
+    if (weights[at + s]) {
+      out.biomes.push(names[ids[at + s]]);
+      out.weights.push(weights[at + s] / 255);
+    }
 }
 
 /** A sample from the region fields at world (x, z) metres. */
 export function samplePoint(
   climate: Climate,
   region: Region,
+  classifier: Classifier,
+  context: PointContext,
   origin: readonly [number, number],
   x: number,
   z: number,
@@ -87,6 +121,43 @@ export function samplePoint(
   out.exposure = expo / 255;
   out.waterDistance = dist / 10;
   out.soil = c[8] / 100;
+  // Classify the point as the centre of a uniform 3 x 3 grid (the blur then leaves it unchanged).
+  const values: Record<string, number> = {
+      height: e,
+      slope: tan,
+      aspect: angle >> 16,
+      curvature: 0,
+      tpi: 0,
+      temperature: c[0],
+      coldest: c[1],
+      warmest: c[2],
+      gdd5: c[3],
+      season: c[4],
+      treeline: c[5],
+      alpha: c[6],
+      moisture: c[7],
+      soil: c[8],
+      rainfall: Math.min(65535, rain),
+      exposure: expo,
+      waterDistance: dist,
+    },
+    ids = new Uint8Array(4),
+    weights = new Uint8Array(4);
+  classify(
+    classifier,
+    {
+      n: 3,
+      gx: divFloor(px, context.cell) - 1,
+      gz: divFloor(pz, context.cell) - 1,
+      seed: context.seed,
+      cell: context.cell,
+      layer: (name) => new Int32Array(9).fill(values[name] ?? 0),
+      user: (name) => context.user(name),
+    },
+    ids,
+    weights,
+  );
+  biomesOf(ids, weights, 0, classifier.ids, out);
   return out;
 }
 
@@ -95,6 +166,7 @@ export function readCell(
   tile: { layer(name: string): RasterLayer | undefined },
   i: number,
   j: number,
+  names: readonly string[],
   out: BiomeSample = {} as BiomeSample,
 ): BiomeSample {
   const value = (name: string) => {
@@ -116,5 +188,7 @@ export function readCell(
   out.exposure = value('exposure');
   out.waterDistance = value('waterDistance');
   out.soil = value('soil');
+  const at = (j * tile.layer('biome')!.width + i) * 4;
+  biomesOf(tile.layer('biome')!.data, tile.layer('biomeWeight')!.data, at, names, out);
   return out;
 }

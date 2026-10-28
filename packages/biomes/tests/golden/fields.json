@@ -1,8 +1,8 @@
 {
   "$comment": "SHA-256 of BiomeWorld.digest for default-layer tiles (climate.test.js). A change here changes every biome map; advance it only with a reason in the commit.",
-  "default88": "5544f735c8f4104a976435eee044472086db7112f8e4308987d570692bb23265",
-  "default015": "116014db13779baea185775a1f4ef6c96f0d4ddecf2481237c4aee1faa0ed2b1",
-  "coast07": "00a3de22e8132a68d417696354ee7538ef6230d3f257e41708a3a85767da0e79",
-  "coast93": "8d0fbdfbc7385d633c0ffa34e2c5fa762d27ea981150ef9bf86e95a8d0b48698",
-  "seedmax55": "aa272c9501b502555e4bcc2ba765e4c398c19dce65fb697b2e7c67a65e747c19"
+  "default88": "0553611c7bd601eec3c3c8b8ff409d3d0378d57fb38976344c53ecc82ecb2d4f",
+  "default015": "e3ebe42614cb4b0cea215e9b1d598fe48a3f961fe1d75867455d9e15c12af825",
+  "coast07": "45d5188fec68e0e7fc2f5bacd9c11c8ccdb6f30ff21bb4644aa9872d9bd6aa8e",
+  "coast93": "4e4179925356403be66afa8bba9cbab91b4d613073e49125a1593a3347280e1f",
+  "seedmax55": "afb36b87dcd95599be965c8b71eb23e120fe0686b5260788bb6aff1a2fb794bf"
 }

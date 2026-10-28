@@ -48,3 +48,25 @@ export { DEFAULT_LAYERS, LAYERS, type LayerFormat, type LayerInfo, type RasterLa
 export { distanceTransform, priorityFlood } from './region.js';
 export type { BiomeSample } from './sample.js';
 export { BiomeWorld, type BiomeTile, type BiomeWorldOptions, type TileRequest } from './world.js';
+export {
+  biotemperature,
+  HOLDRIDGE_BELTS,
+  HOLDRIDGE_HUMIDITY,
+  holdridgeZone,
+  type PaintLayer,
+  type PaintMode,
+  WHITTAKER,
+  whittakerClass,
+} from './classify.js';
+export {
+  type BiomeDefinition,
+  type ClimateEnvelope,
+  type ClusterRule,
+  type ColorVariation,
+  defineBiome,
+  type DetailRule,
+  type GroundLayer,
+  type Range,
+  type SizeDistribution,
+  type SpeciesRule,
+} from './define.js';

@@ -52,7 +52,7 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 | `rainShadow` | 0.6 | 0..1, the share of moisture a 1,500 m rise wrings out |
 | `inland` | 500 | km of land between the sea and the upwind edge when no sea is upwind (continentality) |
 | `coldAir` | 3 | largest night cooling of cold-air pools in K; 0 turns pooling off |
-| `rainSeason` | `'auto'` | when the rain falls: `'uniform'`, `'summer'` or `'winter'` (read by the Koppen label view of B2) |
+| `rainSeason` | `'auto'` | when the rain falls, for the Koppen label view: `'uniform'`, `'summer'` or `'winter'` |
 
 ### The layers of a tile
 
@@ -86,8 +86,75 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
   grows with latitude and continentality, closed-form growing degree days and season length, Korner's treeline
   margin, Hargreaves potential evapotranspiration with FAO-56 radiation, and the moisture index from Fu's form of the
   Budyko curve. Formulas, constants and sources are in `docs/clean-room.md`.
-- Tile cost: about 50 ms per 256 m tile at 1 m on one thread of the reference PC for the 17 climate layers, checked
-  in the package test against a 400 ms budget.
+- Tile cost: about 50 ms per 256 m tile at 1 m on one thread of the reference PC for the 17 climate layers, about
+  85 ms with classification, checked in the package test against a 400 ms budget.
+
+## Biomes, presets and blends
+
+A world classifies every cell into weighted biomes: the `biome` layer holds the four strongest per cell (indices into
+`world.biomes`) and `biomeWeight` their weights, which always sum to exactly 255.
+
+```ts
+import { BiomeWorld, defineBiome } from '@margoengine/biomes';
+import { presets } from '@margoengine/biomes/presets';
+
+const heath = defineBiome({
+  id: 'heath',
+  climate: { moistureIndex: [0.45, 0.75], gdd5: [600, 1600], treeline: [0, null] },
+  ground: [{ material: 'heather' }, { material: 'rock', slope: [30, null] }],
+});
+const world = await BiomeWorld.create({ biomes: [presets.temperate, presets.boreal, heath] });
+const tile = await world.tile(4, 4);
+const first = tile.layer('biome')!.data[0]; // strongest biome of cell (0, 0)
+console.log(world.biomes[first].id, tile.layer('biomeWeight')!.data[0] / 255, world.sample(0, 0).biomes);
+```
+
+- **Envelopes** (`classifier: 'envelopes'`, the default): each biome lists ranges on any fields: `temperature`,
+  `coldest`, `warmest`, `gdd5`, `season`, `treeline`, `rainfall`, `moistureIndex`, `moisture`, `height`, `slope`
+  (degrees), `exposure`, `soil`, `waterDistance`, or `custom` ranges on any layer or on a user mask `mask/<name>`. A
+  range is `[min, max]` in plain units; `null` leaves a side open. Membership is the product of Wendland kernels: 1
+  well inside, a smooth band centred on each bound (`blend`, default 0.15 of the range; open ranges use a per-field
+  width such as 1.5 K or 100 mm), exactly 0 beyond.
+- **Ecotones that wander**: the climate inputs are warped by smooth integer noise (700 m, up to +-1.6 K and +-8 % of
+  rainfall) before classification, so borders do not follow contour lines, and a 3x3 blur removes speckle from noisy
+  slopes.
+- **Nothing is ever empty**: a cell outside every envelope gets the nearest one by normalised distance (ties: higher
+  `priority`, then id).
+- **Whittaker and Holdridge**: `classifier: 'whittaker'` weights each biome by the Whittaker classes in its `zones`
+  (`WHITTAKER`, our rectangles over mean temperature and rainfall from the published diagram); `'holdridge'` by
+  Holdridge life zones (`holdridgeZone(biotemperature, rainfall)`, nearest hexagon in log biotemperature, rainfall and
+  PET ratio, such as `'cool-temperate-perhumid'`).
+
+`presets` holds `temperate`, `boreal`, `alpine`, `wetland`, `tundra`, `desert`, `savanna` and `tropical`, written as
+plant functional type limits over the coldest month, growing degree days and the moisture index, with Korner's
+treeline for forests, so belts move with latitude, aspect and cold air instead of fixed heights. `presetWorlds` holds
+a climate and relief where each one is common, used by the golden digests. The default world uses `temperate` with
+its neighbours `alpine`, `wetland` and `boreal`. Every definition is plain JSON: `defineBiome` validates it and returns
+a frozen copy.
+
+### Painting
+
+User layers sit on top of the climate: `world.writeLayer('paint/<biome>', x, z, data)` (u8 per cell of tile x, z)
+paints a biome, `mask/<name>` writes a mask that envelopes and paint layers can read. Paint layers compose in the
+world's `paint` order with a mode: `'replace'` (the default: the painted share replaces the rest), `'add'`,
+`'multiply'` (0 removes a biome; the next nearest envelope takes over if nothing is left) or `'max'`, optionally
+through a mask: `world.update({ paint: [{ biome: 'desert', mode: 'replace', mask: 'mask/dunes' }] })`. Writing a layer
+recomputes that tile and its neighbours and calls the `onChange` listeners. `readLayer` returns a copy.
+
+### Koppen labels
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+import { KOPPEN, koppen, koppenClass } from '@margoengine/biomes/koppen';
+
+const world = await BiomeWorld.create();
+const codes = koppen(await world.tile(8, 8), world.climate.rainSeason); // one class index per cell
+console.log(KOPPEN[codes[0]]); // 'Cfb' for the default world
+console.log(KOPPEN[koppenClass({ temperature: 2700, coldest: 2600, warmest: 2800, rainfall: 2600, rainSeason: 'uniform' })]); // 'Af'
+```
+
+An optional view over the seasonal climate layers (Beck et al. 2018 rules, 30 classes), not a classifier: nothing
+depends on it and the root entry does not include it. Monthly rainfall follows the climate's `rainSeason`.
 
 ## Same seed, same bytes, everywhere
 

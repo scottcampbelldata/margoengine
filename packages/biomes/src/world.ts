@@ -2,8 +2,10 @@
 // BiomeWorld: a finite world (decision D1, up to 64 km) of tiles with climate fields, built on the CPU in integers.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type Climate, type ClimateOptions, quantizeClimate } from './climate.js';
+import { checkPaint, type Classifier, classifier, classify, type PaintLayer } from './classify.js';
+import { type BiomeDefinition, defineBiome } from './define.js';
 import { tileFields } from './fields.js';
-import { divFloor, imod } from './fixed.js';
+import { divFloor, idiv, imod } from './fixed.js';
 import { type Heights, type HeightSource, heightsOf } from './height.js';
 import { canonicalBytes, DEFAULT_LAYERS, LAYERS, type RasterLayer, sha256 } from './layers.js';
 import { buildRegion, type Region } from './region.js';
@@ -30,6 +32,13 @@ export interface BiomeWorldOptions {
   /** `'auto'` and `'cpu'` compute on the CPU; `'gpu'` is not available yet and throws. Output is identical either way.
    * Default `'auto'`. */
   readonly backend?: 'auto' | 'gpu' | 'cpu';
+  /** Biomes to classify into, at most 254. Default: the temperate preset and its neighbours (alpine, wetland, boreal). */
+  readonly biomes?: readonly BiomeDefinition[];
+  /** `'envelopes'` (each biome's climate envelope), `'whittaker'` or `'holdridge'` (each biome's `zones`). Default
+   * `'envelopes'`. */
+  readonly classifier?: 'envelopes' | 'whittaker' | 'holdridge';
+  /** Paint layers in composition order (the editor appends one per biome it paints). Default none. */
+  readonly paint?: readonly PaintLayer[];
   /** Rejects `create` with the signal's reason when aborted. */
   readonly signal?: AbortSignal;
 }
@@ -102,10 +111,16 @@ export class BiomeWorld implements Disposable {
   /** Finished tiles that hold every default layer, for exact `sample` reads. */
   readonly #ready = new Map<string, BiomeTile>();
   readonly #listeners = new Set<(rect: Rect) => void>();
+  /** User layers (`paint/<biome>`, `mask/<name>`): one u8 raster per tile, keyed `x,z`. */
+  readonly #user = new Map<string, Map<string, Uint8Array>>();
+  #biomes: readonly BiomeDefinition[];
+  #kind: Classifier['kind'];
+  #paint: readonly PaintLayer[];
+  #classifier: Classifier;
   #notifying = false;
   #disposed = false;
 
-  private constructor(options: BiomeWorldOptions) {
+  private constructor(options: BiomeWorldOptions, biomes: readonly BiomeDefinition[]) {
     const seed = options.seed ?? 1,
       size = options.size ?? [4096, 4096],
       tileSize = options.tileSize ?? 256,
@@ -151,6 +166,10 @@ export class BiomeWorld implements Disposable {
     this.tilesX = -divFloor(-size[0], tileSize);
     this.tilesZ = -divFloor(-size[1], tileSize);
     this.#climate = quantizeClimate(options.climate);
+    this.#biomes = biomes;
+    this.#kind = options.classifier ?? 'envelopes';
+    this.#paint = options.paint ?? [];
+    this.#classifier = this.#buildClassifier();
     this.#heights = heightsOf(options.height, this.#origin, this.#size, this.seed);
     this.#region = this.#buildRegion();
   }
@@ -163,9 +182,34 @@ export class BiomeWorld implements Disposable {
     if (typeof options !== 'object' || options === null)
       throw typeError('BiomeWorld options must be an object; pass {} for the defaults', 'biomes');
     aborted(options.signal);
-    await Promise.resolve();
+    const biomes = options.biomes ?? (await defaultBiomes());
     aborted(options.signal);
-    return new BiomeWorld(options);
+    return new BiomeWorld(options, biomes);
+  }
+
+  #buildClassifier(): Classifier {
+    const biomes = this.#biomes;
+    if (!Array.isArray(biomes) || biomes.length < 1 || biomes.length > 254)
+      throw rangeError('BiomeWorld biomes must be 1 to 254 biome definitions', 'biomes');
+    const checked = biomes.map((b) => defineBiome(b)),
+      ids = checked.map((b) => b.id);
+    if (new Set(ids).size !== ids.length) throw rangeError('BiomeWorld biome ids must be unique', 'biomes');
+    if (!['envelopes', 'whittaker', 'holdridge'].includes(this.#kind))
+      throw rangeError("BiomeWorld classifier must be 'envelopes', 'whittaker' or 'holdridge'", 'biomes');
+    if (!checkPaint(this.#paint, ids))
+      throw rangeError('A paint layer names a biome of this world, an optional mode and an optional mask', 'biomes');
+    this.#biomes = checked;
+    return classifier(checked, this.#kind, this.#paint);
+  }
+
+  /** The biome definitions in force (the indices in the `biome` layer point into this list). */
+  get biomes(): readonly BiomeDefinition[] {
+    return this.#biomes;
+  }
+
+  /** The paint layers in composition order. */
+  get paint(): readonly PaintLayer[] {
+    return this.#paint;
   }
 
   #buildRegion(): Region {
@@ -230,13 +274,52 @@ export class BiomeWorld implements Disposable {
     await Promise.resolve();
     this.#live();
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
-      layers = tileFields(
-        { climate: this.#climate, region: this.#region, heights: this.#heights, cell: this.resolution * 1000, cells },
-        x,
-        z,
-        names,
-      ),
-      list = Object.keys(LAYERS).filter((name) => layers.has(name));
+      cell = this.resolution * 1000,
+      frame = { climate: this.#climate, region: this.#region, heights: this.#heights, cell, cells },
+      classified = names.includes('biome') || names.includes('biomeWeight');
+    let layers: Map<string, RasterLayer>;
+    if (!classified) layers = tileFields(frame, x, z, names);
+    else {
+      // Classification blurs over a 1-cell margin: compute the fields one cell wider, classify, then crop.
+      const c = this.#classifier,
+        wide = tileFields(frame, x, z, [...new Set([...names, ...c.inputs.filter((n) => !n.startsWith('mask/'))])], 1),
+        n = cells + 2,
+        gx = x * cells - 1,
+        gz = z * cells - 1,
+        ids = new Uint8Array(cells * cells * 4),
+        weights = new Uint8Array(cells * cells * 4);
+      classify(
+        c,
+        {
+          n,
+          gx,
+          gz,
+          seed: this.seed,
+          cell,
+          layer: (name) => wide.get(name)!.data,
+          user: (name, k) => this.#userAt(name, gx + imod(k, n), gz + idiv(k, n), cells),
+        },
+        ids,
+        weights,
+      );
+      layers = new Map();
+      for (const name of names) {
+        if (name === 'biome' || name === 'biomeWeight') continue;
+        layers.set(name, crop(wide.get(name)!, cells));
+      }
+      const info = (name: 'biome' | 'biomeWeight', data: Uint8Array): RasterLayer => ({
+        name,
+        format: 'rgba8',
+        width: cells,
+        depth: cells,
+        data,
+        scale: LAYERS[name].scale,
+        unit: LAYERS[name].unit,
+      });
+      if (names.includes('biome')) layers.set('biome', info('biome', ids));
+      if (names.includes('biomeWeight')) layers.set('biomeWeight', info('biomeWeight', weights));
+    }
+    const list = Object.keys(LAYERS).filter((name) => layers.has(name));
     return Object.freeze({
       x,
       z,
@@ -246,6 +329,83 @@ export class BiomeWorld implements Disposable {
       layers: Object.freeze(list),
       layer: (name: string) => layers.get(name),
     });
+  }
+
+  /** A user layer's value at a global cell, or undefined where nothing is painted. */
+  #userAt(name: string, gx: number, gz: number, cells: number): number | undefined {
+    const tiles = this.#user.get(name);
+    if (!tiles) return undefined;
+    const tx = divFloor(gx, cells),
+      tz = divFloor(gz, cells),
+      data = tiles.get(`${tx},${tz}`);
+    return data ? data[(gz - tz * cells) * cells + gx - tx * cells] : undefined;
+  }
+
+  /**
+   * A copy of a user layer's raster for tile (x, z) (`paint/<biome>` or `mask/<name>`, u8, `cells` x `cells`), or
+   * undefined where nothing was written.
+   */
+  readLayer(name: string, x: number, z: number): Uint8Array | undefined {
+    this.#live();
+    const data = this.#user.get(name)?.get(`${x},${z}`);
+    return data ? data.slice() : undefined;
+  }
+
+  /**
+   * Writes a user layer raster for tile (x, z): `paint/<biome>` (0..255, composed into the biome weights by the world's
+   * paint layers; a biome painted for the first time gets a `'replace'` layer at the end of the order) or
+   * `mask/<name>` (0..255, read by envelopes and paint masks). `data` is `cells` x `cells`, or undefined to clear.
+   * The tile and its neighbours (the classification blur reads one cell across tile edges) are recomputed on their next
+   * request, and listeners get the dirty rectangle.
+   * @throws RangeError for a bad name, tile or size; MargoError `'state'` from inside an `onChange` listener.
+   */
+  writeLayer(name: string, x: number, z: number, data: Uint8Array | undefined): void {
+    this.#live();
+    if (this.#notifying)
+      throw fault(
+        'state',
+        'BiomeWorld writeLayer called from an onChange listener; write after the listener returns',
+        'biomes',
+      );
+    const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: exact
+      paint = /^paint\/([a-z0-9][a-z0-9-]*)$/.exec(name);
+    if (!(paint ? this.#classifier.ids.includes(paint[1]) : /^mask\/[\w-]+$/.test(name)))
+      throw rangeError('A user layer is paint/<biome id of this world> or mask/<name>', 'biomes');
+    if (!Number.isInteger(x) || !Number.isInteger(z) || x < 0 || z < 0 || x >= this.tilesX || z >= this.tilesZ)
+      throw rangeError(
+        'BiomeWorld tile indices must be integers inside the world (0..tilesX - 1, 0..tilesZ - 1)',
+        'biomes',
+      );
+    if (data !== undefined && (!(data instanceof Uint8Array) || data.length !== cells * cells))
+      throw rangeError('A user layer raster is a Uint8Array of cells x cells values', 'biomes');
+    let tiles = this.#user.get(name);
+    if (!tiles) this.#user.set(name, (tiles = new Map()));
+    if (data) tiles.set(`${x},${z}`, data.slice());
+    else tiles.delete(`${x},${z}`);
+    if (paint && !this.#paint.some((p) => p.biome === paint[1])) {
+      this.#paint = [...this.#paint, { biome: paint[1], mode: 'replace' }];
+      this.#classifier = classifier(this.#biomes, this.#kind, this.#paint);
+    }
+    this.#invalidate([x - 1, z - 1, x + 1, z + 1]);
+    const t = this.tileSize,
+      r = this.resolution;
+    this.#emit([
+      this.bounds[0] + x * t - r,
+      this.bounds[1] + z * t - r,
+      this.bounds[0] + (x + 1) * t + r,
+      this.bounds[1] + (z + 1) * t + r,
+    ]);
+  }
+
+  /** Drops cached tiles in an inclusive tile-index rectangle. */
+  #invalidate([x0, z0, x1, z1]: readonly [number, number, number, number]): void {
+    for (const key of [...this.#cache.keys()]) {
+      const [x, z] = key.slice(0, key.indexOf(':')).split(',').map(Number);
+      if (x >= x0 && x <= x1 && z >= z0 && z <= z1) {
+        this.#cache.delete(key);
+        this.#ready.delete(`${x},${z}`);
+      }
+    }
   }
 
   /**
@@ -297,16 +457,25 @@ export class BiomeWorld implements Disposable {
       gz = Math.floor((z - this.bounds[1]) / this.resolution), // float division
       cells = this.tileSize / this.resolution, // float division: exact
       tile = this.#ready.get(`${Math.floor(gx / cells)},${Math.floor(gz / cells)}`); // float division
-    if (tile) return readCell(tile, gx - tile.x * cells, gz - tile.z * cells, out);
-    return samplePoint(this.#climate, this.#region, this.#origin, x, z, out);
+    if (tile) return readCell(tile, gx - tile.x * cells, gz - tile.z * cells, this.#classifier.ids, out);
+    return samplePoint(
+      this.#climate,
+      this.#region,
+      this.#classifier,
+      { seed: this.seed, cell: this.resolution * 1000, user: (name) => this.#userAt(name, gx, gz, cells) },
+      this.#origin,
+      x,
+      z,
+      out,
+    );
   }
 
   /**
-   * Replaces the climate or the heights; every tile is recomputed on its next request and listeners get the world
-   * rectangle. Height edits change fields far downwind (rain shadow) and downstream, so the whole world is dirty.
+   * Replaces the biomes, classifier, paint order, climate or heights; every tile is recomputed on its next request and
+   * listeners get the world rectangle. Height edits change fields far downwind (rain shadow) and downstream, so the whole world is dirty.
    * @throws MargoError `'state'` when called from inside an `onChange` listener.
    */
-  update(changes: { readonly climate?: ClimateOptions; readonly height?: HeightSource }): void {
+  update(changes: Partial<Pick<BiomeWorldOptions, 'biomes' | 'climate' | 'classifier' | 'paint' | 'height'>>): void {
     this.#live();
     if (this.#notifying)
       throw fault(
@@ -315,7 +484,17 @@ export class BiomeWorld implements Disposable {
         'biomes',
       );
     if (typeof changes !== 'object' || changes === null)
-      throw typeError('BiomeWorld update takes { climate?, height? }', 'biomes');
+      throw typeError('BiomeWorld update takes { biomes?, classifier?, paint?, climate?, height? }', 'biomes');
+    const before = [this.#biomes, this.#kind, this.#paint] as const;
+    if (changes.biomes) this.#biomes = changes.biomes;
+    if (changes.classifier) this.#kind = changes.classifier;
+    if (changes.paint) this.#paint = changes.paint;
+    try {
+      this.#classifier = this.#buildClassifier();
+    } catch (error) {
+      [this.#biomes, this.#kind, this.#paint] = before;
+      throw error;
+    }
     if (changes.climate) this.#climate = quantizeClimate(changes.climate);
     if (changes.height) this.#replaceHeights(changes.height);
     if (changes.climate || changes.height) this.#region = this.#buildRegion();
@@ -360,6 +539,7 @@ export class BiomeWorld implements Disposable {
     this.#cache.clear();
     this.#ready.clear();
     this.#listeners.clear();
+    this.#user.clear();
   }
 
   [Symbol.dispose](): void {
@@ -390,4 +570,18 @@ function riverCells(
       }
     }
   return mask;
+}
+
+/** The interior `cells` x `cells` of a layer computed with a 1-cell margin. */
+function crop(layer: RasterLayer, cells: number): RasterLayer {
+  const n = cells + 2,
+    data = new (layer.data.constructor as Int32ArrayConstructor)(cells * cells);
+  for (let j = 0; j < cells; j++) data.set(layer.data.subarray((j + 1) * n + 1, (j + 1) * n + 1 + cells), j * cells);
+  return { ...layer, width: cells, depth: cells, data };
+}
+
+/** The default biomes: the temperate preset and its neighbours, loaded from the presets entry on first use. */
+async function defaultBiomes(): Promise<readonly BiomeDefinition[]> {
+  const { presets } = await import('./presets.js');
+  return [presets.temperate, presets.alpine, presets.wetland, presets.boreal];
 }

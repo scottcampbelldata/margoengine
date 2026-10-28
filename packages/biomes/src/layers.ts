@@ -70,6 +70,18 @@ export const LAYERS: Readonly<Record<string, LayerInfo>> = Object.freeze({
   exposure: { format: 'u8', scale: 1 / 255, unit: '0..1', about: 'wind exposure (Winstral Sx), 0.5 on flat ground' },
   waterDistance: { format: 'u16', scale: 0.1, unit: 'm', about: 'distance to the sea or a river' },
   soil: { format: 'u8', scale: 0.01, unit: 'm', about: 'soil depth proxy, 0 to 2.55 m' },
+  biome: {
+    format: 'rgba8',
+    scale: 1,
+    unit: 'index',
+    about: 'the 4 strongest biomes per cell, as indices into the world biome list (255 = none)',
+  },
+  biomeWeight: {
+    format: 'rgba8',
+    scale: 1 / 255,
+    unit: '0..1',
+    about: 'their weights, in the same order, summing to exactly 255',
+  },
   profile: { format: 'i16', scale: 0.0001, unit: '1/m', about: 'profile curvature (on request)' },
   plan: { format: 'i16', scale: 0.0001, unit: '1/m', about: 'plan curvature (on request)' },
 });

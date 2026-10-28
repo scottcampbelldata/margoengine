@@ -1341,14 +1341,19 @@
     "exports": [
       "BiomeWorld",
       "DEFAULT_LAYERS",
+      "HOLDRIDGE_BELTS",
+      "HOLDRIDGE_HUMIDITY",
       "LAYERS",
       "ONE",
       "R16",
       "TURN",
+      "WHITTAKER",
       "atan2",
+      "biotemperature",
       "clampInt",
       "continentality",
       "createRelief",
+      "defineBiome",
       "degreeDays",
       "degreesToAngle",
       "distanceTransform",
@@ -1363,6 +1368,7 @@
       "hash4",
       "hash5",
       "heatLoad",
+      "holdridgeZone",
       "idiv",
       "imod",
       "isqrt",
@@ -1388,7 +1394,8 @@
       "udiv",
       "umod",
       "valueNoise",
-      "wendland"
+      "wendland",
+      "whittakerClass"
     ]
   },
   {
