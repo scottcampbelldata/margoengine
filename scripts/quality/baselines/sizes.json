@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3859189,
+  "total": 3864394,
   "history": [
     {
       "date": "2026-10-24",
@@ -665,6 +665,12 @@
     },
     {
       "date": "2026-10-28",
+      "commit": "b92998d6",
+      "reason": "webgl2-compat milestone M2: GLSL ES 3.00 back end (/glsl) and the WebGPU-shaped device on WebGL2 (/device); the root's install() loads them by import(), its static part stays the probe",
+      "grew": 3
+    },
+    {
+      "date": "2026-10-28",
       "commit": "e1e56c4a",
       "reason": "New package @margoengine/biomes (item 27.4, B0): fixed-point maths, hashes, noise, relief and R16; spec budget 16 kB for the finished root",
       "grew": 1
@@ -674,12 +680,6 @@
       "commit": "5f6b4344",
       "reason": "@margoengine/biomes B1 (item 27.4): climate fields (region grid, Priority-Flood, rain march, exposure, distance transform; per-cell lapse, seasons, treeline, Hargreaves PET, Fu-Budyko, soil); spec root budget 16 kB",
       "grew": 1
-    },
-    {
-      "date": "2026-10-28",
-      "commit": "b92998d6",
-      "reason": "webgl2-compat milestone M2: GLSL ES 3.00 back end (/glsl) and the WebGPU-shaped device on WebGL2 (/device); the root's install() loads them by import(), its static part stays the probe",
-      "grew": 3
     },
     {
       "date": "2026-10-28",
@@ -728,6 +728,12 @@
       "commit": "9d6f2cfd",
       "reason": "@margoengine/biomes B4 (item 27.4): /editor, brush paint, erase and fill, strokes, exact undo and redo, edits as data, dirty rectangles with the placement margin",
       "grew": 1
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "ebef8fd9",
+      "reason": "bug 42 a, d: allowedURLs match on a path-segment boundary and every redirected glTF buffer, image and FBX texture is rechecked at its final URL (checkRedirect in packages/shared/asset-url.js)",
+      "grew": 4
     }
   ],
   "items": {
@@ -832,9 +838,9 @@
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,
     "@margoengine/exporters/usdz": 11341,
-    "@margoengine/fbx": 17917,
+    "@margoengine/fbx": 18653,
     "@margoengine/fbx dist/workers/fbx.js": 51819,
-    "@margoengine/fbx/worker": 18806,
+    "@margoengine/fbx/worker": 19547,
     "@margoengine/fsm": 1131,
     "@margoengine/geometry": 20731,
     "@margoengine/geometry/extras": 5843,
@@ -844,7 +850,7 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 5406,
     "@margoengine/gltf": 5976,
-    "@margoengine/gltf-pro": 55036,
+    "@margoengine/gltf-pro": 56912,
     "@margoengine/gltf-pro dist/workers/gltf.js": 20707,
     "@margoengine/gltf-pro dist/workers/progressive.js": 14944,
     "@margoengine/gltf-pro/asset": 5501,
@@ -852,7 +858,7 @@
     "@margoengine/gltf-pro/extended": 6502,
     "@margoengine/gltf-pro/instancing": 3380,
     "@margoengine/gltf-pro/prepare": 17019,
-    "@margoengine/gltf-pro/progressive": 61641,
+    "@margoengine/gltf-pro/progressive": 63493,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/worker": 57046,
     "@margoengine/html": 5013,

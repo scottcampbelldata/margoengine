@@ -1,6 +1,6 @@
 import { margoError } from '../../shared/errors.js';
 import { parseJSON as parseSafeJSON } from '../../shared/json.js';
-import { assetURL } from '../../shared/asset-url.js';
+import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
 import { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
 import type { DracoDecodeOptions, KTX2Decoder, TranscodedKTX2Result } from '@margoengine/decoders';
@@ -806,6 +806,11 @@ export interface AssetOptions {
   buffers?: Array<ArrayBuffer | ArrayBufferView>;
   /** Fetch for the file and its external buffers and images, for example `@margoengine/cache`'s `cache.fetch`. Default `globalThis.fetch`. */
   fetch?: typeof fetch;
+  /**
+   * URL prefixes (for example `https://cdn.example.com/models/`) that buffer and image URIs may point to besides the
+   * file's own directory, matched on a path-segment boundary. Default none: absolute, cross-origin and `../`-escaping
+   * URIs throw a TypeError, and so does a redirect that ends outside these places.
+   */
   allowedURLs?: readonly string[];
   /**
    * Most bytes the file, its buffers and embedded or external images may total (default 64 MiB). Decoded accessors,
@@ -844,6 +849,7 @@ export async function loadAsset(
     if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
     const response = await get(target, { signal });
     if (root && response.url) base = new URL(response.url);
+    else if (!root) checkRedirect(response, base ?? globalThis.location?.href, allowedURLs, 'glTF resource');
     const bytes = await readResponse(response, { maxBytes: limit - total, signal, label: 'glTF download' }).catch(
       (error) => {
         throw error instanceof RangeError ? overBudget(error.message, limit) : error;

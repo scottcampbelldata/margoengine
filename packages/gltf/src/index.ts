@@ -6,7 +6,7 @@ import { splitTRS } from '@margoengine/math/quat';
 import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import { parseJSON } from '../../shared/json.js';
-import { assetURL } from '../../shared/asset-url.js';
+import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
 import { readComponent } from '../../shared/accessor.js';
 
@@ -149,7 +149,8 @@ export interface GLTFOptions {
   maxNodes?: number;
   /**
    * URL prefixes (for example `https://cdn.example.com/models/`) that buffer URIs inside the file may point to besides
-   * the file's own directory. Default none: absolute, cross-origin and `../`-escaping URIs throw a TypeError.
+   * the file's own directory, matched on a path-segment boundary. Default none: absolute, cross-origin and
+   * `../`-escaping URIs throw a TypeError, and so does a redirect that ends outside these places.
    */
   allowedURLs?: readonly string[];
 }
@@ -415,6 +416,7 @@ export async function loadGLTF(
     if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
     const response = await get(target, { signal });
     if (root && response.url) base = new URL(response.url);
+    else if (!root) checkRedirect(response, base, allowedURLs, 'glTF buffer');
     const data = await readResponse(response, { maxBytes: limit - total, signal, label: 'glTF download' });
     total += data.byteLength;
     return data;

@@ -82,6 +82,16 @@ const files = {
 // Static server; paths under /plain/ ignore Range (a server without range support). Records every request.
 const log = [];
 const server = createServer((request, response) => {
+  // /away/ and /hop/ serve the same files, but their .bin requests redirect: /away/ out of the model's directory (to
+  // /external.bin), /hop/ to /hop/inner/, still inside it (bug 42 d).
+  const hop = /^\/(away|hop)\/(inner\/)?(.*)$/.exec(request.url);
+  if (hop && !hop[2] && hop[3].endsWith('.bin')) {
+    log.push({ path: request.url, range: request.headers.range ?? null });
+    response.writeHead(302, { location: hop[1] === 'away' ? `/${hop[3]}` : `/hop/inner/${hop[3]}` });
+    response.end();
+    return;
+  }
+  if (hop) request.url = `/${hop[3]}`;
   const plain = request.url.startsWith('/plain/'),
     // /short/: range replies claim the requested range but send half of it (a broken server or proxy).
     short = request.url.startsWith('/short/'),
@@ -518,6 +528,26 @@ test('progressive: an accessor past the end of its buffer rejects instead of wai
         base + path,
         /^RangeError: glTF mesh 0 primitive 0: POSITION \(accessor \d+\): Invalid glTF bufferView bounds(;.*)?$/,
       );
+  }));
+
+// Review finding (bug 42 d): fetch follows redirects, and the final URL of an external buffer was never checked, so a
+// server could redirect a model's buffer out of its directory. Every hop now passes the same URL policy.
+test('a buffer that redirects out of the model directory is refused; a redirect inside it loads', () =>
+  withGlobals(false, async () => {
+    const { engine } = await gpuEngine(),
+      away =
+        /^TypeError: glTF\b.* redirected to http:\/\/127\.0\.0\.1:\d+\/external\.bin, which leaves the model's directory/;
+    await assert.rejects(loadGLTF(engine, base + '/away/external.gltf'), away);
+    await rejectsInTime(engine, base + '/away/external.gltf', away);
+    // The same redirect is allowed once its target is listed in allowedURLs.
+    assert.ok(await loadGLTF(engine, base + '/away/external.gltf', { allowedURLs: [base + '/external.bin'] }));
+    assert.ok(await loadGLTF(engine, base + '/hop/external.gltf'));
+    const load = loadGLTFProgressive(engine, base + '/hop/external.gltf');
+    try {
+      assert.ok(await load.complete);
+    } finally {
+      load.abort();
+    }
   }));
 
 // Fuzz finding (gate 11a): an image view starting before its buffer was waited for forever (a server without ranges).

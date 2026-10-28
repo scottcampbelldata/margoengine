@@ -332,3 +332,15 @@ test('model texture paths stay inside their directory unless explicitly allowed'
   });
   assert.equal(requests, 1);
 });
+
+// Bug 42 d: fetch follows redirects, so a texture path inside the directory could land outside it unchecked.
+test('a texture whose fetch redirects out of the model directory is refused unless that target is allowed', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => redirectedResponse(PNG, 'https://evil.example/image.png'));
+  const input = fixture({ textures: [{ path: 'albedo.png' }] }),
+    resourcePath = 'https://assets.example/models/robot/';
+  await assert.rejects(
+    convertFBX(input, { resourcePath }),
+    /FBX texture URI redirected to https:\/\/evil\.example\/image\.png, which leaves the model's directory; add its prefix to allowedURLs/,
+  );
+  await convertFBX(input, { resourcePath, allowedURLs: ['https://evil.example/'] });
+});

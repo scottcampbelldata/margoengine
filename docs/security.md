@@ -35,8 +35,11 @@ workers.
 - **URIs inside a model stay inside its directory.** glTF buffer and image URIs and FBX texture file names resolve
   against the model's URL (after redirects) and must stay in its directory on the same origin. Absolute,
   protocol-relative and cross-origin URIs, `../` (also `%2e%2e/`, `..%2F`, `..\`) past the base, and every non-HTTP(S)
-  scheme (`javascript:`, `file:`, `blob:`) throw a `TypeError` before anything is fetched. Opt in per load with
-  `allowedURLs: ['https://cdn.example.com/models/']` (URL prefixes; end them with `/`). `data:` URIs are decoded within
+  scheme (`javascript:`, `file:`, `blob:`) throw a `TypeError` before anything is fetched. A resource whose fetch is
+  redirected is checked again at its final URL; one that lands outside these places throws and its body is not read. Opt in per load with
+  `allowedURLs: ['https://cdn.example.com/models/']` (URL prefixes, matched on a path-segment boundary: `/models`
+  covers `/models` and `/models/a.bin` but not `/models-old/`; an entry naming a file covers only that file). Encoded
+  separators and dot segments (`%2F`, `%5C`, `%2e%2e`) are refused under an allowed prefix too. `data:` URIs are decoded within
   the load's byte budget (`maxDownloadBytes` in gltf-pro, 64 MiB in gltf). USDZ and 3MF only read entries of their own
   archive (paths that escape it are rejected); .margo images are embedded; OBJ `mtllib` is ignored.
 - **Fetches carry no cookies cross-origin.** Margo calls `fetch(url, { signal })`: the browser default

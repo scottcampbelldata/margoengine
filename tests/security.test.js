@@ -65,6 +65,39 @@ test('assetURL keeps model-file URIs inside the model directory unless allowedUR
   assert.throws(() => assetURL('javascript:alert(1)', base, ['javascript:']), TypeError);
 });
 
+test('assetURL allowedURLs match on a path-segment boundary and keep the encoded-separator checks (bug 42 a)', () => {
+  const base = 'https://app.test/models/car/scene.gltf';
+  // A prefix without a trailing slash is a directory or an exact file, never a sibling with a longer name.
+  const dir = ['https://cdn.test/assets'];
+  assert.throws(() => assetURL('https://cdn.test/assets-other/a.png', base, dir), TypeError);
+  assert.throws(() => assetURL('https://cdn.test/assetsX', base, dir), TypeError);
+  assert.equal(assetURL('https://cdn.test/assets/a.png', base, dir).href, 'https://cdn.test/assets/a.png');
+  assert.equal(assetURL('https://cdn.test/assets', base, dir).href, 'https://cdn.test/assets');
+  assert.equal(assetURL('https://cdn.test/assets?v=2', base, dir).href, 'https://cdn.test/assets?v=2');
+  // An exact-file entry keeps working and does not open its siblings.
+  const file = ['https://cdn.test/tex/wood.png'];
+  assert.equal(assetURL('https://cdn.test/tex/wood.png', base, file).href, 'https://cdn.test/tex/wood.png');
+  assert.equal(assetURL('https://cdn.test/tex/wood.png#a', base, file).href, 'https://cdn.test/tex/wood.png#a');
+  assert.throws(() => assetURL('https://cdn.test/tex/wood.png.bak', base, file), TypeError);
+  assert.throws(() => assetURL('https://cdn.test/tex/wood.pngx', base, file), TypeError);
+  // An entry with a query string matches only that query.
+  const query = ['https://cdn.test/get?id=1'];
+  assert.equal(assetURL('https://cdn.test/get?id=1', base, query).href, 'https://cdn.test/get?id=1');
+  assert.throws(() => assetURL('https://cdn.test/get?id=2', base, query), TypeError);
+  // Encoded separators and dot segments are refused under an allowed prefix too, not only in the model directory.
+  const slash = ['https://cdn.test/assets/'];
+  for (const uri of [
+    'https://cdn.test/assets/..%2Fsecret.bin',
+    'https://cdn.test/assets/..%2fsecret.bin',
+    'https://cdn.test/assets/..%5Csecret.bin',
+    'https://cdn.test/assets/a%2Fb.png',
+    'https://cdn.test/assets/%2e%2e%2fsecret.bin',
+  ])
+    assert.throws(() => assetURL(uri, base, slash), TypeError, uri);
+  // A malformed allowedURLs entry is a TypeError that names the fix.
+  assert.throws(() => assetURL('https://cdn.test/a.png', base, ['/assets/']), /pass a full http\(s\) URL/);
+});
+
 test('parseJSON drops __proto__, constructor and prototype keys at every depth, escaped or not', () => {
   const doc = parseJSON(`{"a":${hostileJSON},"list":[${hostileJSON},{"prototype":1,"k":2}],"ok":"\\u00e9"}`);
   assert.deepEqual(Object.keys(doc.a), []);
@@ -163,9 +196,13 @@ test('glTF loaders fetch only URIs inside the model directory (light and gltf-pr
       ['https://cdn.test/bin/tri.bin', Buffer.from(triangle, 'base64')],
     ]),
     fetched = [],
-    previous = globalThis.fetch;
+    previous = globalThis.fetch,
+    // A redirect as fetch reports it: the body of the final URL, with response.url set to it.
+    redirects = new Map([[base + 'moved.bin', 'https://evil.test/tri.bin']]);
   const fetcher = async (url) => {
     fetched.push(String(url));
+    const final = redirects.get(String(url));
+    if (final) return Object.defineProperty(new Response(files.get(base + 'tri.bin')), 'url', { value: final });
     return files.has(String(url)) ? new Response(files.get(String(url))) : new Response('', { status: 404 });
   };
   globalThis.fetch = fetcher;
@@ -199,6 +236,8 @@ test('glTF loaders fetch only URIs inside the model directory (light and gltf-pr
         await assert.rejects(load(url), /leaves the model's directory/, uri);
         assert.deepEqual(fetched, [url], `nothing fetched for ${uri}`);
       }
+      // Bug 42 d: a URI inside the directory whose fetch redirects out of it is refused after the fetch.
+      await assert.rejects(load(scene('moved.bin')), /redirected to https:\/\/evil\.test\/tri\.bin, which leaves/);
       // Opt-in: an allowlisted CDN prefix loads.
       fetched.length = 0;
       const cdn = scene('https://cdn.test/bin/tri.bin');

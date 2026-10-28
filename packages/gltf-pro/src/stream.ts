@@ -19,7 +19,7 @@ import {
   parseJSON,
 } from './asset.js';
 import { decodeExtras, packPrimitive, primitiveDefs } from './pack.js';
-import { assetURL } from '../../shared/asset-url.js';
+import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
 import type { GLTFDocument } from './asset.js';
 
@@ -171,9 +171,11 @@ export class GLTFStream {
     this.reported = now;
     this.post({ type: 'bytes', loaded: this.loaded, total: this.sources.reduce((sum, s) => sum + (s.size ?? 0), 0) });
   }
-  private fetch(source: Source, headers?: Record<string, string>): Promise<Response> {
+  /** `root`: the model's own first request, whose final URL becomes the base; every other response must stay in it. */
+  private fetch(source: Source, headers?: Record<string, string>, root = false): Promise<Response> {
     if (!['http:', 'https:'].includes(source.url.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
     return fetch(source.url, { signal: this.signal, headers }).then((r) => {
+      if (!root) checkRedirect(r, this.base, this.allowedURLs, 'glTF');
       if (!r.ok)
         throw margoError(
           'failed',
@@ -224,7 +226,7 @@ export class GLTFStream {
   private async head(): Promise<GLTFDocument> {
     const s: Source = { url: this.url, got: [], asked: [] };
     this.sources.push(s);
-    const response = await this.fetch(s, { Range: 'bytes=0-65535' }),
+    const response = await this.fetch(s, { Range: 'bytes=0-65535' }, true),
       range = /^bytes 0-\d+\/(\d+)$/.exec(response.headers.get('content-range') ?? '');
     if (response.url) s.url = this.base = new URL(response.url);
     s.ranged = response.status === 206 && !!range;

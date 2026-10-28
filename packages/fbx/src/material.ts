@@ -1,6 +1,6 @@
 import type { MaterialData, TextureData } from '@margoengine/exporters';
 import { readResponse } from '../../shared/loading.js';
-import { assetURL } from '../../shared/asset-url.js';
+import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { findChild, id, property, objectName, type FBXNode } from './document.js';
 import { children, type SceneContext } from './scene.js';
 
@@ -54,7 +54,12 @@ export async function attachMaterials(
       if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('FBX resources need HTTP(S)');
       const url = assetURL(path, base, options.allowedURLs, 'FBX texture');
       if (!['http:', 'https:'].includes(url.protocol)) throw new TypeError('FBX resources need HTTP(S)');
-      const response = await (options.fetch ?? fetch)(url, { signal: ctx.signal });
+      const response = checkRedirect(
+        await (options.fetch ?? fetch)(url, { signal: ctx.signal }),
+        base,
+        options.allowedURLs,
+        'FBX texture',
+      );
       image = await readResponse(response, { maxBytes: limit - bytes, signal: ctx.signal, label: 'FBX texture' });
     }
     bytes += image.byteLength;
