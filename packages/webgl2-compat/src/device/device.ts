@@ -5,6 +5,7 @@
 import { fault } from '../../../shared/errors.js';
 import { webgl2Capabilities, type WebGL2Capabilities } from '../index.js';
 import { extensions, type Extensions, GLState } from './gl.js';
+import { COMPRESSION_EXTENSIONS } from './formats.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
 import {
   CompatBindGroup,
@@ -103,6 +104,9 @@ function featuresOf(caps: WebGL2Capabilities): Set<string> {
   if (caps.extensions.OES_texture_float_linear) f.add('float32-filterable');
   if (caps.extensions.EXT_color_buffer_float) f.add('rg11b10ufloat-renderable');
   if (caps.extensions.EXT_depth_clamp) f.add('depth-clip-control');
+  // A compressed family only when every extension it needs is there (BC: s3tc, its sRGB twin, RGTC and BPTC).
+  for (const [feature, names] of Object.entries(COMPRESSION_EXTENSIONS))
+    if (names.every((n) => caps.extensions[n as keyof typeof caps.extensions])) f.add(feature);
   return f;
 }
 
@@ -264,7 +268,9 @@ export class CompatDevice extends EventTarget {
 
   /** The value of a WebGL2 enum by name. */
   enum(name: string): number {
-    const v = (this.gl as unknown as Record<string, number>)[name];
+    let v: unknown = (this.gl as unknown as Record<string, unknown>)[name];
+    // Compressed formats' enums are on their extension objects, not on the context.
+    for (const e of this.ext.compressed) v ??= e[name];
     if (typeof v !== 'number')
       throw fault('failed', `WebGL2 has no enum ${name} (a bug: report it)`, 'compatibility-layer');
     return v;

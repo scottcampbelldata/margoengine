@@ -2,6 +2,8 @@
 // replayed commands skip calls that change nothing. Written from the Khronos WebGL 2.0 and OpenGL ES 3.0
 // specifications and the WebGL extension registry.
 
+import { COMPRESSION_EXTENSIONS } from './formats.js';
+
 /** The extensions a device uses, when the context has them. */
 export interface Extensions {
   readonly clipControl: {
@@ -24,6 +26,8 @@ export interface Extensions {
   readonly floatBlend: boolean;
   readonly floatLinear: boolean;
   readonly lose: { loseContext(): void } | null;
+  /** The compressed-texture extensions the context has (their objects hold the format enums). */
+  readonly compressed: readonly Readonly<Record<string, unknown>>[];
 }
 
 /** Reads the extensions a device needs (enabling them, as getExtension does). */
@@ -40,6 +44,10 @@ export function extensions(gl: WebGL2RenderingContext): Extensions {
     floatBlend: !!get('EXT_float_blend'),
     floatLinear: !!get('OES_texture_float_linear'),
     lose: get('WEBGL_lose_context'),
+    compressed: Object.values(COMPRESSION_EXTENSIONS)
+      .flat()
+      .map((name) => gl.getExtension(name))
+      .filter((e) => e !== null),
   };
 }
 

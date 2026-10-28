@@ -76,6 +76,38 @@ function clearView(device, view, clearValue) {
 }
 
 const cases = {
+  /** BC1 and BC4 blocks written with writeTexture (two mip levels) and read back by textureLoad. */
+  async compressed(device) {
+    if (!device.features.has('texture-compression-bc')) return { missing: 'texture-compression-bc' };
+    // BC1: colour 0 red, colour 1 blue (565, colour 0 > colour 1: four colours); texel indexes 0 1 2 3 in every row.
+    const bc1 = new Uint8Array(4 * 8);
+    for (let b = 0; b < 4; b++) bc1.set([0x00, 0xf8, 0x1f, b * 4, 0xe4, 0xe4, 0xe4, 0xe4], b * 8);
+    const small = Uint8Array.of(0xe0, 0x07, 0x1f, 0x00, 0x1b, 0x1b, 0x1b, 0x1b);
+    const t1 = device.createTexture({ size: [8, 8], format: 'bc1-rgba-unorm', mipLevelCount: 2, usage: U.TEXTURE_BINDING | U.COPY_DST });
+    device.queue.writeTexture({ texture: t1 }, bc1, { bytesPerRow: 16, rowsPerImage: 2 }, [8, 8]);
+    device.queue.writeTexture({ texture: t1, mipLevel: 1 }, small, { bytesPerRow: 8 }, [4, 4]);
+    // BC4: red 200 and 40, every index 0 (red 0) in the first block and 1 (red 1) in the second.
+    const bc4 = Uint8Array.of(200, 40, 0, 0, 0, 0, 0, 0, 200, 40, 0x49, 0x92, 0x24, 0x49, 0x92, 0x24);
+    const t4 = device.createTexture({ size: [8, 4], format: 'bc4-r-unorm', usage: U.TEXTURE_BINDING | U.COPY_DST });
+    device.queue.writeTexture({ texture: t4 }, bc4, { bytesPerRow: 16 }, [8, 4]);
+    return {
+      pixels: await shade(device, {
+        w: 8,
+        h: 2,
+        code: `@group(0) @binding(0) var a: texture_2d<f32>;
+          @group(0) @binding(1) var b: texture_2d<f32>;
+          @fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
+            let i = vec2u(p.xy);
+            if (i.y == 0u) { return textureLoad(a, vec2u(i.x, i.x), 0); }
+            return vec4f(textureLoad(a, i % 4u, 1).rg, textureLoad(b, vec2u(i.x, 2u), 0).r, 1.0);
+          }`,
+        entries: [
+          { binding: 0, resource: t1.createView() },
+          { binding: 1, resource: t4.createView() },
+        ],
+      }),
+    };
+  },
   /**
    * Sizes and loads of views that start at a later mip level, in 2D, 2D-array and 3D textures (regression: ANGLE's
    * Direct3D 11 back end applies TEXTURE_BASE_LEVEL twice in GLSL's textureSize, so the layer read a quarter of
@@ -639,8 +671,14 @@ let native, compat;
 window.check = {
   names: () => Object.keys(cases),
   async run(name) {
-    native ??= await (await navigator.gpu.requestAdapter()).requestDevice({ requiredFeatures: ['depth32float-stencil8'] });
-    compat ??= await (await createCompatGPU().requestAdapter()).requestDevice({ requiredFeatures: ['depth32float-stencil8'] });
+    if (!native) {
+      // The BC formats where both adapters have them (the layer: s3tc, its sRGB twin, RGTC and BPTC).
+      const a = await navigator.gpu.requestAdapter(),
+        b = await createCompatGPU().requestAdapter();
+      const extra = a.features.has('texture-compression-bc') && b.features.has('texture-compression-bc') ? ['texture-compression-bc'] : [];
+      native = await a.requestDevice({ requiredFeatures: ['depth32float-stencil8', ...extra] });
+      compat = await b.requestDevice({ requiredFeatures: ['depth32float-stencil8', ...extra] });
+    }
     return { native: await run(native, name), compat: await run(compat, name) };
   },
 };

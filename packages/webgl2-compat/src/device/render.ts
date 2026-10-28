@@ -1868,6 +1868,8 @@ export class Replayer {
       t = source.texture as CompatTexture,
       aspect = source.aspect ?? 'all';
     if (t.renderbuffer) throw this.device.unsupported('copying a multisampled texture');
+    if (t.info.block)
+      throw this.device.unsupported(`reading back a ${t.format} texture (WebGL2 cannot read compressed texels)`);
     const plan = readPlan(t.info, aspect);
     if (!plan)
       throw this.device.unsupported(
@@ -2137,6 +2139,7 @@ export function writeTexture(
     t = destination.texture as CompatTexture,
     info = t.info;
   if (!t.texture) throw device.unsupported('writing a multisampled texture');
+  if (info.block) return writeBlocks(device, t, destination, data, layout, size);
   if (!info.bytes || info.kind === 'stencil' || info.kind === 'depth-stencil')
     throw device.unsupported(
       `writing ${info.name} texels (WebGL2 uploads depth and stencil together, so a stencil-only write cannot be made)`,
@@ -2181,6 +2184,57 @@ export function writeTexture(
         TYPED[info.type](tight.buffer, layer * rowBytes * h, rowBytes * h),
       );
   else gl.texSubImage3D(t.target, level, x, y, z, w, h, depth, format, type, pixels);
+  afterUpload(t, level, z, depth);
+}
+
+/** writeTexture into a block-compressed texture: whole blocks, uploaded as they are (compressedTexSubImage). */
+function writeBlocks(
+  device: CompatDevice,
+  t: CompatTexture,
+  destination: GPUTexelCopyTextureInfo,
+  data: Uint8Array,
+  layout: GPUTexelCopyBufferLayout,
+  size: GPUExtent3D,
+): void {
+  const gl = device.gl,
+    block = t.info.block as NonNullable<FormatInfo['block']>;
+  const [w, h, depth] = extent(size),
+    [x, y, z] = origin(destination.origin);
+  const level = destination.mipLevel ?? 0;
+  const across = Math.ceil(w / block.w),
+    down = Math.ceil(h / block.h),
+    rowBytes = across * block.bytes;
+  const bytesPerRow = layout.bytesPerRow ?? rowBytes,
+    rowsPerImage = layout.rowsPerImage ?? down,
+    offset = layout.offset ?? 0;
+  const tight = new Uint8Array(rowBytes * down * depth);
+  for (let layer = 0; layer < depth; layer++)
+    for (let row = 0; row < down; row++) {
+      const from = offset + (layer * rowsPerImage + row) * bytesPerRow;
+      tight.set(data.subarray(from, from + rowBytes), (layer * down + row) * rowBytes);
+    }
+  beforeUpload(device, t, level, z, depth);
+  device.state.scratch(t.target, t.texture);
+  // A copy of whole blocks may run past a mip level smaller than one block; GL takes the level's own size there.
+  const [lw, lh] = t.levelSize(level),
+    cw = Math.min(w, lw - x),
+    ch = Math.min(h, lh - y);
+  const internal = device.enum(t.info.internal),
+    image = rowBytes * down;
+  if (t.target === gl.TEXTURE_2D) gl.compressedTexSubImage2D(gl.TEXTURE_2D, level, x, y, cw, ch, internal, tight);
+  else if (t.target === gl.TEXTURE_CUBE_MAP)
+    for (let layer = 0; layer < depth; layer++)
+      gl.compressedTexSubImage2D(
+        gl.TEXTURE_CUBE_MAP_POSITIVE_X + z + layer,
+        level,
+        x,
+        y,
+        cw,
+        ch,
+        internal,
+        tight.subarray(layer * image, (layer + 1) * image),
+      );
+  else gl.compressedTexSubImage3D(t.target, level, x, y, z, cw, ch, depth, internal, tight);
   afterUpload(t, level, z, depth);
 }
 

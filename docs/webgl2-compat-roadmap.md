@@ -582,3 +582,18 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   26,528 B. A render-only page downloads what it did before plus the bug fixes: the compute chunks (about 22 KB) load
   only with the first compute pipeline. Over the 60,000 B target by 31,068 B; nothing was cut. Browsers with WebGPU
   download none of it, and core + stage are unchanged at 21,974 B.
+
+## Compressed textures (M3, second part, 2026-10-28)
+
+- **Formats and features.** The BC, ETC2/EAC and ASTC formats of WebGPU map onto `WEBGL_compressed_texture_s3tc` and
+  `_s3tc_srgb`, `EXT_texture_compression_rgtc`, `EXT_texture_compression_bptc`, `WEBGL_compressed_texture_etc` and
+  `WEBGL_compressed_texture_astc`. The adapter reports `texture-compression-bc` only when all four BC extensions are
+  there, and `-etc2` and `-astc` when theirs is; a compressed texture needs its feature on the device (TypeError
+  otherwise, as in WebGPU) and a 2D size in whole blocks. On this PC ANGLE Direct3D 11 reports BC only (no ETC2, no
+  ASTC); ANGLE OpenGL reports ETC2 as well.
+- **Writes.** `writeTexture` and `copyBufferToTexture` upload whole blocks with `compressedTexSubImage2D/3D` (a mip
+  level smaller than a block takes the level's own size). Sampling and `textureLoad` decode as on WebGPU: the features
+  check compares BC1 (two mip levels) and BC4 blocks with native WebGPU, bit for bit.
+- **Accepted differences.** WebGL2 cannot read compressed texels back or attach them: `copyTextureToBuffer`,
+  `copyTextureToTexture` and sRGB views of a compressed texture (which the layer would copy) are refused with
+  MargoError code `unsupported`.

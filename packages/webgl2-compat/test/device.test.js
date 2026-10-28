@@ -92,6 +92,18 @@ test('features only where an extension backs them', async () => {
   }).requestAdapter();
   assert.ok(rich.features.has('float32-filterable'));
   assert.ok(rich.features.has('depth-clip-control'));
+  // A compressed family only with every extension it needs: BC without BPTC is not BC.
+  const bc = ['WEBGL_compressed_texture_s3tc', 'WEBGL_compressed_texture_s3tc_srgb', 'EXT_texture_compression_rgtc'];
+  const some = await createCompatGPU({
+    createContext: () => fakeContext({ extensions: ['EXT_color_buffer_float', ...bc, 'WEBGL_compressed_texture_etc'] }),
+  }).requestAdapter();
+  assert.ok(!some.features.has('texture-compression-bc'));
+  assert.ok(some.features.has('texture-compression-etc2'));
+  assert.ok(!some.features.has('texture-compression-astc'));
+  const all = await createCompatGPU({
+    createContext: () => fakeContext({ extensions: ['EXT_color_buffer_float', ...bc, 'EXT_texture_compression_bptc'] }),
+  }).requestAdapter();
+  assert.ok(all.features.has('texture-compression-bc'));
 });
 
 test('requestDevice refuses features and limits the adapter lacks; isCompatDevice tells devices apart', async () => {

@@ -29,6 +29,11 @@ export interface FormatInfo {
   readonly channelBytes: number;
   /** The extension the format needs, if any. */
   readonly extension?: string;
+  /**
+   * A block-compressed format: the block size in texels and bytes, and the WebGPU feature that enables it. Its
+   * `internal` enum lives on the extension object, not on the context.
+   */
+  readonly block?: { readonly w: number; readonly h: number; readonly bytes: number; readonly feature: string };
 }
 
 type Row = [
@@ -133,6 +138,80 @@ export const FORMATS: ReadonlyMap<string, FormatInfo> = new Map(
     },
   ]),
 );
+
+/** WebGPU's compressed formats (WebGPU specification section 26.1.3) on the WebGL extensions that store them. */
+const COMPRESSED: [name: string, internal: string, w: number, h: number, bytes: number, feature: string][] = [
+  ['bc1-rgba-unorm', 'COMPRESSED_RGBA_S3TC_DXT1_EXT', 4, 4, 8, 'bc'],
+  ['bc1-rgba-unorm-srgb', 'COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT', 4, 4, 8, 'bc'],
+  ['bc2-rgba-unorm', 'COMPRESSED_RGBA_S3TC_DXT3_EXT', 4, 4, 16, 'bc'],
+  ['bc2-rgba-unorm-srgb', 'COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT', 4, 4, 16, 'bc'],
+  ['bc3-rgba-unorm', 'COMPRESSED_RGBA_S3TC_DXT5_EXT', 4, 4, 16, 'bc'],
+  ['bc3-rgba-unorm-srgb', 'COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT', 4, 4, 16, 'bc'],
+  ['bc4-r-unorm', 'COMPRESSED_RED_RGTC1_EXT', 4, 4, 8, 'bc'],
+  ['bc4-r-snorm', 'COMPRESSED_SIGNED_RED_RGTC1_EXT', 4, 4, 8, 'bc'],
+  ['bc5-rg-unorm', 'COMPRESSED_RED_GREEN_RGTC2_EXT', 4, 4, 16, 'bc'],
+  ['bc5-rg-snorm', 'COMPRESSED_SIGNED_RED_GREEN_RGTC2_EXT', 4, 4, 16, 'bc'],
+  ['bc6h-rgb-ufloat', 'COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_EXT', 4, 4, 16, 'bc'],
+  ['bc6h-rgb-float', 'COMPRESSED_RGB_BPTC_SIGNED_FLOAT_EXT', 4, 4, 16, 'bc'],
+  ['bc7-rgba-unorm', 'COMPRESSED_RGBA_BPTC_UNORM_EXT', 4, 4, 16, 'bc'],
+  ['bc7-rgba-unorm-srgb', 'COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT', 4, 4, 16, 'bc'],
+  ['etc2-rgb8unorm', 'COMPRESSED_RGB8_ETC2', 4, 4, 8, 'etc2'],
+  ['etc2-rgb8unorm-srgb', 'COMPRESSED_SRGB8_ETC2', 4, 4, 8, 'etc2'],
+  ['etc2-rgb8a1unorm', 'COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2', 4, 4, 8, 'etc2'],
+  ['etc2-rgb8a1unorm-srgb', 'COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2', 4, 4, 8, 'etc2'],
+  ['etc2-rgba8unorm', 'COMPRESSED_RGBA8_ETC2_EAC', 4, 4, 16, 'etc2'],
+  ['etc2-rgba8unorm-srgb', 'COMPRESSED_SRGB8_ALPHA8_ETC2_EAC', 4, 4, 16, 'etc2'],
+  ['eac-r11unorm', 'COMPRESSED_R11_EAC', 4, 4, 8, 'etc2'],
+  ['eac-r11snorm', 'COMPRESSED_SIGNED_R11_EAC', 4, 4, 8, 'etc2'],
+  ['eac-rg11unorm', 'COMPRESSED_RG11_EAC', 4, 4, 16, 'etc2'],
+  ['eac-rg11snorm', 'COMPRESSED_SIGNED_RG11_EAC', 4, 4, 16, 'etc2'],
+  ...[
+    [4, 4],
+    [5, 4],
+    [5, 5],
+    [6, 5],
+    [6, 6],
+    [8, 5],
+    [8, 6],
+    [8, 8],
+    [10, 5],
+    [10, 6],
+    [10, 8],
+    [10, 10],
+    [12, 10],
+    [12, 12],
+  ].flatMap(([w, h]): [string, string, number, number, number, string][] => [
+    [`astc-${w}x${h}-unorm`, `COMPRESSED_RGBA_ASTC_${w}x${h}_KHR`, w, h, 16, 'astc'],
+    [`astc-${w}x${h}-unorm-srgb`, `COMPRESSED_SRGB8_ALPHA8_ASTC_${w}x${h}_KHR`, w, h, 16, 'astc'],
+  ]),
+];
+for (const [name, internal, w, h, bytes, family] of COMPRESSED)
+  (FORMATS as Map<string, FormatInfo>).set(name, {
+    name,
+    internal,
+    format: '',
+    type: '',
+    bytes: 0,
+    channels: 4,
+    kind: 'float',
+    renderable: false,
+    filterable: true,
+    channelBytes: 0,
+    srgb: name.endsWith('-srgb') || undefined,
+    block: { w, h, bytes, feature: `texture-compression-${family}` },
+  });
+
+/** The WebGL extensions behind each compressed-format feature (all of them must be there). */
+export const COMPRESSION_EXTENSIONS: Readonly<Record<string, readonly string[]>> = {
+  'texture-compression-bc': [
+    'WEBGL_compressed_texture_s3tc',
+    'WEBGL_compressed_texture_s3tc_srgb',
+    'EXT_texture_compression_rgtc',
+    'EXT_texture_compression_bptc',
+  ],
+  'texture-compression-etc2': ['WEBGL_compressed_texture_etc'],
+  'texture-compression-astc': ['WEBGL_compressed_texture_astc'],
+};
 
 /** True for formats with a depth part. */
 export const hasDepth = (f: FormatInfo): boolean => f.kind === 'depth' || f.kind === 'depth-stencil';

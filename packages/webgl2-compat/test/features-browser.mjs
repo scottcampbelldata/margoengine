@@ -57,7 +57,10 @@ try {
     lines.push(`${name}: same as native`);
     // Each case must test something: a few known values, so an empty or all-zero result on both sides fails.
     const r = compat.result;
-    if (name === 'mipViews') assert.equal(r.pixels[0], 8 * 1000 + 8 * 100 + 4 * 10 + 4, 'sizes of views of later mip levels');
+    if (name === 'compressed' && !r.missing)
+      assert.deepEqual(r.pixels.slice(0, 4), [1, 0, 0, 1], 'BC1 colour 0 is red');
+    if (name === 'mipViews')
+      assert.equal(r.pixels[0], 8 * 1000 + 8 * 100 + 4 * 10 + 4, 'sizes of views of later mip levels');
     if (name === 'canvasRead')
       assert.deepEqual(
         r.frames,

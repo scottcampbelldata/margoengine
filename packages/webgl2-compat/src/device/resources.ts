@@ -410,6 +410,10 @@ export class CompatTexture {
   ) {
     const info = FORMATS.get(descriptor.format);
     if (!info) throw device.unsupported(`texture format '${descriptor.format}'`);
+    if (info.block && !device.features.has(info.block.feature))
+      throw new TypeError(
+        `A ${descriptor.format} texture needs the '${info.block.feature}' feature; request it in requestDevice({ requiredFeatures })`,
+      );
     this.info = info;
     const size = descriptor.size as number[] | GPUExtent3DDict;
     const [w, h, d] = Array.isArray(size)
@@ -431,6 +435,10 @@ export class CompatTexture {
     this.layers = this.dimension === '3d' ? 1 : d;
     const gl = device.gl;
     if (!w || !h || !d) throw new RangeError('GPUTexture sizes must be at least 1');
+    if (info.block && (w % info.block.w || h % info.block.h || this.dimension !== '2d'))
+      throw new TypeError(
+        `A ${this.format} texture is 2D with a size in whole ${info.block.w} x ${info.block.h} blocks; pass such a size`,
+      );
     for (const f of descriptor.viewFormats ?? [])
       if (f !== this.format && !twins(info, FORMATS.get(f)))
         throw new TypeError(`'${f}' is not a view format of a '${this.format}' texture; WebGPU allows its sRGB twin`);

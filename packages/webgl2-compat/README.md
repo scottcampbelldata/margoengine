@@ -42,8 +42,10 @@ What it does:
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
   `mapAsync` with fenced readbacks, error scopes, `uncapturederror` and `device.lost`. Texture views GL has no view
   for (an sRGB view of a unorm texture, a 2D view of an array layer, a cube view of 6 array layers, an array view of a
-  cube) read a copy that is brought up to date before each use; a square 6-layer texture is a cube map. Readbacks
-  cover every copyable format, depth, stencil, packed and snorm included; occlusion queries, render bundles and
+  cube) read a copy that is brought up to date before each use; a square 6-layer texture is a cube map. Compressed
+  BC, ETC2 and ASTC textures are written with `writeTexture` where the browser's WebGL2 has their extensions (the
+  adapter reports only those features); WebGL2 cannot read them back. Readbacks cover every other copyable format,
+  depth, stencil, packed and snorm included; occlusion queries, render bundles and
   external textures (each video frame is copied: WebGL2 has no zero-copy video) work. The adapter reports
   `info.vendor === 'margo-webgl2'`. Clip space keeps WebGPU's z range through `EXT_clip_control`, and rendering is
   flipped in y so every texture keeps WebGPU's top-left origin; the canvas present flips it back.
