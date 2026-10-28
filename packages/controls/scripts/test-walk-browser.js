@@ -59,10 +59,13 @@ try {
     `eye height upstairs: ${walk.reached.at(-1).eye[1]}`,
   );
   assert.ok(walk.worstClearance >= 0.24, `capsule clearance from walls, stairs and glass: ${walk.worstClearance}`);
-  assert.ok(walk.maxEyeStepPerFrame < 0.06, `no teleporting: ${walk.maxEyeStepPerFrame}`);
+  // Per frame the eye moves with the frame time (a 0.1 s frame on the stairs climbs about 0.07 m), so the bound is on
+  // the step scaled to a 1/60 s frame; the page stalls one frame half-way up the stairs to keep that case covered.
+  assert.ok(walk.longFrameAt > 0, 'the long frame on the stairs happened');
+  assert.ok(walk.maxEyeStepAt60 < 0.06, `no teleporting: ${walk.maxEyeStepAt60} m per 1/60 s`);
   report.walk = { ...walk, shots };
   report.checks.push(
-    `Walked deck -> door -> rug -> doorway -> 16 stairs -> upper floor with the real W key in ${walk.frames} frames; worst capsule clearance ${walk.worstClearance.toFixed(4)} m (radius 0.25), largest eye change per frame ${walk.maxEyeStepPerFrame.toFixed(4)} m`,
+    `Walked deck -> door -> rug -> doorway -> 16 stairs -> upper floor with the real W key in ${walk.frames} frames; worst capsule clearance ${walk.worstClearance.toFixed(4)} m (radius 0.25), largest eye change ${walk.maxEyeStepAt60.toFixed(4)} m per 1/60 s (${walk.maxEyeStepPerFrame.toFixed(4)} m in one frame, a 150 ms stall on the stairs included)`,
   );
   const out = await page.evaluate(() => window.mode('dollhouse'));
   assert.equal(out.mode, 'dollhouse');

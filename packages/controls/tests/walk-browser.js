@@ -17,6 +17,9 @@ const state = (window.walkState = {
   frames: 0,
   worst: Infinity,
   maxStep: 0,
+  // Largest eye change of one update, scaled to a 1/60 s frame: what "no teleporting" means whatever the frame time.
+  maxStepAt60: 0,
+  longFrame: 0,
   waypoint: 1,
   paused: false,
   steering: true,
@@ -31,8 +34,12 @@ walk.pointerLock = false;
 const update = walk.update.bind(walk);
 walk.update = (delta) => {
   const t = performance.now(),
+    y0 = engine.camera.position[1],
     moved = update(delta);
-  if (delta) state.updateMs.push(performance.now() - t);
+  if (delta) {
+    state.updateMs.push(performance.now() - t);
+    state.maxStepAt60 = Math.max(state.maxStepAt60, (Math.abs(engine.camera.position[1] - y0) / delta) * (1 / 60));
+  }
   return moved;
 };
 let last = null;
@@ -48,6 +55,13 @@ engine.onFrame(() => {
     state.maxStep = Math.max(state.maxStep, Math.abs(y - last[1]));
   }
   last = [x, y, z];
+  // One long frame half-way up the stairs, as a busy machine gives: the next update gets the engine's largest delta
+  // (0.1 s), so the eye moves several 1/60 s steps at once without teleporting.
+  if (!state.longFrame && y > EYE + 1 && y < EYE + 2) {
+    const until = performance.now() + 150;
+    while (performance.now() < until);
+    state.longFrame = y;
+  }
   if (!state.steering || state.waypoint >= PATH.length) return;
   const [tx, tz] = PATH[state.waypoint];
   if (Math.hypot(tx - x, tz - z) < 0.15) {
@@ -117,6 +131,8 @@ window.summary = () => {
     frames: state.frames,
     worstClearance: state.worst,
     maxEyeStepPerFrame: state.maxStep,
+    maxEyeStepAt60: state.maxStepAt60,
+    longFrameAt: state.longFrame,
     reached: state.reached,
     errors: state.errors,
     updateMs: {
