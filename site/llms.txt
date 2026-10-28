@@ -64,6 +64,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/shadows](https://margoengine.com/llms/packages/shadows.md): Four-cascade cached directional shadows with PCSS.
 - [@margoengine/lightmap](https://margoengine.com/llms/packages/lightmap.md): CPU lightmap atlases with native albedo, emission, normal and ORM textures; optional area lights, emissive surfaces, bounces and glass (./global) and caustics…
 - [@margoengine/sky](https://margoengine.com/llms/packages/sky.md): Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning).
+- [@margoengine/weather](https://margoengine.com/llms/packages/weather.md): Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript…
 - [@margoengine/toon](https://margoengine.com/llms/packages/toon.md): Stepped diffuse shading and inverted-hull outlines.
 - [@margoengine/oit](https://margoengine.com/llms/packages/oit.md): Weighted blended order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: no popping between overlapping transparent parts.
 - [@margoengine/lod](https://margoengine.com/llms/packages/lod.md): Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas.
@@ -183,6 +184,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/shadows API](https://margoengine.com/llms/api/shadows.md): 1 entry point
 - [@margoengine/lightmap API](https://margoengine.com/llms/api/lightmap.md): 3 entry points
 - [@margoengine/sky API](https://margoengine.com/llms/api/sky.md): 10 entry points
+- [@margoengine/weather API](https://margoengine.com/llms/api/weather.md): 2 entry points
 - [@margoengine/toon API](https://margoengine.com/llms/api/toon.md): 1 entry point
 - [@margoengine/oit API](https://margoengine.com/llms/api/oit.md): 1 entry point
 - [@margoengine/lod API](https://margoengine.com/llms/api/lod.md): 1 entry point
