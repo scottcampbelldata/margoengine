@@ -100,6 +100,6 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 78,500 |
 | @margoengine/water | `.` 8 |  |  | 18,698 |
 | @margoengine/webgl | `.` 3 |  |  | 3,127 |
-| @margoengine/webgl2-compat | `.` 11 |  |  |  |
+| @margoengine/webgl2-compat | `.` 11 |  |  | 1,272 |
 | @margoengine/wfc | `.` 3, `./overlapping` 5 |  |  | 1,787 |
 | @margoengine/xr | `.` 30 |  |  | 6,501 |
