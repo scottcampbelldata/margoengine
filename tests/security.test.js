@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
-import { assetURL } from '../packages/shared/asset-url.js';
+import { assetURL, checkRedirect } from '../packages/shared/asset-url.js';
 import { parseJSON } from '../packages/shared/json.js';
 import { runWorker, serve } from '../packages/shared/worker.js';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
@@ -94,6 +94,31 @@ test('assetURL allowedURLs match on a path-segment boundary and keep the encoded
     'https://cdn.test/assets/%2e%2e%2fsecret.bin',
   ])
     assert.throws(() => assetURL(uri, base, slash), TypeError, uri);
+  // Bug 53: double and deeper encodings are refused on the allowlist branch and the same-directory branch.
+  const doubled = [
+    '%252e%252e/secret',
+    '..%252fsecret',
+    '%252e%252e%252fsecret',
+    '..%255csecret',
+    '%25252e%25252e%25252fsecret',
+    '%25%32e%25%32e/secret',
+    '..%25%32fsecret',
+  ];
+  const hosted = ['https://h/assets/'];
+  for (const tail of doubled) {
+    assert.throws(() => assetURL(`https://h/assets/${tail}`, undefined, hosted), TypeError, tail);
+    assert.throws(() => assetURL(tail, 'https://h/assets/model.gltf'), TypeError, `same directory: ${tail}`);
+  }
+  assert.throws(() => assetURL(`%${'25'.repeat(12)}2e.png`, 'https://h/assets/model.gltf'), TypeError, 'too deep');
+  // Redirects use the same rule.
+  assert.throws(
+    () => checkRedirect({ url: 'https://h/assets/%252e%252e/secret', body: null }, 'https://h/assets/m.gltf', hosted),
+    TypeError,
+  );
+  // Ordinary percent-encoded names keep working.
+  assert.equal(assetURL('https://h/assets/a%20b.png', undefined, hosted).href, 'https://h/assets/a%20b.png');
+  assert.equal(assetURL('https://h/assets/100%25.png', undefined, hosted).href, 'https://h/assets/100%25.png');
+  assert.equal(assetURL('100%25.png', 'https://h/assets/model.gltf').href, 'https://h/assets/100%25.png');
   // A malformed allowedURLs entry is a TypeError that names the fix.
   assert.throws(() => assetURL('https://cdn.test/a.png', base, ['/assets/']), /pass a full http\(s\) URL/);
 });

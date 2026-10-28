@@ -6,7 +6,20 @@
 
 // Encoded separators and encoded dot segments are refused on every branch: some servers decode `..%2F` or `%2e%2e`
 // into a parent step after this check, so a path that looks contained here could leave the directory there.
+// A proxy chain may decode more than once, so the same rule is applied after each decoding round (`%252e%252e`
+// becomes `%2e%2e`, which the rule refuses). A path still changing after 8 rounds is refused.
 const ENCODED_ESCAPE = /%2f|%5c|(^|\/)(\.|%2e){1,2}(\/|$)/i;
+
+/** True when the path, at any depth of percent-decoding, holds an encoded separator or a dot segment. */
+function hidesEscape(path) {
+  for (let round = 0; round < 8; round++) {
+    if (ENCODED_ESCAPE.test(path)) return true;
+    const next = path.replace(/%[\da-f]{2}/gi, (triplet) => String.fromCharCode(`0x${triplet.slice(1)}`));
+    if (next === path) return false;
+    path = next;
+  }
+  return true;
+}
 
 /**
  * True when url lies under the allowedURLs entry prefix. An entry ending in `/` is a directory and matches everything
@@ -37,7 +50,7 @@ export function assetURL(uri, base, allowedURLs = [], label = 'Asset') {
   } catch {
     throw new TypeError(`Invalid ${label} URI; pass a valid URL`);
   }
-  if ((url.protocol === 'http:' || url.protocol === 'https:') && !ENCODED_ESCAPE.test(url.pathname)) {
+  if ((url.protocol === 'http:' || url.protocol === 'https:') && !hidesEscape(url.pathname)) {
     for (const prefix of allowedURLs) if (underPrefix(url, prefix)) return url;
     const root = base === undefined ? undefined : new URL('.', base);
     if (root && url.origin === root.origin && url.pathname.startsWith(root.pathname)) return url;
