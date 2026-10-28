@@ -5,7 +5,9 @@
 //   node scripts/check-engines.mjs --run=repo      also, on this Node: every repository script and test parses
 // Two minimums, because users and contributors run different code:
 //   packages  what users run: each package's dist and bin. Declared by the packages' own `engines` (all the same) and
-//             checked by CI's node-compat job on exactly that version.
+//             checked by CI's node-compat job on exactly that version and on the latest release of its major line:
+//             parse and import, the API scan (tests/node-apis.test.js), the packed-package consumer steps
+//             (modern:test:packages --consumer) and the bundler matrix, with that Node running all of it.
 //   repo      what contributors run: the tests and scripts. Declared by the root package.json `engines` and checked by
 //             CI's test job on exactly that version (the unit tests, so "run" is covered there).
 // The syntax table catches a file that uses syntax newer than its scope's minimum on any Node (an old Node fails to
@@ -38,11 +40,15 @@ export const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 const show = (v) => v.join('.');
 
 const json = (file) => JSON.parse(readFileSync(file, 'utf8'));
-/** The published packages: { dir, manifest }. */
+/** The published packages, packages/* and the command line tools/* (margo-convert, create-margo): { dir, manifest }. */
 export function packages(base = root) {
-  return readdirSync(join(base, 'packages'))
-    .filter((dir) => existsSync(join(base, 'packages', dir, 'package.json')))
-    .map((dir) => ({ dir: join(base, 'packages', dir), manifest: json(join(base, 'packages', dir, 'package.json')) }))
+  return ['packages', 'tools']
+    .filter((top) => existsSync(join(base, top)))
+    .flatMap((top) =>
+      readdirSync(join(base, top))
+        .filter((dir) => existsSync(join(base, top, dir, 'package.json')))
+        .map((dir) => ({ dir: join(base, top, dir), manifest: json(join(base, top, dir, 'package.json')), top })),
+    )
     .filter(({ manifest }) => !manifest.private);
 }
 
@@ -64,7 +70,12 @@ export function files(base = root) {
   for (const dir of readdirSync(join(base, 'packages')))
     for (const sub of ['tests', 'test', 'scripts']) repo.push(join(base, 'packages', dir, sub));
   return {
-    packages: published.flatMap(({ dir }) => [...walk(join(dir, 'dist')), ...walk(join(dir, 'bin'))]),
+    // A tool ships its whole folder (no build); its tests do not ship.
+    packages: published.flatMap(({ dir, top }) =>
+      top === 'tools'
+        ? walk(dir).filter((file) => !/[\\/]tests?[\\/]/.test(relative(dir, file)))
+        : [...walk(join(dir, 'dist')), ...walk(join(dir, 'bin'))],
+    ),
     repo: repo.flatMap((dir) => walk(dir)),
   };
 }
@@ -105,6 +116,16 @@ export async function check(base = root) {
     problems.push(`ci.yml's test job must run on node-version '${show(repoMin)}', the root engines minimum`);
   if (packageMin && !versions(job('node-compat')).some((v) => v.includes(`'${show(packageMin)}'`)))
     problems.push(`ci.yml's node-compat matrix must include '${show(packageMin)}', the packages' engines minimum`);
+  // The end-user proof (bug 39): the minimum's latest release line too, and the steps users depend on.
+  if (packageMin && !versions(job('node-compat')).some((v) => v.includes(`'${packageMin[0]}'`)))
+    problems.push(`ci.yml's node-compat matrix must include '${packageMin[0]}', the latest ${packageMin[0]}.x`);
+  for (const step of [
+    'scripts/check-engines.mjs --run=packages',
+    'tests/node-apis.test.js',
+    'npm run modern:test:packages -- --consumer',
+    'npm run modern:test:bundlers',
+  ])
+    if (!job('node-compat').includes(step)) problems.push(`ci.yml's node-compat job must run \`${step}\``);
 
   const { parseAst } = await import('rolldown/parseAst');
   const scopes = files(base);

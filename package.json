@@ -160,6 +160,7 @@
     "check:depth": "node scripts/test-depth-browser.mjs",
     "check:merge": "node scripts/check-merge.mjs",
     "check:engines": "node scripts/check-engines.mjs",
+    "check:node-apis": "node scripts/check-node-apis.mjs",
     "check:fresh-clone": "node scripts/fresh-clone-check.mjs",
     "check:merge:full": "node scripts/check-merge.mjs --full",
     "check:merge:steps": "npm run verify && npm run check:fresh-clone && npm run build:site && npm run visual:check -- --no-build && npm run check:views && npm run check:gpu-packages -- --no-build && npm run check:depth && npm run check:wgsl && npm run modern:test:packages && npm run check:no-webgpu && npm run modern:test:bundlers && npm run check:quickstart",

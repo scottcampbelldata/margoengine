@@ -17,7 +17,8 @@ Publishing uses the manual, gated [Publish workflow](../.github/workflows/publis
 from `main`; see the [release guide](releasing.md). `npm run publish:dry-run` checks
 and previews the workspace tarballs locally without publishing.
 
-To preview a checkout, use Node.js 24.18+ and run this command from the repository root:
+To preview a checkout, use Node.js 24.18+ and run this command from the repository root (End users: Node 22.12 or
+newer, tested on 22.12 and the latest 22.x, 24.18 and 26. Contributors: Node 24.18 or newer.):
 
 ```sh
 npm run catalog

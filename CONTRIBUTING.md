@@ -4,7 +4,14 @@ Thanks for taking a look. Bug reports, fixes, docs and new examples are all welc
 
 ## Setup
 
-You need Node.js 24.18+ to work in this repository (its tests use `using` declarations; the published packages themselves run on Node 22.12+) and [Git LFS](https://git-lfs.com).
+You need Node.js 24.18+ to work in this repository (its tests use `using` declarations, and the React unit tests rely
+on Node 24's node:test mock.module timing) and [Git LFS](https://git-lfs.com). End users: Node 22.12 or newer (tested
+on 22.12 and the latest 22.x, 24.18 and 26). CI's node-compat job proves that on 22.12.0, the latest 22.x and 26: the
+packages build, pack, install in a clean project, import (every exports entry), type-check their README examples, run
+the consumer program and the packed browser test, and build with Vite, webpack, Next.js, Rollup and esbuild. Shipped
+code may not use a JavaScript or Node API that Node 22.12 lacks without a feature test (`npm run check:node-apis`).
+To run that proof locally, put a Node 22 first on PATH and run `npm run modern:test:packages -- --consumer` and
+`npm run modern:test:bundlers`.
 
 ```sh
 git clone https://github.com/scottcampbelldata/margoengine.git

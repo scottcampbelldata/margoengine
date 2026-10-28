@@ -6,6 +6,12 @@
 //                                                         affected ones); packing, install, licences and the umbrella
 //                                                         smoke test always run; `react` also switches on the React
 //                                                         docs, the React unit tests and the packed browser
+//   npm run modern:test:packages -- --consumer            the end-user steps only, for the packages' oldest Node (22.12,
+//                                                         CI's node-compat job): everything above except the React
+//                                                         unit tests, which are repository tests (node:test
+//                                                         mock.module) and need the contributors' Node (root
+//                                                         package.json engines, 24.18 or newer). Below that Node the
+//                                                         flag is required, so they are never left out silently.
 // MARGOENGINE_PACKAGE_TEST_PREBUILT=1 skips the build (check:merge: `verify` just built, and planted stale files).
 // The consumer project is kept between runs (os.tmpdir()/margoengine-consumer-cache/<key>) with its third-party
 // node_modules; only our tarballs are extracted again. The key covers the lock file, the dependency declarations of
@@ -75,6 +81,21 @@ for (const name of selected ?? [])
 const inScope = (name) => !selected || selected.has(name);
 // The React docs, the React unit tests and the packed browser lifecycle belong to the React package.
 const reactScope = inScope('react');
+// --consumer: what end users run, on any Node the packages support; the React unit tests need the contributors' Node.
+const consumerOnly = process.argv.includes('--consumer');
+const contributorNode = JSON.parse(await readFile('package.json', 'utf8')).engines.node.replace(/^>=\s*/, '');
+const atLeast = (have, want) => {
+  const [a, b] = [have, want].map((v) => v.replace(/^v/, '').split('.').map(Number));
+  return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+};
+assert.ok(
+  consumerOnly || atLeast(process.version, contributorNode) >= 0,
+  `Node ${process.version} is below the contributors' Node ${contributorNode} (root package.json engines), which the ` +
+    'React unit tests need; on an end-user Node run `npm run modern:test:packages -- --consumer`',
+);
+const reactUnitTests = reactScope && !consumerOnly;
+if (reactScope && consumerOnly)
+  console.log(`--consumer: the React unit tests are not run here; they run on Node ${contributorNode} or newer`);
 // bsdtar ships with Windows; a GNU tar earlier on PATH would read `C:` as a host name.
 const tarBin =
   process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
@@ -581,15 +602,14 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
         : [],
     ),
   ];
-  if (reactScope)
+  if (reactScope) pipelines.push(task('React docs tsc', [tsc, '-p', join(fixture, 'docs/tsconfig.json')]), browserRun);
+  if (reactUnitTests)
     pipelines.push(
-      task('React docs tsc', [tsc, '-p', join(fixture, 'docs/tsconfig.json')]),
       task('React unit tests', [
         '--experimental-test-module-mocks',
         '--test',
         ...reactTests.map((file) => join(reactRoot, file)),
       ]),
-      browserRun,
     );
   const settled = await Promise.allSettled(pipelines);
   console.log(`package test timings: ${timings.join(', ')}`);
@@ -606,19 +626,17 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
         scope: selected ? [...selected].sort() : 'all',
         archiveSource: reuseTarballs ? 'cached-tarballs' : prebuilt ? 'verify build' : 'build',
         archiveDirectory: archives,
+        node: process.version,
+        consumerOnly,
         react,
-        reactTests,
+        reactTests: reactUnitTests ? reactTests : [],
         timings,
         checks: [
           'standalone imports and Wasm',
           'strict consumer declarations without workspace ambient types',
           'React 18 SSR',
-          ...(reactScope
-            ? [
-                'React 18 declarative, kit, post, physics, XR and loader lifecycle unit tests',
-                'React 18 StrictMode, nested refs, props, RAF, Suspense and teardown',
-              ]
-            : []),
+          ...(reactUnitTests ? ['React 18 declarative, kit, post, physics, XR and loader lifecycle unit tests'] : []),
+          ...(reactScope ? ['React 18 StrictMode, nested refs, props, RAF, Suspense and teardown'] : []),
         ],
       },
       null,

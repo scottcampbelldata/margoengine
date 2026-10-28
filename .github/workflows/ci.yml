@@ -47,12 +47,16 @@ jobs:
       - name: Tests
         run: node --experimental-test-module-mocks --test --test-concurrency=4 tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js
 
-  # What users run: the built packages on the packages' minimum Node (their engines field) and on the newest.
+  # What users run: the built packages on the packages' minimum Node (their engines field), the latest 22.x and the
+  # newest, with Node itself building, packing, installing and bundling. The repository's own unit tests (the test job)
+  # need the contributors' Node 24.18; that includes the React unit tests of the packed tarball, which rely on
+  # node:test mock.module timing (bug 18), so --consumer leaves only them out and they run in the test job.
   node-compat:
+    name: End-user proof on Node ${{ matrix.node }} (React unit tests run on 24.18)
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: ['22.12.0', '26']
+        node: ['22.12.0', '22', '26']
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,10 +69,17 @@ jobs:
       - run: npm run build:packages
       - name: Every shipped file parses and every package entry imports
         run: node scripts/check-engines.mjs --run=packages
-      # The golden proof digests must hold on every supported Node (bug 17: Node 22's pow differs from Node 26's).
-      - run: node --test tests/proofs-golden.test.js
-      # The packed-package tests are repository tooling (Node 24.18+: bug 18, mock.module timing on Node 22).
-      - if: matrix.node != '22.12.0'
+      # The golden proof digests must hold on every supported Node (bug 17: Node 22's pow differs from Node 26's), and
+      # shipped code may use no API this Node lacks without a feature test (bug 39).
+      - run: node --test tests/proofs-golden.test.js tests/node-apis.test.js
+      - run: npx playwright install chromium
+      - name: Pack, install in a clean project, README type-checks, consumer run, packed browser
+        run: npm run modern:test:packages -- --consumer
+        env:
+          MARGO_SOFTWARE_GPU: '1'
+      - name: Vite, webpack, Next.js (Turbopack and webpack), Rollup and esbuild build the packed packages
+        run: npm run modern:test:bundlers
+      - if: matrix.node == '26'
         run: npm test
 
   kernel:
