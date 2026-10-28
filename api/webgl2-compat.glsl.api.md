@@ -120,6 +120,7 @@ export interface GLSLStage {
     readonly source: string;
     readonly uniforms: readonly GLSLUniform[];
     readonly textures: readonly GLSLTexture[];
+    readonly storage: readonly GLSLStorage[];
     readonly inputs: readonly GLSLLocation[];
     readonly outputs: readonly GLSLLocation[];
     readonly varyings: readonly GLSLVarying[];
@@ -127,6 +128,16 @@ export interface GLSLStage {
     readonly baseInstance?: string;
     readonly fragDepth: boolean;
     readonly notes: readonly string[];
+}
+
+export interface GLSLStorage {
+    readonly group: number;
+    readonly binding: number;
+    readonly texture: string;
+    readonly shared: boolean;
+    readonly info: string;
+    readonly minSize: number;
+    readonly access: 'read' | 'read_write';
 }
 
 export interface GLSLTexture {
@@ -514,6 +525,7 @@ export interface TranslateOptions {
     readonly fragment?: TranslateStage;
     readonly clipControl?: boolean;
     readonly points?: boolean;
+    readonly sharedStorage?: (group: number, binding: number) => boolean;
 }
 
 export interface TranslateStage {

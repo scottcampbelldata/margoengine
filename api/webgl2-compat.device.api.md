@@ -82,6 +82,11 @@ export class CompatBindGroup {
     readonly layout: CompatBindGroupLayout;
     readonly entries: Map<number, Bound>;
     constructor(device: CompatDevice, descriptor: GPUBindGroupDescriptor);
+    storageTexture(): {
+        texture: WebGLTexture;
+        shift: number;
+        rows: ReadonlyMap<number, number>;
+    } | null;
 }
 
 export class CompatBindGroupLayout {
@@ -107,12 +112,17 @@ export class CompatBuffer {
     shadowValid: boolean;
     mapState: 'unmapped' | 'pending' | 'mapped';
     readonly readbacks: Readback[];
+    version: number;
     destroyed: boolean;
     constructor(device: CompatDevice, descriptor: GPUBufferDescriptor);
     write(offset: number, bytes: Uint8Array): void;
     settle(): boolean;
     land(offset: number, bytes: Uint8Array): void;
     bytes(): Uint8Array;
+    dataTexture(): {
+        texture: WebGLTexture;
+        shift: number;
+    } | null;
     mapAsync(mode: number, offset?: number, size?: number): Promise<undefined>;
     getMappedRange(offset?: number, size?: number): ArrayBuffer;
     unmap(): void;
@@ -295,6 +305,7 @@ export class CompatRenderPipeline {
     readonly attributes: Attribute[];
     readonly uniforms: UniformSlot[];
     readonly textures: TextureSlot[];
+    readonly storage: StorageSlot[];
     readonly mode: number;
     readonly cull: number;
     readonly frontFace: number;
@@ -312,6 +323,7 @@ export class CompatRenderPipeline {
         pointers: string[];
         levels: Map<WebGLUniformLocation, number>;
         modes: Map<WebGLUniformLocation, string>;
+        info: Map<WebGLUniformLocation, string>;
     };
     constructor(device: CompatDevice, descriptor: GPURenderPipelineDescriptor, deferLink?: boolean);
     whenLinked(): Promise<void>;
@@ -1019,6 +1031,7 @@ interface GLSLStage {
     readonly source: string;
     readonly uniforms: readonly GLSLUniform[];
     readonly textures: readonly GLSLTexture[];
+    readonly storage: readonly GLSLStorage[];
     readonly inputs: readonly GLSLLocation[];
     readonly outputs: readonly GLSLLocation[];
     readonly varyings: readonly GLSLVarying[];
@@ -1026,6 +1039,16 @@ interface GLSLStage {
     readonly baseInstance?: string;
     readonly fragDepth: boolean;
     readonly notes: readonly string[];
+}
+
+interface GLSLStorage {
+    readonly group: number;
+    readonly binding: number;
+    readonly texture: string;
+    readonly shared: boolean;
+    readonly info: string;
+    readonly minSize: number;
+    readonly access: 'read' | 'read_write';
 }
 
 interface GLSLTexture {
@@ -1181,6 +1204,16 @@ class Replayer {
     }, destination: GPUTexelCopyTextureInfo & {
         texture: CompatTexture;
     }, [w, h, depth]: [number, number, number]): void;
+}
+
+interface StorageSlot {
+    readonly unit: number;
+    readonly group: number;
+    readonly binding: number;
+    readonly info: {
+        readonly location: WebGLUniformLocation;
+        readonly binding: number;
+    }[];
 }
 
 interface TargetState {

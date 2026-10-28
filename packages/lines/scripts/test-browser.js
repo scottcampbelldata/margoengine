@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
+import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 import { createServer } from 'vite';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -27,6 +28,8 @@ try {
       deviceScaleFactor: 1,
       ...(samples === 1 ? { userAgent: 'iPhone Mobile' } : {}),
     });
+    // --compat: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+    if (compatRun()) await page.addInitScript(compatShim, compatUrl());
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => {

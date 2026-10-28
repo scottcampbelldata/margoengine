@@ -58,6 +58,30 @@ export interface GLSLUniform {
   /** Bytes WGSL needs (the variable's store type size): the minimum binding size. */
   readonly minSize: number;
 }
+/**
+ * A storage buffer the stage reads (milestone M4): WebGL2 has none, so the device mirrors the buffer into an RGBA32UI
+ * data texture, one 16-byte row per texel, and the shader fetches rows from it.
+ */
+export interface GLSLStorage {
+  readonly group: number;
+  readonly binding: number;
+  /** GLSL name of the `usampler2D` holding the rows. */
+  readonly texture: string;
+  /**
+   * The rows sit in one data texture shared by every storage buffer of the bind group without a dynamic offset, so a
+   * pipeline spends one texture unit per bind group on them (`texture` is then the same for those buffers).
+   */
+  readonly shared: boolean;
+  /**
+   * GLSL name of the `ivec4` uniform the device sets per draw: x, the binding's first row (offset / 16); y, its size
+   * in bytes (arrayLength and the bounds clamp); z, log2 of the data texture's width.
+   */
+  readonly info: string;
+  /** Bytes WGSL needs (a runtime-sized array counted with one element): the minimum binding size. */
+  readonly minSize: number;
+  /** WGSL access mode; only reads are translated (a write is refused, milestone M5). */
+  readonly access: 'read' | 'read_write';
+}
 /** A combined sampler: one texture with one sampler (or none, for loads and queries). */
 export interface GLSLTexture {
   readonly group: number;
@@ -95,6 +119,8 @@ export interface GLSLStage {
   readonly source: string;
   readonly uniforms: readonly GLSLUniform[];
   readonly textures: readonly GLSLTexture[];
+  /** Storage buffers the stage reads, through data textures. */
+  readonly storage: readonly GLSLStorage[];
   /** Vertex inputs (vertex stage). */
   readonly inputs: readonly GLSLLocation[];
   /** Fragment outputs (fragment stage). */
@@ -125,6 +151,8 @@ interface EmitOptions {
   readonly varyings?: readonly GLSLVarying[];
   /** Prefix of generated uniform names, unique per stage (default `v` or `f`). */
   readonly prefix?: string;
+  /** True for storage buffers read from their bind group's shared data texture (see GLSLStorage.shared). */
+  readonly sharedStorage?: (group: number, binding: number) => boolean;
 }
 
 type Ref =
@@ -316,6 +344,9 @@ class StageEmitter {
   private readonly instances = new Map<string, FnInstance>();
   private readonly pending: FnInstance[] = [];
   private readonly uniforms = new Map<IRGlobalVar, GLSLUniform & { array: string }>();
+  private readonly storages = new Map<IRGlobalVar, GLSLStorage & { array: string }>();
+  /** Row fetch functions of storage buffers, which take the row as an argument instead of an index. */
+  private readonly fetchers = new Set<string>();
   private readonly textures = new Map<string, GLSLTexture>();
   private readonly notes = new Set<string>();
   private readonly constants: Readonly<Record<string, number | boolean>>;
@@ -370,6 +401,7 @@ class StageEmitter {
       source,
       uniforms: [...this.uniforms.values()].map(({ array: _, ...u }) => u),
       textures: [...this.textures.values()],
+      storage: [...this.storages.values()].map(({ array: _, ...b }) => b),
       inputs: io.inputs,
       outputs: io.outputs,
       varyings: io.varyings,
@@ -422,7 +454,7 @@ class StageEmitter {
   /** Array length as GLSL text: a number, or the override that sizes it. */
   private count(t: ArrayType): string {
     if (t.count === 'runtime')
-      throw unsupported('runtime-sized arrays outside storage buffers (storage is milestone M4)');
+      throw unsupported('a runtime-sized array outside a storage buffer (WGSL allows them only there)');
     if (typeof t.count === 'number') return String(t.count);
     const o = this.module.globals.find(
       (g) => g.kind === 'override' && g.name === (t.count as { override: string }).override,
@@ -594,10 +626,11 @@ class StageEmitter {
     return name;
   }
 
-  private uniform(v: IRGlobalVar): GLSLUniform & { array: string } {
+  /** The rows of a uniform block, or of a storage buffer's data texture, that `v` is read from. */
+  private uniform(v: IRGlobalVar): { array: string } {
+    if (v.space === 'storage') return this.storageBuffer(v);
     let u = this.uniforms.get(v);
     if (u) return u;
-    if (v.space === 'storage') throw unsupported(`storage buffer '${v.name}' (storage buffers are milestone M4)`);
     const minSize = sizeOf(v.type),
       words = Math.max(1, Math.ceil(minSize / 16));
     if (words > 4096) throw unsupported(`uniform buffer '${v.name}' of ${minSize} bytes (WebGL2 blocks hold 65,536)`);
@@ -613,6 +646,49 @@ class StageEmitter {
     this.uniforms.set(v, u);
     this.globals.push(`layout(std140) uniform ${u.block} { highp uvec4 ${u.array}[${words}]; };`);
     return u;
+  }
+
+  /**
+   * A storage buffer: rows fetched from its data texture. The fetch clamps the row into the binding, so a read past
+   * its end returns a value from inside it, as WGSL's robust access allows.
+   */
+  private storageBuffer(v: IRGlobalVar): GLSLStorage & { array: string } {
+    let b = this.storages.get(v);
+    if (b) return b;
+    const tag = `${this.prefix}${v.group}_${v.binding}`;
+    const shared = this.options.sharedStorage?.(v.group as number, v.binding as number) ?? false,
+      texture = shared ? `_dg${this.prefix}${v.group}` : `_d${tag}`;
+    b = {
+      group: v.group as number,
+      binding: v.binding as number,
+      texture,
+      shared,
+      info: `_i${tag}`,
+      minSize: sizeOf(v.type),
+      access: v.access === 'read_write' ? 'read_write' : 'read',
+      array: `_r${tag}`,
+    };
+    this.storages.set(v, b);
+    this.fetchers.add(b.array);
+    if (![...this.storages.values()].some((x) => x !== b && x.texture === texture))
+      this.globals.push(`uniform highp usampler2D ${b.texture};`);
+    this.globals.push(
+      `uniform highp ivec4 ${b.info};`,
+      `uvec4 ${b.array}(int r) { r = clamp(r, 0, max(((${b.info}.y + 15) >> 4) - 1, 0)) + ${b.info}.x; return texelFetch(${b.texture}, ivec2(r & ((1 << ${b.info}.z) - 1), r >> ${b.info}.z), 0); }`,
+    );
+    return b;
+  }
+
+  /** Row `i` (a uvec4) of a uniform block's array or of a storage buffer's data texture. */
+  private row(array: string, i: string | number): string {
+    return this.fetchers.has(array) ? `${array}(${i})` : `${array}[${i}]`;
+  }
+
+  /** The element count of the runtime-sized array a reference starts at, from its binding's size (arrayLength). */
+  private runtimeLength(r: Extract<Ref, { kind: 'buffer' }>, array: ArrayType): string {
+    if (r.rows.length || r.dyn.length) throw unsupported('a runtime-sized array behind a dynamic index');
+    const b = this.storageBuffer(r.v);
+    return `max((${b.info}.y - ${r.base}) / ${strideOf(array)}, 0)`;
   }
 
   // ---------------------------------------------------------------- functions
@@ -999,7 +1075,7 @@ class StageEmitter {
           const n =
             outer.kind === 'array'
               ? outer.count === 'runtime'
-                ? ''
+                ? this.runtimeLength(base, outer)
                 : this.count(outer)
               : String(outer.kind === 'matrix' ? outer.columns : (outer as { size: number }).size);
           const index = this.clampedIndex(e.index, n, stable);
@@ -1055,7 +1131,7 @@ class StageEmitter {
     // Rows are dynamic, the byte within the row is static: every component is a fixed swizzle.
     const row = [String(r.base >> 4), ...r.rows].join(' + ');
     if (!r.rows.length && (t.kind === 'scalar' || t.kind === 'vector'))
-      return this.inlineLoad(`${u.array}[${r.base >> 4}]`, r.base & 15, t);
+      return this.inlineLoad(this.row(u.array, r.base >> 4), r.base & 15, t);
     return `${this.rowLoader(u.array, t, r.base & 15)}(${row})`;
   }
 
@@ -1080,7 +1156,7 @@ class StageEmitter {
     const part = (pt: Type, at: number): string => {
       const b = k + at,
         row = b >> 4 ? `r + ${b >> 4}` : 'r';
-      if (pt.kind === 'scalar' || pt.kind === 'vector') return this.inlineLoad(`${array}[${row}]`, b & 15, pt);
+      if (pt.kind === 'scalar' || pt.kind === 'vector') return this.inlineLoad(this.row(array, row), b & 15, pt);
       return `${this.rowLoader(array, pt, b & 15)}(${row})`;
     };
     let body: string;
@@ -1101,7 +1177,7 @@ class StageEmitter {
         const set = t.element.kind === 'array' ? 'a[i].v' : 'a[i]';
         const el =
           t.element.kind === 'scalar' || t.element.kind === 'vector'
-            ? this.inlineLoad(`${array}[r + i * ${stride / 16}]`, k, t.element)
+            ? this.inlineLoad(this.row(array, `r + i * ${stride / 16}`), k, t.element)
             : `${this.rowLoader(array, t.element, k)}(r + i * ${stride / 16})`;
         body = `${ty} a; for (int i = 0; i < ${this.count(t)}; i++) ${set} = ${el}; return a;`;
         break;
@@ -1134,15 +1210,17 @@ class StageEmitter {
     let body: string;
     switch (t.kind) {
       case 'scalar':
-        body = `return ${this.fromBits(`${array}[o >> 2][o & 3]`, t, 1)};`;
+        // The component by selection, not `v[o & 3]`: ANGLE's Direct3D back end emulates a dynamic vector index with
+        // a helper per use, and a shader with many of them (word arrays in storage buffers) fails at its first draw.
+        body = `uvec4 v = ${this.row(array, 'o >> 2')}; int c = o & 3; return ${this.fromBits('(c < 2 ? (c == 0 ? v.x : v.y) : (c == 2 ? v.z : v.w))', t, 1)};`;
         break;
       case 'vector': {
         const raw =
           t.size === 4
-            ? `${array}[o >> 2]`
+            ? this.row(array, 'o >> 2')
             : t.size === 3
-              ? `${array}[o >> 2].xyz`
-              : `((o & 2) == 0 ? ${array}[o >> 2].xy : ${array}[o >> 2].zw)`;
+              ? `${this.row(array, 'o >> 2')}.xyz`
+              : `((o & 2) == 0 ? ${this.row(array, 'o >> 2')}.xy : ${this.row(array, 'o >> 2')}.zw)`;
         body = `return ${this.fromBits(raw, t.element, t.size)};`;
         break;
       }
@@ -1458,7 +1536,11 @@ class StageEmitter {
 
   private builtin(name: string, args: readonly IRExpr[], result: Type): string {
     if (name.startsWith('texture') && name !== 'textureBarrier') return this.texture(name, args, result);
-    if (name === 'arrayLength') throw unsupported('arrayLength() (storage buffers are milestone M4)');
+    if (name === 'arrayLength') {
+      const r = this.pointer(args[0], false);
+      if (r.kind !== 'buffer') throw unsupported('arrayLength() of something that is not a storage buffer');
+      return `uint(${this.runtimeLength(r, r.type as ArrayType)})`;
+    }
     if (name.startsWith('atomic') || name.endsWith('Barrier') || name === 'workgroupUniformLoad')
       throw unsupported(`${name}() (atomics, barriers and workgroup memory are milestone M5)`);
     if (name.startsWith('subgroup') || name.startsWith('quad'))

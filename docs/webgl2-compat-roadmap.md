@@ -460,3 +460,41 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
 - **Sizes (gzip, the sizes gate's method).** The root with `install()` loads 66,864 B (60,837 B after
   M2): `/device` 66,664 B, `/glsl` 41,566 B, `/wgsl` 26,528 B. Over the 60,000 B target by 6,864 B; nothing was cut. Every byte the layer adds loads only through `install()`, so browsers with WebGPU download none of it, and
   `npm run measure:size` reports the same core + stage bytes.
+
+## Storage buffers in render shaders (M4, 2026-10-28)
+
+Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL2, Dawn for WebGPU).
+
+- **Data textures.** A storage buffer read in a vertex or fragment shader is read from an RGBA32UI texture, one
+  16-byte row per texel, row-major, `1 << shift` texels wide (at most 2,048, so a binding holds up to 2,048 x 16 x
+  `MAX_TEXTURE_SIZE` bytes; `maxStorageBufferBindingSize` is capped to that). The shader reads WGSL's own layout from
+  those rows exactly as it reads uniform blocks (static components, dynamic rows), so every struct, `@size`, `@align`
+  and runtime-sized array reads the same bytes as on WebGPU. Each read is clamped into the binding (WGSL's robust
+  access allows any value inside it), and `arrayLength` is (binding size - array offset) / stride from a per-draw
+  uniform, which also clamps indexes into runtime-sized arrays.
+- **Mirroring.** Every change of a buffer's contents (`writeBuffer`, mapped writes, copies, readbacks landing) bumps
+  its version; before a draw reads it, its data texture is refreshed from the GL buffer on the GPU through
+  `PIXEL_UNPACK_BUFFER`, never through the CPU. The storage bindings of a bind group without a dynamic offset share one
+  data texture, filled binding after binding, so a pipeline spends one texture unit per bind group on storage: the
+  glTF PBR fragment shaders with clustered lights read 14 textures and 3 or 4 storage buffers, which would not fit
+  WebGL2's 16 units one texture per buffer. A binding with a dynamic offset keeps its buffer's own texture.
+- **Corpus.** All 1,049 vertex and fragment entry points compile, all 459 distinct stage pairs of the recorded render
+  pipelines link, and all 624 recorded render pipelines draw through the device (347 before M4). Nothing waits on
+  M4 any more; writes to storage, storage textures, atomics and compute wait for M5.
+- **Package checks in forced compatibility** (in `npm run test:gpu`): lod, lines and text pass whole; points passes
+  its single-sample run. Its 4x run shades eye-dome lighting per sample (`@builtin(sample_index)`, comparing matching
+  coverage samples), which WebGL2 cannot do (per-sample shading is out of scope); the layer reads the resolved,
+  averaged texel there, which darkens point edges the per-sample version leaves alone. The voxel checks draw under
+  Bloom (compute, M5), and clustered bins its lights in a compute pass, so both wait for M5 (or, for clustered, the
+  CPU binning path the package plan gives it).
+- **Bugs found and fixed, each with a regression test.** (1) Word reads with a dynamic component (`array<u32>` in a
+  storage buffer: every index) indexed a vector dynamically, which ANGLE's Direct3D back end emulates with a helper
+  per use; a shader with many of them failed at its first draw and lost the context. The component is now selected
+  with static swizzles (corpus draw check). (2) A copy made for one texture binding during a draw (a stale sRGB view's
+  copy) bound texture unit 0 after another binding had been put there; units are now bound only after every copy,
+  resolve and upload of the draw (`features-browser.mjs`, regressions). (3) 4x multisampled integer textures made an
+  incomplete framebuffer (ANGLE has no multisample integer renderbuffers): the device now refuses them with code
+  `unsupported` when the context reports no 4-sample support for the format.
+- **Sizes (gzip, the sizes gate's method).** The root with `install()` loads 68,518 B: `/device` 68,303 B, `/glsl`
+  42,017 B, `/wgsl` 26,528 B. Over the 60,000 B target by 8,518 B; nothing was cut. Browsers with WebGPU download none
+  of it, and core + stage are unchanged.

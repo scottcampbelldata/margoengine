@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
+import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 import { createServer } from 'vite';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -21,12 +22,17 @@ try {
     headless: true,
     args,
   });
-  for (const samples of [1, 4]) {
+  // On the WebGL2 compatibility layer (--compat) only the single-sample path: the 4x eye-dome lighting compares
+  // matching coverage samples per sample (@builtin(sample_index)), and per-sample shading is out of scope on WebGL2
+  // (docs/webgl2-compat-roadmap.md, "Out of scope"); the layer reads the resolved, averaged texel instead.
+  for (const samples of compatRun() ? [1] : [1, 4]) {
     const page = await browser.newPage({
       viewport: { width: 700, height: 700 },
       deviceScaleFactor: 1,
       ...(samples === 1 ? { userAgent: 'iPhone Mobile' } : {}),
     });
+    // --compat: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+    if (compatRun()) await page.addInitScript(compatShim, compatUrl());
     page.setDefaultTimeout(600_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));

@@ -1,8 +1,8 @@
 // The GLSL back end against the whole WGSL corpus in a real WebGL2 compiler (run by `npm run test:browser`, part of
-// check:merge). Every recorded render pipeline whose stages use no storage buffer or storage texture is translated
-// and its two shaders compiled and linked together; every vertex and fragment entry point of the corpus that uses
-// none is translated and compiled on its own. A translation that WebGL2 refuses is a back-end bug. Entry points that
-// reach storage resources, atomics or compute are counted as waiting for later milestones (M4, M5), not skipped
+// check:merge). Every recorded render pipeline is translated (storage buffers read through data textures, milestone
+// M4) and its two shaders compiled and linked together; every vertex and fragment entry point of the corpus is
+// translated and compiled on its own. A translation that WebGL2 refuses is a back-end bug. Entry points that
+// write storage, use storage textures, atomics or compute are counted as waiting for a later milestone (M5), not skipped
 // silently: the counts are printed and must not grow past the recorded ones without a reason.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
@@ -48,6 +48,9 @@ for (const m of modules)
           constants: p.fragment.constants,
         },
         points: p.primitive?.topology === 'point-list',
+        // As the device translates: storage bindings without a dynamic offset share their group's data texture.
+        sharedStorage: (group, binding) =>
+          p.layout === 'auto' || !p.layout?.[group]?.find((e) => e.binding === binding)?.buffer?.dynamic,
       });
       programs.push({
         id: `${m.package} ${m.key} ${p.vertex.entryPoint ?? ''}/${p.fragment?.entryPoint ?? ''}`,

@@ -85,6 +85,8 @@ function limitsOf(caps: WebGL2Capabilities): Record<string, number> {
   cap('maxSamplersPerShaderStage', l.MAX_TEXTURE_IMAGE_UNITS);
   cap('maxUniformBuffersPerShaderStage', Math.min(l.MAX_VERTEX_UNIFORM_BLOCKS, l.MAX_FRAGMENT_UNIFORM_BLOCKS));
   cap('maxUniformBufferBindingSize', l.MAX_UNIFORM_BLOCK_SIZE);
+  // A storage buffer is read through an RGBA32UI data texture at most 2,048 texels (32 KiB) wide.
+  cap('maxStorageBufferBindingSize', 2048 * 16 * l.MAX_TEXTURE_SIZE);
   out.minUniformBufferOffsetAlignment = Math.max(256, l.UNIFORM_BUFFER_OFFSET_ALIGNMENT);
   cap('maxVertexAttributes', l.MAX_VERTEX_ATTRIBS);
   // WebGL caps vertexAttribPointer strides at 255 bytes.

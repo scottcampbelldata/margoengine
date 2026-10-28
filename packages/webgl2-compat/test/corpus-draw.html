@@ -55,7 +55,7 @@ window.drawAll = async (records, sources) => {
         const layout = pipeline.getBindGroupLayout(g);
         if (!layout.entries.length) continue;
         const entries = layout.entries.map((e) => {
-          if (e.buffer) return { binding: e.binding, resource: { buffer: device.createBuffer({ size: Math.ceil((e.buffer.minBindingSize + 256) / 256) * 256, usage: 64 | 8 }) } };
+          if (e.buffer) return { binding: e.binding, resource: { buffer: device.createBuffer({ size: Math.ceil((e.buffer.minBindingSize + 256) / 256) * 256, usage: (e.buffer.type === 'uniform' ? 64 : 128) | 8 }) } };
           if (e.sampler) return { binding: e.binding, resource: device.createSampler(e.sampler.type === 'comparison' ? { compare: 'less' } : { magFilter: 'linear', minFilter: 'linear' }) };
           const t = e.texture,
             dim = t.viewDimension;

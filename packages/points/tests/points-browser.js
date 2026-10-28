@@ -4,6 +4,13 @@ import { SceneTarget } from '../../shared/msaa.js';
 import { PointsPlugin, PointCloud, SpriteBatch, SpriteMaterial, atlasRect, random } from '@margoengine/points';
 import { CameraProjection } from '../../cameras/dist/index.js';
 
+/** The class of a GPU object (WebGPU's, or the WebGL2 compatibility layer's), from one probe it then destroys. */
+const probeClass = (object) => {
+  const proto = Object.getPrototypeOf(object);
+  object.destroy();
+  return proto;
+};
+
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
@@ -702,19 +709,24 @@ window.runPointTests = async () => {
 
   // 11. Disposal removes the pass and releases GPU resources.
   let destroyed = 0;
-  const destroyBuffer = GPUBuffer.prototype.destroy,
-    destroyTexture = GPUTexture.prototype.destroy;
-  GPUBuffer.prototype.destroy = function () {
+  // The device's own classes (the WebGL2 compatibility layer's under --compat), probed from one object each.
+  const bufferProto = probeClass(runtime.gpu.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST }));
+  const textureProto = probeClass(
+    runtime.gpu.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING }),
+  );
+  const destroyBuffer = bufferProto.destroy,
+    destroyTexture = textureProto.destroy;
+  bufferProto.destroy = function () {
     destroyed++;
     return destroyBuffer.call(this);
   };
-  GPUTexture.prototype.destroy = function () {
+  textureProto.destroy = function () {
     destroyed++;
     return destroyTexture.call(this);
   };
   engine.removePlugin('points');
-  GPUBuffer.prototype.destroy = destroyBuffer;
-  GPUTexture.prototype.destroy = destroyTexture;
+  bufferProto.destroy = destroyBuffer;
+  textureProto.destroy = destroyTexture;
   let passRemoved = true;
   try {
     runtime.frameGraph.add({ name: 'points:draw', order: 10, execute() {} })();

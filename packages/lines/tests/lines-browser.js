@@ -16,6 +16,13 @@ import {
 } from '@margoengine/lines';
 import { Camera } from '@margoengine/core';
 
+/** The class of a GPU object (WebGPU's, or the WebGL2 compatibility layer's), from one probe it then destroys. */
+const probeClass = (object) => {
+  const proto = Object.getPrototypeOf(object);
+  object.destroy();
+  return proto;
+};
+
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
@@ -369,13 +376,15 @@ window.runLineTests = async () => {
 
   // 9. Disposal removes the pass and releases buffers.
   let destroyed = 0;
-  const destroy = GPUBuffer.prototype.destroy;
-  GPUBuffer.prototype.destroy = function () {
+  // The device's own classes (the WebGL2 compatibility layer's under --compat), probed from one object each.
+  const bufferProto = probeClass(runtime.gpu.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST }));
+  const destroy = bufferProto.destroy;
+  bufferProto.destroy = function () {
     destroyed++;
     return destroy.call(this);
   };
   engine.removePlugin('lines');
-  GPUBuffer.prototype.destroy = destroy;
+  bufferProto.destroy = destroy;
   // FrameGraph rejects duplicate names, so adding 'lines:draw' succeeds only once the plugin's pass is gone.
   let passRemoved = true;
   try {

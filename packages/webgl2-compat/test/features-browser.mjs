@@ -60,6 +60,10 @@ try {
     if (name === 'srgbView')
       assert.deepEqual(r.back.slice(0, 4), [188, 137, 255, 255], 'linear 0.5 through the sRGB view');
     if (name === 'layerView') assert.notDeepEqual(r.after, r.before, 'the render into the layer is seen');
+    if (name === 'storage') {
+      assert.notDeepEqual(r.written, r.first, 'writeBuffer between submits is seen');
+      assert.deepEqual(r.copied, r.written, 'a GPU copy into a storage buffer is seen');
+    }
     if (name === 'occlusion')
       assert.deepEqual(r.results, [
         [1, 0, 0],
@@ -76,6 +80,7 @@ try {
         r.depthAfter.every((d) => d === 1),
         'a draw with depth writes off left depth untouched',
       );
+      assert.deepEqual(r.both.slice(4, 8), [1, 0, 0, 1], 'a copy made for one binding left the other units alone');
     }
   }
   assert.deepEqual(pageErrors, []);

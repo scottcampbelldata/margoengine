@@ -74,7 +74,13 @@ test('limits come from the context, never above WebGPU defaults; vertex strides 
   assert.equal(limits.maxInterStageShaderVariables, 15);
   assert.equal(limits.maxColorAttachments, 4, 'the smaller of attachments and draw buffers');
   assert.equal(limits.maxVertexBufferArrayStride, 255);
+  assert.equal(limits.maxStorageBufferBindingSize, 134217728, 'WebGPU default: 2,048 x 16 x 16,384 bytes is more');
   assert.ok(Object.isFrozen(limits));
+  // A small context caps storage bindings at what a 2,048-texel-wide RGBA32UI data texture of its size holds.
+  const small = await createCompatGPU({
+    createContext: () => fakeContext({ limits: { MAX_TEXTURE_SIZE: 2048 } }),
+  }).requestAdapter();
+  assert.equal(small.limits.maxStorageBufferBindingSize, 2048 * 16 * 2048);
 });
 
 test('features only where an extension backs them', async () => {

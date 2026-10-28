@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/webgl2-compat",
   "version": "1.0.0",
-  "description": "In development (milestones M0 to M3): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders, texture views, readbacks of every copyable format, occlusion queries, render bundles, external textures and gather run; compute and storage come in later milestones.",
+  "description": "In development (milestones M0 to M4): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders, texture views, readbacks of every copyable format, occlusion queries, render bundles, external textures, gather and storage-buffer reads run; compute and storage writes come in later milestones.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -47,7 +47,7 @@
     "NOTICE"
   ],
   "margo": {
-    "gpuTestTimeoutMinutes": 25
+    "gpuTestTimeoutMinutes": 40
   },
   "publishConfig": {
     "access": "public"
@@ -56,7 +56,7 @@
     "build": "node ../../scripts/build-optional.js webgl2-compat",
     "test": "npm run build && node --test test/*.test.js",
     "test:browser": "npm run build && node test/browser-check.mjs && node test/glsl-corpus-browser.mjs && cd ../.. && node packages/webgl2-compat/test/corpus-draw-browser.mjs",
-    "test:gpu": "npm run build && cd ../.. && node packages/webgl2-compat/test/compat-browser-check.mjs && node packages/webgl2-compat/test/features-browser.mjs && node packages/materials/test/browser-check.mjs --compat && node packages/gltf-pro/scripts/test-shader-review.js --compat",
+    "test:gpu": "npm run build && cd ../.. && node packages/webgl2-compat/test/compat-browser-check.mjs && node packages/webgl2-compat/test/features-browser.mjs && node packages/materials/test/browser-check.mjs --compat && node packages/gltf-pro/scripts/test-shader-review.js --compat && node packages/lod/test/browser-check.mjs --compat && cd packages/lines && node scripts/test-browser.js --compat && cd ../points && node scripts/test-browser.js --compat && cd ../text && node scripts/test-browser.js --compat",
     "capabilities": "npm run build && node scripts/capabilities.mjs",
     "prepack": "npm run build"
   }

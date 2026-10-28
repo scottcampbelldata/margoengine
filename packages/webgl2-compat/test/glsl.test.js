@@ -192,12 +192,8 @@ test('refusals are coded: storage buffers, compute stages and cube gathers name 
       return true;
     });
   coded(
-    () => frag('@group(0) @binding(0) var<storage> b: array<u32>;', 'return vec4u(b[0]);'),
-    /storage buffer 'b' \(storage buffers are milestone M4\)/,
-  );
-  coded(
-    () => frag('@group(0) @binding(0) var<storage> b: array<u32>;', 'return vec4u(arrayLength(&b));'),
-    /arrayLength/,
+    () => frag('@group(0) @binding(0) var<storage, read_write> b: array<u32>;', 'b[0] = 1u; return vec4u(b[1]);'),
+    /a write to storage buffer 'b' \(storage writes are milestone M5\)/,
   );
   coded(
     () =>
@@ -235,6 +231,44 @@ ${V}
   );
   assert.match(g.source, /ivec3\(x0, y1, a\), 0\)\.x, m\.w\)/);
   assert.match(g.source, /return k < n \? k : p - 1 - k;/, 'mirror-repeat');
+});
+
+test('storage buffers are read through a data texture: rows clamped into the binding, arrayLength from its size', () => {
+  const source = `struct P { a: vec4f, b: vec2f, n: u32 }
+struct S { count: u32, items: array<P> }
+@group(1) @binding(2) var<storage, read> s: S;
+@group(0) @binding(0) var<storage> w: array<f32>;
+${V}
+@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
+  let i = u32(p.x);
+  return s.items[i].a + vec4f(s.items[i].b, f32(arrayLength(&s.items)), w[i]) + f32(s.count + s.items[2].n);
+}`;
+  const g = translateWGSL({ vertex: { source }, fragment: { source } }).fragment;
+  assert.deepEqual(
+    g.storage.map(({ group, binding, minSize, access }) => ({ group, binding, minSize, access })),
+    [
+      { group: 1, binding: 2, minSize: 48, access: 'read' },
+      { group: 0, binding: 0, minSize: 4, access: 'read' },
+    ],
+  );
+  const [b] = g.storage;
+  assert.match(g.source, new RegExp(`uniform highp usampler2D ${b.texture};`));
+  // The row fetch clamps into the binding (info.y bytes) and adds its first row (info.x), width 1 << info.z.
+  assert.match(
+    g.source,
+    /uvec4 _rf1_2\(int r\) \{ r = clamp\(r, 0, max\(\(\(_if1_2\.y \+ 15\) >> 4\) - 1, 0\)\) \+ _if1_2\.x; return texelFetch\(_df1_2, ivec2\(r & \(\(1 << _if1_2\.z\) - 1\), r >> _if1_2\.z\), 0\); \}/,
+  );
+  // arrayLength: (binding size - offset of items) / stride 32; the index into items is clamped to it.
+  assert.match(g.source, /uint\(max\(\(_if1_2\.y - 16\) \/ 32, 0\)\)/);
+  assert.match(g.source, /min\(.*uint\(max\(\(_if1_2\.y - 16\) \/ 32, 0\)\) - 1u\)/);
+  assert.equal(g.uniforms.length, 0, 'no uniform blocks');
+  // w[i] is a word with a dynamic component: selected with static swizzles, never v[o & 3] (ANGLE's Direct3D back end
+  // emulates a dynamic vector index per use, and a shader with many failed at its first draw).
+  assert.doesNotMatch(g.source, /\[o & 3\]/);
+  assert.match(
+    g.source,
+    /int c = o & 3; return uintBitsToFloat\(\(c < 2 \? \(c == 0 \? v\.x : v\.y\) : \(c == 2 \? v\.z : v\.w\)\)\);/,
+  );
 });
 
 test('varyings must match: a fragment input the vertex stage does not write is an error', () => {

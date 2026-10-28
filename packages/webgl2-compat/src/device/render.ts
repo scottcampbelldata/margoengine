@@ -91,6 +91,16 @@ interface TextureSlot {
   /** textureGather's address modes and comparison uniforms, each read from its sampler (see CompatSampler.modes). */
   readonly modes: { readonly location: WebGLUniformLocation; readonly group: number; readonly binding: number }[];
 }
+/**
+ * A data texture a pipeline reads storage buffers from: one buffer's own (`binding`), or its bind group's shared one
+ * (`binding` -1), with the per-draw `ivec4` uniform of each buffer read through it (see GLSLStorage).
+ */
+interface StorageSlot {
+  readonly unit: number;
+  readonly group: number;
+  readonly binding: number;
+  readonly info: { readonly location: WebGLUniformLocation; readonly binding: number }[];
+}
 interface TargetState {
   readonly blend?: GPUBlendState;
   readonly writeMask: number;
@@ -107,6 +117,7 @@ export class CompatRenderPipeline {
   readonly attributes: Attribute[] = [];
   readonly uniforms: UniformSlot[] = [];
   readonly textures: TextureSlot[] = [];
+  readonly storage: StorageSlot[] = [];
   readonly mode: number;
   readonly cull: number;
   readonly frontFace: number;
@@ -125,6 +136,7 @@ export class CompatRenderPipeline {
     pointers: [] as string[],
     levels: new Map<WebGLUniformLocation, number>(),
     modes: new Map<WebGLUniformLocation, string>(),
+    info: new Map<WebGLUniformLocation, string>(),
   };
   private linked = false;
   private readonly layouts: (CompatBindGroupLayout | null)[];
@@ -172,6 +184,9 @@ export class CompatRenderPipeline {
         },
         clipControl: !!device.ext.clipControl,
         points: prim.topology === 'point-list',
+        // Storage bindings without a dynamic offset share their bind group's data texture: one unit per group.
+        sharedStorage: (group, binding) =>
+          !explicit?.bindGroupLayouts[group]?.entries.find((e) => e.binding === binding)?.buffer?.hasDynamicOffset,
       });
     } catch (error) {
       if ((error as { code?: string }).code === 'unsupported') throw error;
@@ -298,10 +313,27 @@ export class CompatRenderPipeline {
         if (modes && t.gather) slot.modes.push({ location: modes, group: t.gather.group, binding: t.gather.binding });
       }
     }
-    if (units.size > this.device.limits.maxSampledTexturesPerShaderStage)
+    // Storage buffers read through data textures take the units after the textures.
+    const buffers = new Map<string, StorageSlot>();
+    for (const stage of [glsl.vertex, glsl.fragment] as GLSLStage[])
+      for (const b of stage.storage) {
+        const key = b.shared ? `g${b.group}` : `${b.group}:${b.binding}`;
+        let slot = buffers.get(key);
+        if (!slot) {
+          slot = { unit: units.size + buffers.size, group: b.group, binding: b.shared ? -1 : b.binding, info: [] };
+          buffers.set(key, slot);
+        }
+        const texture = gl.getUniformLocation(program, b.texture),
+          info = gl.getUniformLocation(program, b.info);
+        if (texture) gl.uniform1i(texture, slot.unit);
+        if (info) slot.info.push({ location: info, binding: b.binding });
+      }
+    const used = units.size + buffers.size;
+    if (used > this.device.limits.maxSampledTexturesPerShaderStage)
       throw this.device.unsupported(
-        `a pipeline with ${units.size} texture and sampler pairs (WebGL2 has ${this.device.limits.maxSampledTexturesPerShaderStage} units)`,
+        `a pipeline with ${units.size} texture and sampler pairs and ${buffers.size} storage buffers (WebGL2 has ${this.device.limits.maxSampledTexturesPerShaderStage} texture units, and each storage buffer takes one)`,
       );
+    this.storage.push(...buffers.values());
     this.uniforms.push(...points.values());
     this.textures.push(...units.values());
     this.baseVertex = gl.getUniformLocation(program, '_bv');
@@ -330,6 +362,20 @@ function autoLayouts(glsl: GLSLProgram): CompatBindGroupLayout[] {
           binding: u.binding,
           visibility: bit,
           buffer: { type: 'uniform', hasDynamicOffset: false, minBindingSize: u.minSize },
+        },
+        bit,
+      );
+    for (const b of stage.storage)
+      add(
+        b.group,
+        {
+          binding: b.binding,
+          visibility: bit,
+          buffer: {
+            type: b.access === 'read' ? 'read-only-storage' : 'storage',
+            hasDynamicOffset: false,
+            minBindingSize: b.minSize,
+          },
         },
         bit,
       );
@@ -1332,7 +1378,11 @@ export class Replayer {
     }
   }
 
-  /** Binds the pipeline's uniform blocks and textures from the current bind groups; false when one is missing. */
+  /**
+   * Binds the pipeline's uniform blocks, textures and storage buffers from the current bind groups; false when one is
+   * missing. Copies and uploads (a view's copy brought up to date, a multisample resolve, a storage buffer's data
+   * texture) all happen first: they use texture unit 0 and other GL state, so units are bound only after them.
+   */
   private applyBindings(p: CompatRenderPipeline, pass: PassState): boolean {
     const gl = this.gl,
       s = this.device.state,
@@ -1343,6 +1393,12 @@ export class Replayer {
       if (!g || !bound) return null;
       const di = g.group.layout.dynamic.indexOf(binding);
       return { bound, dynamic: di >= 0 ? (g.offsets[di] ?? 0) : 0 };
+    };
+    const samplerAt = (at: { group: number; binding: number }): CompatSampler | null => {
+      const sb = lookup(at.group, at.binding);
+      if (sb?.bound.kind === 'sampler') return sb.bound.sampler;
+      device.validationError(`Draw: no sampler is bound at @group(${at.group}) @binding(${at.binding})`);
+      return null;
     };
     for (const u of p.uniforms) {
       const found = lookup(u.group, u.binding);
@@ -1362,6 +1418,8 @@ export class Replayer {
       }
       s.uniformBuffer(u.point, buffer.gl as WebGLBuffer, buffer.id, start, bind);
     }
+    // Phase 1: what each unit will hold, with copies, resolves and uploads made now.
+    const plan: { unit: number; target: number; texture: WebGLTexture | null; sampler: WebGLSampler }[] = [];
     for (const t of p.textures) {
       const found = lookup(t.group, t.binding);
       if (!found || found.bound.kind !== 'view') {
@@ -1371,12 +1429,6 @@ export class Replayer {
       const view = found.bound.view,
         tex = view.texture;
       let sampler: WebGLSampler = device.loadSampler;
-      const samplerAt = (at: { group: number; binding: number }): CompatSampler | null => {
-        const sb = lookup(at.group, at.binding);
-        if (sb?.bound.kind === 'sampler') return sb.bound.sampler;
-        device.validationError(`Draw: no sampler is bound at @group(${at.group}) @binding(${at.binding})`);
-        return null;
-      };
       if (t.sampler) {
         const samp = samplerAt(t.sampler);
         if (!samp) return false;
@@ -1394,29 +1446,23 @@ export class Replayer {
           p.cache.modes.set(m.location, key);
         }
       }
-      let target: number,
-        glTexture: WebGLTexture | null,
-        levels = 1;
+      let levels = 1;
       if (tex.renderbuffer) {
         this.resolveForSampling(tex);
-        target = gl.TEXTURE_2D;
-        glTexture = tex.resolved;
+        plan.push({ unit: t.unit, target: gl.TEXTURE_2D, texture: tex.resolved, sampler });
       } else {
         const storage = tex.sampled(view);
         tex.read(storage, view.baseMipLevel, view.mipLevelCount, view.baseArrayLayer, view.arrayLayerCount, this.sync);
-        target = storage.target;
-        glTexture = storage.gl;
         levels = view.mipLevelCount;
-        s.unit(t.unit, target, glTexture, sampler);
         const range = `${view.baseMipLevel}:${view.baseMipLevel + levels - 1}`;
         if (storage.levels !== range) {
-          s.activeUnit(t.unit);
-          gl.texParameteri(target, gl.TEXTURE_BASE_LEVEL, view.baseMipLevel);
-          gl.texParameteri(target, gl.TEXTURE_MAX_LEVEL, view.baseMipLevel + levels - 1);
+          s.scratch(storage.target, storage.gl);
+          gl.texParameteri(storage.target, gl.TEXTURE_BASE_LEVEL, view.baseMipLevel);
+          gl.texParameteri(storage.target, gl.TEXTURE_MAX_LEVEL, view.baseMipLevel + levels - 1);
           storage.levels = range;
         }
+        plan.push({ unit: t.unit, target: storage.target, texture: storage.gl, sampler });
       }
-      s.unit(t.unit, target, glTexture, sampler);
       for (const loc of t.levels)
         if (p.cache.levels.get(loc) !== levels) {
           s.useProgram(p.program);
@@ -1424,6 +1470,52 @@ export class Replayer {
           p.cache.levels.set(loc, levels);
         }
     }
+    for (const b of p.storage) {
+      const setInfo = (location: WebGLUniformLocation, row: number, size: number, shift: number) => {
+        const key = `${row},${size},${shift}`;
+        if (p.cache.info.get(location) === key) return;
+        s.useProgram(p.program);
+        gl.uniform4i(location, row, size, shift, 0);
+        p.cache.info.set(location, key);
+      };
+      if (b.binding < 0) {
+        // The bind group's shared data texture: every storage binding without a dynamic offset.
+        const group = pass.groups[b.group]?.group,
+          data = group?.storageTexture();
+        if (!group || !data) {
+          device.validationError(`Draw: no bind group with storage buffers is bound at @group(${b.group})`);
+          return false;
+        }
+        for (const i of b.info) {
+          const bound = group.entries.get(i.binding),
+            row = data.rows.get(i.binding);
+          if (bound?.kind !== 'buffer' || row === undefined) {
+            device.validationError(`Draw: no storage buffer is bound at @group(${b.group}) @binding(${i.binding})`);
+            return false;
+          }
+          setInfo(i.location, row, bound.size, data.shift);
+        }
+        plan.push({ unit: b.unit, target: gl.TEXTURE_2D, texture: data.texture, sampler: device.loadSampler });
+        continue;
+      }
+      const found = lookup(b.group, b.binding);
+      if (!found || found.bound.kind !== 'buffer') {
+        device.validationError(`Draw: no storage buffer is bound at @group(${b.group}) @binding(${b.binding})`);
+        return false;
+      }
+      const { buffer, offset, size } = found.bound;
+      const data = buffer.dataTexture();
+      if (!data) {
+        device.validationError(
+          `Draw: the buffer at @group(${b.group}) @binding(${b.binding}) has no GPU copy to read; give it STORAGE usage`,
+        );
+        return false;
+      }
+      plan.push({ unit: b.unit, target: gl.TEXTURE_2D, texture: data.texture, sampler: device.loadSampler });
+      for (const i of b.info) setInfo(i.location, (offset + found.dynamic) >> 4, size, data.shift);
+    }
+    // Phase 2: bind the units.
+    for (const u of plan) s.unit(u.unit, u.target, u.texture, u.sampler);
     return true;
   }
 
@@ -1698,6 +1790,7 @@ export class Replayer {
       gl.bindBuffer(gl.COPY_READ_BUFFER, src.gl);
       gl.bindBuffer(gl.COPY_WRITE_BUFFER, dst.gl);
       gl.copyBufferSubData(gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
+      dst.version++;
       if (dst.shadow) dst.shadowValid = false;
       if (!dst.element) return;
     }

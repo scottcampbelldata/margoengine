@@ -63,6 +63,13 @@ export class CompatBuffer {
   private mapMode = 0;
   private ranges: { offset: number; data: ArrayBuffer }[] = [];
   readonly readbacks: Readback[] = [];
+  /** Bumped by every change of the contents, so the data texture knows when to refresh. */
+  version = 0;
+  /**
+   * The RGBA32UI texture shaders read the buffer through as a storage buffer (WebGL2 has none): one 16-byte row per
+   * texel, `1 << shift` texels wide; refreshed from the GL buffer on the GPU when the contents changed.
+   */
+  private data: { texture: WebGLTexture; shift: number; version: number } | null = null;
   destroyed = false;
 
   constructor(
@@ -124,6 +131,7 @@ export class CompatBuffer {
       return;
     }
     const gl = this.device.gl;
+    this.version++;
     if (this.gl) {
       gl.bindBuffer(gl.COPY_WRITE_BUFFER, this.gl);
       gl.bufferSubData(gl.COPY_WRITE_BUFFER, offset, bytes);
@@ -165,6 +173,7 @@ export class CompatBuffer {
   /** Writes bytes into the GL buffers and the shadow copy at once (a waiting write's last step). */
   land(offset: number, bytes: Uint8Array): void {
     const gl = this.device.gl;
+    this.version++;
     if (this.shadow) this.shadow.set(bytes.subarray(0, Math.max(0, this.size - offset)), offset);
     for (const [target, b] of [
       [gl.COPY_WRITE_BUFFER, this.gl],
@@ -194,6 +203,33 @@ export class CompatBuffer {
         this.device.validationError('A buffer was read on the CPU before its occlusion query results were available');
     }
     return this.shadow;
+  }
+
+  /**
+   * The data texture shaders read this buffer through as a storage buffer, brought up to date first (a GPU-side copy
+   * from the GL buffer through PIXEL_UNPACK_BUFFER); null for a buffer without a GL buffer.
+   */
+  dataTexture(): { texture: WebGLTexture; shift: number } | null {
+    if (!this.gl) return null;
+    const gl = this.device.gl,
+      texels = Math.max(1, Math.ceil(this.size / 16));
+    if (!this.data) {
+      const shift = Math.min(11, Math.ceil(Math.log2(texels))),
+        w = 1 << shift,
+        h = Math.ceil(texels / w);
+      const texture = gl.createTexture() as WebGLTexture;
+      this.device.state.scratch(gl.TEXTURE_2D, texture);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, w, h);
+      this.data = { texture, shift, version: -1 };
+    }
+    const d = this.data;
+    if (d.version !== this.version) {
+      if (this.readbacks.length) this.settle();
+      this.device.state.scratch(gl.TEXTURE_2D, d.texture);
+      uploadRows(gl, this.gl, 1 << d.shift, 0, texels, 0);
+      d.version = this.version;
+    }
+    return d;
   }
 
   mapAsync(mode: number, offset = 0, size?: number): Promise<undefined> {
@@ -264,6 +300,10 @@ export class CompatBuffer {
     const gl = this.device.gl;
     if (this.gl) gl.deleteBuffer(this.gl);
     if (this.element) gl.deleteBuffer(this.element);
+    if (this.data) {
+      this.device.state.forgetTexture(this.data.texture);
+      gl.deleteTexture(this.data.texture);
+    }
     this.mapState = 'unmapped';
   }
 }
@@ -289,6 +329,41 @@ export interface TextureStorage {
   /** Base and max level last set on the GL texture. */
   levels: string;
 }
+
+/**
+ * Copies `count` 16-byte rows of a GL buffer, from byte `from`, into the RGBA32UI texture bound at TEXTURE_2D on the
+ * active unit, from texel `start` on (row-major, `w` texels wide): on the GPU, through PIXEL_UNPACK_BUFFER.
+ */
+function uploadRows(
+  gl: WebGL2RenderingContext,
+  buffer: WebGLBuffer,
+  w: number,
+  start: number,
+  count: number,
+  from: number,
+): void {
+  gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, buffer);
+  for (let t = start, left = count, src = from; left > 0; ) {
+    const x = t % w,
+      y = Math.floor(t / w);
+    const rows = x === 0 ? Math.floor(left / w) : 0;
+    const n = rows ? rows * w : Math.min(left, w - x);
+    if (rows) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, y, w, rows, gl.RGBA_INTEGER, gl.UNSIGNED_INT, src);
+    else gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, n, 1, gl.RGBA_INTEGER, gl.UNSIGNED_INT, src);
+    t += n;
+    left -= n;
+    src += n * 16;
+  }
+  gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
+}
+
+/** Deletes the shared data textures of bind groups the program dropped (WebGPU bind groups have no destroy()). */
+const dropped =
+  typeof FinalizationRegistry === 'function'
+    ? new FinalizationRegistry<{ gl: WebGL2RenderingContext; texture: WebGLTexture }>(({ gl, texture }) => {
+        if (!gl.isContextLost()) gl.deleteTexture(texture);
+      })
+    : null;
 
 /** A GPUTexture on WebGL2: a texture, or a multisample renderbuffer (plus a resolved texture when it is sampled). */
 export class CompatTexture {
@@ -358,6 +433,15 @@ export class CompatTexture {
     if (this.sampleCount > 1) {
       if (this.sampleCount !== 4)
         throw new RangeError('Multisampled textures on WebGL2 take 4 samples; pass sampleCount: 4');
+      const counts = gl.getInternalformatParameter(
+        gl.RENDERBUFFER,
+        device.enum(info.internal),
+        gl.SAMPLES,
+      ) as Int32Array | null;
+      if (!counts?.includes(4))
+        throw device.unsupported(
+          `4x multisampled ${this.format} textures (this WebGL2 has no multisample ${info.internal} renderbuffers)`,
+        );
       this.target = 0;
       this.texture = null;
       this.primary = null;
@@ -812,8 +896,18 @@ export class CompatBindGroup {
   label: string;
   readonly layout: CompatBindGroupLayout;
   readonly entries = new Map<number, Bound>();
+  /** The shared data texture of the group's storage bindings without a dynamic offset (see storageTexture()). */
+  private shared: {
+    texture: WebGLTexture;
+    shift: number;
+    rows: Map<number, number>;
+    versions: Map<number, number>;
+  } | null = null;
 
-  constructor(device: CompatDevice, descriptor: GPUBindGroupDescriptor) {
+  constructor(
+    private readonly device: CompatDevice,
+    descriptor: GPUBindGroupDescriptor,
+  ) {
     this.label = descriptor.label ?? '';
     this.layout = descriptor.layout as unknown as CompatBindGroupLayout;
     for (const e of descriptor.entries) {
@@ -838,5 +932,42 @@ export class CompatBindGroup {
           `Bind group entry ${e.binding} is not a resource of this device; pass a buffer binding, sampler, texture view or external texture made by it`,
         );
     }
+  }
+
+  /**
+   * One RGBA32UI texture holding the rows of every storage binding of the group without a dynamic offset, one after
+   * another (`rows` gives each binding's first texel), so a pipeline spends one texture unit on them. A binding is
+   * copied in again, on the GPU, whenever its buffer changed; null when the group has no such binding.
+   */
+  storageTexture(): { texture: WebGLTexture; shift: number; rows: ReadonlyMap<number, number> } | null {
+    const gl = this.device.gl;
+    if (!this.shared) {
+      const rows = new Map<number, number>();
+      let total = 0;
+      for (const e of this.layout.entries) {
+        const bound = this.entries.get(e.binding);
+        if (!e.buffer || e.buffer.type === 'uniform' || e.buffer.hasDynamicOffset || bound?.kind !== 'buffer') continue;
+        rows.set(e.binding, total);
+        total += Math.max(1, Math.ceil(bound.size / 16));
+      }
+      if (!total) return null;
+      const shift = Math.min(11, Math.ceil(Math.log2(total))),
+        texture = gl.createTexture() as WebGLTexture;
+      this.device.state.scratch(gl.TEXTURE_2D, texture);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, 1 << shift, Math.ceil(total / (1 << shift)));
+      this.shared = { texture, shift, rows, versions: new Map() };
+      dropped?.register(this, { gl, texture });
+    }
+    const d = this.shared;
+    for (const [binding, row] of d.rows) {
+      const bound = this.entries.get(binding) as Extract<Bound, { kind: 'buffer' }>,
+        buffer = bound.buffer;
+      if (d.versions.get(binding) === buffer.version || buffer.destroyed || !buffer.gl) continue;
+      if (buffer.readbacks.length) buffer.settle();
+      this.device.state.scratch(gl.TEXTURE_2D, d.texture);
+      uploadRows(gl, buffer.gl, 1 << d.shift, row, Math.max(1, Math.ceil(bound.size / 16)), bound.offset);
+      d.versions.set(binding, buffer.version);
+    }
+    return d;
   }
 }

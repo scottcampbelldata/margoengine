@@ -8,7 +8,15 @@ import type { IRModule } from './wgsl/ir.js';
 
 /** The WGSL front end's types, under the names its own entry gives them (the IR this entry's types refer to). */
 export type * from './wgsl.js';
-export type { GLSLKind, GLSLLocation, GLSLStage, GLSLTexture, GLSLUniform, GLSLVarying } from './glsl/emit.js';
+export type {
+  GLSLKind,
+  GLSLLocation,
+  GLSLStage,
+  GLSLStorage,
+  GLSLTexture,
+  GLSLUniform,
+  GLSLVarying,
+} from './glsl/emit.js';
 export { encodeName as glslName, floatLiteral as glslFloat } from './glsl/emit.js';
 
 /** One stage of a pipeline to translate: a module (source or checked IR) and its entry point. */
@@ -36,6 +44,11 @@ export interface TranslateOptions {
   readonly clipControl?: boolean;
   /** The pipeline draws points (`point-list`): the vertex shader writes `gl_PointSize = 1.0`. Default false. */
   readonly points?: boolean;
+  /**
+   * Which storage buffers read from their bind group's shared data texture (one texture unit per bind group; the
+   * device uses it for every storage binding without a dynamic offset). Default: none, one texture per buffer.
+   */
+  readonly sharedStorage?: (group: number, binding: number) => boolean;
 }
 
 /** A translated pipeline: GLSL ES 3.00 sources and what each stage binds. */
@@ -49,6 +62,7 @@ const EMPTY_FRAGMENT: GLSLStage = {
   source: '#version 300 es\nprecision highp float;\nvoid main() {}\n',
   uniforms: [],
   textures: [],
+  storage: [],
   inputs: [],
   outputs: [],
   varyings: [],
@@ -105,11 +119,16 @@ export function translateStage(
  * @returns Both shader sources and, per stage, the uniform blocks, combined samplers, vertex inputs, varyings and
  *   fragment outputs the device binds.
  * @throws {WGSLError} when a source does not check. MargoError code `unsupported` for WGSL WebGL2 cannot run yet
- *   (storage buffers and textures, atomics, gather, cube arrays). TypeError for a missing or ambiguous entry point.
+ *   (storage writes, storage textures, atomics, cube gathers, cube arrays). TypeError for a missing or ambiguous entry
+ *   point.
  */
 export function translateWGSL(options: TranslateOptions): GLSLProgram {
   if (!options?.vertex) throw new TypeError('translateWGSL needs a vertex stage: { vertex: { source } }');
-  const common = { clipControl: options.clipControl ?? true, points: options.points ?? false };
+  const common = {
+    clipControl: options.clipControl ?? true,
+    points: options.points ?? false,
+    sharedStorage: options.sharedStorage,
+  };
   let fragment = EMPTY_FRAGMENT;
   if (options.fragment) {
     const f = entry(options.fragment, 'fragment');
