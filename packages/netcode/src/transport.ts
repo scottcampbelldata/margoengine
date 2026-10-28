@@ -27,6 +27,22 @@ export const CloseCode = {
   timeout: 4006,
 } as const;
 
+const encoder = new TextEncoder(),
+  decoder = new TextDecoder();
+
+/**
+ * @internal `reason` cut to at most `maxBytes` UTF-8 bytes on a character boundary: a WebSocket close frame holds 125
+ * bytes, 2 of them the code, so a reason gets 123.
+ */
+export function closeReason(reason: string, maxBytes = 123): string {
+  const bytes = encoder.encode(reason);
+  if (bytes.length <= maxBytes) return reason;
+  let end = maxBytes;
+  // bytes[end] is the first byte left out: while it continues a character, that character is left out too.
+  while (end > 0 && (bytes[end] & 0xc0) === 0x80) end--;
+  return decoder.decode(bytes.subarray(0, end));
+}
+
 /**
  * One end of a two-way message connection. GameServer and GameClient set `onmessage` and `onclose`; anything else
  * that implements this shape is a transport.

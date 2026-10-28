@@ -5,7 +5,7 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { Duplex } from 'node:stream';
 import type { Game } from './game.js';
 import { GameServer, type GameServerOptions } from './server.js';
-import { CloseCode, type Connection, type Delivery, type Listener } from './transport.js';
+import { CloseCode, closeReason, type Connection, type Delivery, type Listener } from './transport.js';
 
 /** Options of {@link listenWebSocket}. */
 export interface WebSocketServerOptions {
@@ -97,7 +97,7 @@ class SocketConnection implements Connection {
 
   close(code: number = CloseCode.normal, reason = ''): void {
     if (this.closed) return;
-    const text = Buffer.from(reason.slice(0, 120)),
+    const text = Buffer.from(closeReason(reason)),
       payload = Buffer.allocUnsafe(2 + text.length);
     payload.writeUInt16BE(code === 1005 || code === 1006 ? 1000 : code, 0);
     text.copy(payload, 2);
@@ -137,7 +137,8 @@ class SocketConnection implements Connection {
       }
       const control = opcode >= 8;
       if (control && (length > 125 || !fin)) return this.close(1002, 'bad control frame');
-      if (length > this.options.maxPayload || this.fragmentBytes + length > this.options.maxPayload)
+      // The size limit is on messages: a control frame (at most 125 bytes) may sit between fragments and never counts.
+      if (!control && (length > this.options.maxPayload || this.fragmentBytes + length > this.options.maxPayload))
         return this.close(1009, 'message too big');
       if (b.length < at + 4 + length) return;
       const mask = b.subarray(at, at + 4),

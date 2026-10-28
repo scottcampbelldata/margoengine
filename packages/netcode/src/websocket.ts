@@ -1,7 +1,7 @@
 // A Connection over a WebSocket (browsers, Deno, Bun and Node 22+ all have the standard WebSocket class). A WebSocket
 // is a reliable ordered stream, so 'unreliable' messages are sent reliably too; for real unreliable delivery in a
 // browser use the WebRTC transport.
-import { CloseCode, fault, type Connection, type Delivery } from './transport.js';
+import { CloseCode, closeReason, fault, type Connection, type Delivery } from './transport.js';
 
 /** Options of {@link openWebSocket}. */
 export interface OpenWebSocketOptions {
@@ -48,8 +48,8 @@ class WebSocketConnection implements Connection {
   }
   close(code: number = CloseCode.normal, reason = ''): void {
     if (this.closed) return;
-    // The WebSocket API accepts 1000 and 3000 to 4999 from applications.
-    this.socket.close(code === 1000 || (code >= 3000 && code <= 4999) ? code : 1000, reason.slice(0, 120));
+    // The WebSocket API accepts 1000 and 3000 to 4999 from applications, and a reason of at most 123 UTF-8 bytes.
+    this.socket.close(code === 1000 || (code >= 3000 && code <= 4999) ? code : 1000, closeReason(reason));
     this.finish(code, reason);
   }
   private finish(code: number, reason: string): void {

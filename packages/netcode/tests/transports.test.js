@@ -99,6 +99,44 @@ test('the WebSocket server follows RFC 6455: accept key, masking, binary only, s
   );
 });
 
+// Bug 49: maxPayload limits messages, so a ping between fragments does not count; a close reason is cut by UTF-8
+// bytes on a character boundary, so the close frame stays within the 125 bytes a control frame may hold.
+test('the WebSocket server: control frames are outside maxPayload; close reasons fit a control frame', async (t) => {
+  const listener = await listenWebSocket({ maxPayload: 16 });
+  t.after(() => listener.close());
+  const got = [];
+  listener.onconnection = (connection) => {
+    connection.onmessage = (data) => got.push([...data]);
+  };
+  const reply = await raw(listener.port, upgrade(), [
+    masked(2, new Array(10).fill(1), { fin: false }),
+    masked(9, new Array(10).fill(7)),
+    masked(0, new Array(6).fill(2)),
+  ]);
+  assert.deepEqual(got, [[...new Array(10).fill(1), ...new Array(6).fill(2)]], '16 bytes of message arrive whole');
+  const frames = reply.subarray(reply.indexOf('\r\n\r\n') + 4);
+  assert.deepEqual([...frames.subarray(0, 12)], [0x8a, 10, ...new Array(10).fill(7)], 'the ping got its pong');
+  // 2 + 3 x 60 bytes of reason: cut to 'ab' and 40 euro signs (122 bytes), never inside a character.
+  listener.onconnection = (connection) => connection.close(CloseCode.protocol, `ab${'€'.repeat(60)}`);
+  const closing = await raw(listener.port, upgrade());
+  const frame = closing.subarray(closing.indexOf('\r\n\r\n') + 4);
+  assert.equal(frame[0], 0x88);
+  assert.ok(frame[1] <= 125, `close payload is ${frame[1]} bytes`);
+  assert.equal(frame.readUInt16BE(2), CloseCode.protocol);
+  assert.equal(frame.subarray(4, 2 + frame[1]).toString('utf8'), `ab${'€'.repeat(40)}`);
+});
+
+test('openWebSocket: a long multibyte close reason is cut to 123 UTF-8 bytes instead of throwing', async (t) => {
+  const listener = await listenWebSocket();
+  t.after(() => listener.close());
+  const heard = new Promise((done) => {
+    listener.onconnection = (connection) => (connection.onclose = (code, reason) => done([code, reason]));
+  });
+  const connection = await openWebSocket(`ws://127.0.0.1:${listener.port}`);
+  connection.close(CloseCode.protocol, 'é'.repeat(100));
+  assert.deepEqual(await heard, [CloseCode.protocol, 'é'.repeat(61)]);
+});
+
 test('openWebSocket rejects with a coded error when nothing listens, and honours an AbortSignal', async () => {
   const listener = await listenWebSocket();
   const port = listener.port;
