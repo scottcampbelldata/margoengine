@@ -597,3 +597,15 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
 - **Accepted differences.** WebGL2 cannot read compressed texels back or attach them: `copyTextureToBuffer`,
   `copyTextureToTexture` and sRGB views of a compressed texture (which the layer would copy) are refused with
   MargoError code `unsupported`.
+
+## Per-target blend states without OES_draw_buffers_indexed (M3, second part, 2026-10-28)
+
+- WebGL2 alone has one blend state and one colour write mask for all draw buffers; `OES_draw_buffers_indexed` sets
+  them per target, and ANGLE's OpenGL back end lacks it on some GPUs (the AMD one here). A pipeline whose colour
+  targets differ in blend state or write mask now draws once per group of targets with the same state, with only that
+  group's draw buffers on (before, target 0's state applied to all of them). The features check runs such a pipeline
+  (one target blended additively, one written in red only) on a device whose context hides the extension and compares
+  it with native WebGPU.
+- **Accepted difference.** Such a pipeline with depth writes or stencil writes is refused with MargoError code
+  `unsupported`: the draws after the first would test against the depth and stencil the first one wrote. Weighted
+  blended OIT, the known case, writes no depth in its accumulation pass.

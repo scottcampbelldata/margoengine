@@ -3621,8 +3621,10 @@ What it does:
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
   `mapAsync` with fenced readbacks, error scopes, `uncapturederror` and `device.lost`. Texture views GL has no view
   for (an sRGB view of a unorm texture, a 2D view of an array layer, a cube view of 6 array layers, an array view of a
-  cube) read a copy that is brought up to date before each use; a square 6-layer texture is a cube map. Readbacks
-  cover every copyable format, depth, stencil, packed and snorm included; occlusion queries, render bundles and
+  cube) read a copy that is brought up to date before each use; a square 6-layer texture is a cube map. Compressed
+  BC, ETC2 and ASTC textures are written with `writeTexture` where the browser's WebGL2 has their extensions (the
+  adapter reports only those features); WebGL2 cannot read them back. Readbacks cover every other copyable format,
+  depth, stencil, packed and snorm included; occlusion queries, render bundles and
   external textures (each video frame is copied: WebGL2 has no zero-copy video) work. The adapter reports
   `info.vendor === 'margo-webgl2'`. Clip space keeps WebGPU's z range through `EXT_clip_control`, and rendering is
   flipped in y so every texture keeps WebGPU's top-left origin; the canvas present flips it back.
@@ -3633,9 +3635,7 @@ What it does:
   WGSL rather than GLSL's undefined cases. Storage buffers read in vertex and fragment shaders (WebGL2 has none) are
   read from an RGBA32UI data texture, one 16-byte row per texel, in WGSL's layout; reads are clamped into the binding
   and `arrayLength` comes from its size. The device mirrors each buffer into its data texture on the GPU when the
-  contents change, and the storage bindings of a bind group share one texture, so a pipeline spends one texture unit
-  per group on them. `textureGather` and `textureGatherCompare`, which GLSL ES 3.00 lacks, fetch
-  the four texels by hand with th
+  contents change, and the storage bindings of
 
 [README continues: https://margoengine.com/llms/packages/webgl2-compat.md]
 

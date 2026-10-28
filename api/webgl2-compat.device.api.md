@@ -337,6 +337,7 @@ export class CompatRenderPipeline {
         modes: Map<WebGLUniformLocation, string>;
         info: Map<WebGLUniformLocation, string>;
     };
+    readonly splits: number[][] | null;
     onDraw: (() => void) | null;
     constructor(device: CompatDevice, descriptor: GPURenderPipelineDescriptor, deferLink?: boolean, prebuilt?: GLSLProgram);
     whenLinked(): Promise<void>;
@@ -1051,6 +1052,7 @@ interface Extensions {
     readonly lose: {
         loseContext(): void;
     } | null;
+    readonly compressed: readonly Readonly<Record<string, unknown>>[];
 }
 
 interface FormatInfo {
@@ -1067,6 +1069,12 @@ interface FormatInfo {
     readonly bgra?: boolean;
     readonly channelBytes: number;
     readonly extension?: string;
+    readonly block?: {
+        readonly w: number;
+        readonly h: number;
+        readonly bytes: number;
+        readonly feature: string;
+    };
 }
 
 type FormatKind = 'float' | 'sint' | 'uint' | 'depth' | 'depth-stencil' | 'stencil';

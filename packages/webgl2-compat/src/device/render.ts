@@ -110,6 +110,15 @@ interface TargetState {
   readonly writeMask: number;
 }
 
+/** The blend and write-mask state of a colour target as one string ('' blend for none). */
+function targetKey(t: TargetState | null): string {
+  const b = t?.blend;
+  const blend = b
+    ? `${b.color.operation ?? 'add'},${b.color.srcFactor ?? 'one'},${b.color.dstFactor ?? 'zero'},${b.alpha.operation ?? 'add'},${b.alpha.srcFactor ?? 'one'},${b.alpha.dstFactor ?? 'zero'}`
+    : '';
+  return `${blend}|${t?.writeMask ?? 0}`;
+}
+
 /** A GPURenderPipeline: a linked program, its vertex layout and VAO, its fixed-function state and its binding table. */
 export class CompatRenderPipeline {
   label: string;
@@ -143,6 +152,12 @@ export class CompatRenderPipeline {
     modes: new Map<WebGLUniformLocation, string>(),
     info: new Map<WebGLUniformLocation, string>(),
   };
+  /**
+   * Without OES_draw_buffers_indexed (ANGLE's OpenGL back end), WebGL2 has one blend state and one write mask for
+   * all colour targets: a pipeline whose targets differ draws once per group of targets with the same state, each
+   * time with only that group's draw buffers on. Null when one draw does.
+   */
+  readonly splits: number[][] | null = null;
   /** @internal Sets per-draw uniforms of a program the device built itself (the compute tiers). */
   onDraw: (() => void) | null = null;
   private linked = false;
@@ -169,6 +184,32 @@ export class CompatRenderPipeline {
     this.targets = [...(descriptor.fragment?.targets ?? [])].map((t) =>
       t ? { blend: t.blend, writeMask: t.writeMask ?? 0xf } : null,
     );
+    if (!device.ext.indexed) {
+      const groups = new Map<string, number[]>();
+      this.targets.forEach((t, i) => {
+        if (!t) return;
+        const key = targetKey(t);
+        groups.set(key, [...(groups.get(key) ?? []), i]);
+      });
+      if (groups.size > 1) {
+        // Each draw after the first must see the depth and stencil the first one saw.
+        const ds = descriptor.depthStencil,
+          stencilWrites =
+            !!ds &&
+            (ds.stencilWriteMask ?? 0xffffffff) !== 0 &&
+            [ds.stencilFront, ds.stencilBack].some(
+              (f) =>
+                (f?.passOp ?? 'keep') !== 'keep' ||
+                (f?.failOp ?? 'keep') !== 'keep' ||
+                (f?.depthFailOp ?? 'keep') !== 'keep',
+            );
+        if (ds?.depthWriteEnabled || stencilWrites)
+          throw device.unsupported(
+            "colour targets with different blend states or write masks together with depth or stencil writes (this WebGL2 has no OES_draw_buffers_indexed, so the layer draws once per target state, and later draws would see the first one's depth and stencil)",
+          );
+        this.splits = [...groups.values()];
+      }
+    }
     const vertexModule = descriptor.vertex.module as unknown as CompatShaderModule,
       fragmentModule = descriptor.fragment?.module as unknown as CompatShaderModule | undefined;
     const explicit = descriptor.layout !== 'auto' ? (descriptor.layout as unknown as CompatPipelineLayout) : null;
@@ -1355,7 +1396,7 @@ export class Replayer {
     this.applyTargets(p);
   }
 
-  private applyTargets(p: CompatRenderPipeline): void {
+  private applyTargets(p: CompatRenderPipeline, only?: number): void {
     const gl = this.gl,
       s = this.device.state,
       indexed = this.device.ext.indexed;
@@ -1402,8 +1443,8 @@ export class Replayer {
       });
     };
     if (uniform || !indexed) {
-      // The GL-wide state: identical targets, or no OES_draw_buffers_indexed (then target 0 decides for all).
-      if (states.length) apply(null, states[0]);
+      // The GL-wide state: identical targets, or (without OES_draw_buffers_indexed) the group a split draw draws.
+      if (states.length) apply(null, states[only ?? 0]);
       for (let i = 0; i < 8; i++) {
         s.forget(`colorMask${i}`);
         s.forget(`blend${i}`);
@@ -1619,7 +1660,25 @@ export class Replayer {
   draw(count: number, instances: number, first: number, firstInstance: number): void {
     if (!count || !instances) return;
     const p = this.ready(0, firstInstance);
-    if (p) this.gl.drawArraysInstanced(p.mode, first, count, instances);
+    if (p) this.split(p, () => this.gl.drawArraysInstanced(p.mode, first, count, instances));
+  }
+
+  /** Runs a draw once, or once per target group of a split pipeline (see CompatRenderPipeline.splits). */
+  private split(p: CompatRenderPipeline, run: () => void): void {
+    const pass = this.pass;
+    if (!p.splits || !pass) {
+      run();
+      return;
+    }
+    const gl = this.gl;
+    const all = pass.desc.colors.map((c, i) => (c ? gl.COLOR_ATTACHMENT0 + i : gl.NONE));
+    for (const group of p.splits) {
+      gl.drawBuffers(all.map((b, i) => (group.includes(i) ? b : gl.NONE)));
+      this.applyTargets(p, group[0]);
+      run();
+    }
+    gl.drawBuffers(all);
+    pass.applied = null;
   }
 
   drawIndexed(count: number, instances: number, firstIndex: number, baseVertex: number, firstInstance: number): void {
@@ -1635,7 +1694,9 @@ export class Replayer {
       this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, index.buffer.element);
       p.cache.element = index.buffer.id;
     }
-    this.gl.drawElementsInstanced(p.mode, count, index.type, index.offset + firstIndex * index.size, instances);
+    this.split(p, () =>
+      this.gl.drawElementsInstanced(p.mode, count, index.type, index.offset + firstIndex * index.size, instances),
+    );
   }
 
   // ------------------------------------------------ helper draws

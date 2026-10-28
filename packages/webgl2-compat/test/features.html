@@ -75,7 +75,63 @@ function clearView(device, view, clearValue) {
   device.queue.submit([e.finish()]);
 }
 
+/** A layer device whose WebGL2 hides OES_draw_buffers_indexed (as ANGLE's OpenGL back end on some GPUs). */
+async function unindexed() {
+  const gpu = createCompatGPU({
+    createContext: (attributes) => {
+      const gl = new OffscreenCanvas(1, 1).getContext('webgl2', attributes);
+      const get = gl.getExtension.bind(gl);
+      gl.getExtension = (name) => (name === 'OES_draw_buffers_indexed' ? null : get(name));
+      return gl;
+    },
+  });
+  return (await gpu.requestAdapter()).requestDevice();
+}
+
+/** Two colour targets, one blended additively and one written in red only, from one draw. */
+async function twoTargets(device, depthWrites = false) {
+  const module = device.createShaderModule({
+    code: `${FULL}
+struct O { @location(0) a: vec4f, @location(1) b: vec4f }
+@fragment fn f() -> O { return O(vec4f(0.5), vec4f(0.5, 0.75, 1.0, 1.0)); }`,
+  });
+  const pipeline = device.createRenderPipeline({
+    layout: 'auto',
+    vertex: { module, entryPoint: 'v' },
+    fragment: {
+      module,
+      entryPoint: 'f',
+      targets: [
+        { format: 'rgba8unorm', blend: { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } } },
+        { format: 'rgba8unorm', writeMask: 1 },
+      ],
+    },
+    depthStencil: depthWrites ? { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'always' } : undefined,
+  });
+  const targets = [0, 1].map(() => device.createTexture({ size: [4, 1], format: 'rgba8unorm', usage: U.RENDER_ATTACHMENT | U.COPY_SRC }));
+  const e = device.createCommandEncoder();
+  const pass = e.beginRenderPass({ colorAttachments: targets.map((t) => ({ view: t.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0.25, 0.25, 0.25, 0.25] })) });
+  pass.setPipeline(pipeline);
+  pass.draw(3);
+  pass.end();
+  device.queue.submit([e.finish()]);
+  return Promise.all(targets.map(async (t) => [...(await read(device, t, { bytes: 4 }))].slice(0, 4)));
+}
+
 const cases = {
+  /**
+   * Targets with different blend states and write masks on a WebGL2 without OES_draw_buffers_indexed (the layer
+   * draws once per target state there; before, target 0's state applied to every target).
+   */
+  async blendSplit(device) {
+    if (!device.gl) return { targets: await twoTargets(device) };
+    const plain = await unindexed();
+    try {
+      return { targets: await twoTargets(plain) };
+    } finally {
+      plain.destroy();
+    }
+  },
   /** BC1 and BC4 blocks written with writeTexture (two mip levels) and read back by textureLoad. */
   async compressed(device) {
     if (!device.features.has('texture-compression-bc')) return { missing: 'texture-compression-bc' };
@@ -669,6 +725,18 @@ async function run(device, name) {
 
 let native, compat;
 window.check = {
+  /** Compat only: such targets with depth writes are refused, coded (a second draw would see the first one's depth). */
+  async blendRefusal() {
+    const plain = await unindexed();
+    try {
+      await twoTargets(plain, true);
+      return 'no error';
+    } catch (e) {
+      return `${e.name} ${e.code}: ${e.message}`;
+    } finally {
+      plain.destroy();
+    }
+  },
   names: () => Object.keys(cases),
   async run(name) {
     if (!native) {

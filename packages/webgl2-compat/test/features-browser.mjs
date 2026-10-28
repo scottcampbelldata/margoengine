@@ -57,6 +57,15 @@ try {
     lines.push(`${name}: same as native`);
     // Each case must test something: a few known values, so an empty or all-zero result on both sides fails.
     const r = compat.result;
+    if (name === 'blendSplit')
+      assert.deepEqual(
+        r.targets,
+        [
+          [191, 191, 191, 191],
+          [127, 64, 64, 64],
+        ],
+        'each target keeps its own state',
+      );
     if (name === 'compressed' && !r.missing)
       assert.deepEqual(r.pixels.slice(0, 4), [1, 0, 0, 1], 'BC1 colour 0 is red');
     if (name === 'mipViews')
@@ -97,6 +106,12 @@ try {
       assert.deepEqual(r.both.slice(4, 8), [1, 0, 0, 1], 'a copy made for one binding left the other units alone');
     }
   }
+  const refusal = await page.evaluate(() => window.check.blendRefusal());
+  assert.match(
+    refusal,
+    /^MargoError unsupported: .*different blend states/,
+    'per-target states with depth writes are refused, coded',
+  );
   assert.deepEqual(pageErrors, []);
   console.log(`webgl2-compat features (WebGL2 layer vs native WebGPU, same GPU):\n  ${lines.join('\n  ')}`);
 } finally {
