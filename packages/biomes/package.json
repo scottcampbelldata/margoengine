@@ -58,6 +58,10 @@
       "types": "./dist/view.d.ts",
       "import": "./dist/view.js"
     },
+    "./objects": {
+      "types": "./dist/objects.d.ts",
+      "import": "./dist/objects.js"
+    },
     "./editor": {
       "types": "./dist/editor.d.ts",
       "import": "./dist/editor.js"
@@ -81,13 +85,21 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/terrain": "^1.0.0"
+    "@margoengine/terrain": "^1.0.0",
+    "@margoengine/scatter": "^1.0.0",
+    "@margoengine/procedural": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {
       "optional": true
     },
     "@margoengine/terrain": {
+      "optional": true
+    },
+    "@margoengine/scatter": {
+      "optional": true
+    },
+    "@margoengine/procedural": {
       "optional": true
     }
   },
@@ -98,6 +110,6 @@
     "build": "node ../../scripts/build-optional.js biomes",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs"
+    "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs && node packages/biomes/tests/objects-check.mjs"
   }
 }

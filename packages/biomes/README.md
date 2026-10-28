@@ -7,14 +7,14 @@ work today (run in a clone, or install local tarballs).
 A biome map turns a heightmap and a few climate settings into tiled layers: climate fields, biome weights and masks
 that terrain, scatter and a terrain editor read. This package is optional and tree-shakable and adds 0 bytes to core
 and the stage. It is built in milestones: this release has the integer foundation, climate fields, biome classification with
-presets, a terrain view, editor hooks and the placement of trees, shrubs, rocks and props; drawing them through
-scatter comes next.
+presets, a terrain view, editor hooks and the placement of trees, shrubs, rocks and props; drawn through scatter
+by the view.
 
 Entries, each loaded only when used: the root (`BiomeWorld`, fields, classification), `/presets` (eight biomes, their
 worlds and the reference world `R16`), `/relief` (the procedural landscape; `BiomeWorld.create` loads it only for a
 relief height, the default), `/digest` (canonical bytes and SHA-256, loaded by `world.digest`), `/zones` (Whittaker and
 Holdridge classifiers), `/koppen` (Koppen-Geiger labels), `/toolkit` (the integer helpers), `/placement` (stored objects), `/stats`
-(point-pattern statistics), `/view` and `/editor`. The
+(point-pattern statistics), `/view`, `/objects` (stored objects and detail drawn through scatter) and `/editor`. The
 lazily loaded ones come through the package name, so an app holds one copy of each module.
 
 ## A world in three lines
@@ -207,6 +207,20 @@ slope, height, moisture and curvature rules; `groundWeights(world, tile, materia
 
 WebGPU only. Tiles are made on the page's thread for now (about 42 ms each; the worker pool is a later milestone),
 with a pause between tiles so frames keep drawing.
+
+### Trees, rocks and grass on the terrain
+
+By default a `BiomeView` also draws the world's stored objects and detail: it attaches a `BiomePlacement` and a
+`BiomeObjects` (entry `@margoengine/biomes/objects`), which streams each tile's records into one
+`@margoengine/scatter/tiles` per species mesh (dead trees as snags) and draws every detail species (grass, ferns,
+reeds) with a camera-following scatter whose density map is the placement's. Meshes are the `procedural:<name>` keys
+of the presets, from `@margoengine/procedural`. Pass `objects: false` for terrain alone. `view.objects` is that
+`BiomeObjects` (`count` objects on the GPU, `gpuBytes`, `dropped`).
+
+| `BiomeView.attach` option | Default | Meaning |
+| --- | --- | --- |
+| `objects` | true | draw stored objects and detail |
+| `detailRadius` | 120 | metres around the camera with grass and ferns |
 
 ## Trees, shrubs, rocks and props
 

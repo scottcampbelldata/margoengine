@@ -52,6 +52,11 @@ export interface BiomeViewOptions {
   readonly clipmap?: { readonly cellSize?: number; readonly resolution?: number; readonly levels?: number };
   /** Rejects `attach` and stops streaming when aborted. */
   readonly signal?: AbortSignal;
+  /** Draws the stored objects (trees, shrubs, rocks) and the detail (grass, ferns) of the world's biomes through
+   * scatter. Default true. */
+  readonly objects?: boolean;
+  /** Detail is drawn within this distance of the camera. Default 120 m. */
+  readonly detailRadius?: number;
 }
 
 /** Ground material keys of a biome list in first-use order, at most 8 (the terrain's layer limit). */
@@ -249,6 +254,7 @@ export class BiomeView implements Disposable {
   #textures?: { device: GPUDevice; height: GPUTexture; weights: [GPUTexture, GPUTexture] };
   #queue: Promise<void> = Promise.resolve();
   #off: () => void;
+  #objects?: import('@margoengine/biomes/objects').BiomeObjects;
   #disposed = false;
 
   private constructor(
@@ -338,7 +344,27 @@ export class BiomeView implements Disposable {
     const terrainModule = await import('@margoengine/terrain');
     if (options.signal?.aborted) throw options.signal.reason;
     const limit = (engine as unknown as { gpu?: GPUDevice }).gpu?.limits.maxTextureDimension2D ?? 8192;
-    return new BiomeView(engine, world, options, terrainModule, limit);
+    const view = new BiomeView(engine, world, options, terrainModule, limit);
+    if (options.objects ?? true) {
+      // Placement and its drawing are their own entries, loaded only for a view that draws objects.
+      const [{ BiomePlacement }, { BiomeObjects }] = await Promise.all([
+          import('@margoengine/biomes/placement'),
+          import('@margoengine/biomes/objects'),
+        ]),
+        t = view.textureResolution / 2,
+        [x0, z0, x1, z1] = world.bounds;
+      view.#objects = await BiomeObjects.attach(engine, BiomePlacement.attach(world), {
+        heightmap: () => view.#textures?.height,
+        // Height texels sit on the world's grid corners: the rectangle their centres cover is half a texel wider.
+        bounds: [x0 - t, z0 - t, x1 + t, z1 + t],
+        radius: options.radius ?? 1000,
+        detailRadius: options.detailRadius ?? 120,
+        detailResolution: view.textureResolution,
+      });
+      // Ready once the tiles around the camera are drawn with their objects.
+      (view as { ready: Promise<void> }).ready = view.#enqueue(view.#around());
+    }
+    return view;
   }
 
   /** The world rectangle around the camera that is drawn at full detail. */
@@ -411,6 +437,10 @@ export class BiomeView implements Disposable {
     for await (const tile of this.#world.tiles(rect, { focus: [p[0], p[2]], signal: this.#signal })) {
       if (this.#disposed || this.#signal?.aborted) return;
       this.#writeTile(tile);
+      if (this.#objects)
+        await this.#objects.stream([tile.origin[0], tile.origin[1], tile.origin[0] + 1, tile.origin[1] + 1], {
+          signal: this.#signal,
+        });
       // Let frames render between tiles (tiles are made on this thread until the worker pool of B7).
       await new Promise((done) => setTimeout(done, 0));
     }
@@ -461,6 +491,11 @@ export class BiomeView implements Disposable {
     (this.terrain as Terrain | undefined)?.invalidate();
   }
 
+  /** The stored objects and detail the view draws (`count`, `gpuBytes`, `dropped`), or undefined with `objects: false`. */
+  get objects(): import('@margoengine/biomes/objects').BiomeObjects | undefined {
+    return this.#objects;
+  }
+
   /** Resolves when every queued tile (the first ring and every dirty rectangle so far) is in the textures. */
   whenIdle(): Promise<void> {
     return this.#queue;
@@ -472,6 +507,7 @@ export class BiomeView implements Disposable {
     this.#disposed = true;
     this.#off();
     this.terrain.dispose();
+    this.#objects?.dispose();
     this.#textures = undefined;
   }
 

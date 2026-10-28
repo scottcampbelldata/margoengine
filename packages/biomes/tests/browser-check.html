@@ -26,7 +26,7 @@ window.check={
  async run(){
   const out={};device.pushErrorScope('validation');
   const world=await BiomeWorld.create({size:[512,512],biomes:[presets.temperate,presets.desert],height:{field:(x,z)=>40+3*Math.sin(x/37)*Math.cos(z/41)},climate:{latitude:47,rainfall:1000}});
-  const view=await BiomeView.attach(engine,world,{radius:600});
+  const view=await BiomeView.attach(engine,world,{radius:600,objects:false});
   await view.ready;
   out.materials=view.materials;
   out.before=mean(await shot());

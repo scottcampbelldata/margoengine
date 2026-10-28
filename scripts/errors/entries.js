@@ -463,6 +463,8 @@ export const entries = [
     title: '@margoengine/biomes: biome worlds, climate fields and editing',
     kind: 'family',
     messages: [
+      'BiomeObjects.attach takes an engine and a BiomePlacement',
+      'BiomeObjects needs a heightmap function and the bounds [minX, minZ, maxX, maxZ] it covers',
       'A reverse-j size needs q in 1..10 (above 1) and max in 0.5..8',
       'A weibull size needs shape in 0.5..10 and scale in 0..4 (above 0)',
       "A size distribution kind is 'reverse-j' or 'weibull'",

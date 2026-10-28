@@ -10,6 +10,16 @@ export {
   contactAO,
   radialAO,
 } from './foliage.js';
+export {
+  generateAcaciaMesh,
+  generateBirchMesh,
+  generateCactusMesh,
+  generatePalmMesh,
+  generateReedMesh,
+  generateSnagMesh,
+  generateTundraShrubMesh,
+  type TreeMesh,
+} from './plants.js';
 export { generateCabinMesh, ROOF_PITCH, type HeightField } from './cabin.js';
 export { createHumanoid, poseHumanoid } from './humanoid.js';
 /** Scalar field sampled by `marchingCubes` at world position (x, y, z); must return finite values. */

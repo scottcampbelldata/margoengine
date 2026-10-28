@@ -34,6 +34,10 @@ The sandbox supplies phase/speed from the shared controls module.
 across split vertices while preserving UV seams and tangent frames.
 `generateFernMesh()` produces seven curved, tapered ribbon fronds; use a
 double-sided material. Both return `GeometryData` and are deterministic.
+For the biome presets there are more plants: `generatePalmMesh()`, `generateBirchMesh()`, `generateAcaciaMesh()` and
+`generateSnagMesh()` (a dead standing tree, empty canopy) return `{ trunk, canopy }` like `generateTreeMesh`, and
+`generateCactusMesh()`, `generateReedMesh(stems = 9)` (double sided) and `generateTundraShrubMesh()` return one
+`GeometryData`; each is rooted at the origin, +Y up, in metres.
 `contactAO(y, groundY)` gives bounded ground-contact occlusion, and
 `radialAO(x,y,z,center,radius)` shades enclosed canopy volumes. Use their output
 with `pbrVertexStream()` from geometry to bake ambient occlusion into vertex alpha

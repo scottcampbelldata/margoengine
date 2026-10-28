@@ -118,6 +118,22 @@ export interface ScatterOptions {
    * the terrain under it instead of speckling (after Wohllaib, GDC 2021); distant blades widen. `{}` uses the defaults.
    */
   blades?: ScatterBlades;
+  /**
+   * World rectangle `[minX, minZ, maxX, maxZ]` that `heightmap` and `densityMap` cover, instead of `area` around
+   * `center` (default: none, the textures cover `area`). Needed with `follow`, whose area moves.
+   */
+  bounds?: readonly [number, number, number, number];
+  /**
+   * Red-channel density texture (0..1) over `bounds` that multiplies `density` per instance, such as a biome detail
+   * map (default: none). Instances outside `bounds` are dropped.
+   */
+  densityMap?: () => GPUTexture | undefined;
+  /**
+   * Keeps the grid around the camera: `center` moves in whole grid cells every frame, and each instance's random
+   * numbers come from its world cell, so instances stay where they are as the camera moves (default off). Needs
+   * `bounds` when a `heightmap` or `densityMap` is given.
+   */
+  follow?: boolean;
 }
 const frame = `
 struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f,blade:vec4f}
@@ -216,6 +232,61 @@ struct ScatterInstance {position:vec4f,rotation:vec4f}
  o.color=material[0].rgb${blades ? '*pose.shade' : ''};o.material=vec4f(material[1].xyz,1);${fade ? 'o.lodFade=data.rotation.zw;' : ''}${blades ? 'o.ground=pose.ground;' : ''}return o;
 }
 `;
+/** Whether the frame carries the world-rectangle fields (follow offsets and bounds). */
+const extended = (o: ScatterOptions) => !!(o.bounds || o.follow || o.densityMap);
+
+function validateWorld(o: ScatterOptions): void {
+  const b = o.bounds;
+  if (
+    b !== undefined &&
+    (!Array.isArray(b) || b.length !== 4 || !b.every(Number.isFinite) || b[2] <= b[0] || b[3] <= b[1])
+  )
+    throw new RangeError('Scatter bounds must be a world rectangle [minX, minZ, maxX, maxZ] with max above min');
+  if (o.densityMap !== undefined && typeof o.densityMap !== 'function')
+    throw new TypeError('Scatter densityMap must be a function returning a GPUTexture');
+  if (o.densityMap && !b) throw new RangeError('Scatter densityMap needs bounds: the world rectangle it covers');
+  if (o.follow && o.heightmap && !b)
+    throw new RangeError('Scatter follow with a heightmap needs bounds: the rectangle it covers');
+}
+
+/**
+ * The distribute shader for a set of options. Without bounds, densityMap and follow it is the original text, byte for
+ * byte; each option rewrites only its own part.
+ */
+export function scatterCullShader(o: ScatterOptions): string {
+  if (!extended(o)) return cull;
+  let code = cull.replace('blade:vec4f}', 'blade:vec4f,offset:vec4f,bounds:vec4f}');
+  if (o.follow)
+    // Random numbers from the world cell (grid cell plus the camera's cell offset), not the instance index.
+    code = code
+      .replace(
+        'let i=id.x;if(i>=frame.ids.x||hash(i*7u+1u)>frame.rules.w){return;}',
+        'let i=id.x;if(i>=frame.ids.x){return;}let key=(bitcast<u32>(i32(i%frame.ids.z)+i32(frame.offset.x))*0x9e3779b1u)^(bitcast<u32>(i32(i/frame.ids.z)+i32(frame.offset.y))*0x85ebca77u);if(hash(key*7u+1u)>frame.rules.w){return;}',
+      )
+      .replaceAll('hash(i*7u+', 'hash(key*7u+');
+  if (o.bounds) {
+    // Height and normal read the textures over the world rectangle at the instance's world position.
+    code = code
+      .replace(
+        'let texel=uv*vec2f(size)-0.5;',
+        'let world=vec2f((uv.x-0.5)*frame.area.x+frame.area.z,(uv.y-0.5)*frame.area.y+frame.area.w);let texel=(world-frame.bounds.xy)/(frame.bounds.zw-frame.bounds.xy)*vec2f(size)-0.5;',
+      )
+      .replace('*f32(size.x)/frame.area.x', '*f32(size.x)/(frame.bounds.z-frame.bounds.x)')
+      .replace('*f32(size.y)/frame.area.y', '*f32(size.y)/(frame.bounds.w-frame.bounds.y)');
+  }
+  if (o.densityMap)
+    code = code
+      .replace(
+        '@group(0) @binding(6) var<storage,read> exclusions:array<vec4f>;',
+        '@group(0) @binding(6) var<storage,read> exclusions:array<vec4f>;\n@group(0) @binding(7) var densityMap:texture_2d<f32>;',
+      )
+      .replace(
+        ' for(var j=0u;j<u32(frame.eye.w);j++){',
+        ` let dm=(p.xz-frame.bounds.xy)/(frame.bounds.zw-frame.bounds.xy);if(any(dm<vec2f(0.0))||any(dm>=vec2f(1.0))){return;}\n if(hash(${o.follow ? 'key' : 'i'}*7u+6u)>=textureLoad(densityMap,vec2i(dm*vec2f(textureDimensions(densityMap))),0).r){return;}\n for(var j=0u;j<u32(frame.eye.w);j++){`,
+      );
+  return code;
+}
+
 const coreNormal = 'let n=normalize(i.normal)*select(-1.0,1.0,facing);';
 let serial = 0;
 /**
@@ -229,24 +300,24 @@ let serial = 0;
  */
 export class Scatter implements EnginePlugin {
   readonly name = 'scatter:' + ++serial;
-  private engine?: Engine;
-  private uniform?: GPUBuffer;
-  private instances: GPUBuffer[] = [];
+  protected engine?: Engine;
+  protected uniform?: GPUBuffer;
+  protected instances: GPUBuffer[] = [];
   private vertices: GPUBuffer[] = [];
   private indices: GPUBuffer[] = [];
-  private commands?: GPUBuffer;
-  private fallback?: GPUTexture;
-  private compute?: GPUComputePipeline;
+  protected commands?: GPUBuffer;
+  protected fallback?: GPUTexture;
+  protected compute?: GPUComputePipeline;
   private pipelines = new Map<string, GPURenderPipeline>();
-  private readonly values = new Float32Array(80);
-  private readonly meta = new Uint32Array(this.values.buffer);
-  private readonly geometries: readonly Geometry[];
+  protected readonly values: Float32Array;
+  protected readonly meta: Uint32Array;
+  protected readonly geometries: readonly Geometry[];
   private disposed = false;
   readonly count: number;
   private readonly materialValues = new Float32Array(20);
   private time = 0;
-  private terrain?: GPUTexture;
-  private computeGroup?: GPUBindGroup;
+  protected terrain?: GPUTexture;
+  protected computeGroup?: GPUBindGroup;
   private readonly renderGroups = new Map<GPURenderPipeline, GPUBindGroup[]>();
   private exclusionBuffer?: GPUBuffer;
   private readonly exclusionValues: Float32Array;
@@ -259,12 +330,15 @@ export class Scatter implements EnginePlugin {
   private readonly presentation = overlayDepthPass();
   private readonly attachment = this.presentation.colorAttachments[0];
   private readonly depthAttachment = this.presentation.depthStencilAttachment;
-  private readonly options: ScatterOptions;
+  protected readonly options: ScatterOptions;
   /** Whether any instance can fade between LOD meshes: shaders keep the dither `discard` only then. */
   private readonly fade: boolean;
   constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input: ScatterOptions = {}) {
     this.options = preset('scatter', input);
     const options = this.options;
+    // The world-rectangle options extend the frame by two vec4s (follow offsets, bounds); without them it is as before.
+    this.values = new Float32Array(extended(options) ? 88 : 80);
+    this.meta = new Uint32Array(this.values.buffer);
     this.geometries = geometry instanceof Geometry ? [geometry, geometry, geometry] : [...geometry];
     const {
       count = 10000,
@@ -329,6 +403,8 @@ export class Scatter implements EnginePlugin {
     if (!Number.isFinite(edgeShrink) || edgeShrink < 0 || edgeShrink > 100000)
       throw new RangeError('Scatter edgeShrink must be a distance from 0 to 100000');
     if (options.wind) validateWind(options.wind);
+    validateWorld(options);
+    if (options.bounds) this.values.set(options.bounds, 84);
     const exclusions = options.exclusions ?? [];
     validateExclusions(exclusions);
     this.exclusionValues = new Float32Array(Math.max(1, exclusions.length) * 4);
@@ -404,7 +480,7 @@ export class Scatter implements EnginePlugin {
     const d = engine.gpu;
     this.engine = engine;
     if (
-      Math.max(this.count * 32, this.exclusionValues.byteLength) >
+      Math.max(this.ringCapacity() * 32, this.exclusionValues.byteLength) >
         Math.min(d.limits.maxStorageBufferBindingSize, d.limits.maxBufferSize) ||
       Math.ceil(this.count / 64) > d.limits.maxComputeWorkgroupsPerDimension
     )
@@ -440,7 +516,7 @@ export class Scatter implements EnginePlugin {
       this.indices.push(index);
       d.queue.writeBuffer(v, 0, g.vertices as Float32Array<ArrayBuffer>);
       d.queue.writeBuffer(index, 0, g.indices as Uint32Array<ArrayBuffer>);
-      this.instances.push(d.createBuffer({ size: this.count * 32, usage: GPUBufferUsage.STORAGE }));
+      this.instances.push(d.createBuffer({ size: this.ringCapacity() * 32, usage: GPUBufferUsage.STORAGE }));
     }
     d.queue.writeBuffer(this.commands, 0, commands);
     this.fallback = d.createTexture({
@@ -449,7 +525,7 @@ export class Scatter implements EnginePlugin {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     d.queue.writeTexture({ texture: this.fallback }, new Float32Array(1), { bytesPerRow: 4 }, [1, 1]);
-    this.compute = compute(d, cull);
+    this.compute = compute(d, this.cullCode());
   }
   onPreUpdate(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0)
@@ -477,23 +553,30 @@ export class Scatter implements EnginePlugin {
           this.values[70] = wind[2];
         }
         this.values[71] = this.time;
+        if (this.options.follow) this.followCamera(c.camera.position);
+        this.beforeDistribute(c);
         this.values.set(c.camera.matrix);
         this.values.set(c.camera.position, 16);
         this.values.set(c.camera.planes, 44);
         this.values[43] = +(c.format === 'rgba16float');
         c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
         for (let i = 0; i < 3; i++) c.encoder.clearBuffer(this.commands!, i * 20 + 4, 4);
-        if (this.terrain !== terrain || !this.computeGroup) {
+        const density = this.options.densityMap ? (this.options.densityMap() ?? this.fallback!) : undefined;
+        if (this.terrain !== terrain || this.densityTexture !== density || this.extraChanged || !this.computeGroup) {
           this.computeGroup = group(c.device, this.compute!, [
             { buffer: this.uniform! },
             terrain.createView(),
             ...this.instances.map((buffer) => ({ buffer })),
             { buffer: this.commands! },
             { buffer: this.exclusionBuffer! },
+            ...(density ? [density.createView()] : []),
+            ...this.extraEntries(),
           ]);
           this.terrain = terrain;
+          this.densityTexture = density;
+          this.extraChanged = false;
         }
-        dispatch(c, this.compute!, this.computeGroup, Math.ceil(this.count / 64));
+        dispatch(c, this.compute!, this.computeGroup, Math.ceil(this.dispatched() / 64));
       },
     });
     graph.add({
@@ -504,6 +587,42 @@ export class Scatter implements EnginePlugin {
       },
     });
   }
+  /** The distribute (cull) shader: the stratified grid, with the world-rectangle variants when they are set. */
+  protected cullCode(): string {
+    return scatterCullShader(this.options);
+  }
+
+  /** Extra compute bindings after the built-in ones (the tiles entry adds its records). */
+  protected extraEntries(): ({ buffer: GPUBuffer } | GPUTextureView)[] {
+    return [];
+  }
+
+  /** Set when `extraEntries` changed and the compute bind group must be made again. */
+  protected extraChanged = false;
+  private densityTexture?: GPUTexture;
+
+  /** Threads of the distribute pass. */
+  protected dispatched(): number {
+    return this.count;
+  }
+
+  /** Runs before the frame values are uploaded (the tiles entry uploads new tiles here). */
+  protected beforeDistribute(_c: ScatterPassContext): void {}
+
+  /** Moves `center` to the camera in whole grid cells and stores the cell offset for the world-cell hashes. */
+  private followCamera(eye: ArrayLike<number>): void {
+    const columns = this.meta[38],
+      rows = Math.ceil(this.count / columns),
+      cellX = this.values[20] / columns,
+      cellZ = this.values[21] / rows,
+      ox = Math.floor(eye[0] / cellX) - Math.floor(columns / 2),
+      oz = Math.floor(eye[2] / cellZ) - Math.floor(rows / 2);
+    this.values[22] = (ox + columns / 2) * cellX;
+    this.values[23] = (oz + rows / 2) * cellZ;
+    this.values[80] = ox;
+    this.values[81] = oz;
+  }
+
   private draw(c: ScatterPassContext): void {
     const lit = !!this.options.material;
     if (lit) {
@@ -641,7 +760,12 @@ export class Scatter implements EnginePlugin {
     }
     pass.end();
   }
-  private release(): void {
+  /** Instances each LOD ring can hold: every candidate for the grid. */
+  protected ringCapacity(): number {
+    return this.count;
+  }
+
+  protected release(): void {
     for (const b of [...this.instances, ...this.vertices, ...this.indices]) b.destroy();
     this.instances = [];
     this.vertices = [];

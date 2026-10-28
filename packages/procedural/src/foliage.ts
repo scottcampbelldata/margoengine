@@ -10,7 +10,7 @@ import {
   type GeometryData,
 } from '@margoengine/geometry/utils';
 
-function placed(
+export function placed(
   data: GeometryData,
   x: number,
   y: number,
@@ -68,7 +68,7 @@ function lump(x: number, y: number, z: number): number {
   return radius;
 }
 
-function perturb(data: GeometryData): GeometryData {
+export function perturb(data: GeometryData): GeometryData {
   for (let i = 0; i < data.positions.length; i += 3) {
     const radius = lump(data.positions[i], data.positions[i + 1], data.positions[i + 2]);
     data.positions[i] *= radius;

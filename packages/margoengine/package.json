@@ -111,6 +111,10 @@
       "types": "./dist/biomes/view.d.ts",
       "import": "./dist/biomes/view.js"
     },
+    "./biomes/objects": {
+      "types": "./dist/biomes/objects.d.ts",
+      "import": "./dist/biomes/objects.js"
+    },
     "./biomes/editor": {
       "types": "./dist/biomes/editor.d.ts",
       "import": "./dist/biomes/editor.js"
@@ -1118,6 +1122,10 @@
     "./scatter": {
       "types": "./dist/scatter.d.ts",
       "import": "./dist/scatter.js"
+    },
+    "./scatter/tiles": {
+      "types": "./dist/scatter/tiles.d.ts",
+      "import": "./dist/scatter/tiles.js"
     },
     "./scenery": {
       "types": "./dist/scenery.d.ts",

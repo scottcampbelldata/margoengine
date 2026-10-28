@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3987484,
+  "total": 3994405,
   "history": [
     {
       "date": "2026-10-24",
@@ -776,6 +776,12 @@
       "commit": "17c9ac2b",
       "reason": "netcode rooms limits (bug 50): join timeout, connection and room caps, per-client message token bucket, and timer errors that stop their room instead of throwing uncaught",
       "grew": 1
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "b3291ad1",
+      "reason": "biomes B6: scatter gains bounds, densityMap and follow (WGSL variants only when set, the default shader pinned byte for byte) and the /tiles entry for stored 8-byte records; procedural gains seven preset plant generators; biomes /objects draws a placement through them",
+      "grew": 4
     }
   ],
   "items": {
@@ -793,6 +799,7 @@
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/koppen": 1231,
+    "@margoengine/biomes/objects": 2903,
     "@margoengine/biomes/placement": 10999,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/relief": 2825,
@@ -1020,7 +1027,7 @@
     "@margoengine/post/ssgi": 11862,
     "@margoengine/post/ssr": 11154,
     "@margoengine/post/stack": 4001,
-    "@margoengine/procedural": 8909,
+    "@margoengine/procedural": 9774,
     "@margoengine/procedural/expression": 4720,
     "@margoengine/procedural/lsystem": 2454,
     "@margoengine/procedural/noise": 2314,
@@ -1054,7 +1061,8 @@
     "@margoengine/road": 1171,
     "@margoengine/save": 6955,
     "@margoengine/save/node": 939,
-    "@margoengine/scatter": 12434,
+    "@margoengine/scatter": 13299,
+    "@margoengine/scatter/tiles": 2288,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
     "@margoengine/sciviz": 36802,

@@ -186,6 +186,60 @@ geometry or transforms. It defaults to 1 and accepts a nonnegative finite number
 or a callback sampled each render, such as `() => sky.nightFactor` for night lights.
 The value must fit a GPU float; the callback remains installed after restoration.
 
+## Density maps, a grid that follows the camera, and stored tiles
+
+Three options turn a `Scatter` into world-anchored ground cover: `bounds` (the world rectangle `[minX, minZ, maxX,
+maxZ]` the `heightmap` and `densityMap` cover, instead of `area` around `center`), `densityMap` (a red-channel 0..1
+texture over `bounds` that multiplies `density` per instance, such as a biome detail map) and `follow` (the grid moves
+with the camera in whole cells and every instance takes its random numbers from its world cell, so grass stays put as
+the camera moves). Without them the distribute shader is the same text as before, byte for byte
+(`scatterCullShader(options)` returns it, and the package test pins it).
+
+```ts
+import { Scatter } from '@margoengine/scatter';
+
+const grass = Scatter.attach(engine, blade, {
+  count: 200_000,
+  area: [240, 240], // around the camera
+  follow: true,
+  bounds: [-2048, -2048, 2048, 2048],
+  heightmap: () => heights,
+  densityMap: () => grassDensity, // r8unorm over bounds
+  blades: {},
+});
+```
+
+`@margoengine/scatter/tiles` draws stored instances per tile: `ScatterTiles` takes 8-byte records (u16 x and z inside the
+tile, palette index, log scale, yaw, variant and age, as `@margoengine/biomes/placement` writes them) and expands them on
+the GPU every frame with scatter's own culling, LOD rings, fades, wind and shading. Add tiles as they stream in and
+remove them as they leave; each tile takes one slot of `slotSize` records.
+
+```ts
+import { ScatterTiles } from '@margoengine/scatter/tiles';
+
+const oaks = ScatterTiles.attach(engine, [near, middle, far], {
+  bounds: [-2048, -2048, 2048, 2048],
+  heightmap: () => heights,
+  slots: 100,
+  slotSize: 8192,
+  drawn: 100_000, // instances per LOD ring per frame
+  species: 0, // the palette index this mesh draws (default: all)
+});
+oaks.setTile('3,4', [-1280, -1024], 256, records);
+oaks.removeTile('3,4');
+```
+
+| `ScatterTiles` option | Default | Meaning |
+| --- | --- | --- |
+| `bounds` | required | world rectangle the heightmap covers |
+| `slots` | 64 | tiles held at once |
+| `slotSize` | 4,096 | records one tile may hold |
+| `drawn` | 65,536 | instances each LOD ring draws per frame (more are dropped that frame) |
+| `scale` | 1 | multiplier on every record's scale |
+| `species` | all | the record palette index this mesh draws |
+
+Memory: 8 bytes per stored record on the CPU and the GPU, 32 bytes per drawn instance.
+
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).
 
