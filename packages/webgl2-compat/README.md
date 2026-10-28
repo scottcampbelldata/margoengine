@@ -2,14 +2,15 @@
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: in development, milestones M0 to M4 of the [roadmap](../../docs/webgl2-compat-roadmap.md).** This package
+**Status: in development, milestones M0 to M5 of the [roadmap](../../docs/webgl2-compat-roadmap.md).** This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels
-as native WebGPU on the same GPU, and so do the render checks of materials, glTF PBR, lines, points, text and lod.
-Render shaders read storage buffers too. Shaders that write storage buffers or use storage textures, and compute
-pipelines, are refused with a coded error naming the milestone that brings them (M5); until then, apps that need those
-features keep them off without WebGPU, or use the [`@margoengine/webgl`](../webgl/README.md) preview.
+as native WebGPU on the same GPU, and so do the render checks of materials (its compute scenarios included), glTF
+PBR, lines, points, text, lod and the skinned shadow check. Render shaders read storage buffers, and compute pipelines
+run (milestone M5): as fragment draws, as point draws, or on the CPU, whichever the shader allows (see Compute below).
+Render shaders that write storage buffers or textures are refused with MargoError code `unsupported`: WebGL2 render
+shaders cannot write them.
 
 Load it only where WebGPU is missing, with a dynamic import, so browsers with WebGPU never download it:
 
@@ -56,6 +57,26 @@ What it does:
   contents change, and the storage bindings of a bind group share one texture, so a pipeline spends one texture unit
   per group on them. `textureGather` and `textureGatherCompare`, which GLSL ES 3.00 lacks, fetch
   the four texels by hand with the sampler's address modes (2D and 2D-array textures; a cube gather is refused).
+- **Compute** (`margoengine/webgl2-compat/compute`, milestone M5): compute pipelines and passes, with
+  `dispatchWorkgroups` and `dispatchWorkgroupsIndirect`. The device loads this entry by itself the first time a page
+  creates a compute pipeline, so a render-only page never downloads it; command buffers with compute passes wait in
+  the queue until it has loaded (later writes wait behind them, in order). Each entry point runs on the fastest of
+  three tiers its shader allows:
+  - **fragment**: every texel store writes the invocation's own texel (the global invocation id as coordinates) and
+    no buffer is written: one full-target draw per written texture and z slice.
+  - **scatter**: a bounded number of stores anywhere (buffer words, texels at any coordinates), never read back by the
+    invocation that made them: one instanced point draw per buffer or texture written, instance k of an invocation
+    drawing its k-th store. Buffers are drawn as an R32UI texture of their words and copied back on the GPU.
+  - **cpu**: atomics, workgroup memory, barriers or stores in loops of unknown length: the shader as JavaScript, one
+    invocation at a time (each runs to the next barrier before any goes on), f32 arithmetic rounded as an f32 GPU
+    rounds it, on copies of the bound buffers and textures (GPU-written ones are read back, a stall the device counts
+    in `stalls`).
+
+  Reads see memory as it was before the dispatch, as WGSL allows for invocations that never read back their own
+  stores. The CPU tier cannot read cube, multisampled or external textures, and needs a page that allows JavaScript
+  compiled at run time (Content-Security-Policy `unsafe-eval`); either refusal is MargoError code `unsupported`.
+  `planCompute(stage)` tells which tier an entry point gets and why; `runComputeOnCPU(dispatch)` runs one on the CPU
+  with buffers, without a device.
 - **WGSL front end** (`margoengine/webgl2-compat/wgsl`, milestone M1): `checkWGSL(source)` and `parseWGSL(source)`.
 - `webgl2Capabilities(gl)` and `probeWebGL2()`: what a browser's WebGL2 offers and the tier it reaches. The layer
   renders only on the `full` tier: renderable float colour targets (`EXT_color_buffer_float`) and `highp` in fragment
@@ -104,6 +125,30 @@ releases it. Both report `tier` (`full`, `half-float` or `ldr`), `supported`, `m
 `npm run capabilities --workspace @margoengine/webgl2-compat` prints the report for every installed Chromium browser
 and ANGLE back end on the machine; the roadmap's tier decision quotes it.
 
+### Compute (`margoengine/webgl2-compat/compute`)
+
+```ts
+import { planCompute, runComputeOnCPU } from 'margoengine/webgl2-compat/compute';
+
+const source = `
+@group(0) @binding(0) var<storage, read_write> sums: array<atomic<u32>, 4>;
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+  atomicAdd(&sums[id.x % 4u], id.x);
+}`;
+
+const plan = planCompute({ source });
+console.log(plan.tier, plan.reason); // cpu it uses atomicAdd()
+
+const sums = new Uint32Array(4);
+runComputeOnCPU({ source, workgroups: [2], buffers: new Map([['0:0', sums]]) });
+console.log([...sums]); // [1984, 2016, 2048, 2080]
+```
+
+`planCompute` returns the tier, the workgroup size (overrides applied), what the entry point writes (`targets`, with
+how many words or texels one invocation stores) and the reason it is not on a faster tier. `runComputeOnCPU` binds
+buffers by `"group:binding"` and changes them in place. Neither is needed to use compute through the device; both are
+there for tools and tests.
+
 ### WGSL front end (`margoengine/webgl2-compat/wgsl`)
 
 The first part of the translator: a lexer, parser and type checker for WGSL, written from the W3C WGSL specification.
@@ -150,12 +195,18 @@ browsers' own WebGPU compilers, where it was recorded.
   textureLoad; storage buffers read in both stages, with arrayLength, a dynamic offset, writeBuffer between submits
   and a GPU copy. Results are bit-identical.
 - Package checks in forced-compatibility mode: `--compat` on a check that opens its pages with the repository's
-  browser harness runs every page on the layer. The materials check passes on it except its 14 scenarios that need
-  compute (clustered lights, image-based lighting, GPU culling of instances), which must be refused naming milestone
-  M5; the glTF PBR shader review, lod, lines and text pass whole, and points on its single-sample path (its 4x eye-dome
-  lighting shades per sample, which WebGL2 cannot).
+  browser harness runs every page on the layer. The materials check (its compute scenarios included: clustered
+  lights, image-based lighting, GPU culling of instances), the glTF PBR shader review, lod, lines, text, the shadows
+  lit-faces check (a skinned robot), the voxel render check, the environment check and the post-effects suite pass
+  whole, and points on its single-sample path (its 4x eye-dome lighting shades per sample, which WebGL2 cannot).
+- The compute check against native WebGPU in one page (`npm run test:gpu`): 11 cases over the three tiers (own-texel
+  stores into 2D, array, 3D and mip-level views, a read-write storage texture, struct and word stores at
+  data-dependent indexes, atomics with workgroup memory and barriers, texture reads, stores and sampling on the CPU,
+  indirect dispatch, overrides, and queue order around the lazy load).
 - The corpus (`npm run test:browser`): all 1,049 vertex and fragment entry points compile, all 459 distinct stage pairs
-  of the recorded render pipelines link, and all 624 recorded render pipelines draw once through the device.
+  of the recorded render pipelines link, all 624 recorded render pipelines draw once through the device, and 397
+  recorded compute pipelines are translated for their tier and dispatched once (the voxel path tracer's 20, out of
+  scope on WebGL2, are only planned).
 
 Nothing runs at import time, the package has no dependencies, and core, the stage and every other package never
 import it (a test in this package checks that), so the WebGPU path is byte-identical with or without it.

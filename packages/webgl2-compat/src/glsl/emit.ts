@@ -32,6 +32,7 @@ import {
   type ArrayType,
   type ScalarType,
   type StructType,
+  STORAGE_FORMATS,
   sizeOf,
   type TextureType,
   type Type,
@@ -91,6 +92,12 @@ export interface GLSLTexture {
   readonly name: string;
   /** Mip-level-count uniform name, when the shader needs it (textureNumLevels, robust textureLoad). */
   readonly levels?: string;
+  /**
+   * Size uniform name (`ivec4`: width, height, and depth or layer count of the view's first level), when the shader
+   * needs the size. GLSL's textureSize is not used: ANGLE's Direct3D 11 back end applies TEXTURE_BASE_LEVEL twice in
+   * it (bug 52), so a view of a later mip level read a quarter of its size.
+   */
+  readonly size?: string;
   /**
    * textureGather reads texels by hand: the `ivec4` uniform of this name holds the address modes and comparison of
    * the sampler at this binding (u, v, w: 0 clamp-to-edge, 1 repeat, 2 mirror-repeat; then 0 or the compare function).
@@ -155,7 +162,8 @@ interface EmitOptions {
   readonly sharedStorage?: (group: number, binding: number) => boolean;
 }
 
-type Ref =
+/** @internal A memory reference: a GLSL lvalue, or a place in a uniform or storage buffer. */
+export type Ref =
   | { readonly kind: 'lvalue'; readonly code: string; readonly type: Type }
   | {
       readonly kind: 'buffer';
@@ -322,20 +330,22 @@ export function emitStage(module: IRModule, entry: IREntryPoint, options: EmitOp
   return new StageEmitter(module, entry, options).run();
 }
 
-interface FnInstance {
+/** @internal One emitted instance of a WGSL function. */
+export interface FnInstance {
   readonly name: string;
   readonly fn: IRFunction;
   readonly handles: ReadonlyMap<IRParam, IRGlobalVar>;
 }
 
-class StageEmitter {
-  private readonly stage: 'vertex' | 'fragment';
+/** @internal The GLSL stage emitter; the compute entry extends it (compute/glsl.ts). */
+export class StageEmitter {
+  protected readonly stage: 'vertex' | 'fragment';
   private readonly prefix: string;
   private readonly types: string[] = [];
   private readonly typeNames = new Map<string, string>();
-  private readonly globals: string[] = [];
+  protected readonly globals: string[] = [];
   private readonly globalDone = new Set<object>();
-  private readonly helperSrc: string[] = [];
+  protected readonly helperSrc: string[] = [];
   private readonly helperDone = new Set<string>();
   private readonly loaders: string[] = [];
   private readonly loaderNames = new Map<string, string>();
@@ -347,14 +357,16 @@ class StageEmitter {
   private readonly storages = new Map<IRGlobalVar, GLSLStorage & { array: string }>();
   /** Row fetch functions of storage buffers, which take the row as an argument instead of an index. */
   private readonly fetchers = new Set<string>();
-  private readonly textures = new Map<string, GLSLTexture>();
-  private readonly notes = new Set<string>();
+  protected readonly textures = new Map<string, GLSLTexture>();
+  protected readonly notes = new Set<string>();
   private readonly constants: Readonly<Record<string, number | boolean>>;
   private names = new Map<object, string>();
   private aliases = new Map<IRLocal, Ref>();
   private handles: ReadonlyMap<IRParam, IRGlobalVar> = new Map();
-  private lines: string[] = [];
-  private depth = 1;
+  protected lines: string[] = [];
+  protected depth = 1;
+  /** Storage textures may be read (textureLoad); the compute stages set it. */
+  protected storageTextures = false;
   private counter = 0;
   /** Loop context for break/continue: 'plain' loops and switches, or loops with a continuing block. */
   private breakable: { kind: 'loop' | 'switch' | 'continuing'; flag?: string }[] = [];
@@ -365,11 +377,12 @@ class StageEmitter {
   private baseInstance = false;
 
   constructor(
-    private readonly module: IRModule,
-    private readonly entry: IREntryPoint,
-    private readonly options: EmitOptions,
+    protected readonly module: IRModule,
+    protected readonly entry: IREntryPoint,
+    protected readonly options: EmitOptions,
+    stage?: 'vertex' | 'fragment',
   ) {
-    this.stage = entry.stage as 'vertex' | 'fragment';
+    this.stage = stage ?? (entry.stage as 'vertex' | 'fragment');
     this.prefix = options.prefix ?? (this.stage === 'vertex' ? 'v' : 'f');
     this.constants = options.constants ?? {};
   }
@@ -424,7 +437,7 @@ class StageEmitter {
     return n;
   }
 
-  private temp(): string {
+  protected temp(): string {
     return `_t${this.counter++}`;
   }
 
@@ -503,7 +516,7 @@ class StageEmitter {
     return `${this.type(t)} ${name}`;
   }
 
-  private helper(name: string): string {
+  protected helper(name: string): string {
     if (this.helperDone.has(name)) return name;
     const h = HELPERS[name];
     if (!h)
@@ -519,7 +532,7 @@ class StageEmitter {
   }
 
   /** A generated helper by key, defined once with `source(name)`. */
-  private generated(key: string, source: (name: string) => string): string {
+  protected generated(key: string, source: (name: string) => string): string {
     let name = this.typeNames.get(`fn:${key}`);
     if (!name) {
       name = `_g${this.typeNames.size}`;
@@ -693,7 +706,7 @@ class StageEmitter {
 
   // ---------------------------------------------------------------- functions
 
-  private instance(fn: IRFunction, handles: ReadonlyMap<IRParam, IRGlobalVar>): FnInstance {
+  protected instance(fn: IRFunction, handles: ReadonlyMap<IRParam, IRGlobalVar>): FnInstance {
     const key = `${fn.name}|${fn.params.map((p) => handles.get(p)?.name ?? '').join(',')}`;
     let inst = this.instances.get(key);
     if (!inst) {
@@ -741,7 +754,7 @@ class StageEmitter {
     this.handles = savedHandles;
   }
 
-  private line(text: string): void {
+  protected line(text: string): void {
     this.lines.push(`${'  '.repeat(this.depth)}${text}`);
   }
 
@@ -770,6 +783,12 @@ class StageEmitter {
       case 'assign':
         return this.assign(s.op, s.lhs, s.rhs);
       case 'increment': {
+        if (this.inBuffer(s.lhs)) {
+          const r = this.ref(s.lhs, true) as Extract<Ref, { kind: 'buffer' }>;
+          const one = this.literal(1, elementOfT(r.type) as ScalarType);
+          this.storeBuffer(r, `(${this.load(r)} ${s.op === '++' ? '+' : '-'} ${one})`);
+          return;
+        }
         const r = this.lvalue(s.lhs, false);
         this.line(`${r}${s.op};`);
         return;
@@ -1000,7 +1019,13 @@ class StageEmitter {
       if (!pure(rhs)) this.line(`${this.value(rhs)};`);
       return;
     }
+    const buffer = this.inBuffer(lhs);
     if (op === '=') {
+      if (buffer) {
+        const r = this.ref(lhs, false) as Extract<Ref, { kind: 'buffer' }>;
+        this.storeBuffer(r, this.value(rhs));
+        return;
+      }
       this.line(`${this.lvalue(lhs, false)} = ${this.value(rhs)};`);
       return;
     }
@@ -1009,6 +1034,12 @@ class StageEmitter {
       el = elementOfT(store) as ScalarType;
     const direct =
       (bin === '+' || bin === '-' || bin === '*' || bin === '&' || bin === '|' || bin === '^') && !(el.name === 'bool');
+    if (buffer) {
+      const r = this.ref(lhs, true) as Extract<Ref, { kind: 'buffer' }>;
+      const left = { kind: 'literal', type: store, start: 0, end: 0 } as IRExpr;
+      this.storeBuffer(r, this.binaryText(bin, left, rhs, store, this.load(r)));
+      return;
+    }
     if (direct) {
       this.line(`${this.lvalue(lhs, false)} ${op} ${this.value(rhs)};`);
       return;
@@ -1024,13 +1055,41 @@ class StageEmitter {
   /** An lvalue for assignment. `stable`: dynamic indexes are evaluated once, into temporaries. */
   private lvalue(e: IRExpr, stable: boolean): string {
     const r = this.ref(e, stable);
-    if (r.kind !== 'lvalue')
-      throw unsupported(`a write to ${r.v.space} buffer '${r.v.name}' (storage writes are milestone M5)`);
+    if (r.kind !== 'lvalue') throw unsupported(`a write to ${r.v.space} buffer '${r.v.name}' through a pointer`);
     return r.code;
   }
 
+  /** True when a reference is rooted at a uniform or storage buffer (a store there needs storeBuffer). */
+  protected inBuffer(e: IRExpr): boolean {
+    switch (e.kind) {
+      case 'name':
+        return e.decl.kind === 'var' && (e.decl.space === 'storage' || e.decl.space === 'uniform');
+      case 'member':
+      case 'swizzle':
+      case 'index':
+        return this.inBuffer(e.object);
+      case 'deref':
+        return e.pointer.kind === 'address-of' && this.inBuffer(e.pointer.ref);
+    }
+    return false;
+  }
+
+  /** Stores a value (GLSL text) at a buffer reference: render stages cannot (the compute stages override it). */
+  protected storeBuffer(r: Extract<Ref, { kind: 'buffer' }>, _code: string): void {
+    throw unsupported(
+      `a write to ${r.v.space} buffer '${r.v.name}' in a render stage (WebGL2 render shaders cannot write buffers)`,
+    );
+  }
+
+  /** textureStore: render stages cannot (the compute stages override it). */
+  protected textureStore(args: readonly IRExpr[]): string {
+    throw unsupported(
+      `textureStore() to '${this.handleGlobal(args[0]).name}' in a render stage (WebGL2 render shaders cannot write textures)`,
+    );
+  }
+
   /** A memory reference. `stable` evaluates dynamic indexes into temporaries (pointer lets, compound assignment). */
-  private ref(e: IRExpr, stable: boolean): Ref {
+  protected ref(e: IRExpr, stable: boolean): Ref {
     const type = storeOf(e.type);
     switch (e.kind) {
       case 'name': {
@@ -1120,7 +1179,7 @@ class StageEmitter {
   }
 
   /** Reads a value of `type` from a uniform buffer at a reference. */
-  private load(r: Extract<Ref, { kind: 'buffer' }>): string {
+  protected load(r: Extract<Ref, { kind: 'buffer' }>): string {
     const u = this.uniform(r.v);
     const t = r.type;
     if (r.dyn.length) {
@@ -1413,7 +1472,7 @@ class StageEmitter {
   }
 
   /** The module-scope texture or sampler an argument names (through specialized parameters). */
-  private handleGlobal(e: IRExpr): IRGlobalVar {
+  protected handleGlobal(e: IRExpr): IRGlobalVar {
     if (e.kind === 'name') {
       if (e.decl.kind === 'var' && e.decl.space === 'handle') return e.decl;
       if (e.decl.kind === 'param') {
@@ -1435,7 +1494,7 @@ class StageEmitter {
   }
 
   /** `left op right` with WGSL's semantics. `leftCode` replaces `left` (compound assignment). */
-  private binaryText(op: string, left: IRExpr, right: IRExpr, result: Type, leftCode?: string): string {
+  protected binaryText(op: string, left: IRExpr, right: IRExpr, result: Type, leftCode?: string): string {
     const l = leftCode ?? this.value(left),
       r = this.value(right);
     const lt = left.type,
@@ -1804,7 +1863,13 @@ class StageEmitter {
    * The combined sampler for a texture and an optional sampler. `gatherArg` is the sampler of a textureGather call:
    * the texture is then fetched texel by texel, and the sampler only gives its address modes (a uniform).
    */
-  private combined(textureArg: IRExpr, samplerArg?: IRExpr, levels = false, gatherArg?: IRExpr): GLSLTexture {
+  protected combined(
+    textureArg: IRExpr,
+    samplerArg?: IRExpr,
+    levels = false,
+    gatherArg?: IRExpr,
+    size = false,
+  ): GLSLTexture {
     const tex = this.handleGlobal(textureArg),
       samp = samplerArg ? this.handleGlobal(samplerArg) : undefined,
       gather = gatherArg ? this.handleGlobal(gatherArg) : undefined;
@@ -1813,12 +1878,14 @@ class StageEmitter {
     const key = `${tex.group}:${tex.binding}|${samp ? `${samp.group}:${samp.binding}` : ''}|${gather ? `${gather.group}:${gather.binding}` : ''}`;
     let entry = this.textures.get(key);
     if (!entry) {
-      if (tt.shape === 'storage')
-        throw unsupported(`storage texture '${tex.name}' (storage textures are milestone M5)`);
+      if (tt.shape === 'storage' && !this.storageTextures)
+        throw unsupported(
+          `storage texture '${tex.name}' in a render stage (WebGL2 render shaders cannot write textures)`,
+        );
       if (tt.dimension === 'cube_array') throw unsupported(`cube array texture '${tex.name}' (GLSL ES 3.00 has none)`);
       let glslType = SAMPLER_TYPES[tt.dimension];
       if (tt.shape === 'depth' && comparison) glslType += 'Shadow';
-      const s = tt.sampled?.name;
+      const s = tt.shape === 'storage' ? STORAGE_FORMATS[tt.format as string] : tt.sampled?.name;
       if (tt.shape !== 'depth' && tt.shape !== 'depth_multisampled' && s === 'i32') glslType = `i${glslType}`;
       if (tt.shape !== 'depth' && tt.shape !== 'depth_multisampled' && s === 'u32') glslType = `u${glslType}`;
       entry = {
@@ -1843,10 +1910,15 @@ class StageEmitter {
       this.textures.set(key, entry);
       this.globals.push(`uniform highp int ${entry.levels};`);
     }
+    if (size && !entry.size) {
+      entry = { ...entry, size: `${entry.name}z` };
+      this.textures.set(key, entry);
+      this.globals.push(`uniform highp ivec4 ${entry.size};`);
+    }
     return entry;
   }
 
-  private texture(name: string, args: readonly IRExpr[], result: Type): string {
+  protected texture(name: string, args: readonly IRExpr[], result: Type): string {
     let k = 0,
       component: string | undefined;
     if (name === 'textureGather' && args[0].type.kind !== 'texture') component = this.value(args[k++]);
@@ -1860,15 +1932,16 @@ class StageEmitter {
     const coords1d = (c: string) => (tt.dimension === '1d' ? `vec2(${c}, 0.5)` : c);
     switch (name) {
       case 'textureDimensions': {
-        const t = this.combined(texArg);
-        const level = rest[0] ? `int(${v(rest[0])})` : '0';
-        const size = `textureSize(${t.name}, ${tt.shape === 'multisampled' || tt.shape === 'depth_multisampled' ? '0' : level})`;
-        if (tt.dimension === '1d') return `uint(${size}.x)`;
-        if (tt.dimension === '3d') return `uvec3(${size})`;
-        return `uvec2(${size}.xy)`;
+        const t = this.combined(texArg, undefined, false, undefined, true);
+        const multi = tt.shape === 'multisampled' || tt.shape === 'depth_multisampled';
+        const level = rest[0] && !multi ? `int(${v(rest[0])})` : '';
+        const z = t.size as string;
+        if (tt.dimension === '3d') return `uvec3(${level ? `max(${z}.xyz >> ${level}, ivec3(1))` : `${z}.xyz`})`;
+        const xy = level ? `max(${z}.xy >> ${level}, ivec2(1))` : `${z}.xy`;
+        return tt.dimension === '1d' ? `uint(${xy}.x)` : `uvec2(${xy})`;
       }
       case 'textureNumLayers':
-        return `uint(textureSize(${this.combined(texArg).name}, 0).z)`;
+        return `uint(${this.combined(texArg, undefined, false, undefined, true).size}.z)`;
       case 'textureNumLevels':
         return `uint(${this.combined(texArg, undefined, true).levels})`;
       case 'textureNumSamples':
@@ -1877,7 +1950,7 @@ class StageEmitter {
       case 'textureLoad': {
         const multi = tt.shape === 'multisampled' || tt.shape === 'depth_multisampled';
         const external = tt.shape === 'external';
-        const t = this.combined(texArg, undefined, !multi && !external);
+        const t = this.combined(texArg, undefined, !multi && !external, undefined, true);
         const coord = v(rest[0]);
         const layer = arrayed ? v(rest[1]) : undefined;
         const last = rest[arrayed ? 2 : 1];
@@ -1889,12 +1962,18 @@ class StageEmitter {
           const size = arrayed ? 'ivec3' : n === 3 ? 'ivec3' : 'ivec2';
           const c = tt.dimension === '1d' ? 'ivec2(p, 0)' : arrayed ? 'ivec3(p, a)' : 'p';
           const pparams = `${n === 1 ? 'int' : `ivec${n}`} p${arrayed ? ', int a' : ''}`;
-          return `${rt} ${fname}(highp ${ty} t, ${pparams}, int l, int n) { int m = clamp(l, 0, max(n - 1, 0)); ${size} s = textureSize(t, m) - 1; return texelFetch(t, clamp(${c}, ${size}(0), s), m); }`;
+          const s =
+            n === 3 && !arrayed
+              ? 'max(z.xyz >> m, ivec3(1)) - 1'
+              : arrayed
+                ? 'ivec3(max(z.xy >> m, ivec2(1)), z.z) - 1'
+                : 'max(z.xy >> m, ivec2(1)) - 1';
+          return `${rt} ${fname}(highp ${ty} t, ${pparams}, int l, int n, ivec4 z) { int m = clamp(l, 0, max(n - 1, 0)); ${size} s = ${s}; return texelFetch(t, clamp(${c}, ${size}(0), s), m); }`;
         });
         const levelCount = multi || external ? '1' : (t.levels as string);
         const level = multi || external || !last ? '0' : `int(${v(last)})`;
         const p = `${n === 1 ? 'int' : `ivec${n}`}(${coord})`;
-        const call = `${fn}(${t.name}, ${p}${arrayed ? `, int(${layer})` : ''}, ${level}, ${levelCount})`;
+        const call = `${fn}(${t.name}, ${p}${arrayed ? `, int(${layer})` : ''}, ${level}, ${levelCount}, ${t.size})`;
         return depthResult ? `${call}.x` : call;
       }
       case 'textureSample':
@@ -1953,15 +2032,17 @@ class StageEmitter {
         return `textureGrad(${t.name}, ${p}, ${dx}, ${dy})`;
       }
       case 'textureSampleBaseClampToEdge': {
-        const t = this.combined(texArg, rest[0]);
+        const t = this.combined(texArg, rest[0], false, undefined, true);
         const c = v(rest[1]);
         const fn = this.generated(
           `clampedge:${t.glslType}`,
           (fname) =>
-            `vec4 ${fname}(highp ${t.glslType} t, vec2 c) { vec2 h = 0.5 / vec2(textureSize(t, 0)); return textureLod(t, clamp(c, h, 1.0 - h), 0.0); }`,
+            `vec4 ${fname}(highp ${t.glslType} t, vec2 c, ivec4 z) { vec2 h = 0.5 / vec2(z.xy); return textureLod(t, clamp(c, h, 1.0 - h), 0.0); }`,
         );
-        return `${fn}(${t.name}, ${c})`;
+        return `${fn}(${t.name}, ${c}, ${t.size})`;
       }
+      case 'textureStore':
+        return this.textureStore(args);
       case 'textureGather':
       case 'textureGatherCompare':
         return this.gather(name === 'textureGatherCompare', component, texArg, rest);
@@ -1978,7 +2059,7 @@ class StageEmitter {
     const tt = texArg.type as TextureType;
     if (tt.dimension !== '2d' && tt.dimension !== '2d_array')
       throw unsupported(`textureGather on a ${tt.dimension} texture (GLSL ES 3.00 cannot fetch texels of cube maps)`);
-    const t = this.combined(texArg, undefined, false, rest[0]);
+    const t = this.combined(texArg, undefined, false, rest[0], true);
     const arrayed = tt.dimension === '2d_array',
       depth = tt.shape === 'depth';
     let i = 1;
@@ -2006,20 +2087,20 @@ class StageEmitter {
         `texelFetch(t, ${arrayed ? `ivec3(${x}, ${y}, a)` : `ivec2(${x}, ${y})`}, 0).${c}`;
       const texel = (x: string, y: string) => (compare ? `${test}(r, ${at(x, y)}, m.w)` : at(x, y));
       return [
-        `${rt} ${name}(highp ${t.glslType} t, vec2 c${arrayed ? ', int a' : ''}${compare ? ', float r' : ''}, ivec2 o, ivec4 m) {`,
-        `  ivec${arrayed ? 3 : 2} z = textureSize(t, 0); ivec2 s = z.xy;${arrayed ? ' a = clamp(a, 0, z.z - 1);' : ''}`,
+        `${rt} ${name}(highp ${t.glslType} t, vec2 c${arrayed ? ', int a' : ''}${compare ? ', float r' : ''}, ivec2 o, ivec4 m, ivec4 z) {`,
+        `  ivec2 s = z.xy;${arrayed ? ' a = clamp(a, 0, z.z - 1);' : ''}`,
         '  ivec2 i0 = ivec2(floor(c * vec2(s) - 0.5)) + o, i1 = i0 + 1;',
         `  int x0 = ${wrap}(i0.x, s.x, m.x), x1 = ${wrap}(i1.x, s.x, m.x), y0 = ${wrap}(i0.y, s.y, m.y), y1 = ${wrap}(i1.y, s.y, m.y);`,
         `  return ${rt}(${texel('x0', 'y1')}, ${texel('x1', 'y1')}, ${texel('x1', 'y0')}, ${texel('x0', 'y0')});`,
         '}',
       ].join('\n');
     });
-    return `${fn}(${t.name}, ${coord}${arrayed ? `, ${layer}` : ''}${compare ? `, float(${ref})` : ''}, ${offset}, ${t.gather?.name})`;
+    return `${fn}(${t.name}, ${coord}${arrayed ? `, ${layer}` : ''}${compare ? `, float(${ref})` : ''}, ${offset}, ${t.gather?.name}, ${t.size})`;
   }
 
   // ---------------------------------------------------------------- entry point interface
 
-  private mainFunction(main: FnInstance): {
+  protected mainFunction(main: FnInstance): {
     declarations: string[];
     main: string;
     inputs: GLSLLocation[];
@@ -2159,7 +2240,7 @@ class StageEmitter {
     };
   }
 
-  private builtinInput(name: string): string {
+  protected builtinInput(name: string): string {
     switch (name) {
       case 'vertex_index':
         this.baseVertex = true;

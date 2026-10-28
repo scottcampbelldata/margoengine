@@ -70,6 +70,8 @@ export class CompatBuffer {
    * texel, `1 << shift` texels wide; refreshed from the GL buffer on the GPU when the contents changed.
    */
   private data: { texture: WebGLTexture; shift: number; version: number } | null = null;
+  /** @internal GPU objects the compute runtime keeps for this buffer (its word texture), freed with it. */
+  computeState: { destroy(): void } | null = null;
   destroyed = false;
 
   constructor(
@@ -111,6 +113,7 @@ export class CompatBuffer {
           BufferUsage.MAP_WRITE |
           BufferUsage.INDIRECT |
           BufferUsage.STORAGE |
+          BufferUsage.UNIFORM |
           BufferUsage.QUERY_RESOLVE) ||
       (this.gl && this.element) ||
       descriptor.mappedAtCreation ||
@@ -304,6 +307,7 @@ export class CompatBuffer {
       this.device.state.forgetTexture(this.data.texture);
       gl.deleteTexture(this.data.texture);
     }
+    this.computeState?.destroy();
     this.mapState = 'unmapped';
   }
 }
@@ -715,7 +719,8 @@ export class CompatSampler {
 
   constructor(
     readonly device: CompatDevice,
-    private readonly d: GPUSamplerDescriptor = {},
+    /** The descriptor it was made with (the compute runtime's CPU sampling reads its filters). */
+    readonly d: GPUSamplerDescriptor = {},
   ) {
     this.label = d.label ?? '';
     this.comparison = d.compare !== undefined;

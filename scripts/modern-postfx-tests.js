@@ -4,10 +4,9 @@ import { resolve } from 'node:path';
 import { openBrowser } from './browser.js';
 import { compatRun } from './support/compat-shim.js';
 
-// --compat runs the tonemap half on the WebGL2 compatibility layer (scripts/support/compat-shim.js): DOF, TAA and
-// tonemap's auto-exposure meter are compute passes, which the layer brings in milestone M5, so the compat run checks
-// the tone curves, the 3D LUT, the effects variant (white balance, vignette, grain, aberration), the adapted-exposure
-// read from a storage buffer, Tonemap in an engine (resize, curve change, device restore) and the tonemap demo.
+// --compat runs the whole suite on the WebGL2 compatibility layer (scripts/support/compat-shim.js), the compute passes
+// of DOF, TAA and the auto-exposure meter included (milestone M5); only the phone check, which opens its own page,
+// runs natively alone.
 const compat = compatRun();
 
 const browser = await openBrowser({
@@ -21,7 +20,7 @@ page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text());
 });
 try {
-  const pixels = await page.evaluate(async (withCompute) => {
+  const pixels = await page.evaluate(async () => {
     const { cocShader, coarseShader, bokehShader } = await import('/packages/dof/src/shaders.ts');
     const { tonemapShader } = await import('/packages/tonemap/src/shaders.ts');
     const adapter = await navigator.gpu.requestAdapter(),
@@ -112,7 +111,7 @@ try {
     }
     const T = GPUTextureUsage;
     let coC = null;
-    if (withCompute) {
+    {
       const cocPipeline = await compute(cocShader),
         bokehPipeline = await compute(bokehShader),
         coarsePipeline = await compute(coarseShader);
@@ -406,7 +405,7 @@ try {
       check(Math.abs(grain[0] - base[0]) > 1e-4 && Math.abs(grain[0] - base[0]) < 0.15, 'Grain perturbs the picture');
       setFx([1, 1, 1, 0, 0.5, 0.5, 0, 0.02, -0.5, -0.5, 1, 1, 0, 0, 0, 0]);
       near(await toneWith(fxPipe, fxGroup, rgb), base, 0.00002, 'Aberration clamps at the texture edge');
-      if (withCompute) {
+      {
         // Metering: log-average luminance of a flat field drives the adapted stops toward 18% grey.
         const field = texture(64, 64, 'rgba32float', T.TEXTURE_BINDING | T.COPY_DST),
           meter = buffer(32),
@@ -465,8 +464,8 @@ try {
     for (const resource of owned) resource.destroy();
     device.destroy();
     return { coC, curves, lut: [...graded], deterministic: true };
-  }, !compat);
-  const integration = await page.evaluate(async (withCompute) => {
+  });
+  const integration = await page.evaluate(async () => {
     const { Engine, box, PbrMaterial } = await import('/packages/core/dist/index.js'),
       { engineRuntime } = await import('/packages/core/dist/extension.js');
     const { DOF } = await import('/packages/dof/dist/index.js'),
@@ -485,34 +484,6 @@ try {
       .createMesh()
       .setGeometry(box())
       .setMaterial(new PbrMaterial({ color: [1, 0.2, 0.1] }));
-    if (!withCompute) {
-      // Tonemap alone in an engine on the layer: resize, curve change, re-attach, device restore.
-      let tone = Tonemap.attach(engine);
-      engine.render();
-      await device.queue.onSubmittedWorkDone();
-      canvas.style.width = '160px';
-      canvas.style.height = '104px';
-      engine.render();
-      tone.options.curve = 'acescg';
-      engine.render();
-      tone.destroy();
-      tone = Tonemap.attach(engine);
-      engine.render();
-      await device.queue.onSubmittedWorkDone();
-      const error = await device.popErrorScope();
-      if (error) throw new Error(error.message);
-      await engine.rebootDevice();
-      const restored = engineRuntime(engine).gpu;
-      restored.pushErrorScope('validation');
-      engine.render();
-      await restored.queue.onSubmittedWorkDone();
-      const restoreError = await restored.popErrorScope();
-      if (restoreError) throw new Error(restoreError.message);
-      tone.destroy();
-      mesh.dispose();
-      engine.dispose();
-      return { taa: null, resized: true, restored: true };
-    }
     let dof = DOF.attach(engine),
       tone = Tonemap.attach(engine, { source: () => dof.outputTexture }),
       taa = TAA.attach(engine, { depth: () => dof.depthTexture });
@@ -549,8 +520,8 @@ try {
     mesh.dispose();
     engine.dispose();
     return { taa: true, resized: true, restored: true };
-  }, !compat);
-  for (const name of compat ? ['tonemap'] : ['dof', 'tonemap']) {
+  });
+  for (const name of ['dof', 'tonemap']) {
     await page.goto(`http://127.0.0.1:5193/packages/${name}/examples/index.html`);
     await page.waitForFunction(() => document.querySelector('#status')?.textContent?.startsWith('WebGPU ready'));
     if (name === 'dof') {

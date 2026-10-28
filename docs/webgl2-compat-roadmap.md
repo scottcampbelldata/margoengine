@@ -7,8 +7,9 @@ slowdown: the layer is a separate optional package, loaded by dynamic import onl
 (3) the exact-pixel mode (no context antialiasing) is honoured. Milestones M0 (`@margoengine/webgl2-compat`
 reports WebGL2 capabilities and tiers; the WGSL corpus is recorded) and M1 (the WGSL front end: the whole corpus
 parses and type-checks, [below](#wgsl-front-end-m1-2026-10-27)) and M2 (the GLSL back end and the device: core renders on
-WebGL2 with the same pixels as native WebGPU, [below](#glsl-back-end-and-device-m2-2026-10-28)) are done; M3 (textures, views, copies
-and readbacks for the packages) is next. It was paused
+WebGL2 with the same pixels as native WebGPU, [below](#glsl-back-end-and-device-m2-2026-10-28)) are done, and so are M3 (first
+part), M4 (storage buffers read in render shaders) and M5 (compute, [below](#compute-m5-2026-10-28)); M6 (package compat
+paths) is next. It was paused
 on 2026-10-24 (the apps built on Margo so far run on Electron, which has WebGPU) and planned for after v1.0.0 before
 that.
 
@@ -506,3 +507,78 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
 - **Sizes (gzip, the sizes gate's method).** The root with `install()` loads 68,518 B: `/device` 68,303 B, `/glsl`
   42,017 B, `/wgsl` 26,528 B. Over the 60,000 B target by 8,518 B; nothing was cut. Browsers with WebGPU download none
   of it, and core + stage are unchanged.
+
+## Compute (M5, 2026-10-28)
+
+Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL2, Dawn for WebGPU).
+
+- **Tiers.** Each compute entry point is planned from the typed IR when its pipeline is built (`planCompute` in
+  `margoengine/webgl2-compat/compute`):
+  - *fragment (A1)*: every `textureStore` writes the invocation's own texel (its coordinates are the global invocation
+    id, tracked through lets, conversions, constructors and function parameters: xy for 2D, xy and z as the layer for
+    arrays, xyz for 3D) and no storage buffer is written. One full-target draw per written texture and z slice,
+    scissored to the dispatch; the global id comes from `gl_FragCoord`, and a fragment that stores nothing is
+    discarded.
+  - *scatter (A2, in place of transform feedback)*: a bounded number of stores anywhere, never read back by the
+    invocation that made them. One instanced point draw per target: instance k of an invocation draws its k-th store
+    (a texel, or a 4-byte word of a buffer) at the store's address. Buffers are drawn as their "word texture" (R32UI,
+    one word per texel, filled from the GL buffer and copied back through an RGBA32UI draw and `readPixels` into the
+    buffer, all on the GPU). Every draw of a dispatch reads memory as it was before the dispatch, which is the WGSL
+    result for invocations that do not read back their own stores (storage textures both read and written are read
+    from a copy). Transform feedback would cover only stores at the invocation's own index; skinning batches and light
+    lists store at indexes read from buffers, so the point draw covers both.
+  - *CPU (B)*: atomics, workgroup memory, barriers, stores in loops of unknown length, an own store read back, and
+    anything GLSL ES 3.00 cannot express (f16 values in uniform buffers): the IR as JavaScript, compiled once per
+    pipeline with `new Function`. One invocation at a time; with barriers each invocation is a generator and every
+    invocation of a workgroup runs to its next barrier before any goes on. f32 operations round through `Math.fround`
+    (the same bits as an f32 GPU for +, -, *, / and sqrt), and integers follow WGSL (division by zero, shifts,
+    saturating conversions). Bound buffers are copied in (a GPU-written one is read back: a stall, counted in
+    `device.stalls`) and the ones it writes are copied back; textures are read back per level on first use; stored
+    texels are drawn back through a mask, so unwritten texels keep their values.
+  - *C (package paths)*: no recorded shader needs one so far; M6.
+- **Lazy loading.** The device keeps only what `getBindGroupLayout` needs (default layouts from the IR); planning,
+  translation and the CPU tier load with the compute entry, the first time a page creates a compute pipeline.
+  `createComputePipeline` before that returns at once and is planned at its first dispatch; command buffers with
+  compute passes wait in the queue until the entry has loaded, and later queue operations wait behind them in order.
+  `createComputePipelineAsync` loads it first and rejects on a refusal.
+- **Tier-B budget** (in [limits.md](limits.md)): a clustered-binning kernel over 3,456 clusters takes 1.5 ms with 16
+  lights, 2.8 ms with 64 and 9.4 ms with 256 per dispatch, copies included; a 64-wide reduction with 7 barriers per
+  invocation runs 4.4 million invocations a second. Nothing is refused by size: a larger dispatch runs, slower.
+- **Corpus.** All 443 compute entry points plan in Node: 37 fragment, 308 scatter, 98 CPU. In the browser
+  (`npm run test:browser`) 397 of the 417 recorded compute pipelines are translated and dispatched once with zero
+  failures: 34 fragment, 278 scatter, 82 CPU, 3 refused (below). The other 20 belong to the voxel path tracer, out of
+  scope on WebGL2: ANGLE's Direct3D shader compiler takes 20 s to several minutes for each of its kernels.
+- **Checks on the layer** (`--compat`, in `npm run test:gpu`): the compute check (11 cases, each against native WebGPU
+  in the same page: own-texel stores into 2D, array, 3D and mip-level views, a read-write storage texture, struct and
+  word stores at data-dependent indexes, two targets at once, atomics with workgroup memory and barriers, texture reads
+  and stores on the CPU, CPU sampling, stores in loops of unknown length, indirect dispatch, overrides, and queue order
+  around the lazy load); the materials check whole (its 14 compute scenarios, refused until now, pass: clustered light
+  binning, image-based lighting, GPU culling of instances); the shadows lit-faces check (skinned robot: skinning on the
+  scatter tier, the nearest-depth reduction on the CPU); the voxel render check at 4x and 1x; the environment check
+  (IBL: equirect to cube and the mip chain as fragment draws, the SH projection on the CPU, the BRDF LUT as word
+  stores); and the whole post-effects suite (DOF, TAA and the auto-exposure meter included).
+- **Bugs found and fixed, each with a regression test.** (51) FXC, ANGLE's Direct3D 11 shader compiler, discards every
+  fragment of a shader that ends `if (!flag) discard;` when the global flag is set after a texelFetch behind a
+  uniform-dependent early return (reproduced in raw WebGL2); the fragment tier ends `if (flag) return; discard;`
+  (compute check, `fragmentStore`). (52) ANGLE's Direct3D 11 back end applies `TEXTURE_BASE_LEVEL` twice in GLSL's
+  `textureSize`: a view starting at mip 2 of a 32-texel texture reads 2 texels instead of 8 (reproduced in raw
+  WebGL2). `textureDimensions`, `textureNumLayers`, the robust `textureLoad` clamp, gather and
+  `textureSampleBaseClampToEdge` now read the view's size from a per-texture uniform the device sets, never from
+  `textureSize`; a texture read only for its size keeps a binding slot for that uniform but takes no texture unit
+  (features check, `mipViews`; it broke the environment's mip chain). (53) The layer showed canvas frames
+  a microtask after the submit, so a page reading the canvas in the same task (drawImage, toDataURL) saw the previous
+  frame, where WebGPU shows the current texture; the layer now presents at the end of each submit (features check,
+  `canvasRead`; the voxel check's edit-to-pixels count was one frame late).
+- **Accepted differences.** Render shaders that write storage buffers or textures are refused (WebGL2 render stages
+  cannot write them; no recorded shader does). CPU-tier kernels cannot read cube, multisampled or external textures
+  (refused, coded: the light probes' bake kernels sample a cube map in kernels with workgroup memory, the corpus's 3
+  refusals) and need a page that allows `unsafe-eval`. CPU-tier transcendental functions (sin, exp, pow) differ from
+  the GPU in the last bits, and CPU texture filtering uses exact weights where GPUs use 8-bit fixed-point ones (within
+  4/255 in the check). The scatter tier runs the shader once per store (an invocation that stores a 20-word vertex
+  runs 20 times), so it costs more GPU time than one compute dispatch; M7 measures it. Out-of-bounds reads clamp into
+  the resource, as WGSL allows.
+- **Sizes (gzip, the sizes gate's method, which counts the lazy chunks).** The root with `install()` loads 91,068 B
+  (68,530 B before): `/device` 90,901 B, `/glsl` 42,394 B (the size uniforms of bug 52), `/compute` 41,489 B, `/wgsl`
+  26,528 B. A render-only page downloads what it did before plus the bug fixes: the compute chunks (about 22 KB) load
+  only with the first compute pipeline. Over the 60,000 B target by 31,068 B; nothing was cut. Browsers with WebGPU
+  download none of it, and core + stage are unchanged at 21,974 B.

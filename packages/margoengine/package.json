@@ -1487,6 +1487,10 @@
       "types": "./dist/webgl2-compat.d.ts",
       "import": "./dist/webgl2-compat.js"
     },
+    "./webgl2-compat/compute": {
+      "types": "./dist/webgl2-compat/compute.d.ts",
+      "import": "./dist/webgl2-compat/compute.js"
+    },
     "./webgl2-compat/device": {
       "types": "./dist/webgl2-compat/device.d.ts",
       "import": "./dist/webgl2-compat/device.js"

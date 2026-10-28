@@ -113,6 +113,80 @@ window.drawAll = async (records, sources) => {
   device.destroy();
   return { drawn, failures, waiting };
 };
+// Every recorded compute pipeline (milestone M5): planned, translated for its tier and dispatched once (one
+// workgroup) with stand-in resources, so each fragment or scatter program meets ANGLE's draw-time compile and each
+// CPU kernel runs. Returns the count per tier and the failures.
+window.dispatchAll = async (records, sources) => {
+  const gpu = createCompatGPU();
+  const failures = [],
+    tiers = {};
+  let device, modules;
+  const fresh = async () => {
+    device?.destroy();
+    device = await (await gpu.requestAdapter()).requestDevice();
+    await device.loadCompute();
+    modules = new Map();
+  };
+  await fresh();
+  for (const rec of records) {
+    const module = (key) => {
+      if (!modules.has(key)) modules.set(key, device.createShaderModule({ code: sources[key] }));
+      return modules.get(key);
+    };
+    try {
+      device.pushErrorScope('validation');
+      const pipeline = device.createComputePipeline({
+        layout: 'auto',
+        compute: { module: module(rec.compute.module), entryPoint: rec.compute.entryPoint, constants: rec.compute.constants },
+      });
+      const groups = [];
+      for (let g = 0; g < 4; g++) {
+        const layout = pipeline.getBindGroupLayout(g);
+        if (!layout.entries.length) continue;
+        const entries = layout.entries.map((e) => {
+          if (e.buffer) return { binding: e.binding, resource: { buffer: device.createBuffer({ size: Math.ceil((e.buffer.minBindingSize + 256) / 256) * 256, usage: (e.buffer.type === 'uniform' ? 64 : 128) | 8 }) } };
+          if (e.sampler) return { binding: e.binding, resource: device.createSampler(e.sampler.type === 'comparison' ? { compare: 'less' } : { magFilter: 'linear', minFilter: 'linear' }) };
+          const st = e.storageTexture,
+            t = e.texture,
+            dim = st ? st.viewDimension : t.viewDimension;
+          const tex = device.createTexture({
+            size: [4, 4, dim === 'cube' ? 6 : dim === '2d-array' || dim === '3d' ? 2 : 1],
+            dimension: dim === '3d' ? '3d' : '2d',
+            format: st ? st.format : FORMAT[t.sampleType],
+            sampleCount: t?.multisampled ? 4 : 1,
+            usage: st ? 8 | 4 | 1 : 4 | (t.multisampled ? 16 : 2),
+            textureBindingViewDimension: dim,
+          });
+          return { binding: e.binding, resource: tex.createView({ dimension: dim }) };
+        });
+        groups[g] = device.createBindGroup({ layout, entries });
+      }
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginComputePass();
+      pass.setPipeline(pipeline);
+      groups.forEach((group, g) => group && pass.setBindGroup(g, group));
+      pass.dispatchWorkgroups(1);
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+      const scoped = await device.popErrorScope();
+      const gl = device.gl,
+        error = gl.getError();
+      if (scoped || error || gl.isContextLost()) {
+        failures.push(`${rec.id}: ${scoped?.message ?? ''} GL error ${error}${gl.isContextLost() ? ', context lost' : ''}`.slice(0, 1500));
+        await fresh();
+      } else tiers[pipeline.built.tier] = (tiers[pipeline.built.tier] ?? 0) + 1;
+    } catch (error) {
+      await device.popErrorScope().catch(() => null);
+      const message = String(error?.message ?? error);
+      if (error?.code === 'unsupported') {
+        const reason = message.replace(/; see .*/, '').replace(/'[^']*'/g, "'...'");
+        tiers[`refused: ${reason}`] = (tiers[`refused: ${reason}`] ?? 0) + 1;
+      } else failures.push(`${rec.id}: ${message}`.slice(0, 1500));
+    }
+  }
+  device.destroy();
+  return { tiers, failures };
+};
 window.ready = true;
 </script>
 </body>

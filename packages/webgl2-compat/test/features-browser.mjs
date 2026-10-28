@@ -57,6 +57,17 @@ try {
     lines.push(`${name}: same as native`);
     // Each case must test something: a few known values, so an empty or all-zero result on both sides fails.
     const r = compat.result;
+    if (name === 'mipViews') assert.equal(r.pixels[0], 8 * 1000 + 8 * 100 + 4 * 10 + 4, 'sizes of views of later mip levels');
+    if (name === 'canvasRead')
+      assert.deepEqual(
+        r.frames,
+        [
+          [255, 0, 0, 255],
+          [0, 0, 255, 255],
+          [0, 255, 0, 255],
+        ],
+        'each frame is seen in its own task',
+      );
     if (name === 'srgbView')
       assert.deepEqual(r.back.slice(0, 4), [188, 137, 255, 255], 'linear 0.5 through the sRGB view');
     if (name === 'layerView') assert.notDeepEqual(r.after, r.before, 'the render into the layer is seen');

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3892435,
+  "total": 3986691,
   "history": [
     {
       "date": "2026-10-24",
@@ -764,6 +764,12 @@
       "commit": "0765a2c1",
       "reason": "biomes B5: new entries /placement (stored-object placement: candidates, clusters, Luby hard core, canopy layers, exclusions, records, rasters) and /stats (point-pattern statistics and global envelope tests); the root is unchanged",
       "grew": 2
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "77315526",
+      "reason": "webgl2-compat milestone M5: compute (fragment, scatter and CPU tiers) in the lazy /compute chunks the device loads with the first compute pipeline, plus the per-texture size uniforms of bug 52; nothing loads on the WebGPU path",
+      "grew": 4
     }
   ],
   "items": {
@@ -1138,9 +1144,10 @@
     "@margoengine/weather": 5252,
     "@margoengine/weather/hail": 4287,
     "@margoengine/webgl": 3277,
-    "@margoengine/webgl2-compat": 68870,
-    "@margoengine/webgl2-compat/device": 68664,
-    "@margoengine/webgl2-compat/glsl": 42040,
+    "@margoengine/webgl2-compat": 93801,
+    "@margoengine/webgl2-compat/compute": 42734,
+    "@margoengine/webgl2-compat/device": 93629,
+    "@margoengine/webgl2-compat/glsl": 43666,
     "@margoengine/webgl2-compat/wgsl": 27240,
     "@margoengine/wfc": 1878,
     "@margoengine/wfc/overlapping": 2259,

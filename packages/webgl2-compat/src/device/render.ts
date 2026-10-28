@@ -7,6 +7,7 @@ import { translateWGSL, type GLSLProgram, type GLSLStage } from '../glsl.js';
 import type { TextureType } from '../wgsl/types.js';
 import { type FormatInfo, hasDepth, hasStencil, toHalf, VERTEX_FORMATS } from './formats.js';
 import type { CompatDevice } from './device.js';
+import { type BoundGroup, CompatComputePassEncoder, type CompatComputePipeline } from './compute.js';
 import {
   type Bound,
   type CompatBindGroup,
@@ -82,12 +83,15 @@ interface UniformSlot {
   size: number;
 }
 interface TextureSlot {
-  readonly unit: number;
+  /** The texture unit, or -1 for a texture read only for its size or level count. */
+  unit: number;
   readonly group: number;
   readonly binding: number;
   readonly sampler?: { readonly group: number; readonly binding: number; readonly comparison: boolean };
   readonly type: TextureType;
   readonly levels: WebGLUniformLocation[];
+  /** Size uniforms (the view's first level: width, height, depth or layers; see GLSLTexture.size). */
+  readonly sizes: WebGLUniformLocation[];
   /** textureGather's address modes and comparison uniforms, each read from its sampler (see CompatSampler.modes). */
   readonly modes: { readonly location: WebGLUniformLocation; readonly group: number; readonly binding: number }[];
 }
@@ -135,9 +139,12 @@ export class CompatRenderPipeline {
     element: -1,
     pointers: [] as string[],
     levels: new Map<WebGLUniformLocation, number>(),
+    sizes: new Map<WebGLUniformLocation, string>(),
     modes: new Map<WebGLUniformLocation, string>(),
     info: new Map<WebGLUniformLocation, string>(),
   };
+  /** @internal Sets per-draw uniforms of a program the device built itself (the compute tiers). */
+  onDraw: (() => void) | null = null;
   private linked = false;
   private readonly layouts: (CompatBindGroupLayout | null)[];
   private readonly shaders: WebGLShader[] = [];
@@ -146,6 +153,7 @@ export class CompatRenderPipeline {
     readonly device: CompatDevice,
     descriptor: GPURenderPipelineDescriptor,
     deferLink = false,
+    prebuilt?: GLSLProgram,
   ) {
     const gl = device.gl;
     this.label = descriptor.label ?? '';
@@ -165,29 +173,31 @@ export class CompatRenderPipeline {
       fragmentModule = descriptor.fragment?.module as unknown as CompatShaderModule | undefined;
     const explicit = descriptor.layout !== 'auto' ? (descriptor.layout as unknown as CompatPipelineLayout) : null;
     this.layouts = explicit ? [...explicit.bindGroupLayouts] : [];
-    if (vertexModule.error || fragmentModule?.error) {
+    if (!prebuilt && (vertexModule.error || fragmentModule?.error)) {
       this.failure = 'createRenderPipeline: a shader module of the pipeline failed to compile';
       device.validationError(this.failure);
       return;
     }
     try {
-      this.glsl = translateWGSL({
-        vertex: {
-          module: vertexModule.ir as never,
-          entryPoint: descriptor.vertex.entryPoint,
-          constants: descriptor.vertex.constants as Record<string, number>,
-        },
-        fragment: descriptor.fragment && {
-          module: fragmentModule?.ir as never,
-          entryPoint: descriptor.fragment.entryPoint,
-          constants: descriptor.fragment.constants as Record<string, number>,
-        },
-        clipControl: !!device.ext.clipControl,
-        points: prim.topology === 'point-list',
-        // Storage bindings without a dynamic offset share their bind group's data texture: one unit per group.
-        sharedStorage: (group, binding) =>
-          !explicit?.bindGroupLayouts[group]?.entries.find((e) => e.binding === binding)?.buffer?.hasDynamicOffset,
-      });
+      this.glsl =
+        prebuilt ??
+        translateWGSL({
+          vertex: {
+            module: vertexModule.ir as never,
+            entryPoint: descriptor.vertex.entryPoint,
+            constants: descriptor.vertex.constants as Record<string, number>,
+          },
+          fragment: descriptor.fragment && {
+            module: fragmentModule?.ir as never,
+            entryPoint: descriptor.fragment.entryPoint,
+            constants: descriptor.fragment.constants as Record<string, number>,
+          },
+          clipControl: !!device.ext.clipControl,
+          points: prim.topology === 'point-list',
+          // Storage bindings without a dynamic offset share their bind group's data texture: one unit per group.
+          sharedStorage: (group, binding) =>
+            !explicit?.bindGroupLayouts[group]?.entries.find((e) => e.binding === binding)?.buffer?.hasDynamicOffset,
+        });
     } catch (error) {
       if ((error as { code?: string }).code === 'unsupported') throw error;
       this.failure = `createRenderPipeline${this.label ? ` '${this.label}'` : ''}: ${(error as Error).message}`;
@@ -273,6 +283,7 @@ export class CompatRenderPipeline {
     this.device.state.useProgram(program);
     const points = new Map<string, UniformSlot>(),
       units = new Map<string, TextureSlot>();
+    let textureUnits = 0;
     for (const stage of [glsl.vertex, glsl.fragment] as GLSLStage[]) {
       for (const u of stage.uniforms) {
         const index = gl.getUniformBlockIndex(program, u.block);
@@ -290,25 +301,33 @@ export class CompatRenderPipeline {
         );
       }
       for (const t of stage.textures) {
-        const location = gl.getUniformLocation(program, t.name);
-        if (!location) continue;
+        // A texture read only for its size or level count keeps a slot (the device sets those uniforms from the
+        // bound view) but takes no texture unit: the compiler drops its unused sampler.
+        const location = gl.getUniformLocation(program, t.name),
+          levels = t.levels ? gl.getUniformLocation(program, t.levels) : null,
+          size = t.size ? gl.getUniformLocation(program, t.size) : null;
+        if (!location && !levels && !size) continue;
         const key = `${t.group}:${t.binding}|${t.sampler ? `${t.sampler.group}:${t.sampler.binding}` : ''}|${t.gather ? `${t.gather.group}:${t.gather.binding}` : ''}`;
         let slot = units.get(key);
         if (!slot) {
           slot = {
-            unit: units.size,
+            unit: -1,
             group: t.group,
             binding: t.binding,
             sampler: t.sampler,
             type: t.type,
             levels: [],
+            sizes: [],
             modes: [],
           };
           units.set(key, slot);
         }
-        gl.uniform1i(location, slot.unit);
-        const levels = t.levels ? gl.getUniformLocation(program, t.levels) : null;
+        if (location) {
+          if (slot.unit < 0) slot.unit = textureUnits++;
+          gl.uniform1i(location, slot.unit);
+        }
         if (levels) slot.levels.push(levels);
+        if (size) slot.sizes.push(size);
         const modes = t.gather ? gl.getUniformLocation(program, t.gather.name) : null;
         if (modes && t.gather) slot.modes.push({ location: modes, group: t.gather.group, binding: t.gather.binding });
       }
@@ -320,7 +339,7 @@ export class CompatRenderPipeline {
         const key = b.shared ? `g${b.group}` : `${b.group}:${b.binding}`;
         let slot = buffers.get(key);
         if (!slot) {
-          slot = { unit: units.size + buffers.size, group: b.group, binding: b.shared ? -1 : b.binding, info: [] };
+          slot = { unit: textureUnits + buffers.size, group: b.group, binding: b.shared ? -1 : b.binding, info: [] };
           buffers.set(key, slot);
         }
         const texture = gl.getUniformLocation(program, b.texture),
@@ -328,10 +347,10 @@ export class CompatRenderPipeline {
         if (texture) gl.uniform1i(texture, slot.unit);
         if (info) slot.info.push({ location: info, binding: b.binding });
       }
-    const used = units.size + buffers.size;
+    const used = textureUnits + buffers.size;
     if (used > this.device.limits.maxSampledTexturesPerShaderStage)
       throw this.device.unsupported(
-        `a pipeline with ${units.size} texture and sampler pairs and ${buffers.size} storage buffers (WebGL2 has ${this.device.limits.maxSampledTexturesPerShaderStage} texture units, and each storage buffer takes one)`,
+        `a pipeline with ${textureUnits} texture and sampler pairs and ${buffers.size} storage buffers (WebGL2 has ${this.device.limits.maxSampledTexturesPerShaderStage} texture units, and each storage buffer takes one)`,
       );
     this.storage.push(...buffers.values());
     this.uniforms.push(...points.values());
@@ -462,6 +481,8 @@ export class CompatCommandBuffer {
   constructor(
     readonly ops: readonly Op[],
     public label: string,
+    /** True when it holds compute passes (their runtime loads before it replays). */
+    readonly compute = false,
   ) {}
 }
 
@@ -543,6 +564,7 @@ export class CompatQuerySet {
 export class CompatCommandEncoder {
   private readonly ops: Op[] = [];
   private finished = false;
+  private compute = false;
   constructor(
     private readonly device: CompatDevice,
     public label: string,
@@ -583,8 +605,10 @@ export class CompatCommandEncoder {
     return new CompatRenderPassEncoder(this.ops, d.label ?? '');
   }
 
-  beginComputePass(): never {
-    throw this.device.unsupported('compute passes (compute is milestone M5)');
+  beginComputePass(d: GPUComputePassDescriptor = {}): CompatComputePassEncoder {
+    if (d.timestampWrites) throw this.device.unsupported('timestamp queries');
+    this.compute = true;
+    return new CompatComputePassEncoder(this.ops, this.device, d.label ?? '');
   }
 
   copyBufferToBuffer(
@@ -641,7 +665,7 @@ export class CompatCommandEncoder {
   finish(descriptor: GPUCommandBufferDescriptor = {}): CompatCommandBuffer {
     if (this.finished) this.device.validationError('finish() was already called on this command encoder');
     this.finished = true;
-    return new CompatCommandBuffer(this.ops, descriptor.label ?? this.label);
+    return new CompatCommandBuffer(this.ops, descriptor.label ?? this.label, this.compute);
   }
 }
 
@@ -1261,6 +1285,19 @@ export class Replayer {
     });
   }
 
+  /** Runs one compute dispatch (the compute runtime is loaded before a command buffer with one replays). */
+  dispatch(p: CompatComputePipeline, groups: readonly BoundGroup[], count: readonly number[]): void {
+    if (!count[0] || !count[1] || !count[2]) return;
+    try {
+      if (!p.ready()) return;
+    } catch (error) {
+      p.failure = `createComputePipeline${p.label ? ` '${p.label}'` : ''}: ${(error as Error).message}`;
+      this.device.validationError(p.failure);
+      return;
+    }
+    this.device.computeRuntime?.dispatch(this, p, groups, count);
+  }
+
   /** The bytes of an indirect argument block (from the CPU copy; a GPU-written buffer is read back, which stalls). */
   indirect(buffer: CompatBuffer, offset: number, size: number): ArrayBuffer {
     return buffer.bytes().slice(offset, offset + size).buffer;
@@ -1446,14 +1483,16 @@ export class Replayer {
           p.cache.modes.set(m.location, key);
         }
       }
-      let levels = 1;
-      if (tex.renderbuffer) {
+      let levels = view.mipLevelCount;
+      if (t.unit < 0) {
+        // Read for its size or level count only: nothing to bind.
+      } else if (tex.renderbuffer) {
+        levels = 1;
         this.resolveForSampling(tex);
         plan.push({ unit: t.unit, target: gl.TEXTURE_2D, texture: tex.resolved, sampler });
       } else {
         const storage = tex.sampled(view);
         tex.read(storage, view.baseMipLevel, view.mipLevelCount, view.baseArrayLayer, view.arrayLayerCount, this.sync);
-        levels = view.mipLevelCount;
         const range = `${view.baseMipLevel}:${view.baseMipLevel + levels - 1}`;
         if (storage.levels !== range) {
           s.scratch(storage.target, storage.gl);
@@ -1462,6 +1501,17 @@ export class Replayer {
           storage.levels = range;
         }
         plan.push({ unit: t.unit, target: storage.target, texture: storage.gl, sampler });
+      }
+      if (t.sizes.length) {
+        const [w, h, d] = tex.levelSize(tex.renderbuffer ? 0 : view.baseMipLevel);
+        const depth = tex.dimension === '3d' ? d : tex.renderbuffer ? 1 : view.arrayLayerCount;
+        const key = `${w},${h},${depth}`;
+        for (const loc of t.sizes)
+          if (p.cache.sizes.get(loc) !== key) {
+            s.useProgram(p.program);
+            gl.uniform4i(loc, w, h, depth, 0);
+            p.cache.sizes.set(loc, key);
+          }
       }
       for (const loc of t.levels)
         if (p.cache.levels.get(loc) !== levels) {
@@ -1553,6 +1603,7 @@ export class Replayer {
     if (!this.applyBindings(p, pass)) return null;
     this.applyPipeline(p, pass);
     if (!this.applyVertex(p, pass, baseVertex, firstInstance)) return null;
+    p.onDraw?.();
     const gl = this.gl;
     if (p.baseVertex && p.cache.baseVertex !== baseVertex) {
       gl.uniform1ui(p.baseVertex, baseVertex >>> 0);
@@ -1590,7 +1641,8 @@ export class Replayer {
   // ------------------------------------------------ helper draws
 
   /** A full-target triangle program with this fragment shader body (compiled once per device). */
-  private helper(key: string, fragment: string): Helper {
+  /** @internal */
+  helper(key: string, fragment: string): Helper {
     let h = this.helpers.get(key);
     if (h) return h;
     const gl = this.gl,
@@ -1623,7 +1675,8 @@ export class Replayer {
   }
 
   /** Sets the GL state for a helper draw into the bound framebuffer over (0, 0, w, h). */
-  private helperState(h: Helper, w: number, ht: number): void {
+  /** @internal */
+  helperState(h: Helper, w: number, ht: number): void {
     const gl = this.gl,
       s = this.device.state;
     this.openMasks();
@@ -1647,15 +1700,8 @@ export class Replayer {
    * Draws texels of a storage into a new RGBA32F, RGBA32UI or RGBA32I texture of w x h (texel (x, y) of the level and
    * layer at its (0, 0)) and returns the framebuffer that reads it: how formats readPixels cannot read are read back.
    */
-  private fetchInto(
-    s: TextureStorage,
-    level: number,
-    layer: number,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-  ): ReadSource {
+  /** @internal */
+  fetchInto(s: TextureStorage, level: number, layer: number, x: number, y: number, w: number, h: number): ReadSource {
     const gl = this.gl,
       state = this.device.state,
       kind = s.info.kind === 'uint' ? 'u' : s.info.kind === 'sint' ? 'i' : '';

@@ -150,6 +150,7 @@ export interface GLSLTexture {
     };
     readonly name: string;
     readonly levels?: string;
+    readonly size?: string;
     readonly gather?: {
         readonly name: string;
         readonly group: number;

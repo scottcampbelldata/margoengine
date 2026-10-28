@@ -11,7 +11,7 @@
 // GL cannot make (sRGB reinterpretation, a 2D view of an array layer, cube views of arrays, array views of cubes),
 // copyTextureToBuffer of depth, stencil, packed and snorm formats, occlusion queries, render bundles, textureGather,
 // external textures, and regressions. Each case takes a device and returns plain numbers.
-import { createCompatGPU } from '/packages/webgl2-compat/dist/device.js';
+import { CompatCanvasContext, createCompatGPU } from '/packages/webgl2-compat/dist/device.js';
 
 const U = { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, RENDER_ATTACHMENT: 16 };
 const B = { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, UNIFORM: 64, QUERY_RESOLVE: 512 };
@@ -76,6 +76,69 @@ function clearView(device, view, clearValue) {
 }
 
 const cases = {
+  /**
+   * Sizes and loads of views that start at a later mip level, in 2D, 2D-array and 3D textures (regression: ANGLE's
+   * Direct3D 11 back end applies TEXTURE_BASE_LEVEL twice in GLSL's textureSize, so the layer read a quarter of
+   * the size and clamped loads into it).
+   */
+  async mipViews(device) {
+    const make = (dimension, depth, levels) => {
+      const t = device.createTexture({ size: [16, 16, depth], dimension, format: 'r32float', mipLevelCount: levels, usage: U.TEXTURE_BINDING | U.COPY_DST });
+      for (let l = 0; l < levels; l++) {
+        const w = 16 >> l, d = dimension === '3d' ? Math.max(1, depth >> l) : depth;
+        const data = Float32Array.from({ length: w * w * d }, (_, i) => l * 1000 + i);
+        device.queue.writeTexture({ texture: t, mipLevel: l }, data, { bytesPerRow: w * 4, rowsPerImage: w }, [w, w, d]);
+      }
+      return t;
+    };
+    const flat = make('2d', 1, 4), layered = make('2d', 3, 4), volume = make('3d', 8, 3);
+    return {
+      pixels: await shade(device, {
+        w: 8,
+        code: `@group(0) @binding(0) var t: texture_2d<f32>;
+          @group(0) @binding(1) var a: texture_2d_array<f32>;
+          @group(0) @binding(2) var vol: texture_3d<f32>;
+          @group(0) @binding(3) var only: texture_2d<f32>;
+          @fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
+            let i = u32(p.x);
+            let d = textureDimensions(t);
+            let da = textureDimensions(a, 1);
+            let dv = textureDimensions(vol);
+            return vec4f(f32(textureDimensions(only).x * 1000u + d.x * 100u + da.x * 10u + dv.z), textureLoad(t, vec2u(i, 3u), 0).r, textureLoad(a, vec2u(i % 4u, 1u), 2, 1).r, textureLoad(vol, vec3u(i, i, 1u), 0).r + f32(textureNumLayers(a)));
+          }`,
+        entries: [
+          { binding: 0, resource: flat.createView({ baseMipLevel: 1, mipLevelCount: 2 }) },
+          { binding: 1, resource: layered.createView({ dimension: '2d-array', baseMipLevel: 1 }) },
+          { binding: 2, resource: volume.createView({ baseMipLevel: 1 }) },
+          // Read for its size only (regression: such a texture had no slot, so its size uniform stayed zero).
+          { binding: 3, resource: flat.createView({ baseMipLevel: 1 }) },
+        ],
+      }),
+    };
+  },
+  /**
+   * A canvas read in the task that drew it shows the new frame (regression: the layer showed canvas frames a
+   * microtask after the submit, so a synchronous drawImage of the canvas read the previous frame).
+   */
+  async canvasRead(device) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 4;
+    const context = device.gl ? new CompatCanvasContext(canvas, HTMLCanvasElement.prototype.getContext) : canvas.getContext('webgpu');
+    context.configure({ device, format: 'rgba8unorm', alphaMode: 'premultiplied' });
+    const read = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    read.canvas.width = read.canvas.height = 4;
+    const frames = [];
+    for (const clearValue of [[1, 0, 0, 1], [0, 0, 1, 1], [0, 1, 0, 1]]) {
+      const e = device.createCommandEncoder();
+      e.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue }] }).end();
+      device.queue.submit([e.finish()]);
+      read.clearRect(0, 0, 4, 4);
+      read.drawImage(canvas, 0, 0);
+      frames.push([...read.getImageData(1, 1, 1, 1).data]);
+      await new Promise(requestAnimationFrame);
+    }
+    return { frames };
+  },
   /** An rgba8unorm texture read and written through its rgba8unorm-srgb view, and back. */
   async srgbView(device) {
     const t = device.createTexture({

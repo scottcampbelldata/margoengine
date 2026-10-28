@@ -5,6 +5,7 @@
 import { fault } from '../../../shared/errors.js';
 import { webgl2Capabilities, type WebGL2Capabilities } from '../index.js';
 import { extensions, type Extensions, GLState } from './gl.js';
+import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
 import {
   CompatBindGroup,
   CompatBindGroupLayout,
@@ -223,10 +224,12 @@ export class CompatDevice extends EventTarget {
   private readonly framebuffers = new Map<string, WebGLFramebuffer>();
   /** Canvas contexts with a frame waiting to be shown. */
   readonly presents = new Set<{ present(): void }>();
-  private presentQueued = false;
   readonly replayer: Replayer;
   /** The texture each external source copies into, reused while its size stays. */
   private readonly externals = new WeakMap<object, CompatTexture>();
+  /** The compute runtime, once its entry has loaded (the first compute pipeline loads it). */
+  computeRuntime: ComputeRuntime | null = null;
+  private computeLoad: Promise<void> | null = null;
 
   constructor(
     readonly gl: WebGL2RenderingContext,
@@ -314,7 +317,7 @@ export class CompatDevice extends EventTarget {
 
   // ---------------------------------------------------------------- lifetime
 
-  private lose(reason: 'destroyed' | 'unknown', message: string): void {
+  lose(reason: 'destroyed' | 'unknown', message: string): void {
     if (this.destroyed) return;
     this.destroyed = true;
     this.resolveLost({ reason, message });
@@ -340,6 +343,8 @@ export class CompatDevice extends EventTarget {
   /** Resolves when the GPU has finished every command submitted so far. */
   idle(): Promise<void> {
     if (this.destroyed) return Promise.resolve();
+    const waiting = this.queue.waiting;
+    if (waiting) return waiting.then(() => this.idle());
     const gl = this.gl,
       sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
     gl.flush();
@@ -362,17 +367,19 @@ export class CompatDevice extends EventTarget {
     });
   }
 
-  /** Shows waiting canvas frames at the end of the current task (once per task). */
+  /** Marks a canvas whose texture a replayed pass drew into; the submit shows it when it ends. */
   queuePresent(context: { present(): void }): void {
     this.presents.add(context);
-    if (this.presentQueued) return;
-    this.presentQueued = true;
-    queueMicrotask(() => {
-      this.presentQueued = false;
-      if (this.destroyed) return;
-      for (const c of [...this.presents]) c.present();
-      this.presents.clear();
-    });
+  }
+
+  /**
+   * Shows the canvas frames a submit drew, as it ends: WebGPU shows a canvas texture's contents to anything that
+   * reads the canvas in the same task (drawImage, toDataURL), so the page canvas cannot wait for a later microtask.
+   */
+  flushPresents(): void {
+    if (this.destroyed) return;
+    for (const c of [...this.presents]) c.present();
+    this.presents.clear();
   }
 
   // ---------------------------------------------------------------- framebuffers
@@ -445,17 +452,47 @@ export class CompatDevice extends EventTarget {
       return pipeline;
     });
   }
-  createComputePipeline(descriptor: GPUComputePipelineDescriptor): never {
-    throw this.unsupported(
-      `compute pipelines${descriptor.label ? ` ('${descriptor.label}')` : ''} (compute is milestone M5)`,
+  /**
+   * Loads the compute runtime (the compute entry) once. A render-only page never calls this, so it never downloads
+   * compute; command buffers with compute passes wait in the queue until it has loaded.
+   */
+  loadCompute(): Promise<void> {
+    this.computeLoad ??= import('../compute/runtime.js').then(
+      (m) => {
+        this.computeRuntime = m.computeRuntime(this);
+      },
+      (error) => {
+        this.lose(
+          'unknown',
+          `The compute part of the WebGL2 compatibility layer did not load: ${(error as Error).message}`,
+        );
+        throw error;
+      },
     );
+    return this.computeLoad;
   }
-  createComputePipelineAsync(descriptor: GPUComputePipelineDescriptor): Promise<never> {
-    return Promise.reject(
-      this.unsupported(
-        `compute pipelines${descriptor.label ? ` ('${descriptor.label}')` : ''} (compute is milestone M5)`,
-      ),
-    );
+  /**
+   * A compute pipeline. Once the compute runtime has loaded, what no tier can run throws MargoError code
+   * `unsupported` here; before that (the first pipeline of a page) it is planned at its first dispatch and a refusal
+   * is a validation error then. createComputePipelineAsync always refuses at creation.
+   */
+  createComputePipeline(descriptor: GPUComputePipelineDescriptor): CompatComputePipeline {
+    const pipeline = new CompatComputePipeline(this, descriptor);
+    if (this.computeRuntime) pipeline.ready();
+    else void this.loadCompute().catch(() => undefined);
+    return pipeline;
+  }
+  createComputePipelineAsync(descriptor: GPUComputePipelineDescriptor): Promise<CompatComputePipeline> {
+    return this.loadCompute().then(() => {
+      const pipeline = new CompatComputePipeline(this, descriptor);
+      pipeline.ready();
+      if (pipeline.failure)
+        throw Object.assign(new DOMException(pipeline.failure, 'OperationError'), {
+          name: 'GPUPipelineError',
+          reason: 'validation',
+        });
+      return pipeline;
+    });
   }
   createCommandEncoder(descriptor: GPUCommandEncoderDescriptor = {}): CompatCommandEncoder {
     return new CompatCommandEncoder(this, descriptor.label ?? '');
@@ -500,19 +537,49 @@ export class CompatDevice extends EventTarget {
 /** The GPUQueue: buffer and texture writes run at once; command buffers replay on submit. */
 export class CompatQueue {
   label = '';
+  /** Queue operations waiting for the compute runtime, in submission order; null when nothing waits. */
+  private backlog: (() => void)[] | null = null;
+  /** Resolves when the waiting operations have run. */
+  waiting: Promise<void> | null = null;
   constructor(private readonly device: CompatDevice) {}
 
-  submit(buffers: Iterable<{ ops: readonly ((r: Replayer) => void)[]; used?: boolean }>): void {
+  /** Runs `op` now, or after the operations already waiting. */
+  private inOrder(op: () => void): void {
+    if (this.backlog) this.backlog.push(op);
+    else op();
+  }
+
+  submit(buffers: Iterable<{ ops: readonly ((r: Replayer) => void)[]; used?: boolean; compute?: boolean }>): void {
     const d = this.device;
     if (d.destroyed) return;
+    const list: { ops: readonly ((r: Replayer) => void)[]; compute?: boolean }[] = [];
     for (const cb of buffers) {
       if (cb.used) {
         d.validationError('A command buffer can be submitted once');
         continue;
       }
       cb.used = true;
-      d.replayer.run(cb.ops);
+      list.push(cb);
     }
+    if (!this.backlog && !d.computeRuntime && list.some((cb) => cb.compute)) {
+      // The compute runtime loads first; everything the queue gets meanwhile runs after, in order.
+      const backlog: (() => void)[] = (this.backlog = []);
+      this.waiting = d.loadCompute().then(
+        () => {
+          this.backlog = null;
+          this.waiting = null;
+          for (const op of backlog) op();
+        },
+        () => {
+          this.backlog = null;
+          this.waiting = null;
+        },
+      );
+    }
+    this.inOrder(() => {
+      for (const cb of list) if (!d.destroyed) d.replayer.run(cb.ops);
+      d.flushPresents();
+    });
   }
 
   writeBuffer(
@@ -537,7 +604,10 @@ export class CompatQueue {
       return;
     }
     const bytes = new Uint8Array(view ? view.buffer : (data as ArrayBuffer), base + start, length);
-    buffer.write(offset, bytes);
+    if (this.backlog) {
+      const copy = bytes.slice();
+      this.inOrder(() => buffer.write(offset, copy));
+    } else buffer.write(offset, bytes);
   }
 
   writeTexture(
@@ -548,13 +618,10 @@ export class CompatQueue {
   ): void {
     if (this.device.destroyed) return;
     const view = ArrayBuffer.isView(data) ? data : new Uint8Array(data as ArrayBuffer);
-    writeTexture(
-      this.device,
-      destination as never,
-      new Uint8Array(view.buffer, view.byteOffset, view.byteLength),
-      layout,
-      size,
-    );
+    let bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+    if (this.backlog) bytes = bytes.slice();
+    const target = { ...destination };
+    this.inOrder(() => writeTexture(this.device, target as never, bytes, layout, size));
   }
 
   copyExternalImageToTexture(
@@ -563,7 +630,7 @@ export class CompatQueue {
     size: GPUExtent3D,
   ): void {
     if (this.device.destroyed) return;
-    copyExternalImage(this.device, source, destination as never, size);
+    this.inOrder(() => copyExternalImage(this.device, source, destination as never, size));
   }
 
   onSubmittedWorkDone(): Promise<undefined> {

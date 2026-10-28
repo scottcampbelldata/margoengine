@@ -2,7 +2,7 @@
 // `npm run test:browser`, part of check:merge; run from the repository root). Linking is not enough: ANGLE's Direct3D
 // back end compiles the pixel shader at the first draw, for the formats bound then, and a shader its HLSL compiler
 // cannot build loses the context there (a translation with emulated dynamic vector indexing in every uniform read did).
-// Pipelines that need storage resources or compute wait for later milestones and are counted, not drawn.
+// Then every recorded compute pipeline is planned, translated for its tier and dispatched once (milestone M5).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { readCorpus } from './corpus/store.mjs';
@@ -10,10 +10,23 @@ import { readCorpus } from './corpus/store.mjs';
 const { modules } = readCorpus();
 const sources = {},
   records = [],
+  computes = [],
   seen = new Set();
+let outOfScope = 0;
 for (const m of modules) {
   sources[m.key] = m.code;
   for (const p of m.pipelines) {
+    if (p.compute && p.compute.module === m.key) {
+      const id = JSON.stringify(p.compute);
+      if (!seen.has(id)) {
+        seen.add(id);
+        // The voxel path tracer is out of scope on WebGL2 (roadmap, package plan): its compute shaders take ANGLE's
+        // Direct3D shader compiler 20 s to several minutes each. compute.test.js still plans all of them.
+        if (m.package === 'voxel-pathtracer') outOfScope++;
+        else computes.push({ ...p, id: `${m.package} ${m.key} ${p.compute.entryPoint ?? ''}` });
+      }
+      continue;
+    }
     if (p.kind !== 'render' || !p.vertex || p.vertex.module !== m.key) continue;
     const id = JSON.stringify([p.vertex, p.fragment, p.primitive, p.depthStencil, p.multisample]);
     if (seen.has(id)) continue;
@@ -36,6 +49,21 @@ try {
   if (result.failures.length) console.log(`FAILURES ${result.failures.length}:\n${result.failures.join('\n')}`);
   assert.deepEqual(result.failures, []);
   assert.ok(result.drawn > 200, `only ${result.drawn} pipelines drawn`);
+  const compute = await page.evaluate(({ computes, sources }) => window.dispatchAll(computes, sources), {
+    computes,
+    sources,
+  });
+  const tiers = Object.entries(compute.tiers)
+    .map(([tier, n]) => `  ${n} x ${tier}`)
+    .join('\n');
+  console.log(
+    `WGSL corpus compute: ${computes.length} recorded compute pipelines dispatched on WebGL2 (${outOfScope} of the voxel path tracer, out of scope, not dispatched):\n${tiers}`,
+  );
+  if (compute.failures.length) console.log(`FAILURES ${compute.failures.length}:\n${compute.failures.join('\n')}`);
+  assert.deepEqual(compute.failures, []);
+  // The one refusal of the corpus: light probes sample a cube map in CPU-tier kernels (an accepted difference).
+  for (const tier of Object.keys(compute.tiers))
+    if (tier.startsWith('refused')) assert.match(tier, /textureSampleLevel\(\) on a cube texture on the CPU/);
 } finally {
   await context.close();
 }

@@ -193,7 +193,7 @@ test('refusals are coded: storage buffers, compute stages and cube gathers name 
     });
   coded(
     () => frag('@group(0) @binding(0) var<storage, read_write> b: array<u32>;', 'b[0] = 1u; return vec4u(b[1]);'),
-    /a write to storage buffer 'b' \(storage writes are milestone M5\)/,
+    /a write to storage buffer 'b' in a render stage \(WebGL2 render shaders cannot write buffers\)/,
   );
   coded(
     () =>
