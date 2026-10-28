@@ -38,7 +38,7 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import sharp from 'sharp';
-import { acquire, killTree, quoteWindows } from './gpu-lock.mjs';
+import { acquire, killTree, windowsCommandLine } from './gpu-lock.mjs';
 import { quickstartFiles } from './support/doc-snippets.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -64,9 +64,7 @@ const readerEnv = () => {
 };
 
 const launch = (command, args, options) =>
-  windows
-    ? spawn([command, ...args].map(quoteWindows).join(' '), { ...options, shell: true })
-    : spawn(command, args, options);
+  windows ? spawn(windowsCommandLine([command, ...args]), { ...options, shell: true }) : spawn(command, args, options);
 
 /** The README's three edits that make the reference scenes: shadows off, no texture, no crate spin. */
 export const VARIANTS = {

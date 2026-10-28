@@ -439,6 +439,24 @@ export function quoteWindows(arg) {
   return `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')}"`;
 }
 
+/**
+ * A command line for cmd.exe (`shell: true` on Windows) that hands the program `args` exactly: each quoted for the
+ * program ({@link quoteWindows}), then made literal to cmd. cmd reads the line first and toggles its own quoting at
+ * every ", the escaped \" included, so a | & < > ( ) ^ after an escaped quote stood outside cmd's quotes and ran as its
+ * operator ('a"|b' piped into a command named b). A caret before each such character, with cmd's quote state followed
+ * across the whole line, makes it literal; cmd removes the caret again.
+ */
+export function windowsCommandLine(args) {
+  let out = '',
+    open = false;
+  for (const char of args.map(quoteWindows).join(' ')) {
+    if (char === '"') open = !open;
+    else if (!open && '()^<>&|'.includes(char)) out += '^';
+    out += char;
+  }
+  return out;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [verb, ...rest] = process.argv.slice(2);
   if (verb === 'status') console.log(JSON.stringify(status()));
@@ -499,10 +517,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const maxMinutes = given('max') ?? defaultMaxMinutes(release.mode),
       env = {
         ...process.env,
+        // MARGO_GPU_LOCK chose the lock this run holds. Under another lock (the landing lock) the command's own GPU
+        // work must take the GPU lock beside it, not this one again: inherited, it made every GPU test inside the
+        // landing lock skip the GPU lock and fail its exclusive requests as if nested in a shared slot.
+        ...(isGpuLock ? {} : { MARGO_GPU_LOCK: join(dirname(lockDir), 'gpu.lock') }),
         MARGO_GPU_LOCK_NESTED: join(lockDir, 'nested'),
         MARGO_GPU_LOCK_NESTED_MODE: release.mode,
       };
-    const running = spawnLimited(windows ? command.map(quoteWindows).join(' ') : command, {
+    const running = spawnLimited(windows ? windowsCommandLine(command) : command, {
       timeoutMs: maxMinutes * MIN,
       env,
     });

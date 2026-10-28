@@ -19,9 +19,11 @@ test('a quoted multi-word argument reaches the command intact', () => {
     lock = join(folder, 'test.lock');
   try {
     const printer = 'console.log(JSON.stringify(process.argv.slice(1)))';
-    const out = run(lock, [process.execPath, '-e', printer, 'two words', 'a"quote', 'back\\slash\\', '50%']);
+    // Operators after an escaped quote too: cmd.exe once ran 'a"|b' as a pipe into b.
+    const args = ['two words', 'a"quote', 'back\\slash\\', '50%', 'a"|b', 'x" & echo y', '(c)<d>^e'];
+    const out = run(lock, [process.execPath, '-e', printer, ...args]);
     assert.equal(out.status, 0, out.stderr);
-    assert.deepEqual(JSON.parse(out.stdout.trim()), ['two words', 'a"quote', 'back\\slash\\', '50%']);
+    assert.deepEqual(JSON.parse(out.stdout.trim()), args);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
@@ -53,6 +55,29 @@ test('the nested marker excuses only the held lock: a different lock is still ta
     const same = acquireUnder(gpu, join(gpu, 'nested'));
     assert.equal(same.status, 0, same.stderr);
     assert.equal(JSON.parse(same.stdout.trim()), null);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('run under the landing lock points the command at the GPU lock beside it, which it then really takes', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
+    landing = join(folder, 'land.lock'),
+    gpu = join(folder, 'gpu.lock');
+  try {
+    // A GPU test inside the landing lock: its exclusive request takes the GPU lock instead of failing as nested.
+    const probe = [
+      "const m = await import('./scripts/gpu-lock.mjs');",
+      "const release = await m.acquire({ owner: 'gpu-test', mode: 'exclusive', poll: 10 });",
+      'console.log(process.env.MARGO_GPU_LOCK + "|" + JSON.stringify(m.status()));',
+      'release();',
+    ].join(' ');
+    const out = run(landing, [process.execPath, '--input-type=module', '-e', probe]);
+    assert.equal(out.status, 0, out.stderr);
+    const [lock, status] = out.stdout.trim().split('|');
+    assert.equal(lock, gpu);
+    assert.equal(JSON.parse(status).owner, 'gpu-test');
+    assert.equal(JSON.parse(status).mode, 'exclusive');
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
