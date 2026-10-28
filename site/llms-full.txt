@@ -2833,23 +2833,44 @@ does not own. Each entry says exactly what is needed to close it.
 
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 
-- **What:** on 2026-10-27 the Windows System log shows five `nvlddmkm` event 153 entries ("Error occurred on GPUID:
-  100") at 07:42:55, 08:18:47, 08:58:27, 09:37:03 and 09:53:29, while two or three `check:merge` runs shared the GPU.
-  Each one took the WebGPU device of one browser page: a visual view (`dof-phone`, `texture-formats-phone`) or a
-  browser suite then waited out its ready timeout (120 s, 30 s). No Display 4101 or LiveKernelEvent entry was logged.
-- **Repro:** not yet. Four of the five fell while some run's `voxel-pathtracer test:gpu` was going (each at a different
-  case), the first while three visual checks ran and probably no path tracer. Under an exclusive GPU lock the path
-  tracer suite alone (10:13) and beside `visual:check` and `voxel test:gpu:slow-compile` (10:35) gave no reset, and
-  neither did three later shared runs of it. Its longest submission was 200 ms (native4k), 23 ms in denoise.
-- **Cause: open.** Not a single long dispatch of ours on this GPU (none is near the 2 s watchdog). Every page that lost
-  its device was a short one, and the long path tracer run beside it survived each time.
-- **What is done:** a page whose device is lost (any reason but `destroy()`) now fails its next wait at once with a
-  message naming the loss and the GPU reset (`scripts/support/device-loss.js`, in `openBrowser` and every visual view),
-  so a reset costs one clear failure, not a timeout. The path tracer viewport no longer traces a frame in one dispatch:
-  8.3 million paths at 4K, 100 million at 64 samples a frame on a 1440 x 1100 canvas, which is past the watchdog on a
-  slower GPU; every trace dispatch now carries at most 2^20 paths (`packages/voxel-pathtracer/src/dispatch.ts`).
-- **Needed to close:** what runs at the next reset (process list and GPU lock holders at the moment of the event), then
-  the cause fixed where it lives, or shown to be the driver and reported.
+- **What:** the Windows System log shows nine `nvlddmkm` event 153 entries ("Error occurred on GPUID: 100") on
+  2026-10-27 and 28: 07:42:55, 08:18:47, 08:58:27, 09:37:03, 09:53:29, 22:45:31, 22:45:39, 01:21:49 and 01:41:02,
+  each while two or three `check:merge` runs shared the GPU (NVIDIA RTX A6000, driver 617.42, hardware-accelerated GPU
+  scheduling on, Edge 156 headless). Each took the WebGPU device of one page, and a page asking for a device just then
+  was refused: sciviz at 01:21:47 failed its first `requestDevice` with "D3D12 create command queue failed with
+  E_OUTOFMEMORY (0x8007000E)" with 2 of 48 GB in use, so the failing test is the casualty, not the cause.
+- **Two kinds of reset, told apart by measurement (2026-10-28):** a Windows watchdog reset (TDR) of one GPU engine
+  writes a WER `LiveKernelEvent` 141 report and a `WATCHDOG-*.dmp`; event 153 comes with none, so it is the NVIDIA
+  driver's own reset, not the Windows 2 s watchdog. A deliberate 3 s compute dispatch on the A6000 gives exactly the
+  first kind (141 at 02:08 and 03:11) and no event 153, so our long dispatches are not what makes 153. Nine 141
+  reports from 19:27 to 23:04 on 10-27 came while Edge ran on the AMD integrated GPU (bug 33; at 23:04 the path tracer's
+  spec-math suite was on `amd` and lost its device), which is slow enough for our bigger dispatches to pass 2 s.
+- **Not the trigger (each run under the GPU lock, with a watcher sampling every second):** killing the browser's GPU
+  process in the middle of a 0.6 s dispatch (15 times) or the whole browser tree (15 times); CDP
+  `Browser.crashGpuProcess` mid-work beside a second busy browser (12 times, the lifecycle test's crash); 300 device
+  create and destroy cycles; 6 browsers with back-to-back dispatches for 90 s; one 0.4, 0.8, 1.0 or 1.4 s compute or
+  draw submission at a time against 2 or 3 other browsers (the A6000 runs each submission to the end before another
+  process's, so a short one waits the whole long one, but nothing resets); `test:lifecycle:browser` beside sciviz, 10
+  rounds; two whole `check:gpu-packages` runs and four `visual:check` runs beside other agents' checks (03:00 to 03:10).
+- **Best evidence so far:** eight of the nine came while Scott's Remote Desktop session was connected (07:14 to 14:42,
+  21:11 to 22:59, 01:20 to 01:22; the 01:21:49 reset 17 s before a disconnect); while it is connected the A6000 also
+  draws that session's desktop (it is DXGI adapter 0 only then, bug 33). With the session disconnected, 0 resets in about 90 minutes of the heavier load above. The
+  01:41:02 reset is the exception (disconnected). The morning ones came about every 40 minutes, the length of one
+  check:merge run, while the path tracer still traced a whole frame in one dispatch (fixed 49dca9dd at 11:07).
+- **Also found:** a watchdog reset of one engine (141) cuts that submission short and WebGPU does not lose the device:
+  `onSubmittedWorkDone` resolved at 2.3 s for a 3 s dispatch, a later dispatch and a new device worked, so the page got
+  wrong results with no error. Only the event log shows it, which is why the checks read it (below).
+- **What is done:** a page whose device is lost (any reason but `destroy()`), or whose `requestDevice` the driver
+  refuses, fails its next wait at once, and the message names the reset from the Windows event log (for example
+  "nvlddmkm event 153 at 01:21:49") or says that none was logged (`scripts/support/device-loss.js`,
+  `scripts/support/driver-resets.mjs`). A `check:gpu-packages` test, or any other `check:merge` step, that fails while
+  the log shows a GPU driver reset runs once more; the reset and the rerun are printed and kept in
+  `test-results/gpu-packages.json` and `test-results/check-merge.json`, and a second failure fails the check. The path
+  tracer viewport traces at most 2^20 paths a dispatch (`packages/voxel-pathtracer/src/dispatch.ts`).
+- **Needed to close:** run the checks with the Remote Desktop session disconnected (or with Remote Desktop not using the
+  GPU) for a day and count resets; if 153 still comes, a per-second recorder (GPU engine use and memory per process,
+  Edge GPU processes, lock holders, running tests; kept with the private notes) saves the 150 s before it, and the
+  NVIDIA driver is the next suspect (update it, or try with hardware-accelerated GPU scheduling off).
 
 ### 4x MSAA blending is not repeatable (RTX A6000 under CPU load, and Intel Arc 140V)
 
