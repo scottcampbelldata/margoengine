@@ -115,6 +115,14 @@
       "types": "./dist/biomes/editor.d.ts",
       "import": "./dist/biomes/editor.js"
     },
+    "./biomes/placement": {
+      "types": "./dist/biomes/placement.d.ts",
+      "import": "./dist/biomes/placement.js"
+    },
+    "./biomes/stats": {
+      "types": "./dist/biomes/stats.d.ts",
+      "import": "./dist/biomes/stats.js"
+    },
     "./blender": {
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"

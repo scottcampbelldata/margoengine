@@ -27,7 +27,8 @@ const tree = (id: string, mesh: string, density: number, radius: number, shade: 
   radius,
   shade,
   size: { kind: 'reverse-j', q: 1.4, max: 1.6 },
-  cluster: { kind: 'thomas', parents: 2, spread: 12, offspring: 8 },
+  // Half the stems in fat-tailed 2Dt clusters (seed shadows with scattered outliers, Clark et al. 1999), half at random.
+  cluster: { kind: '2dt', parents: 3, spread: 10, offspring: density / 6 },
 });
 const shrub = (id: string, mesh: string, density: number, radius: number): SpeciesRule => ({
   id,

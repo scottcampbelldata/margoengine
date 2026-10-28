@@ -61,6 +61,14 @@
     "./editor": {
       "types": "./dist/editor.d.ts",
       "import": "./dist/editor.js"
+    },
+    "./placement": {
+      "types": "./dist/placement.d.ts",
+      "import": "./dist/placement.js"
+    },
+    "./stats": {
+      "types": "./dist/stats.d.ts",
+      "import": "./dist/stats.js"
     }
   },
   "files": [

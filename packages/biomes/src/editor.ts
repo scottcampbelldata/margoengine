@@ -6,6 +6,7 @@
 // radius plus the widest cluster spread, research notes 2026-10-28) so later milestones stay inside them.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { clampInt, divFloor, fade, isqrt, ONE } from '@margoengine/biomes/toolkit';
+import { placementReach } from './reach.js';
 import type { BiomeWorld, LayerWrite } from './world.js';
 
 type Rect = readonly [number, number, number, number];
@@ -273,15 +274,7 @@ export class BiomeEditor implements Disposable {
    * plus, for placement, 6 rounds of 2 x the largest species radius and the widest cluster spread.
    */
   margin(): number {
-    let radius = 0,
-      spread = 0;
-    for (const b of this.#world.biomes)
-      for (const s of [...(b.plants ?? []), ...(b.rocks ?? []), ...(b.props ?? [])]) {
-        const max = s.size?.kind === 'reverse-j' ? s.size.max : 1;
-        radius = Math.max(radius, s.radius * max);
-        spread = Math.max(spread, s.cluster ? s.cluster.spread : 0);
-      }
-    return this.#world.resolution + ROUNDS * 2 * radius + spread;
+    return this.#world.resolution + placementReach(this.#world.biomes, ROUNDS);
   }
 
   /** Every applied edit, then each new one as it is made, until the editor is disposed. */

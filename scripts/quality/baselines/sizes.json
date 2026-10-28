@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3878681,
+  "total": 3892435,
   "history": [
     {
       "date": "2026-10-24",
@@ -758,6 +758,12 @@
       "commit": "d57df6d9",
       "reason": "voxel-net server limits (bugs 44, 50): pre-hello connection caps, own-host origin check, authenticate hook with a time limit, bounded edit store with LRU eviction to a VoxelEditStore; Node-only server entry",
       "grew": 1
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "0765a2c1",
+      "reason": "biomes B5: new entries /placement (stored-object placement: candidates, clusters, Luby hard core, canopy layers, exclusions, records, rasters) and /stats (point-pattern statistics and global envelope tests); the root is unchanged",
+      "grew": 2
     }
   ],
   "items": {
@@ -775,8 +781,10 @@
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/koppen": 1231,
+    "@margoengine/biomes/placement": 10999,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/relief": 2825,
+    "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 2880,
     "@margoengine/biomes/view": 5072,
     "@margoengine/biomes/zones": 3875,

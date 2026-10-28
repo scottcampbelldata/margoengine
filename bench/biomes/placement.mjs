@@ -2,7 +2,8 @@
 // Run from the repository root after `npm run build:packages`, on a quiet machine (benchmarks take the GPU lock
 // exclusively): node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node bench/biomes/placement.mjs [--runs=20]
 // Also the `biomes` suite of `npm run bench -- biomes`. Prints one JSON object: ms per km2 per stage, and the spread.
-// Stages arrive with the milestones: relief heights (B0), climate fields (B1), classification (B2), placement (B5).
+// Stages: relief heights (B0), climate fields with classification (B1, B2), stored-object placement (B5). G1 is
+// fields plus placement per km2.
 // The fields stage builds R16's region fields once in its setup (several seconds, not timed).
 import { pathToFileURL } from 'node:url';
 import { median } from '../lib/node.mjs';
@@ -16,13 +17,16 @@ export const TILE = Object.freeze({ x: 2, z: -3, size: 256 });
 export async function stages() {
   const biomes = await import(dist('index')),
     { R16 } = await import(dist('presets')),
-    { createRelief } = await import(dist('relief'));
+    { createRelief } = await import(dist('relief')),
+    { BiomePlacement } = await import(dist('placement'));
   const relief = createRelief(R16.relief),
     x0 = TILE.x * TILE.size * 1000,
     z0 = TILE.z * TILE.size * 1000,
     heights = new Int32Array(TILE.size * TILE.size);
   let world,
-    next = 0;
+    placement,
+    next = 0,
+    nextPlaced = 0;
   const list = [
     {
       id: 'relief',
@@ -47,6 +51,24 @@ export async function stages() {
       async run() {
         // A new tile each run (the world caches finished tiles), all near the centre of R16.
         await world.tile(32 + (next % 8), 30 + (next++ >> 3));
+      },
+    },
+    {
+      id: 'placement',
+      title: 'Stored objects of one R16 tile (trees, shrubs, rocks; its world tiles made in the setup, not timed)',
+      async setup() {
+        world ??= await biomes.BiomeWorld.create({
+          seed: R16.seed,
+          origin: R16.origin,
+          size: R16.size,
+          height: { relief: R16.relief },
+          climate: R16.climate,
+        });
+        placement = BiomePlacement.attach(world);
+        for (let z = 29; z <= 37; z++) for (let x = 39; x <= 48; x++) await world.tile(x, z);
+      },
+      async run() {
+        await placement.tile(40 + (nextPlaced % 8), 30 + (nextPlaced++ >> 3));
       },
     },
   ];

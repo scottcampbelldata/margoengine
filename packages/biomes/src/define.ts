@@ -58,18 +58,31 @@ export interface GroundLayer {
   readonly weight?: number;
 }
 
-/** Size distribution of a species: reverse-J (uneven-aged) or Weibull (even-aged). */
+/**
+ * Stem size distribution of a species, relative to its reference size (1): `'reverse-j'` (uneven-aged: frequencies
+ * fall by `q` per 0.1 of a reference size, de Liocourt; `max` is the largest crown as a multiple of the reference
+ * crown) or `'weibull'` (even-aged, `shape` and `scale` in reference sizes). Crowns grow as size^0.75.
+ */
 export type SizeDistribution =
   | { readonly kind: 'reverse-j'; readonly q: number; readonly max: number }
   | { readonly kind: 'weibull'; readonly shape: number; readonly scale: number };
 
-/** Clustering of a species: Thomas (Gaussian offspring) or Matern (uniform discs). */
+/**
+ * Clustering of a species around hashed parent points: `'thomas'` (Gaussian offspring, sigma = spread), `'matern'`
+ * (uniform discs of radius spread) or `'2dt'` (Clark's fat-tailed 2Dt seed kernel, scale spread, shape `tail`: clusters
+ * with scattered outliers). `parents * offspring` plants per hectare are clustered; the rest of the species' density is
+ * spread at random.
+ */
 export interface ClusterRule {
-  readonly kind: 'thomas' | 'matern';
-  /** Parents per hectare, spread in metres, mean offspring per parent. */
+  readonly kind: 'thomas' | 'matern' | '2dt';
+  /** Parents per hectare. */
   readonly parents: number;
+  /** Kernel scale in metres. */
   readonly spread: number;
-  readonly offspring: number;
+  /** Mean offspring per parent. Default: density / parents (every plant clustered). */
+  readonly offspring?: number;
+  /** 2Dt shape p, 0.5..8 (smaller is fatter-tailed). Default 1. */
+  readonly tail?: number;
 }
 
 /** Colour variation: hue and value jitter 0..1, and whether it follows the seasons. */
@@ -86,7 +99,7 @@ export interface SpeciesRule {
   readonly mesh: string;
   /** Plants per hectare at full suitability. */
   readonly density: number;
-  /** Crown or footprint radius in metres at mean size. */
+  /** Crown or footprint radius in metres at reference size (scale 1). */
   readonly radius: number;
   readonly size?: SizeDistribution;
   readonly cluster?: ClusterRule;
@@ -183,9 +196,9 @@ export function dimension(field: string, range: Range, blend: number): Dimension
   throw rangeError('Unknown envelope field; use a ClimateEnvelope field, a LAYERS name or mask/<name>', 'biomes');
 }
 
-/** A ground layer rule's dimension (slope, height, moisture or curvature): the envelope fields without the layer table. */
-export const groundDimension = (field: 'slope' | 'height' | 'moisture' | 'curvature', range: Range): Dimension =>
-  quantize(FIELDS[field], range, 0.15);
+/** A dimension on one of the envelope fields (no layer table: for ground rules and species suitability). */
+export const fieldDimension = (field: string, range: Range, blend = 0.15): Dimension =>
+  quantize(FIELDS[field], range, blend);
 
 function quantize(
   [layer, toStored, open]: readonly [layer: string, toStored: number | 'slope', open: number],

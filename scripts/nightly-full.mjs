@@ -57,7 +57,8 @@ async function main() {
     log.write(`nightly ${label}, started ${new Date(started).toISOString()}, cwd ${root}\n`);
     const child = spawn(command, args, {
       cwd: root,
-      env: { ...process.env, MARGO_FULL: '1' },
+      // MARGO_NIGHTLY: tests with a nightly depth (the biomes rank envelopes of 2,499 simulations) run it.
+      env: { ...process.env, MARGO_FULL: '1', MARGO_NIGHTLY: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     for (const stream of [child.stdout, child.stderr]) {
