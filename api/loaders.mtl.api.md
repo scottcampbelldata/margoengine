@@ -6,7 +6,7 @@
 import { EngineKernel } from "@margoengine/core";
 import { Material, MaterialMesh, MeshGeometry, Texture, TextureOptions } from "@margoengine/materials";
 
-export interface LoadOBJOptions extends FetchOptions, ParseLimits, Omit<MTLMaterialsOptions, 'baseUrl' | 'signal'>, OBJMeshOptions {
+export interface LoadOBJOptions extends FetchOptions, ParseLimits, OBJMaterialLimits, Omit<MTLMaterialsOptions, 'baseUrl' | 'signal'>, OBJMeshOptions {
     renderOrder?: number;
 }
 
@@ -27,6 +27,7 @@ export interface MTLMaterialSet {
 
 export interface MTLMaterialsOptions {
     baseUrl?: string | URL;
+    allowedURLs?: readonly string[];
     loadTexture?: MTLTextureLoader;
     bump?: 'height' | 'normal';
     doubleSided?: boolean;
@@ -136,6 +137,11 @@ interface OBJGroup extends LoadedGroup {
     object?: string;
     groupNames: string[];
     material?: string;
+}
+
+interface OBJMaterialLimits {
+    maxMaterialLibraries?: number;
+    maxMaterialBytes?: number;
 }
 
 interface OBJStatement {

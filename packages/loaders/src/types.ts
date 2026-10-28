@@ -47,7 +47,7 @@ export interface ParseLimits {
 }
 
 /**
- * Why a LoaderError was thrown: a bad header, truncated data, a size limit, a value out of range, a syntax fault, an unsupported feature, a bad zip, an abort or a failed fetch.
+ * Why a LoaderError was thrown: a bad header, truncated data, a size limit, a value out of range, a syntax fault, an unsupported feature, a bad zip, an abort, a failed fetch, or a URL inside the file that leaves the file's directory (`'url'`: add its prefix to `allowedURLs` to load it).
  */
 export type LoaderErrorCode =
   | 'header'
@@ -58,7 +58,8 @@ export type LoaderErrorCode =
   | 'unsupported'
   | 'zip'
   | 'aborted'
-  | 'fetch';
+  | 'fetch'
+  | 'url';
 
 /** Thrown for every malformed, truncated, oversized or unsupported input. */
 export class LoaderError extends Error {

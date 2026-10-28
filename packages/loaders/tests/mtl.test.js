@@ -261,3 +261,138 @@ test('loadOBJ: fetches the OBJ, its libraries and textures relative to each file
   );
   await assert.rejects(loadOBJ({}, 'relative.obj'), TypeError);
 });
+
+// Bug 46: an OBJ is untrusted, so its mtllib files and textures stay inside its directory (or allowedURLs), init goes
+// only to its own origin, and the libraries share one byte and file budget.
+test('loadOBJ: mtllib and texture URLs outside the OBJ directory are refused unless allowedURLs lists them', async () => {
+  const fetched = [];
+  const files = {
+    'https://example.com/models/a.obj': 'mtllib https://evil.example/steal.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n',
+    'https://example.com/models/b.obj': 'mtllib ../secret/lib.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n',
+    'https://example.com/models/c.obj': 'mtllib lib.mtl\nusemtl m\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n',
+    'https://example.com/models/lib.mtl':
+      'newmtl m\nmap_Kd https://evil.example/t.png\nnorm ../../up.png\nbump ok.png\n',
+    'https://evil.example/steal.mtl': 'newmtl m\nKd 1 0 0\n',
+  };
+  const fetch = async (url) => {
+    fetched.push(String(url));
+    return files[String(url)] === undefined ? new Response('', { status: 404 }) : new Response(files[String(url)]);
+  };
+  for (const name of ['a', 'b'])
+    await assert.rejects(
+      loadOBJ({}, `https://example.com/models/${name}.obj`, { fetch, loadTexture: recorder().load }),
+      (e) => e instanceof LoaderError && e.code === 'url' && /allowedURLs/.test(e.message),
+    );
+  assert.deepEqual(fetched, ['https://example.com/models/a.obj', 'https://example.com/models/b.obj'], 'nothing else');
+  // Textures outside the directory are warnings and never requested; the one beside the OBJ still loads.
+  const { requests, load } = recorder();
+  await assert.rejects(loadOBJ({}, 'https://example.com/models/c.obj', { fetch, loadTexture: load }), TypeError);
+  assert.deepEqual(
+    requests.map((r) => r.url),
+    ['https://example.com/models/ok.png'],
+  );
+  const set = await createMTLMaterials(parseMTL(files['https://example.com/models/lib.mtl']), {
+    baseUrl: 'https://example.com/models/lib.mtl',
+    loadTexture: load,
+  });
+  assert.equal(set.warnings.filter((w) => /allowedURLs/.test(w)).length, 2, set.warnings.join('\n'));
+  set.dispose();
+  // An allowed prefix loads.
+  fetched.length = 0;
+  const allowed = recorder();
+  await assert.rejects(
+    loadOBJ({}, 'https://example.com/models/a.obj', {
+      fetch,
+      loadTexture: allowed.load,
+      allowedURLs: ['https://evil.example/'],
+    }),
+    TypeError, // the stand-in engine: everything loaded, then the mesh fails
+  );
+  assert.deepEqual(fetched, ['https://example.com/models/a.obj', 'https://evil.example/steal.mtl']);
+});
+
+test('loadOBJ: init headers and credentials are never sent to a library on another origin', async () => {
+  const seen = [];
+  const files = {
+    'https://example.com/models/scene.obj': 'mtllib near.mtl\nmtllib far.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n',
+    'https://example.com/models/near.mtl': 'newmtl a\nKd 1 0 0\n',
+    'https://cdn.example/models/far.mtl': 'newmtl b\nKd 0 1 0\n',
+  };
+  const fetch = async (url, init) => {
+    seen.push([String(url), init?.headers?.authorization ?? null, init?.credentials ?? null]);
+    const name = String(url).endsWith('far.mtl') ? 'https://cdn.example/models/far.mtl' : String(url);
+    return new Response(files[name]);
+  };
+  await assert.rejects(
+    loadOBJ({}, 'https://example.com/models/scene.obj', {
+      fetch,
+      loadTexture: recorder().load,
+      init: { headers: { authorization: 'Bearer secret' }, credentials: 'include' },
+      allowedURLs: ['https://example.com/models/far.mtl'],
+    }),
+    TypeError,
+  );
+  assert.deepEqual(seen, [
+    ['https://example.com/models/scene.obj', 'Bearer secret', 'include'],
+    ['https://example.com/models/near.mtl', 'Bearer secret', 'include'],
+    ['https://example.com/models/far.mtl', 'Bearer secret', 'include'],
+  ]);
+  // A library that lives on another origin (allowed by prefix) gets no init at all.
+  seen.length = 0;
+  files['https://example.com/models/scene.obj'] =
+    'mtllib https://cdn.example/models/far.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n';
+  await assert.rejects(
+    loadOBJ({}, 'https://example.com/models/scene.obj', {
+      fetch,
+      loadTexture: recorder().load,
+      init: { headers: { authorization: 'Bearer secret' }, credentials: 'include' },
+      allowedURLs: ['https://cdn.example/models/'],
+    }),
+    TypeError,
+  );
+  assert.deepEqual(seen, [
+    ['https://example.com/models/scene.obj', 'Bearer secret', 'include'],
+    ['https://cdn.example/models/far.mtl', null, null],
+  ]);
+});
+
+test('loadOBJ and parseOBJ: the material libraries share a file count and byte budget', async () => {
+  const lines = (n) => Array.from({ length: n }, (_, i) => `mtllib m${i}.mtl`).join('\n');
+  const tri = '\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n';
+  const fetched = [];
+  const fetch = async (url) => {
+    fetched.push(String(url));
+    if (String(url).endsWith('.obj'))
+      return new Response(String(url).includes('many') ? lines(17) + tri : lines(3) + tri);
+    return new Response(`newmtl x\n# ${'k'.repeat(1000)}\n`);
+  };
+  // 17 files are over the default 16: refused before any library is fetched.
+  await assert.rejects(
+    loadOBJ({}, 'https://example.com/many.obj', { fetch, loadTexture: recorder().load }),
+    (e) => e instanceof LoaderError && e.code === 'limit' && /maxMaterialLibraries/.test(e.message),
+  );
+  assert.deepEqual(fetched, ['https://example.com/many.obj']);
+  // Three libraries of about 1 KB each over a 2,500 byte budget: the third fetch is cut and the load fails.
+  fetched.length = 0;
+  await assert.rejects(
+    loadOBJ({}, 'https://example.com/three.obj', { fetch, loadTexture: recorder().load, maxMaterialBytes: 2500 }),
+    (e) => e instanceof LoaderError && e.code === 'limit' && /maxMaterialBytes/.test(e.message),
+  );
+  assert.equal(fetched.length, 4);
+  // Raising the limits reads them (the stand-in engine then fails the mesh).
+  await assert.rejects(
+    loadOBJ({}, 'https://example.com/many.obj', { fetch, loadTexture: recorder().load, maxMaterialLibraries: 17 }),
+    TypeError,
+  );
+  // parseOBJ applies the same budget to a custom resolver.
+  await assert.rejects(
+    parseOBJ(lines(3) + tri, { resolve: async () => `# ${'x'.repeat(1000)}`, maxMaterialBytes: 2500 }),
+    (e) => e instanceof LoaderError && e.code === 'limit' && /maxMaterialBytes/.test(e.message),
+  );
+  await assert.rejects(
+    parseOBJ(lines(2) + tri, { resolve: async () => '', maxMaterialLibraries: 1 }),
+    /maxMaterialLibraries/,
+  );
+  await assert.rejects(parseOBJ(lines(1) + tri, { resolve: async () => '', maxMaterialBytes: -1 }), RangeError);
+  assert.equal((await parseOBJ(lines(3) + tri, { resolve: async () => 'newmtl a\n' })).materials.length, 1);
+});

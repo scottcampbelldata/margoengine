@@ -86,9 +86,28 @@ export interface OBJGroup extends LoadedGroup {
   material?: string;
 }
 
+/** The budget for an OBJ's material libraries, shared by every `mtllib` file it names. */
+export interface OBJMaterialLimits {
+  /** Most `mtllib` files read; more throws a `LoaderError` with code `'limit'` before any is read. Default 16. */
+  maxMaterialLibraries?: number;
+  /**
+   * Most bytes all `mtllib` files may hold together (a string counts its length); more throws a `LoaderError` with
+   * code `'limit'`. Default 64 MiB.
+   */
+  maxMaterialBytes?: number;
+}
+
+/** @internal Defaults of OBJMaterialLimits (loadOBJ reads them too). */
+export const DEFAULT_MAX_MATERIAL_LIBRARIES = 16;
+/** @internal */
+export const DEFAULT_MAX_MATERIAL_BYTES = 64 * 1024 * 1024;
+
 /** Options of `parseOBJ`. */
-export interface OBJParseOptions extends ParseLimits {
-  /** Reads each `mtllib` file, given its path relative to the OBJ folder. Without it `materials` stays empty. */
+export interface OBJParseOptions extends ParseLimits, OBJMaterialLimits {
+  /**
+   * Reads each `mtllib` file, given its path relative to the OBJ folder. Without it `materials` stays empty. A file
+   * it cannot read is a warning; a `LoaderError` with code `'url'` (a refused URL) or `'limit'` stops the parse.
+   */
   resolve?: AssetResolver;
   signal?: AbortSignal;
 }
@@ -490,18 +509,51 @@ function readOBJ(text: string, limit: Limits): LoadedOBJ {
   return loaded;
 }
 
-async function readMaterials(loaded: LoadedOBJ, resolve: AssetResolver, signal: AbortSignal | undefined) {
+/** A whole-number option, or its default; anything else throws a RangeError naming the option. */
+function wholeOption(value: number | undefined, fallback: number, name: string): number {
+  if (value === undefined) return fallback;
+  if (!Number.isSafeInteger(value) || value < 0)
+    throw new RangeError(`OBJ ${name} is ${value}; pass a non-negative integer`);
+  return value;
+}
+
+async function readMaterials(loaded: LoadedOBJ, resolve: AssetResolver, options: OBJParseOptions) {
+  const signal = options.signal,
+    maxLibraries = wholeOption(options.maxMaterialLibraries, DEFAULT_MAX_MATERIAL_LIBRARIES, 'maxMaterialLibraries'),
+    maxBytes = wholeOption(options.maxMaterialBytes, DEFAULT_MAX_MATERIAL_BYTES, 'maxMaterialBytes');
+  if (loaded.materialLibraries.length > maxLibraries)
+    throw new LoaderError(
+      F,
+      'limit',
+      `${loaded.materialLibraries.length} mtllib files exceed maxMaterialLibraries ${maxLibraries}; raise maxMaterialLibraries to read them`,
+    );
   const byName = new Map<string, MTLMaterial>();
+  let bytes = 0;
   for (const library of loaded.materialLibraries) {
     let content: Uint8Array | string;
     try {
       content = await resolve(library);
     } catch (error) {
       throwIfAborted(signal, F);
+      // A refused URL or a spent budget is the resolver saying no, not a missing file: it stops the parse.
+      if (error instanceof LoaderError && error.code === 'url') throw error;
+      if (error instanceof LoaderError && error.code === 'limit')
+        throw new LoaderError(
+          F,
+          'limit',
+          `mtllib "${library}" is over its budget (${error.message}); raise maxMaterialBytes or maxBytes to read it`,
+        );
       loaded.warnings.push(`mtllib "${library}" could not be read (${(error as Error)?.message ?? error})`);
       continue;
     }
     throwIfAborted(signal, F);
+    bytes += content.length;
+    if (bytes > maxBytes)
+      throw new LoaderError(
+        F,
+        'limit',
+        `mtllib files hold more than maxMaterialBytes ${maxBytes} bytes; raise maxMaterialBytes to read them`,
+      );
     for (const material of parseMTL(content, { path: library }))
       if (!byName.has(material.name)) byName.set(material.name, material);
   }
@@ -522,8 +574,9 @@ async function readMaterials(loaded: LoadedOBJ, resolve: AssetResolver, signal: 
 /**
  * Parses a Wavefront OBJ: `v` (with optional `w`, or `r g b` vertex colors after xyz), `vt`, `vn`, faces of any size
  * with `v`, `v/vt`, `v//vn`, `v/vt/vn` and negative (relative) indices, `o`, `g`, `s`, `usemtl` and `mtllib`, with
- * `\` line continuations, comments and CRLF. With `resolve` it also reads every MTL library and colors each group
- * with its material's `Kd`. Malformed input throws a `LoaderError` naming the line. A file without faces is a
+ * `\` line continuations, comments and CRLF. With `resolve` it also reads every MTL library (within
+ * `maxMaterialLibraries` and `maxMaterialBytes`) and colors each group with its material's `Kd`. Malformed input
+ * throws a `LoaderError` naming the line. A file without faces is a
  * point cloud of its `v` lines.
  */
 export async function parseOBJ(input: BinaryInput | string, options: OBJParseOptions = {}): Promise<LoadedOBJ> {
@@ -531,6 +584,6 @@ export async function parseOBJ(input: BinaryInput | string, options: OBJParseOpt
   if (options.resolve !== undefined && typeof options.resolve !== 'function')
     throw new TypeError('OBJ resolve option is not a function; pass (path) => Promise<Uint8Array | string>');
   const loaded = readOBJ(toText(input, F), limits(options, F));
-  if (options.resolve && loaded.materialLibraries.length) await readMaterials(loaded, options.resolve, options.signal);
+  if (options.resolve && loaded.materialLibraries.length) await readMaterials(loaded, options.resolve, options);
   return loaded;
 }

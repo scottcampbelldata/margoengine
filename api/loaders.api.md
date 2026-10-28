@@ -439,7 +439,7 @@ export class LoaderError extends Error {
     constructor(format: string, code: LoaderErrorCode, message: string);
 }
 
-export type LoaderErrorCode = 'header' | 'truncated' | 'limit' | 'range' | 'syntax' | 'unsupported' | 'zip' | 'aborted' | 'fetch';
+export type LoaderErrorCode = 'header' | 'truncated' | 'limit' | 'range' | 'syntax' | 'unsupported' | 'zip' | 'aborted' | 'fetch' | 'url';
 
 export type LoaderFormat = 'ply' | '3mf' | 'pcd' | 'off' | 'xyz' | 'vtk' | 'usda' | 'usdz';
 
@@ -489,7 +489,12 @@ export interface OBJGroup extends LoadedGroup {
     material?: string;
 }
 
-export interface OBJParseOptions extends ParseLimits {
+export interface OBJMaterialLimits {
+    maxMaterialLibraries?: number;
+    maxMaterialBytes?: number;
+}
+
+export interface OBJParseOptions extends ParseLimits, OBJMaterialLimits {
     resolve?: AssetResolver;
     signal?: AbortSignal;
 }

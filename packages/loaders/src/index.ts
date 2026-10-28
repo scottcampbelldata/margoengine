@@ -5,6 +5,7 @@ export type {
   LoadedOBJ,
   OBJGroup,
   OBJParseOptions,
+  OBJMaterialLimits,
   OBJStatement,
   MTLMaterial,
   MTLMap,

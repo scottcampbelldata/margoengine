@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3849066,
+  "total": 3849698,
   "history": [
     {
       "date": "2026-10-24",
@@ -704,6 +704,12 @@
       "commit": "65e92afc",
       "reason": "new optional entry @margoengine/sky/sun: typed angles, named sun and ambient setters, sunlitSky (lighting API usability fix; core and stage unchanged)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "e4a2e5d0",
+      "reason": "bug 46: loadOBJ checks mtllib and texture URLs with the shared asset URL policy, keeps init on the OBJ origin and budgets the material libraries (security fix, +376 B in loaders/mtl)",
+      "grew": 1
     }
   ],
   "items": {
@@ -849,7 +855,7 @@
     "@margoengine/loaders dist/workers/usd.js": 8439,
     "@margoengine/loaders/common": 3423,
     "@margoengine/loaders/font": 6590,
-    "@margoengine/loaders/mtl": 7554,
+    "@margoengine/loaders/mtl": 8186,
     "@margoengine/loaders/render": 3148,
     "@margoengine/loaders/svg": 11643,
     "@margoengine/loaders/usd": 7783,

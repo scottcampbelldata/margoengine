@@ -10,8 +10,16 @@ import {
   loadTexture as loadMaterialTexture,
 } from '@margoengine/materials';
 import { SRGBToLinear } from '@margoengine/math/color';
-import { type FetchOptions, fetchBytes } from './load.js';
-import { type LoadedOBJ, type MTLMapOptions, type MTLMaterial, parseOBJ } from './obj.js';
+import { DEFAULT_MAX_BYTES, type FetchOptions, fetchBytes } from './load.js';
+import { assetURL } from '../../shared/asset-url.js';
+import {
+  DEFAULT_MAX_MATERIAL_BYTES,
+  type LoadedOBJ,
+  type MTLMapOptions,
+  type MTLMaterial,
+  type OBJMaterialLimits,
+  parseOBJ,
+} from './obj.js';
 import { LoaderError, type ParseLimits } from './types.js';
 import { resolvePath } from './util.js';
 
@@ -31,6 +39,12 @@ export interface MTLMaterialsOptions {
    * `materials` (their paths already include the library folder). Default: the page URL.
    */
   baseUrl?: string | URL;
+  /**
+   * URL prefixes a map may load from besides `baseUrl`'s own directory. A map path from the file that leaves that
+   * directory (an absolute or cross-origin URL, `../` past it, a scheme other than http(s) and data:) is not
+   * requested: it is a warning and its maps are left out. Default none.
+   */
+  allowedURLs?: readonly string[];
   /** Texture loader. Default: materials' `loadTexture` (http(s), blob: and data: URLs). */
   loadTexture?: MTLTextureLoader;
   /**
@@ -248,7 +262,8 @@ export async function createMTLMaterials(
   const abortError = () => new LoaderError(F, 'aborted', 'aborted while loading textures');
 
   let base: string | undefined;
-  const urlOf = (path: string): string => {
+  /** The URL of a map path, or undefined (with a warning) when the URL policy refuses it. */
+  const urlOf = (path: string): string | undefined => {
     if (base === undefined) {
       const from = opts.baseUrl ?? (globalThis as { location?: { href?: string } }).location?.href;
       try {
@@ -259,7 +274,14 @@ export async function createMTLMaterials(
         );
       }
     }
-    return new URL(path, base).href;
+    // data: URIs make no request; everything else must stay inside the base's directory or an allowed prefix.
+    if (/^data:/i.test(path)) return path;
+    try {
+      return assetURL(path, base, opts.allowedURLs, 'MTL texture').href;
+    } catch (error) {
+      warn(`${(error as Error).message}; its maps are left out`);
+      return undefined;
+    }
   };
 
   // One request per (colour space, wrap, URL), in first-use order.
@@ -300,8 +322,10 @@ export async function createMTLMaterials(
       materials.set(m.name, material);
       for (const message of unusedWarnings(m)) warn(message);
       for (const use of mapUses(m, bump)) {
-        const wrap = use.options.clamp ? 'clamp' : 'repeat';
-        assignments.push({ material, slot: use.slot, key: request(urlOf(use.path), use.colorSpace, wrap) });
+        const wrap = use.options.clamp ? 'clamp' : 'repeat',
+          url = urlOf(use.path);
+        if (url === undefined) continue;
+        assignments.push({ material, slot: use.slot, key: request(url, use.colorSpace, wrap) });
         if (use.slot === 'bumpMap' && Number.isFinite(use.options.bm)) material.bumpScale = use.options.bm as number;
         const [ou = 0, ov = 0] = use.options.o ?? [],
           [su = 1, sv = 1] = use.options.s ?? [];
@@ -476,6 +500,7 @@ export function createOBJMesh(
 export interface LoadOBJOptions
   extends FetchOptions,
     ParseLimits,
+    OBJMaterialLimits,
     Omit<MTLMaterialsOptions, 'baseUrl' | 'signal'>,
     OBJMeshOptions {
   /** Draw order of the mesh. Default 0. */
@@ -497,8 +522,12 @@ export interface LoadedOBJMesh {
 /**
  * Loads a textured OBJ in one call: fetches the OBJ, then each `mtllib` relative to it, builds the materials with
  * `createMTLMaterials` (textures relative to their library) and the mesh with `createOBJMesh`. A library that cannot
- * be read is a warning. Throws `TypeError` when `url` is not absolute and there is no page URL, and the
- * `LoaderError` of a failed fetch or parse. When the mesh cannot be built, everything loaded is disposed first.
+ * be read is a warning. The OBJ is untrusted: its `mtllib` files and textures load only from the OBJ's directory or
+ * an `allowedURLs` prefix (a library elsewhere throws a `LoaderError` with code `'url'`, a texture elsewhere is a
+ * warning), `init` (headers, credentials) goes only to the OBJ's own origin, and the libraries share the
+ * `maxMaterialLibraries` and `maxMaterialBytes` budget (code `'limit'`). Throws `TypeError` when `url` is not absolute
+ * and there is no page URL, and the `LoaderError` of a failed fetch or parse. When the mesh cannot be built,
+ * everything loaded is disposed first.
  */
 export async function loadOBJ(
   engine: EngineKernel,
@@ -519,11 +548,33 @@ export async function loadOBJ(
     init: opts.init,
   };
   const bytes = await fetchBytes(objUrl, fetchOptions);
+  const origin = new URL(objUrl).origin,
+    perFile = opts.maxBytes ?? DEFAULT_MAX_BYTES,
+    budget = opts.maxMaterialBytes ?? DEFAULT_MAX_MATERIAL_BYTES;
+  let spent = 0;
   const obj = await parseOBJ(bytes, {
-    resolve: (path) => fetchBytes(new URL(path, objUrl), fetchOptions),
+    resolve: async (path) => {
+      let library: URL;
+      try {
+        library = assetURL(path, objUrl, opts.allowedURLs, 'OBJ mtllib');
+      } catch (error) {
+        throw new LoaderError('OBJ', 'url', (error as Error).message);
+      }
+      // Headers and credentials are the caller's for the OBJ's own origin; an allowed library elsewhere gets none.
+      // The fetch stops at whatever is left of the libraries' shared budget.
+      const content = await fetchBytes(library, {
+        ...fetchOptions,
+        init: library.origin === origin ? opts.init : undefined,
+        maxBytes: Math.max(0, Math.min(perFile, budget - spent)),
+      });
+      spent += content.length;
+      return content;
+    },
     signal: opts.signal,
     maxVertices: opts.maxVertices,
     maxTriangles: opts.maxTriangles,
+    maxMaterialLibraries: opts.maxMaterialLibraries,
+    maxMaterialBytes: opts.maxMaterialBytes,
   });
   const set = await createMTLMaterials(obj.materials, { ...opts, baseUrl: objUrl });
   const ownFallback = opts.fallback ? undefined : new Material(),
