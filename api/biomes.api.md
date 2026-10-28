@@ -62,10 +62,17 @@ export class BiomeWorld implements Disposable {
     static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
     get biomes(): readonly BiomeDefinition[];
     get paint(): readonly PaintLayer[];
+    overview(): {
+        readonly width: number;
+        readonly depth: number;
+        readonly resolution: number;
+        readonly height: Float32Array;
+    };
     get climate(): Climate;
     tile(x: number, z: number, options?: TileRequest): Promise<BiomeTile>;
     readLayer(name: string, x: number, z: number): Uint8Array | undefined;
     writeLayer(name: string, x: number, z: number, data: Uint8Array | undefined): void;
+    writeLayers(writes: readonly LayerWrite[]): void;
     tiles(rect: Rect, options?: TileRequest & {
         readonly focus?: readonly [number, number];
     }): AsyncIterableIterator<BiomeTile>;
@@ -203,6 +210,14 @@ export interface LayerInfo {
     readonly scale: number;
     readonly unit: string;
     readonly about: string;
+}
+
+export interface LayerWrite {
+    readonly name: string;
+    readonly x: number;
+    readonly z: number;
+    readonly data: Uint8Array | undefined;
+    readonly changed?: readonly [number, number, number, number];
 }
 
 export const ONE = 65536;
