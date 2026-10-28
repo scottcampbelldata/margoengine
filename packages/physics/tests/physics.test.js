@@ -1297,3 +1297,31 @@ rtest('misuse throws coded errors that name the fix', () => {
   assert.throws(() => physics.setup(engineA), { code: 'disposed', message: /create a new Physics/ });
   other.dispose();
 });
+
+rtest('setType switches a body between kinematic and dynamic, keeping its pose and joints', () => {
+  const physics = create(),
+    anchor = physics.addBody(null, { type: 'fixed', colliders: [] }),
+    body = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [0, 2, 0],
+      colliders: { shape: 'sphere', radius: 0.2 },
+    });
+  const joint = physics.addJoint(anchor, body, { type: 'rope', length: 5 });
+  for (let i = 0; i < 30; i++) physics.step();
+  assert.deepEqual(body.position, [0, 2, 0], 'a kinematic body ignores gravity');
+  assert.equal(body.setType('dynamic'), body);
+  assert.equal(body.type, 'dynamic');
+  for (let i = 0; i < 30; i++) physics.step();
+  assert.ok(body.position[1] < 1.9, 'a dynamic body falls');
+  assert.ok(joint.valid, 'joints stay');
+  body.setType('kinematicPosition');
+  const held = body.position;
+  for (let i = 0; i < 30; i++) physics.step();
+  assert.deepEqual(body.position, held, 'kinematic again: it stays where it was');
+  body.setType('kinematicPosition');
+  assert.throws(() => body.setType('sideways'), { name: 'TypeError', message: /use dynamic, fixed/ });
+  assert.throws(() => body.setType('toString'), { name: 'TypeError', message: /use dynamic, fixed/ });
+  body.remove();
+  assert.throws(() => body.setType('dynamic'), { code: 'state' });
+  physics.dispose();
+});

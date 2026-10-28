@@ -2134,6 +2134,22 @@
     "category": "Simulation and games"
   },
   {
+    "id": "ragdoll",
+    "title": "Ragdoll",
+    "category": "Simulation and games",
+    "package": "@margoengine/ragdoll",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Ragdolls on Rapier physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "ragdoll",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/ragdoll@1.0.0",
+    "imports": "import { Ragdoll } from '@margoengine/ragdoll';",
+    "exports": [
+      "Ragdoll"
+    ]
+  },
+  {
     "id": "navmesh",
     "title": "Navmesh",
     "package": "@margoengine/navmesh",

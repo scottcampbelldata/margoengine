@@ -124,6 +124,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 ## Packages: Simulation and games
 
 - [@margoengine/physics](https://margoengine.com/llms/packages/physics.md): Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller.
+- [@margoengine/ragdoll](https://margoengine.com/llms/packages/ragdoll.md): Ragdolls on Rapier physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation.
 - [@margoengine/navmesh](https://margoengine.com/llms/packages/navmesh.md): Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build).
 - [@margoengine/ecs](https://margoengine.com/llms/packages/ecs.md): Typed-array packed sparse-set entity component storage.
 - [@margoengine/fsm](https://margoengine.com/llms/packages/fsm.md): Hierarchical state transitions with cross-fade progress.
@@ -233,6 +234,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/audio API](https://margoengine.com/llms/api/audio.md): 1 entry point
 - [@margoengine/mixer API](https://margoengine.com/llms/api/mixer.md): 1 entry point
 - [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 1 entry point
+- [@margoengine/ragdoll API](https://margoengine.com/llms/api/ragdoll.md): 1 entry point
 - [@margoengine/navmesh API](https://margoengine.com/llms/api/navmesh.md): 2 entry points
 - [@margoengine/ecs API](https://margoengine.com/llms/api/ecs.md): 1 entry point
 - [@margoengine/fsm API](https://margoengine.com/llms/api/fsm.md): 1 entry point

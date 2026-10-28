@@ -56,6 +56,7 @@
     "@margoengine/geometry": "geometry generation with no GPU or DOM",
     "@margoengine/mesh-edit": "mesh editing with no GPU or DOM",
     "@margoengine/physics": "physics with no GPU or DOM: game server simulation",
+    "@margoengine/ragdoll": "ragdoll physics with no GPU or DOM: game server simulation of limp bodies",
     "@margoengine/splines": "splines with no GPU or DOM",
     "@margoengine/tween": "tweens with no GPU or DOM",
     "@margoengine/cameras": "camera rigs as maths with no GPU or DOM",

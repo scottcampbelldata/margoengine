@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3840638,
+  "total": 3847149,
   "history": [
     {
       "date": "2026-10-24",
@@ -692,6 +692,12 @@
       "commit": "ecf2b67f",
       "reason": "webgl2-compat milestone M3, first landing: texture view copies, readbacks of depth, stencil, packed and snorm formats, occlusion queries, render bundles, external textures and textureGather; all of it loads only inside install(), never on the WebGPU path",
       "grew": 2
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "b92998d6",
+      "reason": "new optional package @margoengine/ragdoll: ragdolls from a skeleton, cone and hinge limits, kinematic and limp modes, blend back (item 28.5)",
+      "grew": 1
     }
   ],
   "items": {
@@ -934,6 +940,7 @@
     "@margoengine/procedural/voronoi": 5026,
     "@margoengine/quality": 2705,
     "@margoengine/quality/warm": 1536,
+    "@margoengine/ragdoll": 6511,
     "@margoengine/react": 7058,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/controls": 4346,

@@ -100,6 +100,7 @@ export interface RigidBody {
   setEnabled(enabled: boolean): void;
   lockRotations(locked: boolean, wakeUp: boolean): void;
   lockTranslations(locked: boolean, wakeUp: boolean): void;
+  setBodyType(type: number, wakeUp: boolean): void;
 }
 export interface RigidBodyDesc {
   setTranslation(x: number, y: number, z: number): RigidBodyDesc;
@@ -307,6 +308,7 @@ export interface RapierModule {
     /** Rapier 0.12 and later. */
     spring?(restLength: number, stiffness: number, damping: number, anchorA: Vector, anchorB: Vector): JointData;
   };
+  RigidBodyType: Record<'Dynamic' | 'Fixed' | 'KinematicPositionBased' | 'KinematicVelocityBased', number>;
   QueryFilterFlags: Record<'EXCLUDE_SENSORS' | 'EXCLUDE_FIXED' | 'EXCLUDE_KINEMATIC' | 'EXCLUDE_DYNAMIC', number>;
   SolverFlags: { COMPUTE_IMPULSE: number };
   MotorModel: Record<'ForceBased' | 'AccelerationBased', number>;

@@ -110,6 +110,7 @@
     "packages/netcode",
     "packages/tiles",
     "packages/cutscene",
+    "packages/ragdoll",
     "packages/save",
     "packages/mixer",
     "packages/webgl2-compat",

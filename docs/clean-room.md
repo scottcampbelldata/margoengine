@@ -801,3 +801,17 @@ Gaea, World Machine, Houdini and the like) was read; facts about them come only 
 | Holdridge life zones | Holdridge, "Determination of world plant formations from simple climatic data", Science, 1947, and "Life Zone Ecology", 1967: belts at biotemperatures 1.5, 3, 6, 12 and 24 C, rainfall doubling from 62.5 mm, PET ratio 58.93 x biotemperature / rainfall; nearest hexagon centre in the log lattice (our computational form) |
 | Preset limits | Plant functional type screening by coldest month, GDD5 and a drought index after Prentice et al., Journal of Biogeography, 1992 (BIOME1) and Kaplan et al., Journal of Geophysical Research, 2003 (BIOME4); the per-preset numbers are our own, rounded from those background values |
 | Koppen labels | Beck et al., "Present and future Koppen-Geiger climate classification maps at 1-km resolution", Scientific Data, 2018, after Peel, Finlayson and McMahon 2007 (the 30-class rules); months from our sinusoidal year and rain-season regimes |
+
+## Ragdolls: `@margoengine/ragdoll`
+
+Written clean room from the public descriptions below. No source code of ragdoll systems or engines (Unity, Unreal,
+Godot, PhysX, Havok, Jolt, Bullet, three.js, Babylon and the like) was read. Rapier is the physics library underneath;
+only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is used.
+
+| Area | Source |
+| --- | --- |
+| Swing and twist limits | The swing-twist decomposition of a rotation about an axis (standard quaternion algebra: the twist is the rotation's projection onto the axis, the swing the remainder) |
+| Limit impulses | E. Catto, "Iterative Dynamics with Temporal Coherence", GDC 2005 (velocity constraints solved with impulses through the bodies' inverse inertia), applied as an inelastic stop |
+| Limit projection | T. Jakobsen, "Advanced Character Physics", GDC 2001 (projecting a violated constraint back by moving the body), here a turn of the child about its joint |
+| Capsule inertia | Solid cylinder moments of inertia (standard mechanics tables) |
+| Bodies from bones and blending back | Our own design: one capsule per bone in the bone's world frame, joints at the bone origins, kinematic hit boxes that follow the animation, and a per-bone slerp from the frozen physics pose to the animated pose |

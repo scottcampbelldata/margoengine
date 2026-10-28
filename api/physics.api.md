@@ -261,7 +261,6 @@ export class Physics implements EnginePlugin, BodyOwner {
 export class PhysicsBody {
     readonly raw: RigidBody;
     readonly mesh: Mesh | null;
-    readonly type: BodyType;
     readonly colliders: Collider[];
     userData: unknown;
     readonly pose: Float64Array<ArrayBuffer>;
@@ -270,6 +269,8 @@ export class PhysicsBody {
     fitScale?: [number, number, number];
     dirty: boolean;
     constructor(owner: BodyOwner, raw: RigidBody, mesh: Mesh | null, type: BodyType);
+    get type(): BodyType;
+    setType(type: BodyType, wakeUp?: boolean): this;
     get valid(): boolean;
     markRemoved(): void;
     snapshot(reset?: boolean): void;
@@ -400,6 +401,7 @@ export interface RapierModule {
         rope?(length: number, anchorA: Vector, anchorB: Vector): JointData;
         spring?(restLength: number, stiffness: number, damping: number, anchorA: Vector, anchorB: Vector): JointData;
     };
+    RigidBodyType: Record<'Dynamic' | 'Fixed' | 'KinematicPositionBased' | 'KinematicVelocityBased', number>;
     QueryFilterFlags: Record<'EXCLUDE_SENSORS' | 'EXCLUDE_FIXED' | 'EXCLUDE_KINEMATIC' | 'EXCLUDE_DYNAMIC', number>;
     SolverFlags: {
         COMPUTE_IMPULSE: number;
@@ -779,6 +781,7 @@ interface RigidBody {
     setEnabled(enabled: boolean): void;
     lockRotations(locked: boolean, wakeUp: boolean): void;
     lockTranslations(locked: boolean, wakeUp: boolean): void;
+    setBodyType(type: number, wakeUp: boolean): void;
 }
 
 interface RigidBodyDesc {

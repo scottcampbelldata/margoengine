@@ -104,7 +104,7 @@ const layers = {
     'audio',
     'mixer',
   ],
-  'Simulation and games': ['physics', 'navmesh', 'ecs', 'fsm', 'behavior', 'save', 'net', 'netcode', 'voxel-net'],
+  'Simulation and games': ['physics', 'ragdoll', 'navmesh', 'ecs', 'fsm', 'behavior', 'save', 'net', 'netcode', 'voxel-net'],
   'CAD and engineering': ['machinery', 'bvh', 'geometry', 'mesh-edit'],
   'Data and science': ['compute', 'sciviz'],
   'AI tools': ['mcp'],

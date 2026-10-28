@@ -7,6 +7,13 @@ import type { ColliderOptions, RapierModule } from './shapes.js';
 /** How a body moves: `dynamic` (simulated), `fixed`, or kinematic (driven by position or by velocity). */
 export type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
 
+const RAPIER_BODY_TYPES = {
+  dynamic: 'Dynamic',
+  fixed: 'Fixed',
+  kinematicPosition: 'KinematicPositionBased',
+  kinematicVelocity: 'KinematicVelocityBased',
+} as const;
+
 /** Options for adding a rigid body; every field has a default. */
 export interface BodyOptions {
   /** Default 'dynamic'. */
@@ -62,15 +69,39 @@ export class PhysicsBody {
   /** @internal */
   dirty = true;
   private removed = false;
+  private kind: BodyType;
 
   /** @internal */
   constructor(
     private readonly owner: BodyOwner,
     readonly raw: RigidBody,
     readonly mesh: Mesh | null,
-    readonly type: BodyType,
+    type: BodyType,
   ) {
+    this.kind = type;
     this.snapshot(true);
+  }
+  /** How the body moves now; change it with {@link PhysicsBody.setType}. */
+  get type(): BodyType {
+    return this.kind;
+  }
+  /**
+   * Switches how the body moves, keeping its pose, colliders and joints: a ragdoll going limp (`'dynamic'`) or back
+   * under animation (`'kinematicPosition'`), a door that unlocks. Rapier keeps the velocity a dynamic body had; set
+   * it with `setLinearVelocity` when the body was kinematic. A character controller's body must stay
+   * `'kinematicPosition'`.
+   */
+  setType(type: BodyType, wakeUp = true): this {
+    const raw = this.check();
+    if (typeof type !== 'string' || !Object.hasOwn(RAPIER_BODY_TYPES, type))
+      throw new TypeError(`Unknown body type ${type}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
+    if (type === this.kind) return this;
+    raw.setBodyType(this.owner.rapier.RigidBodyType[RAPIER_BODY_TYPES[type]], wakeUp);
+    this.kind = type;
+    this.dirty = true;
+    this.restWritten = false;
+    this.slept = false;
+    return this;
   }
 
   get valid(): boolean {

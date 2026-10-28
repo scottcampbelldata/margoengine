@@ -971,6 +971,10 @@
       "types": "./dist/quality/warm.d.ts",
       "import": "./dist/quality/warm.js"
     },
+    "./ragdoll": {
+      "types": "./dist/ragdoll.d.ts",
+      "import": "./dist/ragdoll.js"
+    },
     "./react": {
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"
@@ -1537,6 +1541,7 @@
     "@margoengine/post": "^1.0.0",
     "@margoengine/procedural": "^1.0.0",
     "@margoengine/quality": "^1.0.0",
+    "@margoengine/ragdoll": "^1.0.0",
     "@margoengine/react": "^1.0.0",
     "@margoengine/rigging": "^1.0.0",
     "@margoengine/road": "^1.0.0",
