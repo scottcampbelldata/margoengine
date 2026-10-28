@@ -17,7 +17,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/animator | `.` 32 |  |  | 16,866 |
 | @margoengine/audio | `.` 19 | 2 |  | 7,625 |
 | @margoengine/behavior | `.` 85, `./steering` 27 |  | 1 | 8,737 |
-| @margoengine/biomes | `.` 82, `./presets` 2, `./koppen` 5, `./view` 7, `./editor` 6 | 61 |  | 20,147 |
+| @margoengine/biomes | `.` 82, `./presets` 2, `./koppen` 5, `./view` 7, `./editor` 6 | 61 |  | 20,516 |
 | @margoengine/blender | `.` 5 |  |  | 3,778 |
 | @margoengine/bvh | `.` 63, `./tree` 23, `./bake` 7 | 17 |  | 23,125 |
 | @margoengine/cache | `.` 5, `./manager` 5 |  |  | 2,421 |
@@ -84,7 +84,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/staging | `.` 4 |  |  | 6,056 |
 | @margoengine/stats | `.` 3 |  |  | 4,897 |
 | @margoengine/taa | `.` 7 |  |  | 10,163 |
-| @margoengine/terrain | `.` 13 | 2 |  | 10,289 |
+| @margoengine/terrain | `.` 13 | 2 |  | 10,539 |
 | @margoengine/text | `.` 35 | 2 |  | 15,673 |
 | @margoengine/tiles | `.` 72 | 1 |  | 14,336 |
 | @margoengine/tonemap | `.` 7 |  |  | 10,825 |
