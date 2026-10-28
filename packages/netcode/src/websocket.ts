@@ -84,17 +84,29 @@ export function openWebSocket(url: string | URL, options: OpenWebSocketOptions =
       socket.close();
       reject(signal?.reason);
     };
-    const failed = (event: CloseEvent) => {
+    const stop = () => {
       signal?.removeEventListener('abort', abort);
+      socket.removeEventListener('close', failed);
+      socket.removeEventListener('error', errored);
+    };
+    const failed = (event: CloseEvent) => {
+      stop();
       reject(fault('failed', `WebSocket to ${url} closed before it opened (${event.code}); check the URL and server`));
+    };
+    // A failed connection fires 'error' and then 'close' in browsers and Node 24, but only 'error' in Node 22's
+    // WebSocket (readyState stays CONNECTING), so the error alone settles the promise.
+    const errored = () => {
+      stop();
+      socket.close();
+      reject(fault('failed', `WebSocket to ${url} failed before it opened; check the URL and server`));
     };
     signal?.addEventListener('abort', abort, { once: true });
     socket.addEventListener('close', failed, { once: true });
+    socket.addEventListener('error', errored, { once: true });
     socket.addEventListener(
       'open',
       () => {
-        signal?.removeEventListener('abort', abort);
-        socket.removeEventListener('close', failed);
+        stop();
         resolve(new WebSocketConnection(socket, dropAbove));
       },
       { once: true },

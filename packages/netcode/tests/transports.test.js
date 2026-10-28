@@ -111,6 +111,23 @@ test('openWebSocket rejects with a coded error when nothing listens, and honours
   await assert.rejects(openWebSocket('ws://x', { WebSocket: 0 }), (e) => e.code === 'unsupported');
 });
 
+// Node 22's WebSocket fires only 'error' (never 'close') when the connection is refused, so openWebSocket used to wait
+// forever there (bug 39). A socket that does just that must reject with `failed` on every runtime.
+test('openWebSocket rejects with `failed` on an error that no close follows', async () => {
+  let closed = 0;
+  class ErrorOnly extends EventTarget {
+    constructor() {
+      super();
+      setTimeout(() => this.dispatchEvent(new Event('error')), 0);
+    }
+    close() {
+      closed++;
+    }
+  }
+  await assert.rejects(openWebSocket('ws://127.0.0.1:9', { WebSocket: ErrorOnly }), (e) => e.code === 'failed');
+  assert.equal(closed, 1, 'the failed socket is closed');
+});
+
 // A stand-in for a pair of RTCDataChannels: what one sends, the other's 'message' event gets (async, like the real one).
 function channelPair(label) {
   const make = () => {
