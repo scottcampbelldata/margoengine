@@ -6,7 +6,8 @@ work today (run in a clone, or install local tarballs).
 
 A biome map turns a heightmap and a few climate settings into tiled layers: climate fields, biome weights and masks
 that terrain, scatter and a terrain editor read. This package is optional and tree-shakable and adds 0 bytes to core
-and the stage. It is built in milestones: this release has the integer foundation and the climate fields.
+and the stage. It is built in milestones: this release has the integer foundation, climate fields, biome classification with
+presets, a terrain view and editor hooks; placement of trees, rocks and props comes next.
 
 ## A world in three lines
 
@@ -193,6 +194,40 @@ slope, height, moisture and curvature rules; `groundWeights(world, tile, materia
 
 WebGPU only. Tiles are made on the page's thread for now (about 85 ms each; the worker pool is a later milestone),
 with a pause between tiles so frames keep drawing.
+
+## Editing: paint, undo and dirty rectangles
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeEditor } from '@margoengine/biomes/editor';
+
+const world = await BiomeWorld.create();
+const editor = BiomeEditor.attach(world); // or `using editor = ...` inside a block
+editor.stroke(() => {
+  editor.paint('wetland', { center: [120, -40], radius: 50 }); // a biome id paints paint/<id>
+  editor.paint('wetland', { center: [150, -30], radius: 50, strength: 0.5, falloff: 'linear' });
+});
+editor.erase('wetland', { center: [130, -35], radius: 10 });
+editor.fill('mask/clearing', { rect: [0, 0, 200, 200], value: 1 });
+console.log(editor.dirty, editor.edits.length); // the rectangles the last step can change, and the edits as data
+editor.undo(); // the exact bytes from before the erase
+```
+
+- `paint(layer, { center, radius = 10, strength = 1, mode = 'add', falloff = 'smooth' })`: modes `'add'`,
+  `'subtract'`, `'set'` (move toward the strength), `'max'` and `'min'`; falloffs `'smooth'` (quintic), `'linear'`,
+  `'constant'`. `erase` moves toward 0; `fill(layer, { rect, value, mask })` sets a rectangle, scaled by a mask.
+- `stroke(work)` or `using s = editor.stroke()` groups edits into one undo step; `undo()` and `redo()` restore the exact
+  bytes of every raster a step touched.
+- Edits are plain data (`editor.edits`, `editor.history()` as an async iterator of every edit as it is made), and
+  `apply(edit)` replays one exactly: a stroke replayed in another world gives the same digests, so edits can be saved or
+  synced.
+- `editor.dirty` covers every cell the last step can change, grown by `editor.margin()`: one cell for the
+  classification blur plus the placement reach (6 rounds of twice the largest species crown and the widest cluster
+  spread), so tiles outside it are guaranteed unchanged. The world reports the same rectangles through `onChange`, and
+  `BiomeView` redraws them. Heights edited with `world.update({ height })` dirty the whole world, since rain shadow
+  and continentality reach far downwind.
+- Brush maths is integer, so the same edit gives the same bytes everywhere. A dab or an undo costs well under a frame;
+  the touched tiles are remade on their next request (on this thread until the worker pool of a later milestone).
 
 ## Same seed, same bytes, everywhere
 

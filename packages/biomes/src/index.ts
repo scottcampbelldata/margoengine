@@ -47,7 +47,7 @@ export type { HeightSource } from './height.js';
 export { DEFAULT_LAYERS, LAYERS, type LayerFormat, type LayerInfo, type RasterLayer } from './layers.js';
 export { distanceTransform, priorityFlood } from './region.js';
 export type { BiomeSample } from './sample.js';
-export { BiomeWorld, type BiomeTile, type BiomeWorldOptions, type TileRequest } from './world.js';
+export { BiomeWorld, type BiomeTile, type BiomeWorldOptions, type LayerWrite, type TileRequest } from './world.js';
 export {
   biotemperature,
   HOLDRIDGE_BELTS,

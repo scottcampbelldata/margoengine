@@ -91,6 +91,10 @@
       "types": "./dist/biomes/view.d.ts",
       "import": "./dist/biomes/view.js"
     },
+    "./biomes/editor": {
+      "types": "./dist/biomes/editor.d.ts",
+      "import": "./dist/biomes/editor.js"
+    },
     "./blender": {
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"

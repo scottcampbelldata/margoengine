@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3855929,
+  "total": 3859189,
   "history": [
     {
       "date": "2026-10-24",
@@ -665,12 +665,6 @@
     },
     {
       "date": "2026-10-28",
-      "commit": "b92998d6",
-      "reason": "webgl2-compat milestone M2: GLSL ES 3.00 back end (/glsl) and the WebGPU-shaped device on WebGL2 (/device); the root's install() loads them by import(), its static part stays the probe",
-      "grew": 3
-    },
-    {
-      "date": "2026-10-28",
       "commit": "e1e56c4a",
       "reason": "New package @margoengine/biomes (item 27.4, B0): fixed-point maths, hashes, noise, relief and R16; spec budget 16 kB for the finished root",
       "grew": 1
@@ -680,6 +674,12 @@
       "commit": "5f6b4344",
       "reason": "@margoengine/biomes B1 (item 27.4): climate fields (region grid, Priority-Flood, rain march, exposure, distance transform; per-cell lapse, seasons, treeline, Hargreaves PET, Fu-Budyko, soil); spec root budget 16 kB",
       "grew": 1
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "b92998d6",
+      "reason": "webgl2-compat milestone M2: GLSL ES 3.00 back end (/glsl) and the WebGPU-shaped device on WebGL2 (/device); the root's install() loads them by import(), its static part stays the probe",
+      "grew": 3
     },
     {
       "date": "2026-10-28",
@@ -697,6 +697,12 @@
       "date": "2026-10-28",
       "commit": "b92998d6",
       "reason": "new optional package @margoengine/ragdoll: ragdolls from a skeleton, cone and hinge limits, kinematic and limp modes, blend back (item 28.5)",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "cdcf5065",
+      "reason": "@margoengine/biomes B3 (item 27.4): /view draws a biome world through @margoengine/terrain (loaded with import()): overview, streamed 1 m tiles, ground weights, generated materials; terrain gains the optional weights textures (decision D4)",
       "grew": 1
     },
     {
@@ -719,8 +725,8 @@
     },
     {
       "date": "2026-10-28",
-      "commit": "cdcf5065",
-      "reason": "@margoengine/biomes B3 (item 27.4): /view draws a biome world through @margoengine/terrain (loaded with import()): overview, streamed 1 m tiles, ground weights, generated materials; terrain gains the optional weights textures (decision D4)",
+      "commit": "9d6f2cfd",
+      "reason": "@margoengine/biomes B4 (item 27.4): /editor, brush paint, erase and fill, strokes, exact undo and redo, edits as data, dirty rectangles with the placement margin",
       "grew": 1
     }
   ],
@@ -735,9 +741,10 @@
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
     "@margoengine/biomes": 20752,
+    "@margoengine/biomes/editor": 3261,
     "@margoengine/biomes/koppen": 1231,
     "@margoengine/biomes/presets": 4407,
-    "@margoengine/biomes/view": 5861,
+    "@margoengine/biomes/view": 5860,
     "@margoengine/blender": 4000,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/bake": 2583,

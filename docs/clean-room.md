@@ -802,6 +802,7 @@ Gaea, World Machine, Houdini and the like) was read; facts about them come only 
 | Preset limits | Plant functional type screening by coldest month, GDD5 and a drought index after Prentice et al., Journal of Biogeography, 1992 (BIOME1) and Kaplan et al., Journal of Geophysical Research, 2003 (BIOME4); the per-preset numbers are our own, rounded from those background values |
 | Koppen labels | Beck et al., "Present and future Koppen-Geiger climate classification maps at 1-km resolution", Scientific Data, 2018, after Peel, Finlayson and McMahon 2007 (the 30-class rules); months from our sinusoidal year and rain-season regimes |
 | Terrain view and ground weights | Our own design: ground layer rules as Wendland bands like the envelopes, biome weights shared among ground layers and rounded to 255 by largest remainder, generated material textures from value noise with box-filtered mips; drawn through the terrain package's optional weights textures |
+| Editor | Our own design: integer brush dabs (quintic, linear or hard falloff) on user rasters, edits kept as plain data for exact replay, undo and redo by raster snapshots; the dirty margin rule (rounds x 2 x the largest radius plus the cluster spread) from our research notes of 2026-10-28 |
 
 ## Ragdolls: `@margoengine/ragdoll`
 

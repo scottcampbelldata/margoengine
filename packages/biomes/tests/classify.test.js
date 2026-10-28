@@ -139,7 +139,7 @@ test('paint layers: replace, add, multiply and max compose in order, masks scale
     rects = [];
   w.onChange((r) => rects.push(r));
   w.writeLayer('paint/desert', 0, 0, full);
-  assert.deepEqual(rects.at(-1), [-257, -257, 1, 1]);
+  assert.deepEqual(rects.at(-1), [-256, -256, 1, 1], 'the tile grown by one cell, clamped to the world');
   assert.deepEqual(w.paint, [{ biome: 'desert', mode: 'replace' }]);
   let t = await w.tile(0, 0);
   assert.deepEqual(top(t, 10, 10), [1, 255]);

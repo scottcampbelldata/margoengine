@@ -11,6 +11,19 @@ import { canonicalBytes, DEFAULT_LAYERS, LAYERS, type RasterLayer, sha256 } from
 import { buildRegion, type Region } from './region.js';
 import { type BiomeSample, readCell, samplePoint } from './sample.js';
 
+/** One user layer raster write of {@link BiomeWorld.writeLayers}. */
+export interface LayerWrite {
+  /** `paint/<biome>` or `mask/<name>`. */
+  readonly name: string;
+  /** Tile indices. */
+  readonly x: number;
+  readonly z: number;
+  /** `cells` x `cells` values 0..255, or undefined to clear the tile's raster. */
+  readonly data: Uint8Array | undefined;
+  /** World rectangle `[minX, minZ, maxX, maxZ]` (metres) of the cells that changed; default the whole tile. */
+  readonly changed?: readonly [number, number, number, number];
+}
+
 /** Settings of {@link BiomeWorld.create}. Every option has a default; `BiomeWorld.create()` makes a working world. */
 export interface BiomeWorldOptions {
   /** u32 seed. Default 1. */
@@ -372,11 +385,20 @@ export class BiomeWorld implements Disposable {
    * Writes a user layer raster for tile (x, z): `paint/<biome>` (0..255, composed into the biome weights by the world's
    * paint layers; a biome painted for the first time gets a `'replace'` layer at the end of the order) or
    * `mask/<name>` (0..255, read by envelopes and paint masks). `data` is `cells` x `cells`, or undefined to clear.
-   * The tile and its neighbours (the classification blur reads one cell across tile edges) are recomputed on their next
-   * request, and listeners get the dirty rectangle.
+   * Same as `writeLayers([{ name, x, z, data }])`.
    * @throws RangeError for a bad name, tile or size; MargoError `'state'` from inside an `onChange` listener.
    */
   writeLayer(name: string, x: number, z: number, data: Uint8Array | undefined): void {
+    this.writeLayers([{ name, x, z, data }]);
+  }
+
+  /**
+   * Writes several user layer rasters at once: all are checked first (nothing is written when one is bad), the tiles
+   * they can change are recomputed on their next request, and listeners get one rectangle: the union of the changed
+   * cells grown by one cell (the classification blur reads one cell across), clamped to the world.
+   * @throws RangeError for a bad name, tile or size; MargoError `'state'` from inside an `onChange` listener.
+   */
+  writeLayers(writes: readonly LayerWrite[]): void {
     this.#live();
     if (this.#notifying)
       throw fault(
@@ -384,34 +406,62 @@ export class BiomeWorld implements Disposable {
         'BiomeWorld writeLayer called from an onChange listener; write after the listener returns',
         'biomes',
       );
+    if (!Array.isArray(writes)) throw typeError('BiomeWorld writeLayers takes an array of layer writes', 'biomes');
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: exact
-      paint = /^paint\/([a-z0-9][a-z0-9-]*)$/.exec(name);
-    if (!(paint ? this.#classifier.ids.includes(paint[1]) : /^mask\/[\w-]+$/.test(name)))
-      throw rangeError('A user layer is paint/<biome id of this world> or mask/<name>', 'biomes');
-    if (!Number.isInteger(x) || !Number.isInteger(z) || x < 0 || z < 0 || x >= this.tilesX || z >= this.tilesZ)
-      throw rangeError(
-        'BiomeWorld tile indices must be integers inside the world (0..tilesX - 1, 0..tilesZ - 1)',
-        'biomes',
-      );
-    if (data !== undefined && (!(data instanceof Uint8Array) || data.length !== cells * cells))
-      throw rangeError('A user layer raster is a Uint8Array of cells x cells values', 'biomes');
-    let tiles = this.#user.get(name);
-    if (!tiles) this.#user.set(name, (tiles = new Map()));
-    if (data) tiles.set(`${x},${z}`, data.slice());
-    else tiles.delete(`${x},${z}`);
-    if (paint && !this.#paint.some((p) => p.biome === paint[1])) {
-      this.#paint = [...this.#paint, { biome: paint[1], mode: 'replace' }];
-      this.#classifier = classifier(this.#biomes, this.#kind, this.#paint);
+      t = this.tileSize,
+      r = this.resolution,
+      [bx0, bz0, bx1, bz1] = this.bounds;
+    for (const w of writes) {
+      const paint = /^paint\/([a-z0-9][a-z0-9-]*)$/.exec(w?.name);
+      if (!(paint ? this.#classifier.ids.includes(paint[1]) : /^mask\/[\w-]+$/.test(w?.name)))
+        throw rangeError('A user layer is paint/<biome id of this world> or mask/<name>', 'biomes');
+      if (
+        !Number.isInteger(w.x) ||
+        !Number.isInteger(w.z) ||
+        w.x < 0 ||
+        w.z < 0 ||
+        w.x >= this.tilesX ||
+        w.z >= this.tilesZ
+      )
+        throw rangeError(
+          'BiomeWorld tile indices must be integers inside the world (0..tilesX - 1, 0..tilesZ - 1)',
+          'biomes',
+        );
+      if (w.data !== undefined && (!(w.data instanceof Uint8Array) || w.data.length !== cells * cells))
+        throw rangeError('A user layer raster is a Uint8Array of cells x cells values', 'biomes');
+      if (
+        w.changed !== undefined &&
+        (!Array.isArray(w.changed) || w.changed.length !== 4 || !w.changed.every(Number.isFinite))
+      )
+        throw rangeError('A layer write changed rectangle is [minX, minZ, maxX, maxZ] in metres', 'biomes');
     }
-    this.#invalidate([x - 1, z - 1, x + 1, z + 1]);
-    const t = this.tileSize,
-      r = this.resolution;
-    this.#emit([
-      this.bounds[0] + x * t - r,
-      this.bounds[1] + z * t - r,
-      this.bounds[0] + (x + 1) * t + r,
-      this.bounds[1] + (z + 1) * t + r,
-    ]);
+    if (!writes.length) return;
+    const dirty = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const w of writes) {
+      let tiles = this.#user.get(w.name);
+      if (!tiles) this.#user.set(w.name, (tiles = new Map()));
+      if (w.data) tiles.set(`${w.x},${w.z}`, w.data.slice());
+      else tiles.delete(`${w.x},${w.z}`);
+      const biome = /^paint\/(.+)$/.exec(w.name)?.[1];
+      if (biome && !this.#paint.some((p) => p.biome === biome)) {
+        this.#paint = [...this.#paint, { biome, mode: 'replace' }];
+        this.#classifier = classifier(this.#biomes, this.#kind, this.#paint);
+      }
+      const c = w.changed ?? [bx0 + w.x * t, bz0 + w.z * t, bx0 + (w.x + 1) * t, bz0 + (w.z + 1) * t];
+      dirty[0] = Math.min(dirty[0], c[0] - r);
+      dirty[1] = Math.min(dirty[1], c[1] - r);
+      dirty[2] = Math.max(dirty[2], c[2] + r);
+      dirty[3] = Math.max(dirty[3], c[3] + r);
+    }
+    const rect = [
+      Math.max(bx0, dirty[0]),
+      Math.max(bz0, dirty[1]),
+      Math.min(bx1, dirty[2]),
+      Math.min(bz1, dirty[3]),
+    ] as const;
+    // Tiles whose cells (plus the 1-cell blur margin) meet the rectangle.
+    this.#invalidate(this.#tileRange([rect[0] - r, rect[1] - r, rect[2] + r, rect[3] + r]));
+    this.#emit(rect);
   }
 
   /** Drops cached tiles in an inclusive tile-index rectangle. */
