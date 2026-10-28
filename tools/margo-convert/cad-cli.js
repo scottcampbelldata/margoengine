@@ -4,6 +4,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { convert, formatOf } from './convert.js';
+import { sameFile } from './pipeline/paths.js';
 
 const usage = `Usage: margo-convert <input.step|.stp|.iges|.igs|.brep> [output.glb] [options]
 
@@ -59,7 +60,7 @@ const number = (name) => {
 };
 
 const [input, output = input.replace(/\.[^./\\]+$/, '') + '.glb'] = positionals;
-if (output === input) fail('output would overwrite the input');
+if (sameFile(input, output)) fail('output would overwrite the input; choose another output path');
 const units = values.units;
 if (units !== undefined && units !== 'mm' && units !== 'cm' && units !== 'm' && units !== 'in' && units !== 'ft')
   fail('--units must be mm, cm, m, in or ft');

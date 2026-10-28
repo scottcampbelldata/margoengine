@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { findFfmpeg, processAudio } from './audio.js';
 import { optimizeModel } from './optimize.js';
+import { inside, modelFile } from './paths.js';
 import { preset as presetFor } from './presets.js';
 import { decodeRgba, encodeDDS, loadSharp, mipChain, processImage, roleOfName } from './textures.js';
 
@@ -106,7 +107,43 @@ function gltfDependencies(file) {
   const uris = [...(json.buffers ?? []), ...(json.images ?? [])]
     .map((/** @type {any} */ x) => x.uri)
     .filter((/** @type {any} */ u) => typeof u === 'string' && !u.startsWith('data:'));
-  return uris.map((/** @type {string} */ u) => resolve(dirname(file), decodeURIComponent(u.split('?')[0])));
+  // A URI that leaves the model's folder is never read, not even to hash it; building the model then fails naming it.
+  return uris.flatMap((/** @type {string} */ u) => {
+    let path;
+    try {
+      path = decodeURIComponent(u.split('?')[0]);
+    } catch {
+      return []; // malformed percent escapes: readModel reports the URI when the model is built
+    }
+    return inside(dirname(file), path) ?? [];
+  });
+}
+
+/**
+ * A previous manifest's entries, or none when it is damaged: unreadable, the wrong shape, or naming an output that is
+ * absolute or outside outDir. Such a manifest is only a cache, so the build starts over and deletes nothing it names.
+ * @param {string} outDir @param {string} manifestPath @returns {ManifestEntry[]}
+ */
+function previousEntries(outDir, manifestPath) {
+  let files;
+  try {
+    files = JSON.parse(readFileSync(manifestPath, 'utf8')).files;
+  } catch {
+    return [];
+  }
+  const valid =
+    Array.isArray(files) &&
+    files.every(
+      (/** @type {any} */ e) =>
+        e !== null &&
+        typeof e === 'object' &&
+        typeof e.source === 'string' &&
+        Array.isArray(e.outputs) &&
+        e.outputs.every(
+          (/** @type {any} */ o) => o !== null && typeof o === 'object' && inside(outDir, o.path) !== undefined,
+        ),
+    );
+  return valid ? files : [];
 }
 
 /**
@@ -155,13 +192,8 @@ export async function build(options) {
   );
   /** @type {Map<string, ManifestEntry>} */ const previous = new Map();
   const manifestPath = join(outDir, MANIFEST_NAME);
-  if (!options.force && existsSync(manifestPath)) {
-    try {
-      for (const entry of JSON.parse(readFileSync(manifestPath, 'utf8')).files) previous.set(entry.source, entry);
-    } catch {
-      // A damaged manifest is only a cache; rebuild.
-    }
-  }
+  if (!options.force && existsSync(manifestPath))
+    for (const entry of previousEntries(outDir, manifestPath)) previous.set(entry.source, entry);
 
   /** @type {ManifestEntry[]} */ const entries = [];
   const ignored = [];
@@ -304,7 +336,7 @@ export async function optimizeModelFile(file, data, preset, tools = {}) {
     bytes = (await convert(data, formatOf(file))).glb;
   }
   return optimizeModel(bytes, preset.model, {
-    resolve: (uri) => new Uint8Array(readFileSync(resolve(dirname(file), uri))),
+    resolve: (uri) => new Uint8Array(readFileSync(modelFile(dirname(file), uri))),
     textures: { preset: preset.texture, sharp: tools.sharp ?? null },
   });
 }

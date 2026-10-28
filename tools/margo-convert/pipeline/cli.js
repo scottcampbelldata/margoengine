@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { build, optimizeModelFile, withOverrides } from './build.js';
+import { sameFile } from './paths.js';
 import { PRESET_NAMES, PRESETS, preset as presetFor } from './presets.js';
 import { loadSharp } from './textures.js';
 
@@ -136,7 +137,7 @@ export async function run(mode, argv) {
     input,
     output = join(dirname(positionals[0]), `${basename(positionals[0], extname(positionals[0]))}.optimized.glb`),
   ] = positionals;
-  if (output === input) return fail('output would overwrite the input');
+  if (sameFile(input, output)) return fail('output would overwrite the input; choose another output path');
   try {
     const data = new Uint8Array(readFileSync(input));
     const sharp = values.sharp === false ? null : await loadSharp();
