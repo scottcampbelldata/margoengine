@@ -9,11 +9,17 @@ export default {
     const { stages, TILE } = await import('../biomes/placement.mjs');
     const perKm2 = 1e6 / (TILE.size * TILE.size);
     return (await stages()).map((stage) =>
-      nodeCase(stage.id, stage.title, { msPerKm2: ms() }, () => {
-        const start = performance.now();
-        stage.run();
-        return { msPerKm2: (performance.now() - start) * perKm2 };
-      }),
+      nodeCase(
+        stage.id,
+        stage.title,
+        { msPerKm2: ms() },
+        async () => {
+          const start = performance.now();
+          await stage.run();
+          return { msPerKm2: (performance.now() - start) * perKm2 };
+        },
+        { setup: async () => stage.setup?.() },
+      ),
     );
   },
 };

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3805657,
+  "total": 3815370,
   "history": [
     {
       "date": "2026-10-24",
@@ -665,14 +665,20 @@
     },
     {
       "date": "2026-10-28",
+      "commit": "e1e56c4a",
+      "reason": "New package @margoengine/biomes (item 27.4, B0): fixed-point maths, hashes, noise, relief and R16; spec budget 16 kB for the finished root",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-28",
       "commit": "b92998d6",
       "reason": "webgl2-compat milestone M2: GLSL ES 3.00 back end (/glsl) and the WebGPU-shaped device on WebGL2 (/device); the root's install() loads them by import(), its static part stays the probe",
       "grew": 3
     },
     {
       "date": "2026-10-28",
-      "commit": "e1e56c4a",
-      "reason": "New package @margoengine/biomes (item 27.4, B0): fixed-point maths, hashes, noise, relief and R16; spec budget 16 kB for the finished root",
+      "commit": "5f6b4344",
+      "reason": "@margoengine/biomes B1 (item 27.4): climate fields (region grid, Priority-Flood, rain march, exposure, distance transform; per-cell lapse, seasons, treeline, Hargreaves PET, Fu-Budyko, soil); spec root budget 16 kB",
       "grew": 1
     }
   ],
@@ -686,7 +692,7 @@
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
-    "@margoengine/biomes": 3826,
+    "@margoengine/biomes": 13539,
     "@margoengine/blender": 4000,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/bake": 2583,

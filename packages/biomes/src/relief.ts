@@ -2,6 +2,7 @@
 // optional coast and river valleys. It is the default height of a BiomeWorld and the terrain of the reference world
 // R16. Every step works on integers below 2^53 with plain arithmetic, floors and integer square roots (value noise from
 // hash.ts), which every JavaScript engine computes identically, so the same options give the same heights everywhere. Our own layout; the noise is cited in hash.ts.
+import { rangeError, typeError } from '../../shared/errors.js';
 import { clampInt, divFloor, divWide, isqrt, ONE } from './fixed.js';
 import { fbm, hash3, ridged } from './hash.js';
 
@@ -65,7 +66,7 @@ const SHELF = 1_500_000,
  */
 export function createRelief(options: ReliefOptions = {}): Relief {
   if (typeof options !== 'object' || options === null)
-    throw new TypeError('Relief options must be an object; pass {} for the defaults');
+    throw typeError('Relief options must be an object; pass {} for the defaults', 'biomes');
   const seed = (options.seed ?? 1) >>> 0,
     size = options.size ?? [4096, 4096],
     origin = options.origin ?? [-size[0] / 2, -size[1] / 2],
@@ -89,8 +90,9 @@ export function createRelief(options: ReliefOptions = {}): Relief {
     count < 0 ||
     count > 8
   )
-    throw new RangeError(
+    throw rangeError(
       'Invalid relief options; size 64..65,536 m, origin within 1,000 km, base within 8 km, relief and seaDepth 0..8,000 m, coast none/west/east/north/south and 0..8 rivers',
+      'biomes',
     );
   const ox = mm(origin[0]),
     oz = mm(origin[1]),
@@ -213,13 +215,14 @@ export function createRelief(options: ReliefOptions = {}): Relief {
  */
 export function quantizeHeights(samples: Float32Array | Float64Array, unit = 1): Int32Array {
   if (!(samples instanceof Float32Array || samples instanceof Float64Array))
-    throw new TypeError('quantizeHeights needs a Float32Array or Float64Array of heights');
-  if (!(unit > 0 && Number.isFinite(unit))) throw new RangeError('quantizeHeights unit must be a positive number');
+    throw typeError('quantizeHeights needs a Float32Array or Float64Array of heights', 'biomes');
+  if (!(unit > 0 && Number.isFinite(unit)))
+    throw rangeError('quantizeHeights unit must be a positive number', 'biomes');
   const out = new Int32Array(samples.length);
   for (let i = 0; i < samples.length; i++) {
     const v = Math.round(samples[i] * unit * 1000);
     if (!(Math.abs(v) <= 2e9))
-      throw new RangeError(`Height sample ${i} is not finite or beyond 2,000 km; fix the input`);
+      throw rangeError(`Height sample ${i} is not finite or beyond 2,000 km; fix the input`, 'biomes');
     out[i] = v;
   }
   return out;

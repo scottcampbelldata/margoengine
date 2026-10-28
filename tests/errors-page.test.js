@@ -7,7 +7,7 @@ import { errorsPage } from '../scripts/errors/page.mjs';
 // margoengine.com/errors (site/errors.html) and the core and stage throws come from one source; these checks keep
 // them from drifting apart.
 // Core, the stage, compute and sciviz (whose messages link to their #compute and #sciviz entries) go through the same
-// checks.
+// checks, and so do ui, mcp and biomes.
 const sources = [
     'packages/core/src',
     'packages/stage/src',
@@ -15,6 +15,7 @@ const sources = [
     'packages/sciviz/src',
     'packages/ui/src',
     'packages/mcp/src',
+    'packages/biomes/src',
   ].flatMap((dir) =>
     readdirSync(dir)
       .filter((f) => f.endsWith('.ts'))

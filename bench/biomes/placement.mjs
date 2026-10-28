@@ -3,6 +3,7 @@
 // exclusively): node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node bench/biomes/placement.mjs [--runs=20]
 // Also the `biomes` suite of `npm run bench -- biomes`. Prints one JSON object: ms per km2 per stage, and the spread.
 // Stages arrive with the milestones: relief heights (B0), climate fields (B1), classification (B2), placement (B5).
+// The fields stage builds R16's region fields once in its setup (several seconds, not timed).
 import { pathToFileURL } from 'node:url';
 import { median } from '../lib/node.mjs';
 
@@ -18,6 +19,8 @@ export async function stages() {
     x0 = TILE.x * TILE.size * 1000,
     z0 = TILE.z * TILE.size * 1000,
     heights = new Int32Array(TILE.size * TILE.size);
+  let world,
+    next = 0;
   const list = [
     {
       id: 'relief',
@@ -25,6 +28,23 @@ export async function stages() {
       run() {
         for (let z = 0, k = 0; z < TILE.size; z++)
           for (let x = 0; x < TILE.size; x++) heights[k++] = relief.height(x0 + x * 1000, z0 + z * 1000);
+      },
+    },
+    {
+      id: 'fields',
+      title: 'Climate fields of one R16 tile at 1 m (17 layers, heights from the procedural relief)',
+      async setup() {
+        world ??= await biomes.BiomeWorld.create({
+          seed: biomes.R16.seed,
+          origin: biomes.R16.origin,
+          size: biomes.R16.size,
+          height: { relief: biomes.R16.relief },
+          climate: biomes.R16.climate,
+        });
+      },
+      async run() {
+        // A new tile each run (the world caches finished tiles), all near the centre of R16.
+        await world.tile(32 + (next % 8), 30 + (next++ >> 3));
       },
     },
   ];
@@ -36,12 +56,13 @@ export async function measure({ runs = 20 } = {}) {
   const perKm2 = 1e6 / (TILE.size * TILE.size),
     result = {};
   for (const stage of await stages()) {
-    stage.run();
-    stage.run();
+    await stage.setup?.();
+    await stage.run();
+    await stage.run();
     const times = [];
     for (let i = 0; i < runs; i++) {
       const start = performance.now();
-      stage.run();
+      await stage.run();
       times.push((performance.now() - start) * perKm2);
     }
     result[stage.id] = {

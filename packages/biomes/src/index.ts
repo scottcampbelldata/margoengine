@@ -19,6 +19,7 @@ export {
   qexp2,
   qlog2,
   qmul,
+  qacos,
   qpow,
   qsqrt,
   sincos,
@@ -29,3 +30,21 @@ export {
 export { fbm, hash2, hash3, hash4, hash5, pcg, ridged, valueNoise } from './hash.js';
 export { createRelief, quantizeHeights, type Relief, type ReliefOptions, type RiverLine } from './relief.js';
 export { R16 } from './r16.js';
+export {
+  continentality,
+  degreeDays,
+  evapotranspiration,
+  halfAmplitude,
+  heatLoad,
+  moistureIndex,
+  quantizeClimate,
+  seasonMean,
+  treelineMargin,
+  type Climate,
+  type ClimateOptions,
+} from './climate.js';
+export type { HeightSource } from './height.js';
+export { DEFAULT_LAYERS, LAYERS, type LayerFormat, type LayerInfo, type RasterLayer } from './layers.js';
+export { distanceTransform, priorityFlood } from './region.js';
+export type { BiomeSample } from './sample.js';
+export { BiomeWorld, type BiomeTile, type BiomeWorldOptions, type TileRequest } from './world.js';

@@ -6,6 +6,7 @@
 // Sources: CORDIC, Volder, "The CORDIC trigonometric computing technique", IRE Transactions on Electronic Computers,
 // 1959 (vectoring and rotation modes, gain K); the binary logarithm by repeated squaring is the textbook digit-by-digit
 // method (each squaring of a mantissa in [1, 2) yields one fraction bit).
+import { rangeError } from '../../shared/errors.js';
 
 /** 1.0 in Q16.16, the format of most fixed-point values in this package. */
 export const ONE = 65536;
@@ -43,6 +44,9 @@ export function mulHigh(): number {
  * `shift` is an integer in 0..32.
  */
 export function mulShift(a: number, b: number, shift: number): number {
+  // Fast path: a product below 2^53 is exact as a double, and so is its floor division by a power of two.
+  const p = (a | 0) * (b | 0);
+  if (p < 9007199254740992 && p > -9007199254740992) return Math.floor(p / 2 ** shift) | 0;
   const lo = mul64(a, b);
   if (shift === 0) return lo | 0;
   if (shift === 32) return high;
@@ -128,7 +132,7 @@ export function qdiv(a: number, b: number): number {
  */
 export function isqrt(n: number): number {
   if (!(n >= 0 && n <= 4503599627370496) || n !== Math.floor(n))
-    throw new RangeError('isqrt needs an integer in 0..2^52; clamp or scale the value first');
+    throw rangeError('isqrt needs an integer in 0..2^52; clamp or scale the value first', 'biomes');
   let s = Math.floor(Math.sqrt(n));
   while (s * s > n) s--;
   while ((s + 1) * (s + 1) <= n) s++;
@@ -152,7 +156,7 @@ export function qlog2(x: number): number {
   let m = e >= 15 ? x >>> (e - 15) : x << (15 - e),
     frac = 0;
   for (let bit = 1 << 15; bit; bit >>>= 1) {
-    m = Math.floor((m * m + 16384) / 32768);
+    m = ((Math.imul(m, m) >>> 0) + 16384) >>> 15; // m < 2^16, so m^2 + 2^14 < 2^32: exact
     if (m >= 65536) {
       m >>>= 1;
       frac |= bit;
@@ -212,7 +216,7 @@ export function atan2(y: number, x: number): number {
   }
   // Scale so the larger magnitude is in [2^28, 2^29): the CORDIC gain (1.65) then stays below 2^31.
   const m = Math.max(Math.abs(x), Math.abs(y));
-  let shift = 0;
+  let shift = m < 2147483648 ? Math.clz32(m) - 3 : 28 - Math.floor(Math.log2(m));
   while (m * 2 ** shift >= 536870912) shift--;
   while (m * 2 ** shift < 268435456) shift++;
   let px = Math.floor(x * 2 ** shift) | 0,
@@ -263,6 +267,22 @@ export function sincos<T extends { [index: number]: number }>(angle: number, out
   out[0] = sign * ((x + 4096) >> 13);
   out[1] = sign * ((y + 4096) >> 13);
   return out;
+}
+
+// Hastings' arccos polynomial, Abramowitz and Stegun 4.4.46 (|error| below 2e-8 rad), coefficients in Q24.
+const ACOS = [26353589, -3600370, 1492820, -841785, 518280, -286691, 111906, -21181];
+
+/**
+ * Arc cosine of a Q16.16 value (clamped to -1..1) as Q16.16 radians, within 3 units: `sqrt(1 - |x|)` times a
+ * degree-7 polynomial (Abramowitz and Stegun 4.4.46), mirrored for negative x.
+ */
+export function qacos(x: number): number {
+  x = clampInt(x | 0, -ONE, ONE);
+  const t = Math.abs(x);
+  let p = ACOS[7];
+  for (let i = 6; i >= 0; i--) p = Math.floor((p * t) / ONE) + ACOS[i];
+  const r = Math.floor((qsqrt(ONE - t) * p) / 16777216);
+  return x < 0 ? 205887 - r : r;
 }
 
 /** A binary angle from degrees (quantised once by plain arithmetic, which every engine rounds the same way). */
