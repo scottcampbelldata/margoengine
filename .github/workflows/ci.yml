@@ -82,6 +82,28 @@ jobs:
       - if: matrix.node == '26'
         run: npm test
 
+  # The unit tests of the packages that run code in Node (scripts/node22-packages.json, one reason per package), with
+  # the same assertions as the test job. Test files with `using` declarations are lowered for Node 22 only
+  # (scripts/lib/lower-using.mjs). The React unit tests need Node 24.18 (mock.module timing, bug 18) and stay in the
+  # test job; browser-only packages are covered on Node 22 by the end-user proof above.
+  node22-tests:
+    name: node22 unit tests (Node-run packages) on ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['22.12.0', '22']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build:packages
+      - run: node scripts/node22-tests.mjs
+
   kernel:
     runs-on: ubuntu-latest
     steps:

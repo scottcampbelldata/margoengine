@@ -1,10 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registerHooks } from 'node:module';
-
-// Source verification avoids rebuilding shared dist while another author works on UV operations.
+// Source verification avoids rebuilding shared dist while another author works on UV operations. module.registerHooks
+// exists from Node 22.15; it is read only for the source mode, so the dist run works on 22.12.
 if (process.env.MARGO_PAINT_SOURCE === '1')
-  registerHooks({
+  (await import('node:module')).registerHooks({
     resolve(specifier, context, nextResolve) {
       if (specifier.startsWith('.') && specifier.endsWith('.js') && context.parentURL?.includes('/mesh-edit/src/'))
         return nextResolve(specifier.slice(0, -3) + '.ts', context);

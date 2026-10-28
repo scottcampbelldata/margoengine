@@ -13,6 +13,16 @@ code may not use a JavaScript or Node API that Node 22.12 lacks without a featur
 To run that proof locally, put a Node 22 first on PATH and run `npm run modern:test:packages -- --consumer` and
 `npm run modern:test:bundlers`.
 
+The unit tests of the packages that run code in Node also run on Node 22.12.0 and the latest 22.x, with the same
+assertions (CI job "node22 unit tests (Node-run packages)", `npm run test:node22` after `npm run build:packages`).
+`scripts/node22-packages.json` lists them with one reason each: the command line tools (margo-convert, create-margo,
+the mcp server), the netcode and voxel-net servers and what they import, save's Node adapter, the format parsers and
+exporters, the WGSL and shader tooling, and the packages of game and geometry logic that use no GPU or DOM. The React
+unit tests stay on Node 24.18 (they rely on node:test mock.module timing; React SSR itself runs on Node 22 in the
+end-user proof), and the browser-only packages are covered on Node 22 by the end-user proof. Test files that use
+`using` declarations run on Node 22 through `scripts/lib/lower-using.mjs`, which lowers them to try/finally only on a
+runtime that cannot parse them.
+
 ```sh
 git clone https://github.com/scottcampbelldata/margoengine.git
 cd margoengine

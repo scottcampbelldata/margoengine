@@ -4,13 +4,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { stripTypeScriptTypes } from 'node:module';
+import { transformWithOxc } from 'vite';
 import { lz4 } from './crate-writer.js';
 
+// Types are stripped with Oxc rather than node:module's stripTypeScriptTypes, which Node 22.12 does not have.
 const repo = new URL('../../../', import.meta.url),
   source = readFileSync(new URL('../src/crate.ts', import.meta.url), 'utf8'),
   loaders = new URL('../../loaders/dist/common.js', import.meta.url).href,
-  js = `${stripTypeScriptTypes(source.replace("'@margoengine/loaders/common'", JSON.stringify(loaders)))}\nexport { decompressFast, lz4Block, decodeInts };\n`,
+  stripped = await transformWithOxc(
+    source.replace("'@margoengine/loaders/common'", JSON.stringify(loaders)),
+    'crate.ts',
+    {
+      lang: 'ts',
+      target: 'esnext',
+    },
+  ),
+  js = `${stripped.code}\nexport { decompressFast, lz4Block, decodeInts };\n`,
   { decompressFast, decodeInts } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
 const vectors = (name) => JSON.parse(readFileSync(new URL(`fixtures/${name}`, import.meta.url), 'utf8')),
   lz = vectors('lz4-usd.json'),

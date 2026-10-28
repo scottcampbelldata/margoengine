@@ -23,7 +23,9 @@ The folder names matter: each app finds the engine at `../margoengine`.
 ## Prerequisites
 
 - Node.js 24.18 or later and npm (the repository minimum). End users: Node 22.12 or newer (tested on 22.12 and the
-  latest 22.x, 24.18 and 26). Contributors: Node 24.18 or newer.
+  latest 22.x, 24.18 and 26). Contributors: Node 24.18 or newer. The unit tests of the packages that run code in
+  Node (`scripts/node22-packages.json`) also run on Node 22: `npm run test:node22` with a Node 22 first on PATH, after
+  `npm run build:packages`; see CONTRIBUTING.md.
 - git and git-lfs (`git lfs install` once per machine).
 - Margo3D Studio only: Rust with the `wasm32-unknown-unknown` target and `wasm-bindgen-cli` at the version its
   `Cargo.toml` names.
