@@ -341,7 +341,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/math`](packages/math/README.md) | Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math, one module per type. |
 | [`@margoengine/quality`](packages/quality/README.md) | Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom. |
 | [`@margoengine/webgl`](packages/webgl/README.md) | WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}). |
-| [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) | In development: the WebGL2 compatibility layer for browsers without WebGPU. Today it reports a browser's WebGL2 capabilities and the compatibility tier they reach; no rendering yet. |
+| [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) | In development (milestones M0 and M1): the WebGL2 compatibility layer for browsers without WebGPU. It reports WebGL2 capability tiers and checks WGSL (parser, type checker, typed IR); it does not render yet. |
 | [`@margoengine/stats`](packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling. |
 | [`@margoengine/inspector`](packages/inspector/README.md) | Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger. |
 

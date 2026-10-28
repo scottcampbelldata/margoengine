@@ -422,4 +422,31 @@ export const entries = [
       'A widget, layout style, theme, colour or Ui option got a value it cannot use: a size that is not a number, auto, fill or a percentage; spacing that is not one, two or four numbers; a colour that is not #rrggbb or #rrggbbaa; a theme field or colour role that does not exist; a slider or progress bar with a range that is empty or not finite; a list entry without a label; an index outside the widgets there are; a text scale outside 0.5 to 3; or a Ui used after it was disposed.',
     fix: 'Read the message: it names the fix. Pass sizes as numbers of UI units, "auto", "fill" or "50%", colours as hex strings, themes made with createTheme(overrides, themes.dark), and widgets made with the classes of @margoengine/ui. After ui.dispose() make a new Ui. Branch on error.code, not on the message.',
   },
+  {
+    id: 'wgsl-syntax',
+    title: 'wgsl-syntax: the text is not WGSL (@margoengine/webgl2-compat/wgsl)',
+    kind: 'family',
+    messages: [],
+    cause:
+      'parseWGSL or checkWGSL met text that the WGSL grammar does not allow: a character WGSL has no token for, a malformed number (a leading zero, a wrong suffix), a reserved word or a name starting with two underscores, a missing semicolon or bracket, an unclosed block comment, a directive after a declaration, or operators the grammar does not let you mix without parentheses (a & b | c, a < b < c).',
+    fix: 'The error names the line and column of the token at fault, in code points, and says what it expected there. Fix the text at that position; `error.detail` is the message without the position, for an editor that marks it itself.',
+  },
+  {
+    id: 'wgsl-type',
+    title: 'wgsl-type: the text parses but breaks a WGSL rule',
+    kind: 'family',
+    messages: [],
+    cause:
+      'The WGSL parses, but a rule of the specification fails: an unknown name, a value of the wrong type, a wrong number of arguments, a constant expression that overflows or divides by zero, a missing return, a break outside a loop, a resource without @group and @binding, two resources at one binding in the same entry point, or a fragment-only built-in reached from a compute entry point.',
+    fix: "Read the message at the line and column it names: it states the rule and the fix. The same shader fails in a browser's own WebGPU compiler too, usually with a similar message.",
+  },
+  {
+    id: 'wgsl-limit',
+    title: 'wgsl-limit: the source is past a front-end limit',
+    kind: 'family',
+    messages: [],
+    cause:
+      'The source is longer than 4 MiB, nests brackets, blocks or expressions more than 255 levels deep (expressions 512 levels in the checker), builds a constant with more than 65,536 values, or uses an abstract integer beyond 2^53. The limits are in WGSL_LIMITS; they keep broken or hostile input from hanging the page.',
+    fix: 'Split the module, flatten the nesting, use a var instead of a huge constant, or give a large integer a concrete type such as i32 or u32.',
+  },
 ];

@@ -4,8 +4,9 @@ Date: 2026-10-21. Status: ACTIVE since 2026-10-27 (Scott), on three conditions: 
 stay under the 25,000-byte gzip gate and neither is touched; (2) browsers with WebGPU download nothing and see no
 slowdown: the layer is a separate optional package, loaded by dynamic import only when `navigator.gpu` is missing or
 `requestAdapter()` answers null, and the WebGPU path of core and every package is byte-identical with and without it;
-(3) the exact-pixel mode (no context antialiasing) is honoured. Milestone M0 is done (`@margoengine/webgl2-compat`
-reports WebGL2 capabilities and tiers; the WGSL corpus is recorded); M1 (the WGSL front end) is next. It was paused
+(3) the exact-pixel mode (no context antialiasing) is honoured. Milestones M0 (`@margoengine/webgl2-compat`
+reports WebGL2 capabilities and tiers; the WGSL corpus is recorded) and M1 (the WGSL front end: the whole corpus
+parses and type-checks, [below](#wgsl-front-end-m1-2026-10-27)) are done; M2 (the GLSL back end) is next. It was paused
 on 2026-10-24 (the apps built on Margo so far run on Electron, which has WebGPU) and planned for after v1.0.0 before
 that.
 
@@ -331,3 +332,34 @@ budgets and GPU-driven culling on WebGL2.
    module); the manifest pins the SHA-256 of the data, and `npm run record:wgsl-corpus` rebuilds both. The corpus test
    fails when a package with WGSL in its source has no module in the corpus. Shaders created inside workers are not
    recorded (the hook runs in pages only); none of the packages compiles WGSL in a worker today.
+
+## WGSL front end (M1, 2026-10-27)
+
+`@margoengine/webgl2-compat/wgsl` (its own entry; the root entry never imports it): `parseWGSL` and `checkWGSL`.
+
+- **What it covers.** The lexer follows the specification's textual structure: nested block comments, every line
+  break, Unicode identifiers, reserved words, all numeric literal forms and the template-list discovery algorithm.
+  The parser covers the whole grammar, including the operator rules (no mixed bitwise chains, no chained
+  comparisons). The checker resolves module-scope declarations in any order with cycle detection, applies the Load
+  Rule and pointer rules, materializes abstract numbers, resolves operator, constructor, conversion and built-in
+  overloads (texture, atomic, packing and bit built-ins included), folds constant expressions with the errors the
+  specification requires (overflow, division by zero, shifts past the width, non-finite floats), checks statement
+  rules (`continuing`, `break if`, `switch` with one `default`, returns on every path by statement behaviors, no
+  recursion), lays out structs with `@align` and `@size`, and checks entry-point interfaces, resource bindings and the
+  stage of every built-in (fragment-only derivatives and sampling, compute-only barriers and workgroup memory).
+- **The IR** is typed: every expression has its WGSL type (memory references kept apart from values), the folded value
+  when it is constant, and its source span; `locate(offset)` gives the line and column. Each entry point lists the
+  globals it reaches, which the back end turns into the per-pipeline binding table.
+- **Errors.** `WGSLError` with code `syntax`, `type` or `limit`, line and column in code points, and a help link
+  (`margoengine.com/errors#wgsl-<code>`). Fuzz tests (random token soup, random expressions in a typed function,
+  mutated corpus modules, nesting bombs, 4 MiB of input) check that nothing else escapes and that every case ends
+  quickly; property tests compare i32, u32 and f32 folding with a reference evaluator.
+- **Corpus result.** All 786 corpus modules parse and check (about 0.5 s for the 3.4 MB on this PC). For every
+  pipeline the browser accepted with an explicit layout, each resource the checked entry point reaches sits at a layout
+  entry of the same kind, visible to its stage.
+- **Left out on purpose, with reasons.** Uniformity analysis (every corpus shader passes it in the browsers' WebGPU
+  compilers; it returns as a check if the layer ever compiles shaders no WebGPU browser saw). Array sizes given by an
+  override expression other than a single override name (no package uses one). Diagnostic filters are parsed and
+  ignored (the front end emits no warnings). Built-ins that do not fold yet (`refract`, the bit and pack functions)
+  give runtime values, so a `const` that uses one fails with a clear message; none is used that way in the packages. Abstract integers are evaluated exactly up to 2^53, not the specification's
+  64 bits; a larger one fails with code `limit` and asks for a concrete type.

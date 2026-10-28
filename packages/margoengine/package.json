@@ -1423,6 +1423,10 @@
       "types": "./dist/webgl2-compat.d.ts",
       "import": "./dist/webgl2-compat.js"
     },
+    "./webgl2-compat/wgsl": {
+      "types": "./dist/webgl2-compat/wgsl.d.ts",
+      "import": "./dist/webgl2-compat/wgsl.js"
+    },
     "./wfc": {
       "types": "./dist/wfc.d.ts",
       "import": "./dist/wfc.js"

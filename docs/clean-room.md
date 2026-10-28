@@ -751,3 +751,4 @@ Written clean room from the specifications below. No source code of shader trans
 | --- | --- |
 | Capability probe and tiers | Khronos WebGL 2.0 specification (`getExtension`, `getParameter`, `getShaderPrecisionFormat`) and the WebGL extension registry entries named in the package; OpenGL ES 3.0 and GLSL ES 3.00 specifications (precision qualifiers) |
 | WGSL corpus recorder | W3C WebGPU specification (`GPUDevice` methods, `getCompilationInfo`) |
+| WGSL front end (`/wgsl`: lexer, parser, type checker, constant folding, IR) | W3C WGSL specification (textual structure and template-list discovery, grammar, types and memory layout, expressions, statements and behaviors, built-in functions, entry-point interfaces); IEEE 754 for f32 and f16 rounding; mulberry32 (public domain) in the fuzz tests |

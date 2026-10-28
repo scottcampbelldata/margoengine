@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/webgl2-compat",
   "version": "1.0.0",
-  "description": "In development: the WebGL2 compatibility layer for browsers without WebGPU. Today it reports a browser's WebGL2 capabilities and the compatibility tier they reach; no rendering yet.",
+  "description": "In development (milestones M0 and M1): the WebGL2 compatibility layer for browsers without WebGPU. It reports WebGL2 capability tiers and checks WGSL (parser, type checker, typed IR); it does not render yet.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -27,6 +27,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./wgsl": {
+      "types": "./dist/wgsl.d.ts",
+      "import": "./dist/wgsl.js"
     }
   },
   "files": [
