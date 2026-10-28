@@ -34,6 +34,8 @@ export abstract class Room<State = unknown> {
     maxClients: number;
     autoDispose: boolean;
     maxMessageBytes: number;
+    maxMessagesPerSecond: number | undefined;
+    messageBurst: number | undefined;
     roomId: string;
     roomName: string;
     readonly clients: RoomClient[];
@@ -78,14 +80,29 @@ export class RoomClient {
 
 export type RoomOptions = Record<string, unknown>;
 
+export interface RoomRateLimits {
+    messagesPerSecond?: number;
+    burst?: number;
+}
+
 export class RoomServer {
     onerror: ((error: unknown, room: Room | undefined) => void) | null;
+    constructor(options?: RoomServerOptions);
     get rooms(): Room[];
+    get connections(): number;
     define(name: string, Class: RoomClass, defaults?: RoomOptions): this;
     create(name: string, options?: RoomOptions): Promise<Room>;
+    private get full();
     accept(connection: Connection): void;
     close(): void;
     [Symbol.dispose](): void;
+}
+
+export interface RoomServerOptions {
+    joinTimeout?: number;
+    maxConnections?: number;
+    maxRooms?: number;
+    limits?: RoomRateLimits;
 }
 
 export class RoomsClient {
