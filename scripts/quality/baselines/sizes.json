@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3847149,
+  "total": 3849066,
   "history": [
     {
       "date": "2026-10-24",
@@ -698,6 +698,12 @@
       "commit": "b92998d6",
       "reason": "new optional package @margoengine/ragdoll: ragdolls from a skeleton, cone and hinge limits, kinematic and limp modes, blend back (item 28.5)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "65e92afc",
+      "reason": "new optional entry @margoengine/sky/sun: typed angles, named sun and ambient setters, sunlitSky (lighting API usability fix; core and stage unchanged)",
+      "grew": 1
     }
   ],
   "items": {
@@ -991,6 +997,7 @@
     "@margoengine/sky/night": 2523,
     "@margoengine/sky/preetham": 953,
     "@margoengine/sky/reflection": 1399,
+    "@margoengine/sky/sun": 1917,
     "@margoengine/sky/weather": 5879,
     "@margoengine/splats": 24851,
     "@margoengine/splats/data": 17665,

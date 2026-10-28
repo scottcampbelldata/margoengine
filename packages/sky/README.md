@@ -36,6 +36,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/fog` | `fog` | 1.7 kB |
 | `/reflection` | `reflectionTexture` | 0.8 kB |
 | `/lighting` | `lighting` (engine sun/moon light, ambient) | 1.0 kB |
+| `/sun` | typed angles, `setSun` / `setAmbient` over core's light, `sunlitSky` (not a `Sky` feature) | 1.6 kB |
 | `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, lightning, thunder timing | 5.6 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
@@ -97,6 +98,64 @@ more air, warming and dimming it (at 17:34 with turbidity 3.2 the sun is at abou
 69% strength, with green at 64% and blue at 21% of red). Surfaces add their own N·L,
 so there is no further elevation factor. `sunlight(mu, altitude, turbidity)` returns
 that colour for any sun elevation. `sunset` is deprecated and ignored.
+
+## Sun, ambient and a sky that lights the scene
+
+`@margoengine/sky/sun` sets core's one sun and its ambient light with named options and typed angles, and builds sky
+options in which the sky lights the scene. It lives here, not in core or the stage (both frozen, and they grow by zero
+bytes for it), because this package already owns the sun's angles (`sunDirectionFromAngles`) and the sky's sunlight;
+it is a separate entry, so an app that only draws a sky does not load it, and an app that only sets the sun loads
+this entry alone (it imports nothing else from the sky).
+
+A 35 degree sun, in three lines:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {degrees, setSun} from 'margoengine/sky/sun';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+setSun(engine, {azimuth: degrees(135), elevation: degrees(35), intensity: 3});
+```
+
+A sky that lights the scene: its sun disc and the engine's sun share one direction, and surfaces take the sky's
+colours as ambient light.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+import {degrees, radians, setAmbient, getSun, sunlitSky} from 'margoengine/sky/sun';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const sky = Sky.attach(engine, {...sunlitSky({elevation: degrees(35)}), turbidity: 3});
+const fromMath = radians(Math.atan2(1, 1)); // 45 degrees; fromMath.degrees === 45
+console.log(getSun(engine).direction, fromMath.degrees, sky.name);
+```
+
+- **Angles carry their unit.** `degrees(35)` and `radians(0.61)` make an `Angle`; read `.degrees` or `.radians`. An
+  `Angle` is not a number: `angle * 2` or `Number(angle)` throws a TypeError, and a plain number where an angle is
+  expected throws a TypeError that says to wrap it. `sunDirectionFromAngles` (in `@margoengine/sky`) still takes plain
+  degrees; `sunDirectionFrom(azimuth, elevation)` is its typed form. There is no warning for small plain-number
+  elevations: 0.6 degrees is a real sun on the horizon, so a guess would give false alarms; typed angles make the
+  mix-up impossible instead.
+- **`setSun(target, options)`** (`target` is an `Engine` or a `Scene`): `direction` (any non-zero vector toward the
+  sun) or `azimuth` with `elevation` (from +Z toward +X; elevation -90 to 90 degrees), `color` (linear RGB) and
+  `intensity`. Options left out keep their current value; core's defaults are direction [3, 5, 4], white, intensity 3.
+  It writes `lighting.direction` (w is the intensity) and `lighting.radiance` (rgb is the colour), and returns the sun
+  as `getSun(target)` reads it: a unit `direction`, `color`, `intensity`. Every value is checked first, so a bad call
+  changes nothing.
+- **`setAmbient(target, {color, intensity})`**: the light every surface gets from all sides, `color * intensity` times
+  its base colour. Defaults (core's): white, 0.15. It writes `lighting.radiance[3]` and `lighting.ambient`;
+  `getAmbient(target)` reads them back.
+- **A sky that drives the light wins.** While a sky with `lighting` is on the target, `setSun` throws MargoError
+  `state` (the sky writes the sun every frame, so the value would be lost); with `lighting.ambient` or `environment`,
+  `setAmbient` does. Change `sky.options.sunDirection` and `sky.options.lighting` instead.
+- **`sunlitSky(options)`** returns `SkyOptions` with `sunDirection` and `lighting` set: `azimuth` (default
+  `degrees(135)`), `elevation` (default `degrees(35)`), `intensity` (default 3, core's own sun strength, so the scene
+  keeps its brightness when the sky takes over; the air dims a lower sun) and `skyAmbient` (default true: the sky's
+  colours light surfaces, above the `skyEnvironmentFloor`). It needs the `lighting` feature (the root `Sky` has it). A
+  `Sky` without `lighting`, its default, draws a backdrop and lights nothing: existing scenes and their pixels stay as
+  they were.
+- **Exposure.** Core has no exposure setting. Scene exposure is `exposure` (stops, default 0) on `Tonemap` from
+  `@margoengine/tonemap`, read every frame: `Tonemap.attach(engine, {exposure: 1})`, then
+  `tonemap.options.exposure = 0.5`. The sky's own `exposure` option brightens only the sky backdrop.
 
 ## Stylized night
 

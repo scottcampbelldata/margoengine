@@ -1179,6 +1179,10 @@
       "types": "./dist/sky/weather.d.ts",
       "import": "./dist/sky/weather.js"
     },
+    "./sky/sun": {
+      "types": "./dist/sky/sun.d.ts",
+      "import": "./dist/sky/sun.js"
+    },
     "./splats": {
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"

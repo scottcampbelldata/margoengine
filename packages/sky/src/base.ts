@@ -111,7 +111,10 @@ export interface SkyOptions {
   timeScale?: number;
   /** Atmospheric haze, 1-10. Default 2. */
   turbidity?: number;
-  /** Exposure in stops, -16..16. Default 0. */
+  /**
+   * Exposure of the sky backdrop only, in stops, -16..16. Default 0. It does not change how bright lit meshes are:
+   * scene exposure is `exposure` on `Tonemap` from `@margoengine/tonemap`.
+   */
   exposure?: number;
   /** Sun/moon scene lighting (needs `lighting`). Omitted: the sky does not drive engine lighting. */
   lighting?: SkyLightingOptions;
@@ -143,7 +146,11 @@ export function sunDirection(hours: number, out = new Float32Array(3)): Float32A
   out[2] = 0;
   return out;
 }
-/** Direction toward the sun from azimuth (+Z toward +X) and elevation, in degrees. Elevation is -90..90. */
+/**
+ * Direction toward the sun from azimuth (+Z toward +X) and elevation, both in DEGREES (not radians). Elevation is
+ * -90..90. A radians value such as 0.61 is read as 0.61 degrees, a sun on the horizon; with typed angles
+ * (`sunDirectionFrom(degrees(135), degrees(35))` from `@margoengine/sky/sun`) the unit cannot be mixed up.
+ */
 export function sunDirectionFromAngles(azimuth: number, elevation: number, out = new Float32Array(3)): Float32Array {
   if (!Number.isFinite(azimuth) || !Number.isFinite(elevation) || Math.abs(elevation) > 90 || out.length !== 3)
     throw new RangeError('Sun angles need a finite azimuth and elevation from -90 to 90 degrees');

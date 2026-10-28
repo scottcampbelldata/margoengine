@@ -73,6 +73,7 @@ export interface Batch {
  * `radiance`: linear rgb light color, w ambient strength, all >= 0; default [1, 1, 1, 0.15]. Invalid values throw
  * RangeError on the next frame.
  * `ambient`: three nonnegative finite linear RGB multipliers for core-mesh ambient; omitted means white.
+ * Named setters with typed angles: `setSun` / `setAmbient` in `@margoengine/sky/sun`.
  */
 export interface Lighting {
   direction: Float32Array;

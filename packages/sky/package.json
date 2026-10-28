@@ -62,6 +62,10 @@
     "./weather": {
       "types": "./dist/weather.d.ts",
       "import": "./dist/weather.js"
+    },
+    "./sun": {
+      "types": "./dist/sun.d.ts",
+      "import": "./dist/sun.js"
     }
   },
   "files": [

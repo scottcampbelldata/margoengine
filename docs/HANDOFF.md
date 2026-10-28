@@ -1,24 +1,22 @@
 # Margo Engine handoff
 
-## To fix and improve: lighting API is easy to misuse (found 2026-10-28)
+## Landed 2026-10-28: lighting API is hard to misuse (`@margoengine/sky/sun`)
 
-- Found when the terrain editor rendered almost black. The cause was an app unit error: degrees were converted to
-  radians before `sunDirectionFromAngles`, which takes degrees, so 35 degrees became 0.6 degrees. The engine was
-  correct, but three things made the mistake easy and silent.
-- Core and stage are frozen for features: any change to core's lighting API needs Scott's approval as a one-off
-  exception. Otherwise use an optional package, docs and warnings.
-1. Packed light values with hidden meanings. `scene.lighting.direction` carries intensity in its fourth component and
-   `radiance` carries ambient strength in its fourth. An app that sets only three components keeps the defaults (3 and
-   0.15) without noticing. Idea: named, typed setters (`sun({ direction, color, intensity })`,
-   `ambient({ color, intensity })`) in an optional package or stage entry, with the packed arrays kept underneath.
-2. A bright sky lights nothing. `addSky` with colours gives a pretty backdrop but no light on the ground, and nothing
-   warns. Idea: a documented default that lights the scene from the sky, or a dev warning when a sky is added to a
-   stage whose lighting was never set.
-3. Degrees versus radians is not caught, because 0.6 degrees is a valid elevation. Idea: explicit angle units (a typed
-   angle, or names like `elevationDegrees`) and a dev-only warning for a sun elevation under 2 degrees when the value
-   looks like radians.
-- Also noted: the app ignored its saved exposure because the engine renderer has no exposure setting of its own in
-  that path. Check that tone mapping exposure is easy to set and documented.
+- Found when the terrain editor rendered almost black: the app converted degrees to radians before
+  `sunDirectionFromAngles` (which takes degrees), so 35 degrees became 0.6. All three causes are fixed in the new
+  optional entry `@margoengine/sky/sun`; core and stage JS are byte-identical (core + stage 21,974 B gzip). Core got
+  TSDoc only, on `scene.lighting` (what the fourth components mean, the defaults, degrees in `sunDirectionFromAngles`).
+1. Packed arrays: `setSun(engine, {azimuth, elevation | direction, color, intensity})` and
+   `setAmbient(engine, {color, intensity})` write core's arrays with every value checked first; `getSun` / `getAmbient`
+   return the same named shape. While a sky with `lighting` drives the light, the setters throw MargoError `state`
+   instead of writing a value the sky overwrites.
+2. Sky that lights nothing: `Sky.attach(engine, sunlitSky({elevation: degrees(35)}))` shares one sun between the disc
+   and the engine light (default strength 3, core's) and lights surfaces from the sky's colours. A `Sky` without
+   `lighting` is unchanged (exact pixels and traces kept); no warning, because a backdrop-only sky is a valid setup.
+3. Units: `degrees(35)` / `radians(x)` make an `Angle`; numeric use throws TypeError, and the setters refuse plain
+   numbers. No small-elevation warning: 0.6 degrees is a real horizon sun, so it would give false alarms.
+- Exposure: core has none; the sky README and `SkyOptions.exposure` now say scene exposure is `Tonemap`'s `exposure`
+  (the sky's own `exposure` brightens only the backdrop). Regression tests: `packages/sky/test/sun.test.js`.
 
 ## Landed 2026-10-27: React subpaths per optional package (part 2 of the React install fix)
 

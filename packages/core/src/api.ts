@@ -54,7 +54,16 @@ export interface Scene {
   readonly name: string;
   /** Clear colour (`#rrggbb`) for views of this scene, or null to keep the colour below (overlays). A view's `clear` wins. */
   background?: string | null;
-  /** This scene's sun and ambient light, as `engine.lighting`. */
+  /**
+   * This scene's sun and ambient light, as `engine.lighting`. Packed arrays, read every frame; set all four components:
+   * - `direction`: xyz toward the sun (any non-zero length), w = sun intensity (>= 0). Default [3, 5, 4, 3].
+   * - `radiance`: rgb = sun colour (linear), w = ambient strength (>= 0). Default [1, 1, 1, 0.15].
+   * - `ambient`: rgb multipliers on the ambient term (linear). Default [1, 1, 1].
+   *
+   * Setting only `direction.set([x, y, z])` keeps intensity 3, and only `radiance.set([r, g, b])` keeps ambient 0.15.
+   * `setSun` and `setAmbient` from `@margoengine/sky/sun` write these with named, checked options and typed angles
+   * (`degrees(35)`). `sunDirectionFromAngles` in `@margoengine/sky` takes degrees, not radians.
+   */
   readonly lighting: { direction: Float32Array; radiance: Float32Array; ambient: Float32Array };
   readonly stats: { visible: number; drawCalls: number };
   readonly meshes: ReadonlyMap<number, Mesh>;
