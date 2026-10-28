@@ -1,5 +1,5 @@
 {
-  "commit": "6a8f7658",
+  "commit": "57ffa82a",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -58,24 +58,40 @@
     },
     "@margoengine/biomes": {
       ".": {
-        "raw": 52419,
-        "gzip": 20516
+        "raw": 40682,
+        "gzip": 15979
+      },
+      "./toolkit": {
+        "raw": 5697,
+        "gzip": 2624
       },
       "./presets": {
-        "raw": 11484,
-        "gzip": 4151
+        "raw": 5422,
+        "gzip": 1768
+      },
+      "./relief": {
+        "raw": 5183,
+        "gzip": 2569
+      },
+      "./digest": {
+        "raw": 1091,
+        "gzip": 638
       },
       "./koppen": {
         "raw": 1719,
         "gzip": 975
       },
+      "./zones": {
+        "raw": 8460,
+        "gzip": 3619
+      },
       "./view": {
-        "raw": 12878,
-        "gzip": 5604
+        "raw": 11057,
+        "gzip": 4816
       },
       "./editor": {
-        "raw": 6792,
-        "gzip": 3005
+        "raw": 7478,
+        "gzip": 3388
       }
     },
     "@margoengine/blender": {

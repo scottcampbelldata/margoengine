@@ -97,7 +97,7 @@ export interface BiomeWorldOptions {
     readonly regionResolution?: number;
     readonly backend?: 'auto' | 'gpu' | 'cpu';
     readonly biomes?: readonly BiomeDefinition[];
-    readonly classifier?: 'envelopes' | 'whittaker' | 'holdridge';
+    readonly classifier?: 'envelopes' | ZoneClassifier;
     readonly paint?: readonly PaintLayer[];
     readonly signal?: AbortSignal;
 }
@@ -186,10 +186,6 @@ export interface GroundLayer {
     readonly weight?: number;
 }
 
-export const HOLDRIDGE_BELTS: readonly string[];
-
-export const HOLDRIDGE_HUMIDITY: readonly string[];
-
 export type HeightSource = {
     readonly samples: Int32Array | Float32Array;
     readonly width: number;
@@ -209,7 +205,6 @@ export interface LayerInfo {
     readonly format: LayerFormat;
     readonly scale: number;
     readonly unit: string;
-    readonly about: string;
 }
 
 export interface LayerWrite {
@@ -220,8 +215,6 @@ export interface LayerWrite {
     readonly changed?: readonly [number, number, number, number];
 }
 
-export const ONE = 65536;
-
 export interface PaintLayer {
     readonly biome: string;
     readonly mode?: PaintMode;
@@ -229,40 +222,6 @@ export interface PaintLayer {
 }
 
 export type PaintMode = 'replace' | 'add' | 'multiply' | 'max';
-
-export const R16: Readonly<{
-    format: "margo-biomes-reference/1";
-    name: "R16";
-    seed: 16;
-    origin: readonly [-8192, -8192];
-    size: readonly [16384, 16384];
-    tileSize: 256;
-    resolution: 1;
-    regionResolution: 16;
-    relief: Readonly<{
-        seed: 16;
-        origin: readonly [-8192, -8192];
-        size: readonly [16384, 16384];
-        base: 140;
-        relief: 1500;
-        coast: 'west';
-        rivers: 2;
-        seaDepth: 40;
-    }>;
-    climate: Readonly<{
-        latitude: 47;
-        seaLevel: 0;
-        lapseRate: 6.5;
-        rainfall: 1100;
-        rainShadow: 0.6;
-    }>;
-    biomes: readonly ["temperate", "alpine", "wetland", "boreal"];
-    density: Readonly<{
-        forestTrees: 50000;
-        forestShrubs: 100000;
-        average: 100000;
-    }>;
-}>;
 
 export type Range = readonly [min: number | null, max: number | null];
 
@@ -280,6 +239,7 @@ export interface Relief {
     height(x: number, z: number): number;
     readonly rivers: readonly RiverLine[];
     readonly valleyWidth: number;
+    waterCells(origin: readonly [number, number], step: number, nx: number, nz: number): Uint8Array;
     readonly settings: Readonly<{
         seed: number;
         origin: readonly [number, number];
@@ -330,27 +290,17 @@ export interface SpeciesRule {
     readonly tags?: readonly string[];
 }
 
-export const TURN = 4294967296;
-
 export interface TileRequest {
     readonly layers?: readonly string[];
     readonly signal?: AbortSignal;
 }
 
-export const WHITTAKER: Readonly<Record<string, {
-    readonly temperature: readonly [number | null, number | null];
-    readonly rainfall: readonly [number | null, number | null];
-}>>;
-
-export function atan2(y: number, x: number): number;
-
-export function biotemperature(mean: number, half: number): number;
-
-export function clampInt(v: number, min: number, max: number): number;
+export interface ZoneClassifier {
+    readonly kind: 'whittaker' | 'holdridge';
+    scorer(biomes: readonly BiomeDefinition[], slotOf: (layer: string) => number): (warped: Int32Array, cells: number, member: Int32Array) => void;
+}
 
 export function continentality(distance: number): number;
-
-export function createRelief(options?: ReliefOptions): Relief;
 
 export function defineBiome(definition: BiomeDefinition): BiomeDefinition;
 
@@ -358,89 +308,23 @@ export function degreeDays<T extends {
     [index: number]: number;
 }>(mean: number, half: number, base: number, out: T): T;
 
-export function degreesToAngle(degrees: number): number;
-
 export function distanceTransform(source: Uint8Array, nx: number, nz: number): Int32Array;
-
-export function divFloor(n: number, d: number): number;
-
-export function divWide(n: number, d: number): number;
 
 export function evapotranspiration(climate: Climate, mean: number, half: number, range: number): number;
 
-export function fade(t: number): number;
-
-export function fbm(seed: number, x: number, z: number, octaves: number): number;
-
 export function halfAmplitude(climate: Climate, continentality: number): number;
-
-export function hash2(a: number, b: number): number;
-
-export function hash3(a: number, b: number, c: number): number;
-
-export function hash4(a: number, b: number, c: number, d: number): number;
-
-export function hash5(a: number, b: number, c: number, d: number, e: number): number;
 
 export function heatLoad(climate: Climate, gx: number, gz: number, slope: number): number;
 
-export function holdridgeZone(biotemperature: number, rainfall: number): string;
-
-export function idiv(a: number, b: number): number;
-
-export function imod(a: number, b: number): number;
-
-export function isqrt(n: number): number;
-
 export function moistureIndex(pet: number, rainfall: number): number;
-
-export function mul64(a: number, b: number): number;
-
-export function mulHigh(): number;
-
-export function mulShift(a: number, b: number, shift: number): number;
-
-export function pcg(v: number): number;
 
 export function priorityFlood(height: Int32Array, nx: number, nz: number, sea: Uint8Array): Int32Array;
 
-export function qacos(x: number): number;
-
-export function qdiv(a: number, b: number): number;
-
-export function qexp2(x: number): number;
-
-export function qlog2(x: number): number;
-
-export function qmul(a: number, b: number): number;
-
-export function qpow(x: number, y: number): number;
-
-export function qsqrt(x: number): number;
-
 export function quantizeClimate(options?: ClimateOptions): Climate;
-
-export function quantizeHeights(samples: Float32Array | Float64Array, unit?: number): Int32Array;
-
-export function ridged(seed: number, x: number, z: number, octaves: number): number;
 
 export function seasonMean(degree: number, days: number, base: number): number;
 
-export function sincos<T extends {
-    [index: number]: number;
-}>(angle: number, out: T): T;
-
 export function treelineMargin(seasonTemperature: number, days: number): number;
-
-export function udiv(a: number, b: number): number;
-
-export function umod(a: number, b: number): number;
-
-export function valueNoise(seed: number, x: number, z: number): number;
-
-export function wendland(r: number): number;
-
-export function whittakerClass(temperature: number, rainfall: number): string;
 
 // Not exported from this entry, but used by the exports above:
 

@@ -5769,6 +5769,12 @@ that terrain, scatter and a terrain editor read. This package is optional and tr
 and the stage. It is built in milestones: this release has the integer foundation, climate fields, biome classification with
 presets, a terrain view and editor hooks; placement of trees, rocks and props comes next.
 
+Entries, each loaded only when used: the root (`BiomeWorld`, fields, classification), `/presets` (eight biomes, their
+worlds and the reference world `R16`), `/relief` (the procedural landscape; `BiomeWorld.create` loads it only for a
+relief height, the default), `/digest` (canonical bytes and SHA-256, loaded by `world.digest`), `/zones` (Whittaker and
+Holdridge classifiers), `/koppen` (Koppen-Geiger labels), `/toolkit` (the integer helpers), `/view` and `/editor`. The
+lazily loaded ones come through the package name, so an app holds one copy of each module.
+
 ## A world in three lines
 
 ```ts
@@ -5793,7 +5799,7 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 | `seed` | 1 | u32 seed |
 | `size` | [4096, 4096] | world extent in metres, 256..65,536, multiples of `regionResolution` |
 | `origin` | `-size / 2` | minimum corner in metres |
-| `height` | `{ relief: {} }` | `{ samples, width, depth, unit? }` (Int32Array mm or Float32Array m, corners on the world's corners), `{ field: (x, z) => metres }` or `{ relief: ReliefOptions }` |
+| `height` | `{ relief: {} }` | `{ samples, width, depth, unit? }` (Int32Array mm or Float32Array m, corners on the world's corners), `{ field: (x, z) => metres }` or `{ relief: ReliefOptions }` (loads `/relief`; `update` to a relief height needs it loaded, by a relief world or `import('@margoengine/biomes/relief')`) |
 | `climate` | see below | climate settings |
 | `tileSize` | 256 | 128, 256 or 512 m |
 | `resolution` | 1 | tile cell size: 0.5, 1, 2 or 4 m |

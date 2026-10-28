@@ -139,7 +139,7 @@ interface BiomeWorldOptions {
     readonly regionResolution?: number;
     readonly backend?: 'auto' | 'gpu' | 'cpu';
     readonly biomes?: readonly BiomeDefinition[];
-    readonly classifier?: 'envelopes' | 'whittaker' | 'holdridge';
+    readonly classifier?: 'envelopes' | ZoneClassifier;
     readonly paint?: readonly PaintLayer[];
     readonly signal?: AbortSignal;
 }
@@ -309,5 +309,10 @@ interface SpeciesRule {
 interface TileRequest {
     readonly layers?: readonly string[];
     readonly signal?: AbortSignal;
+}
+
+interface ZoneClassifier {
+    readonly kind: 'whittaker' | 'holdridge';
+    scorer(biomes: readonly BiomeDefinition[], slotOf: (layer: string) => number): (warped: Int32Array, cells: number, member: Int32Array) => void;
 }
 ```
