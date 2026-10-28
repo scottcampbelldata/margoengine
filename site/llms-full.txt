@@ -1277,10 +1277,13 @@ notes
   props/dagger.gltf: image rogue_texture: png -> webp (15026 -> 7466 bytes)
 ```
 
-(`dagger.gltf` is counted with the `.bin` and `.png` it reads, and is written as `props/dagger.glb`.)
+(`dagger.gltf` is counted with the `.bin` and `.png` it reads, and is written as `props/dagger.glb`. Those files must
+be in the model's folder or below it: a URI that leaves it (`../`, an absolute path, a drive or network path, or a
+symlink that points out) fails that model with a `MargoError` of code `failed`.)
 
 Run it again and every unchanged input says `cached`: an input is skipped when its content hash, the preset and the tool
-version are the same and its outputs still match the manifest. `--force` rebuilds everything.
+version are the same and its outputs still match the manifest. `--force` rebuilds everything. A manifest that names an
+output outside the output folder is treated as damaged: everything is rebuilt and nothing it names is deleted.
 
 ## What the manifest holds
 
