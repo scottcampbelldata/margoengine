@@ -44,8 +44,11 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 
-const path = '/packages/voxel-pathtracer/tests/browser-check.html',
-  port = 5223,
+const started = performance.now(),
+  path = '/packages/voxel-pathtracer/tests/browser-check.html',
+  // A free port, never a fixed one: the `spec-math` run (5 s) sat 265 s behind another helper's 7-minute run of this
+  // suite on port 5223 until the harness killed it as hung (bug 38).
+  port = 'free',
   args = process.argv.slice(2),
   named = args.filter((a) => !a.startsWith('--')),
   wanted = (name) => (named.length ? named.includes(name) : name !== 'pictures' && name !== 'timing'),
@@ -53,12 +56,26 @@ const path = '/packages/voxel-pathtracer/tests/browser-check.html',
   { page, hardware } = context,
   pageErrors = [],
   report = { hardware, date: new Date().toISOString(), results: {} };
+// A slow check says where it is, so a slow run reads differently from a hung one: the page logs `progress ...` lines,
+// shown with the time since the start, and a line is printed at least every 30 s (the last progress line again).
+let lastProgress = 'starting',
+  lastPrinted = performance.now();
+const say = (text) => {
+  lastPrinted = performance.now();
+  console.log(`  [${((lastPrinted - started) / 1000).toFixed(0)} s] ${text}`);
+};
+const heartbeat = setInterval(() => {
+  if (performance.now() - lastPrinted >= 30000) say(`still running, last step: ${lastProgress}`);
+}, 5000);
+heartbeat.unref();
 page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
+  else if (m.text().startsWith('progress ')) say((lastProgress = m.text()));
 });
 page.setDefaultTimeout(900000);
 const run = async (name, ...params) => {
+  lastProgress = name;
   const t0 = performance.now(),
     result = await page.evaluate(([n, p]) => window.check[n](...p), [name, params]);
   report.results[name] = { ...result, png: undefined };

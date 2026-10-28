@@ -667,11 +667,16 @@ window.check={
    return {fw,rt,up:[rt[1]*fw[2]-rt[2]*fw[1],rt[2]*fw[0]-rt[0]*fw[2],rt[0]*fw[1]-rt[1]*fw[0]]};};
   const b0=basisOf(eye,[0,5,-1]);
   const marker=(d)=>({revision:1,models:[model('m',[1,1,1],()=>1)],instances:[{id:'m',modelId:'m',matrix:translate(eye[0]+20*d[0]-0.125,eye[1]+20*d[1]-0.125,eye[2]+20*d[2]-0.125,0.25)}],materials:[{id:1,color:[1,1,1],type:'emit',emission:1}],environment:{skyIntensity:0}});
-  const centroid=(scene,options,W,H)=>withTracer(scene,{maxBounces:1,...options},async(t)=>{
-   const img=await t.renderImage({width:W,height:H,samples:64});let s=0,mx=0,my=0;
+  // One tracer for the whole check: its pipelines compile once (a compile per case was most of the time, and each is
+  // slower still with every builtin rewritten by --spec-math-error). `use` gives each case the defaults, its options
+  // and its scene, exactly as a fresh tracer would have them.
+  let shared;
+  const use=(scene,options)=>{shared.resetOptions();shared.setOptions({maxBounces:1,...options});shared.setScene(scene);return shared;};
+  const centroid=async(scene,options,W,H)=>{
+   const t=use(scene,options),img=await t.renderImage({width:W,height:H,samples:64});let s=0,mx=0,my=0;
    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=lum(img.color,y*W+x);s+=v;mx+=v*(x+0.5);my+=v*(y+0.5);}
    return [mx/s,my/s];
-  });
+  };
   // Brown-Conrady forward model (undistorted to distorted, half-height units, y up).
   const K={k1:-0.15,k2:0.05,p1:0.01,p2:-0.005};
   const distort=([x,y])=>{const r2=x*x+y*y,rad=1+K.k1*r2+K.k2*r2*r2;return [x*rad+2*K.p1*x*y+K.p2*(r2+2*x*x),y*rad+K.p1*(r2+2*y*y)+2*K.p2*x*y];};
@@ -696,7 +701,11 @@ window.check={
    cases.push({name:`distortion at ${u.join(', ')}`,W:320,H:240,options:{distortion:K},d:norm(along(b0,1,u[0]*tan,u[1]*tan)),expected:[160+xd*120,120-yd*120]});
   }
   look(eye,[0,5,-1],{fov:60});
+  shared=VoxelPathTracer.attach(engine,{scene:marker(cases[0].d),maxBounces:1});
+  try{
+  await shared.ready;
   for(const c of cases){
+   console.log(`progress projections ${c.name}`);
    const at=await centroid(marker(c.d),c.options,c.W,c.H);
    out[c.name]={measured:at,expected:c.expected,error:Math.hypot(at[0]-c.expected[0],at[1]-c.expected[1])};
   }
@@ -710,7 +719,8 @@ window.check={
    distorted:{W:160,H:120,options:{distortion:K},ray:null},
   };
   for(const [name,v] of Object.entries(views)){
-   out[`traversal ${name}`]=await withTracer(scene,{maxBounces:1,...v.options},async(tracer)=>{
+   console.log(`progress projections traversal ${name}`);
+   out[`traversal ${name}`]=await (async(tracer)=>{
     const image=await tracer.renderImage({width:v.W,height:v.H,samples:1,jitter:false,aovs:true}),pin=rays(v.W,v.H);
     let hits=0,same=0,maxDepth=0;const mismatch=[];
     for(let y=0;y<v.H;y++)for(let x=0;x<v.W;x++){
@@ -723,8 +733,9 @@ window.check={
      else if(mismatch.length<4)mismatch.push({x,y,gpu:[image.instance[i],image.palette[i]],cpu:cpu&&[cpuInstance,cpu.paletteIndex]});
     }
     return {pixels:v.W*v.H,hits,same,maxRelativeDepth:maxDepth,mismatch};
-   });
+   })(use(scene,v.options));
   }
+  }finally{shared.dispose();}
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },

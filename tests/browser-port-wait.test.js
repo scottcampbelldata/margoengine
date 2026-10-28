@@ -5,7 +5,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer as createNetServer } from 'node:net';
 import { createServer } from 'vite';
-import { listenWhenFree } from '../scripts/browser.js';
+import { readFileSync } from 'node:fs';
+import { freePort, listenWhenFree, startDevServer } from '../scripts/browser.js';
 
 const occupy = () =>
   new Promise((resolve) => {
@@ -58,4 +59,30 @@ test('past its wait limit it fails naming the port; other errors are not waited 
   } finally {
     blocker.close();
   }
+});
+
+// Bug 38 (2026-10-27): voxel-pathtracer's 5-second spec-math check sat 265 s in listenWhenFree behind another helper's
+// 7-minute run of the same suite on its fixed port 5223, and the harness killed it as hung at its 10 minute limit.
+test("port: 'free' starts at once while another suite holds a fixed port, on a port of its own", async () => {
+  const blocker = await occupy(),
+    held = blocker.address().port;
+  const first = await startDevServer({ port: 'free' }),
+    second = await startDevServer({ port: 'free' });
+  try {
+    const ports = [first, second].map((s) => s.server.httpServer.address().port);
+    assert.notEqual(ports[0], ports[1]);
+    assert.ok(!ports.includes(held), 'a port someone else holds is never picked');
+    assert.equal(first.server.config.server.port, ports[0], 'the page opens the port the server listens on');
+    assert.ok((await freePort()) > 0);
+  } finally {
+    await first.close();
+    await second.close();
+    blocker.close();
+  }
+});
+
+test('the voxel-pathtracer browser suite, whose three scripts share one file, takes a free port', () => {
+  const source = readFileSync(new URL('../packages/voxel-pathtracer/tests/browser-check.mjs', import.meta.url), 'utf8');
+  assert.match(source, /port = 'free'/);
+  assert.doesNotMatch(source, /port = 5\d{3}/);
 });

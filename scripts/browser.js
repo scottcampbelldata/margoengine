@@ -2,6 +2,7 @@ import { firefox, webkit } from '@playwright/test';
 import { launchBrowser, resolveBrowser } from './lib/browser.mjs';
 import { createServer } from 'vite';
 import { realpathSync } from 'node:fs';
+import { createServer as createNetServer } from 'node:net';
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
@@ -34,12 +35,28 @@ export async function listenWhenFree(start, { port, waitMs = 20 * 60_000, poll =
   }
 }
 
+/**
+ * A port nothing holds now (the system picks one). A suite that passes `port: 'free'` to `openBrowser` or
+ * `startDevServer` never waits for another suite's port: a fixed port held by a helper's 7-minute run of the same suite
+ * made a 5-second check sit silent in listenWhenFree until the harness's time limit killed it (bug 38).
+ */
+export function freePort() {
+  return new Promise((resolve, reject) => {
+    const probe = createNetServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close((error) => (error ? reject(error) : resolve(port)));
+    });
+  });
+}
+
 /** Folder holding each running dev server's own dependency cache (`startDevServer`), one `<pid>-<random>` folder each. */
 export const DEV_CACHE_ROOT = 'test-results/vite-cache';
 
 /**
  * Starts the Vite dev server a browser suite loads `startPath` from, on `port` (waiting while another suite holds it,
- * listenWhenFree), with a dependency optimizer cache of its own: a fresh folder under DEV_CACHE_ROOT that `close()`
+ * listenWhenFree; `'free'` takes any free port, see freePort), with a dependency optimizer cache of its own: a fresh folder under DEV_CACHE_ROOT that `close()`
  * removes. Vite's default cache (node_modules/.vite) is shared by every server of a checkout, and by every worktree
  * whose node_modules/.vite links to the main checkout's; a server with another root or other aliases re-optimizes into
  * it and replaces the files a second server's page is importing, which then answers 504 "Outdated Optimize Dep" and
@@ -51,6 +68,7 @@ export async function startDevServer({
   plugins = [],
   port = 5193,
 } = {}) {
+  if (port === 'free') port = await freePort();
   // The working directory's real path: Vite refuses to serve a file named by a Windows short (8.3) path, so a checkout
   // reached through one (os.tmpdir() is C:\Users\\... here, where check:fresh-clone clones) would answer every
   // page with 403 "outside of Vite serving allow list".
