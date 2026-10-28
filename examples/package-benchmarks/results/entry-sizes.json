@@ -1,5 +1,5 @@
 {
-  "commit": "51d8786a",
+  "commit": "29ce6fab",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -54,8 +54,16 @@
     },
     "@margoengine/biomes": {
       ".": {
-        "raw": 31356,
-        "gzip": 13144
+        "raw": 51497,
+        "gzip": 20147
+      },
+      "./presets": {
+        "raw": 11484,
+        "gzip": 4151
+      },
+      "./koppen": {
+        "raw": 1719,
+        "gzip": 975
       }
     },
     "@margoengine/blender": {

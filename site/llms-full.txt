@@ -5814,7 +5814,7 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 | `rainShadow` | 0.6 | 0..1, the share of moisture a 1,500 m rise wrings out |
 | `inland` | 500 | km of land between the sea and the upwind edge when no sea is upwind (continentality) |
 | `coldAir` | 3 | largest night cooling of cold-air pools in K; 0 turns pooling off |
-| `rainSeason` | `'auto'` | when the rain falls: `'uniform'`, `'summer'` or `'winter'` (read by the Koppen label view of B2) |
+| `rainSeason` | `'auto'` | when the rain falls, for the Koppen label view: `'uniform'`, `'summer'` or `'winter'` |
 
 ### The layers of a tile
 
@@ -5832,6 +5832,8 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 | `waterDistance` | u16 | 0.1 m | distance to the sea or a river |
 | `soil` | u8 | cm | soil depth proxy, 0 to 2.55 m |
 | `profile`, `plan` | i16 | 1e-4 / m | profile and plan curvature, only when a request names them |
+
+`LAYERS` lists every layer with its format, scale and unit; `value = data[z * width + x] * scale`.
 
 [README continues: https://margoengine.com/llms/packages/biomes.md]
 
