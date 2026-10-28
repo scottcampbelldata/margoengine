@@ -75,6 +75,10 @@
       "types": "./dist/behavior/steering.d.ts",
       "import": "./dist/behavior/steering.js"
     },
+    "./biomes": {
+      "types": "./dist/biomes.d.ts",
+      "import": "./dist/biomes.js"
+    },
     "./blender": {
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"
@@ -1477,6 +1481,7 @@
     "@margoengine/animator": "^1.0.0",
     "@margoengine/audio": "^1.0.0",
     "@margoengine/behavior": "^1.0.0",
+    "@margoengine/biomes": "^1.0.0",
     "@margoengine/blender": "^1.0.0",
     "@margoengine/bvh": "^1.0.0",
     "@margoengine/cache": "^1.0.0",

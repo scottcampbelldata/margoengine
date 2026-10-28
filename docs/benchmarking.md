@@ -95,8 +95,9 @@ The tool takes the lock itself when it is not wrapped, so both forms are safe.
 | `claims` | engine-bench | Opt-in: each other engine's own harness, recorded beside the shared scenes (see [Comparing engines](#comparing-engines)). |
 | `parity` | browser | Opt-in: one scene per row of `docs/threejs-parity.md` that three.js also has (`bench/scenes/parity.js`), run in Margo and in the three.js adapters in engine-bench (`three-webgpu-parity`, `three-webgl-parity`). `npm run bench:parity` runs it and `bench/parity-report.mjs` adds the results to [the speed matrix](whitepaper/perf-vs-threejs.md). |
 | `features` | Node and browser | Opt-in, about an hour: the per-feature scripts in `examples/package-benchmarks` (CAD scale, culling, post stack, loader memory, shadow shimmer, instancing, atlas + VAT, workers, every real-browser test). Each runs once under the run's gate and GPU lock. Its logs and result files go to `benchmarks/runs/<id>/features/`, and the committed results are restored. |
+| `biomes` | Node | Opt-in: biome-map goal G1 on the reference world R16, CPU ms per km2 for each stage (`bench/biomes/placement.mjs`; the stages grow with the biomes milestones). |
 
-`npm run bench` runs every suite except `features`, `claims` and `parity`, which run only when named.
+`npm run bench` runs every suite except `features`, `claims`, `parity` and `biomes`, which run only when named.
 `npm run bench -- --list` prints every case id.
 
 ## Reading results

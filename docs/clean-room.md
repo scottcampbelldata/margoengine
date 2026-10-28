@@ -769,3 +769,18 @@ and the like) was read. The code of `@margoengine/sky/weather` in this repositor
 | Hail path | Constant fall speed (terminal velocity under drag, a design choice) and two ballistic bounces: `y = v t - g t^2 / 2` with a coefficient of restitution on the vertical speed |
 | Wet and snowy surfaces | Our own design: roughness and albedo scales for wet surfaces (wet surfaces look darker and shinier) and a slope threshold for snow |
 | Ground wetness and snow cover | First-order exponential approach to a target, with separate rise and fall time constants |
+
+## Biome maps: `@margoengine/biomes`
+
+Written clean room from the papers and books below (design spec: item 27.4). No source code of other engines, terrain
+or biome tools (Unreal PCG and its Biome Core plugin, Unity terrain and its store assets, Godot add-ons, World Creator,
+Gaea, World Machine, Houdini and the like) was read; facts about them come only from their public documentation.
+
+| Area | Source |
+| --- | --- |
+| Fixed-point library | Exact 64-bit products from 16-bit limbs and integer division with a correction step (textbook integer arithmetic); binary logarithm by repeated squaring of the mantissa (the textbook digit-by-digit method) |
+| Trigonometry | Volder, "The CORDIC trigonometric computing technique", IRE Transactions on Electronic Computers, 1959 (vectoring and rotation modes, gain constant) |
+| Hashes | Jarzynski and Olano, "Hash functions for GPU rendering", Journal of Computer Graphics Techniques, 2020 (PCG output hash, nested hashing for several inputs) |
+| Value noise | Lattice values from those hashes, blended with the quintic fade of Perlin, "Improving Noise", SIGGRAPH 2002; fractal sums and ridged noise in our own integer layout |
+| Blend kernel | Wendland, "Piecewise polynomial, positive definite and compactly supported radial functions of minimal degree", Advances in Computational Mathematics, 1995 (C2 kernel `(1 - r)^4 (4r + 1)`) |
+| Procedural relief and R16 | Our own design: fractal lowlands, ridged mountains under a mask, a smoothstep coast shelf, river valleys carved around polylines |

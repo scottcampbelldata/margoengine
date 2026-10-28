@@ -15,6 +15,7 @@
     "@margoengine/voxel-edit": "reads and writes MagicaVoxel .vox files and sparse edits with no GPU, used by tools",
     "@margoengine/save": "the Node file adapter (node:fs/promises) and the save codec",
     "@margoengine/math": "imported by every Node-run package",
+    "@margoengine/biomes": "biome maps, climate fields and classification run on the CPU with no browser API; their digests are checked in Node",
     "margo-convert": {
       "reason": "bin margo-convert: the offline asset pipeline and CAD converter",
       "tests": [

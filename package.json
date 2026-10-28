@@ -113,7 +113,8 @@
     "packages/save",
     "packages/mixer",
     "packages/webgl2-compat",
-    "packages/weather"
+    "packages/weather",
+    "packages/biomes"
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",
