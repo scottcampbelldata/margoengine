@@ -27,7 +27,7 @@ or in Safari. [docs/limits.md](../limits.md) lists what is untested.
 
 | Claim | Where | Evidence | Command | Status |
 | --- | --- | --- | --- | --- |
-| Core + stage is 22,737 B gzip (57,590 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` at `454df8f3` | `npm run build:packages && npm run measure:size` | PROVEN |
+| Core + stage is 21,974 B gzip (54,876 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` at `51d8786a` | `npm run build:packages && npm run measure:size` | PROVEN |
 | The build fails at 25,000 B gzip for core + stage | README, site | `scripts/core-budget.js`, run by `build:packages` and `measure:size` | `npm run build:packages` | PROVEN |
 | Every other package is optional and has its own size | README | `entry-sizes.json` (every exports entry and worker) | `npm run build:site` | PROVEN |
 | An engine starts with 1,024 entity slots and doubles up to 8,388,608 | site | `packages/core/src/kernel.ts`; `tests/core-dirty-transforms.test.js` (1,000,000 entities) | `npm test` | PROVEN |
@@ -41,10 +41,14 @@ and commit.
 
 | Page | Figures | Evidence | Status |
 | --- | --- | --- | --- |
-| engine | Core 20,432 B, core + stage 22,737 B (57,590 raw), 2,263 B under the gate | `entry-sizes.json` at `454df8f3` (dirty: false) | PROVEN |
+| engine | Core 20,547 B (51,055 raw), core + stage 21,974 B (54,876 raw), 3,026 B under the gate | `entry-sizes.json` at `51d8786a` (dirty: false) | PROVEN |
 | engine | 79 packages; `npm i margoengine`; kit sizes (game 307,012, cad 201,527, viz 277,396, web 155,058 B) | `docs/catalog.json`; `docs/guides/kits.md`, re-measured by `tests/umbrella.test.js` (fails on a 3% move) | PROVEN |
 | engine | Starter first frames: cad 533, web 788, react 835, viz 968, game 1,308 ms (vite dev, packages linked, one run each, RTX A6000 PC) | `examples/package-benchmarks/results/starters-first-frame.json` (`tools/create-margo/test/browser-check.mjs`) | PROVEN (dated, one run) |
-| engine | 5,059 tests | `examples/package-benchmarks/results/test-count.json` | PROVEN |
+| engine | 6,373 tests, 6,371 pass, 2 skipped (Node 26.12, `ec3f9b52`) | `examples/package-benchmarks/results/test-count.json` | PROVEN |
+| engine | Section 10 (what the checks caught): figures quoted from fix commits (`b6bea3e9`, `baa66526`, `ab27353f`, `6d08b0af`, `3a59aa55`, `7714e84e`, `109ec352`, `7ab8cd13`, `6ddd733b`, `85c96a55`, `49dca9dd`, `51d8786a`, `a4fca9be`, `7f0dd465`, `0687e6ec`, `86ed9107`) and `docs/known-bugs.md` | [perf-history.md](perf-history.md) entries 37 to 44 | PROVEN (each from its commit message) |
+| engine | Section 10: Linux run (42 of 43 suites started, 38 passed, 3 stopped at 82 C) at `b92998d6`; AMD 680M sweep at `650291de` | run logs on the machines that ran them, not committed | dated run log, not committed |
+| engine | Section 10: outside audit of `74a01810` (20 findings, verify 6,344 of 6,346 with 2 skipped, 36 fuzz targets, Arc 140V 4x MSAA 4 of 450 frames up to 9 of 255) | the auditor's report (private: it holds details of unfixed findings) | external report, dated |
+| engine | Section 10: 16 of the audit's 20 findings fixed, by class, with regression tests | `4bc89574`, `c6e7623c`, `b96f5f40`, `158076f1`, `6bebf878`, `8c8b51a0`, `ddc5c5ff` and the tests they add | PROVEN (each test fails without its fix, per its commit) |
 | engine | Parity 153 / 4 / 4 of 161 three.js rows | `docs/three-parity-matrix.md` | PROVEN |
 | engine | Views and scenes: +867 B gzip | `docs/multi-view-roadmap.md` size table (21,343 -> 22,210 B) | PROVEN (dated) |
 | engine | Voxel multiplayer: 900 spread / 350 crowded at 20 ticks per second | `packages/voxel-net/bench/results.json`, `docs/voxel-net-capacity-2026-10-21.md` | PROVEN |

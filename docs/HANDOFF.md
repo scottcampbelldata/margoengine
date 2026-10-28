@@ -1,5 +1,21 @@
 # Margo Engine handoff
 
+## Landed 2026-10-26 to 10-28: second-machine and busy-run bug fixes, written up in the whitepaper
+
+- Written up as perf-history entries 37 to 44 ([whitepaper/perf-history.md](whitepaper/perf-history.md)) and section
+  10 of `site/whitepaper/engine.html` (symptom, cause, fix commit, regression test, and what we got wrong); the fixed
+  list is at the end of [known-bugs.md](known-bugs.md).
+- Fixed: precise maths under reassociating GPU compilers (`b6bea3e9`, `baa66526`); Node 22 and 26 `pow` in the
+  math-consolidation proof (`ab27353f`); flaky tests under load (`6d08b0af`, `3a59aa55`, `7714e84e`, `109ec352`,
+  `7ab8cd13`, `6ddd733b`); headless Edge on the AMD iGPU (`85c96a55`); device loss and driver resets named, one rerun
+  after a logged reset with a receipt (`49dca9dd`, `51d8786a`); Node 22 for end users with two real bugs fixed
+  (`a4fca9be`, `7f0dd465`, `0687e6ec`, `86ed9107`).
+- Still open (known-bugs.md): the NVIDIA event 153 resets (cause not found); the text colour emoji check on a machine
+  with no colour emoji font; three Linux GPU suites stopped by heat; the cost of the precise maths; F20 of the
+  2026-10-28 outside audit (being fixed) and three netcode room limits (Scott to decide); 16 of its 20 findings are
+  fixed.
+- Test count re-measured: 6,373 tests, 6,371 pass, 2 skipped at `ec3f9b52` (`results/test-count.json`).
+
 ## Landed 2026-10-28: lighting API is hard to misuse (`@margoengine/sky/sun`)
 
 - Found when the terrain editor rendered almost black: the app converted degrees to radians before
@@ -43,7 +59,7 @@
 - Regression test: `tests/modern-facade-isolation.test.js` builds a stage-only app and fails on any lazy import.
 - Still open: the React root entry (cause 2 in docs/known-bugs.md, "`@margoengine/react` installed alone").
 
-Last updated 2026-10-27. Read this first when starting a new session. Update it whenever work lands.
+Last updated 2026-10-28. Read this first when starting a new session. Update it whenever work lands.
 
 ## Landed 2026-10-27: unwrap packs around pinned charts (item 24 bug fix)
 
@@ -2916,6 +2932,11 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    to 0.0518). The WIP's Oct-15 PNGs, tolerances and quality-presets proof edit are not landed (stale; the proof's
    readers already cover the seed change, claims.md). Still open: the gate's own proof, verify 5 times in a row under a
    bounded load; the WIP's run of it was never recorded.
+   Status 2026-10-28: four load-dependent flaky tests fixed with regression tests (lod heap probe and catalog
+   clipboard `6d08b0af`, quiet-server timeout `3a59aa55`, controls walk `7714e84e` and `109ec352`), plus the shared Vite
+   cache (`7ab8cd13`) and the fixed-port wait (`6ddd733b`). A step that fails during a logged GPU driver reset runs once
+   more with a receipt (`51d8786a`); the reset itself is open (known-bugs.md). The 5-in-a-row proof is still not
+   recorded.
 10. **claims.md:** 0 OVERCLAIM and 0 UNPROVEN rows for anything on public pages.
    Status 2026-10-15 (proofs): every row resting on a proof now cites the proof and its pinned commits (claims.md
    "Proofs": one table of all 46 with baseline -> pin and the --current ref). H-04 (STALE) became PROVEN: `npm run
@@ -2938,6 +2959,9 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    cross-origin fetches, data:/blob: handled). (c) Supply chain: npm audit clean or justified, licences listed, lockfile
    integrity checked, npm publish with 2FA + provenance (plan; publish needs Scott), SECURITY.md with a disclosure
    address. Strict CSP stays (gate 10 / 5l.o).
+   Status 2026-10-28: NOT met. The outside audit of `74a01810` reported 20 findings: 16 fixed with regression tests
+   (`4bc89574`, `c6e7623c`, `b96f5f40`, `158076f1`, `6bebf878`, `8c8b51a0`, `ddc5c5ff`), F20 being fixed, and three
+   netcode room limits (F08 to F10) waiting on Scott's decision (known-bugs.md, "Findings of the outside audit").
    (c) [DONE 2026-10-15 except Scott's account steps below] `scripts/supply-chain.mjs` (`npm run supply-chain`)
    generates `THIRD-PARTY-NOTICES.md` for all 75 published packages (73 + create-margo + margo-convert) from the
    manifests and package-lock.json; `--check` (run by `tests/supply-chain.test.js`, in verify) fails on a stale file, a

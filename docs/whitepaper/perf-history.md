@@ -998,6 +998,269 @@ These entries have no timing. The loss is a feature that did not work.
 - **Rerun:** `node scripts/csp-check.mjs`.
 - **Guard:** `tests/no-eval-workers.test.js`.
 
+## What our checks caught, and what we got wrong (2026-10-26 to 10-28)
+
+In these three days the engine ran on more machines than before: a mini PC with an AMD Radeon 680M integrated GPU
+(Windows, Edge and Chrome), a small Ubuntu server with an Intel UHD integrated GPU (Chromium on Mesa's Vulkan driver),
+a second laptop used for an outside audit, and Node 22 beside Node 24 and 26. Most of what broke was in our own maths,
+our tests or our machines, and several of our first explanations were wrong. Each entry gives:
+
+- **Symptom:** what failed, and where.
+- **Cause:** what was measured.
+- **Fix:** the commit on `main`.
+- **Guard:** the regression test that fails without the fix.
+- **Rerun:** the command.
+- **What we got wrong**, where we did.
+
+Numbers come from the commit messages named, from `docs/known-bugs.md`, or, where marked **not committed**, from a run
+log kept on the machine that ran it. Open items stay in [known-bugs.md](../known-bugs.md).
+
+### 37. GPU shader compilers reassociated our precise maths
+
+- **Symptom:** on the AMD Radeon 680M (D3D12, Edge and Chrome 156), `preciseLog1p(5.963922e-8)` returned 2^-23, which
+  is 8,383,741 units in the last place (ulp) off; its bound is 2. The same code passed on an NVIDIA RTX A6000 and an
+  Intel Arc 140V. On the Intel UHD (ADL-N) with Mesa on Linux, 14 of the 17 precise functions were out of bound.
+- **Cause:** WGSL allows an implementation to reassociate floating-point operations (WGSL section 15.7.5). The precise
+  functions in `packages/shared/precise-math.js` depend on error-free transforms such as `(a + b) - a`, which only work
+  if the compiler keeps the order written. AMD's compiler folded `(1 + x) - 1` to `x`. Mesa also folded `(a + b) - a`,
+  added constants first and factored `a c + b c`, which undid the correction in `preciseDiv`. A bitcast round trip does
+  not stop this: the compilers see through it.
+- **Fix:** `b6bea3e9`. `pmHide(v)` rebuilds a value from its bits with integer operations, which no compiler can fold,
+  and every step whose rounding matters takes hidden operands. The values are unchanged, so the host-side mirror keeps
+  its numbers. After: all 17 functions within bound on the Intel UHD (Mesa), the Radeon 680M and the RTX A6000; `log1p`
+  worst 1.42 of 2 ulp, `pow` 4.5 of 5.
+- **What we got wrong:** our stand-in for a reassociating compiler (`reassociateMath` in `scripts/browser.js`) only
+  folded sums cancelled by their own operand, so it could not show the next case. An Intel UHD run taken before
+  `b6bea3e9` had `preciseSin(3.907435372766365e27)` 1.46 ulp off (bound 1): Mesa had factored the old sine kernel
+  `h + (l (1 - w/2) + (h w) p)` into `h (1 + w p)`. `baa66526` makes the stand-in also factor a sum by one of its own
+  terms; with it the old code fails on NVIDIA too (sin 7,280 inputs over bound). The same commit found Mesa fusing
+  `a + (b - a) * u` in compute's random uniform, which broke the README's promise of the same bits on every device; the
+  product now goes through `pmHide`.
+- **After (dense sweep, `baa66526`):** 573,720 inputs for sin, cos and tan and 298,646 extreme inputs for pow, 0 over
+  bound on the Intel UHD and the RTX A6000. The pre-fix code on the Intel UHD: sin 1,791, cos 1,785, tan 642, pow
+  147,647 over bound. The Radeon 680M sweep on main `650291de` was also 0 over bound (worst sin 0.743 of the bound, pow
+  0.716; not committed).
+- **Guard:** `tests/precise-math.test.js` and `packages/compute/tests/maths.test.js` run the WGSL through
+  `reassociateMath` and fail if anything changes; `test:browser:reassociate` runs the GPU check with the folds applied,
+  so the old code fails on any GPU; `test:browser:sweep` (0.5 s) runs in `check:merge` and the nightly run.
+- **Rerun:** `npm run test:browser:sweep --workspace @margoengine/compute` and
+  `npm run test:browser:reassociate --workspace @margoengine/compute`.
+- **Still open:** what the extra work costs in the precise divide and `pow` is not measured
+  ([known-bugs.md](../known-bugs.md#precise-maths-cost-against-the-wgsl-builtins-not-measured)).
+
+### 38. A pinned proof failed on two machines because Node 22 and Node 26 compute `pow` differently
+
+- **Symptom:** the `math-consolidation` proof passed on the main PC (Node 26.12, V8 14.6) and failed on the Ubuntu
+  server and on a Windows mini PC, both on Node 22.22.1 (V8 12.4): 21 of 24 tape digests differed, although every call
+  still matched its old copy.
+- **Cause:** ECMAScript leaves the rounding of `**`, `Math.sin`, `Math.cos`, `Math.hypot` and the other approximated
+  functions to the engine. V8 14.6 computes `**` with the C library's `pow` (`--use-std-math-pow`, on by default) and
+  V8 12.4 uses its own, so `10 ** -5` differs, and so do 48 of the 256 bytes of the sRGB curve. The proof built its
+  inputs with `10 ** x` and six tapes stored sRGB results. The engine code was correct.
+- **Fix:** `ab27353f`. Inputs are built from exact operations only; during the proof, `sin`, `cos` and `hypot` come
+  from versions built on `+ - * /`, `%` and `sqrt`; a taped call that uses another approximated `Math` function fails
+  the proof. The golden digests were recaptured at the same reference, and a mismatch prints both hosts.
+- **Guard:** `tests/proofs-golden.test.js`, including a replay under the other `pow` (`--no-use-std-math-pow` on Node
+  26); CI runs it on Node 22.12.0 and 26.
+- **Rerun:** `npm run proofs -- --current`, and `node --test tests/proofs-golden.test.js` on each Node.
+- **What we got wrong:** the same hunt found that 14 test files use `using` declarations, which Node 22.22.1 cannot
+  parse (106 to 110 unit tests failed). We first answered by declaring Node 24.18 for the repository (`6c289ed9`),
+  which is right for contributors but left open what end users can run. Entry 41 settles that.
+
+### 39. Flaky tests with one shared cause: timing that depends on machine load
+
+Each of these passed alone and failed in a busy full run. In each, the fault was in the test or its harness.
+
+- **lod, "per-frame selection allocates nothing":** read 5.9 MB of heap growth once in a full verify. The probe
+  measured the shared test runner's heap, which other tests in the same process grow. Fix `6d08b0af`: the probe runs in
+  a fresh process (`packages/lod/test/support/selection-heap-probe.mjs`), where the same 3,000-object loop grows by at
+  most 30 KB, and a loop that does allocate is shown to fail it.
+- **catalog, "searches, copies exact text":** failed on a clipboard mismatch under load. It read the Windows system
+  clipboard, which every process and browser on the machine shares. Fix `6d08b0af`: a clipboard per page, and every
+  step has a bounded limit (`tests/catalog.test.js`).
+- **server-url, "a server that prints no URL in time fails":** its 300 ms limit started before the child process ran,
+  and under eight-way load the child had not printed yet. Fix `3a59aa55`: the clock starts after the child's first
+  line (`tests/server-url.test.js`).
+- **controls walk, "no teleporting: 0.0715"** (limit 0.06 m): the check measured the eye's movement per frame, and the
+  engine clamps one frame at 0.1 s, so a slow frame moves the eye further at the same walking speed. Fix `7714e84e`:
+  the step is bounded per 1/60 s, and the page stalls one frame for 150 ms half-way up the stairs so the long-frame case
+  runs every time (raw step 0.063 m, which the old check rejects; scaled step 0.039 m). Guard `109ec352`:
+  `packages/controls/tests/walk.test.js` walks the house at 1/60, 25, 40 and 100 ms frames, and a 0.4 m jump still fails
+  at every frame time.
+- **The same class, two more causes found in these days:** browser suites that shared one Vite dependency cache, so one
+  re-optimised it while another was loading (`7ab8cd13`: 3 of 30 page loads hung before, 0 of 40 rounds after; guard
+  `tests/vite-cache-isolation.test.js`), and suites that waited silently for a fixed port held by another run
+  (`6ddd733b`: the voxel path tracer's spec-math suite "needed 276 s", of which the check itself took about 5 s; guard
+  `tests/browser-port-wait.test.js`).
+- **What we got wrong:** we first blamed check timeouts on time spent queueing for the GPU lock. Measurement showed
+  they were not lock waits: the causes were the fixed ports above and the GPU resets of entry 41.
+- **Guard for the class:** `scripts/check-fixed-waits.mjs` (in `npm run verify`) fails on any new fixed frame count or
+  sleep in a GPU or browser check unless it gives a reason; the existing ones are counted and the count only goes down.
+
+### 40. Headless Edge picked the integrated AMD GPU when Remote Desktop was disconnected
+
+- **Symptom:** after a reboot on 2026-10-27, headless Edge on the main PC (an NVIDIA RTX A6000 plus the AMD Radeon
+  integrated GPU of its Ryzen 9 9950X) ran WebGPU on the AMD GPU. The visual check then looked for references for that
+  GPU, which do not exist, so every `check:merge` failed there.
+- **Cause:** Chromium's GPU process uses DXGI adapter 0, and WebGPU offers only that adapter. Windows lists first the
+  adapter that carries the session's display output. While the Remote Desktop session was connected the A6000 carried
+  it; while disconnected the order was AMD, A6000, then two software adapters. The check logs line up with the connect
+  and disconnect times. `powerPreference`, `--force_high_performance_gpu`, `--use-webgpu-power-preference` and the
+  Windows per-app graphics setting had no measured effect in the disconnected state.
+- **Fix:** `85c96a55`. `scripts/lib/gpu-adapter.mjs` lists the DXGI adapters at launch (cached), skips software
+  adapters and passes `--use-adapter-luid=<high>,<low>` in decimal for the hardware adapter with the most video memory.
+  The LUID changes at every boot, so it is never hard-coded. `MARGO_GPU` and `MARGO_GPU_LUID` override it. The visual
+  check prints the adapter it asked for and the one it ran on; a missing-reference message names the adapter, the
+  committed profiles and the fix.
+- **Guard:** `tests/gpu-adapter.test.js`, `tests/browser-selection.test.js`, `tests/visual-baselines.test.js`.
+- **What we got wrong:** the first fix, `--force_high_performance_gpu`, passed a probe and then failed the next full
+  check. We guessed the NVIDIA GPU was slow to wake under load; that was wrong. **Still unexplained:** before the
+  reboot, checks got the A6000 overnight with the session disconnected.
+
+### 41. NVIDIA driver resets during busy check runs: cause not found
+
+- **Symptom:** the Windows System log on the main PC shows nine `nvlddmkm` event 153 entries on 2026-10-27 and 28
+  (RTX A6000, driver 617.42, hardware-accelerated GPU scheduling on, Edge 156 headless), each while two or three
+  `check:merge` runs shared the GPU. Each took the WebGPU device of one page, and a page asking for a device just then
+  was refused ("D3D12 create command queue failed with E_OUTOFMEMORY" with 2 of 48 GB in use). The failing test was
+  hit by the reset; it did not cause it. Before the fix, the page then waited out its ready timeout (120 s for a visual view, 30 s for
+  a browser suite) with nothing naming the GPU, and one reset cost a whole `check:merge`.
+- **What was measured:** event 153 is not the Windows GPU watchdog. A deliberate 3 s compute dispatch on the A6000 gives
+  a WER `LiveKernelEvent` 141 report and a watchdog dump, and no event 153. The 141 reset is the worse one for
+  correctness: WebGPU did not lose the device. `onSubmittedWorkDone` resolved at 2.3 s for a 3 s dispatch, and later
+  dispatches and a new device worked, so the page got wrong results with no error. Only the event log shows it.
+- **What we got wrong:** our first theory was the path tracer's long dispatches. We bounded them (`49dca9dd`: at most
+  2^20 paths per dispatch, where a 4K frame was 8.3 million in one; same pixels, native4k frame time unchanged), which
+  is right for slower GPUs, but two controlled exclusive runs gave 0 resets, and each reset hit one short page, not the
+  long run. Also not the trigger, each tried under the GPU lock with a watcher sampling every second: killing the
+  browser's GPU process mid-dispatch (15 times) or the whole browser tree (15 times), CDP `Browser.crashGpuProcess`
+  beside a second busy browser (12 times), 300 device create and destroy cycles, 6 browsers dispatching back to back
+  for 90 s, and long submissions against 2 or 3 other browsers.
+- **Best evidence so far:** 8 of the 9 came while the Remote Desktop session was connected, when the A6000 also draws
+  that session's desktop; 0 came in about 90 minutes of heavier load with it disconnected. The reset at 01:41:02 is the
+  exception. **The cause is not found.**
+- **Fix (to the checks, not the cause):** `49dca9dd` adds `scripts/support/device-loss.js`: a lost device fails the
+  page's next wait at once. `51d8786a` adds `scripts/support/driver-resets.mjs`, which reads GPU driver resets from the
+  Windows event log (NVIDIA, AMD and Intel driver errors, Display 4101, WER `LiveKernelEvent` 141 and 117), so the
+  failure names the reset ("nvlddmkm event 153 at 01:21:49") or says that none was logged. A `check:gpu-packages`
+  test, or any other `check:merge` step, that fails while the log shows a reset runs once more. The reset and the rerun
+  are printed and kept as a receipt in `test-results/gpu-packages.json` and `test-results/check-merge.json`, and a
+  second failure fails the check. A failure with no logged reset is never rerun. Since `6a8f7658`, a run that passed
+  only through such a rerun says so: its summary ends with "PASSED WITH A DRIVER RESET" naming the step and the reset,
+  and both result files carry `passedAfterDriverReset`.
+- **Guard:** `tests/driver-resets.test.js`, `tests/device-loss-guard.test.js`, `tests/browser-startup.test.js`,
+  `packages/voxel-pathtracer/tests/dispatch-budget.test.js`.
+- **Not covered:** a watchdog reset that cuts work short and still lets a check pass is not rerun or reported by the
+  checks; it shows only in the event log.
+- **Next:** a day of checks with the Remote Desktop session disconnected, counting resets; if event 153 still comes, a
+  newer NVIDIA driver, then a run with hardware-accelerated GPU scheduling off.
+
+### 42. Node 22 for end users: shown to work, and two real bugs found
+
+- **Decision (Scott, 2026-10-27):** people who use the packages must be able to run them on Node 22.12 or newer;
+  contributors to the repository use Node 24.18.
+- **Proof, `a4fca9be`:** on Node 22.12.0, `modern:test:packages --consumer` builds and packs every package, installs the
+  tarballs into a clean project, type-checks the README examples, runs the consumer and the packed browser test, and the
+  bundler matrix (Vite, webpack, Next.js with Turbopack and webpack, Rollup, esbuild) passes with Node 22.12.0 running
+  the bundlers. `scripts/check-node-apis.mjs` parses every shipped source file and fails on a use of any of 33 APIs
+  that Node 22.12 lacks (for example `Float16Array`, `Promise.try`, `RegExp.escape`) unless the code tests for it first.
+  No unguarded use was found.
+- **Unit tests, `86ed9107`:** the 47 packages whose code runs in Node have their tests run on Node 22.12.0 and the
+  latest 22.x: 355 test files pass 5 of 5 runs on 22.12.0 (2,866 tests) and on 22.22.1 (2,873). The same files pass on
+  24.18.0. On 22.12 seven splats tests skip with the reason given (their reference encoder, `node:zlib` zstd, arrives
+  in 22.15). The React unit tests stay on Node 24: they depend on the timing of `node:test` module mocks.
+- **Bug 1, `7f0dd465`:** netcode's `openWebSocket` hung forever on a refused connection on Node 22. Node 22's
+  `WebSocket` fires only `error` and stays connecting, where browsers and Node 24 fire `error` then `close`, and
+  `openWebSocket` settled only on `close`. It now rejects with code `failed` on `error` and closes the socket. Guard:
+  `packages/netcode/tests/transports.test.js`.
+- **Bug 2, `0687e6ec`:** data after the end of a compressed stream was accepted on Node 22. The Compression Streams
+  standard says to reject it, and browsers and Node 24 do; Node 22.12.0 accepts it for `deflate` and `deflate-raw`,
+  Node 22.22.1 for `deflate-raw`. So the FBX array reader, the ZIP reader in loaders (also used for TMX), the SOG ZIP
+  reader in splats and the voxel chunk codec accepted malformed input there. `packages/shared/trailing-data.js` probes
+  the runtime once per format and rejects such input where needed, for about 150 to 180 B gzip per affected entry.
+  Guard: `tests/trailing-data.test.js` and the per-package tests named in the commit; fbx's own malformed-input test
+  caught it.
+- **Rerun:** `npm run test:node22` and `npm run check:node-apis` under Node 22.
+- **Not done yet:** the new CI jobs have not run on GitHub; these results come from Windows. Linux on Node 22 has not
+  been run.
+
+### 43. Linux on a real Intel GPU
+
+- **Setup:** an Ubuntu server with an Intel N100 and its Intel UHD GPU, Chromium on Mesa's Vulkan driver, Node 24.
+- **First run (main `be072cdd`, 2026-10-27):** found the Mesa maths of entry 37 and a real engine bug. The voxel check
+  "light removed should be dark" read a pixel that was exactly the clear colour: after an effect was removed,
+  `VoxelRenderer` returned to a composition whose pipelines it had deleted and drew nothing while they compiled again
+  (1 frame on the A6000, 2 on the Intel UHD). Fix `baa66526`: the last four compiled compositions are kept per target,
+  and a composition is named by its effect objects, which also fixed a crash found on the way ("Clustered lighting is
+  not attached" after one clustered light was replaced by another). Guard:
+  `packages/voxel/tests/render-lighting-browser-check.mjs` and `packages/voxel/tests/render.test.js`. Removing an effect
+  out of order still draws nothing for a frame or two ([known-bugs.md](../known-bugs.md#voxelrenderer-draws-nothing-for-a-few-frames-after-an-effect-is-taken-out-of-the-middle)).
+- **Second run (main `b92998d6`, 2026-10-28, not committed):** of 43 package GPU suites, 42 were started, one at a time;
+  38 passed. The text suite failed "Emoji not drawn in color": the server has no colour emoji font, and the test relies
+  on one from the system ([known-bugs.md](../known-bugs.md#text-the-colour-emoji-check-needs-a-colour-emoji-font-on-the-machine)).
+  The voxel, voxel path tracer and root browser suites were stopped by the heat watchdog at 82 C before they finished.
+  **Those three have not been run on Linux;** they count as neither passes nor failures.
+- **Why one at a time:** the server reached 94 to 96 C during a full `npm run verify` on 2026-10-27, so it runs no
+  verify and no parallel GPU work.
+
+### 44. An outside audit
+
+- **What was done (2026-10-28, revision `74a01810`):** a source review, targeted canary tests on a second laptop
+  (temporary files, mock fetches, fake sockets and loopback servers only; no public target and no production system),
+  a full `npm run verify`, a short fuzz run and GPU checks (headless Edge 156, Intel Arc 140V).
+- **Results:** 20 findings. `verify` passed: 6,344 of 6,346 tests, 0 failed, 2 skipped. The fuzz run covered 36
+  targets. The audit also reproduced a known bug on a second GPU: the 4x MSAA blending variance, on the Arc 140V, 4
+  frames of 450 differing at one pixel by up to 9 of 255
+  ([known-bugs.md](../known-bugs.md#4x-msaa-blending-is-not-repeatable-rtx-a6000-under-cpu-load-and-intel-arc-140v)).
+- **Evidence terms the audit used:** *reproduced* (a canary, fuzz case or GPU run showed the behaviour), *code
+  confirmed* (the code path is there, no end-to-end trigger was run) and *project documented* (already in our
+  known-bugs list).
+- **Its stated limits:** the fuzz run was short (seconds per target); the live checks were local canaries only; there
+  was no production test; and a passing verify does not show that there are no bugs.
+- **Status on `main` (2026-10-28):** 16 of the 20 are fixed, each with a regression test that fails without the fix;
+  1 (F20) is being fixed; 3 (F08, F09, F10) are limits the netcode room server does not have yet (netcode leaves
+  authentication and network-level denial of service to the application), and proposals for them are with Scott. A
+  finding is described here only once its fix is on `main`.
+- **Fixed, by class:**
+  - **Files outside their folder (F01, F02, F05), `4bc89574`.** margo-convert read a `.gltf`'s external buffer and
+    image URIs relative to the model with no containment check, so `../`, absolute, drive and UNC paths and symlinks
+    could pull files from outside the model's folder into the output; the stale-output cleanup deleted manifest paths
+    joined to the output folder with no check; and the CLIs refused only an output string identical to the input, so
+    `./file`, case aliases and links could overwrite it. Now `pipeline/paths.js` refuses any path that leaves its folder
+    (lexically or through a link), a manifest naming such a path is treated as damaged and nothing it names is deleted,
+    and `sameFile()` catches every alias. Guard: `tests/margo-convert-paths.test.js`.
+  - **URL allowlist and redirects (F06, F07), `c6e7623c`.** An `allowedURLs` entry matched by string prefix, so
+    `/assets` also allowed `/assets-other/`, and that branch skipped the encoded-separator check; and the final URL
+    after a redirect was never checked for glTF buffers and images or FBX textures. Entries now match on a path
+    boundary, encoded separators and dot segments are refused on both branches, and every redirect is checked against
+    the same policy. Guard: `tests/security.test.js`, `packages/gltf-pro/tests/progressive.test.js`,
+    `packages/fbx/test/loading-materials.test.js`.
+  - **OBJ material libraries (F04, F17), `b96f5f40`.** `loadOBJ` fetched every `mtllib` named in the file with the
+    caller's request options, so an absolute URL in an untrusted OBJ made a request to any host with the caller's
+    headers and credentials, and the libraries had no total budget. Libraries and textures now resolve only inside the
+    OBJ's folder or an `allowedURLs` entry, request options go only to the OBJ's own origin, and the libraries share a
+    count and byte budget. Guard: `packages/loaders/tests/mtl.test.js`.
+  - **Room set-up and failing hooks (F11, F12), `158076f1`.** A netcode room was joinable before its `onCreate`
+    finished, and a throwing `onCreate`, `onJoin` or message handler left the connection hanging or escaped as an
+    unhandled rejection. Rooms are now listed only after `onCreate`, and a failing hook closes that client with
+    `CloseCode.error` and reaches `RoomServer.onerror`. Guard: `packages/netcode/tests/rooms.test.js`.
+  - **WebSocket framing (F18, F19), `6bebf878`.** The Node WebSocket server counted control frames against a fragmented
+    message's size limit, so a legal ping could close the connection, and both transports cut close reasons by
+    characters, not UTF-8 bytes, so a multibyte reason made an oversized control frame. Guard:
+    `packages/netcode/tests/transports.test.js`.
+  - **voxel-net join (F14, F15), `8c8b51a0`.** A message that arrived in the same TCP write as the upgrade was dropped,
+    so the player was cut after 10 s, and a chunk whose generation failed was never asked for again, so a player who
+    did not move never spawned. Early messages are now kept and delivered in order, and failed chunks are retried, then
+    reported with a close code naming the chunk. Guard: `packages/voxel-net/tests/websocket.test.js` and
+    `server.test.js`.
+  - **voxel-net server limits (F03, F13, F16), `ddc5c5ff`.** The voxel-net prototype had no authentication, gave every
+    socket a client object and a timer before it checked the player cap, and kept every edited chunk in memory. It now
+    caps connections that have not joined (in total and per address) before answering the upgrade, accepts only pages
+    from its own host by default (a breaking default; `origins: '*'` restores the old one), runs an `authenticate` hook
+    on the upgrade and the hello, and bounds edited chunks in memory, moving the least recently edited to a
+    `VoxelEditStore`. Guard: `packages/voxel-net/tests/limits.test.js`.
+- **What we got wrong:** our own security review and fuzzers had not found these.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

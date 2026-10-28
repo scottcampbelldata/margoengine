@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Margo Engine whitepaper</title>
-  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 22,737 bytes gzip; 78 optional packages behind one install; a named source for every number. Coming soon.">
+  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 21,974 bytes gzip; 78 optional packages behind one install; a named source for every number. Coming soon.">
   <link rel="canonical" href="https://margoengine.com/whitepaper/engine">
   <meta name="theme-color" content="#0b1020">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Margo Engine whitepaper">
-  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 22,737 bytes gzip; 78 optional packages behind one install; a named source for every number. Coming soon.">
+  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 21,974 bytes gzip; 78 optional packages behind one install; a named source for every number. Coming soon.">
   <meta property="og:url" content="https://margoengine.com/whitepaper/engine">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="../favicon.ico" sizes="32x32">
@@ -30,14 +30,14 @@
 <header class="masthead">
   <p class="eyebrow">Whitepaper · October 2026 · coming soon</p>
   <h1>Margo Engine</h1>
-  <p class="deck">A WebGPU engine for the web. Core plus stage is 22,737 bytes gzipped. Everything else comes from 78 optional packages behind one install. Every number we publish names its source.</p>
-  <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Sizes at commit 454df8f3; tests at 8cc9e939; other figures name their own commit or date</span><span><a href="./engine.pdf">PDF</a></span></div>
+  <p class="deck">A WebGPU engine for the web. Core plus stage is 21,974 bytes gzipped. Everything else comes from 78 optional packages behind one install. Every number we publish names its source.</p>
+  <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Sizes at commit 51d8786a; tests at ec3f9b52; other figures name their own commit or date</span><span><a href="./engine.pdf">PDF</a></span></div>
 </header>
 
 <div class="ledger" role="list">
-  <div role="listitem"><b>22,737 B</b><span>core + stage, min + gzip, Wasm kernel and WebGPU backend included; CI fails a change at 25,000</span><i>entry-sizes.json · 454df8f3</i></div>
+  <div role="listitem"><b>21,974 B</b><span>core + stage, min + gzip, Wasm kernel and WebGPU backend included; CI fails a change at 25,000</span><i>entry-sizes.json · 51d8786a</i></div>
   <div role="listitem"><b>78</b><span>optional packages, all reachable from <code>npm i margoengine</code></span><i>docs/catalog.json</i></div>
-  <div role="listitem"><b>5,059</b><span>Node tests in every <code>npm run verify</code>, all passing</span><i>results/test-count.json · 8cc9e939</i></div>
+  <div role="listitem"><b>6,373</b><span>Node tests in every <code>npm run verify</code>: 6,371 pass, 2 skipped, 0 fail</span><i>results/test-count.json · ec3f9b52</i></div>
   <div role="listitem"><b>153 of 161</b><span>three.js features with an equivalent Margo package; 4 partial, 4 missing</span><i>docs/three-parity-matrix.md · bec8b597</i></div>
 </div>
 
@@ -47,7 +47,7 @@
   <ul>
     <li><strong>Coming soon.</strong> The packages are not on npm yet, and the source repository stays private while we finish the launch checklist.</li>
     <li><strong>WebGPU only, for now.</strong> About 88% of browsers in use support WebGPU: 85.8% fully and 2.02% partly (caniuse.com/webgpu, StatCounter data for September 2026). A WebGL2 fallback for the optional packages is planned. Today an optional package draws basic meshes on WebGL2.</li>
-    <li><strong>One browser verified.</strong> Every real-GPU result comes from Edge on Windows 11. Firefox, Safari, macOS, Linux and phones are not verified yet.</li>
+    <li><strong>Few browsers verified.</strong> Real-GPU results come from Edge and Chrome on Windows 11 (NVIDIA, Intel and AMD GPUs) and from Chromium on one Linux machine with an Intel GPU, where three suites have not finished (section 10). Firefox, Safari, macOS and phones are not verified yet.</li>
     <li><strong>No speed claims against other engines.</strong> The same-scene comparison tool exists, but no quiet-machine run has been made. The numbers on this page are our own internal measurements, and each names its hardware.</li>
   </ul>
 </section>
@@ -64,14 +64,15 @@
   <li><a href="#perf"><span class="n">7</span>Internal measurements</a></li>
   <li><a href="#built"><span class="n">8</span>How it was built</a></li>
   <li><a href="#honest"><span class="n">9</span>Keeping the numbers honest</a></li>
-  <li><a href="#limits"><span class="n">10</span>Honest limits</a></li>
-  <li><a href="#next"><span class="n">11</span>Coming soon</a></li>
-  <li><a href="#repro"><span class="n">12</span>Reproduce</a></li>
+  <li><a href="#caught"><span class="n">10</span>What our checks caught, and what we got wrong</a></li>
+  <li><a href="#limits"><span class="n">11</span>Honest limits</a></li>
+  <li><a href="#next"><span class="n">12</span>Coming soon</a></li>
+  <li><a href="#repro"><span class="n">13</span>Reproduce</a></li>
 </ol>
 </nav>
 
 <h2 id="abstract"><span class="n">0</span>Abstract</h2>
-<p>Margo Engine is a 3D engine for web applications, written in TypeScript. It has a Rust kernel compiled to WebAssembly and a WebGPU renderer. Core plus the high-level stage (<code>createStage</code>) measures 57,590 bytes minified and 22,737 bytes gzipped. The build fails at 25,000.</p>
+<p>Margo Engine is a 3D engine for web applications, written in TypeScript. It has a Rust kernel compiled to WebAssembly and a WebGPU renderer. Core plus the high-level stage (<code>createStage</code>) measures 54,876 bytes minified and 21,974 bytes gzipped. The build fails at 25,000.</p>
 <p>Everything else lives in 78 optional, side-effect-free packages: glTF PBR, shadows, post-processing, physics, CAD, voxel worlds with multiplayer, a path tracer, exporters and React. A bundle contains only the packages it imports, and large runtimes load only when a file needs them.</p>
 <p>This paper covers the design, what we have measured, how the engine was built, and the limits we know about. Each figure names the file it came from. Where we have no committed measurement, we say so. A companion paper covers <a href="./voxel.html">Margo Voxel</a>.</p>
 
@@ -179,8 +180,8 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 </figure>
 <p>Core groups visible meshes by geometry and draws each group with one instanced call, with per-instance material values. When nothing changed, it reuses last frame's instance lists and uploads only the matrices that moved. A group of single-sided, unmirrored instances draws with hardware back-face culling and no <code>discard</code>, which keeps early depth testing on. The renderer uses reversed float depth and GPU picking with integer ids, and it recovers from device loss.</p>
 <h3>Multiple views and scenes</h3>
-<p>One engine draws several views of one scene in a frame: split screen, the four-view CAD layout, picture-in-picture, a minimap. It also draws separate scenes: a HUD with its own objects and lighting, an item preview in a menu, a portal rendered to a texture. Effects with history keep it per view, and every package is view-aware. This is in core, as an approved exception to the size freeze. It added 867 bytes gzip to core + stage, because a smaller kernel paid for most of the 2.7 KB of new code. Core + stage is now 22,737 bytes, 2,263 under the gate. <code>npm run check:views</code> draws views on a real GPU and checks pixels, picks and validation errors in every merge.</p>
-<span class="src">docs/multi-view-roadmap.md · 0ca52f2a · entry-sizes.json · 454df8f3</span>
+<p>One engine draws several views of one scene in a frame: split screen, the four-view CAD layout, picture-in-picture, a minimap. It also draws separate scenes: a HUD with its own objects and lighting, an item preview in a menu, a portal rendered to a texture. Effects with history keep it per view, and every package is view-aware. This is in core, as an approved exception to the size freeze. It added 867 bytes gzip to core + stage, because a smaller kernel paid for most of the 2.7 KB of new code. Core + stage is now 21,974 bytes, 3,026 under the gate. <code>npm run check:views</code> draws views on a real GPU and checks pixels, picks and validation errors in every merge.</p>
+<span class="src">docs/multi-view-roadmap.md · 0ca52f2a · entry-sizes.json · 51d8786a</span>
 <h3>Extension points</h3>
 <dl class="kv">
   <dt>Passes</dt><dd><code>EnginePlugin</code> frame-graph passes. Shadows, post effects, TAA and GPU culling attach with <code>X.attach(engine, options)</code>.</dd>
@@ -194,10 +195,10 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <div class="table"><table>
 <thead><tr><th>Entry</th><th class="num">Raw</th><th class="num">Gzip</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td><code>@margoengine/core</code></td><td class="num">50,698</td><td class="num">20,432</td><td>Wasm kernel, WebGPU renderer, views and scenes</td></tr>
-<tr><td>core + stage</td><td class="num">57,590</td><td class="num">22,737</td><td>the CI-gated figure</td></tr>
+<tr><td><code>@margoengine/core</code></td><td class="num">51,055</td><td class="num">20,547</td><td>Wasm kernel, WebGPU renderer, views and scenes</td></tr>
+<tr><td>core + stage</td><td class="num">54,876</td><td class="num">21,974</td><td>the CI-gated figure</td></tr>
 </tbody></table></div>
-<span class="src">examples/package-benchmarks/results/entry-sizes.json · commit 454df8f3 · dirty: false</span>
+<span class="src">examples/package-benchmarks/results/entry-sizes.json · commit 51d8786a · dirty: false</span>
 <p>Every other entry and worker, and every lazily loaded file, is in the same record and on <a href="../sizes.html">margoengine.com/sizes</a>. A release test builds a page that calls <code>createStage</code> and loads a small glTF, records every request in headless Edge, and fails if the page fetches anything beyond the HTML, its chunks and the model (<code>examples/package-benchmarks/results/basic-scene-network.json</code>).</p>
 <p>We do not call Margo the smallest engine. We publish our method and our numbers. A size comparison with other engines will be run with the same build settings from the folder where those engines live (<code>npm run bench -- size --engines=all</code>), and published with its method when it has been run.</p>
 
@@ -235,20 +236,26 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <p>Past 100,000 parts, <code>CulledMeshes</code> culls core meshes in a compute pass and orbits a 100,008-part assembly at 138 FPS against 29 for core alone, and <code>AssemblyBVH.raycast</code> answers a pick in 0.68 ms at 100k parts (<code>docs/cad-performance.md</code>, same laptop). <code>FloatingOrigin</code> keeps a 10 mm part at 0.019 px of jitter up to 6,000 km from the origin, where float32 alone stops drawing it (<code>results/large-coordinates-gpu.json</code>).</p>
 
 <h2 id="built"><span class="n">8</span>How it was built</h2>
-<p>Margo is built by one person directing AI. Scott Campbell sets the goals, the rules and the gates; Claude, Anthropic's model, writes the code, the tests and the measurements in many parallel sessions. That only works if the process makes mistakes visible. These are the rules and the evidence that they hold.</p>
+<p>Margo is built by one person directing AI. Scott Campbell sets the goals, the rules and the gates, and decides what lands. Claude, Anthropic's model, writes the code, the tests and the measurements in many parallel sessions. Nobody should trust the engine because of who or what wrote it. The checks below are what make it trustworthy, and section 10 shows what they caught in three days, including our own mistakes.</p>
 <ul>
   <li><strong>Written rules every session reads.</strong> <code>AGENTS.md</code> is binding on every session. It sets the core size gate, the clean-room rule, one branch (<code>main</code>), and the checks every change must pass before it lands.</li>
-  <li><strong>Clean room.</strong> No files from other repositories, under any licence. Code is written from public specifications, papers and descriptions. When a 2026-10-21 audit found areas close to other engines' or libraries' code, each was rewritten from a words-only spec by sessions that never saw the old code. That covered geometry, controls, text, shading terms, decoders, path finding and more (<code>docs/HANDOFF.md</code>, landed 2026-10-24). Other engines are run only from their own folder for benchmarks, never copied in. The few standard files every engine uses, such as sample models and prebuilt decoders, are listed with source and licence in <code>THIRD-PARTY-NOTICES.md</code>.</li>
-  <li><strong>Gates that only ratchet.</strong> <code>npm run quality</code> runs in every verify and in CI. It holds five ratchets: entry sizes and heavy static imports, duplicated code between packages, packages and entries with no test, TSDoc and error conventions, and the clean-room checks. Each can only shrink unless a change records its reason. <code>npm run hygiene</code> scores eight more code gates per package.</li>
-  <li><strong>Every bug fixed with a test.</strong> A fix lands with a regression test that fails without it. The fuzzers, the security review and the GPU checks in section 9 each produced fixes that way. The benchmark tool found one this week: shadow casters were drawn one by one, and the fix shipped with a test pinning the batched draws.</li>
+  <li><strong>Parallel helpers, isolated.</strong> Each helper works in its own git worktree on a short branch cut from <code>main</code>, with its own scripts, logs and Vite cache, so one helper's run cannot change another's.</li>
+  <li><strong>One landing at a time.</strong> A helper takes the landing lock (<code>scripts/gpu-lock.mjs</code>, with a heartbeat and a hard time limit), rebases onto <code>main</code>, rebuilds the generated records once (<code>scripts/land-records.mjs</code>), runs <code>npm run verify</code> and pushes. The GPU has three shared slots for correctness tests; benchmarks take it alone. Every check and lock hold has a time limit, and a hung test is killed and named.</li>
+  <li><strong>The full check before every landing.</strong> <code>npm run check:merge</code> runs verify, the site build, the visual check on a real GPU, the shader compile, the GPU test of every affected package, the no-WebGPU fallback and the packed-package tests. A failure is the author's to root-cause even when it looks unrelated; nothing lands on a red check, and no check is loosened to make it pass.</li>
+  <li><strong>A regression test for every bug.</strong> A fix lands with a test that fails without it. When a whole class of bug slips through, a check for the class is added, for example the gate on fixed waits in GPU checks and the reassociating-compiler stand-in in section 10.</li>
+  <li><strong>A nightly full run.</strong> <code>scripts/nightly-full.mjs</code> runs <code>check:merge:full</code> and then the pinned proofs, so the narrowed per-change check cannot hide a failure for more than a day.</li>
+  <li><strong>One rerun, only after a logged GPU driver reset.</strong> A step that fails while the Windows event log shows a GPU driver reset runs once more. The reset and the rerun are printed and kept as a receipt in the check's result file, and a second failure fails the check. A failure without a logged reset is never retried.</li>
+  <li><strong>Clean room.</strong> No files from other repositories, under any licence. Code is written from public specifications, papers and descriptions. When a 2026-10-21 audit found areas close to other engines' or libraries' code, each was rewritten from a words-only spec by sessions that never saw the old code (<code>docs/HANDOFF.md</code>, landed 2026-10-24). Other engines are run only from their own folder for benchmarks. The few standard files every engine uses, such as sample models and prebuilt decoders, are listed with source and licence in <code>THIRD-PARTY-NOTICES.md</code>.</li>
+  <li><strong>Gates that only ratchet.</strong> <code>npm run quality</code> runs in every verify and in CI: entry sizes and heavy static imports, duplicated code, untested packages and entries, TSDoc and error conventions, and the clean-room checks. Each can only shrink unless a change records its reason. <code>npm run hygiene</code> scores eight more code gates per package.</li>
+  <li><strong>Outside eyes.</strong> Test runs on machines we do not develop on (an AMD mini PC, an Intel Linux server, a second laptop) and an outside audit found problems our own runs had missed. Their findings are listed in section 10 and in <code>docs/known-bugs.md</code>.</li>
   <li><strong>Honest reporting.</strong> Sessions report measured numbers only, label anything measured on a busy machine as such, and say when a check could not run.</li>
 </ul>
-<p>We tell this because it is how the engine was made, not because AI makes the engine better. The evidence for the engine is the same as for any engine: the tests, the measurements and the code.</p>
+<p>We describe the method because it is how the engine was made. AI does not make the engine better by itself. The evidence for the engine is the same as for any engine: the tests, the measurements and the code.</p>
 
 <h2 id="honest"><span class="n">9</span>Keeping the numbers honest</h2>
 <h3>Tests and checks</h3>
 <ul>
-  <li><strong>5,059 Node tests</strong> in every <code>npm run verify</code>, all passing at 8cc9e939 (<code>results/test-count.json</code>).</li>
+  <li><strong>6,373 Node tests</strong> in every <code>npm run verify</code> at ec3f9b52: 6,371 pass, 2 skipped, 0 fail, on Node 26.12 (<code>results/test-count.json</code>). An outside audit's run on a second laptop at 74a01810 passed 6,344 of 6,346, with 2 skipped.</li>
   <li><strong>51 GPU-call proofs.</strong> A recording GPU logs every call, descriptor, shader and buffer write, and a proof compares a baseline commit with a candidate exactly. That checks claims such as "attaching nothing from this package leaves core's GPU work unchanged". Each proof is pinned to the commit that made its claim, and 20 run against the working tree in every merge.</li>
   <li><strong>Pixels on a real GPU.</strong> The visual check renders 62 views of sample models and demos and compares them with references captured four times per GPU and browser. A view is never compared with references from another GPU (<code>tests/visual/profiles/</code>).</li>
   <li><strong>Every shader compiled.</strong> <code>npm run check:wgsl</code> compiles every WGSL source the packages hold on the browser's WebGPU, with feature flags both on and off, including shaders no view draws.</li>
@@ -262,14 +269,40 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
   <li>"first" or "only": we have not surveyed every engine;</li>
   <li>"smallest": not without a published method and measurement;</li>
   <li>"drop-in replacement": the API is our own;</li>
-  <li>"production-ready" or "runs everywhere": section 10 says why not yet;</li>
+  <li>"production-ready" or "runs everywhere": section 11 says why not yet;</li>
   <li>faster than any other engine: no quiet-machine comparison has been run.</li>
 </ul>
 
-<h2 id="limits"><span class="n">10</span>Honest limits</h2>
+<h2 id="caught"><span class="n">10</span>What our checks caught, and what we got wrong</h2>
+<p>From 2026-10-26 to 10-28 the engine ran on more machines than before: an AMD Radeon 680M mini PC (Windows, Edge and Chrome), a small Ubuntu server with an Intel UHD GPU (Chromium on Mesa's Vulkan driver), a second laptop for an outside audit, and Node 22 beside Node 24 and 26. Most of what broke was in our maths, our tests or our machines, and several first explanations were wrong. Each item names its fix commit and regression test; the full entries, with every number's source and the rerun commands, are entries 37 to 44 of <code>docs/whitepaper/perf-history.md</code>.</p>
+<h3>GPU compilers rewrote our precise maths</h3>
+<p>On the Radeon 680M, <code>preciseLog1p(5.963922e-8)</code> was 8,383,741 units in the last place (ulp) off, against a bound of 2; on the Intel UHD with Mesa, 14 of the 17 precise functions were out of bound. WGSL allows a compiler to reassociate floating-point operations, and the compilers folded the error-free steps the functions depend on, for example <code>(1 + x) - 1</code> into <code>x</code>. A bitcast round trip does not stop that. The fix, <code>pmHide</code> in <code>packages/shared/precise-math.js</code>, rebuilds a value from its bits with integer operations, which no compiler can fold (<code>b6bea3e9</code>). All 17 are within bound on the three vendors. What we got wrong: our first stand-in for such a compiler only folded self-cancelling sums, so it missed Mesa factoring a sum by one of its own terms; the stand-in now does both, and the old code fails it on any GPU (<code>baa66526</code>). A dense sweep (573,720 inputs for sin, cos and tan, 298,646 for pow) is 0 over bound on Intel and NVIDIA; the pre-fix code on Intel had 1,791 sin results over bound. Guards: <code>tests/precise-math.test.js</code>, <code>packages/compute/tests/maths.test.js</code>, compute <code>test:browser:reassociate</code> and <code>test:browser:sweep</code>. Not measured yet: what the extra work costs.</p>
+<h3>A proof failed on two machines, and the engine was fine</h3>
+<p>The <code>math-consolidation</code> proof passed on Node 26 and failed on two machines with Node 22: 21 of 24 digests differed. ECMAScript leaves the rounding of <code>**</code> and the approximated <code>Math</code> functions to the engine; V8 in Node 26 uses the C library's <code>pow</code> and V8 in Node 22 its own, so <code>10 ** -5</code> differs. The proof now builds inputs from exact operations and fails if a taped call uses an approximated function (<code>ab27353f</code>, guard <code>tests/proofs-golden.test.js</code>, run in CI on Node 22.12 and 26).</p>
+<h3>Flaky tests had one shared cause</h3>
+<p>Four tests passed alone and failed under load, each because its timing depended on how busy the machine was: a heap probe that measured the shared test runner's heap (5.9 MB once; in its own process the same loop grows by at most 30 KB), a catalog test that read the system clipboard every process shares (both <code>6d08b0af</code>), a 300 ms server timeout whose clock started before the child process ran (<code>3a59aa55</code>), and a walk check that bounded the eye's movement per frame while the engine clamps a slow frame at 0.1 s (<code>7714e84e</code>; the guard <code>109ec352</code> walks at 1/60, 25, 40 and 100 ms frames and still fails a 0.4 m jump). The same class gave two more: browser suites sharing one Vite cache (<code>7ab8cd13</code>) and a suite waiting silently for a fixed port (<code>6ddd733b</code>). What we got wrong: we first blamed time spent queueing for the GPU lock; measurement ruled that out.</p>
+<h3>Headless Edge picked the wrong GPU</h3>
+<p>After a reboot, headless Edge on the main PC used the integrated AMD GPU instead of the RTX A6000 whenever the Remote Desktop session was disconnected, and every visual check failed for lack of references for that GPU. Chromium uses DXGI adapter 0, and Windows lists first the adapter that carries the session's display. Power-preference flags and the Windows per-app setting had no measured effect. The launcher now looks up the hardware adapter with the most video memory at launch and passes its LUID (<code>85c96a55</code>, <code>scripts/lib/gpu-adapter.mjs</code>, guard <code>tests/gpu-adapter.test.js</code>). Still unexplained: before that reboot, checks got the A6000 with the session disconnected.</p>
+<h3>NVIDIA driver resets: cause not found</h3>
+<p>Nine <code>nvlddmkm</code> event 153 resets on 10-27 and 28 each took one page's WebGPU device during busy check runs, and the next page asking for a device was refused. We measured that event 153 is not the Windows watchdog: a deliberate 3 s dispatch gives a watchdog report (event 141) and no 153. The 141 reset is worse for correctness: WebGPU kept the device, and the cut-short work returned wrong results with no error. Our first theory, long path tracer dispatches, was wrong. We bounded them anyway (<code>49dca9dd</code>, at most 2<sup>20</sup> paths per dispatch, same pixels), but controlled runs gave no reset, and kills, GPU process crashes, device churn and contention did not reproduce one. Eight of the nine came while the Remote Desktop session was connected. <strong>The cause is not found.</strong> What changed is the checks (<code>51d8786a</code>): a lost device fails at once, the message names the reset from the Windows event log, and a step that fails while a reset is logged runs once more, with the reset and the rerun kept as a receipt, and a run that passed only that way is marked as one (<code>6a8f7658</code>); a second failure fails the check. A watchdog reset that cuts work short while a check still passes is not caught this way.</p>
+<h3>Node 22 for end users</h3>
+<p>The packages must run on Node 22.12 or newer. On Node 22.12.0 the packed packages build, install into a clean project, type-check their README examples and pass the bundler matrix (<code>a4fca9be</code>); a scan of every shipped source file for 33 APIs that Node 22.12 lacks found no unguarded use. The unit tests of the 47 packages that run in Node pass on 22.12.0 and 22.22.1: 355 files, 5 of 5 runs, 2,866 tests on 22.12.0 (<code>86ed9107</code>). This found two real bugs: netcode's <code>openWebSocket</code> hung forever on a refused connection, because Node 22's WebSocket fires only <code>error</code> (<code>7f0dd465</code>), and data after the end of a compressed stream was accepted on Node 22 in the FBX, ZIP, SOG and voxel chunk readers (<code>0687e6ec</code>, guard <code>tests/trailing-data.test.js</code>). These runs were on Windows; the new CI jobs have not run on GitHub yet.</p>
+<h3>Linux on a real Intel GPU</h3>
+<p>On the Ubuntu server, 42 of 43 package GPU suites were started, one at a time, and 38 passed (main <code>b92998d6</code>). The text suite failed because the server has no colour emoji font and the test relies on one from the system; that is open. The voxel, voxel path tracer and root browser suites were stopped by the heat watchdog at 82 C before they finished, so <strong>they have no Linux result</strong>. An earlier run there found a real engine bug: after an effect was removed, the voxel renderer drew nothing for a frame or two while pipelines recompiled (fixed in <code>baa66526</code>; removing an effect out of order still does it, and is open).</p>
+<h3>An outside audit</h3>
+<p>An outside audit of revision <code>74a01810</code> combined a source review, canary tests on a second laptop (temporary files, mock fetches, fake sockets and loopback servers only), a full verify, a short fuzz run over 36 targets and GPU checks. Verify passed 6,344 of 6,346 tests, with 2 skipped. It reported 20 findings, each marked reproduced, code confirmed or project documented, and it reproduced our known 4x MSAA blending variance on a second GPU (Intel Arc 140V: 4 frames of 450 differ at one pixel by up to 9 of 255). It states its own limits: a short fuzz run, local canaries only, no production test, and a passing verify does not show there are no bugs. Our own security review and fuzzers had not found these. Status on <code>main</code>: 16 are fixed, each with a regression test that fails without the fix; 1 is being fixed, and we describe it once its fix lands; 3 are limits the netcode room server does not have yet (netcode leaves authentication to the application), and proposals for them are pending. The fixed ones, by class:</p>
+<ul>
+  <li><strong>Files outside their folder</strong> (<code>4bc89574</code>): the margo-convert command line read a model's external files, deleted stale outputs and accepted an output path without checking that each stayed in its folder, so a crafted <code>.gltf</code> could pull in outside files, a crafted manifest could delete one, and <code>./file</code> or a link could overwrite the input. Every path is now checked against its folder, links included. Guard: <code>tests/margo-convert-paths.test.js</code>.</li>
+  <li><strong>URL allowlist and redirects</strong> (<code>c6e7623c</code>): an <code>allowedURLs</code> entry matched by string prefix, so <code>/assets</code> also allowed <code>/assets-other/</code>, and a redirect's final URL was never checked. Entries now match on a path boundary and every redirect is checked. Guard: <code>tests/security.test.js</code>.</li>
+  <li><strong>OBJ material libraries</strong> (<code>b96f5f40</code>): <code>loadOBJ</code> fetched any <code>mtllib</code> named in the file, from any host, with the caller's headers, and with no total budget. Libraries now stay in the OBJ's folder or the allowlist, headers go only to the OBJ's origin, and the libraries share a budget. Guard: <code>packages/loaders/tests/mtl.test.js</code>.</li>
+  <li><strong>Network servers</strong> (<code>158076f1</code>, <code>6bebf878</code>, <code>8c8b51a0</code>): a netcode room was joinable before its set-up finished and a failing room hook left the client hanging; control frames counted against the WebSocket message limit and close reasons were cut by characters instead of UTF-8 bytes; voxel-net dropped a hello sent in the same write as the upgrade and never retried a chunk whose generation failed. The voxel-net prototype also had no authentication, no cap on connections before the hello and no bound on edited chunks in memory; it now has all three, and accepts pages from its own host by default (<code>ddc5c5ff</code>). Guards: <code>packages/netcode/tests/rooms.test.js</code>, <code>transports.test.js</code>, <code>packages/voxel-net/tests/websocket.test.js</code>, <code>limits.test.js</code>.</li>
+</ul>
+<span class="src">docs/whitepaper/perf-history.md entries 37 to 44 · docs/known-bugs.md · commit messages named above</span>
+
+<h2 id="limits"><span class="n">11</span>Honest limits</h2>
 <ul>
   <li><strong>WebGPU only today.</strong> PBR, shadows, image-based lighting and most packages need WebGPU, which about 88% of browsers in use support (caniuse.com/webgpu, September 2026). A WebGL2 fallback for the optional packages is planned; today WebGL2 draws basic meshes only.</li>
-  <li><strong>Not yet verified</strong> on Firefox, Safari, macOS, Linux, Android or iPhone. Real-GPU results come from Edge on Windows 11, on an Intel Arc 140V laptop and an NVIDIA RTX A6000 desktop.</li>
+  <li><strong>Not yet verified</strong> on Firefox, Safari, macOS, Android or iPhone. Real-GPU results come from Edge and Chrome on Windows 11 (an NVIDIA RTX A6000 desktop, Intel Arc 140V laptops and an AMD Radeon 680M mini PC) and from Chromium on one Ubuntu machine with an Intel UHD GPU, where the voxel, path tracer and root browser suites have not yet run to the end (section 10).</li>
   <li><strong>CAD import is tessellation only.</strong> STEP and IGES become triangle meshes through OpenCascade; the exact geometry is not kept, and the 3.1 MB (gzip) OpenCascade download comes with the first CAD file.</li>
   <li><strong>No editor yet.</strong> Scenes are built in code or imported from files.</li>
   <li><strong>No comparison with other engines yet.</strong> The tool runs the same scenes in other engines, interleaved on one machine, but the quiet-machine runs have not been made. Until they are, we make no speed claim against any other engine.</li>
@@ -277,7 +310,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
   <li><strong>Design envelope.</strong> 8,388,608 entities; 100,000 nodes per file by default; 16 textures per shader stage; float32 coordinates without <code>FloatingOrigin</code>. Every limit, with the error it raises and the package that takes you past it, is in <code>docs/limits.md</code>.</li>
 </ul>
 
-<h2 id="next"><span class="n">11</span>Coming soon</h2>
+<h2 id="next"><span class="n">12</span>Coming soon</h2>
 <ul>
   <li>The packages on npm, <code>npm create margo</code>, and the public repository.</li>
   <li>A WebGL2 fallback for the optional packages.</li>
@@ -287,12 +320,12 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
   <li>An editor.</li>
 </ul>
 
-<h2 id="repro"><span class="n">12</span>Reproduce</h2>
-<p>From a checkout (Node 22.12+ or 24+). Each command writes or prints the figure it backs; GPU commands take the shared GPU lock.</p>
+<h2 id="repro"><span class="n">13</span>Reproduce</h2>
+<p>From a checkout (Node 24.18 or newer for the repository; the published packages run on Node 22.12 or newer). Each command writes or prints the figure it backs; GPU commands take the shared GPU lock.</p>
 <pre><code>npm ci
 npm run build:packages
 npm run measure:size          # core + stage gzip, fails at 25,000
-npm run verify                # the 5,059 tests, quality gates, API reports, current proofs
+npm run verify                # the 6,373 tests, quality gates, API reports, current proofs
 npm run bench                 # every benchmark suite (docs/benchmarking.md)
 npm run proofs                # all 51 pinned GPU-call proofs
 npm run fuzz -- --short       # every parser fuzzer, 4 s each

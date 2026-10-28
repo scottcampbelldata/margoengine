@@ -88,7 +88,46 @@ does not own. Each entry says exactly what is needed to close it.
   slow-compile, slow-mesh and spec-math twins, and the precise maths results in `compute-browser.json`), zipped; then
   this entry removed or turned into the cause found.
 
+### Linux (Intel UHD, Mesa): three GPU suites not finished
+
+- **What:** on the Ubuntu test server (Intel N100 with Intel UHD, Chromium on Mesa's Vulkan driver, Node 24, main
+  b92998d6, 2026-10-28) 42 of the 43 package GPU suites were started, one at a time, and 38 passed. The voxel, voxel
+  path tracer and root browser suites were stopped by the heat watchdog at 82 C before they finished, so they have no
+  Linux result yet. The text failure of the same run is the colour emoji entry below.
+- **Needed to close:** those three suites run to the end on Linux, on a machine that stays cool under a long GPU
+  run, and the results recorded here.
+
 ## Open defects
+
+### Findings of the outside audit (2026-10-28)
+
+- **What:** an outside audit of revision 74a01810 (a source review, canary tests on a second laptop with temporary
+  files, mock fetches, fake sockets and loopback servers only, a full verify that passed 6,344 of 6,346 tests with 2
+  skipped, a short fuzz run over 36 targets and GPU checks) reported 20 findings, F01 to F20, about input handling,
+  the converter command line, the network servers and one slow decoder input. The audit marks each as reproduced, code
+  confirmed or project documented, and states its own limits: a short fuzz run, local canaries only, no production
+  test, and a passing verify does not show there are no bugs.
+- **Status on main (2026-10-28):** 16 of the 20 are fixed with regression tests (F01 to F07 and F11 to
+  F19; classes, commits and tests in
+  [whitepaper/perf-history.md](whitepaper/perf-history.md#44-an-outside-audit) and the table at the end of this page).
+  F20 is being fixed; its details are published once the fix is on main.
+- **netcode room server limits (F08, F09, F10):** limits the room server does not have yet; the netcode README
+  leaves authentication and network-level denial of service to the application. Proposals for them are with Scott.
+- **Needed to close:** F20 fixed with a regression test that fails without it, and the server limits decided and
+  built.
+
+### text: the colour emoji check needs a colour emoji font on the machine
+
+- **Repro:** `npm run test:browser --workspace @margoengine/text` on a Linux machine with no colour emoji font
+  installed (the Ubuntu test server, 2026-10-28) fails "Emoji not drawn in color" (`colorGlyphs` 0) at
+  `packages/text/tests/text-browser.js`.
+- **Cause:** the check draws an emoji through the system's fonts, so its result depends on the machine. Windows has a
+  colour emoji font; a headless Linux server often has none. The engine draws what the system font gives it.
+- **Fix needed:** the test brings its own colour glyph source (a standard emoji font file recorded with its source and
+  licence in `THIRD-PARTY-NOTICES.md`, or a test font), or it detects that no colour font exists and says so with a
+  clear skip message; either with a test that the check fails when colour glyphs are not drawn although a colour
+  font is present.
+
 
 ### VoxelRenderer draws nothing for a few frames after an effect is taken out of the middle
 
@@ -183,6 +222,9 @@ does not own. Each entry says exactly what is needed to close it.
   printed frames: 25, 198, 256, 327, 400), so all 6 also exceed the blended-4x tolerance of 1 below. So it is not
   NVIDIA-only; the earlier run on main d000e4b6 that drew all 450 alike was not a controlled comparison (another
   commit and other conditions).
+- **Second Intel Arc 140V** (an outside audit's laptop, revision 74a01810, 2026-10-28): the same 450-frame repro
+  differed on 4 frames (46, 99, 112 and 326), at the same pixel (101, 72), [109, 107, 104] instead of [100, 99, 96], 9
+  of 255. The standard voxel check passed there.
 - **Cause: open, and it may be on Margo's side.** Measured on the A6000 so far: every differing pixel is seen through
   the glass wall, along glass and terrain edges (pixels whose samples hold more than one surface). Between the frames
   nothing that Margo hands the GPU changes: no buffer write but the frame uniform and indirect arguments, bit for bit
@@ -216,6 +258,15 @@ Measured but not fixed. Their history, sources and rerun commands are in
 The entries below were measured with `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu` (busy
 machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md),
 "Instanced: fixes and what is left"). Each cause was measured, not guessed.
+
+### Precise maths: cost against the WGSL builtins not measured
+
+- **What:** compute's element-wise functions and the path tracer's panorama and fisheye rays use the precise f32
+  functions (`packages/shared/precise-math.js`), and since `b6bea3e9` every step whose rounding matters takes its
+  operands through `pmHide` (four hides in the precise divide where the old code had one, more work in `pow`). Their
+  GPU cost against the builtins (`createCompute({ fastMath: true })`) has never been measured.
+- **Needed to close:** a measured GPU time for both, recorded as an accepted difference in work with a like-for-like
+  `fastMath` row, in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ### createInstancedMesh reads vertex attributes its material does not use
 
@@ -421,3 +472,31 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   4. Test against an analytic bicubic with cross terms (for example x = s, y = t, z = s^2 t^3 over two patches each
      way), comparing sampled points and the meshed area with the exact values, and replace the refusal test in
      `packages/brep/tests/iges.test.js`.
+
+## Fixed 2026-10-26 to 10-28
+
+Each is described with its cause and guard in
+[whitepaper/perf-history.md](whitepaper/perf-history.md#what-our-checks-caught-and-what-we-got-wrong-2026-10-26-to-10-28).
+
+| Bug | Fix | Regression test |
+| --- | --- | --- |
+| Precise maths changed by compilers that reassociate (AMD Radeon 680M, Intel UHD with Mesa) | `b6bea3e9`, `baa66526` | `tests/precise-math.test.js`, `packages/compute/tests/maths.test.js`, compute `test:browser:reassociate` and `test:browser:sweep` |
+| `math-consolidation` proof digests differed between Node 22 and Node 26 | `ab27353f` | `tests/proofs-golden.test.js` |
+| Repository and package Node minimums were one number | `6c289ed9` | `tests/engines.test.js` |
+| VoxelRenderer drew nothing after the last added effect was removed; a replaced clustered light threw | `baa66526` | `packages/voxel/tests/render.test.js`, `render-lighting-browser-check.mjs` |
+| Flaky under load: lod heap probe, catalog clipboard | `6d08b0af` | `packages/lod/test/lod.test.js`, `tests/catalog.test.js` |
+| Flaky under load: quiet-server timeout | `3a59aa55` | `tests/server-url.test.js` |
+| Flaky under load: controls walk step per frame | `7714e84e`, `109ec352` | `packages/controls/tests/walk.test.js` |
+| Browser suites shared one Vite dependency cache | `7ab8cd13` | `tests/vite-cache-isolation.test.js` |
+| GPU suite waited silently for a fixed port | `6ddd733b` | `tests/browser-port-wait.test.js` |
+| Headless Edge used the integrated AMD GPU with Remote Desktop disconnected | `85c96a55` | `tests/gpu-adapter.test.js`, `tests/browser-selection.test.js` |
+| A GPU reset left a page waiting 30 to 120 s with no cause named (the reset itself is still open, above) | `49dca9dd`, `51d8786a` | `tests/device-loss-guard.test.js`, `tests/driver-resets.test.js` |
+| netcode `openWebSocket` hung on a refused connection on Node 22 | `7f0dd465` | `packages/netcode/tests/transports.test.js` |
+| Data after a compressed stream accepted on Node 22 (fbx, loaders ZIP, splats SOG, voxel codec) | `0687e6ec` | `tests/trailing-data.test.js` |
+| Audit F01, F02, F05: margo-convert read, deleted or overwrote files outside their folder | `4bc89574` | `tests/margo-convert-paths.test.js` |
+| Audit F06, F07: `allowedURLs` matched by prefix; redirects were not rechecked | `c6e7623c` | `tests/security.test.js`, `packages/gltf-pro/tests/progressive.test.js` |
+| Audit F04, F17: OBJ material libraries fetched from any host with the caller's options, no total budget | `b96f5f40` | `packages/loaders/tests/mtl.test.js` |
+| Audit F11, F12: netcode room joinable before `onCreate`; failing hooks left clients hanging | `158076f1` | `packages/netcode/tests/rooms.test.js` |
+| Audit F18, F19: WebSocket control frames counted against the message limit; close reasons cut by characters | `6bebf878` | `packages/netcode/tests/transports.test.js` |
+| Audit F14, F15: voxel-net dropped a hello sent with the upgrade; failed chunks were never retried | `8c8b51a0` | `packages/voxel-net/tests/websocket.test.js`, `server.test.js` |
+| Audit F03, F13, F16: voxel-net had no authentication, no cap before the hello and no bound on edited chunks | `ddc5c5ff` | `packages/voxel-net/tests/limits.test.js` |
