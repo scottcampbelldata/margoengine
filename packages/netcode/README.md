@@ -250,7 +250,20 @@ deltas at the patch rate (default every 50 ms); messages are JSON with a size li
 malformed closes the connection. A room is listed and joinable only once its `onCreate` resolved (joins that arrive
 meanwhile wait for it). When `onCreate`, `onJoin`, `onLeave`, `onDispose` or a message handler throws (or its promise
 rejects), the client concerned is closed with `CloseCode.error`, the error goes to `rooms.onerror(error, room)`
-(default `console.error`) and the server keeps running; a room whose `onCreate` threw is disposed.
+(default `console.error`) and the server keeps running; a room whose `onCreate` threw is disposed. When a timed patch
+or a `setSimulationInterval` step throws, `onerror` gets it with the room, and that room is stopped: every client is
+closed with `CloseCode.error` and the room is disposed.
+
+`new RoomServer(options)` limits what clients can hold; every option has a safe default and `new RoomServer()` uses
+them all:
+
+| Option | Default | What happens past it |
+| --- | --- | --- |
+| `joinTimeout` | 10,000 ms | A connection that has not sent its join is closed with `CloseCode.timeout`. |
+| `maxConnections` | 1,024 | Connections in rooms plus those still joining; the next is closed with `CloseCode.full`. `rooms.connections` counts them. |
+| `maxRooms` | 256 | Rooms, those in `onCreate` included. `rooms.create()` rejects with MargoError `'failed'`; a client's `create` or `joinOrCreate` that would make one more is refused (its join rejects). |
+| `limits.messagesPerSecond` | 120 | A token bucket per client in every room; a client over it, its burst spent, is closed with `CloseCode.rateLimit`. A room may set its own `maxMessagesPerSecond`, as it sets `maxMessageBytes`. |
+| `limits.burst` | 60 | The bucket size; a room may set its own `messageBurst`. |
 
 ```ts
 import { defineSchema, LoopbackNetwork } from '@margoengine/netcode';

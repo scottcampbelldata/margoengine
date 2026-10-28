@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### netcode room limits
+
+- `new RoomServer(options)`: `joinTimeout` (10,000 ms, then `CloseCode.timeout`), `maxConnections` (1,024 joined or
+  joining, then `CloseCode.full`), `maxRooms` (256: `create` rejects with MargoError `'failed'`, a client's `create` or
+  `joinOrCreate` is refused) and `limits.messagesPerSecond` / `limits.burst` (120 and 60, a token bucket per client,
+  then `CloseCode.rateLimit`; a room may set `maxMessagesPerSecond` and `messageBurst`). Options out of range throw
+  RangeError; `rooms.connections` counts open connections. `new RoomServer()` keeps working with these defaults.
+- A timed patch or `setSimulationInterval` step that throws no longer throws uncaught: it goes to
+  `RoomServer.onerror(error, room)` and stops that room. A client that leaves while `onAuth` runs is no longer seated
+  as a ghost, and an aborted join rejects with the abort reason.
+
 ### voxel-net server limits (breaking default)
 
 - **Breaking:** `VoxelServer` `origins` (and `acceptWebSocket`) now default to the server's own host: a browser page

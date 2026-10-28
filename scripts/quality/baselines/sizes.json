@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3986691,
+  "total": 3987484,
   "history": [
     {
       "date": "2026-10-24",
@@ -770,6 +770,12 @@
       "commit": "77315526",
       "reason": "webgl2-compat milestone M5: compute (fragment, scatter and CPU tiers) in the lazy /compute chunks the device loads with the first compute pipeline, plus the per-texture size uniforms of bug 52; nothing loads on the WebGPU path",
       "grew": 4
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "17c9ac2b",
+      "reason": "netcode rooms limits (bug 50): join timeout, connection and room caps, per-client message token bucket, and timer errors that stop their room instead of throwing uncaught",
+      "grew": 1
     }
   ],
   "items": {
@@ -986,7 +992,7 @@
     "@margoengine/netcode/generate": 5154,
     "@margoengine/netcode/node": 6102,
     "@margoengine/netcode/rollback": 3471,
-    "@margoengine/netcode/rooms": 4788,
+    "@margoengine/netcode/rooms": 5581,
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/oit": 3199,

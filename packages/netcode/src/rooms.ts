@@ -112,6 +112,13 @@ export abstract class Room<State = unknown> {
   autoDispose = true;
   /** Largest message (either way) in bytes (default 4096). */
   maxMessageBytes = 4096;
+  /**
+   * Messages per second a client may send on average (default: the RoomServer's `limits.messagesPerSecond`, 120). A
+   * client past it, once its burst is spent, is closed with `CloseCode.rateLimit`.
+   */
+  maxMessagesPerSecond: number | undefined = undefined;
+  /** Messages a client may send at once (default: the RoomServer's `limits.burst`, 60). */
+  messageBurst: number | undefined = undefined;
   /** The room's id. */
   roomId = '';
   /** The name it was defined under. */
@@ -127,6 +134,8 @@ export abstract class Room<State = unknown> {
   private lockedByHand = false;
   private disposed = false;
   private ids = new WeakMap<RoomClient, number>();
+  /** Each client's message bucket: tokens left and when it was last refilled. */
+  private buckets = new WeakMap<RoomClient, { tokens: number; at: number }>();
   private nextId = 1;
   /** @internal */ onEmpty: (() => void) | null = null;
   /** @internal Where errors thrown by this room's hooks and handlers go (its RoomServer's `onerror`). */
@@ -149,21 +158,46 @@ export abstract class Room<State = unknown> {
     this.current = state;
     if (this.patchRate < 0) this.setPatchRate(50);
   }
-  /** Milliseconds between state patches (default 50); 0 stops automatic patches (call {@link Room.patch}). */
+  /**
+   * Milliseconds between state patches (default 50); 0 stops automatic patches (call {@link Room.patch}). When a
+   * timed patch throws (a state the schema cannot encode), the room is stopped as for `setSimulationInterval`.
+   */
   setPatchRate(ms: number): void {
     if (this.patchTimer !== undefined) clearInterval(this.patchTimer);
     this.patchRate = ms;
-    this.patchTimer = ms > 0 ? setInterval(() => this.patch(), ms) : undefined;
+    this.patchTimer = ms > 0 ? setInterval(() => this.guard(() => this.patch()), ms) : undefined;
   }
-  /** Runs `step(deltaMs)` every `ms` milliseconds (default 1000 / 60) until the room is disposed. */
+  /**
+   * Runs `step(deltaMs)` every `ms` milliseconds (default 1000 / 60) until the room is disposed. When `step` throws
+   * (or returns a promise that rejects), the error goes to the RoomServer's `onerror(error, room)`, every client is
+   * closed with `CloseCode.error` and the room is disposed.
+   */
   setSimulationInterval(step: (deltaMs: number) => void, ms = 1000 / 60): void {
     if (this.simulationTimer !== undefined) clearInterval(this.simulationTimer);
     let last = performance.now();
     this.simulationTimer = setInterval(() => {
-      const now = performance.now();
-      step(now - last);
+      const now = performance.now(),
+        delta = now - last;
       last = now;
+      this.guard(() => step(delta));
     }, ms);
+  }
+  /** Runs a timer's work; a throw or a rejection stops the room instead of escaping as an uncaught error. */
+  private guard(run: () => unknown): void {
+    if (this.disposed) return;
+    try {
+      const result = run();
+      if (result instanceof Promise) result.catch((error) => this.stop(error));
+    } catch (error) {
+      this.stop(error);
+    }
+  }
+  /** Reports `error`, closes every client with CloseCode.error and disposes of the room. */
+  private stop(error: unknown): void {
+    if (this.disposed) return;
+    this.report(error);
+    for (const client of [...this.clients]) client.connection.close(CloseCode.error, 'room stopped by an error');
+    this.release();
   }
   /** Handles client messages of `type` (`'*'` for any type without its own handler). */
   onMessage<T = unknown>(type: string, handler: (client: RoomClient, message: T) => void): void {
@@ -244,12 +278,18 @@ export abstract class Room<State = unknown> {
     } catch {
       auth = false;
     }
-    if (auth === false || auth === undefined || auth === null || this.disposed || this.locked) return 'refused';
+    // A client that left while onAuth ran is not seated: its close has already passed, so it would never leave.
+    if (auth === false || auth === undefined || auth === null || this.disposed || this.locked || !connection.open)
+      return 'refused';
     client.auth = auth;
     this.ids.set(client, this.nextId++);
+    this.buckets.set(client, { tokens: this.messageBurst ?? 60, at: performance.now() });
     this.clients.push(client);
     connection.onmessage = (data) => this.receive(client, data);
-    connection.onclose = (code) => {
+    // The RoomServer's own close handler (it counts open connections) runs first.
+    const before = connection.onclose;
+    connection.onclose = (code, reason) => {
+      before?.(code, reason);
       this.drop(client, code === CloseCode.normal).catch((error) => this.report(error));
     };
     const w = new Writer(64);
@@ -275,6 +315,16 @@ export abstract class Room<State = unknown> {
   }
 
   private receive(client: RoomClient, data: Uint8Array): void {
+    // A token bucket per client: maxMessagesPerSecond refilled, messageBurst at most.
+    const bucket = this.buckets.get(client);
+    if (bucket) {
+      const now = performance.now(),
+        rate = this.maxMessagesPerSecond ?? 120;
+      bucket.tokens = Math.min(this.messageBurst ?? 60, bucket.tokens + ((now - bucket.at) * rate) / 1000);
+      bucket.at = now;
+      if (bucket.tokens < 1) return client.connection.close(CloseCode.rateLimit, `over ${rate} messages per second`);
+      bucket.tokens--;
+    }
     let handler: ((client: RoomClient, message: unknown) => void) | undefined, message: unknown;
     try {
       if (data.length > this.maxMessageBytes)
@@ -337,13 +387,49 @@ const sameBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.e
 /** A room class: what {@link RoomServer.define} takes. */
 export type RoomClass = new () => Room<unknown>;
 
+/** Per-client message rate of a {@link RoomServer}'s rooms; a room may set its own. */
+export interface RoomRateLimits {
+  /** Messages per second refilled into each client's bucket (default 120); `Room.maxMessagesPerSecond` overrides it. */
+  messagesPerSecond?: number;
+  /** Bucket size: the most messages at once (default 60); `Room.messageBurst` overrides it. */
+  burst?: number;
+}
+
+/** Options of {@link RoomServer}. Every limit has a safe default. */
+export interface RoomServerOptions {
+  /** Milliseconds a new connection has to send its join; then it is closed with `CloseCode.timeout` (default 10,000). */
+  joinTimeout?: number;
+  /** Connections at once, in rooms or still joining (default 1,024); the next is closed with `CloseCode.full`. */
+  maxConnections?: number;
+  /**
+   * Rooms at once, those still in `onCreate` included (default 256). Past it `create` rejects with MargoError
+   * `'failed'`, and a client's `create` or `joinOrCreate` that would make one more is refused.
+   */
+  maxRooms?: number;
+  /** Message rate per client (defaults 120 per second, bursts of 60); a client over it is closed with `CloseCode.rateLimit`. */
+  limits?: RoomRateLimits;
+}
+
+const finite = (name: string, value: unknown, min: number, integer: boolean): number => {
+  if (typeof value !== 'number' || !(value >= min && value < Number.POSITIVE_INFINITY) || (integer && value % 1))
+    throw new RangeError(
+      `RoomServer ${name} is ${String(value)}; pass ${integer ? 'an integer' : 'a number'} >= ${min}`,
+    );
+  return value;
+};
+const positive = (name: string, value: unknown): number => {
+  if (typeof value !== 'number' || !(value > 0 && value < Number.POSITIVE_INFINITY))
+    throw new RangeError(`${name} is ${String(value)}; pass a finite number > 0`);
+  return value;
+};
+
 /**
  * Hosts rooms and matches clients to them. Hand it connections (`listener.onconnection = (c) => rooms.accept(c)`);
  * each connection's first message names the room it wants.
  *
  * @example
  * ```ts
- * const rooms = new RoomServer();
+ * const rooms = new RoomServer({ maxRooms: 100 });
  * rooms.define('lobby', Lobby);
  * listener.onconnection = (connection) => rooms.accept(connection);
  * ```
@@ -353,19 +439,43 @@ export class RoomServer {
   private readonly live = new Map<string, Room>();
   /** Rooms whose onCreate is still running: not joinable yet, but joins for them wait for it. */
   private readonly creating = new Map<Room, Promise<void>>();
+  /** Connections that have not sent their join yet. */
+  private readonly joining = new Set<Connection>();
+  private open = 0;
   private sessions = 0;
   private closed = false;
+  private readonly joinTimeout: number;
+  private readonly maxConnections: number;
+  private readonly maxRooms: number;
+  private readonly rate: number;
+  private readonly burst: number;
 
   /**
-   * Called with each error a room hook (`onCreate`, `onJoin`, `onLeave`, `onDispose`) or message handler threw, and
-   * the room (undefined when its `onCreate` threw). The client concerned is closed with `CloseCode.error`; the
-   * server keeps running. Default: `console.error`.
+   * Called with each error a room hook (`onCreate`, `onJoin`, `onLeave`, `onDispose`), message handler, timed patch
+   * or `setSimulationInterval` step threw, and the room (undefined when its `onCreate` threw). The client concerned
+   * is closed with `CloseCode.error`; a throwing patch or step stops its whole room (every client closed with
+   * `CloseCode.error`, the room disposed). The server keeps running. Default: `console.error`.
    */
   onerror: ((error: unknown, room: Room | undefined) => void) | null = null;
+
+  /** @throws RangeError for an option that is not a number in range. */
+  constructor(options: RoomServerOptions = {}) {
+    const o = options ?? {},
+      limits = o.limits ?? {};
+    this.joinTimeout = finite('joinTimeout', o.joinTimeout ?? 10_000, 1, false);
+    this.maxConnections = finite('maxConnections', o.maxConnections ?? 1024, 1, true);
+    this.maxRooms = finite('maxRooms', o.maxRooms ?? 256, 1, true);
+    this.rate = positive('RoomServer limits.messagesPerSecond', limits.messagesPerSecond ?? 120);
+    this.burst = finite('limits.burst', limits.burst ?? 60, 1, false);
+  }
 
   /** Every live room. */
   get rooms(): Room[] {
     return [...this.live.values()];
+  }
+  /** Connections open now: in rooms, or still joining. */
+  get connections(): number {
+    return this.open;
   }
 
   private report(error: unknown, room: Room | undefined): void {
@@ -386,13 +496,23 @@ export class RoomServer {
   /**
    * Creates a room named `name` now, without a client. The room is listed and joinable once its `onCreate` resolved;
    * when `onCreate` throws, the room is disposed and the promise rejects with that error.
-   * @throws MargoError `failed` for an undefined name, `disposed` once the server is closed.
+   * @throws MargoError `failed` for an undefined name or when `maxRooms` rooms exist, `disposed` once the server is
+   * closed; RangeError when the room class sets `maxMessagesPerSecond` or `messageBurst` out of range.
    */
   async create(name: string, options: RoomOptions = {}): Promise<Room> {
     const definition = this.classes.get(name);
     if (!definition) throw fault('failed', `No room named '${name}' is defined; call define('${name}', RoomClass)`);
     if (this.closed) throw fault('disposed', 'RoomServer is closed; create a new RoomServer');
+    if (this.full)
+      throw fault(
+        'failed',
+        `RoomServer holds maxRooms (${this.maxRooms}) rooms; raise maxRooms or wait for one to close`,
+      );
     const room = new definition.Class();
+    room.maxMessagesPerSecond = positive(`Room '${name}' maxMessagesPerSecond`, room.maxMessagesPerSecond ?? this.rate);
+    room.messageBurst = room.messageBurst ?? this.burst;
+    if (!(room.messageBurst >= 1 && room.messageBurst < Number.POSITIVE_INFINITY))
+      throw new RangeError(`Room '${name}' messageBurst is ${room.messageBurst}; pass a finite number >= 1`);
     room.roomName = name;
     room.roomId = randomId();
     room.report = (error) => this.report(error, room);
@@ -415,15 +535,39 @@ export class RoomServer {
     return room;
   }
 
+  /** Whether `maxRooms` rooms exist (those in `onCreate` count). */
+  private get full(): boolean {
+    return this.live.size + this.creating.size >= this.maxRooms;
+  }
+
   /**
    * Takes a new client connection; its first message (a join) picks or creates the room. When a room hook throws
-   * during the join, `onerror` gets the error and the connection closes with `CloseCode.error`.
+   * during the join, `onerror` gets the error and the connection closes with `CloseCode.error`. A connection past
+   * `maxConnections` is closed at once with `CloseCode.full`; one that sends no join within `joinTimeout` is closed
+   * with `CloseCode.timeout`.
    * @throws MargoError `disposed` once closed.
    */
   accept(connection: Connection): void {
     if (this.closed) throw fault('disposed', 'RoomServer is closed; create a new RoomServer');
+    if (this.open >= this.maxConnections)
+      return connection.close(CloseCode.full, `server full: ${this.maxConnections} connections (maxConnections)`);
+    this.open++;
+    this.joining.add(connection);
+    const timer = setTimeout(
+      () => connection.close(CloseCode.timeout, `no join within ${this.joinTimeout} ms (joinTimeout)`),
+      this.joinTimeout,
+    );
+    let counted = true;
+    connection.onclose = () => {
+      clearTimeout(timer);
+      this.joining.delete(connection);
+      if (counted) this.open--;
+      counted = false;
+    };
     connection.onmessage = (data) => {
       connection.onmessage = null;
+      clearTimeout(timer);
+      this.joining.delete(connection);
       this.join(connection, data).catch((error) => {
         this.report(error, undefined);
         connection.close(CloseCode.error, 'room error');
@@ -479,7 +623,10 @@ export class RoomServer {
         room = find();
       }
     }
-    if (!room && (method === 'create' || method === 'joinOrCreate')) room = await this.create(name, options);
+    if (!room && (method === 'create' || method === 'joinOrCreate')) {
+      if (this.full) return this.refuse(connection, `the server holds its most rooms (${this.maxRooms}); try later`);
+      room = await this.create(name, options);
+    }
     if (!room) return this.refuse(connection, method === 'joinById' ? `no room '${roomId}'` : `no open '${name}' room`);
     const result = await room.admit(connection, `${randomId()}${(++this.sessions).toString(36)}`, options);
     if (result === 'refused') {
@@ -488,9 +635,10 @@ export class RoomServer {
     }
   }
 
-  /** Disconnects every room. */
+  /** Disconnects every room and closes connections still joining. */
   close(): void {
     this.closed = true;
+    for (const connection of [...this.joining]) connection.close(CloseCode.removed, 'server closing');
     for (const room of [...this.live.values()]) room.disconnect();
   }
   /** Same as close, for `using`. */
@@ -689,7 +837,10 @@ export class RoomsClient {
     const connection = await this.connect(),
       untyped = schema as UntypedSchema;
     return new Promise((resolve, reject) => {
+      // The abort reason wins: the close it causes must not reject the join with a close message first.
       const abort = () => {
+        connection.onclose = null;
+        connection.onmessage = null;
         connection.close(CloseCode.normal, 'aborted');
         reject(signal?.reason);
       };
