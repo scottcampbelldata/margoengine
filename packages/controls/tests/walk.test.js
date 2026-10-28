@@ -7,7 +7,7 @@ import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
 import { FloatingOrigin } from '../../cameras/dist/origin.js';
 import { WalkControls } from '../dist/walk.js';
-import { PATH, buildHouse, clearance } from './house.js';
+import { PATH, buildHouse, clearance, eyeStepLimit } from './house.js';
 
 class FakeElement {
   constructor(width = 800, height = 600) {
@@ -545,4 +545,53 @@ test('input: keys, pointer-lock and drag look, touch thumbstick and drag-look, g
     bad.radius = -1;
     bad.update(1 / 60);
   }, /Invalid WalkControls settings/);
+});
+
+/** Walks the house at a fixed frame time and returns every per-frame eye height change with its limit. */
+async function stairSteps(dt) {
+  const { engine } = await world([PATH[0][0], EYE, PATH[0][1]], [PATH[0][0], EYE, PATH[0][1] + 1]);
+  buildHouse(engine);
+  const walk = new WalkControls(engine);
+  let target = 1,
+    frames = 0,
+    last = engine.camera.position[1];
+  const steps = [];
+  while (target < PATH.length && frames < 3000) {
+    const [x, , z] = engine.camera.position,
+      [tx, tz] = PATH[target];
+    if (Math.hypot(tx - x, tz - z) < 0.15) {
+      target++;
+      continue;
+    }
+    engine.camera.target = [x + tx - x, engine.camera.position[1], z + tz - z];
+    walk.axes.y = -1;
+    engine.render({ delta: dt });
+    frames++;
+    steps.push(Math.abs(engine.camera.position[1] - last));
+    last = engine.camera.position[1];
+  }
+  assert.equal(target, PATH.length, `reached every waypoint at dt ${dt}`);
+  return { steps, limit: eyeStepLimit(dt, walk.stepHeight) };
+}
+
+test('bug 37: the eye step per frame scales with the frame time; a slow frame is not a teleport, a real jump still is', async () => {
+  for (const dt of [1 / 60, 0.025, 0.04, 0.1]) {
+    const { steps, limit } = await stairSteps(dt);
+    assert.ok(Math.max(...steps) <= limit, `dt ${dt}: largest eye step ${Math.max(...steps)} within ${limit}`);
+  }
+  // A 100 ms frame on a stair is a legitimate step larger than the old fixed per-frame limit of 0.06 ...
+  const slow = await stairSteps(0.1);
+  assert.ok(Math.max(...slow.steps) > 0.06, 'the old fixed limit 0.06 would fail a legitimate 100 ms frame');
+  // ... while a one-frame jump that the frame time cannot explain is caught at every frame time.
+  for (const dt of [1 / 60, 0.1]) assert.ok(0.4 > eyeStepLimit(dt), `a 0.4 m jump in one ${dt} s frame is a teleport`);
+  const { engine } = await world();
+  buildHouse(engine);
+  const walk = new WalkControls(engine);
+  run(engine, 30);
+  const y = engine.camera.position[1];
+  engine.camera.position = [0, y + 0.4, 0]; // injected teleport
+  engine.camera.target = [0, y + 0.4, 1];
+  engine.render({ delta: 1 / 60 });
+  assert.ok(Math.abs(engine.camera.position[1] - y) < 0.41); // the controls do not hide it, the check must see it
+  assert.ok(0.4 > eyeStepLimit(1 / 60, walk.stepHeight));
 });

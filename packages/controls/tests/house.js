@@ -91,3 +91,11 @@ export function clearance(house, x, y0, y1, z) {
     best = Math.min(best, Math.hypot(gap(q.x0, q.x1, x, x), gap(q.y0, q.y1, y0, y1), z - q.z));
   return best;
 }
+
+/**
+ * The largest legitimate change of the eye height in one frame of `dt` seconds. WalkControls absorbs a step up to
+ * `stepHeight` by moving the feet at once and easing the eye over it with exp(-12 dt), so the eye moves at most the
+ * step times (1 - exp(-12 dt)) per frame (x1.5: a riser plus the tails of earlier ones still easing out, or a second riser inside one long frame; plus 1 mm). The
+ * limit grows with the frame time: a slow frame is a bigger, correct step, not a teleport.
+ */
+export const eyeStepLimit = (dt, stepHeight = 0.19) => 1.5 * stepHeight * (1 - Math.exp(-12 * dt)) + 1e-3;
