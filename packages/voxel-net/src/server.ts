@@ -174,7 +174,12 @@ const NAMES: Record<number, ServerMessage['type']> = {
   WINDOW = 64, // unsent chunks looked at per client per tick
   CHUNKS_PER_TICK = 64,
   BYTES_PER_TICK = 128 * 1024,
-  MAX_STEPS = 240; // movement steps in one input message
+  MAX_STEPS = 240, // movement steps in one input message
+  GENERATE_TRIES = 3, // a chunk's generation is tried this often before the players who need it are closed
+  RETRY_MS = 250, // wait before the second try; it doubles for each further one
+  FAILED_KEPT = 4096; // most chunks whose failures are remembered
+
+const later = (ms: number): Promise<void> => new Promise((done) => setTimeout(done, ms).unref());
 
 const integer = (name: string, value: unknown, min: number, max: number): number => {
   if (typeof value !== 'number') throw new TypeError(`VoxelServer ${name} must be a number`);
@@ -349,6 +354,8 @@ export class VoxelServer {
   readonly #versions = new Map<string, number>();
   readonly #cache = new Map<string, { message: Uint8Array; version: number }>();
   readonly #fetching = new Set<string>();
+  /** View chunks whose generation failed: the tries so far and when the next may start. */
+  readonly #failed = new Map<string, { tries: number; at: number }>();
   readonly #jobs = new Map<string, { job: Promise<Generated>; urgent: boolean }>();
   readonly #ceilings = new Map<string, number>();
   #cacheBytes = 0;
@@ -658,18 +665,36 @@ export class VoxelServer {
     const edited = this.#edited.get(key);
     if (edited) return void this.world.addChunk(cx, cy, cz, edited);
     if (this.#aboveCeiling(spot)) return void this.world.addChunk(cx, cy, cz);
-    const done = this.#generate(spot, true).then(
-      (g) => {
-        this.#loading.delete(key);
-        if (this.#refs.has(key) && !this.world.getChunk(cx, cy, cz))
-          this.world.addChunk(cx, cy, cz, this.#edited.get(key) ?? VoxelChunk.unpack(g.packed));
-      },
-      (error) => {
-        this.#loading.delete(key);
-        this.onError(error);
-      },
-    );
+    // A failed generation is tried again while a player still needs the chunk; after GENERATE_TRIES the players who
+    // need it are closed, since none of them can play (or spawn) without it.
+    const done = (async () => {
+      for (let tries = 1; ; tries++) {
+        try {
+          const g = await this.#generate(spot, true);
+          if (this.#refs.has(key) && !this.world.getChunk(cx, cy, cz))
+            this.world.addChunk(cx, cy, cz, this.#edited.get(key) ?? VoxelChunk.unpack(g.packed));
+          return;
+        } catch (error) {
+          this.onError(error);
+          if (tries >= GENERATE_TRIES) return this.#giveUp(spot);
+          await later(RETRY_MS * 2 ** (tries - 1));
+          if (this.#closed || !this.#refs.has(key) || this.world.getChunk(cx, cy, cz)) return;
+        }
+      }
+    })().finally(() => this.#loading.delete(key));
     this.#loading.set(key, done);
+  }
+  // Closes, with 1011, every player whose simulation range or view needs the chunk that could not be generated.
+  #giveUp(spot: Spot): void {
+    const { key, cx, cy, cz } = spot;
+    this.#failed.delete(key);
+    for (const c of [...this.#clients])
+      if (c.sim.has(key) || (!c.sent.has(key) && c.want.some((s) => s.key === key)))
+        this.#kick(
+          c,
+          1011,
+          `chunk ${cx},${cy},${cz} failed to generate ${GENERATE_TRIES} times; tell the server owner to check the generator`,
+        );
   }
   #aboveCeiling(spot: Spot): boolean {
     const ceiling = this.#ceilings.get(`${spot.cx},${spot.cz}`);
@@ -730,7 +755,27 @@ export class VoxelServer {
       message = Promise.resolve(encodeServerMessage({ type: 'chunk', cx, cy, cz, data: this.#air }));
     else if (this.#jobs.has(key))
       return; // a job is making it and caches it when done
-    else message = this.#generate(spot, false).then((g) => g.message);
+    else {
+      // #sendChunks asks again every tick: a chunk that failed waits out its delay, and is given up after GENERATE_TRIES.
+      const failed = this.#failed.get(key);
+      if (failed && performance.now() < failed.at) return;
+      message = this.#generate(spot, false).then(
+        (g) => {
+          this.#failed.delete(key);
+          return g.message;
+        },
+        (error) => {
+          const tries = (this.#failed.get(key)?.tries ?? 0) + 1;
+          this.#failed.delete(key);
+          if (tries >= GENERATE_TRIES) this.#giveUp(spot);
+          else {
+            if (this.#failed.size >= FAILED_KEPT) this.#failed.delete(this.#failed.keys().next().value as string);
+            this.#failed.set(key, { tries, at: performance.now() + RETRY_MS * 2 ** (tries - 1) });
+          }
+          throw error;
+        },
+      );
+    }
     this.#fetching.add(key);
     message.then(
       (bytes) => {

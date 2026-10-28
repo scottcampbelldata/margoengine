@@ -160,3 +160,93 @@ test('an origin outside the allowed list gets 403, and connectWebSocket rejects 
   await assert.rejects(connectWebSocket('http://127.0.0.1:1'), TypeError);
   await server.close();
 });
+
+// A masked binary frame from a client (key 1 2 3 4), for messages written in the same TCP write as the upgrade.
+const maskedFrame = (payload) => {
+  const out = Buffer.alloc(6 + payload.length),
+    key = [1, 2, 3, 4];
+  out[0] = 0x82;
+  out[1] = 0x80 | payload.length;
+  out.set(key, 2);
+  for (let i = 0; i < payload.length; i++) out[6 + i] = payload[i] ^ key[i & 3];
+  return out;
+};
+const upgradeRequest =
+  'GET / HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
+  'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n';
+
+// Bug 43: bytes that arrive with the upgrade request (`head`) were parsed in the constructor, before the caller could
+// set onmessage, so a message in the same packet as the upgrade was dropped.
+test('messages in the same TCP write as the upgrade reach onmessage set after the connection is made', {
+  timeout: 10_000,
+}, async () => {
+  const server = await echoServer(),
+    socket = connect(server.port, '127.0.0.1');
+  await new Promise((done) => socket.once('connect', done));
+  let data = Buffer.alloc(0);
+  socket.on('data', (chunk) => {
+    data = Buffer.concat([data, chunk]);
+  });
+  socket.write(
+    Buffer.concat([Buffer.from(upgradeRequest), maskedFrame(Buffer.from('one')), maskedFrame(Buffer.from('two'))]),
+  );
+  const started = Date.now();
+  while (Date.now() - started < 2000 && !data.includes('two')) await settle(5);
+  const body = data.subarray(data.indexOf('\r\n\r\n') + 4);
+  assert.deepEqual(
+    [...body],
+    [0x82, 3, ...Buffer.from('one'), 0x82, 3, ...Buffer.from('two')],
+    'both echoed, in order',
+  );
+  socket.destroy();
+  await server.close();
+});
+
+test('connectWebSocket keeps a message and a close that came with the 101 for handlers set after it resolves', {
+  timeout: 10_000,
+}, async () => {
+  // A server that answers the upgrade, a binary frame and a close frame in one write.
+  const http = createServer((_req, res) => res.end());
+  http.on('upgrade', (req, socket) => {
+    socket.write(
+      Buffer.concat([
+        Buffer.from(
+          `HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${acceptKey(req.headers['sec-websocket-key'])}\r\n\r\n`,
+        ),
+        Buffer.from([0x82, 5, ...Buffer.from('hello')]),
+        Buffer.from([0x88, 2, 0x03, 0xe8]),
+      ]),
+    );
+    socket.end();
+    socket.resume(); // read the client's close reply, so the socket ends and http.close() returns
+  });
+  await new Promise((done) => http.listen(0, '127.0.0.1', done));
+  const conn = await connectWebSocket(`ws://127.0.0.1:${http.address().port}`),
+    events = [];
+  await settle(20); // the handlers come late on purpose
+  conn.onmessage = (data) => events.push(Buffer.from(data).toString());
+  conn.onclose = (code) => events.push(code);
+  await settle(20);
+  assert.deepEqual(events, ['hello', 1000]);
+  await new Promise((done) => http.close(done));
+});
+
+test('messages with no handler set are kept only up to 4 x maxMessage bytes, then the connection closes 1008', {
+  timeout: 10_000,
+}, async () => {
+  const http = createServer((_req, res) => res.end()),
+    codes = [];
+  let connection;
+  http.on('upgrade', (req, socket, head) => {
+    connection = acceptWebSocket(req, socket, head, { maxMessage: 125 });
+  });
+  await new Promise((done) => http.listen(0, '127.0.0.1', done));
+  const client = await rawClient(http.address().port);
+  for (let i = 0; i < 6; i++) client.frame(2, Buffer.alloc(100, i));
+  await settle(100);
+  connection.onclose = (code) => codes.push(code);
+  await settle(20);
+  assert.deepEqual(codes, [1008]);
+  client.socket.destroy();
+  await new Promise((done) => http.close(done));
+});

@@ -34,10 +34,30 @@ export interface WebSocketOptions {
  * echoed. {@link WebSocketConnection.onmessage} receives each whole binary message.
  */
 export class WebSocketConnection {
-  /** Called with each binary message. The bytes stay valid; they are not reused. */
-  onmessage: (data: Uint8Array) => void = () => {};
-  /** Called once when the connection ends, with the close code (1006 when the socket ended without one). */
-  onclose: (code: number, reason: string) => void = () => {};
+  /**
+   * Called with each binary message. The bytes stay valid; they are not reused. Messages that arrive before a handler
+   * is set (a hello sent in the same packet as the upgrade request, say) are kept, up to 4 x `maxMessage` bytes, and
+   * delivered in order in a microtask after it is set.
+   */
+  get onmessage(): (data: Uint8Array) => void {
+    return this.#onmessage ?? ignore;
+  }
+  set onmessage(handler: (data: Uint8Array) => void) {
+    this.#onmessage = handler;
+    this.#schedule();
+  }
+  /**
+   * Called once when the connection ends, with the close code (1006 when the socket ended without one). A connection
+   * that ended before a handler was set reports it in a microtask after it is set (after the early messages, when
+   * onmessage is set too).
+   */
+  get onclose(): (code: number, reason: string) => void {
+    return this.#onclose ?? ignore;
+  }
+  set onclose(handler: (code: number, reason: string) => void) {
+    this.#onclose = handler;
+    this.#schedule();
+  }
   /** Bytes read from the socket, frame headers included. */
   bytesIn = 0;
   /** Bytes written to the socket, frame headers included. */
@@ -51,6 +71,14 @@ export class WebSocketConnection {
   #fragmented = false;
   #sentClose = false;
   #closed = false;
+  #onmessage: ((data: Uint8Array) => void) | undefined;
+  #onclose: ((code: number, reason: string) => void) | undefined;
+  /** Messages not yet delivered: they arrived before onmessage was set, or while earlier ones wait to be. */
+  #early: Uint8Array[] = [];
+  #earlyBytes = 0;
+  /** The close not yet reported, when the connection ended before onclose was set or before early messages left. */
+  #ended: [number, string] | undefined;
+  #flushing = false;
   /**
    * Takes over `socket` after the opening handshake. `client` is true on the connecting end (its frames are masked).
    * `head` holds bytes that arrived with the handshake.
@@ -110,7 +138,39 @@ export class WebSocketConnection {
     if (this.#closed) return;
     this.#closed = true;
     this.#parts = [];
-    this.onclose(code, reason);
+    if (this.#onclose && !this.#early.length) this.#onclose(code, reason);
+    else {
+      this.#ended = [code, reason];
+      this.#schedule();
+    }
+  }
+  #message(data: Uint8Array): void {
+    if (this.#onmessage && !this.#early.length) return this.#onmessage(data);
+    this.#early.push(data);
+    this.#earlyBytes += data.length;
+    if (this.#earlyBytes > 4 * this.#max) {
+      this.#early = [];
+      this.#earlyBytes = 0;
+      this.#fail(1008, 'messages arrived before a message handler was set');
+    }
+  }
+  #schedule(): void {
+    if (this.#flushing || (!this.#early.length && !this.#ended)) return;
+    this.#flushing = true;
+    queueMicrotask(() => {
+      this.#flushing = false;
+      if (this.#onmessage) {
+        const early = this.#early;
+        this.#early = [];
+        this.#earlyBytes = 0;
+        for (const data of early) this.#onmessage(data);
+      }
+      const ended = this.#ended;
+      if (ended && this.#onclose) {
+        this.#ended = undefined;
+        this.#onclose(ended[0], ended[1]);
+      }
+    });
   }
   #frame(opcode: number, data: Uint8Array): void {
     const n = data.length,
@@ -189,7 +249,7 @@ export class WebSocketConnection {
     if (opcode === BINARY || opcode === CONTINUATION) {
       if ((opcode === CONTINUATION) !== this.#fragmented)
         return this.#fail(1002, this.#fragmented ? 'expected a continuation frame' : 'continuation without a message');
-      if (fin && !this.#fragmented) return this.onmessage(payload);
+      if (fin && !this.#fragmented) return this.#message(payload);
       this.#parts.push(payload);
       this.#size += payload.length;
       this.#fragmented = !fin;
@@ -197,7 +257,7 @@ export class WebSocketConnection {
         const whole = Buffer.concat(this.#parts, this.#size);
         this.#parts = [];
         this.#size = 0;
-        this.onmessage(whole);
+        this.#message(whole);
       }
     } else if (opcode === TEXT) this.#fail(1003, 'binary messages only');
     else if (opcode === PING) this.#frame(PONG, payload);
@@ -214,6 +274,8 @@ export class WebSocketConnection {
     } else if (opcode !== PONG) this.#fail(1002, `unknown opcode ${opcode}`);
   }
 }
+
+const ignore = (): void => {};
 
 const bad = (socket: Duplex, status: string): undefined => {
   socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);

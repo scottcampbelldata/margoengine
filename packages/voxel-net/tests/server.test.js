@@ -1,12 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VoxelWorld } from '@margoengine/voxel';
-import { encodeClientMessage, Keys, VoxelNetClient } from '../dist/index.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
+import { decodeServerMessage, encodeClientMessage, Keys, PROTOCOL_VERSION, VoxelNetClient } from '../dist/index.js';
 import { VoxelBot } from '../dist/bot.js';
 import { connectWebSocket, VoxelServer } from '../dist/server.js';
 import { testBlocks } from './blocks.js';
 
-const blocks = testBlocks(),
+const flaky = new URL('./flaky-generator.js', import.meta.url),
+  blocks = testBlocks(),
   STONE = blocks.id('stone'),
   wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -199,4 +203,88 @@ test('four bots walk and build for two seconds without errors', async (t) => {
   assert.equal(clients[0].players.size, 3);
   for (const b of bots) b.close();
   await server.close();
+});
+
+// Bug 43: bytes that arrive with the upgrade request were parsed before the server set onmessage, so a hello sent in
+// the same TCP write as the upgrade was lost and the player was dropped after 10 s with no welcome.
+test('a hello sent in the same TCP write as the upgrade is answered with a welcome', { timeout: 10_000 }, async (t) => {
+  const { url } = await start(t),
+    { connect } = await import('node:net'),
+    socket = connect(Number(new URL(url).port), '127.0.0.1');
+  t.after(() => socket.destroy());
+  await new Promise((done) => socket.once('connect', done));
+  const hello = encodeClientMessage({ type: 'hello', version: PROTOCOL_VERSION, view: 2, name: 'early' }),
+    frame = Buffer.alloc(6 + hello.length);
+  frame[0] = 0x82;
+  frame[1] = 0x80 | hello.length;
+  for (let i = 0; i < hello.length; i++) frame[6 + i] = hello[i]; // mask key 0 0 0 0
+  let data = Buffer.alloc(0);
+  socket.on('data', (chunk) => {
+    data = Buffer.concat([data, chunk]);
+  });
+  socket.write(
+    Buffer.concat([
+      Buffer.from(
+        'GET / HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
+          'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n',
+      ),
+      frame,
+    ]),
+  );
+  const started = Date.now();
+  let body;
+  while (Date.now() - started < 3000) {
+    const end = data.indexOf('\r\n\r\n');
+    body = end < 0 ? undefined : data.subarray(end + 4);
+    if (body && body.length >= 2 && body.length >= 2 + (body[1] & 127)) break;
+    await wait(10);
+  }
+  assert.ok(body && body.length >= 2, 'the server answered the early hello');
+  assert.equal(body[0], 0x82);
+  assert.equal(decodeServerMessage(body.subarray(2, 2 + (body[1] & 127))).type, 'welcome');
+});
+
+// Bug 43, second part: a chunk of a player's simulation range whose generation failed was dropped from loading and
+// never asked for again, so a player who did not move waited forever to spawn.
+test('a chunk whose generation fails once is generated again, and the waiting player spawns', {
+  timeout: 20_000,
+}, async (t) => {
+  const dir = mkdtempSync(joinPath(tmpdir(), 'voxel-net-flaky-'));
+  process.env.VOXEL_NET_FLAKY = 'once';
+  process.env.VOXEL_NET_FLAKY_DIR = dir;
+  t.after(() => {
+    delete process.env.VOXEL_NET_FLAKY;
+    delete process.env.VOXEL_NET_FLAKY_DIR;
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const errors = [],
+    { server, url } = await start(t, { generator: flaky, spawn: () => [16, 16] });
+  server.onError = (error) => errors.push(error);
+  const a = await join(url);
+  await drive([a.client], 8000, undefined, spawned([a.client]));
+  assert.ok(a.client.spawned, 'spawned after the retry');
+  assert.ok(errors.length > 0 && errors.every((e) => /fails once/.test(e.message)), 'the failures were reported');
+});
+
+test('a chunk that keeps failing closes the waiting player with 1011 and a reason, after a few tries', {
+  timeout: 20_000,
+}, async (t) => {
+  process.env.VOXEL_NET_FLAKY = 'always';
+  t.after(() => delete process.env.VOXEL_NET_FLAKY);
+  const errors = [],
+    { server, url } = await start(t, { generator: flaky, spawn: () => [16, 16] });
+  server.onError = (error) => errors.push(error);
+  const a = await join(url),
+    reasons = [];
+  const previous = a.conn.onclose;
+  a.conn.onclose = (code, reason) => {
+    reasons.push(reason);
+    previous(code, reason);
+  };
+  const code = await Promise.race([a.closed, wait(15_000).then(() => 'still open')]);
+  assert.equal(code, 1011);
+  assert.match(reasons[0], /^chunk 1,-?\d+,0 failed to generate/);
+  // Bounded: a few tries per failing chunk, not one per tick.
+  const chunks = new Set(errors.map((e) => /chunk (\S+) fails/.exec(e.message)?.[1]));
+  assert.ok(errors.length <= chunks.size * 3 * 2, `${errors.length} errors for ${chunks.size} chunks`);
 });

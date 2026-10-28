@@ -163,8 +163,10 @@ interface VoxelNetTransport {
 }
 
 class WebSocketConnection {
-    onmessage: (data: Uint8Array) => void;
-    onclose: (code: number, reason: string) => void;
+    get onmessage(): (data: Uint8Array) => void;
+    set onmessage(handler: (data: Uint8Array) => void);
+    get onclose(): (code: number, reason: string) => void;
+    set onclose(handler: (code: number, reason: string) => void);
     bytesIn: number;
     bytesOut: number;
     constructor(socket: Duplex, client: boolean, options?: WebSocketOptions, head?: Buffer);

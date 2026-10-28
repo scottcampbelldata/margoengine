@@ -31,7 +31,9 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
   2 up and down) of some player: physics runs and edits are accepted there. Chunks a client can only see (its *view*,
   default 6 chunks across and 3 up and down; a client may ask for 2 to 8) are sent from a cache of finished messages
   (default 256 MiB). Worker threads run the generator (`noiseTerrain` options, or your own `VoxelGenerate` module) and
-  `encodeChunk` in one job. Edited chunks stay in memory for the life of the process.
+  `encodeChunk` in one job. A chunk whose generation fails goes to `server.onError` and is tried again after 250 ms,
+  then 500 ms; after 3 failures the players who need it are closed with 1011 and a reason naming the chunk. Edited
+  chunks stay in memory for the life of the process.
 - **Tick**, 20 per second: each player's queued movement steps and edits in the order they came, then each client's
   view, then one corked write per client: corrections, block changes in chunks it has, nearby players (within 96
   blocks, `EntityCodec` deltas against the last message), and up to 64 chunks or 128 KiB, nearest first.
