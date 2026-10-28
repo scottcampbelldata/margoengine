@@ -1,5 +1,5 @@
 {
-  "commit": "510dd229",
+  "commit": "c477b3bf",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1304,6 +1304,10 @@
       "./weather": {
         "raw": 14440,
         "gzip": 5670
+      },
+      "./sun": {
+        "raw": 4272,
+        "gzip": 1661
       }
     },
     "@margoengine/splats": {
