@@ -37,6 +37,10 @@
     "./koppen": {
       "types": "./dist/koppen.d.ts",
       "import": "./dist/koppen.js"
+    },
+    "./view": {
+      "types": "./dist/view.d.ts",
+      "import": "./dist/view.js"
     }
   },
   "files": [
@@ -47,12 +51,25 @@
   "publishConfig": {
     "access": "public"
   },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/terrain": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/core": {
+      "optional": true
+    },
+    "@margoengine/terrain": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js biomes",
     "test": "npm run build && node --test tests/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs"
   }
 }

@@ -226,6 +226,23 @@ export class BiomeWorld implements Disposable {
       throw fault('disposed', 'BiomeWorld is disposed; create a new one with BiomeWorld.create()', 'biomes');
   }
 
+  /**
+   * The region heights as a quick overview of the whole world: corner samples every `regionResolution` metres, in
+   * metres, rows of increasing z (`width` x `depth`). Views draw it while the 1 m tiles are made.
+   */
+  overview(): {
+    readonly width: number;
+    readonly depth: number;
+    readonly resolution: number;
+    readonly height: Float32Array;
+  } {
+    this.#live();
+    const r = this.#region,
+      height = new Float32Array(r.height.length);
+    for (let i = 0; i < height.length; i++) height[i] = r.height[i] / 1000;
+    return { width: r.nx, depth: r.nz, resolution: this.regionResolution, height };
+  }
+
   /** The climate settings in force, quantised. */
   get climate(): Climate {
     return this.#climate;

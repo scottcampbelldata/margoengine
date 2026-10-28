@@ -52,3 +52,21 @@ fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   if(frame.heights.w>0.5){return vec4f(linear,1);}
   let mapped=pbrNeutral(max(linear,vec3f(0)));return vec4f(select(mapped*12.92,1.055*pow(mapped,vec3f(1.0/2.4))-0.055,mapped>=vec3f(0.0031308)),1);
 }`;
+
+/**
+ * The fragment shader with `TerrainTextures.weights`: layer i's weight is channel i % 4 of weight texture i / 4,
+ * sampled bilinearly over the heightmap's bounds, in place of the height and slope rules (which still set each
+ * layer's texture scale). A function, so importing anything else from this package keeps no shader text.
+ */
+export const weightedFragment = (): string => /* wgsl */ `
+@group(0) @binding(6) var terrainWeightsA:texture_2d<f32>;
+@group(0) @binding(7) var terrainWeightsB:texture_2d<f32>;
+fn terrainWeight(layer:u32,p:vec3f)->f32 {
+  let d=vec2f(textureDimensions(terrainWeightsA));let uv=clamp((p.xz-frame.map.xy)/frame.map.zw,vec2f(0.5)/d,vec2f(1)-vec2f(0.5)/d);
+  let w=select(textureSampleLevel(terrainWeightsB,terrainSampler,uv,0),textureSampleLevel(terrainWeightsA,terrainSampler,uv,0),layer<4u);
+  return w[layer%4u];
+}
+${terrainFragment.replace(
+  `let weight=smoothstep(hs.x-h,hs.x+h,position.y)*(1-smoothstep(hs.y-h,hs.y+h,position.y))*smoothstep(hs.z-s,hs.z+s,slope)*(1-smoothstep(hs.w-s,hs.w+s,slope));`,
+  'let weight=terrainWeight(layer,position);',
+)}`;

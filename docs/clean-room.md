@@ -801,6 +801,7 @@ Gaea, World Machine, Houdini and the like) was read; facts about them come only 
 | Holdridge life zones | Holdridge, "Determination of world plant formations from simple climatic data", Science, 1947, and "Life Zone Ecology", 1967: belts at biotemperatures 1.5, 3, 6, 12 and 24 C, rainfall doubling from 62.5 mm, PET ratio 58.93 x biotemperature / rainfall; nearest hexagon centre in the log lattice (our computational form) |
 | Preset limits | Plant functional type screening by coldest month, GDD5 and a drought index after Prentice et al., Journal of Biogeography, 1992 (BIOME1) and Kaplan et al., Journal of Geophysical Research, 2003 (BIOME4); the per-preset numbers are our own, rounded from those background values |
 | Koppen labels | Beck et al., "Present and future Koppen-Geiger climate classification maps at 1-km resolution", Scientific Data, 2018, after Peel, Finlayson and McMahon 2007 (the 30-class rules); months from our sinusoidal year and rain-season regimes |
+| Terrain view and ground weights | Our own design: ground layer rules as Wendland bands like the envelopes, biome weights shared among ground layers and rounded to 255 by largest remainder, generated material textures from value noise with box-filtered mips; drawn through the terrain package's optional weights textures |
 
 ## Ragdolls: `@margoengine/ragdoll`
 

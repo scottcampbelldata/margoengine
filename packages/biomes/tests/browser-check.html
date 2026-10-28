@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Biomes browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/biomes/view: a biome world draws as terrain with its ground layer, and painting a
+// biome shows that biome's ground layer where it was painted.
+import {Engine} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {BiomeWorld} from '/packages/biomes/dist/index.js';
+import {presets} from '/packages/biomes/dist/presets.js';
+import {BiomeView} from '/packages/biomes/dist/view.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,160,40],target:[0,0,0],near:0.5,far:2000}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return {data,width:texture.width,height:texture.height};
+}
+async function shot(){for(let i=0;i<2;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}return read(post.sceneTexture);}
+// Mean linear colour of the central quarter of the frame.
+function mean({data,width,height}){let r=0,g=0,b=0,n=0;for(let y=height>>2;y<height*3>>2;y++)for(let x=width>>2;x<width*3>>2;x++){const k=(y*width+x)*4;r+=data[k];g+=data[k+1];b+=data[k+2];n++;}return [r/n,g/n,b/n];}
+window.check={
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const world=await BiomeWorld.create({size:[512,512],biomes:[presets.temperate,presets.desert],height:{field:(x,z)=>40+3*Math.sin(x/37)*Math.cos(z/41)},climate:{latitude:47,rainfall:1000}});
+  const view=await BiomeView.attach(engine,world,{radius:600});
+  await view.ready;
+  out.materials=view.materials;
+  out.before=mean(await shot());
+  const full=new Uint8Array(256*256).fill(255);
+  for(let z=0;z<2;z++)for(let x=0;x<2;x++)world.writeLayer('paint/desert',x,z,full);
+  await view.whenIdle();
+  out.after=mean(await shot());
+  // Clearing the paint brings the grass back.
+  for(let z=0;z<2;z++)for(let x=0;x<2;x++)world.writeLayer('paint/desert',x,z,undefined);
+  await view.whenIdle();
+  out.cleared=mean(await shot());
+  view.dispose();
+  out.afterDispose=mean(await shot());
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

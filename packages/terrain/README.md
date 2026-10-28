@@ -104,6 +104,13 @@ engine.start();
 
 The texture factory runs at attachment and after device restoration. Terrain owns and destroys returned textures; recreate them from retained asset data. Height maps support `r32float`, `rgba16float`, or `rgba8unorm` (R channel); optional normal maps support `rgba8unorm` or `rgba16float`, with XYZ encoded in 0..1. Without a normal map, the vertex shader samples neighboring heights. Layer arrays support `rgba8unorm-srgb`, `rgba8unorm`, or `rgba16float` and must contain exactly as many layers as the rules. Supply mipmaps for real assets. `heightScale`/`heightOffset` map samples to world Y; origin/size define XZ texture coverage. Heights clamp at map boundaries.
 
+Optional painted weights: return `weights: [a, b]` from the factory, two `rgba8unorm` 2D textures over the same
+bounds as the heightmap (pass the same texture twice for up to 4 layers). Layer i's weight is channel `i % 4` of texture
+`i / 4`, sampled bilinearly, and replaces the height and slope rules; each rule's `scale` still sets that layer's
+texture repeat. This is how `@margoengine/biomes/view` draws biome ground layers. Without `weights` the shader, bind
+group layout and draw calls are exactly as before (`examples/package-benchmarks/proofs/terrain-ssr.proof.js` checks the
+whole call sequence). Update the textures with `queue.writeTexture` and call `terrain.invalidate()`.
+
 Resolution is a multiple of four from 8-256; levels range from 1-12. The default is 64 cells and six rings, with doubled cell spacing per level. Geometry buffers are allocated once and reused as the camera moves. Layer slope is `1-normal.y` in 0..1; height is world Y. Rules blend smoothly around their thresholds and fall back to layer zero if none match. Terrain uses GGX directional lighting and the scene's reversed depth.
 
 `shadows.add(terrain,{static:true})` registers depth rendering and reception; moving clipmap origins invalidates its static shadow cache. `clustered.add(terrain)` adds local PBR lights. Call `terrain.invalidate()` after changing height texture contents. Raycasts/foot IK should use your retained height data or collision BVH; rendering performs no GPU height readback. The clipmap does not add physics or streaming. `dispose()`/`destroy()` releases textures and geometry. `clipmapGrid()` is exported for custom grid consumers.

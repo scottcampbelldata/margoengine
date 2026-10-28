@@ -156,6 +156,44 @@ console.log(KOPPEN[koppenClass({ temperature: 2700, coldest: 2600, warmest: 2800
 An optional view over the seasonal climate layers (Beck et al. 2018 rules, 30 classes), not a classifier: nothing
 depends on it and the root entry does not include it. Monthly rainfall follows the climate's `rainSeason`.
 
+## Drawing a world as terrain
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 140, 420], target: [0, 60, 0] } });
+const world = await BiomeWorld.create();
+const view = await BiomeView.attach(engine, world); // loads @margoengine/terrain on first use
+await view.ready; // the tiles around the camera are in at full detail
+engine.start();
+// Painting a biome redraws only the tiles it touches:
+world.writeLayer('paint/boreal', 8, 8, new Uint8Array(256 * 256).fill(255));
+await view.whenIdle();
+```
+
+`BiomeView.attach(engine, world, options)` builds a clipmap `Terrain` (`view.terrain`, so `shadows.add(view.terrain)`
+works) from the world: the region overview first, then 1 m tiles within `radius` of the camera, nearest first, written
+into the heightmap and into two ground-weight textures (the terrain's optional `weights`, one channel per material),
+and again for every rectangle `world.onChange` reports. Each biome shares its weight among its ground layers by their
+slope, height, moisture and curvature rules; `groundWeights(world, tile, materials)` is the same computation on the CPU
+(8 bytes per cell summing to 255). Materials are generated textures from `MATERIALS` (16 built-in looks, such as
+`grass`, `sand`, `rock`, `snow`; `materials` overrides or adds them). Up to 8 materials per world, the terrain's limit.
+`terrainColorsFor(world)` gives `TerrainColors` sand, meadow and stone colours for small scenes drawn as one mesh.
+
+| `BiomeView.attach` option | Default | Meaning |
+| --- | --- | --- |
+| `textureResolution` | 2 | metres per heightmap and weights texel, a multiple of the world resolution; raised to fit the device |
+| `radius` | 1,000 | tiles within this many metres of the camera are drawn at full detail |
+| `materials` | none | `{ key: { color: [r, g, b] (sRGB 0..1), detail? (0..1, default 0.25) } }` over `MATERIALS` |
+| `clipmap` | cell 1 m, 64 cells, 6 rings | `cellSize`, `resolution` and `levels` of the terrain |
+| `signal` | none | rejects `attach` and stops streaming |
+
+WebGPU only. Tiles are made on the page's thread for now (about 85 ms each; the worker pool is a later milestone),
+with a pause between tiles so frames keep drawing.
+
 ## Same seed, same bytes, everywhere
 
 Everything that decides the output is integer arithmetic: fixed-point values, integer square roots, CORDIC

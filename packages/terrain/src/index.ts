@@ -11,7 +11,7 @@ import { finiteVector } from '@margoengine/math/validate';
 import { margoError } from '../../shared/errors.js';
 import { MargoError } from '@margoengine/math/errors';
 import { clipmapGrid } from './grid.js';
-import { terrainVertex, terrainFragment } from './shader.js';
+import { terrainVertex, terrainFragment, weightedFragment } from './shader.js';
 import { applyView } from '../../shared/view-rect.js';
 export { clipmapGrid } from './grid.js';
 export { TerrainColors, type TerrainColorOptions } from './colors.js';
@@ -28,6 +28,13 @@ export interface TerrainTextures {
   normalmap?: GPUTexture;
   /** Layer colours, one array layer per `TerrainLayer`: `rgba8unorm-srgb`, `rgba8unorm` or `rgba16float`. */
   layers: GPUTexture;
+  /**
+   * Optional painted layer weights over the heightmap's bounds, two `rgba8unorm` 2D textures: layer i's weight is
+   * channel i % 4 of texture i / 4 (pass the same texture twice for 4 layers). When present they replace the height
+   * and slope rules (each rule's `scale` still sets its texture repeat), as `@margoengine/biomes/view` uses for biome
+   * ground layers. Without them the terrain shader and bindings are unchanged. Default: none.
+   */
+  weights?: readonly [GPUTexture, GPUTexture];
 }
 /** A splat rule: where layer i's texture shows. Rules blend smoothly around their bounds; layer 0 is the fallback. */
 export interface TerrainLayer {
@@ -209,7 +216,12 @@ export class Terrain implements EnginePlugin {
     this.device = engine.gpu;
     this.textures = this.options.textures(this.device);
     const t = this.textures;
-    for (const texture of [t.heightmap, t.layers, ...(t.normalmap ? [t.normalmap] : [])])
+    const weights = t.weights;
+    if (weights !== undefined && (!Array.isArray(weights) || weights.length !== 2))
+      throw new TypeError(
+        'Terrain weights must be two rgba8unorm 2D textures; pass the same texture twice for 4 layers',
+      );
+    for (const texture of [t.heightmap, t.layers, ...(t.normalmap ? [t.normalmap] : []), ...(weights ?? [])])
       if (texture.dimension !== '2d' || !(texture.usage & GPUTextureUsage.TEXTURE_BINDING) || texture.sampleCount !== 1)
         throw new TypeError('Terrain textures must be sampled 2D textures');
     if (
@@ -218,7 +230,8 @@ export class Terrain implements EnginePlugin {
       t.layers.depthOrArrayLayers !== this.options.layers.length ||
       !['rgba8unorm', 'rgba8unorm-srgb', 'rgba16float'].includes(t.layers.format) ||
       !['r32float', 'rgba16float', 'rgba8unorm'].includes(t.heightmap.format) ||
-      (t.normalmap && !['rgba8unorm', 'rgba16float'].includes(t.normalmap.format))
+      (t.normalmap && !['rgba8unorm', 'rgba16float'].includes(t.normalmap.format)) ||
+      (weights && weights.some((w) => w.format !== 'rgba8unorm' || w.depthOrArrayLayers !== 1))
     )
       throw new TypeError(
         'Invalid terrain texture format or layer count; use a layers array texture with one layer per terrain layer and a supported heightmap format.',
@@ -273,6 +286,12 @@ export class Terrain implements EnginePlugin {
         { binding: 3, visibility: fragment, texture: { viewDimension: '2d-array' } },
         { binding: 4, visibility: fragment, sampler: { type: 'filtering' } },
         { binding: 5, visibility: fragment, buffer: { type: 'read-only-storage' } },
+        ...(weights
+          ? [
+              { binding: 6, visibility: fragment, texture: {} },
+              { binding: 7, visibility: fragment, texture: {} },
+            ]
+          : []),
       ],
     });
     const resources = [
@@ -281,6 +300,7 @@ export class Terrain implements EnginePlugin {
       t.layers.createView({ dimension: '2d-array' }),
       this.sampler,
       { buffer: this.rules },
+      ...(weights ? weights.map((w) => w.createView()) : []),
     ];
     const group = (buffer: GPUBuffer) =>
       this.device!.createBindGroup({
@@ -388,7 +408,8 @@ export class Terrain implements EnginePlugin {
     let code =
       (r === undefined
         ? terrainVertex
-        : terrainVertex.replace('o.material=vec4f(0.9,0,1,1)', `o.material=vec4f(${r},0,1,1)`)) + terrainFragment;
+        : terrainVertex.replace('o.material=vec4f(0.9,0,1,1)', `o.material=vec4f(${r},0,1,1)`)) +
+      (this.textures?.weights ? weightedFragment() : terrainFragment);
     for (const effect of this.lighting) code = effect.shader(code, 1);
     return code;
   }
@@ -624,7 +645,9 @@ export class Terrain implements EnginePlugin {
   }
   private release(): void {
     for (const texture of new Set(
-      this.textures ? [this.textures.heightmap, this.textures.normalmap, this.textures.layers] : [],
+      this.textures
+        ? [this.textures.heightmap, this.textures.normalmap, this.textures.layers, ...(this.textures.weights ?? [])]
+        : [],
     ))
       texture?.destroy();
     for (const buffer of [this.vertex, this.center, this.ring, this.rules]) buffer?.destroy();
