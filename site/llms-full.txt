@@ -5767,12 +5767,14 @@ work today (run in a clone, or install local tarballs).
 A biome map turns a heightmap and a few climate settings into tiled layers: climate fields, biome weights and masks
 that terrain, scatter and a terrain editor read. This package is optional and tree-shakable and adds 0 bytes to core
 and the stage. It is built in milestones: this release has the integer foundation, climate fields, biome classification with
-presets, a terrain view and editor hooks; placement of trees, rocks and props comes next.
+presets, a terrain view, editor hooks and the placement of trees, shrubs, rocks and props; drawing them through
+scatter comes next.
 
 Entries, each loaded only when used: the root (`BiomeWorld`, fields, classification), `/presets` (eight biomes, their
 worlds and the reference world `R16`), `/relief` (the procedural landscape; `BiomeWorld.create` loads it only for a
 relief height, the default), `/digest` (canonical bytes and SHA-256, loaded by `world.digest`), `/zones` (Whittaker and
-Holdridge classifiers), `/koppen` (Koppen-Geiger labels), `/toolkit` (the integer helpers), `/view` and `/editor`. The
+Holdridge classifiers), `/koppen` (Koppen-Geiger labels), `/toolkit` (the integer helpers), `/placement` (stored objects), `/stats`
+(point-pattern statistics), `/view` and `/editor`. The
 lazily loaded ones come through the package name, so an app holds one copy of each module.
 
 ## A world in three lines

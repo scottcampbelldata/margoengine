@@ -66,10 +66,11 @@ interface ClimateEnvelope {
 }
 
 interface ClusterRule {
-    readonly kind: 'thomas' | 'matern';
+    readonly kind: 'thomas' | 'matern' | '2dt';
     readonly parents: number;
     readonly spread: number;
-    readonly offspring: number;
+    readonly offspring?: number;
+    readonly tail?: number;
 }
 
 interface ColorVariation {
