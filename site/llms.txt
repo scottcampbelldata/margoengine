@@ -89,6 +89,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 ## Packages: World and effects
 
 - [@margoengine/terrain](https://margoengine.com/llms/packages/terrain.md): Geometry clipmaps and triplanar terrain layers.
+- [@margoengine/biomes](https://margoengine.com/llms/packages/biomes.md): Biome maps from a heightmap and a few climate settings: integer fixed-point climate fields, biome classification with smooth ecotones, presets, terrain ground weights…
 - [@margoengine/voxel](https://margoengine.com/llms/packages/voxel.md): Voxel worlds: a block-type registry, 32-cubed palette chunks with light bytes, and a chunked world with dirty tracking and change events.
 - [@margoengine/voxel-pathtracer](https://margoengine.com/llms/packages/voxel-pathtracer.md): Progressive WebGPU path tracer for instanced voxel models: diffuse, plastic, metal, glass, emissive, blended and volumetric materials, sun, sky, HDR environment and…
 - [@margoengine/voxel-edit](https://margoengine.com/llms/packages/voxel-edit.md): Editing voxel models for editors and tools: dense and sparse grids, modeling operations, brushes and selections, picking, export meshing, .vox scene editing and frame…
@@ -203,6 +204,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 1 entry point
 - [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 1 entry point
 - [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 1 entry point
+- [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 1 entry point
 - [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 12 entry points
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 2 entry points
 - [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 11 entry points
