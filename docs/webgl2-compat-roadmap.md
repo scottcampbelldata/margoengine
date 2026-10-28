@@ -495,6 +495,14 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   resolve and upload of the draw (`features-browser.mjs`, regressions). (3) 4x multisampled integer textures made an
   incomplete framebuffer (ANGLE has no multisample integer renderbuffers): the device now refuses them with code
   `unsupported` when the context reports no 4-sample support for the format.
+- **Tonemap in forced compatibility (completes that part of M3).** `node scripts/modern-postfx-tests.js --compat`
+  (in `npm run test:gpu`) runs the tonemap half of the post-effects suite on the layer: the three tone curves, the
+  Khronos PBR Neutral reference within 2e-5, exposure in stops, contrast, the 3D LUT, the ACEScg white point, the
+  effects variant (white balance, vignette, grain, aberration), the adapted exposure read from a storage buffer,
+  Tonemap in an engine (resize, curve change, re-attach, device restore) and the tonemap demo. DOF, TAA and the
+  auto-exposure meter are compute passes and wait for M5; the native run is unchanged. The environment background
+  checks build their environments with compute (IBL), and the shadows check's scene is a skinned robot (skinning is
+  compute), so both wait for M5 too.
 - **Sizes (gzip, the sizes gate's method).** The root with `install()` loads 68,518 B: `/device` 68,303 B, `/glsl`
   42,017 B, `/wgsl` 26,528 B. Over the 60,000 B target by 8,518 B; nothing was cut. Browsers with WebGPU download none
   of it, and core + stage are unchanged.
