@@ -4,9 +4,27 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
-import { BlockTypes, VoxelWorld } from "@margoengine/voxel";
+import { BlockTypes, PackedChunk, VoxelWorld } from "@margoengine/voxel";
 import { NoiseTerrainOptions } from "@margoengine/voxel/generate";
 import { VoxelCharacter, VoxelCharacterOptions } from "@margoengine/voxel/query";
+
+export interface AcceptWebSocketOptions extends WebSocketOptions {
+    origins?: readonly string[] | '*';
+    admit?: (req: IncomingMessage) => readonly [status: string, message: string] | undefined;
+}
+
+export interface ConnectWebSocketOptions extends WebSocketOptions {
+    headers?: Record<string, string>;
+}
+
+export type VoxelAuthenticate = (req: IncomingMessage, hello: {
+    name: string;
+} | undefined) => boolean | string | Promise<boolean | string>;
+
+export interface VoxelEditStore {
+    save(key: string, chunk: PackedChunk): void | Promise<void>;
+    load(key: string): PackedChunk | undefined | Promise<PackedChunk | undefined>;
+}
 
 export class VoxelServer {
     readonly world: VoxelWorld;
@@ -17,10 +35,13 @@ export class VoxelServer {
     get players(): VoxelServerPlayer[];
     get counts(): {
         players: number;
+        pending: number;
+        pendingAddresses: number;
         worldChunks: number;
         cachedChunks: number;
         cacheBytes: number;
         editedChunks: number;
+        savingChunks: number;
         queuedJobs: number;
     };
     get tick(): number;
@@ -60,7 +81,14 @@ export interface VoxelServerOptions {
     editBurst?: number;
     spawn?: (id: number) => readonly [x: number, z: number];
     cacheBytes?: number;
-    origins?: readonly string[];
+    origins?: readonly string[] | '*';
+    maxPending?: number;
+    maxPerAddress?: number;
+    helloTimeout?: number;
+    authenticate?: VoxelAuthenticate;
+    authTimeout?: number;
+    maxEditedChunks?: number;
+    store?: VoxelEditStore;
     character?: VoxelCharacterOptions;
     allowEdit?: (player: VoxelServerPlayer, x: number, y: number, z: number, state: number, previous: number) => boolean;
 }
@@ -68,6 +96,7 @@ export interface VoxelServerOptions {
 export interface VoxelServerPlayer {
     readonly id: number;
     readonly name: string;
+    readonly identity: string | undefined;
     readonly character: VoxelCharacter;
     readonly spawned: boolean;
 }
@@ -94,11 +123,9 @@ export interface WebSocketOptions {
 
 export const acceptKey: (key: string) => string;
 
-export function acceptWebSocket(req: IncomingMessage, socket: Duplex, head: Buffer, options?: WebSocketOptions & {
-    origins?: readonly string[];
-}): WebSocketConnection | undefined;
+export function acceptWebSocket(req: IncomingMessage, socket: Duplex, head: Buffer, options?: AcceptWebSocketOptions): WebSocketConnection | undefined;
 
-export function connectWebSocket(url: string | URL, options?: WebSocketOptions): Promise<WebSocketConnection>;
+export function connectWebSocket(url: string | URL, options?: ConnectWebSocketOptions): Promise<WebSocketConnection>;
 
 // Not exported from this entry, but used by the exports above:
 

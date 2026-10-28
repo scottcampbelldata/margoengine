@@ -8020,7 +8020,7 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
   (default 256 MiB). Worker threads run the generator (`noiseTerrain` options, or your own `VoxelGenerate` module) and
   `encodeChunk` in one job. A chunk whose generation fails goes to `server.onError` and is tried again after 250 ms,
   then 500 ms; after 3 failures the players who need it are closed with 1011 and a reason naming the chunk. Edited
-  chunks stay in memory for the life of the process.
+  chunks stay in memory, up to `maxEditedChunks`; past it they go to your `store` (see below).
 - **Tick**, 20 per second: each player's queued movement steps and edits in the order they came, then each client's
   view, then one corked write per client: corrections, block changes in chunks it has, nearby players (within 96
   blocks, `EntityCodec` deltas against the last message), and up to 64 chunks or 128 KiB, nearest first.
@@ -8039,18 +8039,9 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
 - **Bots** (`./bot`): `VoxelBot.connect({url, blocks})` joins with the same client, walks, jumps, swims and edits;
   it decodes only the chunks within one chunk of itself.
 
-## Limits of the prototype
+## Connections, login and saved edits
 
-No accounts or login, no saving to disk, no mobs, chat or inventories, no TLS (put `wss://` behind a reverse proxy), one
-process per world. The server trusts nothing from clients but rate-limits only edits and inputs; it has no protection
-against many connections from one address.
-
-## Bench
-
-`npm run bench --workspace @margoengine/voxel-net` (after `npm run build --workspace @margoengine/voxel-net`) runs the
-capacity bench: a server process, bots in several processes joining at 25 per second, a wait until each has its whole
-view, then 30 s of measured play; counts rise until the 20 Hz budget breaks. Options: see the top of
-[bench/run.mjs](bench/run.mjs).
+Every limit has a safe default; set them on `new VoxelServer({...})`.
 
 [README continues: https://margoengine.com/llms/packages/voxel-net.md]
 
