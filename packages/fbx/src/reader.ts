@@ -1,4 +1,5 @@
 import { readResponse } from '../../shared/loading.js';
+import { hasTrailingData } from '../../shared/trailing-data.js';
 /** One FBX record: binary and ASCII files share this shape. Array payloads (`*N { a: ... }` in ASCII) are props[0] as a typed array. */
 export interface FBXNode {
   name: string;
@@ -32,6 +33,7 @@ async function inflate(data: Uint8Array, size: number): Promise<Uint8Array> {
     fail('compressed array is corrupt or longer than declared');
   }
   if (out.length !== size) fail('compressed array has the wrong length');
+  if (await hasTrailingData(data, 'deflate')) fail('compressed array has data after the end of its zlib stream');
   return out;
 }
 function binary(bytes: Uint8Array): Promise<FBXNode[]> {

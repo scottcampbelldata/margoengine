@@ -6,6 +6,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { type PackedChunk, stateError, VoxelChunk } from './chunk.js';
 import { VoxelWorld } from './world.js';
 import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js';
+import { hasTrailingData } from '../../shared/trailing-data.js';
 
 const CELLS = 32768,
   VERSION = 1,
@@ -119,7 +120,10 @@ export async function decodeChunk(bytes: Uint8Array): Promise<VoxelChunk> {
     throw r.fail(`has ${bytes.length} bytes, more than any chunk needs`);
   if (flags & DEFLATE) {
     streams('decodeChunk of deflated bytes');
-    body = await pipe(new DecompressionStream('deflate-raw'), body, MAX_BODY);
+    const deflated = body;
+    body = await pipe(new DecompressionStream('deflate-raw'), deflated, MAX_BODY);
+    if (await hasTrailingData(deflated, 'deflate-raw'))
+      throw new RangeError('Chunk data holds a damaged deflate-raw stream; pass the bytes encodeChunk returned');
   }
   r = new ByteReader(body, 'Chunk data', 'pass the bytes encodeChunk returned');
   const n = r.varint();

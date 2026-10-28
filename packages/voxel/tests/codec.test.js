@@ -178,6 +178,8 @@ test('malformed chunks throw RangeErrors: truncation at every byte, bad headers,
     oversized: new Uint8Array(300000).fill(1),
     'deflate garbage': Uint8Array.of(1, 4, 0xff, 0xff, 0xff),
     'deflate cut short': encodings[1].subarray(0, encodings[1].length - 3),
+    // Node 22's DecompressionStream accepts data after the stream's end; the codec must reject it there too (bug 39).
+    'deflate with data after its end': Uint8Array.of(...encodings[1], 0),
   };
   for (const [what, bytes] of Object.entries(bad))
     assert.equal(await clean(() => decodeChunk(bytes), subject), 'threw', what);

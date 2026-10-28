@@ -1,6 +1,7 @@
 import { LoaderError } from './types.js';
 import { throwIfAborted, toBytes, type BinaryInput } from './util.js';
 import { crc32 } from '../../shared/crc32.js';
+import { hasTrailingData } from '../../shared/trailing-data.js';
 
 const F = 'ZIP';
 
@@ -130,6 +131,8 @@ export async function inflate(
     throw new LoaderError(owner, 'zip', `${subject} has corrupt deflate data (${(error as Error)?.message ?? error})`);
   }
   if (length !== size) throw new LoaderError(owner, 'zip', `${subject} inflated to ${length} bytes, expected ${size}`);
+  if (await hasTrailingData(data, format))
+    throw new LoaderError(owner, 'zip', `${subject} has corrupt deflate data (data after the end of the stream)`);
   return output;
 }
 

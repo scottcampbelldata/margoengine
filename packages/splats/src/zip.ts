@@ -1,6 +1,7 @@
 // Minimal ZIP reader (stored and deflated entries) and stream helpers, written from the public ZIP file format
 // description (PKWARE APPNOTE). Inflate uses the platform's DecompressionStream.
 import { MargoError } from '@margoengine/math/errors';
+import { hasTrailingData } from '../../shared/trailing-data.js';
 
 /** Inflates `bytes` with the platform decompressor (`'gzip'` or raw `'deflate-raw'`). */
 export async function inflate(
@@ -29,6 +30,10 @@ export async function inflate(
       `The compressed data is damaged (${(cause as Error).message}); check that the file is complete.`,
     );
   }
+  if (await hasTrailingData(bytes, format))
+    throw new RangeError(
+      'The compressed data is damaged (data after the end of the stream); check that the file is complete.',
+    );
   const out = new Uint8Array(total);
   let at = 0;
   for (const part of parts) {

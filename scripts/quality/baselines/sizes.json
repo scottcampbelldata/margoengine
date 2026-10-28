@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3624162,
+  "total": 3626663,
   "history": [
     {
       "date": "2026-10-24",
@@ -650,6 +650,12 @@
       "commit": "5c8e1090",
       "reason": "webgl2-compat: new /wgsl entry, the WGSL front end of the compatibility layer (milestone M1); the root entry is unchanged and never imports it",
       "grew": 1
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "b92998d6",
+      "reason": "bug 39: deflate readers reject data after the end of the stream on Node 22, whose DecompressionStream accepts it (packages/shared/trailing-data.js, about 160 bytes gzip)",
+      "grew": 6
     }
   ],
   "items": {
@@ -789,14 +795,14 @@
     "@margoengine/lightmap/refracted": 7846,
     "@margoengine/lines": 18511,
     "@margoengine/loaders": 52602,
-    "@margoengine/loaders dist/workers/usd.js": 8035,
-    "@margoengine/loaders/common": 2999,
+    "@margoengine/loaders dist/workers/usd.js": 8439,
+    "@margoengine/loaders/common": 3423,
     "@margoengine/loaders/font": 6590,
     "@margoengine/loaders/mtl": 7554,
     "@margoengine/loaders/render": 3148,
     "@margoengine/loaders/svg": 11643,
-    "@margoengine/loaders/usd": 7385,
-    "@margoengine/loaders/worker": 8181,
+    "@margoengine/loaders/usd": 7783,
+    "@margoengine/loaders/worker": 8576,
     "@margoengine/lod": 10648,
     "@margoengine/machinery": 44630,
     "@margoengine/machinery dist/workers/cad-runtime.js": 8347,
@@ -996,7 +1002,7 @@
     "@margoengine/voxel-pathtracer": 80311,
     "@margoengine/voxel-pathtracer/studio": 1313,
     "@margoengine/voxel/bevel": 2457,
-    "@margoengine/voxel/codec": 8959,
+    "@margoengine/voxel/codec": 9416,
     "@margoengine/voxel/generate": 4442,
     "@margoengine/voxel/light": 8692,
     "@margoengine/voxel/lightmap": 2762,
@@ -1004,7 +1010,7 @@
     "@margoengine/voxel/physics": 10257,
     "@margoengine/voxel/query": 3821,
     "@margoengine/voxel/render": 23305,
-    "@margoengine/voxel/stream": 12985,
+    "@margoengine/voxel/stream": 13408,
     "@margoengine/voxel/vox": 12969,
     "@margoengine/water": 19258,
     "@margoengine/webgl": 3277,

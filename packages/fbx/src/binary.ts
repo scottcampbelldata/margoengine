@@ -1,4 +1,5 @@
 import { margoError } from '../../shared/errors.js';
+import { hasTrailingData } from '../../shared/trailing-data.js';
 import { invalid, type ParseBudget } from './document.js';
 import type { FBXNode, FBXValue } from './document.js';
 
@@ -69,6 +70,7 @@ export async function parseBinary(
         offset += value.length;
       }
       if (offset !== length) invalid('deflate output differs from declared array size');
+      if (await hasTrailingData(chunk, 'deflate')) invalid('deflate stream has data after its end');
       return output;
     } catch (error) {
       void reader.cancel(error).catch(() => {});

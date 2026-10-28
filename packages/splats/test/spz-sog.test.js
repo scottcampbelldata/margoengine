@@ -144,13 +144,13 @@ function unzip(bytes) {
   return files;
 }
 
-/** Writes a ZIP with every entry stored (method 0) or deflated (method 8). */
-function zip(files, method) {
+/** Writes a ZIP with every entry stored (method 0) or deflated (method 8), `after` appended to each deflated body. */
+function zip(files, method, after = []) {
   const parts = [],
     central = [];
   let offset = 0;
   for (const [name, data] of Object.entries(files)) {
-    const body = method === 8 ? deflateRawSync(data) : data,
+    const body = method === 8 ? Buffer.concat([deflateRawSync(data), Buffer.from(after)]) : data,
       nameBytes = Buffer.from(name),
       head = Buffer.alloc(30);
     head.writeUInt32LE(0x04034b50, 0);
@@ -190,6 +190,12 @@ test('parseSog reads loose files and stored or deflated archives to the same res
   assert.ok(files['meta.json'] && files['means_l.webp'] && files['shN_labels.webp']);
   for (const splats of [await parseSog(files), await parseSog(zip(files, 0)), await parseSog(buffer(zip(files, 8)))])
     assert.deepEqual(difference(splats, expected), { positions: 0, covariances: 0, colors: 0, sphericalHarmonics: 0 });
+});
+
+// Node 22's DecompressionStream accepts data after the end of a deflate-raw stream; parseSog must reject such an
+// archive on every runtime, as browsers and Node 24 do (bug 39).
+test('parseSog rejects a deflated entry with data after the end of its stream', async () => {
+  await assert.rejects(parseSog(zip(unzip(fixture('raccoon.sog')), 8, [0])), /compressed data is damaged/);
 });
 
 test('parseSog rejects what it cannot read with the fix in the message', async () => {

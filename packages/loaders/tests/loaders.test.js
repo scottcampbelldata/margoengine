@@ -988,7 +988,8 @@ function writeZip(entries) {
   let offset = 0;
   for (const entry of entries) {
     const data = typeof entry.data === 'string' ? text(entry.data) : entry.data;
-    const stored = entry.method === 8 ? deflateRawSync(data) : entry.method === 0 ? data : entry.payload;
+    const deflated = entry.method === 8 ? deflateRawSync(data) : entry.method === 0 ? data : entry.payload,
+      stored = entry.after ? Uint8Array.of(...deflated, ...entry.after) : deflated;
     const name = text(entry.name),
       crc = entry.crc ?? crcReference(data),
       size = entry.size ?? data.length;
@@ -1037,6 +1038,16 @@ function writeZip(entries) {
   }
   return out;
 }
+
+// Node 22's DecompressionStream accepts data after the end of a deflate-raw stream; the reader must reject it on every
+// runtime, as browsers and Node 24 do (bug 39).
+test('ZIP: a deflated entry with data after the end of its stream is corrupt', async () => {
+  const archive = writeZip([{ name: 'deflated', data: 'hello'.repeat(100), method: 8, after: [0, 1, 2] }]);
+  const [entry] = readZipDirectory(archive);
+  await rejectsAsync(readZipEntry(archive, entry), 'zip', /corrupt deflate data/);
+  const clean = writeZip([{ name: 'deflated', data: 'hello'.repeat(100), method: 8 }]);
+  assert.equal(new TextDecoder().decode(await readZipEntry(clean, readZipDirectory(clean)[0])), 'hello'.repeat(100));
+});
 
 test('ZIP: pre-aborted reads stop before decompression and invalid limits cannot bypass budgets', async () => {
   const archive = writeZip([
