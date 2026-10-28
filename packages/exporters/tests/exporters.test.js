@@ -1070,23 +1070,31 @@ test('numbers are written as the shortest text that reads back as the same Float
       material: { color: [0.2, 0.4, 0.6, 1] },
     }));
   // Timed against the old digit-by-digit search over the numbers the mesh lines hold, on the same machine and load: the
-  // old export ran that search and more.
+  // old export ran that search and more. The two jobs take turns, nine rounds each, and each keeps its best round: timed
+  // one after the other (three of one, then three of the other), a burst of load from the rest of an eight-way verify
+  // fell on the export alone and it failed at 66.9 against 64.4 ms (2026-10-28); alone it is about 20 against 48 ms.
   const text = new TextDecoder().decode(exportUSDZ({ nodes })),
     numbers = text
       .split('\n')
       .filter((l) => /points =|normals =|primvars:st =/.test(l))
       .flatMap((l) => l.match(/-?[\d.]+(?:e[-+]?\d+)?/g).map(Number)),
-    best = (job) => {
-      let ms = Infinity;
-      for (let i = 0; i < 3; i++) {
-        const start = performance.now();
-        job();
-        ms = Math.min(ms, performance.now() - start);
-      }
-      return ms;
-    },
-    usdz = best(() => exportUSDZ({ nodes })),
-    search = best(() => numbers.forEach(reference));
+    time = (job) => {
+      const start = performance.now();
+      job();
+      return performance.now() - start;
+    };
+  let usdz = Infinity,
+    search = Infinity;
+  for (let round = 0; round < 9; round++) {
+    usdz = Math.min(
+      usdz,
+      time(() => exportUSDZ({ nodes })),
+    );
+    search = Math.min(
+      search,
+      time(() => numbers.forEach(reference)),
+    );
+  }
   assert.ok(numbers.length > 140_000, `${numbers.length} numbers`);
   assert.ok(
     usdz < search,
