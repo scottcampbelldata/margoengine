@@ -48,11 +48,15 @@ test('a server that cannot listen fails, even while another one answers on its p
 });
 
 test('a server that prints no URL in time fails, naming it, with its output', async () => {
-  const child = node(`console.log('starting'); setInterval(() => {}, 1000);`);
+  // The limit starts when the child is running, not when node has loaded: on a busy machine (the whole test suite runs
+  // eight at a time) a child that took over 300 ms to start had printed nothing yet when the limit passed, and this
+  // test failed on its "starting" (2026-10-27). It prints on a timer and the limit starts after its first line.
+  const child = node(`setInterval(() => console.log('starting'), 20);`);
   try {
+    await new Promise((resolve) => child.stdout.once('data', resolve));
     await assert.rejects(
-      serverUrl(child, { pattern, name: 'quiet server', ms: 300 }),
-      /quiet server printed no URL within 0 s:\nstarting/,
+      serverUrl(child, { pattern, name: 'quiet server', ms: 1000 }),
+      /quiet server printed no URL within 1 s:\nstarting/,
     );
   } finally {
     child.kill();
