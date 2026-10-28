@@ -129,6 +129,8 @@ export abstract class Room<State = unknown> {
   private ids = new WeakMap<RoomClient, number>();
   private nextId = 1;
   /** @internal */ onEmpty: (() => void) | null = null;
+  /** @internal Where errors thrown by this room's hooks and handlers go (its RoomServer's `onerror`). */
+  report: (error: unknown) => void = (error) => console.error(error);
 
   /** The synced state (set it with {@link Room.setState}). */
   get state(): State {
@@ -212,21 +214,29 @@ export abstract class Room<State = unknown> {
     this.disconnect();
   }
 
-  /** Called once when the room is made, with the creating client's options. */
+  /**
+   * Called once when the room is made, with the creating client's options. Clients see the room only after it
+   * resolves; if it throws, the room is disposed (`onDispose` runs) and the creating client is closed with
+   * `CloseCode.error`.
+   */
   onCreate(_options: RoomOptions): void | Promise<void> {}
   /** Return false (or throw) to refuse `client`; what it returns is kept as `client.auth`. */
   onAuth(_client: RoomClient, _options: RoomOptions): unknown {
     return true;
   }
-  /** Called when `client` has joined. */
+  /** Called when `client` has joined. If it throws, the client is closed with `CloseCode.error` and `onLeave` runs. */
   onJoin(_client: RoomClient, _options: RoomOptions): void | Promise<void> {}
   /** Called when `client` left: `consented` is true when it called `leave()` itself. */
   onLeave(_client: RoomClient, _consented: boolean): void | Promise<void> {}
   /** Called once when the room is disposed. */
   onDispose(): void | Promise<void> {}
 
-  /** @internal */
-  async admit(connection: Connection, sessionId: string, options: RoomOptions): Promise<RoomClient | undefined> {
+  /** @internal Seats a client: 'joined', 'refused' (by onAuth, or the room is full or gone) or 'failed' (onJoin threw). */
+  async admit(
+    connection: Connection,
+    sessionId: string,
+    options: RoomOptions,
+  ): Promise<'joined' | 'refused' | 'failed'> {
     const client = new RoomClient(sessionId, connection, this.maxMessageBytes);
     let auth: unknown;
     try {
@@ -234,24 +244,38 @@ export abstract class Room<State = unknown> {
     } catch {
       auth = false;
     }
-    if (auth === false || auth === undefined || auth === null || this.disposed || this.locked) return undefined;
+    if (auth === false || auth === undefined || auth === null || this.disposed || this.locked) return 'refused';
     client.auth = auth;
     this.ids.set(client, this.nextId++);
     this.clients.push(client);
     connection.onmessage = (data) => this.receive(client, data);
-    connection.onclose = (code) => void this.drop(client, code === CloseCode.normal);
+    connection.onclose = (code) => {
+      this.drop(client, code === CloseCode.normal).catch((error) => this.report(error));
+    };
     const w = new Writer(64);
     w.u8(JOINED);
     text(w, this.roomId);
     text(w, sessionId);
     w.u32((this.schema as UntypedSchema).hash);
     connection.send(w.done(), 'reliable');
-    await this.onJoin(client, options);
-    this.patch();
-    return client;
+    try {
+      await this.onJoin(client, options);
+      this.patch();
+    } catch (error) {
+      this.fail(client, error, 'onJoin failed');
+      return 'failed';
+    }
+    return 'joined';
+  }
+
+  /** Reports `error` and closes `client` with CloseCode.error (its `onLeave` then runs). */
+  private fail(client: RoomClient, error: unknown, reason: string): void {
+    this.report(error);
+    client.connection.close(CloseCode.error, reason);
   }
 
   private receive(client: RoomClient, data: Uint8Array): void {
+    let handler: ((client: RoomClient, message: unknown) => void) | undefined, message: unknown;
     try {
       if (data.length > this.maxMessageBytes)
         throw new RangeError('Room message is over maxMessageBytes; send smaller messages or raise the limit');
@@ -259,15 +283,24 @@ export abstract class Room<State = unknown> {
       const kind = r.u8();
       if (kind === LEAVE) return client.connection.close(CloseCode.normal, 'left');
       if (kind !== SEND) throw r.fail(`has kind ${kind}, not a message`);
-      const type = readText(r, 256),
-        message = JSON.parse(readText(r, this.maxMessageBytes));
+      const type = readText(r, 256);
+      message = JSON.parse(readText(r, this.maxMessageBytes));
       r.end();
-      const handler = this.handlers.get(type) ?? this.handlers.get('*');
-      if (!handler) return;
-      handler(client, message);
+      handler = this.handlers.get(type) ?? this.handlers.get('*');
     } catch (error) {
-      if (!(error instanceof RangeError || error instanceof SyntaxError || error instanceof TypeError)) throw error;
-      client.connection.close(CloseCode.protocol, error.message.slice(0, 120));
+      // Bytes that do not decode are the client's fault; anything else here is the server's.
+      if (error instanceof RangeError || error instanceof SyntaxError || error instanceof TypeError)
+        return client.connection.close(CloseCode.protocol, error.message);
+      return this.fail(client, error, 'room error');
+    }
+    if (!handler) return;
+    // A handler that throws, or returns a promise that rejects, is reported and its client closed: the error never
+    // escapes into the transport's receive callback or becomes an unhandled rejection.
+    try {
+      const result = handler(client, message) as unknown;
+      if (result instanceof Promise) result.catch((error) => this.fail(client, error, 'message handler failed'));
+    } catch (error) {
+      this.fail(client, error, 'message handler failed');
     }
   }
 
@@ -276,8 +309,11 @@ export abstract class Room<State = unknown> {
     if (i < 0) return;
     this.clients.splice(i, 1);
     this.sent.delete(client);
-    await this.onLeave(client, consented);
-    if (!this.clients.length && this.autoDispose) this.release();
+    try {
+      await this.onLeave(client, consented);
+    } finally {
+      if (!this.clients.length && this.autoDispose) this.release();
+    }
   }
 
   /** @internal */
@@ -286,8 +322,13 @@ export abstract class Room<State = unknown> {
     this.disposed = true;
     if (this.patchTimer !== undefined) clearInterval(this.patchTimer);
     if (this.simulationTimer !== undefined) clearInterval(this.simulationTimer);
-    void this.onDispose();
     this.onEmpty?.();
+    try {
+      const done = this.onDispose();
+      if (done instanceof Promise) done.catch((error) => this.report(error));
+    } catch (error) {
+      this.report(error);
+    }
   }
 }
 
@@ -310,12 +351,26 @@ export type RoomClass = new () => Room<unknown>;
 export class RoomServer {
   private readonly classes = new Map<string, { Class: RoomClass; defaults: RoomOptions }>();
   private readonly live = new Map<string, Room>();
+  /** Rooms whose onCreate is still running: not joinable yet, but joins for them wait for it. */
+  private readonly creating = new Map<Room, Promise<void>>();
   private sessions = 0;
   private closed = false;
+
+  /**
+   * Called with each error a room hook (`onCreate`, `onJoin`, `onLeave`, `onDispose`) or message handler threw, and
+   * the room (undefined when its `onCreate` threw). The client concerned is closed with `CloseCode.error`; the
+   * server keeps running. Default: `console.error`.
+   */
+  onerror: ((error: unknown, room: Room | undefined) => void) | null = null;
 
   /** Every live room. */
   get rooms(): Room[] {
     return [...this.live.values()];
+  }
+
+  private report(error: unknown, room: Room | undefined): void {
+    if (this.onerror) this.onerror(error, room);
+    else console.error(error);
   }
 
   /**
@@ -328,28 +383,51 @@ export class RoomServer {
     return this;
   }
 
-  /** Creates a room named `name` now, without a client. */
+  /**
+   * Creates a room named `name` now, without a client. The room is listed and joinable once its `onCreate` resolved;
+   * when `onCreate` throws, the room is disposed and the promise rejects with that error.
+   * @throws MargoError `failed` for an undefined name, `disposed` once the server is closed.
+   */
   async create(name: string, options: RoomOptions = {}): Promise<Room> {
     const definition = this.classes.get(name);
     if (!definition) throw fault('failed', `No room named '${name}' is defined; call define('${name}', RoomClass)`);
+    if (this.closed) throw fault('disposed', 'RoomServer is closed; create a new RoomServer');
     const room = new definition.Class();
     room.roomName = name;
     room.roomId = randomId();
+    room.report = (error) => this.report(error, room);
+    const ready = (async () => room.onCreate({ ...definition.defaults, ...options }))();
+    this.creating.set(room, ready);
+    try {
+      await ready;
+    } catch (error) {
+      room.release();
+      throw error;
+    } finally {
+      this.creating.delete(room);
+    }
+    if (this.closed) {
+      room.release();
+      throw fault('disposed', 'RoomServer closed while the room was being created; create a new RoomServer');
+    }
     room.onEmpty = () => this.live.delete(room.roomId);
     this.live.set(room.roomId, room);
-    await room.onCreate({ ...definition.defaults, ...options });
     return room;
   }
 
   /**
-   * Takes a new client connection; its first message (a join) picks or creates the room.
+   * Takes a new client connection; its first message (a join) picks or creates the room. When a room hook throws
+   * during the join, `onerror` gets the error and the connection closes with `CloseCode.error`.
    * @throws MargoError `disposed` once closed.
    */
   accept(connection: Connection): void {
     if (this.closed) throw fault('disposed', 'RoomServer is closed; create a new RoomServer');
     connection.onmessage = (data) => {
       connection.onmessage = null;
-      void this.join(connection, data);
+      this.join(connection, data).catch((error) => {
+        this.report(error, undefined);
+        connection.close(CloseCode.error, 'room error');
+      });
     };
   }
 
@@ -377,16 +455,34 @@ export class RoomServer {
       options = parsed;
     } catch (error) {
       if (!(error instanceof RangeError || error instanceof SyntaxError || error instanceof TypeError)) throw error;
-      return connection.close(CloseCode.protocol, (error as Error).message.slice(0, 120));
+      return connection.close(CloseCode.protocol, (error as Error).message);
     }
     if (!this.classes.has(name) && method !== 'joinById') return this.refuse(connection, `no room named '${name}'`);
-    let room: Room | undefined;
-    if (method === 'joinById') room = this.live.get(roomId);
-    else if (method !== 'create') room = [...this.live.values()].find((r) => r.roomName === name && !r.locked);
+    const find = (): Room | undefined =>
+      method === 'joinById'
+        ? this.live.get(roomId)
+        : [...this.live.values()].find((r) => r.roomName === name && !r.locked);
+    let room = method === 'create' ? undefined : find();
+    if (!room && method !== 'create') {
+      // A matching room still in its onCreate is not joinable yet: wait for it, then look again. Its own creator
+      // handles (and reports) a failed onCreate.
+      const waits = [...this.creating]
+        .filter(([r]) => (method === 'joinById' ? r.roomId === roomId : r.roomName === name))
+        .map(([, ready]) =>
+          ready.then(
+            () => {},
+            () => {},
+          ),
+        );
+      if (waits.length) {
+        await Promise.all(waits);
+        room = find();
+      }
+    }
     if (!room && (method === 'create' || method === 'joinOrCreate')) room = await this.create(name, options);
     if (!room) return this.refuse(connection, method === 'joinById' ? `no room '${roomId}'` : `no open '${name}' room`);
-    const client = await room.admit(connection, `${randomId()}${(++this.sessions).toString(36)}`, options);
-    if (!client) {
+    const result = await room.admit(connection, `${randomId()}${(++this.sessions).toString(36)}`, options);
+    if (result === 'refused') {
       this.refuse(connection, 'the room refused the join');
       if (!room.clients.length && room.autoDispose) room.release();
     }

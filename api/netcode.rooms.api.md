@@ -38,6 +38,7 @@ export abstract class Room<State = unknown> {
     roomName: string;
     readonly clients: RoomClient[];
     onEmpty: (() => void) | null;
+    report: (error: unknown) => void;
     get state(): State;
     get locked(): boolean;
     idOf(client: RoomClient): number;
@@ -58,7 +59,7 @@ export abstract class Room<State = unknown> {
     onJoin(_client: RoomClient, _options: RoomOptions): void | Promise<void>;
     onLeave(_client: RoomClient, _consented: boolean): void | Promise<void>;
     onDispose(): void | Promise<void>;
-    admit(connection: Connection, sessionId: string, options: RoomOptions): Promise<RoomClient | undefined>;
+    admit(connection: Connection, sessionId: string, options: RoomOptions): Promise<'joined' | 'refused' | 'failed'>;
     release(): void;
 }
 
@@ -78,6 +79,7 @@ export class RoomClient {
 export type RoomOptions = Record<string, unknown>;
 
 export class RoomServer {
+    onerror: ((error: unknown, room: Room | undefined) => void) | null;
     get rooms(): Room[];
     define(name: string, Class: RoomClass, defaults?: RoomOptions): this;
     create(name: string, options?: RoomOptions): Promise<Room>;

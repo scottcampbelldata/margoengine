@@ -22,6 +22,7 @@ export const CloseCode: {
     readonly full: 4004;
     readonly removed: 4005;
     readonly timeout: 4006;
+    readonly error: 4007;
 };
 
 export interface Connection {

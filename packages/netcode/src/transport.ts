@@ -25,6 +25,8 @@ export const CloseCode = {
   removed: 4005,
   /** The peer stopped answering. */
   timeout: 4006,
+  /** The server failed while handling this connection (a room hook or message handler threw). */
+  error: 4007,
 } as const;
 
 const encoder = new TextEncoder(),

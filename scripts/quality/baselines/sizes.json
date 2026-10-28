@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3849698,
+  "total": 3850068,
   "history": [
     {
       "date": "2026-10-24",
@@ -665,20 +665,26 @@
     },
     {
       "date": "2026-10-28",
-      "commit": "b92998d6",
-      "reason": "webgl2-compat milestone M2: GLSL ES 3.00 back end (/glsl) and the WebGPU-shaped device on WebGL2 (/device); the root's install() loads them by import(), its static part stays the probe",
-      "grew": 3
-    },
-    {
-      "date": "2026-10-28",
       "commit": "e1e56c4a",
       "reason": "New package @margoengine/biomes (item 27.4, B0): fixed-point maths, hashes, noise, relief and R16; spec budget 16 kB for the finished root",
       "grew": 1
     },
     {
       "date": "2026-10-28",
+      "commit": "b92998d6",
+      "reason": "webgl2-compat milestone M2: GLSL ES 3.00 back end (/glsl) and the WebGPU-shaped device on WebGL2 (/device); the root's install() loads them by import(), its static part stays the probe",
+      "grew": 3
+    },
+    {
+      "date": "2026-10-28",
       "commit": "5f6b4344",
       "reason": "@margoengine/biomes B1 (item 27.4): climate fields (region grid, Priority-Flood, rain march, exposure, distance transform; per-cell lapse, seasons, treeline, Hargreaves PET, Fu-Budyko, soil); spec root budget 16 kB",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "e4a2e5d0",
+      "reason": "bug 46: loadOBJ checks mtllib and texture URLs with the shared asset URL policy, keeps init on the OBJ origin and budgets the material libraries (security fix, +376 B in loaders/mtl)",
       "grew": 1
     },
     {
@@ -707,8 +713,8 @@
     },
     {
       "date": "2026-10-28",
-      "commit": "e4a2e5d0",
-      "reason": "bug 46: loadOBJ checks mtllib and texture URLs with the shared asset URL policy, keeps init on the OBJ origin and budgets the material libraries (security fix, +376 B in loaders/mtl)",
+      "commit": "79686932",
+      "reason": "bug 48: rooms wait for onCreate before a room is joinable and report throwing hooks and handlers through RoomServer.onerror, closing the client with CloseCode.error (correctness fix, +114 B in netcode/rooms)",
       "grew": 1
     }
   ],
@@ -917,7 +923,7 @@
     "@margoengine/netcode/generate": 5154,
     "@margoengine/netcode/node": 6102,
     "@margoengine/netcode/rollback": 3471,
-    "@margoengine/netcode/rooms": 4418,
+    "@margoengine/netcode/rooms": 4788,
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/oit": 3199,

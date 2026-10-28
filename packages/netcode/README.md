@@ -247,7 +247,10 @@ matches clients into them (`joinOrCreate`, `create`, `join`, `joinById`); and a 
 `state`, `onStateChange`, `onMessage`, `send`, `leave` and `states()` (an async iterator). Written from public
 descriptions of that API shape, not from any library's source. The state is a schema struct sent in full once, then as
 deltas at the patch rate (default every 50 ms); messages are JSON with a size limit (default 4096 bytes), and anything
-malformed closes the connection.
+malformed closes the connection. A room is listed and joinable only once its `onCreate` resolved (joins that arrive
+meanwhile wait for it). When `onCreate`, `onJoin`, `onLeave`, `onDispose` or a message handler throws (or its promise
+rejects), the client concerned is closed with `CloseCode.error`, the error goes to `rooms.onerror(error, room)`
+(default `console.error`) and the server keeps running; a room whose `onCreate` threw is disposed.
 
 ```ts
 import { defineSchema, LoopbackNetwork } from '@margoengine/netcode';
