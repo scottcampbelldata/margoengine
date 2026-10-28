@@ -182,6 +182,60 @@ engine.start();
 - **Normalized time.** `animator.normalizedTime` is the time in the current state over its cycle (its longest clip): 0 on entry, 1 after one cycle, 2.5 halfway through the third. `exitTime` and events measure the same way.
 - **Events.** `options.events` lists `{state, time, name, data}` moments, `time` from 0 to 1 in the state's cycle. Each fires once per cycle it is passed, loops and long frames included (a 3-cycle frame fires it three times); an event at 0 fires on entering the state. With `Animation.options.loop` false each fires once. Paused (`playing = false`) nothing passes. `animator.on('event' | 'statechange', listener)` returns its unsubscribe function; `statechange` reports `{from, to, duration}` for rules and for `transition()`.
 
+## State graph as data (`margoengine/animator/graph`)
+
+`AnimatorGraph` is the same state machine written as plain data, as in the animator controllers of the big engines:
+typed parameters, transitions whose conditions compare them, crossfades, interruption rules and events. The document
+holds no functions, so a tool can save it as JSON and load it back. It is a separate entry, so an app that writes its
+own `when` predicates does not bundle it.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Animation } from 'margoengine/animation';
+import { AnimatorGraph, type AnimatorGraphDocument } from 'margoengine/animator/graph';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
+const model = await loadGLTF(engine, '/hero.glb'); // clips named Idle, Walk, Run, Jump, Land
+const locomotion: AnimatorGraphDocument = {
+  parameters: { speed: 'float', grounded: { type: 'bool', default: true }, weapon: 'int', jump: 'trigger' },
+  initial: 'move',
+  states: {
+    move: { parameter: 'speed', samples: [{ value: 0, clip: 'Idle' }, { value: 1, clip: 'Walk' }, { value: 3, clip: 'Run' }] },
+    jump: 'Jump',
+    land: 'Land',
+  },
+  transitions: [
+    { from: 'move', to: 'jump', conditions: [['jump'], ['grounded']], duration: 0.05 },
+    { from: 'jump', to: 'land', conditions: [['grounded', '==', true]], exitTime: 0.5, interruptible: false, duration: 0.2 },
+    { from: 'land', to: 'move', exitTime: 0.9, duration: 0.2 },
+  ],
+  events: [{ state: 'land', time: 0, name: 'thud' }],
+};
+const graph = AnimatorGraph.attach(Animation.attach(model), locomotion);
+graph.on('event', (e) => console.log(e.name));
+graph.set('speed', 2.2);
+addEventListener('keydown', (e) => {
+  if (e.code === 'Space') graph.trigger('jump');
+});
+engine.start();
+```
+
+| Part | Meaning |
+| --- | --- |
+| `parameters` | `'float'`, `'int'`, `'bool'` or `'trigger'`, or `{type, default}` (default 0 or false). Floats and ints are the blend parameters the states' blend trees read; a blend tree may only read those. |
+| `conditions` | All must hold. `[bool]` or `[trigger]`; `[bool, '==' or '!=', true or false]`; `[float or int, '>' '>=' '<' '<=' '==' '!=', number]`. Unknown names, comparisons and types throw a `TypeError` when the graph is built. |
+| `exitTime` | The source state's normalized time from which the transition may be taken, as for the Animator. A transition needs conditions, an `exitTime` or both. |
+| `duration` | Crossfade seconds, default 0.15. |
+| `interruptible` | Default true: during the crossfade another transition may cut in, from the blended pose. `false` holds every transition until the crossfade ends. |
+| `from: '*'` | Any state but `to`. |
+
+`set(name, value)` takes a value of the parameter's type (a `RangeError` for a non-integer int or a non-finite
+number, a `TypeError` for a wrong type); `get(name)` reads it. `trigger(name)` sets a trigger until a transition that
+lists it is taken (which clears it) or `resetTrigger(name)`. `graph.state` is the current state, `graph.on` subscribes
+to `'event'` and `'statechange'`, and `graph.animator` is the underlying Animator, so layers, foot IK, CCD chains and
+root motion work on it. `dispose()` (or `using`) removes the Animator.
+
 ## Override layers
 
 `addLayer({clip, weight, mask, blend: 'override'})` blends the masked bones toward the clip's pose by `weight` (an upper-body wave or aim over a walk), where the default `blend: 'additive'` adds the clip's difference from its reference pose. `time` (seconds, read every frame) plays a layer on its own clock; by default a layer follows the state's time. `weight` and `time` may change every frame, for example from `@margoengine/tween`.

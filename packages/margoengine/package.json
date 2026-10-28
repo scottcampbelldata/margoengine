@@ -63,6 +63,10 @@
       "types": "./dist/animator.d.ts",
       "import": "./dist/animator.js"
     },
+    "./animator/graph": {
+      "types": "./dist/animator/graph.d.ts",
+      "import": "./dist/animator/graph.js"
+    },
     "./audio": {
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"

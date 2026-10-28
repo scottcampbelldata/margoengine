@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3864394,
+  "total": 3872684,
   "history": [
     {
       "date": "2026-10-24",
@@ -734,6 +734,12 @@
       "commit": "ebef8fd9",
       "reason": "bug 42 a, d: allowedURLs match on a path-segment boundary and every redirected glTF buffer, image and FBX texture is rechecked at its final URL (checkRedirect in packages/shared/asset-url.js)",
       "grew": 4
+    },
+    {
+      "date": "2026-10-28",
+      "commit": "97db5b2d",
+      "reason": "new entry @margoengine/animator/graph: typed parameters, declarative conditions and interruption rules over the Animator (item 28.5); most of its bytes are the Animator it builds",
+      "grew": 1
     }
   ],
   "items": {
@@ -743,6 +749,7 @@
     "@margoengine/animation/skeleton-utils": 8966,
     "@margoengine/animation/vat": 8130,
     "@margoengine/animator": 17372,
+    "@margoengine/animator/graph": 8290,
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
