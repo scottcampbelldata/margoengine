@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3828221,
+  "total": 3840638,
   "history": [
     {
       "date": "2026-10-24",
@@ -665,6 +665,12 @@
     },
     {
       "date": "2026-10-28",
+      "commit": "b92998d6",
+      "reason": "webgl2-compat milestone M2: GLSL ES 3.00 back end (/glsl) and the WebGPU-shaped device on WebGL2 (/device); the root's install() loads them by import(), its static part stays the probe",
+      "grew": 3
+    },
+    {
+      "date": "2026-10-28",
       "commit": "e1e56c4a",
       "reason": "New package @margoengine/biomes (item 27.4, B0): fixed-point maths, hashes, noise, relief and R16; spec budget 16 kB for the finished root",
       "grew": 1
@@ -677,15 +683,15 @@
     },
     {
       "date": "2026-10-28",
-      "commit": "b92998d6",
-      "reason": "webgl2-compat milestone M2: GLSL ES 3.00 back end (/glsl) and the WebGPU-shaped device on WebGL2 (/device); the root's install() loads them by import(), its static part stays the probe",
+      "commit": "109ae390",
+      "reason": "@margoengine/biomes B2 (item 27.4): biome classification (envelopes, Whittaker, Holdridge, warp, blur, paint, top-4) in the root; new entries /presets (8 presets) and /koppen (label view, 0 bytes in the root)",
       "grew": 3
     },
     {
       "date": "2026-10-28",
-      "commit": "109ae390",
-      "reason": "@margoengine/biomes B2 (item 27.4): biome classification (envelopes, Whittaker, Holdridge, warp, blur, paint, top-4) in the root; new entries /presets (8 presets) and /koppen (label view, 0 bytes in the root)",
-      "grew": 3
+      "commit": "ecf2b67f",
+      "reason": "webgl2-compat milestone M3, first landing: texture view copies, readbacks of depth, stencil, packed and snorm formats, occlusion queries, render bundles, external textures and textureGather; all of it loads only inside install(), never on the WebGPU path",
+      "grew": 2
     }
   ],
   "items": {
@@ -1049,8 +1055,8 @@
     "@margoengine/weather": 5252,
     "@margoengine/weather/hail": 4287,
     "@margoengine/webgl": 3277,
-    "@margoengine/webgl2-compat": 62663,
-    "@margoengine/webgl2-compat/device": 62454,
+    "@margoengine/webgl2-compat": 68870,
+    "@margoengine/webgl2-compat/device": 68664,
     "@margoengine/webgl2-compat/glsl": 42040,
     "@margoengine/webgl2-compat/wgsl": 27240,
     "@margoengine/wfc": 1878,

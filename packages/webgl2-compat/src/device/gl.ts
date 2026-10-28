@@ -128,5 +128,8 @@ export class GLState {
   /** Binds `texture` on a scratch unit for uploads and parameter changes (unit 0 is as good as any: draws rebind). */
   scratch(target: number, texture: WebGLTexture | null): void {
     this.unit(0, target, texture, this.units[0]?.sampler ?? null);
+    // unit() selects the unit only when its binding changes; uploads and parameter calls act on the active unit, so
+    // without this they would reach whatever texture another unit holds when unit 0 already had this one.
+    this.activeUnit(0);
   }
 }

@@ -182,7 +182,7 @@ ${V}
   assert.match(f.source, /precision highp sampler2DArrayShadow;/);
 });
 
-test('refusals are coded: storage buffers, compute stages and gather name what is missing', () => {
+test('refusals are coded: storage buffers, compute stages and cube gathers name what is missing', () => {
   const coded = (fn, re) =>
     assert.throws(fn, (e) => {
       assert.equal(e.name, 'MargoError');
@@ -202,16 +202,39 @@ test('refusals are coded: storage buffers, compute stages and gather name what i
   coded(
     () =>
       frag(
-        '@group(0) @binding(0) var t: texture_2d<f32>; @group(0) @binding(1) var s: sampler;',
-        'return vec4u(textureGather(0, t, s, p.xy));',
+        '@group(0) @binding(0) var t: texture_cube<f32>; @group(0) @binding(1) var s: sampler;',
+        'return vec4u(textureGather(0, t, s, p.xyz));',
       ),
-    /textureGather\(\) \(GLSL ES 3\.00 has no gather\)/,
+    /textureGather on a cube texture \(GLSL ES 3\.00 cannot fetch texels of cube maps\)/,
   );
   assert.throws(() => translateWGSL({}), TypeError);
   assert.throws(
     () => translateWGSL({ vertex: { source: V }, fragment: { source: V } }),
     /no fragment entry point|0 fragment entry points/,
   );
+});
+
+test('gather fetches the four footprint texels in WGSL order with the sampler address modes from a uniform', () => {
+  const source = `@group(0) @binding(0) var t: texture_2d<f32>; @group(0) @binding(1) var s: sampler;
+@group(0) @binding(2) var d: texture_depth_2d_array; @group(0) @binding(3) var c: sampler_comparison;
+${V}
+@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
+  return textureGather(2, t, s, p.xy, vec2i(1, -1)) + textureGatherCompare(d, c, p.xy, 3, 0.5);
+}`;
+  const g = translateWGSL({ vertex: { source }, fragment: { source } }).fragment;
+  const [plain, cmp] = g.textures;
+  assert.deepEqual(plain.gather, { name: `${plain.name}m`, group: 0, binding: 1 });
+  assert.equal(plain.sampler, undefined, 'the texture is fetched, not sampled');
+  assert.equal(cmp.glslType, 'sampler2DArray', 'the comparison is made by hand on a plain sampler');
+  assert.deepEqual(cmp.gather, { name: `${cmp.name}m`, group: 0, binding: 3 });
+  assert.match(g.source, new RegExp(`uniform highp ivec4 ${plain.name}m;`));
+  // x: (u0, v1), y: (u1, v1), z: (u1, v0), w: (u0, v0), component z of each.
+  assert.match(
+    g.source,
+    /vec4\(texelFetch\(t, ivec2\(x0, y1\), 0\)\.z, texelFetch\(t, ivec2\(x1, y1\), 0\)\.z, texelFetch\(t, ivec2\(x1, y0\), 0\)\.z, texelFetch\(t, ivec2\(x0, y0\), 0\)\.z\)/,
+  );
+  assert.match(g.source, /ivec3\(x0, y1, a\), 0\)\.x, m\.w\)/);
+  assert.match(g.source, /return k < n \? k : p - 1 - k;/, 'mirror-repeat');
 });
 
 test('varyings must match: a fragment input the vertex stage does not write is an error', () => {

@@ -2,11 +2,12 @@
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: in development, milestones M0 to M2 of the [roadmap](../../docs/webgl2-compat-roadmap.md).** This package
+**Status: in development, milestones M0 to M3 of the [roadmap](../../docs/webgl2-compat-roadmap.md).** This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels
-as native WebGPU on the same GPU. Shaders that read storage buffers or storage textures, and compute pipelines, are
+as native WebGPU on the same GPU, and so do the materials and glTF PBR packages' render checks. Shaders that read
+storage buffers or storage textures, and compute pipelines, are
 refused with a coded error naming the milestone that brings them (M4 and M5); until then, apps that need those
 features keep them off without WebGPU, or use the [`@margoengine/webgl`](../webgl/README.md) preview.
 
@@ -38,14 +39,19 @@ What it does:
   samples. Buffers, textures (2D, 2D array, 3D, cube, 4x multisampled, depth and stencil formats), samplers, bind
   groups, render pipelines (async creation waits for `KHR_parallel_shader_compile`), render passes with clears,
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
-  `mapAsync` with fenced readbacks, error scopes, `uncapturederror` and `device.lost`. The adapter reports
+  `mapAsync` with fenced readbacks, error scopes, `uncapturederror` and `device.lost`. Texture views GL has no view
+  for (an sRGB view of a unorm texture, a 2D view of an array layer, a cube view of 6 array layers, an array view of a
+  cube) read a copy that is brought up to date before each use; a square 6-layer texture is a cube map. Readbacks
+  cover every copyable format, depth, stencil, packed and snorm included; occlusion queries, render bundles and
+  external textures (each video frame is copied: WebGL2 has no zero-copy video) work. The adapter reports
   `info.vendor === 'margo-webgl2'`. Clip space keeps WebGPU's z range through `EXT_clip_control`, and rendering is
   flipped in y so every texture keeps WebGPU's top-left origin; the canvas present flips it back.
 - **GLSL back end** (`margoengine/webgl2-compat/glsl`): `translateWGSL({ vertex, fragment })` turns a render
   pipeline's WGSL stages into GLSL ES 3.00 and the table the device binds resources by; `translateStage` translates one
   entry point alone. Uniform buffers are read in WGSL's own memory layout (exact for every struct, `@size`, `@align`
   and matCx2), and integer division, remainder, shifts, float to integer conversion and out-of-bounds indexes follow
-  WGSL rather than GLSL's undefined cases.
+  WGSL rather than GLSL's undefined cases. `textureGather` and `textureGatherCompare`, which GLSL ES 3.00 lacks, fetch
+  the four texels by hand with the sampler's address modes (2D and 2D-array textures; a cube gather is refused).
 - **WGSL front end** (`margoengine/webgl2-compat/wgsl`, milestone M1): `checkWGSL(source)` and `parseWGSL(source)`.
 - `webgl2Capabilities(gl)` and `probeWebGL2()`: what a browser's WebGL2 offers and the tier it reaches. The layer
   renders only on the `full` tier: renderable float colour targets (`EXT_color_buffer_float`) and `highp` in fragment
@@ -134,6 +140,13 @@ browsers' own WebGPU compilers, where it was recorded.
   passes with no pixel different on an NVIDIA RTX A6000 under ANGLE Direct3D 11.
 - 32 cases of WGSL semantics computed from runtime inputs (integer division by zero, shifts past 31, saturating
   conversions, the bit and pack built-ins, uniform layouts, loops, switch, pointers), bit-identical to native WebGPU.
+- The milestone M3 features against native WebGPU in one page (`npm run test:gpu`): sRGB, layer, cube and array
+  views; readbacks of depth, stencil, packed and snorm formats; occlusion queries; render bundles; textureGather in
+  every address mode and textureGatherCompare; an external texture from a VideoFrame. Results are bit-identical.
+- Package checks in forced-compatibility mode: `--compat` on a check that opens its pages with the repository's
+  browser harness runs every page on the layer. The materials check passes on it except its 14 scenarios that need
+  compute (clustered lights, image-based lighting, GPU culling of instances), which must be refused naming milestone
+  M5; the glTF PBR shader review passes whole.
 - The corpus (`npm run test:browser`): all 881 vertex and fragment entry points that use no storage resources compile,
   all 257 such distinct stage pairs link, and all 347 such recorded pipelines draw once through the device.
 

@@ -9,12 +9,21 @@ import {
   CompatBindGroup,
   CompatBindGroupLayout,
   CompatBuffer,
+  CompatExternalTexture,
   CompatPipelineLayout,
   CompatSampler,
   CompatShaderModule,
   CompatTexture,
 } from './resources.js';
-import { CompatCommandEncoder, CompatRenderPipeline, Replayer, writeTexture, copyExternalImage } from './render.js';
+import {
+  CompatCommandEncoder,
+  CompatQuerySet,
+  CompatRenderBundleEncoder,
+  CompatRenderPipeline,
+  Replayer,
+  writeTexture,
+  copyExternalImage,
+} from './render.js';
 
 /** The vendor string compatibility adapters report, so apps and stats can show "compatibility mode". */
 export const COMPAT_VENDOR = 'margo-webgl2';
@@ -214,6 +223,8 @@ export class CompatDevice extends EventTarget {
   readonly presents = new Set<{ present(): void }>();
   private presentQueued = false;
   readonly replayer: Replayer;
+  /** The texture each external source copies into, reused while its size stays. */
+  private readonly externals = new WeakMap<object, CompatTexture>();
 
   constructor(
     readonly gl: WebGL2RenderingContext,
@@ -447,14 +458,40 @@ export class CompatDevice extends EventTarget {
   createCommandEncoder(descriptor: GPUCommandEncoderDescriptor = {}): CompatCommandEncoder {
     return new CompatCommandEncoder(this, descriptor.label ?? '');
   }
-  createRenderBundleEncoder(): never {
-    throw this.unsupported('render bundles (milestone M3)');
+  createRenderBundleEncoder(descriptor: GPURenderBundleEncoderDescriptor): CompatRenderBundleEncoder {
+    return new CompatRenderBundleEncoder(this, descriptor);
   }
-  createQuerySet(descriptor: GPUQuerySetDescriptor): never {
-    throw this.unsupported(`${descriptor.type} query sets (occlusion queries are milestone M3)`);
+  createQuerySet(descriptor: GPUQuerySetDescriptor): CompatQuerySet {
+    return new CompatQuerySet(this, descriptor);
   }
-  importExternalTexture(): never {
-    throw this.unsupported('external textures (milestone M3)');
+  /**
+   * A video element's or VideoFrame's current frame as an external texture: copied into an rgba8unorm texture (one
+   * per source, reused while its size stays), since WebGL2 has no zero-copy video.
+   */
+  importExternalTexture(descriptor: GPUExternalTextureDescriptor): CompatExternalTexture {
+    const source = descriptor.source as unknown as {
+      videoWidth?: number;
+      videoHeight?: number;
+      displayWidth?: number;
+      displayHeight?: number;
+    };
+    if ((descriptor.colorSpace ?? 'srgb') !== 'srgb')
+      throw this.unsupported(`external textures in the '${descriptor.colorSpace}' colour space (only srgb)`);
+    const w = source.videoWidth ?? source.displayWidth ?? 0,
+      h = source.videoHeight ?? source.displayHeight ?? 0;
+    if (!w || !h)
+      throw new DOMException(
+        'The video has no frame yet; import it once it has data (readyState 2 or more)',
+        'InvalidStateError',
+      );
+    let t = this.externals.get(source);
+    if (!t || t.width !== w || t.height !== h || t.destroyed) {
+      t?.destroy();
+      t = this.createTexture({ size: [w, h], format: 'rgba8unorm', usage: 0x16, label: 'external texture' });
+      this.externals.set(source, t);
+    }
+    copyExternalImage(this, { source: descriptor.source as never }, { texture: t } as never, [w, h]);
+    return new CompatExternalTexture(t.createView(), descriptor.label ?? '');
   }
 }
 

@@ -1,7 +1,32 @@
 // Real-adapter check (run from the repository root after building packages): node packages/materials/test/browser-check.mjs
+// With --compat the same scenarios run on the WebGL2 compatibility layer (scripts/support/compat-shim.js) and must
+// give the same pixels; the ones in WAITING need compute, which the layer brings in a later milestone
+// (docs/webgl2-compat-roadmap.md): each must be refused with MargoError code `unsupported` naming that milestone.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
+import { compatRun } from '../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../tests/support/png.js';
+/** Scenarios that need compute shaders (clustered light binning, IBL prefiltering, GPU culling of instances). */
+const WAITING = new Set(
+  compatRun()
+    ? [
+        'effects',
+        'iblLambert',
+        'iblStandard',
+        'clusteredLambert',
+        'clusteredPhong',
+        'catcherLocal',
+        'catcherHook',
+        'catcherShare',
+        'catcherDirectional',
+        'displaceInstanced',
+        'displacedLocalShadow',
+        'displacedHookShadow',
+        'litEffects',
+        'surfaceAll',
+      ]
+    : [],
+);
 const context = await openBrowser({ startPath: '/packages/materials/test/browser-check.html', port: 5207 }),
   { page, hardware } = context,
   pageErrors = [];
@@ -197,6 +222,26 @@ try {
     'surfaceAll',
     'video',
   ]) {
+    if (!WAITING.has(name)) {
+      await scenario(name);
+      continue;
+    }
+    const before = pageErrors.length;
+    const refused = await page
+      .evaluate((n) => window.check.run(n), name)
+      .then(
+        () => null,
+        (e) => String(e.message),
+      );
+    assert.match(refused ?? 'not refused', /MargoError: WebGL2 compatibility cannot do .*milestone M\d/, name);
+    console.log('waiting', name, refused.split(';')[0].replace(/^.*cannot do /, ''));
+    // Only the refusal itself may be reported; a refused scenario leaves its meshes and plugins half made, so the next
+    // one starts from a fresh page.
+    for (const e of pageErrors.splice(before)) assert.match(e, /compatibility-layer/, `${name}: ${e}`);
+    await page.reload();
+    await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
+  }
+  async function scenario(name) {
     if (name === 'video') await page.evaluate(() => window.videoStep('#ff00ff'));
     const result = await page.evaluate((n) => window.check.run(n), name),
       center = await pixel();

@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { trackPipelines } from './support/gpu-ready.js';
 import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
+import { compatRun, compatShim } from './support/compat-shim.js';
 
 /**
  * Starts a server on a fixed port with `start` (for example `() => server.listen()`), waiting while something else holds
@@ -458,6 +459,7 @@ export async function openBrowser({
       0,
   ),
   reassociate = process.env.MARGO_REASSOCIATE_MATH === '1' || process.argv.includes('--reassociate-math'),
+  compat = compatRun(),
 } = {}) {
   await mkdir('test-results', { recursive: true });
   const { server, close: stopServer } = await startDevServer({ startPath, aliases, plugins, port }),
@@ -491,6 +493,8 @@ export async function openBrowser({
     if (workerDelayMs > 0) await page.addInitScript(delayWorkerMessages, workerDelayMs);
     // After the delay, so the count of pipelines in flight includes it (scripts/support/gpu-ready.js).
     await page.addInitScript(trackPipelines);
+    // Forced compatibility: the page's WebGPU runs on the WebGL2 layer (scripts/support/compat-shim.js).
+    if (compat) await page.addInitScript(compatShim);
     const wgsl = watchWgsl(page);
     let reloads = 0,
       handledReloads = 0;
@@ -557,6 +561,7 @@ export async function openBrowser({
     hardware.powerPreference = powerPreference;
     hardware.hostPlatform = process.platform;
     hardware.headless = headless;
+    if (compat) hardware.compat = true;
     if (pipelineDelayMs > 0) hardware.pipelineDelayMs = pipelineDelayMs;
     if (mathErrorScale > 0) hardware.mathErrorScale = mathErrorScale;
     if (reassociate) hardware.reassociateMath = true;

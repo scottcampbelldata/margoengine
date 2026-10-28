@@ -390,7 +390,9 @@ depends on nothing), `margoengine` re-exports core (it is the stage facade), and
 shape. navigation (a Recast wrapper) is removed: its API is `@margoengine/navmesh/build`, a clean-room generator, with
 ORCA and the funnel rewritten clean room too (78 packages). Renames: [renames-2026-10-24.md](renames-2026-10-24.md).
 The full WebGL2 fallback was paused by Scott (2026-10-24) and is active again since 2026-10-27: milestones M0 to M2 are done
-(core renders on the layer with the same pixels as native WebGPU; storage and compute wait for M4 and M5), see
+and M3's device work has landed (core, the materials render scenarios and the glTF PBR review render on the layer with
+the same pixels as native WebGPU; texture views, every copyable readback, occlusion queries, render bundles, external
+textures and gather match native bit for bit; storage and compute wait for M4 and M5), see
 [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md), which also records what visitors without WebGPU see today (every site demo: a needs-WebGPU message, `check:no-webgpu`).
 
 ## Landed 2026-10-24: Codex's mesh-edit engine work (codex/mesh-rotation-visibility)

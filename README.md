@@ -343,7 +343,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/math`](packages/math/README.md) | Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math, one module per type. |
 | [`@margoengine/quality`](packages/quality/README.md) | Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom. |
 | [`@margoengine/webgl`](packages/webgl/README.md) | WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}). |
-| [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) | In development (milestones M0 to M2): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders without storage resources run, compute and storage come in later milestones. |
+| [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) | In development (milestones M0 to M3): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders, texture views, readbacks of every copyable format, occlusion queries, render bundles, external textures and gather run; compute and storage come in later milestones. |
 | [`@margoengine/stats`](packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling. |
 | [`@margoengine/inspector`](packages/inspector/README.md) | Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger. |
 

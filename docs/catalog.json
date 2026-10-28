@@ -169,7 +169,7 @@
     "package": "@margoengine/webgl2-compat",
     "version": "1.0.0",
     "published": false,
-    "description": "In development (milestones M0 to M2): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders without storage resources run, compute and storage come in later milestones.",
+    "description": "In development (milestones M0 to M3): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders, texture views, readbacks of every copyable format, occlusion queries, render bundles, external textures and gather run; compute and storage come in later milestones.",
     "requirements": "See the package guide for requirements",
     "keywords": "webgl2 compat",
     "install": "npm install @margoengine/webgl2-compat@1.0.0",

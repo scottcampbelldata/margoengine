@@ -139,6 +139,11 @@ export interface GLSLTexture {
     };
     readonly name: string;
     readonly levels?: string;
+    readonly gather?: {
+        readonly name: string;
+        readonly group: number;
+        readonly binding: number;
+    };
     readonly type: TextureType;
     readonly glslType: string;
 }

@@ -404,3 +404,59 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   and `drawImage` where OffscreenCanvas is missing); vertex strides above 255 bytes, texture views of another format or
   of one layer of an array, render bundles, queries, gather and cube arrays are refused with code `unsupported`, each
   naming its milestone.
+
+## Textures, readbacks, queries, bundles and gather (M3, first landing, 2026-10-28)
+
+Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL2, Dawn for WebGPU).
+
+- **Texture views.** WebGL2 has no texture views, so a view GL cannot sample directly reads a copy of its own: an sRGB
+  view of a unorm texture (or the reverse), a 2D view of one layer of an array or cube, a cube view of six layers of an
+  array, and a 2D-array view of a cube or a 2D texture. A copy is made when first used and brought up to date before
+  each use, one subresource (level and layer) at a time: each storage keeps the version it holds of every subresource,
+  writes (uploads, copies, render attachments) bump the version, and reads copy only what changed. A texture without
+  copies pays nothing. Same-format copies are blits; sRGB twins copy raw bytes through a pixel buffer, on the GPU (a
+  blit would decode and encode). A square 6-layer 2D texture is now allocated as a cube map (WebGPU compatibility
+  mode's default), since every package samples its 6-layer textures as cubes; a 2D-array view of it reads a copy.
+  Rendering into an sRGB view writes the sRGB copy, which the unorm view then reads back exactly.
+- **Readbacks.** `copyTextureToBuffer` covers every format WebGPU lets a buffer receive: depth16unorm and depth32float
+  (also the depth aspect of depth32float-stencil8), stencil (stencil8 and the stencil aspect of the depth-stencil
+  formats), the packed rgb10a2unorm, rgb10a2uint, rg11b10ufloat and rgb9e5ufloat, and the snorm formats. Formats
+  `readPixels` cannot read are drawn first into a 32-bit target with `texelFetch` and packed back into WebGPU's bytes;
+  stencil is read by eight bit-plane draws (each passes the stencil test where its bit is set and adds its weight).
+  Two values cannot round-trip, because WebGL2 reads decoded values, not stored bits: rgb9e5ufloat comes back in its
+  canonical encoding (a non-canonical one written by `writeTexture` reads back canonical), and an snorm byte of -128
+  reads back as -127 (both decode to -1.0). Writing stencil-only data stays refused: WebGL2 uploads depth and stencil
+  together.
+- **Occlusion queries** use `ANY_SAMPLES_PASSED`: a result is 1 when any sample passed, else 0 (WebGPU asks only for
+  zero or not). WebGL2 makes results available only in a later task, so a resolve lands in its buffer once they are,
+  and every later write and copy into that buffer waits behind it in order; `mapAsync` resolves after that.
+  Timestamp queries stay unavailable.
+- **Render bundles** record the same steps as a render pass and replay inside `executeBundles`, with the pass's
+  pipeline, bind groups and buffers cleared before and after, as WebGPU specifies.
+- **External textures** copy the video frame (an `HTMLVideoElement` or `VideoFrame`) into an rgba8unorm texture per
+  source at each `importExternalTexture`, reused while the size stays; sampled values are sRGB-encoded, as for
+  `colorSpace: 'srgb'` (other colour spaces are refused). WebGL2 has no zero-copy video.
+- **Gather.** `textureGather` and `textureGatherCompare` fetch the four texels of the bilinear footprint at level 0
+  with `texelFetch`, applying the sampler's address modes and compare function from a uniform the device sets at each
+  draw. 2D and 2D-array textures; a gather on a cube is refused (GLSL ES 3.00 cannot fetch cube texels).
+- **Results against native WebGPU** (`features-browser.mjs` in `npm run test:gpu`, both in one page): sRGB views both
+  ways and rendering through one, 2D views of array layers before and after rendering into them, cube views of a
+  6-layer and of layers 6 to 11 of a 12-layer texture, an array view of a cube, readbacks of 16 format and aspect
+  cases, occlusion queries over two frames, two bundles with their own pipelines between pass draws, gather in all
+  three address modes with offsets and an array layer, gather compare, and an external texture: all bit-identical.
+- **Forced-compatibility runs of package checks.** `--compat` (or `MARGO_COMPAT=1`) on any check that opens its pages
+  with `scripts/browser.js` runs them on the layer with no page edit: an init script
+  (`scripts/support/compat-shim.js`) makes the first `requestAdapter()` install the layer with `force: true`. The
+  materials check passes 44 scenarios on the layer; its 14 others need compute (clustered lights, image-based
+  lighting, GPU culling of instances) and must be refused with code `unsupported` naming milestone M5. The glTF PBR
+  shader review passes whole. Both run in `npm run test:gpu`. Still to come in M3: the shadows check (its scene is a
+  skinned robot, and skinning is compute), the tonemap half of the post-effects suite, and the environment
+  background checks, which need splitting from their compute parts or the animation compat path first.
+- **Bugs found and fixed, each with a regression test in `features-browser.mjs`.** (1) An upload while another texture
+  unit was active went to that unit's texture: `GLState.scratch` selected unit 0 only when its binding changed (the
+  materials check's canvas texture update showed the old image). (2) A draw that sampled a multisampled texture's
+  resolve wrote depth with depth writes off: the resolve blit reset the write masks after the pipeline had set them;
+  bindings are now applied before the pipeline state.
+- **Sizes (gzip, the sizes gate's method).** The root with `install()` loads 66,864 B (60,837 B after
+  M2): `/device` 66,664 B, `/glsl` 41,566 B, `/wgsl` 26,528 B. Over the 60,000 B target by 6,864 B; nothing was cut. Every byte the layer adds loads only through `install()`, so browsers with WebGPU download none of it, and
+  `npm run measure:size` reports the same core + stage bytes.

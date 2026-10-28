@@ -14,6 +14,7 @@ export {
   CompatBindGroup,
   CompatBindGroupLayout,
   CompatBuffer,
+  CompatExternalTexture,
   CompatPipelineLayout,
   CompatSampler,
   CompatShaderModule,
@@ -23,6 +24,9 @@ export {
 export {
   CompatCommandBuffer,
   CompatCommandEncoder,
+  CompatQuerySet,
+  CompatRenderBundle,
+  CompatRenderBundleEncoder,
   CompatRenderPassEncoder,
   CompatRenderPipeline,
 } from './device/render.js';

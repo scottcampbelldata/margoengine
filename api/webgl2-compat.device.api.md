@@ -110,7 +110,8 @@ export class CompatBuffer {
     destroyed: boolean;
     constructor(device: CompatDevice, descriptor: GPUBufferDescriptor);
     write(offset: number, bytes: Uint8Array): void;
-    settle(): void;
+    settle(): boolean;
+    land(offset: number, bytes: Uint8Array): void;
     bytes(): Uint8Array;
     mapAsync(mode: number, offset?: number, size?: number): Promise<undefined>;
     getMappedRange(offset?: number, size?: number): ArrayBuffer;
@@ -147,7 +148,7 @@ export class CompatCommandEncoder {
     copyTextureToBuffer(source: GPUTexelCopyTextureInfo, destination: GPUTexelCopyBufferInfo, size: GPUExtent3D): void;
     copyTextureToTexture(source: GPUTexelCopyTextureInfo, destination: GPUTexelCopyTextureInfo, size: GPUExtent3D): void;
     clearBuffer(buffer: CompatBuffer, offset?: number, size?: number): void;
-    resolveQuerySet(): never;
+    resolveQuerySet(querySet: CompatQuerySet, firstQuery: number, queryCount: number, destination: CompatBuffer, destinationOffset: number): void;
     pushDebugGroup(): void;
     popDebugGroup(): void;
     insertDebugMarker(): void;
@@ -204,9 +205,16 @@ export class CompatDevice extends EventTarget {
     createComputePipeline(descriptor: GPUComputePipelineDescriptor): never;
     createComputePipelineAsync(descriptor: GPUComputePipelineDescriptor): Promise<never>;
     createCommandEncoder(descriptor?: GPUCommandEncoderDescriptor): CompatCommandEncoder;
-    createRenderBundleEncoder(): never;
-    createQuerySet(descriptor: GPUQuerySetDescriptor): never;
-    importExternalTexture(): never;
+    createRenderBundleEncoder(descriptor: GPURenderBundleEncoderDescriptor): CompatRenderBundleEncoder;
+    createQuerySet(descriptor: GPUQuerySetDescriptor): CompatQuerySet;
+    importExternalTexture(descriptor: GPUExternalTextureDescriptor): CompatExternalTexture;
+}
+
+export class CompatExternalTexture {
+    readonly view: CompatTextureView;
+    label: string;
+    readonly expired = false;
+    constructor(view: CompatTextureView, label?: string);
 }
 
 export class CompatGPU {
@@ -226,6 +234,21 @@ export class CompatPipelineLayout {
     constructor(descriptor: GPUPipelineLayoutDescriptor);
 }
 
+export class CompatQuerySet {
+    label: string;
+    readonly type: GPUQueryType;
+    readonly count: number;
+    readonly queries: (WebGLQuery | null)[];
+    destroyed: boolean;
+    constructor(device: CompatDevice, descriptor: GPUQuerySetDescriptor);
+    begin(i: number): WebGLQuery;
+    hold(queries: readonly (WebGLQuery | null)[]): void;
+    release(queries: readonly (WebGLQuery | null)[]): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+    destroy(): void;
+}
+
 export class CompatQueue {
     label: string;
     constructor(device: CompatDevice);
@@ -239,27 +262,26 @@ export class CompatQueue {
     onSubmittedWorkDone(): Promise<undefined>;
 }
 
-export class CompatRenderPassEncoder {
+export class CompatRenderBundle {
+    readonly ops: readonly Op[];
     label: string;
-    constructor(ops: Op[], label: string);
-    setPipeline(pipeline: CompatRenderPipeline): void;
-    setBindGroup(index: number, group: CompatBindGroup | null, offsets?: Iterable<number> | Uint32Array, start?: number, length?: number): void;
-    setVertexBuffer(slot: number, buffer: CompatBuffer | null, offset?: number, size?: number): void;
-    setIndexBuffer(buffer: CompatBuffer, format: GPUIndexFormat, offset?: number, size?: number): void;
-    draw(vertexCount: number, instanceCount?: number, firstVertex?: number, firstInstance?: number): void;
-    drawIndexed(indexCount: number, instanceCount?: number, firstIndex?: number, baseVertex?: number, firstInstance?: number): void;
-    drawIndirect(buffer: CompatBuffer, offset: number): void;
-    drawIndexedIndirect(buffer: CompatBuffer, offset: number): void;
+    constructor(ops: readonly Op[], label: string);
+}
+
+export class CompatRenderBundleEncoder extends DrawRecorder {
+    readonly descriptor: GPURenderBundleEncoderDescriptor;
+    constructor(device: CompatDevice, descriptor: GPURenderBundleEncoderDescriptor);
+    finish(descriptor?: GPURenderBundleDescriptor): CompatRenderBundle;
+}
+
+export class CompatRenderPassEncoder extends DrawRecorder {
     setViewport(x: number, y: number, width: number, height: number, minDepth: number, maxDepth: number): void;
     setScissorRect(x: number, y: number, width: number, height: number): void;
     setBlendConstant(c: GPUColor): void;
     setStencilReference(reference: number): void;
-    beginOcclusionQuery(): void;
+    beginOcclusionQuery(queryIndex: number): void;
     endOcclusionQuery(): void;
-    executeBundles(): void;
-    pushDebugGroup(): void;
-    popDebugGroup(): void;
-    insertDebugMarker(): void;
+    executeBundles(bundles: Iterable<CompatRenderBundle>): void;
     end(): void;
 }
 
@@ -289,6 +311,7 @@ export class CompatRenderPipeline {
         element: number;
         pointers: string[];
         levels: Map<WebGLUniformLocation, number>;
+        modes: Map<WebGLUniformLocation, string>;
     };
     constructor(device: CompatDevice, descriptor: GPURenderPipelineDescriptor, deferLink?: boolean);
     whenLinked(): Promise<void>;
@@ -302,6 +325,7 @@ export class CompatSampler {
     label: string;
     readonly sampler: WebGLSampler;
     readonly comparison: boolean;
+    readonly modes: Int32Array;
     constructor(device: CompatDevice, d?: GPUSamplerDescriptor);
     nearest(): WebGLSampler;
 }
@@ -329,14 +353,19 @@ export class CompatTexture {
     readonly info: FormatInfo;
     readonly target: number;
     readonly texture: WebGLTexture | null;
+    readonly primary: TextureStorage | null;
     readonly renderbuffer: WebGLRenderbuffer | null;
     readonly resolved: WebGLTexture | null;
     stale: boolean;
     initialized: boolean;
-    levels: string;
     destroyed: boolean;
     readonly framebuffers: Set<string>;
+    readonly layers: number;
     constructor(device: CompatDevice, descriptor: GPUTextureDescriptor);
+    sampled(v: CompatTextureView): TextureStorage;
+    attached(v: CompatTextureView): TextureStorage;
+    read(s: TextureStorage, level: number, levels: number, layer: number, layers: number, sync: (from: TextureStorage, to: TextureStorage, level: number, layer: number) => void): void;
+    wrote(s: TextureStorage, level: number, levels: number, layer: number, layers: number): void;
     levelSize(level: number): [number, number, number];
     createView(descriptor?: GPUTextureViewDescriptor): CompatTextureView;
     dispose(): void;
@@ -887,6 +916,7 @@ type Canvas = HTMLCanvasElement | OffscreenCanvas;
 
 interface ColorAttachment {
     readonly view: CompatTextureView;
+    readonly depthSlice: number;
     readonly resolveTarget?: CompatTextureView;
     readonly clearValue: readonly number[];
     readonly loadOp: GPULoadOp;
@@ -898,6 +928,23 @@ type CompatExtension = (typeof COMPAT_EXTENSIONS)[number];
 type CompatLimit = (typeof COMPAT_LIMITS)[number];
 
 type CompatTier = 'full' | 'half-float' | 'ldr';
+
+class DrawRecorder {
+    protected readonly ops: Op[];
+    label: string;
+    constructor(ops: Op[], label: string);
+    setPipeline(pipeline: CompatRenderPipeline): void;
+    setBindGroup(index: number, group: CompatBindGroup | null, offsets?: Iterable<number> | Uint32Array, start?: number, length?: number): void;
+    setVertexBuffer(slot: number, buffer: CompatBuffer | null, offset?: number, size?: number): void;
+    setIndexBuffer(buffer: CompatBuffer, format: GPUIndexFormat, offset?: number, size?: number): void;
+    draw(vertexCount: number, instanceCount?: number, firstVertex?: number, firstInstance?: number): void;
+    drawIndexed(indexCount: number, instanceCount?: number, firstIndex?: number, baseVertex?: number, firstInstance?: number): void;
+    drawIndirect(buffer: CompatBuffer, offset: number): void;
+    drawIndexedIndirect(buffer: CompatBuffer, offset: number): void;
+    pushDebugGroup(): void;
+    popDebugGroup(): void;
+    insertDebugMarker(): void;
+}
 
 type ErrorFilter = 'validation' | 'out-of-memory' | 'internal';
 
@@ -991,6 +1038,11 @@ interface GLSLTexture {
     };
     readonly name: string;
     readonly levels?: string;
+    readonly gather?: {
+        readonly name: string;
+        readonly group: number;
+        readonly binding: number;
+    };
     readonly type: TextureType;
     readonly glslType: string;
 }
@@ -1082,19 +1134,20 @@ interface PassDescriptor {
         readonly stencilStoreOp?: GPUStoreOp;
         readonly stencilReadOnly: boolean;
     };
+    readonly queries?: CompatQuerySet;
 }
 
 type Readback = {
-    sync: WebGLSync;
-    pack: WebGLBuffer;
-    bytes: number;
-    write: (data: Uint8Array) => void;
+    ready(): boolean;
+    readonly forcible: boolean;
+    apply(): void;
 };
 
 class Replayer {
     constructor(device: CompatDevice);
     run(ops: readonly Op[]): void;
     framebufferOf(t: CompatTexture): WebGLFramebuffer;
+    readonly sync: (from: TextureStorage, to: TextureStorage, level: number, layer: number) => void;
     beginPass(desc: PassDescriptor): void;
     endPass(): void;
     setPipeline(p: CompatRenderPipeline): void;
@@ -1105,6 +1158,10 @@ class Replayer {
     setScissor(x: number, y: number, w: number, h: number): void;
     setBlendConstant(c: number[]): void;
     setStencilReference(reference: number): void;
+    executeBundles(bundles: readonly CompatRenderBundle[]): void;
+    beginQuery(index: number): void;
+    endQuery(): void;
+    resolveQueries(set: CompatQuerySet, first: number, count: number, dst: CompatBuffer, offset: number): void;
     indirect(buffer: CompatBuffer, offset: number, size: number): ArrayBuffer;
     draw(count: number, instances: number, first: number, firstInstance: number): void;
     drawIndexed(count: number, instances: number, firstIndex: number, baseVertex: number, firstInstance: number): void;
@@ -1142,6 +1199,24 @@ interface TextureSlot {
     };
     readonly type: TextureType;
     readonly levels: WebGLUniformLocation[];
+    readonly modes: {
+        readonly location: WebGLUniformLocation;
+        readonly group: number;
+        readonly binding: number;
+    }[];
+}
+
+interface TextureStorage {
+    readonly id: number;
+    readonly texture: CompatTexture;
+    readonly gl: WebGLTexture;
+    readonly target: number;
+    readonly format: GPUTextureFormat;
+    readonly info: FormatInfo;
+    readonly layer: number;
+    readonly layers: number;
+    have: Uint32Array | null;
+    levels: string;
 }
 
 interface UniformSlot {

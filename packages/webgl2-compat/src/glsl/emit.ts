@@ -67,6 +67,11 @@ export interface GLSLTexture {
   readonly name: string;
   /** Mip-level-count uniform name, when the shader needs it (textureNumLevels, robust textureLoad). */
   readonly levels?: string;
+  /**
+   * textureGather reads texels by hand: the `ivec4` uniform of this name holds the address modes and comparison of
+   * the sampler at this binding (u, v, w: 0 clamp-to-edge, 1 repeat, 2 mirror-repeat; then 0 or the compare function).
+   */
+  readonly gather?: { readonly name: string; readonly group: number; readonly binding: number };
   readonly type: TextureType;
   /** GLSL sampler type (`sampler2D`, `usampler2DArray`, `sampler2DShadow`...). */
   readonly glslType: string;
@@ -1713,13 +1718,17 @@ class StageEmitter {
 
   // ---------------------------------------------------------------- textures
 
-  /** The combined sampler for a texture and an optional sampler. */
-  private combined(textureArg: IRExpr, samplerArg?: IRExpr, levels = false): GLSLTexture {
+  /**
+   * The combined sampler for a texture and an optional sampler. `gatherArg` is the sampler of a textureGather call:
+   * the texture is then fetched texel by texel, and the sampler only gives its address modes (a uniform).
+   */
+  private combined(textureArg: IRExpr, samplerArg?: IRExpr, levels = false, gatherArg?: IRExpr): GLSLTexture {
     const tex = this.handleGlobal(textureArg),
-      samp = samplerArg ? this.handleGlobal(samplerArg) : undefined;
+      samp = samplerArg ? this.handleGlobal(samplerArg) : undefined,
+      gather = gatherArg ? this.handleGlobal(gatherArg) : undefined;
     const tt = tex.type as TextureType;
     const comparison = samp ? (samp.type as { comparison: boolean }).comparison : false;
-    const key = `${tex.group}:${tex.binding}|${samp ? `${samp.group}:${samp.binding}` : ''}`;
+    const key = `${tex.group}:${tex.binding}|${samp ? `${samp.group}:${samp.binding}` : ''}|${gather ? `${gather.group}:${gather.binding}` : ''}`;
     let entry = this.textures.get(key);
     if (!entry) {
       if (tt.shape === 'storage')
@@ -1738,8 +1747,14 @@ class StageEmitter {
         type: tt,
         glslType,
       };
+      if (gather)
+        entry = {
+          ...entry,
+          gather: { name: `${entry.name}m`, group: gather.group as number, binding: gather.binding as number },
+        };
       this.textures.set(key, entry);
       this.globals.push(`uniform ${glslType} ${entry.name};`);
+      if (entry.gather) this.globals.push(`uniform highp ivec4 ${entry.gather.name};`);
     }
     if (levels && !entry.levels) {
       entry = { ...entry, levels: `${entry.name}l` };
@@ -1867,10 +1882,57 @@ class StageEmitter {
       }
       case 'textureGather':
       case 'textureGatherCompare':
-        void component;
-        throw unsupported(`${name}() (GLSL ES 3.00 has no gather)`);
+        return this.gather(name === 'textureGatherCompare', component, texArg, rest);
     }
     throw unsupported(`the texture built-in ${name}()`);
+  }
+
+  /**
+   * textureGather and textureGatherCompare, which GLSL ES 3.00 lacks: the four texels of the bilinear footprint at
+   * level 0, fetched with the sampler's address modes applied by hand, in WGSL's order (x: u0 v1, y: u1 v1, z: u1 v0,
+   * w: u0 v0); the comparison form compares each with the reference by the sampler's compare function.
+   */
+  private gather(compare: boolean, component: string | undefined, texArg: IRExpr, rest: readonly IRExpr[]): string {
+    const tt = texArg.type as TextureType;
+    if (tt.dimension !== '2d' && tt.dimension !== '2d_array')
+      throw unsupported(`textureGather on a ${tt.dimension} texture (GLSL ES 3.00 cannot fetch texels of cube maps)`);
+    const t = this.combined(texArg, undefined, false, rest[0]);
+    const arrayed = tt.dimension === '2d_array',
+      depth = tt.shape === 'depth';
+    let i = 1;
+    const coord = this.value(rest[i++]);
+    const layer = arrayed ? `int(${this.value(rest[i++])})` : '';
+    const ref = compare ? this.value(rest[i++]) : '';
+    const offset = rest[i] ? this.value(rest[i]) : 'ivec2(0)';
+    const c = depth ? 'x' : (SWIZZLE[Number(component ?? 0)] ?? 'x');
+    const rt =
+      compare || depth ? 'vec4' : `${t.glslType.startsWith('u') ? 'u' : t.glslType.startsWith('i') ? 'i' : ''}vec4`;
+    const wrap = this.generated(
+      'gatherwrap',
+      (fn) =>
+        `int ${fn}(int i, int n, int m) { if (m == 1) { int k = i % n; return k < 0 ? k + n : k; } if (m == 2) { int p = 2 * n; int k = i % p; k = k < 0 ? k + p : k; return k < n ? k : p - 1 - k; } return clamp(i, 0, n - 1); }`,
+    );
+    const test = compare
+      ? this.generated(
+          'gathertest',
+          (fn) =>
+            `float ${fn}(float r, float d, int f) { bool p = f == 1 ? false : f == 2 ? r < d : f == 3 ? r == d : f == 4 ? r <= d : f == 5 ? r > d : f == 6 ? r != d : f == 7 ? r >= d : true; return p ? 1.0 : 0.0; }`,
+        )
+      : '';
+    const fn = this.generated(`gather:${t.glslType}:${c}:${compare}`, (name) => {
+      const at = (x: string, y: string) =>
+        `texelFetch(t, ${arrayed ? `ivec3(${x}, ${y}, a)` : `ivec2(${x}, ${y})`}, 0).${c}`;
+      const texel = (x: string, y: string) => (compare ? `${test}(r, ${at(x, y)}, m.w)` : at(x, y));
+      return [
+        `${rt} ${name}(highp ${t.glslType} t, vec2 c${arrayed ? ', int a' : ''}${compare ? ', float r' : ''}, ivec2 o, ivec4 m) {`,
+        `  ivec${arrayed ? 3 : 2} z = textureSize(t, 0); ivec2 s = z.xy;${arrayed ? ' a = clamp(a, 0, z.z - 1);' : ''}`,
+        '  ivec2 i0 = ivec2(floor(c * vec2(s) - 0.5)) + o, i1 = i0 + 1;',
+        `  int x0 = ${wrap}(i0.x, s.x, m.x), x1 = ${wrap}(i1.x, s.x, m.x), y0 = ${wrap}(i0.y, s.y, m.y), y1 = ${wrap}(i1.y, s.y, m.y);`,
+        `  return ${rt}(${texel('x0', 'y1')}, ${texel('x1', 'y1')}, ${texel('x1', 'y0')}, ${texel('x0', 'y0')});`,
+        '}',
+      ].join('\n');
+    });
+    return `${fn}(${t.name}, ${coord}${arrayed ? `, ${layer}` : ''}${compare ? `, float(${ref})` : ''}, ${offset}, ${t.gather?.name})`;
   }
 
   // ---------------------------------------------------------------- entry point interface

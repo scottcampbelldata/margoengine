@@ -34,7 +34,17 @@ let nextId = 1;
 /** A small unique id for cache keys. */
 const id = (): number => nextId++;
 
-type Readback = { sync: WebGLSync; pack: WebGLBuffer; bytes: number; write: (data: Uint8Array) => void };
+/**
+ * A write to a buffer that waits for the GPU: a texture readback (a pixel buffer behind a fence, which may be forced
+ * at the cost of a stall), occlusion query results (never forced: WebGL2 makes them available only in a later task),
+ * or a write queued behind one of those so that writes land in submission order.
+ */
+type Readback = {
+  ready(): boolean;
+  /** True when apply() may run before ready() (a stall, counted). */
+  readonly forcible: boolean;
+  apply(): void;
+};
 
 /** A GPUBuffer on WebGL2. */
 export class CompatBuffer {
@@ -89,7 +99,12 @@ export class CompatBuffer {
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, glSize, gl.DYNAMIC_DRAW);
     }
     const needsShadow =
-      usage & (BufferUsage.MAP_READ | BufferUsage.MAP_WRITE | BufferUsage.INDIRECT | BufferUsage.STORAGE) ||
+      usage &
+        (BufferUsage.MAP_READ |
+          BufferUsage.MAP_WRITE |
+          BufferUsage.INDIRECT |
+          BufferUsage.STORAGE |
+          BufferUsage.QUERY_RESOLVE) ||
       (this.gl && this.element) ||
       descriptor.mappedAtCreation ||
       (!this.gl && !this.element);
@@ -101,8 +116,13 @@ export class CompatBuffer {
     }
   }
 
-  /** Writes bytes at `offset` into every copy. */
+  /** Writes bytes at `offset` into every copy (after the writes still waiting for the GPU, in order). */
   write(offset: number, bytes: Uint8Array): void {
+    if (this.readbacks.length && !this.settle()) {
+      const copy = bytes.slice();
+      this.readbacks.push({ ready: () => true, forcible: true, apply: () => this.land(offset, copy) });
+      return;
+    }
     const gl = this.device.gl;
     if (this.gl) {
       gl.bindBuffer(gl.COPY_WRITE_BUFFER, this.gl);
@@ -119,23 +139,42 @@ export class CompatBuffer {
     }
   }
 
-  /** Brings the shadow copy up to date with the GPU (a synchronous read: callers wait on a fence first). */
-  settle(): void {
+  /**
+   * Applies the waiting writes in order, forcing readbacks that may be forced, and brings the shadow copy up to date
+   * with the GPU. False when a write cannot land yet (query results not available): it and the writes after it wait.
+   */
+  settle(): boolean {
     const gl = this.device.gl;
-    for (const r of this.readbacks.splice(0)) {
-      const data = new Uint8Array(r.bytes);
-      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, r.pack);
-      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, data);
-      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-      gl.deleteBuffer(r.pack);
-      gl.deleteSync(r.sync);
-      r.write(data);
+    while (this.readbacks.length) {
+      const r = this.readbacks[0];
+      if (!r.ready()) {
+        if (!r.forcible) return false;
+        this.device.stalls++;
+      }
+      this.readbacks.shift();
+      r.apply();
     }
     if (!this.shadowValid && this.shadow && this.gl) {
       gl.bindBuffer(gl.COPY_READ_BUFFER, this.gl);
       gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, this.shadow);
       this.shadowValid = true;
     }
+    return true;
+  }
+
+  /** Writes bytes into the GL buffers and the shadow copy at once (a waiting write's last step). */
+  land(offset: number, bytes: Uint8Array): void {
+    const gl = this.device.gl;
+    if (this.shadow) this.shadow.set(bytes.subarray(0, Math.max(0, this.size - offset)), offset);
+    for (const [target, b] of [
+      [gl.COPY_WRITE_BUFFER, this.gl],
+      [gl.ELEMENT_ARRAY_BUFFER, this.element],
+    ] as const)
+      if (b) {
+        if (target === gl.ELEMENT_ARRAY_BUFFER) this.device.state.bindVertexArray(null);
+        gl.bindBuffer(target, b);
+        gl.bufferSubData(target, offset, bytes.subarray(0, Math.max(0, this.size - offset)));
+      }
   }
 
   /** The current bytes (settling first): for indirect arguments and copies the GPU cannot do. */
@@ -151,7 +190,8 @@ export class CompatBuffer {
     }
     if (!this.shadowValid || this.readbacks.length) {
       this.device.stalls++;
-      this.settle();
+      if (!this.settle())
+        this.device.validationError('A buffer was read on the CPU before its occlusion query results were available');
     }
     return this.shadow;
   }
@@ -166,7 +206,10 @@ export class CompatBuffer {
     void size;
     this.mapState = 'pending';
     this.mapMode = mode;
-    return this.device.idle().then(() => {
+    return this.device.idle().then(async () => {
+      // Occlusion results arrive a task after the GPU finishes: wait for every write this buffer still expects.
+      while (!this.destroyed && !this.device.destroyed && this.mapState === 'pending' && !this.settle())
+        await new Promise((resolve) => setTimeout(resolve, 1));
       if (this.destroyed || this.device.destroyed) {
         this.mapState = 'unmapped';
         throw new DOMException(
@@ -179,7 +222,6 @@ export class CompatBuffer {
           'Unmapped before the mapping finished; call unmap() after mapAsync() resolves',
           'AbortError',
         );
-      this.settle();
       this.mapState = 'mapped';
       return undefined;
     });
@@ -226,6 +268,28 @@ export class CompatBuffer {
   }
 }
 
+/**
+ * One GL texture holding a texture's subresources. WebGL2 has no texture views, so a view of another format (an sRGB
+ * view of a unorm texture), of one layer as 2D, of six layers as a cube, or of a cube or 2D texture as an array reads
+ * a copy of its own, made when first needed and brought up to date before each use (see {@link CompatTexture.read}).
+ */
+export interface TextureStorage {
+  readonly id: number;
+  readonly texture: CompatTexture;
+  readonly gl: WebGLTexture;
+  /** TEXTURE_2D, TEXTURE_2D_ARRAY, TEXTURE_3D or TEXTURE_CUBE_MAP. */
+  readonly target: number;
+  readonly format: GPUTextureFormat;
+  readonly info: FormatInfo;
+  /** The first texture layer it holds and how many (all of them, except for 2D and cube copies). */
+  readonly layer: number;
+  readonly layers: number;
+  /** The data version it holds per subresource (level * layers of the texture + layer); null until copies exist. */
+  have: Uint32Array | null;
+  /** Base and max level last set on the GL texture. */
+  levels: string;
+}
+
 /** A GPUTexture on WebGL2: a texture, or a multisample renderbuffer (plus a resolved texture when it is sampled). */
 export class CompatTexture {
   readonly id = id();
@@ -239,20 +303,27 @@ export class CompatTexture {
   readonly format: GPUTextureFormat;
   readonly usage: number;
   readonly info: FormatInfo;
-  /** GL texture target (TEXTURE_2D, TEXTURE_2D_ARRAY, TEXTURE_3D, TEXTURE_CUBE_MAP); 0 for a renderbuffer. */
+  /** GL texture target of the primary storage; 0 for a renderbuffer. */
   readonly target: number;
+  /** The primary storage's GL texture (uploads, copies and render attachments of the texture's own format). */
   readonly texture: WebGLTexture | null;
+  readonly primary: TextureStorage | null;
   readonly renderbuffer: WebGLRenderbuffer | null;
   /** Single-sample copy of a multisampled texture that shaders read; `stale` until the next resolve. */
   readonly resolved: WebGLTexture | null;
   stale = false;
   /** False until written: a load of an unwritten texture reads zeros, as WebGPU requires. */
   initialized = false;
-  /** Base and max level last set on the GL texture. */
-  levels = '';
   destroyed = false;
   /** Framebuffer keys that attach this texture, deleted with it. */
   readonly framebuffers = new Set<string>();
+  /** Layers as subresources count them (a 3D texture is one layer per level). */
+  readonly layers: number;
+  /** Copies for views GL cannot make, by format, target and first layer; null while there are none. */
+  private copies: Map<string, TextureStorage> | null = null;
+  /** Current data version per subresource and the storage holding it; null while the primary is the only storage. */
+  private ver: Uint32Array | null = null;
+  private owner: TextureStorage[] | null = null;
 
   constructor(
     readonly device: CompatDevice,
@@ -278,42 +349,166 @@ export class CompatTexture {
     this.format = descriptor.format;
     this.usage = descriptor.usage;
     this.label = descriptor.label ?? '';
+    this.layers = this.dimension === '3d' ? 1 : d;
     const gl = device.gl;
     if (!w || !h || !d) throw new RangeError('GPUTexture sizes must be at least 1');
+    for (const f of descriptor.viewFormats ?? [])
+      if (f !== this.format && !twins(info, FORMATS.get(f)))
+        throw new TypeError(`'${f}' is not a view format of a '${this.format}' texture; WebGPU allows its sRGB twin`);
     if (this.sampleCount > 1) {
       if (this.sampleCount !== 4)
         throw new RangeError('Multisampled textures on WebGL2 take 4 samples; pass sampleCount: 4');
       this.target = 0;
       this.texture = null;
+      this.primary = null;
       this.renderbuffer = gl.createRenderbuffer();
       gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
       gl.renderbufferStorageMultisample(gl.RENDERBUFFER, 4, device.enum(info.internal), w, h);
-      this.resolved = descriptor.usage & TextureUsage.TEXTURE_BINDING ? this.storage(gl.TEXTURE_2D, 1, w, h, 1) : null;
+      this.resolved =
+        descriptor.usage & TextureUsage.TEXTURE_BINDING ? this.allocate(gl.TEXTURE_2D, info, 1, w, h, 1) : null;
       return;
     }
     this.renderbuffer = null;
     this.resolved = null;
+    // A square 6-layer 2D texture is a cube map unless told otherwise (WebGPU's compatibility-mode default): sampling
+    // it as a cube is the common case, and a 2D-array or 2D view of it reads a copy.
     const hint = (descriptor as { textureBindingViewDimension?: string }).textureBindingViewDimension;
     const target =
       this.dimension === '3d'
         ? gl.TEXTURE_3D
-        : hint === 'cube' || (hint === undefined && d === 6 && descriptor.viewFormats === undefined && false)
+        : hint === 'cube' || (hint === undefined && d === 6 && w === h)
           ? gl.TEXTURE_CUBE_MAP
           : d > 1 || hint === '2d-array'
             ? gl.TEXTURE_2D_ARRAY
             : gl.TEXTURE_2D;
     this.target = target;
-    this.texture = this.storage(target, this.mipLevelCount, w, h, d);
+    this.primary = this.storageOf(target, this.format, info, 0, this.layers);
+    this.texture = this.primary.gl;
   }
 
-  private storage(target: number, levels: number, w: number, h: number, d: number): WebGLTexture {
+  private allocate(target: number, info: FormatInfo, levels: number, w: number, h: number, d: number): WebGLTexture {
     const gl = this.device.gl,
       t = gl.createTexture() as WebGLTexture;
     this.device.state.scratch(target, t);
-    const internal = this.device.enum(this.info.internal);
+    const internal = this.device.enum(info.internal);
     if (target === gl.TEXTURE_3D || target === gl.TEXTURE_2D_ARRAY) gl.texStorage3D(target, levels, internal, w, h, d);
     else gl.texStorage2D(target, levels, internal, w, h);
     return t;
+  }
+
+  private storageOf(
+    target: number,
+    format: GPUTextureFormat,
+    info: FormatInfo,
+    layer: number,
+    layers: number,
+  ): TextureStorage {
+    const gl = this.device.gl;
+    const depth = target === gl.TEXTURE_3D ? this.depthOrArrayLayers : target === gl.TEXTURE_2D_ARRAY ? layers : 1;
+    return {
+      id: id(),
+      texture: this,
+      gl: this.allocate(target, info, this.mipLevelCount, this.width, this.height, depth),
+      target,
+      format,
+      info,
+      layer,
+      layers,
+      have: null,
+      levels: '',
+    };
+  }
+
+  /**
+   * The storage a view reads when sampled: the primary, or a copy when GL cannot sample the primary as the view asks
+   * (another format, a 2D view of a layer, a cube view of an array, an array view of a cube or 2D texture).
+   */
+  sampled(v: CompatTextureView): TextureStorage {
+    const gl = this.device.gl,
+      p = this.primary as TextureStorage;
+    let target = p.target,
+      layer = 0,
+      layers = this.layers;
+    if (v.dimension === '2d' && target !== gl.TEXTURE_2D) {
+      target = gl.TEXTURE_2D;
+      layer = v.baseArrayLayer;
+      layers = 1;
+    } else if (v.dimension === 'cube' && target !== gl.TEXTURE_CUBE_MAP) {
+      target = gl.TEXTURE_CUBE_MAP;
+      layer = v.baseArrayLayer;
+      layers = 6;
+    } else if (v.dimension === '2d-array' && target !== gl.TEXTURE_2D_ARRAY) target = gl.TEXTURE_2D_ARRAY;
+    return this.copy(v.format, target, layer, layers);
+  }
+
+  /** The storage a render pass writes through a view: the primary, or the copy of the view's format. */
+  attached(v: CompatTextureView): TextureStorage {
+    const p = this.primary as TextureStorage;
+    return v.format === this.format ? p : this.copy(v.format, p.target, 0, this.layers);
+  }
+
+  private copy(format: GPUTextureFormat, target: number, layer: number, layers: number): TextureStorage {
+    const p = this.primary as TextureStorage;
+    if (format === this.format && target === p.target) return p;
+    const key = `${format}:${target}:${layer}`;
+    let s = this.copies?.get(key);
+    if (s) return s;
+    const info = FORMATS.get(format) as FormatInfo;
+    if (!info.renderable || !this.info.renderable || this.info.kind === 'stencil')
+      throw this.device.unsupported(
+        `a ${format} ${target === p.target ? '' : 'layer or cube '}view of a ${this.format} texture, which WebGL2 would copy (${this.format} is not renderable there)`,
+      );
+    s = this.storageOf(target, format, info, layer, layers);
+    if (!this.copies) {
+      // Tracking starts with the first copy: every subresource is current in the primary.
+      const n = this.mipLevelCount * this.layers;
+      this.copies = new Map();
+      this.ver = new Uint32Array(n).fill(1);
+      this.owner = new Array<TextureStorage>(n).fill(p);
+      p.have = new Uint32Array(n).fill(1);
+    }
+    s.have = new Uint32Array(this.mipLevelCount * this.layers);
+    this.copies.set(key, s);
+    return s;
+  }
+
+  /**
+   * Brings a storage's levels and layers up to date before a read (or a partial write): each subresource another
+   * storage changed since is copied over with `sync`. Free while the texture has no copies.
+   */
+  read(
+    s: TextureStorage,
+    level: number,
+    levels: number,
+    layer: number,
+    layers: number,
+    sync: (from: TextureStorage, to: TextureStorage, level: number, layer: number) => void,
+  ): void {
+    const ver = this.ver,
+      owner = this.owner,
+      have = s.have;
+    if (!ver || !owner || !have) return;
+    for (let l = level; l < level + levels; l++)
+      for (let a = layer; a < layer + layers; a++) {
+        const i = l * this.layers + a;
+        if (have[i] === ver[i]) continue;
+        sync(owner[i], s, l, a);
+        have[i] = ver[i];
+      }
+  }
+
+  /** Records that `s` now holds the newest data of these levels and layers (after a write through it). */
+  wrote(s: TextureStorage, level: number, levels: number, layer: number, layers: number): void {
+    const ver = this.ver,
+      owner = this.owner,
+      have = s.have;
+    if (!ver || !owner || !have) return;
+    for (let l = level; l < level + levels; l++)
+      for (let a = layer; a < layer + layers; a++) {
+        const i = l * this.layers + a;
+        have[i] = ++ver[i];
+        owner[i] = s;
+      }
   }
 
   /** Size of a mip level. */
@@ -342,19 +537,20 @@ export class CompatTexture {
     this.destroyed = true;
     const gl = this.device.gl;
     this.device.dropFramebuffers(this);
-    if (this.texture) {
-      this.device.state.forgetTexture(this.texture);
-      gl.deleteTexture(this.texture);
-    }
-    if (this.resolved) {
-      this.device.state.forgetTexture(this.resolved);
-      gl.deleteTexture(this.resolved);
-    }
+    for (const t of [this.texture, this.resolved, ...[...(this.copies?.values() ?? [])].map((c) => c.gl)])
+      if (t) {
+        this.device.state.forgetTexture(t);
+        gl.deleteTexture(t);
+      }
     if (this.renderbuffer) gl.deleteRenderbuffer(this.renderbuffer);
   }
 }
 
-/** A GPUTextureView: a mip range, a layer range and a dimension of one texture. */
+/** True when `b` is the sRGB twin of `a` (or `a` of `b`): the one format reinterpretation WebGPU views allow. */
+const twins = (a: FormatInfo, b: FormatInfo | undefined): boolean =>
+  !!b && a.name !== b.name && a.name.replace('-srgb', '') === b.name.replace('-srgb', '');
+
+/** A GPUTextureView: a format, a mip range, a layer range and a dimension of one texture. */
 export class CompatTextureView {
   readonly id = id();
   label: string;
@@ -372,21 +568,18 @@ export class CompatTextureView {
   ) {
     this.label = d.label ?? '';
     this.format = d.format ?? texture.format;
-    if (this.format !== texture.format)
-      throw texture.device.unsupported(
-        `a ${this.format} view of a ${texture.format} texture (texture views are milestone M3)`,
-      );
-    const layers = texture.dimension === '3d' ? 1 : texture.depthOrArrayLayers;
+    if (this.format !== texture.format && !twins(texture.info, FORMATS.get(this.format)))
+      throw new TypeError(`A '${texture.format}' texture has no '${this.format}' view; WebGPU allows its sRGB twin`);
+    const gl = texture.device.gl,
+      layers = texture.layers;
     this.dimension =
       d.dimension ??
       (texture.dimension === '3d'
         ? '3d'
         : texture.dimension === '1d'
           ? '1d'
-          : layers > 1 && texture.target !== texture.device.gl.TEXTURE_2D
-            ? texture.target === texture.device.gl.TEXTURE_CUBE_MAP
-              ? 'cube'
-              : '2d-array'
+          : layers > 1 || texture.target === gl.TEXTURE_2D_ARRAY
+            ? '2d-array'
             : '2d');
     this.baseMipLevel = d.baseMipLevel ?? 0;
     this.mipLevelCount = d.mipLevelCount ?? texture.mipLevelCount - this.baseMipLevel;
@@ -395,10 +588,33 @@ export class CompatTextureView {
       d.arrayLayerCount ??
       (this.dimension === '2d' || this.dimension === '3d' || this.dimension === '1d'
         ? 1
-        : layers - this.baseArrayLayer);
+        : this.dimension === 'cube'
+          ? 6
+          : layers - this.baseArrayLayer);
     this.aspect = d.aspect ?? 'all';
+    if (
+      this.mipLevelCount < 1 ||
+      this.arrayLayerCount < 1 ||
+      this.baseMipLevel + this.mipLevelCount > texture.mipLevelCount ||
+      this.baseArrayLayer + this.arrayLayerCount > layers
+    )
+      throw new RangeError(
+        `The view's levels or layers lie outside the texture (${texture.mipLevelCount} levels, ${layers} layers); pass a range inside it`,
+      );
   }
 }
+
+/** WebGPU compare functions in the order {@link CompatSampler.modes} numbers them (from 1). */
+const COMPARE_FUNCTIONS: readonly GPUCompareFunction[] = [
+  'never',
+  'less',
+  'equal',
+  'less-equal',
+  'greater',
+  'not-equal',
+  'greater-equal',
+  'always',
+];
 
 /** A GPUSampler: a WebGL2 sampler object (and a nearest-filtered twin for depth textures read without comparison). */
 export class CompatSampler {
@@ -406,6 +622,11 @@ export class CompatSampler {
   label: string;
   readonly sampler: WebGLSampler;
   readonly comparison: boolean;
+  /**
+   * What textureGather reads by hand: address modes u, v, w (0 clamp-to-edge, 1 repeat, 2 mirror-repeat) and the
+   * comparison (0 none, then never, less, equal, less-equal, greater, not-equal, greater-equal, always).
+   */
+  readonly modes: Int32Array;
   private nearestTwin: WebGLSampler | null = null;
 
   constructor(
@@ -414,6 +635,13 @@ export class CompatSampler {
   ) {
     this.label = d.label ?? '';
     this.comparison = d.compare !== undefined;
+    const mode = (m?: GPUAddressMode) => (m === 'repeat' ? 1 : m === 'mirror-repeat' ? 2 : 0);
+    this.modes = Int32Array.of(
+      mode(d.addressModeU),
+      mode(d.addressModeV),
+      mode(d.addressModeW),
+      d.compare ? COMPARE_FUNCTIONS.indexOf(d.compare) + 1 : 0,
+    );
     this.sampler = this.make(false);
   }
 
@@ -561,6 +789,23 @@ export type Bound =
   | { readonly kind: 'sampler'; readonly sampler: CompatSampler }
   | { readonly kind: 'view'; readonly view: CompatTextureView };
 
+/**
+ * A GPUExternalTexture: the video frame, copied into an rgba8unorm texture of the device when it is imported (WebGL2
+ * has no zero-copy video; the roadmap accepts the copy). Sampled values are the frame's sRGB-encoded values, as for
+ * WebGPU's `colorSpace: 'srgb'`.
+ */
+export class CompatExternalTexture {
+  label: string;
+  /** Always false: the copy stays valid, though WebGPU code imports a new one each frame. */
+  readonly expired = false;
+  constructor(
+    readonly view: CompatTextureView,
+    label = '',
+  ) {
+    this.label = label;
+  }
+}
+
 /** A GPUBindGroup. */
 export class CompatBindGroup {
   readonly id = id();
@@ -576,6 +821,7 @@ export class CompatBindGroup {
       if (r instanceof CompatSampler) this.entries.set(e.binding, { kind: 'sampler', sampler: r });
       else if (r instanceof CompatTextureView) this.entries.set(e.binding, { kind: 'view', view: r });
       else if (r instanceof CompatTexture) this.entries.set(e.binding, { kind: 'view', view: r.createView() });
+      else if (r instanceof CompatExternalTexture) this.entries.set(e.binding, { kind: 'view', view: r.view });
       else if (r instanceof CompatBuffer)
         this.entries.set(e.binding, { kind: 'buffer', buffer: r, offset: 0, size: r.size });
       else if (r && typeof r === 'object' && (r as GPUBufferBinding).buffer instanceof CompatBuffer) {
@@ -588,7 +834,9 @@ export class CompatBindGroup {
           size: b.size ?? b.buffer.size - offset,
         });
       } else
-        throw device.unsupported(`bind group resource at binding ${e.binding} (external textures are milestone M3)`);
+        throw new TypeError(
+          `Bind group entry ${e.binding} is not a resource of this device; pass a buffer binding, sampler, texture view or external texture made by it`,
+        );
     }
   }
 }
