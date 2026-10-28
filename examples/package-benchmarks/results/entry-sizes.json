@@ -1,5 +1,5 @@
 {
-  "commit": "d493c34c",
+  "commit": "8c8b51a0",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1612,12 +1612,12 @@
         "gzip": 5395
       },
       "./server": {
-        "raw": 27589,
-        "gzip": 10594
+        "raw": 28965,
+        "gzip": 11088
       },
       "./bot": {
-        "raw": 17980,
-        "gzip": 7164
+        "raw": 18571,
+        "gzip": 7368
       }
     },
     "@margoengine/voxel-pathtracer": {
