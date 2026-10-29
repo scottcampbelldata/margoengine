@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3898432,
+  "total": 3898734,
   "history": [
     {
       "date": "2026-10-24",
@@ -836,6 +836,12 @@
       "commit": "67177481",
       "reason": "item 53.1 part 2: shadows grows 34 B (14,378 from 14,344) for per-draw context-free pipeline lookups that keep frames in V8's middle tier from boxing numbers",
       "grew": 1
+    },
+    {
+      "date": "2026-10-29",
+      "commit": "80dbc26b",
+      "reason": "biomes/view 7,493 B gzip, over its 7,374 B budget: laptop APU flythrough fixes (frames send the jobs they plan within the streaming budget, a frame that plans leaves sending to the next, a send waits for the budget a send to a worker takes, terrain tiles go in a band of rows at a time, a view tile reuses its ground weights array); Scott accepted up to 7,516 B on 2026-10-29",
+      "grew": 1
     }
   ],
   "items": {
@@ -860,7 +866,7 @@
     "@margoengine/biomes/relief": 2825,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 2880,
-    "@margoengine/biomes/view": 7374,
+    "@margoengine/biomes/view": 7676,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4000,

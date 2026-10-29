@@ -57,10 +57,11 @@ test('a worker job reuses its working arrays: placement and view tiles make a sm
   // The next tile along: its own column of neighbours is new (three world tiles made), the rest are cached.
   const place = await bytes(() => placement.tile(6, 5)),
     drawn = await bytes(() => view(6, 5));
-  // Before: 22.9 MB for the placement (10.5 MB of candidate tables, three world tiles of 4 MB working fields each) and
-  // 4.6 MB for the view tile made again with the view's layers. Now about 2.1 MB and 0.9 MB, nearly all of it output.
+  // Before: 24.0 MB for the placement (10.5 MB of candidate tables, three world tiles of 4 MB working fields each) and
+  // 4.6 MB for the view tile made again with the view's layers. Now about 2.1 MB and 0.2 MB, nearly all of it output
+  // (the view tile's three textures, the placed tile's records and maps, the new world tiles' layers).
   assert.ok(place < 4e6, `placing a tile made ${(place / 1e6).toFixed(1)} MB of fresh arrays`);
-  assert.ok(drawn < 1.5e6, `a view tile made ${(drawn / 1e6).toFixed(1)} MB of fresh arrays`);
+  assert.ok(drawn < 0.5e6, `a view tile made ${(drawn / 1e6).toFixed(1)} MB of fresh arrays`);
   placement.dispose();
   world.dispose();
 });
@@ -108,4 +109,29 @@ test('reused working arrays give the bytes of fresh ones, whatever was made befo
   }
   placement.dispose();
   shared.dispose();
+});
+
+test('a view tile reuses its ground weights array and gives the bytes of a fresh one, also for a cell with no biome weight', async () => {
+  const world = await BiomeWorld.create({ workers: false }),
+    materials = groundMaterials(world.biomes),
+    bytes = (t) => [[...t.heights], [...t.weights[0]], [...t.weights[1]]],
+    first = bytes(viewTile(world, await world.tile(4, 4), materials, 2));
+  // A cell whose four biome weights are all 0 goes wholly to the first material: once, it left the other seven bytes
+  // as they were, so the reused array (and the view's overview, which reuses its 8 bytes per sample) kept old weights.
+  const n = 4,
+    flat = {
+      cells: 2,
+      layer: (name) =>
+        name === 'biome' || name === 'biomeWeight'
+          ? { data: new Uint8Array(n * 4) }
+          : { data: new Int32Array(n), scale: 0.001 },
+    };
+  viewTile(world, await world.tile(6, 2), materials, 2);
+  const zero = viewTile(world, flat, materials, 1);
+  for (let k = 0; k < n; k++) {
+    assert.deepEqual([...zero.weights[0].subarray(k * 4, k * 4 + 4)], [255, 0, 0, 0]);
+    assert.deepEqual([...zero.weights[1].subarray(k * 4, k * 4 + 4)], [0, 0, 0, 0]);
+  }
+  assert.deepEqual(bytes(viewTile(world, await world.tile(4, 4), materials, 2)), first);
+  world.dispose();
 });

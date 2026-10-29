@@ -81,10 +81,15 @@ export interface ViewTile {
   readonly weights: readonly [Uint8Array, Uint8Array];
 }
 
+/** Ground weights of the last view tile made on this thread, reused (a worker makes one tile after another). */
+let ground: Uint8Array | undefined;
+
 /** A view tile made on this thread (a world without workers): the same arrays a worker sends. */
 export function viewTile(world: BiomeWorld, tile: BiomeTile, materials: readonly string[], step: number): ViewTile {
+  const n = tile.cells * tile.cells * 8;
+  if (!ground || ground.length < n) ground = new Uint8Array(n);
   const count = Math.floor(tile.cells / step), // float division: exact multiple
-    ground = groundWeights(world, tile, materials),
+    weights = weightsInto(world, tile, materials, ground),
     height = tile.layer('height')!,
     heights = new Float32Array(count * count),
     a = new Uint8Array(count * count * 4),
@@ -94,8 +99,8 @@ export function viewTile(world: BiomeWorld, tile: BiomeTile, materials: readonly
       const k = j * step * tile.cells + i * step,
         t = j * count + i;
       heights[t] = height.data[k] * height.scale;
-      a.set(ground.subarray(k * 8, k * 8 + 4), t * 4);
-      b.set(ground.subarray(k * 8 + 4, k * 8 + 8), t * 4);
+      a.set(weights.subarray(k * 8, k * 8 + 4), t * 4);
+      b.set(weights.subarray(k * 8 + 4, k * 8 + 8), t * 4);
     }
   return { x: tile.x, z: tile.z, count, heights, weights: [a, b] };
 }
@@ -132,9 +137,13 @@ function rulesOf(biomes: readonly BiomeDefinition[], materials: readonly string[
  * whose rules all miss uses its first layer). Integer only.
  */
 export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: readonly string[]): Uint8Array {
+  return weightsInto(world, tile, materials, new Uint8Array(tile.cells * tile.cells * 8));
+}
+
+/** `groundWeights` written into `out` (8 bytes per cell or more; every byte of the cells is written). */
+function weightsInto(world: BiomeWorld, tile: BiomeTile, materials: readonly string[], out: Uint8Array): Uint8Array {
   const rules = rulesOf(world.biomes, materials),
     n = tile.cells * tile.cells,
-    out = new Uint8Array(n * 8),
     ids = tile.layer('biome')?.data,
     weights = tile.layer('biomeWeight')?.data;
   if (!ids || !weights) throw typeError('groundWeights needs a tile with the biome and biomeWeight layers', 'biomes');
@@ -176,7 +185,8 @@ function quantise(w: Int32Array, out: Uint8Array, at: number): void {
   let total = 0;
   for (let i = 0; i < 8; i++) total += w[i];
   if (!total) {
-    out[at] = 255;
+    // All to the first material, the other seven 0 (the array may be reused).
+    out.fill(0, at + 1, at + 8)[at] = 255;
     return;
   }
   let given = 0;
