@@ -69,6 +69,7 @@ export class BiomeWorkers implements Disposable {
   readonly #placements = new Map<number, object>();
   readonly #slots: (Slot | undefined)[];
   #next = 1;
+  #posts = 0;
   #disposed = false;
 
   constructor(size: number, world: BiomeWorld, state: () => WorldState, create = spawn) {
@@ -272,6 +273,7 @@ export class BiomeWorkers implements Disposable {
     };
     worker.onmessageerror = () => this.#restart(slot, 'Biome worker reply could not be read; it was restarted');
     worker.postMessage({ id: 0, ...message }, transfer);
+    this.#posts++;
     slot.worker = worker;
   }
 
@@ -294,6 +296,7 @@ export class BiomeWorkers implements Disposable {
     try {
       // A change goes to every worker as a copy; a job's own arrays move.
       slot.worker.postMessage({ id: job.id, ...job.message }, job.barrier ? [] : [...transferables(job.message)]);
+      this.#posts++;
     } catch (error) {
       slot.busy = undefined;
       clearTimeout(job.timer);
@@ -342,6 +345,14 @@ export class BiomeWorkers implements Disposable {
   #settle(job: Job): void {
     if (job.abort) job.signal!.removeEventListener('abort', job.abort);
     job.abort = undefined;
+  }
+
+  /**
+   * Messages posted to the workers so far (jobs, changes and the replicas new workers start from): a job that leaves
+   * it unchanged waits in a queue behind a busy worker.
+   */
+  get posts(): number {
+    return this.#posts;
   }
 
   /** Jobs queued or running over all workers. */

@@ -126,6 +126,30 @@ test('an aborted job leaves the queue and a retry gives the same bytes; height s
   await assert.rejects(remote.tile(1, 1), { code: 'disposed' });
 });
 
+// Regression: the view learns what a send costs only from sends that reached a worker; a job queued behind a busy
+// worker costs microseconds, and counting those let its estimate fade until a send that woke a worker started late in
+// a frame (flythrough-check, stalled workers). `posts` tells the two apart.
+test('posts counts the messages that reached a worker: a job queued behind a busy worker leaves it as it was', async () => {
+  const sent = [];
+  let worker;
+  const world = await BiomeWorld.create({
+      ...options,
+      workers: 1,
+      createWorker: () => (worker = { postMessage: (message) => sent.push(message), terminate() {} }),
+    }),
+    pool = world.workers;
+  assert.equal(pool.posts, 0, 'no worker before the first job');
+  const first = pool.run({ op: 'tile', x: 0, z: 0, layers: ['height'] });
+  assert.equal(pool.posts, 2, 'a new worker gets its replica, then the job');
+  const second = pool.run({ op: 'tile', x: 1, z: 0, layers: ['height'] });
+  assert.equal(pool.posts, 2, 'the second job waits behind the busy worker');
+  worker.onmessage({ data: { id: sent[1].id, result: 'a' } });
+  assert.equal(pool.posts, 3, 'it goes when the worker replies');
+  worker.onmessage({ data: { id: sent[2].id, result: 'b' } });
+  assert.deepEqual(await Promise.all([first, second]), ['a', 'b']);
+  world.dispose();
+});
+
 test('a crashed worker rejects its job with failed and a fresh replica takes the next', {
   timeout: 240000,
 }, async () => {

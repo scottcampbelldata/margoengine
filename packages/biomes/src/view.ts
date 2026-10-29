@@ -329,6 +329,8 @@ export class BiomeView implements Disposable {
   readonly #arrived: { priority: number; apply: () => void; key: string; last: boolean; send?: boolean }[] = [];
   /** True while a frame plans: jobs it starts are sent within the frame budget, not all at once. */
   #inFrame = false;
+  /** What a send that reached a worker took lately (the largest, fading by a fifth a send). */
+  #sendCost = 0;
   /** Copying time spent so far on tiles whose steps are not all in, by job key. */
   readonly #work = new Map<string, number>();
   #eye?: [number, number];
@@ -726,21 +728,31 @@ export class BiomeView implements Disposable {
   }
 
   /**
-   * Sends waiting jobs and copies arrived tiles in, nearest first, until `budget` milliseconds are spent (one always
-   * goes in).
+   * Sends waiting jobs and copies arrived tiles in, nearest first (one step always goes in). Copying goes on while
+   * budget is left: its steps are small, and holding them back for the dearest copy step seen lately left tiles
+   * copying over four times as many frames. A send starts only when the budget left covers what a send that reached a
+   * worker took lately: waking a worker thread costs many copy steps on a laptop.
    */
   #apply(budget: number): void {
-    const start = performance.now();
+    const start = performance.now(),
+      workers = this.#world.workers;
     let n = 0;
-    while (this.#arrived.length && (n === 0 || performance.now() - start < budget)) {
+    while (this.#arrived.length) {
       let best = 0;
       for (let i = 1; i < this.#arrived.length; i++)
         if (this.#arrived[i].priority < this.#arrived[best].priority) best = i;
+      if (n && performance.now() - start + (this.#arrived[best].send ? this.#sendCost : 0) >= budget) break;
       const [next] = this.#arrived.splice(best, 1),
+        posts = workers?.posts,
         t0 = performance.now();
       next.apply();
       n++;
-      if (next.send) continue;
+      if (next.send) {
+        // Only a send that reached a worker counts: one queued behind busy workers (or cancelled) costs nothing, and
+        // counting those let the estimate fade until a send that woke a worker started late in a frame.
+        if (workers?.posts !== posts) this.#sendCost = Math.max(performance.now() - t0, this.#sendCost * 0.8);
+        continue;
+      }
       const spent = (this.#work.get(next.key) ?? 0) + performance.now() - t0;
       if (next.last) {
         this.#work.delete(next.key);

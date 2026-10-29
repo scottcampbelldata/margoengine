@@ -21,6 +21,7 @@ export class BiomeWorkers implements Disposable {
         readonly signal?: AbortSignal;
     }): Promise<T>;
     broadcast(message: WorkerMessage): void;
+    get posts(): number;
     get pending(): number;
     dispose(): void;
     [Symbol.dispose](): void;

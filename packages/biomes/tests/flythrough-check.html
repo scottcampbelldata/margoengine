@@ -44,24 +44,50 @@ window.check={
   * A slow machine: sending a job wakes a worker thread, and copying bytes into textures is memory bound, both much
   * dearer on a laptop than on a desktop. Here every send to a worker takes SEND ms and every texture write COPY ms
   * per kB: a third of the flight on 4 workers, timing the view's own work in each frame (its plugin). Jobs a frame
-  * starts must go out within the frame budget, and a tile must go in a few rows at a time, not in one frame.
+  * starts must go out within the frame budget, and a tile must go in a few rows at a time, not in one frame. With STALL
+  * set, the workers' replies are held back for STALL ms out of every 2 x STALL ms, as busy workers on a laptop are:
+  * jobs the view sends meanwhile only wait in the pool's queues.
   */
- async slowSends(SEND,COPY){
-  let sends=0;const queue=device.queue,writeTexture=queue.writeTexture;
-  queue.writeTexture=function(dst,data,layout,size){const end=performance.now()+COPY*(layout.bytesPerRow??0)*(size[1]??size.height??1)/1024;while(performance.now()<end);return writeTexture.call(this,dst,data,layout,size);};
-  const createWorker=()=>{const w=new Worker('/packages/biomes/dist/workers/biomes.js',{name:'margoengine-biomes'}),post=w.postMessage.bind(w);w.postMessage=(m,t)=>{sends++;const end=performance.now()+SEND;while(performance.now()<end);post(m,t);};return w;};
-  const world=await BiomeWorld.create({workers:4,createWorker});place(0);
+ async slowSends(SEND,COPY,STALL=0){
+  let sends=0,late=0,inView=false,stepped=false,known=false;const queue=device.queue,writeTexture=queue.writeTexture;
+  queue.writeTexture=function(dst,data,layout,size){if(inView)stepped=true;const end=performance.now()+COPY*(layout.bytesPerRow??0)*(size[1]??size.height??1)/1024;while(performance.now()<end);return writeTexture.call(this,dst,data,layout,size);};
+  const createWorker=()=>{const w=new Worker('/packages/biomes/dist/workers/biomes.js',{name:'margoengine-biomes'}),post=w.postMessage.bind(w);if(STALL){let on=null;Object.defineProperty(w,'onmessage',{get:()=>on,set:(f)=>{on=f;}});w.addEventListener('message',(e)=>held?held.push(()=>on?.(e)):on?.(e));}w.postMessage=(m,t)=>{sends++;if(inView){if(stepped&&known)late++;known=true;}const end=performance.now()+SEND;while(performance.now()<end);post(m,t);};return w;};
+  let held=null;const world=await BiomeWorld.create({workers:4,createWorker});place(0);
   const view=await BiomeView.attach(engine,world);await view.ready;
+  // Every step the view takes marks the frame: a texture write, an objects step, a job handed to the pool (sent or queued).
+  const run=world.workers.run.bind(world.workers);world.workers.run=(...a)=>{const r=run(...a);if(inView)stepped=true;return r;};
+  const proto=Object.getPrototypeOf(view.objects),steps=proto.steps;proto.steps=function(...a){return steps.apply(this,a).map((f)=>()=>{f();if(inView)stepped=true;});};
+  const stall=STALL&&setInterval(()=>{if(held){const go=held;held=null;for(const f of go)setTimeout(f,0);}else held=[];},STALL);
   const plugin=[...engine.plugins.values()].find((p)=>p.name.startsWith('biomes-view:')),own=plugin.onPreUpdate,times=[];
-  plugin.onPreUpdate=(delta)=>{const t0=performance.now();own(delta);times.push(performance.now()-t0);};
+  plugin.onPreUpdate=(delta)=>{const t0=performance.now();inView=true;stepped=false;own(delta);inView=false;times.push(performance.now()-t0);};
   for(let i=0;i<10;i++){await frame();engine.render({delta:1/60});}
-  await view.whenIdle();times.length=0;sends=0;
+  await view.whenIdle();times.length=0;sends=0;late=0;known=false;
   let s=0,last=await frame();
   while(s<LENGTH/3){const now=await frame(),dt=Math.min(0.1,(now-last)/1000);last=now;s+=SPEED*dt;place(s);engine.render({delta:dt});}
-  delete queue.writeTexture;
-  const out={frames:times.length,max:Math.max(...times),sends};view.dispose();world.dispose();
+  delete queue.writeTexture;proto.steps=steps;clearInterval(stall);if(held){for(const f of held)f();held=null;}
+  const out={frames:times.length,max:Math.max(...times),sends,late};view.dispose();world.dispose();
   return out;
  }
+};
+/**
+ * Copying goes on while budget is left: a frame that copied and left copy steps waiting spent its whole budget. With
+ * every tile made first (no sends) and each detail map write slowed by SLOW ms, the frames that stopped short are
+ * counted; the view once held all objects steps back for a whole frame after one dear step, and copied over four
+ * times as many frames.
+ */
+window.check.packing=async function(SLOW){
+ const world=await BiomeWorld.create({workers:4});place(0);
+ const view=await BiomeView.attach(engine,world);await view.ready;
+ await view.prefetch([FROM[0]-1300,FROM[1]-1300,FROM[0]+(TO[0]-FROM[0])/3+1300,FROM[1]+(TO[1]-FROM[1])/3+1300]);
+ const queue=device.queue,writeTexture=queue.writeTexture;
+ queue.writeTexture=function(dst,...rest){if(dst.texture.format==='r8unorm'){const end=performance.now()+SLOW;while(performance.now()<end);}return writeTexture.call(this,dst,...rest);};
+ for(let i=0;i<10;i++){await frame();engine.render({delta:1/60});}
+ await view.whenIdle();
+ let s=0,copied=0,short=0,last=await frame();
+ while(s<LENGTH/3){const now=await frame(),dt=Math.min(0.1,(now-last)/1000);last=now;s+=SPEED*dt;place(s);
+  view.frameTimes.length=0;engine.render({delta:dt});
+  if(view.frameTimes.length){copied++;if(view.streaming.arrived&&view.frameTimes[0]<0.25)short++;}}
+ delete queue.writeTexture;view.dispose();world.dispose();return {copied,short};
 };
 /**
  * A frame that plans (new jobs on their way) sends and copies nothing, unless the frame before planned and did nothing

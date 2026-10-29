@@ -57,6 +57,35 @@ try {
   console.log(`plan frames: ${plan.plans} frames planned, ${plan.both} of them also sent or copied`);
   assert.ok(plan.plans >= 5, `the flight planned ${plan.plans} times`);
   assert.equal(plan.both, 0, `${plan.both} frames that planned also sent or copied`);
+  // Regression: a step started whenever any budget was left, so a 2 ms send went out after a cheap copy step in the
+  // same frame and the frame ran a whole send past its budget. A send now starts only when the budget left covers what
+  // a send took lately: with sends of 2 ms and copying at full speed, a send goes first in its frame, after no texture
+  // write, objects step or other job. The first send the view makes in a frame has no cost to go by yet (sends while
+  // the view loads go out at once, not in frames), so it may follow another step: the count starts after it.
+  const fast = await page.evaluate((send) => window.check.slowSends(send, 0), SEND);
+  console.log(`fast copies, slow sends: ${fast.sends} sends, ${fast.late} after another step in their frame`);
+  assert.ok(fast.sends >= 8, `the flight sent ${fast.sends} jobs`);
+  assert.equal(fast.late, 0, `${fast.late} sends started after another step in the same frame`);
+  // Regression: the view learned what a send costs from every send step, and a step that only queued its job behind a
+  // busy worker costs microseconds: with workers stalled for seconds (a laptop's busy workers) a run of queued sends
+  // faded the estimate until a send that woke a worker started late in a frame (late 1 in 3 of 5 runs before, on the
+  // laptop APU in 3 of 6). Only sends that reached a worker count now.
+  let stalled = 0;
+  for (let i = 0; i < 2; i++) {
+    const s = await page.evaluate((send) => window.check.slowSends(send, 0, 3000), SEND);
+    console.log(`stalled workers: ${s.sends} sends, ${s.late} after another step in their frame`);
+    assert.ok(s.sends >= 8, `the flight sent ${s.sends} jobs`);
+    stalled += s.late;
+  }
+  assert.equal(stalled, 0, `${stalled} sends started after another step in the same frame with stalled workers`);
+  // Regression: a copy step started only when the budget left covered the dearest copy step seen lately, so after one
+  // dear step (a detail map, a pool growth) each frame stopped after one cheap step and copying spread over four times
+  // as many frames (prefetched flights: view p50 0.2 ms, was 0.0). Copying goes on while budget is left: with detail
+  // map writes slowed by 1 ms, no frame that copied stops short of its budget while copy steps wait.
+  const pack = await page.evaluate(() => window.check.packing(1));
+  console.log(`packing: ${pack.copied} frames copied, ${pack.short} stopped short of the budget with steps waiting`);
+  assert.ok(pack.copied >= 20, `${pack.copied} frames copied`);
+  assert.equal(pack.short, 0, `${pack.short} frames stopped copying with budget left and copy steps waiting`);
   // MARGO_BIOMES_WORKERS sets the worker count of the flights (default: the world's default, at most 4).
   const r = await page.evaluate((workers) => window.check.run(workers), Number(process.env.MARGO_BIOMES_WORKERS) || 0),
     median = (list) => [...list].sort((a, b) => a - b)[list.length >> 1],
