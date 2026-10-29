@@ -15,9 +15,12 @@ const place=(s)=>{const t=Math.min(1,s/LENGTH),x=FROM[0]+(TO[0]-FROM[0])*t,z=FRO
 const frame=()=>new Promise((done)=>requestAnimationFrame(done));
 /** One flight: real-time frames until the camera reaches the end; per frame the render time and the interval. */
 async function fly(view){
- const times=[],intervals=[];let s=0,last=performance.now();place(0);
+ const times=[],intervals=[];let s=0,last;place(0);
  for(let i=0;i<30;i++){await frame();engine.render({delta:1/60});}
- await view.whenIdle();view.tileTimes.length=0;view.frameTimes.length=0;last=performance.now();
+ await view.whenIdle();view.tileTimes.length=0;view.frameTimes.length=0;
+ // Intervals between frame timestamps only: a frame's timestamp is when it began, which can be earlier than a
+ // performance.now() read while the page was late, and a negative delta is (rightly) refused by render.
+ last=await frame();
  while(s<LENGTH){
   const now=await frame(),dt=Math.min(0.1,(now-last)/1000);intervals.push(now-last);last=now;s+=SPEED*dt;place(s);
   const t0=performance.now();engine.render({delta:dt});times.push(performance.now()-t0);
@@ -26,10 +29,10 @@ async function fly(view){
 }
 window.check={
  /** Three flights of each kind, taking turns: streamed (tiles made as the camera goes), then prefetched (every tile made first), each on a fresh world. */
- async run(){
+ async run(workers){
   const out={streamed:[],prefetched:[]};device.pushErrorScope('validation');
   for(let round=0;round<3;round++)for(const kind of ['streamed','prefetched']){
-   const world=await BiomeWorld.create();out.workers=world.workers?Math.max(1,Math.min(4,navigator.hardwareConcurrency-1)):0;place(0);
+   const world=await BiomeWorld.create(workers?{workers}:{});out.workers=world.workers?.size??0;place(0);
    const view=await BiomeView.attach(engine,world);await view.ready;
    if(kind==='prefetched')await view.prefetch([FROM[0]-1300,FROM[1]-1300,TO[0]+1300,TO[1]+1300]);
    const flight=await fly(view);flight.objects=view.objects.count;out[kind].push(flight);view.dispose();world.dispose();
@@ -53,7 +56,7 @@ window.check={
   plugin.onPreUpdate=(delta)=>{const t0=performance.now();own(delta);times.push(performance.now()-t0);};
   for(let i=0;i<10;i++){await frame();engine.render({delta:1/60});}
   await view.whenIdle();times.length=0;sends=0;
-  let s=0,last=performance.now();
+  let s=0,last=await frame();
   while(s<LENGTH/3){const now=await frame(),dt=Math.min(0.1,(now-last)/1000);last=now;s+=SPEED*dt;place(s);engine.render({delta:dt});}
   delete queue.writeTexture;
   const out={frames:times.length,max:Math.max(...times),sends};view.dispose();world.dispose();

@@ -49,7 +49,8 @@ try {
     slow.max <= SEND + 1.5,
     `the view spent ${slow.max.toFixed(1)} ms in one frame with ${SEND} ms sends: jobs or a whole tile went in beyond the frame budget`,
   );
-  const r = await page.evaluate(() => window.check.run()),
+  // MARGO_BIOMES_WORKERS sets the worker count of the flights (default: the world's default, at most 4).
+  const r = await page.evaluate((workers) => window.check.run(workers), Number(process.env.MARGO_BIOMES_WORKERS) || 0),
     median = (list) => [...list].sort((a, b) => a - b)[list.length >> 1],
     streamed = r.streamed.map(summary),
     prefetched = r.prefetched.map(summary),
@@ -81,6 +82,12 @@ try {
   assert.deepEqual(r.errors, []);
   assert.deepEqual(pageErrors, []);
   assert.ok(r.workers > 0, 'the world made its tiles on workers');
+  // Frame timestamps never run backwards (an interval from performance.now() once did, and render refused its delta).
+  for (const f of [...r.streamed, ...r.prefetched])
+    assert.ok(
+      f.intervals.every((i) => i >= 0),
+      `a negative frame interval: ${Math.min(...f.intervals)} ms`,
+    );
   assert.ok(
     streamed.every((s) => s.frames > 600),
     `real-time flights of ${streamed.map((s) => s.frames)} frames`,
