@@ -9,9 +9,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import {
+  checkInterpreter,
   compareVersions,
   ensureVenv,
   findPython,
+  jupyterServerCommand,
   missingNeeded,
   NEEDED_PACKAGES,
   namesToRead,
@@ -20,6 +22,7 @@ import {
   requirementsHash,
   SETUP,
   STAMP,
+  venvTools,
 } from '../python/tests/venv.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -340,4 +343,111 @@ test('every Python package the Jupyter check opens is pinned in the requirements
   );
   for (const name of ['ipykernel', 'ipywidgets', 'jupyter-server', 'tornado', 'numpy', 'pandas'])
     assert.ok(pins.has(name), `${name} is imported by the notebooks but not pinned`);
+});
+
+// Bug 68 (audit E-04): the check launched test-results/.venv-data/Scripts/jupyter.exe, which resolved to the global
+// Python's JupyterLab (no widget manager) although the venv had jupyterlab_widgets. Now Jupyter starts through the
+// venv's own Python, and the check proves whose interpreter that is before it opens a page.
+const venvWithOnlyPython = () => {
+  const venv = join(scratch(), 'venv'),
+    bin = process.platform === 'win32' ? 'Scripts' : 'bin',
+    ext = process.platform === 'win32' ? '.exe' : '';
+  mkdirSync(join(venv, bin), { recursive: true });
+  writeFileSync(join(venv, bin, 'python' + ext), '');
+  return { venv, python: join(venv, bin, 'python' + ext), bin };
+};
+const reports = (info) => () => ({ status: 0, stdout: `${JSON.stringify(info)}\n` });
+
+test('the Jupyter server starts as python -m jupyterlab in the venv, never through a jupyter launcher', () => {
+  const { venv, python } = venvWithOnlyPython();
+  try {
+    // A venv with no jupyter launcher at all is a usable venv (the launcher is not used).
+    assert.deepEqual(venvTools(venv), { python });
+    const { command, args } = jupyterServerCommand(venv, ['--no-browser', '--port=1']);
+    assert.equal(command, python);
+    assert.deepEqual(args, ['-m', 'jupyterlab', '--no-browser', '--port=1']);
+    assert.throws(() => jupyterServerCommand(join(venv, 'nothing'), []), /no python in .*nothing.*setup:python-test/);
+  } finally {
+    rmSync(resolve(venv, '..'), { recursive: true, force: true });
+  }
+  const check = readFileSync(join(root, 'python/tests/jupyter-browser.mjs'), 'utf8');
+  assert.doesNotMatch(check, /Scripts\/jupyter|bin\/jupyter|jupyter\.exe/, 'the check names no jupyter launcher');
+  assert.match(check, /jupyterServerCommand\(venv,/, 'the server is started through jupyterServerCommand');
+  assert.match(check, /checkInterpreter\(\{ venv, python \}\)/, 'the interpreter is checked before anything starts');
+});
+
+test('the interpreter check passes only for the venv own python with jupyterlab and jupyterlab_widgets', () => {
+  const { venv, python } = venvWithOnlyPython();
+  try {
+    const versions = { jupyterlab: '4.6.4', jupyterlab_widgets: '3.0.17' };
+    const good = checkInterpreter({
+      venv,
+      python,
+      exec: reports({ exe: python, prefix: venv, basePrefix: 'C:/Python313', versions }),
+    });
+    assert.equal(good.ok, true);
+    assert.match(good.line, /python .*python.* \(prefix .*\), jupyterlab 4\.6\.4, jupyterlab_widgets 3\.0\.17/);
+    // The global Python (the E-04 case): its prefix is not the venv.
+    const global = checkInterpreter({
+      venv,
+      python,
+      exec: reports({ exe: 'C:/Python313/python.exe', prefix: 'C:/Python313', basePrefix: 'C:/Python313', versions }),
+    });
+    assert.equal(global.ok, false);
+    assert.match(global.problem, /would run on C:\/Python313\/python\.exe .*not the venv .*no widget manager/);
+    assert.ok(global.problem.includes(SETUP));
+    // Missing widgets, as the global JupyterLab had.
+    const noWidgets = checkInterpreter({
+      venv,
+      python,
+      exec: reports({
+        exe: python,
+        prefix: venv,
+        basePrefix: 'C:/Python313',
+        versions: { ...versions, jupyterlab_widgets: null },
+      }),
+    });
+    assert.equal(noWidgets.ok, false);
+    assert.match(noWidgets.problem, /jupyterlab_widgets not installed in the venv/);
+    assert.match(noWidgets.line, /jupyterlab_widgets not installed/);
+    // A probe that fails to run or prints nonsense stops the check with the fix.
+    assert.match(
+      checkInterpreter({ venv, python, exec: () => ({ status: 1, stderr: 'boom' }) }).problem,
+      /would not run the interpreter probe: boom/,
+    );
+    assert.match(
+      checkInterpreter({ venv, python, exec: () => ({ status: 0, stdout: 'hello' }) }).problem,
+      /no readable interpreter probe/,
+    );
+  } finally {
+    rmSync(resolve(venv, '..'), { recursive: true, force: true });
+  }
+});
+
+test('a freshly made venv whose interpreter is not its own is removed with the reason', () => {
+  const venv = join(scratch(), 'venv'),
+    bin = process.platform === 'win32' ? 'Scripts' : 'bin',
+    ext = process.platform === 'win32' ? '.exe' : '';
+  try {
+    const { exec } = fake((command, args) => {
+      if (args.includes('venv')) {
+        mkdirSync(join(venv, bin), { recursive: true });
+        writeFileSync(join(venv, bin, 'python' + ext), '');
+        return { status: 0 };
+      }
+      if (args.includes('pip')) return { status: 0 };
+      if (args.includes('-c') && args.some((a) => /sys.prefix/.test(a)))
+        return {
+          status: 0,
+          stdout: `${JSON.stringify({ exe: 'C:/Python313/python.exe', prefix: 'C:/Python313', versions: { jupyterlab: '4.6.4', jupyterlab_widgets: '3.0.17' } })}\n`,
+        };
+      return version(args) || { status: 0 };
+    });
+    const result = ensureVenv({ venv, env: { MARGO_PYTHON: 'py-fake' }, exec, log: quiet });
+    assert.equal(result.ok, false);
+    assert.match(result.reason, /not the venv/);
+    assert.equal(existsSync(venv), false, 'the wrong venv is removed so the next run starts clean');
+  } finally {
+    rmSync(resolve(venv, '..'), { recursive: true, force: true });
+  }
 });

@@ -7,7 +7,7 @@
 //   MARGO_PYTHON=<python>                   make it with this Python (default: Python 3.12 or 3.13 found by py -3.13 / py -3.12 / python3.13 / python3.12 / python3 / python)
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -19,12 +19,65 @@ export const SETUP = 'npm run setup:python-test';
 /** The venv folder: MARGO_JUPYTER_VENV, else test-results/.venv-data in the main checkout. */
 export const venvDir = (env = process.env) => env.MARGO_JUPYTER_VENV || join(mainCheckout, 'test-results/.venv-data');
 
-/** `{ python, jupyter }` executables in `venv`, or undefined when either is missing. */
+/**
+ * `{ python }`: the venv's own interpreter, or undefined when it has none. Jupyter is always started through it
+ * (`python -m jupyterlab`, see {@link jupyterServerCommand}), never through the `Scripts/jupyter.exe` or `bin/jupyter`
+ * launcher: on a PC with a global JupyterLab that launcher can resolve to the global Python, which has no widget
+ * manager (audit E-04, bug 68).
+ */
 export function venvTools(venv) {
-  const find = (names) => names.map((p) => join(venv, p)).find(existsSync);
-  const python = find(['Scripts/python.exe', 'bin/python']),
-    jupyter = find(['Scripts/jupyter.exe', 'bin/jupyter']);
-  return python && jupyter ? { python, jupyter } : undefined;
+  const python = ['Scripts/python.exe', 'bin/python'].map((p) => join(venv, p)).find(existsSync);
+  return python ? { python } : undefined;
+}
+
+/** The command that starts the Jupyter server of the check: the venv's Python running JupyterLab as a module. */
+export function jupyterServerCommand(venv, serverArgs) {
+  const tools = venvTools(venv);
+  if (!tools) throw new Error(`no python in ${venv}: run ${SETUP}`);
+  return { command: tools.python, args: ['-m', 'jupyterlab', ...serverArgs] };
+}
+
+/** Python run in the venv before anything starts: which interpreter this is and which Jupyter packages it has. */
+export const INTERPRETER_PROBE =
+  'import sys, json, importlib.metadata as m\nout = {"exe": sys.executable, "prefix": sys.prefix, "basePrefix": sys.base_prefix, "versions": {}}\nfor n in ("jupyterlab", "jupyterlab_widgets"):\n    try:\n        out["versions"][n] = m.version(n)\n    except m.PackageNotFoundError:\n        out["versions"][n] = None\nprint(json.dumps(out))';
+
+const samePath = (a, b) => {
+  const real = (p) => {
+    try {
+      return realpathSync.native(p);
+    } catch {
+      return resolve(p);
+    }
+  };
+  return real(a).toLowerCase() === real(b).toLowerCase();
+};
+
+/**
+ * Asks the venv's Python who it is and checks the answer before any page opens: its `sys.prefix` is the venv (a
+ * global Python's prefix is not) and `jupyterlab` and `jupyterlab_widgets` are installed in it. Returns
+ * `{ ok, line, problem }`; `line` prints the interpreter and the two versions, `problem` names the fix.
+ */
+export function checkInterpreter({ venv, python, exec = run }) {
+  const probe = exec(python, ['-c', INTERPRETER_PROBE], 60_000);
+  if (probe.status !== 0)
+    return { ok: false, problem: `${python} would not run the interpreter probe: ${tail(probe.stderr || probe.stdout, 3)}. Run ${SETUP}` };
+  let info;
+  try {
+    info = JSON.parse(probe.stdout.trim().split('\n').pop());
+  } catch {
+    return { ok: false, problem: `${python} printed no readable interpreter probe: ${tail(probe.stdout, 3)}. Run ${SETUP}` };
+  }
+  const line = `python ${info.exe} (prefix ${info.prefix}), jupyterlab ${info.versions.jupyterlab ?? 'not installed'}, jupyterlab_widgets ${info.versions.jupyterlab_widgets ?? 'not installed'}`;
+  if (!samePath(info.prefix, venv))
+    return {
+      ok: false,
+      line,
+      problem: `the Jupyter server would run on ${info.exe} (prefix ${info.prefix}), not the venv ${venv}; its JupyterLab has no widget manager. Run ${SETUP} to repair the venv`,
+    };
+  const absent = ['jupyterlab', 'jupyterlab_widgets'].filter((n) => !info.versions[n]);
+  if (absent.length)
+    return { ok: false, line, problem: `${absent.join(' and ')} not installed in the venv ${venv}: run ${SETUP}` };
+  return { ok: true, line };
 }
 
 const PIP_ARGS = ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--timeout', '30', '--retries', '2', '-r', requirements];
@@ -127,9 +180,10 @@ export function ensureVenv({ venv = venvDir(), env = process.env, exec = run, lo
   const pip = exec(tools().python, PIP_ARGS, 25 * 60_000);
   if (pip.status !== 0) return fail('installing python/requirements-notebook.txt', pip);
   const done = venvTools(venv);
-  if (!done) {
+  const inside = done && checkInterpreter({ venv, python: done.python, exec });
+  if (!done || !inside.ok) {
     rmSync(venv, { recursive: true, force: true });
-    return { ok: false, reason: `python/requirements-notebook.txt installed, but ${venv} has no jupyter executable: ${fix}` };
+    return { ok: false, reason: `python/requirements-notebook.txt installed, but ${inside?.problem ?? `${venv} has no python`}: ${fix}` };
   }
   writeFileSync(join(venv, STAMP), `${want}\n`);
   return { ok: true, tools: done, made: true };

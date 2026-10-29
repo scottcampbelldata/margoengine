@@ -19,7 +19,21 @@ import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { decodePNG } from '../../tests/support/png.js';
 import { killTree, notebookHasKernel, serverPort, startKernel, step } from './jupyter-steps.mjs';
-import { compareVersions, ensureVenv, missingNeeded, namesToRead, parsePins, requirements, SETUP, STAMP, venvDir, venvTools } from './venv.mjs';
+import { closeAll } from '../../scripts/support/shutdown.mjs';
+import {
+  checkInterpreter,
+  compareVersions,
+  ensureVenv,
+  jupyterServerCommand,
+  missingNeeded,
+  namesToRead,
+  parsePins,
+  requirements,
+  SETUP,
+  STAMP,
+  venvDir,
+  venvTools,
+} from './venv.mjs';
 
 // Run by a supervisor: this file starts itself as a child under a hard time limit and, on timeout, ends the child and
 // everything it started (the server, kernels, browser) and says so. The child does the work below.
@@ -64,9 +78,14 @@ process.on('uncaughtException', (error) => {
 
 const root = resolve(import.meta.dirname, '../..'),
   venv = venvDir(),
-  { jupyter, python } = venvTools(venv) ?? {},
+  { python } = venvTools(venv) ?? {},
   extension = join(root, 'python/margoengine/labextension');
-assert.ok(jupyter && python, `no jupyter in ${venv}: run ${SETUP}`);
+assert.ok(python, `no python in ${venv}: run ${SETUP}`);
+// The server runs on the venv's own interpreter (never the venv's jupyter launcher program, which resolved to a global Python
+// whose JupyterLab has no widget manager, bug 68): say which one before anything starts, and stop if it is not the venv's.
+const interpreter = checkInterpreter({ venv, python });
+console.log(`jupyter: interpreter ${interpreter.line ?? 'unknown'}`);
+assert.ok(interpreter.ok, interpreter.problem);
 assert.ok(existsSync(join(extension, 'package.json')), 'the extension is not built: run node python/build-frontend.mjs');
 
 // The Python and Jupyter stack the check runs on, at the head of the server log kept on failure and in the success
@@ -170,10 +189,7 @@ writeFileSync(join(settings, 'tracker.jupyterlab-settings'), JSON.stringify({ wi
 const portHolder = createServer();
 await new Promise((done) => portHolder.listen(0, '127.0.0.1', done));
 const offered = portHolder.address().port;
-const server = spawn(
-  jupyter,
-  [
-    'lab',
+const { command: serverCommand, args: serverArgs } = jupyterServerCommand(venv, [
     '--no-browser',
     `--port=${offered}`,
     '--ServerApp.token=',
@@ -182,7 +198,10 @@ const server = spawn(
     `--ServerApp.root_dir=${folder}`,
     '--LabApp.expose_app_in_browser=True',
     '--JupyterNotebookApp.expose_app_in_browser=True',
-  ],
+  ]);
+const server = spawn(
+  serverCommand,
+  serverArgs,
   {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
@@ -434,7 +453,8 @@ try {
     `jupyter: Notebook 7 drew 3 figures (${notebook.drawn.join(', ')} bright pixels); its own page errors without Margo: ${[...own].join(' | ') || 'none'}`,
   );
 } finally {
-  await Promise.race([browser?.close(), new Promise((r) => setTimeout(r, 15_000))]);
+  // A close that does not finish in the shared budget fails the check by name (scripts/support/shutdown.mjs).
+  await closeAll({ browser });
   // The jupyter launcher starts the server and its kernels as child processes; on Windows kill() stops only the
   // launcher, so the whole tree is ended.
   killTree(server.pid);

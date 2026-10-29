@@ -8,7 +8,9 @@
 // into a parent step after this check, so a path that looks contained here could leave the directory there.
 // A proxy chain may decode more than once, so the same rule is applied after each decoding round (`%252e%252e`
 // becomes `%2e%2e`, which the rule refuses). A path still changing after 8 rounds is refused.
-const ENCODED_ESCAPE = /%2f|%5c|(^|\/)(\.|%2e){1,2}(\/|$)/i;
+// An encoded NUL (`%00`, at any depth, or the NUL itself once decoded) is refused too: it ends the name in C-based
+// file APIs, so `ok%00.png` can name `ok` there (audit 2026-10-28).
+const ENCODED_ESCAPE = /%2f|%5c|%00|\u0000|(^|\/)(\.|%2e){1,2}(\/|$)/i;
 
 /** True when the path, at any depth of percent-decoding, holds an encoded separator or a dot segment. */
 function hidesEscape(path) {

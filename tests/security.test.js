@@ -110,6 +110,32 @@ test('assetURL allowedURLs match on a path-segment boundary and keep the encoded
     assert.throws(() => assetURL(tail, 'https://h/assets/model.gltf'), TypeError, `same directory: ${tail}`);
   }
   assert.throws(() => assetURL(`%${'25'.repeat(12)}2e.png`, 'https://h/assets/model.gltf'), TypeError, 'too deep');
+  // Audit E-04 note: an encoded NUL is refused at any depth of re-encoding, in the model directory and under an allowed
+  // prefix, and in the middle of a name as well as at its end.
+  const nul = [
+    'ok%00.bin',
+    'ok%00',
+    '%00',
+    'a/%00/b.bin',
+    'ok%2500.bin',
+    'ok%252500.bin',
+    'ok%25%30%30.bin',
+    'ok%2500%2500.bin',
+  ];
+  for (const tail of nul) {
+    assert.throws(() => assetURL(tail, 'https://h/assets/model.gltf'), TypeError, `same directory: ${tail}`);
+    assert.throws(() => assetURL(`https://h/assets/${tail}`, undefined, hosted), TypeError, `allowlist: ${tail}`);
+  }
+  assert.throws(() => assetURL(`ok${'%25'.repeat(7)}00.bin`, 'https://h/assets/model.gltf'), TypeError, 'deep NUL');
+  assert.throws(
+    () => checkRedirect({ url: 'https://h/assets/ok%2500.bin', body: null }, 'https://h/assets/m.gltf', hosted),
+    TypeError,
+    'a redirect to a NUL name',
+  );
+  // Names that merely contain the digits 00 or a literal percent still load.
+  assert.equal(assetURL('tex%2000.png', 'https://h/assets/model.gltf').href, 'https://h/assets/tex%2000.png');
+  assert.equal(assetURL('a00.bin', 'https://h/assets/model.gltf').href, 'https://h/assets/a00.bin');
+  assert.equal(assetURL('50%25.png', 'https://h/assets/model.gltf').href, 'https://h/assets/50%25.png');
   // Redirects use the same rule.
   assert.throws(
     () => checkRedirect({ url: 'https://h/assets/%252e%252e/secret', body: null }, 'https://h/assets/m.gltf', hosted),
