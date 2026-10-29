@@ -33,7 +33,7 @@ import { placementReach, STRATA } from './reach.js';
 /** Position unit: 1/256 m (3.9 mm), the step of a record inside a 256 m tile. */
 const TICK = 256;
 /** Perfect plasticity cells: 32 m, world-anchored, inside every tile size. */
-const PPA = 32 * TICK;
+const PPA_SHIFT = 13; // 2^13 ticks = 32 m
 /** log2(e) in Q16. */
 const LOG2E = 94548;
 /** Largest local cluster intensity, as a multiple of the mean (candidates are generated at this rate). */
@@ -139,8 +139,8 @@ export interface PlacedTile {
   readonly exclusion: RasterLayer;
   /** Detail species densities (grass, flowers, pebbles), drawn per frame by scatter, never stored as objects. */
   readonly density: readonly DensityMap[];
-  /** Candidates generated for the tile, objects accepted, candidates left undecided after the last round, and how many
-   * candidates settled in each round (index 0 is round 1). */
+  /** Candidates generated in the tile's placement cells (before thinning), objects accepted, candidates left undecided
+   * after the last round, and how many candidates settled in each round (index 0 is round 1). */
   readonly stats: {
     readonly candidates: number;
     readonly accepted: number;
@@ -173,6 +173,7 @@ interface Spec extends PlacedSpecies {
   readonly kappa: number; // candidate oversampling, Q16
   readonly gen: number; // generation cell, ticks
   readonly mu: number; // expected candidates per generation cell, Q16
+  readonly e0: number; // exp(-mu), Q16: the Poisson draw's first term
   readonly cluster?: Cluster;
 }
 
@@ -181,13 +182,15 @@ interface Cluster {
   readonly reach: number; // ticks
   readonly cell: number; // parent cell, ticks
   readonly mu: number; // parents per parent cell, Q16
+  readonly e0: number; // exp(-mu), Q16
   readonly beta: number; // clustered share, Q16
   readonly code: number;
 }
 
 interface Stratum {
   readonly species: readonly Spec[];
-  readonly g: number; // cell, ticks
+  readonly g: number; // cell, ticks, a power of two
+  readonly gs: number; // log2 g
   readonly dmax: number; // largest conflict distance in the layer, ticks
   readonly rmax: number; // largest crown radius in the layer, ticks
 }
@@ -323,15 +326,19 @@ function clusterOf(rule: SpeciesRule, index: number, code: number): Cluster | un
     reach,
     cell: cellM * TICK,
     mu: divFloor(parents * cellM * cellM, 10000),
+    e0: firstTerm(divFloor(parents * cellM * cellM, 10000)),
     beta,
     code: (code ^ 0x51ed270b ^ index) >>> 0,
   };
 }
 
-/** Poisson count for mean mu (Q16, at most 8) from a u32 draw: inverse CDF in Q16. */
-function poisson(mu: number, h: number): number {
+/** exp(-mu) in Q16 for a mean mu (Q16): the first term of {@link poisson}. */
+const firstTerm = (mu: number) => qexp2(-Math.min(15 * ONE, qmul(mu, LOG2E)));
+
+/** Poisson count for mean mu (Q16, at most 8, with e0 = firstTerm(mu)) from a u32 draw: inverse CDF in Q16. */
+function poisson(mu: number, e0: number, h: number): number {
   const u = h >>> 16;
-  let p = qexp2(-Math.min(15 * ONE, qmul(mu, LOG2E))),
+  let p = e0,
     cdf = p,
     k = 0;
   while (u >= cdf && k < 40) {
@@ -392,6 +399,7 @@ function planOf(biomes: readonly BiomeDefinition[], options: PlacementOptions): 
           kappa,
           gen: 0,
           mu: qmul(perHa, kappa), // per ha for now; set per generation cell below
+          e0: 0,
           cluster,
         });
       }
@@ -429,9 +437,11 @@ function planOf(biomes: readonly BiomeDefinition[], options: PlacementOptions): 
       const perM2 = (m: number) => divFloor(s.mu * (m >> 8) * (m >> 8), 10000); // Q16 candidates in an m x m tick cell
       while (gen > TICK && perM2(gen) > 4 * ONE) gen >>= 1;
       (s as { gen: number }).gen = gen;
-      (s as { mu: number }).mu = perM2(gen);
+      const mu = perM2(gen);
+      (s as { mu: number }).mu = mu;
+      (s as { e0: number }).e0 = firstTerm(mu);
     }
-    strata.push({ species: list, g, dmax, rmax });
+    strata.push({ species: list, g, gs: 31 - Math.clz32(g), dmax, rmax });
   }
   const details = new Map<string, Plan['details'][number]>();
   biomes.forEach((b, biome) => {
@@ -566,6 +576,82 @@ function excluded(s: Shapes, x: number, z: number, out: Int32Array): number {
   return edge ? 1 : 0;
 }
 
+/**
+ * Cells (cx, cz) to a range of a flat list: an open-addressing table on two i32 keys over a toroidal window of 2^bits x
+ * 2^bits cells, so a run's neighbouring cells sit in neighbouring slots and a lookup is nearly direct; a collision
+ * probes the next slot. (A Map keyed by one number would need keys above 2^31, which engines keep as slow heap doubles.)
+ */
+class Cells {
+  bits: number;
+  kx: Int32Array;
+  kz: Int32Array;
+  /** First list index of the cell, -1 for an empty slot. */
+  start: Int32Array;
+  count: Int32Array;
+  /** A second number per cell (placement: candidates generated in it before thinning). */
+  tally: Int32Array;
+  size = 0;
+
+  constructor(bits: number) {
+    this.bits = bits;
+    const n = 1 << (2 * bits);
+    this.kx = new Int32Array(n);
+    this.kz = new Int32Array(n);
+    this.start = new Int32Array(n).fill(-1);
+    this.count = new Int32Array(n);
+    this.tally = new Int32Array(n);
+  }
+
+  /** The slot of cell (cx, cz), or -1 when it is not in the table. */
+  find(cx: number, cz: number): number {
+    const { kx, kz, start, bits } = this,
+      mask = start.length - 1;
+    let i = ((cz << bits) | (cx & ((1 << bits) - 1))) & mask;
+    for (;;) {
+      if (start[i] < 0) return -1;
+      if (kx[i] === cx && kz[i] === cz) return i;
+      i = (i + 1) & mask;
+    }
+  }
+
+  /** Adds cell (cx, cz) (not in the table yet) with its list start; returns its slot, valid until the next add. */
+  add(cx: number, cz: number, first: number): number {
+    if (2 * (this.size + 1) > this.start.length) this.#grow();
+    this.size++;
+    const mask = this.start.length - 1;
+    let i = ((cz << this.bits) | (cx & ((1 << this.bits) - 1))) & mask;
+    while (this.start[i] >= 0) i = (i + 1) & mask;
+    this.kx[i] = cx;
+    this.kz[i] = cz;
+    this.start[i] = first;
+    this.count[i] = 0;
+    this.tally[i] = 0;
+    return i;
+  }
+
+  #grow(): void {
+    const { kx, kz, start, count, tally } = this,
+      bigger = new Cells(this.bits + 1);
+    for (let i = 0; i < start.length; i++)
+      if (start[i] >= 0) {
+        const slot = bigger.add(kx[i], kz[i], start[i]);
+        bigger.count[slot] = count[i];
+        bigger.tally[slot] = tally[i];
+      }
+    this.bits = bigger.bits;
+    this.kx = bigger.kx;
+    this.kz = bigger.kz;
+    this.start = bigger.start;
+    this.count = bigger.count;
+    this.tally = bigger.tally;
+    this.size = bigger.size;
+  }
+}
+
+/** Window bits of a {@link Cells} table for cells of 2^shift ticks over a tile of `tileTicks` plus an apron. */
+const windowBits = (tileTicks: number, shift: number) =>
+  clampInt(32 - Math.clz32((tileTicks >> Math.min(shift, 30)) + 31), 4, 9);
+
 /** Growable candidate pool of one stratum during one tile's placement. */
 class Pool {
   n = 0;
@@ -583,9 +669,12 @@ class Pool {
   nbn = new Int32Array(1024);
   list = new Int32Array(4096);
   listN = 0;
-  readonly cells = new Map<number, number>(); // cell key -> start * 2^20 + count... stored as two maps
-  readonly cellStart = new Map<number, number>();
-  readonly cellCount = new Map<number, number>();
+  /** Generated stratum cells: their candidate ranges, and how many candidates each generated before thinning. */
+  readonly cells: Cells;
+
+  constructor(bits: number) {
+    this.cells = new Cells(bits);
+  }
 
   grow(): void {
     const size = this.x.length * 2,
@@ -634,26 +723,32 @@ class Pool {
   }
 }
 
-const cellKey = (cx: number, cz: number) => (cx + 1048576) * 2097152 + (cz + 1048576);
+/** Parent points of one cluster rule: per parent cell, a range of [x, z] tick pairs in `xz`. */
+interface Parents {
+  readonly cells: Cells;
+  xz: Int32Array;
+  n: number;
+}
 
 /** One tile's placement run: lazily generated candidates and memoised Luby rounds, per stratum. */
 class Run {
   readonly pools: Pool[];
   readonly scratch = new Int32Array(1);
-  readonly parentCache = new Map<number, Map<number, Int32Array>>();
-  candidates = 0;
+  readonly look = { f: undefined as Fields | undefined, k: 0 };
+  readonly parentCache = new Map<number, Parents>();
   #tile = Number.NaN;
   #fields: Fields | undefined;
-  readonly #byTile = new Map<number, Fields | undefined>();
+  /** Fields by tile index (z * tiles along x + x), filled on first use. */
+  readonly #byTile: (Fields | undefined)[] = [];
 
   /** The fields of world tile (tx, tz) (inside the world), or a Missing throw while it is not made yet. */
   tileFields(tx: number, tz: number): Fields {
-    const key = tx * 65536 + tz;
-    let f = this.#byTile.get(key);
+    const key = tz * (this.geometry.worldX >> this.geometry.tileShift) + tx;
+    let f = this.#byTile[key];
     if (!f) {
       f = this.fields(tx, tz);
       if (!f) throw new Missing(tx, tz);
-      this.#byTile.set(key, f);
+      this.#byTile[key] = f;
     }
     return f;
   }
@@ -662,18 +757,27 @@ class Run {
     readonly plan: Plan,
     readonly seed: number,
     readonly fields: (tx: number, tz: number) => Fields | undefined,
-    readonly geometry: { tileTicks: number; cellTicks: number; cells: number; worldX: number; worldZ: number },
+    readonly geometry: {
+      tileTicks: number;
+      cellTicks: number;
+      cells: number;
+      worldX: number;
+      worldZ: number;
+      /** log2 of tileTicks and of cellTicks (both powers of two). */
+      tileShift: number;
+      cellShift: number;
+    },
     readonly shapes: Shapes,
   ) {
-    this.pools = plan.strata.map(() => new Pool());
+    this.pools = plan.strata.map((st) => new Pool(windowBits(geometry.tileTicks, st.gs)));
   }
 
   /** The world cell fields at a tick position, or undefined outside the world. */
   at(x: number, z: number, out: { f?: Fields; k: number }): boolean {
     const g = this.geometry;
     if (x < 0 || z < 0 || x >= g.worldX || z >= g.worldZ) return false;
-    const tx = divFloor(x, g.tileTicks),
-      tz = divFloor(z, g.tileTicks),
+    const tx = x >> g.tileShift,
+      tz = z >> g.tileShift,
       key = tx * 65536 + tz;
     if (key !== this.#tile) {
       this.#fields = this.tileFields(tx, tz);
@@ -681,26 +785,28 @@ class Run {
     }
     const f = this.#fields!;
     out.f = f;
-    out.k = divFloor(z - tz * g.tileTicks, g.cellTicks) * g.cells + divFloor(x - tx * g.tileTicks, g.cellTicks);
+    out.k = ((z - tz * g.tileTicks) >> g.cellShift) * g.cells + ((x - tx * g.tileTicks) >> g.cellShift);
     return true;
   }
 
-  /** The parents of a cluster's parent cell, [x, z] ticks, made once per run. */
-  parents(c: Cluster, px: number, pz: number): Int32Array {
-    let byCell = this.parentCache.get(c.code);
-    if (!byCell) this.parentCache.set(c.code, (byCell = new Map()));
-    const key = cellKey(px, pz);
-    let list = byCell.get(key);
-    if (list) return list;
-    const count = poisson(c.mu, hash5(this.seed, c.code, px, pz, 0));
-    list = new Int32Array(2 * count);
+  /** The parents of a cluster's parent cell, made once per run: their slot in `store.cells` (pairs in `store.xz`). */
+  parents(c: Cluster, px: number, pz: number, store: Parents): number {
+    const found = store.cells.find(px, pz);
+    if (found >= 0) return found;
+    const count = poisson(c.mu, c.e0, hash5(this.seed, c.code, px, pz, 0)),
+      slot = store.cells.add(px, pz, store.n);
+    if (store.n + 2 * count > store.xz.length) {
+      const grown = new Int32Array(Math.max(2 * store.xz.length, store.n + 2 * count));
+      grown.set(store.xz);
+      store.xz = grown;
+    }
     for (let i = 1; i <= count; i++) {
       const h = hash5(this.seed, c.code, px, pz, i);
-      list[2 * i - 2] = px * c.cell + Math.floor(((h >>> 16) * c.cell) / 65536);
-      list[2 * i - 1] = pz * c.cell + Math.floor(((h & 0xffff) * c.cell) / 65536);
+      store.xz[store.n++] = px * c.cell + Math.floor(((h >>> 16) * c.cell) / 65536);
+      store.xz[store.n++] = pz * c.cell + Math.floor(((h & 0xffff) * c.cell) / 65536);
     }
-    byCell.set(key, list);
-    return list;
+    store.cells.count[slot] = 2 * count;
+    return slot;
   }
 
   /**
@@ -709,12 +815,8 @@ class Run {
    */
   somewhere(b: number, x0: number, z0: number, x1: number, z1: number): boolean {
     const g = this.geometry;
-    for (let tz = divFloor(Math.max(0, z0), g.tileTicks); tz <= divFloor(Math.min(g.worldZ - 1, z1), g.tileTicks); tz++)
-      for (
-        let tx = divFloor(Math.max(0, x0), g.tileTicks);
-        tx <= divFloor(Math.min(g.worldX - 1, x1), g.tileTicks);
-        tx++
-      ) {
+    for (let tz = Math.max(0, z0) >> g.tileShift; tz <= Math.min(g.worldZ - 1, z1) >> g.tileShift; tz++)
+      for (let tx = Math.max(0, x0) >> g.tileShift; tx <= Math.min(g.worldX - 1, x1) >> g.tileShift; tx++) {
         if (this.tileFields(tx, tz).present[b]) return true;
       }
     return false;
@@ -727,11 +829,16 @@ class Run {
       x1 = divFloor(x + c.reach, c.cell),
       z0 = divFloor(z - c.reach, c.cell),
       z1 = divFloor(z + c.reach, c.cell);
-    let sum = 0;
+    let sum = 0,
+      store = this.parentCache.get(c.code);
+    if (!store) this.parentCache.set(c.code, (store = { cells: new Cells(5), xz: new Int32Array(1024), n: 0 }));
     for (let pz = z0; pz <= z1; pz++)
       for (let px = x0; px <= x1; px++) {
-        const parents = this.parents(c, px, pz);
-        for (let i = 0; i < parents.length; i += 2) {
+        const slot = this.parents(c, px, pz, store),
+          start = store.cells.start[slot],
+          end = start + store.cells.count[slot],
+          parents = store.xz;
+        for (let i = start; i < end; i += 2) {
           const ox = parents[i],
             oz = parents[i + 1],
             d2 = (x - ox) * (x - ox) + (z - oz) * (z - oz);
@@ -746,30 +853,39 @@ class Run {
     return ONE - c.beta + qmul(c.beta, Math.min(CLUSTER_CAP * ONE, sum));
   }
 
-  /** Generates (once) the candidates of stratum `s` in cell (cx, cz) that pass thinning, light and lower layers. */
-  cell(s: number, cx: number, cz: number): void {
+  /**
+   * Generates (once) the candidates of stratum `s` in cell (cx, cz) that pass thinning, light and lower layers. Returns
+   * the cell's slot in the stratum's table (valid until that table's next add).
+   */
+  cell(s: number, cx: number, cz: number): number {
     const pool = this.pools[s],
-      key = cellKey(cx, cz);
-    if (pool.cellStart.has(key)) return;
+      found = pool.cells.find(cx, cz);
+    if (found >= 0) return found;
     const st = this.plan.strata[s],
       start = pool.n,
-      look = { f: undefined as Fields | undefined, k: 0 },
-      e = this.scratch;
-    // Mark the cell first: generating it can query other strata, never this one.
-    pool.cellStart.set(key, start);
-    pool.cellCount.set(key, 0);
+      look = this.look,
+      e = this.scratch,
+      // Mark the cell first: generating it can query other strata, never this one, so the slot stays valid.
+      slot = pool.cells.add(cx, cz, start);
+    let generated = 0;
     for (const sp of st.species) {
       if (!this.somewhere(sp.biomeIndex, cx * st.g, cz * st.g, (cx + 1) * st.g - 1, (cz + 1) * st.g - 1)) continue;
-      const steps = divFloor(st.g, sp.gen); // a power of two
+      const steps = divFloor(st.g, sp.gen), // a power of two
+        // A stratum cell no larger than a tile lies inside one tile (both are aligned powers of two), so each of its
+        // generation cells would get the same answer as the cell itself.
+        each = st.g > this.geometry.tileTicks;
       for (let b = 0; b < steps; b++)
         for (let a = 0; a < steps; a++) {
           const gx = cx * steps + a,
             gz = cz * steps + b;
-          if (!this.somewhere(sp.biomeIndex, gx * sp.gen, gz * sp.gen, (gx + 1) * sp.gen - 1, (gz + 1) * sp.gen - 1))
+          if (
+            each &&
+            !this.somewhere(sp.biomeIndex, gx * sp.gen, gz * sp.gen, (gx + 1) * sp.gen - 1, (gz + 1) * sp.gen - 1)
+          )
             continue;
-          const n = poisson(sp.mu, hash5(this.seed, sp.code, gx, gz, 0));
+          const n = poisson(sp.mu, sp.e0, hash5(this.seed, sp.code, gx, gz, 0));
+          generated += n;
           for (let i = 1; i <= n; i++) {
-            this.candidates++;
             const h0 = hash5(this.seed, sp.code, gx, gz, i),
               h1 = pcg(h0),
               h2 = pcg(h1),
@@ -824,7 +940,9 @@ class Run {
           }
         }
     }
-    pool.cellCount.set(key, pool.n - start);
+    pool.cells.count[slot] = pool.n - start;
+    pool.cells.tally[slot] = generated;
+    return slot;
   }
 
   /** Is (x, z) under an accepted crown of an earlier plant layer (1 .. s - 1)? */
@@ -834,12 +952,11 @@ class Run {
       if (!st.species.length) continue;
       const reach = st.rmax,
         pool = this.pools[t];
-      for (let cz = divFloor(z - reach, st.g); cz <= divFloor(z + reach, st.g); cz++)
-        for (let cx = divFloor(x - reach, st.g); cx <= divFloor(x + reach, st.g); cx++) {
-          this.cell(t, cx, cz);
-          const key = cellKey(cx, cz),
-            start = pool.cellStart.get(key)!,
-            end = start + pool.cellCount.get(key)!;
+      for (let cz = (z - reach) >> st.gs; cz <= (z + reach) >> st.gs; cz++)
+        for (let cx = (x - reach) >> st.gs; cx <= (x + reach) >> st.gs; cx++) {
+          const slot = this.cell(t, cx, cz),
+            start = pool.cells.start[slot],
+            end = start + pool.cells.count[slot];
           for (let i = start; i < end; i++) {
             const dx = pool.x[i] - x,
               dz = pool.z[i] - z;
@@ -858,12 +975,11 @@ class Run {
       if (!st.species.length) continue;
       const pool = this.pools[t],
         reach = qmul(this.plan.across, st.rmax + r) + 1;
-      for (let cz = divFloor(z - reach, st.g); cz <= divFloor(z + reach, st.g); cz++)
-        for (let cx = divFloor(x - reach, st.g); cx <= divFloor(x + reach, st.g); cx++) {
-          this.cell(t, cx, cz);
-          const key = cellKey(cx, cz),
-            start = pool.cellStart.get(key)!,
-            end = start + pool.cellCount.get(key)!;
+      for (let cz = (z - reach) >> st.gs; cz <= (z + reach) >> st.gs; cz++)
+        for (let cx = (x - reach) >> st.gs; cx <= (x + reach) >> st.gs; cx++) {
+          const slot = this.cell(t, cx, cz),
+            start = pool.cells.start[slot],
+            end = start + pool.cells.count[slot];
           for (let i = start; i < end; i++) {
             const d = qmul(this.plan.factor[sp * n + pool.sp[i]], r + pool.r[i]),
               dx = pool.x[i] - x,
@@ -884,19 +1000,19 @@ class Run {
       x = pool.x[i],
       z = pool.z[i],
       reach = st.dmax,
-      cx0 = divFloor(x - reach, st.g),
-      cx1 = divFloor(x + reach, st.g),
-      cz0 = divFloor(z - reach, st.g),
-      cz1 = divFloor(z + reach, st.g);
+      cx0 = (x - reach) >> st.gs,
+      cx1 = (x + reach) >> st.gs,
+      cz0 = (z - reach) >> st.gs,
+      cz1 = (z + reach) >> st.gs;
     for (let cz = cz0; cz <= cz1; cz++) for (let cx = cx0; cx <= cx1; cx++) this.cell(s, cx, cz);
     // Generating cells may have grown the pool; read it again.
     const p = this.pools[s];
     p.nb[i] = p.listN;
     for (let cz = cz0; cz <= cz1; cz++)
       for (let cx = cx0; cx <= cx1; cx++) {
-        const key = cellKey(cx, cz),
-          start = p.cellStart.get(key)!,
-          end = start + p.cellCount.get(key)!;
+        const slot = p.cells.find(cx, cz),
+          start = p.cells.start[slot],
+          end = start + p.cells.count[slot];
         for (let j = start; j < end; j++) {
           if (j === i) continue;
           const pj = p.prio[j],
@@ -1202,6 +1318,8 @@ export class BiomePlacement implements Disposable {
         cells: w.tileSize / w.resolution, // float division: exact
         worldX: w.tilesX * tileTicks,
         worldZ: w.tilesZ * tileTicks,
+        tileShift: 31 - Math.clz32(tileTicks),
+        cellShift: 31 - Math.clz32(w.resolution * TICK),
       },
       this.#shapes,
     );
@@ -1216,17 +1334,18 @@ export class BiomePlacement implements Disposable {
       z0 = tz * tileTicks,
       rounds = new Uint32Array(plan.rounds),
       objects: { s: number; i: number }[] = [];
-    let unresolved = 0;
+    let unresolved = 0,
+      candidates = 0;
     // Every candidate inside the tile, each layer in order.
     plan.strata.forEach((st, s) => {
       if (!st.species.length) return;
-      for (let cz = divFloor(z0, st.g); cz <= divFloor(z0 + tileTicks - 1, st.g); cz++)
-        for (let cx = divFloor(x0, st.g); cx <= divFloor(x0 + tileTicks - 1, st.g); cx++) {
-          run.cell(s, cx, cz);
-          const pool = run.pools[s],
-            key = cellKey(cx, cz),
-            start = pool.cellStart.get(key)!,
-            end = start + pool.cellCount.get(key)!;
+      for (let cz = z0 >> st.gs; cz <= (z0 + tileTicks - 1) >> st.gs; cz++)
+        for (let cx = x0 >> st.gs; cx <= (x0 + tileTicks - 1) >> st.gs; cx++) {
+          const slot = run.cell(s, cx, cz),
+            pool = run.pools[s],
+            start = pool.cells.start[slot],
+            end = start + pool.cells.count[slot];
+          candidates += pool.cells.tally[slot];
           for (let i = start; i < end; i++) {
             const px = pool.x[i],
               pz = pool.z[i];
@@ -1249,7 +1368,7 @@ export class BiomePlacement implements Disposable {
     for (const k of trees) {
       const o = objects[k],
         p = run.pools[o.s],
-        key = cellKey(divFloor(p.x[o.i], PPA), divFloor(p.z[o.i], PPA));
+        key = ((p.x[o.i] >> PPA_SHIFT) + 32768) * 65536 + (p.z[o.i] >> PPA_SHIFT) + 32768;
       let list = byCell.get(key);
       if (!list) byCell.set(key, (list = []));
       list.push(k);
@@ -1274,7 +1393,9 @@ export class BiomePlacement implements Disposable {
           );
       let area = 0,
         zStar = 0;
-      // The canopy closes at 60 % crown cover: the cover a dense stand reaches under the hard core and the room rule
+      // The canopy closes at 60 % crown cover, the lower bound of a closed tree canopy (crowns interlocking, generally
+      // 60 to 100 % crown cover; below it an open canopy, 25 to 60 %) in the FGDC Vegetation Classification Standard,
+      // FGDC-STD-005, June 1997. It is also the cover a dense stand reaches under the hard core and the room rule
       // (measured 0.6 to 0.65 of the ground at the candidate rates placement uses), m^2 Q16.
       const cellArea = 614 * ONE;
       for (const q of order) {
@@ -1344,13 +1465,12 @@ export class BiomePlacement implements Disposable {
     for (const s of [1, 2]) {
       const st = plan.strata[s];
       if (!st.species.length) continue;
-      for (let cz = divFloor(z0 - reachT, st.g); cz <= divFloor(z0 + tileTicks + reachT, st.g); cz++)
-        for (let cx = divFloor(x0 - reachT, st.g); cx <= divFloor(x0 + tileTicks + reachT, st.g); cx++) {
-          run.cell(s, cx, cz);
-          const pool = run.pools[s],
-            key = cellKey(cx, cz),
-            start = pool.cellStart.get(key)!,
-            end = start + pool.cellCount.get(key)!;
+      for (let cz = (z0 - reachT) >> st.gs; cz <= (z0 + tileTicks + reachT) >> st.gs; cz++)
+        for (let cx = (x0 - reachT) >> st.gs; cx <= (x0 + tileTicks + reachT) >> st.gs; cx++) {
+          const slot = run.cell(s, cx, cz),
+            pool = run.pools[s],
+            start = pool.cells.start[slot],
+            end = start + pool.cells.count[slot];
           for (let i = start; i < end; i++) if (run.accepted(s, i)) crowns.push(pool.x[i], pool.z[i], pool.r[i]);
         }
     }
@@ -1358,10 +1478,10 @@ export class BiomePlacement implements Disposable {
       const cx = crowns[c] - x0,
         cz = crowns[c + 1] - z0,
         r = crowns[c + 2],
-        i0 = Math.max(0, divFloor(cx - r, cellTicks)),
-        i1 = Math.min(cells - 1, divFloor(cx + r, cellTicks)),
-        j0 = Math.max(0, divFloor(cz - r, cellTicks)),
-        j1 = Math.min(cells - 1, divFloor(cz + r, cellTicks));
+        i0 = Math.max(0, (cx - r) >> run.geometry.cellShift),
+        i1 = Math.min(cells - 1, (cx + r) >> run.geometry.cellShift),
+        j0 = Math.max(0, (cz - r) >> run.geometry.cellShift),
+        j1 = Math.min(cells - 1, (cz + r) >> run.geometry.cellShift);
       for (let j = j0; j <= j1; j++)
         for (let i = i0; i <= i1; i++) {
           // Four sub-samples per cell; each covered quarter adds 64 (255 when all are).
@@ -1429,7 +1549,7 @@ export class BiomePlacement implements Disposable {
       canopy: raster('canopy', canopy),
       exclusion: raster('exclusion', exclusion),
       density: Object.freeze(density),
-      stats: Object.freeze({ candidates: run.candidates, accepted: count, unresolved, rounds }),
+      stats: Object.freeze({ candidates, accepted: count, unresolved, rounds }),
       forEachInstance(visit: (instance: InstanceView) => void) {
         const out = {} as InstanceView;
         for (let k = 0; k < count; k++) {
@@ -1486,13 +1606,12 @@ export class BiomePlacement implements Disposable {
         out: Awaited<ReturnType<BiomePlacement['inspect']>> = [];
       this.#plan.strata.forEach((st, s) => {
         if (!st.species.length) return;
-        for (let cz = divFloor(z0, st.g); cz <= divFloor(z1 - 1, st.g); cz++)
-          for (let cx = divFloor(x0, st.g); cx <= divFloor(x1 - 1, st.g); cx++) {
-            run.cell(s, cx, cz);
-            const p = run.pools[s],
-              key = cellKey(cx, cz),
-              start = p.cellStart.get(key)!,
-              end = start + p.cellCount.get(key)!;
+        for (let cz = z0 >> st.gs; cz <= (z1 - 1) >> st.gs; cz++)
+          for (let cx = x0 >> st.gs; cx <= (x1 - 1) >> st.gs; cx++) {
+            const slot = run.cell(s, cx, cz),
+              p = run.pools[s],
+              start = p.cells.start[slot],
+              end = start + p.cells.count[slot];
             for (let i = start; i < end; i++) {
               if (p.x[i] < x0 || p.z[i] < z0 || p.x[i] >= x1 || p.z[i] >= z1) continue;
               run.live(s, i, this.#plan.rounds);

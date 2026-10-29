@@ -273,18 +273,37 @@ export function moistureIndex(pet: number, rainfall: number): number {
   // Very dry: E is all of P, so alpha = 1 / phi (the curve is within 1e-4 of it there).
   if (phi >= 16 * ONE) return qdiv(ONE, phi);
   if (phi < 64) return ONE;
-  const ratio = ONE + phi - qpow(ONE + qpow(phi, W), INVERSE_W);
-  return clampInt(qdiv(ratio, phi), 0, ONE);
+  // The curve depends on phi alone, and neighbouring cells share it: a direct-mapped cache of this pure function (the
+  // result is the same with or without it).
+  if (!budykoKeys) {
+    budykoKeys = new Int32Array(65536).fill(-1);
+    budykoValues = new Int32Array(65536);
+  }
+  const slot = phi & 65535;
+  if (budykoKeys[slot] === phi) return budykoValues[slot];
+  const ratio = ONE + phi - qpow(ONE + qpow(phi, W), INVERSE_W),
+    alpha = clampInt(qdiv(ratio, phi), 0, ONE);
+  budykoKeys[slot] = phi;
+  budykoValues[slot] = alpha;
+  return alpha;
 }
+
+/** The cache of moistureIndex, made on first use: phi keys (-1 empty) and their moisture indices. */
+let budykoKeys: Int32Array | undefined, budykoValues: Int32Array;
 
 /**
  * Heat load in Q16, -1..1: cos(aspect - warmest aspect) x min(1, tan(slope) / tan(30 degrees)), from the downslope
  * gradient: `gx` and `gz` are the east and south height gradients (any common scale), slope is Q8.8 tan.
  */
 export function heatLoad(climate: Climate, gx: number, gz: number, slope: number): number {
+  return heatLoadOf(climate, gx, gz, slope, isqrt(Math.min(68719476736, gx * gx + gz * gz)));
+}
+
+/** {@link heatLoad} given `root` = floor(sqrt(min(2^36, gx^2 + gz^2))), which the tile kernel has already. */
+export function heatLoadOf(climate: Climate, gx: number, gz: number, slope: number, root: number): number {
   if (slope <= 0 || (gx === 0 && gz === 0)) return 0;
   // Downslope direction: north component gz, east component -gx.
   const [wc, ws] = climate.warm,
-    c = divWide(gz * wc - gx * ws, isqrt(Math.min(68719476736, gx * gx + gz * gz)) || 1);
+    c = divWide(gz * wc - gx * ws, root || 1);
   return Math.floor((clampInt(c, -ONE, ONE) * Math.min(ONE, divFloor(slope * ONE, 148))) / ONE); // tan 30 = 148 / 256
 }

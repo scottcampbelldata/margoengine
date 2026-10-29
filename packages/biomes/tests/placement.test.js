@@ -563,7 +563,7 @@ test('the editor dirty margin covers the placement reach, and an edit leaves til
   assert.notEqual(await p.digest(7, 1), near);
 });
 
-test('time budget (G1): one preset forest tile placed in under 2 s on one thread (measured about N ms)', async () => {
+test('time budget (G1): one preset forest tile placed in under 400 ms on one thread (measured about 27 ms on the reference PC)', async () => {
   const w = await BiomeWorld.create({ size: [1024, 1024], ...presetWorldOptions('temperate') }),
     p = BiomePlacement.attach(w);
   await p.tile(0, 0);
@@ -578,5 +578,5 @@ test('time budget (G1): one preset forest tile placed in under 2 s on one thread
   await p.tile(1, 1);
   await p.tile(2, 1);
   const each = (performance.now() - start) / 2;
-  assert.ok(each < 2000, `placement took ${each.toFixed(0)} ms per tile`);
+  assert.ok(each < 400, `placement took ${each.toFixed(0)} ms per tile`);
 });

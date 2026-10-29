@@ -560,23 +560,7 @@ export class Scatter implements EnginePlugin {
         this.values.set(c.camera.planes, 44);
         this.values[43] = +(c.format === 'rgba16float');
         c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
-        for (let i = 0; i < 3; i++) c.encoder.clearBuffer(this.commands!, i * 20 + 4, 4);
-        const density = this.options.densityMap ? (this.options.densityMap() ?? this.fallback!) : undefined;
-        if (this.terrain !== terrain || this.densityTexture !== density || this.extraChanged || !this.computeGroup) {
-          this.computeGroup = group(c.device, this.compute!, [
-            { buffer: this.uniform! },
-            terrain.createView(),
-            ...this.instances.map((buffer) => ({ buffer })),
-            { buffer: this.commands! },
-            { buffer: this.exclusionBuffer! },
-            ...(density ? [density.createView()] : []),
-            ...this.extraEntries(),
-          ]);
-          this.terrain = terrain;
-          this.densityTexture = density;
-          this.extraChanged = false;
-        }
-        dispatch(c, this.compute!, this.computeGroup, Math.ceil(this.dispatched() / 64));
+        this.cull(c, terrain);
       },
     });
     graph.add({
@@ -587,6 +571,33 @@ export class Scatter implements EnginePlugin {
       },
     });
   }
+  /** Records the distribute (cull) dispatch: clears the ring counts, then fills the rings (the tiles entry shares it). */
+  protected cull(c: ScatterPassContext, terrain: GPUTexture): void {
+    for (let i = 0; i < 3; i++) c.encoder.clearBuffer(this.commands!, i * 20 + 4, 4);
+    const density = this.options.densityMap ? (this.options.densityMap() ?? this.fallback!) : undefined;
+    if (this.terrain !== terrain || this.densityTexture !== density || this.extraChanged || !this.computeGroup) {
+      this.computeGroup = group(c.device, this.compute!, [
+        { buffer: this.uniform! },
+        terrain.createView(),
+        ...this.instances.map((buffer) => ({ buffer })),
+        { buffer: this.commands! },
+        { buffer: this.exclusionBuffer! },
+        ...(density ? [density.createView()] : []),
+        ...this.extraEntries(),
+      ]);
+      this.terrain = terrain;
+      this.densityTexture = density;
+      this.extraChanged = false;
+    }
+    dispatch(c, this.compute!, this.computeGroup, Math.ceil(this.dispatched() / 64));
+  }
+
+  /** Call after replacing `instances`: the bind groups that read them are made again. */
+  protected instancesChanged(): void {
+    this.renderGroups.clear();
+    this.computeGroup = undefined;
+  }
+
   /** The distribute (cull) shader: the stratified grid, with the world-rectangle variants when they are set. */
   protected cullCode(): string {
     return scatterCullShader(this.options);

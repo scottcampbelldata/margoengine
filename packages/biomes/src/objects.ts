@@ -146,11 +146,14 @@ export class BiomeObjects implements Disposable {
   /** Records left out because a tile held more than its slot (0 unless a stand is denser than expected). */
   dropped = 0;
 
-  /** GPU bytes held for stored objects: 8 per record slot and 32 per drawable instance in each LOD ring (goal G2). */
+  /**
+   * GPU bytes held for stored objects (goal G2): per species, its held records (8 bytes each) and its LOD rings (32
+   * bytes per instance they can draw), both sized from the held tiles with headroom; a tree's canopy shares its trunk's.
+   */
   get gpuBytes(): number {
     let n = 0;
     for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])
-      for (const t of entry.tiles) n += t.slots * t.slotSize * 8 + t.drawnCapacity * 32 * 3;
+      for (const t of entry.tiles) n += t.gpuBytes;
     return n;
   }
 
@@ -168,37 +171,33 @@ export class BiomeObjects implements Disposable {
     const { radius, detailRadius, detailResolution, bounds, heightmap } = this.#options,
       side = this.#placement.tileSize,
       // Canopy trees are drawn within the full radius, smaller plants, rocks and props within 300 m.
-      tiles = (key: string, density: number, cluster: number, near: boolean) => {
+      tiles = (key: string, near: boolean) => {
         const r = near ? Math.min(radius, 300) : radius,
           slots = (Math.ceil((2 * r) / side) + 2) ** 2, // float division: view only
-          // The most records a tile can hold (density times area, times the cluster and edge peaks), within scatter's
-          // limit of 1,000,000 records.
-          slotSize = Math.min(
-            Math.floor(1000000 / slots), // float division: view only
-            2 ** Math.ceil(Math.log2(Math.max(64, ((density * side * side) / 1e4) * cluster * 1.5))),
-          );
-        return {
-          radius: r,
-          tiles: partsOf(key, this.#modules.procedural, this.#make).map((part) =>
+          // Memory follows the held records, so a tile may hold up to scatter's per-tile limit (no stand is dropped).
+          slotSize = Math.min(65536, Math.floor(16777216 / slots)), // float division: view only
+          list: ScatterTiles[] = [];
+        for (const part of partsOf(key, this.#modules.procedural, this.#make))
+          list.push(
             this.#modules.tiles.ScatterTiles.attach(this.#engine, part.geometry, {
               bounds,
               heightmap,
               slots,
               slotSize,
-              drawn: Math.min(1000000, Math.max(4096, Math.ceil((density * Math.PI * r * r) / 1e4))),
               lod: [r * 0.15, r * 0.4, r],
               lodFade: 0,
               color: part.color,
               maxSlope: 90,
               // Plants sway with a light breeze; stone does not.
               ...(part.color === STONE ? {} : { wind: [1, 0, 0.25] as const }),
+              // A tree's canopy draws the trunk's objects: one set of records, culling and rings for both.
+              ...(list.length ? { share: list[0] } : {}),
             }),
-          ),
-        };
+          );
+        return { radius: r, tiles: list };
       };
-    for (const s of this.#placement.species)
-      this.#species.set(s.key, tiles(s.mesh, s.density, s.clustered ? 4 : 1, s.layer !== 1));
-    this.#snags = tiles('procedural:snag', 200, 4, false);
+    for (const s of this.#placement.species) this.#species.set(s.key, tiles(s.mesh, s.layer !== 1));
+    this.#snags = tiles('procedural:snag', false);
     const [x0, z0, x1, z1] = bounds,
       width = Math.ceil((x1 - x0) / detailResolution), // float division: view only
       depth = Math.ceil((z1 - z0) / detailResolution); // float division
@@ -293,11 +292,12 @@ export class BiomeObjects implements Disposable {
     this.remove(key);
     for (const [s, list] of bySpecies) {
       const entry = this.#species.get(tile.species[s]);
+      // The first part holds the records; the others share them.
       if (entry && distance <= entry.radius)
-        for (const t of entry.tiles) t.setTile(key, tile.origin, tile.size, pick(list, t.slotSize));
+        entry.tiles[0].setTile(key, tile.origin, tile.size, pick(list, entry.tiles[0].slotSize));
     }
     if (this.#snags && distance <= this.#snags.radius)
-      for (const t of this.#snags.tiles) t.setTile(key, tile.origin, tile.size, pick(dead, t.slotSize));
+      this.#snags.tiles[0].setTile(key, tile.origin, tile.size, pick(dead, this.#snags.tiles[0].slotSize));
     this.#held.set(key, tile.count);
     // Detail densities into the world-wide textures (every detailResolution metres).
     const res = this.#options.detailResolution,
@@ -340,15 +340,16 @@ export class BiomeObjects implements Disposable {
   remove(key: string): void {
     if (!this.#held.delete(key)) return;
     for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])
-      for (const t of entry.tiles) t.removeTile(key);
+      entry.tiles[0].removeTile(key);
   }
 
   /** Frees every scatter and texture. */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    // Sharing parts first, then the part whose buffers they read.
     for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])
-      for (const t of entry.tiles) t.dispose();
+      for (const t of [...entry.tiles].reverse()) t.dispose();
     for (const d of this.#details) {
       d.scatter.dispose();
       d.texture?.destroy();

@@ -10,7 +10,7 @@ import {
   degreeDays,
   evapotranspiration,
   halfAmplitude,
-  heatLoad,
+  heatLoadOf,
   moistureIndex,
   seasonMean,
   treelineMargin,
@@ -160,7 +160,8 @@ export function tileFields(
       const gx = c + 2 * f + ii - (a + 2 * d + gg),
         gz = gg + 2 * hh + ii - (a + 2 * b + c),
         s2 = Math.min(68719476736, gx * gx + gz * gz),
-        tan = Math.min(32767, divFloor(isqrt(s2 * 65536), 8 * cell)); // Q8.8
+        root8 = isqrt(s2 * 65536), // floor(256 sqrt(s2)); floor(sqrt(s2)) is root8 >> 8
+        tan = Math.min(32767, divFloor(root8, 8 * cell)); // Q8.8
       slope[k] = tan;
       // Downslope direction (-gx, -gz); north is -z, so its north component is gz.
       const angle = gx === 0 && gz === 0 ? 0 : atan2(-gx, gz);
@@ -217,7 +218,7 @@ export function tileFields(
       rainfall[k] = Math.min(65535, rain);
       exposure[k] = expo;
       water[k] = dist;
-      cellClimate(climate, e, tan, gx, gz, position, boxRadius, rain, cont, expo, dist, fill, dd, c9);
+      cellClimate(climate, e, tan, gx, gz, position, boxRadius, rain, cont, expo, dist, fill, dd, c9, root8 >> 8);
       temperature[k] = c9[0];
       coldest[k] = c9[1];
       warmest[k] = c9[2];
@@ -253,10 +254,11 @@ export function cellClimate(
   fill: number,
   dd: number[],
   out: Int32Array,
+  root = isqrt(Math.min(68719476736, gx * gx + gz * gz)),
 ): Int32Array {
   // Temperature: sea-level mean, day and night lapse, heat load, cold-air pooling (spec 2.2).
   const above = Math.max(0, e - climate.sea),
-    heat = heatLoad(climate, gx, gz, tan),
+    heat = heatLoadOf(climate, gx, gz, tan, root),
     range0 =
       700 +
       Math.floor((600 * cont) / ONE) +

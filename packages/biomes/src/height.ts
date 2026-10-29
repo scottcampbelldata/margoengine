@@ -46,7 +46,7 @@ function weights(t: number, out: Int32Array, at: number): void {
  * output cell (c, r) lies at lattice position ((x0 + c) * nx / dx, (z0 + r) * nz / dz), written row-major into `out`.
  */
 function resample(
-  get: (i: number, j: number) => number,
+  get: ((i: number, j: number) => number) | LatticeFill,
   count: number,
   rows: number,
   x0: number,
@@ -75,7 +75,9 @@ function resample(
     jlo = iz[0] - 1,
     jspan = iz[rows - 1] + 3 - jlo,
     lattice = new Float64Array(span * jspan);
-  for (let j = 0; j < jspan; j++) for (let i = 0; i < span; i++) lattice[j * span + i] = get(lo + i, jlo + j);
+  if (typeof get === 'function')
+    for (let j = 0; j < jspan; j++) for (let i = 0; i < span; i++) lattice[j * span + i] = get(lo + i, jlo + j);
+  else get.fill(lo, jlo, span, jspan, lattice);
   // Along x for every lattice row, then along z.
   const across = new Float64Array(jspan * count);
   for (let j = 0; j < jspan; j++)
@@ -102,6 +104,51 @@ function resample(
           ONE,
       );
   }
+}
+
+/** Fills `out` (`span` x `rows`, row-major) with lattice values from lattice point (i0, j0). */
+interface LatticeFill {
+  fill(i0: number, j0: number, span: number, rows: number, out: Float64Array): void;
+}
+
+/** Lattice points per side of a cached relief block (64 m at the 4 m lattice), and the most blocks kept (4 MB). */
+const BLOCK = 16,
+  BLOCKS = 4096;
+
+/**
+ * The procedural relief's lattice, cached per world in 16 x 16 blocks: neighbouring tiles (and a tile's apron) read
+ * the same lattice points, so each is evaluated once while its block stays cached (oldest blocks go first). The
+ * values are those of `at`, so the cache changes no output.
+ */
+function latticeCache(at: (i: number, j: number) => number): LatticeFill {
+  const blocks = new Map<number, Int32Array>(),
+    block = (bi: number, bj: number) => {
+      // Block indices stay within +-2^15 for every world (64 km at 4 m is 16,384 lattice points, 1,024 blocks).
+      const key = (bi + 32768) * 65536 + (bj + 32768);
+      let b = blocks.get(key);
+      if (b) return b;
+      b = new Int32Array(BLOCK * BLOCK);
+      for (let j = 0; j < BLOCK; j++)
+        for (let i = 0; i < BLOCK; i++) b[j * BLOCK + i] = at(bi * BLOCK + i, bj * BLOCK + j);
+      if (blocks.size >= BLOCKS) blocks.delete(blocks.keys().next().value!);
+      blocks.set(key, b);
+      return b;
+    };
+  return {
+    fill(i0, j0, span, rows, out) {
+      for (let bj = Math.floor(j0 / BLOCK); bj * BLOCK < j0 + rows; bj++)
+        for (let bi = Math.floor(i0 / BLOCK); bi * BLOCK < i0 + span; bi++) {
+          const b = block(bi, bj),
+            x0 = Math.max(i0, bi * BLOCK),
+            x1 = Math.min(i0 + span, (bi + 1) * BLOCK),
+            z0 = Math.max(j0, bj * BLOCK),
+            z1 = Math.min(j0 + rows, (bj + 1) * BLOCK);
+          for (let j = z0; j < z1; j++)
+            for (let i = x0; i < x1; i++)
+              out[(j - j0) * span + (i - i0)] = b[(j - bj * BLOCK) * BLOCK + i - bi * BLOCK];
+        }
+    },
+  };
 }
 
 /** A world's heights: grids of samples at a given spacing, in mm, positions relative to the world's minimum corner. */
@@ -136,7 +183,8 @@ export function heightsOf(
       size: [size[0] / 1000, size[1] / 1000],
       ...(source?.relief ?? {}),
     });
-    const at = (i: number, j: number) => made.height(origin[0] + i * LATTICE, origin[1] + j * LATTICE);
+    const at = (i: number, j: number) => made.height(origin[0] + i * LATTICE, origin[1] + j * LATTICE),
+      cached = latticeCache(at);
     return {
       relief: made,
       grid(gx, gz, count, rows, step) {
@@ -145,7 +193,7 @@ export function heightsOf(
           const k = step / LATTICE;
           for (let r = 0; r < rows; r++)
             for (let c = 0; c < count; c++) out[r * count + c] = at((gx + c) * k, (gz + r) * k);
-        } else resample(at, count, rows, gx, gz, step, LATTICE, step, LATTICE, out);
+        } else resample(cached, count, rows, gx, gz, step, LATTICE, step, LATTICE, out);
         return out;
       },
     };

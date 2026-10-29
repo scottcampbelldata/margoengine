@@ -96,10 +96,13 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
   grows with latitude and continentality, closed-form growing degree days and season length, Korner's treeline
   margin, Hargreaves potential evapotranspiration with FAO-56 radiation, and the moisture index from Fu's form of the
   Budyko curve. Formulas, constants and sources are in `docs/clean-room.md`.
-- Tile cost on one thread of the reference PC (R16 mountain tiles, `bench/biomes/placement.mjs`): about 25 ms per
-  256 m tile at 1 m for the 17 climate layers and about 42 ms with classification (650 ms per km2; it was 1,350 before
-  the kernels were rewritten over typed planes with identical bytes), checked in the package test against a 400 ms
-  budget.
+- Tile cost on one thread of the reference PC (R16 mountain tiles, `bench/biomes/placement.mjs`, best of three runs of
+  20): about 28 ms per 256 m tile at 1 m for the 17 climate layers with classification (430 ms per km2) and about
+  16 ms for the stored objects (250 ms per km2): 680 ms per km2 in all, against 1,340 at the start of this round and
+  goal G1's 400. The same bytes as before: the gains came from an integer hash table for placement cells, shifts for
+  power-of-two cells, classification that finds the nearest envelope only where it is needed and skips the blend
+  steps for one-biome cells, a cache of the moisture curve and of the relief lattice. The package tests check a
+  400 ms budget per tile.
 
 ## Biomes, presets and blends
 
@@ -215,7 +218,10 @@ By default a `BiomeView` also draws the world's stored objects and detail: it at
 `@margoengine/scatter/tiles` per species mesh (dead trees as snags) and draws every detail species (grass, ferns,
 reeds) with a camera-following scatter whose density map is the placement's. Meshes are the `procedural:<name>` keys
 of the presets, from `@margoengine/procedural`. Pass `objects: false` for terrain alone. `view.objects` is that
-`BiomeObjects` (`count` objects on the GPU, `gpuBytes`, `dropped`).
+`BiomeObjects` (`count` objects on the GPU, `gpuBytes`, `dropped`). GPU memory follows what is held: the zero-config
+world's 172,569 streamed objects take 6.5 MB (records 8 bytes each, LOD rings 32 bytes per instance they can draw, both
+sized from the held tiles with headroom, and a tree's canopy sharing its trunk's), down from 117.6 MB when every tile
+slot and ring was sized for the densest case (`packages/biomes/tests/objects-check.mjs`, RTX A6000).
 
 | `BiomeView.attach` option | Default | Meaning |
 | --- | --- | --- |

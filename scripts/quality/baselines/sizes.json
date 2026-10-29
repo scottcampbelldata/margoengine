@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3996109,
+  "total": 3997776,
   "history": [
     {
       "date": "2026-10-24",
@@ -794,6 +794,12 @@
       "commit": "9247d10f",
       "reason": "react Canvas loadFallback and fallbackContent: WebGPU precheck, loader resolution, coded unsupported error (+110 B gzip, zero core bytes)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-29",
+      "commit": "b0604e04",
+      "reason": "biomes/placement +230 B: the integer cell table that halves placement time (G1); scatter/tiles +907 B: records and LOD rings sized from what is held, 117.6 to 6.5 MB of GPU memory (G2), and meshes that share one set of rings",
+      "grew": 2
     }
   ],
   "items": {
@@ -811,8 +817,8 @@
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/koppen": 1231,
-    "@margoengine/biomes/objects": 2903,
-    "@margoengine/biomes/placement": 10999,
+    "@margoengine/biomes/objects": 2843,
+    "@margoengine/biomes/placement": 11566,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/relief": 2825,
     "@margoengine/biomes/stats": 2755,
@@ -1074,7 +1080,7 @@
     "@margoengine/save": 6955,
     "@margoengine/save/node": 939,
     "@margoengine/scatter": 13299,
-    "@margoengine/scatter/tiles": 2288,
+    "@margoengine/scatter/tiles": 3448,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
     "@margoengine/sciviz": 36802,

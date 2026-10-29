@@ -183,6 +183,36 @@ export function membership(
   }
 }
 
+/** Memberships (Q16) of envelope `b` over `cells` cells into `m`, as {@link membership} without the distances. */
+function memberships(d: Dims, b: number, values: Int32Array, cells: number, m: Int32Array): void {
+  m.fill(ONE);
+  for (let q = d.start[b], end = d.start[b + 1]; q < end; q++) {
+    const at = d.slot[q] * cells,
+      lo = d.lo[q],
+      hi = d.hi[q],
+      width = d.width[q],
+      half = width >> 1;
+    for (let k = 0; k < cells; k++) {
+      const mk = m[k];
+      if (!mk) continue;
+      const x = values[at + k],
+        dist = Math.max(lo - x, x - hi);
+      m[k] = Math.floor((mk * wendland(clampInt(divFloor((dist + half) * ONE, width), 0, ONE))) / ONE);
+    }
+  }
+}
+
+/** The largest normalised signed distance (Q16) of envelope `b` at cell `k`, as {@link membership} writes to `far`. */
+function farAt(d: Dims, b: number, values: Int32Array, cells: number, k: number): number {
+  let far = -2147483647;
+  for (let q = d.start[b], end = d.start[b + 1]; q < end; q++) {
+    const x = values[d.slot[q] * cells + k],
+      f = clampInt(divFloor(Math.max(d.lo[q] - x, x - d.hi[q]) * ONE, d.width[q]), -1048576, 1048576);
+    if (f > far) far = f;
+  }
+  return far;
+}
+
 /** Inputs of a classification: layer getters over an n x n grid (the tile plus a 1-cell margin). */
 export interface ClassifyInput {
   readonly n: number;
@@ -209,9 +239,6 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     count = c.ids.length,
     cells = n * n,
     member = new Int32Array(count * cells),
-    nearest = new Int32Array(cells),
-    // Normalised distance of every envelope at every cell, for the fallback after paint.
-    farAll = new Int32Array(count * cells),
     slots = c.inputs.length,
     modes = c.modes,
     { rank, envelopes } = c,
@@ -275,27 +302,37 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
       for (let k = 0; k < cells; k++) out[k] = clampInt(source[k] + divFloor(n2[k] * 10, 32768), 0, 255);
     else out.set(source);
   }
-  // Envelope memberships and distances; the nearest envelope per cell in biome order (ties by rank).
-  const bestFar = new Int32Array(cells).fill(2147483647),
-    // With a zone classifier the envelope memberships only find the nearest envelope; zones fill `member`.
-    zones = !!c.score,
-    scratch = zones ? new Int32Array(cells) : member;
-  nearest.fill(-1);
-  for (let b = 0; b < count; b++) {
-    const m = scratch.subarray(zones ? 0 : b * cells, zones ? cells : (b + 1) * cells),
-      far = farAll.subarray(b * cells, (b + 1) * cells);
-    membership(envelopes, b, warped, cells, m, far);
-    for (let k = 0; k < cells; k++) {
-      const f = far[k];
-      if (f < bestFar[k] || (f === bestFar[k] && rank[b] < rank[nearest[k]])) {
-        nearest[k] = b;
-        bestFar[k] = f;
+  // Envelope memberships. The nearest envelope (the fallback where no biome has weight) is found only at the cells that
+  // need it, from the same distances `membership` gives, in biome order with ties by rank.
+  const zones = !!c.score;
+  if (!zones)
+    for (let b = 0; b < count; b++)
+      memberships(envelopes, b, warped, cells, member.subarray(b * cells, (b + 1) * cells));
+  c.score?.(warped, cells, member);
+  const nearestAt = (k: number) => {
+    let best = -1,
+      bestFar = 2147483647;
+    for (let b = 0; b < count; b++) {
+      const f = farAt(envelopes, b, warped, cells, k);
+      if (f < bestFar || (f === bestFar && rank[b] < rank[best])) {
+        best = b;
+        bestFar = f;
       }
     }
-  }
-  c.score?.(warped, cells, member);
+    return best;
+  };
+  // The 3x3 box sums of every membership plane over the inner cells: rows of three, then three rows (the same integer
+  // sums as adding the nine cells).
   const inner = n - 2,
-    w = new Int32Array(count),
+    rowSum = new Int32Array(cells),
+    box = new Int32Array(count * cells);
+  for (let b = 0; b < count; b++) {
+    const base = b * cells;
+    for (let k = 1; k < cells - 1; k++) rowSum[k] = member[base + k - 1] + member[base + k] + member[base + k + 1];
+    for (let j = 1; j <= inner; j++)
+      for (let i = 1, k = j * n + 1; i <= inner; i++, k++) box[base + k] = rowSum[k - n] + rowSum[k] + rowSum[k + n];
+  }
+  const w = new Int32Array(count),
     pick = new Int32Array(count),
     blocked = new Uint8Array(count),
     share = new Int32Array(4),
@@ -305,17 +342,32 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     maskGrid = paint.map((p) => (p.mask ? input.user(p.mask) : undefined));
   for (let j = 0; j < inner; j++)
     for (let i = 0; i < inner; i++) {
-      const k = (j + 1) * n + i + 1;
-      let total = 0;
+      const k = (j + 1) * n + i + 1,
+        out = (j * inner + i) * 4;
+      let total = 0,
+        only = -1,
+        some = 0;
       for (let b = 0; b < count; b++) {
-        const base = b * cells + k;
-        let s = 0;
-        for (let dz = -n; dz <= n; dz += n) s += member[base + dz - 1] + member[base + dz] + member[base + dz + 1];
-        w[b] = Math.floor(s / 9);
-        total += w[b];
+        const v = Math.floor(box[b * cells + k] / 9);
+        w[b] = v;
+        total += v;
+        if (v) {
+          some++;
+          only = b;
+        }
+      }
+      if (!paint.length && some <= 1) {
+        // One biome (or none: the nearest envelope) takes all 255: what the general steps below give for one weight.
+        ids[out] = some ? only : nearestAt(k);
+        weights[out] = 255;
+        for (let s = 1; s < 4; s++) {
+          ids[out + s] = 255;
+          weights[out + s] = 0;
+        }
+        continue;
       }
       if (!total) {
-        w[nearest[k]] = ONE;
+        w[nearestAt(k)] = ONE;
         total = ONE;
       }
       for (let b = 0; b < count; b++) w[b] = divFloor(w[b] * ONE, total);
@@ -343,11 +395,11 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
       for (let b = 0; b < count; b++) total += w[b];
       if (!total) {
         // Everything painted away: the nearest envelope among the biomes paint did not multiply to 0.
-        let pickB = nearest[k],
+        let pickB = nearestAt(k),
           pickFar = 2147483647;
         for (let b = 0; b < count; b++) {
           if (blocked[b]) continue;
-          const f = farAll[b * cells + k];
+          const f = farAt(envelopes, b, warped, cells, k);
           if (f < pickFar || (f === pickFar && rank[b] < rank[pickB])) {
             pickB = b;
             pickFar = f;
@@ -399,7 +451,6 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
         }
         order[at] = s;
       }
-      const out = (j * inner + i) * 4;
       for (let s = 0; s < 4; s++) {
         const live = s < used && share[order[s]] > 0;
         ids[out + s] = live ? pick[order[s]] : 255;
