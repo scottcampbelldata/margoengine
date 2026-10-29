@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 import { listenWhenFree } from '../../../scripts/browser.js';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/post-image/vite-cache',
@@ -18,8 +19,7 @@ const browser = await launchBrowser({ headless: true }),
   errors = [];
 const context = {
   close: async () => {
-    await browser.close();
-    await server.close();
+    await closeAll({ browser, servers: [server] });
   },
 };
 await page.goto('http://127.0.0.1:5341/packages/post/test/image-browser.html');

@@ -9,6 +9,7 @@ import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { build } from 'vite';
 import { SCENES, STANDARD, caseId, sceneParams } from '../scenes/catalog.js';
 import { root } from './env.mjs';
+import { closeAll } from '../../scripts/support/shutdown.mjs';
 
 export const distDir = resolve(root, 'test-results/bench/dist');
 const types = {
@@ -113,7 +114,7 @@ export async function serve({ port, external }) {
     }
   });
   await new Promise((r, j) => server.once('error', j).listen(port, '127.0.0.1', r));
-  return { url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() };
+  return { url: `http://127.0.0.1:${server.address().port}`, close: () => closeAll({ servers: [server] }) };
 }
 
 const args = [

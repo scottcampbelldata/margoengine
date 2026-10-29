@@ -6,6 +6,7 @@ import { listenWhenFree } from './browser.js';
 import { resolve } from 'node:path';
 import { installDemoLoadAudit } from './demo-load-audit.js';
 import { launchBrowser } from './lib/browser.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 await mkdir('test-results', { recursive: true });
 const root = resolve('examples/gameplay-sandbox');
@@ -238,6 +239,5 @@ try {
     JSON.stringify({ hardware, headless: true, results }, null, 2) + '\n',
   );
 } finally {
-  await browser?.close();
-  await server.close();
+  await closeAll({ browser, servers: [server] });
 }

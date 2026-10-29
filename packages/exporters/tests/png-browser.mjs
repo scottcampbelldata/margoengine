@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const server = await createServer({
   root: fileURLToPath(new URL('..', import.meta.url)),
@@ -55,6 +56,5 @@ try {
   assert.deepEqual([result.rawShrunk.width, result.rawShrunk.height], [3, 2], 'maxTextureSize 3 on raw 6x3');
   console.log(`png-browser: 5 checks passed (${browser.version()})`);
 } finally {
-  await browser?.close();
-  await server.close();
+  await closeAll({ browser, servers: [server] });
 }

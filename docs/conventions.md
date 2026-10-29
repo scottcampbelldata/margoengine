@@ -140,3 +140,12 @@ Baselines only shrink. When you fix a violation the gate fails until you lock it
 `npm run quality -- --gate=<gate> --update --reason="why"`; the reason is appended to the file's `history`. Size budgets
 only suggest shrinking. `--summary` prints the biggest offenders; `--details` writes every item and duplicate block to
 `test-results/quality.json`.
+
+## Browser suites end with `closeAll`
+
+A script that starts a browser must end it through `closeAll` from `scripts/support/shutdown.mjs` (bug 30, bug 70): the
+browser context and browser first, then the servers' connections, the servers, and the child processes' trees, all inside
+one budget that throws `SHUTDOWN_TIMEOUT` naming what was still open. A plain `server.close()` waits for every
+connection a browser holds, so a suite that passed every assertion could hang on its cleanup for ever. `launchBrowser`,
+`openBrowser` and `startDevServer` already close that way. `tests/browser-teardown.test.js` (part of `npm run verify`)
+fails for any script that starts a browser and an HTTP server of its own without `closeAll`.

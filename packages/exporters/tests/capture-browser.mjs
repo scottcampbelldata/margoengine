@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({
@@ -243,6 +244,5 @@ try {
   );
   console.log(`capture-browser: all checks passed (${report.backend})`);
 } finally {
-  await browser?.close();
-  await server.close();
+  await closeAll({ browser, servers: [server] });
 }

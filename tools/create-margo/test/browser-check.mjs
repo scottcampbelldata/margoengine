@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { decodePNG } from '../../../tests/support/png.js';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');
 // What each template must show once it runs: a selector and the text it holds.
@@ -92,11 +93,11 @@ try {
       );
       await page.close();
     } finally {
-      await server.close();
+      await closeAll({ servers: [server] });
     }
   }
   console.log(report.join('\n'));
   console.log('create-margo browser check passed');
 } finally {
-  await browser.close();
+  await closeAll({ browser });
 }

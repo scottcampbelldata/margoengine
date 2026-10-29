@@ -12,6 +12,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForQuiet, onAC } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
+import { closeAll } from '../../scripts/support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
   arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -81,11 +82,11 @@ try {
             `${feature} ${warm ? 'warm' : 'cold'}: first ${result.firstFrameMs.toFixed(1)} ms, next ${result.nextFrameMs.toFixed(1)}, steady ${result.afterMedianMs.toFixed(1)}${warm ? `, warmUp ${result.warmUpMs.toFixed(0)} ms ${JSON.stringify(result.report)} image vs cold ${JSON.stringify(result.image)}` : ''}${errors.length ? ' ERRORS ' + errors[0] : ''}`,
           );
         } finally {
-          await browser.close();
+          await closeAll({ browser });
         }
       }
 } finally {
-  await server.close();
+  await closeAll({ servers: [server] });
 }
 const median = (values) => values.sort((a, b) => a - b)[values.length >> 1],
   pick = (feature, warm) => samples.filter((s) => s.feature === feature && s.warm === warm);

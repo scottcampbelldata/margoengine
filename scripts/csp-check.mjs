@@ -22,6 +22,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { build } from 'vite';
 import { onAC } from './quiet-gate.mjs';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   out = join(root, 'test-results/csp-check');
@@ -267,11 +268,11 @@ const report = {
           );
         }
       } finally {
-        server.close();
+        await closeAll({ servers: [server] });
       }
     }
   } finally {
-    await browser.close();
+    await closeAll({ browser });
   }
   if (!onAC()) throw new Error('Lost AC power during the run: discard it');
 }

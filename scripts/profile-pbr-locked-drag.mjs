@@ -70,6 +70,7 @@ const observer = `
 import {PBRModel as LockedPBR} from '@margoengine/gltf-pro';
 import {Animation as LockedAnimation} from '@margoengine/animation';
 import { launchBrowser } from './lib/browser.mjs';
+import { closeAll } from './support/shutdown.mjs';
 const lockedCounters=globalThis.__lockedCounters={pbrDraws:0,beauty:0,gbuffer:0,ambient:0,transparent:0,transmission:0,capture:0,primitiveDraws:0,deforms:0,unsafe:0};
 const lockedDraw=LockedPBR.prototype.draw,lockedDeform=LockedAnimation.prototype.deform;
 LockedPBR.prototype.draw=function(context,mode,color,depth){
@@ -505,8 +506,7 @@ try {
   report.failure = error.stack ?? String(error);
   throw error;
 } finally {
-  await browser?.close();
-  await new Promise((done) => server.close(done));
+  await closeAll({ browser, servers: [server] });
   await writeFile(resolve(folder, 'report.json'), JSON.stringify(report, null, 2));
 }
 console.log(

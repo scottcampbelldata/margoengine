@@ -5,6 +5,7 @@ import { writeFile } from 'node:fs/promises';
 import { decodePNG } from '../../../tests/support/png.js';
 import { requireAC } from '../cad/power.mjs';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const which = process.argv.slice(2).length ? process.argv.slice(2) : ['stall', 'pixels', 'gpu', 'override'];
 await writeFile(
@@ -122,7 +123,7 @@ try {
     await second.browser.close();
   }
 } finally {
-  await server.close();
+  await closeAll({ servers: [server] });
 }
 out.acPowerAtEnd = requireAC();
 await writeFile(`test-results/toggle-${which.join('-')}.json`, JSON.stringify(out, null, 1));

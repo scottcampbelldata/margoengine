@@ -3,6 +3,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build, preview } from 'vite';
 import { listenWhenFree, openBrowser } from './browser.js';
+import { closeAll } from './support/shutdown.mjs';
 const root = resolve('test-results/machinery-runtime-consumer');
 await mkdir(root, { recursive: true });
 await writeFile(
@@ -416,7 +417,5 @@ try {
   await writeFile('test-results/modern-machinery-runtime-browser.json', JSON.stringify({ hardware, checks }, null, 2));
   console.log(JSON.stringify({ hardware, checks }, null, 2));
 } finally {
-  await starter?.httpServer.close();
-  await server?.httpServer.close();
-  await browser.close();
+  await closeAll({ browser, servers: [starter, server] });
 }

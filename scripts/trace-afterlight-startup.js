@@ -7,6 +7,7 @@ import { createServer } from 'vite';
 import { installStartupApiTrace } from './support/afterlight-startup-api-trace.js';
 import { installDemoLoadAudit } from './demo-load-audit.js';
 import { launchBrowser } from './lib/browser.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 function installResourceAudit() {
   const buffers = [],
@@ -256,14 +257,9 @@ try {
   errors.push(error.stack ?? String(error));
   throw error;
 } finally {
-  if (browser) {
-    await browser.close();
-    browserClosed = true;
-  }
-  if (server) {
-    await server.close();
-    serverClosed = true;
-  }
+  await closeAll({ browser, servers: [server] });
+  browserClosed = Boolean(browser);
+  serverClosed = Boolean(server);
   report.closed = { browserClosed, serverClosed };
   report.finishedAt = new Date().toISOString();
   await writeFile(reportPath, JSON.stringify(report, null, 2) + '\n');

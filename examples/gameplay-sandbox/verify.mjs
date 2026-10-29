@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build, preview } from 'vite';
 import { launchBrowser } from '../../scripts/lib/browser.mjs';
+import { closeAll } from '../../scripts/support/shutdown.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url)),
   output = resolve(root, '../../test-results/gameplay-sandbox');
@@ -397,6 +398,5 @@ try {
     );
 } finally {
   await writeFile(resolve(output, 'verification.json'), JSON.stringify(report, null, 2));
-  await browser.close();
-  await new Promise((resolve, reject) => server.httpServer.close((error) => (error ? reject(error) : resolve())));
+  await closeAll({ browser, servers: [server] });
 }

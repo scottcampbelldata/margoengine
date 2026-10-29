@@ -221,8 +221,7 @@ createRoot(document.getElementById('root')).render(<Canvas label="cube" loadFall
         await tab.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'networkidle' });
         return paths.filter((path) => path !== '/' && path !== '/favicon.ico').map((path) => path.slice(1));
       } finally {
-        await browser.close();
-        server.close();
+        await closeAll({ browser, servers: [server] });
       }
     })();
     return {
@@ -787,6 +786,7 @@ ${result.stdout}${result.stderr}`,
 import { createStage } from 'margoengine';
 import { Shadows } from 'margoengine/shadows';
 import { OrbitControls } from '@margoengine/controls/orbit';
+import { closeAll } from './support/shutdown.mjs';
 window.result = [typeof createStage, typeof Shadows, typeof OrbitControls].join();
 </script>`;
       const types = {
@@ -820,8 +820,7 @@ window.result = [typeof createStage, typeof Shadows, typeof OrbitControls].join(
         );
         done('import map: loaded');
       } finally {
-        await browser.close();
-        server.close();
+        await closeAll({ browser, servers: [server] });
       }
     })(),
   );

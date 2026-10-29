@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { closeAll } from './support/shutdown.mjs';
 // Saves a screenshot of an example page served by `npm run dev:examples`, using SwiftShader WebGPU so it runs without a GPU.
 // node scripts/screenshot-example.mjs http://127.0.0.1:5173/examples/cad-views.html out.png [width] [height] [waitMs]
 const [url, out, w = 1280, h = 720, wait = 9000] = process.argv.slice(2);
@@ -26,4 +27,4 @@ console.log(
     .catch(() => ''),
 );
 await page.screenshot({ path: out });
-await browser.close();
+await closeAll({ browser });

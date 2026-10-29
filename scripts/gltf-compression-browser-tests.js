@@ -59,6 +59,7 @@ await writeFile(
   `
 import {Engine} from '@margoengine/core';
 import {loadGLTF, parseGLTF} from '@margoengine/gltf-pro';
+import { closeAll } from './support/shutdown.mjs';
 
 window.runCompressionConsumer = async kind => {
   const NativeWorker = window.Worker, workers = [];
@@ -184,6 +185,5 @@ try {
   await writeFile(resolve(results, 'report.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 } finally {
-  await browser?.close();
-  await server.close();
+  await closeAll({ browser, servers: [server] });
 }

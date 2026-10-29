@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 import { createServer } from 'vite';
 import { acquire } from '../../scripts/gpu-lock.mjs';
 import { launchBrowser } from '../../scripts/lib/browser.mjs';
+import { closeAll } from '../../scripts/support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
   arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -229,7 +230,6 @@ try {
   writeFileSync(out, JSON.stringify(report, null, 1) + '\n');
   console.log('wrote', out);
 } finally {
-  await browser?.close();
-  await server?.close();
+  await closeAll({ browser, servers: [server] });
   releaseGpu();
 }

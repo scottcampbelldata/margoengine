@@ -29,6 +29,7 @@ await writeFile(
   `
 import {Engine} from '@margoengine/core';
 import {loadGLTF} from '@margoengine/gltf-pro';
+import { closeAll } from './support/shutdown.mjs';
 window.runKTX2Consumer=async()=>{
   const NativeWorker=window.Worker,workers=[];
   window.Worker=class extends NativeWorker{
@@ -116,6 +117,5 @@ try {
   await writeFile(resolve(results, 'report.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await browser?.close();
-  await server.close();
+  await closeAll({ browser, servers: [server] });
 }

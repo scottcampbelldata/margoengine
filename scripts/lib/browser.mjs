@@ -1,5 +1,6 @@
 import { chromium, firefox } from '@playwright/test';
 import { gpuAdapterArg } from './gpu-adapter.mjs';
+import { closeAll } from '../support/shutdown.mjs';
 
 /**
  * Which browser the repository's browser checks drive, and how it is launched, in one place.
@@ -136,6 +137,18 @@ export function chromiumLaunchOptions({ name, args = [], webgpu = true, env, pla
   };
 }
 
+/**
+ * Makes `browser.close()` a bounded teardown (bug 70): it throws `SHUTDOWN_TIMEOUT` naming the browser if the close has
+ * not finished within the shared budget (scripts/support/shutdown.mjs), instead of leaving a suite that has passed every
+ * assertion hanging on its cleanup. The browser still closes the same way; only the wait for it is bounded.
+ */
+export function withBoundedClose(browser) {
+  if (typeof browser?.close !== 'function') return browser;
+  const close = browser.close.bind(browser);
+  browser.close = (...args) => closeAll({ browser: { close: () => close(...args) } });
+  return browser;
+}
+
 /** Exit code when the requested browser cannot be started (not a test failure, not a skip). */
 export const LAUNCH_FAILED = 3;
 
@@ -183,7 +196,7 @@ export async function launchBrowser({
     reason = unsupportedReason(browser, needs);
   if (reason) return skipSuite(reason);
   try {
-    if (browser.engine === 'firefox') return await launchers.firefox.launch({ ...options });
+    if (browser.engine === 'firefox') return withBoundedClose(await launchers.firefox.launch({ ...options }));
     const launch = (channel) =>
       launchers.chromium.launch({
         ...options,
@@ -192,10 +205,10 @@ export async function launchBrowser({
         ...(browser.executablePath ? { executablePath: browser.executablePath } : {}),
       });
     try {
-      return await launch(browser.channel);
+      return withBoundedClose(await launch(browser.channel));
     } catch (error) {
       if (browser.explicit || browser.channel !== 'msedge') throw error;
-      return await launch(undefined);
+      return withBoundedClose(await launch(undefined));
     }
   } catch (error) {
     report(launchFailureMessage(browser, error, { suite: process.argv[1]?.split(/[\\/]/).pop() }));

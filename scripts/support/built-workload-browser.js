@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve, relative, isAbsolute } from 'node:path';
 import { launchBrowser, resolveBrowser } from '../lib/browser.mjs';
 import { preview } from 'vite';
+import { closeAll } from './shutdown.mjs';
 
 /** Static preview only; dependencies and workers are already assembled before any measured context starts. */
 export async function openBrowser({
@@ -73,19 +74,11 @@ export async function openBrowser({
       hardware,
       artifact,
       async close() {
-        try {
-          await browser.close();
-        } finally {
-          await new Promise((done) => server.httpServer.close(done));
-        }
+        await closeAll({ browser, servers: [server] });
       },
     };
   } catch (error) {
-    try {
-      await browser?.close();
-    } finally {
-      if (server) await new Promise((done) => server.httpServer.close(done));
-    }
+    await closeAll({ browser, servers: [server] });
     throw error;
   }
 }

@@ -21,6 +21,7 @@ import { build, preview } from 'vite';
 import { listenWhenFree } from './browser.js';
 import { acquire } from './gpu-lock.mjs';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   fixture = resolve(root, 'tests/fixtures/basic-scene');
@@ -263,7 +264,9 @@ try {
     `basic scene: ${files.length} requests, ${result.total.transferred} B transferred; ${result.notFetched.length} built files not fetched`,
   );
 } finally {
-  await browser?.close();
-  releaseGpu();
-  await new Promise((done) => server.httpServer.close(done));
+  try {
+    await closeAll({ browser, servers: [server] });
+  } finally {
+    releaseGpu();
+  }
 }

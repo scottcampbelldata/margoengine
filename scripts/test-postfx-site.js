@@ -5,6 +5,7 @@ import { preview } from 'vite';
 import { decodePNG } from '../tests/support/png.js';
 import { installDemoLoadAudit } from './demo-load-audit.js';
 import { launchBrowser } from './lib/browser.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 await mkdir('test-results', { recursive: true });
 const snapshot = await mkdtemp(resolve('test-results/postfx-site-'));
@@ -300,6 +301,5 @@ try {
     }),
   );
 } finally {
-  await browser.close();
-  await new Promise((resolve) => server.httpServer.close(resolve));
+  await closeAll({ browser, servers: [server] });
 }

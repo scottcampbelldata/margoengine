@@ -43,6 +43,7 @@ import {
 } from './support/visual-baselines.js';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
 import { lastAdapterChoice } from './lib/gpu-adapter.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   baselineRoot = resolve(root, 'tests/visual'),
@@ -389,9 +390,14 @@ try {
           `run ${run + 1}/${runs} ${id} ${((Date.now() - t) / 1000).toFixed(1)} s${result.captures.length > run ? '' : ' FAILED'}`,
         );
       }
-      // Edge's shutdown can hang after a power change (seen 2026-10-14); do not let it block the remaining runs.
+      // Edge's shutdown can hang after a power change (seen 2026-10-14): closeAll gives up after its budget and says
+      // what was still open, instead of blocking the remaining runs.
     } finally {
-      await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 15_000))]);
+      // The teardown budget ran out: say so and go on, the pictures are already taken.
+      await closeAll({ browser }).catch((error) => {
+        if (error.code !== 'SHUTDOWN_TIMEOUT') throw error;
+        console.warn(error.message);
+      });
     }
   }
   const powerAfter = acPower(),
@@ -565,8 +571,10 @@ try {
   console.error(error);
   exitCode = 1;
 } finally {
-  await server?.close();
-  await devServer?.close();
-  releaseGpu();
+  try {
+    await closeAll({ servers: [server, devServer] });
+  } finally {
+    releaseGpu();
+  }
 }
 process.exit(exitCode);

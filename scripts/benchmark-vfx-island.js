@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { resolve } from 'node:path';
 import { launchBrowser } from './lib/browser.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 const baselineRef = process.argv[2];
 assert(baselineRef, 'Pass the explicit baseline Git ref used by scripts/measure-vfx-memory.js');
@@ -655,6 +656,5 @@ try {
       })
       .catch(() => {});
   await context?.close();
-  await browser?.close();
-  await server?.close();
+  await closeAll({ browser, servers: [server] });
 }

@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 import { createServer } from 'vite';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
@@ -53,6 +54,5 @@ try {
   console.log(JSON.stringify(report, null, 2));
   console.log(`${report.checks.length} browser checks passed`);
 } finally {
-  await browser?.close();
-  await server.close();
+  await closeAll({ browser, servers: [server] });
 }

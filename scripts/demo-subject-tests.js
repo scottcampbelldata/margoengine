@@ -6,6 +6,7 @@ import { decodePNG } from '../tests/support/png.js';
 import { installDemoLoadAudit } from './demo-load-audit.js';
 import { submitPrincipalScene } from '../packages/shared/demo-frame.js';
 import { launchBrowser } from './lib/browser.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 await mkdir('test-results', { recursive: true });
 const auditOnly = process.argv.includes('--audit-only');
@@ -209,6 +210,5 @@ try {
     console.log(JSON.stringify(report, null, 2));
   }
 } finally {
-  await browser.close();
-  await new Promise((resolve) => server.httpServer.close(resolve));
+  await closeAll({ browser, servers: [server] });
 }

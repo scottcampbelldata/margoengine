@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 import { readGLB, validate, validator, toolsDir } from '../tests/helpers.js';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
@@ -75,6 +76,5 @@ try {
   await writeFile(resolve(results, 'exporters-browser.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await browser?.close();
-  await server.close();
+  await closeAll({ browser, servers: [server] });
 }

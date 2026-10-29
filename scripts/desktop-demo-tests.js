@@ -8,6 +8,7 @@ import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import { preview } from 'vite';
 import { decodePNG } from '../tests/support/png.js';
 import { installDemoLoadAudit } from './demo-load-audit.js';
+import { closeAll } from './support/shutdown.mjs';
 
 const demos = [
   { name: 'citadel', path: '/night-citadel/', range: ['azimuth', 'azimuth-value'] },
@@ -472,6 +473,5 @@ try {
   }
   console.log(reportPath);
 } finally {
-  await browser?.close();
-  if (server) await new Promise((resolve) => server.httpServer.close(resolve));
+  await closeAll({ browser, servers: [server] });
 }

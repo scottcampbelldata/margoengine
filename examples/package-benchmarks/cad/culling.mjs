@@ -8,6 +8,7 @@ import { cpus, totalmem } from 'node:os';
 import { acPower } from './power.mjs';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const flag = (name) => process.argv.includes(`--${name}`);
@@ -164,7 +165,6 @@ try {
   await writeFile(new URL(`./results-${label}.json`, import.meta.url), JSON.stringify(out, null, 1));
   console.log('wrote', `examples/package-benchmarks/cad/results-${label}.json`);
 } finally {
-  await browser?.close();
-  await server?.close();
+  await closeAll({ browser, servers: [server] });
   releaseGpu();
 }

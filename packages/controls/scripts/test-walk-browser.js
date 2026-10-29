@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url)),
   results = resolve(root, 'test-results/walk');
@@ -104,6 +105,5 @@ try {
   console.log(JSON.stringify(report, null, 2));
   console.log(`${report.checks.length} walk browser checks passed`);
 } finally {
-  await browser?.close();
-  await server.close();
+  await closeAll({ browser, servers: [server] });
 }

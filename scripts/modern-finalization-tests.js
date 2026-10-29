@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { listenWhenFree, openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
 import { preview } from 'vite';
+import { closeAll } from './support/shutdown.mjs';
 const browser = await openBrowser({ startPath: '/tests/modern.html' }),
   { page, hardware } = browser,
   errors = [],
@@ -215,6 +216,5 @@ try {
   await writeFile('test-results/modern-finalization.json', JSON.stringify({ hardware, checks }, null, 2));
   console.log(JSON.stringify({ hardware, checks }, null, 2));
 } finally {
-  if (starter) await new Promise((resolve) => starter.httpServer.close(resolve));
-  await browser.close();
+  await closeAll({ browser, servers: [starter] });
 }

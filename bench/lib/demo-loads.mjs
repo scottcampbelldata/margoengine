@@ -9,6 +9,7 @@ import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { preview } from 'vite';
 import { installDemoLoadAudit } from '../../scripts/demo-load-audit.js';
 import { root } from './env.mjs';
+import { closeAll } from '../../scripts/support/shutdown.mjs';
 
 export const DEMOS = [
   '/night-citadel/',
@@ -70,7 +71,7 @@ export async function serveSite() {
   return {
     origin: server.resolvedUrls.local[0],
     async close() {
-      await new Promise((r) => server.httpServer.close(r));
+      await closeAll({ servers: [server] });
       await rm(snapshot, { recursive: true, force: true });
     },
   };

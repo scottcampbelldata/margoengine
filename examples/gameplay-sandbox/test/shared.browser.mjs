@@ -3,6 +3,7 @@ import { build, preview } from 'vite';
 import { resolve } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   output = resolve(root, '../../test-results/gameplay-sandbox/shared-modules');
@@ -696,6 +697,5 @@ try {
   console.log(JSON.stringify(report));
 } finally {
   await writeFile(resolve(output, 'verification.json'), JSON.stringify(report, null, 2));
-  await browser.close();
-  await new Promise((resolve, reject) => server.httpServer.close((error) => (error ? reject(error) : resolve())));
+  await closeAll({ browser, servers: [server] });
 }

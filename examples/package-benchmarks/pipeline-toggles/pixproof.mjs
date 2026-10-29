@@ -5,6 +5,7 @@ import { writeFile } from 'node:fs/promises';
 import { decodePNG } from '../../../tests/support/png.js';
 import { requireAC } from '../cad/power.mjs';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 await writeFile(
   'test-results/pixproof.html',
   '<!doctype html><meta charset="utf-8"><style>body{margin:0}canvas{display:block;width:1280px;height:720px}</style><canvas id="view"></canvas><script type="module" src="/examples/package-benchmarks/pipeline-toggles/pixproof.js"></script>',
@@ -51,8 +52,7 @@ try {
     if (shots.after[i] + shots.after[i + 1] + shots.after[i + 2] > 60) lit++;
   out.diff = { channels: n, max, of: shots.before.length, litPixels: lit };
 } finally {
-  await browser.close();
-  await server.close();
+  await closeAll({ browser, servers: [server] });
 }
 out.acPowerAtEnd = requireAC();
 console.log(JSON.stringify(out));

@@ -10,6 +10,7 @@ import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { trackPipelines } from './support/gpu-ready.js';
 import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
 import { compatRun, compatShim } from './support/compat-shim.js';
+import { closeAll } from './support/shutdown.mjs';
 
 /**
  * Starts a server on a fixed port with `start` (for example `() => server.listen()`), waiting while something else holds
@@ -82,9 +83,14 @@ export async function startDevServer({
   }
   const cacheDir = await mkdtemp(join(caches, `${process.pid}-`));
   let server;
+  // Bounded (bug 70): a browser's keep-alive and event-stream connections made a plain `server.close()` wait for ever, so the
+  // connections are dropped first and a close that still does not finish throws SHUTDOWN_TIMEOUT naming the server.
   const close = async () => {
-    await server?.close();
-    await rm(cacheDir, { recursive: true, force: true });
+    try {
+      await closeAll({ servers: [server] });
+    } finally {
+      await rm(cacheDir, { recursive: true, force: true });
+    }
   };
   try {
     server = await createServer({
@@ -587,8 +593,11 @@ export async function openBrowser({
       async close() {
         // Compilation info arrives asynchronously: wait for every report (wgsl-guard keeps them) before reading them.
         await page.evaluate(() => Promise.all(globalThis.__margoWgslReports ?? [])).catch(() => {});
-        await browser.close();
-        await closeServer();
+        try {
+          await closeAll({ browser });
+        } finally {
+          await closeServer();
+        }
         if (wgsl.modules.size)
           console.log(`WGSL: ${wgsl.modules.size} distinct shader modules compiled, ${wgsl.errors.length} errors`);
         if (wgsl.errors.length) throw new Error(`WGSL compile errors:\n${wgsl.errors.slice(0, 20).join('\n')}`);
@@ -597,8 +606,11 @@ export async function openBrowser({
       },
     };
   } catch (error) {
-    await browser?.close();
-    await closeServer();
+    try {
+      await closeAll({ browser });
+    } finally {
+      await closeServer();
+    }
     throw error;
   }
 }

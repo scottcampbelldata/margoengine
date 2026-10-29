@@ -12,6 +12,7 @@ import { launchBrowser } from './lib/browser.mjs';
 import { createServer, preview } from 'vite';
 import { acquire } from './gpu-lock.mjs';
 import { message } from '../examples/needs-webgpu.js';
+import { closeAll } from './support/shutdown.mjs';
 
 /** Bytes of a built chunk plus every chunk it imports statically (`from "./x.js"`), each counted once. */
 async function codeBytes(folder, chunk, seen = new Set()) {
@@ -186,8 +187,6 @@ try {
     `no-WebGPU check passed: ${demos.length} pages x ${Object.keys(modes).length} modes, ${relative(root, dist)}`,
   );
 } finally {
-  await browser?.close();
-  await site?.close();
-  await dev?.close();
+  await closeAll({ browser, servers: [site, dev] });
   release();
 }

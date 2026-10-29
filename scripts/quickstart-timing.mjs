@@ -41,6 +41,7 @@ import sharp from 'sharp';
 import { acquire, killTree, windowsCommandLine } from './gpu-lock.mjs';
 import { quickstartFiles } from './support/doc-snippets.mjs';
 import { describeHardware, hardwareLine, waitForPicture } from './support/scene-ready.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const windows = process.platform === 'win32';
@@ -639,7 +640,7 @@ export async function main() {
     process.exitCode = 1;
   } finally {
     clearTimeout(hardStop);
-    await browser?.close().catch(() => {});
+    await closeAll({ browser }).catch((error) => console.error(error.message));
     release?.();
     cleanup();
     if (!flag('keep') && !reuse)
