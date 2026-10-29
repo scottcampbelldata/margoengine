@@ -134,6 +134,8 @@ function fakeGPU(t, offered = []) {
         },
         createShaderModule: (descriptor) => ({ label: descriptor.label ?? '' }),
         createBindGroup: (descriptor) => ({ label: descriptor.label ?? '' }),
+        createBindGroupLayout: (descriptor) => ({ label: descriptor.label ?? '' }),
+        createPipelineLayout: (descriptor) => ({ label: descriptor.label ?? '' }),
         createBuffer: (descriptor) => new GPUBuffer(descriptor),
         createTexture: (descriptor) => new GPUTexture(descriptor),
         createSampler: () => new GPUSampler(),

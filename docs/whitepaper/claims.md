@@ -27,7 +27,7 @@ or in Safari. [docs/limits.md](../limits.md) lists what is untested.
 
 | Claim | Where | Evidence | Command | Status |
 | --- | --- | --- | --- | --- |
-| Core + stage is 21,974 B gzip (54,876 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` at `51d8786a` | `npm run build:packages && npm run measure:size` | PROVEN |
+| Core + stage is 22,116 B gzip (55,415 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` at the bug 61 fix (2026-10-29) | `npm run build:packages && npm run measure:size` | PROVEN |
 | The build fails at 25,000 B gzip for core + stage | README, site | `scripts/core-budget.js`, run by `build:packages` and `measure:size` | `npm run build:packages` | PROVEN |
 | Every other package is optional and has its own size | README | `entry-sizes.json` (every exports entry and worker) | `npm run build:site` | PROVEN |
 | An engine starts with 1,024 entity slots and doubles up to 8,388,608 | site | `packages/core/src/kernel.ts`; `tests/core-dirty-transforms.test.js` (1,000,000 entities) | `npm test` | PROVEN |
@@ -41,7 +41,7 @@ and commit.
 
 | Page | Figures | Evidence | Status |
 | --- | --- | --- | --- |
-| engine | Core 20,547 B (51,055 raw), core + stage 21,974 B (54,876 raw), 3,026 B under the gate | `entry-sizes.json` at `51d8786a` (dirty: false) | PROVEN |
+| engine | Core 20,691 B (51,594 raw), core + stage 22,116 B (55,415 raw), 2,884 B under the gate | `entry-sizes.json` at the bug 61 fix (2026-10-29, dirty: false) | PROVEN |
 | engine | 93 packages (none published to npm yet); `npm i margoengine`; kit sizes (game 307,012, cad 201,527, viz 277,396, web 155,058 B) | `docs/catalog.json`; `docs/guides/kits.md`, re-measured by `tests/umbrella.test.js` (fails on a 3% move) | PROVEN |
 | engine | Starter first frames: cad 533, web 788, react 835, viz 968, game 1,308 ms (vite dev, packages linked, one run each, RTX A6000 PC) | `examples/package-benchmarks/results/starters-first-frame.json` (`tools/create-margo/test/browser-check.mjs`) | PROVEN (dated, one run) |
 | engine | 6,373 tests, 6,371 pass, 2 skipped (Node 26.12, `ec3f9b52`) | `examples/package-benchmarks/results/test-count.json` | PROVEN |

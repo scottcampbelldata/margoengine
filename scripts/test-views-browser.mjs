@@ -45,6 +45,8 @@ try {
       engine.scene.background = '#440000';
       hud.background = '#000044';
       let target, device;
+      // Canvas format may be BGRA; returned bytes are in the native texture order.
+      const bgra = navigator.gpu.getPreferredCanvasFormat().startsWith('bgra');
       const read = async () => {
         const row = Math.ceil((canvas.width * 4) / 256) * 256;
         const buffer = device.createBuffer({
@@ -61,11 +63,21 @@ try {
             const offset = Math.floor(y) * row + Math.floor(x) * 4;
             return Array.from(bytes.subarray(offset, offset + 3));
           };
+          // Pixels of each view's half that are not its colour (object or background): 0 when both clears drew.
+          const split = Math.round(canvas.width / 2),
+            wrong = [0, 0];
+          for (let y = 0; y < canvas.height; y++)
+            for (let x = 0; x < canvas.width; x++) {
+              const [first, , third] = pixel(x, y),
+                [r, b] = bgra ? [third, first] : [first, third];
+              if (x < split ? !(r > b + 20) : !(b > r + 20)) wrong[+(x >= split)]++;
+            }
           return {
             left: pixel(canvas.width / 4, canvas.height / 2),
             right: pixel((3 * canvas.width) / 4, canvas.height / 2),
             leftGround: pixel(2, 2),
             rightGround: pixel(canvas.width - 3, 2),
+            wrong,
           };
         } finally {
           buffer.destroy();
@@ -98,11 +110,16 @@ try {
         if (validation) throw new Error(validation.message);
         const red = (p) => p[0] > p[2] + 20,
           blue = (p) => p[2] > p[0] + 20;
-        // Canvas format may be BGRA; returned bytes are in the native texture order.
-        const bgra = navigator.gpu.getPreferredCanvasFormat().startsWith('bgra');
-        for (const p of Object.values(pixels)) if (bgra) p.reverse();
-        if (!red(pixels.left) || !blue(pixels.right) || !red(pixels.leftGround) || !blue(pixels.rightGround))
-          throw new Error('scene pixels mixed: ' + JSON.stringify(pixels));
+        for (const [key, p] of Object.entries(pixels)) if (bgra && key !== 'wrong') p.reverse();
+        // Each partial view clears by a draw (bug 61: at 4x on Intel Arc a blend-constant clear left both black).
+        if (
+          !red(pixels.left) ||
+          !blue(pixels.right) ||
+          !red(pixels.leftGround) ||
+          !blue(pixels.rightGround) ||
+          pixels.wrong.some(Boolean)
+        )
+          throw new Error(`scene pixels mixed at ${samples}x: ` + JSON.stringify(pixels));
         if (pickedLeft !== a || pickedRight !== b || masked !== null) throw new Error('wrong scene pick');
         if (engine.lighting !== engine.scene.lighting || engine.frameGraph !== engine.scene.frameGraph)
           throw new Error('scene aliases leaked');

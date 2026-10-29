@@ -12,7 +12,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core and CAD tools built on 
 [Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 21,974 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 22,116 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
 
 ## Install
@@ -293,7 +293,7 @@ meshes (no textures, effects or picking).
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 21,974 B | 54,876 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 22,116 B | 55,415 B |
 
 Recorded at commit `454df8f3` in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as

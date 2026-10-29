@@ -61,7 +61,12 @@ for (const [name, Effect] of [
 ])
   test(`${name} clears its material targets inside the view rectangle only`, () => {
     const { passes, draws } = inView(new Effect()),
-      clear = passes.find((pass) => pass.some((e) => e[0] === 'pass.setBlendConstant'));
+      clear = passes.find(
+        (pass) =>
+          pass[0][1].colorAttachments.length > 1 &&
+          pass.some((e) => e[0] === 'pass.setViewport') &&
+          pass.some((e) => e[0] === 'pass.draw'),
+      );
     assert.ok(clear, 'a clear quad covers the material targets');
     assert.ok(clear[0][1].colorAttachments.length > 1, 'every MRT target is cleared');
     assert.ok(

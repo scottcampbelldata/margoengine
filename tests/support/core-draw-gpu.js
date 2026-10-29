@@ -47,6 +47,8 @@ export function gpuDrawHarness(t, samples = 1) {
       queue: { writeBuffer() {}, submit() {} },
       createBuffer: (descriptor) => ({ ...descriptor, destroy() {} }),
       createBindGroup: () => ({}),
+      createBindGroupLayout: () => ({}),
+      createPipelineLayout: () => ({}),
       textures: [],
       createTexture(descriptor) {
         const texture = {

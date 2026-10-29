@@ -18,7 +18,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core and CAD tools built on 
 [Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 21,974 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 22,116 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
 
 ## Install
@@ -299,7 +299,7 @@ meshes (no textures, effects or picking).
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 21,974 B | 54,876 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 22,116 B | 55,415 B |
 
 Recorded at commit `454df8f3` in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
@@ -1091,7 +1091,7 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 151,721 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
-part of a kit pays for that part; core + stage alone is 21,974 B). Wasm decoders, workers and lazily loaded parts
+part of a kit pays for that part; core + stage alone is 22,116 B). Wasm decoders, workers and lazily loaded parts
 are extra and load only when used. `tests/umbrella.test.js` measures these numbers on every run and fails when one
 moves more than 3%.
 
@@ -2604,7 +2604,7 @@ features add no core or stage functionality.
 
 # Design envelope
 
-Margo is a small WebGPU engine: core plus the stage facade is 21,974 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes), and every
+Margo is a small WebGPU engine: core plus the stage facade is 22,116 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -2657,7 +2657,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
-| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl/test/webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 21,974 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) gets, on every live demo, "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no engine code; the landing page draws no scene. No demo runs on the WebGL2 preview: each needs effects, particles, skinning or compute. | `@margoengine/webgl` (3,021 B gzip, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo shows the message with no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). Most rendering packages stay WebGPU-only; a fuller WebGL2 compatibility package is in development as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
+| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl/test/webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 22,116 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) gets, on every live demo, "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no engine code; the landing page draws no scene. No demo runs on the WebGL2 preview: each needs effects, particles, skinning or compute. | `@margoengine/webgl` (3,021 B gzip, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo shows the message with no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). Most rendering packages stay WebGPU-only; a fuller WebGL2 compatibility package is in development as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
 | Compute on the WebGL2 compatibility layer | Measured (Edge 156, ANGLE Direct3D 11, NVIDIA RTX A6000, 2026-10-28, [compute.html](../packages/webgl2-compat/test/compute.html) cases and a timing page). Compute entry points that store only their own texel run as fragment draws and those with a bounded number of stores as point draws, on the GPU. The rest (atomics, workgroup memory, barriers, stores in loops of unknown length) run on the CPU in JavaScript: a clustered-binning kernel over 3,456 clusters takes 1.5 ms with 16 lights, 2.8 ms with 64 and 9.4 ms with 256 (37 to 94 million loop iterations a second); a 64-wide workgroup reduction with 7 barriers runs 4.4 million invocations a second (65,536 in 14.9 ms). | WebGL2 has no compute shaders, storage buffers or atomics. | The same results as WebGPU (the layer's compute check compares both on one GPU), slower: GPU-written inputs of a CPU kernel are read back synchronously (counted in the device's `stalls`). Cube textures, multisampled and external textures cannot be read by CPU-tier kernels (MargoError `unsupported`); CPU kernels need a page that allows JavaScript compiled at run time (CSP `unsafe-eval`). | Keep per-frame CPU-tier work under the numbers measured here; [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md) lists the tiers. |
 | Package routes on the WebGL2 compatibility layer | Measured (Edge 156, ANGLE Direct3D 11, NVIDIA RTX A6000, 2026-10-29, frame wall time, native WebGPU then the layer; [routes-browser.mjs](../packages/webgl2-compat/test/routes-browser.mjs) checks the pixels). DOF at 1280 x 720: 0.72 ms, 10.1 ms on its route (913 ms on the generic CPU tier before). Splats: 10,000 in 1.2 ms, 17.9 ms (44 ms before); 100,000 in 2.1 ms, 39 ms (308 ms before). `CulledInstances`, 10,000 parts: 0.98 ms, 1.14 ms (11.7 ms before). VFX on the CPU tier, its plan's route: 5,000 particles 0.61 ms, 6.5 ms; 50,000 in 0.67 ms, 48 ms. Scatter on the CPU tier: 10,000 instances 0.56 ms, 5.4 ms; 100,000 in 0.85 ms, 40 ms. | WebGL2 has no workgroup memory, atomics or compute; each route does the same work another way. | The same pixels as native WebGPU. Splats read their projected keys back once a frame (a counted stall); `'occlusion'` culling culls against the frustum only (the same image, more parts drawn). The voxel path tracer and XR refuse the layer (MargoError `unsupported`). | Budget VFX particles and scatter instances by the per-frame times measured here (about 1 µs per particle and 0.4 µs per instance on this PC). |
 | Content Security Policy | Enforced by the browser: core compiles its Wasm kernel, so `script-src` needs `'wasm-unsafe-eval'` (as do the machinery kernel, OCCT, Draco and Basis). Nothing needs `'unsafe-eval'`, workers included: the Draco/KTX2 decoder worker and the STEP/IGES CAD worker load their Emscripten code with `importScripts`, and the build replaces the `new Function` wrapper generators in the Basis and OCCT glue with closures, output byte-identical ([no-eval-workers.test.js](../tests/no-eval-workers.test.js)). No COOP/COEP. Checked with zero violations on Edge, one policy on the page and every worker ([csp-check.json](../examples/package-benchmarks/results/csp-check.json)). | Wasm is how the kernel stays small and fast. | Without `'wasm-unsafe-eval'`, `Engine.create` rejects ("Compiling or instantiating WebAssembly module violates the following Content Security policy directive") ([csp-check-negative.json](../examples/package-benchmarks/results/csp-check-negative.json)). | Headers for Cloudflare Pages, Netlify, Vercel and Nginx in [deploying.md](deploying.md). A Draco, Basis or OCCT build you substitute for the bundled one may still call `new Function` (three.js's Basis transcoder does) and then needs `'unsafe-eval'` for its worker. |
@@ -2669,7 +2669,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ### React page
 
-What a minimal React page downloads, and why it is larger than core + stage (21,974 B gzip). The cube page of the
+What a minimal React page downloads, and why it is larger than core + stage (22,116 B gzip). The cube page of the
 bundler matrix (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `useFrame`, and `OrbitControls` from
 `@margoengine/react/controls`), built by Vite 8.3.4, React 19.3 and `@margoengine/react` installed alone with
 `@margoengine/controls` (2026-10-27), measured from the build's source maps (minified bytes per package; gzip is each
@@ -3343,7 +3343,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 21,974 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 22,116 B gzip.
 
 Use either name; they are interchangeable. Each package is still published on its own (`@margoengine/shadows`) for
 apps that want a smaller install.
