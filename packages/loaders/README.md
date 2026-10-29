@@ -82,7 +82,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 - Core `Geometry` holds positions and normals only, at most 1,000,000 vertices: UVs and vertex colors are kept in `LoadedGeometry` but not rendered, and larger meshes must be split by group. Point clouds render as octahedron markers (subsampled past `maxPoints`) because core has no point primitive.
 - PLY face colors and other per-face properties are ignored. OFF per-face colors and binary OFF are not supported. VTK XML (`.vtp`, `.vtu`), other legacy dataset types, VERTICES/LINES cells and cell data are not read. PCD ignores fields other than position, normal, rgb/rgba and intensity.
 - 3MF: textures (`texture2dgroup`), composite materials, multi-properties, beam lattices, slices and ZIP64 or encrypted packages are not supported; objects of type `other` are skipped.
-- STEP and IGES live in the machinery package, and so does `parseCAD`, the CAD path for STL (welded parts for sections, edges and deduplication; see [STL](#stl)); glTF in gltf and gltf-pro.
+- glTF lives in gltf and gltf-pro.
 
 ## STL
 
@@ -106,7 +106,7 @@ const geometry = toGeometry(mesh, {normals: 'flat'}); // a core Geometry, if the
 
 Options (defaults): `weld: false`, `maxTriangles: 16,000,000`, `maxVertices: 8,000,000` (checked before allocating, so a short file cannot claim millions), `signal` (aborts with a `LoaderError` of code `'aborted'`, checked every 16,384 triangles). A binary file is recognised by its length (`84 + 50 * triangles`), so binary files whose header starts with `solid` still work; otherwise text starting with `solid` is read as ASCII, several solids in one file are concatenated, and keywords are case-insensitive. Errors are `LoaderError`s: `'truncated'` (data shorter than the header says; pass the whole file), `'syntax'`, `'limit'` (raise `maxTriangles` or `maxVertices`), `'header'`, `'aborted'`. The Materialise Magics color variant and per-facet colors in ASCII files are not read.
 
-`parseCAD(engine, bytes, 'stl')` from `@margoengine/machinery/cad` is the CAD path: it also welds corners, builds parts and creates meshes, which CAD sections, edges and deduplication need, so it costs more. The repository's speed matrix (`docs/whitepaper`, row 10.11) measures both.
+The repository's speed matrix (`docs/whitepaper`, row 10.11) measures this loader.
 
 ## Tests
 

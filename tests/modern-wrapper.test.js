@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Stage, sphere } from '../packages/stage/dist/index.js';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { addCAD } from '@margoengine/stage/cad';
 import { addGLTF } from '@margoengine/stage/gltf';
 
 async function scene(capacity = 16) {
@@ -104,13 +103,31 @@ test('facade preserves real mesh handles, hierarchy and rollback after bad trans
   assert.throws(() => app.sphere(), /disposed/);
 });
 
-test('model loading infers URL formats, fits imports, rolls back failures and aborts on disposal', async () => {
+/** A one-triangle glTF document with its positions in an embedded buffer. */
+function triangleGLTF(positions) {
+  const vertices = new Float32Array(positions);
+  return JSON.stringify({
+    asset: { version: '2.0' },
+    buffers: [
+      {
+        byteLength: 36,
+        uri: `data:application/octet-stream;base64,${Buffer.from(vertices.buffer).toString('base64')}`,
+      },
+    ],
+    bufferViews: [{ buffer: 0, byteLength: 36 }],
+    accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3' }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    nodes: [{ mesh: 0 }],
+  });
+}
+
+test('model loading fits imports, rolls back failures and aborts on disposal', async () => {
   const originalFetch = globalThis.fetch,
     { app, engine } = await scene();
-  const obj = 'v 9 -1 0\nv 11 -1 0\nv 10 1 0\nf 1 2 3';
-  globalThis.fetch = async () => new Response(obj);
+  const offset = triangleGLTF([9, -1, 0, 11, -1, 0, 10, 1, 0]);
+  globalThis.fetch = async () => new Response(offset);
   try {
-    const model = await addCAD(app, 'https://example.invalid/assembly.OBJ?download=1');
+    const model = await addGLTF(app, 'https://example.invalid/assembly.gltf?download=1');
     assert.equal(model.position, model.root.position);
     model.position.set(2, 0, 0);
     model.scale.setAll(1);
@@ -136,39 +153,23 @@ test('model loading infers URL formats, fits imports, rolls back failures and ab
     model.destroy();
     assert.equal(engine.meshes.size, 0);
     assert.throws(() => model.bounds, /disposed/);
-    const vertices = new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]);
-    const gltf = {
-      asset: { version: '2.0' },
-      buffers: [
-        {
-          byteLength: 36,
-          uri: `data:application/octet-stream;base64,${Buffer.from(vertices.buffer).toString('base64')}`,
-        },
-      ],
-      bufferViews: [{ buffer: 0, byteLength: 36 }],
-      accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3' }],
-      meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
-      nodes: [{ mesh: 0 }],
-    };
-    globalThis.fetch = async () => new Response(JSON.stringify(gltf));
+    globalThis.fetch = async () => new Response(triangleGLTF([-1, -1, 0, 1, -1, 0, 0, 1, 0]));
     const triangle = await addGLTF(app, 'https://example.invalid/model.gltf');
     assert.equal(triangle.meshes.length, 1);
     triangle.destroy();
-    globalThis.fetch = async () => new Response(obj);
-    const copy = await addCAD(app, 'https://example.invalid/download', { format: 'obj', fit: false });
+    globalThis.fetch = async () => new Response(offset);
+    const copy = await addGLTF(app, 'https://example.invalid/copy.gltf', { fit: false });
     copy.destroy();
-    await assert.rejects(addCAD(app, 'https://example.invalid/model.fbx'), /Specify/);
-    await assert.rejects(addCAD(app, 'https://example.invalid/model.glb'), /Specify/);
     await assert.rejects(addGLTF(app, 'https://example.invalid/model.gltf', { fit: 'yes' }), /fit: boolean/);
     await assert.rejects(
-      addCAD(app, 'https://example.invalid/model.obj', { signal: AbortSignal.abort('cancelled') }),
+      addGLTF(app, 'https://example.invalid/model.gltf', { signal: AbortSignal.abort('cancelled') }),
       (error) => error === 'cancelled',
     );
     const fit = app.fit;
     app.fit = () => {
       throw new Error('fit failed');
     };
-    await assert.rejects(addCAD(app, 'https://example.invalid/model.obj'), /fit failed/);
+    await assert.rejects(addGLTF(app, 'https://example.invalid/model.gltf'), /fit failed/);
     assert.equal(engine.meshes.size, 0);
     app.fit = fit;
     let started;
@@ -180,7 +181,7 @@ test('model loading infers URL formats, fits imports, rolls back failures and ab
         signal.addEventListener('abort', () => reject(signal.reason), { once: true });
         started();
       });
-    const pending = addCAD(app, 'https://example.invalid/slow.obj');
+    const pending = addGLTF(app, 'https://example.invalid/slow.gltf');
     await ready;
     app.dispose();
     await assert.rejects(pending, (error) => error.name === 'AbortError');

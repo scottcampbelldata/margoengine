@@ -2,7 +2,7 @@ import type { PassContext } from '@margoengine/core/extension';
 export function sectionState(context: Extract<PassContext, { backend: 'webgpu' }>): GPUBufferBinding | undefined;
 /**
  * The WGSL statement that discards `position` (default `i.position`) against uniform `name`'s planes: the union of
- * their negative sides for SectionPlanes ('section'), else by settings.y (0 union, 1 intersection).
+ * their negative sides for a scene `section` plugin ('section'), else by settings.y (0 union, 1 intersection).
  */
 export function clipStatement(name: string, position?: string): string;
 /**

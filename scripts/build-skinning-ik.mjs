@@ -27,20 +27,12 @@ const auditModules = () => ({
       if (output.type === 'chunk') for (const id of Object.keys(output.modules)) moduleIds.add(id);
   },
 });
-// The stage's unused CAD loader would otherwise emit its large optional codec. This demo loads only local GLB assets.
-const noCAD = {
-  name: 'margo-ik-no-cad',
-  enforce: 'pre',
-  resolveId: (id) => (/^@margoengine\/machinery(?:\/|$)/.test(id) ? '\0margo-ik-no-cad' : null),
-  load: (id) =>
-    id === '\0margo-ik-no-cad' ? `throw new Error('CAD loading is outside this standalone IK demo');` : null,
-};
 const output = await build({
   configFile: false,
   root: resolve(root, 'examples'),
   base: './',
   publicDir: false,
-  plugins: [noCAD, auditModules()],
+  plugins: [auditModules()],
   worker: { plugins: () => [auditModules()] },
   build: {
     outDir,

@@ -79,7 +79,7 @@ export function sphere(radius = 1, segments = 32): Geometry {
 /**
  * Small facade over an engine for quick scenes: meshes with PBR materials and camera fitting. Create one with
  * `createStage`. Optional features are separate entries that take the stage, so an app bundles only the ones it
- * imports: `addGLTF` (`@margoengine/stage/gltf`), `addCAD` (`/cad`), `addSky` (`/sky`), `addParticles` (`/particles`),
+ * imports: `addGLTF` (`@margoengine/stage/gltf`), `addSky` (`/sky`), `addParticles` (`/particles`),
  * `addEffects` (`/effects`), `addEnvironment` (`/environment`) and `addShadows` (`/shadows`).
  */
 export class Stage {

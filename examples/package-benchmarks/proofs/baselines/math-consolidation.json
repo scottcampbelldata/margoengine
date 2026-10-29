@@ -12,8 +12,7 @@
   "textual: environment's sRGB decode is the same expression": true,
   "textual: sRGB encode copies are one expression": true,
   "textual: splats' decode is the same expression": true,
-  "textual: grass and scatter LCG expressions": true,
-  "textual: machinery's vector copies are controls'": true
+  "textual: grass and scatter LCG expressions": true
  },
  "outputs": {
   "bvh src/math.ts #1": "b0d9e8471ec6d5f1782ed50103d82d4b8f76f585967f47b7f0661031ceee0788",

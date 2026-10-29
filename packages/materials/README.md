@@ -876,12 +876,12 @@ batch.remove(crate); // its space is reused by a later item that fits
 ## Clipping planes
 
 `clippingPlanes` takes up to 6 world-space planes `[a, b, c, d]`; points with `a x + b y + c z + d < 0` are cut away
-(the convention of machinery's `SectionPlanes`), on every material class: standard, physical, unlit, Lambert, Phong,
+(the same convention as the scene's section binding), on every material class: standard, physical, unlit, Lambert, Phong,
 toon, normal, matcap, depth, distance, `WgslMaterial` and `@margoengine/shader` node materials. The cut applies in the
 beauty, G-buffer and SSAO passes and, with `clipShadows` (default true), in `@margoengine/shadows` directional shadow
 maps. Planes are normalised on assignment and reading returns copies; assign a new list to change them (live). A
 clipped caster redraws its shadow every frame. `@margoengine/lines` and `@margoengine/points` materials take the same
-option. `clipIntersection: true` cuts away only what is behind every plane (their intersection: a wedge or a corner out of a solid) instead of what is behind any of them; it is a uniform value, so switching it compiles nothing, and shadows follow it. A scene's `SectionPlanes` still clip everything; with both, the scene's planes clip the shadows. Clustered
+option. `clipIntersection: true` cuts away only what is behind every plane (their intersection: a wedge or a corner out of a solid) instead of what is behind any of them; it is a uniform value, so switching it compiles nothing, and shadows follow it. A scene's section planes (the `section` binding) still clip everything; with both, the scene's planes clip the shadows. Clustered
 point-light shadows and GPU picking ignore material planes.
 
 ```ts

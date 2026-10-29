@@ -253,7 +253,7 @@ export const builders = {
       },
       output: () => geometryCounts([out]),
       info: () => ({
-        note: 'parseSTL: CPU geometry data (typed arrays, no weld, flat normals computed where the file stores zero); like-for-like with a plain STL loader. The CAD path is p-stl-cad',
+        note: 'parseSTL: CPU geometry data (typed arrays, no weld, flat normals computed where the file stores zero); like-for-like with a plain STL loader',
       }),
     };
   },
@@ -268,28 +268,6 @@ export const builders = {
       output: () => geometryCounts([out]),
       info: () => ({
         note: 'parseSTL: its normals are already computed (flat, where the file stores zero), so the mesh lights correctly with no further call; three needs computeVertexNormals() after STLLoader.parse',
-      }),
-    };
-  },
-
-  async 'p-stl-cad'(canvas, data, marks) {
-    const engine = await engineFor(canvas, CAMERA, 64, marks),
-      { parseCAD } = await timed(marks, () => import('@margoengine/machinery/cad'));
-    let model;
-    return {
-      task() {
-        model?.dispose();
-        model = parseCAD(engine, data.bytes, 'stl');
-      },
-      output: () =>
-        geometryCounts(
-          model.meshes.map((m) => {
-            const g = m.geometry ?? m.primitives?.[0]?.geometry;
-            return g ? { positions: { length: g.vertices.length / 2 }, indices: g.indices } : { positions: [] };
-          }),
-        ),
-      info: () => ({
-        note: "parseCAD 'stl' (Margo's only public STL reader): welds vertices, computes face normals and creates core meshes (GPU buffers); previous meshes disposed in the call",
       }),
     };
   },

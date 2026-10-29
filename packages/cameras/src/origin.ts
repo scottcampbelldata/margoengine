@@ -93,7 +93,7 @@ export class FloatingOrigin implements EnginePlugin {
     const o = this.value;
     return [world[0] - o[0], world[1] - o[1], world[2] - o[2]];
   }
-  /** World plane [nx, ny, nz, d] (n·x + d = 0) → local plane, e.g. for `SectionPlanes` options; redo it in `onRebase`. */
+  /** World plane [nx, ny, nz, d] (n·x + d = 0) → local plane, e.g. for materials `clippingPlanes`; redo it in `onRebase`. */
   toLocalPlane(plane: ArrayLike<number>): [number, number, number, number] {
     const o = this.value;
     return [plane[0], plane[1], plane[2], plane[3] + plane[0] * o[0] + plane[1] * o[1] + plane[2] * o[2]];

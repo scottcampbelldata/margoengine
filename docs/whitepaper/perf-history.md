@@ -114,24 +114,9 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
   - Double-sided CAD scenes are unchanged.
 - **Rerun and guard:** as entry 2.
 
-### 4. AssemblyBVH rebuild at 7,560 parts
+### 4. Retired (2026-10-29)
 
-- **Loss:** a rebuild took 1,399.9248 ms.
-  - Node v24.15.0 with a fake renderer, on AC power.
-  - Source: `examples/package-benchmarks/proofs/results/machinery-cad.json`, `baselineMs`.
-  - The first record, in `7419fd44`, had 801.6726 ms (no AC note).
-- **Cause:** the BVH flattened every instanced triangle into world space and built one Wasm BVH over all of them.
-  - Every transform change needed a full rebuild.
-  - Assemblies above 1,000,000 instanced triangles were refused.
-- **Trade-off:** there is now one local-space BVH per distinct geometry, with a per-part bounding-sphere pass.
-  Raycasts at this size are about 2x slower, per [cad-performance.md](../cad-performance.md).
-- **Fix:** `7419fd44` two-level assembly BVH; re-measured on AC in `1c3e8757`.
-- **After:**
-  - 3.4799 ms, a speed-up of 402.289x (same file, `candidateMs`).
-  - The first record had 2.1594 ms (371.248x).
-  - At 89,883 parts: rebuild 40.795 ms, raycast 0.595 ms.
-- **Rerun:** `node examples/package-benchmarks/proofs/machinery-cad.proof.js` (also run by `npm run proofs`).
-- **Guard:** `examples/package-benchmarks/proofs/machinery-cad.proof.js` and `tests/modern-machinery-runtime.test.js`.
+The code this entry measured is no longer part of Margo Engine, so its cases are not run. Removing a package is not a speed change.
 
 ### 5. gltf-pro plain materials lost early depth testing again
 
@@ -407,10 +392,10 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
 ### 26. STL import and USDZ export: pushes, needless fingerprints and the digit search
 
 - **Loss:** speed matrix rows 10.11 and 11.3 (runs `20261025-161120`, `20261025-161539`): `p-stl` (204,800-triangle
-  binary STL through `parseCAD`) 111 ms against three.js 2.69; `p-export-usdz` (1,000 boxes) 52.8 ms against 2.78.
+  binary STL through the welded-parts path that has since been removed) 111 ms against three.js 2.69; `p-export-usdz` (1,000 boxes) 52.8 ms against 2.78.
 - **Causes, measured** (Node CPU profiles):
-  1. the STL reader and the corner weld grew JS arrays by `push` (1.8 million pushes; `parseCADGeometry` 63 ms);
-  2. `deduplicateParts` (and the CAD worker) fingerprinted every part, a sort of all its triangles plus a CRC, even
+  1. the STL reader and the corner weld grew JS arrays by `push` (1.8 million pushes; 63 ms);
+  2. part deduplication fingerprinted every part, a sort of all its triangles plus a CRC, even
      when no other part had its triangle count and nothing could match: 40 ms for the one STL part;
   3. the exporters' `num()` tried `toPrecision(1..9)` for every number until one read back: 75% of `exportUSDZ`;
   4. CRC-32 ran a byte at a time (4 ms for the 2.5 MB archive).
@@ -418,8 +403,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
   rounds and bounds them as before); a part is fingerprinted only once a second part with its triangle count arrives;
   `num()` binary-searches the digit count (the read-back interval is symmetric except at powers of two, which still
   scan every count), returns integers directly and caches recent values; CRC-32 runs slicing-by-8. Output is
-  bit-identical: the same welded geometry, a byte-identical archive. Trade-off: +500 B gzip on `exporters/usdz`,
-  +326 B on the CAD worker.
+  bit-identical: the same welded geometry, a byte-identical archive. Trade-off: +500 B gzip on `exporters/usdz`.
 - **After** (diagnostic, busy machine, RTX A6000; run `20261026-165034`, 3 runs): ms per call.
 
   | Scene | Before | After | three.js |
@@ -430,8 +414,7 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
   Both rows are still slower because the work differs (see [Open losses](#open-losses)).
 - **Rerun:** `node bench/cli.mjs parity --cases=p-stl,p-export-usdz --engines=margo,three-webgpu-parity,three-webgl-parity
   --runs=3 --warmup=1 --no-compare --no-fail`, then `node bench/parity-report.mjs <run.json> --partial`.
-- **Guard:** `tests/cad-triangles.test.js` (a lone 204,800-triangle part deduplicates in under 10 ms; matching still
-  works in any order of counts; the worker reuses a repeated part), `packages/exporters/tests/exporters.test.js`
+- **Guard:** `packages/exporters/tests/exporters.test.js`
   (written numbers equal the old search on 60,000 edge and random Float32 values; a 1,000-box USDZ export takes less
   time than the old search over its numbers alone).
 
@@ -586,33 +569,31 @@ ms against 0.75 and 1.98, faster, with no change of their own.
 
 ### 31. STL import: a plain `parseSTL` for the like-for-like comparison
 
-- **Loss:** `p-stl` (204,800-triangle binary STL) timed `parseCAD` at 28.7 ms against three.js's `STLLoader` at 2.6
-  (entry 26). The cause left after entry 26 was different work, not a slow loop: `parseCAD` welds corners (205,440
-  vertices), computes face normals, builds parts and creates GPU meshes, which CAD sections, edges and dedup need.
+- **Loss:** `p-stl` (204,800-triangle binary STL) timed the welded-parts path at 28.7 ms against three.js's `STLLoader` at 2.6
+  (entry 26). The cause left after entry 26 was different work, not a slow loop: that path welded corners (205,440
+  vertices), computed face normals, built parts and created GPU meshes.
 - **Change:** `parseSTL` in `@margoengine/loaders` (`d8cefa7b`), a plain reader like three's: binary and ASCII STL to
   typed arrays (3 vertices per triangle, the file's facet normals or flat normals where the file stores zero,
   VisCAM/SolidView colors if present), no weld unless `weld: true`, `AbortSignal`, coded errors. `p-stl` now times
-  `parseSTL`; the old `parseCAD` path stays as the Margo-only scene `p-stl-cad` (three.js has no CAD path), so the CAD
-  cost stays measured. `parseCAD` itself is unchanged.
+  `parseSTL`.
 - **After** (diagnostic, busy machine, RTX A6000; run `20261026-201722`, 3 runs): ms per call.
 
   | Scene | Before | After | three.js |
   | --- | --- | --- | --- |
-  | `p-stl` (`parseSTL`, plain) | 28.7 (`parseCAD`) | 4.9 | 2.8, still 1.7x slower |
-  | `p-stl-cad` (`parseCAD`) | 28.7 | 29.4 | no equivalent |
+  | `p-stl` (`parseSTL`, plain) | 28.7 (welded-parts path) | 4.9 | 2.8, still 1.7x slower |
 
 - **Accepted difference in work (Scott, 2026-10-26):** the `p-stl` gap is kept listed (4.7 against 2.7 ms, 1.7x) but
   accepted: `parseSTL` returns a render-ready mesh with flat face normals computed, while three's `STLLoader` copies the
   file's zero normals, which light wrongly until `computeVertexNormals()` is called. The scene `p-stl-normals` times the
   full job on both sides (run `20261026-211213`, diagnostic, 5 runs): three 8.7 ms (WebGPU build) / 8.7 (WebGL),
-  `parseSTL` 4.7 ms, so Margo is about 1.9x faster; `p-stl-cad` (`parseCAD`) 32 ms, no three.js equivalent.
+  `parseSTL` 4.7 ms, so Margo is about 1.9x faster.
 - **What is left in `p-stl`:** `parseSTL` computes the flat normal of every facet whose stored normal is zero (this
   file's writer leaves them zero, as most do), about 1.3 ms in Node (the profile shows `flatNormal` as the largest
   share), where three copies the zeros; it also writes an identity index array and zero-fills a third array. It is
   not a loop to fix: returning usable normals is the behavior a user wants. See
   [known-bugs.md](../known-bugs.md#stl-import-still-computes-normals-threes-stlloader-leaves-zero).
 - **Trade-off:** +1.9 KB gzip on the loaders root entry (a separate module; apps that do not import it pay nothing).
-- **Rerun:** `node bench/cli.mjs parity --cases=p-stl,p-stl-cad --engines=margo,three-webgpu-parity,three-webgl-parity
+- **Rerun:** `node bench/cli.mjs parity --cases=p-stl --engines=margo,three-webgpu-parity,three-webgl-parity
   --runs=3 --warmup=1 --no-compare --no-fail`, then `node bench/parity-report.mjs <run.json> --partial`.
 - **Guard:** `packages/loaders/tests/stl.test.js` (binary and ASCII give the same geometry, stored and computed
   normals, colors, weld, truncated and malformed input, limits, abort); the loaders `npm test` script now passes
@@ -662,7 +643,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   to 8 levels; each edge is now drawn once, in one direction). The current build renders the same pixels on a second run, so these come from the changes, not
   from noise, and all sit far inside the matrix's tolerance (SSIM >= 0.9, mean delta E <= 6).
 - **Bytes:** OBJ, STL and PLY (binary and ASCII), GLB and USDZ exports, EXR writing, all 32 EXR and HDR fixtures and
-  the CAD path's STL geometry hash the same before and after (`b30af0b8`, `1be3aca1`).
+  the welded STL geometry hash the same before and after (`b30af0b8`, `1be3aca1`).
 - **Marching cubes:** `4be0e7d2` also changed the scene, from summing every ball at every grid point to writing each
   ball only near it as three's add-on does, so `p-marching-cubes` compared two workloads. Row 17.11 now runs both,
   labelled: `p-marching-cubes-dense` (the original scene, its image byte-identical to the original's) and
@@ -679,7 +660,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   stretch through the Gershgorin bound of M^T M (exact for rotation and scale) plus a float32 pad; LocalShadows, the
   LOD imposter cull and gltf-pro's progressive load order use it. The `p-point-shadows` image is unchanged.
 - **Labels:** the matrix names what each case of a multi-case row measures (`bench/scenes/parity.js` `LABELS`): helmet's
-  default PCSS shadows beside the setup closest to three's, `parseSTL` beside `parseCAD`, dense beside localized.
+  default PCSS shadows beside the setup closest to three's, `p-stl` beside `p-stl-normals`, dense beside localized.
 - **Guard:** `packages/clustered/test/shadows.test.js` (casters across face seams, on edges and corners, grazing the
   range, a centre outside one face's frustum overlapping the next, and 120 sheared casters, each checked against
   sampled sphere points), `tests/shared-sphere.test.js`, and `tests/bench.test.js` (row 17.11 keeps the dense case,
@@ -992,7 +973,7 @@ These entries have no timing. The loss is a feature that did not work.
 - **Loss:** the decoder worker loaded its code with `eval`, and the embind glue used `new Function`. Pages with a strict
   CSP failed.
 - **Fix:** `d000b1d9` loads decoder code with `importScripts` and replaces the generated wrappers with closures. Facade
-  demo builds dropped about 7.79 MB of CAD code each (commit message).
+  demo builds dropped about 7.79 MB of unused code each (commit message).
 - **After:** 14/14 pages pass (same message). The current record is
   `examples/package-benchmarks/results/csp-check.json`.
 - **Rerun:** `node scripts/csp-check.mjs`.
@@ -1286,8 +1267,7 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   - [claims.md](claims.md) records that there is no publishable result yet.
 - **STL import and USDZ export against three.js: partly closed (entries 26 and 31).** `p-stl` (the plain `parseSTL`)
   4.7 ms against 2.7 (accepted difference in work, see entry 31; with three's `computeVertexNormals()` on both sides,
-  `p-stl-normals`, Margo is 4.7 against 8.7 ms, faster): it computes the flat normals the file leaves zero, where three copies the zeros. The CAD path
-  `p-stl-cad` (`parseCAD`, which welds, builds parts and creates GPU meshes) is 29.4 ms with no three.js equivalent.
+  `p-stl-normals`, Margo is 4.7 against 8.7 ms, faster): it computes the flat normals the file leaves zero, where three copies the zeros.
   `p-export-usdz` 16.0 ms against 2.5 (run `20261026-165034`, diagnostic): `exportUSDZ` writes every mesh in world
   space (2.46 MB) where three's archive is 444 KB. Causes and plans:
   [known-bugs.md](../known-bugs.md#stl-import-still-computes-normals-threes-stlloader-leaves-zero) and

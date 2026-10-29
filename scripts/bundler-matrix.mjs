@@ -338,7 +338,7 @@ ${result.stdout}${result.stderr}`,
         // Only what the page imports: no package outside its graph is emitted, and nothing larger than JavaScript.
         // Installed code only: Vite stands in a three-line module for an optional peer that is not installed.
         const extra =
-          /node_modules\/@margoengine\/(machinery|gltf|gltf-pro|decoders|fbx|creative|scenery|sky|environment|geometry)\//;
+          /node_modules\/@margoengine\/(gltf|gltf-pro|decoders|fbx|creative|scenery|sky|environment|geometry)\//;
         assert.deepEqual(
           scoped.files.filter((file) => !file.endsWith('.js') && !file.endsWith('.html')),
           [],
@@ -369,19 +369,19 @@ ${result.stdout}${result.stderr}`,
           [],
           'margoengine: the initial load holds no optional engine package',
         );
-        // Regression (2026-10-27): the Stage class's loaders put OpenCascade's .wasm into every build of a Canvas page.
+        // Regression (2026-10-27): the Stage class's loaders put an optional package's .wasm into every build of a Canvas page.
         // margoengine/react re-exports every binding, so its module graph still reaches gltf-pro's decoders, and Vite
         // copies their .wasm when it reads a module, before tree-shaking; no chunk of them is emitted or fetched
         // (docs/limits.md). @margoengine/react alone emits none (asserted above).
         assert.deepEqual(
           umbrella.files.filter((file) => file.endsWith('.wasm')).map((file) => file.replace(/-[\w-]{8}\.wasm$/, '')),
           ['assets/basis_transcoder', 'assets/draco_decoder'],
-          'margoengine: no OpenCascade .wasm; only the decoders gltf-pro names (docs/limits.md)',
+          'margoengine: no .wasm the app does not import; only the decoders gltf-pro names (docs/limits.md)',
         );
         assert.deepEqual(
-          umbrella.modules.filter((id) => /node_modules\/@margoengine\/(gltf-pro|decoders|machinery)\//.test(id)),
+          umbrella.modules.filter((id) => /node_modules\/@margoengine\/(gltf-pro|decoders)\//.test(id)),
           [],
-          'margoengine: no chunk of gltf-pro, the decoders or machinery is emitted',
+          'margoengine: no chunk of gltf-pro or the decoders is emitted',
         );
         for (const [label, app] of [
           ['react alone', scoped],
@@ -403,7 +403,7 @@ ${result.stdout}${result.stderr}`,
             app.initial <= REACT_BUDGET.initial,
             `${label}: ${app.initial} B gzip at load > ${REACT_BUDGET.initial}`,
           );
-          // The browser fetches JavaScript only, nothing from an optional family (CAD, decoders, glTF, sky, ...), and
+          // The browser fetches JavaScript only, nothing from an optional family (decoders, glTF, sky, ...), and
           // no part of the controls index the page does not use (TransformControls, DragControls and the BVH raycaster).
           assert.deepEqual(
             app.requested.filter((file) => !file.endsWith('.js')),
@@ -579,7 +579,7 @@ ${result.stdout}${result.stderr}`,
   // with webpack and with Turbopack, each in its own project: the cube page with nothing else, and the same page with
   // OrbitControls from @margoengine/react/controls and only @margoengine/controls added. Regression (2026-10-27): both
   // bundlers stopped with "Module not found" for 18 optional peers, reached through the Stage class and the React root.
-  // Each build must resolve every module and emit no OpenCascade, Draco or Basis file.
+  // Each build must resolve every module and emit no Wasm, Draco or Basis file.
   const nextAlone = async (label, extra, scene) => {
     const app = await mkdtemp(join(temp, `margoengine-bundlers-next-${label}-`));
     try {
@@ -619,7 +619,7 @@ ${result.stdout}${result.stderr}`,
         [],
         `next ${label}: npm installed only @margoengine/react, the added packages and what they require (${engine})`,
       );
-      assert.equal(engine.includes('gltf-pro') || engine.includes('machinery') || engine.includes('shadows'), false);
+      assert.equal(engine.includes('gltf-pro') || engine.includes('shadows'), false);
       await mkdir(join(app, 'app'), { recursive: true });
       await writeFile(join(app, 'next.config.mjs'), 'export default {};\n');
       await writeFile(
@@ -711,7 +711,7 @@ ${result.stdout}${result.stderr}`,
             `${bundler} react alone: no optional engine package is emitted`,
           );
           assert.deepEqual(
-            files.filter((file) => /\.wasm$|occt|draco|basis/i.test(file)),
+            files.filter((file) => /\.wasm$|draco|basis/i.test(file)),
             [],
             `${bundler} react alone: no Wasm`,
           );
@@ -746,9 +746,9 @@ ${result.stdout}${result.stderr}`,
           file.replaceAll('\\', '/'),
         );
         assert.deepEqual(
-          emitted.filter((file) => /occt|draco|basis|\.wasm$/i.test(file)),
+          emitted.filter((file) => /draco|basis|\.wasm$/i.test(file)),
           [],
-          `next ${label} ${flag}: no OpenCascade, Draco or Basis file is emitted`,
+          `next ${label} ${flag}: no Wasm, Draco or Basis file is emitted`,
         );
         done(`next ${label} ${flag}: built with ${engine.length} engine packages installed`);
       }

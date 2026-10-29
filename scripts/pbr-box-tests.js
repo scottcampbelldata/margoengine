@@ -13,8 +13,6 @@ export async function pbrBoxBrowserChecks(page) {
     const { loadGLTF: loadBasicGLTF } = await import('/packages/gltf/dist/index.js');
     const { Physics } = await import('/packages/physics/dist/index.js');
     const { exportGLB } = await import('/packages/exporters/dist/index.js');
-    const { deduplicateParts } = await import('/packages/machinery/dist/cad.js');
-    const { AssemblyBVH } = await import('/packages/machinery/dist/spatial.js');
     const { BoxHelper } = await import('/packages/lines/dist/index.js');
     const { worldBounds } = await import('/packages/stage/dist/model.js');
     const { meshTriangles } = await import('/packages/shared/mesh-source.js');
@@ -310,32 +308,6 @@ export async function pbrBoxBrowserChecks(page) {
           json.nodes.filter((node) => node.children?.length).length === 2,
         'export flattened the source hierarchy',
       );
-      const groups = deduplicateParts(model.nodes);
-      check(groups.parts === 1 && groups.unique === 1, 'CAD grouping lost the Box primitive');
-      rejects(
-        () => deduplicateParts([model.root]),
-        /CAD grouping contains no supported geometry/,
-        'root-only CAD grouping',
-      );
-      const assembly = await AssemblyBVH.create(model.nodes);
-      let hit;
-      try {
-        const center = [0, 1, 2].map((axis) => (bounds[axis] + bounds[axis + 3]) / 2);
-        hit = assembly.raycast([center[0], center[1], bounds[5] + 2], [0, 0, -1]);
-        check(hit?.node === mesh, '12-triangle AssemblyBVH missed the transformed Box');
-      } finally {
-        assembly.dispose();
-      }
-      let rootBVHError;
-      try {
-        await AssemblyBVH.create([model.root]);
-      } catch (error) {
-        rootBVHError = error;
-      }
-      check(
-        /BVH requires 1\.\.1000000 triangles/.test(rootBVHError?.message ?? ''),
-        'root-only BVH must reject absent geometry',
-      );
       const helper = new BoxHelper(mesh),
         rootHelper = new BoxHelper(model.root);
       try {
@@ -488,8 +460,6 @@ export async function pbrBoxBrowserChecks(page) {
           localExportExact: true,
           roundtripWorldGeometry: true,
           minimalLoaderControl: true,
-          cad: groups,
-          bvhHitTriangle: hit.triangle,
           coreGeometry: null,
         },
         avocado: {

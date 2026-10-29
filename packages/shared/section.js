@@ -1,5 +1,5 @@
-// Optional renderers reuse SectionPlanes' existing uniform; core and machinery
-// keep their shader patch and ownership unchanged. Per-material clipping planes (@margoengine/materials
+// Optional renderers reuse the existing uniform of a scene's `section` plugin (a plugin that patches core's mesh
+// shader and owns the binding named `section`); its patch and ownership stay unchanged. Per-material clipping planes (@margoengine/materials
 // `clippingPlanes`) use the same layout under another name, so one shader can carry both.
 const bindingPattern = /@group\(0\) @binding\((\d+)\) var<uniform> section:Section;/;
 const cache = new Map();
@@ -21,7 +21,7 @@ export function sectionState(context) {
     }
 }
 /**
- * The WGSL statement that discards `position` against uniform `name`'s planes. SectionPlanes ('section') cut away the
+ * The WGSL statement that discards `position` against uniform `name`'s planes. A `section` plugin ('section') cuts away the
  * union of the planes' negative sides; other names read settings.y as the mode: 0 the union, 1 the intersection (a
  * point goes only when it is behind every plane).
  */

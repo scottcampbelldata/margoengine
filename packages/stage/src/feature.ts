@@ -41,7 +41,7 @@ export async function attachPlugin<T extends EnginePlugin, M>(
   return stage.use(create(await optionalPackage(name, load, stage.signal)));
 }
 
-/** Validates the shared load options of `addGLTF` and `addCAD`. */
+/** Validates the shared load options of the model loaders (`addGLTF`). */
 export function loadTarget(url: string | URL, fit: unknown): URL {
   if (typeof fit !== 'boolean') throw typeError('fit: boolean', 'arguments');
   return new URL(url, globalThis.location?.href);

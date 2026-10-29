@@ -126,8 +126,8 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     await page.waitForFunction(() => !document.querySelector('#search').disabled);
     assert.equal(await page.locator('.module:visible').count(), entries.length);
     for (const [term, id] of [
-      ['conveyor', 'machinery'],
-      ['SectionPlanes', 'machinery'],
+      ['Gerstner', 'water'],
+      ['CharacterController', 'physics'],
       ['loadGLTF', 'gltf'],
       ['particle', 'creative'],
       ['useFrame', 'react'],
@@ -162,23 +162,23 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
       assert.match(example, /^<!doctype html>/);
       await card.locator('.source summary').click();
     }
-    await page.locator('#machinery .exports summary').click();
-    await page.getByRole('button', { name: 'Copy import for Kinematics', exact: true }).click();
-    await waitForClipboard("import { Kinematics } from '@margoengine/machinery';");
-    assert.equal(await clipboard(), "import { Kinematics } from '@margoengine/machinery';");
+    await page.locator('#physics .exports summary').click();
+    await page.getByRole('button', { name: 'Copy import for Vehicle', exact: true }).click();
+    await waitForClipboard("import { Vehicle } from '@margoengine/physics';");
+    assert.equal(await clipboard(), "import { Vehicle } from '@margoengine/physics';");
     const shown = await page.evaluate(() => {
       navigator.clipboard.writeText = async () => {
         throw new Error('Denied');
       };
       return window.statuses.length;
     });
-    await page.getByRole('button', { name: 'Copy import for SectionPlanes', exact: true }).click();
+    await page.getByRole('button', { name: 'Copy import for CharacterController', exact: true }).click();
     await page.waitForFunction(
-      () => window.getSelection().toString() === "import { SectionPlanes } from '@margoengine/machinery';",
+      () => window.getSelection().toString() === "import { CharacterController } from '@margoengine/physics';",
     );
     assert.equal(
       await page.evaluate(() => window.getSelection().toString()),
-      "import { SectionPlanes } from '@margoengine/machinery';",
+      "import { CharacterController } from '@margoengine/physics';",
     );
     // The denied copy showed the select-and-press-Ctrl+C message (however long ago).
     assert.match((await page.evaluate((from) => window.statuses.slice(from), shown)).join('\n'), /Ctrl\+C/);

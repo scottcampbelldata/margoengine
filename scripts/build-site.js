@@ -36,18 +36,6 @@ const site = (config) =>
     worker: { rollupOptions: { output: names } },
     build: { ...config.build, emptyOutDir: true, rollupOptions: { ...config.build.rollupOptions, output: names } },
   });
-// The stage facade (`margoengine`) imports @margoengine/machinery lazily for STEP/IGES/STL/OBJ in `load()`, so every
-// demo built on it shipped the 7.6 MB OCCT .wasm and the CAD chunks (never downloaded: no demo loads CAD). Those builds
-// get a stand-in that rejects instead; demos that need CAD must not use `noCAD`.
-const noCAD = {
-  name: 'margo-site-no-cad',
-  enforce: 'pre',
-  resolveId: (id) => (/^@margoengine\/machinery(\/|$)/.test(id) ? '\0margo-no-cad' : null),
-  load: (id) =>
-    id === '\0margo-no-cad'
-      ? `throw new Error('This margoengine.com demo build leaves out @margoengine/machinery (scripts/build-site.js)');`
-      : null,
-};
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 for (const name of await readdir('site'))
@@ -79,7 +67,6 @@ const pages = [
   'flight-helmet',
   'windy-meadow',
   'tokyo-diorama',
-  'cad-views',
   'split-screen',
   'minimap',
   'batched-mesh',
@@ -100,7 +87,6 @@ await site({
   root: 'examples',
   base: './',
   publicDir: false,
-  plugins: [noCAD],
   build: {
     outDir: `${out}/demos`,
     target: 'es2022',
@@ -111,7 +97,6 @@ await site({
   configFile: false,
   root: 'packages/creative/examples/earth',
   base: './',
-  plugins: [noCAD],
   build: { outDir: `${out}/demos/earth`, target: 'es2022' },
 });
 for (const name of ['dof', 'tonemap', 'animator'])
@@ -120,7 +105,6 @@ for (const name of ['dof', 'tonemap', 'animator'])
     root: `packages/${name}/examples`,
     base: './',
     publicDir: false,
-    plugins: [noCAD],
     build: { outDir: `${out}/demos/${name}`, target: 'es2022' },
   });
 // The in-browser benchmark (bench/): the CLI's scene page and harness behind a runner page, with the models its glTF
@@ -130,7 +114,6 @@ await site({
   root: 'bench',
   base: './',
   publicDir: false,
-  plugins: [noCAD],
   build: {
     outDir: `${out}/bench`,
     target: 'es2022',
@@ -145,6 +128,6 @@ for (const name of ['ATTRIBUTION.md', 'robot-CREDITS.md', 'tokyo-diorama-CREDITS
 execFileSync(process.execPath, [resolve('scripts/build-skinning-ik.mjs')], { stdio: 'inherit' });
 await cp('test-results/skinning-ik-site', `${out}/demos/light-keeper`, { recursive: true });
 await cp('packages/creative/examples/earth/assets/ATTRIBUTION.md', `${out}/demos/earth/assets/ATTRIBUTION.md`);
-// Licence notices for the third-party code the demos bundle (Draco, Basis, OCCT, Rapier); scripts/supply-chain.mjs.
+// Licence notices for the third-party code the demos bundle (Draco, Basis, Rapier); scripts/supply-chain.mjs.
 await cp('THIRD-PARTY-NOTICES.md', `${out}/THIRD-PARTY-NOTICES.md`);
 console.log(out);

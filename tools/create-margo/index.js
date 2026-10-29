@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 const TEMPLATES = {
   web: { about: 'a lit scene with orbit controls and quality tiers (default)', shared: true },
   game: { about: 'a small physics game with the margoengine/game kit and Rapier', shared: true },
-  cad: { about: 'a CAD viewer: CAD mouse profiles, view cube, section plane, STEP/IGES/STL import', shared: true },
   viz: { about: 'a point-cloud visualization with grid and labels (margoengine/viz)', shared: true },
   react: { about: 'React + Vite with margoengine/react', shared: true },
   next: { about: 'Next.js (app router) with margoengine/react', shared: false },

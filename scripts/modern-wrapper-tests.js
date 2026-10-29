@@ -22,7 +22,7 @@ const bundled = await build({
 });
 const chunks = bundled.output.filter((output) => output.type === 'chunk'),
   entry = chunks.find((chunk) => chunk.isEntry);
-for (const name of ['gltf', 'machinery', 'creative', 'scenery']) {
+for (const name of ['gltf', 'creative', 'scenery']) {
   assert.ok(!Object.keys(entry.modules).some((id) => id.includes(`/packages/${name}/`)), `${name} leaked into startup`);
   assert.ok(
     chunks.some(

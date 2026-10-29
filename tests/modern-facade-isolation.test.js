@@ -20,21 +20,6 @@ const featureMarkers = {
   sky: 'sky-moon',
   shadows: 'Invalid shadow options',
   environment: 'environment:lighting',
-  cad: 'part-instancer',
-  cadAsync: 'CAD input must be a non-empty ArrayBuffer',
-  kinematics: 'breaks the solver limits',
-  surface: 'surface-physics',
-  telemetry: 'telemetry-channel',
-  section: 'section-planes',
-  assembly: 'Assembly tag must be a non-empty string',
-  metrology: 'Vertex index is out of range',
-  spatial: 'BVH requires 1..1000000 triangles',
-  clearance: 'Clearance requires geometry',
-  materials: 'Unknown industrial material name',
-  overlays: 'engineering-annotations',
-  exploded: 'exploded-view',
-  // worldAnchor is a shared helper; retaining it must not pull in SVG annotations.
-  worldAnchor: 'Anchor point must be three finite numbers',
 };
 const cases = [
   // Wrappers load the one implementation they wrap: creative particles over vfx, scenery's SkyMoon over sky.
@@ -52,68 +37,11 @@ const cases = [
   { key: 'grass', pack: 'creative', entry: 'grass', exports: ['GrassField'], allowed: ['grass'] },
   { key: 'planet', pack: 'creative', entry: 'planet', exports: ['Planet'], allowed: ['planet'] },
   { key: 'sky', pack: 'scenery', entry: 'sky', exports: ['SkyMoon'], allowed: ['sky'], packs: ['sky'] },
-  {
-    key: 'cad',
-    pack: 'machinery',
-    entry: 'cad',
-    exports: ['parseCAD', 'loadCAD', 'deduplicateParts', 'PartInstancer'],
-    allowed: ['cad', 'cadAsync'],
-  },
-  { key: 'cadAsync', pack: 'machinery', entry: 'cad-async', exports: ['parseCADAsync'], allowed: ['cadAsync'] },
-  { key: 'kinematics', pack: 'machinery', entry: 'kinematics', exports: ['Kinematics'], allowed: ['kinematics'] },
-  { key: 'surface', pack: 'machinery', entry: 'surface', exports: ['SurfacePhysics'], allowed: ['surface'] },
-  {
-    key: 'telemetry',
-    pack: 'machinery',
-    entry: 'telemetry',
-    exports: ['TelemetryChannel'],
-    allowed: ['telemetry', 'kinematics'],
-  },
-  {
-    key: 'section',
-    pack: 'machinery',
-    entry: 'section',
-    exports: ['SectionPlanes', 'boxSection'],
-    allowed: ['section'],
-  },
-  { key: 'assembly', pack: 'machinery', entry: 'assembly', exports: ['AssemblyIndex'], allowed: ['assembly'] },
-  {
-    key: 'metrology',
-    pack: 'machinery',
-    entry: 'metrology',
-    exports: ['vertexAnchor', 'edgeAnchor', 'faceAnchor', 'holeAnchor', 'snapAnchor', 'snapFeature', 'measureDistance'],
-    allowed: ['metrology', 'worldAnchor'],
-  },
-  {
-    key: 'spatial',
-    pack: 'machinery',
-    entry: 'spatial',
-    exports: ['AssemblyBVH'],
-    allowed: ['spatial', 'metrology', 'worldAnchor'],
-  },
-  { key: 'clearance', pack: 'machinery', entry: 'clearance', exports: ['measureClearance'], allowed: ['clearance'] },
-  {
-    key: 'materials',
-    pack: 'machinery',
-    entry: 'materials',
-    exports: ['industrialMaterials', 'industrialMaterial'],
-    exportTypes: { industrialMaterials: 'object' },
-    allowed: ['materials'],
-  },
-  {
-    key: 'overlays',
-    pack: 'machinery',
-    entry: 'overlays',
-    exports: ['EngineeringAnnotations', 'worldAnchor', 'projectAnnotation'],
-    allowed: ['overlays', 'worldAnchor'],
-  },
-  { key: 'exploded', pack: 'machinery', entry: 'exploded', exports: ['ExplodedView'], allowed: ['exploded'] },
 ];
 const optionalPacks = [
   'creative',
   'scenery',
   'sky',
-  'machinery',
   'gltf',
   'gltf-pro',
   'blender',
@@ -234,7 +162,6 @@ test('initial core + stage consumer keeps every optional pack behind a lazy boun
     '@margoengine/creative/particles',
     '@margoengine/creative/post',
     '@margoengine/scenery/sky',
-    '@margoengine/machinery/cad',
     '@margoengine/shadows',
     '@margoengine/environment',
   ]) {
@@ -310,17 +237,16 @@ test('eager facade and lazy features retain one canonical core module graph', as
 });
 
 test('actual root/subpath imports share identities and facade helpers preserve returned features', async () => {
-  const [facade, core, creative, scenery, machinery, gltf] = await Promise.all([
+  const [facade, core, creative, scenery, gltf] = await Promise.all([
     import('margoengine'),
     import('@margoengine/core'),
     import('@margoengine/creative'),
     import('@margoengine/scenery'),
-    import('@margoengine/machinery'),
     import('@margoengine/gltf'),
   ]);
   assert.equal(facade.Geometry, core.Geometry, 'Facade has a different Geometry constructor');
   assert.equal(facade.Engine, core.Engine, 'Facade has a different Engine factory');
-  const roots = { creative, scenery, machinery };
+  const roots = { creative, scenery };
   for (const feature of cases) {
     const narrow = await import('@margoengine/' + feature.pack + '/' + feature.entry);
     assert.deepEqual(
@@ -344,18 +270,7 @@ test('actual root/subpath imports share identities and facade helpers preserve r
   }
   void gltf;
   // The whole-pack accessors are gone: an app imports the package itself.
-  for (const name of [
-    'load',
-    'gltf',
-    'machinery',
-    'creative',
-    'scenery',
-    'sky',
-    'particles',
-    'effects',
-    'environment',
-    'shadows',
-  ])
+  for (const name of ['load', 'gltf', 'creative', 'scenery', 'sky', 'particles', 'effects', 'environment', 'shadows'])
     assert.equal(facade.Stage.prototype[name], undefined, 'Stage.' + name + ' is back on the class');
   const attached = [],
     receiver = new facade.Stage({

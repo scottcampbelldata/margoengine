@@ -283,6 +283,27 @@ test('build writes a manifest with sizes and hashes, a size report, and handles 
   }
 });
 
+test('build converts no CAD file: a .step file is listed as ignored, not built (CAD conversion left the pipeline)', {
+  timeout: 120_000,
+}, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-convert-')),
+    input = join(dir, 'in');
+  try {
+    mkdirSync(input);
+    copyFileSync(at('examples/assets/khronos/OrientationTest/OrientationTest.glb'), join(input, 'OrientationTest.glb'));
+    writeFileSync(join(input, 'part.step'), 'not a model');
+    const { manifest, report } = await build({ input, outDir: join(dir, 'out') });
+    assert.deepEqual(
+      manifest.files.map((f) => f.source),
+      ['OrientationTest.glb'],
+    );
+    assert.match(report, /ignored 1 file that are not models, textures or audio/);
+    assert.ok(!existsSync(join(dir, 'out', 'part.glb')), 'no GLB was converted from the .step file');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('incremental builds skip unchanged inputs and rebuild only what changed', { timeout: 180_000 }, async () => {
   const w = workspace();
   try {
@@ -392,8 +413,15 @@ test('CLI: build, optimize, help and errors', { timeout: 120_000 }, () => {
     assert.match(bad.out, /unknown preset "ps5"/);
     assert.equal(run('optimize', join(w.input, 'Fox.glb'), join(w.input, 'Fox.glb')).code, 1);
     assert.equal(run('build').code, 1);
-    // The CAD converter is still the default command.
-    assert.match(run('--help').out, /Usage: margo-convert <input\.step/);
+    // Without a mode the CLI converts nothing: --help prints the build and optimize usage, anything else exits 1 with it.
+    const help = run('--help');
+    assert.equal(help.code, 0);
+    assert.match(help.out, /^Usage:\n {2}margo-convert build /);
+    for (const args of [[], ['part.step']]) {
+      const none = run(...args);
+      assert.equal(none.code, 1, args.join(' '));
+      assert.match(none.out, /margo-convert optimize <model\.glb\|\.gltf>/, args.join(' '));
+    }
   } finally {
     rmSync(w.dir, { recursive: true, force: true });
   }

@@ -4,10 +4,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { deflateSync } from 'node:zlib';
-import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import {
   LoaderError,
   parse3MF,
@@ -18,7 +16,6 @@ import {
   readZipDirectory,
   readZipEntry,
 } from '../packages/loaders/dist/index.js';
-import { parseCAD, parseCADAsync, SurfacePhysics } from '../packages/machinery/dist/index.js';
 import { convertFBX } from '../packages/fbx/dist/index.js';
 import { parseUSDA as usdzUSDA, parseUSDC, parseUSDZ } from '../packages/usdz/dist/index.js';
 import { parseIFC } from '../packages/ifc/dist/index.js';
@@ -26,16 +23,7 @@ import { V, writeCrate } from '../packages/usdz/tests/crate-writer.js';
 import { zip } from '../scripts/fuzz/targets-assets.js';
 
 const root = resolve(import.meta.dirname, '..'),
-  require = createRequire(join(root, 'package.json')),
   text = (s) => new TextEncoder().encode(s);
-const headless = async () =>
-  new Engine({ width: 1, height: 1, clientWidth: 1, clientHeight: 1 }, await TransformStore.create(), {
-    backend: 'webgl2',
-    add() {},
-    remove() {},
-    render() {},
-    dispose() {},
-  });
 /** Throws a LoaderError with `code`, and allocates at most `maxMiB` while doing it. */
 async function loaderError(run, code, maxMiB = 16) {
   globalThis.gc?.();
@@ -123,98 +111,6 @@ test('ZIP: a deflate bomb or a lying declared size is refused before inflating',
   // A big entry that compresses 10x (packages/loaders/tests/fixtures/gears.3mf) still reads; maxRatio raises the limit.
   const plain = zip([{ name: 'a', data: new Uint8Array(4 << 20), method: 8 }]);
   assert.equal((await readZipEntry(plain, readZipDirectory(plain)[0], { maxRatio: 10_000 })).length, 4 << 20);
-});
-
-test('STL and OBJ (machinery): no quadratic STL scan, non-UTF-8 text is a named error', async () => {
-  const engine = await headless();
-  // Found: hang. "facet normal" without "endfacet" made the lazy regex rescan to the end of the file each time.
-  const stl = `solid x\n${'facet normal 0 0 1\n'.repeat(200_000)}endsolid x\n`;
-  await quick('ASCII STL', () => assert.throws(() => parseCAD(engine, stl, 'stl'), /STL contains no triangles/));
-  // Found: TextDecoder's own TypeError ("The encoded data was not valid for encoding utf-8").
-  const bad = new Uint8Array([0x76, 0x20, 0xff, 0xfe, 0x0a]);
-  assert.throws(() => parseCAD(engine, bad, 'obj'), /^TypeError: Invalid OBJ: the file is not UTF-8 text; /);
-  assert.throws(() => parseCAD(engine, bad, 'stl'), /^TypeError: Invalid STL: the file is not UTF-8 text; /);
-  const ok = parseCAD(
-    engine,
-    'solid t\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid t\n',
-    'stl',
-  );
-  assert.equal(ok.meshes.length, 1);
-  engine.dispose();
-});
-
-/** Runs machinery's built CAD worker in-process (one fresh worker per file, as loadCAD does). */
-async function cadWorker(bytes, format) {
-  const code = readFileSync(join(root, 'packages/machinery/dist/workers/cad-runtime.js'), 'utf8');
-  return new Promise((done) => {
-    const self = {
-      location: { href: 'file:///cad-runtime.js' },
-      postMessage: (m) => (m.error !== undefined || m.done) && done(m),
-      importScripts() {
-        self.occtimportjs = () => require('occt-import-js')({ print() {}, printErr() {} });
-      },
-    };
-    new Function('self', code)(self);
-    self.onmessage({ data: { buffer: bytes.slice().buffer, format, smoothing: true } });
-  });
-}
-
-test('STEP (machinery worker): an OpenCascade stack overflow or trap is a named error; the next file loads', async () => {
-  // Found: the worker reported OCCT's raw "Maximum call stack size exceeded" for a 50,000-deep parameter list.
-  const deep = text(
-    `ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((''),'2;1');\nFILE_NAME('','',(''),(''),'','','');\nFILE_SCHEMA(('AUTOMOTIVE_DESIGN'));\nENDSEC;\nDATA;\n#1=CARTESIAN_POINT('',${'('.repeat(50_000)}0.${')'.repeat(50_000)});\nENDSEC;\nEND-ISO-10303-21;\n`,
-  );
-  const failed = await cadWorker(deep, 'step');
-  assert.match(failed.error, /^B-Rep import failed/);
-  const cube = readFileSync(join(root, 'node_modules/occt-import-js/test/testfiles/cube-10x10mm/Cube 10x10.stp'));
-  assert.equal((await cadWorker(new Uint8Array(cube), 'step')).done, true);
-});
-
-test('loadCAD worker: an import that never answers is terminated at timeoutMs with a named error', async () => {
-  // Found (fuzzer, IGES seed 2 iteration 786): a 4-byte change in Cube 10x10.igs keeps OpenCascade busy for 135 s.
-  const saved = globalThis.Worker,
-    terminated = [];
-  globalThis.Worker = class {
-    postMessage() {} // OpenCascade still tessellating: no reply
-    terminate() {
-      terminated.push(this);
-    }
-  };
-  const engine = await headless();
-  try {
-    await assert.rejects(
-      parseCADAsync(engine, new Uint8Array(64).buffer, 'iges', { timeoutMs: 50 }),
-      /^RangeError: CAD import did not finish within 50 ms \(raise the timeoutMs option\)$/,
-    );
-    assert.equal(terminated.length, 1);
-    assert.equal(engine.meshes.size, 0);
-    assert.throws(() => parseCADAsync(engine, new Uint8Array(64).buffer, 'iges', { timeoutMs: 0 }), /timeoutMs/);
-  } finally {
-    globalThis.Worker = saved;
-    engine.dispose();
-  }
-});
-
-test('SurfacePhysics: malformed parts, carriers and vectors are TypeErrors that name them', async () => {
-  // Found: "Cannot read properties of undefined (reading 'check')" and "... (reading 'length')" from setup.
-  const engine = await headless(),
-    node = () => engine.createMesh();
-  const cases = [
-    [[{ node: node(), carrier: 0, lane: 0, axis: [1, 0, 0], halfLength: 1 }], [{ node: undefined }], /surface carrier/],
-    [[{ node: null, carrier: 0, lane: 0, axis: [1, 0, 0], halfLength: 1 }], [{ node: node() }], /surface part/],
-    [[{ node: node(), carrier: 0, lane: 0, axis: null, halfLength: 1 }], [{ node: node() }], /surface vector/],
-    [[null], [{ node: node() }], /surface part/],
-    [[{ node: { check: 1 }, carrier: 0, lane: 0, axis: [1, 0, 0], halfLength: 1 }], [{ node: node() }], /surface part/],
-  ];
-  for (const [parts, carriers, message] of cases) {
-    const surface = await SurfacePhysics.create(parts, carriers);
-    assert.throws(
-      () => engine.use(surface),
-      (e) => e instanceof TypeError && message.test(e.message),
-    );
-  }
-  await assert.rejects(SurfacePhysics.create('parts', []), /Surface parts and carriers must be arrays/);
-  engine.dispose();
 });
 
 test('FBX: truncated scalar properties and corrupt zlib arrays are FBX errors (no unhandled rejection)', async () => {

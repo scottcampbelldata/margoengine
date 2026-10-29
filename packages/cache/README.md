@@ -2,7 +2,7 @@
 
 Import `margoengine/cache` from the `margoengine` package, or `@margoengine/cache` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Opt-in offline asset cache. Heavy GLB, .bin, texture and STEP files are kept in IndexedDB, so repeat visits load them
+Opt-in offline asset cache. Heavy GLB, .bin and texture files are kept in IndexedDB, so repeat visits load them
 from disk and the viewer keeps working with bad or no Wi-Fi (a factory floor). `cache.fetch` is fetch-compatible and
 every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 2.4 kB
 min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and service workers.
@@ -10,7 +10,6 @@ min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and s
 ```ts
 import {AssetCache} from 'margoengine/cache';
 import {loadGLTF} from 'margoengine/gltf-pro';
-import {loadCAD} from 'margoengine/machinery/cad';
 
 const cache = new AssetCache({
   name: 'plant-viewer',    // IndexedDB database name
@@ -19,7 +18,6 @@ const cache = new AssetCache({
   persist: true,           // ask the browser not to evict this origin's storage (main thread only)
 });
 const line = await loadGLTF(engine, '/line-4.glb', {fetch: cache.fetch});
-const gearbox = await loadCAD(engine, '/gearbox.step', {fetch: cache.fetch});
 
 console.log(cache.stats);         // {hits, revalidated, offline, misses, stored, evicted, errors}
 console.log(await cache.usage()); // {bytes, files, quota, usage} (quota/usage from navigator.storage.estimate())
@@ -37,7 +35,6 @@ of files available offline ahead of time, fetch them once and wait for the write
 | gltf-pro `loadGLTF`, `parseGLTFAsync` | `fetch` (file, external .bin and images) | `loadGLTFInWorker` runs on the main thread (a function cannot move to the worker); for a GLB use `parseGLTFInWorker(engine, await (await cache.fetch(url)).arrayBuffer())` to keep parsing in the worker |
 | fbx `loadFBX`, `parseFBX`, `convertFBX` | `fetch` (file and external textures) | `loadFBXInWorker` / `parseFBXInWorker` run on the main thread; `parseFBXInWorker(engine, bytes)` without `fetch` keeps the worker for embedded textures |
 | usdz `loadUSDZ` | `fetch` | `loadUSDZInWorker` downloads through `fetch` here and parses in the worker |
-| machinery `loadCAD` (STL, OBJ, STEP, IGES) | `fetch` | download here, STEP/IGES parsing stays in the OCCT worker |
 | loaders `fetchBytes`, `load` | `fetch` (already existed) | `parse*InWorker(bytes)` |
 
 The cache itself also works inside your own worker (`new AssetCache(...)` there opens the same database).
@@ -129,7 +126,7 @@ manager.abort(); // cancels every request in flight (each reports onError); the 
 ## Full offline (service worker)
 
 The asset cache covers model files. For the app itself (HTML, JS, worker scripts such as gltf-pro's
-`dist/workers/gltf.js` or the OCCT runtime) to start offline, add a service worker. The same class works there and
+`dist/workers/gltf.js` or a decoder runtime) to start offline, add a service worker. The same class works there and
 then also covers loads made inside workers:
 
 ```js
@@ -137,7 +134,7 @@ then also covers loads made inside workers:
 import {AssetCache} from 'margoengine/cache';
 const cache = new AssetCache({name: 'plant-viewer', version: '2026.10', maxBytes: 2 ** 30});
 self.addEventListener('fetch', event => {
-  if (/\.(glb|gltf|bin|ktx2|png|jpg|webp|step|stp|iges|igs|stl|wasm|js)$/i.test(new URL(event.request.url).pathname))
+  if (/\.(glb|gltf|bin|ktx2|png|jpg|webp|stl|wasm|js)$/i.test(new URL(event.request.url).pathname))
     event.respondWith(cache.fetch(event.request));
 });
 ```

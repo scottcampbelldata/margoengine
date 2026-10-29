@@ -802,7 +802,7 @@ try {
   assert.equal(exact.wrong, 0, 'the 1-texel checker reads back exactly');
   assert.equal(exact.colors, 2, 'no MSAA: a tilted box shows only its face colour and the background');
 
-  // The multi-view demos (examples/cad-views, split-screen, minimap) held still by reduced motion: picks through each
+  // The multi-view demos (examples/split-screen, minimap) held still by reduced motion: picks through each
   // view hit what that view shows, a mesh on a layer a view leaves out is never picked through it, and the frame time
   // (median of 60 frames, each awaited on the GPU) is recorded.
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -818,17 +818,6 @@ try {
     );
   const demos = {};
   for (const [file, name, checks] of [
-    [
-      'cad-views',
-      'cadViews',
-      [
-        [0, 0.5, 0.5, 'Pulley'],
-        [1, 0.5, 0.5, 'Pulley'],
-        [2, 0.5, 0.5, 'Pulley'],
-        [3, 0.5, 0.5, 'Right bearing block'],
-        [0, 0.03, 0.97, null],
-      ],
-    ],
     [
       'split-screen',
       'splitScreen',

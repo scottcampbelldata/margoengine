@@ -27,7 +27,6 @@
     "@scottcampbelldata/vexel-core",
     "@scottcampbelldata/vexel-gltf",
     "@scottcampbelldata/vexel-react",
-    "@scottcampbelldata/vexel-machinery",
     "@scottcampbelldata/vexel-creative"
   ],
   "react": "18.3.1",

@@ -1,8 +1,7 @@
-// Browser side of the 1d''/1e.f measurements (driven by toggle.mjs).
+// Browser side of the 1d''/1e.f measurements (driven by toggle.mjs). The section-plane toggle and the feature-edge
+// background left with the CAD package (2026-10-29): what stays is the fog toggle and the shader override timings.
 import { Engine, box } from '/packages/core/dist/extension.js';
 import { loadGLTF } from '/packages/gltf-pro/dist/index.js';
-import { SectionPlanes } from '/packages/machinery/dist/index.js';
-import { FeatureEdges } from '/packages/machinery/dist/edges.js';
 import { Fog } from '/packages/environment/dist/index.js';
 import { Stats } from '/packages/stats/dist/index.js';
 
@@ -34,7 +33,6 @@ async function scene({ profiling = false, close = false } = {}) {
           .setPosition([x * 0.45, -1.2, z * 0.45])
           .setScale([0.35, 0.35, 0.35]);
   model = await loadGLTF(engine, '/examples/assets/scifi-helmet.glb');
-  if (!close) engine.use(new FeatureEdges());
   if (profiling) {
     stats = new Stats({ profiling: true });
     engine.use(stats);
@@ -51,19 +49,15 @@ async function frames(n) {
   for (let i = 0; i < n; i++) out.push(await frame());
   return out;
 }
-const plane = [[1, 0, 0, 0.05]],
-  fogOptions = { color: '#9ab', near: 2, far: 12 };
+const fogOptions = { color: '#9ab', near: 2, far: 12 };
 
 window.measure = {
   // Toggle stall: 'add' = today's way (create the plugin when wanted), 'toggle' = created switched off at load, then `enabled = true`.
   async stall(mode) {
     await scene();
     await frames(60);
-    let section, fog;
+    let fog;
     if (mode === 'toggle') {
-      section = new SectionPlanes({ planes: plane, enabled: false });
-      Object.assign(section, { enabled: false });
-      engine.use(section);
       fog = new Fog(fogOptions);
       fog.enabled = false;
       engine.use(fog);
@@ -72,16 +66,7 @@ window.measure = {
       await sleep(1500);
       await frames(30);
     }
-    const steady = median(await frames(40));
-    let t = performance.now();
-    if (mode === 'add') {
-      section = new SectionPlanes({ planes: plane });
-      engine.use(section);
-    } else section.enabled = true;
-    const sectionFrame = await frame(),
-      sectionSetup = performance.now() - t - sectionFrame;
-    const between = median(await frames(30));
-    t = performance.now();
+    const between = median(await frames(40));
     if (mode === 'add') {
       fog = new Fog(fogOptions);
       engine.use(fog);
@@ -91,14 +76,10 @@ window.measure = {
     const after = median(await frames(30));
     return {
       mode,
-      steady,
-      sectionFrame: +sectionFrame.toFixed(2),
-      sectionSpike: +(sectionFrame - steady).toFixed(2),
       between,
       fogFrame: +fogFrame.toFixed(2),
       fogSpike: +(fogFrame - between).toFixed(2),
       after,
-      sectionSetup: +sectionSetup.toFixed(2),
       errors: window.gpuErrors,
     };
   },
@@ -109,9 +90,6 @@ window.measure = {
       return;
     }
     if (step === 1) {
-      window.section = new SectionPlanes({ planes: plane });
-      window.section.enabled = false;
-      engine.use(window.section);
       window.fog = new Fog(fogOptions);
       window.fog.enabled = false;
       engine.use(window.fog);
@@ -122,33 +100,29 @@ window.measure = {
       return;
     }
     if (step === 2) {
-      window.section.enabled = true;
       window.fog.enabled = true;
       await sleep(500);
       await frames(20);
       return window.gpuErrors;
     }
   },
-  // GPU time (timestamp queries) of the same view with sections and fog absent, present but off, and on.
+  // GPU time (timestamp queries) of the same view with fog absent, present but off, and on.
   async gpu(rounds) {
     await scene({ profiling: true });
     await frames(30);
-    let section, fog;
+    let fog;
     const set = async (state) => {
-      const present = engine.hasPlugin('section-planes');
+      const present = engine.hasPlugin('fog');
       if (state === 'absent' && present) {
-        engine.removePlugin('section-planes');
         engine.removePlugin('fog');
         fog.dispose();
       }
       if (state !== 'absent' && !present) {
-        section = new SectionPlanes({ planes: plane });
         fog = new Fog(fogOptions);
-        engine.use(section);
         engine.use(fog);
         fog.applyTo(model);
       }
-      if (section) section.enabled = fog.enabled = state === 'on';
+      if (fog) fog.enabled = state === 'on';
       await sleep(300);
       await frames(20);
     };

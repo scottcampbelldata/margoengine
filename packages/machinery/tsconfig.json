@@ -1,1 +1,0 @@
-{"extends":"../gltf/tsconfig.json","compilerOptions":{"outDir":"dist","rootDir":"src","emitDeclarationOnly":true},"include":["src"]}

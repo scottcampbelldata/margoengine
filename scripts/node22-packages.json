@@ -17,9 +17,8 @@
     "@margoengine/math": "imported by every Node-run package",
     "@margoengine/biomes": "biome maps, climate fields and classification run on the CPU with no browser API; their digests are checked in Node",
     "margo-convert": {
-      "reason": "bin margo-convert: the offline asset pipeline and CAD converter",
+      "reason": "bin margo-convert: the offline asset pipeline",
       "tests": [
-        "tests/margo-convert.test.js",
         "tests/margo-convert-audio.test.js",
         "tests/margo-convert-pipeline.test.js",
         "tests/margo-convert-textures.test.js"
@@ -34,7 +33,6 @@
     "@margoengine/exporters": "margo-convert's export path (glTF, USDZ, game engine formats) runs in Node",
     "@margoengine/decoders": "margo-convert decodes PNG and meshopt in Node",
     "@margoengine/gltf-pro": "imported by exporters; its loaders parse server-side",
-    "@margoengine/machinery": "margo-convert's CAD path (edges) and parseCADAsync run in Node",
     "@margoengine/loaders": "format parsers documented as SSR safe (STL, OBJ, PLY, 3MF, DXF, DAE and more)",
     "@margoengine/points": "LAS, LAZ, E57 and octree parsers",
     "@margoengine/tiles": "3D Tiles tileset parsing and traversal with no GPU",
@@ -72,7 +70,7 @@
     },
     "@margoengine/gltf": {
       "reason": "margo-convert parses glTF with it in Node; its own tests are a section of tests/modern.test.js (core, run on 24), so the margo-convert tests cover its Node path here",
-      "tests": ["tests/margo-convert.test.js", "tests/margo-convert-pipeline.test.js"]
+      "tests": ["tests/margo-convert-pipeline.test.js"]
     }
   },
   "contributorNode": {

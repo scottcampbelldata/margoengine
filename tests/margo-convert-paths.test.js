@@ -140,25 +140,25 @@ test('a manifest naming outputs outside the output folder is damaged: nothing it
   assert.equal(cached.manifest.files.find((f) => f.source === 'scene.gltf').status, 'cached');
 });
 
-test('sameFile and both CLIs refuse an output that aliases the input (bug 47)', (t) => {
+test('sameFile and the CLI refuse an output that aliases the input (bug 47)', (t) => {
   const { dir, assets } = workspace(t);
-  const input = join(assets, 'part.step'),
-    body = 'ISO-10303-21; not converted';
+  const input = join(assets, 'part.glb'),
+    body = 'glTF; not converted';
   writeFileSync(input, body);
-  linkSync(input, join(dir, 'hard.step'));
+  linkSync(input, join(dir, 'hard.glb'));
   symlinkSync(assets, join(dir, 'via'), 'junction');
-  const upper = join(assets, 'PART.STEP'),
+  const upper = join(assets, 'PART.GLB'),
     caseInsensitive = existsSync(upper);
   const aliases = [
-    ['./part.step', true],
-    ['sub/../part.step', true],
-    [join(dir, 'hard.step'), true],
-    [join(dir, 'via', 'part.step'), true],
-    ['PART.STEP', caseInsensitive],
+    ['./part.glb', true],
+    ['sub/../part.glb', true],
+    [join(dir, 'hard.glb'), true],
+    [join(dir, 'via', 'part.glb'), true],
+    ['PART.GLB', caseInsensitive],
     ['other.glb', false],
   ];
   for (const [alias, same] of aliases)
-    assert.equal(sameFile(join(assets, 'part.step'), resolve(assets, alias)), same, alias);
+    assert.equal(sameFile(join(assets, 'part.glb'), resolve(assets, alias)), same, alias);
   const run = (cli, args) => {
     try {
       execFileSync(process.execPath, [join(root, cli), ...args], { cwd: assets, stdio: 'pipe', timeout: 60_000 });
@@ -168,9 +168,9 @@ test('sameFile and both CLIs refuse an output that aliases the input (bug 47)', 
     }
   };
   for (const [alias, same] of aliases.filter(([, same]) => same))
-    for (const cli of [['tools/margo-convert/cad-cli.js'], ['tools/margo-convert/cli.js', 'optimize']]) {
-      const result = run(cli[0], [...cli.slice(1), 'part.step', alias]);
-      assert.equal(result.code, 1, `${cli.join(' ')} part.step ${alias}`);
+    for (const cli of [['tools/margo-convert/cli.js', 'optimize']]) {
+      const result = run(cli[0], [...cli.slice(1), 'part.glb', alias]);
+      assert.equal(result.code, 1, `${cli.join(' ')} part.glb ${alias}`);
       assert.match(result.err, /output would overwrite the input; choose another output path/);
       assert.equal(readFileSync(input, 'utf8'), body, `${alias} overwrote the input`);
       assert.ok(same);

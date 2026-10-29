@@ -129,7 +129,7 @@ try {
   const manifest = JSON.parse(await readFile('examples/vite/dist/.vite/manifest.json', 'utf8')),
     requests = new Set();
   const chunks = {};
-  for (const name of ['gltf', 'machinery', 'creative', 'scenery']) {
+  for (const name of ['gltf', 'creative', 'scenery']) {
     const key = `../../packages/${name}/dist/index.js`;
     assert.ok(manifest[key].isDynamicEntry);
     assert.ok(!manifest['index.html'].imports?.includes(key));
@@ -203,9 +203,6 @@ try {
   await page.getByRole('button', { name: 'Load glTF module' }).click();
   await page.getByRole('status').filter({ hasText: 'Static glTF loaded' }).waitFor();
   assert.ok(requests.has(chunks.gltf));
-  await page.getByRole('button', { name: 'Toggle exploded view' }).click();
-  await page.getByRole('status').filter({ hasText: 'Machinery: exploded view' }).waitFor();
-  assert.ok(requests.has(chunks.machinery));
   await page.getByRole('button', { name: 'Load glTF module' }).click();
   await page.getByRole('status').filter({ hasText: 'Static glTF loaded' }).waitFor();
   await page.getByRole('button', { name: 'Toggle GPU leaves' }).click();
@@ -217,20 +214,6 @@ try {
   await page.getByRole('button', { name: 'Toggle GPU leaves' }).click();
   await page.getByRole('status').filter({ hasText: 'Particles removed' }).waitFor();
   await page.getByText('Domain tools', { exact: true }).click();
-  await page.getByRole('button', { name: 'Toggle capped section' }).click();
-  await page.getByRole('status').filter({ hasText: 'Machinery: capped section' }).waitFor();
-  await page.getByLabel('Section offset').fill('0.2');
-  await page.getByRole('button', { name: 'Toggle dimensions' }).click();
-  await page.getByRole('status').filter({ hasText: 'Machinery: dimensions and callout' }).waitFor();
-  await page.waitForFunction(() =>
-    document.querySelector('svg[data-margoengine-annotations]')?.textContent?.includes('1.60 m'),
-  );
-  assert.match(await page.locator('svg[data-margoengine-annotations]').textContent(), /1.60 m.*Mint assembly/);
-  const obj = 'v -1 -1 0\nv 1 -1 0\nv 0 1 0\ng first\nf 1 2 3\ng second\nf 1 2 3';
-  await page
-    .getByLabel('Import STL, OBJ, STEP or IGES')
-    .setInputFiles({ name: 'fixture.obj', mimeType: 'text/plain', buffer: Buffer.from(obj) });
-  await page.getByRole('status').filter({ hasText: 'CAD: 2 parts, 1 unique CAD geometries' }).waitFor();
   const fx = page.getByRole('button', { name: 'Toggle atmosphere and FX' });
   await fx.click();
   await page.getByRole('status').filter({ hasText: 'Bloom, atmosphere and FX' }).waitFor();
@@ -256,7 +239,7 @@ try {
   );
   await page.locator('canvas').screenshot({ path: 'test-results/modern-vite-domains.png' });
   result.checks.push({
-    name: 'Vite domain controls: cut slider, dimensions, OBJ upload/deduplication, atmosphere/FX, toon, device restoration',
+    name: 'Vite domain controls: atmosphere/FX, toon, device restoration',
   });
   await scenery.click();
   await page.getByRole('status').filter({ hasText: 'Scenery removed' }).waitFor();
@@ -271,7 +254,7 @@ try {
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await page.screenshot({ path: 'test-results/modern-vite-mobile.png', fullPage: true });
   result.checks.push({
-    name: 'Vite production: lazy packages, repeated import, explode, GPU leaves, material control, mobile layout',
+    name: 'Vite production: lazy packages, repeated import, GPU leaves, material control, mobile layout',
     chunks,
   });
   await page.addInitScript(() => {

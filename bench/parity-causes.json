@@ -48,7 +48,7 @@
     ]
   },
   "10.11": {
-    "cause": "Before: JS arrays grown by push in the STL read and weld (63 ms in Node) and a fingerprint of the lone part with nothing to match (40 ms): 111 -> 28.7 ms. Then a like-for-like reader: p-stl now times the plain parseSTL (typed arrays, no weld, flat normals computed where the file stores zero): 4.9 ms against three's 2.8, the rest being those computed normals. ACCEPTED difference in work (Scott, 2026-10-26): parseSTL returns a render-ready mesh, while three's STLLoader copies the file's zero normals, which light wrongly until computeVertexNormals() runs; p-stl-normals times that full job (three 8.7 ms, parseSTL 4.7 ms, faster). The old path stays measured as p-stl-cad (parseCAD welds corners, builds parts and creates GPU meshes: 29.4 ms, no three.js equivalent)",
+    "cause": "Before: JS arrays grown by push in the STL read and weld (63 ms in Node) and a fingerprint of the lone part with nothing to match (40 ms): 111 -> 28.7 ms. Then a like-for-like reader: p-stl now times the plain parseSTL (typed arrays, no weld, flat normals computed where the file stores zero): 4.9 ms against three's 2.8, the rest being those computed normals. ACCEPTED difference in work (Scott, 2026-10-26): parseSTL returns a render-ready mesh, while three's STLLoader copies the file's zero normals, which light wrongly until computeVertexNormals() runs; p-stl-normals times that full job (three 8.7 ms, parseSTL 4.7 ms, faster). The old weld-and-parts path (29.4 ms, no three.js equivalent) was measured as p-stl-cad until that scene left with the CAD package (2026-10-29).",
     "knownBug": "stl-import-still-computes-normals-threes-stlloader-leaves-zero",
     "fixes": [
       {
@@ -59,7 +59,7 @@
       {
         "commit": "d8cefa7b",
         "tradeoff": "+1.9 KB gzip on the loaders root entry (separate module); computes flat normals where the file stores zero",
-        "rerun": "node bench/cli.mjs parity --cases=p-stl,p-stl-cad --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+        "rerun": "node bench/cli.mjs parity --cases=p-stl,p-stl-normals --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
       }
     ]
   },

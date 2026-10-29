@@ -1,4 +1,4 @@
-// The per-file node and part caps (glTF, gltf-pro, .margo, OBJ, SurfacePhysics) default to 100,000
+// The per-file node caps (glTF, gltf-pro, .margo) default to 100,000
 // and are options up to core's 8,388,608 entities; the error names the option.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +7,6 @@ import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { parseGLTF as parseLight } from '../packages/gltf/dist/index.js';
 import { parseGLTF as parsePro } from '../packages/gltf-pro/dist/index.js';
 import { decodeMargo, parseMargo } from '../packages/blender/dist/index.js';
-import { parseCAD, SurfacePhysics } from '../packages/machinery/dist/index.js';
 import { headlessModels } from './support/pbr-snapshot.js';
 
 const headless = async () =>
@@ -95,26 +94,4 @@ test('.margo (blender): maxNodes on decodeMargo, parseMargo and the gltf-pro mod
   await headlessModels(async () =>
     assert.equal((await parseMargo(await headless(), out, { maxNodes: N })).nodes.length, N),
   );
-});
-
-test('OBJ (machinery): maxParts', async () => {
-  const obj = 'o p\n'.repeat(N - 1) + 'v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n';
-  assert.throws(
-    () => parseCAD(null, obj, 'obj'),
-    (e) => over('OBJ part limit', N, 'maxParts').test(String(e)),
-  );
-  assert.equal(parseCAD(await headless(), obj, 'obj', { maxParts: N }).meshes.length, 1);
-});
-
-test('SurfacePhysics (machinery): maxParts, for parts and for carriers', async () => {
-  const many = Array.from({ length: N }, () => ({})),
-    one = [{}];
-  await assert.rejects(SurfacePhysics.create(many, one), (e) =>
-    over('Too many surface parts', N, 'maxParts').test(String(e)),
-  );
-  await assert.rejects(SurfacePhysics.create(one, many), (e) =>
-    over('Too many surface carriers', N, 'maxParts').test(String(e)),
-  );
-  await assert.rejects(SurfacePhysics.create(one, one, { maxParts: 0 }), invalid('maxParts'));
-  assert.equal((await SurfacePhysics.create(many, one, { maxParts: N })).parts.length, N);
 });

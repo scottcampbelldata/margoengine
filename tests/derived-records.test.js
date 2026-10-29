@@ -46,6 +46,21 @@ test('mergeRatchet keeps added items, drops items one side fixed, and sorts the 
   assert.equal(merged.items.fixed, undefined);
 });
 
+test('mergeRatchet: a history entry one side reworded comes back neither in old nor in duplicate form', () => {
+  const old = entry('names a removed package'),
+    reworded = entry('names nothing'),
+    other = entry('other'),
+    theirs = entry('theirs');
+  const merged = mergeRatchet(
+    baseline({ a: 1 }, [old, other]),
+    baseline({ a: 1 }, [reworded, other]),
+    baseline({ a: 1 }, [old, other, theirs]),
+  );
+  assert.deepEqual(merged.history, [other, reworded, theirs]);
+  const removed = mergeRatchet(baseline({ a: 1 }, [old]), baseline({ a: 1 }, [old]), baseline({ a: 1 }, []));
+  assert.deepEqual(removed.history, []);
+});
+
 test('mergeRatchet keeps every reasoned history entry once, base first', () => {
   const first = entry('first'),
     mine = entry('mine'),

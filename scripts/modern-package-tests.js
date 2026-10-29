@@ -31,7 +31,6 @@ const names = [
     'core',
     'gltf',
     'react',
-    'machinery',
     'creative',
     'scenery',
     'gltf-pro',
@@ -209,15 +208,6 @@ for (const name of packedNames) {
     assert.ok(files.has('FORMAT.md'), '@margoengine/blender must retain its format specification');
   assert.ok(files.has('README.md') && files.has('LICENSE') && files.has('NOTICE'));
   assert.ok(!files.has('dist/__stale-package-test.js'));
-  if (name === 'machinery')
-    for (const file of [
-      'cad-runtime.js',
-      'occt-import-js.js',
-      'occt-import-js.wasm',
-      'OCCT-LICENSE.txt',
-      'OCCT-NOTICE.txt',
-    ])
-      assert.ok(files.has('dist/workers/' + file), `Missing CAD worker asset: ${file}`);
   assert.notEqual(manifest.private, true);
   assert.equal(manifest.license, 'Apache-2.0');
   assert.equal(manifest.publishConfig.access, 'public');
@@ -421,7 +411,6 @@ import { Box } from '@margoengine/react/geometry';
 import { Gltf, Model } from '@margoengine/react/gltf-pro';
 import { MeshTransmissionMaterial } from '@margoengine/react/materials';
 import { Shadows } from '@margoengine/react/shadows';
-import {Kinematics,ExplodedView,SectionPlanes,EngineeringAnnotations,PartInstancer,parseCAD,parseCADAsync,loadCAD,deduplicateParts,SurfacePhysics,TelemetryChannel,AssemblyBVH,measureClearance} from '@margoengine/machinery';
 import {GPUParticles,PostProcessing,ToonShading,HDRRenderTarget} from '@margoengine/creative';
 import {PostStack,Bloom} from '@margoengine/post';
 import {SkyMoon,type SkyMoonConfig} from '@margoengine/scenery';
@@ -438,10 +427,9 @@ const html=renderToString(<Canvas><Mesh><BoxGeometry/><PbrMaterial/></Mesh></Can
 const afterScene=renderToString(<Canvas><Box color="#84d6bd"/><Mesh><BoxGeometry/><MeshTransmissionMaterial factor={0}/></Mesh><Gltf src="/character.glb"><Animation clip="Walk" blend={0.2}/></Gltf></Canvas>);if(!afterScene.includes('<canvas'))throw new Error('Root scene exports failed');
 const declarative=renderToString(<Canvas onCreated={stage=>stage.engine.camera.position=[1,2,5]}><Model src="/model.glb" materials={{Upper:{baseColor:[0.2,0.8,0.3]}}} onLoad={mesh=>mesh.setPosition([1,0,0])}/><Environment src="/studio.hdr" exposure={1} background/><OrbitControls enableDamping minDistance={1} maxDistance={10}/><Shadows/></Canvas>);
 if(!declarative.includes('<canvas')||typeof useMargo!=='function'||typeof useMargoStage!=='function')throw new Error('Declarative exports failed');
-if(!html.includes('<canvas')||typeof loadGLTF!=='function'||!Kinematics||!ExplodedView||new GPUParticles({count:32}).count!==32)throw new Error('Consumer failed');
-new SectionPlanes({planes:[[0,0,1,0]]});new EngineeringAnnotations();new PartInstancer();new ToonShading();new PostStack([new Bloom({strength:0.5}),new PostProcessing({atmosphere:{density:0.01}})]);
-if(typeof parseCAD!=='function'||typeof loadCAD!=='function'||typeof deduplicateParts!=='function'||!HDRRenderTarget)throw new Error('Domain exports failed');
-if(typeof parseCADAsync!=='function'||typeof SurfacePhysics.create!=='function'||typeof TelemetryChannel.create!=='function'||typeof AssemblyBVH.create!=='function'||typeof measureClearance!=='function')throw new Error('Machinery runtime exports failed');
+if(!html.includes('<canvas')||typeof loadGLTF!=='function'||new GPUParticles({count:32}).count!==32)throw new Error('Consumer failed');
+new ToonShading();new PostStack([new Bloom({strength:0.5}),new PostProcessing({atmosphere:{density:0.01}})]);
+if(!HDRRenderTarget)throw new Error('Domain exports failed');
 const moonlit:SkyMoonConfig={moonDirection:[0,1,0],moonPhase:1};if(new SkyMoon(moonlit).config!==moonlit)throw new Error('Scenery exports failed');
 function refs(engine:import('@margoengine/core').EngineKernel,node:MeshRef){
 // @ts-expect-error useMargoStage uses the portable engine surface
@@ -457,7 +445,7 @@ engine.gpu;
 node.matrix;
 }}}/></Canvas>;
 }
-function frozen(canvas:HTMLCanvasElement){void EngineKernel.create(canvas).then(engine=>{const mesh=engine.createMesh();void loadCAD(engine,'http://example.invalid/model.stl');void loadGLTF(engine,'http://example.invalid/model.glb');new Kinematics([{node:mesh,axis:'x',min:0,max:1}],{distances:[{a:mesh,b:mesh,length:0}]});engine.use(new PartInstancer());
+function frozen(canvas:HTMLCanvasElement){void EngineKernel.create(canvas).then(engine=>{const mesh=engine.createMesh();void loadGLTF(engine,'http://example.invalid/model.glb');
 // @ts-expect-error runtime storage is confined to the extension entry
 engine.store;
 // @ts-expect-error GPU state is confined to the extension entry

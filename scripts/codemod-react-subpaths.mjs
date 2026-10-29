@@ -95,7 +95,6 @@ export const SUBPATHS = {
   dof: ['DepthOfField', 'DepthOfFieldProps'],
   tonemap: ['Tonemap', 'TonemapProps'],
   taa: ['TAA', 'TAAProps'],
-  machinery: ['SectionPlanes', 'SectionPlanesProps'],
   voxel: ['Voxels', 'VoxelsProps', 'useBlockTextures'],
 };
 const HOME = new Map(Object.entries(SUBPATHS).flatMap(([subpath, names]) => names.map((name) => [name, subpath])));

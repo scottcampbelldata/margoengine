@@ -78,7 +78,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `BoxGeometry`, `SphereGeometry`, `ExtrudeGeometry`, `BufferGeometryUtils` | `@margoengine/geometry` |
 | `TextureLoader`, `MeshStandardMaterial` with maps and the other mesh materials | `@margoengine/materials` |
 | `GLTFLoader` (textured, extensions) | `@margoengine/gltf-pro` (+ `@margoengine/decoders` for Draco, meshopt, KTX2) |
-| `FBXLoader`, `USDZLoader`, `PLYLoader`/`PCDLoader`/`3MFLoader`, `STLLoader`/`OBJLoader` | `@margoengine/fbx`, `@margoengine/usdz`, `@margoengine/loaders`, `@margoengine/machinery` |
+| `FBXLoader`, `USDZLoader`, `PLYLoader`/`PCDLoader`/`3MFLoader`, `STLLoader`/`OBJLoader` | `@margoengine/fbx`, `@margoengine/usdz`, `@margoengine/loaders` |
 | `AnimationMixer`, skinning, morphs | `@margoengine/animation` (+ `@margoengine/animator` for blending) |
 | `DirectionalLight` shadows | `@margoengine/shadows` |
 | `PointLight`, `SpotLight` (and their shadows) | `@margoengine/clustered` (shadows: `@margoengine/clustered/shadows`) |
@@ -108,8 +108,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | react-three-fiber | `@margoengine/react` |
 
 Feature entries keep bundles smaller still: `@margoengine/post/ssao`, `@margoengine/post/bloom`,
-`@margoengine/post/stack`, `@margoengine/post/fxaa`, `@margoengine/animation/vat`, `@margoengine/sky/base` and
-`@margoengine/machinery/cad` load one feature without the rest of their package.
+`@margoengine/post/stack`, `@margoengine/post/fxaa`, `@margoengine/animation/vat`, `@margoengine/sky/base` load one feature without the rest of their package.
 
 ## Renderer, scene, camera and resize
 
@@ -598,21 +597,16 @@ const ply = await new PLYLoader().loadAsync('/scan.ply');
 ```ts
 import {loadFBX} from '@margoengine/fbx';
 import {loadUSDZ} from '@margoengine/usdz';
-import {loadCAD} from '@margoengine/machinery/cad';
 import {parsePLY, parseSTL, createMeshes} from '@margoengine/loaders';
 
 const character = await loadFBX(engine, '/character.fbx');  // skins, morphs and clips; a gltf-pro model
 const chair = await loadUSDZ(engine, '/chair.usdz');        // static USDA/USDC/USDZ
-const part = await loadCAD(engine, '/part.stl');            // STL, OBJ (geometry only), STEP and IGES in a worker
 const raw = parseSTL(await (await fetch('/part.stl')).arrayBuffer()); // STL as plain typed arrays, like STLLoader
 const scan = createMeshes(engine, parsePLY(await (await fetch('/scan.ply')).arrayBuffer()));
 ```
 
-The stage facade frames what it loads: `await addCAD(app, '/part.step')` (`margoengine/stage/cad`) handles STL, OBJ,
-STEP and IGES, and `await addGLTF(app, '/model.glb')` (`margoengine/stage/gltf`) glTF with constant colours. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. Textured OBJ with its MTL loads in one call with `loadOBJ` from `@margoengine/loaders/mtl`; Collada reads geometry,
-materials and the hierarchy (`parseDAE`). For STEP/IGES files you ship yourself, convert them once with
-`npx margo-convert part.step part.glb` ([tools/margo-convert](../tools/margo-convert/README.md)) and load the GLB:
-the page then skips the 3.1 MB OCCT download.
+The stage facade frames what it loads: `await addGLTF(app, '/model.glb')` (`margoengine/stage/gltf`) handles glTF with constant colours. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. Textured OBJ with its MTL loads in one call with `loadOBJ` from `@margoengine/loaders/mtl`; Collada reads geometry,
+materials and the hierarchy (`parseDAE`).
 
 ### Caching and offline (`THREE.Cache`)
 
@@ -623,15 +617,13 @@ THREE.Cache.enabled = true; // in-memory, this page only
 ```ts
 import {AssetCache} from '@margoengine/cache';
 import {loadGLTF} from '@margoengine/gltf-pro';
-import {loadCAD} from '@margoengine/machinery/cad';
 
 // IndexedDB: survives reloads, works offline, revalidates with ETag/Last-Modified, LRU within maxBytes.
 const cache = new AssetCache({name: 'plant-viewer', version: '2026.10', maxBytes: 2 ** 30});
 const line = await loadGLTF(engine, '/line-4.glb', {fetch: cache.fetch});
-const gearbox = await loadCAD(engine, '/gearbox.step', {fetch: cache.fetch});
 ```
 
-Every loader (gltf-pro, fbx, usdz, machinery `loadCAD`, `@margoengine/loaders`) takes the same `fetch` option.
+Every loader (gltf-pro, fbx, usdz, `@margoengine/loaders`) takes the same `fetch` option.
 
 ## Animation
 
@@ -1198,8 +1190,8 @@ features add no core or stage functionality.
 | General viewport/scissor support | Core draws accept viewport/scissor rectangles; optional native passes and picking do not inherit them, and camera aspect remains caller-controlled |
 | WebGL2 for optional packages | Closed v1 limit: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | glTF `KHR_animation_pointer` | Files that require it are rejected; when only used, animation `createMaterialAnimation` plays base-colour UV offset and scale tracks, and exporters write those tracks from data scenes. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
-| Stencil caps for clipped glTF-pro models, per-material clipping planes | Missing (machinery `SectionPlanes` clip core and native glTF-pro primitives and their directional shadows, but cap core meshes only; shader `discard` slices without caps or shadows) |
-| `BatchedMesh` | Missing (machinery `PartPacks` packs static parts into one draw; render layers are in `@margoengine/cameras/layers`) |
+| Stencil caps for clipped glTF-pro models | Missing (shader `discard` slices without caps or shadows) |
+| `BatchedMesh` | Missing (render layers are in `@margoengine/cameras/layers`) |
 | LDraw and other long-tail loaders; COLLADA skins and animation | Missing (loaders read OBJ with MTL materials, SVG, TrueType fonts and COLLADA geometry and materials; voxel reads and writes VOX) |
 | Arbitrary property tracks (`PropertyBinding`) | Missing (node TRS and morph-weight clips are authored with animation `createKeyframeClip`) |
 | `ArcballControls`, roll in the controls | Missing (core `camera.up` can roll; no control drives it) |

@@ -6,7 +6,7 @@
 
 # Margo Engine
 
-A small WebGPU engine for the web, with a Rust/Wasm core and CAD tools built on OpenCascade.
+A small WebGPU engine for the web, with a Rust/Wasm core.
 
 [![CI](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml/badge.svg)](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/margoengine.svg)](https://www.npmjs.com/package/margoengine)
@@ -19,7 +19,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core and CAD tools built on 
 [Coming from three.js](docs/from-threejs.md)
 
 The core and the stage together are 22,414 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
-(glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
+(glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Install
 
@@ -225,7 +225,7 @@ change the kernel.
 
 ```sh
 npm run dev               # Night Citadel showcase
-npm run dev:examples      # every page in examples/, e.g. /examples/cad-views.html
+npm run dev:examples      # every page in examples/, e.g. /examples/flight-helmet.html
 npm run lint              # Biome
 npm run typecheck         # strict TypeScript for all packages
 npm run test:all          # every Node test in the repo
@@ -239,46 +239,14 @@ npm run measure:size      # core + stage size check
   field. Each one is its own package.
 - Rust/Wasm transform kernel with GPU culling and instancing.
 - Loaders for glTF/GLB (Draco, Meshopt, KTX2), FBX, USDZ, OBJ, STL, PLY, 3MF, COLLADA, IFC and more.
-- CAD import: STEP and IGES through OpenCascade (WebAssembly, in a worker, loaded only when you use it), plus STL
-  and OBJ.
-- CAD tools: section planes with capped cutaways, measurement, a view cube, GPU picking and selection outlines.
+- Camera controls with CAD-style mouse presets, a view cube, GPU picking and selection outlines.
 - Skinning, morph targets, blend trees and IK.
 - Physics on Rapier, navmesh, ECS, input and audio.
 - Terrain, water, sky, procedural scenery, voxels and a progressive voxel path tracer.
 - React 18 and 19 components (`@margoengine/react`).
 - Optional WebGL2 fallback for basic scenes.
 
-## Example: load a STEP file
-
-```js
-import { Engine } from 'margoengine/core';
-import { loadCAD } from 'margoengine/machinery/cad';
-
-const engine = await Engine.create(document.querySelector('canvas'));
-// OpenCascade tessellates the file in a worker; the model's parts arrive as core meshes, in meters.
-const model = await loadCAD(engine, '/parts/assembly.step');
-console.log(model.meshes.length, 'parts');
-engine.start();
-```
-
-More in [examples/](examples/README.md).
-
-## CAD
-
-[`@margoengine/machinery`](packages/machinery/README.md) reads STEP and IGES with
-[OpenCascade](https://dev.opencascade.org/) through `occt-import-js`, compiled to WebAssembly. The importer runs in a
-worker and is loaded only when a STEP or IGES file is, so it is not part of the core size. OpenCascade is LGPL-2.1
-(with the Open CASCADE exception); its files ship separately in `dist/workers` and can be replaced with your own
-build ([THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
-
-- STEP and IGES become core meshes with OpenCascade's surface normals; STL and OBJ load too.
-- Section planes with capped cutaways, feature edges, exploded views and an assembly BVH for picking.
-- Measurement: vertex, edge, face and hole anchors, distances and clearance.
-- [`margo-convert`](tools/margo-convert/README.md) turns a STEP file into a GLB at build time, so a site can show it
-  without loading OpenCascade.
-
-Sizes, load times and limits are in [docs/cad-performance.md](docs/cad-performance.md) and
-[docs/limits.md](docs/limits.md).
+More examples are in [examples/](examples/README.md).
 
 ## Browser support
 
@@ -306,7 +274,7 @@ the size of every other package entry. `npm run measure:size` bundles the entry 
 the package build, gzips it at the default level and prints the figure for your checkout. The build fails if
 core + stage reaches 25,000 B gzip.
 
-`npm run bench` runs the render, load, CAD, physics and memory suites with medians, p95 and machine checks. See
+`npm run bench` runs the render, load, assembly, physics and memory suites with medians, p95 and machine checks. See
 [docs/benchmarking.md](docs/benchmarking.md). No comparisons with other engines are published here yet.
 
 ## Architecture
@@ -332,7 +300,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-93 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+92 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -366,7 +334,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB, STL, OBJ, PLY, USDZ and COLLADA exporters for Margo Engine scenes and geometry data. |
 | [`@margoengine/ifc`](packages/ifc/README.md) | IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime. |
 | [`@margoengine/blender`](packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |
-| [`@margoengine/cache`](packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin, textures and STEP files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |
+| [`@margoengine/cache`](packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin and texture files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |
 | [`@margoengine/splats`](packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |
 | [`@margoengine/tiles`](packages/tiles/README.md) | Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf-pro. |
 
@@ -459,11 +427,10 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/netcode`](packages/netcode/README.md) | Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests. |
 | [`@margoengine/voxel-net`](packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
-### CAD and engineering (4)
+### Geometry and spatial (3)
 
 | Package | What it is |
 | --- | --- |
-| [`@margoengine/machinery`](packages/machinery/README.md) | Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine. |
 | [`@margoengine/bvh`](packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
 | [`@margoengine/geometry`](packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 | [`@margoengine/mesh-edit`](packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |
@@ -530,7 +497,7 @@ A short tour. Each package README has the full reference. The public API of ever
 
 ```ts
 import { createStage, Geometry } from 'margoengine';
-import { addCAD } from 'margoengine/stage/cad';
+import { addGLTF } from 'margoengine/stage/gltf';
 
 const stage = await createStage('#scene', { controls: true, autoStart: true, onError: console.error });
 
@@ -538,7 +505,7 @@ stage.box({ size: [1, 1, 1], color: '#84d6bd', position: [0, 0.5, 0] });
 stage.sphere({ radius: 0.5, metalness: 1, roughness: 0.2 });
 stage.mesh(new Geometry(positions, normals, indices), { color: '#c3c9d0' });
 
-const model = await addCAD(stage, '/part.step'); // STL, OBJ, STEP, IGES; addGLTF (margoengine/stage/gltf) for glTF and GLB
+const model = await addGLTF(stage, '/part.glb'); // glTF and GLB
 stage.fit(model.meshes);
 
 const off = stage.onTick((delta) => {}); // seconds since the last frame
@@ -579,18 +546,6 @@ shadows.add(cube);
 ```
 
 The [package list](../README.md#packages) and the [catalog](README.md) describe each one.
-
-## CAD
-
-```ts
-import { loadCAD } from 'margoengine/machinery/cad';
-
-// STEP and IGES go through OpenCascade (WebAssembly) in a worker; STL and OBJ load too.
-const model = await loadCAD(engine, '/parts/assembly.step', { linearDeflection: 0.0001 });
-model.dispose();
-```
-
-See the [machinery README](../packages/machinery/README.md).
 
 ## Errors
 
@@ -697,10 +652,10 @@ capabilities go in optional packages, and a fix that would add a capability is l
 
 **Exception, the stage facade (Scott, 2026-10-27):** the stage is lifted from the freeze for one restructuring,
 because it broke "pay only for what you import" and nothing is published yet, so no user is broken. Its ten
-optional-package methods (`load`, `gltf`, `machinery`, `creative`, `scenery`, `sky`, `particles`, `effects`,
+optional-package methods (`load`, `gltf`, `creative`, `scenery`, `sky`, `particles`, `effects`,
 `environment`, `shadows`) held `import()`s that every app building a `Stage` reached (class methods are never
 tree-shaken), so webpack and Turbopack failed on uninstalled optional peers. They moved into feature entries that take
-the stage (`@margoengine/stage/gltf` `addGLTF`, `/cad` `addCAD`, `/sky` `addSky`, `/particles` `addParticles`,
+the stage (`@margoengine/stage/gltf` `addGLTF`, `/sky` `addSky`, `/particles` `addParticles`,
 `/effects` `addEffects`, `/environment` `addEnvironment`, `/shadows` `addShadows`; the whole-pack accessors became a
 plain `import()`), and the root gained `stage.signal`. The stage root shrank (core + stage 22,781 -> 21,910 B gzip).
 Core is untouched. The exception covers this one change; the freeze applies again after it.
@@ -719,11 +674,10 @@ A name declared and exported by two packages must mean the same thing, or be ren
 | `projectPoint`, `PickHit`, `Blending`, `TextureSource` (points) | labels, selection, materials, shader | Points' renamed: `projectToPixels`, `PointsPickHit`, `PointsBlending`, `PointsTextureSource`. |
 | `smoothstep` (tween) | math, shader | Tween's easing renamed `easeSmoothstep`. |
 | `ExpandOptions` | lines, procedural | lines' renamed `ExpandLineOptions` (its function is `expandLine`). |
-| `SurfaceOptions` | procedural, machinery | procedural's renamed `MarchingCubesOptions`. |
 | `Vector3` (navmesh/build) | math | `Navigation` takes math's `Vec3Like`; math's `Vector3` is the class. |
 | `loadGLTF`, `parseGLTF` | gltf, gltf-pro | Open, group B. |
 | `texture` (vfx) | shader | vfx's `@margoengine/vfx/texture` feature object renamed `textureFeature` (pass `{texture: textureFeature}`); shader's `texture()` node keeps the name. |
-| `Environment`, `Sky`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `TAA`, `Tonemap`, `Shadows`, `AmbientLight`, `HemisphereLight`, `Fog`, `Scene`, `RenderView`, `BatchedMesh`, `DepthTexture`, `SceneTargets`, `SectionPlanes`, `OrbitControls`, `MapControls`, `ArcballControls` | environment, sky, post, taa, tonemap, shadows, core, materials, machinery, controls; react | Kept: the plugin or pass class and react's JSX component that adds it with the same options (React names components after what they render). Allowlisted. |
+| `Environment`, `Sky`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `TAA`, `Tonemap`, `Shadows`, `AmbientLight`, `HemisphereLight`, `Fog`, `Scene`, `RenderView`, `BatchedMesh`, `DepthTexture`, `SceneTargets`, `OrbitControls`, `MapControls`, `ArcballControls` | environment, sky, post, taa, tonemap, shadows, core, materials, controls; react | Kept: the plugin or pass class and react's JSX component that adds it with the same options (React names components after what they render). Allowlisted. |
 | `Vec3` (lod), `Color` (sky, terrain), `HeightField` (terrain) | math | Math's: lod uses `MutableVec3` / `Vec3`, sky and terrain colours are `Vec3`, terrain re-exports math's `HeightField`. |
 | `PbrMaterial` | core, materials, react | Kept, one meaning: materials' `PbrMaterial` takes every core `PbrMaterial` option with the same meaning and adds maps and physical options, with a textured material's defaults (white, roughness 1, metalness 0, front side) rather than core's indigo double-sided placeholder; core's stays the constant-colour material of core meshes, and react's is the JSX element that builds core's. Allowlisted. |
 
@@ -879,7 +833,7 @@ npm i margoengine
 
 Then import what you use. Every package is a subpath of `margoengine`: `margoengine/shadows` is the package
 `@margoengine/shadows`, the same module and the same classes. An app bundles only what it imports, however many
-packages are installed. For a ready-made set, import a [kit](kits.md) instead (`margoengine/game`, `/cad`, `/viz`,
+packages are installed. For a ready-made set, import a [kit](kits.md) instead (`margoengine/game`, `/viz`,
 `/web`).
 
 <!-- Every ```ts block in this file is type-checked against the built packages by tests/from-threejs-snippets.test.js.
@@ -909,7 +863,6 @@ stage.onTick((delta) => {
 | Load a glTF/GLB model with PBR materials | `loadGLTF` from `margoengine/gltf-pro` |
 | Load a static glTF model, smallest code | `loadGLTF` from `margoengine/gltf` |
 | Load FBX, USDZ, OBJ, STL, PLY, Collada ... | `margoengine/fbx`, `margoengine/usdz`, `margoengine/loaders` |
-| Load STEP, IGES (CAD) | `loadCAD` from `margoengine/machinery/cad` |
 | Export glTF, STL, OBJ, USDZ | `margoengine/exporters` |
 | Image-based lighting, fog, backgrounds | `margoengine/environment` |
 | Many point, spot and area lights | `Clustered` from `margoengine/clustered` |
@@ -1095,7 +1048,6 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
 | `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 317,851 B |
-| `margoengine/cad` | CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export | 188,599 B |
 | `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 280,415 B |
 | `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 151,721 B |
 
@@ -1125,24 +1077,12 @@ shadows.add(floor);
 shadows.add(crate);
 ```
 
-## A CAD viewer in one import
-
-```ts
-import {SOLIDWORKS, ViewCube, cadControls, createStage} from 'margoengine/cad';
-import { addCAD } from 'margoengine/stage/cad';
-
-const stage = await createStage('#viewport', {controls: false});
-cadControls(stage.engine, {profile: SOLIDWORKS, keys: window});
-ViewCube.attach(stage.engine);
-await addCAD(stage, '/bracket.step');
-```
-
 ## Which kit
 
 - Most apps start with a kit and add single packages (`margoengine/<package>`) for anything else.
 - The kits overlap where apps overlap (orbit controls, the stage, post-processing); the same name is the same class
   in every kit.
-- `npm create margo@latest my-game -- --template game` (or `cad`, `viz`) starts an app from a kit.
+- `npm create margo@latest my-game -- --template game` (or `viz`) starts an app from a kit.
 
 ## Contents
 
@@ -1178,34 +1118,6 @@ Games: models, animation, light and shadow, sky, physics, audio, input, effects.
 | `margoengine/post/bloom` | `Bloom` |
 | `margoengine/post/fxaa` | `FXAA` |
 | `margoengine/tonemap` | `Tonemap` |
-
-### `margoengine/cad`
-
-CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export.
-
-| From | Names |
-| --- | --- |
-| `margoengine` | `createStage`, `Stage` |
-| `margoengine/machinery/cad` | `loadCAD`, `parseCAD`, `PartInstancer` |
-| `margoengine/machinery/section` | `SectionPlanes` |
-| `margoengine/machinery/exploded` | `ExplodedView` |
-| `margoengine/machinery/dimensions` | `Dimensions` |
-| `margoengine/machinery/metrology` | `measureDistance`, `snapFeature` |
-| `margoengine/machinery/edges` | `FeatureEdges` |
-| `margoengine/controls/orbit` | `cadControls`, `OrbitControls` |
-| `margoengine/controls/profiles` | `MARGO`, `SOLIDWORKS`, `AUTOCAD`, `INVENTOR`, `FUSION`, `ONSHAPE`, `RHINO`, `BLENDER`, `MAYA`, `PROFILES` |
-| `margoengine/controls/transform` | `TransformControls` |
-| `margoengine/viewcube` | `ViewCube` |
-| `margoengine/selection` | `Selection`, `Picking` |
-| `margoengine/cameras` | `CameraProjection` |
-| `margoengine/lines` | `Lines`, `GridHelper`, `AxesHelper` |
-| `margoengine/labels` | `Label`, `LabelRenderer` |
-| `margoengine/environment` | `EnvironmentLighting` |
-| `margoengine/shadows` | `Shadows` |
-| `margoengine/post/stack` | `PostStack` |
-| `margoengine/post/ssao` | `SSAO` |
-| `margoengine/post/fxaa` | `FXAA` |
-| `margoengine/exporters` | `exportGLB`, `exportSTL`, `exportOBJ` |
 
 ### `margoengine/viz`
 
@@ -1318,7 +1230,6 @@ const loaded = await loadGLTF(engine, `/dist/${fox}`);
 ```bash
 npx margo-convert optimize helmet.glb                 # helmet.optimized.glb, web preset
 npx margo-convert optimize helmet.glb out/helmet.glb --preset unity
-npx margo-convert optimize bracket.step bracket.glb   # STEP, IGES and BREP are converted first
 ```
 
 ## Presets
@@ -1481,7 +1392,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `BoxGeometry`, `SphereGeometry`, `ExtrudeGeometry`, `BufferGeometryUtils` | `@margoengine/geometry` |
 | `TextureLoader`, `MeshStandardMaterial` with maps and the other mesh materials | `@margoengine/materials` |
 | `GLTFLoader` (textured, extensions) | `@margoengine/gltf-pro` (+ `@margoengine/decoders` for Draco, meshopt, KTX2) |
-| `FBXLoader`, `USDZLoader`, `PLYLoader`/`PCDLoader`/`3MFLoader`, `STLLoader`/`OBJLoader` | `@margoengine/fbx`, `@margoengine/usdz`, `@margoengine/loaders`, `@margoengine/machinery` |
+| `FBXLoader`, `USDZLoader`, `PLYLoader`/`PCDLoader`/`3MFLoader`, `STLLoader`/`OBJLoader` | `@margoengine/fbx`, `@margoengine/usdz`, `@margoengine/loaders` |
 | `AnimationMixer`, skinning, morphs | `@margoengine/animation` (+ `@margoengine/animator` for blending) |
 | `DirectionalLight` shadows | `@margoengine/shadows` |
 | `PointLight`, `SpotLight` (and their shadows) | `@margoengine/clustered` (shadows: `@margoengine/clustered/shadows`) |
@@ -1511,8 +1422,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | react-three-fiber | `@margoengine/react` |
 
 Feature entries keep bundles smaller still: `@margoengine/post/ssao`, `@margoengine/post/bloom`,
-`@margoengine/post/stack`, `@margoengine/post/fxaa`, `@margoengine/animation/vat`, `@margoengine/sky/base` and
-`@margoengine/machinery/cad` load one feature without the rest of their package.
+`@margoengine/post/stack`, `@margoengine/post/fxaa`, `@margoengine/animation/vat`, `@margoengine/sky/base` load one feature without the rest of their package.
 
 ## Renderer, scene, camera and resize
 
@@ -2001,21 +1911,16 @@ const ply = await new PLYLoader().loadAsync('/scan.ply');
 ```ts
 import {loadFBX} from '@margoengine/fbx';
 import {loadUSDZ} from '@margoengine/usdz';
-import {loadCAD} from '@margoengine/machinery/cad';
 import {parsePLY, parseSTL, createMeshes} from '@margoengine/loaders';
 
 const character = await loadFBX(engine, '/character.fbx');  // skins, morphs and clips; a gltf-pro model
 const chair = await loadUSDZ(engine, '/chair.usdz');        // static USDA/USDC/USDZ
-const part = await loadCAD(engine, '/part.stl');            // STL, OBJ (geometry only), STEP and IGES in a worker
 const raw = parseSTL(await (await fetch('/part.stl')).arrayBuffer()); // STL as plain typed arrays, like STLLoader
 const scan = createMeshes(engine, parsePLY(await (await fetch('/scan.ply')).arrayBuffer()));
 ```
 
-The stage facade frames what it loads: `await addCAD(app, '/part.step')` (`margoengine/stage/cad`) handles STL, OBJ,
-STEP and IGES, and `await addGLTF(app, '/model.glb')` (`margoengine/stage/gltf`) glTF with constant colours. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. Textured OBJ with its MTL loads in one call with `loadOBJ` from `@margoengine/loaders/mtl`; Collada reads geometry,
-materials and the hierarchy (`parseDAE`). For STEP/IGES files you ship yourself, convert them once with
-`npx margo-convert part.step part.glb` ([tools/margo-convert](../tools/margo-convert/README.md)) and load the GLB:
-the page then skips the 3.1 MB OCCT download.
+The stage facade frames what it loads: `await addGLTF(app, '/model.glb')` (`margoengine/stage/gltf`) handles glTF with constant colours. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. Textured OBJ with its MTL loads in one call with `loadOBJ` from `@margoengine/loaders/mtl`; Collada reads geometry,
+materials and the hierarchy (`parseDAE`).
 
 ### Caching and offline (`THREE.Cache`)
 
@@ -2026,15 +1931,13 @@ THREE.Cache.enabled = true; // in-memory, this page only
 ```ts
 import {AssetCache} from '@margoengine/cache';
 import {loadGLTF} from '@margoengine/gltf-pro';
-import {loadCAD} from '@margoengine/machinery/cad';
 
 // IndexedDB: survives reloads, works offline, revalidates with ETag/Last-Modified, LRU within maxBytes.
 const cache = new AssetCache({name: 'plant-viewer', version: '2026.10', maxBytes: 2 ** 30});
 const line = await loadGLTF(engine, '/line-4.glb', {fetch: cache.fetch});
-const gearbox = await loadCAD(engine, '/gearbox.step', {fetch: cache.fetch});
 ```
 
-Every loader (gltf-pro, fbx, usdz, machinery `loadCAD`, `@margoengine/loaders`) takes the same `fetch` option.
+Every loader (gltf-pro, fbx, usdz, `@margoengine/loaders`) takes the same `fetch` option.
 
 ## Animation
 
@@ -2601,8 +2504,8 @@ features add no core or stage functionality.
 | General viewport/scissor support | Core draws accept viewport/scissor rectangles; optional native passes and picking do not inherit them, and camera aspect remains caller-controlled |
 | WebGL2 for optional packages | Closed v1 limit: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | glTF `KHR_animation_pointer` | Files that require it are rejected; when only used, animation `createMaterialAnimation` plays base-colour UV offset and scale tracks, and exporters write those tracks from data scenes. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
-| Stencil caps for clipped glTF-pro models, per-material clipping planes | Missing (machinery `SectionPlanes` clip core and native glTF-pro primitives and their directional shadows, but cap core meshes only; shader `discard` slices without caps or shadows) |
-| `BatchedMesh` | Missing (machinery `PartPacks` packs static parts into one draw; render layers are in `@margoengine/cameras/layers`) |
+| Stencil caps for clipped glTF-pro models | Missing (shader `discard` slices without caps or shadows) |
+| `BatchedMesh` | Missing (render layers are in `@margoengine/cameras/layers`) |
 | LDraw and other long-tail loaders; COLLADA skins and animation | Missing (loaders read OBJ with MTL materials, SVG, TrueType fonts and COLLADA geometry and materials; voxel reads and writes VOX) |
 | Arbitrary property tracks (`PropertyBinding`) | Missing (node TRS and morph-weight clips are authored with animation `createKeyframeClip`) |
 | `ArcballControls`, roll in the controls | Missing (core `camera.up` can roll; no control drives it) |
@@ -2633,8 +2536,8 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
-| Entities (core meshes, assembly nodes included) | Enforced: 8,388,608 slots (2^23; [kernel.ts](../packages/core/src/kernel.ts), [core-dirty-transforms.test.js](../tests/core-dirty-transforms.test.js)). The store starts at `capacity` (default 1,024) and doubles on demand. Measured ([results-scale-node.json](../examples/package-benchmarks/cad/results-scale-node.json), Node 24, quiet-gated): 352.1 B of kernel memory per slot at 1,048,576 slots (351 B by layout); a static kernel tick costs 3.3 ms at 100,006 entities, 20.2 ms at 499,992 and 41.5 ms at 1,000,012. Above 1,048,576 slots: not measured. | One float32 structure-of-arrays Wasm kernel computes every transform, bound and visibility. It is the reason core is small and fast, and its per-entity cost is linear: about 41 ns per entity per frame even when nothing moves. | Growth is automatic. Past the cap `createMesh` throws `RangeError: Capacity`; `Engine.create` with a larger `capacity` throws `RangeError: Capacity: 1..8388608`. A growth that cannot allocate throws and leaves the store as it was. Before the cap, frame time grows with entity count. | `@margoengine/culling`. `CulledInstances` keeps parts out of the entity store entirely: 0.41-0.55 ms CPU per frame at 89,883 parts, flat in part count ([results-culling.json](../examples/package-benchmarks/cad/results-culling.json)); parts lose picking, hierarchy and section caps. `CulledMeshes` GPU-culls parts that must stay core meshes ([cad-performance.md](cad-performance.md#gpu-culling-of-core-meshes-culledmeshes)); it removes GPU work, not the kernel tick: with `minRadius: 1.5` a 100,008-part orbit draws 11 % of the parts at 138 FPS (core: 29) ([results-5l-after-culled1.5.json](../examples/package-benchmarks/cad/results-5l-after-culled1.5.json)). |
-| Nodes and parts per file in packages | Enforced, default 100,000 ([limits.js](../packages/shared/limits.js), [count-limits.test.js](../tests/count-limits.test.js)): glTF nodes ([gltf](../packages/gltf/src/index.ts), [gltf-pro asset.ts](../packages/gltf-pro/src/asset.ts)), `.margo` nodes ([blender](../packages/blender/src/index.ts)), OBJ parts and STEP/IGES meshes ([machinery cad-parser.ts](../packages/machinery/src/cad-parser.ts), [cad-worker.ts](../packages/machinery/src/workers/cad-worker.ts)), `SurfacePhysics` parts and carriers ([machinery surface.ts](../packages/machinery/src/surface.ts)). | Input validation that bounds memory for untrusted files: every node or part becomes a core mesh. | `RangeError: Too many glTF nodes (100001 > 100000; raise the maxNodes option)`; likewise `Too many .margo nodes` (`maxNodes`), `OBJ part limit` and `Too many CAD parts` (`maxParts`), `Too many surface parts` and `Too many surface carriers` (`maxParts`). | The option the error names, up to core's 8,388,608 entities: `maxNodes` on the glTF, gltf-pro and `.margo` loaders, `maxParts` on `loadCAD`/`parseCAD` and `SurfacePhysics.create`; a value outside 1 to 8,388,608 throws `maxNodes must be an integer from 1 to 8388608`. Load time and memory past 100,000: not measured. |
+| Entities (core meshes, assembly nodes included) | Enforced: 8,388,608 slots (2^23; [kernel.ts](../packages/core/src/kernel.ts), [core-dirty-transforms.test.js](../tests/core-dirty-transforms.test.js)). The store starts at `capacity` (default 1,024) and doubles on demand. Measured ([results-scale-node.json](../examples/package-benchmarks/cad/results-scale-node.json), Node 24, quiet-gated): 352.1 B of kernel memory per slot at 1,048,576 slots (351 B by layout); a static kernel tick costs 3.3 ms at 100,006 entities, 20.2 ms at 499,992 and 41.5 ms at 1,000,012. Above 1,048,576 slots: not measured. | One float32 structure-of-arrays Wasm kernel computes every transform, bound and visibility. It is the reason core is small and fast, and its per-entity cost is linear: about 41 ns per entity per frame even when nothing moves. | Growth is automatic. Past the cap `createMesh` throws `RangeError: Capacity`; `Engine.create` with a larger `capacity` throws `RangeError: Capacity: 1..8388608`. A growth that cannot allocate throws and leaves the store as it was. Before the cap, frame time grows with entity count. | `@margoengine/culling`. `CulledInstances` keeps parts out of the entity store entirely: 0.41-0.55 ms CPU per frame at 89,883 parts, flat in part count ([results-culling.json](../examples/package-benchmarks/cad/results-culling.json)); parts lose picking, hierarchy and section caps. `CulledMeshes` GPU-culls parts that must stay core meshes; it removes GPU work, not the kernel tick. |
+| Nodes and parts per file in packages | Enforced, default 100,000 ([limits.js](../packages/shared/limits.js), [count-limits.test.js](../tests/count-limits.test.js)): glTF nodes ([gltf](../packages/gltf/src/index.ts), [gltf-pro asset.ts](../packages/gltf-pro/src/asset.ts)), `.margo` nodes ([blender](../packages/blender/src/index.ts)). | Input validation that bounds memory for untrusted files: every node or part becomes a core mesh. | `RangeError: Too many glTF nodes (100001 > 100000; raise the maxNodes option)`; likewise `Too many .margo nodes` (`maxNodes`). | The option the error names, up to core's 8,388,608 entities: `maxNodes` on the glTF, gltf-pro and `.margo` loaders; a value outside 1 to 8,388,608 throws `maxNodes must be an integer from 1 to 8388608`. Load time and memory past 100,000: not measured. |
 | Buffers per geometry | Enforced: a geometry's vertex, index and instance buffers (96 B per instance) must each fit the device's `maxBufferSize`; core requests the WebGPU default ([renderer.ts](../packages/core/src/renderer.ts)). Not measured. | WebGPU's guaranteed limits, so the same scene runs on every adapter. | `RangeError: GPU buffer limit` when the geometry is first drawn. | Split the geometry, or draw the copies with `CulledInstances`. |
 | Shader variants per engine | Enforced: 64 cached pipeline variants ([renderer.ts](../packages/core/src/renderer.ts)). How close real scenes come: not measured. | Bounds pipeline compilation and memory. Variants come from MSAA, target format and shader text; each pick shader text (`engine.pick` with the scene's pass hooks) is one more. | `RangeError: Shader limit: 64`. | Not needed so far; fewer distinct shader patches per engine. |
 | Frame allocation (JavaScript heap per steady-state frame) | Measured by the check `npm run test:frame-alloc:browser` ([frame-alloc-browser.mjs](../scripts/frame-alloc-browser.mjs), scenes in [tests/fixtures/frame-alloc](../tests/fixtures/frame-alloc/main.js); run by `check:merge`). RTX A6000 desktop, Edge 156 headless with `--enable-precise-memory-info`: `performance.memory.usedJSHeapSize` read once per frame, 600 warm-up frames then 600 recorded, frames with a garbage collection left out, the median frame, largest of three runs, at the item 53.1 commit (`perf(core, shadows, post)`, 2026-10-29). Per frame, before and after: three lit meshes 1,428 B to 460 B; 10,000 moving instanced boxes 1,076 B to 388 B; the same room with cascaded shadows and eight moving casters 26,920 B to 3,508 B; with SSAO, Bloom, tone mapping and FXAA 5,116 B to 2,240 B. The check fails when a median frame passes these floors; they are only ever lowered. | Every byte a frame allocates is a byte the garbage collector must sweep later, and a collection in the middle of a frame is a stutter. Margo reuses its arrays, descriptors and callbacks from frame to frame instead of making new ones. | Not 0 B, and it cannot reach 0 B: every WebGPU call that returns an object (the command encoder and its finished command buffer, each render pass, the canvas's current texture and its view) hands back a new 16 B JavaScript wrapper from the browser, and V8 stores the fractional frame time it passes to frame callbacks and plugins as a heap number. Shadows and post-processing add passes, so they add wrappers; the rest of their bytes are open work. In these runs 0 to 3 of 600 recorded frames held a collection. | Keep your own `onFrame` callbacks allocation-free (the check's scenes keep their clock in a `Float64Array`). `node scripts/frame-alloc-browser.mjs --profile --source` names the functions that allocate per frame. |
@@ -2658,7 +2561,6 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
-| STEP and IGES in the browser | Measured ([cad-performance.md](cad-performance.md#step--iges-loading-loadcad), [results-step.json](../examples/package-benchmarks/cad/results-step.json)): OpenCascade is a 7,604,031 B `.wasm` (3,114,121 B gzip); a 441,968 B STEP takes 1,403-1,715 ms from request to model. Enforced ([cad-parser.ts](../packages/machinery/src/cad-parser.ts), [cad-async.ts](../packages/machinery/src/cad-async.ts)), for STEP, IGES, STL and OBJ: 64 MiB input, 1,000,000 triangles (3,000,000 indices) per file, 1,000,000 welded vertices per part, 1,000,000 OBJ `v` records per file. OCCT runs in 32-bit Wasm (2-4 GB heap, one thread); where a file exhausts it: not measured. | B-rep tessellation needs OpenCascade, a large third-party kernel. It stays out of core and loads only when a STEP or IGES file does. | A 3.1 MB download and seconds of tessellation per file; `TypeError: Invalid CAD input` (not an ArrayBuffer, empty, or an unknown format). Over a cap, a `RangeError` names the cap and the way past it, e.g. `RangeError: OBJ vertex limit (over 1000000); export it as GLB and load it with @margoengine/gltf-pro` or `RangeError: CAD exceeds 64 MiB (70000000 > 67108864 bytes); convert it to GLB with margo-convert and load it with @margoengine/gltf-pro`. | [`margo-convert`](../tools/margo-convert/README.md) converts at build time: `as1-oc-214.stp` (441,968 B) becomes a 68,352 B GLB (25,579 B gzip), validator 0 errors ([margo-convert-diagnostic.json](../examples/package-benchmarks/results/margo-convert-diagnostic.json); sizes are deterministic, its timings diagnostic). The GLB loads with no OCCT. |
 | glTF download budget | Enforced: gltf-pro reads at most `maxDownloadBytes` (default 64 MiB, 67,108,864 B: `assetLimit`) of JSON, buffers and images per load, and decoded accessors, packed geometry and decoded images may each use 4x that (256 MiB by default); `@margoengine/gltf` reads at most 64 MiB ([asset.ts](../packages/gltf-pro/src/asset.ts), [loading.js](../packages/shared/loading.js); [accessors.test.js](../packages/gltf-pro/tests/accessors.test.js)). Khronos ABeautifulGame (a 43 MB GLB whose 33 2048x2048 textures decode to 528 MiB) is over the default image budget. | Bounds memory for any URL an app is handed. | gltf-pro names the option for the download and packed-geometry budgets, e.g. `RangeError: glTF exceeds download budget (67108864 bytes; raise the maxDownloadBytes option)`; decoded accessors and images over 4x throw `RangeError: Decoded glTF exceeds byte budget` or `RangeError: glTF images exceed decoded size limit`; the light loader throws `glTF download byte budget exceeded` or `glTF buffers exceed 64 MiB`. | gltf-pro's `maxDownloadBytes` option (ABeautifulGame loads with 160 MiB, [khronos-gallery.js](../examples/khronos-gallery.js)); for the light loader, use gltf-pro. |
 | Malformed and hostile files | Enforced at each parser's trust boundary (glTF, gltf-pro with its parse worker and progressive stream, `.margo`, Draco, KTX2, meshopt, HDR, EXR, UltraHDR, FBX), checked by seeded fuzzers (`npm run fuzz`, [targets-formats.js](../scripts/fuzz/targets-formats.js); regressions in [fuzz-formats-regressions.test.js](../tests/fuzz-formats-regressions.test.js)): every input ends in a result or the package's own error. Limits added with them: a gltf-pro document nested deeper than 256 levels ([asset.ts](../packages/gltf-pro/src/asset.ts)); an EXR chunk that decodes to more than 256 MiB, or chunks too small to hold the image ([exr.ts](../packages/environment/src/exr.ts)); a Draco or KTX2 decode running longer than 10 s plus 4 s per MiB of input ([pool.ts](../packages/decoders/src/pool.ts)). How long large valid Draco and KTX2 files take to decode: not measured. | Files from a URL are untrusted: a malformed one must fail with an error the app can show, not crash, hang, read outside its bytes or claim memory its size cannot justify. | `TypeError: Invalid glTF JSON: nested deeper than 256 levels`, `RangeError: Unsupported EXR: a chunk decodes to more than 256 MiB`, `RangeError: Invalid EXR: chunks are too small for the image size`, `MargoError: Draco decode timed out after <limit> ms (corrupt data?); the decoder worker was restarted`. | The decoders' `timeout` option (`Infinity` turns the limit off). No real glTF comes near 256 levels; EXR: fewer channels per file. |
 | Vertices per primitive | Enforced: gltf-pro takes up to 1,000,000 vertices per primitive (index accessors are bounded only by the decoded budget); the light `@margoengine/gltf` loader up to 1,000,000 vertices in total ([accessors.test.js](../packages/gltf-pro/tests/accessors.test.js): 1,000,002 indices decode, 1,000,002 vertices are refused). | Vertex buffers are also bound as storage buffers, and indices pass through float32, exact up to 2^24. | gltf-pro names the location: `glTF mesh 0 "part" primitive 0: Expected bounded triangle geometry`; the light loader: `RangeError: glTF exceeds one million vertices`. | gltf-pro instead of the light loader lifts the total; a primitive over 1,000,000 vertices must be split at export (for CAD, a coarser `margo-convert --linear-deflection`). |
@@ -2670,7 +2572,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl/test/webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 22,414 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) gets, on every live demo, "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no engine code; the landing page draws no scene. No demo runs on the WebGL2 preview: each needs effects, particles, skinning or compute. | `@margoengine/webgl` (3,021 B gzip, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo shows the message with no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). Most rendering packages stay WebGPU-only; a fuller WebGL2 compatibility package is in development as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
 | Compute on the WebGL2 compatibility layer | Measured (Edge 156, ANGLE Direct3D 11, NVIDIA RTX A6000, 2026-10-28, [compute.html](../packages/webgl2-compat/test/compute.html) cases and a timing page). Compute entry points that store only their own texel run as fragment draws and those with a bounded number of stores as point draws, on the GPU. The rest (atomics, workgroup memory, barriers, stores in loops of unknown length) run on the CPU in JavaScript: a clustered-binning kernel over 3,456 clusters takes 1.5 ms with 16 lights, 2.8 ms with 64 and 9.4 ms with 256 (37 to 94 million loop iterations a second); a 64-wide workgroup reduction with 7 barriers runs 4.4 million invocations a second (65,536 in 14.9 ms). | WebGL2 has no compute shaders, storage buffers or atomics. | The same results as WebGPU (the layer's compute check compares both on one GPU), slower: GPU-written inputs of a CPU kernel are read back synchronously (counted in the device's `stalls`). Multisampled and external textures cannot be read by CPU-tier kernels (MargoError `unsupported`); cube textures are sampled there as on WebGPU, seamless; CPU kernels need a page that allows JavaScript compiled at run time (CSP `unsafe-eval`; nothing else in the layer does). A CPU-tier dispatch stops at its work budget, 100,000,000 invocations plus loop iterations by default (`cpuWorkBudget`), and is reported as a `GPUInternalError` coded `failed` with nothing stored. | Keep per-frame CPU-tier work under the numbers measured here; [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md) lists the tiers. |
 | Package routes on the WebGL2 compatibility layer | Measured (Edge 156, ANGLE Direct3D 11, NVIDIA RTX A6000, 2026-10-29, frame wall time, native WebGPU then the layer; [routes-browser.mjs](../packages/webgl2-compat/test/routes-browser.mjs) checks the pixels). DOF at 1280 x 720: 0.72 ms, 10.1 ms on its route (913 ms on the generic CPU tier before). Splats: 10,000 in 1.2 ms, 17.9 ms (44 ms before); 100,000 in 2.1 ms, 39 ms (308 ms before). `CulledInstances`, 10,000 parts: 0.98 ms, 1.14 ms (11.7 ms before). VFX on the CPU tier, its plan's route: 5,000 particles 0.61 ms, 6.5 ms; 50,000 in 0.67 ms, 48 ms. Scatter on the CPU tier: 10,000 instances 0.56 ms, 5.4 ms; 100,000 in 0.85 ms, 40 ms. | WebGL2 has no workgroup memory, atomics or compute; each route does the same work another way. | The same pixels as native WebGPU. Splats read their projected keys back once a frame (a counted stall); `'occlusion'` culling culls against the frustum only (the same image, more parts drawn). The voxel path tracer and XR refuse the layer (MargoError `unsupported`). | Budget VFX particles and scatter instances by the per-frame times measured here (about 1 µs per particle and 0.4 µs per instance on this PC). |
-| Content Security Policy | Enforced by the browser: core compiles its Wasm kernel, so `script-src` needs `'wasm-unsafe-eval'` (as do the machinery kernel, OCCT, Draco and Basis). Nothing needs `'unsafe-eval'`, workers included: the Draco/KTX2 decoder worker and the STEP/IGES CAD worker load their Emscripten code with `importScripts`, and the build replaces the `new Function` wrapper generators in the Basis and OCCT glue with closures, output byte-identical ([no-eval-workers.test.js](../tests/no-eval-workers.test.js)). No COOP/COEP. Checked with zero violations on Edge, one policy on the page and every worker ([csp-check.json](../examples/package-benchmarks/results/csp-check.json)). | Wasm is how the kernel stays small and fast. | Without `'wasm-unsafe-eval'`, `Engine.create` rejects ("Compiling or instantiating WebAssembly module violates the following Content Security policy directive") ([csp-check-negative.json](../examples/package-benchmarks/results/csp-check-negative.json)). | Headers for Cloudflare Pages, Netlify, Vercel and Nginx in [deploying.md](deploying.md). A Draco, Basis or OCCT build you substitute for the bundled one may still call `new Function` (three.js's Basis transcoder does) and then needs `'unsafe-eval'` for its worker. |
+| Content Security Policy | Enforced by the browser: core compiles its Wasm kernel, so `script-src` needs `'wasm-unsafe-eval'` (as do Draco and Basis). Nothing needs `'unsafe-eval'`, workers included: the Draco/KTX2 decoder worker loads its Emscripten code with `importScripts`, and the build replaces the `new Function` wrapper generators in the Basis glue with closures, output byte-identical ([no-eval-workers.test.js](../tests/no-eval-workers.test.js)). No COOP/COEP. Checked with zero violations on Edge, one policy on the page and every worker ([csp-check.json](../examples/package-benchmarks/results/csp-check.json)). | Wasm is how the kernel stays small and fast. | Without `'wasm-unsafe-eval'`, `Engine.create` rejects ("Compiling or instantiating WebAssembly module violates the following Content Security policy directive") ([csp-check-negative.json](../examples/package-benchmarks/results/csp-check-negative.json)). | Headers for Cloudflare Pages, Netlify, Vercel and Nginx in [deploying.md](deploying.md). A Draco or Basis build you substitute for the bundled one may still call `new Function` (three.js's Basis transcoder does) and then needs `'unsafe-eval'` for its worker. |
 | React app budget (what a bundler emits and the browser loads) | Measured and enforced by the bundler matrix (`npm run modern:test:bundlers`, part of `check:merge`): a Vite 8 build of the React cube page (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `OrbitControls` from `@margoengine/react/controls`, `useFrame`; React 19) loads 94,216 B gzip before it runs (React, React DOM, core, the stage and the React bindings; budget 100,000 B), and with `@margoengine/react` installed alone the whole build emits 104,197 B gzip of JavaScript and no Wasm (budget 115,000 B). The matrix loads the built page in Edge and fails if it requests Wasm, an optional engine package or the BVH raycaster, and builds the same page with `@margoengine/react` alone in Next.js 16 (webpack and Turbopack), Rollup and esbuild: every module resolves and no optional package is emitted. Breakdown: [React page](#react-page). The build prints no warnings, without `@vitejs/plugin-react` too: `'use client'` is only on the `react-server` entries. | `@margoengine/react`'s root holds only bindings that need no optional package; each optional one is a subpath named after its package (`/controls`, `/gltf-pro`, `/shadows`, ...), and the stage's features are entries of their own (`@margoengine/stage/gltf`, ...), so no root reaches an optional package, not even through a lazy `import()` (`tests/optional-peer-reach.test.js`). | With `npm i margoengine`, `margoengine/react` re-exports every binding, so its module graph reaches gltf-pro's decoders: Vite copies the Basis (527,333 B) and Draco (192,420 B) `.wasm` to `dist` when it reads those modules, before tree-shaking. No chunk of them is emitted and the page never requests them (94,222 B gzip at load). | Install `@margoengine/react` alone, plus the packages its subpaths name (`@margoengine/controls` for `OrbitControls`): nothing else is installed or emitted. |
 | No visual editor | By design: Margo is code-first. | An editor is a product of its own; the engine stays a library. | Scenes are built in code or authored in another tool. | Author in Blender and export glTF or `.margo` (`@margoengine/blender`, `tools/blender-addon`, [guides/blender-game.md](guides/blender-game.md)); inspect at runtime with `@margoengine/inspector` and its `/frame` debugger; move objects with `@margoengine/controls`'s TransformControls. A Margo Studio editor is planned after 1.0. |
 | Tested hardware | Committed real-GPU results come from two Windows 11 machines in Edge 155: the Intel Arc 140V laptop above and an NVIDIA RTX A6000 desktop (its own visual-baseline profile, `nvidia-ampere-msedge-155`; the voxel results above come from it). Phones: the demos were run by hand on an iPhone (Safari), with no scripted run or committed result; a Galaxy S23 Ultra report of a slow island demo is unresolved. | One developer, two machines so far. | Behaviour elsewhere follows WebGPU's guarantees but is unverified. | Untested: AMD GPUs, NVIDIA GPUs other than the A6000, Apple silicon Macs, Android devices other than the S23 report, Linux, ChromeOS. Results from these are welcome; [reproduce.md](whitepaper/reproduce.md) has the commands. |
@@ -3056,22 +2958,17 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
 ### STL import still computes normals three's STLLoader leaves zero
 
 - **What:** `p-stl`, a 204,800-triangle binary STL: the plain `parseSTL` 4.9 ms against three's `STLLoader` 2.8 ms
-  (run `20261026-201722`, busy machine, diagnostic); the CAD path `parseCAD` (scene `p-stl-cad`) is 29.4 ms, with no
-  three.js equivalent. History: `parseCAD` 111 ms before perf-history entry 26, 28.7 after it, then `parseSTL`
-  (entry 31).
+  (run `20261026-201722`, busy machine, diagnostic). `parseSTL` changed in perf-history entry 31.
 - **Cause (measured, Node CPU profile of `parseSTL`):** both readers copy the file's floats into one non-indexed
   buffer (614,400 vertices). This file stores zero facet normals, as most writers do. three copies the zeros;
   `parseSTL` computes the flat normal of each such facet (`flatNormal`, about 1.3 ms of its time in Node), writes an
-  identity index array and zero-fills a third array. `parseCAD` additionally welds corners (205,440 vertices), builds
-  parts and creates GPU meshes with a `PbrMaterial`; the weld is what CAD sections, edges and part deduplication rely
-  on, so it keeps it.
+  identity index array and zero-fills a third array.
 - **Status: accepted difference in work (Scott, 2026-10-26).** `parseSTL` computes flat face normals on ingestion so the
   mesh is render-ready; three's `STLLoader` copies the file's zero normals, which light wrongly until the user calls
   `computeVertexNormals()`. The full job is measured as `p-stl-normals` (run `20261026-211213`, diagnostic): three
   `STLLoader.parse` + `computeVertexNormals()` 8.7 ms, `parseSTL` 4.7 ms, so Margo is faster when both produce a
-  lit mesh. The plain-copy `p-stl` gap (4.7 against 2.7 ms, 1.7x) stays listed. The entry stays because `p-stl-cad`
-  (the CAD path, 32 ms) is a different job with no three.js equivalent.
-- **Plan:** none for the CAD path (different job). For `parseSTL`, the remaining gap is the computed normals, which are
+  lit mesh. The plain-copy `p-stl` gap (4.7 against 2.7 ms, 1.7x) stays listed.
+- **Plan:** for `parseSTL`, the remaining gap is the computed normals, which are
   the behavior a user needs; an opt-out only to win a benchmark would measure less work, so it is not planned.
 
 ### USDZ export writes every mesh in world space
@@ -3193,28 +3090,6 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   is fixed (entry 36).
 - **Plan (gltf-pro and animation):** create the pipelines a loaded model will draw with
   (`createRenderPipelineAsync` / `createComputePipelineAsync`) while it loads, so the first frame finds them ready.
-
-## Unverified against the specification
-
-### IGES parametric spline surface (entity 114): coefficient order not checked
-
-- **What:** `igesToSTEP` and `parseIGES` in `@margoengine/brep` (`packages/brep/src/iges/step.ts`) refuse entity 114
-  with `MargoError` code `unsupported`; a file holding other surfaces converts with the 114 left out and named in
-  `warnings`.
-- **Why:** the IGES 5.3 specification (US PRO/IPO-100-1996) gives the 114 bicubic patch polynomial only as a formula
-  image, which could not be viewed when the reader was written. The order of the 16 coefficients per coordinate
-  (48 per patch: x, then y, then z, named A to S) was taken from memory, not the text, so it was not shipped.
-- **Needed to close:**
-  1. Read the specification's section on entity 114 (section 4.15, "Parametric Spline Surface Entity"; the request
-     that opened this item said 4.25, which is the Offset Curve Entity) and its Appendix B.5, and write down the
-     formula image: which power of s = u - TU(i) and t = v - TV(j) each of the 16 coefficients multiplies.
-  2. Confirm or correct the assumed order 1, s, s^2, s^3, t, s t, s^2 t, s^3 t, t^2, ..., s^3 t^3, and confirm the
-     patch order (u patches outer, with the (N + 1)-th placeholder column per row).
-  3. Restore the power-to-Bezier conversion of each patch into one B-spline surface (knots at the breakpoints with
-     multiplicity 3) and enable the 114 case.
-  4. Test against an analytic bicubic with cross terms (for example x = s, y = t, z = s^2 t^3 over two patches each
-     way), comparing sampled points and the meshed area with the exact values, and replace the refusal test in
-     `packages/brep/tests/iges.test.js`.
 
 ## Fixed 2026-10-26 to 10-28
 
@@ -3402,7 +3277,7 @@ You normally use this package as [`margoengine`](../margoengine/README.md): `imp
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
-This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/machinery`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, and `@margoengine/shadows` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, and `@margoengine/shadows` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
@@ -4286,7 +4161,7 @@ window.addEventListener('pagehide', () => stage.dispose(), {once:true});
 
 Import `margoengine/cache` from the `margoengine` package, or `@margoengine/cache` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Opt-in offline asset cache. Heavy GLB, .bin, texture and STEP files are kept in IndexedDB, so repeat visits load them
+Opt-in offline asset cache. Heavy GLB, .bin and texture files are kept in IndexedDB, so repeat visits load them
 from disk and the viewer keeps working with bad or no Wi-Fi (a factory floor). `cache.fetch` is fetch-compatible and
 every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 2.4 kB
 min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and service workers.
@@ -4294,7 +4169,6 @@ min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and s
 ```ts
 import {AssetCache} from 'margoengine/cache';
 import {loadGLTF} from 'margoengine/gltf-pro';
-import {loadCAD} from 'margoengine/machinery/cad';
 
 const cache = new AssetCache({
   name: 'plant-viewer',    // IndexedDB database name
@@ -4303,7 +4177,6 @@ const cache = new AssetCache({
   persist: true,           // ask the browser not to evict this origin's storage (main thread only)
 });
 const line = await loadGLTF(engine, '/line-4.glb', {fetch: cache.fetch});
-const gearbox = await loadCAD(engine, '/gearbox.step', {fetch: cache.fetch});
 
 console.log(cache.stats);         // {hits, revalidated, offline, misses, stored, evicted, errors}
 console.log(await cache.usage()); // {bytes, files, quota, usage} (quota/usage from navigator.storage.estimate())
@@ -4321,7 +4194,6 @@ of files available offline ahead of time, fetch them once and wait for the write
 | gltf-pro `loadGLTF`, `parseGLTFAsync` | `fetch` (file, external .bin and images) | `loadGLTFInWorker` runs on the main thread (a function cannot move to the worker); for a GLB use `parseGLTFInWorker(engine, await (await cache.fetch(url)).arrayBuffer())` to keep parsing in the worker |
 | fbx `loadFBX`, `parseFBX`, `convertFBX` | `fetch` (file and external textures) | `loadFBXInWorker` / `parseFBXInWorker` run on the main thread; `parseFBXInWorker(engine, bytes)` without `fetch` keeps the worker for embedded textures |
 | usdz `loadUSDZ` | `fetch` | `loadUSDZInWorker` downloads through `fetch` here and parses in the worker |
-| machinery `loadCAD` (STL, OBJ, STEP, IGES) | `fetch` | download here, STEP/IGES parsing stays in the OCCT worker |
 | loaders `fetchBytes`, `load` | `fetch` (already existed) | `parse*InWorker(bytes)` |
 
 The cache itself also works inside your own worker (`new AssetCache(...)` there opens the same database).
@@ -4361,6 +4233,11 @@ const [model, chair] = await Promise.all([
   loadGLTF(engine, 'https://example.com/models/line-4.gltf', {fetch: manager.fetch}),
   loadOBJ(engine, 'https://example.com/models/chair.obj', {fetch: manager.fetch}),
 ]);
+
+// Work that does not fetch counts too; manager.signal aborts with the manager.
+manager.itemStart('bake');
+manager.itemEnd('bake'); // or manager.itemError('bake', error)
+manager.abort(); // cancels every request in flight (each reports onError); the manager stays usable
 ```
 
 [README continues: https://margoengine.com/llms/packages/cache.md]
@@ -5090,7 +4967,7 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   objects whose level changed are touched; no measurable heap growth (under 64 KB over 1,000 frames with 3,000
   objects switching every frame, `npm test`). Geometry levels keep a hidden mesh per geometry so core never frees and re-uploads a batch whose last
   user just switched away. New objects take effect on the next frame.
-- **Subassembly imposters**: a core `Mesh` with child meshes bakes its whole visible subtree in its own space, each part with its own material (`Imposter.bake(engine, module)`), as it is at bake time. Bake once per distinct subassembly design and share the atlas across every copy (the subtree scan is O(meshes)). Anchor each copy on an empty mesh that is not inside the subtree (a sibling with the same transform), because a hidden anchor or ancestor hides the imposter, and use the subassembly mesh itself as level 0: `lods.add(anchor, [{object: module}, {object: imposter, screen: 0.03}], {radius: imposter.radius})`. Measured on a 100k-part assembly in `docs/cad-performance.md`. Picking: `engine.pick` and `AssemblyBVH` do not see a subassembly while it shows its imposter (its parts are hidden); `lods.pickProxies()` reports it.
+- **Subassembly imposters**: a core `Mesh` with child meshes bakes its whole visible subtree in its own space, each part with its own material (`Imposter.bake(engine, module)`), as it is at bake time. Bake once per distinct subassembly design and share the atlas across every copy (the subtree scan is O(meshes)). Anchor each copy on an empty mesh that is not inside the subtree (a sibling with the same transform), because a hidden anchor or ancestor hides the imposter, and use the subassembly mesh itself as level 0: `lods.add(anchor, [{object: module}, {object: imposter, screen: 0.03}], {radius: imposter.radius})`. Picking: `engine.pick` does not see a subassembly while it shows its imposter (its parts are hidden); `lods.pickProxies()` reports it.
 - **Imposters** bake `frames`² orthographic views over the whole sphere of directions (octahedral layout) on the
   GPU, through gltf-pro's own shader with an early return, so base-colour textures, vertex colours, normal maps,
   alpha masks and `@margoengine/materials` maps are all captured. The atlas stores albedo + coverage (RGBA8 sRGB, with
@@ -5102,7 +4979,7 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   (alpha-to-coverage under MSAA, a fixed per-pixel dither at 1x) instead of a hard cut at 0.5. Each tile is sampled
   with its mip level computed from the smooth coordinate and clamped half a texel of the coarser level read, so
   trilinear filtering never reaches a neighbouring view. Bounding-sphere frustum culling on the CPU, hidden anchors (or hidden
-  ancestors) are skipped, and a
+  ancestors) are skipped, and all instances of one atlas are one instanced draw (order 1.5, after opaque meshe
 
 [README continues: https://margoengine.com/llms/packages/lod.md]
 
@@ -5136,14 +5013,14 @@ console.log(await parts.readCounts()); // parts drawn per batch in the last fram
 ```
 
 Parts are not core meshes. That is where the CPU saving comes from (core's kernel and batch collection never see
-them), and also the main limit: no core `engine.pick`, no hierarchy, no `ExplodedView`/`AssemblyBVH`/`FeatureEdges`,
+them), and also the main limit: no core `engine.pick`, no hierarchy, no mesh BVH raycasts,
 no section caps, no shadows. Section clipping itself does apply, because the parts are drawn with core's own frame
 shader.
 
 ## Core meshes: `CulledMeshes`
 
 `CulledMeshes` GPU-culls regular core meshes instead of a separate part list, so they keep everything core meshes have:
-`engine.pick`, `Picking`, hierarchy, `ExplodedView`, `AssemblyBVH` and `FeatureEdges` (checked on the GPU below).
+`engine.pick`, `Picking` and hierarchy (checked on the GPU below).
 
 ```ts
 import {CulledMeshes} from 'margoengine/culling';
@@ -5157,13 +5034,11 @@ tests every instance's bounding sphere (the kernel's sphere, padded for float32)
 `minRadius`, its projected size, and compacts the kept instance records in their original order into the package's
 buffer with indirect arguments. It then sets `batch.redirect` (core's one GPU-culling hook, see the core README), so
 core's main pass and every replay of it (SSAO, SSR, selection outline...) draw the compacted list with core's own
-pipelines; core still uploads its instance buffer, which the culler reads. `FeatureEdges` (machinery) draws its lines from the
-compacted list too, so edges get the same frustum and screen-size culling. `engine.pick` draws from
+pipelines; core still uploads its instance buffer, which the culler reads. `engine.pick` draws from
 core's CPU instance data and is unaffected. With `minRadius: 0` (default) frames are pixel-identical to core
 (`examples/package-benchmarks/cad/culled-meshes.mjs`). Limits: frustum and screen size only (no Hi-Z occlusion yet; use
 `CulledInstances` for occlusion on static parts); with `engine.render()` (CPU culling on) the GPU test only adds the
-screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies (numbers in
-[cad-performance.md](../../docs/cad-performance.md)): a dropped part simply disappears, so keep it under the size where a
+screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies: a dropped part simply disappears, so keep it under the size where a
 part is still recognisable.
 
 ## Modes
@@ -5301,7 +5176,7 @@ Crisp GPU text for Margo Engine: signed distance field glyphs generated at runti
 
 Build from source with `npm run build` in `packages/text`.
 
-SDF `Text` for Latin, Greek, Cyrillic, CJK, Hebrew and emoji (no Arabic or Indic shaping and no ligatures; see Limits), for labels and signage. CAD dimension callouts with constant-pixel labels are built on it in `@margoengine/machinery/dimensions`.
+SDF `Text` for Latin, Greek, Cyrillic, CJK, Hebrew and emoji (no Arabic or Indic shaping and no ligatures; see Limits), for labels and signage.
 
 ```ts
 import {Engine, box} from 'margoengine/core';
@@ -5344,7 +5219,9 @@ title.layout.bounds;                  // {left, right, top, bottom}
 - **One draw call per block.** Glyph quads live in a storage buffer and are expanded in the vertex shader. Shadow, outline and fill are layers of the same instanced draw (instance `i` draws glyph `i % n` in layer `i / n`), so every fill is drawn over every neighbour's outline. Antialiasing uses screen-space derivatives of the atlas coordinates, so edges stay one pixel wide at any scale or angle.
 - **Blending and depth.** Premultiplied alpha blending, reversed-Z depth test (`greater-equal`) without depth writes, so overlapping glyph quads never z-fight. Blocks are sorted back to front; `onTop` blocks draw last with the depth test off.
 - **Placement.** World-oriented text uses its local matrix, times the attached mesh's world matrix from `engineRuntime(engine).store.matrices`. Billboard text keeps the model's origin and scale and spans the camera's right and up vectors. Text attached to a hidden or disposed mesh is skipped.
-- **Lifecycle.** `onDeviceRestored` rebuilds pipelines, buffers and atlases; `dispose` (via `removePlugi
+- **Lifecycle.** `onDeviceRestored` rebuilds pipelines, buffers and atlases; `dispose` (via `removePlugin`) releases them. Texts stay registered.
+
+## Options
 
 [README continues: https://margoengine.com/llms/packages/text.md]
 
@@ -6646,7 +6523,7 @@ engine.start();
 
 For a 2D state use `{parameters:['strafe','forward'],samples:[{value:[0,0],clip:'Idle'},...]}` with unique coordinates. Parameters default to zero. 1D samples must be strictly increasing. Clips loop independently in seconds (`Animation.options.loop` false holds the last frame). `playing = false` pauses state time and crossfades; `Animation.options.speed` scales them, as for Animation playback. `transition(state,duration)` switches states explicitly; predicates are evaluated in declaration order, at most once per frame. Add a layer with `addLayer({clip:'Aim',weight:0.5,mask:[upperBodyNodeIndex,...]})`. Masks use glTF node indices. The returned function removes the layer; mutable weights are validated each frame. `referenceTime` defaults to zero.
 
-`addFootIK({hip,knee,ankle,pole,raycast,offset,probeHeight})` requires a direct three-node leg chain. The callback receives a world-space origin above the current ankle and a downward ray. Return `{position,normal?}` or `null`; supply terrain collision data or an existing BVH. For `AssemblyBVH`, adapt its result with `hit ? {position:hit.point} : null`. Normals align the ankle's local +Y with the terrain. Bones/ancestors require positive uniform scales. Unreachable targets clamp to the leg's reach; the pole chooses the knee bend direction. `solveTwoBoneIK()` is also exported as a standalone analytical solver.
+`addFootIK({hip,knee,ankle,pole,raycast,offset,probeHeight})` requires a direct three-node leg chain. The callback receives a world-space origin above the current ankle and a downward ray. Return `{position,normal?}` or `null`; supply terrain collision data or an existing BVH. For a BVH raycast, adapt its result to `{position}` or `null`. Normals align the ankle's local +Y with the terrain. Bones/ancestors require positive uniform scales. Unreachable targets clamp to the leg's reach; the pole chooses the knee bend direction. `solveTwoBoneIK()` is also exported as a standalone analytical solver.
 
 ## CCD chains (any length)
 
@@ -8141,65 +8018,6 @@ Every limit has a safe default; set them on `new VoxelServer({...})`.
 
 [README continues: https://margoengine.com/llms/packages/voxel-net.md]
 
-=== @margoengine/machinery (packages/machinery/README.md) ===
-
-# @margoengine/machinery
-
-Import `margoengine/machinery` from the `margoengine` package, or `@margoengine/machinery` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
-
-Joints and couplings, bounded IK, Wasm surface transport, binary telemetry, worker CAD import, stencil sections, assembly BVH picking and metrology for Margo Engine.
-
-Package name: `@margoengine/machinery`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
-
-```sh
-npm install @margoengine/core@1.0.0 @margoengine/machinery@1.0.0
-```
-
-```ts
-import { Engine, box } from 'margoengine/core';
-import { Kinematics } from 'margoengine/machinery/kinematics';
-import { industrialMaterial } from 'margoengine/machinery/materials';
-
-const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
-const engine = await Engine.create(canvas);
-const arm = engine.createMesh().setGeometry(box()).setScale([0.3, 1.5, 0.3])
-  .setMaterial(industrialMaterial('anodizedAluminum'));
-const kinematics = new Kinematics([
-  { node: arm, axis: 'y', kind: 'revolute', min: -Math.PI / 2, max: Math.PI / 2 },
-]);
-engine.use(kinematics);
-let elapsed = 0;
-engine.onFrame((_, delta) => {
-  elapsed += delta;
-  kinematics.setAngle(0, Math.sin(elapsed));
-});
-engine.start();
-```
-
-STEP and IGES import uses [OpenCascade](https://dev.opencascade.org/) (occt-import-js, WebAssembly, LGPL-2.1 with the Open CASCADE exception), run in a worker and loaded only when a STEP or IGES file is; see the licence note at the end.
-
-Call `engine.dispose()` on teardown. `loadCAD` uses a worker in browsers; `parseCADAsync` transfers and detaches an owned ArrayBuffer. Both support STL/OBJ/STEP/IGES. Synchronous `parseCAD` retains STL/OBJ support. STEP/IGES tessellation loads separate OpenCascade assets only when needed and returns meters; STL/OBJ retain their input units. STEP/IGES shade with OpenCascade's own surface normals by default: smooth across each curved face, hard at every B-rep edge. STL/OBJ worker imports weld corners at the same point and smooth their normals by default, up to a crease angle: triangles that meet at more than `creaseAngle` degrees (default 40) keep a hard edge, so a box stays sharp and a cylinder cut into 9 or more sides shades round. `{ smoothing: false }` gives one flat normal per triangle.
-
-OBJ triangles and quads become triangles directly (a quad splits along its inside diagonal); faces with five or more corners go through contour triangulation, whose 10,000,000-step work budget still bounds them. `node scripts/machinery-cad-large-tests.js` loads a 50,000-part OBJ through `parseCADAsync` on a real GPU and packs it.
-
-For STEP and IGES, `parseCADAsync` and `loadCAD` take an optional `linearDeflection`: the largest distance in meters that OpenCascade's triangles may stray from the true surface (smaller is finer). Omitted, the OpenCascade call is unchanged. The 100,000-part default `maxParts` is unchanged.
-
-To read STEP or IGES with a reader of your own instead of OpenCascade, pass an `importer` to `loadCAD` or `parseCADAsync` (default none). It gets the engine, the file's bytes, the format and the import options after the size and option checks, and returns the `CADModel`:
-
-```ts
-import { Engine } from 'margoengine/core';
-import { loadCAD, type CADModel } from 'margoengine/machinery/cad';
-
-declare function readStep(engine: Engine, bytes: ArrayBuffer): Promise<CADModel>;
-
-const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
-const model = await loadCAD(engine, '/part.step', {
-  importer: (engine, bytes) => readStep(engine as Engine, bytes),
-});
-```
-
-[README continues: https://margoengine.com/llms/packages/machinery.md]
-
 === @margoengine/bvh (packages/bvh/README.md) ===
 
 # @margoengine/bvh
@@ -8808,7 +8626,6 @@ The `Model` line needs a `.glb` file at `public/model.glb`; delete it for a scen
 
 - `examples/animation-formats.html`: Collada skins and glTF animation pointers
 - `examples/batched-mesh.html`: Many shapes drawn in one call
-- `examples/cad-views.html`: Top, front, right and perspective views of one model
 - `examples/character-animation.html`: A walking robot with blendable expressions
 - `examples/clipping-planes.html`: Section planes on every material
 - `examples/depth-texture.html`: A depth texture that any material can sample

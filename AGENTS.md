@@ -4,7 +4,7 @@
 
 - Treat `@margoengine/core` and the stage facade as feature-frozen for v1.0.0. Do not add features to either, including material graphs, skinning math, or post-processing passes.
 - Freeze = no new features; core bug fixes go in core (Scott, 2026-10-24). Fix a bug or unsafe API in core itself, with a test, within the size gate; never leave it because core is frozen. Details: `docs/conventions.md#core-freeze`.
-- Exception (Scott, 2026-10-27): the stage facade was lifted from the freeze for ONE restructuring, a bug against "pay only for what you import": its optional-package methods moved out of the `Stage` class into feature entries (`@margoengine/stage/gltf` `addGLTF`, `/cad`, `/sky`, `/particles`, `/effects`, `/environment`, `/shadows`), so the stage root holds no `import()` of an optional package. Core stays untouched; the freeze applies again after this change.
+- Exception (Scott, 2026-10-27): the stage facade was lifted from the freeze for ONE restructuring, a bug against "pay only for what you import": its optional-package methods moved out of the `Stage` class into feature entries (`@margoengine/stage/gltf` `addGLTF`, `/sky`, `/particles`, `/effects`, `/environment`, `/shadows`; the `./cad` entry was removed on Scott's go, 2026-10-29), so the stage root holds no `import()` of an optional package. Core stays untouched; the freeze applies again after this change.
 - CI must automatically fail any pull request that pushes the combined core + stage gzip size to **25,000 bytes or above**. A measured result from 22,000 through 24,999 bytes is inside the allowed band.
 - Build future capabilities strictly in separate, optional, tree-shakable packages:
   - `@margoengine/gltf-pro`: glTF 2.0 PBR.
@@ -58,14 +58,9 @@ Scott's rule (2026-10-24): every API and tool should feel modern and familiar, s
   type-checks them).
 - When you see a place where Margo is harder to use than the tools people come from, fix it or list it in HANDOFF.
 
-## brep is private
+## No CAD in this repository
 
-Scott's decision (2026-10-25): `@margoengine/brep` is a private, future paid product. It no longer lives in this
-repo: it moved, with its history, to the private repo `scottcampbelldata/margo-cad-kernel`. Public docs, the site, the
-whitepaper, the catalog and package READMEs present CAD as built on OpenCascade (STEP and IGES through
-`occt-import-js` in machinery's worker). Do not advertise or reintroduce brep, its formats, exact Booleans or other
-brep-only features here, and never claim a CAD kernel on par with OpenCascade. Machinery's generic `importer` option
-(`loadCAD`, `parseCADAsync`) is the only plug-in point; it never names the kernel.
+Scott's decision (2026-10-29): CAD import and CAD tooling are not part of this repository and must not be added back. `npm run check:banned-terms` (in verify) enforces it; its encoded list is `scripts/banned-terms.json`.
 
 ## Before every push to main
 

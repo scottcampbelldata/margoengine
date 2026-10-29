@@ -190,13 +190,13 @@ try {
             front = e.createMesh().setGeometry(geometry).setPosition([0, 0, 1]);
           e.render();
           assert((await e.pick(64, 64)) === front, 'MRT lost depth occlusion');
-          const { SectionPlanes } = await import('/packages/machinery/dist/index.js'),
+          const { TestSectionPlugin } = await import('/tests/support/section-plugin.js'),
             planes = [[0, 0, -1, 0]];
-          e.use(new SectionPlanes({ planes, cap: false }));
+          e.use(new TestSectionPlugin({ planes }));
           assert((await e.pick(64, 64)) === back, 'Micro pass lost section clipping');
           planes[0][3] = 2;
           assert((await e.pick(64, 64)) === front, 'Mutable section clipping was stale');
-          e.removePlugin('section-planes');
+          e.removePlugin('section');
           const root = e.createMesh().setScale([2, 1, 0.5]);
           front.setParent(root).setScale([-1, 1, 1]).setRotation([0, 0, 0.4]);
           assert((await e.pick(64, 64)) === front, 'Mirrored/sheared hierarchy was culled incorrectly');

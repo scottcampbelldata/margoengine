@@ -31,7 +31,7 @@ eye sees as shaking). Results: `examples/package-benchmarks/results/large-coordi
 
 - **Kernel world matrix** (`store.matrices`, the per-instance model matrix): the root translation is rounded to the
   float32 grid, and child matrices are composed in float64 but stored in float32, so the 1 mm bolts snap to the grid
-  (at 6,000 km the two bolts 7 mm apart land on the same grid point, 0 mm apart in world space; machinery `measureDistance` composes the hierarchy in float64 below the common ancestor and still reads 7 mm; `packages/cameras/test/origin.test.js`). Mostly a
+  (at 6,000 km the two bolts 7 mm apart land on the same grid point, 0 mm apart in world space; `packages/cameras/test/origin.test.js`). Mostly a
   static misplacement, not jitter.
 - **View-projection matrix** (`camera.matrix`, float64 in `Camera.update`, stored float32): its translation column holds
   eye-distance terms of the size of the coordinates, so rounding changes every frame as the camera moves. This is the
@@ -130,8 +130,6 @@ Works (unit-tested in `packages/cameras/test/origin.test.js` on the real kernel,
 - `engine.pick` (GPU run above) and bvh `Raycaster` hits (unit test): computed in local coordinates;
   `origin.toWorld(hit.point)` gives float64 world (within 1 µm at 6,000 km in the test). The selection `Picking`
   plugin reads the same matrices (not separately tested).
-- machinery measurements (`measureDistance` and anchors): differences of local points, exact (7 mm bolt spacing at
-  6,000 km: 7.0000002 mm with the plugin, 0 mm without).
 - Section planes: pass `origin.toLocalPlane(worldPlane)` and refresh it in `onRebase`.
 - Parts moved through `mesh.position` (drag/transform gizmos, physics): read back on the next rebase.
 
@@ -164,6 +162,6 @@ view-projection and vertex world-position errors with no app code. But it cannot
 already float32 in `store.transforms` (0.5 m grid at 6,000 km; the 7 mm bolts still share one world position). It would also
 need float64 position columns in the Rust/Wasm kernel, which changes the memory layout and the `store.transforms`
 types. And `store.matrices` would become eye-relative, which breaks every package that reads world matrices from it
-(gltf-pro, bvh, selection, shadows, machinery, staging, taa and others). Byte cost was not measured on a scratch
+(gltf-pro, bvh, selection, shadows, staging, taa and others). Byte cost was not measured on a scratch
 branch, because nothing remains that only core can fix. The one thing left (km-scale vertices or child translations
 inside a single asset) is not fixed by that core change either; a loader that re-centres at parse time fixes it.

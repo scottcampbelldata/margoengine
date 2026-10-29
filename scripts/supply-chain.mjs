@@ -21,7 +21,7 @@ export const OUTPUT = 'THIRD-PARTY-NOTICES.md';
 /** Licences any runtime dependency may carry without review. */
 const ALLOWED = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'Zlib', '0BSD']);
 /** Reviewed exceptions: package -> licence it may carry (see the obligations section of the output). */
-const EXCEPTIONS = { 'occt-import-js': 'LGPL-2.1', 'web-ifc': 'MPL-2.0' };
+const EXCEPTIONS = { 'web-ifc': 'MPL-2.0' };
 
 /** Why each external runtime dependency or peer exists. A new one fails --check until it is added here. */
 const WHY = {
@@ -30,7 +30,6 @@ const WHY = {
   react: 'React component bindings for the stage',
   'react-dom': 'React DOM root and portal rendering for scene and HTML components',
   scheduler: 'React DOM scheduling dependency',
-  'occt-import-js': 'OpenCascade STEP/IGES/BREP tessellation in Node (offline converter)',
 };
 
 /**
@@ -58,16 +57,6 @@ export const BUNDLED = [
     modified:
       'the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line',
     notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
-  },
-  {
-    package: '@margoengine/machinery',
-    component: 'occt-import-js 0.0.23 with OpenCascade (Viktor Kovacs; Open Cascade SAS)',
-    licence: 'LGPL-2.1',
-    files: 'dist/workers/occt-import-js.wasm, dist/workers/occt-import-js.js',
-    source: 'node_modules/occt-import-js/dist, copied by scripts/build-modern.js',
-    modified:
-      'the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line',
-    notices: ['dist/workers/OCCT-NOTICE.txt', 'dist/workers/OCCT-LICENSE.txt'],
   },
   {
     package: '@margoengine/post, @margoengine/tonemap',
@@ -351,27 +340,6 @@ ${table(
     https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/transcoder/build: \`basis_transcoder.wasm\`
     (\`6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a\`) and \`basis_transcoder.js\`
     (\`8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1\`, before the build's static-embind step).
-- **LGPL-2.1 (occt-import-js and the OpenCascade code compiled into it, \`@margoengine/machinery\`).** We ship the
-  library unchanged as Wasm plus a modified copy of its JavaScript glue. Margo Engine's STEP and IGES import is
-  OpenCascade: \`loadCAD\` and \`parseCADAsync\` hand those files to this library in a worker. OpenCascade Technology
-  (Open Cascade SAS) is licensed under LGPL-2.1 with the Open CASCADE Exception 1.0
-  (https://dev.opencascade.org/resources/licensing); its source is https://github.com/Open-Cascade-SAS/OCCT, and the
-  exact revision occt-import-js 0.0.23 builds is linked from OCCT-NOTICE.txt. How each obligation is met:
-  - *Licence and notice* (s. 1, 2): \`dist/workers/OCCT-LICENSE.txt\` (the upstream LGPL-2.1 text) and
-    \`dist/workers/OCCT-NOTICE.txt\` ship next to the files.
-  - *Modified files carry a notice of the change* (s. 2b): the glue's first line says it was modified by Margo Engine's
-    build and how; OCCT-NOTICE.txt repeats it. The change is generated, so its date is the build's; the transformation
-    and its history are \`scripts/static-embind.js\` in the public repository.
-  - *The modified library stays LGPL-2.1* (s. 2c): OCCT-NOTICE.txt says so; only Margo Engine's own code is Apache-2.0.
-  - *Corresponding source* (s. 4): the glue is itself JavaScript source, and the exact transformation is in our
-    repository (\`scripts/static-embind.js\`, Apache-2.0, published with every release tag). The unmodified Wasm's source is
-    occt-import-js 0.0.23 (its npm tarball carries the importer's C++ and build scripts) with the OpenCascade revision
-    pinned by its git submodule; OCCT-NOTICE.txt links both.
-  - *Replace or relink* (s. 6): the glue and Wasm are separate files loaded by URL at run time
-    (\`dist/workers/occt-import-js.js\`, \`.wasm\`), never bundled into our code, so a user can drop in their own
-    interface-compatible build: replace \`dist/workers/occt-import-js.js\` and \`occt-import-js.wasm\` in the
-    installed package with your own build under the same names (machinery resolves them as \`./workers/...\` from its
-    \`dist\` files). \`margo-convert\` depends on the unmodified npm package, so npm can swap it.
 - **MPL-2.0 (web-ifc, peer of \`@margoengine/ifc\`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves \`web-ifc.wasm\` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
 - **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries
@@ -383,7 +351,7 @@ ${table(
 - **MIT (React).** Keep the copyright and permission notice: npm dependencies carry their own
   LICENSE files.
 - **Site and demos.** The site build copies this file to \`/THIRD-PARTY-NOTICES.md\`, so the demos that bundle Draco,
-  Basis, OCCT or Rapier carry these notices next to the asset credits below.
+  Basis or Rapier carry these notices next to the asset credits below.
 
 ## Published packages
 

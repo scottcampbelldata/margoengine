@@ -66,7 +66,6 @@ Depth.prototype.onResize = function (listener) {
 };
 mock.module('@margoengine/post/depth', { namedExports: { DepthTexture: Depth } });
 mock.module('@margoengine/post/mrt', { namedExports: { SceneTargets: plugin('targets') } });
-const Section = plugin('section');
 mock.module('@margoengine/environment', {
   namedExports: {
     AmbientLight: plugin('ambient', { color: '#ffffff', intensity: 1 }),
@@ -107,19 +106,6 @@ mock.module('@margoengine/voxel/light', {
     },
   },
 });
-mock.module('@margoengine/machinery/section', {
-  namedExports: {
-    SectionPlanes: class extends Section {
-      static attach(engine, options) {
-        const value = super.attach(engine, options);
-        value.options = options;
-        value.enabled = true;
-        return value;
-      }
-    },
-  },
-});
-
 const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost' });
 for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'navigator'])
   Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
@@ -127,7 +113,6 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { Context } = await import('../dist/internal.js');
 const { BatchedMesh, BatchedItem } = await import('@margoengine/react/materials');
 const { DepthTexture, SceneTargets } = await import('@margoengine/react/post');
-const { SectionPlanes } = await import('@margoengine/react/machinery');
 const { Sun } = await import('@margoengine/react');
 const { AmbientLight, HemisphereLight, Fog } = await import('@margoengine/react/environment');
 const { Voxels } = await import('@margoengine/react/voxel');
@@ -255,37 +240,6 @@ test('DepthTexture and SceneTargets add every PBR model, now and later, and recr
   await flush();
   assert.notEqual(targets.current, kept, 'new outputs recreate them');
   assert.deepEqual(targets.current.args[0].outputs, { albedo: 'albedo', normal: 'normal' });
-});
-
-test('SectionPlanes moves planes live and recreates only when the plane count or cap options change', async () => {
-  const value = scene(),
-    ref = React.createRef();
-  const view = render(tree(value, h(SectionPlanes, { ref, planes: [[1, 0, 0, 0]], color: '#00ff00' })));
-  await flush();
-  const section = ref.current;
-  assert.deepEqual(section.options.planes, [[1, 0, 0, 0]]);
-  assert.equal(section.options.color, '#00ff00');
-  view.rerender(tree(value, h(SectionPlanes, { ref, planes: [[1, 0, 0, -2]], color: '#00ff00', enabled: false })));
-  await flush();
-  assert.equal(ref.current, section, 'new plane values keep the section');
-  assert.deepEqual(section.options.planes, [[1, 0, 0, -2]]);
-  assert.equal(section.enabled, false);
-  view.rerender(
-    tree(
-      value,
-      h(SectionPlanes, {
-        ref,
-        planes: [
-          [1, 0, 0, -2],
-          [0, 1, 0, 0],
-        ],
-        color: '#00ff00',
-      }),
-    ),
-  );
-  await flush();
-  assert.notEqual(ref.current, section, 'a second plane recreates it');
-  assert.equal(section.disposals, 1);
 });
 
 test('Sun sets the sun in linear colour and restores the previous sun on unmount', async () => {

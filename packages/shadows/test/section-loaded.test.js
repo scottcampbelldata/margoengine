@@ -4,13 +4,14 @@ import { readFile } from 'node:fs/promises';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/src/shaders.ts';
 import { parseGLTF } from '../../gltf-pro/dist/index.js';
-import { SectionPlanes } from '../../machinery/dist/section.js';
+import { TestSectionPlugin } from '../../../tests/support/section-plugin.js';
 import { Shadows } from '../dist/index.js';
 import { Material, createMesh } from '../../materials/dist/index.js';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 
-// The GPU boundary is mocked; the asset parser, native caster records and both
-// optional plugins are real. Pixel coverage is checked by the browser regression.
+// The GPU boundary is mocked; the asset parser, native caster records and the shadows plugin are real, and the scene
+// `section` binding comes from the test section plugin (tests/support/section-plugin.js). Pixel coverage is checked by
+// the browser regression.
 async function fixture(t, { node = false, section = true, material } = {}) {
   const gpu = mockGPU(),
     modules = new WeakMap(),
@@ -93,7 +94,7 @@ async function fixture(t, { node = false, section = true, material } = {}) {
         )
       : parseGLTF(engine, await readFile(new URL('../../exporters/tests/fixtures/Box.glb', import.meta.url))),
     planes = [[1, 0, 0, 0]],
-    sections = new SectionPlanes({ planes, cap: false }),
+    sections = new TestSectionPlugin({ planes }),
     shadows = new Shadows({ resolution: 64, bounds: { min: [-2, -2, -2], max: [2, 2, 2] } }),
     view = context(gpu, { samples: 1, shader: wgsl });
   t.after(() => engine.dispose());
@@ -124,7 +125,7 @@ async function fixture(t, { node = false, section = true, material } = {}) {
 
 function sectionBuffer(frame) {
   const match = /@group\(0\) @binding\((\d+)\) var<uniform> section:Section;/.exec(frame.shader);
-  assert.ok(match, 'the actual SectionPlanes pass declares its uniform');
+  assert.ok(match, 'the section pass declares its uniform');
   return frame.bindings.find((entry) => entry.binding === Number(match[1])).resource.buffer;
 }
 
@@ -160,13 +161,13 @@ test('loaded Box cached shadows invalidate for plane edits, enable changes, remo
   f.sections.enabled = true;
   assert.equal(f.frame().draws.length, 1, 'turning sections on redraws the cut shadow');
   const previous = sectionBuffer(f.frame());
-  f.engine.removePlugin('section-planes');
+  f.engine.removePlugin('section');
   const removed = f.frame();
   assert.equal(removed.draws.length, 1, 'removal restores the complete cached shadow');
   assert.doesNotMatch(removed.draws[0].code, /var<uniform> section:/);
   assert.equal(removed.draws[0].group.entries.length, 3);
   assert.equal(f.frame().draws.length, 0, 'the absent-section path still caches unchanged casters');
-  const replacement = new SectionPlanes({ planes: f.planes, cap: false });
+  const replacement = new TestSectionPlugin({ planes: f.planes });
   f.engine.use(replacement);
   const replaced = f.frame(),
     buffer = sectionBuffer(replaced);
@@ -211,7 +212,7 @@ test("a material's own clipping planes clip its shadow under their own name, uni
   assert.equal(buffer, f.model.shadowPrimitives[0].clip.buffer, 'the material uniform itself is bound');
 });
 
-test("with SectionPlanes attached the scene planes clip a clipped material's shadow", async (t) => {
+test("with a scene section attached the scene planes clip a clipped material's shadow", async (t) => {
   const material = new Material({ clippingPlanes: [[0, 0, 1, 0]] }),
     f = await fixture(t, { section: true, material }),
     [draw] = f.frame().draws;

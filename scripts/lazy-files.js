@@ -22,15 +22,6 @@ export const LAZY_FILES = [
   },
   {
     package: 'margoengine',
-    file: 'packages/machinery/dist/cad.js',
-    label: '@margoengine/machinery/cad',
-    kind: 'Chunk',
-    measure: 'bundle',
-    external: core,
-    when: '`addCAD(stage, url)` (`margoengine/stage/cad`) of a .stl, .obj, .step or .iges URL, first call',
-  },
-  {
-    package: 'margoengine',
     file: 'packages/scenery/dist/sky.js',
     label: '@margoengine/scenery/sky',
     kind: 'Chunk',
@@ -73,31 +64,6 @@ export const LAZY_FILES = [
     measure: 'bundle',
     external: core,
     when: '`addShadows(stage)` (`margoengine/stage/shadows`), first call',
-  },
-  // CAD import: one worker per import; OCCT only for B-Rep formats.
-  {
-    package: '@margoengine/machinery',
-    file: 'packages/machinery/dist/workers/cad-runtime.js',
-    label: 'workers/cad-runtime.js',
-    kind: 'Worker',
-    measure: 'file',
-    when: 'Each `loadCAD()` / `parseCADAsync()` (`@margoengine/machinery/cad`, also `addCAD(stage, url)` from `margoengine/stage/cad`) where `Worker` exists',
-  },
-  {
-    package: '@margoengine/machinery',
-    file: 'packages/machinery/dist/workers/occt-import-js.js',
-    label: 'workers/occt-import-js.js',
-    kind: 'OCCT glue',
-    measure: 'file',
-    when: 'STEP or IGES only: the CAD worker imports it before parsing',
-  },
-  {
-    package: '@margoengine/machinery',
-    file: 'packages/machinery/dist/workers/occt-import-js.wasm',
-    label: 'workers/occt-import-js.wasm',
-    kind: 'Wasm',
-    measure: 'file',
-    when: 'STEP or IGES only: right after the glue, in the same worker',
   },
   // Draco and KTX2/Basis: a pool of classic workers, each loading the decoder it is asked for once.
   {

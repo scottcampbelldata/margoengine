@@ -1,9 +1,7 @@
 // Fuzz targets for the asset parsers (launch gate 11a): @margoengine/loaders (PLY, PCD, OFF, XYZ, VTK, 3MF, USDA/USDZ),
-// machinery (STL, OBJ, STEP, IGES through the built CAD worker; SurfacePhysics), fbx, usdz (USDA, USDC, USDZ), ifc
-// (web-ifc), net snapshots and the exporters round trip. Seeds are the repo's fixtures plus files the targets build;
+// fbx, usdz (USDA, USDC, USDZ), ifc (web-ifc), net snapshots and the exporters round trip. Seeds are the repo's fixtures plus files the targets build;
 // generators add hostile structure (zip bombs, traversal names, cycles, deep nesting, huge counts).
 import { readFileSync, readdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { deflateRawSync } from 'node:zlib';
@@ -11,7 +9,6 @@ import { checkModel, headless } from './formats.js';
 import { bytesOf, concat, isNamed, random } from './harness.js';
 
 const root = resolve(import.meta.dirname, '../..'),
-  require = createRequire(join(root, 'package.json')),
   file = (path) => new Uint8Array(readFileSync(join(root, path))),
   fixtures = (dir, pattern) =>
     readdirSync(join(root, dir))
@@ -326,21 +323,8 @@ function mutateTree(r, nodes, budget = { n: 1 + r.int(4) }) {
   }
 }
 
-// --- STEP / IFC ---------------------------------------------------------------------------------------------------
+// --- IFC (STEP physical file syntax) ---------------------------------------------------------------------------------
 
-const stepGenerators = [
-  function selfReference(r) {
-    return bytesOf(
-      `ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((''),'2;1');\nFILE_NAME('','',(''),(''),'','','');\nFILE_SCHEMA(('AUTOMOTIVE_DESIGN'));\nENDSEC;\nDATA;\n#1=CARTESIAN_POINT('',(0.,0.,0.));\n#2=DIRECTION('',(0.,0.,1.));\n#3=AXIS2_PLACEMENT_3D('',#${r.pick([1, 3, 4, 99999999])},#2,#${r.pick([3, 2])});\n#4=PLANE('',#3);\n#5=ADVANCED_FACE('',(#5),#4,.T.);\n#6=CLOSED_SHELL('',(#5,#6));\n#7=MANIFOLD_SOLID_BREP('',#6);\nENDSEC;\nEND-ISO-10303-21;\n`,
-    );
-  },
-  function deepList(r) {
-    const depth = r.pick([1000, 50000]);
-    return bytesOf(
-      `ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((''),'2;1');\nFILE_NAME('','',(''),(''),'','','');\nFILE_SCHEMA(('AUTOMOTIVE_DESIGN'));\nENDSEC;\nDATA;\n#1=CARTESIAN_POINT('',${'('.repeat(depth)}0.${')'.repeat(depth)});\nENDSEC;\nEND-ISO-10303-21;\n`,
-    );
-  },
-];
 const ifcGenerators = [
   function ifcCycles(r) {
     const a = r.pick([11, 12, 999999, 0]);
@@ -366,47 +350,9 @@ const loaderTarget = (name, parse, extra) => ({
   ...extra,
 });
 
-/** Runs the built machinery CAD worker in-process (as tests/margo-convert.test.js does), OCCT compiled once. */
-let cadCode, occtModule;
-export async function cadWorker(buffer, format, maxParts) {
-  cadCode ??= readFileSync(join(root, 'packages/machinery/dist/workers/cad-runtime.js'), 'utf8');
-  const replies = [];
-  let resolve;
-  const finished = new Promise((r) => (resolve = r));
-  const self = {
-    onmessage: null,
-    location: { href: 'file:///cad-runtime.js' },
-    postMessage(message) {
-      replies.push(message);
-      if (message.error !== undefined || message.done) resolve();
-    },
-    importScripts() {
-      self.occtimportjs = async (options) => {
-        occtModule ??= await WebAssembly.compile(
-          readFileSync(require.resolve('occt-import-js/dist/occt-import-js.wasm')),
-        );
-        return require('occt-import-js')({
-          ...options,
-          print() {},
-          printErr() {},
-          instantiateWasm(imports, done) {
-            WebAssembly.instantiate(occtModule, imports).then((instance) => done(instance, occtModule));
-            return {};
-          },
-        });
-      };
-    },
-  };
-  new Function('self', cadCode)(self);
-  await self.onmessage({ data: { buffer, format, smoothing: true, maxParts, occtURL: '', wasmURL: '' } });
-  await finished;
-  const last = replies.at(-1);
-  if (last.error !== undefined) throw new Error(last.error);
-  return replies;
-}
 /**
  * Sends `message` to a worker thread kept in `threads[key]` and resolves its reply, or null after `ms`: then the thread
- * is terminated (the next call starts a fresh one), as loadCAD and parseIFCInWorker terminate their workers.
+ * is terminated (the next call starts a fresh one), as parseIFCInWorker terminates its worker.
  */
 const threads = {};
 function threadCall(key, code, message, ms) {
@@ -426,32 +372,6 @@ function threadCall(key, code, message, ms) {
   });
 }
 const closeThreads = () => Promise.all(Object.keys(threads).map((key) => threads[key].terminate()));
-
-const cadThread = `
-const { parentPort } = require('node:worker_threads');
-const ready = import(${JSON.stringify(import.meta.url)});
-parentPort.on('message', async ({ buffer, format }) => {
-  const { cadWorker } = await ready;
-  try { await cadWorker(buffer, format); parentPort.postMessage({}); }
-  catch (e) { parentPort.postMessage({ error: String(e?.message ?? e) }); }
-});`;
-const cadTarget = (format, seeds, extra) => ({
-  name: `machinery/${format}`,
-  async run(bytes) {
-    if (format !== 'step' && format !== 'iges') return void (await cadWorker(bytes.slice().buffer, format));
-    // OpenCascade can run for minutes on a malformed file: loadCAD terminates its worker at timeoutMs, so does this.
-    const deadline = (this.timeMs ?? 15_000) - 3000,
-      reply = await threadCall('cad', cadThread, { buffer: bytes.slice().buffer, format }, deadline);
-    if (reply === null)
-      throw new RangeError(`CAD import did not finish within ${deadline} ms (raise the timeoutMs option)`);
-    if (reply.error !== undefined) throw new Error(reply.error);
-  },
-  teardown: closeThreads,
-  seeds,
-  ...extra,
-});
-
-const occtFiles = (names) => names.map((n) => file(join('node_modules/occt-import-js/test/testfiles', n)));
 
 const ifcThread = `
 const { parentPort } = require('node:worker_threads');
@@ -539,100 +459,6 @@ export default [
     generators: usdzGenerators,
     generatorRate: 0.3,
   }),
-  cadTarget('stl', () => [occtFiles(['cube-10x10mm/Cube 10x10.stl'])[0], bytesOf(stlAscii)], {
-    text: false,
-    generators: [
-      function asciiNoEndfacet(r) {
-        return bytesOf(`solid x\n${'facet normal 0 0 1\n'.repeat(r.pick([1000, 200_000]))}endsolid x\n`);
-      },
-      function binaryCount(r) {
-        const out = new Uint8Array(84 + 50 * r.int(4));
-        new DataView(out.buffer).setUint32(80, r.pick([0, 1, 0xffffffff, (out.length - 84) / 50]), true);
-        return out;
-      },
-    ],
-  }),
-  cadTarget('obj', () => [file('packages/bvh/tests/fixtures/bean.obj'), bytesOf(objQuad)], {
-    text: true,
-    timeMs: 4000,
-    generators: [
-      function hugeFace(r) {
-        const n = r.pick([4096, 4097, 100_000]);
-        return bytesOf(
-          `${Array.from({ length: Math.min(n, 5000) }, (_, i) => `v ${Math.cos(i)} ${Math.sin(i)} 0`).join('\n')}\nf ${Array.from({ length: n }, (_, i) => (i % 5000) + 1).join(' ')}\n`,
-        );
-      },
-      function manyGroups(r) {
-        return bytesOf(`${'g a\n'.repeat(r.pick([100_001, 1000]))}v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n`);
-      },
-      function badIndex(r) {
-        return bytesOf(
-          `v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 ${r.pick(['4', '0', '-4', '-1', '99999999999999999999', '1/2/3/4', 'a'])}\n${r.pick(['', 'usemtl x\n', `${'x'.repeat(100_000)} y\n`])}`,
-        );
-      },
-    ],
-  }),
-  cadTarget(
-    'step',
-    () =>
-      occtFiles([
-        'cube-10x10mm/Cube 10x10.stp',
-        'simple-basic-cube/cube.stp',
-        'cube-units/cube-mm.step',
-        'rounded-cube/rounded-cube.step',
-      ]),
-    { text: true, timeMs: 15000, weight: 2, generators: stepGenerators },
-  ),
-  cadTarget('iges', () => occtFiles(['cube-10x10mm/Cube 10x10.igs']), { text: true, timeMs: 15000 }),
-  {
-    name: 'machinery/surface',
-    async setup() {
-      this.M = await import('@margoengine/machinery');
-      this.helpers = await import(`file://${join(root, 'packages/exporters/tests/helpers.js').replaceAll('\\', '/')}`);
-    },
-    seeds: () => [new Uint8Array(64).fill(1), Uint8Array.from({ length: 128 }, (_, i) => i)],
-    async run(bytes) {
-      // Bytes drive the part and carrier lists: counts, carrier and lane indices, vectors (finite or not).
-      const r = random(bytes.reduce((h, b) => Math.imul(h ^ b, 16777619), 2166136261)),
-        engine = await this.helpers.headlessEngine(64),
-        vec = () =>
-          r.pick([
-            [0, 0, 1],
-            [1, 0, 0],
-            [0, 0, 0],
-            [Number.NaN, 0, 0],
-            [2, 0, 0],
-            [1e39, 0, 0],
-            [1, 0],
-          ]),
-        maybe = (v) => (r.chance(0.8) ? v : r.pick([undefined, null, 'x', -1, 1e300, Number.NaN]));
-      try {
-        const carriers = Array.from({ length: r.int(4) }, () => ({
-          node: maybe(engine.createMesh()),
-          velocity: maybe(vec()),
-          angularVelocity: r.chance(0.5) ? maybe(vec()) : undefined,
-        }));
-        const parts = Array.from({ length: r.int(5) }, () => ({
-          node: maybe(engine.createMesh()),
-          carrier: maybe(r.int(5) - 1),
-          lane: maybe(r.int(3)),
-          axis: maybe(vec()),
-          halfLength: maybe(r.pick([0.5, 0, -1, 1e30])),
-          friction: r.chance(0.5) ? maybe(0.3) : undefined,
-          mass: r.chance(0.5) ? maybe(r.pick([1, 0, -1])) : undefined,
-        }));
-        const surface = await this.M.SurfacePhysics.create(parts, carriers, {
-          gravity: maybe(9.8),
-          maxParts: r.chance(0.9) ? undefined : maybe(2),
-        });
-        engine.use(surface);
-        for (let i = 0; i < 3; i++) surface.onPreUpdate(r.pick([0, 1 / 60, -1, 1e9, Number.NaN]));
-        if (r.chance(0.3)) surface.setCarrier(maybe(0), maybe(1));
-      } finally {
-        engine.dispose();
-      }
-    },
-  },
   {
     name: 'fbx',
     timeMs: 4000,
@@ -823,12 +649,12 @@ export default [
           if (!(e instanceof L.LoaderError && e.code === 'unsupported')) throw e;
         }),
       );
-      for (const [format, data] of [
-        ['stl', typeof stl === 'string' ? bytesOf(stl) : stl],
-        ['obj', bytesOf(obj)],
+      // The STL and OBJ files load again with @margoengine/loaders; a LoaderError is named, only engine errors are findings.
+      for (const [format, parse, data] of [
+        ['stl', (d) => L.parseSTL(d), typeof stl === 'string' ? bytesOf(stl) : stl],
+        ['obj', (d) => L.parseOBJ(d), bytesOf(obj)],
       ])
-        await cadWorker(data.slice().buffer, format).catch((e) => {
-          // Machinery rejects degenerate or self-overlapping triangles by name; only engine errors are findings.
+        await (async () => parse(data))().catch((e) => {
           if (!isNamed(e, {})) throw new Error(`round trip ${format}: ${e.message}`);
         });
     },
@@ -836,9 +662,6 @@ export default [
 ];
 
 const ENGINE_NET = /Cannot read|is not|undefined/;
-
-const stlAscii = `solid t\n facet normal 0 0 1\n  outer loop\n   vertex 0 0 0\n   vertex 1 0 0\n   vertex 0 1 0\n  endloop\n endfacet\n facet normal 0 0 -1\n  outer loop\n   vertex 0 0 0\n   vertex 0 1 0\n   vertex 1 1 -1\n  endloop\n endfacet\nendsolid t\n`;
-const objQuad = `# quad\no a\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nvt 0 0\nvn 0 0 1\nf 1/1/1 2/1/1 3/1/1 4/1/1\ng b\nusemtl m\nf -4 -3 -2\n`;
 
 function randomScene(r) {
   const finite = () => r.pick([0, 1, -1, 0.5, 1e-30, 1e30, 3.4e38, r.next() * 10 - 5]),

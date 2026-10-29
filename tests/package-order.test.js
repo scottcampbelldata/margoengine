@@ -28,7 +28,7 @@ test('every workspace package builds after the packages it declares', async () =
     for (const name of Object.keys({ ...dependencies, ...peerDependencies, ...devDependencies }))
       if (byName.has(name))
         assert.ok(position.get(byName.get(name)) < position.get(dir), `${dir} must build after ${name}`);
-  assert.ok(position.get('bvh') < position.get('controls') && position.get('geometry') < position.get('machinery'));
+  assert.ok(position.get('bvh') < position.get('controls') && position.get('geometry') < position.get('terrain'));
 });
 
 test('dev and runtime dependencies order too; unrelated packages keep workspace order', () => {

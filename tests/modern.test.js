@@ -9,31 +9,11 @@ import {
   Engine,
   FrameGraph,
 } from '../packages/core/dist/extension.js';
-import {
-  Kinematics,
-  ExplodedView,
-  parseCAD,
-  deduplicateParts,
-  SectionPlanes,
-  projectAnnotation,
-  worldAnchor,
-} from '../packages/machinery/dist/index.js';
 import { GPUParticles, PostProcessing, ToonShading, HDRRenderTarget } from '../packages/creative/dist/index.js';
 import { parseGLTF } from '../packages/gltf/dist/index.js';
 import { compose } from './support/matrices.js';
 import { GPURenderer } from '../packages/core/dist/renderer.js';
 import { CADCameraControls } from '../packages/core/dist/controls.js';
-import {
-  AssemblyIndex,
-  vertexAnchor,
-  faceAnchor,
-  holeAnchor,
-  snapAnchor,
-  measureDistance,
-  boxSection,
-  industrialMaterials,
-  industrialMaterial,
-} from '../packages/machinery/dist/index.js';
 
 function activate(store, id) {
   store.active[id] = 1;
@@ -227,19 +207,6 @@ async function headlessEngine(capacity = 8) {
   );
   return { engine, resources };
 }
-
-test('CAD grouping rejects unsupported empty inputs and skips transform-only nodes in populated assemblies', async () => {
-  const { engine } = await headlessEngine();
-  try {
-    const root = engine.createMesh();
-    assert.throws(() => deduplicateParts([root]), /found no supported geometry/);
-    assert.throws(() => deduplicateParts([]), /found no supported geometry/);
-    engine.createMesh(root).setGeometry(box());
-    assert.deepEqual(deduplicateParts(engine.meshes.values()), { parts: 1, unique: 1 });
-  } finally {
-    engine.dispose();
-  }
-});
 
 test('GPU picks update scene state without a color frame and optional pickers retain stale-slot guards', async () => {
   const store = await TransformStore.create(4);
@@ -541,36 +508,9 @@ test('Frame graph orders passes, prevents edits during execution, and releases p
     engine.dispose();
   }
 });
-test('Machinery pack enforces limits and controls explode positions; particles validate and require WebGPU', async () => {
+test('Particles validate their count and require WebGPU', async () => {
   const { engine } = await headlessEngine();
   try {
-    const node = engine.createMesh(),
-      joints = new Kinematics([{ node, axis: 'y', min: -1, max: 1, velocity: 2 }]);
-    engine.use(joints);
-    engine.render({ delta: 1 });
-    assert.equal(node.rotation.y, 1);
-    assert.throws(() => joints.setAngle(0, 2), /limits/);
-    const explode = new ExplodedView([{ node, offset: [4, 0, 0] }]);
-    engine.use(explode);
-    explode.amount = 0.5;
-    engine.render();
-    assert.equal(node.position.x, 2);
-    explode.amount = 1.1;
-    assert.throws(() => engine.render(), /amount/);
-    engine.removePlugin(explode.name);
-    const huge = engine.createMesh().setPosition([3e38, 0, 0]),
-      overflow = new ExplodedView([{ node: huge, offset: [3e38, 0, 0] }]);
-    engine.use(overflow);
-    overflow.amount = 1;
-    const saved = huge.position.x;
-    assert.throws(() => overflow.onPreUpdate(), /position/);
-    assert.equal(huge.position.x, saved);
-    overflow.amount = 0;
-    huge.dispose();
-    const reused = engine.createMesh();
-    assert.throws(() => overflow.onPreUpdate(), /disposed/);
-    assert.equal(reused.position.x, 0);
-    engine.removePlugin(overflow.name);
     const larger = new GPUParticles({ count: 100001 });
     assert.equal(larger.count, 100001);
     larger.dispose();
@@ -581,205 +521,9 @@ test('Machinery pack enforces limits and controls explode positions; particles v
   }
 });
 
-function asciiSTL(triangles) {
-  return `solid fixture\n${triangles.map((points) => `facet normal 0 0 1\nouter loop\n${points.map((p) => `vertex ${p.join(' ')}`).join('\n')}\nendloop\nendfacet`).join('\n')}\nendsolid fixture`;
-}
-test('CAD welding preserves hard normals, binary STL imports, OBJ concave groups deduplicate and failures roll back', async () => {
-  const { engine, resources } = await headlessEngine(16);
-  try {
-    const square = [
-      [
-        [0, 0, 0],
-        [1, 0, 0],
-        [1, 1, 0],
-      ],
-      [
-        [0, 0, 0],
-        [1, 1, 0],
-        [0, 1, 0],
-      ],
-    ];
-    const model = parseCAD(engine, asciiSTL(square), 'stl'),
-      g = model.meshes[0].geometry;
-    assert.equal(g.vertices.length / 6, 4);
-    assert.equal(g.indices.length, 6);
-    model.dispose();
-    const cube = box(),
-      bytes = new Uint8Array(84 + 12 * 50),
-      view = new DataView(bytes.buffer);
-    view.setUint32(80, 12, true);
-    for (let f = 0; f < 12; f++)
-      for (let i = 0; i < 9; i++)
-        view.setFloat32(
-          84 + f * 50 + 12 + i * 4,
-          cube.vertices[cube.indices[f * 3 + Math.floor(i / 3)] * 6 + (i % 3)],
-          true,
-        );
-    const binary = parseCAD(engine, bytes, 'stl');
-    assert.equal(binary.meshes[0].geometry.vertices.length / 6, 24, 'Hard edges were smoothed');
-    assert.equal(binary.meshes[0].geometry.indices.length, 36);
-    binary.dispose();
-    const obj =
-      'v 0 0 0\nv 2 0 0\nv 2 1 0\nv 1 1 0\nv 1 2 0\nv 0 2 0\ng first\nf 1 2 3 4 5 6\ng repeat\nf -6 -5 -4 -3 -2 -1';
-    const assembly = parseCAD(engine, obj, 'obj');
-    assert.equal(assembly.meshes.length, 2);
-    assert.equal(assembly.meshes[0].geometry, assembly.meshes[1].geometry);
-    assert.equal(resources.size, 1);
-    assert.deepEqual(deduplicateParts(assembly.meshes), { parts: 2, unique: 1 });
-    assert.equal(assembly.meshes[0].geometry.indices.length, 12);
-    assembly.dispose();
-    // A real triangle with two corners 1 um apart keeps three corners; a 1e-5 rounding weld used to collapse it.
-    const tiny = parseCAD(
-      engine,
-      asciiSTL([
-        [
-          [0, 0, 0],
-          [0.000001, 0, 0],
-          [0, 1, 0],
-        ],
-      ]),
-      'stl',
-    );
-    assert.equal(tiny.meshes[0].geometry.vertices.length / 6, 3);
-    assert.equal(tiny.meshes[0].geometry.indices.length, 3);
-    tiny.dispose();
-    for (const [input, format] of [
-      ['v 0 0 0\nf 1 2 3', 'obj'],
-      [
-        asciiSTL([
-          [
-            [0, 0, 0],
-            [0, 0, 0],
-            [1, 0, 0],
-          ],
-        ]),
-        'stl',
-      ],
-    ])
-      assert.throws(() => parseCAD(engine, input, format));
-    assert.equal(engine.meshes.size, 0);
-    assert.equal(resources.size, 0);
-    const limited = await headlessEngine(1);
-    limited.engine.store.grow = () => {
-      throw new RangeError('Test host capacity limit');
-    };
-    try {
-      assert.throws(() => parseCAD(limited.engine, asciiSTL(square), 'stl'), /capacity/);
-      assert.equal(limited.engine.meshes.size, 0);
-      assert.equal(limited.resources.size, 0);
-    } finally {
-      limited.engine.dispose();
-    }
-  } finally {
-    engine.dispose();
-  }
-});
-test('Machinery prismatic, gears and slider-crank are bounded and failed coupling writes are atomic', async () => {
+test('GPU extension boundaries validate before attachment', async () => {
   const { engine } = await headlessEngine();
   try {
-    const shaft = engine.createMesh(),
-      gear = engine.createMesh(),
-      slider = engine.createMesh().setPosition([10, 0, 0]);
-    const k = new Kinematics(
-      [
-        { node: shaft, axis: 'z', min: -Math.PI, max: Math.PI },
-        { node: gear, axis: 'z', min: -1, max: 1 },
-        { node: slider, axis: 'x', kind: 'prismatic', min: 1, max: 3 },
-      ],
-      { gears: [{ source: 0, target: 1, ratio: -2 }], pistons: [{ source: 0, target: 2, radius: 0.5, rodLength: 2 }] },
-    );
-    engine.use(k);
-    k.setValue(0, 0);
-    assert.equal(slider.position.x, 12.5);
-    k.setAngle(0, 0.4);
-    assert.ok(Math.abs(gear.rotation.z + 0.8) < 1e-6);
-    const saved = [shaft.rotation.z, gear.rotation.z, slider.position.x];
-    assert.throws(() => k.setAngle(0, 1), /Coupling/);
-    assert.deepEqual([shaft.rotation.z, gear.rotation.z, slider.position.x], saved);
-    assert.throws(() => k.setValue(1, 0), /coupled/);
-    assert.throws(() => k.setAngle(2, 0), /Prismatic/);
-  } finally {
-    engine.dispose();
-  }
-});
-test('Bounded IK and distance constraints solve reachable goals and report unreachable residuals', async () => {
-  const { engine } = await headlessEngine();
-  try {
-    const a = engine.createMesh(),
-      b = engine.createMesh(a).setPosition([1, 0, 0]),
-      tip = engine.createMesh(b).setPosition([1, 0, 0]);
-    const target = { node: tip, target: [1, 1, 0] };
-    const k = new Kinematics(
-      [
-        { node: a, axis: 'z', min: -Math.PI, max: Math.PI },
-        { node: b, axis: 'z', min: -Math.PI, max: Math.PI },
-      ],
-      { targets: [target], iterations: 100 },
-    );
-    engine.use(k);
-    const result = k.solve();
-    assert.ok(result.converged, JSON.stringify(result));
-    assert.ok(Math.hypot(tip.matrix[12] - 1, tip.matrix[13] - 1) < 0.002);
-    target.target = [4, 4, 0];
-    assert.equal(k.solve().converged, false);
-    assert.ok(k.result.error > 1);
-    engine.removePlugin(k.name);
-    const slider = engine.createMesh(),
-      anchor = engine.createMesh().setPosition([2, 0, 0]);
-    const distance = new Kinematics([{ node: slider, axis: 'x', kind: 'prismatic', min: 0, max: 4 }], {
-      distances: [{ a: slider, b: anchor, length: 1 }],
-    });
-    engine.use(distance);
-    assert.ok(distance.solve().converged);
-    assert.ok(Math.abs(slider.position.x - 1) < 0.002);
-  } finally {
-    engine.dispose();
-  }
-});
-test('240 coupled shafts write flat Wasm Euler state and retain atomic rollback without per-tick snapshots', async () => {
-  const { engine } = await headlessEngine(250);
-  try {
-    const nodes = Array.from({ length: 241 }, () => engine.createMesh()),
-      joints = nodes.map((node) => ({ node, axis: 'z', min: -1, max: 1 })),
-      gears = nodes.slice(1).map((_, i) => ({ source: 0, target: i + 1, ratio: i === 239 ? -2 : 1 })),
-      k = new Kinematics(joints, { gears });
-    engine.use(k);
-    const snapshot = k.previous;
-    for (let i = 0; i < 100; i++) {
-      k.setAngle(0, 0.4);
-      k.onPreUpdate(1 / 60);
-      engine.store.tick(false);
-    }
-    assert.equal(k.previous, snapshot);
-    for (let i = 1; i < 240; i++) {
-      assert.equal(nodes[i].euler.buffer, engine.store.rotations.buffer);
-      assert.ok(Math.abs(nodes[i].rotation.z - 0.4) < 1e-6);
-      assert.ok(Math.abs(nodes[i].matrix[0] - Math.cos(0.4)) < 1e-6);
-    }
-    assert.ok(Math.abs(nodes[240].rotation.z + 0.8) < 1e-6);
-    assert.throws(() => k.setAngle(0, 0.8), /Coupling/);
-    assert.ok(Math.abs(nodes[0].rotation.z - 0.4) < 1e-6);
-    assert.throws(() => k.onPreUpdate(NaN), /delta/);
-    assert.throws(() => new Kinematics(joints, { targets: [{ node: nodes[0], target: [0, 0, 0] }] }), /solver limits/);
-    engine.removePlugin(k.name);
-    assert.ok(engine.store.constrained.every((v) => v === 0));
-  } finally {
-    engine.dispose();
-  }
-});
-test('Overlay projection follows world hierarchy; GPU extension boundaries validate before attachment', async () => {
-  const { engine } = await headlessEngine();
-  try {
-    const parent = engine.createMesh().setPosition([1, 0, 0]),
-      node = engine.createMesh(parent).setPosition([0, 1, 0]);
-    engine.render();
-    assert.deepEqual(worldAnchor({ node, point: [0, 0, 0] }), [1, 1, 0]);
-    const camera = new Camera({ position: [0, 0, 4] });
-    camera.update(1, true);
-    assert.deepEqual(projectAnnotation(camera, [0, 0, 0], 200, 200), [100, 100]);
-    assert.equal(projectAnnotation(camera, [0, 0, 5], 200, 200), null);
-    assert.throws(() => new SectionPlanes({ planes: [[0, 0, 0, 1]] }), /plane/);
-    assert.throws(() => engine.use(new SectionPlanes({ planes: [[0, 0, 1, 0]] })), /WebGPU/);
     assert.throws(
       () => new GPUParticles({ obstacles: [{ kind: 'sphere', center: [0, 0, 0], radius: -1 }] }),
       /Obstacle/,
@@ -987,11 +731,11 @@ test('Rust limits clamp direct writes, parent visibility cascades and reused slo
     const root = engine.createMesh(),
       joint = engine.createMesh(root),
       leaf = engine.createMesh(joint).setGeometry(box());
-    const k = new Kinematics([
-      { node: joint, axis: 'z', min: -0.5, max: 0.5 },
-      { node: joint, axis: 'x', kind: 'prismatic', min: 0, max: 2 },
-    ]);
-    engine.use(k);
+    // Twelve limit floats per slot: a (min, max) pair for position x, y, z then rotation x, y, z; bit n of
+    // `constrained` turns pair n on. Position x in [0, 2] and rotation z in [-0.5, 0.5]:
+    engine.store.limits.set([0, 2], joint.id * 12);
+    engine.store.limits.set([-0.5, 0.5], joint.id * 12 + 10);
+    engine.store.constrained[joint.id] = (1 << 0) | (1 << 5);
     joint.rotation.z = 5;
     joint.position.x = 9;
     engine.store.tick(false);
@@ -1012,60 +756,6 @@ test('Rust limits clamp direct writes, parent visibility cascades and reused slo
     const reused = engine.createMesh();
     assert.equal(reused.visible, true);
     assert.equal(engine.store.constrained[reused.id], 0);
-  } finally {
-    engine.dispose();
-  }
-});
-test('Assembly names, tags, subtrees and refresh handle renames and disposal', async () => {
-  const { engine } = await headlessEngine();
-  try {
-    const root = engine.createMesh(),
-      a = engine.createMesh(root),
-      b = engine.createMesh();
-    a.name = 'Roller_Assembly_1';
-    b.name = 'Roller_Assembly_2';
-    const query = new AssemblyIndex(engine);
-    query.tag(a, 'roller');
-    assert.throws(() => query.tag(a, 42), /tag/);
-    assert.deepEqual(query.findChildrenByName('Roller_Assembly_*', root), [a]);
-    assert.deepEqual(query.findByTag('roller'), [a]);
-    a.name = 'Drive[1]';
-    query.refresh();
-    assert.deepEqual(query.findChildrenByName('Drive[1]'), [a]);
-    engine.store.parents[a.id] = a.id;
-    assert.deepEqual(query.findChildrenByName('Drive[1]', root), []);
-    engine.store.parents[a.id] = root.id;
-    query.setSubtreeVisible(root, false);
-    engine.render();
-    assert.equal(engine.store.visible[a.id], 0);
-    a.dispose();
-    query.refresh();
-    assert.deepEqual(query.findByTag('roller'), []);
-  } finally {
-    engine.dispose();
-  }
-});
-test('Metrology snaps vertices, triangle midpoints and circular holes in transformed world space', async () => {
-  const { engine } = await headlessEngine();
-  try {
-    const node = engine
-      .createMesh()
-      .setGeometry(
-        new Geometry([1, 0, 0, 0, 1, 0, -1, 0, 0, 0, -1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2, 0, 2, 3]),
-      )
-      .setPosition([2, 3, 0])
-      .setScale([2, 2, 2]);
-    engine.render();
-    const a = vertexAnchor(node, 0),
-      b = vertexAnchor(node, 2);
-    assert.equal(measureDistance(a, b), 4000);
-    assert.ok(Math.abs(measureDistance(a, b, 'in') - 4 / 0.0254) < 1e-9);
-    assert.deepEqual(worldAnchor(holeAnchor(node, [0, 1, 2, 3])), [2, 3, 0]);
-    assert.deepEqual(worldAnchor(faceAnchor(node, 0)), [2, 3 + 2 / 3, 0]);
-    assert.deepEqual(snapAnchor(node, [4.01, 3, 0], { maxDistance: 0.02 })?.point, [1, 0, 0]);
-    assert.equal(snapAnchor(node, [10, 10, 0], { maxDistance: 0.1 }), null);
-    assert.throws(() => holeAnchor(node, [0, 0, 0]), /collinear/);
-    assert.throws(() => vertexAnchor(node, 9), /vertex/);
   } finally {
     engine.dispose();
   }
@@ -1104,17 +794,12 @@ test('CAD controls orbit an arbitrary pivot, pan, smooth zoom, fit portrait boun
   assert.equal(listeners.size, 0);
   assert.equal(element.style.touchAction, 'auto');
 });
-test('Reversed float depth separates sub-millimeter surfaces at industrial range; presets and six-plane boxes validate', () => {
+test('Reversed float depth separates sub-millimeter surfaces at industrial range', () => {
   const camera = new Camera({ position: [0, 0, 0], target: [0, 0, -1], near: 0.001, far: 10000 });
   camera.update(1, true);
   const m = camera.matrix,
     depth = (z) => Math.fround((m[10] * z + m[14]) / -z);
   assert.notEqual(depth(-500), depth(-500.0001));
-  assert.equal(boxSection([-1, -2, -3], [1, 2, 3]).length, 6);
-  assert.throws(() => boxSection([1, 0, 0], [0, 1, 1]), /box/);
-  assert.equal(industrialMaterials.neoprene.roughness, 0.85);
-  assert.equal(industrialMaterial('galvanizedZinc').data[5], Math.fround(0.95));
-  assert.ok(Object.isFrozen(industrialMaterials.machinedSteel));
 });
 test('Frozen core entry stays portable and the one-install React entry exposes its complete scene bindings', async () => {
   // margoengine/react re-exports every @margoengine/react subpath but physics (each binding lives in the subpath named
@@ -1133,7 +818,6 @@ test('Frozen core entry stays portable and the one-install React entry exposes i
       'BatchedMesh',
       'DepthTexture',
       'SceneTargets',
-      'SectionPlanes',
       'AmbientLight',
       'Sun',
       'Fog',

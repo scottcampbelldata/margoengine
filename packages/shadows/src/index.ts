@@ -136,8 +136,8 @@ export interface ShadowPrimitive {
   alphaTransform?: Float32Array;
   instances?: { readonly count: number; upload(device: GPUDevice): GPUBuffer };
   /**
-   * Planes that clip this caster (materials `clippingPlanes`): a uniform of up to 6 world planes in the SectionPlanes
-   * layout. A scene's SectionPlanes take precedence over it.
+   * Planes that clip this caster (materials `clippingPlanes`): a uniform of up to 6 world planes in the scene
+   * `section` binding's layout. A scene's `section` binding takes precedence over it.
    */
   clip?: GPUBufferBinding;
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices): bound at group 1. */
@@ -656,7 +656,7 @@ export class Shadows implements EnginePlugin {
         if (c.backend !== 'webgpu') return;
         this.render(c);
         if (sectionState(c)) {
-          // SectionPlanes owns its existing binding. Move only the shadow
+          // The scene's `section` plugin owns its existing binding. Move only the shadow
           // sampling declarations and resources past the occupied slots.
           const base = Math.max(0, ...c.bindings.map((entry) => entry.binding)) + 1;
           c.shader = this.shader(c.shader)
@@ -1230,7 +1230,7 @@ export class Shadows implements EnginePlugin {
   ): void {
     if (p.stride !== 24 && p.stride !== 80)
       throw new RangeError('Unsupported shadow vertex stride; use 24-byte or 80-byte vertices.');
-    // A scene's SectionPlanes win; a material's planes (union or intersection, settings.y) bind under their own name.
+    // A scene's `section` binding wins; a material's planes (union or intersection, settings.y) bind under their own name.
     const section = scene ?? p.clip,
       material = !scene && !!p.clip;
     const inst = p.instances;

@@ -3,20 +3,19 @@
 
 Margo Engine's own code is licensed under the Apache License 2.0 (`LICENSE` and `NOTICE`; every tarball ships both). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 95 published packages (93 in `packages/`
+assets the site and examples use. It covers all 94 published packages (92 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-84 of 95 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+85 of 94 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
 | --- | --- | --- | --- | --- | --- |
 | `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics, @margoengine/react, margoengine | Rapier rigid-body solver; optional, the app installs and initializes it |
-| `occt-import-js` | 0.0.23 | LGPL-2.1 | dependency | margo-convert | OpenCascade STEP/IGES/BREP tessellation in Node (offline converter) |
 | `react` | 19.3.0 | MIT | optional peer | @margoengine/react, @margoengine/ui, margoengine | React component bindings for the stage |
 | `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/react, margoengine | React DOM root and portal rendering for scene and HTML components |
 | `scheduler` | 0.28.0 | MIT | transitive (via react-dom) | margoengine | React DOM scheduling dependency |
@@ -31,7 +30,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | --- | --- | --- | --- | --- | --- |
 | @margoengine/decoders | Draco 3D decoder (Google) | Apache-2.0 | dist/draco/draco_decoder.wasm, dist/draco/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | Basis Universal transcoder (Binomial LLC) | Apache-2.0 | dist/basis/basis_transcoder.wasm, dist/basis/basis_transcoder.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
-| @margoengine/machinery | occt-import-js 0.0.23 with OpenCascade (Viktor Kovacs; Open Cascade SAS) | LGPL-2.1 | dist/workers/occt-import-js.wasm, dist/workers/occt-import-js.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/workers/OCCT-NOTICE.txt, dist/workers/OCCT-LICENSE.txt |
 | @margoengine/post, @margoengine/tonemap | Colour-transform references: AgX (Troy Sobotka, Eary Chow), ACES filmic curve (Krzysztof Narkowicz), Khronos PBR Neutral; the ACES 1.x style fit written for Margo | attribution (formulas and constants; agx.test.js re-derives every AgX matrix and constant, aces.test.js measures the own ACES fit against its sample table) | AgX/ACES shader code: AgX and the Narkowicz curve also compiled into post (ImagePost) and voxel-pathtracer from packages/shared; the own ACES fit only into tonemap | re-derived; ACES fit written for Margo | NOTICE.md |
 | @margoengine/sciviz | Standard colour-map tables: viridis, magma, inferno, plasma (Smith and van der Walt); cividis (Nuñez, Anderton and Renslow 2018) | CC0-1.0 (viridis family); CC-BY-4.0 (cividis) | dist/tables.js (data only, 256 colours per map) | values rounded to 8 bits per channel and written as hex | NOTICE.md |
 
@@ -51,27 +49,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/transcoder/build: `basis_transcoder.wasm`
     (`6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a`) and `basis_transcoder.js`
     (`8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1`, before the build's static-embind step).
-- **LGPL-2.1 (occt-import-js and the OpenCascade code compiled into it, `@margoengine/machinery`).** We ship the
-  library unchanged as Wasm plus a modified copy of its JavaScript glue. Margo Engine's STEP and IGES import is
-  OpenCascade: `loadCAD` and `parseCADAsync` hand those files to this library in a worker. OpenCascade Technology
-  (Open Cascade SAS) is licensed under LGPL-2.1 with the Open CASCADE Exception 1.0
-  (https://dev.opencascade.org/resources/licensing); its source is https://github.com/Open-Cascade-SAS/OCCT, and the
-  exact revision occt-import-js 0.0.23 builds is linked from OCCT-NOTICE.txt. How each obligation is met:
-  - *Licence and notice* (s. 1, 2): `dist/workers/OCCT-LICENSE.txt` (the upstream LGPL-2.1 text) and
-    `dist/workers/OCCT-NOTICE.txt` ship next to the files.
-  - *Modified files carry a notice of the change* (s. 2b): the glue's first line says it was modified by Margo Engine's
-    build and how; OCCT-NOTICE.txt repeats it. The change is generated, so its date is the build's; the transformation
-    and its history are `scripts/static-embind.js` in the public repository.
-  - *The modified library stays LGPL-2.1* (s. 2c): OCCT-NOTICE.txt says so; only Margo Engine's own code is Apache-2.0.
-  - *Corresponding source* (s. 4): the glue is itself JavaScript source, and the exact transformation is in our
-    repository (`scripts/static-embind.js`, Apache-2.0, published with every release tag). The unmodified Wasm's source is
-    occt-import-js 0.0.23 (its npm tarball carries the importer's C++ and build scripts) with the OpenCascade revision
-    pinned by its git submodule; OCCT-NOTICE.txt links both.
-  - *Replace or relink* (s. 6): the glue and Wasm are separate files loaded by URL at run time
-    (`dist/workers/occt-import-js.js`, `.wasm`), never bundled into our code, so a user can drop in their own
-    interface-compatible build: replace `dist/workers/occt-import-js.js` and `occt-import-js.wasm` in the
-    installed package with your own build under the same names (machinery resolves them as `./workers/...` from its
-    `dist` files). `margo-convert` depends on the unmodified npm package, so npm can swap it.
 - **MPL-2.0 (web-ifc, peer of `@margoengine/ifc`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves `web-ifc.wasm` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
 - **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries
@@ -83,7 +60,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 - **MIT (React).** Keep the copyright and permission notice: npm dependencies carry their own
   LICENSE files.
 - **Site and demos.** The site build copies this file to `/THIRD-PARTY-NOTICES.md`, so the demos that bundle Draco,
-  Basis, OCCT or Rapier carry these notices next to the asset credits below.
+  Basis or Rapier carry these notices next to the asset credits below.
 
 ## Published packages
 
@@ -126,7 +103,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/lines` | none | none | LICENSE, NOTICE |
 | `@margoengine/loaders` | none | none | LICENSE, NOTICE |
 | `@margoengine/lod` | none | none | LICENSE, NOTICE |
-| `@margoengine/machinery` | none | occt-import-js 0.0.23 with OpenCascade (LGPL-2.1) | LICENSE, NOTICE, dist/workers/OCCT-NOTICE.txt, dist/workers/OCCT-LICENSE.txt |
 | `margoengine` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer); web-ifc ^0.0.78 (optional peer) | none | LICENSE, NOTICE |
 | `@margoengine/materials` | none | none | LICENSE, NOTICE |
 | `@margoengine/math` | none | none | LICENSE, NOTICE |
@@ -183,7 +159,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/wfc` | none | none | LICENSE, NOTICE |
 | `@margoengine/xr` | none | none | LICENSE, NOTICE |
 | `create-margo` | none | none | LICENSE, NOTICE |
-| `margo-convert` | occt-import-js 0.0.23 (dependency) | none | LICENSE, NOTICE |
+| `margo-convert` | none | none | LICENSE, NOTICE |
 
 ## Assets used by the site, demos and examples (not in any npm tarball)
 
@@ -212,7 +188,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 
 ## Development and workspace tooling (never shipped)
 
-`package-lock.json` holds 187 third-party entries (build tools, test tools, the examples' and apps' own
-dependencies, platform-optional binaries). Licences: MIT 94, Apache-2.0 45, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-2-Clause 2, BSD-3-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, LGPL-2.1 1, MIT-0 1.
+`package-lock.json` holds 186 third-party entries (build tools, test tools, the examples' and apps' own
+dependencies, platform-optional binaries). Licences: MIT 94, Apache-2.0 45, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-2-Clause 2, BSD-3-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, MIT-0 1.
 Install scripts anywhere in the lock: fsevents@2.3.3. Deprecated: whatwg-encoding@3.1.1. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks
 every tarball against its integrity hash.

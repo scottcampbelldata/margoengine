@@ -4,7 +4,6 @@ import { readFile, access, glob } from 'node:fs/promises';
 import { basename, dirname } from 'node:path';
 import { readBytes, readResponse } from '../packages/shared/loading.js';
 import { invert, finiteVector } from '../packages/shared/math.js';
-import { triangulatePolygon } from '../packages/shared/polygon.js';
 import { compose } from './support/matrices.js';
 
 test('shared streaming retains byte bounds, abort reasons and reader cleanup', async () => {
@@ -69,35 +68,6 @@ test('finite vector bounds agree with Float32 rounding at overflow and subnormal
     if (valid) assert.doesNotThrow(() => finiteVector([value], 1, 'Boundary'));
     else assert.throws(() => finiteVector([value], 1, 'Boundary'), /finite/);
   }
-});
-
-test('shared CAD triangulation retains holes, invalid-contour rejection and output budgets', () => {
-  const contour = [
-      [0, 0],
-      [4, 0],
-      [4, 4],
-      [0, 4],
-    ],
-    hole = [
-      [1, 1],
-      [1, 2],
-      [2, 2],
-      [2, 1],
-    ];
-  const result = triangulatePolygon(contour, [hole]);
-  assert.equal(result.area, 15);
-  assert(result.indices.length > 0);
-  assert.throws(() => triangulatePolygon(contour, [], { maxVertices: 3 }), /budget/);
-  assert.throws(
-    () =>
-      triangulatePolygon([
-        [0, 0],
-        [2, 2],
-        [0, 2],
-        [2, 0],
-      ]),
-    /zero area|cross/,
-  );
 });
 
 test('workspace exposes scoped packages and keeps benchmark dependencies out of runtime packages', async () => {

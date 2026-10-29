@@ -1,4 +1,4 @@
-// React's multi-view (<Scene>, <RenderView>), <BatchedMesh>, <SectionPlanes> and <Voxels> on a real GPU: each mode is mounted in
+// React's multi-view (<Scene>, <RenderView>), <BatchedMesh>, <Voxels> and <Sky> on a real GPU: each mode is mounted in
 // StrictMode, left to render, and checked by the colours in its screenshot. Takes the GPU lock.
 //   npm run test:browser:extras --workspace @margoengine/react
 import assert from 'node:assert/strict';
@@ -65,13 +65,6 @@ try {
   assert.ok(dominant(first, 0), `the first batched item is red, got ${first}`);
   assert.ok(dominant(second, 2), `the second batched item is blue, got ${second}`);
   result.checks.push({ name: 'BatchedMesh: two items, one batch, own colours and places', first, second });
-
-  image = await shot('section', (i) => dominant(sample(i, 0.42, 0.5), 0));
-  const kept = sample(image, 0.42, 0.5),
-    cut = sample(image, 0.58, 0.5);
-  assert.ok(dominant(kept, 0), `the left half of the box stays, got ${kept}`);
-  assert.ok(!dominant(cut, 0), `the right half is cut away, got ${cut}`);
-  result.checks.push({ name: 'SectionPlanes: one plane cuts away half the box', kept, cut });
 
   image = await shot('voxels', (i) => dominant(sample(i, 0.5, 0.5), 0));
   const block = sample(image, 0.5, 0.5),

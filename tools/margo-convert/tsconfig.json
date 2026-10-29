@@ -13,8 +13,6 @@
   },
   "files": [
     "cli.js",
-    "cad-cli.js",
-    "convert.js",
     "pipeline/cli.js",
     "pipeline/build.js",
     "pipeline/optimize.js",

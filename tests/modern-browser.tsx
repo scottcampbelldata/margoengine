@@ -3,7 +3,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Engine, box, PbrMaterial, type Mesh as CoreMesh } from '@margoengine/core/extension';
 import { Canvas, Mesh, BoxGeometry, PbrMaterial as ReactMaterial, useFrame } from '@margoengine/react';
 import { GPUParticles, PostProcessing, ToonShading } from '@margoengine/creative';
-import { SectionPlanes, EngineeringAnnotations, PartInstancer } from '@margoengine/machinery';
 import { webglRenderer } from '@margoengine/webgl';
 const state: {
   core?: Engine;
@@ -128,22 +127,6 @@ const harness = {
     engine.render({ delta: 0.1 });
     await engine.gpu!.queue.onSubmittedWorkDone();
     return particles;
-  },
-  async machinery() {
-    const e = state.core!,
-      mesh = [...e.meshes.values()][0],
-      plane = [0, 0, -1, 0];
-    e.use(new PartInstancer());
-    e.use(new SectionPlanes({ planes: [plane], color: '#00ff00', hatch: 0 }));
-    e.use(
-      new EngineeringAnnotations({
-        dimensions: [{ a: { node: mesh, point: [-0.5, 0, 0] }, b: { node: mesh, point: [0.5, 0, 0] } }],
-        callouts: [{ anchor: { node: mesh, point: [0, 0, 0] }, label: 'Section cap' }],
-      }),
-    );
-    e.render();
-    await e.gpu!.queue.onSubmittedWorkDone();
-    return plane;
   },
   creative(options: ConstructorParameters<typeof PostProcessing>[0]) {
     const e = state.core!,

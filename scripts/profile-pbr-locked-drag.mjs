@@ -185,7 +185,6 @@ for (const variant of ['direct', 'cache']) {
     name: 'frozen-pbr-drag',
     enforce: 'pre',
     resolveId(source, importer) {
-      if (/^@margoengine\/machinery(?:\/|$)/.test(source)) return '\0locked-no-cad';
       if (source === '@margoengine/gltf-pro') return virtual;
       if (importer === virtual && source.startsWith('.')) {
         const path = normalize(resolve(root, 'packages/gltf-pro/src', source));
@@ -197,7 +196,6 @@ for (const variant of ['direct', 'cache']) {
       }
     },
     load(id) {
-      if (id === '\0locked-no-cad') return 'throw new Error("CAD is outside this diagnostic scene");';
       if (id === virtual) return variant === 'direct' ? directSource : cacheSource;
       const path = normalize(id.split('?')[0]);
       if (sources.has(path)) {

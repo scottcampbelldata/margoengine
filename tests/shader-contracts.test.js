@@ -15,7 +15,6 @@ const targets = { core, hdr, meshVertex, gltf: pbrShader, gltfExtended: extended
 const linearBlock = /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/;
 // [package source file, target shader, anchor]; strings must occur in the target, regexes must match it.
 const contracts = [
-  ['machinery/src/section.ts', 'core', 'let facing='],
   ['shadows/src/index.ts', 'core', 'let linear=direct*'],
   ['shadows/src/index.ts', 'terrain', 'let linear=direct*'],
   ['clustered/src/index.ts', 'core', /let linear=([^;]+);/],

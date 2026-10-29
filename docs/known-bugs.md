@@ -335,22 +335,17 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
 ### STL import still computes normals three's STLLoader leaves zero
 
 - **What:** `p-stl`, a 204,800-triangle binary STL: the plain `parseSTL` 4.9 ms against three's `STLLoader` 2.8 ms
-  (run `20261026-201722`, busy machine, diagnostic); the CAD path `parseCAD` (scene `p-stl-cad`) is 29.4 ms, with no
-  three.js equivalent. History: `parseCAD` 111 ms before perf-history entry 26, 28.7 after it, then `parseSTL`
-  (entry 31).
+  (run `20261026-201722`, busy machine, diagnostic). `parseSTL` changed in perf-history entry 31.
 - **Cause (measured, Node CPU profile of `parseSTL`):** both readers copy the file's floats into one non-indexed
   buffer (614,400 vertices). This file stores zero facet normals, as most writers do. three copies the zeros;
   `parseSTL` computes the flat normal of each such facet (`flatNormal`, about 1.3 ms of its time in Node), writes an
-  identity index array and zero-fills a third array. `parseCAD` additionally welds corners (205,440 vertices), builds
-  parts and creates GPU meshes with a `PbrMaterial`; the weld is what CAD sections, edges and part deduplication rely
-  on, so it keeps it.
+  identity index array and zero-fills a third array.
 - **Status: accepted difference in work (Scott, 2026-10-26).** `parseSTL` computes flat face normals on ingestion so the
   mesh is render-ready; three's `STLLoader` copies the file's zero normals, which light wrongly until the user calls
   `computeVertexNormals()`. The full job is measured as `p-stl-normals` (run `20261026-211213`, diagnostic): three
   `STLLoader.parse` + `computeVertexNormals()` 8.7 ms, `parseSTL` 4.7 ms, so Margo is faster when both produce a
-  lit mesh. The plain-copy `p-stl` gap (4.7 against 2.7 ms, 1.7x) stays listed. The entry stays because `p-stl-cad`
-  (the CAD path, 32 ms) is a different job with no three.js equivalent.
-- **Plan:** none for the CAD path (different job). For `parseSTL`, the remaining gap is the computed normals, which are
+  lit mesh. The plain-copy `p-stl` gap (4.7 against 2.7 ms, 1.7x) stays listed.
+- **Plan:** for `parseSTL`, the remaining gap is the computed normals, which are
   the behavior a user needs; an opt-out only to win a benchmark would measure less work, so it is not planned.
 
 ### USDZ export writes every mesh in world space

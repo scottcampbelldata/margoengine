@@ -1,6 +1,6 @@
 // Every feature class with a CSP footprint in one page: the core Wasm kernel, gltf-pro worker parsing, the Draco and
 // KTX2 decoder workers (Emscripten + Wasm), the BVH module worker, the post stack, DOM overlays (stats, labels, view
-// cube, inspector) and the machinery OCCT STEP worker. scripts/csp-check.mjs serves the build with _headers applied.
+// cube, inspector). scripts/csp-check.mjs serves the build with _headers applied.
 import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { loadGLTFInWorker } from '@margoengine/gltf-pro/worker';
 import { DracoDecoder, KTX2Decoder } from '@margoengine/decoders';
@@ -13,11 +13,9 @@ import { Stats } from '@margoengine/stats';
 import { HTML } from '@margoengine/html';
 import { ViewCube } from '@margoengine/viewcube';
 import { Inspector } from '@margoengine/inspector';
-import { parseCADAsync } from '@margoengine/machinery/cad-async';
 import helmetURL from '../../examples/assets/flight-helmet-mobile.glb?url';
 import dracoURL from '../../packages/decoders/tests/fixtures/Box.bin?url';
 import ktx2URL from '../../packages/decoders/tests/fixtures/AnisotropyBarnLamp_normalbump.ktx2?url';
-import stepURL from '../../node_modules/occt-import-js/test/testfiles/cube-10x10mm/Cube 10x10.stp?url';
 
 const steps = {},
   status = document.querySelector('#status');
@@ -84,6 +82,5 @@ await step('overlays', async () => {
   Inspector.attach(engine);
   return 'Stats, HTML labels, ViewCube, Inspector';
 });
-await step('machinery STEP', async () => (await parseCADAsync(engine, await bytes(stepURL), 'step')).meshes.length);
 await new Promise((done) => setTimeout(done, 1000));
 window.cspCheck = { ok: Object.values(steps).every((s) => s.ok), steps };

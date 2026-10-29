@@ -62,7 +62,6 @@ const loaded = await loadGLTF(engine, `/dist/${fox}`);
 ```bash
 npx margo-convert optimize helmet.glb                 # helmet.optimized.glb, web preset
 npx margo-convert optimize helmet.glb out/helmet.glb --preset unity
-npx margo-convert optimize bracket.step bracket.glb   # STEP, IGES and BREP are converted first
 ```
 
 ## Presets

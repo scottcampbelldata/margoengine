@@ -17,7 +17,7 @@ A short tour. Each package README has the full reference. The public API of ever
 
 ```ts
 import { createStage, Geometry } from 'margoengine';
-import { addCAD } from 'margoengine/stage/cad';
+import { addGLTF } from 'margoengine/stage/gltf';
 
 const stage = await createStage('#scene', { controls: true, autoStart: true, onError: console.error });
 
@@ -25,7 +25,7 @@ stage.box({ size: [1, 1, 1], color: '#84d6bd', position: [0, 0.5, 0] });
 stage.sphere({ radius: 0.5, metalness: 1, roughness: 0.2 });
 stage.mesh(new Geometry(positions, normals, indices), { color: '#c3c9d0' });
 
-const model = await addCAD(stage, '/part.step'); // STL, OBJ, STEP, IGES; addGLTF (margoengine/stage/gltf) for glTF and GLB
+const model = await addGLTF(stage, '/part.glb'); // glTF and GLB
 stage.fit(model.meshes);
 
 const off = stage.onTick((delta) => {}); // seconds since the last frame
@@ -66,18 +66,6 @@ shadows.add(cube);
 ```
 
 The [package list](../README.md#packages) and the [catalog](README.md) describe each one.
-
-## CAD
-
-```ts
-import { loadCAD } from 'margoengine/machinery/cad';
-
-// STEP and IGES go through OpenCascade (WebAssembly) in a worker; STL and OBJ load too.
-const model = await loadCAD(engine, '/parts/assembly.step', { linearDeflection: 0.0001 });
-model.dispose();
-```
-
-See the [machinery README](../packages/machinery/README.md).
 
 ## Errors
 

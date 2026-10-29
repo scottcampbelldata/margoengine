@@ -85,15 +85,6 @@
    "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Select a physical GPU with GPU_VENDOR and BROWSER_ARGS\r\n    at file:///<repo>/scripts/modern-hardware-gpu-tests.js:9:8\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\r\n    at async node:internal/modules/esm/loader:639:26\r\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.15.0"
   },
   {
-   "script": "scripts/modern-machinery-runtime-tests.js",
-   "pass": false,
-   "exitCode": 1,
-   "seconds": 7.2,
-   "acPowerBefore": true,
-   "acPowerAfter": true,
-   "tail": "node:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\npage.evaluate: Error: WebGPU unavailable\r\n    at http://127.0.0.1:5193/packages/core/dist/engine.js:1:4747\r\n    at e.create (http://127.0.0.1:5193/packages/core/dist/engine.js:1:4777)\r\n    at async eval (eval at evaluate (:370:30), <anonymous>:1:21)\r\n    at async <anonymous>:396:30\r\n    at <repo>\\scripts\\modern-machinery-runtime-tests.js:32:28 {\r\n  log: []\r\n}\r\n\r\nNode.js v24.15.0"
-  },
-  {
    "script": "scripts/modern-night-citadel-tests.js",
    "pass": true,
    "exitCode": 0,
@@ -209,24 +200,6 @@
    "acPowerBefore": true,
    "acPowerAfter": true,
    "tail": "bleed {\"shape\":\"knot\",\"rule\":\"old\",\"level\":4,\"tileTexels\":8,\"maxBleed\":0.4028,\"bleedingEdgeSamples\":0.2431}\nbleed {\"shape\":\"knot\",\"rule\":\"new\",\"level\":0,\"tileTexels\":128,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"knot\",\"rule\":\"new\",\"level\":1,\"tileTexels\":64,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"knot\",\"rule\":\"new\",\"level\":2,\"tileTexels\":32,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"knot\",\"rule\":\"new\",\"level\":3,\"tileTexels\":16,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"knot\",\"rule\":\"new\",\"level\":4,\"tileTexels\":8,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"old\",\"level\":0,\"tileTexels\":128,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"old\",\"level\":1,\"tileTexels\":64,\"maxBleed\":0.125,\"bleedingEdgeSamples\":0.0519}\nbleed {\"shape\":\"disc\",\"rule\":\"old\",\"level\":2,\"tileTexels\":32,\"maxBleed\":0.2813,\"bleedingEdgeSamples\":0.0968}\nbleed {\"shape\":\"disc\",\"rule\":\"old\",\"level\":3,\"tileTexels\":16,\"maxBleed\":0.3828,\"bleedingEdgeSamples\":0.1684}\nbleed {\"shape\":\"disc\",\"rule\":\"old\",\"level\":4,\"tileTexels\":8,\"maxBleed\":0.4266,\"bleedingEdgeSamples\":0.2899}\nbleed {\"shape\":\"disc\",\"rule\":\"new\",\"level\":0,\"tileTexels\":128,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"new\",\"level\":1,\"tileTexels\":64,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"new\",\"level\":2,\"tileTexels\":32,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"new\",\"level\":3,\"tileTexels\":16,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nbleed {\"shape\":\"disc\",\"rule\":\"new\",\"level\":4,\"tileTexels\":8,\"maxBleed\":0,\"bleedingEdgeSamples\":0}\nsweep {\"shape\":\"knot\",\"frames\":12,\"frameSize\":128,\"distance\":12,\"pitch\":20,\"steps\":181,\"cardPx\":177.7,\"refStep\":{\"median\":1.488,\"max\":2.132},\"impStep\":{\"median\":2.209,\"max\":5.778},\"excessMax\":4.48,\"errMean\":13.81,\"errMax\":18.443,\"ghostMean\":0.0124,\"ghostMax\":0.03269,\"snapRatio\":2.62,\"refRatio\":1.43}\nsweep {\"shape\":\"knot\",\"frames\":12,\"frameSize\":128,\"distance\":12,\"pitch\":-25,\"steps\":181,\"cardPx\":177.7,\"refStep\":{\"median\":1.454,\"max\":1.828},\"impStep\":{\"median\":2.137,\"max\":4.827},\"excessMax\":3.629,\"errMean\":12.746,\"errMax\":18.077,\"ghostMean\":0.01435,\"ghostMax\":0.0565,\"snapRatio\":2.26,\"refRatio\":1.26}\nsweep {\"shape\":\"knot\",\"frames\":12,\"frameSize\":128,\"distance\":12,\"pitch\":60,\"steps\":181,\"cardPx\":177.7,\"refStep\":{\"median\":1.52,\"max\":1.785},\"impStep\":{\"median\":2.431,\"max\":5.942},\"excessMax\":4.665,\"errMean\":19.75,\"errMax\":22.293,\"ghostMean\":0.01561,\"ghostMax\":0.03095,\"snapRatio\":2.44,\"refRatio\":1.17}\nsweep {\"shape\":\"disc\",\"frames\":12,\"frameSize\":128,\"distance\":12,\"pitch\":20,\"steps\":181,\"cardPx\":118.5,\"refStep\":{\"median\":0.049,\"max\":0.068},\"impStep\":{\"median\":0.736,\"max\":12.18},\"excessMax\":12.128,\"errMean\":12.534,\"errMax\":32.725,\"ghostMean\":0.00644,\"ghostMax\":0.01316,\"snapRatio\":16.55,\"refRatio\":1.39}\nsweep {\"shape\":\"knot\",\"frames\":12,\"frameSize\":128,\"distance\":40,\"pitch\":20,\"steps\":91,\"cardPx\":53.3,\"refStep\":{\"median\":2.619,\"max\":3.746},\"impStep\":{\"median\":3.696,\"max\":5.906},\"excessMax\":2.516,\"errMean\":8.661,\"errMax\":13.132,\"ghostMean\":0.00043,\"ghostMax\":0.00309,\"snapRatio\":1.6,\"refRatio\":1.43}\nsweep {\"shape\":\"knot\",\"frames\":12,\"frameSize\":128,\"distance\":80,\"pitch\":20,\"steps\":91,\"cardPx\":26.7,\"refStep\":{\"median\":2.473,\"max\":3.716},\"impStep\":{\"median\":3.507,\"max\":5.638},\"excessMax\":2.521,\"errMean\":9.319,\"errMax\":13.08,\"ghostMean\":0,\"ghostMax\":0,\"snapRatio\":1.61,\"refRatio\":1.5}\nsweep {\"shape\":\"disc\",\"frames\":12,\"frameSize\":128,\"distance\":40,\"pitch\":20,\"steps\":91,\"cardPx\":35.5,\"refStep\":{\"median\":0.085,\"max\":0.14},\"impStep\":{\"median\":1.127,\"max\":9.123},\"excessMax\":9.031,\"errMean\":9.078,\"errMax\":28.809,\"ghostMean\":0.00158,\"ghostMax\":0.00504,\"snapRatio\":8.09,\"refRatio\":1.65}\nsweep {\"shape\":\"disc\",\"frames\":12,\"frameSize\":128,\"distance\":80,\"pitch\":20,\"steps\":91,\"cardPx\":17.8,\"refStep\":{\"median\":0.034,\"max\":0.099},\"impStep\":{\"median\":0.883,\"max\":6.426},\"excessMax\":6.401,\"errMean\":10.414,\"errMax\":25.802,\"ghostMean\":0,\"ghostMax\":0,\"snapRatio\":7.28,\"refRatio\":2.91}\nimposter check finished"
-  },
-  {
-   "script": "packages/machinery/test/dimensions-check.mjs",
-   "pass": true,
-   "exitCode": 0,
-   "seconds": 6.9,
-   "acPowerBefore": true,
-   "acPowerAfter": true,
-   "tail": "      }\n    },\n    \"perspective-1\": {\n      \"label\": \"2000.0 mm\",\n      \"anchorY\": 137.13,\n      \"span\": 91.5,\n      \"lineRows\": [\n        96,\n        97,\n        103,\n        104,\n        105,\n        106,\n        112,\n        113\n      ],\n      \"offset\": 24.13,\n      \"ink\": {\n        \"width\": 69,\n        \"height\": 11\n      }\n    }\n  }\n}\ndimension callouts browser check passed"
-  },
-  {
-   "script": "packages/machinery/test/edges-check.mjs",
-   "pass": true,
-   "exitCode": 0,
-   "seconds": 8.8,
-   "acPowerBefore": true,
-   "acPowerAfter": true,
-   "tail": "adapter {\"vendor\":\"intel\",\"architecture\":\"xe-2lpg\",\"device\":\"\",\"description\":\"\",\"fallback\":false}\nok plain [[122,128,133],[126,132,138],[118,124,129],[126,132,138],[122,128,133]]\nok perspective [[255,0,255],[255,0,255],[255,0,255],[255,0,255],[255,0,255]]\nok ortho [[255,0,255],[237,18,239],[255,0,255],[255,0,255],[255,0,255]]\nok section [[255,0,255],[255,0,255],[255,0,255],[5,6,9],[255,0,255]]\nok exploded [[255,0,255],[255,0,255],[255,0,255],[255,0,255],[255,0,255]]\nok hidden [[5,6,9],[5,6,9],[5,6,9],[5,6,9],[5,6,9]]\nok tiny [[5,6,9],[5,6,9],[5,6,9],[5,6,9],[5,6,9]]\nfeature edges browser check passed"
   },
   {
    "script": "packages/materials/test/browser-check.mjs",

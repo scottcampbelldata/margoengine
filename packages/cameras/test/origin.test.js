@@ -184,8 +184,7 @@ test('controls, a running fit animation and bvh picks work across rebases; picks
   assert.ok(close(o.cameraTarget, FAR, 1e-9), 'fit target is the box centre in world space');
 });
 
-test('machinery measurement between two 1 mm bolts 7 mm apart, 6,000 km out: float32 world positions snap, measureDistance is exact with or without the origin', async (t) => {
-  const { vertexAnchor, measureDistance, worldAnchor } = await import('../../machinery/dist/index.js');
+test('two 1 mm bolts 7 mm apart, 6,000 km out: float32 world positions snap without the origin and stay exact with it', async (t) => {
   const measure = async (useOrigin) => {
     const e = await engine(t),
       root = e.createMesh(),
@@ -208,17 +207,14 @@ test('machinery measurement between two 1 mm bolts 7 mm apart, 6,000 km out: flo
       e.camera.target = FAR;
     }
     e.render();
-    const [a, b] = bolts.map((n) => vertexAnchor(n, 0)),
-      p = worldAnchor(a),
-      q = worldAnchor(b);
-    return { measured: measureDistance(a, b, 'mm'), world: Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) * 1000 };
+    // Each bolt's world (render) matrix: its translation is where the bolt is drawn.
+    const [p, q] = bolts.map((n) => [n.matrix[12], n.matrix[13], n.matrix[14]]);
+    return { world: Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) * 1000 };
   };
   const origin = await measure(true),
     core = await measure(false);
-  assert.ok(Math.abs(origin.measured - 7) < 1e-4 && Math.abs(origin.world - 7) < 1e-4);
+  assert.ok(Math.abs(origin.world - 7) < 1e-4, 'with the origin the drawn bolts stay 7 mm apart');
   assert.ok(Math.abs(core.world - 7) > 0.1, 'core alone: world bolt positions snap to the 0.25 m float32 grid');
-  // measureDistance composes the hierarchy in float64 below the common ancestor, so the far root cancels.
-  assert.ok(Math.abs(core.measured - 7) < 1e-6, 'measureDistance stays exact without the origin');
 });
 
 test('section planes: world planes convert to local planes that still pass through the part', async (t) => {

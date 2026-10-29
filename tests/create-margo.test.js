@@ -75,7 +75,7 @@ test('create-margo scaffolds the template and refuses a non-empty directory', (t
   assert.throws(() => execFileSync(process.execPath, [cli, '.'], { cwd: temp, stdio: 'pipe' }), /not empty/);
   assert.throws(
     () => execFileSync(process.execPath, [cli, 'x', '--template', 'x'], { cwd: temp, stdio: 'pipe' }),
-    /unknown template x; use one of web, game, cad, viz, react, next/,
+    /unknown template x; use one of web, game, viz, react, next/,
   );
   assert.throws(() => execFileSync(process.execPath, [cli, '--force'], { cwd: temp, stdio: 'pipe' }), /unknown option/);
   assert.ok(!existsSync(join(temp, 'x')) && !existsSync(join(temp, '--template')));
@@ -85,7 +85,6 @@ test('create-margo scaffolds the template and refuses a non-empty directory', (t
 const templates = {
   web: { main: 'src/main.ts', imports: "from 'margoengine/environment'" },
   game: { main: 'src/main.ts', imports: "from 'margoengine/game'" },
-  cad: { main: 'src/main.ts', imports: "from 'margoengine/cad'" },
   viz: { main: 'src/main.ts', imports: "from 'margoengine/viz'" },
   react: { main: 'src/scene.tsx', imports: "from 'margoengine/react'" },
 };

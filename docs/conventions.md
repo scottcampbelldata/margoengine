@@ -91,10 +91,10 @@ capabilities go in optional packages, and a fix that would add a capability is l
 
 **Exception, the stage facade (Scott, 2026-10-27):** the stage is lifted from the freeze for one restructuring,
 because it broke "pay only for what you import" and nothing is published yet, so no user is broken. Its ten
-optional-package methods (`load`, `gltf`, `machinery`, `creative`, `scenery`, `sky`, `particles`, `effects`,
+optional-package methods (`load`, `gltf`, `creative`, `scenery`, `sky`, `particles`, `effects`,
 `environment`, `shadows`) held `import()`s that every app building a `Stage` reached (class methods are never
 tree-shaken), so webpack and Turbopack failed on uninstalled optional peers. They moved into feature entries that take
-the stage (`@margoengine/stage/gltf` `addGLTF`, `/cad` `addCAD`, `/sky` `addSky`, `/particles` `addParticles`,
+the stage (`@margoengine/stage/gltf` `addGLTF`, `/sky` `addSky`, `/particles` `addParticles`,
 `/effects` `addEffects`, `/environment` `addEnvironment`, `/shadows` `addShadows`; the whole-pack accessors became a
 plain `import()`), and the root gained `stage.signal`. The stage root shrank (core + stage 22,781 -> 21,910 B gzip).
 Core is untouched. The exception covers this one change; the freeze applies again after it.
@@ -113,11 +113,10 @@ A name declared and exported by two packages must mean the same thing, or be ren
 | `projectPoint`, `PickHit`, `Blending`, `TextureSource` (points) | labels, selection, materials, shader | Points' renamed: `projectToPixels`, `PointsPickHit`, `PointsBlending`, `PointsTextureSource`. |
 | `smoothstep` (tween) | math, shader | Tween's easing renamed `easeSmoothstep`. |
 | `ExpandOptions` | lines, procedural | lines' renamed `ExpandLineOptions` (its function is `expandLine`). |
-| `SurfaceOptions` | procedural, machinery | procedural's renamed `MarchingCubesOptions`. |
 | `Vector3` (navmesh/build) | math | `Navigation` takes math's `Vec3Like`; math's `Vector3` is the class. |
 | `loadGLTF`, `parseGLTF` | gltf, gltf-pro | Open, group B. |
 | `texture` (vfx) | shader | vfx's `@margoengine/vfx/texture` feature object renamed `textureFeature` (pass `{texture: textureFeature}`); shader's `texture()` node keeps the name. |
-| `Environment`, `Sky`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `TAA`, `Tonemap`, `Shadows`, `AmbientLight`, `HemisphereLight`, `Fog`, `Scene`, `RenderView`, `BatchedMesh`, `DepthTexture`, `SceneTargets`, `SectionPlanes`, `OrbitControls`, `MapControls`, `ArcballControls` | environment, sky, post, taa, tonemap, shadows, core, materials, machinery, controls; react | Kept: the plugin or pass class and react's JSX component that adds it with the same options (React names components after what they render). Allowlisted. |
+| `Environment`, `Sky`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `TAA`, `Tonemap`, `Shadows`, `AmbientLight`, `HemisphereLight`, `Fog`, `Scene`, `RenderView`, `BatchedMesh`, `DepthTexture`, `SceneTargets`, `OrbitControls`, `MapControls`, `ArcballControls` | environment, sky, post, taa, tonemap, shadows, core, materials, controls; react | Kept: the plugin or pass class and react's JSX component that adds it with the same options (React names components after what they render). Allowlisted. |
 | `Vec3` (lod), `Color` (sky, terrain), `HeightField` (terrain) | math | Math's: lod uses `MutableVec3` / `Vec3`, sky and terrain colours are `Vec3`, terrain re-exports math's `HeightField`. |
 | `PbrMaterial` | core, materials, react | Kept, one meaning: materials' `PbrMaterial` takes every core `PbrMaterial` option with the same meaning and adds maps and physical options, with a textured material's defaults (white, roughness 1, metalness 0, front side) rather than core's indigo double-sided placeholder; core's stays the constant-colour material of core meshes, and react's is the JSX element that builds core's. Allowlisted. |
 

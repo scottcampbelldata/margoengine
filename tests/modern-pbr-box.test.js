@@ -7,8 +7,6 @@ import { loadGLTF, parseGLTF, PBRModel } from '@margoengine/gltf-pro';
 import { parseGLTF as parseBasicGLTF } from '@margoengine/gltf';
 import { Physics } from '@margoengine/physics';
 import { exportGLB } from '@margoengine/exporters';
-import { deduplicateParts } from '@margoengine/machinery/cad';
-import { AssemblyBVH } from '@margoengine/machinery/spatial';
 import { BoxHelper } from '@margoengine/lines';
 import { Stage } from 'margoengine';
 import { worldBounds } from '../packages/stage/dist/model.js';
@@ -312,53 +310,6 @@ test('Box model.bounds, facade worldBounds and Stage.fit enclose the actual PBR 
       0,
       'bounds and fitting never register a second core draw',
     );
-  });
-});
-
-test('Box CAD and static AssemblyBVH consume only explicitly passed primitive nodes', async () => {
-  await withBox(async ({ engine, model, mesh, primitive }) => {
-    assert.deepEqual(deduplicateParts(model.nodes), { parts: 1, unique: 1 });
-    assert.throws(() => deduplicateParts([model.root]), { message: /^CAD grouping found no supported geometry/ });
-    assert.throws(() => deduplicateParts([engine.createMesh()]), {
-      message: /^CAD grouping found no supported geometry/,
-    });
-    const assembly = await AssemblyBVH.create(model.nodes);
-    try {
-      const world = transformed(primitivePositions(primitive), mesh.matrix),
-        { min, max } = positionBounds(world);
-      // Exercise every real triangle through the public query rather than the old
-      // flat BVH's private count; the current BVH shares local geometry across parts.
-      const faces = new Set();
-      for (let at = 0; at < primitive.indices.length; at += 3) {
-        const [a, b, c] = [...primitive.indices.subarray(at, at + 3)].map((index) => [
-          ...world.subarray(index * 3, index * 3 + 3),
-        ]);
-        const ab = b.map((v, axis) => v - a[axis]),
-          ac = c.map((v, axis) => v - a[axis]);
-        const normal = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
-        const length = Math.hypot(...normal),
-          direction = normal.map((v) => v / length);
-        const center = a.map((v, axis) => (v + b[axis] + c[axis]) / 3);
-        const face = assembly.raycast(
-          center.map((v, axis) => v + direction[axis] * 2),
-          direction.map((v) => -v),
-        );
-        assert.equal(face?.node, mesh);
-        assert.equal(face.triangle, at / 3);
-        close([face.distance], [2], 'actual triangle ray distance');
-        faces.add(face.triangle);
-      }
-      assert.equal(faces.size, 12, 'the real source contributes all 12 queryable triangles');
-      const ray = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, max[2] + 2];
-      const hit = assembly.raycast(ray, [0, 0, -1]);
-      assert.equal(hit?.node, mesh);
-      assert.ok(hit.triangle >= 0 && hit.triangle < 12);
-      close([hit.distance], [2], 'actual transformed box ray distance');
-      await assert.rejects(AssemblyBVH.create([model.root]), { message: 'BVH requires 1..1000000 triangles' });
-    } finally {
-      assembly.dispose();
-    }
-    assert.equal(mesh.geometry, null);
   });
 });
 

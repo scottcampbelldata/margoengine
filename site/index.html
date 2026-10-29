@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Margo Engine: a small WebGPU engine for web apps</title>
-  <meta name="description" content="Margo Engine is an Apache-2.0 licensed 3D engine for the web: a Rust and Wasm kernel, WebGPU rendering with an optional WebGL2 fallback, and optional packs for glTF, machinery, React and effects.">
+  <meta name="description" content="Margo Engine is an Apache-2.0 licensed 3D engine for the web: a Rust and Wasm kernel, WebGPU rendering with an optional WebGL2 fallback, and optional packs for glTF, React and effects.">
   <link rel="canonical" href="https://margoengine.com/">
   <meta name="theme-color" content="#0b1020">
   <meta property="og:type" content="website">
@@ -58,7 +58,7 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></
         <div>
           <h3>Install from npm, once published</h3>
           <pre tabindex="0"><code>npm install @margoengine/core</code></pre>
-          <p>npm publication is pending. The release includes 93 packages under <code>@margoengine</code> and <code>margoengine</code>, the one install that holds them all. <a href="./catalog/">Browse all packages and runnable examples</a></p>
+          <p>npm publication is pending. The release includes 92 packages under <code>@margoengine</code> and <code>margoengine</code>, the one install that holds them all. <a href="./catalog/">Browse all packages and runnable examples</a></p>
         </div>
       </div>
     </section>
@@ -92,7 +92,7 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></
         </div>
         <div>
           <h3>Domains</h3>
-          <p><code>machinery</code> for joints, sections, dimensions and CAD import, <code>creative</code> and <code>vfx</code> for particles and post effects, <code>scenery</code>, <code>terrain</code> and <code>splats</code>.</p>
+          <p><code>creative</code> and <code>vfx</code> for particles and post effects, <code>scenery</code>, <code>terrain</code> and <code>splats</code>.</p>
         </div>
       </div>
     </section>
@@ -132,7 +132,7 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></
       </div>
       <p class="more"><a href="./demos/light-keeper/">The light keeper</a> · A robot workshop with collision-aware arm motion, eye tracking, shadows and live reflections.</p>
       <p class="more">Optional effects: <a href="./demos/dof/">Depth of field</a> · <a href="./demos/tonemap/">Tonemapping and color grading</a></p>
-      <p class="more">Several views of one engine: <a href="./demos/cad-views.html">Four-view CAD layout</a> · <a href="./demos/split-screen.html">Split-screen two players</a> · <a href="./demos/minimap.html">Minimap</a></p>
+      <p class="more">Several views of one engine: <a href="./demos/split-screen.html">Split-screen two players</a> · <a href="./demos/minimap.html">Minimap</a></p>
       <p class="more">Feature demos: <a href="./demos/batched-mesh.html">Batched mesh</a> · <a href="./demos/clipping-planes.html">Clipping planes</a> · <a href="./demos/scene-targets.html">Scene targets</a> · <a href="./demos/depth-texture.html">Depth texture</a> · <a href="./demos/animation-formats.html">Collada and animation pointers</a> · <a href="./demos/texture-formats.html">Texture formats</a> · <a href="./demos/weather.html">Weather</a></p>
       <p class="more">Data and science: <a href="./demos/compute-lab.html">GPU data lab</a> (<code>@margoengine/compute</code>) · <a href="./demos/sciviz-volume.html">Volume rendering</a> · <a href="./demos/sciviz-points.html">Millions of points</a> · <a href="./demos/sciviz-surface.html">Surface plot</a> (<code>@margoengine/sciviz</code>)</p>
       <p class="more">Game interface: <a href="./demos/ui-game.html">Menus, a health bar, an inventory and dialogs</a> (<code>@margoengine/ui</code>) · drawn in the engine, with keyboard, gamepad and screen reader support</p>
@@ -142,7 +142,7 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></
 
     <section class="status">
       <h2>Where it stands</h2>
-      <p>Margo Engine is at version 0.1.0 and Apache-2.0 licensed. Its STEP and IGES import uses OpenCascade (LGPL-2.1), loaded separately and only when a CAD file is. WebGPU needs a supporting browser on HTTPS or localhost. Particles, sections, image-based lighting and the scenery pack require WebGPU; CPU-side machinery and CAD tools work on either backend. Its real-GPU test suites run in Edge (Chromium) on a Windows laptop with an Intel Arc 140V; Chrome uses the same engine. Firefox, Safari and mobile GPUs are not yet verified.</p>
+      <p>Margo Engine is at version 0.1.0 and Apache-2.0 licensed. WebGPU needs a supporting browser on HTTPS or localhost. Particles, image-based lighting and the scenery pack require WebGPU. Its real-GPU test suites run in Edge (Chromium) on a Windows laptop with an Intel Arc 140V; Chrome uses the same engine. Firefox, Safari and mobile GPUs are not yet verified.</p>
       <p>The <a href="./whitepaper/engine.html">Margo Engine whitepaper</a> gives the design and every measured number behind this page, each with its source and hardware. The <a href="./whitepaper/voxel.html">Margo Voxel whitepaper</a> covers the voxel editor, path tracer and multiplayer packages built on it.</p>
     </section>
   </main>

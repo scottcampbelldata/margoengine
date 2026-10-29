@@ -14,7 +14,7 @@ export interface StageModel {
 type RawBuffers = Omit<GeometryBuffers, 'instance'> &
   Partial<Pick<GeometryBuffers, 'instance'>> & { readonly vertexOffset?: number };
 
-/** What `addGLTF(stage, url)` and `addCAD(stage, url)` return: the imported meshes under one root, moved, rotated and scaled as one. */
+/** What `addGLTF(stage, url)` returns: the imported meshes under one root, moved, rotated and scaled as one. */
 export interface LoadedModel extends Pick<Mesh, 'position' | 'rotation' | 'scale'> {
   readonly root: Mesh;
   readonly meshes: readonly Mesh[];

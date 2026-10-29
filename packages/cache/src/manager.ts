@@ -48,7 +48,7 @@ const NULL_BODY = new Set([101, 103, 204, 205, 304]);
 
 /**
  * Counts loading work across loaders: pass `manager.fetch` as any loader's `fetch` option (gltf, gltf-pro, loaders,
- * fbx, usdz, machinery's loadCAD, blender, environment, audio, ...), and every file it requests, including external
+ * fbx, usdz, blender, environment, audio, ...), and every file it requests, including external
  * buffers and textures the loader resolves, is one item. A batch starts when an item starts while none is pending
  * and ends with `onLoad`. Failed items call `onError` and then count as done, so `onLoad` still follows.
  * `manager.abort()` cancels every request in flight; the manager stays usable for new loads.

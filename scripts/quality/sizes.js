@@ -38,7 +38,7 @@ export async function sizesGate({ root, packages }) {
       if (existsSync(join(root, entry.dist))) jobs.push({ key: entry.specifier, file: entry.dist });
     const workers = join(root, 'packages', pkg.dir, 'dist/workers');
     if (existsSync(workers))
-      for (const name of readdirSync(workers).filter((n) => n.endsWith('.js') && !n.startsWith('occt-import-js')))
+      for (const name of readdirSync(workers).filter((n) => n.endsWith('.js')))
         jobs.push({ key: `${pkg.name} dist/workers/${name}`, file: `packages/${pkg.dir}/dist/workers/${name}` });
   }
   const missing = packages.flatMap((p) => p.entries).filter((e) => !existsSync(join(root, e.dist)));

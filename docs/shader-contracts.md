@@ -11,17 +11,16 @@ Packages extend each other's WGSL in three ways. Prefer them in this order.
    where the package creates the pipeline itself: core builds the mesh pipeline from `PassContext.shader`, so a patch of
    core's shader cannot use them.
 3. **Text anchors.** Core's mesh shader (`packages/core/src/shaders.ts`) is frozen for 1.0 and has no hooks, so packages
-   that change core meshes (shadows, sections, IBL, fog, tone mapping, TAA, SSAO, toon, picking, scatter, terrain colors)
+   that change core meshes (shadows, IBL, fog, tone mapping, TAA, SSAO, toon, picking, scatter, terrain colors)
    rewrite its text through `PassContext.shader`. Each anchor they rely on is listed in `tests/shader-contracts.test.js`,
    which fails, naming the package, if the anchor no longer occurs exactly once in the shader it targets, or if the
    package stops using it. Most of these patches also throw at runtime when the anchor is missing (shadows, clustered,
-   environment, sky lighting, sections' caps, materials, shader nodes, LOD baking).
+   environment, sky lighting, materials, shader nodes, LOD baking).
 
 Text anchors in core's shader (the full list, with the package file using each, is the test's `contracts` table):
 
 | Anchor | Used by |
 | --- | --- |
-| `let facing=` | machinery SectionPlanes (clip loop before it) |
 | `let linear=direct*`, `let linear=…;` | shadows, clustered, environment IBL, scatter (also mirrored in terrain's own shader) |
 | `let n=normalize(i.normal)*select(-1.0,1.0,facing);` | terrain colors: a block opened after it and closed with the fragment shadows `i` and `n` with the terrain's per-pixel albedo, roughness and normal, so later patches keep their text |
 | `frame.radiance.w` | sky lighting (sky ambient), environment IBL (zeroes the constant ambient) |

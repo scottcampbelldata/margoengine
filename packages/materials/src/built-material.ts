@@ -1328,7 +1328,7 @@ export interface MaterialOptions extends PhysicalOptions {
   /** Thick only: how far diffuse light wraps past the terminator, 0 through 1 (default 0.5). Live. */
   subsurfaceWrap?: number;
   /**
-   * Up to 6 world-space planes `[a, b, c, d]`: points with `a x + b y + c z + d < 0` are cut away (the SectionPlanes
+   * Up to 6 world-space planes `[a, b, c, d]`: points with `a x + b y + c z + d < 0` are cut away (the section
    * convention), in every pass that draws the material. Live; default none.
    */
   clippingPlanes?: readonly (readonly number[])[];
@@ -1644,7 +1644,7 @@ type MapState = {
   refs: number;
   device?: GPUDevice;
   buffer?: GPUBuffer;
-  /** The clipping-plane uniform (SectionPlanes layout) and its binding, kept while the buffer lives. */
+  /** The clipping-plane uniform (section layout) and its binding, kept while the buffer lives. */
   clip?: GPUBuffer;
   clipBinding?: GPUBufferBinding;
   clipData?: Float32Array;
@@ -1821,7 +1821,7 @@ function displacementOf(m: Material, device: GPUDevice | null | undefined, owner
     ? last
     : (state.displacement = { buffer, view, sampler });
 }
-/** The clipping-plane uniform of `m` for `owner` (SectionPlanes layout: 6 planes, count in settings.x), written now. */
+/** The clipping-plane uniform of `m` for `owner` (section layout: 6 planes, count in settings.x), written now. */
 function clipUniform(m: Material, device: GPUDevice, owner: object): GPUBufferBinding {
   const buffer = materialBuffer(m, device, owner, 112, 'clip'),
     state = mapState(m, owner),

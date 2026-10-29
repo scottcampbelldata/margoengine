@@ -8,7 +8,6 @@
     "3d",
     "renderer",
     "game-engine",
-    "cad",
     "wasm"
   ],
   "homepage": "https://margoengine.com",
@@ -655,70 +654,6 @@
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
     },
-    "./machinery": {
-      "types": "./dist/machinery.d.ts",
-      "import": "./dist/machinery.js"
-    },
-    "./machinery/cad": {
-      "types": "./dist/machinery/cad.d.ts",
-      "import": "./dist/machinery/cad.js"
-    },
-    "./machinery/cad-async": {
-      "types": "./dist/machinery/cad-async.d.ts",
-      "import": "./dist/machinery/cad-async.js"
-    },
-    "./machinery/kinematics": {
-      "types": "./dist/machinery/kinematics.d.ts",
-      "import": "./dist/machinery/kinematics.js"
-    },
-    "./machinery/surface": {
-      "types": "./dist/machinery/surface.d.ts",
-      "import": "./dist/machinery/surface.js"
-    },
-    "./machinery/telemetry": {
-      "types": "./dist/machinery/telemetry.d.ts",
-      "import": "./dist/machinery/telemetry.js"
-    },
-    "./machinery/section": {
-      "types": "./dist/machinery/section.d.ts",
-      "import": "./dist/machinery/section.js"
-    },
-    "./machinery/assembly": {
-      "types": "./dist/machinery/assembly.d.ts",
-      "import": "./dist/machinery/assembly.js"
-    },
-    "./machinery/metrology": {
-      "types": "./dist/machinery/metrology.d.ts",
-      "import": "./dist/machinery/metrology.js"
-    },
-    "./machinery/spatial": {
-      "types": "./dist/machinery/spatial.d.ts",
-      "import": "./dist/machinery/spatial.js"
-    },
-    "./machinery/clearance": {
-      "types": "./dist/machinery/clearance.d.ts",
-      "import": "./dist/machinery/clearance.js"
-    },
-    "./machinery/materials": {
-      "types": "./dist/machinery/materials.d.ts",
-      "import": "./dist/machinery/materials.js"
-    },
-    "./machinery/overlays": {
-      "types": "./dist/machinery/overlays.d.ts",
-      "import": "./dist/machinery/overlays.js"
-    },
-    "./machinery/exploded": {
-      "types": "./dist/machinery/exploded.d.ts",
-      "import": "./dist/machinery/exploded.js"
-    },
-    "./machinery/edges": {
-      "types": "./dist/machinery/edges.d.ts",
-      "import": "./dist/machinery/edges.js"
-    },
-    "./machinery/dimensions": {
-      "types": "./dist/machinery/dimensions.d.ts",
-      "import": "./dist/machinery/dimensions.js"
-    },
     "./materials": {
       "types": "./dist/materials.d.ts",
       "import": "./dist/materials.js"
@@ -1083,10 +1018,6 @@
       "types": "./dist/react/taa.d.ts",
       "import": "./dist/react/taa.js"
     },
-    "./react/machinery": {
-      "types": "./dist/react/machinery.d.ts",
-      "import": "./dist/react/machinery.js"
-    },
     "./react/voxel": {
       "types": "./dist/react/voxel.d.ts",
       "import": "./dist/react/voxel.js"
@@ -1246,10 +1177,6 @@
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"
-    },
-    "./stage/cad": {
-      "types": "./dist/stage/cad.d.ts",
-      "import": "./dist/stage/cad.js"
     },
     "./stage/sky": {
       "types": "./dist/stage/sky.d.ts",
@@ -1531,10 +1458,6 @@
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"
     },
-    "./cad": {
-      "types": "./dist/cad.d.ts",
-      "import": "./dist/cad.js"
-    },
     "./viz": {
       "types": "./dist/viz.d.ts",
       "import": "./dist/viz.js"
@@ -1582,7 +1505,6 @@
     "@margoengine/lines": "^1.0.0",
     "@margoengine/loaders": "^1.0.0",
     "@margoengine/lod": "^1.0.0",
-    "@margoengine/machinery": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
     "@margoengine/math": "^1.0.0",
     "@margoengine/mcp": "^1.0.0",

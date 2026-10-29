@@ -282,13 +282,6 @@
       ],
       "reason": "One thing, two forms: @margoengine/post's SceneTargets plugin and @margoengine/react's <SceneTargets> JSX component that attaches it with the same options. Decision in docs/conventions.md."
     },
-    "SectionPlanes": {
-      "packages": [
-        "machinery",
-        "react"
-      ],
-      "reason": "One thing, two forms: @margoengine/machinery's SectionPlanes plugin and @margoengine/react's <SectionPlanes> JSX component that attaches it with the same options. Decision in docs/conventions.md."
-    },
     "Scene": {
       "packages": [
         "core",

@@ -135,13 +135,12 @@ The scenery `sky-moon` implementation was deliberately replaced by the
 than restoring `SkyMoonPass`. The consolidation record
 lists all 74 public packages, preserved optional entries and audit decisions.
 
-### Errors name their fix (packages machinery to xr)
+### Errors name their fix (packages materials to xr)
 
 Every thrown message in these packages now says what to do about the problem. A former bare `Error` is now a
 `MargoError` with a `code` (`disposed`, `attached`, `state`, `unsupported`, `failed`) or a `TypeError` / `RangeError`.
 Message text changed: branch on `error.code` or the class, not the text. Changed error types:
 
-- machinery: bare `Error` became `MargoError` (codes `state`, `attached`, `disposed`, `unsupported`, `failed`).
 - materials: bare `Error` became `MargoError` (`state`, `disposed`, `attached`); a node-graph cycle and a graph
   without exactly one emit are now `TypeError`.
 - physics: bare `Error` became `MargoError` (`disposed`, `attached`, `state`).
@@ -237,7 +236,7 @@ Message text changed: branch on `error.code` or the class, not the text. Changed
 ### Loaded PBR geometry consumers
 
 - A canonical weak registry now feeds inspector overlays, line helpers, static
-  raycasts/AssemblyBVH, automatic picking/selection, direct mesh shadow casters,
+  raycasts, automatic picking/selection, direct mesh shadow casters,
   TAA and native XR. Multiple primitives retain their identities even when they
   share GPU buffers. Disposal, hidden ancestors and reused mesh slots are guarded.
 - Native XR owns PBR resources and skin/morph kernels on its compatible device,
@@ -248,7 +247,7 @@ Message text changed: branch on `error.code` or the class, not the text. Changed
   and its internal raw adapter still read core geometry only. Supported model
   bounds/raw and explicit camera-fitting alternatives have passing regressions.
   Core and stage stay frozen; these four limitations are not reported as fixed.
-- Physics, glTF export and CAD grouping read loader-owned bind-pose primitives
+- Physics and glTF export read loader-owned bind-pose primitives
   through an optional CPU geometry bridge. Loaded glTF/FBX meshes retain their
   original core geometry slots and hierarchy. Unsupported export data and
   operations without usable triangles report explicit errors. Ten real-loader
@@ -263,7 +262,7 @@ Message text changed: branch on `error.code` or the class, not the text. Changed
   `Skinned mesh needs an explicit collider`. Explicit capsules/dimensions and
   direct-node fitting retain their existing behavior. Failed fits leave no body.
 - Eleven standalone built-entry Box regressions and five real-Rapier cases cover
-  attached roots, transformed hierarchies, export, CAD/BVH/helpers and cleanup.
+  attached roots, transformed hierarchies, export, BVH/helpers and cleanup.
   The native GPU gate also loads complete Draco Avocado with all three original
   textures, verifies the exact synchronous diagnostic, and releases its worker.
 

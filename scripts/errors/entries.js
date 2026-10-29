@@ -84,7 +84,7 @@ export const entries = [
     messages: ['Install <package>', 'Specify format'],
     cause:
       '`stage.load` needs an optional package for this format and it is not installed, or the URL has no known extension.',
-    fix: 'Install the named package (for example `npm i @margoengine/gltf`), or pass `{format}`: one of gltf, glb, stl, obj, step, iges.',
+    fix: 'Install the named package (for example `npm i @margoengine/gltf`), or pass `{format}`: one of gltf, glb.',
   },
   {
     id: 'camera',

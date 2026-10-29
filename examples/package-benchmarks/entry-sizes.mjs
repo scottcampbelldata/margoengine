@@ -44,7 +44,7 @@ export async function measureEntries({ log = console.log } = {}) {
     }
     const workers = resolve(root, 'packages', dir, 'dist/workers');
     if (existsSync(workers))
-      for (const name of readdirSync(workers).filter((n) => n.endsWith('.js') && !n.startsWith('occt-import-js')))
+      for (const name of readdirSync(workers).filter((n) => n.endsWith('.js')))
         entries[`dist/workers/${name}`] = await size(resolve(workers, name));
     if (Object.keys(entries).length) report.packages[pkg.name] = entries;
     log(

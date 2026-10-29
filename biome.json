@@ -13,8 +13,7 @@
       "!**/dist",
       "!**/vendor",
       "!packages/clustered/src/ltc.ts",
-      "!packages/core/src/wasm.ts",
-      "!packages/machinery/src/wasm.ts"
+      "!packages/core/src/wasm.ts"
     ]
   },
   "formatter": {

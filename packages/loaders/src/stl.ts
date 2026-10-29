@@ -253,9 +253,6 @@ function finish(
  *   set), as sRGB 0 to 1; facets without a color get 0.8 gray. ASCII files and uncolored binary files have none.
  * - `indices`: 0, 1, 2, ... (or the weld's indices with `weld: true`).
  *
- * Use `parseCAD` from `@margoengine/machinery/cad` instead when you need welded parts for CAD sections, edges or
- * part deduplication.
- *
  * @throws LoaderError with code `'header'` (too short to be STL), `'truncated'` (binary data shorter than its
  * triangle count, or an ASCII file cut inside a facet), `'syntax'` (a malformed ASCII facet or number), `'limit'`
  * (past `maxTriangles` or `maxVertices`; raise them) or `'aborted'` (the `signal` fired); `'range'` for a bad limit.

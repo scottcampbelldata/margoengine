@@ -411,8 +411,8 @@ families.push({
   },
 });
 
-// --- packages/shared/math.js (pivoted invert + finiteVector) moved to math: animation, creative, gltf-pro, machinery,
-// post, sky, taa (invert); animator, clustered, creative, shadows, sky, terrain, vfx (finiteVector) ---
+// --- packages/shared/math.js (pivoted invert + finiteVector) moved to math: animation, creative, gltf-pro, a CAD
+// package since removed, post, sky, taa (invert); animator, clustered, creative, shadows, sky, terrain, vfx (finiteVector) ---
 async function sharedAtRef() {
   const { mkdir, writeFile } = await import('node:fs/promises'),
     { pathToFileURL } = await import('node:url');
@@ -824,28 +824,13 @@ families.push({
   },
 });
 
-// --- vec3 helpers: controls (add, sub, scale, dot, cross, length, normalize, clamp), machinery metrology/clearance/dimensions ---
+// --- vec3 helpers: controls (add, sub, scale, dot, cross, length, normalize, clamp) ---
 families.push({
   name: 'vec3 helpers',
   async verify() {
     const vec3 = await math('vec3'),
       utils = await math('mathutils'),
       controls = (await both('controls', 'src/math.ts')).baseline;
-    // machinery's copies differ from controls' only in parameter types.
-    const expression = (code) => code.replace(/^const\w+=\([^)]*\)(:\w+)?=>/, '');
-    textual("machinery's vector copies are controls'", () => {
-      for (const [file, names] of [
-        ['packages/machinery/src/metrology.ts', ['sub', 'dot', 'cross']],
-        ['packages/machinery/src/clearance.ts', ['dot', 'sub', 'cross']],
-        ['packages/machinery/src/dimensions.ts', ['sub']],
-      ])
-        for (const name of names)
-          assert.equal(
-            expression(body(file, name)),
-            expression(body('packages/controls/src/math.ts', name).replace(/\s/g, '')),
-            `${file} ${name}`,
-          );
-    });
     let n = 0;
     for (let i = 0; i < 100000; i++) {
       const a = [value(), value(), value()],

@@ -60,7 +60,7 @@
   "coreGzip": 18255,
   "reactEntryGzip": 20966,
   "browser": {
-    "passed": 33,
+    "passed": 32,
     "failed": 0,
     "hardware": {
       "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
@@ -342,16 +342,6 @@
           "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
           "run",
           "modern:test:scene-helpers"
-        ]
-      },
-      {
-        "name": "machinery",
-        "status": "passed",
-        "log": "test-results/consolidation-browser-final/machinery.log",
-        "command": [
-          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
-          "run",
-          "modern:test:machinery"
         ]
       },
       {

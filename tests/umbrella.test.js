@@ -104,7 +104,6 @@ test('importing through margoengine bundles the same code as importing the packa
 test('each kit re-exports exactly the names it lists, as the same bindings', async () => {
   const kits = {
     game: await import('margoengine/game'),
-    cad: await import('margoengine/cad'),
     viz: await import('margoengine/viz'),
     web: await import('margoengine/web'),
   };

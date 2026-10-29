@@ -103,7 +103,6 @@ test('sizes page lists every file loaded later, with its measured bytes and the 
   );
   for (const entry of LAZY_FILES) assert.ok(existsSync(new URL(entry.file, root)), entry.file);
   for (const name of [
-    'occt-import-js.wasm',
     'draco_decoder.wasm',
     'basis_transcoder.wasm',
     'rapier3d-compat',
@@ -138,7 +137,7 @@ test('sizes page shows the basic glTF scene network log from the same build: onl
   assert.deepEqual([network.commit, network.dirty], [sizes.commit, sizes.dirty]);
   const paths = network.files.map((file) => file.path);
   assert.deepEqual(
-    paths.filter((path) => /\.wasm$|occt|draco|basis|rapier|recast|ifc|worker|cad/i.test(path)),
+    paths.filter((path) => /\.wasm$|draco|basis|rapier|recast|ifc|worker|cad/i.test(path)),
     [],
   );
   for (const role of ['Page', 'Entry: core + stage + app', '@margoengine/gltf (addGLTF)', 'Model'])
@@ -147,8 +146,8 @@ test('sizes page shows the basic glTF scene network log from the same build: onl
     network.files.every((file) => file.role),
     'every request is an expected file',
   );
-  // Since the stage feature entries (2026-10-27) the build emits only what the app imports: no OCCT .wasm, CAD
-  // worker or other pack waits unfetched beside it.
+  // Since the stage feature entries (2026-10-27) the build emits only what the app imports: no .wasm, worker or
+  // other pack waits unfetched beside it.
   assert.deepEqual(network.notFetched, [], 'the build emitted no file the page does not fetch');
   for (const key of ['transferred', 'raw', 'gzip', 'brotli'])
     assert.equal(

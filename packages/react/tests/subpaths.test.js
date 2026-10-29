@@ -73,7 +73,6 @@ const expected = {
   './dof': ['DepthOfField'],
   './tonemap': ['Tonemap'],
   './taa': ['TAA'],
-  './machinery': ['SectionPlanes'],
   './voxel': ['Voxels', 'useBlockTextures'],
   './physics': [
     'BallCollider',
@@ -114,7 +113,6 @@ const optionalPeers = [
   '@margoengine/animation',
   '@margoengine/animator',
   '@margoengine/voxel',
-  '@margoengine/machinery',
   '@margoengine/cameras',
 ];
 async function temporary(run) {
@@ -368,7 +366,6 @@ test('Vite picking-cube initial chunk graph excludes optional React subpaths and
       'shadows',
       'cameras',
       'gltf',
-      'machinery',
       'scenery',
       'creative',
       'environment',

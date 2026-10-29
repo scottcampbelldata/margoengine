@@ -927,7 +927,7 @@ export interface PBRMaterial extends GLTFMaterial {
   displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /**
    * Clipping planes the shading applies (`@margoengine/materials` clippingPlanes with clipShadows), for shadow casters
-   * to clip too: a uniform of up to 6 world planes in the SectionPlanes layout (plane count in settings.x).
+   * to clip too: a uniform of up to 6 world planes in the scene `section` binding's layout (plane count in settings.x).
    */
   clip?: GPUBufferBinding;
   /** Use the retained UV-transform frame layout for constructed optional materials. */
@@ -2112,7 +2112,7 @@ export class PBRModel implements EnginePlugin {
   }
   /**
    * Points `target` at `source`'s vertex and index GPU buffers and frees the pair `target` used, so identical shapes
-   * draw from one pair (machinery's `deduplicateParts` calls it). Both must be triangle primitives of this model with
+   * draw from one pair. Both must be triangle primitives of this model with
    * equal vertices and indices, neither skinned nor morphed; their CPU arrays, materials and nodes stay separate, and
    * the sharing survives a device restore. Returns false, changing nothing, when they do not qualify or the model is
    * still streaming.

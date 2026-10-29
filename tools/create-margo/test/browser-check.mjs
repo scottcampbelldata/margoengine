@@ -16,7 +16,6 @@ const root = resolve(import.meta.dirname, '../../..');
 const templates = {
   web: { text: null },
   game: { selector: '#hud', text: /Orbs 0 \/ 6/ },
-  cad: { selector: '#info', text: /Bracket, modeled in \d+ ms: \d+ faces, volume 55\.81 cm³/ },
   viz: { selector: 'body', text: /300,000 stars/ },
   react: { text: null },
 };

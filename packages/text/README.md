@@ -6,7 +6,7 @@ Crisp GPU text for Margo Engine: signed distance field glyphs generated at runti
 
 Build from source with `npm run build` in `packages/text`.
 
-SDF `Text` for Latin, Greek, Cyrillic, CJK, Hebrew and emoji (no Arabic or Indic shaping and no ligatures; see Limits), for labels and signage. CAD dimension callouts with constant-pixel labels are built on it in `@margoengine/machinery/dimensions`.
+SDF `Text` for Latin, Greek, Cyrillic, CJK, Hebrew and emoji (no Arabic or Indic shaping and no ligatures; see Limits), for labels and signage.
 
 ```ts
 import {Engine, box} from 'margoengine/core';

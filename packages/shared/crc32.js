@@ -1,5 +1,5 @@
 // CRC-32 (ISO 3309, reflected polynomial 0xEDB88320): the exporters ZIP, USDZ and PNG writers, the decoders PNG reader,
-// the loaders ZIP reader (its public crc32), the voxel-pathtracer PNG writer and machinery's CAD tessellation hash.
+// the loaders ZIP reader (its public crc32), and the voxel-pathtracer PNG writer.
 
 /** Eight 256-entry tables: table k advances a byte through k further zero bytes ("slicing-by-8"). */
 let tables;

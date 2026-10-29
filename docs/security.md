@@ -16,7 +16,7 @@ option objects you set. Margo does not sanitise these. If your app passes a URL 
 is your app's input to check.
 
 **Untrusted: everything inside an asset file and everything from the network.** glTF/GLB JSON (names, `extras`,
-extensions, URIs), .margo, OBJ/STL/PLY/3MF/PCD/XYZ/OFF/VTK, FBX, USD/USDA/USDC/USDZ, IFC, STEP/IGES, KTX2/Basis,
+extensions, URIs), .margo, OBJ/STL/PLY/3MF/PCD/XYZ/OFF/VTK, FBX, USD/USDA/USDC/USDZ, IFC, KTX2/Basis,
 Draco, meshopt, EXR/HDR/UltraHDR, audio/video metadata, `@margoengine/net` snapshots and replies from Margo's own
 workers.
 
@@ -53,7 +53,7 @@ workers.
   Text parsers have no regex with super-linear backtracking on file input (the STL facet scan and the 3MF attribute
   regex were quadratic). Parser fuzzing is gate 11 (a).
 - **No `eval`.** No package source uses `eval`, `new Function` or string timers, and every dynamic `import()` names a
-  fixed module. The shipped Basis and OCCT glue is rewritten so the decoder and CAD workers run without
+  fixed module. The shipped Basis glue is rewritten so the decoder workers run without
   `'unsafe-eval'` (`tests/no-eval-workers.test.js`; see [deploying.md](deploying.md)).
 
 ## What your app must do

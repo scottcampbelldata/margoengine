@@ -330,11 +330,11 @@ export class Picking implements EnginePlugin {
   }
   private fresh(): boolean {
     const e = this.engine!;
-    // shortcut: mutable clipping uniforms have no revision, use the micro pass while sections are attached.
+    // shortcut: mutable clipping uniforms have no revision, use the micro pass while a `section` plugin is attached.
     if (
       this.primitives.hasSources ||
       !this.captured ||
-      e.hasPlugin('section-planes') ||
+      e.hasPlugin('section') ||
       this.graph !== e.frameGraph ||
       this.graphRevision !== e.frameGraph.revision ||
       this.snapshot.size !== e.meshes.size ||

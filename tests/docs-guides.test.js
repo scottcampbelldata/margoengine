@@ -54,11 +54,6 @@ test('the start page routes to every guide and the README routes to the start pa
   assert.ok(read('README.md').includes('docs/start-here.md'));
 });
 
-test('no public page names the private CAD kernel', () => {
-  for (const file of ['README.md', 'docs/start-here.md', ...GUIDES.map((g) => g.file)])
-    assert.doesNotMatch(read(file), /\bbrep\b/i, `${file} must not mention brep`);
-});
-
 test('every guide code block is TypeScript, shell or HTML, so it is checked or clearly not code', () => {
   for (const guide of GUIDES)
     for (const b of blocks(read(guide.file)))

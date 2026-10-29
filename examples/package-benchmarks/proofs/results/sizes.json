@@ -133,17 +133,6 @@
       },
       "gzipDelta": 476
     },
-    "machinery": {
-      "before": {
-        "raw": 84327,
-        "gzip": 34389
-      },
-      "after": {
-        "raw": 85302,
-        "gzip": 34720
-      },
-      "gzipDelta": 331
-    },
     "navmesh": {
       "before": {
         "raw": 8703,

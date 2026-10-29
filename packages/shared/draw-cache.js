@@ -1,6 +1,6 @@
 // Pieces of core's mesh draw that plugins drawing core meshes the same way reuse: the instanced vertex layout of core
-// geometry and the per-pipeline bind group cache keyed by the frame's extra bindings (core's renderer, machinery's
-// part packs, selection's picking).
+// geometry and the per-pipeline bind group cache keyed by the frame's extra bindings (core's renderer, selection's
+// picking).
 
 /** Core mesh vertex buffers: interleaved position and normal (24 bytes), then 96-byte instance records (6 vec4f). */
 export const coreMeshBuffers = [

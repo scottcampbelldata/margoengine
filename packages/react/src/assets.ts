@@ -242,7 +242,7 @@ export function disposeAssetCache(cache: AssetCache): void {
   cache.environments.clear();
 }
 /**
- * Warms `key` in every active Canvas with `start`, or queues it until a Canvas exists: the shared machinery of
+ * Warms `key` in every active Canvas with `start`, or queues it until a Canvas exists: the shared mechanism of
  * `Gltf.preload`, `Fbx.preload` and `Environment.preload`.
  */
 export function preloadAsset(key: string, start: (cache: AssetCache) => Promise<void>): Promise<void> {

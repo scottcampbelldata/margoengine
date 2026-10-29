@@ -22,7 +22,6 @@ All pages need a browser with WebGPU. A page shows a short notice when WebGPU is
 | --- | --- |
 | [animation-formats.html](animation-formats.html) | Collada skins and glTF animation pointers |
 | [batched-mesh.html](batched-mesh.html) | Many shapes drawn in one call |
-| [cad-views.html](cad-views.html) | Top, front, right and perspective views of one model |
 | [character-animation.html](character-animation.html) | A walking robot with blendable expressions |
 | [clipping-planes.html](clipping-planes.html) | Section planes on every material |
 | [depth-texture.html](depth-texture.html) | A depth texture that any material can sample |

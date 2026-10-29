@@ -1,7 +1,8 @@
 // Built package imports exercise the same loader and rendering boundary as consumers.
 import { Engine, Geometry, PbrMaterial } from '../packages/core/dist/extension.js';
 import { loadGLTF } from '../packages/gltf-pro/dist/index.js';
-import { SectionPlanes } from '../packages/machinery/dist/index.js';
+// The scene `section` binding that gltf-pro and shadows read comes from the test section plugin.
+import { TestSectionPlugin } from './support/section-plugin.js';
 import { Shadows } from '../packages/shadows/dist/index.js';
 
 declare global {
@@ -19,7 +20,7 @@ const engine = await Engine.create(document.querySelector('canvas')!, {
   errors: string[] = [],
   asset = '/packages/exporters/tests/fixtures/Box.glb',
   model = await loadGLTF(engine, asset),
-  section = new SectionPlanes({ planes: [[1, 0, 0, 0]], cap: false }),
+  section = new TestSectionPlugin({ planes: [[1, 0, 0, 0]] }),
   shadows = new Shadows({
     resolution: 1024,
     bounds: { min: [-3, -2, -2], max: [3, 2, 1] },

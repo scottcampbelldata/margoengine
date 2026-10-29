@@ -1,4 +1,4 @@
-// Page helpers the three multi-view demos share (cad-views, split-screen, minimap): an outlined, labelled box over
+// Page helpers the two multi-view demos share (split-screen, minimap): an outlined, labelled box over
 // each view that its controls listen on, click-to-pick through that view, the reduced-motion pause and a frame timer.
 // Only public APIs: engine.views, engine.render({views}), engine.pick(x, y, view).
 import type { EngineKernel, Mesh, RenderView } from 'margoengine';

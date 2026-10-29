@@ -976,16 +976,6 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       params: {},
       data: () => ({ bytes: stlBytes(grid(320)) }),
     },
-    'p-stl-cad': {
-      area: 'loaders',
-      kind: 'task',
-      rows: ['10.11'],
-      title: 'STL parse, CAD path',
-      draws:
-        'One call: parse the same binary STL through the CAD path (welded parts, face normals and GPU meshes). Margo only: three.js has no CAD path; compare with p-stl.',
-      params: {},
-      data: () => ({ bytes: stlBytes(grid(320)) }),
-    },
     'p-ply': {
       area: 'loaders',
       kind: 'task',
@@ -1672,7 +1662,7 @@ export const ROWS = {
   '10.8': { scenes: ['p-fbx'] },
   '10.9': { scenes: ['p-obj'] },
   '10.10': { scenes: ['p-mtl'] },
-  '10.11': { scenes: ['p-stl', 'p-stl-normals', 'p-stl-cad'] },
+  '10.11': { scenes: ['p-stl', 'p-stl-normals'] },
   '10.12': { scenes: ['p-ply'] },
   '10.13': { scenes: ['p-3mf'] },
   '10.14': { scenes: ['p-usdz'] },
@@ -1780,10 +1770,8 @@ export const LABELS = {
   'helmet-filterpcf-cascades1':
     "the shadow setup closest to three's: filter 'pcf', 1 cascade (three: one PCFSoftShadowMap)",
   'p-stl':
-    "parseSTL: STL raw triangles + flat normals (typed arrays, no weld) against three's STLLoader, which copies the file's zero normals (an accepted difference in work); its first runs timed the CAD path, now p-stl-cad",
+    "parseSTL: STL raw triangles + flat normals (typed arrays, no weld) against three's STLLoader, which copies the file's zero normals (an accepted difference in work); its first runs timed a weld-and-parts path that left with the CAD package",
   'p-stl-normals': "like-for-like with usable normals: parseSTL against three's STLLoader + computeVertexNormals()",
-  'p-stl-cad':
-    'parseCAD: CAD parse with weld and topology (welded parts, face normals, GPU meshes; no three.js equivalent)',
   'p-marching-cubes-dense':
     'dense: the original workload, every ball summed at every grid point (more work than three, whose add-on writes each ball only near it)',
   'p-marching-cubes-localized':

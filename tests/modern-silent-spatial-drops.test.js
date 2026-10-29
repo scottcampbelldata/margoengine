@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parseGLTF } from '@margoengine/gltf';
 import { MeshBVH, Raycaster } from '@margoengine/bvh';
-import { AssemblyBVH } from '@margoengine/machinery/spatial';
 import { Picking, Selection } from '@margoengine/selection';
 import { parseGLTF as parsePBR } from '@margoengine/gltf-pro';
 import { meshTriangles } from '../packages/shared/mesh-source.js';
@@ -256,42 +255,6 @@ for (const fixture of loadedPBRFixtures) {
     });
   });
 
-  test(`${fixture.producer}: mixed AssemblyBVH retains real ${fixture.asset} beside a loader-backed core control`, async () => {
-    await withLoaded(fixture, async (loaded) => {
-      const { engine, mesh, primitive } = loaded,
-        { ray } = await loadedRay(loaded);
-      // Parse the checked-in Box again through the real basic glTF loader only
-      // as a positive control. The PBR subject keeps its loader-owned buffers.
-      const controlModel = coreControl(engine),
-        control = controlModel.meshes[0];
-      controlModel.root.setPosition([1000, 1000, 1000]);
-      engine.store.tick(false);
-      const controlPositions = new Float32Array(control.geometry.vertices.length / 2);
-      for (let at = 0; at < controlPositions.length; at += 3)
-        controlPositions.set(control.geometry.vertices.subarray(at * 2, at * 2 + 3), at);
-      const controlRay = triangleRay(worldPositions(controlPositions, control.matrix), control.geometry.indices);
-      const assembly = await AssemblyBVH.create([mesh, control]);
-      try {
-        assert.equal(
-          assembly.raycast(controlRay.origin, controlRay.direction)?.node === control,
-          true,
-          'accepted mixed BVH is valid and its core control remains hittable',
-        );
-        assert.equal(mesh.geometry, null, 'real loaded PBR node was not given a core Geometry');
-        assert.ok(primitive.indices.length > 0);
-        const hit = assembly.raycast(ray.origin, ray.direction);
-        assert.equal(
-          hit?.node === mesh,
-          true,
-          'accepted mixed BVH must retain the real loaded part instead of silently returning null',
-        );
-      } finally {
-        assembly.dispose();
-        controlModel.dispose();
-      }
-    });
-  });
-
   // Loader sources are discovered from selected nodes. Explicit registration
   // remains supported and must not duplicate the discovered primitive draws.
   test(`${fixture.producer}: Selection.set retains real ${fixture.asset} without silently encoding zero mask triangles`, async () => {
@@ -353,14 +316,6 @@ test('real loader primitives remain distinct on one node and Selection only mask
       const hits = caster.intersectMeshes(loaded.engine, [mesh]);
       assert.equal(hits.length % 2, 0);
       assert.ok(hits.length >= 2, 'both source primitives contribute hits');
-      const assembly = await AssemblyBVH.create([mesh]);
-      try {
-        const hit = assembly.raycast(ray.origin, ray.direction);
-        assert.equal(hit.node, mesh);
-        assert.ok(assembly.snap(hit, { kind: 'edge' }));
-      } finally {
-        assembly.dispose();
-      }
       const selection = Selection.attach(loaded.engine);
       try {
         selection.set([mesh]);
@@ -389,8 +344,7 @@ test('real loader primitives remain distinct on one node and Selection only mask
 test('active GPU deformation rejects synchronous bind-pose queries and selection prepares the live model once', async () => {
   await withLoaded(loadedPBRFixtures[1], async (loaded) => {
     const { engine, model, mesh, primitive } = loaded,
-      { raycaster } = await loadedRay(loaded),
-      assembly = await AssemblyBVH.create([mesh]);
+      { raycaster } = await loadedRay(loaded);
     let prepared = 0;
     const deformed = engine.gpu.createBuffer({
       size: primitive.vertices.byteLength,
@@ -414,8 +368,6 @@ test('active GPU deformation rejects synchronous bind-pose queries and selection
     try {
       assert.throws(() => raycaster.intersectMeshes(engine, [mesh]), /Deformed.*intersectModel/);
       assert.throws(() => raycaster.intersectEngine(engine), /Deformed.*intersectModel/);
-      await assert.rejects(AssemblyBVH.create([mesh]), /Deformed.*intersectModel/);
-      assert.throws(() => assembly.rebuild(), /Deformed.*intersectModel/);
       const posedRay = triangleRay(
           worldPositions(primitivePositions({ vertices: posed }), mesh.matrix),
           primitive.indices,
@@ -447,7 +399,6 @@ test('active GPU deformation rejects synchronous bind-pose queries and selection
     } finally {
       primitive.deformed = undefined;
       deformed.destroy();
-      assembly.dispose();
     }
   });
 });

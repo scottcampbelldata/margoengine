@@ -68,11 +68,6 @@
        "ok": true,
        "detail": "Stats, HTML labels, ViewCube, Inspector",
        "ms": 10
-      },
-      "machinery STEP": {
-       "ok": true,
-       "detail": 1,
-       "ms": 545
       }
      }
     },

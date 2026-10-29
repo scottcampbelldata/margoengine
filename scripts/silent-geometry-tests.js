@@ -15,7 +15,6 @@ export async function silentGeometryBrowserChecks(page) {
     const { BoxHelper, VertexNormalsHelper } = await import('/packages/lines/dist/index.js');
     const { Picking, Selection } = await import('/packages/selection/dist/index.js');
     const { Raycaster } = await import('/packages/bvh/dist/index.js');
-    const { AssemblyBVH } = await import('/packages/machinery/dist/spatial.js');
     const { Shadows } = await import('/packages/shadows/dist/index.js');
     const { Clustered } = await import('/packages/clustered/dist/index.js');
     const { TAA } = await import('/packages/taa/dist/index.js');
@@ -545,12 +544,6 @@ export async function silentGeometryBrowserChecks(page) {
           ray.intersectEngine(instance).some((hit) => hit.mesh === mesh),
           'engine Raycaster dropped the loaded mesh',
         );
-        const assembly = await AssemblyBVH.create([mesh]);
-        try {
-          check(assembly.raycast(origin, direction)?.node === mesh, 'AssemblyBVH dropped a loaded mesh');
-        } finally {
-          assembly.dispose();
-        }
         summary.staticQueries = true;
         const box = new BoxHelper(mesh),
           normals = new VertexNormalsHelper(mesh);

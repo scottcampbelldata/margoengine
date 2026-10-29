@@ -1,5 +1,5 @@
 // Kernel math in Node (the same Wasm as the browser): transform propagation, frustum culling, matrix maths, BVH
-// raycasts on a mesh and on an assembly.
+// raycasts on a mesh.
 import { headlessEngine, ms, nodeCase, timed } from '../lib/node.mjs';
 
 const dist = (p) => `../../packages/${p}/dist/index.js`;
@@ -96,37 +96,6 @@ export default {
           return { buildMs, raysMs };
         },
         { teardown: async () => delete state.grid },
-      ),
-      nodeCase(
-        'raycast-assembly-500',
-        '1,000 rays against a 500-part assembly (@margoengine/machinery AssemblyBVH)',
-        { raysMs: ms() },
-        async () => {
-          const { AssemblyBVH } = await import(dist('machinery'));
-          const { box } = await import('../../packages/core/dist/extension.js');
-          if (!state.assembly) {
-            const e = await headlessEngine(502),
-              nodes = Array.from({ length: 500 }, (_, i) => e.createMesh().setGeometry(box()).setPosition([i, 0, 0]));
-            e.render({ culling: false });
-            state.assembly = { e, nodes, bvh: await AssemblyBVH.create(nodes) };
-          }
-          const { bvh, nodes } = state.assembly;
-          return {
-            raysMs: timed(
-              () => {
-                for (let i = 0; i < 1000; i++) bvh.raycast([nodes[i % 500].position.x, 0, 4], [0, 0, -1]);
-              },
-              { reps: 15 },
-            ),
-          };
-        },
-        {
-          teardown: async () => {
-            state.assembly?.bvh.dispose();
-            state.assembly?.e.dispose();
-            delete state.assembly;
-          },
-        },
       ),
     ];
   },

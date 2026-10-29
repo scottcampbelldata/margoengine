@@ -17,7 +17,7 @@ lit scene with shadows, orbit controls and click-to-select.
 | Show a `.glb` or `.gltf` model | [Loading glTF](guides/loading-gltf.md) |
 | Play a character's animation clips | [Animation](guides/animation.md) |
 | Walk through a building in first person | [Walkthrough](guides/walkthrough.md) |
-| Show a STEP, IGES, STL or OBJ file | [Imports](guides/imports.md) and the [machinery README](../packages/machinery/README.md) |
+| Show an STL or OBJ file | [Imports](guides/imports.md) and the [loaders README](../packages/loaders/README.md) |
 | Make the scene look better (bloom, SSAO, tone mapping) | [post](../packages/post/README.md), [tonemap](../packages/tonemap/README.md) |
 | Add physics | [physics](../packages/physics/README.md) |
 | Draw text or game menus | [text](../packages/text/README.md), [ui](../packages/ui/README.md) |

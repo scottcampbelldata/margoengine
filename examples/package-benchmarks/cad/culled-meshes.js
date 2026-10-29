@@ -1,12 +1,8 @@
 // Browser side of culled-meshes.mjs: engine A draws core meshes through @margoengine/culling's CulledMeshes (GPU frustum
-// culling, rendered with culling:false so the CPU does not cull), engine B is plain core drawing every part (no culling at all,
-// so FeatureEdges sees the same instances on both). Same scene,
-// same edits; FeatureEdges, ExplodedView, engine.pick and AssemblyBVH run on both.
+// culling, rendered with culling:false so the CPU does not cull), engine B is plain core drawing every part (no culling at
+// all). Same scene, same edits (an exploded layout, moved, hidden and added parts); engine.pick runs on both.
 import { Engine } from '../../../packages/core/dist/index.js';
 import { CulledMeshes } from '../../../packages/culling/dist/index.js';
-import { FeatureEdges } from '../../../packages/machinery/dist/edges.js';
-import { ExplodedView } from '../../../packages/machinery/dist/exploded.js';
-import { AssemblyBVH } from '../../../packages/machinery/dist/spatial.js';
 import { buildAssembly } from './assembly.js';
 
 const errors = [],
@@ -23,18 +19,23 @@ async function setup() {
   culled = CulledMeshes.attach(a);
   sides = [a, b].map((e) => {
     const assembly = buildAssembly(e, 24);
-    if (location.search.includes('edges')) e.use(new FeatureEdges({ angle: 30, width: 1.5 }));
-    const explode = new ExplodedView(
-      assembly.parts.map((p) => ({
-        node: p,
-        offset: [p.matrix[12] * 0.4, 0.06 + (p.name === 'bolt' ? 0.08 : 0), p.matrix[14] * 0.4],
-      })),
-    );
-    e.use(explode);
-    return { e, assembly, explode };
+    return { e, assembly, explode: exploded(assembly.parts) };
   });
   await draw();
   return { parts: sides[0].assembly.parts.length, capacity: a.store.capacity };
+}
+// Moves each part out from the centre by `amount` of its offset (an exploded layout in plain core transforms).
+function exploded(parts) {
+  const rows = parts.map((p) => ({
+    p,
+    base: [p.position.x, p.position.y, p.position.z],
+    offset: [p.matrix[12] * 0.4, 0.06 + (p.name === 'bolt' ? 0.08 : 0), p.matrix[14] * 0.4],
+  }));
+  return {
+    set amount(amount) {
+      for (const { p, base, offset } of rows) p.setPosition(base.map((v, axis) => v + offset[axis] * amount));
+    },
+  };
 }
 const draw = async () => {
   a.render({ culling: false });
@@ -114,14 +115,5 @@ async function picks() {
   await draw();
   return out;
 }
-// Ray from the eye to the plate of the second module (the first module is hidden at step 5; hidden parts are not hit).
-async function bvh() {
-  const index = await AssemblyBVH.create(sides[0].assembly.parts),
-    eye = a.camera.position,
-    m = sides[0].assembly.parts[27].matrix,
-    hit = index.raycast([...eye], [m[12] - eye[0], m[13] - eye[1], m[14] - eye[2]]);
-  index.dispose();
-  return { hit: !!hit, part: hit ? sides[0].assembly.parts.indexOf(hit.node) : -1 };
-}
-window.check = { setup, step, steps: steps.length, picks, bvh, errors };
+window.check = { setup, step, steps: steps.length, picks, errors };
 window.ready = true;

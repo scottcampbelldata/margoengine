@@ -467,7 +467,7 @@
     "package": "@margoengine/cache",
     "version": "1.0.0",
     "published": false,
-    "description": "Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin, textures and STEP files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback.",
+    "description": "Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin and texture files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback.",
     "requirements": "See the package guide for requirements",
     "keywords": "cache",
     "install": "npm install @margoengine/cache@1.0.0",
@@ -2336,50 +2336,6 @@
     ]
   },
   {
-    "id": "machinery",
-    "title": "Machinery & CAD",
-    "package": "@margoengine/machinery",
-    "description": "Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine.",
-    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
-    "keywords": "conveyor rollers motor gears piston robot arm industrial kinematics revolute prismatic ik stl obj cad metrology measurements cutting caps annotations assembly",
-    "install": "npm install @margoengine/core@1.0.0 @margoengine/machinery@1.0.0",
-    "imports": "import { Engine, box, PbrMaterial } from '@margoengine/core';\nimport { Kinematics } from '@margoengine/machinery';",
-    "exports": [
-      "AssemblyBVH",
-      "AssemblyIndex",
-      "EngineeringAnnotations",
-      "ExplodedView",
-      "Kinematics",
-      "PartInstancer",
-      "SectionPlanes",
-      "SurfacePhysics",
-      "TelemetryChannel",
-      "boxSection",
-      "deduplicateParts",
-      "edgeAnchor",
-      "faceAnchor",
-      "holeAnchor",
-      "industrialMaterial",
-      "industrialMaterials",
-      "loadCAD",
-      "measureClearance",
-      "measureDistance",
-      "parseCAD",
-      "parseCADAsync",
-      "projectAnnotation",
-      "snapAnchor",
-      "snapFeature",
-      "vertexAnchor",
-      "worldAnchor"
-    ],
-    "example": "./examples/machinery.html",
-    "exampleTitle": "Drive a bounded joint",
-    "exampleNote": "Animate a revolute joint with Kinematics. The package also supports worker-based STL, OBJ, STEP and IGES import; see its guide for formats and CAD asset loading.",
-    "version": "1.0.0",
-    "published": false,
-    "category": "CAD and engineering"
-  },
-  {
     "id": "bvh",
     "title": "Bvh",
     "package": "@margoengine/bvh",
@@ -2414,7 +2370,7 @@
       "terminateBVHWorker",
       "worldTriangles"
     ],
-    "category": "CAD and engineering"
+    "category": "Geometry and spatial"
   },
   {
     "id": "geometry",
@@ -2485,12 +2441,12 @@
       "wireframe",
       "wireframePositions"
     ],
-    "category": "CAD and engineering"
+    "category": "Geometry and spatial"
   },
   {
     "id": "mesh-edit",
     "title": "Mesh-edit",
-    "category": "CAD and engineering",
+    "category": "Geometry and spatial",
     "package": "@margoengine/mesh-edit",
     "version": "1.0.0",
     "published": false,

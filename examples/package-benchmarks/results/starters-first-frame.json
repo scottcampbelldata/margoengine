@@ -7,7 +7,6 @@
   "templates": {
     "web": { "createMs": 68, "devServerMs": 50, "firstFrameAfterServerMs": 669, "totalMs": 788 },
     "game": { "createMs": 101, "devServerMs": 11, "firstFrameAfterServerMs": 1196, "totalMs": 1308 },
-    "cad": { "createMs": 53, "devServerMs": 11, "firstFrameAfterServerMs": 469, "totalMs": 533 },
     "viz": { "createMs": 54, "devServerMs": 11, "firstFrameAfterServerMs": 902, "totalMs": 968 },
     "react": { "createMs": 55, "devServerMs": 12, "firstFrameAfterServerMs": 768, "totalMs": 835 }
   },

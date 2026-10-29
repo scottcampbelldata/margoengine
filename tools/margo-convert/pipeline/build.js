@@ -18,7 +18,6 @@ export const MANIFEST_NAME = 'margo-manifest.json';
 export const REPORT_NAME = 'margo-size-report.txt';
 
 const MODEL = new Set(['.glb', '.gltf']);
-const CAD = new Set(['.step', '.stp', '.iges', '.igs', '.brep']);
 const TEXTURE = new Set(['.png', '.jpg', '.jpeg']);
 const AUDIO = new Set(['.wav', '.mp3', '.ogg', '.opus', '.flac', '.m4a', '.aac']);
 const IMAGE_EXTENSION = /** @type {Record<string, string>} */ ({
@@ -45,7 +44,7 @@ const posix = (p) => p.split(sep).join('/');
  * What happened to one input.
  * @typedef {object} ManifestEntry
  * @property {string} source relative to the input folder, forward slashes
- * @property {'model'|'cad'|'texture'|'audio'} kind
+ * @property {'model'|'texture'|'audio'} kind
  * @property {number} sourceBytes
  * @property {string} sourceSha256 hash of the file (and of the external files a .gltf reads)
  * @property {string} settingsSha256 hash of the preset, tool version and encoders used
@@ -202,15 +201,7 @@ export async function build(options) {
     options.signal?.throwIfAborted();
     if (consumed.has(resolve(file))) continue;
     const ext = extname(file).toLowerCase();
-    const kind = MODEL.has(ext)
-      ? 'model'
-      : CAD.has(ext)
-        ? 'cad'
-        : TEXTURE.has(ext)
-          ? 'texture'
-          : AUDIO.has(ext)
-            ? 'audio'
-            : null;
+    const kind = MODEL.has(ext) ? 'model' : TEXTURE.has(ext) ? 'texture' : AUDIO.has(ext) ? 'audio' : null;
     const source = posix(relative(base, file)) || basename(file);
     if (!kind) {
       ignored.push(source);
@@ -322,20 +313,15 @@ function emit(outDir, rel, data, hashNames) {
 }
 
 /**
- * Optimises one model file (STEP, IGES and BREP are converted to GLB first) for a preset.
- * @param {string} file path, used to find the external files of a .gltf and to tell CAD formats apart
+ * Optimises one model file (GLB or glTF) for a preset.
+ * @param {string} file path, used to find the external files of a .gltf
  * @param {Uint8Array} data the file's bytes
  * @param {import('./presets.js').Preset} preset
  * @param {{sharp?: any}} [tools] `sharp`: the sharp module for texture encoding (omit for PNG only)
  * @returns {Promise<import('./optimize.js').ModelResult>}
  */
 export async function optimizeModelFile(file, data, preset, tools = {}) {
-  let bytes = data;
-  if (CAD.has(extname(file).toLowerCase())) {
-    const { convert, formatOf } = await import('../convert.js');
-    bytes = (await convert(data, formatOf(file))).glb;
-  }
-  return optimizeModel(bytes, preset.model, {
+  return optimizeModel(data, preset.model, {
     resolve: (uri) => new Uint8Array(readFileSync(modelFile(dirname(file), uri))),
     textures: { preset: preset.texture, sharp: tools.sharp ?? null },
   });
@@ -347,9 +333,8 @@ export async function optimizeModelFile(file, data, preset, tools = {}) {
  */
 async function buildOne(entry, file, data, preset, outDir, hashNames, tools) {
   const stem = entry.source.replace(/\.[^./]+$/, '');
-  if (entry.kind === 'model' || entry.kind === 'cad') {
+  if (entry.kind === 'model') {
     const result = await optimizeModelFile(file, data, preset, tools);
-    if (entry.kind === 'cad') entry.notes.push('converted from CAD with OCCT');
     if (result.skipped) {
       entry.status = entry.kind === 'model' && extname(file).toLowerCase() === '.glb' ? 'copied' : 'skipped';
       entry.notes.push(`not optimised: ${result.skipped}`);
@@ -449,7 +434,7 @@ export function sizeReport(manifest, ignored = []) {
   lines.push(
     `${t.inputs} inputs: ${t.built} built, ${t.cached} cached, ${t.copied} copied, ${t.skipped} skipped, ${t.failed} failed`,
   );
-  for (const kind of ['model', 'cad', 'texture', 'audio']) {
+  for (const kind of ['model', 'texture', 'audio']) {
     const of = manifest.files.filter((e) => e.kind === kind);
     if (!of.length) continue;
     const before = of.reduce((n, e) => n + e.sourceBytes, 0),

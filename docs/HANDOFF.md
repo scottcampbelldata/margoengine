@@ -50,7 +50,7 @@
 - `@margoengine/react` installed alone now builds with webpack and Turbopack (Next.js 16 App Router), Vite, Rollup
   and esbuild: the root entry holds only bindings that need no optional package; a binding that needs
   `@margoengine/<name>` is imported from `@margoengine/react/<name>` (controls, gltf-pro, fbx, animation,
-  environment, html, shadows, sky, text, geometry, materials, post, dof, tonemap, taa, machinery, voxel, physics, xr).
+  environment, html, shadows, sky, text, geometry, materials, post, dof, tonemap, taa, voxel, physics, xr).
   `/kit` is gone. `margoengine/react` (the one install) still exports every binding except physics.
 - API: `<Canvas shadows>` / `<Stage shadows>` became `<Shadows />` (`/shadows`); `castShadow` alone no longer turns
   shadows on. `preload(url)` became `Gltf.preload`, `Fbx.preload`, `Environment.preload`. `<Mesh layers>` needs no
@@ -63,7 +63,7 @@
 ## Landed 2026-10-27: stage feature entries (stage freeze exception, part 1 of the React install fix)
 
 - The `Stage` class lost its ten optional-package methods; each is now a function in its own entry that takes the
-  stage: `addGLTF` (`@margoengine/stage/gltf`), `addCAD` (`/cad`), `addSky`, `addParticles`, `addEffects`,
+  stage: `addGLTF` (`@margoengine/stage/gltf`), `addSky`, `addParticles`, `addEffects`,
   `addEnvironment`, `addShadows`; the whole-pack accessors became plain `import()`. Scott lifted the stage from the
   freeze for this one change (AGENTS.md, docs/conventions.md#core-freeze). Callers: `node scripts/codemod-stage-loaders.mjs`.
 - Size gate: core + stage 22,781 -> 21,910 B gzip (`npm run measure:size`), 3,090 B under the gate. Core untouched.
@@ -120,7 +120,7 @@ Last updated 2026-10-28. Read this first when starting a new session. Update it 
 root browser suites (modern, XR, USDZ, postfx, modules, catalog) under one GPU lock hold; `check:merge` runs it. It
 finds package scripts by name and fails before running anything when a file under `packages/*/{test,tests,scripts}`
 drives a browser but no script runs it, when a root browser/GPU script is in no check, or when a test takes
-`gpu.lock` by hand. Twenty-three unrun GPU tests got package scripts (cameras, lod, machinery, materials, shader,
+`gpu.lock` by hand. Twenty-three unrun GPU tests got package scripts (cameras, lod, materials, shader,
 sky, staging, vfx, viewcube, voxel, voxel-pathtracer, post, terrain, exporters png/capture, gltf-pro shader review).
 Failures found on main and fixed in the tests: labels and text asked core for WebGL2 without `fallback:
 webglRenderer`; creative expected 4x MSAA and DPR 2 from the light tier and the phone tier (now 1x and DPR 1);
@@ -131,7 +131,7 @@ sun) and sampled a cleared lightmap before its pipelines were rebuilt; gltf-pro'
 fixed in shader). After the rebase it caught a new bug: materials' no-map `bareShader` (c640305c) left reads of undeclared
 maps over gltf-pro's KHR physical shader (`specularColorMap`); fixed in materials with a regression test.
 
-## Landed 2026-10-25: provenance sweep and IGES reader
+## Landed 2026-10-25: provenance sweep
 
 Provenance sweep: FXAA rebuilt from Lottes' FXAA whitepaper (`post/fxaa`); the transmission blur footprint now comes
 from the median GGX facet tilt and Snell's law; voxel light levels 0-15 are equal CIE L* steps; Phong
@@ -139,12 +139,6 @@ from the median GGX facet tilt and Snell's law; voxel light levels 0-15 are equa
 [clean-room.md](clean-room.md) with the full table; FBX Phong shininess maps to roughness like materials. New:
 Eight voxel views re-recorded (light curve); post-ssr and post-ssr-models advanced for the FXAA shader. Core + stage
 unchanged at 22,737 B.
-
-## 2026-10-25: public CAD is OpenCascade
-
-Scott: the engine's CAD import is OpenCascade only. Here, STEP and IGES stay on OpenCascade; machinery takes an
-optional `importer` function on `loadCAD` / `parseCADAsync` for a reader the engine does not ship (TSDoc, README,
-`tests/cad-importer.test.js`). The `cad` starter loads a STEP part through OpenCascade. Rule in AGENTS.md.
 
 ## Landed 2026-10-24: pixel-exact drawing (`exactSize`)
 
@@ -168,15 +162,14 @@ broke the cycle the umbrella would have made. Core + stage is measured from `pac
 Third-party libraries (Rapier, web-ifc, React) are optional peers. Quality gates, API reports and entry sizes skip
 the generated aliases.
 
-Kits: `margoengine/game`, `/cad`, `/viz`, `/web`, named re-exports listed in `scripts/umbrella.mjs` (contents and
+Kits: `margoengine/game`, `/viz`, `/web`, named re-exports listed in `scripts/umbrella.mjs` (contents and
 full sizes in [guides/kits.md](guides/kits.md); an unused name costs nothing, checked per kit). Starters:
-`npm create margo@latest my-game -- --template game` (templates web, game, cad, viz, react, next), each depending on
+`npm create margo@latest my-game -- --template game` (templates web, game, viz, react, next), each depending on
 `margoengine` alone; `tests/create-margo.test.js` builds every Vite template and type-checks the Next one. The
 "which import do I need" page is [guides/imports.md](guides/imports.md).
 
 Second landing: every template opens to a lit, animated scene with a README of three things to try (game: Prototype
-Pete walks and runs in a sunny field with physics crates and six orbs to collect; cad: a STEP
-plate read through OpenCascade, live dimensions, click-to-measure, section, view cube; viz: a 300,000-point
+Pete walks and runs in a sunny field with physics crates and six orbs to collect; viz: a 300,000-point
 galaxy; web: the studio scene with shadows and a turntable; react/next: shapes in sun with soft shadows and bloom).
 `tools/create-margo/test/browser-check.mjs` runs each under `vite` dev in Edge and times create to first frame
 (0.5 to 1.3 s, packages linked, no install). Every package README shows `margoengine/...` imports;
@@ -191,7 +184,7 @@ reaching Rapier (fixed: physics is `margoengine/react/physics`), so the react an
 - Collada `<lookat>`, `<skew>`, cameras (`daeCameraView`) and lights (`daeEngineLights`) from the 1.4.1/1.5 spec, 9
   tests built from the spec text (`packages/loaders/tests/dae-scene.test.js`).
 - `clipIntersection` on every materials Material, LineMaterial and points/sprite material, and in directional
-  shadows (a material's planes bind as `materialClip`; scene SectionPlanes keep their unchanged shader text). The
+  shadows (a material's planes bind as `materialClip`; scene section planes keep their unchanged shader text). The
   clipping demo's torus knot loses a wedge to it.
 - DepthTexture: 10 node tests and `npm run check:depth` (in check:merge) reading depth back on the GPU at 1x and 4x.
   It found a real bug: SceneTargets recreated its textures every view when a canvas view and a target view of
@@ -318,13 +311,11 @@ waterlogging, tracer emission and cut-outs) landed next, above.
 
 ## Landed 2026-10-24: multi-view demos (roadmap M7 done)
 
-Three site demos built from public APIs only: [four-view CAD layout](../examples/cad-views.html) (top, front and right
-orthographic views plus perspective, one scene, a click picks per view and selects the part in all four),
-[split-screen two players](../examples/split-screen.html) (two chase cameras, each player's marker on a layer only
+Two site demos built from public APIs only: [split-screen two players](../examples/split-screen.html) (two chase cameras, each player's marker on a layer only
 their view draws) and [minimap](../examples/minimap.html) (a square straight-down ortho map over a chase view; the car
 arrow and route are map-only layers). Built by `scripts/build-site.js`, linked from the home page and the sitemap, in
 the visual check (high, light, phone), in `check:no-webgpu` (found automatically) and in a new `check:views` demos
-section (picks through each view, layers a view leaves out, frame time: 3.5, 3.4 and 3.5 ms on the RTX A6000).
+section (picks through each view, layers a view leaves out, frame time: 3.4 and 3.5 ms on the RTX A6000).
 `npm run bench -- scaling` gained `boxes-10000-views4` and `boxes-100000-views4` (4.44 ms CPU against 1.07 ms for one
 view at 100,000: the per-view kernel tick, roadmap M9). No engine change; core + stage unchanged at 22,253 B. Core
 throws `Pick pending` for a second `engine.pick` while one is in flight, so the demos drop such clicks. No HUD or
@@ -390,7 +381,7 @@ Later sessions shrink them (`--update`) and never grow them without `--reason`. 
 | --- | --- |
 | sizes | 257 entry/worker budgets; 78 static leaks (decoders reached by 21 entries, gltf-pro by 18, geometry by 13; `materials` root loads gltf-pro and decoders) |
 | duplicates | 30 package pairs, 1,120 lines (splats vs vfx 90, clustered vs shadows 88, fog.ts in lines/points/splats/vfx/water 70 per pair); 49 family copies (hidden-ancestor walk 16 packages, GGX 12, hex colour 7, glTF accessors 6, GLB 3, CRC table 3, partial view 2); 13 value re-exports |
-| tests | 51 entries no verify test imports (math 16, post 11, machinery 10, sky 5, creative 4, vfx 3, fbx 1, usdz 1); 0 packages without tests. Entries a test builds from a computed path (tests/modern-facade-isolation) are not seen |
+| tests | 51 entries no verify test imports (math 16, post 11, sky 5, creative 4, vfx 3, fbx 1, usdz 1); 0 packages without tests. Entries a test builds from a computed path (tests/modern-facade-isolation) are not seen |
 | api | 344 undocumented exports; 274 bare `Error` throws in 77 files; 1,431 throw messages naming no fix in 307 files |
 | clean-room | 31 mentions in 12 files (tests, fixtures and 2 READMEs); 5 third-party deps (web-ifc, rapier x2, react, react-dom); recast-navigation removed 2026-10-24 with the navigation package |
 
@@ -398,8 +389,7 @@ Later sessions shrink them (`--update`) and never grow them without `--reason`. 
 
 Codex's `work/changes` (82cef03e, 100 commits) was reviewed, rewritten and landed as per-change commits. Multiple
 views and scenes are in core as Scott's approved freeze exception: core + stage 22,253 B gzip (core 20,015), 2,747 B
-under the 25,000 B gate. Every package is view-aware ([multi-view-roadmap.md](multi-view-roadmap.md)); only the M7
-CAD demos are open. One clean-room AgX in `packages/shared/agx.js`. Public renames for the apps:
+under the 25,000 B gate. Every package is view-aware ([multi-view-roadmap.md](multi-view-roadmap.md)); the multi-view demos are done. One clean-room AgX in `packages/shared/agx.js`. Public renames for the apps:
 [renames-2026-10-24.md](renames-2026-10-24.md). Removed until done properly: voxel slab and stair shapes (back since,
 see the slabs and stairs landing above).
 Checks at landing: `npm run check:merge` (4,405 tests, proofs 20/20, visual 62/62, `check:views`) and hygiene with no
@@ -546,24 +536,6 @@ visual baselines, measured performance at render distance 8 and 16). Rapier 0.21
 Known limits: `setGeometry` cannot change the number of material groups; dispose a `Skin` before `setGeometry` on a
 skinned mesh; DAE export is static only; WebM pacing is approximate; GIF frame rate is capped at 50.
 
-Large-assembly drawing (2026-10-17): core gains one hook, `Batch.claimed` (core neither binds nor encodes a claimed
-batch and `engine.stats.drawCalls` leaves it out; picks still draw it), plus the type-only `DrawOptions.partIds`, set on
-selection's existing id draw. `@margoengine/machinery` `PartInstancer` packs small closed static parts into root-space
-buffers drawn inside every core draw; `deduplicateParts` shares glTF-pro GPU buffer pairs through gltf-pro's new
-`PBRModel.shareBuffers` (same model, not skinned or morphed); `parseCADAsync` takes an optional `linearDeflection`.
-Measured on this PC (NVIDIA Ampere): 1,000 distinct small boxes from a loaded OBJ draw as 1 pack draw (1,002 parts:
-3 draws instead of 1,002); 39/39 real-GPU checks (`node scripts/machinery-pack-tests.js`). Core + stage measures
-21,107 bytes gzip (+13), core 18,876. No stage, wireframe, exporters or SectionPlanes change.
-
-CAD triangles (2026-10-17): NIST_MTC_CRADA_ASSEMBLY_REV-D.STP failed to load. OpenCascade emits zero-area triangles
-(32 here: box 24, cover 8; two corners at the identical point), which threw "Degenerate CAD triangle"; and the weld keyed
-corners on a 1e-5 grid, 10 um in metres, which merged 23 distinct screw corners 1 nm-10 um apart and collapsed 46 real
-triangles ("Triangle collapses at CAD welding tolerance"). Corners now weld only at the same Float32 point (OpenCascade's
-shared-edge copies are bit-identical) and zero-area triangles stay, adding no normal weight; no triangle is left out.
-The earlier branch `claude/degenerate-triangles` (6daa7bf, 49660e4, d0d09f1), which dropped those triangles, is
-superseded and must not be merged. Through the built worker in Node: 36 parts, 158,370 of 158,370 triangles, all
-finite; regression `tests/cad-triangles.test.js`. Browser load and frame time with PartInstancer: not yet measured.
-
 Current parity work (2026-10-17): dispersion, depth/distance materials and back-side-only rendering are on main
 (`aa2150c`, `e8befe7`, `95b4eae`). Polygon offset, stencil and color-write controls are on main (`156c4b8`).
 Material wireframe is on main (`80de63c`) in optional materials/gltf-pro and directional/local/contact shadows.
@@ -595,8 +567,8 @@ PostStack's existing depthTexture and its consumers are unchanged. Selection's R
 proof are complete. The authorized loaded glTF-pro scene camera/light export in optional exporters is also complete;
 no further parity work is authorized. Do not start any MISSING row or change core, stage, wireframe, picking or the
 outline renderer.
-Section clipping now reuses the existing machinery
-uniform in optional glTF-pro and directional shadow shaders; core, stage and the machinery core-shader patch are unchanged.
+Section clipping now reuses the existing section
+uniform in optional glTF-pro and directional shadow shaders; core and stage are unchanged.
 Physical GPU Box.glb tests pass 15 checks at actual 1x/4x, including removal/retention of beauty and cast shadow.
 Stencil caps for loaded models remain a gap. Core + stage stayed exactly 21,094 bytes gzip.
 Section verification passes `npm run check:merge`: 2,518 Node tests, 15 current proofs and all 55 visual views,
@@ -681,7 +653,7 @@ Size facts for the pitch (three.js 0.186.1, minimal lit scene, minified / gzip, 
 Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude verified the result.
 
 - Kept, with proofs that all pass when re-run alone (slowest case 1.07x, most 1.5-6x): animation, animator,
-  bvh, creative, decoders, ecs, exporters, geometry, gltf, gltf-pro, labels, loaders, machinery (CAD parser),
+  bvh, creative, decoders, ecs, exporters, geometry, gltf, gltf-pro, labels, loaders,
   navmesh, points, post (SSAO), road, splats, splines, taa, terrain, text, wfc.
 - Size: about +5.5 kB gzip across those packages (`results/sizes.json`, `proofs/size.js`). Core + stage unchanged.
 - Reverted (no gain): fsm, procedural, blender. Already lean: scatter, water, sky, shadows, vfx, clustered, dof,
@@ -732,14 +704,14 @@ it with every number (on battery Windows throttles the CPU/GPU and may drop the 
      27/39, `gates-browser-tests-before-fixes.json`). Not passing: `modern-hardware-gpu-tests.js` needs a discrete
      NVIDIA/AMD GPU (`GPU_VENDOR`), not applicable on this laptop; `modern-package-tests.js` now installs and packs, then
      failed type-checking README snippets that were fragments. Fixed later the same day: every README snippet is
-     self-contained (animation, controls, creative, environment, gltf-pro, machinery, post, sky; gltf-pro's
+     self-contained (animation, controls, creative, environment, gltf-pro, post, sky; gltf-pro's
      `stage.engine.gpu` became `engineRuntime(stage.engine).gpu`), the script also packs materials, decoders, dof and
      tonemap (README imports), gives the packaged React tests the files they read, and aliases each export subpath
      exactly in the browser stage. README type-check, consumer and React unit tests (17/17) now pass. Still failing: the
      browser stage, because `@margoengine/bvh` dist/raycaster.js imports `../../shared/instances.js` (since `c0945b9`;
      bvh builds with plain tsc), which is outside the tarball. Broken for npm users too; needs a bvh build or source fix.
    - Stale tests fixed: postfx DOF uniform 32 -> 48 bytes (see below); WebGL2 paths now pass `fallback: webglRenderer`
-     (browser, wrapper, machinery runtime, stress; core needs the fallback since `1356787`); demos that need 4x MSAA or
+     (browser, wrapper, stress; core needs the fallback since `1356787`); demos that need 4x MSAA or
      unpaced frames load `?quality=high` (grass, extension); sky-fog test uses `sky.tables.view` and its own fog uniform
      (sky internals since `3bab400`); Vite starter status text "Bloom, atmosphere and FX"; package tests parse
      `npm pack --json` after prepack output, allow post's NOTICE.md and pack geometry/lines/text/bvh/math; extension
@@ -853,17 +825,16 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    skinning (silhouette IoU 0.98), merged atlas frame = separate (mean diff 0.07/255, 64 -> 1 draws), 1,024 walking robots
    in 1 draw at 0.7-0.9 ms CPU and 11-16 ms GPU per frame (7.4M vertices; machine busy). Left: VAT clip blending, half-float VAT (shadows/IBL for crowds: 5l.j).] Production optimizations (from Scott's three.js conference recap, Paris, Sept 2026): general LOD object (gap 18),
    octahedral imposters, texture atlases (needs texture transforms in materials), vertex animation textures for
-   GPU crowds. Imposters and LOD first; they serve CAD/simulator scenes and landing pages alike. Compute nodes belong
+   GPU crowds. Imposters and LOD first; they serve simulator scenes and landing pages alike. Compute nodes belong
    in the 1b shader package.
 1d'. [done] Imposter atlas seams: mip bleed (up to 0.43 coverage from neighbouring views at coarse mips) fixed with a
    per-level clamp; snapping (hard 0.5 coverage cut at view midpoints) fixed with a coverage cross-fade and one depth
    parallax step; numbers in packages/lod/README.md, check `node packages/lod/test/imposter-check.mjs`.
 1d''. [DONE, "Pipeline toggles 3/n" + "4/n"] Pipeline cache keyed by shader module + override-constant bitmask, with common
    permutations pre-warmed, so toggling a section plane or fog never stalls on a synchronous compile (pairs with 1e.f).
-   Done differently where cheaper: `SectionPlanes.enabled` and `Fog.enabled` switch by uniform (clip loop reads 0 planes;
+   Done differently where cheaper: Section planes and `Fog.enabled` switch by uniform (clip loop reads 0 planes;
    fog uploads near = far = float max, density 0), so the shader never changes and nothing compiles; while sections are
-   off their five cap pipelines compile with createRenderPipelineAsync, and switching on waits for them; FeatureEdges
-   compiles its other (section/plain) variant in the background. gltf-pro's pipeline key is now (state, shader-text id,
+   off their five cap pipelines compile with createRenderPipelineAsync, and switching on waits for them. gltf-pro's pipeline key is now (state, shader-text id,
    alpha-test bit) instead of the whole shader text (a 300-primitive lit draw 10.8 -> 1.3 ms CPU, mock GPU). Real GPU
    (Arc 140V, Edge 1280x720 4x, 1,600 boxes + DamagedHelmet + edges, fresh browser per run, 5 runs): adding the plugin
    when wanted spikes the frame +178 ms (sections, 146-228) / +121 ms (fog, 96-262); switching on a plugin created off at
@@ -884,70 +855,28 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 1d. [DONE: points, labels, clustered, splats, DOF `5cf148e`; SSAO (camera's own projection, signed depth; `scripts/ssao-gpu-check.js`); lines (world widths from the clip matrix's y row; perspective byte-identical, `examples/package-benchmarks/proofs/lines-perspective.proof.js`; ortho unit test, no GPU run)] Orthographic follow-ups: SSAO, lines/points world widths, labels CSS perspective, clustered froxels, DOF and splats
    assume a perspective camera; fix each in its own package. Optional core hook (Camera.projection + up) would remove
    the cameras package's update replacement; only if Scott wants it.
-1e. [a-d done, see below] CAD track (Scott, 2026-10-14: "the smallest, fastest, best CAD engine"; the visualization/interaction layer, not a
-   modelling kernel). Much already exists in @margoengine/machinery: SectionPlanes (with stencil caps),
-   ExplodedView, PartInstancer, AssemblyBVH, measurement, annotations, STEP/IGES/STL/OBJ via loadCAD. To do:
-   a. Audit and benchmark machinery at CAD scale on real hardware: 10k/50k/100k-part assemblies at 60 FPS, kernel tick
-      time per part count (a Node run measured about 12.8 ms per tick at 100,000 entities with 10-deep hierarchies and
-      culling, so "<0.5 ms for 50k" claims must be measured before use), pick latency, section-cap correctness.
-   b. Feature/crease edge lines: build dihedral-angle edges at import (geometry edgesGeometry exists), draw with
-      depth bias via lines, instanced per part, no z-fighting; silhouettes later.
-   c. Exploded view and isolation driven from GPU storage buffers (check what ExplodedView does today).
-   d. STEP/IGES load cost: measure the OCCT Wasm payload and init time; look for a lighter path.
-   Done for a-d (see `docs/cad-performance.md`, raw JSON in `examples/package-benchmarks/cad/`): real-GPU numbers at
-   10k/50k/90k parts; `@margoengine/machinery/edges` FeatureEdges (instanced, depth-biased, ortho + section aware, compute
-   size culling); ExplodedView free at rest; AssemblyBVH two-level (no 1M instanced-triangle cap, rebuild 370x faster).
-   Core hot spots for Scott (not changed): kernel recomputes every entity every frame (139-164 ns each, 16 ms at 100k on AC),
-   JS batch collection 11 ms at 81k visible, 10 MB instance upload per frame, engine.pick 64 ms at 90k, O(n) mesh removal,
-   100k entity cap. OCCT: 3.1 MB gzip Wasm, ~150 ms init, ~1.2-1.5 s parse for a 442 kB STEP.
+1e. [only f remains here]
    f. Specialized pipelines instead of uber-shaders. The cost of one do-everything shader is register pressure: the
       compiler reserves registers for the worst path, cutting how many threads an integrated GPU runs at once.
       (Branches on per-draw uniforms do not diverge; that part of the usual argument is wrong.) Plan: audit every
-      pipeline (core PBR, gltf-pro standard/physical, materials modes, machinery sections, shader nodes) for unused
-      paths; define four archetypes (cad-basic: colour/metal/rough + key light + IBL; cad-unlit: caps, axes, handles;
-      cad-edges: lines with depth bias, no lighting; pbr-advanced: clearcoat/transmission/sheen for the few parts that
+      pipeline (core PBR, gltf-pro standard/physical, materials modes, shader nodes) for unused
+      paths; define four archetypes (basic: colour/metal/rough + key light + IBL; unlit: caps, axes, handles;
+      edges: lines with depth bias, no lighting; pbr-advanced: clearcoat/transmission/sheen for the few parts that
       need it); use WebGPU pipeline-overridable constants (`override`) for small toggles such as clipping, fog and IBL
-      instead of runtime branches or string patches. Measure GPU time per archetype on the 50k-part scene before and
+      instead of runtime branches or string patches. Measure GPU time per archetype on a 50k-part scene before and
       after; keep only what measures faster. Core's shader is frozen and already minimal.
       [DONE, "Specialized pipelines 4/n"] Audit: gltf-pro already splits standard/physical (physical compiled only for
-      materials using it); materials' shading modes and shader-node materials each compile their own code; machinery
-      edges have section/plain variants; caps are own pipelines. The cost found was not register pressure but `discard`:
+      materials using it); materials' shading modes and shader-node materials each compile their own code; caps are own
+      pipelines. The cost found was not register pressure but `discard`:
       any discard in a fragment shader costs early depth testing. gltf-pro's back-face and alpha-mask discards are now
       `override` constants (margoFaceTest off in gltf-pro's own pipelines, where the pipeline already culls back faces;
       margoAlphaTest on only for MASK): full-screen DamagedHelmet 0.852 -> 0.524 ms GPU (timestamp queries, interleaved
       rounds); turning the other uniform toggles (unlit, HDR output, blend alpha) into constants gave 0.721 alone and
       nothing on top, so they stay uniforms. Real-GPU pixel proof vs 15c87f1 (7 material kinds front and back, helmet,
-      SSAO G-buffer/ambient passes): 0 of 3.69M channels differ. CAD 50k + edges: the cad-basic (core) and cad-edges
-      shaders are unchanged; pass medians core 12.6/17.9 -> 11.5/13.7 ms, edges 3.54/4.52 -> 3.60/3.67 ms (noise;
-      cad/results-1ef-*.json). Overrides cannot be used for patches of core's shader (core builds that pipeline), so
+      SSAO G-buffer/ambient passes): 0 of 3.69M channels differ. Overrides cannot be used for patches of core's shader (core builds that pipeline), so
       clipping/fog stay uniform-gated (1d''). For Scott, not measured: core's frozen shader culls back faces with
       `if(!facing&&i.material.z<0.5){discard;}` (its pipeline has cullMode none), so every core mesh pays the same
       early-depth cost; per-sidedness pipelines with cullMode would remove it (a core change).
-   e. A CAD launch demo (large assembly, sections, edges, measurement, ortho views) and an honest comparison page.
-1e'. [DONE 2026-10-14: steps 1, 2, 3 and 5 ported onto perf/auto-quality, one commit each, plus the CAD-controls pole
-   fix and the engine.pick OffscreenCanvas fix; core + stage 18,681 -> 19,543 B gzip (+481, +252, +96, +5, +21, +7).
-   Quiet-machine before/after (Scott stopped everything else; AC; GPU lock; alternating rounds; docs/cad-performance.md):
-   kernel in frame 2.6-4x cheaper everywhere (90k still 16.0 -> 5.5 ms); collection 7.8 -> 0.28 ms at 90k still, 7.6 ->
-   1.1 ms at 90k with 1% moving; FPS 50k orbit 49 -> 92, 50k still 53 -> 78, 50k move 54 -> 133, 90k still 33 -> 52,
-   90k move 33 -> 43; 90k orbit unchanged 34 -> 33 (GPU-bound, cull result changes every frame); 10k move 207 -> 182
-   (GPU time rose, unexplained); engine.pick 43 -> 31 ms at 90k (only via the cheaper update, step 4 not merged).
-   Bit-exact: tests/core-dirty-transforms.test.js, real-GPU pixels-check.mjs 0 differing pixels, verify 1,051 pass.
-   Instance-buffer contract in core's README; selection's micro pick pass was the only writer (now its own buffer).
-   Back-face culling measured on branch scratch/core-backface-cull, not merged: +315 B, see the decisions below.]
-   Original decision text: CAD scale is CPU-bound in core; measured on AC, docs/cad-performance.md: at 50k parts the
-   frame is 20.9 ms CPU (45 FPS), at 90k 39.1 ms (25 FPS); kernel tick 7.7 / 16.4 ms and JS batch collection 6.2 /
-   11.3 ms dominate. Core hot spots: (1) kernel recomputes every entity every frame, even static ones (~150 ns each);
-   (2) JS batch collection walks every mesh every frame; (3) the whole instance buffer is uploaded every frame;
-   (4) engine.pick re-renders the scene and creates a pipeline per pick (63.5 ms at 90k); (5) removing a mesh scans
-   all meshes (disposing a 90k assembly takes minutes); (6) the 100,000-entity cap. PROTOTYPE DONE, AWAITING SCOTT:
-   branch `worktree-agent-a46261c57b837ecd0` (base 7980c86, one commit per step; needs a rebase onto the current tip,
-   expect conflicts in selection and scripts/build-modern.js). Core+stage 18,681 -> 19,921 with all five steps:
-   s1 kernel skips unchanged entities (+481; 90k tick 16.5 -> 4.4 ms), s2 reuse last frame's instances (+252),
-   s3 upload only changed ranges (+96), s4 pick reuses pipeline + draws only parts under the pixel (+406; 90k pick
-   57.6 -> ~12 ms), s5 fast removal scan (+5; dispose 90k 48 s -> 20 ms). 90k still: 27 -> 39 FPS; 50k 1% moving:
-   45 -> 103 FPS; 50k orbit 46 -> 79 FPS; 90k orbit only 26 -> 30 (culling changes each frame; GPU culling 1f.a is
-   the route). Costs: +66 B per kernel entity slot, instance-buffer contract (writers must not touch core's buffers),
-   rebuilt Wasm kernel. Raw JSON examples/package-benchmarks/cad/results-s0..s5-*.json on that branch.
 1f. Beat-three.js additions (Scott's list, 2026-10-14; checked against the code, modified where noted):
    a. [DONE: `@margoengine/culling` `CulledInstances`, 7,015 B gzip, no core change. Parts uploaded once, compute pass
       tests frustum (+ optional Hi-Z occlusion from a depth prepass of last frame's large visible parts, so no one-frame
@@ -955,13 +884,13 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       frame; FPS orbit 36 -> 52, still 32 -> 53, grazing 48 -> 98 (frustum mode). Occlusion does not pay on the open
       sheet (nothing extra culled from above; +1-2 ms GPU) but does on a stacked block (90k orbit 28 -> 37 FPS, 81k -> 21k
       parts drawn), so `frustum` is the default. Real-GPU pixel check: 0 differing pixels over 640 frames vs drawing
-      everything, coplanar twins unchanged. Limits: parts are not core meshes (no engine.pick, hierarchy, ExplodedView,
-      FeatureEdges, section caps, shadows). Numbers: docs/cad-performance.md; JSON results-culling.json. Follow-ups:
-      single-pass Hi-Z downsample, picking via instance IDs, FeatureEdges/caps over these parts.]
+      everything, coplanar twins unchanged. Limits: parts are not core meshes (no engine.pick, hierarchy,
+      section caps, shadows). JSON: results-culling.json. Follow-ups:
+      single-pass Hi-Z downsample, picking via instance IDs, caps over these parts.]
       GPU occlusion culling (Hi-Z depth pyramid + indirect draws) in a new optional package. Core's DrawOptions already
       accept `indirect` per batch, so start there; if a core hook turns out to be needed, bring it to Scott first.
    b. Render-bundle replay: measure first. Core already draws one instanced call per distinct geometry, so encoding is
-      small when parts share shapes; bundles matter for assemblies with many unique shapes. Use the CAD benchmark's
+      small when parts share shapes; bundles matter for assemblies with many unique shapes. Use the benchmark's
       encoding numbers to decide.
    c. GPU timing overlay: DONE in core - `Engine.create(canvas, {features: ['timestamp-query']})` (approved by Scott,
       +26 bytes); Stats profiling works with it. Remaining: richer overlay in Stats (VRAM/buffer counts) if wanted.
@@ -985,14 +914,6 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       visible outline; perspective and ortho alike. Off = byte-identical GPU calls to 46f9484
       (`proofs/selection-xray-off.proof.js`, 10,586 calls at 1x/4x). Selection 9,504 -> 10,321 min+gzip (+817).
       Real-GPU `node packages/selection/test/xray.browser.mjs`. Hidden lines trace the selection's silhouette only.
-   f. [DONE] Text: @margoengine/text is already GPU SDF text (not DOM). Upgrade to MSDF only if corner sharpness at large
-      sizes needs it; add instanced dimension callouts that stay sharp at orthographic zoom, tied to machinery's
-      annotations. Done: `@margoengine/machinery/dimensions` `Dimensions.attach(engine, options)`: linear (machinery
-      `Dimension`/anchors as is), angle and radius/diameter callouts, values from `measureDistance`; laid out in CSS
-      pixels per frame and placed in the view plane at each anchor's depth, so constant pixel size at any ortho zoom and
-      in perspective; all lines one `@margoengine/lines` segment list (one draw), labels one text block each. New entry
-      3,973 min+gzip (machinery root unchanged; lines + text added as machinery dependencies). Real-GPU
-      `node packages/machinery/test/dimensions-check.mjs`. MSDF not needed for this.
    g. [done: `@margoengine/viewcube` (DOM/CSS 3D, 2.8 kB gzip, real-browser click check); the gizmo was NOT constant-size
       in orthographic (sized and picked by camera distance): fixed in controls/view.ts + transform.ts, orbit pan too]
       ViewCube (snap to top/front/right/iso, perspective/orthographic toggle) - new; transform gizmos already exist in
@@ -1000,7 +921,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    h. [done: `discard(cond, value)`, `storage(..., {atomic: true})` with atomicAdd/Max/Min/Load/Store; real-GPU check
       passed on Intel Arc] Shader nodes: fragment `discard` and compute atomics (small, high value).
    i. [DONE, verified, no fix needed] Shadows: cascades already snap to texels (shadows/src/cascades.ts); verify there is no shimmer when panning in
-      orthographic CAD views rather than re-implementing. `node examples/package-benchmarks/shadow-shimmer.mjs`
+      orthographic views rather than re-implementing. `node examples/package-benchmarks/shadow-shimmer.mjs`
       (JSON `results/shadow-shimmer.json`; Arc 140V, AC, 800x600 4x MSAA, 2048 maps, 64 frames, 0.25 px per frame;
       counts are shadow-edge (penumbra) pixels changed by more than 2 levels). Static noise floor 0. Orthographic pan,
       motion-compensated (frame i vs i+4 shifted 1 px): 0.57 of 14,423 per frame (max 10). Live vs cascades fitted to
@@ -1009,8 +930,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       cached. Dolly (ortho, fixed height): texel lattice world-locked (radii constant, centres integral to 6e-14 texel);
       112 per frame, of which 63 where the floor point changes cascade (the split distance sweeping, inherent to CSM)
       and 49 elsewhere (0.36%, isolated flips on the thin posts as depth re-quantizes when the snapped centre steps).
-   j. [DONE] Workers and OffscreenCanvas: move FBX/USD/glTF parsing into workers with transferable buffers (machinery CAD and
-      decoders already use workers); test core on an OffscreenCanvas (engine sizing falls back to canvas.width, so
+   j. [DONE] Workers and OffscreenCanvas: move FBX/USD/glTF parsing into workers with transferable buffers (decoders already use workers); test core on an OffscreenCanvas (engine sizing falls back to canvas.width, so
       it may already work).
       Done: opt-in `/worker` entries, each falling back to the calling thread without `Worker` (SSR, Node):
       `@margoengine/gltf-pro/worker` (`loadGLTFInWorker`, `parseGLTFInWorker`, `modelFromPrepared`; also falls back when
@@ -1052,7 +972,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       (`typeof window`), now checks `typeof Worker` only; selection `Picking` divided by clientWidth, now
       `clientWidth || width` (coordinates are canvas pixels on an OffscreenCanvas). DOM-bound by design (need the app to
       forward events/elements): core `CADCameraControls`, controls, stats, html, labels, input, inspector, viewcube,
-      machinery overlays, margoengine `createStage` (querySelector, style). CORE CHANGE FOR SCOTT (not made): in
+      margoengine `createStage` (querySelector, style). CORE CHANGE FOR SCOTT (not made): in
       `Engine.pick` use `const w=this.canvas.clientWidth||this.canvas.width,h=this.canvas.clientHeight||this.canvas.height`
       for the bounds check and the `x*this.canvas.width/w, y*this.canvas.height/h` scaling; core + stage 18,681 -> 18,689
       gzip (+8, measured on the built dist).
@@ -1095,7 +1015,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       creative (post, toon), dof, selection picking, scatter, terrain colors, plus shared meshVertex's copy of core's
       inputs (toon, selection): must stay text (core frozen, no overrides possible on core's pipeline); every anchor is in
       tests/shader-contracts.test.js, which fails naming the package if it stops occurring exactly once. Intra-package
-      patches (gltf-pro physical variant, machinery caps, vfx features, points EDL, sky fog, water spray/HORIZON, post
+      patches (gltf-pro physical variant, vfx features, points EDL, sky fog, water spray/HORIZON, post
       composites) left as is: owner and patcher are the same package and its own tests cover them. Silent no-op patches
       left silent (taa `o.clip=frame.camera*p`, tonemap/post/creative/dof capture regex, toon, scatter, terrain): the
       contract test covers the core side; making them throw would touch post/dof, which another worker owns.
@@ -1223,7 +1143,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    shared/math invert, composeMatrix), `quat` (eulerToQuaternion, multiplyQuaternions), `vec3` (add, sub, scale, dot,
    cross, length, normalize), `validate` (finiteVector), `color` parseColor + ColorInput, MathUtils.createLcgRandom.
    packages/shared/math.js is deleted. Users: animation, animator, bvh, clustered, controls, creative, environment,
-   exporters, gltf-pro, labels, lines, loaders, machinery, physics, points, post, scatter, shadows, sky, splats, taa,
+   exporters, gltf-pro, labels, lines, loaders, physics, points, post, scatter, shadows, sky, splats, taa,
    terrain, text, usdz, vfx. Proof: `node examples/package-benchmarks/proofs/math-consolidation.proof.js` builds every
    replaced copy from 2484971 and compares Object.is per element on random + special inputs (±0, NaN, ±Infinity,
    subnormals, singular matrices; ~2.0M checks); `--time` times the hot paths (all within noise). Public signatures kept
@@ -1232,7 +1152,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    (m, out, workspace?) and returns out/null (old shared invert: (out, m, offset, workspace), boolean; every caller
    passed offset 0 and tested truthiness). Gzip (compact min, math inlined, vs 2484971): most within ±10; points +42
    (three public-API adapters + createRandom's shape), controls +26 and bvh +23 (wrappers; controls raw +4, the rest is
-   gzip placement), environment -111, labels -30, post/sky/taa/machinery/creative -7..-31. Core + stage 18,681.
+   gzip placement), environment -111, labels -30, post/sky/taa/creative -7..-31. Core + stage 18,681.
    Deliberately left (not bit-identical or not duplicates): text's compose (x*(y+y) form; differs from 2*(x*y) on
    under/overflow) and math's own Matrix4/Quaternion class code; every slerp (physics, animation, animator, net, fbx
    differ in threshold/clamp/renormalize); controls invertAffine and transformPoint, lines' projective transformPoint,
@@ -1250,7 +1170,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    shared/math invert+finiteVector users; mat4 multiply in animation, bvh, points, text, exporters, loaders/usdz, usdz;
    mat4 invert in shared, bvh, lines, environment; transformPoint in bvh, lines, controls; compose/decompose in
    exporters, text, loaders/threemf, usdz; euler->quat/slerp in physics, text, controls; frustum planes in bvh, points;
-   vector helpers in geometry, controls, audio, bvh, lines, machinery, navmesh, loaders; colour parsing + sRGB decode in
+   vector helpers in geometry, controls, audio, bvh, lines, navmesh, loaders; colour parsing + sRGB decode in
    lines, points, text, loaders/threemf, loaders/engine, splats, core/geometry (core stays as is); seeded PRNGs in points,
    scatter, procedural, creative; ray tests in controls, selection, bvh; per-package math.ts in audio, bvh, controls,
    geometry, lines, physics, points, text). Prove no behaviour change and record bytes per package.
@@ -1348,8 +1268,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       nothing at 6,000 km). Worst case before a rebase (CPU): 0.05 px jitter, independent of distance. Rebase cost
       (Node, real kernel, fake GPU, quiet machine): 10k roots 0.8 ms call + 1.5 ms frame (static 0.35), 50k 4.3 + 7.1 ms
       (static 1.6); moving all 50k through mesh.position costs 11 ms. Real GPU (frame = render + onSubmittedWorkDone; quiet gate passed before the lock wait, so semi-diagnostic): 10k static 4.7 ms, rebase 0.6 + 6.1 ms; 50k static 5.4, rebase 4.4 + 11 ms, i.e. one ~10 ms hitch per rebase at 50k. Works with core meshes, children,
-      gltf-pro models, CADCameraControls/OrbitControls, engine.pick, bvh hits (toWorld within 1 µm at 6,000 km), machinery
-      measurement (7 mm bolt spacing at 6,000 km: 7.0000002 mm; core alone 0), section planes via toLocalPlane, parts moved
+      gltf-pro models, CADCameraControls/OrbitControls, engine.pick, bvh hits (toWorld within 1 µm at 6,000 km), section planes via toLocalPlane, parts moved
       through mesh.position (read back). Limits: km-scale vertices or child translations inside one asset (float32 at
       load; re-centre at load, a loader option could do it), state other code keeps in local coordinates (OrbitControls
       saveState, an ortho CameraProjection.fit in flight, saved views: shift in onRebase). Core relative-to-eye
@@ -1374,32 +1293,6 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       TransparentCanvas alpha within 0.002; PostStack 1 layer identical to sorted. Orbit 360x1 deg vs a per-triangle
       sorted reference: steps with >1% popped pixels sorted 13, OIT 0 (worst 1.41% vs 0.36%). GPU (diagnostic, busy
       machine) 720p sorted +0.33 / OIT +0.56 ms, 1080p +0.59 / +1.28 ms. Limits in `packages/oit/README.md`.
-   c. STEP/IGES: an offline converter (`npx margo-convert part.step part.glb`, Node, reusing machinery's OCCT path and
-      the new glTF exporter, optional baked feature edges) so production apps ship pre-tessellated GLB; keep the 3.1 MB
-      OCCT path for drag-and-drop; docs say so plainly. Measure conversion time and output size on the repo's STEP files.
-      DONE: `tools/margo-convert` (unscoped npm package `margo-convert`, bin `margo-convert`, like create-margo; not a
-      machinery `bin`, so no Node-only code or exporters dependency lands in a runtime package). `npx margo-convert
-      part.step [part.glb]` (.step/.stp/.iges/.igs/.brep), library `convert(bytes, format, options)`. occt-import-js
-      0.0.23 runs in Node as is (same build and `{linearUnit:'meter'}` defaults as loadCAD's worker); GLB written by
-      exporters' data-scene `exportGLB`. Writes metres (BREP: `--units`, default mm), the STEP product tree with part
-      names, one material per sRGB colour (linear in glTF; parts without colour get loadCAD's #a6b9c8; multi-colour
-      parts split into child meshes), OCCT surface normals, part vertices relative to their bbox centre (node translation
-      in JSON doubles), and shared meshes for rigid copies (same index buffer + rigid transform from 3 anchors within
-      1e-6 of part size; as1-oc-214: 18 parts -> 5 meshes, GLB < half of `--no-instancing`). Not EXT_mesh_gpu_instancing:
-      the data-scene writer has none and the light loader rejects node extensions; shared meshes become one shared core
-      Geometry (instanced draws). Options `--linear-deflection <mm>`, `--angular-deflection <deg>`, `--merge` (one
-      world-space node per material), `--no-instancing`, `--edges`/`--edge-angle` (machinery `featureEdges` offline ->
-      `mesh.extras.featureEdges` uint32 index-pair accessor + `featureAngle`; not lines, both Margo loaders take
-      triangles only; FeatureEdges does not read it yet, recompute costs ~1 ms per 1,000 distinct triangles). No
-      Draco/meshopt (no Draco encoder; meshoptimizer only via @types/three). Results (README, busy machine, quiet gate
-      skipped: results/margo-convert-diagnostic.json): as1-oc-214.stp 441,968 B -> 68,352 B GLB (25,579 gzip), 5,040
-      triangles, ~1.2-2.1 s; as1-tu-203 142 kB -> 65 kB; dm1-oc-214 226 kB -> 35 kB; cube STEP/IGES ~10 kB -> 1.7 kB;
-      BREP 42 kB -> 54 kB. Validator 0/0/0 on all (+1 UNUSED_OBJECT info per edge accessor with --edges). Browser
-      loadCAD of as1 was 1.4-1.7 s + 3.1 MB OCCT. Test `tests/margo-convert.test.js` (in verify; skips without OCCT):
-      validator, gltf-pro + light loader, triangles/bounds (1e-6 m)/part names equal to loadCAD run in Node through an
-      in-process stand-in Worker executing the built cad-runtime.js; instancing, merge, edges == featureEdges, options,
-      BREP units, CLI errors, `tsc --checkJs --strict` of the tool. Follow-ups: a FeatureEdges option to take the baked
-      edges; a gated (quiet) timing run; optional meshopt output if Scott accepts the dependency.
    d. 16-texture limit, long term: texture arrays for same-size material maps (gltf-pro physical, terrain splats) and
       shared shadow arrays; optionally core requests a higher `maxSampledTexturesPerShaderStage` when the adapter
       allows (core bytes, Scott decides). After 1.0 unless a demo needs it.
@@ -1424,7 +1317,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       Finding: SSAO's ambient replay uses `_=` and so still runs the full lighting; the same dead-block trick would cut it.
    b. [DONE] Volumetric fog and light shafts: `VolumetricFog.attach(engine, {density, heightFalloff, height, anisotropy,
       noise, wind, range, grid, temporal, shadows, lights, depth})` in the new entry `@margoengine/environment/volumetric`
-      (environment owns scene fog, i.e. three's `scene.fog`; this is its heavier replacement and needs no sky, so CAD and
+      (environment owns scene fog, i.e. three's `scene.fog`; this is its heavier replacement and needs no sky, so
       indoor scenes can use it; built separately so the root entry is byte-identical, 21,140 B; the entry is 6,658 B
       min+gzip). Froxel grid (default 160x90x64, quadratic slices over `range` m from the near plane, read from
       `camera.matrix`, so perspective and orthographic both work): one compute pass injects density (uniform, height
@@ -1484,8 +1377,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       `usage()` (+ `navigator.storage.estimate()`), `delete`, `clear`, `dispose`/`using`. Loaders: one pass-through
       `fetch` option on gltf-pro (+12 B; `loadGLTFInWorker` stays on the main thread when it is passed, like decoders;
       README recipe `parseGLTFInWorker(engine, await (await cache.fetch(url)).arrayBuffer())` keeps worker parsing),
-      fbx (+21 B, file + textures), usdz (+9 B; `loadUSDZInWorker` downloads here, parses in the worker, +63 B),
-      machinery `loadCAD` (+9 B; STEP parsing stays in the OCCT worker); loaders already had it. Design: GET/HTTP(S)
+      fbx (+21 B, file + textures), usdz (+9 B; `loadUSDZInWorker` downloads here, parses in the worker, +63 B);
+      loaders already had it. Design: GET/HTTP(S)
       only, keyed by URL; miss stores the 200 body in the background (no-store and non-200 skipped); a hit is served
       without a request while `max-age` holds, else revalidated once per AssetCache with If-None-Match /
       If-Modified-Since (304 serve, 200 replace); offline, error status, timeout, or a drop mid-download serve the stored
@@ -1593,21 +1486,17 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       DONE: `docs/deploying.md` (linked from README and docs/README.md). Policy: `default-src 'self'; script-src 'self'
       'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src
       'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'`. Found in the real-browser
-      run: two workers need `'unsafe-eval'` in their own (per-file) policy: `decoder.worker-*.js` (decoders runs the
-      Draco/Basis Emscripten scripts via indirect eval) and `cad-runtime-*.js` (occt-import-js embind uses `new
-      Function`); a worker takes its CSP from its own response headers, so the page stays strict. `'unsafe-inline'`
+      run: one worker needs `'unsafe-eval'` in its own (per-file) policy: `decoder.worker-*.js` (decoders runs the
+      Draco/Basis Emscripten scripts via indirect eval); a worker takes its CSP from its own response headers, so the page stays strict. `'unsafe-inline'`
       styles: Vite keeps index.html `<style>` inline, ViewCube and Inspector insert `<style>`. No package source
       changed. `tools/create-margo/template/public/_headers` (CSP + immutable `/assets/*`); `site/_headers` gains the
       CSP on every page except `/catalog/examples/*` (inline scripts + jsDelivr/esm.sh, left without CSP) and caching
       for dof/tonemap assets and demo `.wasm`. Check: `node scripts/gpu-lock.mjs run --owner=<id> -- node
       scripts/csp-check.mjs` (harness page with core, gltf-pro worker, Draco, KTX2, bvh worker, PostStack SSAO+Bloom+
-      FXAA, Stats/HTML/ViewCube/Inspector, machinery STEP; the create-margo app; 11 site/dist pages; zero violations,
+      FXAA, Stats/HTML/ViewCube/Inspector; the create-margo app; 11 site/dist pages; zero violations,
       Edge, Arc 140V, AC; `examples/package-benchmarks/results/csp-check.json`; claims DOC-072..075).
       `CSP_OVERRIDE=<policy>` shows what a missing directive breaks (checked: no `'wasm-unsafe-eval'` -> Engine.create
-      fails; strict policy on the eval workers -> Draco, KTX2, STEP fail, all else passes). Side finding (fixed in 5l.o):
-      every site demo folder (`demos/`, `demos/dof/`, `demos/tonemap/`, `demos/earth/`) shipped the 7.6 MB OCCT `.wasm`
-      and CAD chunks although no demo imports STEP (deploy bytes only; never downloaded). Both eval-worker rules are gone
-      since 5l.o.
+      fails; strict policy on the eval worker -> Draco, KTX2 fail, all else passes)..
    b. Tier-aware feature presets: `@margoengine/quality` already picks light/full tiers (MSAA, DPR, pacing only). Add
       presets packages read on attach (shadow cascades/resolution, SSR off, volumetrics off/low grid, SSAO half-res,
       particle counts) so the light tier scales features automatically; measure the light tier on the laptop.
@@ -1678,14 +1567,11 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    its proof link; linked from README, docs/README.md, the site's "Where it stands" (GitHub link; the site build ships
    no .md pages) and whitepaper outline section 7; every number is claims.md LIM-001..026 (25 PROVEN; LIM-024, the CSP
    error strings, UNPROVEN like DOC-074 until the CSP_OVERRIDE runs are committed). Limits with NO escape hatch yet, to
-   queue: (1) [DONE 2026-10-15, 5w worker] the 100,000 node/part caps in gltf, gltf-pro, .margo (blender), OBJ (machinery)
-   and SurfacePhysics are options now, default unchanged (100,000), allowed 1..8,388,608 (core's entity cap):
+   queue: (1) [DONE 2026-10-15, 5w worker] the 100,000 node/part caps in gltf, gltf-pro, .margo (blender), and OBJ
+   are options now, default unchanged (100,000), allowed 1..8,388,608 (core's entity cap):
    `maxNodes` on gltf `parseGLTF`/`loadGLTF`, every gltf-pro loader (+ `parseGLTF`/`parsePreparedPBR` last argument, worker
-   and progressive paths), blender `decodeMargo`/`parseMargo`/`loadMargo`; `maxParts` on machinery `parseCAD`/`loadCAD`
-   (OBJ objects/groups and, new, the STEP/IGES worker's 100,000-mesh cap) and `SurfacePhysics.create` (parts and
-   carriers separately). One helper, `packages/shared/limits.js`; errors name the option, e.g. `RangeError: Too many glTF
-   nodes (100001 > 100000; raise the maxNodes option)`; `.margo` and SurfacePhysics now say `Too many .margo nodes` /
-   `Too many surface parts|carriers` instead of the old combined TypeError/RangeError. Test `tests/count-limits.test.js`
+   and progressive paths), blender `decodeMargo`/`parseMargo`/`loadMargo`. One helper, `packages/shared/limits.js`; errors name the option, e.g. `RangeError: Too many glTF
+   nodes (100001 > 100000; raise the maxNodes option)`; `.margo` now says `Too many .margo nodes` instead of the old combined TypeError/RangeError. Test `tests/count-limits.test.js`
    (each package at 100,001 with and without the option; gltf-pro builds a 100,001-node model headless in < 1 s,
    diagnostic). Not measured: load time/memory past 100,000. Seen in passing (core, frozen, not fixed): disposing a 100,001-node
    gltf-pro model takes ~9.4 s in Node vs ~0.6 s to parse it (diagnostic, not quiet-gated): core `Engine.remove` scans
@@ -1702,8 +1588,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    starts (no unmeasured numbers - e.g. coordinate jitter distance comes from 5f.a's measurements), why it exists
    (usually: keeping core small), the clear error or symptom a user sees, and the escape hatch package/tool with its
    proof link. Rows at least: 100,000-entity cap (GPU culling / streaming 5g.d), 16 sampled textures per stage (named
-   error; texture arrays 5f.d), float32 coordinates (floating-origin plugin 5f.a), giant STEP files (offline converter
-   5f.c), one directional light in core (clustered), WebGPU-first (WebGL = basic fallback only), order-independent
+   error; texture arrays 5f.d), float32 coordinates (floating-origin plugin 5f.a), one directional light in core (clustered), WebGPU-first (WebGL = basic fallback only), order-independent
    transparency (OIT package 5f.b), no visual editor, untested devices. Write it after 5f/5g land so every threshold
    and escape hatch is real.
 5k. HARD REQUIREMENT (Scott, 2026-10-14 night): code hygiene >= 9/10 before launch, defined as gates enforced by
@@ -1754,8 +1639,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    | 3 any | 121 / 1,906 (382 public declarations + src files) | 3.7 | 109 `any` in public declarations (shader 48, physics 25, gltf-pro 17, controls 17, usdz 2), 243 explicit internal (13 allowlisted) |
    | 4 strict | 146 / 219 flags | 0.0 | `strict` on everywhere; noImplicitOverride + noFallthroughCasesInSwitch off in all 73 packages. Turning both on costs only 35 TS4114 (missing `override`): controls 14, environment 12, lines 4, shader 2, html/sky/vfx 1; no fallthrough errors |
    | 5 types | 138 / 1,388 names | 0.1 | 57 names: Vec3 in 9 packages, Context in 7, ColorInput/parseColor 4-5, Color 4, math vs shader helpers (add, dot, cross, normalize, clamp, smoothstep, ...), loadGLTF/parseGLTF, parseUSDA/parseUSDZ, multiplyMatrices, Ray, ... (list in hygiene.json `duplicates`) |
-   | 6 tsdoc | 593 / 1,326 exported symbols | 0.0 | worst: shader 84, machinery 36, core 27, math 27, loaders 26, physics 22, react 22, bvh 20 |
-   | 7 errors | 534 / 1,856 throws are bare `Error` | 0.0 | environment 131, decoders 46, post 32, machinery 29, creative 23, core 21 |
+   | 6 tsdoc | 593 / 1,326 exported symbols | 0.0 | worst: shader 84, core 27, math 27, loaders 26, physics 22, react 22, bvh 20 |
+   | 7 errors | 534 / 1,856 throws are bare `Error` | 0.0 | environment 131, decoders 46, post 32, creative 23, core 21 |
    | 8 api | manual | - | open items of "API rough edges before 1.0" (1, 7, 8, 10) |
    | 9 dead | 43 / 2,869 files + exports | 8.5 | no unreachable src file; 43 unused exports, e.g. bvh SIDE_*, controls gizmo constants, geometry math helpers, shared polygon helpers |
    PHASE 2 groups (4 parallel agents, balanced by measured work = public any + unallowlisted internal any + missing
@@ -1771,7 +1656,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    - C (426) lighting, post and environment: environment, post, creative, clustered, tonemap, shadows, taa, sky, water,
      terrain, dof, oit, toon, transitions, splats, vfx, scatter, lod, webgl, culling (278 bare Errors, mostly
      mechanical; shader text must stay byte-identical: proofs + visual:check).
-   - D (421) interaction, CAD and UI: physics, controls, machinery, bvh, react, xr, selection, labels, inspector,
+   - D (421) interaction and UI: physics, controls, bvh, react, xr, selection, labels, inspector,
      staging, stats, cameras, html, viewcube, gizmo, scenery (public `any`: physics raw Rapier 25, controls 17).
    Each group: `npm run hygiene` before/after, api:update only for intended type changes, zero JS byte change unless a
    proof says otherwise; then a short serial pass sets 1h.h's error codes and switches verify to `--strict`.
@@ -1816,7 +1701,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
      moves, gzip delta per file: text +221, points +110, shader +109, lines +105, usdz worker +93, water +87,
      navigation +84, animation/vat +82, wfc +78 / overlapping +71, gltf-pro asset chunk +77, ecs +73, fbx worker +71,
      fsm +69, blender +69, html +69, tween +66, gltf-pro worker +65, post scene-fade +65, materials +63,
-     creative planet +62, gltf +60, cinematic +60, machinery cad +57, fbx +51, input +49, gltf-pro src +37,
+     creative planet +62, gltf +60, cinematic +60, fbx +51, input +49, gltf-pro src +37,
      math index +18; new math entries errors 197, mesh 312.
    - Scorecard (`npm run hygiene`), group A (23 packages + shared) before -> after:
      format 0/190 10.0 -> 0/194 10.0; lint 9/190 5.3 -> 0/194 10.0; any 50/739 3.2 -> 0/741 10.0; strict 44/66 0.0 ->
@@ -1872,46 +1757,25 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
      format, lint, any, strict already 10.0. Every C package 10.0 (was 5.6-7.5). No package's gate got worse; react
      types 18 -> 12, math 8 -> 7, shader 3 -> 2 (shared names). Overall: types 155 -> 129 (3.3 -> 4.4), tsdoc 474 ->
      369 (0.0), errors 560 -> 293 (0.0 -> 2.1), dead 69 -> 64 (8.6 -> 8.7); hygiene 6.4 -> 6.8.
-5l. Raise CAD performance and general 3D rendering to 9/10 (Scott, 2026-10-14 night). Measurable targets (Intel Arc
+5l. Raise large-scene performance and general 3D rendering to 9/10 (Scott, 2026-10-14 night). Measurable targets (Intel Arc
    laptop, quiet PC):
-   CAD: 100k parts + feature edges orbit >= 60 FPS; 1M parts >= 30 FPS; pick < 10 ms at 100k; 100k-part model
+   100k parts orbit >= 60 FPS; 1M parts >= 30 FPS; pick < 10 ms at 100k; 100k-part model
    interactive < 2 s; km-scale coordinates jitter-free (5f.a); transparent housings without popping (5f.b).
-   Status 2026-10-15 (a-d, 0 core bytes, core + stage 19,922 B): 100k parts + edges orbit MET with GPU small-part
-   culling (61-88 FPS, two quiet-gated sessions; core path 28-30); pick < 10 ms MET on the `AssemblyBVH` path only (0.68 ms
-   median raycast at 100k), NOT with `engine.pick` (34-54 ms; core re-renders the scene, the unmerged pick fast path is
-   core step 4). Numbers, tables and raw JSON: docs/cad-performance.md "100,000 parts", `cad/results-5l-*.json`.
    a. [DONE] Small-part (screen-size) culling + distant-subassembly imposters for core meshes. Small parts: `CulledMeshes`
       `minRadius` (already in @margoengine/culling) is the cull; measured at 100k parts (100,008 parts, 1432x768 4x MSAA
-      orbit, `run.mjs --culled=1.5`): 29.3 -> 137.8 FPS, GPU 31.1 -> 6.9 ms, 11,363 parts drawn. Imposters:
+      orbit): 29.3 -> 137.8 FPS, GPU 31.1 -> 6.9 ms, 11,363 parts drawn. Imposters:
       `@margoengine/lod` `Imposter.bake(engine, mesh)` now bakes a Mesh's whole visible subtree (each part with its own
       material, transforms applied, mirrored parts flip winding; `packages/lod/src/imposter.ts`, lod +450 B gzip, test in
-      lod.test.js); a module shown as one imposter under 12 px (`run.mjs --imposters=12`): GPU 3.0 ms but CPU-bound at
+      lod.test.js); a module shown as one imposter under 12 px: GPU 3.0 ms but CPU-bound at
       91.7 FPS (each LOD switch toggles `visible` -> core re-collects, ~4 ms), so on this laptop small-part culling alone
-      wins; imposters are for GPU-limited cases. Limits: imposter modules are not hit by `engine.pick`/`AssemblyBVH`
+      wins; imposters are for GPU-limited cases. Limits: imposter modules are not hit by `engine.pick`
       (`lods.pickProxies()` reports them); one subtree scan per bake (bake once per distinct design, share the atlas);
       anchors must sit outside the subtree (+1 entity per copy).
-   b. [DONE, verified] GPU culling for core meshes with picking, feature edges, exploded view and AssemblyBVH still
+   b. [DONE, verified] GPU culling for core meshes with picking still
       working: `CulledMeshes` (5m.b hook) re-checked on the GPU 2026-10-15 (`cad/culled-meshes.mjs`: 0 differing pixels
-      in 8 steps, pick grid identical, BVH hit). Package-side finish: `FeatureEdges` now draws from the redirected
-      (culled) list, so edges get the same culling. Not done: Hi-Z occlusion for core meshes (it did not pay on this
+      in 8 steps, pick grid identical). Not done: Hi-Z occlusion for core meshes (it did not pay on this
       layout for CulledInstances); the `engine.start()` switch was added afterwards with Scott's approval (2026-10-15):
       `engine.start({culling: false})`, core + stage 19,922 -> 19,928 B (+6), test in tests/core-hooks.test.js.
-   c. [DONE] Cheaper feature edges (`packages/machinery/src/edges.ts`): counts from core's batches (no per-frame loop over
-      meshes: CPU 0.9-2.4 -> 0.07-0.2 ms), reads `CulledMeshes`' culled list, parts fade in between `minRadius` and 2x (no
-      popping), segments stored longest first and drawn in 4 tiers (all, 1/4, 1/16, 1/64) chosen per part on the GPU from
-      the projected length at its centre depth. GPU edges pass 4.3-4.4 -> 3.5 ms at 50k, 5.5-7.1 -> 4.3-5.6 ms at 100k with
-      GPU culling; at 100k with CPU culling sessions disagree (-10 % / +2 %). `refresh()` removed (not needed). Edges
-      entry 3,940 -> 4,530 B. Limit: a segment just over half a pixel near a large part's front can be skipped.
-   d. [DONE] CAD correctness (machinery): section caps skip open shells (geometry with an edge not shared by exactly two
-      consistently wound triangles, positions welded to 0.1 mm/unit; `capOpenShells: true` restores capping):
-      `section-open-check.mjs` stray cap pixels on an open sheet 9,429 -> 0, closed box unchanged (8,337). Measurement:
-      `measureDistance` composes the hierarchy in float64 below the anchors' common ancestor: 5 mm between parts of an
-      assembly 1 km out, float32 world error 47 µm (4.4 mm at 100 km) -> 8.5e-11 m (`test/metrology.test.js`; the
-      cameras origin test now asserts it). Snapping: `AssemblyBVH.snap` / `snapAnchor` / new `snapFeature` snap
-      'vertex' to CAD corners and 'edge' to the closest point on a feature edge over the whole part (never triangulation
-      diagonals or face interiors; before: hit-triangle vertices and triangle-edge midpoints). Sizes: section 3,958 ->
-      4,325, metrology 1,173 -> 2,296, spatial 14,411 -> 14,941, dimensions 3,434 -> 3,880, machinery root 33,430 -> 34,608 B (edgesGeometry from
-      @margoengine/geometry is external, 551 B, shared).
    (Plus already queued: back-face culling B, 5f.a-c, 5g.d streaming + entity cap decision.)
    General 3D: ~115/156 parity rows covered (93 of 159 now); every demo 60 FPS on the light tier; side-by-side renders that
    hold up against three.js/Babylon for the same scene.
@@ -2134,28 +1998,22 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       (gltf-pro shader + ACES vs three's) and close what's package-side. Re-measure with the vs-threejs harness pairs.
    o. [DONE 2026-10-15] CSP follow-ups (from 1a36f67): the decoders worker runs Draco/Basis glue through `eval` (needs per-file
       `'unsafe-eval'`) - load them as module/classic workers or wrap them so the strict page CSP covers everything;
-      occt-import-js uses `new Function` (third party: document, or wrap); the site build copies the 7.6 MB OCCT .wasm
-      and CAD code into every demo folder though no demo imports STEP (deploy size only) - stop copying it.
       DONE: no file needs `'unsafe-eval'`, workers included. (1) `decoder.worker.js` is now a prebuilt, self-contained
       classic worker (`packages/decoders/scripts/build.js`, Vite iife; `pool.ts` references it as
       `new URL('./decoder.worker.js?no-inline', import.meta.url)`, the gltf-pro pattern) that loads the Draco/Basis
       wrappers with `importScripts`; `codec.ts` lost its `(0, eval)` loader. Asset name unchanged (`decoder.worker-*.js`),
-      app still passes `decoderPath`/`transcoderPath`. (2) Basis and occt-import-js 0.0.23 are embind builds without
-      `DYNAMIC_EXECUTION=0` (occt-import-js 0.0.23 ships dist, its C++ wrapper, CMakeLists with `--bind` and Windows build
-      scripts, not the OpenCascade submodule: rebuilding is not ours).
+      app still passes `decoderPath`/`transcoderPath`. (2) Basis is an embind build without
+      `DYNAMIC_EXECUTION=0`.
       But embind's `new Function` is JS-side only: `scripts/static-embind.js` rewrites the glue's two generators
       (`craftInvokerFunction`, `_emval_get_method_caller`) into the closures `DYNAMIC_EXECUTION=0` emits, with exact
       patterns (a different Emscripten version fails the build) and a modification notice in each file's first line;
-      applied to dist `basis/basis_transcoder.js` (decoders build) and `workers/occt-import-js.js` (build-modern.js). Both
-      `.wasm` files and the Draco wrapper are unmodified; NOTICE.md / OCCT-NOTICE.txt (LGPL-2.1) say so. Proof:
+      applied to dist `basis/basis_transcoder.js` (decoders build). The
+      `.wasm` file and the Draco wrapper are unmodified; NOTICE.md says so. Proof:
       `tests/no-eval-workers.test.js` (in verify) runs each glue in a Node vm context with code generation from strings
-      disabled: vendor Basis and OCCT glue throw `EvalError`; shipped glue gives byte-identical KTX2 transcodes (all 4
-      targets), identical `as1-oc-214.stp` and `Cube 10x10.igs` reads; Draco Box/Avocado identical; built workers have no
-      `eval`/`Function(`. Glue sizes: Basis 57,548 -> 58,505 B, OCCT 96,871 -> 97,826 B (raw); decoder worker 5,405 B.
-      (3) `scripts/build-site.js` resolves `@margoengine/machinery*` to a stand-in that throws for the four demo builds on
-      the stage facade (the stage's lazy `load()` CAD import pulled OCCT in): `demos/`, `demos/earth/`, `demos/dof/`,
-      `demos/tonemap/` each lose 7,793,583-7,793,677 B of assets (OCCT .wasm + glue, `cad-runtime`, CAD chunks; 31,174,612 B
-      in all; night-citadel and gameplay-sandbox unchanged). (4) Evidence: `csp-check.mjs` harness now serves the
+      disabled: vendor Basis glue throws `EvalError`; shipped glue gives byte-identical KTX2 transcodes (all 4
+      targets); Draco Box/Avocado identical; built workers have no
+      `eval`/`Function(`. Glue size: Basis 57,548 -> 58,505 B (raw); decoder worker 5,405 B.
+      (4) Evidence: `csp-check.mjs` harness now serves the
       create-margo `_headers` unchanged (`scripts/csp-check/eval-workers.headers` deleted; site/_headers loses its Tokyo-corner decoder-worker eval rule): 14/14 pages PASS, zero
       violations (`results/csp-check.json`); override runs are now recorded in `results/csp-check-negative.json`:
       `script-src 'self'` -> Engine.create's "WebAssembly.compile(): Compiling or instantiating WebAssembly module violates
@@ -2401,20 +2259,15 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       64.5 ms at 100k / 500k / 1M entities. Proofs: 1M-entity Node test bit-exact vs a fresh kernel
       (`tests/core-dirty-transforms.test.js`), `cad/pixels-check.mjs` (now grows mid-run) and `cad/cull-pixels.mjs
       --ref=b6a3796` 0 differing pixels. Wasm rebuilt reproducibly from lib.rs (SHA-256 9a7d9a44...). Selection's
-      outline flags and XR instance storage follow the grown capacity. CAD browser runs at 10k / 50k / 90k (DIAGNOSTIC: the quiet gate never passed, other agents held the GPU;
-      `cad/results-cap-{before1,after1,after2}-orbit.json`; the before2 round and the 200k/500k/1M runs were lost to the
-      04:30 crash): kernel in frame 0.59 / 3.55 / 5.87 ms before vs 0.46-0.56 / 2.48-2.85 / 5.39-6.0 after, collection
-      1.36 / 9.0 / 14.4 vs 1.0 / 5.7-6.6 / 13.6 ms, 90k orbit 14.9 FPS (GPU contended) vs 34.5-35.6; no regression seen,
-      quiet re-run still owed.
-      Still capped at 100,000 by their own input validation (package-side, not core): glTF/gltf-pro nodes, .margo nodes,
-      OBJ parts, `SurfacePhysics` parts; `AssemblyBVH` 1,000,000 triangles per geometry is unrelated. `docs/limits.md`
+      outline flags and XR instance storage follow the grown capacity.
+      Still capped at 100,000 by their own input validation (package-side, not core): glTF/gltf-pro nodes and .margo nodes. `docs/limits.md`
       does not exist yet (5j): its entity row is "8,388,608 slots, 351 B each; ~40 ms CPU kernel floor at 1M even when
       static; escape hatch CulledMeshes/CulledInstances".
    Result (b): package-side alone cannot make core skip a batch (upload sits inside the draw loop, batches/counts are
       private, the only route is writing core's private indirect buffer). Hook: `PassContext.batches` + `Batch.redirect
       = {instances, args}` (+34 B). `CulledMeshes` in @margoengine/culling: GPU frustum (+ optional `minRadius`)
-      culling and stable compaction of core batches; picking, FeatureEdges, ExplodedView, AssemblyBVH keep working
-      (`cad/culled-meshes.mjs`: 0 differing pixels in 8 steps incl. explode, hide, growth; pick grid identical; BVH hits). Not done: Hi-Z occlusion for core meshes (CulledInstances has it;
+      culling and stable compaction of core batches; picking keeps working
+      (`cad/culled-meshes.mjs`: 0 differing pixels in 8 steps incl. hide, growth; pick grid identical). Not done: Hi-Z occlusion for core meshes (CulledInstances has it;
       port its prepass), and an engine-level "CPU culling off" switch for `engine.start()` loops (today only
       `render({culling: false})`; about +15 B as `engine.culling`), which is what makes the kept set stable while
       orbiting.
@@ -2507,7 +2360,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       unchanged): gltf-pro root 60,850 / 19,087 -> 64,345 / 20,260 (+1,173 gzip; applyGLTFLights and viewGLTFCamera are
       separate tree-shakable exports), /asset +103, /prepare +377, /progressive +561, /worker +576, workers/gltf.js +401,
       workers/progressive.js +375, /instancing 0; decoders root 5,036 -> 5,917 (+881, meshopt v1 + COLOR); gltf +133;
-      blender +158; machinery root +184, /cad +141, /surface +179, cad worker +165. Visual: `visual:update` for the 7
+      blender +158. Visual: `visual:update` for the 7
       khronos views whose image changed (MeshPrimitiveModes, MeshoptCubeTest, ABeautifulGame new; Cameras,
       DirectionalLight, NodePerformanceTest, ToyCar now through the file's camera/light), then `visual:check
       --only=khronos` 32/32 pass, run-to-run noise 0.
@@ -2525,8 +2378,6 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
         WebGPU boilerplate it replaces.
       - Three.js migration ("Rosetta stone"): docs/from-threejs.md exists - polish into a flagship page (Scene,
         materials, render loop/useFrame, controls, loaders; three.js vs Margo side by side).
-      - Flagship tutorial: CAD viewer - large assembly with progressive + worker loading, instancing, section planes,
-        edges, picking, ViewCube, navigation profiles, floating origin, offline cache.
       - Flagship tutorial: indie game - grow docs/guides/blender-game.md into a runnable step-by-step (player, Blender
         level via extras, physics jump/gravity, third-person camera, audio), with a matching runnable example.
       - Cookbook (how-to) starter set: resize/DPR, device loss, colliders from a glTF hierarchy, switching controls,
@@ -2593,13 +2444,12 @@ Baselines are for the Arc 140V + Edge build recorded in the manifest; another GP
   `scratch/core-backface-cull` (per cull-group pipelines with a shader override; +315 B -> 19,858, over the 19,600
   target). GPU per frame: 50k CAD 15.6 -> 13.7 ms (double-sided, the default) and 14.2 -> 12.4 ms (single-sided);
   one full-screen layer 1.31 -> 0.79 / 0.79 -> 0.39 ms; 16 full-screen layers back to front 11.9 -> 4.7 ms.
-  Details and caveats in docs/cad-performance.md.
 - API: standardize on `X.attach(engine, options)` for features; `dispose()` is the primary cleanup name, `destroy()`
   stays as a deprecated alias until 1.0, and packages (not core) add `[Symbol.dispose]()` calling `dispose()`.
   [DONE, packages only; core and the stage facade untouched] Every engine feature has `static attach(engine,
   ...constructorArgs)` (`engine.use(new X(...))` in one call; constructors and `engine.use` still work). Async
   features return a Promise: `Environment.attach(engine, source, options)` (create + use; `create` stays for a bare
-  GPUDevice), `Planet.attach`, `XR.attach`, `SurfacePhysics.attach`, `TelemetryChannel.attach`. Controls have one
+  GPUDevice), `Planet.attach`, `XR.attach`. Controls have one
   generic `Controls.attach(engine, ...args)` typed from each subclass constructor (`OrbitControls.attach(engine)`; the
   constructor stays for a bare Camera); DragControls, TransformControls, ViewCube, Physics (`new Physics(null, ...)`
   stays for headless) and GrassField (`attach(engine, options)`) have attach too. GPUParticles and SkyMoon override
@@ -2673,7 +2523,7 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
   (10k moving parts: 187 ms CPU per frame through `setTransform`).
   Earlier note kept for history:
 - Back-face culling: SKIPPED for core (Scott agreed, 2026-10-14). Measured on `scratch/core-backface-cull`
-  (+315 B -> 19,858; 50k CAD 15.6 -> 13.7 ms GPU, noisy; 16 full-screen layers 11.9 -> 4.7 ms). CAD files often have
+  (+315 B -> 19,858; 50k CAD 15.6 -> 13.7 ms GPU, noisy; 16 full-screen layers 11.9 -> 4.7 ms). Assembly files often have
   open shells, mirrored parts and section cuts; pipeline-level culling stays a leaf-package option for closed solids.
 - Island light tier keeps 100k particles by default; add a `?particles=1m` URL switch (the menu already has 1M).
   Start after the visual-regression agent merges (it edits the sandbox).
@@ -2742,8 +2592,8 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
 
 1. Rebuild every demo on the current packages and bring each up to date with the new capabilities: quality tiers
    and pacing, materials and textures, shader nodes, post stack + FXAA, environment IBL/fog/backgrounds, cameras
-   (orthographic, ViewCube), picking/outlines/DragControls, LOD/imposters, glTF extensions, native FBX/USD, lights,
-   CAD sections/edges/exploded views. Add new demos where a capability has none (e.g. a CAD assembly viewer).
+   (orthographic, ViewCube), picking/outlines/DragControls, LOD/imposters, glTF extensions, native FBX/USD, lights.
+   Add new demos where a capability has none.
    Run `npm run visual:check` before and after rebuilding each demo: before, to start from a clean pass; after, every
    failing view of that demo must be an intended change (look at the diff in `test-results/visual/index.html`), then
    `npm run visual:update -- --only=<demo>` and commit the new baselines with the rebuild. Any other demo failing means
@@ -2751,7 +2601,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    prefers-reduced-motion, a readiness signal, `?quality=high|low`; a new demo gets an entry in
    `scripts/visual-regression.js` and a `visual:update -- --only=<id>`.
 2. Whitepaper (`docs/whitepaper.md`, also published on the site) proving every public claim with reproducible tests
-   and benchmarks: size (`npm run measure:threejs`), load/startup times, frame times per device tier, CAD scale
+   and benchmarks: size (`npm run measure:threejs`), load/startup times, frame times per device tier, assembly scale
    (10k/50k/100k parts), picking latency, LOD/imposter savings, package proofs, fair three.js benchmark (WebGL and
    WebGPU), visual-regression results, and stated limits (devices not tested, WebGPU-first). Each number names the
    command, hardware, browser and date that produced it; all runs serial on an idle GPU.
@@ -2835,7 +2685,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    visual compare); plus a manual check on a Mac (unplug a monitor / switch GPU) if Scott can.
    Status 2026-10-15: automated part passes, 24/24 views (`npm run visual:device-loss`, 5i.d); Mac check open.
 4. **Bundle transparency.** A sizes page (treemap or table) generated from `entry-sizes.json`: every package and entry
-   (min+gzip), plus every lazily fetched file (workers, Rapier Wasm, OCCT Wasm, Draco/Basis decoders) and WHEN each
+   (min+gzip), plus every lazily fetched file (workers, Rapier Wasm, Draco/Basis decoders) and WHEN each
    loads. A test proves a basic glTF scene fetches only the expected files. Core+stage figure from
    `npm run measure:size`.
    [DONE 2026-10-15] Sizes page: `site/dist/sizes.html` (margoengine.com/sizes.html, linked from the landing
@@ -2847,7 +2697,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    `tests/sizes-page.test.js` (in verify) checks every catalog package is listed with the numbers of that one measured
    commit. Finished the same day (gate 4b): (a) "Loaded later, and what loads it": every file a package fetches or
    compiles on its own after its entry, one row each with raw, gzip and brotli bytes and the exact call that loads it.
-   The list is `scripts/lazy-files.js` (25 rows: the stage's 7 lazy packs, the CAD worker + OCCT glue + .wasm, the
+   The list is `scripts/lazy-files.js` (the stage's lazy packs, the
    decoder worker + Draco and Basis glue + .wasm, the gltf-pro/fbx/usdz/loaders parser workers, the BVH module worker,
    Rapier, Recast, web-ifc.wasm and web-ifc-mt.wasm); `entry-sizes.mjs` measures them into `entry-sizes.json`
    `lazyFiles` (files the bundler copies as is: bytes on disk; chunks/module worker/Rapier/Recast: bundled and
@@ -2858,8 +2708,8 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    `tests/fixtures/basic-scene` (`createStage('#scene')` + `app.load('./model.glb')`, a 1,332 B cube), served by
    `vite preview`, opened in headless Edge 155 (Arc 140V), Playwright network log. It asserts the page fetched exactly
    the HTML, the entry chunk and its static imports, the @margoengine/gltf chunk and the model, each once, and nothing
-   with wasm/occt/draco/basis/rapier/recast/ifc/worker/cad in its name, while the same build holds the 7,604,031 B
-   OCCT .wasm, the CAD worker and the other packs (16 files, 7,952,535 B, never requested). Measured at 5a7bbc2: 6
+   with wasm/draco/basis/rapier/recast/ifc/worker in its name, while the same build holds the
+   other lazy packs (never requested). Measured at 5a7bbc2: 6
    requests, 30,027 B transferred (preview gzips JS; body + headers), 62,702 B raw / 27,020 gzip / 23,774 brotli; the
    entry chunk (core + stage + app) 47,732 raw / 20,564 gzip, the glTF chunk 11,018 / 4,566. It records
    `results/basic-scene-network.json`; the sizes page shows that table and refuses (throws) a record from another
@@ -2924,7 +2774,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    10.0); groups B and D open, then verify switches to `--strict`.
 7. **Docs + playground** (item 8): quickstart, three.js migration, two flagship tutorials, cookbook, generated API
    reference, live-editable examples.
-8. **Humble, exact scope on the landing page:** a small, fast WebGPU engine for high-part-count CAD/engineering
+8. **Humble, exact scope on the landing page:** a small, fast WebGPU engine for high-part-count
    assemblies, modular web 3D apps and instant-load web games - not "replaces Unreal/Unity/Blender". Design-envelope
    page (5j) linked.
 9. **No flaky gates:** `npm run verify` passes 5 times in a row under load (5l.s).
@@ -2959,7 +2809,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    opaque/BLEND glTF materials on main. Selection outlines now include descendants of a selected plain core mesh
    (8f710eb3; Scott deferred deciding whether to keep that, 2026-10-17); BackSide support costs selection's model mask a few ALU ops when unused (95b4eae6).
 11. **Security (Scott, 2026-10-15):** 0 open findings, each fixed with a regression test. (a) Every parser of untrusted
-   input (glTF/GLB, OBJ, STL, PLY, 3MF, PCD, XYZ, OFF, VTK, FBX, USD/USDZ, IFC, STEP/IGES, KTX2/Basis, Draco, meshopt,
+   input (glTF/GLB, OBJ, STL, PLY, 3MF, PCD, XYZ, OFF, VTK, FBX, USD/USDZ, IFC, KTX2/Basis, Draco, meshopt,
    EXR, HDR, UltraHDR, .margo, audio/video metadata, net snapshots) has a seeded fuzzer: malformed and hostile inputs
    produce a named error within the size/time budget, never a hang, crash, out-of-range read or memory blowup; the
    fuzzers run in `test:release`. (b) No script injection (user/file strings into innerHTML in html, labels,
@@ -2975,31 +2825,24 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    generates `THIRD-PARTY-NOTICES.md` for all 75 published packages (73 + create-margo + margo-convert) from the
    manifests and package-lock.json; `--check` (run by `tests/supply-chain.test.js`, in verify) fails on a stale file, a
    manifest without license/repository/files/exports/sideEffects or with `private`, a runtime dependency without a
-   stated reason, a licence outside MIT/ISC/Apache-2.0/BSD/Zlib/0BSD (reviewed exceptions: occt-import-js LGPL-2.1,
-   web-ifc MPL-2.0), an install script, a deprecation, a non-registry or hash-less lock entry, or a runtime dependency
+   stated reason, a licence outside MIT/ISC/Apache-2.0/BSD/Zlib/0BSD (reviewed exception: web-ifc MPL-2.0), an install script, a deprecation, a non-registry or hash-less lock entry, or a runtime dependency
    the code never imports. The same test reads every tarball's file list with npm's own npm-packlist (~1 s for all 75)
    and requires LICENSE, README and each package's third-party notices, and no src/tests/fixtures/source maps/keys.
    Runtime npm dependencies (lock versions): recast-navigation 0.43.1 + @recast-navigation/core/generators/wasm 0.43.1
-   (MIT; navigation), occt-import-js 0.0.23 (LGPL-2.1; margo-convert); peers web-ifc 0.0.78 (MPL-2.0; ifc),
+   (MIT; navigation); peers web-ifc 0.0.78 (MPL-2.0; ifc),
    @dimforge/rapier3d-compat 0.21.0 (Apache-2.0, optional; physics), react 19.3.0 (MIT; react). 65 of 75 packages have
    no third-party runtime dependency. None has an install script; the whole lock has one (fsevents 2.3.3, dev, macOS
-   optional) and one deprecation (whatwg-encoding 3.1.1, dev via jsdom). The pre-1.0 runtime deps (occt-import-js,
-   web-ifc, recast-navigation) are the maintenance risk: check `npm view <name> time.modified` before each release.
+   optional) and one deprecation (whatwg-encoding 3.1.1, dev via jsdom). The pre-1.0 runtime deps (web-ifc,
+   recast-navigation) are the maintenance risk: check `npm view <name> time.modified` before each release.
    `npm audit` (registry reachable, 2026-10-15): 0 vulnerabilities (all and `--omit=dev`); `npm audit signatures`
    against the main checkout's install: 116 packages with verified registry signatures, 39 with attestations.
    Shipped third-party code and notices: decoders (Draco, Basis: Apache-2.0, now with `dist/LICENSE-Apache-2.0.txt`;
    the meshopt decoder was then a port of meshoptimizer with its MIT notice; rewritten from the extension specifications
-   on 2026-10-24, so that notice and its THIRD-PARTY-NOTICES row are removed), machinery (OCCT
-   glue + Wasm, LGPL-2.1: OCCT-NOTICE.txt rewritten to state each obligation; the patched glue's first line now
-   carries the change date, LGPL s. 2b, via `scripts/static-embind.js`), text (`sdf.ts` follows TinySDF line by line:
-   BSD-2-Clause `NOTICE.md` added and shipped; 2026-10-24: `sdf.ts` was rewritten clean-room from the Felzenszwalb-Huttenlocher paper with its own sub-pixel seeding, so the TinySDF notice and `NOTICE.md` were removed). LGPL how-met list in THIRD-PARTY-NOTICES.md (notice + licence text
-   next to the files, modification marked and dated, transformation script public, upstream source linked, glue and
-   Wasm loaded by URL so users can swap in their own build). Open for Scott: whether linking upstream occt-import-js
-   0.0.23 suffices for LGPL s. 4 or we mirror its source tarball (the airtight option); not legal advice.
+   on 2026-10-24, so that notice and its THIRD-PARTY-NOTICES row are removed), text (`sdf.ts` follows TinySDF line by line:
+   BSD-2-Clause `NOTICE.md` added and shipped; 2026-10-24: `sdf.ts` was rewritten clean-room from the Felzenszwalb-Huttenlocher paper with its own sub-pixel seeding, so the TinySDF notice and `NOTICE.md` were removed).
    The site build copies THIRD-PARTY-NOTICES.md to `/THIRD-PARTY-NOTICES.md` (a footer link is still to add).
    Tarballs (npm pack --dry-run of all 75, after build:packages): no surprises; only package.json, README, LICENSE,
-   NOTICE.md (post, tonemap, text), blender's FORMAT.md and dist/. The OCCT .wasm/.js contain the upstream
-   author's build paths (`C:/Users/vkovacs/...` in assert strings), not ours. Secrets scan (tracked files, all
+   NOTICE.md (post, tonemap, text), blender's FORMAT.md and dist/. Secrets scan (tracked files, all
    history, built dist): no tokens, keys, .npmrc/.env files or email addresses in files; the owner's business email
    appears only as the git author email of 389 commits (public once pushed; set user.email to the GitHub noreply
    address for future commits if that matters). `margo-convert` gained `sideEffects: false`; create-margo is
@@ -3028,8 +2871,6 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
      directory (after redirects), no `%2F`/`%5C`, HTTP(S) only, else TypeError before any fetch; new option
      `allowedURLs` (URL prefixes) on gltf `GLTFOptions`, gltf-pro `AssetOptions` (worker and progressive forward it)
      and `FBXOptions`. Default is the safe one. (API reports updated.)
-   - HIGH, ReDoS: STL text `/facet\s+normal[\s\S]*?endfacet/g` (`machinery/src/cad-parser.ts`) rescanned to EOF for each
-     unterminated facet (20,000 facets, 380 KB: 0.84 s; a 64 MiB file: hours). Now an indexOf scan, same facets.
    - MEDIUM, ReDoS: 3MF XML attribute regex (`loaders/src/xml.ts`) was quadratic on a long run without `=` (20 KB: 0.3 s);
      a lookbehind now starts names only at token boundaries (1 MB: 6 ms).
    - MEDIUM, budget bypass by prototype lookup: gltf-pro `components[def.type]` / `componentSizes[...]` on plain objects:
@@ -3051,7 +2892,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
      (`readResponse`); FBX textures share the converted GLB's 128 MiB.
    - LOW, worker boundary: `shared/worker.js` `runWorker` hung on a null reply and mapped error name `constructor` to
      `Object`; `serve`, decoders, bvh and progressive workers threw on non-object messages; progressive started a
-     second stream on any message without `order`; CAD client hung on null; progressive client had no
+     second stream on any message without `order`; progressive client had no
      `onmessageerror` and no image-index bounds. All checked at the boundary now; unknown messages are ignored.
    Reviewed, no finding: no `innerHTML`-class sink in any package (`tests/security.test.js` scans for them; inspector,
    frame debugger, stats and view cube use `textContent`; a node or GPU label `<img src=x onerror=alert(1)>` renders
@@ -3079,14 +2920,12 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    65,535-byte entry names, 3MF component fan-out and cycles (also across p:path parts), deep XML/USDA/STEP lists, bad
    string escapes, Crate files with revisiting path jump tables, FBX record trees with hostile values, int64 overflow,
    cyclic connections, ASCII arrays of 8 M values, IFC reference cycles. Seeds: the repo fixtures (loaders, usdz, ifc,
-   bvh OBJs, triangle.fbx, the FBX and Crate test writers) and the occt-import-js test STEP/IGES/STL files. STEP/IGES
-   run through machinery's built CAD worker (OCCT compiled once, instantiated per file) and IFC through web-ifc, each in
-   a worker thread terminated at a deadline as loadCAD and parseIFCInWorker do. `test:release` runs `npm run fuzz --
-   --short` (4 s per target, seed 1). Clean run, seed 3, 90 s per target (180 s STEP): ply 11,311, pcd 14,804, xyz
-   14,577, off 13,041, vtk 11,739, 3mf 7,696, loaders usda 14,233, loaders usdz 17,134, stl 13,779, obj 8,394, iges
-   2,137, step 3,752, SurfacePhysics 12,157, fbx 1,235, usdz usda 14,569, usdc 2,983, usdz 14,740, ifc 5,932, net
+   bvh OBJs, triangle.fbx, the FBX and Crate test writers). IFC runs through web-ifc in
+   a worker thread terminated at a deadline as parseIFCInWorker does. `test:release` runs `npm run fuzz --
+   --short` (4 s per target, seed 1). Clean run, seed 3, 90 s per target: ply 11,311, pcd 14,804, xyz
+   14,577, off 13,041, vtk 11,739, 3mf 7,696, loaders usda 14,233, loaders usdz 17,134, stl 13,779, obj 8,394, fbx 1,235, usdz usda 14,569, usdc 2,983, usdz 14,740, ifc 5,932, net
    snapshots 15,954, exporters round trip 10,333 inputs, 0 findings. Earlier runs (seed 1 at 120 s, seed 2 at 180 s on
-   STEP/IGES/IFC/USDC/FBX/3MF) found the last five below. Findings, all fixed with a regression in
+   IFC/USDC/FBX/3MF) found the last five below. Findings, all fixed with a regression in
    tests/fuzz-regressions.test.js (reproducers in tests/fixtures/fuzz), packages/ifc/tests/worker.test.js or
    packages/physics/tests/physics.test.js:
    - PLY, PCD, OFF: a short file declaring millions of elements allocated first (PLY: 336 MiB for 314 B; PCD
@@ -3100,16 +2939,8 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
      most 100,000 object instances (the per-file part cap); empty meshes skip per-instance work.
    - USDA (loaders readUSDA, also used by usdz): `( """doc""" )` metadata and quoted prim names with bad escapes threw
      JSON.parse's SyntaxError; now LoaderError `syntax`.
-   - STL/OBJ (machinery): non-UTF-8 text threw TextDecoder's TypeError, now `Invalid STL/OBJ: not UTF-8 text`; the
-     ASCII STL facet regex was quadratic (hang; the same linear scan also landed in 11b).
-   - STEP/IGES (CAD worker): OCCT's own "Maximum call stack size exceeded" (a 50,000-deep list) reached the caller raw.
-     OCCT failures and Wasm traps are now `B-Rep import failed: OpenCascade threw/trapped on this STEP file`, OCCT mesh
-     indices are bounds checked, and a dead worker rejects with `CAD worker failed: ...`; one worker per load, so the
-     next file starts a fresh OCCT (tested). A 4-byte change in Cube 10x10.igs keeps OCCT busy 135 s: new
-     `timeoutMs` (default 120,000) terminates the worker with `CAD import did not finish within ... ms`.
    - IFC: web-ifc 0.0.78 loops forever inside its Wasm on malformed parameter lists (`#1e999`, `#11 x`, `.T.x`, `'a'b`,
-     `$x`, `#-1`): parseIFC now checks ISO 10303-21 statement syntax first (linear; all 56 occt-import-js STEP files and
-     wall.ifc pass) and reports LoaderError `syntax`. web-ifc's own TypeErrors (OpenModel without FILE_SCHEMA) and traps
+     `$x`, `#-1`): parseIFC now checks statement syntax first (linear; wall.ifc passes) and reports LoaderError `syntax`. web-ifc's own TypeErrors (OpenModel without FILE_SCHEMA) and traps
      are LoaderError `unsupported`. It also loops on syntactically valid but schema-invalid models (a string where a
      set belongs, a missing attribute: fixtures/fuzz/ifc-arity-hang.ifc), which no check in front of it can rule out,
      so untrusted IFC needs the new `@margoengine/ifc/worker` `parseIFCInWorker(bytes, {webIfc, wasmPath, timeoutMs})`:
@@ -3128,12 +2959,11 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
      check took 6.3 s for 320 1,024-gons (1.3 MB). Now: each path entry visited once and depth checked while walking,
      Set lookups, counts never preallocated, LZ4 output at most 255x its input, field types checked, `USD: USDA layer is
      not UTF-8 text`, 10^7 polygon work (as loaders' USDA).
-   - SurfacePhysics: non-object parts, carriers, nodes or vectors threw "Cannot read properties of undefined"; now
-     `TypeError: Invalid surface part/carrier/vector`. Physics (Rapier): a NaN or infinite convex hull failed inside
+   - Physics (Rapier): a NaN or infinite convex hull failed inside
      Rapier ("expected instance of p"), a NaN trimesh or heightfield was accepted and poisoned the simulation; now
      `RangeError: ... must be finite Float32 values` before Rapier.
    Typed-array audit (every view/index read in these parsers checked against its buffer before access): fixed the FBX
-   'Y'/'C' reads, the PLY/PCD/OFF/Crate/LZ4/ZIP allocations sized by file counts, the OCCT index reads; checked and
+   'Y'/'C' reads, the PLY/PCD/OFF/Crate/LZ4/ZIP allocations sized by file counts; checked and
    left as they were: PLY binary rows, PCD binary/LZF, ZIP directory and local headers, VTK binary, Crate take/seek,
    LZ4 byte reads, FBX arrays and `need`, binary STL, 3MF triangle and property indices, USD face/normal/UV indices,
    FBX layer indices, IFC face indices. No findings: net snapshots (finite packets always sample finite), exporters
@@ -3205,8 +3035,8 @@ up front: "do I need 40 installs to draw a cube?" and "will package versions cla
 before publishing; use only measured numbers from claims.md.
 
 Facts today: 73 packages (72 `@margoengine/*` + `margoengine`). `margoengine` is the stage facade (`createStage`):
-core + stage = 19,999 B gzip (`npm run measure:size`). Installing it also installs gltf, machinery, creative, scenery,
-environment and shadows, but their code loads only on first use (`app.load()` for glTF/STL/OBJ/STEP/IGES, `app.sky()`,
+core + stage = 19,999 B gzip (`npm run measure:size`). Installing it also installs gltf, creative, scenery,
+environment and shadows, but their code loads only on first use (`app.load()` for glTF, `app.sky()`,
 particles, post, `app.environment()`, `app.shadows()`), so a spinning model costs core + stage + the gltf entry.
 
 1. Three ways in, shown at the top of the README and the getting-started page, in this order:
@@ -3249,7 +3079,7 @@ particles, post, `app.environment()`, `app.shadows()`), so a spinning model cost
    - Animation and interaction (11): animation, animator, tween, cinematic, controls, cameras, input, gizmo, viewcube,
      selection, audio
    - Simulation and games (6): physics, navigation, navmesh, ecs, fsm, net
-   - CAD and engineering (3): machinery, bvh, geometry
+   - Geometry and spatial (2): bvh, geometry
    - Frameworks (1): react
 3. No version clashes: DONE 2026-10-15. All 73 packages, create-margo and margo-convert are 1.0.0; every internal
    range (packages, template, examples, Night Citadel) is `^1.0.0`. `node scripts/set-version.mjs <x.y.z>` moves them

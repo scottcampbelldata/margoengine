@@ -2,7 +2,7 @@
 
 [Browse the searchable catalog](https://scottcampbelldata.github.io/margoengine/).
 
-Search all 93 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the five standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
+Search all 92 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the four standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
 
 The [release notes](../CHANGELOG.md#unreleased) cover standalone USDZ parsing,
 Draco/Meshopt support in glTF Pro and synchronous parsing behavior. The core and the stage
@@ -41,7 +41,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-93 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+92 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -75,7 +75,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/exporters`](../packages/exporters/README.md) | glTF/GLB, STL, OBJ, PLY, USDZ and COLLADA exporters for Margo Engine scenes and geometry data. |
 | [`@margoengine/ifc`](../packages/ifc/README.md) | IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime. |
 | [`@margoengine/blender`](../packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |
-| [`@margoengine/cache`](../packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin, textures and STEP files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |
+| [`@margoengine/cache`](../packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin and texture files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |
 | [`@margoengine/splats`](../packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |
 | [`@margoengine/tiles`](../packages/tiles/README.md) | Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf-pro. |
 
@@ -168,11 +168,10 @@ node --test tests/catalog.test.js
 | [`@margoengine/netcode`](../packages/netcode/README.md) | Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests. |
 | [`@margoengine/voxel-net`](../packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
-### CAD and engineering (4)
+### Geometry and spatial (3)
 
 | Package | What it is |
 | --- | --- |
-| [`@margoengine/machinery`](../packages/machinery/README.md) | Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine. |
 | [`@margoengine/bvh`](../packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
 | [`@margoengine/geometry`](../packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 | [`@margoengine/mesh-edit`](../packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |

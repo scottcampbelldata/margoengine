@@ -1,7 +1,7 @@
 // Emscripten's embind builds every C++ call wrapper with `new Function` unless the module was compiled with
 // DYNAMIC_EXECUTION=0, so a prebuilt embind glue file fails under a CSP without 'unsafe-eval'. Those wrappers are
 // JavaScript only (the .wasm is the same either way), so this rewrites the glue's two code generators into the closures
-// DYNAMIC_EXECUTION=0 emits instead. Used on the Basis transcoder (packages/decoders) and occt-import-js (machinery).
+// DYNAMIC_EXECUTION=0 emits instead. Used on the Basis transcoder (packages/decoders).
 // The patterns are exact: a different Emscripten version fails the build here instead of shipping an unpatched file.
 
 const patches = [

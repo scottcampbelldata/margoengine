@@ -22,7 +22,6 @@ Canvas on the server creates no GPU, physics world, pointer lock or XR session. 
 | `@margoengine/react/materials` | `MeshTransmissionMaterial`, `BatchedMesh`, `BatchedItem` | `@margoengine/materials` (and `gltf-pro` for transmission) |
 | `@margoengine/react/post` | `EffectComposer`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `DepthTexture`, `SceneTargets` | `@margoengine/post` |
 | `@margoengine/react/dof`, `/tonemap`, `/taa` | `DepthOfField`, `Tonemap`, `TAA` (inside an `EffectComposer`) | `@margoengine/dof`, `tonemap` or `taa`, and `@margoengine/post` |
-| `@margoengine/react/machinery` | `SectionPlanes` | `@margoengine/machinery` |
 | `@margoengine/react/voxel` | `Voxels`, `useBlockTextures` | `@margoengine/voxel` |
 | `@margoengine/react/physics` | `Physics`, `RigidBody`, the collider components, `usePhysics`, `useJoint`, `useBeforePhysicsStep`, `useAfterPhysicsStep` | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
 | `@margoengine/react/xr` | `XR`, `Controller`, `useXR` | `@margoengine/xr` |

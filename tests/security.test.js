@@ -13,7 +13,7 @@ import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { parseGLTF as parseLight, loadGLTF as loadLight } from '../packages/gltf/dist/index.js';
 import { parseGLTF as parsePro, loadGLTF as loadPro } from '../packages/gltf-pro/dist/index.js';
 import { decodeMargo } from '../packages/blender/dist/index.js';
-import { parseCAD } from '../packages/machinery/dist/index.js';
+import { parseSTL } from '../packages/loaders/dist/index.js';
 import { parseUSDA } from '../packages/usdz/dist/index.js';
 import { Inspector } from '../packages/inspector/dist/index.js';
 import { headless, headlessModels } from './support/pbr-snapshot.js';
@@ -299,11 +299,10 @@ test('glTF loaders fetch only URIs inside the model directory (light and gltf-pr
   clean();
 });
 
-test('STL text with unterminated facets is rejected in linear time (was quadratic, ReDoS)', async () => {
-  const engine = await headless(),
-    text = 'solid x\n' + 'facet normal 0 0 1\n'.repeat(200_000) + 'endsolid x\n',
+test('STL text with unterminated facets is rejected in linear time (ReDoS)', () => {
+  const text = new TextEncoder().encode('solid x\n' + 'facet normal 0 0 1\n'.repeat(200_000) + 'endsolid x\n'),
     started = performance.now();
-  assert.throws(() => parseCAD(engine, text, 'stl'), /STL contains no triangles/);
+  assert.throws(() => parseSTL(text), /not closed with "endfacet"/);
   assert.ok(performance.now() - started < 2000, `took ${performance.now() - started} ms`);
 });
 

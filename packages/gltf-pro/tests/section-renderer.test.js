@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { GLTFAsset, parseGLTF } from '../dist/index.js';
 import { PBRInstances } from '../dist/instancing.js';
-import { SectionPlanes } from '../../machinery/dist/index.js';
+import { TestSectionPlugin } from '../../../tests/support/section-plugin.js';
 import { wgsl } from '../../core/src/shaders.ts';
 import { compactTests, pbrShader, viewShader } from '../src/shader.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
@@ -67,7 +67,7 @@ async function fixture(t, { transmission = false } = {}) {
     context,
     draws,
     section(planes = [[1, 0, 0, 0]]) {
-      const value = new SectionPlanes({ planes, cap: false });
+      const value = new TestSectionPlugin({ planes });
       let clip;
       value.setup(engine);
       value.registerPasses({
@@ -119,7 +119,7 @@ function assertClipped(draw) {
   assert.ok(sectionBuffer(draw), 'the final fragment receives the live section uniform at group 0 binding 2');
 }
 
-test('loaded Box.glb retains the original PBR shader and bindings without SectionPlanes', async (t) => {
+test('loaded Box.glb retains the original PBR shader and bindings without a section binding', async (t) => {
   const f = await fixture(t),
     [draw] = f.frame();
   assert.equal(draw.pipeline.fragment.module.code, viewShader(compactTests(pbrShader)));

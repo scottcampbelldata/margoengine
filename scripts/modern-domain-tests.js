@@ -15,13 +15,9 @@ const pixel = async (name) => {
     const e = window.modern.state.core;
     e.render();
     await e.gpu.queue.onSubmittedWorkDone();
-    document.querySelectorAll('svg[data-margoengine-annotations]').forEach((svg) => (svg.style.visibility = 'hidden'));
   });
   const image = await decodePNG(
     await page.locator('[data-core]').screenshot({ path: `test-results/modern-${name}.png` }),
-  );
-  await page.evaluate(() =>
-    document.querySelectorAll('svg[data-margoengine-annotations]').forEach((svg) => (svg.style.visibility = '')),
   );
   const offset = (Math.floor(image.height / 2) * image.width + Math.floor(image.width / 2)) * 4;
   return [...image.data.slice(offset, offset + 3)];
@@ -29,17 +25,15 @@ const pixel = async (name) => {
 try {
   await page.waitForFunction(() => window.modern);
   await page.evaluate(() => window.modern.core('webgpu'));
-  await page.evaluate(() => window.modern.machinery());
-  const cap = await pixel('cap');
-  assert.ok(cap[1] > 150 && cap[0] < 20 && cap[2] < 20, `Missing solid green cap: ${cap}`);
-  assert.match(await page.locator('svg[aria-label]').textContent(), /1.00 m.*Section cap/);
+  const box = await pixel('base');
+  assert.ok(box[0] > box[1] + 15, `Missing red PBR box: ${box}`);
   await page.evaluate(() => {
     const e = window.modern.state.core;
     [...e.meshes.values()][0].scale.x = -1;
     e.render();
   });
-  const mirror = await pixel('cap-mirrored');
-  assert.deepEqual(mirror, cap);
+  const mirror = await pixel('base-mirrored');
+  assert.deepEqual(mirror, box);
   const original = await page.evaluate(() => {
     const e = window.modern.state.core;
     window.saved = { store: e.store, memory: e.store.matrices.buffer, mesh: [...e.meshes.values()][0], device: e.gpu };
@@ -67,10 +61,10 @@ try {
   assert.equal(recovery.error, undefined);
   assert.ok(recovery.store && recovery.memory && recovery.mesh);
   assert.deepEqual(recovery.matrix, original);
-  assert.deepEqual(await pixel('recovered'), cap);
+  assert.deepEqual(await pixel('recovered'), box);
   checks.push({
-    name: 'Indirect instancing, shader/stencil caps, mirrored transforms, SVG dimensions, actual device.destroy recovery',
-    cap,
+    name: 'Mirrored transforms and actual device.destroy recovery keep the store, meshes and pixels',
+    box,
     recovery,
   });
   await page.evaluate(() => window.modern.core('webgpu'));
@@ -181,7 +175,6 @@ try {
   const hdr = await pixel('hdr');
   assert.ok(hdr.every(Number.isFinite) && hdr[0] > 30, `HDR output missing: ${hdr}`);
   await page.evaluate(async () => {
-    await window.modern.machinery();
     window.modern.toon();
     window.modern.sorted();
     window.modern.state.core.render({ delta: 0.1 });
@@ -219,10 +212,12 @@ try {
     read.unmap();
     read.destroy();
     buffer.destroy();
-    return { actual, expected: e.camera.matrix[14] / e.camera.matrix[15] };
+    // The unit box's front face (z = 0.5) faces the camera on the z axis, so its depth is the same at every pixel.
+    const m = e.camera.matrix;
+    return { actual, expected: (0.5 * m[10] + m[14]) / (0.5 * m[11] + m[15]) };
   });
-  assert.ok(Math.abs(depth.actual - depth.expected) < 1e-5, 'Stencil/FX passes corrupted cap depth');
-  checks.push({ name: 'Cap writes plane depth; particle/sky/bloom/fog passes preserve it', ...depth });
+  assert.ok(Math.abs(depth.actual - depth.expected) < 1e-5, 'FX passes corrupted the box depth');
+  checks.push({ name: 'The box writes its front-face depth; particle/sky/bloom/fog passes preserve it', ...depth });
   const cache = await page.evaluate(async () => {
     const e = window.modern.state.core;
     e.render();
@@ -293,8 +288,7 @@ try {
     await page.evaluate((scenario) => {
       const e = window.modern.state.core;
       e.stop();
-      const s = e.plugins.get('section-planes'),
-        p = e.plugins.get('gpu-particles'),
+      const p = e.plugins.get('gpu-particles'),
         fx = e.plugins.get('post-processing');
       const request = navigator.gpu.requestAdapter.bind(navigator.gpu);
       window.race = {
@@ -309,7 +303,6 @@ try {
           delete navigator.gpu.requestAdapter;
         },
         resources: [
-          s.buffers[0],
           p.particles,
           p.simulation,
           p.computeGroup,
@@ -323,7 +316,6 @@ try {
           fx.depthView,
           fx.presentGroup,
           fx.resolveGroup,
-          s.pass,
           fx.presentPass,
         ],
       };
@@ -369,11 +361,9 @@ try {
       window.race.remove();
       window.race.removePass?.();
       window.race.restoreRequest();
-      const s = e.plugins.get('section-planes'),
-        p = e.plugins.get('gpu-particles'),
+      const p = e.plugins.get('gpu-particles'),
         fx = e.plugins.get('post-processing'),
         resources = [
-          s.buffers[0],
           p.particles,
           p.simulation,
           p.computeGroup,
@@ -387,7 +377,6 @@ try {
           fx.depthView,
           fx.presentGroup,
           fx.resolveGroup,
-          s.pass,
           fx.presentPass,
         ];
       return {

@@ -77,7 +77,6 @@
       "name": "Vite production: lazy packages, repeated import, explode, GPU leaves, material control, mobile layout",
       "chunks": {
         "gltf": "assets/dist-cudCUkIP.js",
-        "machinery": "assets/dist-Dn1cD73g.js",
         "creative": "assets/dist-DJ7bsYnO.js"
       }
     },

@@ -1,7 +1,7 @@
 # Benchmarking
 
 Margo has one benchmark tool: `npm run bench`. It measures bytes, startup, rendering, objects, kernel maths, glTF,
-loaders, CAD, voxels, physics, memory and React. Every run passes the same quiet-machine gate and repeats each case. It
+loaders, assemblies, voxels, physics, memory and React. Every run passes the same quiet-machine gate and repeats each case. It
 records the machine it ran on and writes a versioned JSON result with a readable report. It can compare that run with
 an earlier run or commit and fails when something got slower. The same scenes run in the browser at
 [margoengine.com/bench/](https://margoengine.com/bench/), so anyone can measure their own machine with the code we use.
@@ -82,19 +82,19 @@ The tool takes the lock itself when it is not wrapped, so both forms are safe.
 | `objects` | browser | 10,000 objects as static meshes, moving meshes, instances and moving instances. |
 | `instanced` | browser | Instanced boxes, static at 1,000, 10,000 and 50,000 and moving at 10,000, through each instancing path (Margo: `createInstancedMesh` and `CulledInstances`, `mode=culled`). The instanced comparison of `docs/whitepaper/boxes-vs-threejs.md`. |
 | `scaling` | browser | 1, 100, 1,000, 10,000 and 100,000 meshes, then 100,000 and 250,000 instances, then 400, 5,000 and 10,000 shadow casters. |
-| `math` | Node | Kernel world matrices and frustum culling for 100,000 meshes, 100,000 matrix compositions, BVH build and rays on 500,000 triangles, rays against a 500-part assembly. |
+| `math` | Node | Kernel world matrices and frustum culling for 100,000 meshes, 100,000 matrix compositions, BVH build and rays on 500,000 triangles. |
 | `gltf` | browser | Load and draw SciFiHelmet, FlightHelmet and RobotExpressive, then the helmet with image-based lighting and shadows. |
 | `loaders` | Node | PLY, 3MF, OFF, VTK and PCD files from the loaders tests, and a generated 500,000-triangle OBJ. |
 | `cad` | Node and browser | Kernel tick for assemblies of 10,017, 50,004 and 89,883 parts, then 10,000 and 50,000-part assemblies drawn. |
 | `voxel` | Node and browser | Fill a 256 x 64 x 256 terrain, mesh its 128 chunks, 10,000 voxel raycasts, then the voxel sandbox at render distance 8. |
-| `physics` | Node | Rapier steps for 1,000 and 5,000 boxes, and the machinery conveyor solver for 500 parts. |
+| `physics` | Node | Rapier steps for 1,000 and 5,000 boxes. |
 | `memory` | Node and browser | Heap and kernel memory per 100,000 meshes, then JS heap and live GPU memory after the boxes, instances and helmet scenes. |
 | `compute` | browser | `@margoengine/compute`: sort (2^16 to 2^22 keys), prefix sum, sum, histogram and random normals (2^20 and 2^24 values), matrix products (256 to 2048) and FFTs (2^16 to 2^22 points), as task scenes. GPU time, wall time and throughput (see [GPU compute](#gpu-compute)). |
 | `viz` | browser | `@margoengine/sciviz` figures with axes: scatter plots of 100,000 to 4,000,000 points, surfaces of 256^2 and 1024^2, volumes of 64^3 and 128^3. |
 | `react` | browser | Mount 1,000 boxes declared with `@margoengine/react`, then re-render all of them every frame. |
 | `claims` | engine-bench | Opt-in: each other engine's own harness, recorded beside the shared scenes (see [Comparing engines](#comparing-engines)). |
 | `parity` | browser | Opt-in: one scene per row of `docs/threejs-parity.md` that three.js also has (`bench/scenes/parity.js`), run in Margo and in the three.js adapters in engine-bench (`three-webgpu-parity`, `three-webgl-parity`). `npm run bench:parity` runs it and `bench/parity-report.mjs` adds the results to [the speed matrix](whitepaper/perf-vs-threejs.md). |
-| `features` | Node and browser | Opt-in, about an hour: the per-feature scripts in `examples/package-benchmarks` (CAD scale, culling, post stack, loader memory, shadow shimmer, instancing, atlas + VAT, workers, every real-browser test). Each runs once under the run's gate and GPU lock. Its logs and result files go to `benchmarks/runs/<id>/features/`, and the committed results are restored. |
+| `features` | Node and browser | Opt-in, about an hour: the per-feature scripts in `examples/package-benchmarks` (assembly scale, culling, post stack, loader memory, shadow shimmer, instancing, atlas + VAT, workers, every real-browser test). Each runs once under the run's gate and GPU lock. Its logs and result files go to `benchmarks/runs/<id>/features/`, and the committed results are restored. |
 | `biomes` | Node | Opt-in: biome-map goal G1 on the reference world R16, CPU ms per km2 for each stage on one thread, and the wall time per km2 of fields and stored objects for an 8 x 8 block of tiles on 1 and on 8 worker threads running the built worker script (`bench/biomes/placement.mjs`, `--workers=<n>`). |
 
 `npm run bench` runs every suite except `features`, `claims`, `parity` and `biomes`, which run only when named.
@@ -494,7 +494,6 @@ A case may set `runs` or `warmup` when one sample is already a whole script run 
 | `npm run measure:threejs` (`scripts/compare-threejs-size.js`) | `npm run bench -- size --engines=all`, with each engine's `sizeEntry` in engine-bench. `examples/package-benchmarks/results/threejs-size.json` stays as the record of the last measurement. |
 | `npm run measure:demos` (`scripts/measure-demo-bytes.js`) | `npm run bench -- size --cases=demo-`. |
 | `npm run benchmark:demo-loads` | `npm run bench -- startup --cases=demo-` (`LOAD_PROFILE` as before). |
-| `npm run modern:bench:machinery` | The `physics` suite (conveyor solver) and `math` (assembly raycasts). |
 | `npm run bench:voxel` | Now the `voxel` suite. `examples/voxel-sandbox/bench.mjs` still writes its own detailed record. |
 
 Unchanged:

@@ -1,7 +1,7 @@
 {
   "name": "margo-convert",
   "version": "1.0.0",
-  "description": "Offline asset pipeline and CAD converter for Margo Engine: margo-convert build ./assets --preset web; margo-convert part.step part.glb",
+  "description": "Offline asset pipeline for Margo Engine: margo-convert build ./assets --preset web",
   "keywords": [
     "asset-pipeline",
     "cli",
@@ -10,7 +10,6 @@
     "margoengine",
     "meshopt",
     "optimize",
-    "step",
     "webgpu",
     "webp",
     "3d"
@@ -31,7 +30,6 @@
     "margo-convert": "cli.js"
   },
   "exports": {
-    ".": "./convert.js",
     "./build": "./pipeline/build.js",
     "./optimize": "./pipeline/optimize.js",
     "./presets": "./pipeline/presets.js"
@@ -39,8 +37,6 @@
   "sideEffects": false,
   "files": [
     "cli.js",
-    "cad-cli.js",
-    "convert.js",
     "pipeline",
     "NOTICE"
   ],
@@ -51,9 +47,7 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/exporters": "^1.0.0",
-    "@margoengine/machinery": "^1.0.0",
-    "@margoengine/math": "^1.0.0",
-    "occt-import-js": "0.0.23"
+    "@margoengine/math": "^1.0.0"
   },
   "publishConfig": {
     "access": "public"

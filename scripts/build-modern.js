@@ -1,5 +1,5 @@
 import { execFileSync, execSync } from 'node:child_process';
-import { readFile, writeFile, mkdir, copyFile, rm, readdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { build } from 'vite';
 import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
@@ -8,7 +8,6 @@ import { compactPackage } from './compact-package.js';
 import { compactOutput, external, measureCoreStage } from './measure-size.js';
 import { packageOrder } from './package-order.js';
 import { buildWorkers, restoreWorkerUrls } from './build-workers.js';
-import { staticEmbind } from './static-embind.js';
 import { packageDeclarations, packageRuntime } from './package-declarations.js';
 import { writeServerEntries } from './react-server-entries.js';
 import { importMap } from './umbrella.mjs';
@@ -75,49 +74,6 @@ if (!precompiled)
     'packages/core/src/wasm.ts',
     `// Generated raw-deflate blueprint; consumers need no Rust toolchain.\nexport const wasmBase64: string = '${compressedWasm.toString('base64')}';\n`,
   );
-const machineryPath =
-  'packages/machinery/kernel/target/wasm32-unknown-unknown/release/margoengine_machinery_kernel.wasm';
-if (!precompiled) {
-  execFileSync(
-    'cargo',
-    [
-      'build',
-      '--manifest-path',
-      'packages/machinery/kernel/Cargo.toml',
-      '--target',
-      'wasm32-unknown-unknown',
-      '--release',
-    ],
-    {
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        CARGO_TARGET_DIR: resolve('packages/machinery/kernel/target'),
-        RUSTFLAGS: '-C target-feature=+simd128',
-      },
-    },
-  );
-  execFileSync(
-    process.execPath,
-    [
-      'node_modules/binaryen/bin/wasm-opt',
-      machineryPath,
-      '-O3',
-      '--enable-simd',
-      '--enable-bulk-memory',
-      '--enable-nontrapping-float-to-int',
-      '--strip-debug',
-      '--strip-producers',
-      '-o',
-      machineryPath + '.optimized',
-    ],
-    { stdio: 'inherit' },
-  );
-  await writeFile(
-    'packages/machinery/src/wasm.ts',
-    `// Generated machinery kernel; consumers need no Rust toolchain.\nexport const machineryWasm: string = '${gzipSync(await readFile(machineryPath + '.optimized')).toString('base64')}';\n`,
-  );
-}
 // Build every workspace package in dependency order (scripts/package-order.js reads package.json; a package that needs
 // another's dist at build time must declare it). A package with its own `build` script runs it; the rest use the
 // pipeline below: tsc + compaction for core and the stage facade, tsc for react, a Vite library build + tsc otherwise.
@@ -206,43 +162,6 @@ for (const name of packageOrder(manifests)) {
       },
     },
   });
-  if (name === 'machinery') {
-    // Retain analyzable asset URLs for the consuming app's bundler.
-    for (const file of (await readdir(output)).filter((file) => file.endsWith('.js'))) {
-      const entry = resolve(output, file);
-      await writeFile(
-        entry,
-        (await readFile(entry, 'utf8')).replace(/(?:''|""|``)\s*\+\s*import\.meta\.url/g, 'import.meta.url'),
-      );
-    }
-    await build({
-      configFile: false,
-      publicDir: false,
-      logLevel: 'warn',
-      build: {
-        outDir: resolve(output, 'workers'),
-        emptyOutDir: true,
-        target: 'es2022',
-        lib: {
-          entry: 'packages/machinery/src/workers/cad-worker.ts',
-          name: 'CADWorker',
-          formats: ['iife'],
-          fileName: () => 'cad-runtime.js',
-        },
-      },
-    });
-    // occt-import-js's embind wrappers would need 'unsafe-eval'; ship the closure form (scripts/static-embind.js). Wasm unchanged.
-    await writeFile(
-      resolve(output, 'workers/occt-import-js.js'),
-      staticEmbind(await readFile('node_modules/occt-import-js/dist/occt-import-js.js', 'utf8'), 'occt-import-js.js'),
-    );
-    await copyFile(
-      'node_modules/occt-import-js/dist/occt-import-js.wasm',
-      resolve(output, 'workers/occt-import-js.wasm'),
-    );
-    await copyFile('node_modules/occt-import-js/LICENSE.md', resolve(output, 'workers/OCCT-LICENSE.txt'));
-    await copyFile('packages/machinery/src/workers/OCCT-NOTICE.txt', resolve(output, 'workers/OCCT-NOTICE.txt'));
-  }
   await buildWorkers(resolve(`packages/${name}`));
   await tsc(name);
   await restoreWorkerUrls(output);
@@ -278,7 +197,6 @@ const packages = [
   'react',
   'loaders',
   'exporters',
-  'machinery',
   'vfx',
   'sky',
   'creative',
@@ -314,7 +232,7 @@ for (const name of packages) {
       chunks.every((chunk) =>
         Object.keys(chunk.modules).every(
           (id) =>
-            !['machinery', 'creative', 'scenery', 'loaders', 'exporters', ...featurePackages].some((pack) =>
+            !['creative', 'scenery', 'loaders', 'exporters', ...featurePackages].some((pack) =>
               id.includes(`/packages/${pack}/`),
             ),
         ),
@@ -358,19 +276,6 @@ assert.ok(
 sizes.particlesOnly = { raw: Buffer.byteLength(shaken), gzip: gzipSync(shaken).length };
 await mkdir('test-results', { recursive: true });
 await writeFile('test-results/modern-bundle-sizes.json', JSON.stringify(sizes, null, 2));
-const isolation = await build({
-  configFile: false,
-  publicDir: false,
-  logLevel: 'silent',
-  build: { write: false, target: 'es2022', lib: { entry: 'tests/modern-machinery-consumer.js', formats: ['es'] } },
-});
-for (const chunk of (Array.isArray(isolation) ? isolation[0] : isolation).output.filter(
-  (item) => item.type === 'chunk',
-))
-  assert.ok(
-    Object.keys(chunk.modules).every((id) => !id.includes('/creative/') && !id.includes('/scenery/')),
-    'Creative/scenery code leaked into a machinery consumer',
-  );
 console.error(JSON.stringify(sizes, null, 2));
 // The catalog reads every built dist, so it is regenerated here and can never trail the packages.
 execFileSync(process.execPath, ['scripts/build-catalog.js'], { stdio: 'inherit' });

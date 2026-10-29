@@ -1,20 +1,14 @@
 // Real-GPU check for @margoengine/culling's CulledMeshes on regular core meshes: engine A draws through
 // the GPU culler (core's CPU culling off), engine B is plain core drawing every part; every step's frames must be identical, the culler must
-// actually drop parts in partial views, and engine.pick, FeatureEdges, ExplodedView and AssemblyBVH must keep working.
+// actually drop parts in partial views (an exploded layout, moved, hidden and added parts), and engine.pick must keep working.
 // Run from the repository root after building packages, holding the GPU lock:
 //   node examples/package-benchmarks/cad/culled-meshes.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
-// --edges also attaches FeatureEdges to both engines. Its compute pass appends visible parts with atomics, so its line
-// order (and the blending of overlapping antialiased lines) varies from run to run. Lines of parts between minRadius and twice
-// that fade in with alpha below 1, which makes the blend more order-dependent: with --edges channels may differ by up to 3
-// (a missing or extra line would differ by about 100).
-const edges = process.argv.includes('--edges');
-
 const context = await openBrowser({
-    startPath: '/examples/package-benchmarks/cad/culled-meshes.html' + (edges ? '?edges' : ''),
+    startPath: '/examples/package-benchmarks/cad/culled-meshes.html',
     port: 5221,
   }),
   { page, hardware } = context,
@@ -58,8 +52,7 @@ try {
     console.log(
       `step ${i}: ${r.label}: ${differing} of ${a.data.length / 4} pixels differ (max channel delta ${delta}), ${lit} lit; GPU drew ${r.drawn} of ${r.submitted}, capacity ${r.capacity}`,
     );
-    if (edges) assert.ok(delta <= 3, `${r.label}: culled frame differs from core by ${delta}`);
-    else assert.equal(differing, 0, `${r.label}: culled frame differs from core`);
+    assert.equal(differing, 0, `${r.label}: culled frame differs from core`);
     assert.ok(lit > 1500, `${r.label}: scene not visible`);
     assert.ok(r.drawn <= r.submitted, `${r.label}: drawn count out of range`);
     if (r.drawn < r.submitted * 0.5) partial++;
@@ -73,9 +66,7 @@ try {
     'engine.pick agrees with plain core',
   );
   assert.ok(hits > 5, `engine.pick hits culled meshes (${hits})`);
-  const bvh = await page.evaluate(() => window.check.bvh());
-  assert.ok(bvh.hit, 'AssemblyBVH ray hits');
-  console.log('picks', hits, 'of', picks.length, 'hit, identical on both engines; AssemblyBVH hit part', bvh.part);
+  console.log('picks', hits, 'of', picks.length, 'hit, identical on both engines');
   assert.deepEqual(await page.evaluate(() => window.check.errors), []);
   assert.deepEqual(pageErrors, []);
   console.log('culled core meshes pixel check passed');

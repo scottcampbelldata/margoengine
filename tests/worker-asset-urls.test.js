@@ -39,9 +39,6 @@ test('published worker URLs stay literal import.meta.url', () => {
     ['packages/fbx/dist', './workers/fbx.js?no-inline'],
     ['packages/loaders/dist', './workers/usd.js?no-inline'],
     ['packages/usdz/dist', './workers/usdz.js?no-inline'],
-    ['packages/machinery/dist', './workers/cad-runtime.js?no-inline'],
-    ['packages/machinery/dist', './workers/occt-import-js.js?no-inline'],
-    ['packages/machinery/dist', './workers/occt-import-js.wasm?no-inline'],
     ['packages/voxel/dist', './workers/mesher.js?no-inline'],
     ['packages/voxel/dist', './workers/terrain.js?no-inline'],
   ];

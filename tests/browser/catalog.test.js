@@ -72,8 +72,8 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
       assert.match(await page.locator(`#${id} .requirements`).textContent(), /\^1\.0\.0/);
     }
     for (const [term, id] of [
-      ['conveyor', 'machinery'],
-      ['SectionPlanes', 'machinery'],
+      ['Gerstner', 'water'],
+      ['CharacterController', 'physics'],
       ['loadGLTF', 'gltf'],
       ['particle', 'creative'],
       ['useFrame', 'react'],
@@ -103,10 +103,10 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
       assert.match(example, /^<!doctype html>/);
       await card.locator('.source summary').click();
     }
-    await page.locator('#machinery .exports summary').click();
+    await page.locator('#physics .exports summary').click();
     assert.equal(
-      await copy(page.getByRole('button', { name: 'Copy import for Kinematics', exact: true })),
-      "import { Kinematics } from '@margoengine/machinery';",
+      await copy(page.getByRole('button', { name: 'Copy import for Vehicle', exact: true })),
+      "import { Vehicle } from '@margoengine/physics';",
     );
     const shown = await page.evaluate(() => {
       navigator.clipboard.writeText = async () => {
@@ -114,11 +114,11 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
       };
       return window.statuses.length;
     });
-    await page.getByRole('button', { name: 'Copy import for SectionPlanes', exact: true }).click();
+    await page.getByRole('button', { name: 'Copy import for CharacterController', exact: true }).click();
     await page.waitForFunction((from) => window.statuses.slice(from).some((text) => /Ctrl\+C/.test(text)), shown);
     assert.equal(
       await page.evaluate(() => window.getSelection().toString()),
-      "import { SectionPlanes } from '@margoengine/machinery';",
+      "import { CharacterController } from '@margoengine/physics';",
     );
     for (const width of [375, 1440]) {
       await page.setViewportSize({ width, height: 900 });

@@ -15,6 +15,5 @@ export * from '@margoengine/react/post';
 export * from '@margoengine/react/dof';
 export * from '@margoengine/react/tonemap';
 export * from '@margoengine/react/taa';
-export * from '@margoengine/react/machinery';
 export * from '@margoengine/react/voxel';
 export * from '@margoengine/react/xr';

@@ -146,23 +146,23 @@ test('miss stores, a new session revalidates with ETag (304), the same session s
 
 test('a changed file (200 to the conditional request) replaces the stored copy; Last-Modified works without ETag', async () => {
   globalThis.indexedDB = fakeIndexedDB();
-  const files = { '/part.step': { body: bytes(300), modified: 'Mon, 12 Oct 2026 10:00:00 GMT' } },
+  const files = { '/part.glb': { body: bytes(300), modified: 'Mon, 12 Oct 2026 10:00:00 GMT' } },
     network = server(files);
   const first = new AssetCache({ name: 'b', fetch: network });
-  await read(await first.fetch(base + 'part.step'));
+  await read(await first.fetch(base + 'part.glb'));
   await first.flush();
   const second = new AssetCache({ name: 'b', fetch: network });
-  await read(await second.fetch(base + 'part.step'));
+  await read(await second.fetch(base + 'part.glb'));
   assert.equal(network.log.at(-1).since, 'Mon, 12 Oct 2026 10:00:00 GMT');
   assert.equal(second.stats.revalidated, 1);
-  files['/part.step'] = { body: bytes(400, 9), modified: 'Wed, 14 Oct 2026 10:00:00 GMT' };
+  files['/part.glb'] = { body: bytes(400, 9), modified: 'Wed, 14 Oct 2026 10:00:00 GMT' };
   const third = new AssetCache({ name: 'b', fetch: network });
-  assert.deepEqual(await read(await third.fetch(base + 'part.step')), files['/part.step'].body);
+  assert.deepEqual(await read(await third.fetch(base + 'part.glb')), files['/part.glb'].body);
   await third.flush();
   network.offline = true;
   assert.deepEqual(
-    await read(await new AssetCache({ name: 'b', fetch: network }).fetch(base + 'part.step')),
-    files['/part.step'].body,
+    await read(await new AssetCache({ name: 'b', fetch: network }).fetch(base + 'part.glb')),
+    files['/part.glb'].body,
   );
 });
 
@@ -350,7 +350,7 @@ test('Range requests: a miss passes through and fills the whole file in the back
   );
 });
 
-// gltf-pro, fbx, usdz and machinery take the same `fetch` option; they need a GPU engine, so the real-browser check
+// gltf-pro, fbx and usdz take the same `fetch` option; they need a GPU engine, so the real-browser check
 // (examples/package-benchmarks/cache/) covers them with loadGLTF.
 test('@margoengine/loaders fetchBytes takes cache.fetch and loads offline from the cache', async () => {
   globalThis.indexedDB = fakeIndexedDB();

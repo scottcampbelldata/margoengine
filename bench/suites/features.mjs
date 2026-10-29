@@ -13,8 +13,6 @@ const STEPS = [
   ['package-sizes', `${bench}/proofs/size.js`],
   ['textured-instancing-mock', `${bench}/textured-instancing.mjs`],
   ['exporters-model', `${bench}/exporters-model.mjs`],
-  ['cad', `${bench}/cad/run.mjs`, '--label=bench'],
-  ['cad-edges', `${bench}/cad/run.mjs`, '--edges', '--sizes=50000', '--label=bench-edges'],
   ['cad-culling', `${bench}/cad/culling.mjs`, '--label=bench-culling'],
   ['post-stack', `${bench}/gates/post-stack.mjs`],
   ['loaders-memory', `${bench}/gates/memory.mjs`],

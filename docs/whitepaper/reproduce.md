@@ -15,7 +15,7 @@ npm run build:packages     # every package, size gates, catalog (no Rust toolcha
 ## Everything in one command
 
 ```sh
-npm run bench                  # every suite: size, startup, render, objects, scaling, math, glTF, loaders, CAD,
+npm run bench                  # every suite: size, startup, render, objects, scaling, math, glTF, loaders, assemblies,
                                # voxel, physics, memory, React (quiet-machine gate, GPU lock, 5 runs per case)
 npm run bench -- features      # also every per-feature real-GPU script below (about an hour)
 npm run bench -- --list        # the suites and cases
@@ -100,7 +100,6 @@ route is a clone because 1.0.0 is not on npm yet.
 | glTF export: validator errors and export time | `node examples/package-benchmarks/exporters-model.mjs` | no | `results/exporters-model.json` | Khronos glTF-Validator from node_modules; the timing needs the quiet PC. |
 | Textured instancing, encoding CPU | `node examples/package-benchmarks/textured-instancing.mjs` | no (mock) | `results/textured-instancing.json` | Mock GPU: CPU encoding only, not frame rate. |
 | **Margo vs other engines, same scenes** | `npm run bench -- render objects scaling --engines=all` | yes | `benchmarks/runs/<id>.json`, screenshots in `benchmarks/runs/<id>/` | Scenes in `bench/scenes/catalog.js`; other engines' implementations live in engine-bench. Earlier results: `results/vs-threejs-*.json`. |
-| CAD scale 10k/50k/90k parts | `node examples/package-benchmarks/cad/run.mjs --sizes=10000,50000,max --label=<name>` | yes | `cad/results-<name>.json` | `--edges` feature edges, `--low` 1x MSAA, `--step` OCCT STEP/IGES load. Takes no lock itself (`npm run bench -- features` takes it). |
 | GPU culling | `node examples/package-benchmarks/cad/culling.mjs --check --label=<name>` | yes | `cad/results-<name>.json` | |
 | Post stack per effect, SSAO + IBL | `node examples/package-benchmarks/gates/post-stack.mjs` | yes | `results/gates-post-stack.json` | |
 | DOF before/after | `node examples/package-benchmarks/gates/dof.mjs --baseline=5b9dbbd` | yes | `results/gates-dof.json` | Builds the baseline. |

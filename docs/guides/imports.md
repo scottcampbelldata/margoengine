@@ -8,7 +8,7 @@ npm i margoengine
 
 Then import what you use. Every package is a subpath of `margoengine`: `margoengine/shadows` is the package
 `@margoengine/shadows`, the same module and the same classes. An app bundles only what it imports, however many
-packages are installed. For a ready-made set, import a [kit](kits.md) instead (`margoengine/game`, `/cad`, `/viz`,
+packages are installed. For a ready-made set, import a [kit](kits.md) instead (`margoengine/game`, `/viz`,
 `/web`).
 
 <!-- Every ```ts block in this file is type-checked against the built packages by tests/from-threejs-snippets.test.js.
@@ -38,7 +38,6 @@ stage.onTick((delta) => {
 | Load a glTF/GLB model with PBR materials | `loadGLTF` from `margoengine/gltf-pro` |
 | Load a static glTF model, smallest code | `loadGLTF` from `margoengine/gltf` |
 | Load FBX, USDZ, OBJ, STL, PLY, Collada ... | `margoengine/fbx`, `margoengine/usdz`, `margoengine/loaders` |
-| Load STEP, IGES (CAD) | `loadCAD` from `margoengine/machinery/cad` |
 | Export glTF, STL, OBJ, USDZ | `margoengine/exporters` |
 | Image-based lighting, fog, backgrounds | `margoengine/environment` |
 | Many point, spot and area lights | `Clustered` from `margoengine/clustered` |

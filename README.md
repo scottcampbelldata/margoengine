@@ -1,6 +1,6 @@
 # Margo Engine
 
-A small WebGPU engine for the web, with a Rust/Wasm core and CAD tools built on OpenCascade.
+A small WebGPU engine for the web, with a Rust/Wasm core.
 
 [![CI](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml/badge.svg)](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/margoengine.svg)](https://www.npmjs.com/package/margoengine)
@@ -13,7 +13,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core and CAD tools built on 
 [Coming from three.js](docs/from-threejs.md)
 
 The core and the stage together are 22,414 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
-(glTF, shadows, physics, post effects, CAD) is a separate package you import only if you use it.
+(glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Install
 
@@ -219,7 +219,7 @@ change the kernel.
 
 ```sh
 npm run dev               # Night Citadel showcase
-npm run dev:examples      # every page in examples/, e.g. /examples/cad-views.html
+npm run dev:examples      # every page in examples/, e.g. /examples/flight-helmet.html
 npm run lint              # Biome
 npm run typecheck         # strict TypeScript for all packages
 npm run test:all          # every Node test in the repo
@@ -233,46 +233,14 @@ npm run measure:size      # core + stage size check
   field. Each one is its own package.
 - Rust/Wasm transform kernel with GPU culling and instancing.
 - Loaders for glTF/GLB (Draco, Meshopt, KTX2), FBX, USDZ, OBJ, STL, PLY, 3MF, COLLADA, IFC and more.
-- CAD import: STEP and IGES through OpenCascade (WebAssembly, in a worker, loaded only when you use it), plus STL
-  and OBJ.
-- CAD tools: section planes with capped cutaways, measurement, a view cube, GPU picking and selection outlines.
+- Camera controls with CAD-style mouse presets, a view cube, GPU picking and selection outlines.
 - Skinning, morph targets, blend trees and IK.
 - Physics on Rapier, navmesh, ECS, input and audio.
 - Terrain, water, sky, procedural scenery, voxels and a progressive voxel path tracer.
 - React 18 and 19 components (`@margoengine/react`).
 - Optional WebGL2 fallback for basic scenes.
 
-## Example: load a STEP file
-
-```js
-import { Engine } from 'margoengine/core';
-import { loadCAD } from 'margoengine/machinery/cad';
-
-const engine = await Engine.create(document.querySelector('canvas'));
-// OpenCascade tessellates the file in a worker; the model's parts arrive as core meshes, in meters.
-const model = await loadCAD(engine, '/parts/assembly.step');
-console.log(model.meshes.length, 'parts');
-engine.start();
-```
-
-More in [examples/](examples/README.md).
-
-## CAD
-
-[`@margoengine/machinery`](packages/machinery/README.md) reads STEP and IGES with
-[OpenCascade](https://dev.opencascade.org/) through `occt-import-js`, compiled to WebAssembly. The importer runs in a
-worker and is loaded only when a STEP or IGES file is, so it is not part of the core size. OpenCascade is LGPL-2.1
-(with the Open CASCADE exception); its files ship separately in `dist/workers` and can be replaced with your own
-build ([THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
-
-- STEP and IGES become core meshes with OpenCascade's surface normals; STL and OBJ load too.
-- Section planes with capped cutaways, feature edges, exploded views and an assembly BVH for picking.
-- Measurement: vertex, edge, face and hole anchors, distances and clearance.
-- [`margo-convert`](tools/margo-convert/README.md) turns a STEP file into a GLB at build time, so a site can show it
-  without loading OpenCascade.
-
-Sizes, load times and limits are in [docs/cad-performance.md](docs/cad-performance.md) and
-[docs/limits.md](docs/limits.md).
+More examples are in [examples/](examples/README.md).
 
 ## Browser support
 
@@ -300,7 +268,7 @@ the size of every other package entry. `npm run measure:size` bundles the entry 
 the package build, gzips it at the default level and prints the figure for your checkout. The build fails if
 core + stage reaches 25,000 B gzip.
 
-`npm run bench` runs the render, load, CAD, physics and memory suites with medians, p95 and machine checks. See
+`npm run bench` runs the render, load, assembly, physics and memory suites with medians, p95 and machine checks. See
 [docs/benchmarking.md](docs/benchmarking.md). No comparisons with other engines are published here yet.
 
 ## Architecture
@@ -326,7 +294,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-93 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+92 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -360,7 +328,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB, STL, OBJ, PLY, USDZ and COLLADA exporters for Margo Engine scenes and geometry data. |
 | [`@margoengine/ifc`](packages/ifc/README.md) | IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime. |
 | [`@margoengine/blender`](packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |
-| [`@margoengine/cache`](packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin, textures and STEP files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |
+| [`@margoengine/cache`](packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin and texture files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |
 | [`@margoengine/splats`](packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |
 | [`@margoengine/tiles`](packages/tiles/README.md) | Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf-pro. |
 
@@ -453,11 +421,10 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/netcode`](packages/netcode/README.md) | Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests. |
 | [`@margoengine/voxel-net`](packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
-### CAD and engineering (4)
+### Geometry and spatial (3)
 
 | Package | What it is |
 | --- | --- |
-| [`@margoengine/machinery`](packages/machinery/README.md) | Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine. |
 | [`@margoengine/bvh`](packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
 | [`@margoengine/geometry`](packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 | [`@margoengine/mesh-edit`](packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |

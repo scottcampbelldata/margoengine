@@ -205,11 +205,10 @@ Wrap `Model` and file-backed `Environment` components in React `Suspense` to sho
 
 ## Batching, views, lights and voxels
 
-`<BatchedMesh maxItems maxVertices>` draws many different geometries in one draw call per pass; put a `<BatchedItem geometry position rotation scale color visible>` (or `matrix`) per object inside. Moving, tinting or hiding an item updates the batch in place with no React render of the batch; capacity and `material` are fixed. `<SectionPlanes planes={[[1, 0, 0, 0]]}>` cuts the scene with up to six planes and caps closed solids; plane values update live. `<DepthTexture>` and `<SceneTargets outputs={{ albedo: 'albedo', normal: 'normal' }}>` render the scene's depth or several targets in one pass for your own shaders; their ref is the live plugin (`depth.texture`, `targets.texture('normal')`), and the Canvas's PBR models are added for you. All four need WebGPU.
+`<BatchedMesh maxItems maxVertices>` draws many different geometries in one draw call per pass; put a `<BatchedItem geometry position rotation scale color visible>` (or `matrix`) per object inside. Moving, tinting or hiding an item updates the batch in place with no React render of the batch; capacity and `material` are fixed. `<DepthTexture>` and `<SceneTargets outputs={{ albedo: 'albedo', normal: 'normal' }}>` render the scene's depth or several targets in one pass for your own shaders; their ref is the live plugin (`depth.texture`, `targets.texture('normal')`), and the Canvas's PBR models are added for you. All three need WebGPU.
 
 ```tsx
 import { Canvas } from '@margoengine/react';
-import { SectionPlanes } from '@margoengine/react/machinery';
 import { BatchedMesh, BatchedItem } from '@margoengine/react/materials';
 import { boxGeometry } from '@margoengine/geometry';
 
@@ -222,13 +221,12 @@ export function Crates({ count }: { count: number }) {
           <BatchedItem key={i} geometry={cube} position={[i * 1.5, 0, 0]} color={i % 2 ? '#84d6bd' : '#e45630'} />
         ))}
       </BatchedMesh>
-      <SectionPlanes planes={[[0, 0, 1, 0]]} />
     </Canvas>
   );
 }
 ```
 
-`<RenderView>` draws the Canvas through a camera into part of it (split screen, a four-view CAD layout, a minimap) or into a texture: `camera` (a core `Camera`; default the Canvas camera), `viewport` (fractions from the top left), `scissor`, `clear`, `layers`, `target`, `id` and `order`. With one or more views the Canvas draws only those; picking follows the view under the pointer. `<Scene name>` holds meshes drawn only by the views that name it (`<RenderView scene="hud">`), such as a HUD overlay or an item preview; `background={null}` keeps what is below. `<Mesh layers={mask}>` (a `layerMask(...)` from `@margoengine/cameras/layers`) limits which views draw a mesh. Views and scenes work on WebGPU and WebGL2.
+`<RenderView>` draws the Canvas through a camera into part of it (split screen, a four-view layout, a minimap) or into a texture: `camera` (a core `Camera`; default the Canvas camera), `viewport` (fractions from the top left), `scissor`, `clear`, `layers`, `target`, `id` and `order`. With one or more views the Canvas draws only those; picking follows the view under the pointer. `<Scene name>` holds meshes drawn only by the views that name it (`<RenderView scene="hud">`), such as a HUD overlay or an item preview; `background={null}` keeps what is below. `<Mesh layers={mask}>` (a `layerMask(...)` from `@margoengine/cameras/layers`) limits which views draw a mesh. Views and scenes work on WebGPU and WebGL2.
 
 ```tsx
 import { Camera } from '@margoengine/core';
@@ -409,8 +407,8 @@ Import `Scene` from a server `page.tsx` behind `<Suspense fallback={...}>`. Next
 in the [React cookbook](../../docs/react-cookbook.md); moving from react-three-fiber is in
 [Coming from react-three-fiber](../../docs/react-from-r3f.md).
 
-A Next.js page is larger than the Vite page: about 194 KB gzip of JavaScript. Its build output also holds the OpenCascade
-Wasm (7,604,031 B) and the Basis and Draco decoders; they are emitted but never requested at load or while orbiting.
+A Next.js page is larger than the Vite page: about 194 KB gzip of JavaScript. Its build output also holds the Basis and
+Draco decoders; they are emitted but never requested at load or while orbiting.
 
 SSR emits an accessible canvas without accessing GPU APIs. The ESM output preserves `use client` and includes TypeScript declarations. Peer ranges accept core `^1.0.0` and React 18 or 19.
 
@@ -504,8 +502,6 @@ What the numbers mean, by scope. None of them is "the size of your app":
   adds 1,750 B to the entry and fetches glTF support (56,074 B gzip) when it mounts.
 - **A React page with PBR models loaded, in an independent study:** about 563 KB decoded, 193 KB gzip, including React and
   the shared scene infrastructure. A Next.js page is about 194 KB gzip.
-- **The OpenCascade Wasm (7.6 MB):** fetched only by an app that loads STEP or IGES files. In other apps it can be in the
-  build output but is never requested.
 
 The measured breakdown of a React build, package by package, is in [docs/limits.md](../../docs/limits.md#react-page).
 

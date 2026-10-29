@@ -4,7 +4,6 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import validator from 'gltf-validator';
 import { Physics } from '@margoengine/physics';
 import { exportGLTF } from '@margoengine/exporters';
-import { deduplicateParts } from '@margoengine/machinery/cad';
 import { accessor } from '../packages/exporters/tests/helpers.js';
 import {
   loadedPBRFixtures,
@@ -180,13 +179,6 @@ for (const fixture of loadedPBRFixtures) {
       assert.equal(mesh.geometry, null, 'export does not attach a second core Geometry');
     });
   });
-
-  test(`${fixture.producer}: default CAD grouping counts the part from real ${fixture.asset}`, async () => {
-    await withLoaded(fixture, ({ mesh }) => {
-      assert.deepEqual(deduplicateParts([mesh]), { parts: 1, unique: 1 });
-      assert.equal(mesh.geometry, null, 'CAD grouping does not attach a second core Geometry');
-    });
-  });
 }
 
 test('default PhysicsBody rejects a mesh with neither core geometry nor a PBR primitive', async () => {
@@ -207,15 +199,6 @@ test('default glTF export rejects a mesh with neither core geometry nor a PBR pr
   try {
     engine.createMesh();
     assert.throws(() => exportGLTF(engine), /geometry|primitive/i);
-  } finally {
-    engine.dispose();
-  }
-});
-
-test('default CAD grouping rejects a mesh with neither core geometry nor a PBR primitive', async () => {
-  const engine = await loadedPBREngine();
-  try {
-    assert.throws(() => deduplicateParts([engine.createMesh()]), /geometry|primitive/i);
   } finally {
     engine.dispose();
   }

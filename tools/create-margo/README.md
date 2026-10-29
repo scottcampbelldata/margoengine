@@ -4,7 +4,7 @@ Start a [Margo Engine](https://margoengine.com) app with one command:
 
 ```sh
 npm create margo@latest my-app
-# a game, a CAD viewer, a visualization, React or Next.js:
+# a game, a visualization, React or Next.js:
 npm create margo@latest my-game -- --template game
 # pnpm create margo my-game --template game / yarn create margo ... / bun create margo ...
 ```
@@ -13,7 +13,6 @@ npm create margo@latest my-game -- --template game
 | --- | --- |
 | `web` (default) | A lit scene with image-based lighting, orbit controls, the stats overlay and measured quality tiers |
 | `game` | A small physics game: roll a ball into crates, with shadows (the `margoengine/game` kit and Rapier) |
-| `cad` | A CAD viewer: SolidWorks-style mouse, view cube, section plane, open STEP/IGES/STL/OBJ/glTF (`margoengine/cad`) |
 | `viz` | 200,000 points, a grid and an HTML label (`margoengine/viz`) |
 | `react` | React + Vite: JSX components from `margoengine/react` |
 | `next` | Next.js app router with `margoengine/react` |

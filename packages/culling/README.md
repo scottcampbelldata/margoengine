@@ -26,14 +26,14 @@ console.log(await parts.readCounts()); // parts drawn per batch in the last fram
 ```
 
 Parts are not core meshes. That is where the CPU saving comes from (core's kernel and batch collection never see
-them), and also the main limit: no core `engine.pick`, no hierarchy, no `ExplodedView`/`AssemblyBVH`/`FeatureEdges`,
+them), and also the main limit: no core `engine.pick`, no hierarchy, no mesh BVH raycasts,
 no section caps, no shadows. Section clipping itself does apply, because the parts are drawn with core's own frame
 shader.
 
 ## Core meshes: `CulledMeshes`
 
 `CulledMeshes` GPU-culls regular core meshes instead of a separate part list, so they keep everything core meshes have:
-`engine.pick`, `Picking`, hierarchy, `ExplodedView`, `AssemblyBVH` and `FeatureEdges` (checked on the GPU below).
+`engine.pick`, `Picking` and hierarchy (checked on the GPU below).
 
 ```ts
 import {CulledMeshes} from 'margoengine/culling';
@@ -47,13 +47,11 @@ tests every instance's bounding sphere (the kernel's sphere, padded for float32)
 `minRadius`, its projected size, and compacts the kept instance records in their original order into the package's
 buffer with indirect arguments. It then sets `batch.redirect` (core's one GPU-culling hook, see the core README), so
 core's main pass and every replay of it (SSAO, SSR, selection outline...) draw the compacted list with core's own
-pipelines; core still uploads its instance buffer, which the culler reads. `FeatureEdges` (machinery) draws its lines from the
-compacted list too, so edges get the same frustum and screen-size culling. `engine.pick` draws from
+pipelines; core still uploads its instance buffer, which the culler reads. `engine.pick` draws from
 core's CPU instance data and is unaffected. With `minRadius: 0` (default) frames are pixel-identical to core
 (`examples/package-benchmarks/cad/culled-meshes.mjs`). Limits: frustum and screen size only (no Hi-Z occlusion yet; use
 `CulledInstances` for occlusion on static parts); with `engine.render()` (CPU culling on) the GPU test only adds the
-screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies (numbers in
-[cad-performance.md](../../docs/cad-performance.md)): a dropped part simply disappears, so keep it under the size where a
+screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies: a dropped part simply disappears, so keep it under the size where a
 part is still recognisable.
 
 ## Modes
@@ -86,13 +84,13 @@ Because occluders are re-rendered this frame from this frame's camera, there is 
 becomes disoccluded is drawn in the frame it becomes visible. A culled part fails the depth test at every sample it
 could touch, and visible parts are drawn in the same order as without culling, so coplanar faces resolve the same way
 (greater-equal depth: the later batch wins). Occlusion falls back to frustum culling for any frame whose shader discards
-fragments beyond core's single-sided rule or changes core's clip-position line (for example `SectionPlanes`).
+fragments beyond core's single-sided rule or changes core's clip-position line.
 
 ## Measurements
 
 Intel Arc 140V (Core Ultra 7 258V), headless Edge, 1432x768, 4x MSAA, AC power, GPU lock held:
 `examples/package-benchmarks/cad/results-culling.json`, written by `node examples/package-benchmarks/cad/culling.mjs
---check --views=orbit,still,grazing --layouts=sheet,stack`. Summary in `docs/cad-performance.md`.
+--check --views=orbit,still,grazing --layouts=sheet,stack`.
 
 | 89,883 parts | core meshes | `none` | `frustum` | `occlusion` |
 | --- | --- | --- | --- | --- |

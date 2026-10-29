@@ -1,5 +1,5 @@
 // Browser side of the GPU culling benchmark and pixel check. Driven by culling.mjs.
-// The same synthetic assembly as bench.js, drawn either as core meshes ('core') or by @margoengine/culling
+// The synthetic assembly of assembly.js, drawn either as core meshes ('core') or by @margoengine/culling
 // ('none' = draw all, 'frustum', 'occlusion'); parts keep core's per-shape order in both.
 import { Engine, PbrMaterial } from '../../../packages/core/dist/index.js';
 import { Stats } from '../../../packages/stats/dist/index.js';
@@ -43,7 +43,7 @@ const materials = () => ({
   nut: new PbrMaterial({ color: '#b0a17a', roughness: 0.35, metalness: 0.9 }),
   washer: new PbrMaterial({ color: '#d8d8d8', roughness: 0.3, metalness: 0.9 }),
 });
-// layout 'sheet' is bench.js's flat grid; 'stack' stacks the same modules in a cube of layers 0.13 m apart (a dense block).
+// layout 'sheet' is a flat grid of modules; 'stack' stacks the same modules in a cube of layers 0.13 m apart (a dense block).
 export function assemblyBatches(modules, { twin = false, layout = 'sheet' } = {}) {
   const shapes = partShapes(),
     geometries = Object.fromEntries(Object.entries(shapes).map(([name, data]) => [name, toGeometry(data)])),
@@ -132,7 +132,7 @@ async function run({
   }
   result.buildMs = now() - t;
   result.triangles = triangles;
-  // orbit/still: the overview of bench.js. grazing: inside the assembly, 0.3 m above the plates, orbiting its centre.
+  // orbit/still: an overview of the whole assembly. grazing: inside the assembly, 0.3 m above the plates, orbiting its centre.
   const grazing = view === 'grazing',
     r = extent * (grazing ? 0.3 : 0.75);
   let angle = view === 'still' ? 0.8 : 0;

@@ -1,4 +1,4 @@
-// Real-GPU harness for React's multi-view, BatchedMesh and SectionPlanes (scripts/test-extras-browser.js reads pixels).
+// Real-GPU harness for React's multi-view, BatchedMesh, Voxels and Sky (scripts/test-extras-browser.js reads pixels).
 import React, { StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { boxGeometry } from '@margoengine/geometry';
@@ -7,11 +7,10 @@ import { BlockTextures } from '@margoengine/voxel/render';
 import { Sphere } from '@margoengine/react/geometry';
 import { Sky } from '@margoengine/react/sky';
 import { Canvas, Mesh, BoxGeometry, PbrMaterial, Scene, RenderView, useFrame } from '@margoengine/react';
-import { SectionPlanes } from '@margoengine/react/machinery';
 import { BatchedMesh, BatchedItem } from '@margoengine/react/materials';
 import { Voxels } from '@margoengine/react/voxel';
 
-type Mode = 'views' | 'batched' | 'section' | 'voxels' | 'sky-metal' | 'sky-metal-off';
+type Mode = 'views' | 'batched' | 'voxels' | 'sky-metal' | 'sky-metal-off';
 // A 4 x 4 x 4 block of one red stone type, textured from raw pixels (no image files).
 const blocks = new BlockTypes(),
   stone = blocks.define('stone'),
@@ -41,11 +40,7 @@ function App({ mode }: { mode: Mode }) {
       <Canvas
         backend="webgpu"
         camera={
-          mode === 'voxels'
-            ? { position: [6, 70, 9], target: [0, 64, 0] }
-            : mode === 'section'
-              ? { position: [0, 0, 6], target: [0, 0, 0] }
-              : { position: [0, 0, 7], target: [0, 0, 0] }
+          mode === 'voxels' ? { position: [6, 70, 9], target: [0, 64, 0] } : { position: [0, 0, 7], target: [0, 0, 0] }
         }
         onError={(error) => state.errors.push(String(error))}
       >
@@ -75,13 +70,6 @@ function App({ mode }: { mode: Mode }) {
           <>
             <Sky hours={12} timeScale={0} environment={mode === 'sky-metal'} />
             <Sphere args={[1.6, 48, 24]} color="#ffffff" metalness={1} roughness={0.25} />
-          </>
-        )}
-        {mode === 'section' && (
-          <>
-            <Red />
-            {/* Points with -x < 0 (the right half) are cut away. */}
-            <SectionPlanes planes={[[-1, 0, 0, 0]]} />
           </>
         )}
       </Canvas>

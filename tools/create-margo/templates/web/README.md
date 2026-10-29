@@ -14,7 +14,7 @@ The whole scene is `src/main.ts`. `margoengine` is the only engine dependency: e
 (`margoengine/environment`, `margoengine/controls/orbit`), and the build keeps only what you import.
 
 `public/_headers` (copied into `dist/`) gives Cloudflare Pages and Netlify a Content Security Policy that Margo works
-under and a year-long cache for fingerprinted assets. The same policy covers Draco/KTX2 decoding and STEP import: no
+under and a year-long cache for fingerprinted assets. The same policy covers Draco/KTX2 decoding: no
 file needs `'unsafe-eval'`.
 
 ## Three things to try next

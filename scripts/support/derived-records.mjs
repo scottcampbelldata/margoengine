@@ -26,7 +26,8 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
  * Ratchet rules: an item changed on one side takes that side; changed on both, the smaller limit wins (a limit only
  * ever shrinks here, so growth that one side justified in `history` is re-checked by `npm run quality` afterwards and
  * is never silently widened by a merge); an item removed on one side (its violation was fixed) stays removed. History
- * keeps every reasoned entry from both sides, base order first. `total` is recomputed.
+ * keeps every reasoned entry either side added, base order first; a base entry one side reworded or removed stays out.
+ * `total` is recomputed.
  */
 export function mergeRatchet(base, ours, theirs) {
   const b = base?.items ?? {},
@@ -42,12 +43,17 @@ export function mergeRatchet(base, ours, theirs) {
     else value = Math.min(o[key], t[key]);
     if (value !== undefined) items[key] = value;
   }
-  const seen = new Set(),
+  // A base entry that one side reworded or removed stays out (the same rule as items); new entries of both sides stay.
+  const id = (entry) => JSON.stringify(entry),
+    kept = (list) => new Set((list ?? []).map(id)),
+    inOurs = kept(ours.history),
+    inTheirs = kept(theirs.history),
+    seen = new Set((base?.history ?? []).map(id).filter((key) => !inOurs.has(key) || !inTheirs.has(key))),
     history = [];
   for (const entry of [...(base?.history ?? []), ...(ours.history ?? []), ...(theirs.history ?? [])]) {
-    const id = JSON.stringify(entry);
-    if (!seen.has(id)) {
-      seen.add(id);
+    const key = id(entry);
+    if (!seen.has(key)) {
+      seen.add(key);
       history.push(entry);
     }
   }

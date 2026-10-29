@@ -48,7 +48,6 @@ const types = {
   '.txt': 'text/plain; charset=utf-8',
   '.md': 'text/markdown; charset=utf-8',
   '.xml': 'application/xml',
-  '.stp': 'application/octet-stream',
 };
 
 /** _headers rules: [pattern RegExp, [[name, value] | ['!', name]]]. `*` is a splat, `:name` one path segment. */

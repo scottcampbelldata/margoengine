@@ -38,10 +38,6 @@
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"
     },
-    "./cad": {
-      "types": "./dist/cad.d.ts",
-      "import": "./dist/cad.js"
-    },
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"
@@ -72,7 +68,6 @@
   },
   "peerDependencies": {
     "@margoengine/gltf": "^1.0.0",
-    "@margoengine/machinery": "^1.0.0",
     "@margoengine/creative": "^1.0.0",
     "@margoengine/scenery": "^1.0.0",
     "@margoengine/environment": "^1.0.0",
@@ -80,9 +75,6 @@
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
-      "optional": true
-    },
-    "@margoengine/machinery": {
       "optional": true
     },
     "@margoengine/creative": {

@@ -62,12 +62,13 @@ compute shaders and no storage buffers; it has two indirect draw calls (`rendere
   renderer for every package. v1.0 keeps that decision and ships `@margoengine/webgl` as the preview.
 - On 2026-10-21 a complete roadmap was requested to implement the full fallback in the next version. This document is
   that roadmap. The core freeze and the 25,000-byte core + stage gzip gate stay in force: the plan needs zero core bytes.
-- The translation-layer design replaces "a WebGL2 version of every package" (37 packages with WGSL shaders today). One
+- The translation-layer design replaces "a WebGL2 version of every package" (36 packages with WGSL shaders today). One
   translator and one API layer serve all of them, including packages written later.
 
 ## What the packages use today
 
-Counted by string match in each package's `src/` at `685c4de9` (2026-10-21). Shaders assembled from templates count
+Counted by string match in each package's `src/` at `685c4de9` (2026-10-21); the rows and totals cover the packages
+still in the engine, and the texture-format mentions are as counted then. Shaders assembled from templates count
 once, so these are lower bounds. The survey script is reproducible: it reads `git ls-tree` and counts the patterns.
 
 | Package | Vertex | Fragment | Compute | Storage (read) | Storage (read-write) | Atomics | Storage textures | Indirect | Readback |
@@ -90,7 +91,6 @@ once, so these are lower bounds. The survey script is reproducible: it reads `gi
 | culling | 1 | 1 | 9 | 6 | 13 | 1 | 0 | 2 | 2 |
 | scatter | 4 | 3 | 1 | 3 | 4 | 1 | 0 | 2 | 0 |
 | creative | 7 | 6 | 2 | 2 | 2 | 1 | 1 | 2 | 0 |
-| machinery | 2 | 4 | 1 | 4 | 2 | 1 | 0 | 1 | 0 |
 | shader | 0 | 1 | 1 | 0 | 0 | 2 | 0 | 0 | 1 |
 | voxel | 2 | 3 | 0 | 4 | 0 | 0 | 0 | 3 | 0 |
 | voxel-pathtracer | 1 | 1 | 8 | 11 | 8 | 0 | 1 | 0 | 1 |
@@ -98,8 +98,8 @@ once, so these are lower bounds. The survey script is reproducible: it reads `gi
 | points | 3 | 6 | 0 | 5 | 0 | 0 | 0 | 0 | 0 |
 | lines, text, lod, terrain, staging, toon, tonemap, oit, transitions, video, react, controls, xr | 0-3 each | 1-3 each | 0 | 0-2 | 0 | 0 | 0 | 0 | 0-1 |
 
-Totals: 70 vertex, 140 fragment and 78 compute entry points; 89 read-only and 55 read-write storage bindings; 11 atomic
-declarations; 35 storage-texture bindings; 42 indirect calls; 16 readbacks; 13 workgroup-memory declarations.
+Totals: 68 vertex, 136 fragment and 77 compute entry points; 85 read-only and 53 read-write storage bindings; 10 atomic
+declarations; 35 storage-texture bindings; 41 indirect calls; 16 readbacks; 13 workgroup-memory declarations.
 Texture formats in use, by mentions: rgba16float 91, rgba8unorm 37, depth32float 35, r32float 21, depth32float-stencil8
 20, r8unorm 17, rgba8unorm-srgb 16, rgba32float 12, r32uint 9, depth24plus 8, and a long tail.
 
@@ -229,7 +229,7 @@ Expected result per package on WebGL2. "Same" means the same pixels within the p
 | water | Height and flow simulation per texel (A1); spray particles as vfx below | Same surface; fewer spray particles |
 | vfx, creative particles | Simulation on the CPU in a worker (C) with a lower particle budget; instanced draw | Same look, budget measured in M6 (not 1,000,000) |
 | splats | Depth sort in a worker (C), the established WebGL approach; projection in the vertex shader | Same image, sort lags by a frame |
-| culling, scatter, machinery packs | GPU-driven culling off; core's CPU frustum culling remains; scatter places instances on the CPU | Same image, more draw calls |
+| culling and scatter packs | GPU-driven culling off; core's CPU frustum culling remains; scatter places instances on the CPU | Same image, more draw calls |
 | stats, inspector | No GPU timestamps | CPU timings only |
 | voxel-pathtracer | Out of scope for the first release; revisit after M8 | Not available on WebGL2 |
 | xr | WebXR on WebGL2 needs `XRWebGLLayer`, a separate path | Not available on WebGL2 in this version |

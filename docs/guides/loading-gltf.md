@@ -79,7 +79,7 @@ window.addEventListener('pagehide', () => stage.dispose(), { once: true });
 | Required extensions the loader does not know | The load rejects. |
 
 `addGLTF(stage, url)` (from `@margoengine/stage/gltf`) is a shorter call that fits the camera for you, but it uses the basic loader: constant-colour
-geometry without textures. Use it for CAD formats (STEP, IGES, STL, OBJ). For textured models, use `loadGLTF`.
+geometry without textures. Use it for plain untextured geometry. For textured models, use `loadGLTF`.
 
 ## Common mistakes
 
@@ -96,4 +96,4 @@ geometry without textures. Use it for CAD formats (STEP, IGES, STL, OBJ). For te
 - Play the model's animations: [animation](animation.md).
 - Click its parts: [interaction](interaction.md). `Picking` finds loaded models automatically; `hit.model` is the model
   and `hit.mesh` is the part.
-- All loaders, including FBX, OBJ, STL, USDZ and CAD: [package catalog](../../README.md#packages).
+- All loaders, including FBX, OBJ, STL and USDZ: [package catalog](../../README.md#packages).

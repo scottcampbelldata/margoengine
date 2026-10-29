@@ -11,7 +11,6 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
 | `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 317,851 B |
-| `margoengine/cad` | CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export | 188,599 B |
 | `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 280,415 B |
 | `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 151,721 B |
 
@@ -41,24 +40,12 @@ shadows.add(floor);
 shadows.add(crate);
 ```
 
-## A CAD viewer in one import
-
-```ts
-import {SOLIDWORKS, ViewCube, cadControls, createStage} from 'margoengine/cad';
-import { addCAD } from 'margoengine/stage/cad';
-
-const stage = await createStage('#viewport', {controls: false});
-cadControls(stage.engine, {profile: SOLIDWORKS, keys: window});
-ViewCube.attach(stage.engine);
-await addCAD(stage, '/bracket.step');
-```
-
 ## Which kit
 
 - Most apps start with a kit and add single packages (`margoengine/<package>`) for anything else.
 - The kits overlap where apps overlap (orbit controls, the stage, post-processing); the same name is the same class
   in every kit.
-- `npm create margo@latest my-game -- --template game` (or `cad`, `viz`) starts an app from a kit.
+- `npm create margo@latest my-game -- --template game` (or `viz`) starts an app from a kit.
 
 ## Contents
 
@@ -94,34 +81,6 @@ Games: models, animation, light and shadow, sky, physics, audio, input, effects.
 | `margoengine/post/bloom` | `Bloom` |
 | `margoengine/post/fxaa` | `FXAA` |
 | `margoengine/tonemap` | `Tonemap` |
-
-### `margoengine/cad`
-
-CAD and engineering: STEP/IGES/STL/OBJ import, CAD navigation, sections, measuring, export.
-
-| From | Names |
-| --- | --- |
-| `margoengine` | `createStage`, `Stage` |
-| `margoengine/machinery/cad` | `loadCAD`, `parseCAD`, `PartInstancer` |
-| `margoengine/machinery/section` | `SectionPlanes` |
-| `margoengine/machinery/exploded` | `ExplodedView` |
-| `margoengine/machinery/dimensions` | `Dimensions` |
-| `margoengine/machinery/metrology` | `measureDistance`, `snapFeature` |
-| `margoengine/machinery/edges` | `FeatureEdges` |
-| `margoengine/controls/orbit` | `cadControls`, `OrbitControls` |
-| `margoengine/controls/profiles` | `MARGO`, `SOLIDWORKS`, `AUTOCAD`, `INVENTOR`, `FUSION`, `ONSHAPE`, `RHINO`, `BLENDER`, `MAYA`, `PROFILES` |
-| `margoengine/controls/transform` | `TransformControls` |
-| `margoengine/viewcube` | `ViewCube` |
-| `margoengine/selection` | `Selection`, `Picking` |
-| `margoengine/cameras` | `CameraProjection` |
-| `margoengine/lines` | `Lines`, `GridHelper`, `AxesHelper` |
-| `margoengine/labels` | `Label`, `LabelRenderer` |
-| `margoengine/environment` | `EnvironmentLighting` |
-| `margoengine/shadows` | `Shadows` |
-| `margoengine/post/stack` | `PostStack` |
-| `margoengine/post/ssao` | `SSAO` |
-| `margoengine/post/fxaa` | `FXAA` |
-| `margoengine/exporters` | `exportGLB`, `exportSTL`, `exportOBJ` |
 
 ### `margoengine/viz`
 

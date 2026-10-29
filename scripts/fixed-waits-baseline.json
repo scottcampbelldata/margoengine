@@ -7,8 +7,6 @@
     "packages/exporters/tests/capture-browser.mjs": 1,
     "packages/labels/tests/labels-browser.js": 1,
     "packages/lines/tests/lines-browser.js": 1,
-    "packages/machinery/test/dimensions-check.mjs": 2,
-    "packages/machinery/test/section-open-check.html": 1,
     "packages/sciviz/tests/sciviz-browser.js": 1,
     "packages/selection/test/tools-check.mjs": 1,
     "packages/staging/test/browser-check.html": 1,
@@ -43,7 +41,6 @@
     "scripts/test-taa-pbr-storage.js": 1,
     "scripts/test-views-browser.mjs": 1,
     "scripts/visual-regression.js": 2,
-    "tests/cad-scale-browser.ts": 1,
     "tests/post-looks-browser.js": 1,
     "tools/create-margo/test/browser-check.mjs": 2
   }

@@ -44,7 +44,7 @@ Alternate renders must be sequential, outside a running frame pass. For several 
 
 ## Views and scenes
 
-Several cameras in one frame: split screen, a four-view CAD layout, a minimap. Each view is a camera and a rectangle,
+Several cameras in one frame: split screen, a four-view layout, a minimap. Each view is a camera and a rectangle,
 fractions of the canvas by default (`pixels: true` for drawing-buffer pixels); the camera aspect follows the rectangle.
 
 ```ts
