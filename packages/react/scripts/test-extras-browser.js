@@ -43,7 +43,7 @@ try {
     await page.waitForFunction(() => window.extras.state.frames >= 30, null, { timeout: 30_000 });
     const deadline = Date.now() + 30_000;
     for (;;) {
-      const image = decodePNG(
+      const image = await decodePNG(
         await page.locator('canvas').screenshot({ path: `test-results/react-extras-${mode}.png` }),
       );
       if (drawn(image) || Date.now() > deadline) return image;
