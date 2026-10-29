@@ -50,9 +50,9 @@ After the five systems: [Known gaps](#known-gaps), [Sources and commits](#source
 
 | Role | What it does | What it never does | Model and effort (rule in 1.2) |
 | --- | --- | --- | --- |
-| Maintainer | Sets goals, gives rulings, approves pushes, downloads, publishing, system settings, hardware actions. | Nothing is assumed approved without the maintainer saying so in chat. | n/a |
+| Maintainer | Sets goals, gives rulings, approves pushes, downloads, publishing, system settings, hardware actions. Talks only to the coordinator. | Nothing is assumed approved without the maintainer saying so in chat. | n/a |
 | Coordinator | Keeps the queue, starts and stops helpers, writes briefs, keeps `RESUME.md`, the bug queue and the dashboard current, reports to the maintainer in short lines. Plans around shared bottlenecks. | Never runs two agents on one task. Never polls helpers. Never relays every helper message. Never trusts a "landed" claim without checking `origin/main`. | Strongest model when planning or scheduling is hard; it must say so to the maintainer if its own model is too weak for a decision. |
-| Helper (feature or fix) | One task in its own worktree on its own branch cut from current main: code, regression tests, quick checks, one full `check:merge`, landing through the landing lock. Reports once, at the end. | No progress messages. No shared scratch files. No hand edits of generated records. Never deletes a lock. | Picked per job: see 1.2. |
+| Helper (feature or fix) | One task in its own worktree on its own branch cut from current main: code, regression tests, quick checks, one full `check:merge`, landing through the landing lock. Reports once, at the end. | No progress messages. No shared scratch files. No hand edits of generated records. Never deletes a lock. Never stops or waits silently: when it has no next job or needs a decision it asks the coordinator, not the maintainer. | Picked per job: see 1.2. |
 | Bug-hunt agent | A dedicated agent for a bug whose cause is not obvious (GPU or timing, concurrency, maths, unclear responsible package, failed once already). Finds the root cause, fixes it in the owning package, adds a regression test. | Not the cheap model that happened to find the bug. Never a band-aid (retry, loosened tolerance, skip). | Opus, high effort when truly hard. |
 | Planning agent | Writes a plan file and prepares work, with no push and no landing until the maintainer says go. | Executes nothing irreversible. | Opus, medium or high. |
 | Investigator | A read-only probe into a host or tool behaviour (which GPU a browser picks, why a reset happened). Writes notes and probe scripts into `handoffs/<topic>/`. | Changes no repo code unless re-briefed as a fixer. | Opus high for hard host questions. |
@@ -236,6 +236,8 @@ In practice:
 | A helper's interim notice arrives at the coordinator | Answer in one line or not at all. | Relay it to the maintainer. |
 | Helper finishes | One short paragraph: what landed (hash on `origin/main`), what did not and why, bugs found. | A recap of every step. |
 | Holder asks for status | Measured numbers, answer first. | Predicted results of agents that have not reported. |
+| A message arrives from a peer session (for example over Remote Control) | Acknowledge it in one line and give the coordinator's session name so replies arrive. This is the one exception to staying quiet. | Leave a peer message unanswered. |
+| A helper or peer session needs a decision or has no next job | Ask the coordinator. The maintainer talks only to the coordinator. | Stop or wait silently, or ask the maintainer directly. |
 
 Known cost of breaking it: the coordinator handoff records that the old coordinator session "stays open only to relay
 helper reports to the new one", because helper ids answer only the session that started them. That relay is the
@@ -656,6 +658,8 @@ The same principle applies to process: the bug 25b fix bounded the path tracer's
 | Older handoffs taught `bash -c "..."` through the lock wrapper (`handoffs/handoff-gpu-tests.md`) | on Windows the wrapper ran it through cmd.exe and split it | script file inside the worktree, `bash <script>` (rule 2) |
 | The bug queue reused numbers | ambiguous references | one counter, coordinator owned (1.12.2) |
 | A cheap finder kept working a GPU bug | slow, failed rounds | judge difficulty first; dedicated Opus hunter (1.12.1) |
+| A docs-only change was pushed to main outside the landing lock | the lock holder's push was rejected and its landing ran again | every push to main through the lock (2.4 rule 6) |
+| Helpers were started with a model but no effort | effort inherited a default instead of matching the job | set both at every start (1.2); every brief states them (1.4.1) |
 
 ### 1.15 How to replicate system 1 from scratch
 
@@ -1053,6 +1057,9 @@ written on grant.
 4. Build-only steps do not take the GPU lock; GPU-using scripts take it around the browser only (`build:site` and
    `test:basic-scene` "take the GPU lock themselves, only around the browser; do not wrap them in it", `AGENTS.md`).
 5. Inspect with `status`; to see a holder's progress, read its log, not its lock entry.
+6. Every push to main goes through the landing lock, docs-only pushes included. A push made outside it moves main under
+   the holder, whose own push is then rejected as non-fast-forward and has to queue and run again (2026-10-29: a
+   docs-only playbook push outside the lock cost the leak-scrub landing a full rerun, about 40 minutes of lock time).
 
 ### 2.5 Generic reference lock (for a new project)
 
@@ -1609,6 +1616,8 @@ export const pinnedProofsCommand = () => [
 
 Both run with `MARGO_FULL=1` and `MARGO_NIGHTLY=1` (tests with a nightly depth run it). The exit code is the first
 failing run's. The script "registers nothing with the OS".
+
+Where it runs: the maintainer moved the nightly full run off the development PC. It runs on the Beelink or the Ubuntu server only, and the development PC's scheduled task is disabled. The Task Scheduler description below is the historical setup of that task.
 
 Windows Task Scheduler: task "MargoEngine Nightly Full Check", daily at 10:00, task to run
 `<projects>/margoengine-nightly/nightly.cmd` (read with `schtasks /query /v` on 2026-10-29: Status Ready, Last Result 0).
@@ -4053,6 +4062,7 @@ function restore(engine: EngineLike) {
 | Quickstart | `npm run check:quickstart` | `scripts/quickstart-timing.mjs` | check:merge | the README quickstart, followed line by line in a temp folder, does not render a textured, shadowed, pickable scene |
 | Public truth | `node --test tests/public-truth.test.js` | `scripts/support/public-truth.mjs` | verify (unit tests) | licence statement or package count mismatch |
 | Fixed waits | `tests/check-fixed-waits.test.js` | `scripts/check-fixed-waits.mjs` | verify | a new fixed frame count or sleep without `// fixed-wait: <reason>` |
+| Dropped promises | `tests/support-async-calls.test.js` | the test itself | verify | an async test or script helper is called without `await` or `return` (a dropped promise; added after a React extras test failed this way) |
 | Node versions | `node --test tests/proofs-golden.test.js tests/node-apis.test.js` | | CI node-compat | digests differ on a Node; API not on the minimum Node |
 | Kernel | `npm run test:kernel` | cargo | CI kernel job | any Rust test |
 
