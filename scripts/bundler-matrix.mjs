@@ -18,6 +18,7 @@ import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { chromiumLaunchOptions } from './lib/browser.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 // The React cube page's gzip budgets (docs/limits.md, "React app budget"): what the browser loads before the page runs
 // (React, React DOM, core, the stage and the React bindings), and everything a build of it emits with @margoengine/react
@@ -786,7 +787,6 @@ ${result.stdout}${result.stderr}`,
 import { createStage } from 'margoengine';
 import { Shadows } from 'margoengine/shadows';
 import { OrbitControls } from '@margoengine/controls/orbit';
-import { closeAll } from './support/shutdown.mjs';
 window.result = [typeof createStage, typeof Shadows, typeof OrbitControls].join();
 </script>`;
       const types = {
