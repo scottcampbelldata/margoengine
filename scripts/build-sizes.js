@@ -142,6 +142,7 @@ ${table(
   <link rel="canonical" href="https://margoengine.com/sizes.html">
   <meta name="theme-color" content="#0b1020">
   <link rel="icon" href="./favicon.ico" sizes="32x32">
+  <link rel="preload" href="./fonts/SourceSans3-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./site.css">
 </head>
 <body>

@@ -97,6 +97,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'site/fonts/OFL.txt',
+    'site text typeface: Source Sans 3 (Copyright 2010-2024 Adobe, with Reserved Font Name "Source"; SIL Open Font License 1.1, full text in the linked file), self-hosted as site/fonts/SourceSans3-latin.woff2, the Latin subset of the variable font exactly as served by Google Fonts (https://fonts.gstatic.com/s/sourcesans3/v20/nwpStKy2OAdR1K-IwhWudF-R3w8aZQ.woff2, 28,872 bytes, SHA-256 19143dca075972bc84e3fd9eab7416dd40cc565dccb2435a044bdfabe060c7d5, fetched 2026-10-28, not modified); licence text from https://github.com/adobe-fonts/source-sans (LICENSE.md, SHA-256 56af9b9c6715597e458284a474dc118a50a4150e9d547c70f7b4a33c3e6a9328)',
+  ],
+  [
     'examples/assets/ATTRIBUTION.md',
     'demo models: RobotExpressive (CC0), FlightHelmet (CC0), Tokyo diorama (Apache-2.0)',
   ],
