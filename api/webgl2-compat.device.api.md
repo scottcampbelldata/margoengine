@@ -50,6 +50,8 @@ export type BinaryOp = '||' | '&&' | '|' | '&' | '^' | '==' | '!=' | '<' | '>' |
 
 export const COMPAT_VENDOR = "margo-webgl2";
 
+export const CPU_WORK_BUDGET = 100000000;
+
 export interface CallExpr extends Span {
     readonly kind: 'call';
     readonly callee: IdentExpr;
@@ -63,6 +65,7 @@ export interface CallStmt extends Span {
 
 export class CompatAdapter {
     readonly capabilities: WebGL2Capabilities;
+    readonly cpuWorkBudget: number;
     readonly features: ReadonlySet<string>;
     readonly limits: Readonly<Record<string, number>>;
     readonly info: {
@@ -72,7 +75,8 @@ export class CompatAdapter {
         description: string;
     };
     readonly isFallbackAdapter = false;
-    constructor(gl: WebGL2RenderingContext, capabilities: WebGL2Capabilities);
+    constructor(gl: WebGL2RenderingContext, capabilities: WebGL2Capabilities,
+    cpuWorkBudget?: number);
     requestDevice(descriptor?: GPUDeviceDescriptor): Promise<CompatDevice>;
 }
 
@@ -190,6 +194,12 @@ export class CompatDevice extends EventTarget {
         scatter: number;
         cpu: number;
     };
+    readonly programs: {
+        count: number;
+        translateMs: number;
+        linkMs: number;
+    };
+    cpuWorkBudget: number;
     destroyed: boolean;
     onuncapturederror: ((event: Event) => void) | null;
     readonly loadSampler: WebGLSampler;
@@ -203,8 +213,9 @@ export class CompatDevice extends EventTarget {
     compare(f: GPUCompareFunction): number;
     unsupported(what: string): Error;
     pushErrorScope(filter: ErrorFilter): void;
-    popErrorScope(): Promise<CompatValidationError | null>;
+    popErrorScope(): Promise<CompatValidationError | CompatInternalError | null>;
     validationError(message: string): void;
+    internalError(message: string): void;
     lose(reason: 'destroyed' | 'unknown', message: string): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -250,6 +261,12 @@ export class CompatGPU {
 
 export interface CompatGPUOptions {
     readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
+    readonly cpuWorkBudget?: number;
+}
+
+export class CompatInternalError extends Error {
+    readonly code = "failed";
+    constructor(message: string);
 }
 
 export class CompatPipelineLayout {
@@ -1160,6 +1177,10 @@ interface GLSLVarying {
 
 class GLState {
     readonly gl: WebGL2RenderingContext;
+    readonly counts: {
+        requests: number;
+        hits: number;
+    };
     constructor(gl: WebGL2RenderingContext);
     useProgram(p: WebGLProgram | null): void;
     bindVertexArray(v: WebGLVertexArrayObject | null): void;
@@ -1189,6 +1210,7 @@ interface Helper {
 interface InstallOptions {
     readonly force?: boolean;
     readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
+    readonly cpuWorkBudget?: number;
 }
 
 interface InstallResult {

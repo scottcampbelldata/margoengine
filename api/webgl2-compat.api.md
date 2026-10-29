@@ -16,6 +16,7 @@ export type CompatTier = 'full' | 'half-float' | 'ldr';
 export interface InstallOptions {
     readonly force?: boolean;
     readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
+    readonly cpuWorkBudget?: number;
 }
 
 export interface InstallResult {
