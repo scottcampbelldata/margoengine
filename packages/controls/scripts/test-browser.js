@@ -58,7 +58,14 @@ try {
   );
   await page.mouse.move(...at(200, 200));
   for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -200);
-  await page.waitForTimeout(50);
+  // Wait for the dolly itself (the wheel is applied on a frame), not for 50 ms.
+  await page.waitForFunction(
+    (distance) => Math.abs(window.measure().distance - distance) < 1e-6,
+    6 * 2 ** (-600 / 500),
+    {
+      timeout: 10_000,
+    },
+  );
   const zoomed = await page.evaluate(() => window.measure());
   // 500 px of wheel halve the distance (3a1b76cf): three -200 px notches are 2^(-600/500).
   near(zoomed.distance, 6 * 2 ** (-600 / 500), 1e-6, 'wheel dollies in');

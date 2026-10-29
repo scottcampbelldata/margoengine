@@ -23,7 +23,11 @@ export function isCheckFile(path) {
   const p = path.replaceAll('\\', '/');
   if (SKIP.test(p) || !/\.(html|js|mjs|ts)$/.test(p) || /\.test\.js$|\.d\.ts$/.test(p)) return false;
   if (/(^|\/)bench[^/]*$/i.test(p) || /benchmark/i.test(p)) return false;
-  return /(^|\/)(tests?)\//.test(p) || /^scripts\/[^/]*(browser|test|check|visual|modern)[^/]*\.(js|mjs)$/.test(p);
+  return (
+    /(^|\/)(tests?)\//.test(p) ||
+    /^scripts\/[^/]*(browser|test|check|visual|modern|quickstart)[^/]*\.(js|mjs)$/.test(p) ||
+    /^(packages|examples)\/[^/]+\/scripts\/[^/]*(browser|test|check)[^/]*\.(js|mjs)$/.test(p)
+  );
 }
 
 // A counted loop: `for (let i = 0; i < 20; i++)` (the bound a number, nothing else in the condition).

@@ -40,6 +40,7 @@ import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import sharp from 'sharp';
 import { acquire, killTree, windowsCommandLine } from './gpu-lock.mjs';
 import { quickstartFiles } from './support/doc-snippets.mjs';
+import { describeHardware, hardwareLine, waitForPicture } from './support/scene-ready.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const windows = process.platform === 'win32';
@@ -376,6 +377,7 @@ export async function main() {
     while (!/Local:\s+(http:\/\/\S+)/.test(output.replace(/\x1b\[[0-9;]*m/g, ''))) {
       assert.ok(Date.now() < deadline, `the dev server printed no address in 60 s:\n${output}`);
       assert.ok(dev.exitCode === null, `the dev server exited:\n${output}`);
+      // fixed-wait: the poll interval of a loop that asserts a 60 s deadline and the process still running
       await new Promise((r) => setTimeout(r, 100));
     }
     origin = /Local:\s+(http:\/\/[^\s/]+)/.exec(output.replace(/\x1b\[[0-9;]*m/g, ''))[1];
@@ -424,33 +426,61 @@ export async function main() {
     const shoot = (page) => page.screenshot({ type: 'png' });
     const shotDir = join(root, 'test-results/quickstart-timing');
     mkdirSync(shotDir, { recursive: true });
-    /** Waits, takes the picture, keeps it as test-results/quickstart-timing/<label>.png and returns its pixels. */
-    const settle = async (page, ms = 1200, label) => {
-      await page.waitForTimeout(ms);
-      const png = await shoot(page);
-      if (label) writeFileSync(join(shotDir, `${label}.png`), png);
-      return pixels(png);
+    /**
+     * Waits until the page has really drawn (no fixed sleep: a slower GPU compiles for longer, bug 62), keeps the picture
+     * as test-results/quickstart-timing/<label>.png and returns its pixels. `ready` says what the picture must show (a
+     * string names what is missing); `stable` also needs two equal pictures in a row, which a frozen scene reaches once
+     * its last pipeline is in.
+     */
+    const settle = async (
+      page,
+      label,
+      { ready = (shot) => (findBall(shot) ? true : 'the ball is not drawn'), stable = false } = {},
+    ) => {
+      let last;
+      const shot = await waitForPicture(page, {
+        label: `the ${label} page`,
+        shoot: async (p) => (last = await shoot(p)),
+        pixels,
+        ready,
+        stable,
+      });
+      writeFileSync(join(shotDir, `${label}.png`), last);
+      return shot;
     };
+    /** Polls `probe` (a picture of the page) until it holds, failing with `what` and the page's problems past 30 s. */
+    const until = (page, what, ready) => waitForPicture(page, { label: what, shoot, pixels, ready, timeoutMs: 30_000 });
 
     // 5a. The shipped page: first frame = the first screenshot that is not one colour.
     const page = await open(pageUrl('readme'));
-    for (let tries = 0; ; tries++) {
-      if (tries >= 300) {
-        const answer = await fetch(page.url()).then(
-          async (r) => `${r.status} ${(await r.text()).slice(0, 300)}`,
-          (e) => String(e),
-        );
-        assert.fail(
-          `no frame with content in 30 s; problems: ${page.problems.join(' | ')}; the server answers a plain request with: ${answer}`,
-        );
-      }
-      const shot = await pixels(await shoot(page));
-      if (findBall(shot) && sharpEdges(shot, 560, 700, 20) > 300) break;
-      await page.waitForTimeout(100);
+    try {
+      await waitForPicture(page, {
+        label: 'the shipped page',
+        shoot,
+        pixels,
+        ready: (shot) =>
+          !findBall(shot)
+            ? 'the ball is not drawn'
+            : sharpEdges(shot, 560, 700, 20) > 300
+              ? true
+              : 'the floor shows no checker edges',
+        timeoutMs: 30_000,
+      });
+    } catch (error) {
+      const answer = await fetch(page.url()).then(
+        async (r) => `${r.status} ${(await r.text()).slice(0, 300)}`,
+        (e) => String(e),
+      );
+      throw new Error(`no frame with content: ${error.message}; the server answers a plain request with: ${answer}`, {
+        cause: error,
+      });
     }
     mark('first frame rendered (ball, floor texture visible)');
     sizes.pageDownloadedBytes = page.bytes;
-    await page.waitForTimeout(800);
+    const hardware = await describeHardware(page);
+    sizes.hardware = hardware;
+    notes.push(`hardware: ${hardwareLine(hardware)}`);
+    console.log(`hardware: ${hardwareLine(hardware)}`);
     const status = () => page.textContent('#status');
     assert.match(await status(), /Drag to orbit/, 'the status line must still show its first text');
 
@@ -459,11 +489,11 @@ export async function main() {
       off = await open(pageUrl('noshadow')),
       plain = await open(pageUrl('notexture'));
     const [shotOn, shotOff, shotPlain] = [
-      await settle(frozen, 1200, 'frozen'),
-      await settle(off, 1200, 'no-shadow'),
-      await settle(plain, 1200, 'no-texture'),
+      await settle(frozen, 'frozen', { stable: true }),
+      await settle(off, 'no-shadow', { stable: true }),
+      await settle(plain, 'no-texture', { stable: true }),
     ];
-    const shipped = await settle(page, 300, 'shipped');
+    const shipped = await settle(page, 'shipped');
 
     // TEXTURE: sharp checker edges on the floor band, many with the texture and (nearly) none without.
     const band = [560, 700],
@@ -515,14 +545,16 @@ export async function main() {
         if (shot.rgb[i] > 220 && shot.rgb[i + 1] > 110 && shot.rgb[i + 1] < 190 && shot.rgb[i + 2] < 90) n++;
       return n;
     };
-    const before = await settle(page, 300);
+    const before = await settle(page, 'before-pick');
     assert.ok(orange(before) < 30, 'there is an orange outline before any pick');
     assert.match(
       await clickAndWait(Math.round(ball.cx), Math.round(ball.cy)),
       /Picked the ball\./,
       'clicking the ball must fire the handler',
     );
-    const ballPicked = await settle(page, 600);
+    const ballPicked = await until(page, 'the orange outline after picking the ball', (shot) =>
+      orange(shot) > 100 ? true : `only ${orange(shot)} orange pixels`,
+    );
     assert.ok(orange(ballPicked) > 100, `no orange outline after picking the ball (${orange(ballPicked)} px)`);
     // The crate sits left of the ball and spins; scan the left half of the floor row by row until the handler says so.
     let crate = null;
@@ -540,15 +572,22 @@ export async function main() {
       /Click the crate or the ball\./,
       'clicking empty floor must clear the pick',
     );
-    const still = await settle(page, 400);
+    const still = await until(page, 'the outline cleared after clicking empty floor', (shot) =>
+      orange(shot) < 30 ? true : `${orange(shot)} orange pixels remain`,
+    );
     await page.mouse.move(300, 640);
     await page.mouse.down();
     await page.mouse.move(520, 600, { steps: 14 });
     await page.mouse.up();
-    await page.waitForTimeout(900);
-    const orbited = await pixels(await shoot(page));
-    let moved = 0;
-    for (let i = 0; i < still.lum.length; i += 7) if (Math.abs(still.lum[i] - orbited.lum[i]) > 25) moved++;
+    const changed = (shot) => {
+      let n = 0;
+      for (let i = 0; i < still.lum.length; i += 7) if (Math.abs(still.lum[i] - shot.lum[i]) > 25) n++;
+      return n;
+    };
+    const orbited = await until(page, 'the picture after the orbit drag', (shot) =>
+      changed(shot) > 1500 ? true : `${changed(shot)} sampled pixels changed`,
+    );
+    const moved = changed(orbited);
     assert.ok(moved > 1500, `an orbit drag must change the picture (${moved} sampled pixels changed)`);
     assert.doesNotMatch(await status(), /Picked/, 'an orbit drag must not pick');
     const secondsToInteractive = mark('interaction verified (pick handler, outline, orbit)');
@@ -592,7 +631,7 @@ export async function main() {
     );
     writeResults(true);
     console.log(
-      `PASSED: first frame ${firstFrame} s, verified interactive ${secondsToInteractive} s (gate ${gate} s). Results: test-results/quickstart-timing.json`,
+      `PASSED: first frame ${firstFrame} s, verified interactive ${secondsToInteractive} s (gate ${gate} s) on ${hardwareLine(sizes.hardware)}. Results: test-results/quickstart-timing.json`,
     );
   } catch (error) {
     if (!dead) writeResults(false, String(error?.message ?? error).slice(0, 2000));

@@ -256,6 +256,7 @@ try {
     assert(!quality.overflow && !quality.open);
     assert.equal(await mobile.locator('#pause').getAttribute('aria-pressed'), 'true');
     const original = await mobile.evaluate(() => earthAudit.frame);
+    // fixed-wait: reduced motion must leave the globe unchanged over a real interval; nothing to wait for
     await mobile.waitForTimeout(100);
     const still = await mobile.evaluate(() => earthAudit.frame);
     assert(
