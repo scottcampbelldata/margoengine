@@ -19,6 +19,7 @@ import { atan2, clampInt, divFloor, isqrt, ONE, qexp2, qlog2 } from './fixed.js'
 import type { Heights } from './height.js';
 import { LAYERS, type RasterLayer } from './layers.js';
 import type { Region } from './region.js';
+import type { Scratch } from './scratch.js';
 
 /** The geometry a tile kernel needs. */
 export interface TileFrame {
@@ -29,6 +30,8 @@ export interface TileFrame {
   readonly cell: number;
   /** Cells per tile side. */
   readonly cells: number;
+  /** Working arrays reused from tile to tile (the world's); without it every array is fresh. */
+  readonly scratch?: Scratch;
 }
 
 /** Radius of the topographic position box, mm (a 49 m box at 1 m). */
@@ -48,14 +51,16 @@ const ARRAYS = { i32: Int32Array, i16: Int16Array, u16: Uint16Array, u8: Uint8Ar
 function raster(
   name: string,
   cells: number,
+  scratch?: Scratch,
 ): RasterLayer & { data: Int32Array | Int16Array | Uint16Array | Uint8Array } {
-  const info = LAYERS[name];
+  const info = LAYERS[name],
+    Type = ARRAYS[info.format] as new (length: number) => Int32Array | Int16Array | Uint16Array | Uint8Array;
   return {
     name,
     format: info.format,
     width: cells,
     depth: cells,
-    data: new ARRAYS[info.format](cells * cells),
+    data: scratch ? scratch.take(name, Type, cells * cells) : new Type(cells * cells),
     scale: info.scale,
     unit: info.unit,
   };
@@ -63,7 +68,9 @@ function raster(
 
 /**
  * Computes the named layers of tile (tx, tz), `margin` extra cells on each side. Every layer here is a pure function of
- * the global cell, the heights and the region fields.
+ * the global cell, the heights and the region fields. With the frame's scratch, the layers not asked for and the
+ * working arrays are reused; `temporary` reuses the returned layers too (valid until the next call: the caller copies
+ * what it keeps).
  */
 export function tileFields(
   frame: TileFrame,
@@ -71,8 +78,9 @@ export function tileFields(
   tz: number,
   names: readonly string[],
   margin = 0,
+  temporary = false,
 ): Map<string, RasterLayer> {
-  const { climate, region, heights, cell } = frame,
+  const { climate, region, heights, cell, scratch } = frame,
     // Output: the tile plus `margin` cells on every side (classification blurs over them).
     cells = frame.cells + 2 * margin,
     first = -margin,
@@ -80,11 +88,11 @@ export function tileFields(
     side = cells + 2 * apron,
     gx0 = tx * frame.cells + first - apron,
     gz0 = tz * frame.cells + first - apron,
-    h = heights.grid(gx0, gz0, side, side, cell),
+    h = heights.grid(gx0, gz0, side, side, cell, scratch),
     want = new Set(names),
     out = new Map<string, RasterLayer>();
   const make = (name: string) => {
-    const layer = raster(name, cells);
+    const layer = raster(name, cells, temporary || !want.has(name) ? scratch : undefined);
     if (want.has(name)) out.set(name, layer);
     return layer.data;
   };
@@ -108,8 +116,13 @@ export function tileFields(
     profile = want.has('profile') ? make('profile') : undefined,
     plan = want.has('plan') ? make('plan') : undefined;
   // Box sums of heights for the topographic position index (exact: below 2^53).
-  const sat = new Float64Array((side + 1) * (side + 1));
+  const sat = scratch
+    ? scratch.take('sat', Float64Array, (side + 1) * (side + 1))
+    : new Float64Array((side + 1) * (side + 1));
+  // Row 0 and column 0 are read as zeros and never written (a reused array may hold old sums there).
+  sat.fill(0, 0, side + 1);
   for (let z = 0; z < side; z++) {
+    sat[(z + 1) * (side + 1)] = 0;
     let row = 0;
     for (let x = 0; x < side; x++) {
       row += h[z * side + x];

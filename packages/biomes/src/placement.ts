@@ -637,6 +637,22 @@ class Cells {
     this.tally = new Int32Array(n);
   }
 
+  /**
+   * Empties the table to a window of 2^bits x 2^bits cells, as a new one, over the memory it has (a table grown in an
+   * earlier run keeps its larger arrays): slots are read only once `add` wrote them.
+   */
+  reset(bits: number): void {
+    const n = 1 << (2 * bits),
+      view = (a: Int32Array) => (a.buffer.byteLength >= n * 4 ? new Int32Array(a.buffer, 0, n) : new Int32Array(n));
+    this.bits = bits;
+    this.size = 0;
+    this.kx = view(this.kx);
+    this.kz = view(this.kz);
+    this.start = view(this.start).fill(-1);
+    this.count = view(this.count);
+    this.tally = view(this.tally);
+  }
+
   /** The slot of cell (cx, cz), or -1 when it is not in the table. */
   find(cx: number, cz: number): number {
     const { kx, kz, start, bits } = this,
@@ -709,6 +725,13 @@ class Pool {
 
   constructor(bits: number) {
     this.cells = new Cells(bits);
+  }
+
+  /** Empties the pool for the next run, keeping its arrays (each candidate's fields are written when it is pushed). */
+  reset(bits: number): this {
+    this.n = this.listN = 0;
+    this.cells.reset(bits);
+    return this;
   }
 
   grow(): void {
@@ -803,8 +826,13 @@ class Run {
       cellShift: number;
     },
     readonly shapes: Shapes,
+    /** Pools of earlier runs to reuse (a run goes start to finish in one call, so one run uses them at a time). */
+    reuse: Pool[] = [],
   ) {
-    this.pools = plan.strata.map((st) => new Pool(windowBits(geometry.tileTicks, st.gs)));
+    this.pools = plan.strata.map((st, s) => {
+      const bits = windowBits(geometry.tileTicks, st.gs);
+      return reuse[s] ? reuse[s].reset(bits) : (reuse[s] = new Pool(bits));
+    });
   }
 
   /** The world cell fields at a tick position, or undefined outside the world. */
@@ -1137,6 +1165,8 @@ export class BiomePlacement implements Disposable {
   /** The world's workers (tiles are placed there, by a replica of this placement), and this placement's id there. */
   readonly #workers: BiomeWorld['workers'];
   readonly #pid = ++serial;
+  /** Candidate pools reused from tile to tile (tens of megabytes of tables per tile otherwise). */
+  readonly #pools: Pool[] = [];
 
   private constructor(world: BiomeWorld, options: PlacementOptions) {
     this.#world = world;
@@ -1387,6 +1417,7 @@ export class BiomePlacement implements Disposable {
         cellShift: 31 - Math.clz32(w.resolution * TICK),
       },
       this.#shapes,
+      this.#pools,
     );
   }
 
@@ -1692,6 +1723,7 @@ export class BiomePlacement implements Disposable {
     this.#workers?.detach(this.#pid);
     this.#cache.clear();
     this.#listeners.clear();
+    this.#pools.length = 0;
   }
 
   [Symbol.dispose](): void {

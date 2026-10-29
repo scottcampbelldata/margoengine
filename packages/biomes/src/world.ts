@@ -10,6 +10,7 @@ import { type Heights, type HeightSource, heightsOf } from './height.js';
 import { DEFAULT_LAYERS, LAYERS, type RasterLayer } from './layers.js';
 import type { createRelief } from './relief.js';
 import { buildRegion, type Region } from './region.js';
+import { Scratch } from './scratch.js';
 import { type BiomeSample, readCell, samplePoint } from './sample.js';
 
 /** One user layer raster write of {@link BiomeWorld.writeLayers}. */
@@ -153,6 +154,8 @@ export class BiomeWorld implements Disposable {
   readonly #origin: readonly [number, number]; // mm
   readonly #size: readonly [number, number]; // mm
   readonly #cache = new Map<string, Promise<BiomeTile>>();
+  /** Working arrays of tile making, reused from tile to tile (a tile is made start to finish in one go). */
+  readonly #scratch = new Scratch();
   /** Finished tiles that hold every default layer, for exact `sample` reads. */
   readonly #ready = new Map<string, BiomeTile>();
   readonly #listeners = new Set<(rect: Rect) => void>();
@@ -388,14 +391,29 @@ export class BiomeWorld implements Disposable {
     this.#live();
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
       cell = this.resolution * 1000,
-      frame = { climate: this.#climate, region: this.#region, heights: this.#heights, cell, cells },
+      frame = {
+        climate: this.#climate,
+        region: this.#region,
+        heights: this.#heights,
+        cell,
+        cells,
+        scratch: this.#scratch,
+      },
       classified = names.includes('biome') || names.includes('biomeWeight');
     let layers: Map<string, RasterLayer>;
     if (!classified) layers = tileFields(frame, x, z, names);
     else {
       // Classification blurs over a 1-cell margin: compute the fields one cell wider, classify, then crop.
       const c = this.#classifier,
-        wide = tileFields(frame, x, z, [...new Set([...names, ...c.inputs.filter((n) => !n.startsWith('mask/'))])], 1),
+        // The wide fields are working arrays: the tile keeps cropped copies.
+        wide = tileFields(
+          frame,
+          x,
+          z,
+          [...new Set([...names, ...c.inputs.filter((n) => !n.startsWith('mask/'))])],
+          1,
+          true,
+        ),
         n = cells + 2,
         gx = x * cells - 1,
         gz = z * cells - 1,

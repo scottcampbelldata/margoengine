@@ -4,6 +4,7 @@
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { divFloor, ONE } from './fixed.js';
 import type { createRelief, Relief, ReliefOptions } from './relief.js';
+import type { Scratch } from './scratch.js';
 
 /**
  * Where a world's heights come from.
@@ -56,11 +57,14 @@ function resample(
   nz: number,
   dz: number,
   out: Int32Array,
+  scratch?: Scratch,
 ): void {
-  const ix = new Int32Array(count),
-    wx = new Int32Array(count * 4),
-    iz = new Int32Array(rows),
-    wz = new Int32Array(rows * 4);
+  const take = <T extends Int32Array | Float64Array>(key: string, Type: new (n: number) => T, n: number): T =>
+      scratch ? scratch.take(key, Type, n) : new Type(n),
+    ix = take('resample.ix', Int32Array, count),
+    wx = take('resample.wx', Int32Array, count * 4),
+    iz = take('resample.iz', Int32Array, rows),
+    wz = take('resample.wz', Int32Array, rows * 4);
   const place = (p: number, num: number, den: number, index: Int32Array, w: Int32Array, k: number) => {
     const scaled = p * num,
       i = divFloor(scaled, den),
@@ -74,12 +78,12 @@ function resample(
     span = ix[count - 1] + 3 - lo,
     jlo = iz[0] - 1,
     jspan = iz[rows - 1] + 3 - jlo,
-    lattice = new Float64Array(span * jspan);
+    lattice = take('resample.lattice', Float64Array, span * jspan);
   if (typeof get === 'function')
     for (let j = 0; j < jspan; j++) for (let i = 0; i < span; i++) lattice[j * span + i] = get(lo + i, jlo + j);
   else get.fill(lo, jlo, span, jspan, lattice);
   // Along x for every lattice row, then along z.
-  const across = new Float64Array(jspan * count);
+  const across = take('resample.across', Float64Array, jspan * count);
   for (let j = 0; j < jspan; j++)
     for (let c = 0; c < count; c++) {
       const base = j * span + ix[c] - 1 - lo,
@@ -153,8 +157,11 @@ function latticeCache(at: (i: number, j: number) => number): LatticeFill {
 
 /** A world's heights: grids of samples at a given spacing, in mm, positions relative to the world's minimum corner. */
 export interface Heights {
-  /** Heights of `count` x `rows` cells starting at cell (gx, gz), `step` mm apart. */
-  grid(gx: number, gz: number, count: number, rows: number, step: number): Int32Array;
+  /**
+   * Heights of `count` x `rows` cells starting at cell (gx, gz), `step` mm apart. With `scratch` the grid and the
+   * working arrays are reused (valid until the next call with it).
+   */
+  grid(gx: number, gz: number, count: number, rows: number, step: number, scratch?: Scratch): Int32Array;
   /** The procedural relief, when the source is one (its rivers are water sources). */
   readonly relief?: Relief;
 }
@@ -187,13 +194,13 @@ export function heightsOf(
       cached = latticeCache(at);
     return {
       relief: made,
-      grid(gx, gz, count, rows, step) {
-        const out = new Int32Array(count * rows);
+      grid(gx, gz, count, rows, step, scratch) {
+        const out = scratch ? scratch.take('grid', Int32Array, count * rows) : new Int32Array(count * rows);
         if (step % LATTICE === 0) {
           const k = step / LATTICE;
           for (let r = 0; r < rows; r++)
             for (let c = 0; c < count; c++) out[r * count + c] = at((gx + c) * k, (gz + r) * k);
-        } else resample(cached, count, rows, gx, gz, step, LATTICE, step, LATTICE, out);
+        } else resample(cached, count, rows, gx, gz, step, LATTICE, step, LATTICE, out, scratch);
         return out;
       },
     };
@@ -204,8 +211,8 @@ export function heightsOf(
     const field = source.field;
     if (typeof field !== 'function') throw typeError('A height field must be a function (x, z) => metres', 'biomes');
     return {
-      grid(gx, gz, count, rows, step) {
-        const out = new Int32Array(count * rows);
+      grid(gx, gz, count, rows, step, scratch) {
+        const out = scratch ? scratch.take('grid', Int32Array, count * rows) : new Int32Array(count * rows);
         for (let r = 0; r < rows; r++)
           for (let c = 0; c < count; c++) {
             const v = Math.round(
@@ -254,9 +261,9 @@ export function heightsOf(
     return row(i, j);
   };
   return {
-    grid(gx, gz, count, rows, step) {
-      const out = new Int32Array(count * rows);
-      resample(at, count, rows, gx, gz, step * (width - 1), size[0], step * (depth - 1), size[1], out);
+    grid(gx, gz, count, rows, step, scratch) {
+      const out = scratch ? scratch.take('grid', Int32Array, count * rows) : new Int32Array(count * rows);
+      resample(at, count, rows, gx, gz, step * (width - 1), size[0], step * (depth - 1), size[1], out, scratch);
       return out;
     },
   };

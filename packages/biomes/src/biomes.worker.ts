@@ -5,7 +5,7 @@
 import { typeError } from '../../shared/errors.js';
 import { type BiomeTile, BiomeWorld, type BiomeWorldOptions } from './world.js';
 import { BiomePlacement, type PlacedTile, type PlacementOptions } from './placement.js';
-import { VIEW_LAYERS, viewTile } from './view.js';
+import { viewTile } from './view.js';
 
 let world: BiomeWorld | undefined,
   /** Why the replica could not be made: every later job rejects with it. */
@@ -131,8 +131,10 @@ async function run(m: Message): Promise<unknown> {
         m.detail as number | undefined,
       );
     case 'view': {
-      // What a view draws of a tile: heights (metres) and the two ground weight textures every `step` cells.
-      const t = await world!.tile(m.x as number, m.z as number, { layers: VIEW_LAYERS });
+      // What a view draws of a tile: heights (metres) and the two ground weight textures every `step` cells. The tile is
+      // asked for with the default layers (VIEW_LAYERS among them), so the view and placement of a tile, which go to
+      // the same worker, share one cached tile instead of making it twice.
+      const t = await world!.tile(m.x as number, m.z as number);
       return viewTile(world!, t, m.materials as string[], m.step as number);
     }
     default:
