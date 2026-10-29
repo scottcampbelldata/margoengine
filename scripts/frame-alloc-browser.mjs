@@ -35,10 +35,10 @@ const root = resolve(import.meta.dirname, '..'),
  * docs/limits.md ("Frame allocation"). Lower a floor when a fix lowers the measurement; never raise one.
  */
 export const FLOORS = {
-  basic: { median: 460 },
-  instanced: { median: 388 },
-  shadowed: { median: 3508 },
-  post: { median: 2240 },
+  basic: { median: 340 },
+  instanced: { median: 292 },
+  shadowed: { median: 860 },
+  post: { median: 1528 },
 };
 
 /** Per-frame bytes from per-frame heap samples: { median, mean, max, min, gcFrames, frames }. `read` is subtracted. */

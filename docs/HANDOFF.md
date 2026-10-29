@@ -3,13 +3,16 @@
 ## Landed 2026-10-29: steady-state frames allocate far less, gated in check:merge (item 53.1, part 1)
 
 - `npm run test:frame-alloc:browser` (run by `check:gpu-packages`) measures the JavaScript heap bytes of a median
-  steady-state frame in Edge and fails over a floor: basic 460 B (was 1,428), 10,000 instanced boxes 388 B (was
-  1,076), shadowed 3,508 B (was 26,920), post 2,240 B (was 5,116). Method and the bytes that cannot go (16 B per
+  steady-state frame in Edge and fails over a floor: basic 340 B (was 1,428), 10,000 instanced boxes 292 B (was
+  1,076), shadowed 860 B (was 26,920), post 1,528 B (was 5,116). Method and the bytes that cannot go (16 B per
   returned WebGPU object, a boxed frame time): [limits.md](limits.md), "Frame allocation"; claim LIM-031.
 - `tests/frame-alloc.test.js` (in verify) is the Node regression: core under 256 B per frame, shadows add under 512 B.
-- Core grew 68 B gzip (21,000 B, cap 21,504 B); core + stage is 22,414 B.
-- Open (part 2): shadow draw and cascade fit number boxing, the post stack, the per-frame bindings list, and the
-  kernel's transforms per frame in a frame budget.
+- Core is 21,063 B gzip (cap 21,504 B); core + stage is 22,482 B.
+- Part 2: V8 middle-tier number boxing removed from core, shadows and math (probes in `tests/frame-alloc.test.js`);
+  `examples/package-benchmarks/transforms-budget.mjs` finds 14,500 moving transforms per frame within 4 ms of CPU
+  (claim LIM-032).
+- Left as measured limits: the frame-resources view set (about 120 B in post), the SSAO scene walk, 16 B per WebGPU
+  object, the boxed frame time ([limits.md](limits.md), "Frame allocation").
 
 ## Landed 2026-10-26 to 10-28: second-machine and busy-run bug fixes, written up in the whitepaper
 

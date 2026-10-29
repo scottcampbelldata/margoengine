@@ -446,21 +446,20 @@ export class GPURenderer implements Renderer {
         let group = this.bindGroup;
         if (pipeline !== this.pipeline || bindings.length) {
           let cached = this.groups.get(pipeline);
-          if (
-            !cached ||
-            cached.bindings.length !== bindings.length ||
-            bindings.some((entry, i) => {
-              const previous = cached!.bindings[i],
-                resource = entry.resource as GPUBufferBinding,
-                old = previous.resource as GPUBufferBinding;
-              return (
-                entry.binding !== previous.binding ||
-                (resource.buffer
-                  ? resource.buffer !== old.buffer || resource.offset !== old.offset || resource.size !== old.size
-                  : resource !== old)
-              );
-            })
-          ) {
+          // An index loop, not some(): a closure per draw would be garbage every frame.
+          let stale = !cached || cached.bindings.length !== bindings.length;
+          for (let i = 0; !stale && i < bindings.length; i++) {
+            const entry = bindings[i],
+              previous = cached!.bindings[i],
+              resource = entry.resource as GPUBufferBinding,
+              old = previous.resource as GPUBufferBinding;
+            stale =
+              entry.binding !== previous.binding ||
+              (resource.buffer
+                ? resource.buffer !== old.buffer || resource.offset !== old.offset || resource.size !== old.size
+                : resource !== old);
+          }
+          if (stale || !cached) {
             const group = this.device.createBindGroup({
               layout: pipeline.getBindGroupLayout(0),
               entries: [{ binding: 0, resource: { buffer: this.uniform } }, ...bindings],
@@ -595,7 +594,8 @@ export class GPURenderer implements Renderer {
     context.shader = wgsl;
     context.bindings = this.bindings;
     context.indirect = false;
-    this.bindings.length = 0;
+    // Emptied by pop, which keeps the array's storage: length = 0 drops it, so the plugins' pushes reallocate it.
+    while (this.bindings.length) this.bindings.pop();
     graph.execute(context);
     if (!this.deviceLost && !this.disposed) {
       if (this.preserveMSAA && !this.holdColor) {

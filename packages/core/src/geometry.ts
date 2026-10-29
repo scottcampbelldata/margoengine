@@ -2,9 +2,12 @@ import { rangeError, typeError } from '../../shared/errors.js';
 
 export function finite(values: ArrayLike<number>, size: number, label: string): void {
   if (values.length !== size) throw typeError(`${label}: ${size} values`, 'transform');
+  let f: number;
   for (let i = 0; i < size; i++) {
     const value = values[i];
-    if (typeof value !== 'number' || !Number.isFinite(Math.fround(value)))
+    // f - f is 0 exactly for a finite f. Not Number.isFinite: this runs every frame (the camera matrix, setters), and
+    // V8's optimizing tier below the top one calls it, boxing each fractional value into a new heap number.
+    if (typeof value !== 'number' || (f = Math.fround(value)) - f !== 0)
       throw rangeError(`${label}: finite values`, 'transform');
   }
 }

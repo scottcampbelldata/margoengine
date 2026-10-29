@@ -23,7 +23,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth, nearestDepth, type ShadowFilter } from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { hypot } from '../../shared/hypot.js';
+import { hypot, hypotOf, hypotTerms } from '../../shared/hypot.js';
 import {
   casterBuffers,
   casterPipeline,
@@ -424,7 +424,9 @@ export class Shadows implements EnginePlugin {
             : i === 2
               ? (o.normalBias ?? 0.02)
               : (o.casterMargin ?? 100);
-      if (!Number.isFinite(Math.fround(v)) || v < 0)
+      // Runs every frame: f - f is 0 exactly for a finite f, and Number.isFinite would box each fractional f.
+      const f = Math.fround(v);
+      if (f - f !== 0 || v < 0)
         throw new RangeError(
           'Invalid shadow options; lightSize, bias, normalBias and casterMargin must be finite and 0 or more.',
         );
@@ -696,8 +698,13 @@ export class Shadows implements EnginePlugin {
       cz = (center[2] = (box[2] + box[5]) / 2);
     center[3] = 0;
     this.engine!.meshes.forEach(this.extendRadius);
+    const h = hypotTerms;
+    h[0] = cx - camera.position[0];
+    h[1] = cy - camera.position[1];
+    h[2] = cz - camera.position[2];
+    hypotOf(3);
     const radius = center[3],
-      d = hypot(3, cx - camera.position[0], cy - camera.position[1], cz - camera.position[2]);
+      d = h[4];
     const far = 2 ** (Math.ceil(Math.log2(d + radius) * 4) / 4),
       near = d > radius ? 2 ** (Math.floor(Math.log2(d - radius) * 4) / 4) : 0;
     if (far < fit.far && far > camera.near) fit.far = far;
@@ -739,7 +746,12 @@ export class Shadows implements EnginePlugin {
     if (!mesh.geometry) return;
     const w = this.worldSphere(id),
       c = this.rangeCenter;
-    c[3] = Math.max(c[3], hypot(3, w[0] - c[0], w[1] - c[1], w[2] - c[2]) + w[3]);
+    const h = hypotTerms;
+    h[0] = w[0] - c[0];
+    h[1] = w[1] - c[1];
+    h[2] = w[2] - c[2];
+    hypotOf(3);
+    c[3] = Math.max(c[3], h[4] + w[3]);
   };
   private render(c: ShadowPassContext): void {
     this.validate();
@@ -975,8 +987,9 @@ export class Shadows implements EnginePlugin {
     m[14] = 0.5 - pz / depth;
     m[15] = 1;
     this.ranges.fill(depth);
+    // Not Number.isFinite, which boxes each fractional value per frame (cascades.ts fitCascades).
     for (let i = 0; i < 16; i++)
-      if (!Number.isFinite(m[i]))
+      if (m[i] - m[i] !== 0)
         throw new RangeError('Shadow bounds matrix is not finite; check the bounds for extreme values.');
   }
   private identity(object: object): number {
@@ -1278,6 +1291,9 @@ export class Shadows implements EnginePlugin {
     if (staleCaster(record, p, pipeline, displacement) || record.section !== section?.buffer) {
       if (record) for (const b of record.uniforms) b.destroy();
       records.delete(identity);
+      // The closure below captures this block's const, not draw's pipeline: a captured function variable makes V8
+      // allocate a context on every draw call, used or not; a block's is made only when the block runs.
+      const made = pipeline;
       const uniforms: GPUBuffer[] = [],
         groups: GPUBindGroup[] = [];
       try {
@@ -1314,7 +1330,7 @@ export class Shadows implements EnginePlugin {
         sampler: p.alphaSampler,
         section: section?.buffer,
         displacement,
-        displaced: displacementGroup(this.device!, () => pipeline.getBindGroupLayout(1), displacement),
+        displaced: displacementGroup(this.device!, () => made.getBindGroupLayout(1), displacement),
       };
       records.set(identity, record);
     }

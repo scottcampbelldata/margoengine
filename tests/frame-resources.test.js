@@ -124,3 +124,28 @@ test('one view drawing several times in a frame writes its own buffer, as a plai
     assert.equal(writeUniform(device, uniform, new Float32Array([x, 0, 0, 0]), left), undefined);
   assert.equal(gpu.buffers.length, buffers, 'no copies for a single view');
 });
+
+// Regression (item 53.1, part 2): every frame queued a new closing closure and swapped in a new empty retired list,
+// garbage on every frame of every app with post-processing.
+test('a device closes its frames with one callback, made once, and keeps an empty retired list', async () => {
+  const { device } = strictGPU(),
+    queued = new Set(),
+    queue = globalThis.queueMicrotask;
+  globalThis.queueMicrotask = (callback) => {
+    queued.add(callback);
+    queue(callback);
+  };
+  let retired;
+  try {
+    for (let i = 0; i < 3; i++) {
+      currentFrame(device, left);
+      await frame();
+      const state = globalThis[Symbol.for('margoengine.frame-resources')].devices.get(device);
+      if (i === 0) retired = state.retired;
+      assert.equal(state.retired, retired, 'an empty retired list is kept, not replaced');
+    }
+  } finally {
+    globalThis.queueMicrotask = queue;
+  }
+  assert.equal(queued.size, 1);
+});

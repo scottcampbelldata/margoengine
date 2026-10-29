@@ -60,11 +60,9 @@ export class VectorRef {
       : this.mesh.engine.store.transforms[(this.kind === 'scale' ? scaleFields : positionFields)[axis]][this.mesh.id];
   }
   private validate(value: number): void {
-    if (
-      typeof value !== 'number' ||
-      !Number.isFinite(Math.fround(value)) ||
-      (this.kind === 'scale' && Math.fround(value) === 0)
-    )
+    let f: number;
+    // f - f is 0 exactly for a finite f; Number.isFinite would box each fractional value per setter call (geometry.ts).
+    if (typeof value !== 'number' || (f = Math.fround(value)) - f !== 0 || (this.kind === 'scale' && f === 0))
       throw rangeError('Invalid transform', 'transform');
   }
   private write(axis: number, value: number): void {

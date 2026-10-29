@@ -1,0 +1,100 @@
+{
+  "commit": "67177481",
+  "dirty": true,
+  "date": "2026-10-29",
+  "method": "Node, core dist, stand-in GPU device (tests/support/still-gpu.mjs); every mesh sets position.y and rotation.y each frame; one shared geometry and material; every mesh in view; median of the timed frames",
+  "node": "v26.12.0",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "threads": 32,
+  "memoryGiB": 94,
+  "budgetMs": 4,
+  "warmup": 120,
+  "frames": 300,
+  "movingWithinBudget": 14500,
+  "rows": [
+    {
+      "count": 1000,
+      "median": 0.22980000000001155,
+      "p90": 0.3299999999999983,
+      "drawCalls": 1,
+      "visible": 1000
+    },
+    {
+      "count": 2000,
+      "median": 0.46100000000001273,
+      "p90": 0.6393000000000484,
+      "drawCalls": 1,
+      "visible": 2000
+    },
+    {
+      "count": 4000,
+      "median": 1.4303999999999633,
+      "p90": 3.3617000000001553,
+      "drawCalls": 1,
+      "visible": 4000
+    },
+    {
+      "count": 8000,
+      "median": 2.8115000000000236,
+      "p90": 4.175600000000031,
+      "drawCalls": 1,
+      "visible": 8000
+    },
+    {
+      "count": 12000,
+      "median": 2.870299999999588,
+      "p90": 3.982100000000173,
+      "drawCalls": 1,
+      "visible": 12000
+    },
+    {
+      "count": 14000,
+      "median": 3.0684999999994034,
+      "p90": 4.11410000000069,
+      "drawCalls": 1,
+      "visible": 14000
+    },
+    {
+      "count": 14500,
+      "median": 3.4395000000004075,
+      "p90": 4.6731999999992695,
+      "drawCalls": 1,
+      "visible": 14500
+    },
+    {
+      "count": 14600,
+      "median": 4.129099999998289,
+      "p90": 4.986700000001292,
+      "drawCalls": 1,
+      "visible": 14600
+    },
+    {
+      "count": 14700,
+      "median": 4.545899999997346,
+      "p90": 5.2237999999997555,
+      "drawCalls": 1,
+      "visible": 14700
+    },
+    {
+      "count": 14800,
+      "median": 4.798699999999371,
+      "p90": 5.772500000000946,
+      "drawCalls": 1,
+      "visible": 14800
+    },
+    {
+      "count": 15000,
+      "median": 6.580299999999625,
+      "p90": 10.150700000000143,
+      "drawCalls": 1,
+      "visible": 15000
+    },
+    {
+      "count": 16000,
+      "median": 6.90729999999985,
+      "p90": 9.643800000000738,
+      "drawCalls": 1,
+      "visible": 16000
+    }
+  ]
+}

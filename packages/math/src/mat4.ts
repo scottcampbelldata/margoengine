@@ -130,7 +130,9 @@ export function invertMatrixStable<T extends Float32Array | Float64Array>(
     let scale = 0;
     for (let c = 0; c < 8; c++) {
       const v = c < 4 ? m[c * 4 + r] : +(c - 4 === r);
-      if (!Number.isFinite(v)) return null;
+      // v - v is 0 exactly for a finite v. Not Number.isFinite: cameras invert every frame, and V8's optimizing tier
+      // below the top one calls it, boxing each fractional value into a new heap number.
+      if (typeof v !== 'number' || v - v !== 0) return null;
       a[r * 8 + c] = v;
       if (c < 4) scale = Math.max(scale, Math.abs(v));
     }
@@ -141,7 +143,8 @@ export function invertMatrixStable<T extends Float32Array | Float64Array>(
     let pivot = c;
     for (let r = c + 1; r < 4; r++)
       if (Math.abs(a[r * 8 + c]) / a[32 + r] > Math.abs(a[pivot * 8 + c]) / a[32 + pivot]) pivot = r;
-    if (a[pivot * 8 + c] === 0 || !Number.isFinite(a[pivot * 8 + c])) return null;
+    const p = a[pivot * 8 + c];
+    if (p === 0 || p - p !== 0) return null;
     for (let k = 0; k < 8; k++) {
       const value = a[c * 8 + k];
       a[c * 8 + k] = a[pivot * 8 + k];
@@ -158,9 +161,10 @@ export function invertMatrixStable<T extends Float32Array | Float64Array>(
         for (let k = 0; k < 8; k++) a[r * 8 + k] -= f * a[c * 8 + k];
       }
   }
+  let f: number;
   for (let i = 0; i < 16; i++) {
     const v = a[(i % 4) * 8 + (i >> 2) + 4];
-    if (!Number.isFinite(v) || (out instanceof Float32Array && !Number.isFinite(Math.fround(v)))) return null;
+    if (v - v !== 0 || (out instanceof Float32Array && (f = Math.fround(v)) - f !== 0)) return null;
     a[36 + i] = v;
   }
   for (let i = 0; i < 16; i++) out[i] = a[36 + i];

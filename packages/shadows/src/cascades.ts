@@ -1,4 +1,4 @@
-import { hypot } from '../../shared/hypot.js';
+import { hypotOf, hypotTerms as h } from '../../shared/hypot.js';
 import type { Camera, Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 
@@ -73,8 +73,13 @@ export function fitCascades(
     throw new RangeError(
       'Cascade fit needs a positive aspect, an integer resolution of at least 1, a margin of 0 or more and a count from 1 to 4; pass valid values.',
     );
-  // hypot, not Math.hypot: this runs every frame and Math.hypot allocates its arguments (the same bits in V8).
-  const length = hypot(3, direction[0], direction[1], direction[2]);
+  // hypotOf, not Math.hypot: this runs every frame, Math.hypot allocates its arguments and a call with numbers boxes
+  // them; the terms and result go through hypotTerms (h) instead (the same bits in V8).
+  h[0] = direction[0];
+  h[1] = direction[1];
+  h[2] = direction[2];
+  hypotOf(3);
+  const length = h[4];
   if (!length) throw new RangeError('Shadow light direction has zero length; pass a nonzero direction vector.');
   const zx = -direction[0] / length,
     zy = -direction[1] / length,
@@ -83,7 +88,11 @@ export function fitCascades(
   let xx = vertical ? -zy : zz,
     xy = vertical ? zx : 0,
     xz = vertical ? 0 : -zx;
-  const xl = hypot(3, xx, xy, xz);
+  h[0] = xx;
+  h[1] = xy;
+  h[2] = xz;
+  hypotOf(3);
+  const xl = h[4];
   xx /= xl;
   xy /= xl;
   xz /= xl;
@@ -92,8 +101,12 @@ export function fitCascades(
     yz = zx * xy - zy * xx;
   const fx = camera.target[0] - camera.position[0],
     fy = camera.target[1] - camera.position[1],
-    fz = camera.target[2] - camera.position[2],
-    fl = hypot(3, fx, fy, fz);
+    fz = camera.target[2] - camera.position[2];
+  h[0] = fx;
+  h[1] = fy;
+  h[2] = fz;
+  hypotOf(3);
+  const fl = h[4];
   if (!fl)
     throw new RangeError(
       'Shadow camera position and target are the same point; move the target away from the position.',
@@ -104,14 +117,20 @@ export function fitCascades(
   ranges.fill(0, count);
   for (let i = 0; i < count; i++) {
     const end = splits[i];
-    if (!Number.isFinite(end) || end <= start)
+    // x - x is 0 exactly for a finite x. Per-frame checks avoid Number.isFinite: V8's optimizing tier before the top
+    // one calls it, and boxes each fractional argument into a new heap number.
+    if (end - end !== 0 || end <= start)
       throw new RangeError('Cascade split ends must be finite and increase; check near, far and lambda.');
     const mid = (start + end) / 2,
       px = camera.position[0] + (fx / fl) * mid,
       py = camera.position[1] + (fy / fl) * mid,
       pz = camera.position[2] + (fz / fl) * mid;
     // A sphere keeps extents stable under camera rotation; one texel covers snapping error.
-    const radius = (Math.ceil(hypot(3, end * tan * aspect, end * tan, end - mid) * 16) / 16) * (1 + 2 / resolution),
+    h[0] = end * tan * aspect;
+    h[1] = end * tan;
+    h[2] = end - mid;
+    hypotOf(3);
+    const radius = (Math.ceil(h[4] * 16) / 16) * (1 + 2 / resolution),
       texel = (2 * radius) / resolution;
     const cx = Math.round((px * xx + py * xy + pz * xz) / texel) * texel,
       cy = Math.round((px * yx + py * yy + pz * yz) / texel) * texel,
@@ -136,7 +155,7 @@ export function fitCascades(
     start = end;
   }
   for (let i = 0; i < matrices.length; i++)
-    if (!Number.isFinite(matrices[i]))
+    if (matrices[i] - matrices[i] !== 0)
       throw new RangeError(
         'Shadow cascade matrix is not finite; check the camera, light direction and bounds for extreme values.',
       );

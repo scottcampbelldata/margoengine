@@ -42,13 +42,18 @@ export function currentFrame(device, view) {
   if (!state.open) {
     state.open = true;
     state.frame++;
-    queueMicrotask(() => {
-      state.open = false;
-      state.views.clear();
-      const list = state.retired;
-      state.retired = [];
-      for (const resource of list) resource.destroy();
-    });
+    // One closing callback per device, made on first use (a state made by an older copy of this module has none): a
+    // new closure every frame would be garbage.
+    queueMicrotask(
+      (state.close ??= () => {
+        state.open = false;
+        state.views.clear();
+        if (!state.retired.length) return;
+        const list = state.retired;
+        state.retired = [];
+        for (const resource of list) resource.destroy();
+      }),
+    );
   }
   if (view) state.views.add(view);
   return state.frame;
