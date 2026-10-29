@@ -320,8 +320,8 @@ export class BiomeView implements Disposable {
    * objects, then `x,z`) with their tile, the frame's streaming work (finished jobs waiting to be copied in, jobs
    * waiting to be sent), the camera's last place and velocity. */
   readonly #drawn = new Set<string>();
-  /** Tiles whose objects are on the GPU, and whether they went in near the camera (with the small plants). */
-  readonly #placed = new Map<string, boolean>();
+  /** Tiles whose objects are on the GPU: the tile, and whether it went in near the camera (with the small plants). */
+  readonly #placed = new Map<string, readonly [number, number, boolean]>();
   readonly #pending = new Map<
     string,
     { readonly controller: AbortController; readonly x: number; readonly z: number }
@@ -335,6 +335,8 @@ export class BiomeView implements Disposable {
   readonly #velocity: [number, number] = [0, 0];
   #planned?: [number, number];
   #lastFrame = 0;
+  /** The last frame planned and left its sending and copying to this one. */
+  #waited = false;
   #frames = 0;
   #first?: Set<string>;
   #firstDone?: () => void;
@@ -486,7 +488,12 @@ export class BiomeView implements Disposable {
   #detailStep = 1;
   #name = '';
 
-  /** Before each frame: track the camera, plan when it moved, copy arrived tiles in within the budget. */
+  /**
+   * Before each frame: track the camera, plan when it moved, copy arrived tiles in within the budget. A frame that
+   * plans leaves sending and copying to the next frame (a plan comes every few frames and takes a good part of the
+   * budget; sending its jobs in the same frame made those frames the slowest 1 percent on a laptop APU), unless the
+   * frame before planned too (a camera that plans every frame still gets its tiles).
+   */
   #frame(delta: number): void {
     if (this.#disposed) return;
     this.#lastFrame = performance.now();
@@ -498,12 +505,14 @@ export class BiomeView implements Disposable {
       for (let i = 0; i < 2; i++) this.#velocity[i] += ((eye[i] - this.#eye[i]) / delta - this.#velocity[i]) * 0.2; // float division: view only
     }
     this.#eye = eye;
-    const moved = this.#planned ? Math.hypot(eye[0] - this.#planned[0], eye[1] - this.#planned[1]) : Infinity;
-    if (moved > this.#world.tileSize / 8 || this.#frames % 30 === 0) {
+    const moved = this.#planned ? Math.hypot(eye[0] - this.#planned[0], eye[1] - this.#planned[1]) : Infinity,
+      plan = moved > this.#world.tileSize / 8 || this.#frames % 30 === 0;
+    if (plan) {
       this.#inFrame = true;
       this.#plan(false);
       this.#inFrame = false;
     }
+    if ((this.#waited = plan && !this.#waited)) return;
     this.#apply(this.#budget);
   }
 
@@ -552,9 +561,8 @@ export class BiomeView implements Disposable {
     // Cancel what fell out of range on its way; take objects of tiles behind the camera off the GPU.
     for (const [key, job] of this.#pending)
       if (Math.min(near(job.x, job.z, eye), near(job.x, job.z, ahead)) > r + side) this.#cancel(key);
-    for (const [key, close] of this.#placed) {
-      const [x, z] = key.split(',').map(Number),
-        d = near(x, z, eye);
+    for (const [key, [x, z, close]] of this.#placed) {
+      const d = near(x, z, eye);
       if (d > r + side) {
         this.#objects!.remove(key);
         this.#placed.delete(key);
@@ -637,7 +645,7 @@ export class BiomeView implements Disposable {
             last: true,
             apply: () => {
               last();
-              this.#placed.set(`${x},${z}`, priority <= this.#near);
+              this.#placed.set(`${x},${z}`, [x, z, priority <= this.#near]);
               this.#first?.delete(key);
             },
           });

@@ -63,5 +63,21 @@ window.check={
   return out;
  }
 };
+/**
+ * A frame that plans (new jobs on their way) sends and copies nothing, unless the frame before planned and did nothing
+ * too; it once sent the jobs it planned in the same frame, and on a laptop APU those frames were the slowest 1 percent.
+ */
+window.check.planFrames=async function(){
+ const world=await BiomeWorld.create({workers:4});place(0);
+ const view=await BiomeView.attach(engine,world);await view.ready;
+ for(let i=0;i<10;i++){await frame();engine.render({delta:1/60});}
+ await view.whenIdle();
+ let s=0,plans=0,both=0,waited=false,last=await frame();
+ while(s<LENGTH/3){const now=await frame(),dt=Math.min(0.1,(now-last)/1000);last=now;s+=SPEED*dt;place(s);
+  const p0=view.streaming.pending,c0=view.frameTimes.length;engine.render({delta:dt});
+  const planned=view.streaming.pending>p0,copied=view.frameTimes.length>c0;
+  if(planned){plans++;if(copied&&!waited)both++;}waited=planned&&!copied;}
+ view.dispose();world.dispose();return {plans,both};
+};
 window.ready=true;
 </script></body></html>

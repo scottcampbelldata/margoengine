@@ -50,6 +50,13 @@ try {
     slow.max <= SEND + 1.5,
     `the view spent ${slow.max.toFixed(1)} ms in one frame with ${SEND} ms sends: jobs or a whole tile went in beyond the frame budget`,
   );
+  // Regression: a frame that planned also sent its new jobs and copied tiles in; plans come every few frames, and on a
+  // laptop APU those frames were the slowest 1 percent (p99 +0.3 ms, at the limit). A frame that plans must send and
+  // copy nothing, unless the frame before planned and did nothing too.
+  const plan = await page.evaluate(() => window.check.planFrames());
+  console.log(`plan frames: ${plan.plans} frames planned, ${plan.both} of them also sent or copied`);
+  assert.ok(plan.plans >= 5, `the flight planned ${plan.plans} times`);
+  assert.equal(plan.both, 0, `${plan.both} frames that planned also sent or copied`);
   // MARGO_BIOMES_WORKERS sets the worker count of the flights (default: the world's default, at most 4).
   const r = await page.evaluate((workers) => window.check.run(workers), Number(process.env.MARGO_BIOMES_WORKERS) || 0),
     median = (list) => [...list].sort((a, b) => a - b)[list.length >> 1],
