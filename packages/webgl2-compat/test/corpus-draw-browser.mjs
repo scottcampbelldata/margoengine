@@ -61,9 +61,11 @@ try {
   );
   if (compute.failures.length) console.log(`FAILURES ${compute.failures.length}:\n${compute.failures.join('\n')}`);
   assert.deepEqual(compute.failures, []);
-  // The one refusal of the corpus: light probes sample a cube map in CPU-tier kernels (an accepted difference).
-  for (const tier of Object.keys(compute.tiers))
-    if (tier.startsWith('refused')) assert.match(tier, /textureSampleLevel\(\) on a cube texture on the CPU/);
+  // Nothing is refused: the light probes' bake kernels, which sample a cube map on the CPU tier, were the last.
+  assert.deepEqual(
+    Object.keys(compute.tiers).filter((tier) => tier.startsWith('refused')),
+    [],
+  );
 } finally {
   await context.close();
 }

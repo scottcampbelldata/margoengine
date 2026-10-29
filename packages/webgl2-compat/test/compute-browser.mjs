@@ -18,6 +18,7 @@ const TIERS = {
   cpuSample: 'cpu',
   indirect: 'scatter',
   destroyAfterSubmit: 'scatter',
+  cpuCube: 'cpu',
   asyncPipeline: 'scatter',
 };
 
@@ -73,7 +74,11 @@ try {
     lines.push(`${name} (${TIERS[name]}): same as native`);
   }
   const refusal = await page.evaluate(() => window.check.refusal());
-  assert.match(refusal, /^MargoError unsupported: .*cube texture/, 'cube sampling on the CPU tier is refused, coded');
+  assert.match(
+    refusal,
+    /^MargoError unsupported: WebGL2 compatibility cannot run textureSampleLevel\(\) on a cube_array texture on the CPU/,
+    'a cube array on the CPU tier is refused, coded',
+  );
   assert.deepEqual(pageErrors, []);
   console.log(`webgl2-compat compute (WebGL2 layer vs native WebGPU, same GPU):\n  ${lines.join('\n  ')}`);
 } finally {

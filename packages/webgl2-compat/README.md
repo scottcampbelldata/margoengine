@@ -76,7 +76,9 @@ What it does:
     in `stalls`).
 
   Reads see memory as it was before the dispatch, as WGSL allows for invocations that never read back their own
-  stores. The CPU tier cannot read cube, multisampled or external textures, and needs a page that allows JavaScript
+  stores. The CPU tier samples cube textures at a level as WebGPU does (seamless filtering across face edges; at a
+  corner the three texels that meet there are averaged), cannot read multisampled or external textures, and needs a
+  page that allows JavaScript
   compiled at run time (Content-Security-Policy `unsafe-eval`); either refusal is MargoError code `unsupported`.
   `planCompute(stage)` tells which tier an entry point gets and why; `runComputeOnCPU(dispatch)` runs one on the CPU
   with buffers, without a device. `device.dispatches` counts the dispatches each tier has run.
@@ -213,14 +215,15 @@ browsers' own WebGPU compilers, where it was recorded.
   check and scatter's LOD check pass whole, and points on its single-sample path (its 4x eye-dome lighting shades per sample, which WebGL2 cannot).
 - The package routes against native WebGPU (`npm run test:gpu`): DOF, splats, `CulledInstances` and `CulledMeshes`
   each draw the same scene natively and on the layer once a frame's dispatches are their route's; no pixel differs.
-- The compute check against native WebGPU in one page (`npm run test:gpu`): 12 cases over the three tiers (own-texel
+- The compute check against native WebGPU in one page (`npm run test:gpu`): 13 cases over the three tiers (own-texel
   stores into 2D, array, 3D and mip-level views, a read-write storage texture, struct and word stores at
   data-dependent indexes, atomics with workgroup memory and barriers, texture reads, stores and sampling on the CPU,
-  indirect dispatch, overrides, queue order around the lazy load, and resources destroyed right after the submit
+  indirect dispatch, overrides, cube sampling on the CPU across seams and corners, queue order around the lazy load,
+  and resources destroyed right after the submit
   that uses them while it waits for that load).
 - The corpus (`npm run test:browser`): all 1,049 vertex and fragment entry points compile, all 459 distinct stage pairs
   of the recorded render pipelines link, all 624 recorded render pipelines draw once through the device, and 397
-  recorded compute pipelines are translated for their tier and dispatched once (the voxel path tracer's 20, out of
+  recorded compute pipelines are translated for their tier and dispatched once, none refused (the voxel path tracer's 20, out of
   scope on WebGL2, are only planned).
 
 Nothing runs at import time, the package has no dependencies, and core, the stage and every other package never

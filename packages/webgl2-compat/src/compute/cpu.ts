@@ -163,6 +163,99 @@ function sampleLevel(
   return out.map(fr);
 }
 
+/**
+ * The face (0 to 5: +X, -X, +Y, -Y, +Z, -Z) a direction selects and its face coordinates (s, t) in [0, 1], by the
+ * major axis, as WGSL's cube sampling (the Vulkan and GLSL face table) defines them.
+ */
+function cubeFace(x: number, y: number, z: number): [number, number, number] {
+  const ax = Math.abs(x),
+    ay = Math.abs(y),
+    az = Math.abs(z);
+  let face: number, sc: number, tc: number, ma: number;
+  if (az >= ax && az >= ay) {
+    face = z < 0 ? 5 : 4;
+    ma = az;
+    sc = z < 0 ? -x : x;
+    tc = -y;
+  } else if (ay >= ax) {
+    face = y < 0 ? 3 : 2;
+    ma = ay;
+    sc = x;
+    tc = y < 0 ? -z : z;
+  } else {
+    face = x < 0 ? 1 : 0;
+    ma = ax;
+    sc = x < 0 ? z : -z;
+    tc = -y;
+  }
+  return [face, (sc / ma + 1) / 2, (tc / ma + 1) / 2];
+}
+
+/** The direction through face coordinates (sc, tc) in [-1, 1] (or past them) of `face`: cubeFace's inverse. */
+function faceDirection(face: number, sc: number, tc: number): [number, number, number] {
+  switch (face) {
+    case 0:
+      return [1, -tc, -sc];
+    case 1:
+      return [-1, -tc, sc];
+    case 2:
+      return [sc, 1, tc];
+    case 3:
+      return [sc, -1, -tc];
+    case 4:
+      return [sc, -tc, 1];
+    default:
+      return [-sc, -tc, -1];
+  }
+}
+
+/**
+ * Texel (i, j) of `face` of a cube level of n x n, where i or j may be one past the face: such a texel is read from
+ * the neighbouring face its centre's direction falls on, so filtering is seamless across edges as on WebGPU; past both
+ * (a corner) it is the average of the three texels that meet there.
+ */
+function cubeTexel(l: CPULevel, base: number, face: number, i: number, j: number): number[] {
+  const n = l.w,
+    inI = i >= 0 && i < n,
+    inJ = j >= 0 && j < n;
+  if (inI && inJ) return texel(l, i, j, base + face);
+  const across = (a: number, b: number): number[] => {
+    const [f, s, t] = cubeFace(...faceDirection(face, (2 * (a + 0.5)) / n - 1, (2 * (b + 0.5)) / n - 1));
+    return texel(l, clampInt(Math.floor(s * n), 0, n - 1), clampInt(Math.floor(t * n), 0, n - 1), base + f);
+  };
+  if (inI || inJ) return across(i, j);
+  const ci = clampInt(i, 0, n - 1),
+    cj = clampInt(j, 0, n - 1),
+    a = texel(l, ci, cj, base + face),
+    b = across(i, cj),
+    c = across(ci, j);
+  return a.map((v, k) => (v + b[k] + c[k]) / 3);
+}
+
+/** A bilinear (or nearest) sample of one level of cube `cube` (0 for a plain cube) along direction p. */
+function sampleCubeLevel(t: CPUTexture, level: number, p: number[], cube: number, linear: boolean): number[] {
+  const l = t.level(level),
+    base = clampInt(cube, 0, l.d / 6 - 1) * 6,
+    [face, s, u] = cubeFace(p[0], p[1], p[2]),
+    n = l.w;
+  if (!linear)
+    return texel(l, clampInt(Math.floor(s * n), 0, n - 1), clampInt(Math.floor(u * n), 0, n - 1), base + face);
+  const fx = s * n - 0.5,
+    fy = u * n - 0.5,
+    x0 = Math.floor(fx),
+    y0 = Math.floor(fy),
+    ax = fx - x0,
+    ay = fy - y0;
+  const out = [0, 0, 0, 0];
+  for (let j = 0; j < 2; j++)
+    for (let i = 0; i < 2; i++) {
+      const w = (j ? ay : 1 - ay) * (i ? ax : 1 - ax),
+        c = cubeTexel(l, base, face, x0 + i, y0 + j);
+      for (let k = 0; k < 4; k++) out[k] += c[k] * w;
+    }
+  return out.map(fr);
+}
+
 /** The helpers generated kernels call, by short name. */
 export const H = {
   fr,
@@ -346,6 +439,20 @@ export const H = {
     if (f <= 0 || l1 === l0) return a;
     const q1 = shifted(l1),
       b = sampleLevel(t, s, l1, q1[0], q1[1], q1[2], layer, s.min);
+    return a.map((x, i) => fr(x + (b[i] - x) * f));
+  },
+  /** textureSampleLevel of a cube or cube-array texture (`cube` the array index). Address modes do not apply. */
+  tsc(t: CPUTexture, s: CPUSampler, p: number[], cube: number, level: number): number[] {
+    const lod = Math.min(Math.max(level, s.lodMin), s.lodMax),
+      top = t.levels - 1;
+    if (lod <= 0) return sampleCubeLevel(t, 0, p, cube, s.mag);
+    if (!s.mip) return sampleCubeLevel(t, clampInt(Math.floor(lod + 0.5), 0, top), p, cube, s.min);
+    const l0 = clampInt(Math.floor(lod), 0, top),
+      l1 = Math.min(l0 + 1, top),
+      f = Math.min(lod, top) - l0,
+      a = sampleCubeLevel(t, l0, p, cube, s.min);
+    if (f <= 0 || l1 === l0) return a;
+    const b = sampleCubeLevel(t, l1, p, cube, s.min);
     return a.map((x, i) => fr(x + (b[i] - x) * f));
   },
   /** textureStore: out-of-bounds stores do nothing. */

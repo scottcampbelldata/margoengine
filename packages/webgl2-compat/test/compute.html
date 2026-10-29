@@ -321,6 +321,52 @@ const cases = {
     if (d !== device) d.destroy();
     return { values, tier: tierOf(p) };
   },
+  // Cube sampling on the CPU tier (the atomic puts the kernel there), as the light probes' bake kernels do: linear
+  // filtering across faces, seams and corners, two levels and between them.
+  async cpuCube(device) {
+    const n = 8,
+      faces = (level) => pattern((n >> level) * (n >> level) * 4 * 6, (i) => (i * 53 + level * 101 + (i >> 2) * 7) & 255);
+    const make = (layers, dimension) => {
+      const t = device.createTexture({ size: [n, n, layers], format: 'rgba8unorm', mipLevelCount: 2, usage: U.TEXTURE_BINDING | U.COPY_DST });
+      for (let level = 0; level < 2; level++) {
+        const m = n >> level;
+        for (let layer = 0; layer < layers; layer += 6)
+          device.queue.writeTexture({ texture: t, mipLevel: level, origin: [0, 0, layer] }, faces(level), { bytesPerRow: m * 4, rowsPerImage: m }, [m, m, 6]);
+      }
+      return t.createView({ dimension, arrayLayerCount: layers });
+    };
+    const cube = make(6, 'cube');
+    const s = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
+    // Directions: face centres, random ones, points a fraction of a texel either side of every edge, and near corners.
+    const dirs = [];
+    let seed = 3;
+    const rnd = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296) * 2 - 1;
+    for (const d of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) dirs.push([...d, 0]);
+    for (let i = 0; i < 64; i++) dirs.push([rnd(), rnd(), rnd(), i % 4 === 0 ? 1 : i % 4 === 1 ? 0.4 : 0]);
+    for (let i = 0; i < 48; i++) {
+      const a = rnd(), e = (i % 2 ? 1 : -1) * 0.03;
+      const axes = [[1, 1 + e, a], [1 + e, a, -1], [a, -1, 1 + e], [-1 - e, a, 1], [a, 1, -1 - e], [1, a, 1 + e]];
+      dirs.push([...axes[i % 6], 0]);
+    }
+    for (let i = 0; i < 16; i++) dirs.push([1, 1 + rnd() * 0.05, 1 + rnd() * 0.05, 0].map((v, k) => (k < 3 && i & (1 << k) ? -v : v)));
+    const input = buffer(device, Float32Array.from(dirs.flat()));
+    const out = buffer(device, new Float32Array(dirs.length * 4));
+    const count = buffer(device, new Uint32Array(1));
+    const p = compute(device, `
+      @group(0) @binding(0) var sky: texture_cube<f32>;
+      @group(0) @binding(1) var s: sampler;
+      @group(0) @binding(2) var<storage, read> dirs: array<vec4f>;
+      @group(0) @binding(3) var<storage, read_write> out: array<vec4f>;
+      @group(0) @binding(4) var<storage, read_write> n: atomic<u32>;
+      @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+        if (id.x >= arrayLength(&dirs)) { return; }
+        let d = dirs[id.x];
+        out[id.x] = textureSampleLevel(sky, s, d.xyz, d.w) + vec4f(f32(textureNumLevels(sky)) * 0.0);
+        atomicAdd(&n, 1u);
+      }`);
+    run(device, p, [group(device, p, [cube, s, { buffer: input }, { buffer: out }, { buffer: count }])], Math.ceil(dirs.length / 64));
+    return { values: f32(await readBuffer(device, out)), tier: tierOf(p), tolerance: 4 / 255 };
+  },
   async asyncPipeline(device) {
     const p = await device.createComputePipelineAsync({
       layout: 'auto',
@@ -365,11 +411,11 @@ window.check = {
     const device = await (await createCompatGPU().requestAdapter()).requestDevice();
     await device.loadCompute();
     try {
-      // Cube sampling on the CPU tier (atomics put it there): refused, coded.
-      const code = `@group(0) @binding(0) var sky: texture_cube<f32>;
+      // A cube array on the CPU tier (atomics put it there; WebGL2 has no cube arrays): refused, coded.
+      const code = `@group(0) @binding(0) var sky: texture_cube_array<f32>;
         @group(0) @binding(1) var s: sampler;
         @group(0) @binding(2) var<storage, read_write> n: atomic<u32>;
-        @compute @workgroup_size(1) fn main() { if (textureSampleLevel(sky, s, vec3f(1.0), 0.0).r > 0.5) { atomicAdd(&n, 1u); } }`;
+        @compute @workgroup_size(1) fn main() { if (textureSampleLevel(sky, s, vec3f(1.0), 0, 0.0).r > 0.5) { atomicAdd(&n, 1u); } }`;
       device.createComputePipeline({ layout: 'auto', compute: { module: device.createShaderModule({ code }), entryPoint: 'main' } });
       return 'no error';
     } catch (e) {

@@ -26,6 +26,9 @@ import {
 } from '../wgsl/types.js';
 import { type CPUBindings, H, type KernelModule } from './cpu.js';
 
+/** What the CPU tier runs on a cube texture. */
+const CUBE_CALLS = new Set(['textureSampleLevel', 'textureDimensions', 'textureNumLevels']);
+
 const unsupported = (what: string): Error =>
   fault('unsupported', `WebGL2 compatibility cannot run ${what} on the CPU`, 'compatibility-layer');
 
@@ -1273,8 +1276,10 @@ class JSEmitter {
       tt = args[0].type as TextureType;
     const v = (e: IRExpr | undefined) => (e ? this.value(e, false) : '0');
     const arrayed = tt.dimension === '2d_array';
+    // Cube textures: sampling at a level (seamless, as on WebGPU) and the size queries; WebGL2 has no cube arrays.
+    const cube = tt.dimension === 'cube' && CUBE_CALLS.has(name);
     if (
-      tt.dimension === 'cube' ||
+      (tt.dimension === 'cube' && !cube) ||
       tt.dimension === 'cube_array' ||
       tt.shape === 'external' ||
       tt.shape === 'multisampled' ||
@@ -1283,6 +1288,10 @@ class JSEmitter {
       throw unsupported(
         `${name}() on a ${tt.shape === 'sampled' || tt.shape === 'depth' ? tt.dimension : tt.shape} texture`,
       );
+    if (cube && name === 'textureSampleLevel') {
+      const call = `tsc(${tex}, ${this.handle(args[1])}, ${v(args[2])}, 0, ${v(args[3])})`;
+      return tt.shape === 'depth' ? `${call}[0]` : call;
+    }
     switch (name) {
       case 'textureDimensions': {
         const d = `td(${tex}, ${v(args[1])})`;

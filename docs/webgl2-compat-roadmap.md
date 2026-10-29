@@ -571,9 +571,9 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   frame, where WebGPU shows the current texture; the layer now presents at the end of each submit (features check,
   `canvasRead`; the voxel check's edit-to-pixels count was one frame late).
 - **Accepted differences.** Render shaders that write storage buffers or textures are refused (WebGL2 render stages
-  cannot write them; no recorded shader does). CPU-tier kernels cannot read cube, multisampled or external textures
-  (refused, coded: the light probes' bake kernels sample a cube map in kernels with workgroup memory, the corpus's 3
-  refusals) and need a page that allows `unsafe-eval`. CPU-tier transcendental functions (sin, exp, pow) differ from
+  cannot write them; no recorded shader does). CPU-tier kernels cannot read cube (sampled since 2026-10-29,
+  [below](#cube-sampling-on-the-cpu-tier-2026-10-29)), multisampled or external textures (refused, coded: the light
+  probes' bake kernels sample a cube map in kernels with workgroup memory, the corpus's 3 refusals then) and need a page that allows `unsafe-eval`. CPU-tier transcendental functions (sin, exp, pow) differ from
   the GPU in the last bits, and CPU texture filtering uses exact weights where GPUs use 8-bit fixed-point ones (within
   4/255 in the check). The scatter tier runs the shader once per store (an invocation that stores a 20-word vertex
   runs 20 times), so it costs more GPU time than one compute dispatch; M7 measures it. Out-of-bounds reads clamp into
@@ -658,3 +658,17 @@ wall time per frame, native then the layer.
 - **Accepted differences.** `'occlusion'` culling culls against the frustum only on the layer (the Hi-Z pyramid would
   be a GPU readback every frame): the same image with more parts drawn. `CulledMeshes`' `minRadius` threshold is
   tested in double precision, so a part exactly at the threshold may be kept on one path and dropped on the other.
+
+## Cube sampling on the CPU tier (2026-10-29)
+
+- CPU-tier kernels now sample cube textures with `textureSampleLevel` and query `textureDimensions` and
+  `textureNumLevels` on them. The face and face coordinates come from the major axis by WGSL's face table; linear
+  filtering is seamless as on WebGPU: a texel of the bilinear footprint past a face edge is read from the neighbouring
+  face its centre's direction falls on, and at a corner the three texels that meet there are averaged. Cube arrays
+  stay refused (WebGL2 has none), as does a cube in any other built-in on the CPU.
+- This clears the corpus's last refusals: the light probes' bake kernels (a cube map sampled in kernels with
+  workgroup memory). All 397 recorded compute pipelines that are in scope now dispatch (34 fragment, 278 scatter, 85
+  CPU), none refused.
+- The compute check's `cpuCube` case samples an 8 x 8 cube with two levels along 134 directions (face centres, random
+  ones, both sides of every edge, near every corner) at levels 0, 0.4 and 1, natively and on the CPU tier: within the
+  4/255 the check allows CPU texture filtering (exact weights against the GPU's 8-bit fixed-point ones).
