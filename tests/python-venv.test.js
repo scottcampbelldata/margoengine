@@ -4,7 +4,7 @@
 // the fix, in seconds: never a silent pass, never a hang. Processes are faked here (no Python or network needed).
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -260,4 +260,15 @@ test('a missing or different pinned package fails, naming it (bug 31)', () => {
   assert.equal(problems.length, 2);
   assert.match(problems[0], /jupyterlab is 4\.5\.0 but pinned to 4\.6\.4/);
   assert.match(problems[1], /tornado 6\.6 is pinned but not installed/);
+});
+
+test('the pinned requirements install every package the Jupyter check opens (notebook for its Notebook 7 step)', () => {
+  const check = readFileSync(join(root, 'python/tests/jupyter-browser.mjs'), 'utf8');
+  const pins = parsePins(readFileSync(join(root, 'python/requirements-notebook.txt'), 'utf8'));
+  assert.ok(check.includes("'/notebooks/"), 'the check opens the Notebook 7 interface');
+  assert.ok(
+    pins.has('notebook'),
+    'python/requirements-notebook.txt must pin notebook, or a fresh venv fails that step',
+  );
+  assert.ok(pins.has('jupyterlab'));
 });

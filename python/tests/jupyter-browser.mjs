@@ -73,7 +73,8 @@ assert.ok(existsSync(join(extension, 'package.json')), 'the extension is not bui
 // line, so a failure names the versions it ran against. Only the venv's own packages count: the venv excludes the
 // system and user site-packages.
 // The names come from the pinned requirements file: a pinned package that is missing or at another version fails the
-// check by name; the optional extras (such as notebook, which jupyterlab does not need) print "not installed".
+// check by name; the optional extras (the ones jupyterlab needs no pin for) print "not installed". notebook is pinned: the
+// Notebook 7 step below opens its interface and fails without it.
 const pins = parsePins(readFileSync(requirements, 'utf8'));
 const stack = spawnSync(
   python,
