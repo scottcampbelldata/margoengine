@@ -103,6 +103,6 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/water | `.` 8 |  |  | 18,698 |
 | @margoengine/weather | `.` 37, `./hail` 6 |  |  | 4,998 |
 | @margoengine/webgl | `.` 3 |  |  | 3,127 |
-| @margoengine/webgl2-compat | `.` 15, `./compute` 83, `./device` 104, `./glsl` 90, `./wgsl` 76 | 44 |  | 91,068 |
+| @margoengine/webgl2-compat | `.` 15, `./compute` 83, `./device` 104, `./glsl` 90, `./wgsl` 76 | 44 |  | 92,467 |
 | @margoengine/wfc | `.` 3, `./overlapping` 5 |  |  | 1,787 |
 | @margoengine/xr | `.` 30 |  |  | 6,501 |
