@@ -7,6 +7,8 @@ import { game } from './game.js';
 const port = Number(process.argv[2] ?? process.env.ARENA_PORT ?? 8787),
   stop = new AbortController();
 process.once('SIGINT', () => stop.abort());
-const served = await serve(game, { port, host: '127.0.0.1', signal: stop.signal });
+// The page comes from the dev server on another port, so any page may connect; the server listens on 127.0.0.1 only.
+const origins = '*';
+const served = await serve(game, { port, host: '127.0.0.1', origins, signal: stop.signal });
 console.log(`arena server on ws://127.0.0.1:${served.port} (Ctrl+C stops it)`);
 await served.done;

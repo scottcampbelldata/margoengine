@@ -46,7 +46,7 @@ does not own. Each entry says exactly what is needed to close it.
   WebGPU XR binding (`XRGPUBinding`), or an AR headset with the same; then a reticle placed on a real floor and a real
   table (viewer source) and by screen tap (transient source), one placement anchored, and the result recorded here.
 
-### Intel Arc 140V: three new GPU-suite failures fixed on this PC, not yet rerun on Intel
+### Intel Arc 140V: three GPU-suite failures fixed on this PC and rechecked on Intel by the outside audit
 
 - **Verified on Intel** (Core Ultra 7 258V, Arc 140V, driver 32.0.101.8860, main at 30bea6fa, recheck of 2026-10-27):
   the four failures of the first run (main d000e4b6) are fixed there. FFT: the Stockham passes match the host-twiddle
@@ -83,10 +83,14 @@ does not own. Each entry says exactly what is needed to close it.
   fixed frame count or sleep in a GPU or browser check unless it carries `// fixed-wait: <reason>`; the ones already
   there are counted in `scripts/fixed-waits-baseline.json` and only go down. `scripts/support/gpu-ready.js`
   (`waitForPipelines`) waits for the pipelines themselves.
-- **Not verified:** that the three now pass on the Intel GPU, and the precise functions' bounds on its compiler.
-- **Needed to close:** the steps in `private/handoffs/intel-recheck.md` on the Intel PC (the suites, their
-  slow-compile, slow-mesh and spec-math twins, and the precise maths results in `compute-browser.json`), zipped; then
-  this entry removed or turned into the cause found.
+- **Rechecked on Intel by the outside audit of 2026-10-28** (a second Intel Arc 140V laptop; the audit is the source
+  for this paragraph): the compute spec-math case, the voxel normal and slow-compile cases and the voxel-pathtracer
+  spec-math fisheye case all passed. The audit does not say whether the three fixes above (the precise maths, the
+  `pending` count and the precise fisheye rays) were what changed them, and it reports no per-function bounds.
+- **Not verified:** the precise functions' error bounds on the Intel compiler (`compute-browser.json` from an Intel
+  PC), which no recheck has recorded.
+- **Needed to close:** the `compute-browser.json` precise-maths results from an Intel PC (steps in
+  `private/handoffs/intel-recheck.md`), then this entry removed or turned into the cause found.
 
 ### Linux (Intel UHD, Mesa): three GPU suites not finished
 
@@ -111,10 +115,13 @@ does not own. Each entry says exactly what is needed to close it.
   F19; classes, commits and tests in
   [whitepaper/perf-history.md](whitepaper/perf-history.md#44-an-outside-audit) and the table at the end of this page).
   F20 is being fixed; its details are published once the fix is on main.
-- **netcode room server limits (F08, F09, F10):** limits the room server does not have yet; the netcode README
-  leaves authentication and network-level denial of service to the application. Proposals for them are with Scott.
-- **Needed to close:** F20 fixed with a regression test that fails without it, and the server limits decided and
-  built.
+- **netcode room server limits (F08, F09, F10): fixed.** `RoomServer` has `joinTimeout`, `maxConnections`,
+  `maxRooms` and per-client message rates, and room timers that throw no longer throw uncaught (`92b7c5ba`, bug 50;
+  tests in `packages/netcode/tests/rooms.test.js`). The low-level `listenWebSocket` of `@margoengine/netcode/node` had
+  none of them (audit E-02, bug 67); it now has the same kind of defaults: own-host `origins` (`'*'` opts out),
+  `maxConnections` (1,024) and `firstMessageTimeout` (10 s), with tests in `packages/netcode/tests/transports.test.js`.
+  Authentication and network-level denial of service (a flood below the TCP layer) are still the application's.
+- **Needed to close:** F20 fixed with a regression test that fails without it.
 
 ### The exporters USDZ timing test can still fail when every core is busy allocating
 

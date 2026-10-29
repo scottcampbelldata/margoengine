@@ -15,8 +15,23 @@ export interface WebSocketServerOptions {
   host?: string;
   /** The URL path that accepts WebSocket upgrades (default any path). */
   path?: string;
-  /** Allowed `Origin` headers; other origins get 403 (default any, including none). */
-  origins?: readonly string[];
+  /**
+   * Which web pages may connect, by their `Origin` header; others get 403 (default: only pages served from this
+   * server's own host, that is an Origin of `http://` or `https://` plus the request's `Host` header). `'*'` allows any
+   * page; a list allows exactly those origins (and then a request with no Origin is refused too). Without a list, a
+   * client that sends no Origin (Node, bots, native clients; browsers always send one) connects.
+   */
+  origins?: readonly string[] | '*';
+  /**
+   * Connections at once, still waiting for their first message included (default 1,024). The next upgrade is answered
+   * with HTTP 503 before any connection object exists.
+   */
+  maxConnections?: number;
+  /**
+   * Milliseconds a new connection has to send its first message; then it is closed with `CloseCode.timeout` (default
+   * 10,000). Pings do not count: a client that only connects and idles cannot hold a slot.
+   */
+  firstMessageTimeout?: number;
   /** Largest message accepted from a client, in bytes (default 64 KiB); a bigger one closes with 1009. */
   maxPayload?: number;
   /** Bytes queued in a socket above which 'unreliable' messages are dropped (default 64 KiB). */
@@ -52,6 +67,7 @@ class SocketConnection implements Connection {
   private fragments: Buffer[] = [];
   private fragmentBytes = 0;
   private fragmentKind = 0;
+  private heard = false;
 
   constructor(
     private readonly socket: Duplex,
@@ -59,6 +75,7 @@ class SocketConnection implements Connection {
       Pick<WebSocketServerOptions, 'maxPayload' | 'dropUnreliableAbove' | 'maxBuffered'>
     >,
     private readonly forget: (connection: SocketConnection) => void,
+    private readonly firstMessage: () => void = () => {},
   ) {
     socket.on('data', (chunk: Buffer) => this.data(chunk));
     socket.on('close', () => this.finish(1006, 'connection lost'));
@@ -103,6 +120,15 @@ class SocketConnection implements Connection {
     text.copy(payload, 2);
     this.socket.end(this.frame(8, payload));
     this.finish(code, reason);
+  }
+
+  /** Hands one whole message over; the first one ends the first-message deadline. */
+  private deliver(payload: Buffer): void {
+    if (!this.heard) {
+      this.heard = true;
+      this.firstMessage();
+    }
+    this.onmessage?.(payload, 'reliable');
   }
 
   private finish(code: number, reason: string): void {
@@ -157,7 +183,7 @@ class SocketConnection implements Connection {
       if (opcode === 1) return this.close(1003, 'binary messages only');
       if (opcode === 2) {
         if (this.fragments.length) return this.close(1002, 'new message inside a fragmented one');
-        if (fin) this.onmessage?.(payload, 'reliable');
+        if (fin) this.deliver(payload);
         else {
           this.fragmentKind = 2;
           this.fragments.push(payload);
@@ -174,13 +200,24 @@ class SocketConnection implements Connection {
           this.fragments = [];
           this.fragmentBytes = 0;
           this.fragmentKind = 0;
-          this.onmessage?.(whole, 'reliable');
+          this.deliver(whole);
         }
         continue;
       }
       return this.close(1002, `unknown opcode ${opcode}`);
     }
   }
+}
+
+/** Whether `request` comes from an origin that `origins` allows (see {@link WebSocketServerOptions.origins}). */
+function originAllowed(request: IncomingMessage, origins: WebSocketServerOptions['origins']): boolean {
+  const origin = request.headers.origin;
+  if (origins === '*') return true;
+  if (origins) return origins.includes(String(origin ?? ''));
+  if (origin === undefined) return true;
+  const host = String(request.headers.host ?? '').toLowerCase(),
+    from = origin.toLowerCase();
+  return host !== '' && (from === `http://${host}` || from === `https://${host}`);
 }
 
 /**
@@ -192,7 +229,12 @@ class SocketConnection implements Connection {
  * const listener = await listenWebSocket({ port: 8080, host: '0.0.0.0', origins: ['https://game.example.com'] });
  * listener.onconnection = (connection) => server.accept(connection);
  * ```
- * @throws RangeError (as a rejection) for a port or limit out of range; the server's error when it cannot listen.
+ * Safe defaults, each with an option: only pages from this server's own host may connect (`origins`; `'*'` opts out),
+ * at most 1,024 connections (`maxConnections`), and a connection that sends nothing within 10 s is closed
+ * (`firstMessageTimeout`).
+ *
+ * @throws TypeError (as a rejection) for `origins` that is not `'*'` or a list of strings; RangeError (as a rejection)
+ * for a port or limit out of range; the server's error when it cannot listen.
  */
 export async function listenWebSocket(options: WebSocketServerOptions = {}): Promise<WebSocketListener> {
   const port = options.port ?? 0,
@@ -206,6 +248,21 @@ export async function listenWebSocket(options: WebSocketServerOptions = {}): Pro
     throw new RangeError(`WebSocket port is ${port}; pass an integer from 0 to 65535`);
   if (!Number.isInteger(maxPayload) || maxPayload < 1 || maxPayload > 2 ** 31)
     throw new RangeError(`WebSocket maxPayload is ${maxPayload}; pass bytes from 1 to 2^31`);
+  const maxConnections = options.maxConnections ?? 1024,
+    firstMessageTimeout = options.firstMessageTimeout ?? 10_000;
+  if (!Number.isInteger(maxConnections) || maxConnections < 1)
+    throw new RangeError(`WebSocket maxConnections is ${String(maxConnections)}; pass an integer >= 1`);
+  if (typeof firstMessageTimeout !== 'number' || !(firstMessageTimeout >= 1 && firstMessageTimeout <= 2 ** 31 - 1))
+    throw new RangeError(
+      `WebSocket firstMessageTimeout is ${String(firstMessageTimeout)}; pass milliseconds from 1 to 2147483647`,
+    );
+  const { origins } = options;
+  if (
+    origins !== undefined &&
+    origins !== '*' &&
+    !(Array.isArray(origins) && origins.every((o) => typeof o === 'string'))
+  )
+    throw new TypeError("WebSocket origins must be a list of origins such as ['https://game.example.com'], or '*'");
   const http = options.server ?? createServer((_request, response) => response.writeHead(426).end('Upgrade required')),
     connections = new Set<SocketConnection>();
   let accepting = true;
@@ -214,12 +271,11 @@ export async function listenWebSocket(options: WebSocketServerOptions = {}): Pro
   };
   const upgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     const key = request.headers['sec-websocket-key'],
-      path = new URL(request.url ?? '/', 'http://localhost').pathname,
-      origin = request.headers.origin;
+      path = new URL(request.url ?? '/', 'http://localhost').pathname;
     if (!accepting) return refuse(socket, '503 Service Unavailable');
     if (options.path !== undefined && path !== options.path) return refuse(socket, '404 Not Found');
-    if (options.origins && (origin === undefined || !options.origins.includes(origin)))
-      return refuse(socket, '403 Forbidden');
+    if (!originAllowed(request, origins)) return refuse(socket, '403 Forbidden');
+    if (connections.size >= maxConnections) return refuse(socket, '503 Service Unavailable');
     if (
       request.method !== 'GET' ||
       String(request.headers.upgrade).toLowerCase() !== 'websocket' ||
@@ -235,7 +291,19 @@ export async function listenWebSocket(options: WebSocketServerOptions = {}): Pro
       `HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`,
     );
     (socket as unknown as { setNoDelay?(on: boolean): void }).setNoDelay?.(true);
-    const connection = new SocketConnection(socket, limits, (c) => connections.delete(c));
+    const timer = setTimeout(
+      () => connection.close(CloseCode.timeout, `no message within ${firstMessageTimeout} ms (firstMessageTimeout)`),
+      firstMessageTimeout,
+    );
+    const connection: SocketConnection = new SocketConnection(
+      socket,
+      limits,
+      (c) => {
+        clearTimeout(timer);
+        connections.delete(c);
+      },
+      () => clearTimeout(timer),
+    );
     connections.add(connection);
     listener.onconnection?.(connection);
     if (head.length) socket.unshift(head);

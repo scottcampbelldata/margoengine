@@ -28,7 +28,9 @@ export interface WebSocketServerOptions {
     port?: number;
     host?: string;
     path?: string;
-    origins?: readonly string[];
+    origins?: readonly string[] | '*';
+    maxConnections?: number;
+    firstMessageTimeout?: number;
     maxPayload?: number;
     dropUnreliableAbove?: number;
     maxBuffered?: number;

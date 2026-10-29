@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4041952,
+  "total": 4042381,
   "history": [
     {
       "date": "2026-10-24",
@@ -824,6 +824,12 @@
       "commit": "91cbab8a",
       "reason": "item 53.1: steady-state frames allocate far less (index loops instead of iterators, persistent callbacks, cached descriptors, hypot without argument arrays); core 21,000 B under its 21,504 B cap",
       "grew": 2
+    },
+    {
+      "date": "2026-10-29",
+      "commit": "ca14cb58",
+      "reason": "netcode/node: listenWebSocket gained own-host origin check, maxConnections and a first-message deadline (bug 67), 173 bytes gzip",
+      "grew": 1
     }
   ],
   "items": {
@@ -1041,7 +1047,7 @@
     "@margoengine/net": 1371,
     "@margoengine/netcode": 12975,
     "@margoengine/netcode/generate": 5154,
-    "@margoengine/netcode/node": 6102,
+    "@margoengine/netcode/node": 6531,
     "@margoengine/netcode/rollback": 3471,
     "@margoengine/netcode/rooms": 5581,
     "@margoengine/netcode/webrtc": 998,

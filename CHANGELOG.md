@@ -13,6 +13,17 @@
   `RoomServer.onerror(error, room)` and stops that room. A client that leaves while `onAuth` runs is no longer seated
   as a ghost, and an aborted join rejects with the abort reason.
 
+### netcode raw WebSocket listener (breaking default)
+
+- **Breaking:** `listenWebSocket` (and `serve`, which uses it) from `@margoengine/netcode/node` now defaults `origins` to
+  the server's own host, like `RoomServer`'s neighbours `VoxelServer` and `acceptWebSocket`: a browser page must come
+  from `http://` or `https://` plus the request's `Host`. Pages on another origin get HTTP 403; pass
+  `origins: ['https://your.page']`, or `origins: '*'` for the old behaviour (any page). Clients that send no Origin (Node,
+  bots) still connect unless a list is given, as before.
+- New `maxConnections` (1,024; the next upgrade is answered with HTTP 503 before a connection exists) and
+  `firstMessageTimeout` (10,000 ms; a connection with no message by then is closed with `CloseCode.timeout`). Options out
+  of range throw RangeError, and an `origins` that is not `'*'` or a list of strings throws TypeError.
+
 ### voxel-net server limits (breaking default)
 
 - **Breaking:** `VoxelServer` `origins` (and `acceptWebSocket`) now default to the server's own host: a browser page

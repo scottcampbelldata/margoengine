@@ -99,6 +99,111 @@ test('the WebSocket server follows RFC 6455: accept key, masking, binary only, s
   );
 });
 
+// Bug 67 (audit E-02): the raw listener had no connection cap, no idle deadline and took any Origin. Its defaults now
+// match RoomServer, VoxelServer and acceptWebSocket.
+const hostOf = (port) => `localhost:${port}`;
+// Like raw(), with the real Host and no waiting for a server close: resolves with what arrived within `ms`.
+async function rawHost(port, headers, ms = 300) {
+  const socket = connect(port, '127.0.0.1'),
+    chunks = [];
+  socket.on('data', (chunk) => chunks.push(chunk));
+  await new Promise((done) => socket.once('connect', done));
+  socket.write(`GET /play HTTP/1.1\r\nHost: ${hostOf(port)}\r\n${headers}\r\n`);
+  await wait(ms);
+  socket.destroy();
+  return Buffer.concat(chunks).toString('latin1');
+}
+
+test('listenWebSocket origins: the default is the own host; "*" and a list opt out; no Origin still connects', async (t) => {
+  const listener = await listenWebSocket();
+  t.after(() => listener.close());
+  const own = `http://${hostOf(listener.port)}`;
+  assert.match(await rawHost(listener.port, upgrade(`Origin: ${own}\r\n`)), /^HTTP\/1.1 101/, 'own host');
+  assert.match(await rawHost(listener.port, upgrade(`Origin: ${own.toUpperCase()}\r\n`)), /^HTTP\/1.1 101/, 'case');
+  assert.match(await rawHost(listener.port, upgrade()), /^HTTP\/1.1 101/, 'a client with no Origin header');
+  assert.match(await rawHost(listener.port, upgrade('Origin: https://evil.example\r\n')), /^HTTP\/1.1 403/);
+  assert.match(
+    await rawHost(listener.port, upgrade('Origin: http://localhost:1\r\n')),
+    /^HTTP\/1.1 403/,
+    'port differs',
+  );
+  const open = await listenWebSocket({ origins: '*' });
+  t.after(() => open.close());
+  assert.match(await rawHost(open.port, upgrade('Origin: https://evil.example\r\n')), /^HTTP\/1.1 101/, "'*'");
+  const listed = await listenWebSocket({ origins: ['https://ok.example'] });
+  t.after(() => listed.close());
+  assert.match(await rawHost(listed.port, upgrade('Origin: https://ok.example\r\n')), /^HTTP\/1.1 101/);
+  assert.match(await rawHost(listed.port, upgrade()), /^HTTP\/1.1 403/, 'a list refuses a client with no Origin');
+  for (const origins of ['https://ok.example', 5, [1], {}, null])
+    await assert.rejects(listenWebSocket({ origins }), TypeError, String(origins));
+});
+
+test('listenWebSocket maxConnections: the next upgrade gets 503 until one closes', async (t) => {
+  const listener = await listenWebSocket({ maxConnections: 2 });
+  t.after(() => listener.close());
+  const held = [];
+  listener.onconnection = (connection) => held.push(connection);
+  const sockets = [];
+  t.after(() => sockets.forEach((socket) => socket.destroy()));
+  const hold = async () => {
+    const socket = connect(listener.port, '127.0.0.1'),
+      chunks = [];
+    socket.on('data', (chunk) => chunks.push(chunk));
+    await new Promise((done) => socket.once('connect', done));
+    socket.write(`GET / HTTP/1.1\r\nHost: x\r\n${upgrade()}\r\n`);
+    await wait(150);
+    sockets.push(socket);
+    return () => Buffer.concat(chunks).toString('latin1');
+  };
+  const [one, two, three] = [await hold(), await hold(), await hold()];
+  assert.match(one(), /^HTTP\/1.1 101/);
+  assert.match(two(), /^HTTP\/1.1 101/);
+  assert.match(three(), /^HTTP\/1.1 503/, 'the third connection is over maxConnections');
+  assert.equal(held.length, 2, 'the refused one never became a connection');
+  held[0].close();
+  await wait(100);
+  const four = await hold();
+  assert.match(four(), /^HTTP\/1.1 101/, 'a slot is free again');
+  for (const socket of sockets) socket.destroy();
+  for (const bad of [0, -1, 1.5, '3', Number.NaN])
+    await assert.rejects(listenWebSocket({ maxConnections: bad }), RangeError, String(bad));
+});
+
+test('listenWebSocket firstMessageTimeout: a silent connection is closed with timeout; a message or the default keeps it', async (t) => {
+  const listener = await listenWebSocket({ firstMessageTimeout: 200 });
+  t.after(() => listener.close());
+  const closed = [];
+  listener.onconnection = (connection) => {
+    connection.onclose = (code, reason) => closed.push([code, reason]);
+  };
+  const silent = await raw(listener.port, upgrade());
+  assert.equal(closeCode(silent), CloseCode.timeout, 'closed with the timeout code');
+  assert.match(String(closed[0]?.[1]), /no message within 200 ms \(firstMessageTimeout\)/);
+  // A ping is not a message; a binary message is, and then the connection stays open past the deadline.
+  closed.length = 0;
+  await raw(listener.port, upgrade(), [masked(9, [])]);
+  assert.equal(closed.length, 1, 'a ping alone does not keep the connection');
+  closed.length = 0;
+  const socket = connect(listener.port, '127.0.0.1');
+  await new Promise((done) => socket.once('connect', done));
+  socket.write(`GET / HTTP/1.1\r\nHost: x\r\n${upgrade()}\r\n`);
+  await wait(50);
+  socket.write(masked(2, [1]));
+  await wait(450);
+  assert.deepEqual(closed, [], 'a connection that sent a message stays open past firstMessageTimeout');
+  socket.destroy();
+  for (const bad of [0, -5, Number.POSITIVE_INFINITY, Number.NaN, '10', 2 ** 31])
+    await assert.rejects(listenWebSocket({ firstMessageTimeout: bad }), RangeError, String(bad));
+  // The documented default is 10 s, and a zero-config server still runs a game for a client that sends at once.
+  const served = await serve(game, { port: 0 });
+  t.after(() => served.close());
+  const client = await GameClient.join(game, await openWebSocket(`ws://127.0.0.1:${served.port}`), {
+    input: () => ({ x: 0, y: 0, boost: false }),
+  });
+  assert.ok(served.server.players.includes(client.player));
+  client.close();
+});
+
 // Bug 49: maxPayload limits messages, so a ping between fragments does not count; a close reason is cut by UTF-8
 // bytes on a character boundary, so the close frame stays within the 125 bytes a control frame may hold.
 test('the WebSocket server: control frames are outside maxPayload; close reasons fit a control frame', async (t) => {

@@ -185,10 +185,14 @@ Each transport is its own entry, so an app loads only the one it uses.
   wraps them as a `Connection`, so snapshots and inputs really are unreliable and never wait behind a lost packet.
   Signalling (offer, answer, ICE candidates) is yours to carry, over any channel. Works for client-server and for
   `RollbackSession` peers.
-- `@margoengine/netcode/node` (Node only): `listenWebSocket({ port, host, path, origins, maxPayload })` is a WebSocket
+- `@margoengine/netcode/node` (Node only): `listenWebSocket({ port, host, path, origins, maxConnections, firstMessageTimeout, maxPayload })` is a WebSocket
   server written here from RFC 6455 on `node:http` and `node:crypto` (no dependency): binary messages only (text
   closes with 1003), client frames must be masked (1002), messages over `maxPayload` (default 64 KiB) close with 1009,
-  fragmentation and ping are handled, unknown origins get 403, a client more than 8 MiB behind is closed as too slow.
+  fragmentation and ping are handled, a client more than 8 MiB behind is closed as too slow. Safe defaults, each with
+  an option: only web pages served from the server's own host may connect (`origins`, default the own host; `'*'` allows
+  any page, a list allows exactly those origins; a client that sends no Origin, such as Node, still connects unless a
+  list is given; others get 403), at most 1,024 connections (`maxConnections`; the next upgrade gets 503) and a
+  connection that sends no message within 10,000 ms is closed with `CloseCode.timeout` (`firstMessageTimeout`).
   `serve(game, options)` runs a `GameServer` on it in real time: the self-hosted server in one call.
 
 ```ts
@@ -235,7 +239,9 @@ setTimeout(() => {
 ```
 
 Behind TLS: run it on a private port behind a reverse proxy (nginx, Caddy) that terminates `wss://` and forwards the
-upgrade; set `origins` to your site's origin so other pages cannot open sockets to it.
+upgrade. The default `origins` compares the page's Origin with the request's `Host` header, so if the proxy rewrites
+`Host` (or the page is served from another host than the game server), set `origins` to your site's origin, for
+example `origins: ['https://game.example.com']`; `origins: '*'` accepts any page.
 
 ## Rooms and matchmaking
 
