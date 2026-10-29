@@ -52,8 +52,9 @@ workers.
   chose.
   Text parsers have no regex with super-linear backtracking on file input (the STL facet scan and the 3MF attribute
   regex were quadratic). Parser fuzzing is gate 11 (a).
-- **No `eval`.** No package source uses `eval`, `new Function` or string timers, and every dynamic `import()` names a
-  fixed module. The shipped Basis glue is rewritten so the decoder workers run without
+- **No `eval`.** No package source uses `eval` or string timers, and every dynamic `import()` names a fixed module.
+  The one `new Function` is in the optional CPU compute tier of `@margoengine/webgl2-compat`, which therefore needs
+  `'unsafe-eval'` on the page and is refused without it. The shipped Basis glue is rewritten so the decoder workers run without
   `'unsafe-eval'` (`tests/no-eval-workers.test.js`; see [deploying.md](deploying.md)).
 
 ## What your app must do
