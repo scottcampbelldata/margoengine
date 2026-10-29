@@ -1,5 +1,5 @@
 {
-  "commit": "dcf4ae1e",
+  "commit": "41dce7ca",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -308,8 +308,8 @@
     },
     "@margoengine/culling": {
       ".": {
-        "raw": 28551,
-        "gzip": 9457
+        "raw": 31261,
+        "gzip": 10464
       }
     },
     "@margoengine/cutscene": {
@@ -354,8 +354,8 @@
     },
     "@margoengine/dof": {
       ".": {
-        "raw": 21707,
-        "gzip": 7001
+        "raw": 24094,
+        "gzip": 7648
       }
     },
     "@margoengine/ecs": {
@@ -1364,8 +1364,8 @@
     },
     "@margoengine/splats": {
       ".": {
-        "raw": 68052,
-        "gzip": 24381
+        "raw": 69606,
+        "gzip": 24807
       },
       "./data": {
         "raw": 47222,
@@ -1662,8 +1662,8 @@
     },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 222070,
-        "gzip": 78500
+        "raw": 222318,
+        "gzip": 78601
       },
       "./studio": {
         "raw": 2264,
@@ -1694,16 +1694,16 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 306569,
-        "gzip": 92467
+        "raw": 306806,
+        "gzip": 92539
       },
       "./compute": {
         "raw": 143187,
         "gzip": 41489
       },
       "./device": {
-        "raw": 305554,
-        "gzip": 92286
+        "raw": 305791,
+        "gzip": 92352
       },
       "./glsl": {
         "raw": 145604,
@@ -1726,8 +1726,8 @@
     },
     "@margoengine/xr": {
       ".": {
-        "raw": 19006,
-        "gzip": 6501
+        "raw": 19166,
+        "gzip": 6566
       }
     }
   },
