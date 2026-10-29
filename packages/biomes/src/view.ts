@@ -269,6 +269,8 @@ function cellNoise(seed: number, x: number, y: number, cells: number): number {
 }
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
+/** Texels of a view tile copied in per step (rows of it): 16 kB per texture, tens of microseconds. */
+const BAND = 4096;
 /** Views attached so far (each registers a uniquely named per-frame plugin). */
 let views = 0;
 
@@ -489,11 +491,8 @@ export class BiomeView implements Disposable {
     const moved = this.#planned ? Math.hypot(eye[0] - this.#planned[0], eye[1] - this.#planned[1]) : Infinity;
     if (moved > this.#world.tileSize / 8 || this.#frames % 30 === 0) {
       this.#inFrame = true;
-      try {
-        this.#plan(false);
-      } finally {
-        this.#inFrame = false;
-      }
+      this.#plan(false);
+      this.#inFrame = false;
     }
     this.#apply(this.#budget);
   }
@@ -591,19 +590,17 @@ export class BiomeView implements Disposable {
         key,
         last: false,
         send: true,
-        apply: () => this.#start(kind, key, job, priority),
+        apply: () => this.#pending.get(key) === job && this.#start(kind, key, job, priority),
       });
       this.#drainTimer ??= setTimeout(this.#drain, 50);
     }
   }
 
-  /** Drops a job on its way: aborts it, or takes it out of the frame's work when it was not sent yet. */
+  /** Drops a job on its way (one not sent yet is skipped when its turn comes). */
   #cancel(key: string): void {
     this.#pending.get(key)?.controller.abort();
     this.#pending.delete(key);
     this.#first?.delete(key);
-    const at = this.#arrived.findIndex((w) => w.send && w.key === key);
-    if (at >= 0) this.#arrived.splice(at, 1);
   }
 
   #start(
@@ -634,17 +631,28 @@ export class BiomeView implements Disposable {
               this.#first?.delete(key);
             },
           });
-        } else
-          this.#arrived.push({
-            priority,
-            key,
-            last: true,
-            apply: () => {
-              this.#writeView(result as ViewTile);
-              this.#drawn.add(`${x},${z}`);
-              this.#first?.delete(key);
-            },
-          });
+        } else {
+          // Terrain goes in a band of rows at a time (BAND texels: three small texture writes), so one tile never
+          // takes a frame on a slow machine either; the tile counts as drawn once its last band is in.
+          const tile = result as ViewTile,
+            rows = Math.max(1, (BAND / tile.count) | 0); // float division: whole rows
+          for (let j = 0; j < tile.count; j += rows) {
+            const end = Math.min(tile.count, j + rows),
+              last = end === tile.count;
+            this.#arrived.push({
+              priority,
+              key,
+              last,
+              apply: () => {
+                this.#writeView(tile, j, end);
+                if (last) {
+                  this.#drawn.add(`${x},${z}`);
+                  this.#first?.delete(key);
+                }
+              },
+            });
+          }
+        }
         // Without frames (a page that waits for `ready` before drawing) the results go in from a timer.
         this.#drainTimer ??= setTimeout(this.#drain, 50);
       },
@@ -823,37 +831,41 @@ export class BiomeView implements Disposable {
     }
   }
 
-  /** Copies a view tile into the CPU copies of the textures and uploads its rectangle straight from its arrays. */
-  #writeView(tile: ViewTile): void {
+  /**
+   * Copies rows `j0` to `j1` of a view tile into the CPU copies of the textures and uploads them straight from the
+   * tile's arrays. The terrain is told once the tile's last row is in.
+   */
+  #writeView(tile: ViewTile, j0: number, j1: number): void {
     const w = this.#world,
       texel = this.textureResolution,
       [x0, z0] = w.bounds,
       u0 = Math.round((x0 + tile.x * w.tileSize - x0) / texel), // float division: whole texels
       v0 = Math.round((z0 + tile.z * w.tileSize - z0) / texel), // float division
       cw = Math.min(tile.count, this.#width - u0),
-      cd = Math.min(tile.count, this.#depth - v0);
-    for (let j = 0; j < cd; j++) {
+      cd = Math.min(tile.count, this.#depth - v0),
+      end = Math.min(j1, cd);
+    for (let j = j0; j < end; j++) {
       const row = (v0 + j) * this.#width + u0;
       this.#heights.set(tile.heights.subarray(j * tile.count, j * tile.count + cw), row);
       this.#weights[0].set(tile.weights[0].subarray(j * tile.count * 4, (j * tile.count + cw) * 4), row * 4);
       this.#weights[1].set(tile.weights[1].subarray(j * tile.count * 4, (j * tile.count + cw) * 4), row * 4);
     }
     const t = this.#textures;
-    if (!t || cw <= 0 || cd <= 0) return;
+    if (!t || cw <= 0 || end <= j0) return;
     if (cw === tile.count) {
-      // The tile's own arrays are the texel rectangle: no staging copy.
+      // The tile's own arrays are the texel rectangle: no staging copy (4 bytes per texel in all three).
       const write = (texture: GPUTexture, data: Float32Array | Uint8Array) =>
         t.device.queue.writeTexture(
-          { texture, origin: [u0, v0] },
+          { texture, origin: [u0, v0 + j0] },
           data as Uint8Array<ArrayBuffer>,
-          { bytesPerRow: tile.count * 4 },
-          [cw, cd],
+          { offset: j0 * tile.count * 4, bytesPerRow: tile.count * 4 },
+          [cw, end - j0],
         );
       write(t.height, tile.heights);
       write(t.weights[0], tile.weights[0]);
       write(t.weights[1], tile.weights[1]);
-      (this.terrain as Terrain | undefined)?.invalidate();
-    } else this.#upload(u0, v0, cw, cd);
+      if (end === cd) (this.terrain as Terrain | undefined)?.invalidate();
+    } else this.#upload(u0, v0 + j0, cw, end - j0);
   }
 
   /** Uploads a texel rectangle of the CPU copies (kept for device restoration). */

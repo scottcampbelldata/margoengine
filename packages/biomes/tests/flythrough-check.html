@@ -38,12 +38,14 @@ window.check={
   return out;
  },
  /**
-  * Sending a job wakes a worker thread, which costs much more on a laptop than on a desktop. Here every send to a
-  * worker takes SEND ms: a third of the flight on 4 workers, timing the view's own work in each frame (its plugin).
-  * Jobs a frame starts must go out within the frame budget, not all in the frame that planned them.
+  * A slow machine: sending a job wakes a worker thread, and copying bytes into textures is memory bound, both much
+  * dearer on a laptop than on a desktop. Here every send to a worker takes SEND ms and every texture write COPY ms
+  * per kB: a third of the flight on 4 workers, timing the view's own work in each frame (its plugin). Jobs a frame
+  * starts must go out within the frame budget, and a tile must go in a few rows at a time, not in one frame.
   */
- async slowSends(SEND){
-  let sends=0;
+ async slowSends(SEND,COPY){
+  let sends=0;const queue=device.queue,writeTexture=queue.writeTexture;
+  queue.writeTexture=function(dst,data,layout,size){const end=performance.now()+COPY*(layout.bytesPerRow??0)*(size[1]??size.height??1)/1024;while(performance.now()<end);return writeTexture.call(this,dst,data,layout,size);};
   const createWorker=()=>{const w=new Worker('/packages/biomes/dist/workers/biomes.js',{name:'margoengine-biomes'}),post=w.postMessage.bind(w);w.postMessage=(m,t)=>{sends++;const end=performance.now()+SEND;while(performance.now()<end);post(m,t);};return w;};
   const world=await BiomeWorld.create({workers:4,createWorker});place(0);
   const view=await BiomeView.attach(engine,world);await view.ready;
@@ -53,6 +55,7 @@ window.check={
   await view.whenIdle();times.length=0;sends=0;
   let s=0,last=performance.now();
   while(s<LENGTH/3){const now=await frame(),dt=Math.min(0.1,(now-last)/1000);last=now;s+=SPEED*dt;place(s);engine.render({delta:dt});}
+  delete queue.writeTexture;
   const out={frames:times.length,max:Math.max(...times),sends};view.dispose();world.dispose();
   return out;
  }
