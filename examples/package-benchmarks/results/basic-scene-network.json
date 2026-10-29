@@ -1,5 +1,5 @@
 {
-  "commit": "298a3cd0",
+  "commit": "baab9133",
   "dirty": false,
   "browser": "msedge 156.0.4314.50 headless",
   "adapter": "nvidia ampere",
@@ -11,7 +11,7 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 370,
+      "gzip": 369,
       "brotli": 227
     },
     {
@@ -24,13 +24,13 @@
       "brotli": 1049
     },
     {
-      "path": "assets/index-CDWzcyOa.js",
+      "path": "assets/index-DNGbUI69.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 23351,
-      "raw": 56661,
-      "gzip": 22970,
-      "brotli": 20263
+      "transferred": 23670,
+      "raw": 57420,
+      "gzip": 23289,
+      "brotli": 20600
     },
     {
       "path": "assets/dist-N2CBoZNQ.js",
@@ -53,10 +53,10 @@
   ],
   "total": {
     "requests": 5,
-    "transferred": 33670,
-    "raw": 76468,
-    "gzip": 30958,
-    "brotli": 27302
+    "transferred": 33989,
+    "raw": 77227,
+    "gzip": 31276,
+    "brotli": 27639
   },
   "notFetched": []
 }

@@ -1,10 +1,10 @@
 {
-  "commit": "298a3cd0",
+  "commit": "baab9133",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 55415,
-    "gzip": 22116,
+    "raw": 56174,
+    "gzip": 22414,
     "limit": 25000
   },
   "packages": {
@@ -264,42 +264,42 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 51594,
-        "gzip": 20691
+        "raw": 52353,
+        "gzip": 21000
       },
       "./extension": {
-        "raw": 48441,
-        "gzip": 19789
+        "raw": 49200,
+        "gzip": 20134
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 62177,
-        "gzip": 19004
+        "raw": 62187,
+        "gzip": 19011
       },
       "./particles": {
         "raw": 1023,
         "gzip": 602
       },
       "./targets": {
-        "raw": 7480,
-        "gzip": 2602
+        "raw": 7488,
+        "gzip": 2603
       },
       "./toon": {
         "raw": 1713,
         "gzip": 954
       },
       "./post": {
-        "raw": 19039,
-        "gzip": 6880
+        "raw": 19047,
+        "gzip": 6879
       },
       "./grass": {
-        "raw": 16443,
-        "gzip": 5992
+        "raw": 16451,
+        "gzip": 5995
       },
       "./planet": {
-        "raw": 21089,
-        "gzip": 7110
+        "raw": 21097,
+        "gzip": 7119
       },
       "./stars": {
         "raw": 6132,
@@ -1018,20 +1018,20 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 142350,
-        "gzip": 39336
+        "raw": 142399,
+        "gzip": 39337
       },
       "./bloom": {
-        "raw": 19632,
-        "gzip": 6540
+        "raw": 19671,
+        "gzip": 6554
       },
       "./ssao": {
         "raw": 29418,
         "gzip": 9414
       },
       "./scene-fade": {
-        "raw": 6649,
-        "gzip": 2882
+        "raw": 6653,
+        "gzip": 2883
       },
       "./stack": {
         "raw": 10632,
@@ -1066,8 +1066,8 @@
         "gzip": 6355
       },
       "./image": {
-        "raw": 35660,
-        "gzip": 11653
+        "raw": 35699,
+        "gzip": 11662
       },
       "./smaa": {
         "raw": 17521,
@@ -1114,8 +1114,8 @@
     },
     "@margoengine/quality": {
       ".": {
-        "raw": 5256,
-        "gzip": 2449
+        "raw": 5264,
+        "gzip": 2451
       },
       "./warm": {
         "raw": 2705,
@@ -1312,8 +1312,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 39621,
-        "gzip": 13926
+        "raw": 40571,
+        "gzip": 14281
       }
     },
     "@margoengine/sky": {
@@ -1688,8 +1688,8 @@
     },
     "@margoengine/webgl": {
       ".": {
-        "raw": 7003,
-        "gzip": 3127
+        "raw": 7011,
+        "gzip": 3132
       }
     },
     "@margoengine/webgl2-compat": {
@@ -1753,9 +1753,9 @@
       "brotli": 10078
     },
     "packages/creative/dist/post.js": {
-      "raw": 19039,
-      "gzip": 6880,
-      "brotli": 6209
+      "raw": 19047,
+      "gzip": 6879,
+      "brotli": 6194
     },
     "packages/environment/dist/index.js": {
       "raw": 89798,
@@ -1763,9 +1763,9 @@
       "brotli": 26165
     },
     "packages/shadows/dist/index.js": {
-      "raw": 39621,
-      "gzip": 13926,
-      "brotli": 12446
+      "raw": 40571,
+      "gzip": 14281,
+      "brotli": 12770
     },
     "packages/machinery/dist/workers/cad-runtime.js": {
       "raw": 20052,
