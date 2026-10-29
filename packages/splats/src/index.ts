@@ -17,6 +17,7 @@ import { histogram, scan, scanTotals, scatter } from './sort.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { alphaBlend } from '../../shared/pass.js';
+import { loadCompatRoute } from '../../shared/compat.js';
 export { parseSplat, validateSplats, type SplatData } from './data.js';
 export { parsePly, encodeSplat, decomposeCovariance } from './ply.js';
 export { parseSpz, parseSog, type ParseSpzOptions, type ParseSogOptions, type SogFiles } from './compressed.js';
@@ -55,6 +56,8 @@ export class Splats implements EnginePlugin {
   private readonly fogData = new Float32Array(12);
   private sortPipelines: GPUComputePipeline[] = [];
   private sortGroups: GPUBindGroup[][] = [];
+  // The WebGL2 layer's route (./compat.js): the whole sort as one CPU-tier dispatch.
+  private compatSort?: { pipeline: GPUComputePipeline; group: GPUBindGroup };
   private renders = new Map<string, { pipeline: GPURenderPipeline; group: GPUBindGroup }>();
   private disposed = false;
   // Reused each frame: the draw pass descriptor and the pipeline record for the current target formats.
@@ -184,9 +187,11 @@ export class Splats implements EnginePlugin {
     ];
     this.projectionGroup = bind(this.projection, this.projectionBuffers);
     this.sortPipelines = [histogram, scan, scanTotals, scatter].map(compute);
+    const settings: GPUBuffer[] = [];
     for (let pass = 0; pass < 8; pass++) {
       const parameters = buffer(16, GPUBufferUsage.UNIFORM, new Uint32Array([this.count, groups, blocks, pass * 4])),
         front = pass % 2;
+      settings.push(parameters);
       this.sortGroups.push([
         bind(this.sortPipelines[0], [parameters, this.keys[front], hist]),
         bind(this.sortPipelines[1], [parameters, hist, offsets, totals]),
@@ -194,6 +199,10 @@ export class Splats implements EnginePlugin {
         bind(this.sortPipelines[3], [parameters, this.keys[front], this.keys[1 - front], offsets, bases]),
       ]);
     }
+    const keys = this.keys;
+    loadCompatRoute(d, () => import('./compat.js'))?.then(({ splatCompatSort }) => {
+      if (this.keys === keys) this.compatSort = splatCompatSort(d, settings[0], keys);
+    });
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -251,13 +260,15 @@ export class Splats implements EnginePlugin {
     try {
       if (fog) this.dispatch(pass, fog.pipeline, fog.group, groups, 1);
       else this.dispatch(pass, this.projection!, this.projectionGroup!, groups, 1);
-      for (let stage = 0; stage < 8; stage++) {
-        const binds = this.sortGroups[stage];
-        this.dispatch(pass, this.sortPipelines[0], binds[0], groups, 1);
-        this.dispatch(pass, this.sortPipelines[1], binds[1], blocks, 16);
-        this.dispatch(pass, this.sortPipelines[2], binds[2], 1, 1);
-        this.dispatch(pass, this.sortPipelines[3], binds[3], groups, 1);
-      }
+      if (this.compatSort) this.dispatch(pass, this.compatSort.pipeline, this.compatSort.group, 1, 1);
+      else
+        for (let stage = 0; stage < 8; stage++) {
+          const binds = this.sortGroups[stage];
+          this.dispatch(pass, this.sortPipelines[0], binds[0], groups, 1);
+          this.dispatch(pass, this.sortPipelines[1], binds[1], blocks, 16);
+          this.dispatch(pass, this.sortPipelines[2], binds[2], 1, 1);
+          this.dispatch(pass, this.sortPipelines[3], binds[3], groups, 1);
+        }
     } finally {
       pass.end();
     }
@@ -366,6 +377,7 @@ export class Splats implements EnginePlugin {
     this.keys = [];
     this.sortGroups = [];
     this.sortPipelines = [];
+    this.compatSort = undefined;
     this.renders.clear();
     this.record = undefined;
     this.uniform = this.index = this.projected = this.evaluated = undefined;

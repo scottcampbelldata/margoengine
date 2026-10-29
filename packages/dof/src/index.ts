@@ -11,10 +11,11 @@ import {
 import { render, group, compute } from '../../shared/gpu.js';
 import { orthographic } from '../../shared/projection.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { cocShader, coarseShader, bokehShader, presentShader } from './shaders.js';
+import { cocShader, coarseShader, bokehShader, presentShader, groupMax } from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewSize } from '../../shared/view-rect.js';
 import { coreShaderRequired, linearShader } from '../../shared/display.js';
+import { loadCompatRoute } from '../../shared/compat.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -56,6 +57,9 @@ export class DOF implements EnginePlugin {
   private cocPipeline?: GPUComputePipeline;
   private bokehPipeline?: GPUComputePipeline;
   private coarsePipeline?: GPUComputePipeline;
+  // The WebGL2 layer's route (./compat.js): the CoC kernel without tile maxima, which this pass computes instead.
+  private tilesPipeline?: GPUComputePipeline;
+  private tilesGroup?: GPUBindGroup;
   private presentPipeline?: GPURenderPipeline;
   private scene?: GPUTexture;
   private depth?: GPUTexture;
@@ -156,6 +160,16 @@ export class DOF implements EnginePlugin {
     });
     this.bokehPipeline = compute(engine.gpu, bokehShader);
     this.coarsePipeline = compute(engine.gpu, coarseShader);
+    const uniform = this.uniform;
+    loadCompatRoute(engine.gpu, () => import('./compat.js'))?.then(({ dofCompatPipelines }) => {
+      if (this.uniform !== uniform) return;
+      ({
+        coc: this.cocPipeline,
+        tiles: this.tilesPipeline,
+        bokeh: this.bokehPipeline,
+      } = dofCompatPipelines(engine.gpu!, { cocShader, bokehShader, groupMax }));
+      this.releaseTextures();
+    });
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -170,7 +184,7 @@ export class DOF implements EnginePlugin {
       name: 'dof:coc',
       order: 20,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.dispatch(c, this.cocPipeline!, this.groups[0]);
+        if (c.backend === 'webgpu') this.circles(c);
       },
     });
     graph.add({
@@ -280,15 +294,7 @@ export class DOF implements EnginePlugin {
       multisample: c.descriptor.multisample,
     });
     this.groups = [
-      c.device.createBindGroup({
-        layout: this.cocPipeline!.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: this.uniform! } },
-          { binding: 1, resource: this.depth.createView({ aspect: 'depth-only' }) },
-          { binding: 2, resource: cocView },
-          { binding: 3, resource: tileView },
-        ],
-      }),
+      this.cocGroup(c.device, this.depth, true),
       c.device.createBindGroup({
         layout: this.bokehPipeline!.getBindGroupLayout(0),
         entries: [
@@ -306,6 +312,40 @@ export class DOF implements EnginePlugin {
       }),
       group(c.device, this.coarsePipeline!, [{ buffer: this.uniform! }, this.sceneView, cocView, coarseView]),
     ];
+  }
+  /** The CoC pass's bind group; on the WebGL2 route also the tile pass's (`tilesGroup`). */
+  private cocGroup(device: GPUDevice, depth: GPUTexture, direct = false): GPUBindGroup {
+    if (this.tilesPipeline) {
+      this.tilesGroup = group(device, this.tilesPipeline, [this.cocView!, this.tileView!]);
+      return group(device, this.cocPipeline!, [
+        { buffer: this.uniform! },
+        depth.createView({ aspect: 'depth-only' }),
+        this.cocView!,
+      ]);
+    }
+    // The WebGPU route keeps its calls in the order the proofs recorded (layout first when made directly).
+    if (direct)
+      return device.createBindGroup({
+        layout: this.cocPipeline!.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.uniform! } },
+          { binding: 1, resource: depth.createView({ aspect: 'depth-only' }) },
+          { binding: 2, resource: this.cocView! },
+          { binding: 3, resource: this.tileView! },
+        ],
+      });
+    return group(device, this.cocPipeline!, [
+      { buffer: this.uniform! },
+      depth.createView({ aspect: 'depth-only' }),
+      this.cocView!,
+      this.tileView!,
+    ]);
+  }
+
+  /** CoC and 8x8 tile maxima: one kernel on WebGPU, two on the WebGL2 route. */
+  private circles(c: Context): void {
+    this.dispatch(c, this.cocPipeline!, this.groups[0]);
+    if (this.tilesPipeline) this.dispatch(c, this.tilesPipeline, this.tilesGroup!, 64);
   }
   private blur(c: Context): void {
     this.dispatch(c, this.coarsePipeline!, this.groups[3], 16);
@@ -341,12 +381,7 @@ export class DOF implements EnginePlugin {
     }
     if (this.sceneDepth !== depth) {
       this.sceneDepth = depth;
-      this.groups[0] = group(device, this.cocPipeline!, [
-        { buffer: this.uniform! },
-        depth.createView({ aspect: 'depth-only' }),
-        this.cocView!,
-        this.tileView!,
-      ]);
+      this.groups[0] = this.cocGroup(device, depth);
     }
     if (this.input !== input) {
       this.input = input;
@@ -365,7 +400,7 @@ export class DOF implements EnginePlugin {
         this.coarseView!,
       ]);
     }
-    this.dispatch(c, this.cocPipeline!, this.groups[0]);
+    this.circles(c);
     this.blur(c);
     if (output.hdr) return this.outputView;
     if (this.key !== key) {
@@ -426,7 +461,7 @@ export class DOF implements EnginePlugin {
     this.releaseTextures();
     this.uniform?.destroy();
     this.uniform = undefined;
-    this.cocPipeline = this.bokehPipeline = this.coarsePipeline = undefined;
+    this.cocPipeline = this.bokehPipeline = this.coarsePipeline = this.tilesPipeline = undefined;
     this.originalColor = this.originalDepth = undefined;
     this.shaders.clear();
   }

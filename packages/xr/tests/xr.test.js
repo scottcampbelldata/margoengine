@@ -639,3 +639,16 @@ test('XR grows isolated instance storage after the core store expands', async (t
   await xr.end();
   assert.ok(f.buffers.every((buffer) => buffer.destroyed === 1));
 });
+
+test('XR.create refuses the WebGL2 compatibility layer with a coded error naming what it needs', async (t) => {
+  const f = await fixture(t);
+  navigator.gpu.requestAdapter = async () => ({
+    info: { vendor: 'margo-webgl2' },
+    requestDevice: async () => f.device,
+  });
+  await assert.rejects(XR.create(f.engine), {
+    code: 'unsupported',
+    message: /XR needs the browser's own WebGPU \(XRGPUBinding\); the WebGL2 compatibility layer has no XR path/,
+  });
+  assert.equal(f.engine.hasPlugin('xr'), false);
+});

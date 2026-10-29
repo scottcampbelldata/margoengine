@@ -15,6 +15,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { agx } from '../../shared/agx.js';
+import { compatTier } from '../../shared/compat.js';
 import { acesNarkowicz } from '../../shared/aces.js';
 import {
   FLAG_CLAMP,
@@ -657,6 +658,12 @@ export class VoxelPathTracer implements EnginePlugin {
     const device = engine.gpu;
     if (!device)
       throw new MargoError('unsupported', 'VoxelPathTracer needs the WebGPU backend; create the engine with WebGPU');
+    // Out of scope on the WebGL2 layer: ANGLE's Direct3D shader compiler takes 20 s to minutes for each kernel.
+    if (compatTier(device) === 'webgl2')
+      throw new MargoError(
+        'unsupported',
+        "VoxelPathTracer needs the browser's own WebGPU; on the WebGL2 compatibility layer draw the voxels with @margoengine/voxel",
+      );
     this.#engine = engine;
     this.#state(device);
   }

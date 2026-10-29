@@ -219,6 +219,8 @@ export class CompatDevice extends EventTarget {
   readonly state: GLState;
   /** Synchronous GPU-to-CPU reads the layer had to make (indirect arguments written by the GPU and the like). */
   stalls = 0;
+  /** Compute dispatches run so far, per tier: fragment draws, point draws (scatter) and the CPU. */
+  readonly dispatches = { fragment: 0, scatter: 0, cpu: 0 };
   destroyed = false;
   onuncapturederror: ((event: Event) => void) | null = null;
   /** The sampler that loads and size queries use (no filtering, every level). */
@@ -553,6 +555,14 @@ export class CompatQueue {
   private inOrder(op: () => void): void {
     if (this.backlog) this.backlog.push(op);
     else op();
+  }
+  /**
+   * Queues `op` behind the operations waiting for the compute runtime and answers true, or answers false when nothing
+   * waits. A resource's destroy() goes through here: WebGPU frees it once the work submitted before is done.
+   */
+  afterWaiting(op: () => void): boolean {
+    this.backlog?.push(op);
+    return !!this.backlog;
   }
 
   submit(buffers: Iterable<{ ops: readonly ((r: Replayer) => void)[]; used?: boolean; compute?: boolean }>): void {

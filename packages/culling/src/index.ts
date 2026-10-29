@@ -5,6 +5,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { MargoError } from '@margoengine/math/errors';
 import { computeShader, depthShader } from './shaders.js';
 import { viewSize } from '../../shared/view-rect.js';
+import { loadCompatRoute } from '../../shared/compat.js';
 export { CulledMeshes } from './meshes.js';
 export type { CulledMeshesOptions } from './meshes.js';
 
@@ -90,6 +91,8 @@ export class CulledInstances implements EnginePlugin {
   private readonly floats = new Float32Array(this.uniform);
   private readonly words = new Uint32Array(this.uniform);
   private readonly frame = new Float32Array(32);
+  // The WebGL2 layer's route (./compat.js): frustum tests and compaction on the CPU, kept records uploaded.
+  private route?: ReturnType<typeof import('./compat.js').instancesRoute>;
   private buffers: Record<string, GPUBuffer> = {};
   private geometryBuffers = new Map<Geometry, { vertex: GPUBuffer; index: GPUBuffer }>();
   private compute?: {
@@ -294,6 +297,22 @@ export class CulledInstances implements EnginePlugin {
     }
     this.low = this.hiddenLow = Infinity;
     this.high = this.hiddenHigh = 0;
+    const records = this.buffers.records;
+    loadCompatRoute(d, () => import('./compat.js'))?.then(({ instancesRoute }) => {
+      if (this.buffers.records === records)
+        this.route = instancesRoute(
+          {
+            records: this.records,
+            hidden: this.hidden,
+            bounds: this.bounds,
+            batchOf: this.batchOf,
+            starts: this.starts,
+            count: n,
+          },
+          this.args,
+          B,
+        );
+    });
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -539,49 +558,52 @@ export class CulledInstances implements EnginePlugin {
     d.queue.writeBuffer(b.frame, 0, this.frame as Float32Array<ArrayBuffer>);
     const p = this.compute!,
       groups = Math.ceil(this.count / 256);
-    if (occlusion) {
-      d.queue.writeBuffer(b.earlyArgs, 0, this.earlyReset as Uint32Array<ArrayBuffer>);
-      const select = c.encoder.beginComputePass();
-      select.setPipeline(p.early);
-      select.setBindGroup(0, this.groups.early);
-      select.dispatchWorkgroups(groups);
-      select.end();
-      const pass = c.encoder.beginRenderPass(this.early);
-      // The target may be larger than this view (shared with a larger one).
-      if (c.view) pass.setViewport(0, 0, width, height, 0, 1);
-      this.batches.forEach((batch, i) => {
-        const sided = batch.material.data[6] < 0.5;
-        pass.setPipeline(sided ? this.prepass!.sided : this.prepass!.plain);
-        pass.setBindGroup(0, sided ? this.groups.sided : this.groups.prepass);
-        const g = this.geometryBuffers.get(batch.geometry)!;
-        pass.setVertexBuffer(0, g.vertex);
-        pass.setVertexBuffer(1, b.earlyList, this.starts[i] * 4);
-        pass.setIndexBuffer(g.index, 'uint32');
-        pass.drawIndexedIndirect(b.earlyArgs, i * 20);
-      });
+    if (this.route) this.route(d, b, c.camera.planes, mode > 0);
+    else {
+      if (occlusion) {
+        d.queue.writeBuffer(b.earlyArgs, 0, this.earlyReset as Uint32Array<ArrayBuffer>);
+        const select = c.encoder.beginComputePass();
+        select.setPipeline(p.early);
+        select.setBindGroup(0, this.groups.early);
+        select.dispatchWorkgroups(groups);
+        select.end();
+        const pass = c.encoder.beginRenderPass(this.early);
+        // The target may be larger than this view (shared with a larger one).
+        if (c.view) pass.setViewport(0, 0, width, height, 0, 1);
+        this.batches.forEach((batch, i) => {
+          const sided = batch.material.data[6] < 0.5;
+          pass.setPipeline(sided ? this.prepass!.sided : this.prepass!.plain);
+          pass.setBindGroup(0, sided ? this.groups.sided : this.groups.prepass);
+          const g = this.geometryBuffers.get(batch.geometry)!;
+          pass.setVertexBuffer(0, g.vertex);
+          pass.setVertexBuffer(1, b.earlyList, this.starts[i] * 4);
+          pass.setIndexBuffer(g.index, 'uint32');
+          pass.drawIndexedIndirect(b.earlyArgs, i * 20);
+        });
+        pass.end();
+      }
+      const pass = c.encoder.beginComputePass();
+      if (occlusion) {
+        pass.setPipeline(p.depth0);
+        pass.setBindGroup(0, this.groups.depth0);
+        pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
+        pass.setPipeline(p.reduce);
+        for (let l = 1; l < this.levels; l++) {
+          pass.setBindGroup(0, this.levelGroups[l]);
+          pass.dispatchWorkgroups(Math.ceil(this.words[48 + l * 4 + 1] / 8), Math.ceil(this.words[48 + l * 4 + 2] / 8));
+        }
+      }
+      pass.setPipeline(p.cull);
+      pass.setBindGroup(0, this.groups.cull);
+      pass.dispatchWorkgroups(groups);
+      pass.setPipeline(p.scan);
+      pass.setBindGroup(0, this.groups.scan);
+      pass.dispatchWorkgroups(1);
+      pass.setPipeline(p.scatter);
+      pass.setBindGroup(0, this.groups.scatter);
+      pass.dispatchWorkgroups(groups);
       pass.end();
     }
-    const pass = c.encoder.beginComputePass();
-    if (occlusion) {
-      pass.setPipeline(p.depth0);
-      pass.setBindGroup(0, this.groups.depth0);
-      pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
-      pass.setPipeline(p.reduce);
-      for (let l = 1; l < this.levels; l++) {
-        pass.setBindGroup(0, this.levelGroups[l]);
-        pass.dispatchWorkgroups(Math.ceil(this.words[48 + l * 4 + 1] / 8), Math.ceil(this.words[48 + l * 4 + 2] / 8));
-      }
-    }
-    pass.setPipeline(p.cull);
-    pass.setBindGroup(0, this.groups.cull);
-    pass.dispatchWorkgroups(groups);
-    pass.setPipeline(p.scan);
-    pass.setBindGroup(0, this.groups.scan);
-    pass.dispatchWorkgroups(1);
-    pass.setPipeline(p.scatter);
-    pass.setBindGroup(0, this.groups.scatter);
-    pass.dispatchWorkgroups(groups);
-    pass.end();
     // Main pass: core's own shader and pipeline state (sections, fog and other shader hooks apply), core's targets.
     const key = c.shader + c.format + c.descriptor.multisample?.count + c.descriptor.depthStencil!.format;
     if (key !== this.pipelineKey) {
@@ -635,6 +657,7 @@ export class CulledInstances implements EnginePlugin {
     main.end();
   }
   private release(): void {
+    this.route = undefined;
     for (const buffer of Object.values(this.buffers)) buffer.destroy();
     for (const g of this.geometryBuffers.values()) {
       g.vertex.destroy();

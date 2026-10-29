@@ -185,6 +185,11 @@ export class CompatDevice extends EventTarget {
     readonly ext: Extensions;
     readonly state: GLState;
     stalls: number;
+    readonly dispatches: {
+        fragment: number;
+        scatter: number;
+        cpu: number;
+    };
     destroyed: boolean;
     onuncapturederror: ((event: Event) => void) | null;
     readonly loadSampler: WebGLSampler;
@@ -272,6 +277,7 @@ export class CompatQueue {
     label: string;
     waiting: Promise<void> | null;
     constructor(device: CompatDevice);
+    afterWaiting(op: () => void): boolean;
     submit(buffers: Iterable<{
         ops: readonly ((r: Replayer) => void)[];
         used?: boolean;

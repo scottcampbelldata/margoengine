@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/webgl2-compat",
   "version": "1.0.0",
-  "description": "In development (milestones M0 to M5): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders, texture views, readbacks of every copyable format, occlusion queries, render bundles, external textures, gather and storage-buffer reads run, and compute pipelines run as fragment draws, point draws or on the CPU, whichever the shader allows.",
+  "description": "In development (milestones M0 to M6): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders, texture views, readbacks of every copyable format, occlusion queries, render bundles, external textures, gather and storage-buffer reads run, compute pipelines run as fragment draws, point draws or on the CPU, whichever the shader allows, and DOF, splats and culling take routes of their own there.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -60,7 +60,7 @@
     "build": "node ../../scripts/build-optional.js webgl2-compat",
     "test": "npm run build && node --test test/*.test.js",
     "test:browser": "npm run build && node test/browser-check.mjs && node test/glsl-corpus-browser.mjs && cd ../.. && node packages/webgl2-compat/test/corpus-draw-browser.mjs",
-    "test:gpu": "npm run build && cd ../.. && node packages/webgl2-compat/test/compat-browser-check.mjs && node packages/webgl2-compat/test/features-browser.mjs && node packages/webgl2-compat/test/compute-browser.mjs && node packages/materials/test/browser-check.mjs --compat && node packages/gltf-pro/scripts/test-shader-review.js --compat && node packages/lod/test/browser-check.mjs --compat && node scripts/modern-postfx-tests.js --compat && node packages/shadows/test/lit-faces-browser.mjs --compat && node packages/voxel/tests/render-browser-check.mjs --compat && cd packages/environment && node scripts/test-browser.js --compat && cd ../lines && node scripts/test-browser.js --compat && cd ../points && node scripts/test-browser.js --compat && cd ../text && node scripts/test-browser.js --compat",
+    "test:gpu": "npm run build && cd ../.. && node packages/webgl2-compat/test/compat-browser-check.mjs && node packages/webgl2-compat/test/features-browser.mjs && node packages/webgl2-compat/test/compute-browser.mjs && node packages/webgl2-compat/test/routes-browser.mjs && node packages/vfx/test/browser-check.mjs --compat && node packages/scatter/test/lod.browser.mjs --compat && node packages/materials/test/browser-check.mjs --compat && node packages/gltf-pro/scripts/test-shader-review.js --compat && node packages/lod/test/browser-check.mjs --compat && node scripts/modern-postfx-tests.js --compat && node packages/shadows/test/lit-faces-browser.mjs --compat && node packages/voxel/tests/render-browser-check.mjs --compat && cd packages/environment && node scripts/test-browser.js --compat && cd ../lines && node scripts/test-browser.js --compat && cd ../points && node scripts/test-browser.js --compat && cd ../text && node scripts/test-browser.js --compat",
     "capabilities": "npm run build && node scripts/capabilities.mjs",
     "prepack": "npm run build"
   }

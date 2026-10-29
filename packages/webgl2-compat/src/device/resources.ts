@@ -298,7 +298,7 @@ export class CompatBuffer {
   }
 
   destroy(): void {
-    if (this.destroyed) return;
+    if (this.destroyed || this.device.queue.afterWaiting(() => this.destroy())) return;
     this.destroyed = true;
     const gl = this.device.gl;
     if (this.gl) gl.deleteBuffer(this.gl);
@@ -629,7 +629,7 @@ export class CompatTexture {
   }
 
   destroy(): void {
-    if (this.destroyed) return;
+    if (this.destroyed || this.device.queue.afterWaiting(() => this.destroy())) return;
     this.destroyed = true;
     const gl = this.device.gl;
     this.device.dropFramebuffers(this);

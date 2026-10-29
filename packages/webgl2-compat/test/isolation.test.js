@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..', '..', '..');
@@ -64,7 +64,7 @@ function distReach(entry, staticOnly = false) {
     all += text;
     const pattern = staticOnly
       ? /(?:\bfrom\s*|\bimport\s+)["']([^"']+)["']/g
-      : /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["']([^"']+)["']/g;
+      : /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'`]([^"'`]+)["'`]/g;
     for (const m of text.matchAll(pattern)) {
       const s = m[1];
       if (s.startsWith('.')) {
@@ -83,6 +83,27 @@ test('the built core, stage, React and umbrella roots reach no module of the lay
     const { files, text } = distReach(entry);
     assert.ok(files > 0);
     assert.ok(!text.includes('webgl2-compat'), `${pkg}'s built root or a module it reaches names the layer`);
+  }
+});
+
+test("packages' WebGL2 routes load by import() only: their roots' static graphs never reach the route", () => {
+  // Packages find the layer by its adapter vendor (packages/shared/compat.js) and import their route lazily, so a page
+  // with WebGPU downloads none of it.
+  for (const pkg of ['dof', 'splats', 'culling']) {
+    const entry = join(root, 'packages', pkg, 'dist', 'index.js');
+    const all = distReach(entry),
+      fixed = distReach(entry, true);
+    assert.match(all.text, /margo-webgl2/, `${pkg} detects the layer`);
+    const chunk = readdirSync(join(root, 'packages', pkg, 'dist')).find((f) => /^compat-[\w-]+\.js$/.test(f));
+    assert.ok(chunk, `${pkg} builds its route into a chunk of its own`);
+    assert.match(
+      all.text,
+      new RegExp(`import\\(\\s*["'\`]\\./${chunk.replace('.', '\\.')}["'\`]\\s*\\)`),
+      `${pkg} imports it lazily`,
+    );
+    const route = readFileSync(join(root, 'packages', pkg, 'dist', chunk), 'utf8');
+    assert.ok(!fixed.text.includes(route.slice(0, 400)), `${pkg}'s root reaches its route statically`);
+    assert.ok(all.text.includes(route.slice(0, 400)), 'the route is reached through import()');
   }
 });
 

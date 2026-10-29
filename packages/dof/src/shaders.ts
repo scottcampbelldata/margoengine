@@ -4,7 +4,7 @@ const params = `struct Params {lens:vec4f,frame:vec4f,ortho:vec4f}
 
 // Largest value over an 8x8 workgroup, without atomics (contended workgroup atomics cost ~0.3 ms at 720p on Arc).
 // Call from uniform control flow.
-const groupMax = `var<workgroup> lanes:array<f32,64>;
+export const groupMax = `var<workgroup> lanes:array<f32,64>;
 var<workgroup> rows:array<f32,8>;
 fn groupMax(v:f32,local:u32)->f32 {
   lanes[local]=v;workgroupBarrier();

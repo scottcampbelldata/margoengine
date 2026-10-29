@@ -294,6 +294,33 @@ const cases = {
     device.queue.submit([e.finish()]);
     return { values: u32(await readBuffer(device, out)), tier: tierOf(p) };
   },
+  // A texture and a buffer destroyed right after the submit that uses them: WebGPU frees them once that work is done.
+  // On a fresh layer device the work waits in the queue while the compute part loads, so it ran after the GL objects
+  // were deleted (an incomplete framebuffer, found by DOF's compatibility route rebuilding its targets).
+  async destroyAfterSubmit(device) {
+    const d = device.gl ? await (await createCompatGPU().requestAdapter()).requestDevice() : device;
+    const p = compute(d, `@group(0) @binding(0) var<storage, read_write> out: array<u32>;
+      @compute @workgroup_size(4) fn main(@builtin(global_invocation_id) id: vec3u) { out[id.x] = id.x + 7u; }`);
+    const scratch = d.createBuffer({ size: 16, usage: B.STORAGE | B.COPY_SRC });
+    const target = d.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: U.RENDER_ATTACHMENT | U.COPY_SRC });
+    const pixels = d.createBuffer({ size: 1024, usage: B.COPY_DST | B.COPY_SRC });
+    const words = d.createBuffer({ size: 16, usage: B.COPY_DST | B.COPY_SRC });
+    const e = d.createCommandEncoder();
+    const pass = e.beginComputePass();
+    pass.setPipeline(p);
+    pass.setBindGroup(0, group(d, p, [{ buffer: scratch }]));
+    pass.dispatchWorkgroups(1);
+    pass.end();
+    e.beginRenderPass({ colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0.25, 0.5, 0.75, 1] }] }).end();
+    e.copyTextureToBuffer({ texture: target }, { buffer: pixels, bytesPerRow: 256 }, [4, 4]);
+    e.copyBufferToBuffer(scratch, 0, words, 0, 16);
+    d.queue.submit([e.finish()]);
+    target.destroy();
+    scratch.destroy();
+    const values = { pixel: [...(await readBuffer(d, pixels, 4))], words: u32(await readBuffer(d, words)) };
+    if (d !== device) d.destroy();
+    return { values, tier: tierOf(p) };
+  },
   async asyncPipeline(device) {
     const p = await device.createComputePipelineAsync({
       layout: 'auto',

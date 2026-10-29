@@ -8,6 +8,7 @@ import {
 } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
+import { COMPAT_VENDOR } from '../../shared/compat.js';
 import { StereoRenderer } from './renderer.js';
 import { XRController } from './controller.js';
 export { XRController } from './controller.js';
@@ -114,6 +115,12 @@ export class XR implements EnginePlugin {
       throw new MargoError(
         'unsupported',
         'XR-compatible WebGPU adapter unavailable; use a headset browser with WebGPU XR support.',
+      );
+    // WebXR on WebGL2 needs XRWebGLLayer, a separate path this version does not have.
+    if ((adapter as { info?: { vendor?: string } }).info?.vendor === COMPAT_VENDOR)
+      throw new MargoError(
+        'unsupported',
+        "XR needs the browser's own WebGPU (XRGPUBinding); the WebGL2 compatibility layer has no XR path",
       );
     signal?.throwIfAborted();
     const requiredFeatures = runtime.gpu

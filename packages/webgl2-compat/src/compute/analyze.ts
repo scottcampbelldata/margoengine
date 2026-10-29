@@ -184,7 +184,8 @@ export function planCompute(
   entry: IREntryPoint,
   constants: Readonly<Record<string, number | boolean>> = {},
 ): ComputePlan {
-  if (entry.stage !== 'compute') throw new TypeError(`'${entry.name}' is not a compute entry point; pass a @compute entry point`);
+  if (entry.stage !== 'compute')
+    throw new TypeError(`'${entry.name}' is not a compute entry point; pass a @compute entry point`);
   return new Analyzer(module, entry, constants).run();
 }
 

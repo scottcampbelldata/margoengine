@@ -2,6 +2,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Batch, Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { loadCompatRoute } from '../../shared/compat.js';
 
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -104,6 +105,8 @@ export class CulledMeshes implements EnginePlugin {
   private readonly frame = new Float32Array(44);
   private readonly slots = new Map<Geometry, Slot>();
   private redirected: Batch[] = [];
+  // The WebGL2 layer's route (./compat.js): the same test on the CPU, kept records uploaded.
+  private route?: ReturnType<typeof import('./compat.js').meshesRoute>;
 
   /** Same as `engine.use(new CulledMeshes(options))`; returns the plugin. */
   static attach(engine: EngineKernel, options?: CulledMeshesOptions): CulledMeshes {
@@ -127,7 +130,10 @@ export class CulledMeshes implements EnginePlugin {
         'CulledMeshes requires WebGPU; attach a new CulledMeshes to a WebGPU engine',
       );
     this.engine = engine;
-    this.device = engine.gpu;
+    const d = (this.device = engine.gpu);
+    loadCompatRoute(d, () => import('./compat.js'))?.then(({ meshesRoute }) => {
+      if (this.device === d) this.route = meshesRoute();
+    });
   }
   registerPasses(graph: FrameGraph): void {
     // First in the frame, so every core draw of these batches (main pass and replays) sees this frame's culled lists.
@@ -199,25 +205,29 @@ export class CulledMeshes implements EnginePlugin {
     f[41] = (Math.hypot(m[1], m[5], m[9]) * c.height) / 2;
     f[42] = this.minRadius * ratio;
     d.queue.writeBuffer(this.frameBuffer, 0, f as Float32Array<ArrayBuffer>);
-    const pass = c.encoder.beginComputePass(),
+    const route = this.route,
+      pass = route ? undefined : c.encoder.beginComputePass(),
       p = this.pipelines,
       live = new Set<Geometry>();
     for (const batch of batches) {
       if (!batch.count) continue;
       const slot = this.slot(d, engine, batch);
       live.add(batch.geometry);
-      const groups = Math.ceil(batch.count / 256);
-      pass.setBindGroup(0, slot.group!);
-      pass.setPipeline(p.cull);
-      pass.dispatchWorkgroups(groups);
-      pass.setPipeline(p.scan);
-      pass.dispatchWorkgroups(1);
-      pass.setPipeline(p.scatter);
-      pass.dispatchWorkgroups(groups);
+      if (route) route(d, batch, slot.drawn!, slot.args!, this.frame);
+      else {
+        const groups = Math.ceil(batch.count / 256);
+        pass!.setBindGroup(0, slot.group!);
+        pass!.setPipeline(p.cull);
+        pass!.dispatchWorkgroups(groups);
+        pass!.setPipeline(p.scan);
+        pass!.dispatchWorkgroups(1);
+        pass!.setPipeline(p.scatter);
+        pass!.dispatchWorkgroups(groups);
+      }
       batch.redirect = { instances: slot.drawn!, args: slot.args! };
       this.redirected.push(batch);
     }
-    pass.end();
+    pass?.end();
     for (const [geometry, slot] of this.slots)
       if (!live.has(geometry)) {
         for (const b of slot.buffers) b.destroy();
@@ -283,7 +293,7 @@ export class CulledMeshes implements EnginePlugin {
     for (const slot of this.slots.values()) for (const b of slot.buffers) b.destroy();
     this.slots.clear();
     this.frameBuffer?.destroy();
-    this.frameBuffer = this.pipelines = undefined;
+    this.frameBuffer = this.pipelines = this.route = undefined;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();

@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>WebGL2 compatibility: package routes</title>
+</head>
+<body style="margin:0">
+<canvas style="width:400px;height:300px"></canvas>
+<script type="module">
+// Milestone M6: one package route per page load, ?mode=native|compat&case=dof|splats|instances|meshes, in exact-pixel
+// mode (exactSize, one sample). On the layer each package loads its route lazily; until then it runs its WebGPU route
+// on the layer's generic tiers, so the page renders frames until a frame's compute dispatches are the route's own
+// (`window.check.route`), then the driver compares the canvas with the native one.
+import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+import { install } from '/packages/webgl2-compat/dist/index.js';
+
+const q = new URLSearchParams(location.search);
+const mode = q.get('mode') ?? 'native',
+  name = q.get('case') ?? 'dof';
+const errors = [];
+addEventListener('error', (e) => errors.push(String(e.message)));
+addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.message ?? e.reason)));
+
+// A row of lit boxes from near to far: depth for DOF, parts for culling.
+function boxes(engine, n = 9) {
+  const cube = box(1, 1, 1);
+  for (let i = 0; i < n; i++)
+    engine
+      .createMesh()
+      .setGeometry(cube)
+      .setMaterial(new PbrMaterial({ color: [0.2 + (i % 3) * 0.3, 0.8 - (i % 4) * 0.15, 0.3 + (i % 5) * 0.12], roughness: 0.4 }))
+      .setPosition([(i - 4) * 1.3, 0.5, -i * 1.6])
+      .setRotation([0.2 * i, 0.5 * i, 0]);
+}
+// Expected compute dispatches of one frame once the route is taken (the layer's per-tier counters).
+const routes = {
+  dof: { fragment: 4, scatter: 0, cpu: 0 }, // CoC, tiles, 2x2 far gather, bokeh
+  splats: { fragment: 0, scatter: 1, cpu: 1 }, // projection on the GPU, the sort on the CPU
+  instances: { fragment: 0, scatter: 0, cpu: 0 },
+  meshes: { fragment: 0, scatter: 0, cpu: 0 },
+};
+const cases = {
+  async dof(engine) {
+    boxes(engine);
+    const { DOF } = await import('/packages/dof/dist/index.js');
+    DOF.attach(engine, { focalDistance: 6, focalLength: 0.05, aperture: 1.4, maxRadius: 16 });
+  },
+  async splats(engine) {
+    const { Splats } = await import('/packages/splats/dist/index.js');
+    const n = 4000, positions = new Float32Array(n * 3), covariances = new Float32Array(n * 6), colors = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) {
+      const a = i * 2.39996, r = Math.sqrt(i / n) * 3;
+      positions.set([Math.cos(a) * r, Math.sin(i * 0.37) * 1.2 + 0.5, Math.sin(a) * r - 2], i * 3);
+      covariances.set([0.02 + (i % 3) * 0.01, 0.004, 0, 0.02, 0, 0.015], i * 6);
+      colors.set([0.3 + (i % 7) / 10, 0.4 + (i % 5) / 10, 0.9 - (i % 3) / 5, 0.55], i * 4);
+    }
+    Splats.attach(engine, { positions, covariances, colors });
+  },
+  async instances(engine) {
+    const { CulledInstances } = await import('/packages/culling/dist/index.js');
+    const transforms = new Float32Array(2000 * 16);
+    // A 50 x 40 sheet, much of it outside the view.
+    for (let i = 0; i < 2000; i++)
+      transforms.set([0.3, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0.3, 0, (i % 50) * 0.5 - 12, 0.2, -Math.floor(i / 50) * 0.5 + 4, 1], i * 16);
+    CulledInstances.attach(engine, [{ geometry: box(1, 1, 1), material: new PbrMaterial({ color: '#c08040' }), transforms }]);
+  },
+  async meshes(engine) {
+    boxes(engine, 40);
+    const { CulledMeshes } = await import('/packages/culling/dist/index.js');
+    CulledMeshes.attach(engine);
+  },
+};
+
+async function main() {
+  const canvas = document.querySelector('canvas');
+  if (mode === 'compat') {
+    const result = await install({ force: true });
+    if (!result.installed) throw new Error('install() did not install: ' + result.reason);
+  }
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    exactSize: [400, 300],
+    camera: { position: [0, 3, 8], target: [0, 0.5, -3], near: 0.1, far: 100 },
+  });
+  await cases[name](engine);
+  const device = () => engine.gpu;
+  const frame = async () => {
+    engine.render({ delta: 0 });
+    await device().queue.onSubmittedWorkDone();
+    await new Promise((r) => setTimeout(r, 0)); // let a route's import() settle between frames
+  };
+  window.check = {
+    info: () => ({ vendor: device().adapterInfo?.vendor ?? null, errors: errors.splice(0), gl: device().gl ? device().gl.getError() : 0 }),
+    /** Frames until one frame's dispatches are the route's (compat), then one more frame to compare; the last frame's dispatches and stalls. */
+    async route() {
+      await frame();
+      if (mode !== 'compat') return { frames: 1 };
+      const want = routes[name];
+      for (let frames = 1; frames < 200; frames++) {
+        const before = { ...device().dispatches }, stalls = device().stalls;
+        await frame();
+        const got = Object.fromEntries(Object.entries(device().dispatches).map(([k, v]) => [k, v - before[k]]));
+        if (JSON.stringify(got) === JSON.stringify(want)) return { frames, dispatches: got, stalls: device().stalls - stalls };
+      }
+      throw new Error(`${name}: the route's dispatches ${JSON.stringify(want)} never came; last ${JSON.stringify(device().dispatches)}`);
+    },
+    async time(n = 20) {
+      await frame();
+      const t = performance.now();
+      for (let i = 0; i < n; i++) engine.render({ delta: 0 });
+      await device().queue.onSubmittedWorkDone();
+      return (performance.now() - t) / n;
+    },
+  };
+  window.ready = true;
+}
+main().catch((e) => {
+  errors.push(String(e?.stack ?? e));
+  window.check = { info: () => ({ errors }) };
+  window.ready = true;
+});
+</script>
+</body>
+</html>

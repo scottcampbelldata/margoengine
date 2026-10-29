@@ -8,8 +8,8 @@ slowdown: the layer is a separate optional package, loaded by dynamic import onl
 reports WebGL2 capabilities and tiers; the WGSL corpus is recorded) and M1 (the WGSL front end: the whole corpus
 parses and type-checks, [below](#wgsl-front-end-m1-2026-10-27)) and M2 (the GLSL back end and the device: core renders on
 WebGL2 with the same pixels as native WebGPU, [below](#glsl-back-end-and-device-m2-2026-10-28)) are done, and so are M3 (first
-part), M4 (storage buffers read in render shaders) and M5 (compute, [below](#compute-m5-2026-10-28)); M6 (package compat
-paths) is next. It was paused
+part), M4 (storage buffers read in render shaders), M5 (compute, [below](#compute-m5-2026-10-28)) and M6 (package
+routes, [below](#package-routes-m6-2026-10-29)); M7 (performance) is next. It was paused
 on 2026-10-24 (the apps built on Margo so far run on Electron, which has WebGPU) and planned for after v1.0.0 before
 that.
 
@@ -247,7 +247,7 @@ Relative sizes are planning guesses, not measurements: S (days), M (one to two w
 | M3 | Textures, samplers, render targets, copies, readback | M | gltf-pro, materials, shadows, tonemap and environment backgrounds pass their GPU checks in forced-compat mode. |
 | M4 | Storage-as-data-texture | M | clustered (with CPU binning), points, lines, text, voxel and lod pass in forced-compat mode. |
 | M5 | Compute tiers A1, A2, B | L | environment IBL, post effects, sky, taa, selection, water surface and animation skinning pass; tier-B budget measured and written into `docs/limits.md`. |
-| M6 | Package compat paths (tier C) | L | vfx, creative particles, splats, culling, scatter, machinery and DOF have their compat routes; each refusal message is tested. |
+| M6 | Package compat paths (tier C) | L | vfx, creative particles, splats, culling, scatter and DOF have their compat routes; each refusal message is tested. |
 | M7 | Performance | M | State-cache hit rate, program compile time and frame time measured on the browser matrix; regressions against the M2 baseline fixed or recorded. |
 | M8 | Demos, docs and release | M | Every site demo runs in forced-compat mode; `docs/limits.md` gains a WebGL2 column; the parity matrix's WebGL2 rows are rewritten; the package is size-recorded in `entry-sizes.json`. |
 
@@ -535,7 +535,8 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
     saturating conversions). Bound buffers are copied in (a GPU-written one is read back: a stall, counted in
     `device.stalls`) and the ones it writes are copied back; textures are read back per level on first use; stored
     texels are drawn back through a mask, so unwritten texels keep their values.
-  - *C (package paths)*: no recorded shader needs one so far; M6.
+  - *C (package paths)*: no recorded shader needs one; packages whose kernels would be slow on the CPU tier take a
+    route of their own (M6, [below](#package-routes-m6-2026-10-29)).
 - **Lazy loading.** The device keeps only what `getBindGroupLayout` needs (default layouts from the IR); planning,
   translation and the CPU tier load with the compute entry, the first time a page creates a compute pipeline.
   `createComputePipeline` before that returns at once and is planned at its first dispatch; command buffers with
@@ -609,3 +610,51 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
 - **Accepted difference.** Such a pipeline with depth writes or stencil writes is refused with MargoError code
   `unsupported`: the draws after the first would test against the depth and stencil the first one wrote. Weighted
   blended OIT, the known case, writes no depth in its accumulation pass.
+
+## Package routes (M6, 2026-10-29)
+
+Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL2, Dawn for WebGPU); frame times are
+wall time per frame, native then the layer.
+
+- **How a package finds the layer.** `compatTier(device)` and `loadCompatRoute(device, load)` in `packages/shared`
+  (`compat.js`): the layer's devices report the adapter vendor `margo-webgl2`. A package with a route starts its
+  `import('./compat.js')` in `setup` only there, so pages with WebGPU never download the route, and keeps its WebGPU
+  route until the chunk has loaded: the layer runs that route too (on its generic tiers, slowly), so no frame is drawn
+  differently and no package needs an asynchronous setup. Core never imports the helper (core + stage unchanged at
+  21,974 B gzip); the WGSL of every WebGPU route is byte-identical (checked against the previous commit).
+- **DOF.** Its CoC and bokeh kernels share 8x8 tile maxima through workgroup memory, which put them on the CPU tier:
+  913 ms a frame at 1280 x 720 (0.72 ms natively). The route computes the CoC per pixel, the tile maxima in a pass of
+  its own (one invocation per tile, the same 64 values) and the near-field reach per pixel from its neighbouring tiles;
+  all four kernels store only their own texel and run as fragment draws: 10.1 ms. Max is exact and order-free, so the
+  output equals the WebGPU route's.
+- **Splats.** The 8-pass radix sort (32 dispatches with workgroup histograms and scans) took 44 ms for 10,000 splats and
+  308 ms for 100,000. The route sorts the projected keys in one CPU dispatch (an LSD radix sort with 8-bit digits, 4
+  passes, stable on the whole 32-bit key, so the same order); the projection stays on the GPU: 17.9 and 39 ms (1.2 and
+  2.1 natively), with one readback of the keys a frame (a counted stall). The plan's worker sort with a frame of lag
+  is not needed for the same image.
+- **Culling.** `CulledInstances` (cull, scan and compaction kernels with workgroup scans, and the Hi-Z pyramid) took
+  11.7 ms for 10,000 parts (0.98 natively). The route runs the kernels' frustum test in double precision on the CPU
+  from the transforms the plugin keeps and uploads the kept records and the indirect arguments: 1.14 ms, no compute,
+  no stall. `CulledMeshes` does the same from core's batch records. A padded bounding sphere is conservative, so the
+  image is the same.
+- **Generic tiers as the route.** VFX and creative particles (a VFX preset) and scatter use atomics; the plan's
+  route for them is simulation and placement on the CPU, which is what the CPU tier does with their own kernels. Their checks pass on the layer (`--compat`). Budgets: VFX 6.5 ms for 5,000 particles and
+  48 ms for 50,000 (0.61 and 0.67 natively); scatter 5.4 ms for 10,000 instances and 40 ms for 100,000 (0.56 and 0.85).
+- **Refusals.** The voxel path tracer (out of scope: ANGLE's Direct3D compiler takes 20 s to minutes per kernel) and XR
+  (WebXR on WebGL2 needs `XRWebGLLayer`) refuse the layer with MargoError code `unsupported` naming what they need;
+  each message has a unit test.
+- **Checks.** `routes-browser.mjs` (in `npm run test:gpu`) draws DOF, splats, `CulledInstances` and `CulledMeshes`
+  natively and on the layer in exact-pixel mode once a frame's dispatches are the route's own: no pixel differs.
+  `routes.test.js` checks each route's tiers and computes the sort and the culling against the kernels' results. The
+  VFX and scatter LOD checks run with `--compat` in `npm run test:gpu`.
+- **Bugs found and fixed, each with a regression test.** (61) A buffer or texture destroyed right after the submit that used
+  it lost its GL object before that work ran when the queue was waiting for the compute part to load (an incomplete
+  framebuffer at DOF's first frames); WebGPU frees a resource only after the work submitted before. `destroy()` now
+  waits behind the queue's backlog (compute check, `destroyAfterSubmit`).
+  (58) On an AMD Radeon 680M (ANGLE Direct3D 11) the post-effects suite on the layer timed out filling the DOF example's
+  focus slider: DOF's kernels ran on the CPU tier, 2.4 s a frame at 1100 x 660 even on this PC (the fill took 14 s
+  here, over 30 s on the slower CPU), so the page never answered. The DOF route takes it to 11 ms a frame (the fill
+  15 ms); the suite now asserts on the layer that the example's frames dispatch nothing on the CPU tier.
+- **Accepted differences.** `'occlusion'` culling culls against the frustum only on the layer (the Hi-Z pyramid would
+  be a GPU readback every frame): the same image with more parts drawn. `CulledMeshes`' `minRadius` threshold is
+  tested in double precision, so a part exactly at the threshold may be kept on one path and dropped on the other.

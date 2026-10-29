@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4038591,
+  "total": 4040515,
   "history": [
     {
       "date": "2026-10-24",
@@ -812,6 +812,12 @@
       "commit": "4dd9de84",
       "reason": "biomes/objects +47 B (bug 64): a byte budget and the device texture limit for detail maps, checked before anything is allocated",
       "grew": 1
+    },
+    {
+      "date": "2026-10-29",
+      "commit": "a03b8fed",
+      "reason": "webgl2-compat M6: dof, splats and culling load their WebGL2 routes by import() only on the layer (lazy chunks counted; static entries grow by the detection hook only: dof +260 B, splats +167 B, culling +268 B gzip)",
+      "grew": 2
     }
   ],
   "items": {
@@ -882,7 +888,7 @@
     "@margoengine/creative/stars": 2909,
     "@margoengine/creative/targets": 2821,
     "@margoengine/creative/toon": 1188,
-    "@margoengine/culling": 9572,
+    "@margoengine/culling": 10778,
     "@margoengine/cutscene": 6845,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,
@@ -892,7 +898,7 @@
     "@margoengine/decoders/texture": 914,
     "@margoengine/decoders/tga": 1614,
     "@margoengine/decoders/tiff": 4129,
-    "@margoengine/dof": 7162,
+    "@margoengine/dof": 7880,
     "@margoengine/ecs": 1606,
     "@margoengine/environment": 29930,
     "@margoengine/environment/cube-camera": 5727,

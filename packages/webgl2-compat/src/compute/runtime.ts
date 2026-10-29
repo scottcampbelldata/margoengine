@@ -72,7 +72,8 @@ class Runtime implements ComputeRuntime {
   build(p: CompatComputePipeline): ComputeBuilt {
     const ir = p.module.ir,
       entry = p.entry;
-    if (!ir || !entry) throw new TypeError('The pipeline has no checked entry point; create it from a module that compiled');
+    if (!ir || !entry)
+      throw new TypeError('The pipeline has no checked entry point; create it from a module that compiled');
     const plan = planCompute(ir, entry, p.constants);
     if (plan.tier === 'cpu') return { tier: 'cpu', plan, kernel: compileCPU(ir, entry, p.constants) } as CPUBuilt;
     try {
@@ -144,6 +145,7 @@ class Runtime implements ComputeRuntime {
         this.device.validationError(`dispatchWorkgroups: no bind group is set at index ${i}`);
         return;
       }
+    this.device.dispatches[built.tier]++;
     if (built.tier === 'cpu') this.runCPU(r, built, groups, count);
     else this.runGPU(r, built, groups, count);
   }
@@ -151,7 +153,10 @@ class Runtime implements ComputeRuntime {
   private bound(groups: readonly BoundGroup[], group: number, binding: number): { bound: Bound; dynamic: number } {
     const g = groups[group],
       bound = g?.group.entries.get(binding);
-    if (!g || !bound) throw new TypeError(`No resource is bound at @group(${group}) @binding(${binding}); bind one in the bind group set there`);
+    if (!g || !bound)
+      throw new TypeError(
+        `No resource is bound at @group(${group}) @binding(${binding}); bind one in the bind group set there`,
+      );
     const di = g.group.layout.dynamic.indexOf(binding);
     return { bound, dynamic: di >= 0 ? (g.offsets[di] ?? 0) : 0 };
   }

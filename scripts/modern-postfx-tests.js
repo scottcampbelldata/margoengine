@@ -524,6 +524,26 @@ try {
   for (const name of ['dof', 'tonemap']) {
     await page.goto(`http://127.0.0.1:5193/packages/${name}/examples/index.html`);
     await page.waitForFunction(() => document.querySelector('#status')?.textContent?.startsWith('WebGPU ready'));
+    if (name === 'dof' && compat) {
+      // Bug 58: on the layer DOF's WebGPU kernels ran on the CPU tier (2.4 s a frame at 1100 x 660 here), so the
+      // page's main thread stayed busy and the fill below timed out on a slower CPU. Its route must be taken: frames
+      // with no CPU-tier dispatch, its kernels as fragment draws.
+      const route = await page.evaluate(async () => {
+        const gpu = window.dofDemo.stage.engine.gpu,
+          frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        for (let tries = 0; tries < 100; tries++) {
+          const before = { ...gpu.dispatches },
+            start = performance.now();
+          await frame();
+          const ms = (performance.now() - start) / 2;
+          if (gpu.dispatches.cpu === before.cpu && gpu.dispatches.fragment > before.fragment)
+            return { tries, ms, ...gpu.dispatches };
+        }
+        return { tries: -1, ...gpu.dispatches };
+      });
+      assert.ok(route.tries >= 0, `DOF on the WebGL2 layer never took its route: ${JSON.stringify(route)}`);
+      console.log(`DOF example on the WebGL2 layer: its route, ${route.ms.toFixed(1)} ms a frame`);
+    }
     if (name === 'dof') {
       await page.locator('#focus').fill('4');
       await page.locator('#focus').dispatchEvent('input');

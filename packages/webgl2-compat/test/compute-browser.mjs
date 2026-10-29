@@ -17,6 +17,7 @@ const TIERS = {
   cpuLoops: 'cpu',
   cpuSample: 'cpu',
   indirect: 'scatter',
+  destroyAfterSubmit: 'scatter',
   asyncPipeline: 'scatter',
 };
 

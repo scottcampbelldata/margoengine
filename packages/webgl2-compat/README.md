@@ -2,13 +2,14 @@
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: in development, milestones M0 to M5 of the [roadmap](../../docs/webgl2-compat-roadmap.md).** This package
+**Status: in development, milestones M0 to M6 of the [roadmap](../../docs/webgl2-compat-roadmap.md).** This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels
 as native WebGPU on the same GPU, and so do the render checks of materials (its compute scenarios included), glTF
 PBR, lines, points, text, lod and the skinned shadow check. Render shaders read storage buffers, and compute pipelines
 run (milestone M5): as fragment draws, as point draws, or on the CPU, whichever the shader allows (see Compute below).
+Packages whose WebGPU route would be slow there take a route of their own (milestone M6, see Package routes below).
 Render shaders that write storage buffers or textures are refused with MargoError code `unsupported`: WebGL2 render
 shaders cannot write them.
 
@@ -78,7 +79,16 @@ What it does:
   stores. The CPU tier cannot read cube, multisampled or external textures, and needs a page that allows JavaScript
   compiled at run time (Content-Security-Policy `unsafe-eval`); either refusal is MargoError code `unsupported`.
   `planCompute(stage)` tells which tier an entry point gets and why; `runComputeOnCPU(dispatch)` runs one on the CPU
-  with buffers, without a device.
+  with buffers, without a device. `device.dispatches` counts the dispatches each tier has run.
+- **Package routes** (milestone M6): a package asks whether its device is the layer's (the adapter vendor
+  `margo-webgl2`, never browser sniffing) and then loads a route of its own with `import()`, so pages with WebGPU never
+  download it; until it has loaded the package keeps its WebGPU route, which the layer also runs, so no frame is drawn
+  differently. DOF computes its 8x8 tile maxima without workgroup memory (all four of its kernels become fragment
+  draws: 10 ms instead of 0.9 s a frame at 720p); splats sort their depth keys in one CPU dispatch (18 ms instead of
+  44 ms for 10,000 splats; one readback of the keys a frame); `CulledInstances` and `CulledMeshes` cull against the
+  frustum on the CPU and upload what they keep (1.1 ms instead of 11.7 ms for 10,000 parts; `'occlusion'` culls
+  against the frustum only there). Each draws the same pixels as on native WebGPU. VFX, creative particles and
+  scatter run their WebGPU kernels on the CPU tier, the plan's route for them. The voxel path tracer and XR refuse the layer with MargoError code `unsupported`.
 - **WGSL front end** (`margoengine/webgl2-compat/wgsl`, milestone M1): `checkWGSL(source)` and `parseWGSL(source)`.
 - `webgl2Capabilities(gl)` and `probeWebGL2()`: what a browser's WebGL2 offers and the tier it reaches. The layer
   renders only on the `full` tier: renderable float colour targets (`EXT_color_buffer_float`) and `highp` in fragment
@@ -199,12 +209,15 @@ browsers' own WebGPU compilers, where it was recorded.
 - Package checks in forced-compatibility mode: `--compat` on a check that opens its pages with the repository's
   browser harness runs every page on the layer. The materials check (its compute scenarios included: clustered
   lights, image-based lighting, GPU culling of instances), the glTF PBR shader review, lod, lines, text, the shadows
-  lit-faces check (a skinned robot), the voxel render check, the environment check and the post-effects suite pass
-  whole, and points on its single-sample path (its 4x eye-dome lighting shades per sample, which WebGL2 cannot).
-- The compute check against native WebGPU in one page (`npm run test:gpu`): 11 cases over the three tiers (own-texel
+  lit-faces check (a skinned robot), the voxel render check, the environment check, the post-effects suite, the VFX
+  check and scatter's LOD check pass whole, and points on its single-sample path (its 4x eye-dome lighting shades per sample, which WebGL2 cannot).
+- The package routes against native WebGPU (`npm run test:gpu`): DOF, splats, `CulledInstances` and `CulledMeshes`
+  each draw the same scene natively and on the layer once a frame's dispatches are their route's; no pixel differs.
+- The compute check against native WebGPU in one page (`npm run test:gpu`): 12 cases over the three tiers (own-texel
   stores into 2D, array, 3D and mip-level views, a read-write storage texture, struct and word stores at
   data-dependent indexes, atomics with workgroup memory and barriers, texture reads, stores and sampling on the CPU,
-  indirect dispatch, overrides, and queue order around the lazy load).
+  indirect dispatch, overrides, queue order around the lazy load, and resources destroyed right after the submit
+  that uses them while it waits for that load).
 - The corpus (`npm run test:browser`): all 1,049 vertex and fragment entry points compile, all 459 distinct stage pairs
   of the recorded render pipelines link, all 624 recorded render pipelines draw once through the device, and 397
   recorded compute pipelines are translated for their tier and dispatched once (the voxel path tracer's 20, out of
