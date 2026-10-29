@@ -22,12 +22,33 @@ export class PlacementLayout {
 
 export class Scatter implements EnginePlugin {
     readonly name: string;
+    protected engine?: Engine;
+    protected uniform?: GPUBuffer;
+    protected instances: GPUBuffer[];
+    protected commands?: GPUBuffer;
+    protected fallback?: GPUTexture;
+    protected compute?: GPUComputePipeline;
+    protected readonly values: Float32Array;
+    protected readonly meta: Uint32Array;
+    protected readonly geometries: readonly Geometry[];
     readonly count: number;
+    protected terrain?: GPUTexture;
+    protected computeGroup?: GPUBindGroup;
+    protected readonly options: ScatterOptions;
     constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input?: ScatterOptions);
     static attach(engine: EngineKernel, geometry: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterOptions): Scatter;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     registerPasses(graph: FrameGraph): void;
+    protected cullCode(): string;
+    protected extraEntries(): ({
+        buffer: GPUBuffer;
+    } | GPUTextureView)[];
+    protected extraChanged: boolean;
+    protected dispatched(): number;
+    protected beforeDistribute(_c: ScatterPassContext): void;
+    protected ringCapacity(): number;
+    protected release(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -97,6 +118,9 @@ export interface ScatterOptions {
     sink?: number;
     edgeShrink?: number;
     blades?: ScatterBlades;
+    bounds?: readonly [number, number, number, number];
+    densityMap?: () => GPUTexture | undefined;
+    follow?: boolean;
 }
 
 export type ScatterWind = readonly [number, number, number];
@@ -113,9 +137,15 @@ export function radialPlacements(centers: readonly (readonly [number, number])[]
 
 export function randomPlacements(total: number, bounds: GroundBounds, scale: readonly [number, number], seed?: number): GroundPlacement[];
 
+export function scatterCullShader(o: ScatterOptions): string;
+
 export function spacePlacements(candidates: readonly GroundPlacement[], radius: number, gap?: number): GroundPlacement[];
 
 // Not exported from this entry, but used by the exports above:
+
+type ScatterPassContext = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 type ScatterPassContext = Extract<PassContext, {
     backend: 'webgpu';

@@ -13,6 +13,7 @@ export class BiomeView implements Disposable {
     readonly textureResolution: number;
     private constructor();
     static attach(engine: EngineKernel, world: BiomeWorld, options?: BiomeViewOptions): Promise<BiomeView>;
+    get objects(): import('@margoengine/biomes/objects').BiomeObjects | undefined;
     whenIdle(): Promise<void>;
     dispose(): void;
     [Symbol.dispose](): void;
@@ -28,6 +29,8 @@ export interface BiomeViewOptions {
         readonly levels?: number;
     };
     readonly signal?: AbortSignal;
+    readonly objects?: boolean;
+    readonly detailRadius?: number;
 }
 
 export const MATERIALS: Readonly<Record<string, MaterialLook>>;

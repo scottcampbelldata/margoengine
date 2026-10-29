@@ -40,6 +40,11 @@ export const ROOF_PITCH: number;
 
 export const SIMPLEX_SCALE: readonly number[];
 
+export interface TreeMesh {
+    readonly trunk: GeometryData;
+    readonly canopy: GeometryData;
+}
+
 export const WARP_OFFSETS: readonly number[];
 
 export interface WarpOptions {
@@ -64,6 +69,10 @@ export function domainWarp(noise: NoiseFunction, { warp, strength, dimensions }?
 
 export function fbm(noise: NoiseFunction, options?: FractalOptions): NoiseFunction;
 
+export function generateAcaciaMesh(): TreeMesh;
+
+export function generateBirchMesh(): TreeMesh;
+
 export function generateCabinMesh(height: HeightField, position?: readonly [number, number]): {
     floor: number;
     siding: GeometryData;
@@ -72,13 +81,21 @@ export function generateCabinMesh(height: HeightField, position?: readonly [numb
     glass: GeometryData;
 };
 
+export function generateCactusMesh(): GeometryData;
+
 export function generateFernMesh(): GeometryData;
 
 export function generateGrassMesh(blades?: number): GeometryData;
 
+export function generatePalmMesh(): TreeMesh;
+
+export function generateReedMesh(stems?: number): GeometryData;
+
 export function generateRockMesh(): GeometryData;
 
 export function generateShrubMesh(): GeometryData;
+
+export function generateSnagMesh(): TreeMesh;
 
 export function generateTreeMesh(kind: 'conifer' | 'broadleaf'): {
     trunk: GeometryData;
@@ -86,6 +103,8 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf'): {
     center: Float32Array<ArrayBuffer>;
     radius: number;
 };
+
+export function generateTundraShrubMesh(): GeometryData;
 
 export function marchingCubes(field: DensityField | ArrayLike<number>, { resolution, bounds, level }?: MarchingCubesOptions): Geometry | null;
 

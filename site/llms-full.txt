@@ -5863,14 +5863,14 @@ work today (run in a clone, or install local tarballs).
 A biome map turns a heightmap and a few climate settings into tiled layers: climate fields, biome weights and masks
 that terrain, scatter and a terrain editor read. This package is optional and tree-shakable and adds 0 bytes to core
 and the stage. It is built in milestones: this release has the integer foundation, climate fields, biome classification with
-presets, a terrain view, editor hooks and the placement of trees, shrubs, rocks and props; drawing them through
-scatter comes next.
+presets, a terrain view, editor hooks and the placement of trees, shrubs, rocks and props; drawn through scatter
+by the view.
 
 Entries, each loaded only when used: the root (`BiomeWorld`, fields, classification), `/presets` (eight biomes, their
 worlds and the reference world `R16`), `/relief` (the procedural landscape; `BiomeWorld.create` loads it only for a
 relief height, the default), `/digest` (canonical bytes and SHA-256, loaded by `world.digest`), `/zones` (Whittaker and
 Holdridge classifiers), `/koppen` (Koppen-Geiger labels), `/toolkit` (the integer helpers), `/placement` (stored objects), `/stats`
-(point-pattern statistics), `/view` and `/editor`. The
+(point-pattern statistics), `/view`, `/objects` (stored objects and detail drawn through scatter) and `/editor`. The
 lazily loaded ones come through the package name, so an app holds one copy of each module.
 
 ## A world in three lines
@@ -6467,6 +6467,10 @@ The sandbox supplies phase/speed from the shared controls module.
 across split vertices while preserving UV seams and tangent frames.
 `generateFernMesh()` produces seven curved, tapered ribbon fronds; use a
 double-sided material. Both return `GeometryData` and are deterministic.
+For the biome presets there are more plants: `generatePalmMesh()`, `generateBirchMesh()`, `generateAcaciaMesh()` and
+`generateSnagMesh()` (a dead standing tree, empty canopy) return `{ trunk, canopy }` like `generateTreeMesh`, and
+`generateCactusMesh()`, `generateReedMesh(stems = 9)` (double sided) and `generateTundraShrubMesh()` return one
+`GeometryData`; each is rooted at the origin, +Y up, in metres.
 `contactAO(y, groundY)` gives bounded ground-contact occlusion, and
 `radialAO(x,y,z,center,radius)` shades enclosed canopy volumes. Use their output
 with `pbrVertexStream()` from geometry to bake ambient occlusion into vertex alpha
@@ -6486,21 +6490,6 @@ Surface extraction is the package's own marching tetrahedra (since 5l.v; it repl
 For a surface that changes every frame (metaballs, sculpting), pass the samples instead of a function: a grid of
 `resolution[0] * [1] * [2]` values, x fastest, then y, then z, sampled at the grid points of `bounds`. Writing each
 blob only into the samples near it is far cheaper than a function that sums every blob at every grid point.
-
-```ts
-import {marchingCubes} from 'margoengine/procedural';
-const n = 48, grid = new Float32Array(n * n * n).fill(1); // 1: outside
-for (let z = 0, i = 0; z < n; z++)
-  for (let y = 0; y < n; y++)
-    for (let x = 0; x < n; x++, i++) grid[i] = Math.hypot(x - 24, y - 24, z - 24) / 16 - 1; // a sphere
-const sphere = marchingCubes(grid, {resolution: [n, n, n]}); // normals from the grid's gradient
-```
-
-```ts
-import {generateTreeMesh, generateShrubMesh} from 'margoengine/procedural';
-const pine = generateTreeMesh('conifer'); // Also accepts 'broadleaf'.
-const bush = generateShrubMesh();
-```
 
 [README continues: https://margoengine.com/llms/packages/procedural.md]
 
