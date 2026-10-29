@@ -1,5 +1,5 @@
 {
-  "commit": "1b282ebe",
+  "commit": "e92cb5cc",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -86,8 +86,8 @@
         "gzip": 3619
       },
       "./view": {
-        "raw": 18268,
-        "gzip": 7493
+        "raw": 18297,
+        "gzip": 7514
       },
       "./objects": {
         "raw": 7960,
