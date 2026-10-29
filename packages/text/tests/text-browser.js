@@ -3,6 +3,7 @@ import { engineRuntime } from '@margoengine/core/extension';
 import { SceneTarget } from '../../shared/msaa.js';
 import { TextRenderer, Text, Font } from '@margoengine/text';
 import { webglRenderer } from '@margoengine/webgl';
+import { buildColorFont, COLOR_FONT_FAMILY } from './color-font.js';
 
 /** The class of a GPU object (WebGPU's, or the WebGL2 compatibility layer's), from one probe it then destroys. */
 const probeClass = (object) => {
@@ -377,15 +378,50 @@ window.runTextTests = async () => {
   await settle(runtime.gpu);
 
   // 7. Emoji render as color bitmaps.
-  label.set({ text: '\u{1F600}\u{1F680}', fontSize: 2, anchorX: 'center', anchorY: 'middle' });
+  const yellowInk = ([r, g, b]) => r > 180 && g > 130 && b < 90,
+    greenInk = ([r, g, b]) => r < 60 && g > 180 && b < 60;
+  // 7a. With the system's colour emoji font, where the machine has one (a headless Linux server often has none).
+  const systemEmoji = font.glyph('\u{1F600}');
+  if (systemEmoji?.color) {
+    label.set({ text: '\u{1F600}\u{1F680}', fontSize: 2, anchorX: 'center', anchorY: 'middle' });
+    image = await frame();
+    const yellow = ink(image, yellowInk).count;
+    report.emoji = { colorGlyphs: renderer.atlas.colorGlyphs, yellowPixels: yellow };
+    assert(
+      renderer.atlas.colorGlyphs >= 1 && yellow > 100,
+      `Emoji not drawn in color: ${JSON.stringify(report.emoji)}`,
+    );
+    report.checks.push('System emoji are rasterized as color bitmaps');
+  } else {
+    report.skipped = [
+      `System emoji check skipped: no colour emoji font for ${font.family} on this machine (U+1F600 rasterizes ${
+        systemEmoji ? 'without colour' : 'empty'
+      }); the test colour font below covers the colour glyph path`,
+    ];
+    console.log(report.skipped[0]);
+  }
+  // 7b. With a colour font the test builds itself (tests/color-font.js), the same on every machine: its flat palette
+  // colours must reach the screen through the colour atlas.
+  const colorFont = new Font({ face: new FontFace(COLOR_FONT_FAMILY, buildColorFont()) });
+  await colorFont.load();
+  const colorsBefore = renderer.atlas.colorGlyphs;
+  label.set({ text: '\u{1F600}\u{1F680}', font: colorFont, fontSize: 2, anchorX: 'center', anchorY: 'middle' });
   image = await frame();
-  const yellow = ink(image, ([r, g, b]) => r > 180 && g > 130 && b < 90).count;
-  report.emoji = { colorGlyphs: renderer.atlas.colorGlyphs, yellowPixels: yellow };
-  assert(renderer.atlas.colorGlyphs >= 1 && yellow > 100, `Emoji not drawn in color: ${JSON.stringify(report.emoji)}`);
-  report.checks.push('Emoji are rasterized as color bitmaps');
+  report.testColorFont = {
+    colorGlyphs: renderer.atlas.colorGlyphs - colorsBefore,
+    yellowPixels: ink(image, yellowInk).count,
+    greenPixels: ink(image, greenInk).count,
+  };
+  assert(
+    report.testColorFont.colorGlyphs === 2 &&
+      report.testColorFont.yellowPixels > 300 &&
+      report.testColorFont.greenPixels > 300,
+    `Test colour font emoji not drawn in color: ${JSON.stringify(report.testColorFont)}`,
+  );
+  report.checks.push('Emoji from a COLR/CPAL colour font are rasterized as color bitmaps in their palette colours');
 
   // 8. Atlas growth with many distinct glyphs; earlier glyphs survive the growth unchanged.
-  label.set({ text: 'Hello', fontSize: 1.2, anchorX: 'left', anchorY: 'middle' });
+  label.set({ text: 'Hello', font, fontSize: 1.2, anchorX: 'left', anchorY: 'middle' });
   const before = await frame(),
     beforeInk = ink(before);
   const cjkFont = new Font({

@@ -16,6 +16,7 @@ import {
   TextRenderer,
   parseColor,
 } from '../dist/index.js';
+import { buildColorFont, COLOR_FONT_PALETTE } from './color-font.js';
 
 const close = (actual, expected, message = '', epsilon = 1e-9) =>
   assert.ok(Math.abs(actual - expected) <= epsilon, `${message} expected ${expected}, got ${actual}`);
@@ -566,4 +567,42 @@ test('cached Text layouts skip snapshot array construction and retain all invali
     metrics: mock.metrics,
   });
   assert.notEqual(text.layout, layout, 'different font identity invalidates layout');
+});
+
+test('the in-memory colour test font is a well-formed sfnt with COLR/CPAL and both emoji mapped', () => {
+  const bytes = new Uint8Array(buildColorFont()),
+    view = new DataView(bytes.buffer);
+  let sum = 0;
+  for (let i = 0; i < bytes.length; i += 4) sum = (sum + view.getUint32(i)) >>> 0;
+  assert.equal(bytes.length % 4, 0);
+  assert.equal(sum, 0xb1b0afba, 'whole-font checksum matches head.checkSumAdjustment');
+  const count = view.getUint16(4),
+    tables = {};
+  for (let i = 0; i < count; i++) {
+    const at = 12 + 16 * i,
+      tag = String.fromCharCode(...bytes.subarray(at, at + 4));
+    tables[tag] = { offset: view.getUint32(at + 8), length: view.getUint32(at + 12) };
+  }
+  const tags = Object.keys(tables);
+  assert.deepEqual(tags, [...tags].sort(), 'table records sorted by tag');
+  for (const tag of ['COLR', 'CPAL', 'OS/2', 'cmap', 'glyf', 'head', 'hhea', 'hmtx', 'loca', 'maxp', 'name', 'post'])
+    assert.ok(tables[tag], `${tag} present`);
+  // cmap format 12 subtable maps U+1F600 to glyph 1 and U+1F680 to glyph 2.
+  const cmap = tables.cmap.offset,
+    sub = cmap + view.getUint32(cmap + 4 + 8 + 4);
+  assert.equal(view.getUint16(sub), 12);
+  assert.deepEqual(
+    [0, 1].map((g) => [view.getUint32(sub + 16 + 12 * g), view.getUint32(sub + 24 + 12 * g)]),
+    [
+      [0x1f600, 1],
+      [0x1f680, 2],
+    ],
+  );
+  // CPAL colour records are BGRA and match the exported palette.
+  const cpal = tables.CPAL.offset,
+    records = cpal + view.getUint32(cpal + 8);
+  assert.deepEqual(
+    COLOR_FONT_PALETTE.map((_, i) => [bytes[records + 4 * i + 2], bytes[records + 4 * i + 1], bytes[records + 4 * i]]),
+    COLOR_FONT_PALETTE,
+  );
 });
