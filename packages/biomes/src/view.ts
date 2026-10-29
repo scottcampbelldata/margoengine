@@ -4,9 +4,9 @@
 // overview from the region grid first, then 1 m tiles streamed around the camera and ahead of it along its velocity
 // (a 300 km/h flight crosses a 256 m tile every 3.1 s), nearest first, and again for every dirty rectangle the world
 // reports (so painting shows up). On a world with workers the tiles, their ground weights and their objects are made
-// there; the page only copies finished arrays in, a few per frame within a time budget, and tiles that fall behind the
-// camera before they arrive are cancelled. Terrain is loaded with import() on attach, so this entry costs nothing
-// until it is used.
+// there; the page only sends the jobs and copies finished arrays in, a few per frame within a time budget, and tiles
+// that fall behind the camera before they arrive are cancelled. Terrain is loaded with import() on attach, so this
+// entry costs nothing until it is used.
 // Ground layer rules use the same Wendland bands as biome envelopes (define.ts); materials are generated textures.
 import type { EngineKernel } from '@margoengine/core';
 import type { Terrain, TerrainColorOptions } from '@margoengine/terrain';
@@ -64,7 +64,8 @@ export interface BiomeViewOptions {
   readonly detailRadius?: number;
   /** Seconds ahead along the camera's velocity that tiles are fetched early. Default 3. */
   readonly lookahead?: number;
-  /** Milliseconds per frame the page may spend copying arrived tiles in (one always goes in). Default 0.25. */
+  /** Milliseconds per frame the page may spend streaming: sending tile jobs to the world's workers and copying
+   * arrived tiles in, nearest first (one always goes in). Default 0.25. */
   readonly budget?: number;
   /** Most bytes of detail density maps (`BiomeObjects` `detailBudget`); the view coarsens detail maps to fit. Default
    * 128 MiB. */
@@ -304,12 +305,18 @@ export class BiomeView implements Disposable {
   #off: () => void;
   #offObjects?: () => void;
   /** Streaming: tiles drawn at full detail, tiles whose objects are on the GPU, jobs on their way (`v` view, `p`
-   * objects, then `x,z`), finished jobs waiting to be copied in, the camera's last place and velocity. */
+   * objects, then `x,z`) with their tile, the frame's streaming work (finished jobs waiting to be copied in, jobs
+   * waiting to be sent), the camera's last place and velocity. */
   readonly #drawn = new Set<string>();
   /** Tiles whose objects are on the GPU, and whether they went in near the camera (with the small plants). */
   readonly #placed = new Map<string, boolean>();
-  readonly #pending = new Map<string, AbortController>();
-  readonly #arrived: { priority: number; apply: () => void; key: string; last: boolean }[] = [];
+  readonly #pending = new Map<
+    string,
+    { readonly controller: AbortController; readonly x: number; readonly z: number }
+  >();
+  readonly #arrived: { priority: number; apply: () => void; key: string; last: boolean; send?: boolean }[] = [];
+  /** True while a frame plans: jobs it starts are sent within the frame budget, not all at once. */
+  #inFrame = false;
   /** Copying time spent so far on tiles whose steps are not all in, by job key. */
   readonly #work = new Map<string, number>();
   #eye?: [number, number];
@@ -323,7 +330,7 @@ export class BiomeView implements Disposable {
   #drainTimer?: ReturnType<typeof setTimeout>;
   /**
    * Page-thread time each arrived tile took to copy in, milliseconds (the last 600 tiles, terrain and objects apart),
-   * and the copying time of each frame that copied any: for budgets and tests.
+   * and the streaming time (copying tiles in, sending jobs) of each frame that did any: for budgets and tests.
    */
   readonly tileTimes: number[] = [];
   readonly frameTimes: number[] = [];
@@ -480,7 +487,14 @@ export class BiomeView implements Disposable {
     }
     this.#eye = eye;
     const moved = this.#planned ? Math.hypot(eye[0] - this.#planned[0], eye[1] - this.#planned[1]) : Infinity;
-    if (moved > this.#world.tileSize / 8 || this.#frames % 30 === 0) this.#plan(false);
+    if (moved > this.#world.tileSize / 8 || this.#frames % 30 === 0) {
+      this.#inFrame = true;
+      try {
+        this.#plan(false);
+      } finally {
+        this.#inFrame = false;
+      }
+    }
     this.#apply(this.#budget);
   }
 
@@ -527,14 +541,8 @@ export class BiomeView implements Disposable {
       }
     }
     // Cancel what fell out of range on its way; take objects of tiles behind the camera off the GPU.
-    for (const [key, controller] of this.#pending) {
-      const [x, z] = key.slice(1).split(',').map(Number);
-      if (Math.min(near(x, z, eye), near(x, z, ahead)) > r + side) {
-        controller.abort();
-        this.#pending.delete(key);
-        this.#first?.delete(key);
-      }
-    }
+    for (const [key, job] of this.#pending)
+      if (Math.min(near(job.x, job.z, eye), near(job.x, job.z, ahead)) > r + side) this.#cancel(key);
     for (const [key, close] of this.#placed) {
       const [x, z] = key.split(',').map(Number),
         d = near(x, z, eye);
@@ -564,17 +572,52 @@ export class BiomeView implements Disposable {
           .then((tile) => viewTile(w, tile, this.materials, step));
   }
 
-  /** Starts one job: `v` the tile's terrain, `p` its objects; the result waits in `#arrived` to be copied in. */
+  /**
+   * Starts one job: `v` the tile's terrain, `p` its objects; the result waits in `#arrived` to be copied in. A job a
+   * frame starts is sent within the frame budget, nearest first, along with the copying: a send to an idle worker
+   * wakes its thread (about 40 microseconds on a desktop, several times that on a laptop), and one plan may start a
+   * dozen jobs.
+   */
   #fetch(kind: 'v' | 'p', x: number, z: number, priority: number): void {
     const key = kind + `${x},${z}`,
-      controller = new AbortController(),
-      signal = this.#signal ? AbortSignal.any([this.#signal, controller.signal]) : controller.signal,
+      job = { controller: new AbortController(), x, z },
       made = this.#made.get(key);
-    this.#pending.set(key, controller);
-    // A prefetched tile is ready already; it still goes in through the frame budget.
+    this.#pending.set(key, job);
+    // A prefetched tile is ready already (nothing to send); it still goes in through the frame budget.
+    if (made || !this.#inFrame) this.#start(kind, key, job, priority, made);
+    else {
+      this.#arrived.push({
+        priority,
+        key,
+        last: false,
+        send: true,
+        apply: () => this.#start(kind, key, job, priority),
+      });
+      this.#drainTimer ??= setTimeout(this.#drain, 50);
+    }
+  }
+
+  /** Drops a job on its way: aborts it, or takes it out of the frame's work when it was not sent yet. */
+  #cancel(key: string): void {
+    this.#pending.get(key)?.controller.abort();
+    this.#pending.delete(key);
+    this.#first?.delete(key);
+    const at = this.#arrived.findIndex((w) => w.send && w.key === key);
+    if (at >= 0) this.#arrived.splice(at, 1);
+  }
+
+  #start(
+    kind: 'v' | 'p',
+    key: string,
+    job: { readonly controller: AbortController; readonly x: number; readonly z: number },
+    priority: number,
+    made?: ViewTile | PlacedTile,
+  ): void {
+    const { controller, x, z } = job,
+      signal = this.#signal ? AbortSignal.any([this.#signal, controller.signal]) : controller.signal;
     (made ? Promise.resolve(made) : this.#make(kind, x, z, priority, signal)).then(
       (result) => {
-        if (this.#pending.get(key) !== controller || this.#disposed) return;
+        if (this.#pending.get(key) !== job || this.#disposed) return;
         this.#pending.delete(key);
         if (kind === 'p') {
           // Objects go in a species at a time (each step is small), so one tile never takes a whole frame.
@@ -606,7 +649,7 @@ export class BiomeView implements Disposable {
         this.#drainTimer ??= setTimeout(this.#drain, 50);
       },
       () => {
-        if (this.#pending.get(key) === controller) this.#pending.delete(key);
+        if (this.#pending.get(key) === job) this.#pending.delete(key);
         this.#first?.delete(key);
         this.#settled();
       },
@@ -656,7 +699,10 @@ export class BiomeView implements Disposable {
     await Promise.all(jobs);
   }
 
-  /** Copies arrived tiles in, nearest first, until `budget` milliseconds are spent (one always goes in). */
+  /**
+   * Sends waiting jobs and copies arrived tiles in, nearest first, until `budget` milliseconds are spent (one always
+   * goes in).
+   */
   #apply(budget: number): void {
     const start = performance.now();
     let n = 0;
@@ -667,13 +713,14 @@ export class BiomeView implements Disposable {
       const [next] = this.#arrived.splice(best, 1),
         t0 = performance.now();
       next.apply();
+      n++;
+      if (next.send) continue;
       const spent = (this.#work.get(next.key) ?? 0) + performance.now() - t0;
       if (next.last) {
         this.#work.delete(next.key);
         this.tileTimes.push(spent);
         if (this.tileTimes.length > 600) this.tileTimes.shift();
       } else this.#work.set(next.key, spent);
-      n++;
     }
     if (n && Number.isFinite(budget)) {
       this.frameTimes.push(performance.now() - start);
@@ -707,8 +754,7 @@ export class BiomeView implements Disposable {
         z0 = w.bounds[1] + z * side;
       if (x0 < rect[2] && x0 + side > rect[0] && z0 < rect[3] && z0 + side > rect[1]) {
         this.#made.delete(kind + key);
-        this.#pending.get(kind + key)?.abort();
-        this.#pending.delete(kind + key);
+        this.#cancel(kind + key);
         // Terrain is made again by the next plan; objects are placed again now (they stay until the new ones are in).
         if (kind === 'v') this.#drawn.delete(key);
         else if (this.#placed.has(key)) {
@@ -858,7 +904,7 @@ export class BiomeView implements Disposable {
     this.#disposed = true;
     this.#off();
     this.#offObjects?.();
-    for (const controller of this.#pending.values()) controller.abort();
+    for (const job of this.#pending.values()) job.controller.abort();
     this.#pending.clear();
     this.#arrived.length = 0;
     clearTimeout(this.#drainTimer);

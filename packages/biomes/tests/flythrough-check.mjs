@@ -36,6 +36,17 @@ page.on('console', (m) => {
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
   await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+  // Regression: a frame that planned new tiles sent every job at once, outside the copy budget; on a laptop APU
+  // (Ryzen 7 7735HS, Radeon 680M) waking the workers made those frames the slowest 1 percent. With each send slowed to 2 ms, the view's work
+  // per frame must stay within one send plus its 0.25 ms budget (and the plan), not one send per job planned.
+  const SEND = 2,
+    slow = await page.evaluate((send) => window.check.slowSends(send), SEND);
+  console.log(`slow sends: ${slow.sends} sends over ${slow.frames} frames, view frame max ${slow.max.toFixed(1)} ms`);
+  assert.ok(slow.sends >= 8, `the flight sent ${slow.sends} jobs`);
+  assert.ok(
+    slow.max <= SEND + 1.5,
+    `the view spent ${slow.max.toFixed(1)} ms in one frame with ${SEND} ms sends: jobs went out beyond the frame budget`,
+  );
   const r = await page.evaluate(() => window.check.run()),
     median = (list) => [...list].sort((a, b) => a - b)[list.length >> 1],
     streamed = r.streamed.map(summary),
