@@ -18,6 +18,8 @@ export class BiomePlacement implements Disposable {
     onChange(listener: (rect: Rect) => void): () => void;
     tile(x: number, z: number, options?: {
         readonly signal?: AbortSignal;
+        readonly priority?: number;
+        readonly detail?: number;
     }): Promise<PlacedTile>;
     tiles(rect: Rect, options?: {
         readonly focus?: readonly [number, number];
@@ -48,6 +50,10 @@ export interface DensityMap {
     readonly mesh: string;
     readonly density: number;
     readonly data: Uint8Array;
+    readonly sampled?: {
+        readonly every: number;
+        readonly data: Uint8Array;
+    };
 }
 
 export type Exclusion = {
@@ -102,6 +108,11 @@ export interface PlacedTile {
         readonly unresolved: number;
         readonly rounds: Uint32Array;
     };
+    readonly groups?: readonly {
+        readonly species: number;
+        readonly dead: boolean;
+        readonly records: Uint8Array;
+    }[];
     forEachInstance(visit: (instance: InstanceView) => void): void;
 }
 
@@ -170,6 +181,7 @@ class BiomeWorld implements Disposable {
     readonly tilesZ: number;
     private constructor();
     static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
+    get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
     get biomes(): readonly BiomeDefinition[];
     get paint(): readonly PaintLayer[];
     overview(): {
@@ -210,6 +222,9 @@ interface BiomeWorldOptions {
     readonly classifier?: 'envelopes' | ZoneClassifier;
     readonly paint?: readonly PaintLayer[];
     readonly signal?: AbortSignal;
+    readonly workers?: number | false;
+    readonly createWorker?: () => Worker;
+    readonly cache?: number;
 }
 
 interface Climate {

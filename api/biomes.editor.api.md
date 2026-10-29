@@ -117,6 +117,7 @@ class BiomeWorld implements Disposable {
     readonly tilesZ: number;
     private constructor();
     static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
+    get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
     get biomes(): readonly BiomeDefinition[];
     get paint(): readonly PaintLayer[];
     overview(): {
@@ -157,6 +158,9 @@ interface BiomeWorldOptions {
     readonly classifier?: 'envelopes' | ZoneClassifier;
     readonly paint?: readonly PaintLayer[];
     readonly signal?: AbortSignal;
+    readonly workers?: number | false;
+    readonly createWorker?: () => Worker;
+    readonly cache?: number;
 }
 
 interface Climate {

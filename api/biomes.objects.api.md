@@ -15,6 +15,7 @@ export class BiomeObjects implements Disposable {
         readonly signal?: AbortSignal;
     }): Promise<void>;
     add(tile: PlacedTile, distance?: number): void;
+    steps(tile: PlacedTile, distance?: number): (() => void)[];
     remove(key: string): void;
     dispose(): void;
     [Symbol.dispose](): void;
@@ -26,7 +27,12 @@ export interface BiomeObjectsOptions {
     readonly radius?: number;
     readonly detailRadius?: number;
     readonly detailResolution?: number;
+    readonly detailBudget?: number;
 }
+
+export const DETAIL_BUDGET = 134217728;
+
+export function detailFits(bounds: readonly [number, number, number, number], resolution: number, species: number, limit: number, budget?: number): boolean;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -62,6 +68,8 @@ class BiomePlacement implements Disposable {
     onChange(listener: (rect: Rect) => void): () => void;
     tile(x: number, z: number, options?: {
         readonly signal?: AbortSignal;
+        readonly priority?: number;
+        readonly detail?: number;
     }): Promise<PlacedTile>;
     tiles(rect: Rect, options?: {
         readonly focus?: readonly [number, number];
@@ -127,6 +135,7 @@ class BiomeWorld implements Disposable {
     readonly tilesZ: number;
     private constructor();
     static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
+    get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
     get biomes(): readonly BiomeDefinition[];
     get paint(): readonly PaintLayer[];
     overview(): {
@@ -167,6 +176,9 @@ interface BiomeWorldOptions {
     readonly classifier?: 'envelopes' | ZoneClassifier;
     readonly paint?: readonly PaintLayer[];
     readonly signal?: AbortSignal;
+    readonly workers?: number | false;
+    readonly createWorker?: () => Worker;
+    readonly cache?: number;
 }
 
 interface Climate {
@@ -239,6 +251,10 @@ interface DensityMap {
     readonly mesh: string;
     readonly density: number;
     readonly data: Uint8Array;
+    readonly sampled?: {
+        readonly every: number;
+        readonly data: Uint8Array;
+    };
 }
 
 interface DetailRule {
@@ -340,6 +356,11 @@ interface PlacedTile {
         readonly unresolved: number;
         readonly rounds: Uint32Array;
     };
+    readonly groups?: readonly {
+        readonly species: number;
+        readonly dead: boolean;
+        readonly records: Uint8Array;
+    }[];
     forEachInstance(visit: (instance: InstanceView) => void): void;
 }
 

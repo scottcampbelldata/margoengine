@@ -11,10 +11,19 @@ export class BiomeView implements Disposable {
     readonly materials: readonly string[];
     readonly ready: Promise<void>;
     readonly textureResolution: number;
+    readonly tileTimes: number[];
+    readonly frameTimes: number[];
     private constructor();
     static attach(engine: EngineKernel, world: BiomeWorld, options?: BiomeViewOptions): Promise<BiomeView>;
+    prefetch(rect: readonly [number, number, number, number], options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<void>;
     get objects(): import('@margoengine/biomes/objects').BiomeObjects | undefined;
     whenIdle(): Promise<void>;
+    get streaming(): {
+        readonly pending: number;
+        readonly arrived: number;
+    };
     dispose(): void;
     [Symbol.dispose](): void;
 }
@@ -31,6 +40,9 @@ export interface BiomeViewOptions {
     readonly signal?: AbortSignal;
     readonly objects?: boolean;
     readonly detailRadius?: number;
+    readonly lookahead?: number;
+    readonly budget?: number;
+    readonly detailBudget?: number;
 }
 
 export const MATERIALS: Readonly<Record<string, MaterialLook>>;
@@ -40,11 +52,23 @@ export interface MaterialLook {
     readonly detail?: number;
 }
 
+export const VIEW_LAYERS: readonly string[];
+
+export interface ViewTile {
+    readonly x: number;
+    readonly z: number;
+    readonly count: number;
+    readonly heights: Float32Array;
+    readonly weights: readonly [Uint8Array, Uint8Array];
+}
+
 export function groundMaterials(biomes: readonly BiomeDefinition[]): string[];
 
 export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: readonly string[]): Uint8Array;
 
 export function terrainColorsFor(world: BiomeWorld, materials?: Readonly<Record<string, MaterialLook>>): Pick<TerrainColorOptions, 'sand' | 'meadow' | 'stone'>;
+
+export function viewTile(world: BiomeWorld, tile: BiomeTile, materials: readonly string[], step: number): ViewTile;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -105,6 +129,7 @@ class BiomeWorld implements Disposable {
     readonly tilesZ: number;
     private constructor();
     static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
+    get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
     get biomes(): readonly BiomeDefinition[];
     get paint(): readonly PaintLayer[];
     overview(): {
@@ -145,6 +170,9 @@ interface BiomeWorldOptions {
     readonly classifier?: 'envelopes' | ZoneClassifier;
     readonly paint?: readonly PaintLayer[];
     readonly signal?: AbortSignal;
+    readonly workers?: number | false;
+    readonly createWorker?: () => Worker;
+    readonly cache?: number;
 }
 
 interface Climate {
