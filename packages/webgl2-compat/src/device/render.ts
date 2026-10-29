@@ -121,6 +121,8 @@ function targetKey(t: TargetState | null): string {
 
 /** A GPURenderPipeline: a linked program, its vertex layout and VAO, its fixed-function state and its binding table. */
 export class CompatRenderPipeline {
+  // When the GLSL went to WebGL2 (device.programs.linkMs).
+  private handedOver = 0;
   label: string;
   readonly program: WebGLProgram | null = null;
   readonly vao: WebGLVertexArrayObject | null = null;
@@ -170,7 +172,8 @@ export class CompatRenderPipeline {
     deferLink = false,
     prebuilt?: GLSLProgram,
   ) {
-    const gl = device.gl;
+    const gl = device.gl,
+      started = performance.now();
     this.label = descriptor.label ?? '';
     const prim = descriptor.primitive ?? {};
     this.mode = device.enum(TOPOLOGY[prim.topology ?? 'triangle-list']);
@@ -267,6 +270,9 @@ export class CompatRenderPipeline {
         });
       }
     }
+    this.handedOver = performance.now();
+    device.programs.count++;
+    device.programs.translateMs += this.handedOver - started;
     const program = gl.createProgram() as WebGLProgram;
     for (const stage of [this.glsl.vertex, this.glsl.fragment]) {
       const s = gl.createShader(stage.stage === 'vertex' ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER) as WebGLShader;
@@ -311,6 +317,7 @@ export class CompatRenderPipeline {
   finish(): void {
     if (this.linked || !this.program || this.failure) return;
     this.linked = true;
+    this.device.programs.linkMs += performance.now() - this.handedOver;
     const gl = this.device.gl,
       program = this.program,
       glsl = this.glsl as GLSLProgram;

@@ -1,0 +1,168 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>WebGL2 compatibility: performance</title>
+</head>
+<body style="margin:0">
+<canvas style="width:960px;height:540px"></canvas>
+<script type="module">
+// Milestone M7 measurements, one page load per run: ?mode=native|compat&scene=basic|dof|splats|instances&layer=<url
+// of a built layer root, default the package's dist>. perf-browser.mjs drives it on each browser and ANGLE back end.
+// Reports the start-up (Engine.create to the first finished frame), the layer's program counters, frame time as
+// throughput (frames rendered back to back, then one wait for the GPU) and the state cache's hit rate over those frames.
+import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+
+const q = new URLSearchParams(location.search);
+const mode = q.get('mode') ?? 'native',
+  scene = q.get('scene') ?? 'basic',
+  layer = q.get('layer') ?? '/packages/webgl2-compat/dist/index.js';
+const errors = [];
+addEventListener('error', (e) => errors.push(String(e.message)));
+addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.message ?? e.reason)));
+
+// The parity check's scene: a lit grid of 24 cubes, a mirrored mesh, a one-sided mesh and a floor.
+function grid(engine) {
+  const cube = box(1, 1, 1);
+  for (let i = 0; i < 6; i++)
+    for (let j = 0; j < 4; j++)
+      engine.createMesh().setGeometry(cube)
+        .setMaterial(new PbrMaterial({ color: [0.2 + i * 0.13, 0.9 - j * 0.2, 0.3 + ((i * j) % 5) * 0.12], roughness: 0.1 + j * 0.25, metalness: i / 5 }))
+        .setPosition([(i - 2.5) * 1.4, 0.5, (j - 1.5) * 1.4]).setRotation([0.3 * j, 0.4 * i, 0]);
+  engine.createMesh().setGeometry(cube).setMaterial(new PbrMaterial({ color: '#d04020', roughness: 0.3 })).setPosition([0, 2.2, -2]).setScale([-1.5, 0.6, 1]);
+  engine.createMesh().setGeometry(cube).setMaterial(new PbrMaterial({ color: '#808080', roughness: 0.9 })).setPosition([0, -0.1, 0]).setScale([12, 0.2, 9]);
+}
+const scenes = {
+  basic: async (engine) => grid(engine),
+  async dof(engine) {
+    grid(engine);
+    const { DOF } = await import('/packages/dof/dist/index.js');
+    DOF.attach(engine, { focalDistance: 6, focalLength: 0.05, aperture: 1.4, maxRadius: 16 });
+  },
+  async splats(engine) {
+    const { Splats } = await import('/packages/splats/dist/index.js');
+    const n = 20000, positions = new Float32Array(n * 3), covariances = new Float32Array(n * 6), colors = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) {
+      const a = i * 2.39996, r = Math.sqrt(i / n) * 4;
+      positions.set([Math.cos(a) * r, Math.sin(i * 0.37) * 1.2 + 0.5, Math.sin(a) * r], i * 3);
+      covariances.set([0.01, 0.002, 0, 0.01, 0, 0.008], i * 6);
+      colors.set([0.3 + (i % 7) / 10, 0.4 + (i % 5) / 10, 0.9 - (i % 3) / 5, 0.6], i * 4);
+    }
+    Splats.attach(engine, { positions, covariances, colors });
+  },
+  async instances(engine) {
+    const { CulledInstances } = await import('/packages/culling/dist/index.js');
+    const n = 10000, transforms = new Float32Array(n * 16);
+    for (let i = 0; i < n; i++)
+      transforms.set([0.1, 0, 0, 0, 0, 0.1, 0, 0, 0, 0, 0.1, 0, (i % 100) * 0.2 - 10, 0.2, -Math.floor(i / 100) * 0.2 + 5, 1], i * 16);
+    CulledInstances.attach(engine, [{ geometry: box(1, 1, 1), material: new PbrMaterial({ color: '#c08040' }), transforms }]);
+  },
+};
+
+// The scatter tier's cost: 65,536 invocations each storing `words` u32 at its own record (a point draw per stored
+// word on the layer), dispatched back to back; per dispatch.
+async function scatter(words) {
+  const device = await (await navigator.gpu.requestAdapter()).requestDevice(),
+    n = 65536;
+  const fields = Array.from({ length: words }, (_, k) => `w${k}: u32`).join(', '),
+    values = Array.from({ length: words }, (_, k) => `id.x * ${k + 1}u + k.x`).join(', ');
+  const module = device.createShaderModule({
+    code: `struct R { ${fields} }
+      @group(0) @binding(0) var<storage, read_write> out: array<R>;
+      @group(0) @binding(1) var<uniform> k: vec4u;
+      @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) { out[id.x] = R(${values}); }`,
+  });
+  const pipeline = await device.createComputePipelineAsync({ layout: 'auto', compute: { module, entryPoint: 'main' } });
+  const out = device.createBuffer({ size: n * words * 4, usage: GPUBufferUsage.STORAGE }),
+    k = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const group = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: out } }, { binding: 1, resource: { buffer: k } }] });
+  const dispatch = () => {
+    const e = device.createCommandEncoder(), pass = e.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, group);
+    pass.dispatchWorkgroups(n / 64);
+    pass.end();
+    device.queue.submit([e.finish()]);
+  };
+  dispatch();
+  await device.queue.onSubmittedWorkDone();
+  window.check = {
+    async measure(frames = 20, rounds = 5) {
+      const times = [];
+      for (let r = 0; r < rounds; r++) {
+        const t = performance.now();
+        for (let i = 0; i < frames; i++) dispatch();
+        await device.queue.onSubmittedWorkDone();
+        times.push((performance.now() - t) / frames);
+      }
+      times.sort((a, b) => a - b);
+      return { vendor: device.adapterInfo?.vendor ?? null, frame: times[Math.floor(rounds / 2)], tier: pipeline.built?.tier ?? null, errors: errors.splice(0) };
+    },
+  };
+  window.ready = true;
+}
+
+async function main() {
+  const canvas = document.querySelector('canvas');
+  if (mode === 'compat') {
+    const result = await (await import(layer)).install({ force: true });
+    if (!result.installed) throw new Error('install() did not install: ' + result.reason);
+  }
+  if (scene === 'scatter') return scatter(Number(q.get('words') ?? 1));
+  const t0 = performance.now();
+  const engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 4.5, 9], target: [0, 0.5, 0], near: 0.1, far: 100 } });
+  await scenes[scene](engine);
+  const device = () => engine.gpu;
+  engine.render({ delta: 0 });
+  await device().queue.onSubmittedWorkDone();
+  const startup = performance.now() - t0;
+  // Let lazily loaded routes and compute land, then warm up.
+  for (let i = 0; i < 10; i++) {
+    engine.render({ delta: 1 / 60 });
+    await device().queue.onSubmittedWorkDone();
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  window.check = {
+    async measure(frames = 30, rounds = 5) {
+      const times = [], before = { ...(device().state?.counts ?? {}) };
+      // A task between frames, as between animation frames: the layer of milestone M2 showed a frame in a microtask
+      // after the submit (bug 53), so frames rendered in one task showed only the last one.
+      const channel = new MessageChannel(),
+        task = () => new Promise((r) => {
+          channel.port1.onmessage = r;
+          channel.port2.postMessage(0);
+        });
+      for (let k = 0; k < rounds; k++) {
+        const t = performance.now();
+        for (let i = 0; i < frames; i++) {
+          engine.render({ delta: 1 / 60 });
+          await task();
+        }
+        await device().queue.onSubmittedWorkDone();
+        times.push((performance.now() - t) / frames);
+      }
+      times.sort((a, b) => a - b);
+      const after = device().state?.counts, programs = device().programs;
+      return {
+        vendor: device().adapterInfo?.vendor ?? null,
+        renderer: device().adapterInfo?.device ?? null,
+        startup,
+        frame: times[Math.floor(times.length / 2)],
+        hitRate: after ? (after.hits - before.hits) / Math.max(1, after.requests - before.requests) : null,
+        requestsPerFrame: after ? (after.requests - before.requests) / (frames * rounds) : null,
+        programs: programs ? { ...programs } : null,
+        stalls: device().stalls ?? null,
+        errors: errors.splice(0),
+      };
+    },
+  };
+  window.ready = true;
+}
+main().catch((e) => {
+  errors.push(String(e?.stack ?? e));
+  window.check = { measure: async () => ({ errors }) };
+  window.ready = true;
+});
+</script>
+</body>
+</html>

@@ -9,7 +9,7 @@ import { COMPAT_VENDOR, CompatAdapter, CompatDevice, CompatGPU, type CompatGPUOp
 /** The WGSL front end's types, under the names its own entry gives them (the IR this entry's types refer to). */
 export type * from './wgsl.js';
 export { COMPAT_VENDOR, CompatAdapter, CompatCanvasContext, CompatDevice, CompatGPU, type CompatGPUOptions };
-export { CompatValidationError, CompatQueue } from './device/device.js';
+export { CompatInternalError, CompatValidationError, CompatQueue, CPU_WORK_BUDGET } from './device/device.js';
 export {
   CompatBindGroup,
   CompatBindGroupLayout,

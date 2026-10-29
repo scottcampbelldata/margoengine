@@ -38,7 +38,17 @@ export interface CompatGPUOptions {
    * asks for 4 samples.
    */
   readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
+  /**
+   * The most work one compute dispatch may do on the CPU tier, counted in invocations plus loop iterations (default
+   * {@link CPU_WORK_BUDGET}, 100,000,000: about one to three seconds of JavaScript). A dispatch that passes it (an
+   * endless loop, or a dispatch too large for the CPU) stops, leaves its buffers and textures as they were, and is
+   * reported as a `GPUInternalError` with MargoError code `failed`. Raise it for long, legitimate CPU kernels.
+   */
+  readonly cpuWorkBudget?: number;
 }
+
+/** The default {@link CompatGPUOptions.cpuWorkBudget}: invocations plus loop iterations per CPU-tier dispatch. */
+export const CPU_WORK_BUDGET = 100_000_000;
 
 const WEBGPU_DEFAULT_LIMITS: Record<string, number> = {
   maxTextureDimension1D: 8192,
@@ -148,7 +158,10 @@ export class CompatGPU {
       gl.getExtension('WEBGL_lose_context')?.loseContext();
       return Promise.resolve(null);
     }
-    return Promise.resolve(new CompatAdapter(gl, caps));
+    const budget = this.options.cpuWorkBudget ?? CPU_WORK_BUDGET;
+    if (!(budget > 0))
+      throw new RangeError('Invalid cpuWorkBudget; pass a positive number of invocations and loop iterations');
+    return Promise.resolve(new CompatAdapter(gl, caps, budget));
   }
 
   /** The canvas format the layer renders fastest: WebGL2 stores rgba. */
@@ -168,6 +181,8 @@ export class CompatAdapter {
   constructor(
     private readonly gl: WebGL2RenderingContext,
     readonly capabilities: WebGL2Capabilities,
+    /** See {@link CompatGPUOptions.cpuWorkBudget}. */
+    readonly cpuWorkBudget = CPU_WORK_BUDGET,
   ) {
     this.features = featuresOf(capabilities);
     this.limits = Object.freeze(limitsOf(capabilities));
@@ -206,6 +221,14 @@ export class CompatValidationError extends Error {
     this.name = 'GPUValidationError';
   }
 }
+/** The error object of an internal error (GPUInternalError's shape), with a MargoError code. */
+export class CompatInternalError extends Error {
+  readonly code = 'failed';
+  constructor(message: string) {
+    super(message);
+    this.name = 'GPUInternalError';
+  }
+}
 
 /** A GPUDevice on WebGL2. */
 export class CompatDevice extends EventTarget {
@@ -221,12 +244,20 @@ export class CompatDevice extends EventTarget {
   stalls = 0;
   /** Compute dispatches run so far, per tier: fragment draws, point draws (scatter) and the CPU. */
   readonly dispatches = { fragment: 0, scatter: 0, cpu: 0 };
+  /**
+   * Render programs made so far: how many, the milliseconds spent translating their WGSL to GLSL, and the
+   * milliseconds from handing GLSL to WebGL2 to a known link status (with KHR_parallel_shader_compile, wall time
+   * while the page went on).
+   */
+  readonly programs = { count: 0, translateMs: 0, linkMs: 0 };
+  /** See {@link CompatGPUOptions.cpuWorkBudget}; may be raised or lowered at any time. */
+  cpuWorkBudget: number;
   destroyed = false;
   onuncapturederror: ((event: Event) => void) | null = null;
   /** The sampler that loads and size queries use (no filtering, every level). */
   readonly loadSampler: WebGLSampler;
   private resolveLost!: (info: { reason: 'destroyed' | 'unknown'; message: string }) => void;
-  private readonly scopes: { filter: ErrorFilter; error: CompatValidationError | null }[] = [];
+  private readonly scopes: { filter: ErrorFilter; error: CompatValidationError | CompatInternalError | null }[] = [];
   private readonly framebuffers = new Map<string, WebGLFramebuffer>();
   /** Canvas contexts with a frame waiting to be shown. */
   readonly presents = new Set<{ present(): void }>();
@@ -246,6 +277,7 @@ export class CompatDevice extends EventTarget {
     this.features = features;
     this.limits = adapter.limits;
     this.adapterInfo = adapter.info;
+    this.cpuWorkBudget = adapter.cpuWorkBudget;
     this.ext = extensions(gl);
     this.state = new GLState(gl);
     this.lost = new Promise((resolve) => (this.resolveLost = resolve));
@@ -305,16 +337,22 @@ export class CompatDevice extends EventTarget {
   pushErrorScope(filter: ErrorFilter): void {
     this.scopes.push({ filter, error: null });
   }
-  popErrorScope(): Promise<CompatValidationError | null> {
+  popErrorScope(): Promise<CompatValidationError | CompatInternalError | null> {
     const scope = this.scopes.pop();
     if (!scope) return Promise.reject(new DOMException('No error scope to pop', 'OperationError'));
     return Promise.resolve(scope.error);
   }
   /** Reports a validation error to the innermost validation scope, else as `uncapturederror`. */
   validationError(message: string): void {
-    const error = new CompatValidationError(message);
+    this.report('validation', new CompatValidationError(message));
+  }
+  /** Reports an internal error (a CPU-tier dispatch over its work budget) the same way, to an 'internal' scope. */
+  internalError(message: string): void {
+    this.report('internal', new CompatInternalError(message));
+  }
+  private report(filter: ErrorFilter, error: CompatValidationError | CompatInternalError): void {
     for (let i = this.scopes.length - 1; i >= 0; i--)
-      if (this.scopes[i].filter === 'validation') {
+      if (this.scopes[i].filter === filter) {
         this.scopes[i].error ??= error;
         return;
       }

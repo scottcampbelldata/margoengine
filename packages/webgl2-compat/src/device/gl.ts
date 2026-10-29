@@ -62,20 +62,28 @@ export class GLState {
   private readonly ubo: string[] = [];
   private readonly units: { target: number; texture: WebGLTexture | null; sampler: WebGLSampler | null }[] = [];
   private active = -1;
+  /** State changes asked for and those the cache found already in place (no GL call made), for the hit rate. */
+  readonly counts = { requests: 0, hits: 0 };
 
   constructor(readonly gl: WebGL2RenderingContext) {}
+  /** Counts one request; true (a hit) when `same`. */
+  private hit(same: boolean): boolean {
+    this.counts.requests++;
+    if (same) this.counts.hits++;
+    return same;
+  }
 
   useProgram(p: WebGLProgram | null): void {
-    if (this.program !== p) this.gl.useProgram((this.program = p));
+    if (!this.hit(this.program === p)) this.gl.useProgram((this.program = p));
   }
   bindVertexArray(v: WebGLVertexArrayObject | null): void {
-    if (this.vao !== v) this.gl.bindVertexArray((this.vao = v));
+    if (!this.hit(this.vao === v)) this.gl.bindVertexArray((this.vao = v));
   }
   bindDrawFramebuffer(f: WebGLFramebuffer | null): void {
-    if (this.drawFbo !== f) this.gl.bindFramebuffer(this.gl.DRAW_FRAMEBUFFER, (this.drawFbo = f));
+    if (!this.hit(this.drawFbo === f)) this.gl.bindFramebuffer(this.gl.DRAW_FRAMEBUFFER, (this.drawFbo = f));
   }
   bindReadFramebuffer(f: WebGLFramebuffer | null): void {
-    if (this.readFbo !== f) this.gl.bindFramebuffer(this.gl.READ_FRAMEBUFFER, (this.readFbo = f));
+    if (!this.hit(this.readFbo === f)) this.gl.bindFramebuffer(this.gl.READ_FRAMEBUFFER, (this.readFbo = f));
   }
   /** Forget framebuffer bindings (after a framebuffer is deleted). */
   forgetFramebuffers(): void {
@@ -89,14 +97,14 @@ export class GLState {
     if (this.program === p) this.useProgram(null);
   }
   enable(cap: number, on: boolean): void {
-    if (this.enabled.get(cap) === on) return;
+    if (this.hit(this.enabled.get(cap) === on)) return;
     this.enabled.set(cap, on);
     if (on) this.gl.enable(cap);
     else this.gl.disable(cap);
   }
   /** Runs `set` when `value` differs from the last value stored under `key`. */
   set(key: string, value: string, set: () => void): void {
-    if (this.keys.get(key) === value) return;
+    if (this.hit(this.keys.get(key) === value)) return;
     this.keys.set(key, value);
     set();
   }
@@ -106,7 +114,7 @@ export class GLState {
   }
   uniformBuffer(point: number, buffer: WebGLBuffer, id: number, offset: number, size: number): void {
     const key = `${id}:${offset}:${size}`;
-    if (this.ubo[point] === key) return;
+    if (this.hit(this.ubo[point] === key)) return;
     this.ubo[point] = key;
     this.gl.bindBufferRange(this.gl.UNIFORM_BUFFER, point, buffer, offset, size);
   }
@@ -114,20 +122,20 @@ export class GLState {
   unit(index: number, target: number, texture: WebGLTexture | null, sampler: WebGLSampler | null): void {
     let u = this.units[index];
     if (!u) u = this.units[index] = { target: 0, texture: null, sampler: null };
-    if (u.target !== target || u.texture !== texture) {
+    if (!this.hit(u.target === target && u.texture === texture)) {
       this.activeUnit(index);
       if (u.target && u.target !== target) this.gl.bindTexture(u.target, null);
       this.gl.bindTexture(target, texture);
       u.target = target;
       u.texture = texture;
     }
-    if (u.sampler !== sampler) {
+    if (!this.hit(u.sampler === sampler)) {
       this.gl.bindSampler(index, sampler);
       u.sampler = sampler;
     }
   }
   activeUnit(index: number): void {
-    if (this.active !== index) this.gl.activeTexture(this.gl.TEXTURE0 + (this.active = index));
+    if (!this.hit(this.active === index)) this.gl.activeTexture(this.gl.TEXTURE0 + (this.active = index));
   }
   /** Forget a texture's unit bindings (after it is deleted or bound outside the cache). */
   forgetTexture(texture: WebGLTexture): void {

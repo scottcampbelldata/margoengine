@@ -60,6 +60,7 @@ export class DOF implements EnginePlugin {
   // The WebGL2 layer's route (./compat.js): the CoC kernel without tile maxima, which this pass computes instead.
   private tilesPipeline?: GPUComputePipeline;
   private tilesGroup?: GPUBindGroup;
+  private waiting = false;
   private presentPipeline?: GPURenderPipeline;
   private scene?: GPUTexture;
   private depth?: GPUTexture;
@@ -100,8 +101,9 @@ export class DOF implements EnginePlugin {
   get depthTexture(): GPUTexture | undefined {
     return this.host ? this.host.depthTexture : this.depth;
   }
+  /** The blurred linear HDR image; while DOF alone waits for its WebGL2 route, the sharp captured scene. */
   get outputTexture(): GPUTexture | undefined {
-    return this.output;
+    return this.paused ? this.scene : this.output;
   }
   get enabled(): boolean {
     return this.options.enabled ?? true;
@@ -160,16 +162,33 @@ export class DOF implements EnginePlugin {
     });
     this.bokehPipeline = compute(engine.gpu, bokehShader);
     this.coarsePipeline = compute(engine.gpu, coarseShader);
-    const uniform = this.uniform;
-    loadCompatRoute(engine.gpu, () => import('./compat.js'))?.then(({ dofCompatPipelines }) => {
-      if (this.uniform !== uniform) return;
-      ({
-        coc: this.cocPipeline,
-        tiles: this.tilesPipeline,
-        bokeh: this.bokehPipeline,
-      } = dofCompatPipelines(engine.gpu!, { cocShader, bokehShader, groupMax }));
-      this.releaseTextures();
-    });
+    const uniform = this.uniform,
+      route = loadCompatRoute(engine.gpu, () => import('./compat.js'));
+    // Alone, DOF skips its CoC and blur until its WebGL2 route has loaded: its WebGPU route there takes the CPU tier,
+    // about a second a frame at 720p on a fast CPU and several on a laptop's (bug 58), so the first frames show the
+    // captured scene sharp, and effects reading outputTexture (Tonemap's source) get that scene.
+    this.waiting = !!route;
+    route?.then(
+      ({ dofCompatPipelines }) => {
+        if (this.uniform !== uniform) return;
+        this.waiting = false;
+        ({
+          coc: this.cocPipeline,
+          tiles: this.tilesPipeline,
+          bokeh: this.bokehPipeline,
+        } = dofCompatPipelines(engine.gpu!, { cocShader, bokehShader, groupMax }));
+        this.releaseTextures();
+      },
+      (error) => {
+        // The WebGPU route still draws the same pixels: draw with it, and let the page hear why it is slow.
+        this.waiting = false;
+        throw error;
+      },
+    );
+  }
+  /** True while DOF, used alone, waits for its WebGL2 route (it presents the captured scene unblurred then). */
+  private get paused(): boolean {
+    return this.waiting && !this.host;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -184,14 +203,14 @@ export class DOF implements EnginePlugin {
       name: 'dof:coc',
       order: 20,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.circles(c);
+        if (c.backend === 'webgpu' && !this.paused) this.circles(c);
       },
     });
     graph.add({
       name: 'dof:bokeh',
       order: 21,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.blur(c);
+        if (c.backend === 'webgpu' && !this.paused) this.blur(c);
       },
     });
     graph.add({
@@ -360,11 +379,18 @@ export class DOF implements EnginePlugin {
     pass.end();
   }
   private present(c: Context): void {
+    const paused = this.paused;
+    if (paused) {
+      // No CoC pass resolved the capture: resolve it here and show it sharp (made only on this path, so the WebGPU
+      // route keeps the calls the proofs recorded).
+      this.captureTarget!.resolve(c.encoder, true);
+      this.groups[4] ??= group(c.device, this.presentPipeline!, [this.sceneView!]);
+    }
     this.attachment.view = this.originalColor!;
     this.attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.presentPipeline!);
-    pass.setBindGroup(0, this.groups[2]);
+    pass.setBindGroup(0, this.groups[paused ? 4 : 2]);
     applyView(pass, c);
     pass.draw(3);
     pass.end();

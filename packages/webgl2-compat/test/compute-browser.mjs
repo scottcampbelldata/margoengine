@@ -73,6 +73,23 @@ try {
     assert.ok(JSON.stringify(compat.result.values).match(/[1-9]/), `${name} returned only zeros`);
     lines.push(`${name} (${TIERS[name]}): same as native`);
   }
+  // Bug 65: a CPU-tier dispatch cannot hold the page for good; it stops at its work budget, coded, memory unchanged.
+  const budget = await page.evaluate(() => window.check.budget());
+  for (const r of budget.slice(0, 2)) {
+    assert.equal(r.tier, 'cpu', r.case);
+    assert.equal(r.error?.name, 'GPUInternalError', `${r.case}: ${JSON.stringify(r)}`);
+    assert.equal(r.error.code, 'failed', r.case);
+    assert.match(
+      r.error.message,
+      /stopped at its work budget of 20000 invocations and loop iterations.*raise cpuWorkBudget/,
+      r.case,
+    );
+  }
+  assert.deepEqual(budget[0].after, [7, 7, 7, 7], 'the endless loop stored nothing');
+  assert.deepEqual(budget[1].after, [0, 0, 0, 0], 'the oversized dispatch stored nothing');
+  assert.equal(budget[2].error, null, 'a raised budget runs the dispatch');
+  assert.equal(budget[2].after[0], 64000, 'every invocation ran');
+  lines.push('work budget: an endless loop and 64,000 invocations stop at 20,000, coded, nothing stored');
   const refusal = await page.evaluate(() => window.check.refusal());
   assert.match(
     refusal,

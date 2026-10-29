@@ -23,7 +23,15 @@ import {
   CompatTextureView,
 } from '../device/resources.js';
 import { type ComputePlan, type ComputeTarget, planCompute } from './analyze.js';
-import { type CPUBuffer, type CPULevel, type CPUSampler, type CPUTexture, runKernel } from './cpu.js';
+import {
+  type CPUBuffer,
+  type CPULevel,
+  type CPUSampler,
+  type CPUTexture,
+  H,
+  runKernel,
+  WorkBudgetExceeded,
+} from './cpu.js';
 import { emitCompute } from './glsl.js';
 import { type CPUKernel, compileCPU } from './js.js';
 
@@ -146,7 +154,7 @@ class Runtime implements ComputeRuntime {
         return;
       }
     this.device.dispatches[built.tier]++;
-    if (built.tier === 'cpu') this.runCPU(r, built, groups, count);
+    if (built.tier === 'cpu') this.runCPU(r, built, groups, count, p.label);
     else this.runGPU(r, built, groups, count);
   }
 
@@ -405,7 +413,13 @@ class Runtime implements ComputeRuntime {
 
   // ---------------------------------------------------------------- CPU tier
 
-  private runCPU(r: Replayer, built: CPUBuilt, groups: readonly BoundGroup[], count: readonly number[]): void {
+  private runCPU(
+    r: Replayer,
+    built: CPUBuilt,
+    groups: readonly BoundGroup[],
+    count: readonly number[],
+    label: string,
+  ): void {
     const buffers = new Map<string, CPUBuffer>(),
       textures = new Map<string, CPUTexture>(),
       samplers = new Map<string, CPUSampler>();
@@ -442,7 +456,21 @@ class Runtime implements ComputeRuntime {
       }
     }
     const kernel = built.kernel.bind({ buffers, textures, samplers });
-    runKernel(kernel, built.kernel.barriers, built.plan.workgroupSize, count);
+    H.work.left = this.device.cpuWorkBudget;
+    try {
+      runKernel(kernel, built.kernel.barriers, built.plan.workgroupSize, count);
+    } catch (error) {
+      if (!(error instanceof WorkBudgetExceeded)) throw error;
+      // Like a GPU that resets a dispatch running too long: nothing it stored lands, and the page hears why.
+      this.device.internalError(
+        `A compute dispatch on the WebGL2 layer's CPU tier stopped at its work budget of ${this.device.cpuWorkBudget} ` +
+          `invocations and loop iterations ('${label}', ${count.join(' x ')} workgroups): an endless loop, or more work ` +
+          'than the CPU can do in one dispatch. Make the dispatch smaller, or raise cpuWorkBudget in install() or on the device',
+      );
+      return;
+    } finally {
+      H.work.left = Number.POSITIVE_INFINITY;
+    }
     for (const w of writes) w.buffer.write(w.offset, w.bytes);
     for (const w of written) this.upload(r, w.view, w.texture);
   }

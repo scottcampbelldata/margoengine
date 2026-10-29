@@ -57,15 +57,25 @@ try {
     lines.push(`${name}: same as native`);
     // Each case must test something: a few known values, so an empty or all-zero result on both sides fails.
     const r = compat.result;
-    if (name === 'blendSplit')
-      assert.deepEqual(
-        r.targets,
-        [
-          [191, 191, 191, 191],
-          [127, 64, 64, 64],
-        ],
-        'each target keeps its own state',
+    // Bug 66: these sanity values are near, not equal to, the ideal bytes: GPUs round a half differently (an Intel Arc
+    // 140V gives 192 and 128 where this NVIDIA GPU gives 191 and 127, natively and on the layer alike). The exact
+    // check is the comparison with native WebGPU on the same adapter above.
+    const near = (got, want, what) =>
+      assert.ok(
+        got.length === want.length && got.every((v, i) => Math.abs(v - want[i]) <= 2),
+        `${what}: ${JSON.stringify(got)}, about ${JSON.stringify(want)}`,
       );
+    if (name === 'blendSplit') {
+      const [added, red] = r.targets;
+      near(added, [191, 191, 191, 191], 'target 0 blends additively in every channel');
+      assert.ok(
+        added.every((v) => v === added[0]),
+        'target 0 treats every channel alike',
+      );
+      near(red, [127, 64, 64, 64], 'target 1 writes red only');
+      assert.deepEqual(red.slice(1), [red[1], red[1], red[1]], 'target 1 keeps green, blue and alpha');
+      assert.ok(red[0] > red[1] + 32, 'target 1 replaced red');
+    }
     if (name === 'compressed' && !r.missing)
       assert.deepEqual(r.pixels.slice(0, 4), [1, 0, 0, 1], 'BC1 colour 0 is red');
     if (name === 'mipViews')
@@ -80,8 +90,7 @@ try {
         ],
         'each frame is seen in its own task',
       );
-    if (name === 'srgbView')
-      assert.deepEqual(r.back.slice(0, 4), [188, 137, 255, 255], 'linear 0.5 through the sRGB view');
+    if (name === 'srgbView') near(r.back.slice(0, 4), [188, 137, 255, 255], 'linear 0.5 through the sRGB view');
     if (name === 'layerView') assert.notDeepEqual(r.after, r.before, 'the render into the layer is seen');
     if (name === 'storage') {
       assert.notDeepEqual(r.written, r.first, 'writeBuffer between submits is seen');

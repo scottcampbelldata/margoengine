@@ -2,7 +2,7 @@
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: in development, milestones M0 to M6 of the [roadmap](../../docs/webgl2-compat-roadmap.md).** This package
+**Status: in development, milestones M0 to M7 of the [roadmap](../../docs/webgl2-compat-roadmap.md).** This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels
@@ -80,8 +80,15 @@ What it does:
   corner the three texels that meet there are averaged), cannot read multisampled or external textures, and needs a
   page that allows JavaScript
   compiled at run time (Content-Security-Policy `unsafe-eval`); either refusal is MargoError code `unsupported`.
+  A CPU-tier dispatch may do at most `cpuWorkBudget` invocations plus loop iterations (an `install()` option and a
+  device property; default 100,000,000, about one to three seconds): past it the dispatch stops, nothing it stored
+  lands, and it is reported as a `GPUInternalError` with MargoError code `failed`, so an endless loop cannot hold the
+  page. Only the CPU tier needs `unsafe-eval`; rendering and the fragment and point-draw tiers do not.
   `planCompute(stage)` tells which tier an entry point gets and why; `runComputeOnCPU(dispatch)` runs one on the CPU
-  with buffers, without a device. `device.dispatches` counts the dispatches each tier has run.
+  with buffers, without a device. `device.dispatches` counts the dispatches each tier has run, `device.programs` the
+  render programs made with their translation and link time, and `device.state.counts` the state changes asked for
+  and those the cache answered without a GL call (milestone M7 measures them on each ANGLE back end with
+  `test/perf-browser.mjs`).
 - **Package routes** (milestone M6): a package asks whether its device is the layer's (the adapter vendor
   `margo-webgl2`, never browser sniffing) and then loads a route of its own with `import()`, so pages with WebGPU never
   download it; until it has loaded the package keeps its WebGPU route, which the layer also runs, so no frame is drawn

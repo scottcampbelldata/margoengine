@@ -672,3 +672,62 @@ wall time per frame, native then the layer.
 - The compute check's `cpuCube` case samples an 8 x 8 cube with two levels along 134 directions (face centres, random
   ones, both sides of every edge, near every corner) at levels 0, 0.4 and 1, natively and on the CPU tier: within the
   4/255 the check allows CPU texture filtering (exact weights against the GPU's 8-bit fixed-point ones).
+
+## Performance (M7, 2026-10-29)
+
+Measured on this PC (NVIDIA RTX A6000) with the GPU held exclusively, `perf-browser.mjs` (960 x 540 canvas, 4x MSAA,
+frames rendered with a task between them, median of 5 rounds of 30): wall time per frame, native WebGPU (Dawn) where
+the browser offers it, the layer, and for the basic scene the milestone M2 layer built from bd1fcd0a. With
+`--use-angle=gl`, `vulkan` or `swiftshader` Chrome's WebGPU has no adapter, so only the layer runs there.
+
+| Browser and back end | Basic: native, layer, M2 layer | DOF | Splats (20,000) | CulledInstances (10,000) |
+| --- | --- | --- | --- | --- |
+| Edge, ANGLE Direct3D 11 | 0.29, 0.20, 0.18 ms | 0.35, 2.95 ms | 0.48, 3.26 ms | 0.41, 1.20 ms |
+| Chrome, ANGLE Direct3D 11 | 0.22, 0.18, 0.21 ms | 0.34, 2.41 ms | 0.52, 3.71 ms | 0.35, 1.13 ms |
+| Chrome, ANGLE OpenGL | -, 0.96, 0.90 ms | 6.76 ms | 37.97 ms | 4.12 ms |
+| Chrome, ANGLE Vulkan | -, 0.23, 0.18 ms | 0.39 ms | 3.29 ms | 1.06 ms |
+| Chrome, SwiftShader (CPU) | -, 8.81, 9.07 ms | 85.4 ms | 189 ms | 79.7 ms |
+
+- **Against the M2 baseline.** The basic scene draws within noise of the M2 layer on every back end (the GLSL of its
+  programs is byte-identical). Frames rendered back to back in one task first showed the current layer slower (0.24
+  against 0.17 ms on Edge, 8.8 against 3.7 ms on SwiftShader): the M2 layer showed a frame in a microtask after the
+  submit (bug 53), so such a run presented one frame in thirty; the page now yields a task between frames, as
+  animation frames do. Against native WebGPU the layer stays within the 1.5x target on the Direct3D 11 and Vulkan
+  back ends for the basic scene.
+- **State cache.** 70% to 76% of the state changes the layer asks for are already in place and cost no GL call (43
+  requests a frame for the basic scene, 275 with DOF); `device.state.counts` holds the numbers.
+- **Programs.** Translating WGSL to GLSL takes 2 to 6 ms for a scene's programs; handing them to WebGL2 until the link
+  status is known takes 31 to 34 ms for the basic scene on Direct3D 11 (ANGLE compiles there), 11 ms on OpenGL and
+  under 1 ms on Vulkan and SwiftShader (their compile happens at the first draw or in the background).
+  `device.programs` holds the counts and times.
+- **Stalls.** None in steady frames except the splats route's one key readback a frame. DOF alone now shows the
+  captured scene sharp (no CoC or blur pass) until its route has loaded, instead of a first frame on the CPU tier: its
+  start-up (Engine.create to the first finished frame) went from 1,148 to 71 ms on Edge, and its 7 start-up stalls to
+  none. Effects that read its `outputTexture` (Tonemap's `source`) get that sharp scene meanwhile (the unit test
+  and the post-effects suite on the layer check it).
+- **Scatter tier.** 65,536 invocations storing 1, 2, 4, 8 and 16 words take 0.51, 0.52, 0.76, 1.10 and 1.94 ms a
+  dispatch on the layer (0.19 to 0.26 natively): about 0.09 ms more per stored word, since every word is a point
+  draw of its own. Transform feedback would write all of an invocation's words at its own index in one vertex
+  pass (up to 64 interleaved components); it is not built yet: no package's kernel spends more than a few
+  milliseconds a frame there (splat projection, 14 words, is the largest).
+- **Integrated GPUs.** The bug 58 frame (8.4 s a frame on an AMD Radeon 680M) came from the CPU tier, not the GPU. A
+  per-frame time budget check for every compat demo on an integrated GPU belongs to M8, which runs every demo on the
+  layer.
+
+## Hardening (M7, 2026-10-29)
+
+- **CPU-tier work budget (bug 65).** Generated kernels ran with no limit, so an endless loop or a huge dispatch held
+  the tab. Each CPU-tier dispatch now has a budget of invocations plus loop iterations (`cpuWorkBudget`, an
+  `install()` option and a device property, default 100,000,000, about one to three seconds of JavaScript here):
+  every invocation and every loop iteration takes one, and a dispatch that runs out stops, stores nothing (its
+  copies are not written back) and is reported as a `GPUInternalError` with MargoError code `failed` naming the fix,
+  as a GPU resets a dispatch that runs too long. The compute check runs an endless loop and a 64,000-invocation
+  dispatch against a budget of 20,000, and the same dispatch after raising it.
+- **`unsafe-eval`.** Only the CPU tier compiles code at run time (`new Function`); rendering and the fragment and
+  point-draw tiers do not. Under a Content-Security-Policy without `unsafe-eval` the CPU-tier kernels are refused
+  with MargoError code `unsupported`. On the layer that means the splats route's sort and the generic routes of VFX,
+  scatter, clustered binning and other atomics or workgroup kernels. An interpreter of the IR
+  would remove the need at a large speed cost; it is listed for after M8.
+- **Adapter-independent checks (bug 66).** The features check compared compat with native exactly but also held
+  three sanity bytes an Intel Arc 140V rounds one level differently (both natively and on the layer); those now
+  allow two levels, and the exact comparison with native on the same adapter stays.

@@ -163,6 +163,13 @@ export interface InstallOptions {
    * `antialias: false`, so exact-pixel rendering stays exact.
    */
   readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
+  /**
+   * The most work one compute dispatch may do on the CPU tier, in invocations plus loop iterations. Default
+   * 100,000,000 (about one to three seconds of JavaScript). A dispatch that passes it stops, keeps memory as it was
+   * and is reported as a `GPUInternalError` with code `failed`; raise it for long, legitimate CPU kernels, or set
+   * `device.cpuWorkBudget` on one device.
+   */
+  readonly cpuWorkBudget?: number;
 }
 
 /** What {@link install} did. */

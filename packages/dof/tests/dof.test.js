@@ -158,3 +158,31 @@ test('DOF scales the circle of confusion by the height of the view being drawn',
   assert.ok(Math.abs(h.writes[6] - scale) < 1e-6, 'half-height view, half the scale');
   dof.dispose();
 });
+
+test('DOF alone on the WebGL2 layer shows the sharp scene, as outputTexture too, until its route has loaded', async () => {
+  // Regression: while it waited for its route, DOF skipped capture and presentation too, so outputTexture stayed
+  // undefined and Tonemap with source: () => dof.outputTexture threw on the first frames (modern-postfx-tests --compat).
+  const h = gpuHarness();
+  h.engine.gpu.adapterInfo = { vendor: 'margo-webgl2' };
+  const dof = DOF.attach(h.engine, { focalDistance: 5, focalLength: 0.05, aperture: 2 });
+  h.frame();
+  assert.equal(h.counts.compute, 0, 'no CoC or blur kernel before the route');
+  const sharp = dof.outputTexture;
+  assert.ok(sharp, 'outputTexture is the captured scene while waiting');
+  assert.deepEqual([sharp.width, sharp.height, sharp.format, sharp.sampleCount], [128, 96, 'rgba16float', 1]);
+  assert.ok(sharp.usage & GPUTextureUsage.TEXTURE_BINDING);
+  assert.equal(h.context.presentation.colorAttachments[0].view, h.originalColor, 'presented to the canvas');
+  assert.equal(h.context.color, h.originalColor);
+  assert.equal(h.context.depth, h.originalDepth);
+  h.frame();
+  assert.equal(dof.outputTexture, sharp, 'steady while waiting');
+  for (let i = 0; i < 50 && h.counts.compute === 0; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    h.frame();
+  }
+  assert.ok(h.counts.compute > 0, 'the route blurs once loaded');
+  assert.ok(sharp.destroyed);
+  assert.notEqual(dof.outputTexture, dof.depthTexture);
+  assert.equal(dof.outputTexture.usage & GPUTextureUsage.STORAGE_BINDING, GPUTextureUsage.STORAGE_BINDING);
+  dof.dispose();
+});

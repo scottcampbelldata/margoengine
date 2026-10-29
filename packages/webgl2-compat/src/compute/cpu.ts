@@ -256,9 +256,17 @@ function sampleCubeLevel(t: CPUTexture, level: number, p: number[], cube: number
   return out.map(fr);
 }
 
+/** Thrown when a dispatch has used up its work budget (`H.work`); the runtime reports it and keeps memory as it was. */
+export class WorkBudgetExceeded extends Error {}
+
 /** The helpers generated kernels call, by short name. */
 export const H = {
   fr,
+  /** Invocations and loop iterations the running dispatch may still do; every loop iteration takes one. */
+  work: { left: Number.POSITIVE_INFINITY },
+  over(): never {
+    throw new WorkBudgetExceeded('CPU work budget exceeded');
+  },
   /** A shallow copy of a composite value (its insides are never changed in place). */
   cp: (v: unknown) => (Array.isArray(v) ? v.slice() : v),
   /** `o` with the value at keys[i...] replaced by `v`, copying along the path. */
@@ -508,6 +516,7 @@ export function runKernel(
         for (let z = 0; z < wz; z++)
           for (let y = 0; y < wy; y++)
             for (let x = 0; x < wx; x++) {
+              if (--H.work.left < 0) H.over();
               const context: Record<string, unknown> = { w };
               k.invocation(context);
               const values: Record<string, unknown> = {

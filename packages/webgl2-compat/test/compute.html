@@ -406,6 +406,39 @@ window.check = {
     compat ??= await (await createCompatGPU().requestAdapter()).requestDevice();
     return { native: await runCase(native, name), compat: await runCase(compat, name) };
   },
+  /**
+   * Compat only (bug 65): the CPU tier's work budget. An endless loop and a dispatch with more invocations than the
+   * budget each stop with a GPUInternalError coded 'failed' and leave memory as it was; a raised budget runs the
+   * same dispatch.
+   */
+  async budget() {
+    const device = await (await createCompatGPU({ cpuWorkBudget: 20000 }).requestAdapter()).requestDevice();
+    await device.loadCompute();
+    const out = [];
+    const attempt = async (p, entries, workgroups) => {
+      device.pushErrorScope('internal');
+      run(device, p, [group(device, p, entries)], workgroups);
+      const error = await device.popErrorScope();
+      return error && { name: error.name, code: error.code, message: error.message };
+    };
+    try {
+      const k = buffer(device, Uint32Array.of(0, 0, 0, 0), B.UNIFORM | B.COPY_DST);
+      const words = buffer(device, Uint32Array.of(7, 7, 7, 7));
+      const endless = compute(device, `@group(0) @binding(0) var<storage, read_write> out: array<u32>;
+        @group(0) @binding(1) var<uniform> k: vec4u;
+        @compute @workgroup_size(1) fn main() { loop { if (k.x == 12345u) { break; } out[0] += 1u; } }`);
+      out.push({ case: 'endless loop', tier: tierOf(endless), error: await attempt(endless, [{ buffer: words }, { buffer: k }], 1), after: u32(await readBuffer(device, words)) });
+      const count = buffer(device, new Uint32Array(4));
+      const wide = compute(device, `@group(0) @binding(0) var<storage, read_write> n: atomic<u32>;
+        @compute @workgroup_size(64) fn main() { atomicAdd(&n, 1u); }`);
+      out.push({ case: '64,000 invocations', tier: tierOf(wide), error: await attempt(wide, [{ buffer: count }], 1000), after: u32(await readBuffer(device, count)) });
+      device.cpuWorkBudget = 100000;
+      out.push({ case: 'raised budget', error: await attempt(wide, [{ buffer: count }], 1000), after: u32(await readBuffer(device, count)) });
+    } finally {
+      device.destroy();
+    }
+    return out;
+  },
   /** Compat only: a refusal must be coded. */
   async refusal() {
     const device = await (await createCompatGPU().requestAdapter()).requestDevice();

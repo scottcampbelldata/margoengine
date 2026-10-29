@@ -421,7 +421,7 @@ class JSEmitter {
       case 'loop': {
         const label = `L${this.counter++}`;
         if (!s.continuing?.length && !s.breakIf) {
-          this.line(`${label}: for (;;) {`);
+          this.line(`${label}: for (;;) { if (--work.left < 0) over();`);
           this.loops.push({ brk: label, cont: label });
           this.block(s.body);
           this.loops.pop();
@@ -429,7 +429,7 @@ class JSEmitter {
           return;
         }
         const inner = `C${this.counter++}`;
-        this.line(`${label}: for (;;) {`);
+        this.line(`${label}: for (;;) { if (--work.left < 0) over();`);
         this.depth++;
         this.line(`${inner}: {`);
         this.loops.push({ brk: label, cont: `#${inner}` });
@@ -451,7 +451,7 @@ class JSEmitter {
         if (s.init) this.statement(s.init);
         // The update runs on `continue` too, as WGSL's for loop specifies: emitted as a labelled body block.
         const inner = `C${this.counter++}`;
-        this.line(`${label}: for (;;) {`);
+        this.line(`${label}: for (;;) { if (--work.left < 0) over();`);
         this.depth++;
         if (s.condition) this.line(`if (!(${this.value(s.condition, false)})) break;`);
         this.line(`${inner}: {`);
@@ -472,7 +472,7 @@ class JSEmitter {
       }
       case 'while': {
         const label = `L${this.counter++}`;
-        this.line(`${label}: for (;;) {`);
+        this.line(`${label}: for (;;) { if (--work.left < 0) over();`);
         this.depth++;
         this.line(`if (!(${this.value(s.condition, false)})) break;`);
         this.loops.push({ brk: label, cont: label });
