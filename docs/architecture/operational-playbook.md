@@ -170,6 +170,10 @@ table in `RESUME.md`, and the handoff files in `handoffs/`):
 8. Report once: what to report, in one short paragraph, at the end; `HANDOFF at <tokens>: <path>` if it hands off.
 9. `model` and `effort`.
 
+When the brief asks a peer machine to run a test, it gives the exact commit, the exact commands and the exact lines to
+report, and asks for the lines that match the new checks by name. A report filter once hid the lines that decided the
+run, so ask for the raw matching lines, not a summary.
+
 #### 1.4.2 The rules file every brief carries
 
 `handoffs/session-rules.txt` has 15 numbered rules. The ones that belong in this part, quoted:
@@ -287,6 +291,9 @@ worse. Some Margo Engine helpers ran past 800,000 tokens. A fresh agent with a g
 - Quality: a long context holds stale state (old commit hashes, superseded plans, a lock that has since been released)
   next to current state, and the agent's answers get worse. A note forces the state to be written once, in its current
   form.
+- Measured on one job (2026-10-29): biomes streaming had four bug hunters, each stopped at about 150 tool calls
+  without a fix. A successor started from a good note finished the hunt that the three before it could not. The cost
+  of a handoff is the note; the saving is a context free of stale state.
 - Compaction: when a context is compacted the agent keeps a summary it did not write and cannot check. The rule treats
   a compaction as a handoff trigger for that reason: write the note while the details are still there, or at the
   latest right after the compaction, from the real state (git, logs, processes), not from the summary.
@@ -461,6 +468,11 @@ Procedure:
    2.17, the Linux `pkill -f` trap).
 7. Read the logs the note names, from the end.
 8. Only then decide: continue, finish a landing, or restart from the last good commit.
+
+Confirm a landing by its content, not only by an ancestor hash. A hash a helper names can be a different landing's
+commit: the leak scrub was reported landed as a hash that was another landing's records commit, and the scrub had never
+reached main. After the ancestor check, look at what the landing was meant to change on `origin/main` (files gone or
+changed, `git log origin/main --grep='<subject words>'`) and treat a mismatch as NOT landed.
 
 Why "never trust the note or memory" is literal here: on 2026-10-29 the main checkout was 91 commits behind
 `origin/main`, so a session that read files from the working tree instead of `origin/main` would have documented a
@@ -1684,6 +1696,10 @@ Where each limit lives, at `67ca53a5`:
 | `verify` in a landing | 3000 s | landing script `timeout 3000` | same |
 | Nightly | 240 min and 60 min | `nightly-full.mjs` | per-run lock limit |
 
+Float comparisons in timing checks compare in whole timer steps. A limit such as 1 ms against a timer that reports in
+fixed steps must be compared after converting both sides to whole steps; a raw float comparison can fail on rounding
+alone. The fix is the comparison, never a looser limit.
+
 Two gaps found in the bug queue and closed: a fixed port that made a 5-second check sit silently behind another
 suite's 7-minute run until the 10-minute limit killed it (bug 38b, fixed with `port: 'free'` and progress lines every
 30 s of silence); a teardown that never ended after every assertion passed (bug 30, 2.14). One gap still open in the
@@ -1995,6 +2011,9 @@ Crash hygiene rules that follow:
    with `git status` before restarting.
 4. After a reboot on a two-GPU PC, check which adapter the browser gets before starting landings (the 10-27 restart
    list: "run the adapter probe 5 times ... only start landings when it prints nvidia 5 of 5").
+5. A hard reset with no bugcheck was later seen next to a Windows Update restart that killed the temperature logger.
+   Restart the logger after any reboot, and check that it is advancing (two reads 30 s apart show different
+   timestamps) before every heavy job. A logger that stopped silently leaves no data for the next reset.
 
 #### 2.15.9 Thermal protections and remote test machines
 
@@ -4865,6 +4884,17 @@ export function decide({ files, packageOf, dependentsOf, fullTriggers, max = 12 
 | Paired size records named different commits | build-sizes failed | entry-sizes and network record from different commits | both regenerated together; build-sizes asserts one commit |
 | Stale public numbers | webgl size three different values (found while writing this) | no public-truth check for sizes | not fixed; reported |
 | Doc says 8-line windows | `quality-gate.mjs` header vs code `WINDOW = 6` (found while writing this) | comment drift | not fixed; reported |
+
+
+### 5.18 A check that passes on the dev GPU is not enough
+
+Performance and concurrency checks that landed on the dev GPU caught real bugs only when run on a slower second
+machine (an AMD 680M integrated GPU in a small PC). Rule: run such a check on a slower machine before landing.
+
+- A worker cap that looked fine on the dev GPU cost late tiles and failed on the slower machine. Measured there: p99
+  0.1 to 0.2 ms against a limit of 0.3 ms, and worst frame 0.3 to 0.9 ms against a limit of 1 ms.
+- A negative p99 difference passed only because the baseline got slower. Never accept a pass whose baseline moved:
+  compare the baseline of this run with its recorded value first.
 
 ---
 
