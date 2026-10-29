@@ -31,7 +31,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/culling | `.` 6 |  |  | 10,464 |
 | @margoengine/cutscene | `.` 43 |  |  | 6,589 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 3, `./tga` 3, `./dds` 5, `./ktx` 5, `./tiff` 3 | 5 |  | 478,227 |
-| @margoengine/dof | `.` 2 |  |  | 7,648 |
+| @margoengine/dof | `.` 2 |  |  | 7,746 |
 | @margoengine/ecs | `.` 6 |  |  | 1,495 |
 | @margoengine/environment | `.` 62, `./probes` 8, `./volumetric` 3, `./reflector` 7, `./refractor` 7, `./cube-camera` 4, `./exr-write` 4 | 15 |  | 29,504 |
 | @margoengine/exporters | `.` 61, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./roblox` 16, `./roblox-chunks` 22, `./skin` 9, `./godot` 7, `./godot-addon` 2, `./unity` 12, `./hash` 2, `./import-names` 7, `./godot-lightmap` 3, `./unity-precision` 21, `./unity-precision-importer` 3, `./unity-pixel-art` 2, `./unreal-precision` 23, `./unreal-precision-importer` 2, `./unreal-pixel-art` 2, `./godot-precision-addon` 3, `./godot-precision` 23, `./godot-flipbook` 2, `./roblox-runtime` 25, `./roblox-runtime-restore` 1 | 92 |  | 33,668 |
@@ -103,6 +103,6 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/water | `.` 8 |  |  | 18,698 |
 | @margoengine/weather | `.` 37, `./hail` 6 |  |  | 4,998 |
 | @margoengine/webgl | `.` 3 |  |  | 3,127 |
-| @margoengine/webgl2-compat | `.` 15, `./compute` 83, `./device` 106, `./glsl` 90, `./wgsl` 76 | 44 |  | 92,539 |
+| @margoengine/webgl2-compat | `.` 15, `./compute` 83, `./device` 106, `./glsl` 90, `./wgsl` 76 | 44 |  | 93,763 |
 | @margoengine/wfc | `.` 3, `./overlapping` 5 |  |  | 1,787 |
 | @margoengine/xr | `.` 30 |  |  | 6,566 |
