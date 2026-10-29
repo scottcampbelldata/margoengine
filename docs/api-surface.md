@@ -28,10 +28,10 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/controls | `.` 50, `./orbit` 7, `./arcball` 5, `./transform` 5, `./drag` 3, `./profiles` 13, `./walk` 6 | 63 |  | 23,268 |
 | @margoengine/core | `.` 17, `./extension` 26 | 16 |  | 20,547 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 19,004 |
-| @margoengine/culling | `.` 6 |  |  | 9,457 |
+| @margoengine/culling | `.` 6 |  |  | 10,464 |
 | @margoengine/cutscene | `.` 43 |  |  | 6,589 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 3, `./tga` 3, `./dds` 5, `./ktx` 5, `./tiff` 3 | 5 |  | 478,227 |
-| @margoengine/dof | `.` 2 |  |  | 7,001 |
+| @margoengine/dof | `.` 2 |  |  | 7,648 |
 | @margoengine/ecs | `.` 6 |  |  | 1,495 |
 | @margoengine/environment | `.` 62, `./probes` 8, `./volumetric` 3, `./reflector` 7, `./refractor` 7, `./cube-camera` 4, `./exr-write` 4 | 15 |  | 29,504 |
 | @margoengine/exporters | `.` 61, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./roblox` 16, `./roblox-chunks` 22, `./skin` 9, `./godot` 7, `./godot-addon` 2, `./unity` 12, `./hash` 2, `./import-names` 7, `./godot-lightmap` 3, `./unity-precision` 21, `./unity-precision-importer` 3, `./unity-pixel-art` 2, `./unreal-precision` 23, `./unreal-precision-importer` 2, `./unreal-pixel-art` 2, `./godot-precision-addon` 3, `./godot-precision` 23, `./godot-flipbook` 2, `./roblox-runtime` 25, `./roblox-runtime-restore` 1 | 92 |  | 33,668 |
@@ -78,7 +78,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/shader | `.` 142, `./noise` 9, `./graph` 17, `./readback` 4, `./raw` 13, `./effects` 19, `./editor` 24 | 147 |  | 12,275 |
 | @margoengine/shadows | `.` 8 | 1 |  | 13,926 |
 | @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 8, `./sun` 16 | 97 |  | 15,542 |
-| @margoengine/splats | `.` 19, `./data` 17 |  |  | 24,381 |
+| @margoengine/splats | `.` 19, `./data` 17 |  |  | 24,807 |
 | @margoengine/splines | `.` 3 |  |  | 1,382 |
 | @margoengine/stage | `.` 23, `./gltf` 3, `./cad` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1 | 18 |  | 1,984 |
 | @margoengine/staging | `.` 4 |  |  | 6,056 |
@@ -99,10 +99,10 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 10, `./lightmap` 3 | 80 |  | 5,911 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./assist` 3, `./library` 6 | 73 |  | 7,533 |
 | @margoengine/voxel-net | `.` 23, `./server` 13, `./bot` 4 | 10 |  | 5,395 |
-| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 78,500 |
+| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 78,601 |
 | @margoengine/water | `.` 8 |  |  | 18,698 |
 | @margoengine/weather | `.` 37, `./hail` 6 |  |  | 4,998 |
 | @margoengine/webgl | `.` 3 |  |  | 3,127 |
-| @margoengine/webgl2-compat | `.` 15, `./compute` 83, `./device` 104, `./glsl` 90, `./wgsl` 76 | 44 |  | 92,467 |
+| @margoengine/webgl2-compat | `.` 15, `./compute` 83, `./device` 104, `./glsl` 90, `./wgsl` 76 | 44 |  | 92,539 |
 | @margoengine/wfc | `.` 3, `./overlapping` 5 |  |  | 1,787 |
-| @margoengine/xr | `.` 30 |  |  | 6,501 |
+| @margoengine/xr | `.` 30 |  |  | 6,566 |

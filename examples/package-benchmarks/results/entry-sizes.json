@@ -1,10 +1,10 @@
 {
-  "commit": "41dce7ca",
+  "commit": "64034d95",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 54876,
-    "gzip": 21974,
+    "raw": 55415,
+    "gzip": 22116,
     "limit": 25000
   },
   "packages": {
@@ -264,12 +264,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 51055,
-        "gzip": 20547
+        "raw": 51594,
+        "gzip": 20691
       },
       "./extension": {
-        "raw": 47902,
-        "gzip": 19638
+        "raw": 48441,
+        "gzip": 19789
       }
     },
     "@margoengine/creative": {
@@ -1018,8 +1018,8 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 141810,
-        "gzip": 39189
+        "raw": 142350,
+        "gzip": 39336
       },
       "./bloom": {
         "raw": 19632,
@@ -1046,16 +1046,16 @@
         "gzip": 4565
       },
       "./ssr": {
-        "raw": 31882,
-        "gzip": 10921
+        "raw": 32421,
+        "gzip": 11052
       },
       "./gtao": {
         "raw": 37429,
         "gzip": 11712
       },
       "./ssgi": {
-        "raw": 34352,
-        "gzip": 11583
+        "raw": 34891,
+        "gzip": 11713
       },
       "./motion-blur": {
         "raw": 22080,
