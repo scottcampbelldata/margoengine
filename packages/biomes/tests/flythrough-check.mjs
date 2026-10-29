@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { MAX_LIMIT, P99_LIMIT, settle } from './flythrough-limits.mjs';
 
 const quantile = (list, q) => {
   const s = [...list].sort((a, b) => a - b);
@@ -92,8 +93,14 @@ try {
     streamed.every((s) => s.frames > 600),
     `real-time flights of ${streamed.map((s) => s.frames)} frames`,
   );
-  assert.ok(result.p99Added <= 0.3, `streaming added ${result.p99Added.toFixed(3)} ms to the 99th percentile frame`);
-  assert.ok(result.maxAdded <= 1, `streaming added ${result.maxAdded.toFixed(3)} ms to the worst frame`);
+  assert.ok(
+    settle(result.p99Added) <= P99_LIMIT,
+    `streaming added ${result.p99Added.toFixed(3)} ms to the 99th percentile frame`,
+  );
+  assert.ok(
+    settle(result.maxAdded) <= MAX_LIMIT,
+    `streaming added ${result.maxAdded.toFixed(3)} ms to the worst frame`,
+  );
   console.log(
     `ok biomes flythrough: p99 +${result.p99Added.toFixed(2)} ms, worst +${result.maxAdded.toFixed(2)} ms (medians of 3 flights each)`,
   );
