@@ -17,7 +17,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/animator | `.` 32, `./graph` 7 | 9 |  | 16,866 |
 | @margoengine/audio | `.` 19 | 2 |  | 7,625 |
 | @margoengine/behavior | `.` 85, `./steering` 27 |  | 1 | 8,737 |
-| @margoengine/biomes | `.` 41, `./toolkit` 34, `./presets` 3, `./relief` 4, `./digest` 3, `./koppen` 5, `./zones` 9, `./view` 7, `./objects` 2, `./editor` 7, `./placement` 7, `./stats` 12 | 133 |  | 15,979 |
+| @margoengine/biomes | `.` 41, `./toolkit` 34, `./presets` 3, `./relief` 4, `./digest` 3, `./koppen` 5, `./zones` 9, `./view` 7, `./objects` 2, `./editor` 7, `./placement` 7, `./stats` 12 | 133 |  | 16,433 |
 | @margoengine/blender | `.` 5 |  |  | 3,778 |
 | @margoengine/bvh | `.` 63, `./tree` 23, `./bake` 7 | 17 |  | 23,125 |
 | @margoengine/cache | `.` 5, `./manager` 5 |  |  | 2,421 |
@@ -71,7 +71,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10 |  |  | 7,638 |
 | @margoengine/road | `.` 3 |  |  | 1,027 |
 | @margoengine/save | `.` 42, `./node` 1 | 2 |  | 6,699 |
-| @margoengine/scatter | `.` 19, `./tiles` 3 | 9 |  | 12,911 |
+| @margoengine/scatter | `.` 19, `./tiles` 3 | 9 |  | 12,933 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
 | @margoengine/sciviz | `.` 70, `./colormaps` 11, `./maths` 37 | 3 |  | 35,730 |
 | @margoengine/selection | `.` 25 | 2 |  | 17,888 |
