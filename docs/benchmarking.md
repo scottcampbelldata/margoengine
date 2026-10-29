@@ -85,7 +85,7 @@ The tool takes the lock itself when it is not wrapped, so both forms are safe.
 | `math` | Node | Kernel world matrices and frustum culling for 100,000 meshes, 100,000 matrix compositions, BVH build and rays on 500,000 triangles, rays against a 500-part assembly. |
 | `gltf` | browser | Load and draw SciFiHelmet, FlightHelmet and RobotExpressive, then the helmet with image-based lighting and shadows. |
 | `loaders` | Node | PLY, 3MF, OFF, VTK and PCD files from the loaders tests, and a generated 500,000-triangle OBJ. |
-| `cad` | Node and browser | Kernel tick for 10,017 to 89,883-part assemblies, 16 B-rep booleans and meshing, a STEP write, parse and tessellation, then 10,000 and 50,000-part assemblies drawn. |
+| `cad` | Node and browser | Kernel tick for assemblies of 10,017, 50,004 and 89,883 parts, then 10,000 and 50,000-part assemblies drawn. |
 | `voxel` | Node and browser | Fill a 256 x 64 x 256 terrain, mesh its 128 chunks, 10,000 voxel raycasts, then the voxel sandbox at render distance 8. |
 | `physics` | Node | Rapier steps for 1,000 and 5,000 boxes, and the machinery conveyor solver for 500 parts. |
 | `memory` | Node and browser | Heap and kernel memory per 100,000 meshes, then JS heap and live GPU memory after the boxes, instances and helmet scenes. |

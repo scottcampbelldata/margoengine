@@ -1,0 +1,8 @@
+{
+  "about": "Terms no tracked text file may contain. Each entry is the first 24 hex digits of SHA-256 of 'margo-banned:' + the lowercased word, so this file never names them. 'tokens' match whole words (as written and with hyphens removed); 'pairs' match 'a/b' path pieces.",
+  "tokens": ["41273cbe89746cba15fe90a2", "5392dc1fdcc32f016e65ff7a", "fc0d8977a6a3f4c17b48aecb"],
+  "pairs": ["3ea53541f37d23ebedd721b1", "ae9dc8497543a38ce91de580"],
+  "allow": [
+    { "path": "AGENTS.md", "reason": "the project rule that says what stays out of public text" }
+  ]
+}

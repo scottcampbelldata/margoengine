@@ -140,13 +140,11 @@ from the median GGX facet tilt and Snell's law; voxel light levels 0-15 are equa
 Eight voxel views re-recorded (light curve); post-ssr and post-ssr-models advanced for the FXAA shader. Core + stage
 unchanged at 22,737 B.
 
-## 2026-10-25: brep is private; public CAD is OpenCascade
+## 2026-10-25: public CAD is OpenCascade
 
-Scott: brep is a private paid product and no longer lives in this repo. It moved, with its history, to the private
-repo `scottcampbelldata/margo-cad-kernel` (clone at `C:\Development\Projects\margo-cad-kernel`). Here, STEP and IGES
-stay on OpenCascade; machinery takes an optional `importer` function on `loadCAD` / `parseCADAsync` for a reader the
-engine does not ship (TSDoc, README, `tests/cad-importer.test.js`). The `cad` starter loads a STEP part through
-OpenCascade. Rule in AGENTS.md.
+Scott: the engine's CAD import is OpenCascade only. Here, STEP and IGES stay on OpenCascade; machinery takes an
+optional `importer` function on `loadCAD` / `parseCADAsync` for a reader the engine does not ship (TSDoc, README,
+`tests/cad-importer.test.js`). The `cad` starter loads a STEP part through OpenCascade. Rule in AGENTS.md.
 
 ## Landed 2026-10-24: pixel-exact drawing (`exactSize`)
 
@@ -887,7 +885,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    assume a perspective camera; fix each in its own package. Optional core hook (Camera.projection + up) would remove
    the cameras package's update replacement; only if Scott wants it.
 1e. [a-d done, see below] CAD track (Scott, 2026-10-14: "the smallest, fastest, best CAD engine"; the visualization/interaction layer, not a
-   B-rep modelling kernel). Much already exists in @margoengine/machinery: SectionPlanes (with stencil caps),
+   modelling kernel). Much already exists in @margoengine/machinery: SectionPlanes (with stencil caps),
    ExplodedView, PartInstancer, AssemblyBVH, measurement, annotations, STEP/IGES/STL/OBJ via loadCAD. To do:
    a. Audit and benchmark machinery at CAD scale on real hardware: 10k/50k/100k-part assemblies at 60 FPS, kernel tick
       time per part count (a Node run measured about 12.8 ms per tick at 100,000 entities with 10-deep hierarchies and
