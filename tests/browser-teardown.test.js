@@ -24,7 +24,6 @@ const NOT_YET = new Map([
     'packages/webgl2-compat/scripts/capabilities.mjs',
     'owned by the webgl2-compat work, which has not landed yet; it starts no server of its own',
   ],
-  ['python/tests/jupyter-browser.mjs', 'being reworked for bug 68 (the venv interpreter); moves onto closeAll there'],
 ]);
 
 /** The tracked scripts, tests and tools that start a browser but do not use the shared bounded teardown. */
