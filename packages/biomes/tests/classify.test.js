@@ -362,3 +362,33 @@ test('defineBiome validates shape and values and freezes a copy', () => {
   ])
     assert.throws(() => defineBiome(bad), RangeError, JSON.stringify(bad));
 });
+
+test('classification reuses its planes: no multi-megabyte arrays per tile, same bytes in any order', async () => {
+  // Fresh planes per tile (several MB each) cost every thread of the page while workers make tiles (page faults,
+  // then releases): the streamed flythrough on a Radeon 680M laptop drew slower frames while its workers ran.
+  const make = () => BiomeWorld.create({ seed: 5, size: [1024, 1024], workers: false }),
+    a = await make(),
+    b = await make();
+  await a.tile(0, 0);
+  const Int32 = globalThis.Int32Array,
+    big = [];
+  globalThis.Int32Array = new Proxy(Int32, {
+    construct(target, args, newTarget) {
+      const array = Reflect.construct(target, args, newTarget === globalThis.Int32Array ? target : newTarget);
+      // A plane of the classification grid (the tile plus a 1-cell margin, 258 x 258) times biomes or inputs.
+      if (typeof args[0] === 'number' && args[0] >= 4 * 258 * 258 && args[0] % (258 * 258) === 0) big.push(args[0]);
+      return array;
+    },
+  });
+  let second;
+  try {
+    second = await a.tile(3, 1);
+  } finally {
+    globalThis.Int32Array = Int32;
+  }
+  assert.deepEqual(big, [], 'classification planes made again for a second tile');
+  // The reused planes give the bytes a fresh world gives, tile order aside.
+  const fresh = await b.tile(3, 1);
+  for (const name of ['biome', 'biomeWeight'])
+    assert.deepEqual(second.layer(name).data, fresh.layer(name).data, `${name} after reuse`);
+});

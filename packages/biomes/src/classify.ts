@@ -227,6 +227,18 @@ export interface ClassifyInput {
   readonly cell: number;
 }
 
+/**
+ * Planes reused by every classification on this thread (one per tile, several megabytes each): fresh arrays of that
+ * size per tile cost every thread of the page (page faults, then releases), which shows as slower page frames while
+ * workers make tiles. Grown when a larger grid comes; the caller writes each cell before reading it.
+ */
+const planes: Int32Array[] = [];
+function scratch(at: number, length: number): Int32Array {
+  let plane = planes[at];
+  if (!plane || plane.length < length) plane = planes[at] = new Int32Array(length);
+  return plane.length === length ? plane : plane.subarray(0, length);
+}
+
 /** Wavelength of the ecotone warp, mm. */
 const WARP = 700_000;
 
@@ -238,15 +250,15 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
   const n = input.n,
     count = c.ids.length,
     cells = n * n,
-    member = new Int32Array(count * cells),
+    member = scratch(0, count * cells),
     slots = c.inputs.length,
     modes = c.modes,
     { rank, envelopes } = c,
     // Every step below runs over whole planes of cells (one input, one envelope bound at a time), in the same order
     // per cell as a cell-by-cell loop, so the integers are the same and the loops stay small and monomorphic.
-    warped = new Int32Array(slots * cells),
-    dT = new Int32Array(cells),
-    n2 = new Int32Array(cells);
+    warped = scratch(1, slots * cells),
+    dT = scratch(2, cells),
+    n2 = scratch(3, cells);
   // Warp noise on the 8-cell lattice covering this grid: lattice point (a, b) is global cell (8 (a0 + a), 8 (b0 + b)).
   // The lattice spans both axes on their own: a point's grid (sample) need not start at the same lattice phase in x
   // and z (a tile's always does).
@@ -305,7 +317,9 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
   // Envelope memberships. The nearest envelope (the fallback where no biome has weight) is found only at the cells that
   // need it, from the same distances `membership` gives, in biome order with ties by rank.
   const zones = !!c.score;
-  if (!zones)
+  // A zone scorer adds into the planes; envelope memberships fill them.
+  if (zones) member.fill(0);
+  else
     for (let b = 0; b < count; b++)
       memberships(envelopes, b, warped, cells, member.subarray(b * cells, (b + 1) * cells));
   c.score?.(warped, cells, member);
@@ -324,8 +338,9 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
   // The 3x3 box sums of every membership plane over the inner cells: rows of three, then three rows (the same integer
   // sums as adding the nine cells).
   const inner = n - 2,
-    rowSum = new Int32Array(cells),
-    box = new Int32Array(count * cells);
+    // Every cell of these is written before it is read (rowSum at 1..cells - 2, box at the inner cells).
+    rowSum = scratch(4, cells),
+    box = scratch(5, count * cells);
   for (let b = 0; b < count; b++) {
     const base = b * cells;
     for (let k = 1; k < cells - 1; k++) rowSum[k] = member[base + k - 1] + member[base + k] + member[base + k + 1];
