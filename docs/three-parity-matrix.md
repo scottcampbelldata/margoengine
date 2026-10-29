@@ -11,12 +11,13 @@ COVERED can still name a limit. PARTIAL means one common three.js use is absent.
 implements that feature. Public copy should keep calling Margo an alternative path; the matrix is not a claim that
 Margo replaces three.js.
 
-## WebGL2 draws core meshes only
+## WebGL2 runs on a layer that is still in development
 
-That is a closed decision for v1.0: WebGL beyond core was closed as won't-do on 2026-10-14.
-`@margoengine/webgl` implements one `Renderer` that draws core meshes (constant colours, one directional light, no
-textures or effects); an app opts in with `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`. A full
-WebGL2 path: `@margoengine/webgl` is the basic preview; `loadFallback` and `fallbackContent` are the supported way to degrade today; a fuller WebGL2 compatibility package is in development as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)).
+`@margoengine/webgl2-compat` (milestones M0 to M7 of [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)) puts a WebGPU-shaped
+device on WebGL2 and translates every WGSL shader to GLSL ES 3.00, so core and the optional packages run unchanged at
+zero core bytes. The row stays PARTIAL: M8 (every site demo, docs, release) is open, the layer is 92,467 B gzip against
+a 60,000 B target, the voxel path tracer and XR refuse it, and CPU-tier compute kernels need `unsafe-eval`. The older
+`@margoengine/webgl` preview (core meshes only) still ships; `loadFallback` and `fallbackContent` remain the supported way to degrade today.
 
 ## The 4 MISSING rows
 
@@ -29,7 +30,7 @@ WebGL2 path: `@margoengine/webgl` is the basic preview; `loadFallback` and `fall
 
 ## The 4 PARTIAL rows
 
-Closed or v1 limits: WebGL2 fallback (above).
+In progress: WebGL2 fallback (above).
 
 Narrower APIs that already have a Margo path: Node materials (typed WGSL nodes, not a statement language), WebXR VR
 (untested on a headset) and WebXR AR (hit testing and anchors, untested on a device; no plane detection, depth sensing
