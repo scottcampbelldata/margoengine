@@ -73,7 +73,7 @@ test('the nightly job runs the pinned proofs after the full check, alone under t
   assert.deepEqual(args.slice(-3), ['npm', 'run', 'proofs']);
   assert.match(
     readFileSync(join(root, 'scripts/nightly-full.mjs'), 'utf8'),
-    /\['pinned proofs', pinnedProofsCommand\(\)\]/,
+    /label: 'pinned proofs', command: pinnedProofsCommand()/,
   );
 });
 

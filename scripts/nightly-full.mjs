@@ -6,10 +6,14 @@
 // landing machine can erase. Only --current ran in any check before, so nine pinned proofs failed for days unnoticed
 // (bug 6). It registers nothing with the OS; schedule it with whatever runs jobs on this PC:
 //   node scripts/nightly-full.mjs
+// Overall deadline: MARGO_NIGHTLY_DEADLINE_MIN minutes (default 240) for the whole run; past it the running step's process
+// tree is killed, the result is TIMEOUT (exit 124) and the alert is raised. Every run writes test-results/nightly/last-status.json
+// (pass, fail or timeout, and the step), ALERT.txt on a failure, and ends its log with a "nightly RESULT" line.
 // Run it from a checkout at the commit to test (the main checkout, after `git pull --ff-only`). Takes the GPU lock exclusively (it
 // includes timed steps) for the whole run (the steps inside nest under it), so landing runs wait their turn.
-import { spawn } from 'node:child_process';
-import { createWriteStream, mkdirSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -43,39 +47,176 @@ export const pinnedProofsCommand = () => [
   ['scripts/gpu-lock.mjs', 'run', '--owner=nightly-proofs', '--exclusive', '--max=60', '--', 'npm', 'run', 'proofs'],
 ];
 
-async function main() {
-  const dir = join(root, 'test-results/nightly');
+/** Hard limit for the whole nightly run, in minutes. Override with MARGO_NIGHTLY_DEADLINE_MIN (a positive number). */
+export const defaultDeadlineMin = 240;
+export const deadlineMs = (env = process.env) => {
+  const minutes = Number(env.MARGO_NIGHTLY_DEADLINE_MIN ?? defaultDeadlineMin);
+  return (Number.isFinite(minutes) && minutes > 0 ? minutes : defaultDeadlineMin) * 60_000;
+};
+
+/** Ends a process and everything it started (Windows: taskkill /T /F; elsewhere the process group). */
+export function killTree(pid) {
+  if (!pid) return;
+  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+  else
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {}
+    }
+}
+
+const desktopMarker = () => join(homedir(), 'Desktop', 'MARGO-NIGHTLY-FAILED.txt');
+
+/**
+ * Best-effort alert that needs no Claude tokens and no network: ALERT.txt beside the logs, a marker file on the
+ * Desktop and a Windows toast. The toast can fail in a scheduled task with no signed-in desktop session, so
+ * last-status.json and the final "nightly RESULT" log line are the reliable record; the rest is a bonus.
+ * MARGO_NIGHTLY_NO_ALERT=1 turns the Desktop file and the toast off (tests).
+ */
+export function alert(dir, text, env = process.env) {
+  try {
+    writeFileSync(join(dir, 'ALERT.txt'), `${text}\n`);
+  } catch {}
+  if (env.MARGO_NIGHTLY_NO_ALERT === '1' || process.platform !== 'win32') return;
+  try {
+    if (existsSync(join(homedir(), 'Desktop'))) writeFileSync(desktopMarker(), `${text}\n`);
+  } catch {}
+  try {
+    const message = text.replace(/'/g, "''").slice(0, 200);
+    const script =
+      "$ErrorActionPreference='Stop';[void][Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime];" +
+      "$x=[Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent('ToastText02');" +
+      "$t=$x.GetElementsByTagName('text');$t.Item(0).AppendChild($x.CreateTextNode('Margo nightly check'))|Out-Null;" +
+      `$t.Item(1).AppendChild($x.CreateTextNode('${message}'))|Out-Null;` +
+      "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Margo nightly').Show([Windows.UI.Notifications.ToastNotification]::new($x))";
+    spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+      stdio: 'ignore',
+      timeout: 15_000,
+    });
+  } catch {}
+}
+
+/** Clears the markers of an earlier failure once a run passes. */
+function clearAlert(dir, env) {
+  const files = [join(dir, 'ALERT.txt')];
+  if (env.MARGO_NIGHTLY_NO_ALERT !== '1') files.push(desktopMarker());
+  for (const file of files) {
+    try {
+      rmSync(file, { force: true });
+    } catch {}
+  }
+}
+
+/**
+ * Runs the steps in order under one overall deadline. Each step is {label, command: [program, args]}. When the
+ * deadline passes, the running step's whole process tree is killed (the GPU lock `run` wrapper is in that tree, and a
+ * lock whose holder is dead is reclaimed by the next waiter), the remaining steps are skipped and the result is
+ * `timeout`. Writes the dated log and `last-status.json` ({result: pass|fail|timeout, step, ...}) in `dir`, raises
+ * the alert on fail or timeout, and returns the exit code (0 pass, 124 timeout, or the failing step's code).
+ */
+export async function runNightly({
+  steps,
+  dir,
+  cwd = root,
+  env = process.env,
+  deadline = deadlineMs(env),
+  quiet = false,
+}) {
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${stamp()}.log`),
-    log = createWriteStream(file);
-  let code = 0;
-  for (const [label, [command, args]] of [
-    ['full check:merge', nightlyCommand()],
-    ['pinned proofs', pinnedProofsCommand()],
-  ]) {
-    const started = Date.now();
-    log.write(`nightly ${label}, started ${new Date(started).toISOString()}, cwd ${root}\n`);
-    const child = spawn(command, args, {
-      cwd: root,
+    log = createWriteStream(file, { flags: 'a' }),
+    began = Date.now(),
+    results = [];
+  let code = 0,
+    result = 'pass',
+    failedStep = null;
+  for (const { label, command } of steps) {
+    const left = deadline - (Date.now() - began),
+      started = Date.now();
+    log.write(
+      `nightly ${label}, started ${new Date(started).toISOString()}, cwd ${cwd}, ${Math.max(0, Math.round(left / 1000))} s left of the deadline\n`,
+    );
+    if (left <= 0) {
+      results.push({ step: label, result: 'timeout', seconds: 0 });
+      result = 'timeout';
+      failedStep = label;
+      code = 124;
+      break;
+    }
+    const child = spawn(command[0], command[1], {
+      cwd,
       // MARGO_NIGHTLY: tests with a nightly depth (the biomes rank envelopes of 2,499 simulations) run it.
-      env: { ...process.env, MARGO_FULL: '1', MARGO_NIGHTLY: '1' },
+      env: { ...env, MARGO_FULL: '1', MARGO_NIGHTLY: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     });
     for (const stream of [child.stdout, child.stderr]) {
       stream.on('data', (chunk) => {
         log.write(chunk);
-        process.stdout.write(chunk);
+        if (!quiet) process.stdout.write(chunk);
       });
     }
-    const status = await new Promise((done) => child.on('close', (value) => done(value ?? 1)));
-    log.write(
-      `\nnightly ${label} ${status === 0 ? 'PASSED' : `FAILED (exit ${status})`} in ${Math.round((Date.now() - started) / 1000)} s\n`,
-    );
-    code ||= status;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killTree(child.pid);
+    }, left);
+    const status = await new Promise((done) => {
+      child.once('error', () => done(1));
+      child.once('close', (value) => done(value ?? 1));
+    });
+    clearTimeout(timer);
+    const seconds = Math.round((Date.now() - started) / 1000);
+    if (timedOut) {
+      log.write(
+        `\nnightly ${label} TIMED OUT after ${seconds} s (overall deadline ${Math.round(deadline / 60_000)} min), process tree killed\n`,
+      );
+      results.push({ step: label, result: 'timeout', seconds });
+      result = 'timeout';
+      failedStep = label;
+      code = 124;
+      break;
+    }
+    log.write(`\nnightly ${label} ${status === 0 ? 'PASSED' : `FAILED (exit ${status})`} in ${seconds} s\n`);
+    results.push({ step: label, result: status === 0 ? 'pass' : 'fail', exit: status, seconds });
+    if (status !== 0 && result === 'pass') {
+      result = 'fail';
+      failedStep = label;
+      code = status;
+    }
   }
+  const total = Math.round((Date.now() - began) / 1000),
+    summary = `nightly RESULT ${result.toUpperCase()}${failedStep ? ` at step "${failedStep}"` : ''}, ${total} s, log ${file}`;
+  log.write(`${summary}\n`);
   await new Promise((done) => log.end(done));
-  console.log(`log: ${file}`);
-  process.exitCode = code;
+  const record = {
+    result,
+    step: failedStep,
+    exitCode: code,
+    finished: new Date().toISOString(),
+    seconds: total,
+    deadlineMin: deadline / 60_000,
+    log: file,
+    steps: results,
+  };
+  writeFileSync(join(dir, 'last-status.json'), `${JSON.stringify(record, null, 2)}\n`);
+  if (result === 'pass') clearAlert(dir, env);
+  else alert(dir, summary, env);
+  if (!quiet) console.log(summary);
+  return code;
+}
+
+async function main() {
+  process.exitCode = await runNightly({
+    steps: [
+      { label: 'full check:merge', command: nightlyCommand() },
+      { label: 'pinned proofs', command: pinnedProofsCommand() },
+    ],
+    dir: join(root, 'test-results/nightly'),
+  });
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();
