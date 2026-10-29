@@ -7,7 +7,7 @@
 import type { EngineKernel, Geometry } from '@margoengine/core';
 import type { Scatter } from '@margoengine/scatter';
 import type { ScatterTiles } from '@margoengine/scatter/tiles';
-import { rangeError, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 import type { BiomePlacement, PlacedTile } from './placement.js';
 
 /** Settings of {@link BiomeObjects.attach}. */
@@ -22,6 +22,30 @@ export interface BiomeObjectsOptions {
   readonly detailRadius?: number;
   /** Metres per detail density texel. Default 2. */
   readonly detailResolution?: number;
+  /**
+   * Most bytes the detail density maps may take over all detail species (each map is one byte per texel over `bounds`,
+   * kept on this thread and as a GPU texture). Default 128 MiB.
+   */
+  readonly detailBudget?: number;
+}
+
+/** Default {@link BiomeObjectsOptions.detailBudget}: 128 MiB of detail maps. */
+export const DETAIL_BUDGET = 134_217_728;
+
+/**
+ * Whether the detail maps of `species` detail species over `bounds`, one texel every `resolution` metres, fit `budget`
+ * bytes and textures of at most `limit` texels a side (the device's largest 2D texture).
+ */
+export function detailFits(
+  bounds: readonly [number, number, number, number],
+  resolution: number,
+  species: number,
+  limit: number,
+  budget = DETAIL_BUDGET,
+): boolean {
+  const width = Math.ceil((bounds[2] - bounds[0]) / resolution), // float division: view only
+    depth = Math.ceil((bounds[3] - bounds[1]) / resolution); // float division: view only
+  return width <= limit && depth <= limit && width * depth * species <= budget;
 }
 
 /** Colours (linear RGB) of the procedural meshes' parts. */
@@ -108,7 +132,7 @@ export class BiomeObjects implements Disposable {
   private constructor(engine: EngineKernel, placement: BiomePlacement, options: BiomeObjectsOptions, modules: Modules) {
     this.#engine = engine;
     this.#placement = placement;
-    this.#options = { radius: 1000, detailRadius: 120, detailResolution: 2, ...options };
+    this.#options = { radius: 1000, detailRadius: 120, detailResolution: 2, detailBudget: DETAIL_BUDGET, ...options };
     this.#modules = modules;
   }
 
@@ -129,9 +153,19 @@ export class BiomeObjects implements Disposable {
         'BiomeObjects needs a heightmap function and the bounds [minX, minZ, maxX, maxZ] it covers',
         'biomes',
       );
-    for (const key of ['radius', 'detailRadius', 'detailResolution'] as const)
+    for (const key of ['radius', 'detailRadius', 'detailResolution', 'detailBudget'] as const)
       if (options[key] !== undefined && !(options[key]! > 0))
         throw rangeError(`BiomeObjects ${key} must be above 0`, 'biomes');
+    if (!(b[2] > b[0] && b[3] > b[1]))
+      throw rangeError('BiomeObjects bounds must be [minX, minZ, maxX, maxZ] with max above min', 'biomes');
+    // Checked before anything is allocated: a huge world or a fine resolution must not ask for gigabytes of maps.
+    const limit = (engine as unknown as { gpu?: GPUDevice }).gpu?.limits.maxTextureDimension2D ?? 8192;
+    if (!detailFits(b, options.detailResolution ?? 2, placement.details.length, limit, options.detailBudget))
+      throw fault(
+        'unsupported',
+        "BiomeObjects detail maps exceed detailBudget or the device's largest texture; raise detailResolution or detailBudget, or shrink bounds",
+        'biomes',
+      );
     const [tiles, scatter, procedural, core] = await Promise.all([
       import('@margoengine/scatter/tiles'),
       import('@margoengine/scatter'),
@@ -263,12 +297,17 @@ export class BiomeObjects implements Disposable {
 
   /**
    * Puts one placed tile on the GPU (its objects by species, dead trees as snags, each species only within its draw
-   * distance of the tile's nearest point, `distance`) and its detail densities.
+   * distance of the tile's nearest point, `distance`) and, within 300 m or a tile beyond the detail radius, its detail
+   * densities.
    */
   add(tile: PlacedTile, distance = 0): void {
     const key = `${tile.x},${tile.z}`,
       bySpecies = new Map<number, number[]>(),
       dead: number[] = [];
+    if (tile.groups) {
+      for (const step of this.steps(tile, distance)) step();
+      return;
+    }
     for (let k = 0; k < tile.count; k++) {
       const age = tile.instances[k * 8 + 7] >> 4;
       if (age >= 2) dead.push(k);
@@ -299,41 +338,110 @@ export class BiomeObjects implements Disposable {
     if (this.#snags && distance <= this.#snags.radius)
       this.#snags.tiles[0].setTile(key, tile.origin, tile.size, pick(dead, this.#snags.tiles[0].slotSize));
     this.#held.set(key, tile.count);
-    // Detail densities into the world-wide textures (every detailResolution metres).
+    if (distance <= this.#detailReach) for (const d of tile.density) this.#density(tile, d);
+  }
+
+  /** Tiles within this distance of the camera write their detail densities (detail is drawn much closer). */
+  get #detailReach(): number {
+    return Math.max(Math.min(this.#options.radius, 300), this.#options.detailRadius + this.#placement.tileSize);
+  }
+
+  /**
+   * The work of `add` as small steps (one species' records, one detail map, each well under a tenth of a millisecond),
+   * for a caller that spreads a tile over frames: run them in order. Each species is replaced in one step, so the
+   * tile's old objects stay drawn until their new ones are in. Detail densities are written for tiles within 300 m
+   * (or a tile beyond the detail radius); add the tile again when it comes closer.
+   */
+  steps(tile: PlacedTile, distance = 0): (() => void)[] {
+    if (!tile.groups) return [() => this.add(tile, distance)];
+    const key = `${tile.x},${tile.z}`,
+      records = new Map<ScatterTiles, Uint8Array>(),
+      out: (() => void)[] = [];
+    for (const g of tile.groups) {
+      const entry = g.dead ? this.#snags : this.#species.get(tile.species[g.species]);
+      if (!entry || distance > entry.radius) continue;
+      const t = entry.tiles[0],
+        n = g.records.length >> 3;
+      if (n > t.slotSize) this.dropped += n - t.slotSize;
+      records.set(t, n > t.slotSize ? g.records.subarray(0, t.slotSize * 8) : g.records);
+    }
+    const held = this.#held.has(key);
+    for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])]) {
+      const t = entry.tiles[0],
+        r = records.get(t);
+      if (r) out.push(() => t.setTile(key, tile.origin, tile.size, r));
+      else if (held) out.push(() => t.removeTile(key));
+    }
+    out.push(() => this.#held.set(key, tile.count));
+    if (distance <= this.#detailReach) for (const d of tile.density) out.push(() => this.#density(tile, d));
+    return out;
+  }
+
+  /** One detail density map of a tile into its world-wide texture (one texel every detailResolution metres). */
+  #density(tile: PlacedTile, d: PlacedTile['density'][number]): void {
+    const entry = this.#details.find((e) => e.id === d.id);
+    if (!entry) return;
     const res = this.#options.detailResolution,
       [x0, z0, x1] = this.#options.bounds,
       width = Math.ceil((x1 - x0) / res), // float division: view only
-      cells = tile.density[0]?.data.length ? Math.round(Math.sqrt(tile.density[0].data.length)) : 0,
-      step = tile.size / cells; // float division: metres per cell
-    const every = Math.max(1, Math.round(res / step)); // float division: view only
-    for (const d of tile.density) {
-      const entry = this.#details.find((e) => e.id === d.id);
-      if (!entry) continue;
-      for (let j = 0; j < cells; j += every)
-        for (let i = 0; i < cells; i += every) {
-          // float division
-          const u = Math.floor((tile.origin[0] + i * step - x0) / res), // float division
-            v = Math.floor((tile.origin[1] + j * step - z0) / res); // float division
-          if (u >= 0 && v >= 0 && u < width && v * width + u < entry.data.length)
-            entry.data[v * width + u] = d.data[j * cells + i];
-        }
-      // Upload the rows the tile covers (the texture is made on the first frame that reads it).
-      const device = (this.#engine as unknown as { gpu?: GPUDevice }).gpu;
-      if (entry.texture && device) {
-        const depth = entry.data.length / width, // float division: exact
-          u0 = Math.max(0, Math.floor((tile.origin[0] - x0) / res)), // float division
-          v0 = Math.max(0, Math.floor((tile.origin[1] - z0) / res)), // float division
-          w = Math.min(width - u0, Math.ceil(tile.size / res)), // float division
-          h = Math.min(depth - v0, Math.ceil(tile.size / res)); // float division
-        if (w > 0 && h > 0)
-          device.queue.writeTexture(
-            { texture: entry.texture, origin: [u0, v0] },
-            entry.data as Uint8Array<ArrayBuffer>,
-            { offset: v0 * width + u0, bytesPerRow: width },
-            [w, h],
-          );
-      }
+      depth = entry.data.length / width, // float division: exact
+      cells = Math.round(Math.sqrt(d.data.length)),
+      step = tile.size / cells, // float division: metres per cell
+      every = Math.max(1, Math.round(res / step)), // float division: view only
+      n = Math.ceil(cells / every), // float division: view only
+      us = new Int32Array(n),
+      vs = new Int32Array(n);
+    // The texel of every sampled column and row, once.
+    for (let i = 0; i < n; i++) {
+      us[i] = Math.floor((tile.origin[0] + i * every * step - x0) / res); // float division: view only
+      vs[i] = Math.floor((tile.origin[1] + i * every * step - z0) / res); // float division: view only
     }
+    const device = (this.#engine as unknown as { gpu?: GPUDevice }).gpu,
+      s = d.sampled;
+    if (
+      s?.every === every &&
+      us[0] >= 0 &&
+      vs[0] >= 0 &&
+      us[n - 1] === us[0] + n - 1 &&
+      vs[n - 1] === vs[0] + n - 1 &&
+      us[n - 1] < width &&
+      vs[n - 1] < depth
+    ) {
+      // Sampled by the worker for this texel grid and inside the texture: rows in, and the upload straight from it.
+      for (let j = 0; j < n; j++) entry.data.set(s.data.subarray(j * n, (j + 1) * n), (vs[0] + j) * width + us[0]);
+      if (entry.texture && device)
+        device.queue.writeTexture(
+          { texture: entry.texture, origin: [us[0], vs[0]] },
+          s.data as Uint8Array<ArrayBuffer>,
+          { bytesPerRow: n },
+          [n, n],
+        );
+      return;
+    }
+    let u0 = Infinity,
+      u1 = -1,
+      v0 = Infinity,
+      v1 = -1;
+    for (let j = 0; j < n; j++) {
+      const v = vs[j];
+      if (v < 0 || v >= depth) continue;
+      for (let i = 0; i < n; i++) {
+        const u = us[i];
+        if (u < 0 || u >= width) continue;
+        entry.data[v * width + u] = d.data[j * every * cells + i * every];
+        if (u < u0) u0 = u;
+        if (u > u1) u1 = u;
+      }
+      if (v < v0) v0 = v;
+      if (v > v1) v1 = v;
+    }
+    // Upload the texels the tile covers from a compact copy (the texture is made on the first frame that reads it).
+    if (!entry.texture || !device || u1 < u0 || v1 < v0) return;
+    const w = u1 - u0 + 1,
+      h = v1 - v0 + 1,
+      block = new Uint8Array(w * h);
+    for (let v = 0; v < h; v++) block.set(entry.data.subarray((v0 + v) * width + u0, (v0 + v) * width + u0 + w), v * w);
+    device.queue.writeTexture({ texture: entry.texture, origin: [u0, v0] }, block, { bytesPerRow: w }, [w, h]);
   }
 
   /** Takes one tile's objects off the GPU. */

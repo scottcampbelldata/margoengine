@@ -55,6 +55,36 @@ export interface BiomeWorldOptions {
   readonly paint?: readonly PaintLayer[];
   /** Rejects `create` with the signal's reason when aborted. */
   readonly signal?: AbortSignal;
+  /**
+   * Web Workers that make tiles and stored objects off the page's thread, 0..16 (`false` is 0). Default: hardware
+   * threads less one, at most 4, where workers exist (browsers); none elsewhere. The output is byte for byte the same
+   * either way. A `field` height source keeps the work on this thread (a function cannot be sent to a worker).
+   */
+  readonly workers?: number | false;
+  /** Makes one worker, for bundlers that copy worker scripts their own way and for tests. Default: the package's
+   * worker script, `dist/workers/biomes.js`. */
+  readonly createWorker?: () => Worker;
+  /** Tiles kept in the cache; the least recently used go first (a default 256 m tile at 1 m holds about 2.6 MB).
+   * 1..4,096. Default 64. */
+  readonly cache?: number;
+}
+
+/** What the workers entry (`@margoengine/biomes/workers`) reads of a world to make a replica. */
+export interface WorldState {
+  readonly options: BiomeWorldOptions;
+  readonly biomes: readonly BiomeDefinition[];
+  readonly classifier: 'envelopes' | ZoneClassifier;
+  readonly paint: readonly PaintLayer[];
+  readonly user: ReadonlyMap<string, ReadonlyMap<string, Uint8Array>>;
+}
+
+/** The worker side of a world (`@margoengine/biomes/workers`), as the world uses it. */
+interface Remote {
+  tile(x: number, z: number, names: readonly string[]): Promise<BiomeTile>;
+  write(writes: readonly LayerWrite[]): void;
+  /** False when the change cannot reach a worker (a `field` height): the world works on its own thread from then on. */
+  change(changes: object): boolean;
+  dispose(): void;
 }
 
 /** Options of a tile request. */
@@ -84,8 +114,6 @@ export interface BiomeTile {
 const TILE_SIZES = [128, 256, 512],
   RESOLUTIONS = [0.5, 1, 2, 4],
   BACKENDS = ['auto', 'gpu', 'cpu'];
-/** Most tiles kept in the cache before the oldest is dropped (the streaming cache with a memory cap arrives in B7). */
-const CACHE = 256;
 
 type Rect = readonly [number, number, number, number];
 
@@ -136,6 +164,10 @@ export class BiomeWorld implements Disposable {
   #classifier: Classifier;
   #notifying = false;
   #disposed = false;
+  readonly #limit: number;
+  /** The options as given (climate and heights unquantised), for worker replicas. */
+  #given: BiomeWorldOptions;
+  #remote?: Remote;
 
   private constructor(options: BiomeWorldOptions, biomes: readonly BiomeDefinition[]) {
     const seed = options.seed ?? 1,
@@ -143,7 +175,8 @@ export class BiomeWorld implements Disposable {
       tileSize = options.tileSize ?? 256,
       resolution = options.resolution ?? 1,
       regionResolution = options.regionResolution ?? 16,
-      backend = options.backend ?? 'auto';
+      backend = options.backend ?? 'auto',
+      cache = options.cache ?? 64;
     if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
       throw rangeError('BiomeWorld seed must be an integer in 0..2^32-1', 'biomes');
     if (!TILE_SIZES.includes(tileSize)) throw rangeError('BiomeWorld tileSize must be 128, 256 or 512', 'biomes');
@@ -173,6 +206,10 @@ export class BiomeWorld implements Disposable {
     if (!BACKENDS.includes(backend)) throw rangeError("BiomeWorld backend must be 'auto', 'gpu' or 'cpu'", 'biomes');
     if (backend === 'gpu')
       throw fault('unsupported', "The biomes GPU backend is not available yet; use backend 'auto' or 'cpu'", 'biomes');
+    if (!Number.isInteger(cache) || cache < 1 || cache > 4096)
+      throw rangeError('BiomeWorld cache must be an integer number of tiles, 1..4,096', 'biomes');
+    this.#limit = cache;
+    this.#given = options;
     this.seed = seed >>> 0;
     this.tileSize = tileSize;
     this.resolution = resolution;
@@ -205,7 +242,38 @@ export class BiomeWorld implements Disposable {
     if (h === undefined || (typeof h === 'object' && h !== null && 'relief' in h))
       relief ??= (await import('@margoengine/biomes/relief')).createRelief;
     aborted(options.signal);
-    return new BiomeWorld(options, biomes);
+    const world = new BiomeWorld(options, biomes),
+      { workers } = options;
+    if (workers !== undefined && workers !== false && !(Number.isInteger(workers) && workers >= 0 && workers <= 16))
+      throw rangeError('BiomeWorld workers must be an integer 0..16 or false', 'biomes');
+    // Workers are their own entry, loaded only for a world that uses them (by default where Web Workers exist).
+    const auto = workers === undefined && typeof Worker === 'function' && typeof globalThis.location !== 'undefined';
+    if ((auto || (workers && workers > 0)) && !(h && typeof h === 'object' && 'field' in h)) {
+      const { BiomeWorkers, defaultWorkers } = await import('@margoengine/biomes/workers'),
+        count = workers || defaultWorkers();
+      if (count) world.#remote = new BiomeWorkers(count, world, () => world.#state(), options.createWorker);
+    }
+    aborted(options.signal);
+    return world;
+  }
+
+  /** The state a worker replica is made from (the workers entry builds its message). */
+  #state(): WorldState {
+    return {
+      options: this.#given,
+      biomes: this.#biomes,
+      classifier: this.#kind,
+      paint: this.#paint,
+      user: this.#user,
+    };
+  }
+
+  /**
+   * The world's workers (`BiomeWorkers` of `@margoengine/biomes/workers`), or undefined on a world without them:
+   * placement and views send their jobs there.
+   */
+  get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined {
+    return this.#remote as import('@margoengine/biomes/workers').BiomeWorkers | undefined;
   }
 
   #buildClassifier(): Classifier {
@@ -290,10 +358,14 @@ export class BiomeWorld implements Disposable {
     aborted(options.signal);
     const key = `${x},${z}:${[...names].sort().join(',')}`;
     let pending = this.#cache.get(key);
-    if (!pending) {
-      pending = this.#make(x, z, names);
+    if (pending) {
+      // Least recently used goes first: a hit moves to the end.
+      this.#cache.delete(key);
       this.#cache.set(key, pending);
-      if (this.#cache.size > CACHE) {
+    } else {
+      pending = this.#remote ? this.#remote.tile(x, z, names) : this.#make(x, z, names);
+      this.#cache.set(key, pending);
+      if (this.#cache.size > this.#limit) {
         const oldest = this.#cache.keys().next().value!;
         this.#cache.delete(oldest);
         this.#ready.delete(oldest.slice(0, oldest.indexOf(':')));
@@ -475,6 +547,7 @@ export class BiomeWorld implements Disposable {
       dirty[2] = Math.max(dirty[2], c[2] + r);
       dirty[3] = Math.max(dirty[3], c[3] + r);
     }
+    this.#remote?.write(writes);
     const rect = [
       Math.max(bx0, dirty[0]),
       Math.max(bz0, dirty[1]),
@@ -586,6 +659,11 @@ export class BiomeWorld implements Disposable {
     }
     if (changes.climate) this.#climate = quantizeClimate(changes.climate);
     if (changes.height) this.#replaceHeights(changes.height);
+    this.#given = { ...this.#given, ...changes };
+    if (this.#remote && !this.#remote.change(changes)) {
+      this.#remote.dispose();
+      this.#remote = undefined;
+    }
     if (changes.climate || changes.height) this.#region = this.#buildRegion();
     this.#cache.clear();
     this.#ready.clear();
@@ -625,6 +703,8 @@ export class BiomeWorld implements Disposable {
   /** Frees the cache and listeners; later calls throw MargoError `'disposed'`. */
   dispose(): void {
     this.#disposed = true;
+    this.#remote?.dispose();
+    this.#remote = undefined;
     this.#cache.clear();
     this.#ready.clear();
     this.#listeners.clear();

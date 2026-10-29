@@ -87,7 +87,7 @@ test('ScatterTiles packs held records, filters a palette index, frees tiles and 
   const code = h.pipelines.find((p) => p.compute).compute.module.code;
   assert.equal(code, tilesCullShader());
   assert.match(code, /var<storage,read> records:array<vec2u>/);
-  assert.match(code, /if\(slot>=tiles\[0\]\[ring\+1u\]\)\{atomicSub/);
+  assert.match(code, /if\(slot>=pages\[0\]\[ring\+1u\]\)\{atomicSub/);
   assert.ok(tiles.removeTile('0,0'));
   assert.ok(!tiles.removeTile('0,0'));
   tiles.setTile('0,1', [0, 256], 256, Uint8Array.from(record(3, 4, 1)));
@@ -97,17 +97,23 @@ test('ScatterTiles packs held records, filters a palette index, frees tiles and 
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 
-/** The table and records ScatterTiles uploaded: [tile count, ring capacities] and per tile [x, z, side, count, first]. */
-function uploaded(h, tiles) {
-  const table = h.resources.find((r) => r.size === 4 * (4 + 8 * tiles.slots) && !r.destroyed),
+/**
+ * What ScatterTiles uploaded: the ring capacities and, per used page (64 records), [page, origin x, origin z, side,
+ * records in it], read from the page table (the one buffer of 16 bytes per page plus a header).
+ */
+function uploaded(h, pages) {
+  const table = h.resources.find((r) => !r.destroyed && r.size === 16 * (1 + pages)),
     u = new Uint32Array(table.data),
     f = new Float32Array(table.data),
-    list = [];
-  for (let k = 0; k < u[0]; k++) list.push([f[4 + 8 * k], f[5 + 8 * k], f[6 + 8 * k], u[7 + 8 * k], u[8 + 8 * k]]);
-  return { count: u[0], rings: [u[1], u[2], u[3]], list };
+    used = [];
+  for (let p = 0; p < pages; p++) {
+    const e = 4 * (1 + p);
+    if (u[e + 3]) used.push([p, f[e], f[e + 1], f[e + 2], u[e + 3]]);
+  }
+  return { rings: [u[1], u[2], u[3]], used };
 }
 
-test('ScatterTiles memory follows what is held: packed records, rings sized from the camera, shared meshes', () => {
+test('ScatterTiles memory follows what is held: records in pages, rings sized from the camera, shared meshes', () => {
   const h = optionalGPU(),
     lod = [100, 300, 1000],
     trunks = new ScatterTiles(box(), { bounds: [0, 0, 4096, 4096], slots: 16, slotSize: 4096, lod }),
@@ -117,63 +123,73 @@ test('ScatterTiles memory follows what is held: packed records, rings sized from
   const tile = (n, species = 0) => Uint8Array.from(Array.from({ length: n }, (_, k) => record(k, k, species)).flat());
   // Three tiles in a row from the camera at (128, 0, 128): the first holds it, the next start 128 and 384 m away.
   Object.assign(h.engine.camera.position, [128, 0, 128]);
-  trunks.setTile('0,0', [0, 0], 256, tile(3000));
-  trunks.setTile('1,0', [256, 0], 256, tile(200));
-  crowns.setTile('2,0', [512, 0], 256, tile(100)); // a sharing mesh hands its tiles to the leader
+  trunks.setTile('0,0', [0, 0], 256, tile(100)); // 2 pages
+  trunks.setTile('1,0', [256, 0], 256, tile(64)); // 1 page
+  crowns.setTile('2,0', [512, 0], 256, tile(30)); // 1 page; a sharing mesh hands its tiles to the leader
   assert.equal(trunks.size, 3);
   assert.equal(crowns.size, 3);
   h.frame();
-  let t = uploaded(h, trunks);
-  assert.deepEqual(
-    t.list.map((e) => [e[0], e[3], e[4]]),
-    [
-      [0, 3000, 0],
-      [256, 200, 3000],
-      [512, 100, 3200],
-    ],
-  );
+  // The pool starts with 16 pages; pages are taken from the low end.
+  let t = uploaded(h, 16);
+  assert.deepEqual(t.used, [
+    [0, 0, 0, 256, 64],
+    [1, 0, 0, 256, 36],
+    [2, 256, 0, 256, 64],
+    [3, 512, 0, 256, 30],
+  ]);
   // Ring needs at this camera: near (100 m) only the first tile, middle (300 m) two, far all three; each with headroom.
   const room = (n) => Math.ceil(n * 1.5) + 256;
-  assert.deepEqual(t.rings, [room(3000), room(3200), room(3300)]);
-  // Bytes: the records (3,000 outgrew the first 1,024 slots, with headroom) and the three rings; the sharing mesh holds
-  // none of its own, and both draw one set of rings.
-  assert.equal(trunks.gpuBytes, room(3000) * 8 + (room(3000) + room(3200) + room(3300)) * 32 + 4 * (4 + 8 * 16));
+  assert.deepEqual(t.rings, [room(100), room(164), room(194)]);
+  // Bytes: 16 pages of records, the three rings and the page table; the sharing mesh holds none of its own, and both
+  // draw one set of rings.
+  assert.equal(trunks.gpuBytes, 16 * 64 * 8 + (room(100) + room(164) + room(194)) * 32 + 16 * 17);
   assert.equal(crowns.gpuBytes, 0);
-  const rings = h.resources.filter((r) => !r.destroyed && r.size >= room(3000) * 32);
-  assert.equal(rings.length, 3, 'one set of rings for both meshes');
-  // A removed tile leaves a hole; a new tile goes after the last one while it fits. Records stay byte for byte.
+  assert.equal(
+    h.resources.filter((r) => !r.destroyed && r.size === room(100) * 32).length,
+    1,
+    'one near ring for both',
+  );
+  // A removed tile frees its page; the next tile takes it, and nothing else moves.
   trunks.removeTile('1,0');
-  trunks.setTile('3,0', [768, 0], 256, tile(900));
+  trunks.setTile('3,0', [768, 0], 256, tile(20));
   h.frame();
-  t = uploaded(h, trunks);
+  t = uploaded(h, 16);
   assert.deepEqual(
-    t.list.map((e) => [e[0], e[3], e[4]]),
+    t.used.map((e) => [e[0], e[1], e[4]]),
     [
-      [0, 3000, 0],
-      [512, 100, 3200],
-      [768, 900, 3300],
+      [0, 0, 64],
+      [1, 0, 36],
+      [2, 768, 20],
+      [3, 512, 30],
     ],
   );
-  const records = h.resources.find((r) => !r.destroyed && r.size === room(3000) * 8),
-    words = new Uint32Array(records.data);
-  assert.equal(words[2 * (3300 + 7)], 7 | (7 << 16), "tile 3,0's record 7 sits at 3,307");
-  // A tile that does not fit after the last one closes the holes first: everything moves together.
-  trunks.removeTile('0,0');
-  trunks.setTile('4,0', [1024, 0], 256, tile(4000));
+  const records = (pages) => new Uint32Array(h.resources.find((r) => !r.destroyed && r.size === pages * 64 * 8).data);
+  assert.equal(records(16)[2 * (2 * 64 + 7)], 7 | (7 << 16), "tile 3,0's record 7 is in page 2");
+  assert.equal(records(16)[2 * (1 * 64 + 5)], 69 | (69 << 16), "tile 0,0's record 69 is the 6th of its second page");
+  // More than the free pages: the pool grows with headroom, the held pages keep their places.
+  trunks.setTile('4,0', [1024, 0], 256, tile(4000)); // 63 pages
   h.frame();
-  t = uploaded(h, trunks);
+  const grown = Math.ceil((Math.ceil((16 + 63 - 12) * 64 * 1.5) + 256) / 64);
+  t = uploaded(h, grown);
+  assert.equal(t.used.length, 4 + 63);
   assert.deepEqual(
-    t.list.map((e) => [e[0], e[3], e[4]]),
+    t.used.slice(0, 4).map((e) => [e[0], e[1]]),
     [
-      [512, 100, 0],
-      [768, 900, 100],
-      [1024, 4000, 1000],
+      [0, 0],
+      [1, 0],
+      [2, 768],
+      [3, 512],
     ],
   );
-  // A far camera shrinks the near and middle rings once they use under a quarter of their buffers.
+  assert.equal(records(grown)[2 * (3 * 64 + 29)], 29 | (29 << 16), 'tile 2,0 kept its page');
+  // A dense tile at the camera grows the near ring; a far camera shrinks it again once it uses under a quarter (rings
+  // under 1,024 instances stay, so a camera moving back and forth does not remake them).
+  trunks.setTile('0,0', [0, 0], 256, tile(2000)); // 32 of the 40 free pages
+  h.frame();
+  assert.equal(uploaded(h, grown).rings[0], room(2000));
   Object.assign(h.engine.camera.position, [4000, 0, 4000]);
   h.frame();
-  t = uploaded(h, trunks);
+  t = uploaded(h, grown);
   assert.deepEqual(t.rings.slice(0, 2), [room(0), room(0)]);
   crowns.dispose();
   trunks.dispose();

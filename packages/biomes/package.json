@@ -73,6 +73,10 @@
     "./stats": {
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"
+    },
+    "./workers": {
+      "types": "./dist/workers.d.ts",
+      "import": "./dist/workers.js"
     }
   },
   "files": [
@@ -110,6 +114,6 @@
     "build": "node ../../scripts/build-optional.js biomes",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs && node packages/biomes/tests/objects-check.mjs"
+    "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs && node packages/biomes/tests/objects-check.mjs && node packages/biomes/tests/flythrough-check.mjs"
   }
 }

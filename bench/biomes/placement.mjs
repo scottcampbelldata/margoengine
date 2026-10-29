@@ -3,7 +3,8 @@
 // exclusively): node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node bench/biomes/placement.mjs [--runs=20]
 // Also the `biomes` suite of `npm run bench -- biomes`. Prints one JSON object: ms per km2 per stage, and the spread.
 // Stages: relief heights (B0), climate fields with classification (B1, B2), stored-object placement (B5). G1 is
-// fields plus placement per km2.
+// fields plus placement per km2; `workers` times the same work for a block of tiles on 1 and on 8 worker threads
+// (B7, `--workers=<n>`).
 // The fields stage builds R16's region fields once in its setup (several seconds, not timed).
 import { pathToFileURL } from 'node:url';
 import { median } from '../lib/node.mjs';
@@ -99,9 +100,56 @@ export async function measure({ runs = 20 } = {}) {
   return result;
 }
 
+/**
+ * G1 on workers: wall time per km2 to make fields, classification and stored objects for a block of `side` x `side`
+ * R16 tiles near the centre on `workers` worker threads running the built worker script, after each worker made its
+ * replica (the replicas' region fields are not timed). Every placement job makes the world tiles it reads in its own
+ * worker, so the neighbours a block shares across workers are made more than once and that cost is in the number.
+ */
+export async function measureWorkers({ workers = 8, side = 8 } = {}) {
+  const biomes = await import(dist('index')),
+    { R16 } = await import(dist('presets')),
+    { BiomePlacement } = await import(dist('placement')),
+    { ThreadWebWorker } = await import(new URL('../../packages/biomes/tests/thread-worker.js', import.meta.url).href);
+  const world = await biomes.BiomeWorld.create({
+      seed: R16.seed,
+      origin: R16.origin,
+      size: R16.size,
+      height: { relief: R16.relief },
+      climate: R16.climate,
+      workers,
+      createWorker: () => new ThreadWebWorker(),
+    }),
+    placement = BiomePlacement.attach(world);
+  try {
+    // Warm every worker: enough jobs far from the block that each worker takes some.
+    await Promise.all(Array.from({ length: 2 * workers }, (_, k) => placement.tile(4 + 4 * (k % 8), 4 + 8 * (k >> 3))));
+    const start = performance.now(),
+      jobs = [];
+    for (let z = 0; z < side; z++) for (let x = 0; x < side; x++) jobs.push(placement.tile(40 + x, 40 + z));
+    await Promise.all(jobs);
+    const km2 = (side * side * TILE.size * TILE.size) / 1e6;
+    return { workers, tiles: side * side, msPerKm2: (performance.now() - start) / km2 };
+  } finally {
+    world.dispose();
+  }
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const runs = Number(process.argv.find((a) => a.startsWith('--runs='))?.slice(7) ?? 20);
+  const runs = Number(process.argv.find((a) => a.startsWith('--runs='))?.slice(7) ?? 20),
+    workers = Number(process.argv.find((a) => a.startsWith('--workers='))?.slice(10) ?? 8);
   console.log(
-    JSON.stringify({ suite: 'biomes', world: 'R16', tile: TILE, runs, stages: await measure({ runs }) }, null, 1),
+    JSON.stringify(
+      {
+        suite: 'biomes',
+        world: 'R16',
+        tile: TILE,
+        runs,
+        stages: await measure({ runs }),
+        workers: [await measureWorkers({ workers: 1 }), await measureWorkers({ workers })],
+      },
+      null,
+      1,
+    ),
   );
 }

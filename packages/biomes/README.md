@@ -206,10 +206,32 @@ slope, height, moisture and curvature rules; `groundWeights(world, tile, materia
 | `radius` | 1,000 | tiles within this many metres of the camera are drawn at full detail |
 | `materials` | none | `{ key: { color: [r, g, b] (sRGB 0..1), detail? (0..1, default 0.25) } }` over `MATERIALS` |
 | `clipmap` | cell 1 m, 64 cells, 6 rings | `cellSize`, `resolution` and `levels` of the terrain |
+| `lookahead` | 3 | seconds ahead along the camera's velocity that tiles are fetched early |
+| `budget` | 0.25 | milliseconds per frame the page spends copying arrived tiles in (one step always goes in) |
+| `detailBudget` | 128 MiB | most bytes of detail density maps (one byte per texel per detail species, on this thread and the GPU); detail maps coarsen by halves to fit it and the device's largest texture |
 | `signal` | none | rejects `attach` and stops streaming |
 
-WebGPU only. Tiles are made on the page's thread for now (about 42 ms each; the worker pool is a later milestone),
-with a pause between tiles so frames keep drawing.
+WebGPU only. The view streams before every frame: tiles within `radius` of the camera, and of where the camera will be
+`lookahead` seconds on, are fetched nearest first; tiles that fall out of range on their way are cancelled, and objects
+of tiles left behind leave the GPU. On a world with workers (the default in browsers) the tiles, their ground weights
+and their objects are made there, and the page only copies finished arrays in, a species or a detail map at a time
+within `budget`. `view.prefetch(rect)` makes the tiles of a rectangle ahead of time (a planned flight, a loading
+screen). Measured (goal G3, `packages/biomes/tests/flythrough-check.mjs`, RTX A6000, 4 workers): a 300 km/h flight
+over the zero-config world adds nothing measurable to the slowest 1 percent of frames or to the worst frame against the
+same flight with every tile made first (medians of three flights each, within the timer's 0.1 ms); copying one arrived
+tile in takes 0.1 ms at the median and 0.3 ms at the 99th percentile on the page's thread.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const world = await BiomeWorld.create({ workers: 3 });
+const view = await BiomeView.attach(engine, world, { lookahead: 4, budget: 0.5 });
+await view.prefetch([-1500, -1500, 1500, 1500]); // the tiles of a planned flight, made before it starts
+console.log(view.streaming); // { pending, arrived }: tiles on their way and waiting to go in
+```
 
 ### Trees, rocks and grass on the terrain
 
@@ -218,7 +240,11 @@ By default a `BiomeView` also draws the world's stored objects and detail: it at
 `@margoengine/scatter/tiles` per species mesh (dead trees as snags) and draws every detail species (grass, ferns,
 reeds) with a camera-following scatter whose density map is the placement's. Meshes are the `procedural:<name>` keys
 of the presets, from `@margoengine/procedural`. Pass `objects: false` for terrain alone. `view.objects` is that
-`BiomeObjects` (`count` objects on the GPU, `gpuBytes`, `dropped`). GPU memory follows what is held: the zero-config
+`BiomeObjects` (`count` objects on the GPU, `gpuBytes`, `dropped`). Its detail density maps cover the world at
+`detailResolution` metres per texel, one byte per texel per detail species; `detailBudget` (default 128 MiB) caps their
+total and the device's largest texture caps each side, checked before anything is allocated:
+`BiomeObjects.attach` rejects with MargoError `'unsupported'` past either (`detailFits` tells ahead), and `BiomeView`
+coarsens its detail maps until they fit. GPU memory follows what is held: the zero-config
 world's 172,569 streamed objects take 6.5 MB (records 8 bytes each, LOD rings 32 bytes per instance they can draw, both
 sized from the held tiles with headroom, and a tree's canopy sharing its trunk's), down from 117.6 MB when every tile
 slot and ring was sized for the densest case (`packages/biomes/tests/objects-check.mjs`, RTX A6000).
@@ -319,6 +345,44 @@ editor.undo(); // the exact bytes from before the erase
   and continentality reach far downwind.
 - Brush maths is integer, so the same edit gives the same bytes everywhere. A dab or an undo costs well under a frame;
   the touched tiles are remade on their next request (on this thread until the worker pool of a later milestone).
+
+## Workers
+
+A world makes its tiles and stored objects on Web Workers when they exist (browsers): by default hardware threads less
+one, at most 4; `workers: 0` or `false` keeps everything on the page's thread, and in Node there are none unless you
+pass `createWorker`. Each worker holds a replica of the world made from the same options and changed by the same calls
+in the same order (paint and mask writes, `update`, placements and their updates), so a tile made in a worker is byte
+for byte the page's tile: the package test compares digests of fields, placements and view tiles made both ways,
+after writes and updates too. Height `samples` are copied to each worker; a `field` function cannot be sent, so a world
+with one works on the page's thread. Jobs queue per worker by priority (a view passes the tile's distance), never
+across a change, and go to the worker that made the neighbouring tiles when it is not much busier. A queued job
+leaves the queue when its signal aborts; a worker that crashes or runs a job past 60 s is replaced by a fresh replica
+and its job rejects with MargoError `'failed'`. The worker script is `dist/workers/biomes.js` (lazy: a world without
+workers never loads it or the `/workers` entry); bundlers copy it as an asset, or pass your own `createWorker`.
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomePlacement } from '@margoengine/biomes/placement';
+
+const world = await BiomeWorld.create({ workers: 3, cache: 32 }); // at most 32 tiles kept on this thread
+const placement = BiomePlacement.attach(world); // places on the workers too
+const tile = await world.tile(4, 4); // made on a worker, its arrays moved here without a copy
+const objects = await placement.tile(4, 4, { priority: 1 });
+console.log(tile.layers.length, objects.count, objects.groups?.length);
+world.dispose(); // terminates the workers
+```
+
+| `BiomeWorld.create` option | Default | Meaning |
+| --- | --- | --- |
+| `workers` | threads less one, at most 4, where Web Workers exist; else 0 | worker replicas that make tiles and objects |
+| `createWorker` | the package's worker script | makes one worker (custom bundlers, tests) |
+| `cache` | 64 | tiles kept on this thread, least recently used first out (a default tile is about 2.6 MB) |
+
+Measured on the reference PC (`bench/biomes/placement.mjs`, R16, an 8 x 8 block of tiles, Node worker threads running
+the same script): fields and stored objects take 1,005 ms per km2 of wall time on one worker and 363 on eight, against
+680 on the page's thread alone and goal G1's 70 on eight workers. A placement reads its neighbours' fields, and each
+worker makes the ones it needs itself, so tiles at the edges of what a worker places are made more than once; sharing
+made tiles between workers (or making only the strip a placement reads) is what would close the gap.
 
 ## Same seed, same bytes, everywhere
 

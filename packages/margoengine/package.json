@@ -127,6 +127,10 @@
       "types": "./dist/biomes/stats.d.ts",
       "import": "./dist/biomes/stats.js"
     },
+    "./biomes/workers": {
+      "types": "./dist/biomes/workers.d.ts",
+      "import": "./dist/biomes/workers.js"
+    },
     "./blender": {
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"

@@ -1,8 +1,12 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// BiomeView part 1 (spec 4, B3): a biome world drawn as clipmap terrain. Heights and per-material ground weights go
-// into `@margoengine/terrain` (its optional `TerrainTextures.weights`, decision D4): an overview from the region grid
-// first, then 1 m tiles around the camera, nearest first, and again for every dirty rectangle the world reports (so
-// painting shows up). Terrain is loaded with import() on attach, so this entry costs nothing until it is used.
+// BiomeView (spec 4, B3, B6, B7): a biome world drawn as clipmap terrain with its stored objects. Heights and
+// per-material ground weights go into `@margoengine/terrain` (its optional `TerrainTextures.weights`, decision D4): an
+// overview from the region grid first, then 1 m tiles streamed around the camera and ahead of it along its velocity
+// (a 300 km/h flight crosses a 256 m tile every 3.1 s), nearest first, and again for every dirty rectangle the world
+// reports (so painting shows up). On a world with workers the tiles, their ground weights and their objects are made
+// there; the page only copies finished arrays in, a few per frame within a time budget, and tiles that fall behind the
+// camera before they arrive are cancelled. Terrain is loaded with import() on attach, so this entry costs nothing
+// until it is used.
 // Ground layer rules use the same Wendland bands as biome envelopes (define.ts); materials are generated textures.
 import type { EngineKernel } from '@margoengine/core';
 import type { Terrain, TerrainColorOptions } from '@margoengine/terrain';
@@ -10,6 +14,7 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type BiomeDefinition, type Dimension, fieldDimension } from './define.js';
 // The toolkit comes through the package name, so the view shares the root's copy (a view always has a world).
 import { clampInt, divFloor, hash3, ONE, wendland } from '@margoengine/biomes/toolkit';
+import type { PlacedTile } from './placement.js';
 import type { BiomeTile, BiomeWorld } from './world.js';
 
 /** The look of a ground material: sRGB colour 0..1 and the contrast of its generated detail 0..1. */
@@ -57,7 +62,45 @@ export interface BiomeViewOptions {
   readonly objects?: boolean;
   /** Detail is drawn within this distance of the camera. Default 120 m. */
   readonly detailRadius?: number;
+  /** Seconds ahead along the camera's velocity that tiles are fetched early. Default 3. */
+  readonly lookahead?: number;
+  /** Milliseconds per frame the page may spend copying arrived tiles in (one always goes in). Default 0.25. */
+  readonly budget?: number;
+  /** Most bytes of detail density maps (`BiomeObjects` `detailBudget`); the view coarsens detail maps to fit. Default
+   * 128 MiB. */
+  readonly detailBudget?: number;
 }
+
+/** What a view draws of one tile: heights in metres and the two ground weight textures, `count` x `count` texels. */
+export interface ViewTile {
+  readonly x: number;
+  readonly z: number;
+  readonly count: number;
+  readonly heights: Float32Array;
+  readonly weights: readonly [Uint8Array, Uint8Array];
+}
+
+/** A view tile made on this thread (a world without workers): the same arrays a worker sends. */
+export function viewTile(world: BiomeWorld, tile: BiomeTile, materials: readonly string[], step: number): ViewTile {
+  const count = Math.floor(tile.cells / step), // float division: exact multiple
+    ground = groundWeights(world, tile, materials),
+    height = tile.layer('height')!,
+    heights = new Float32Array(count * count),
+    a = new Uint8Array(count * count * 4),
+    b = new Uint8Array(count * count * 4);
+  for (let j = 0; j < count; j++)
+    for (let i = 0; i < count; i++) {
+      const k = j * step * tile.cells + i * step,
+        t = j * count + i;
+      heights[t] = height.data[k] * height.scale;
+      a.set(ground.subarray(k * 8, k * 8 + 4), t * 4);
+      b.set(ground.subarray(k * 8 + 4, k * 8 + 8), t * 4);
+    }
+  return { x: tile.x, z: tile.z, count, heights, weights: [a, b] };
+}
+
+/** Layers a view tile reads. */
+export const VIEW_LAYERS = Object.freeze(['height', 'slope', 'moisture', 'curvature', 'biome', 'biomeWeight']);
 
 /** Ground material keys of a biome list in first-use order, at most 8 (the terrain's layer limit). */
 export function groundMaterials(biomes: readonly BiomeDefinition[]): string[] {
@@ -225,6 +268,8 @@ function cellNoise(seed: number, x: number, y: number, cells: number): number {
 }
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
+/** Views attached so far (each registers a uniquely named per-frame plugin). */
+let views = 0;
 
 /**
  * A biome world drawn as terrain: heights and ground materials from the world, streamed around the camera at full
@@ -251,9 +296,37 @@ export class BiomeView implements Disposable {
   readonly #weights: [Uint8Array, Uint8Array];
   readonly #radius: number;
   readonly #signal?: AbortSignal;
+  readonly #lookahead: number;
+  readonly #budget: number;
+  /** Distance within which small plants, rocks and props are drawn (BiomeObjects' near radius). */
+  readonly #near: number;
   #textures?: { device: GPUDevice; height: GPUTexture; weights: [GPUTexture, GPUTexture] };
-  #queue: Promise<void> = Promise.resolve();
   #off: () => void;
+  #offObjects?: () => void;
+  /** Streaming: tiles drawn at full detail, tiles whose objects are on the GPU, jobs on their way (`v` view, `p`
+   * objects, then `x,z`), finished jobs waiting to be copied in, the camera's last place and velocity. */
+  readonly #drawn = new Set<string>();
+  /** Tiles whose objects are on the GPU, and whether they went in near the camera (with the small plants). */
+  readonly #placed = new Map<string, boolean>();
+  readonly #pending = new Map<string, AbortController>();
+  readonly #arrived: { priority: number; apply: () => void; key: string; last: boolean }[] = [];
+  /** Copying time spent so far on tiles whose steps are not all in, by job key. */
+  readonly #work = new Map<string, number>();
+  #eye?: [number, number];
+  readonly #velocity: [number, number] = [0, 0];
+  #planned?: [number, number];
+  #lastFrame = 0;
+  #frames = 0;
+  #first?: Set<string>;
+  #firstDone?: () => void;
+  #idle: (() => void)[] = [];
+  #drainTimer?: ReturnType<typeof setTimeout>;
+  /**
+   * Page-thread time each arrived tile took to copy in, milliseconds (the last 600 tiles, terrain and objects apart),
+   * and the copying time of each frame that copied any: for budgets and tests.
+   */
+  readonly tileTimes: number[] = [];
+  readonly frameTimes: number[] = [];
   #objects?: import('@margoengine/biomes/objects').BiomeObjects;
   #disposed = false;
 
@@ -268,6 +341,11 @@ export class BiomeView implements Disposable {
     this.#world = world;
     this.#signal = options.signal;
     this.#radius = options.radius ?? 1000;
+    this.#lookahead = options.lookahead ?? 3;
+    this.#budget = options.budget ?? 0.25;
+    this.#near = Math.min(this.#radius, 300);
+    if (!(this.#lookahead >= 0) || !(this.#budget > 0))
+      throw rangeError('BiomeView lookahead must be 0 or more seconds and budget above 0 ms', 'biomes');
     const [x0, z0, x1, z1] = world.bounds;
     let texel = options.textureResolution ?? 2;
     const steps = texel / world.resolution; // float division: option check
@@ -327,8 +405,10 @@ export class BiomeView implements Disposable {
         return { heightmap: height, layers, weights };
       },
     });
-    this.#off = world.onChange((rect) => this.#enqueue(rect));
-    this.ready = this.#enqueue(this.#around());
+    this.#off = world.onChange((rect) => this.#dirty(rect, 'v'));
+    this.ready = new Promise((done) => {
+      this.#firstDone = done;
+    });
   }
 
   /**
@@ -347,31 +427,302 @@ export class BiomeView implements Disposable {
     const view = new BiomeView(engine, world, options, terrainModule, limit);
     if (options.objects ?? true) {
       // Placement and its drawing are their own entries, loaded only for a view that draws objects.
-      const [{ BiomePlacement }, { BiomeObjects }] = await Promise.all([
+      const [{ BiomePlacement }, { BiomeObjects, detailFits }] = await Promise.all([
           import('@margoengine/biomes/placement'),
           import('@margoengine/biomes/objects'),
         ]),
         t = view.textureResolution / 2,
         [x0, z0, x1, z1] = world.bounds;
-      view.#objects = await BiomeObjects.attach(engine, BiomePlacement.attach(world), {
+      const placement = BiomePlacement.attach(world),
+        bounds = [x0 - t, z0 - t, x1 + t, z1 + t] as const;
+      view.#placement = placement;
+      // Detail maps start at the terrain's texel and coarsen by halves until they fit the budget and the device.
+      let detail = view.textureResolution;
+      while (!detailFits(bounds, detail, placement.details.length, limit, options.detailBudget)) detail *= 2;
+      view.#detailStep = Math.round(detail / world.resolution); // float division: exact multiple
+      view.#objects = await BiomeObjects.attach(engine, placement, {
         heightmap: () => view.#textures?.height,
         // Height texels sit on the world's grid corners: the rectangle their centres cover is half a texel wider.
-        bounds: [x0 - t, z0 - t, x1 + t, z1 + t],
+        bounds,
         radius: options.radius ?? 1000,
         detailRadius: options.detailRadius ?? 120,
-        detailResolution: view.textureResolution,
+        detailResolution: detail,
+        detailBudget: options.detailBudget,
       });
-      // Ready once the tiles around the camera are drawn with their objects.
-      (view as { ready: Promise<void> }).ready = view.#enqueue(view.#around());
+      view.#offObjects = placement.onChange((rect) => view.#dirty(rect, 'p'));
     }
+    if (options.signal?.aborted) {
+      view.dispose();
+      throw options.signal.reason;
+    }
+    // Streaming runs before every frame; `ready` resolves once the tiles around the camera are in.
+    engine.use({ name: `biomes-view:${++views}`, setup() {}, onPreUpdate: (delta) => view.#frame(delta) });
+    view.#name = `biomes-view:${views}`;
+    view.#plan(true);
     return view;
   }
 
-  /** The world rectangle around the camera that is drawn at full detail. */
-  #around(): readonly [number, number, number, number] {
+  #placement?: import('@margoengine/biomes/placement').BiomePlacement;
+  /** World cells per detail texel (the worker samples detail maps at it). */
+  #detailStep = 1;
+  #name = '';
+
+  /** Before each frame: track the camera, plan when it moved, copy arrived tiles in within the budget. */
+  #frame(delta: number): void {
+    if (this.#disposed) return;
+    this.#lastFrame = performance.now();
+    this.#frames++;
     const p = this.#engine.camera.position,
-      r = this.#radius;
-    return [p[0] - r, p[2] - r, p[0] + r, p[2] + r];
+      eye: [number, number] = [p[0], p[2]];
+    if (this.#eye && delta > 0) {
+      // Velocity, smoothed over about five frames.
+      for (let i = 0; i < 2; i++) this.#velocity[i] += ((eye[i] - this.#eye[i]) / delta - this.#velocity[i]) * 0.2; // float division: view only
+    }
+    this.#eye = eye;
+    const moved = this.#planned ? Math.hypot(eye[0] - this.#planned[0], eye[1] - this.#planned[1]) : Infinity;
+    if (moved > this.#world.tileSize / 8 || this.#frames % 30 === 0) this.#plan(false);
+    this.#apply(this.#budget);
+  }
+
+  /**
+   * The tiles to have: within the radius of the camera or of where it will be `lookahead` seconds on. Missing ones
+   * are fetched nearest first; ones on their way that fell out of range are cancelled; objects of tiles left behind
+   * leave the GPU.
+   */
+  #plan(first: boolean): void {
+    if (this.#disposed) return;
+    const p = this.#engine.camera.position,
+      eye: [number, number] = [p[0], p[2]],
+      ahead: [number, number] = [
+        eye[0] + this.#velocity[0] * this.#lookahead,
+        eye[1] + this.#velocity[1] * this.#lookahead,
+      ],
+      w = this.#world,
+      side = w.tileSize,
+      r = this.#radius,
+      [bx, bz] = w.bounds,
+      near = (x: number, z: number, at: readonly [number, number]) =>
+        Math.hypot(
+          Math.max(0, bx + x * side - at[0], at[0] - bx - (x + 1) * side),
+          Math.max(0, bz + z * side - at[1], at[1] - bz - (z + 1) * side),
+        ),
+      tx = (v: number) => Math.min(w.tilesX - 1, Math.max(0, Math.floor((v - bx) / side))), // float division: view only
+      tz = (v: number) => Math.min(w.tilesZ - 1, Math.max(0, Math.floor((v - bz) / side))), // float division: view only
+      wanted: [number, number, number][] = [];
+    this.#planned = eye;
+    for (let z = tz(Math.min(eye[1], ahead[1]) - r); z <= tz(Math.max(eye[1], ahead[1]) + r); z++)
+      for (let x = tx(Math.min(eye[0], ahead[0]) - r); x <= tx(Math.max(eye[0], ahead[0]) + r); x++) {
+        const d = near(x, z, eye);
+        if (Math.min(d, near(x, z, ahead)) <= r) wanted.push([d, x, z]);
+      }
+    wanted.sort((a, b) => a[0] - b[0] || a[2] - b[2] || a[1] - b[1]);
+    if (first) this.#first = new Set();
+    for (const [d, x, z] of wanted) {
+      const key = `${x},${z}`;
+      if (!this.#drawn.has(key) && !this.#pending.has('v' + key)) this.#fetch('v', x, z, d);
+      if (this.#objects && !this.#placed.has(key) && !this.#pending.has('p' + key)) this.#fetch('p', x, z, d);
+      if (first && d <= r) {
+        this.#first!.add('v' + key);
+        if (this.#objects) this.#first!.add('p' + key);
+      }
+    }
+    // Cancel what fell out of range on its way; take objects of tiles behind the camera off the GPU.
+    for (const [key, controller] of this.#pending) {
+      const [x, z] = key.slice(1).split(',').map(Number);
+      if (Math.min(near(x, z, eye), near(x, z, ahead)) > r + side) {
+        controller.abort();
+        this.#pending.delete(key);
+        this.#first?.delete(key);
+      }
+    }
+    for (const [key, close] of this.#placed) {
+      const [x, z] = key.split(',').map(Number),
+        d = near(x, z, eye);
+      if (d > r + side) {
+        this.#objects!.remove(key);
+        this.#placed.delete(key);
+      } else if (close !== d <= this.#near && (close ? d > this.#near + side : true) && !this.#pending.has('p' + key))
+        // Small plants, rocks and props go in within the near radius and out a tile beyond it: place it again.
+        this.#fetch('p', x, z, d);
+    }
+    this.#settled();
+  }
+
+  /** A tile's terrain (`v`) or objects (`p`), made by the world's workers when it has them. */
+  #make(kind: 'v' | 'p', x: number, z: number, priority: number, signal?: AbortSignal): Promise<ViewTile | PlacedTile> {
+    const w = this.#world,
+      step = Math.round(this.textureResolution / w.resolution); // float division: exact multiple
+    if (kind === 'p') return this.#placement!.tile(x, z, { signal, priority, detail: this.#detailStep });
+    return w.workers
+      ? w.workers.run<ViewTile>(
+          { op: 'view', x, z, materials: this.materials, step },
+          { near: [x, z], priority, signal },
+        )
+      : // No workers: made on this thread, one per task so frames keep drawing.
+        new Promise<void>((done) => setTimeout(done, 0))
+          .then(() => w.tile(x, z, { layers: VIEW_LAYERS, signal }))
+          .then((tile) => viewTile(w, tile, this.materials, step));
+  }
+
+  /** Starts one job: `v` the tile's terrain, `p` its objects; the result waits in `#arrived` to be copied in. */
+  #fetch(kind: 'v' | 'p', x: number, z: number, priority: number): void {
+    const key = kind + `${x},${z}`,
+      controller = new AbortController(),
+      signal = this.#signal ? AbortSignal.any([this.#signal, controller.signal]) : controller.signal,
+      made = this.#made.get(key);
+    this.#pending.set(key, controller);
+    // A prefetched tile is ready already; it still goes in through the frame budget.
+    (made ? Promise.resolve(made) : this.#make(kind, x, z, priority, signal)).then(
+      (result) => {
+        if (this.#pending.get(key) !== controller || this.#disposed) return;
+        this.#pending.delete(key);
+        if (kind === 'p') {
+          // Objects go in a species at a time (each step is small), so one tile never takes a whole frame.
+          const steps = this.#objects!.steps(result as PlacedTile, priority),
+            last = steps.pop()!;
+          for (const apply of steps) this.#arrived.push({ priority, apply, key, last: false });
+          this.#arrived.push({
+            priority,
+            key,
+            last: true,
+            apply: () => {
+              last();
+              this.#placed.set(`${x},${z}`, priority <= this.#near);
+              this.#first?.delete(key);
+            },
+          });
+        } else
+          this.#arrived.push({
+            priority,
+            key,
+            last: true,
+            apply: () => {
+              this.#writeView(result as ViewTile);
+              this.#drawn.add(`${x},${z}`);
+              this.#first?.delete(key);
+            },
+          });
+        // Without frames (a page that waits for `ready` before drawing) the results go in from a timer.
+        this.#drainTimer ??= setTimeout(this.#drain, 50);
+      },
+      () => {
+        if (this.#pending.get(key) === controller) this.#pending.delete(key);
+        this.#first?.delete(key);
+        this.#settled();
+      },
+    );
+  }
+
+  /** Copies everything in when no frame has drawn for 100 ms; frames copy within their budget otherwise. */
+  #drain = (): void => {
+    this.#drainTimer = undefined;
+    if (!this.#arrived.length || this.#disposed) return;
+    if (performance.now() - this.#lastFrame > 100) this.#apply(Infinity);
+    else this.#drainTimer = setTimeout(this.#drain, 100);
+  };
+
+  /** Finished tiles made ahead by `prefetch`, by job key (at most 1,024). */
+  readonly #made = new Map<string, ViewTile | PlacedTile>();
+
+  /**
+   * Makes the tiles of a world rectangle (metres) ahead of time, terrain and objects, so a camera that goes there
+   * later finds them ready (a planned flight, a loading screen). They go in when the camera comes within range.
+   * Rejects with the signal's reason when aborted.
+   */
+  async prefetch(
+    rect: readonly [number, number, number, number],
+    options: { readonly signal?: AbortSignal } = {},
+  ): Promise<void> {
+    if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite))
+      throw typeError('BiomeView prefetch takes a [minX, minZ, maxX, maxZ] rectangle in metres', 'biomes');
+    const w = this.#world,
+      side = w.tileSize,
+      jobs: Promise<void>[] = [];
+    for (let z = 0; z < w.tilesZ; z++)
+      for (let x = 0; x < w.tilesX; x++) {
+        const x0 = w.bounds[0] + x * side,
+          z0 = w.bounds[1] + z * side;
+        if (x0 >= rect[2] || x0 + side <= rect[0] || z0 >= rect[3] || z0 + side <= rect[1]) continue;
+        for (const kind of this.#objects ? (['v', 'p'] as const) : (['v'] as const)) {
+          const key = kind + `${x},${z}`;
+          if (this.#made.has(key) || this.#made.size >= 1024) continue;
+          jobs.push(
+            this.#make(kind, x, z, 0, options.signal).then((result) => {
+              this.#made.set(key, result);
+            }),
+          );
+        }
+      }
+    await Promise.all(jobs);
+  }
+
+  /** Copies arrived tiles in, nearest first, until `budget` milliseconds are spent (one always goes in). */
+  #apply(budget: number): void {
+    const start = performance.now();
+    let n = 0;
+    while (this.#arrived.length && (n === 0 || performance.now() - start < budget)) {
+      let best = 0;
+      for (let i = 1; i < this.#arrived.length; i++)
+        if (this.#arrived[i].priority < this.#arrived[best].priority) best = i;
+      const [next] = this.#arrived.splice(best, 1),
+        t0 = performance.now();
+      next.apply();
+      const spent = (this.#work.get(next.key) ?? 0) + performance.now() - t0;
+      if (next.last) {
+        this.#work.delete(next.key);
+        this.tileTimes.push(spent);
+        if (this.tileTimes.length > 600) this.tileTimes.shift();
+      } else this.#work.set(next.key, spent);
+      n++;
+    }
+    if (n && Number.isFinite(budget)) {
+      this.frameTimes.push(performance.now() - start);
+      if (this.frameTimes.length > 600) this.frameTimes.shift();
+    }
+    this.#settled();
+  }
+
+  /** Resolves `ready` once the first tiles are in, and `whenIdle` waiters once nothing is on its way. */
+  #settled(): void {
+    if (this.#first && !this.#first.size) {
+      this.#first = undefined;
+      this.#firstDone?.();
+    }
+    if (!this.#pending.size && !this.#arrived.length && this.#idle.length)
+      for (const done of this.#idle.splice(0)) done();
+  }
+
+  /**
+   * A dirty world rectangle: its tiles (terrain `v` or objects `p`) are made again when in range (the old ones drawn
+   * until the new ones are in); jobs on their way and prefetched tiles there are dropped.
+   */
+  #dirty(rect: readonly [number, number, number, number], kind: 'v' | 'p'): void {
+    const w = this.#world,
+      side = w.tileSize,
+      held = kind === 'v' ? [...this.#drawn] : [...this.#placed.keys()],
+      keys = [...this.#pending.keys(), ...this.#made.keys()].filter((k) => k[0] === kind).map((k) => k.slice(1));
+    for (const key of new Set([...held, ...keys])) {
+      const [x, z] = key.split(',').map(Number),
+        x0 = w.bounds[0] + x * side,
+        z0 = w.bounds[1] + z * side;
+      if (x0 < rect[2] && x0 + side > rect[0] && z0 < rect[3] && z0 + side > rect[1]) {
+        this.#made.delete(kind + key);
+        this.#pending.get(kind + key)?.abort();
+        this.#pending.delete(kind + key);
+        // Terrain is made again by the next plan; objects are placed again now (they stay until the new ones are in).
+        if (kind === 'v') this.#drawn.delete(key);
+        else if (this.#placed.has(key)) {
+          const e = this.#engine.camera.position;
+          this.#fetch(
+            'p',
+            x,
+            z,
+            Math.hypot(Math.max(0, x0 - e[0], e[0] - x0 - side), Math.max(0, z0 - e[2], e[2] - z0 - side)),
+          );
+        }
+      }
+    }
+    this.#plan(false);
   }
 
   /** Heights from the world's region overview, bilinear to the texel grid. */
@@ -426,43 +777,37 @@ export class BiomeView implements Disposable {
     }
   }
 
-  /** Queues the tiles overlapping `rect` (nearest the camera first); resolves when they are drawn into the textures. */
-  #enqueue(rect: readonly [number, number, number, number]): Promise<void> {
-    this.#queue = this.#queue.then(() => this.#stream(rect)).catch(() => {});
-    return this.#queue;
-  }
-
-  async #stream(rect: readonly [number, number, number, number]): Promise<void> {
-    const p = this.#engine.camera.position;
-    for await (const tile of this.#world.tiles(rect, { focus: [p[0], p[2]], signal: this.#signal })) {
-      if (this.#disposed || this.#signal?.aborted) return;
-      this.#writeTile(tile);
-      if (this.#objects)
-        await this.#objects.stream([tile.origin[0], tile.origin[1], tile.origin[0] + 1, tile.origin[1] + 1], {
-          signal: this.#signal,
-        });
-      // Let frames render between tiles (tiles are made on this thread until the worker pool of B7).
-      await new Promise((done) => setTimeout(done, 0));
-    }
-  }
-
-  #writeTile(tile: BiomeTile): void {
-    const world = this.#world,
+  /** Copies a view tile into the CPU copies of the textures and uploads its rectangle straight from its arrays. */
+  #writeView(tile: ViewTile): void {
+    const w = this.#world,
       texel = this.textureResolution,
-      step = Math.round(texel / world.resolution), // float division: exact multiple
-      [x0, z0] = world.bounds,
-      u0 = Math.round((tile.origin[0] - x0) / texel), // float division
-      v0 = Math.round((tile.origin[1] - z0) / texel), // float division
-      count = Math.floor(tile.cells / step), // float division
-      height = tile.layer('height')!,
-      ground = groundWeights(world, tile, this.materials);
-    for (let j = 0; j < count && v0 + j < this.#depth; j++)
-      for (let i = 0; i < count && u0 + i < this.#width; i++) {
-        const k = j * step * tile.cells + i * step;
-        this.#heights[(v0 + j) * this.#width + u0 + i] = height.data[k] * height.scale;
-        this.#setWeights(u0 + i, v0 + j, ground, k * 8);
-      }
-    this.#upload(u0, v0, Math.min(count, this.#width - u0), Math.min(count, this.#depth - v0));
+      [x0, z0] = w.bounds,
+      u0 = Math.round((x0 + tile.x * w.tileSize - x0) / texel), // float division: whole texels
+      v0 = Math.round((z0 + tile.z * w.tileSize - z0) / texel), // float division
+      cw = Math.min(tile.count, this.#width - u0),
+      cd = Math.min(tile.count, this.#depth - v0);
+    for (let j = 0; j < cd; j++) {
+      const row = (v0 + j) * this.#width + u0;
+      this.#heights.set(tile.heights.subarray(j * tile.count, j * tile.count + cw), row);
+      this.#weights[0].set(tile.weights[0].subarray(j * tile.count * 4, (j * tile.count + cw) * 4), row * 4);
+      this.#weights[1].set(tile.weights[1].subarray(j * tile.count * 4, (j * tile.count + cw) * 4), row * 4);
+    }
+    const t = this.#textures;
+    if (!t || cw <= 0 || cd <= 0) return;
+    if (cw === tile.count) {
+      // The tile's own arrays are the texel rectangle: no staging copy.
+      const write = (texture: GPUTexture, data: Float32Array | Uint8Array) =>
+        t.device.queue.writeTexture(
+          { texture, origin: [u0, v0] },
+          data as Uint8Array<ArrayBuffer>,
+          { bytesPerRow: tile.count * 4 },
+          [cw, cd],
+        );
+      write(t.height, tile.heights);
+      write(t.weights[0], tile.weights[0]);
+      write(t.weights[1], tile.weights[1]);
+      (this.terrain as Terrain | undefined)?.invalidate();
+    } else this.#upload(u0, v0, cw, cd);
   }
 
   /** Uploads a texel rectangle of the CPU copies (kept for device restoration). */
@@ -496,9 +841,15 @@ export class BiomeView implements Disposable {
     return this.#objects;
   }
 
-  /** Resolves when every queued tile (the first ring and every dirty rectangle so far) is in the textures. */
+  /** Resolves when no tile is on its way or waiting to be copied in (the tiles around the camera and every dirty one). */
   whenIdle(): Promise<void> {
-    return this.#queue;
+    if (this.#disposed || (!this.#pending.size && !this.#arrived.length)) return Promise.resolve();
+    return new Promise((done) => this.#idle.push(done));
+  }
+
+  /** Tiles on their way (terrain and objects jobs) and tiles waiting to be copied in. */
+  get streaming(): { readonly pending: number; readonly arrived: number } {
+    return { pending: this.#pending.size, arrived: this.#arrived.length };
   }
 
   /** Stops streaming and frees the terrain and its textures. */
@@ -506,9 +857,18 @@ export class BiomeView implements Disposable {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#off();
+    this.#offObjects?.();
+    for (const controller of this.#pending.values()) controller.abort();
+    this.#pending.clear();
+    this.#arrived.length = 0;
+    clearTimeout(this.#drainTimer);
+    if (this.#name) this.#engine.removePlugin(this.#name);
     this.terrain.dispose();
     this.#objects?.dispose();
+    this.#placement?.dispose();
     this.#textures = undefined;
+    this.#firstDone?.();
+    for (const done of this.#idle.splice(0)) done();
   }
 
   [Symbol.dispose](): void {

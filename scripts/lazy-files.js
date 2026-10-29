@@ -193,6 +193,14 @@ export const LAZY_FILES = [
     when: 'First `buildAsync()` where `Worker` exists; one worker shared until `terminateBVHWorker()`',
   },
   {
+    package: '@margoengine/biomes',
+    file: 'packages/biomes/dist/workers/biomes.js',
+    label: 'workers/biomes.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'First tile, placement or view job of a `BiomeWorld` with workers (the default in browsers): up to `workers` workers, each a replica of the world, reused until `dispose()`',
+  },
+  {
     package: '@margoengine/voxel',
     file: 'packages/voxel/dist/workers/mesher.js',
     label: 'workers/mesher.js',

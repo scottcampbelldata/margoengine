@@ -3,10 +3,11 @@
 // index, log scale, yaw, variant) uploaded per tile and expanded on the GPU every frame by scatter's own distribute
 // pass, rewritten to read records instead of a stratified grid, so culling, LOD rings, fades, wind, ground fit and
 // shading are scatter's.
-// GPU memory follows what is held (goal G2 of the biomes spec): the records of every held tile sit packed in one buffer
-// sized from their count with headroom, and each LOD ring holds only as many instances as the held tiles within its
-// distance can give, recounted every frame from the camera. A second mesh of the same objects (a tree's canopy over its
-// trunk) shares the first one's records, culling and rings instead of repeating them.
+// GPU memory follows what is held (goal G2 of the biomes spec): records live in pages of 64 taken from a free list (a
+// tile wastes less than one page, adding or removing a tile moves nothing else, and streaming never repacks), the pool
+// grows with headroom only when every page is taken, and each LOD ring holds only as many instances as the held tiles
+// within its distance can give, recounted every frame from the camera. A second mesh of the same objects (a tree's
+// canopy over its trunk) shares the first one's records, culling and rings instead of repeating them.
 import type { EngineKernel, Geometry } from '@margoengine/core';
 import { engineRuntime, type Engine, type PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
@@ -47,18 +48,17 @@ export function tilesCullShader(): string {
   const code = scatterCullShader({ bounds: [0, 0, 1, 1] })
     .replace(
       '@group(0) @binding(6) var<storage,read> exclusions:array<vec4f>;',
-      '@group(0) @binding(6) var<storage,read> exclusions:array<vec4f>;\n@group(0) @binding(7) var<storage,read> records:array<vec2u>;\n@group(0) @binding(8) var<storage,read> tiles:array<vec4u>;',
+      '@group(0) @binding(6) var<storage,read> exclusions:array<vec4f>;\n@group(0) @binding(7) var<storage,read> records:array<vec2u>;\n@group(0) @binding(8) var<storage,read> pages:array<vec4u>;',
     )
     .replace(
       ' let slot=atomicAdd(&commands[ring].count,1u);',
-      // tiles[0] = (tile count, ring capacities): a ring never writes past its buffer.
-      ' let slot=atomicAdd(&commands[ring].count,1u);if(slot>=tiles[0][ring+1u]){atomicSub(&commands[ring].count,1u);return;}',
+      // pages[0] = (0, ring capacities): a ring never writes past its buffer.
+      ' let slot=atomicAdd(&commands[ring].count,1u);if(slot>=pages[0][ring+1u]){atomicSub(&commands[ring].count,1u);return;}',
     )
     .replace(
       /let i=id\.x;if\(i>=frame\.ids\.x\|\|hash\(i\*7u\+1u\)>frame\.rules\.w\)\{return;\}[\s\S]*?let uv=[^\n]*\n/,
-      // Tile t is tiles[1 + 2t] = (origin x, origin z, side as f32 bits, count) and tiles[2 + 2t].x = its first record,
-      // sorted by first record: the last tile starting at or before record i holds it, if it is within its count.
-      'let i=id.x;if(i>=frame.ids.x){return;}let n=tiles[0].x;if(n==0u){return;}var lo=0u;var hi=n;loop{if(lo+1u>=hi){break;}let mid=(lo+hi)>>1u;if(tiles[2u+2u*mid].x<=i){lo=mid;}else{hi=mid;}}\n let tile=tiles[1u+2u*lo];let first=tiles[2u+2u*lo].x;if(i<first||i-first>=tile.w){return;}let r=records[i];\n let world=bitcast<vec2f>(tile.xy)+vec2f(f32(r.x&0xffffu),f32(r.x>>16u))*bitcast<f32>(tile.z)/65536.0;\n',
+      // Page p (records 64 p .. 64 p + 63) is pages[1 + p] = (its tile's origin x and z and side as f32 bits, records used).
+      'let i=id.x;if(i>=frame.ids.x){return;}let page=pages[1u+(i>>6u)];if((i&63u)>=page.w){return;}let r=records[i];\n let world=bitcast<vec2f>(page.xy)+vec2f(f32(r.x&0xffffu),f32(r.x>>16u))*bitcast<f32>(page.z)/65536.0;\n',
     )
     .replace('let world=vec2f((uv.x-0.5)*frame.area.x+frame.area.z,(uv.y-0.5)*frame.area.y+frame.area.w);', '')
     .replace(
@@ -77,15 +77,16 @@ export function tilesCullShader(): string {
   return code;
 }
 
-/** Records the first buffer holds before it grows; a held tile's records are packed after the previous ones. */
-const FIRST_CAPACITY = 1024;
+/** Records per page, and the pages the pool starts with. */
+const PAGE = 64,
+  FIRST_PAGES = 16;
 /** Headroom when a buffer grows: half again the records or instances that need it, plus a little. */
 const grown = (n: number) => Math.ceil(n * 1.5) + 256;
 
-/** One held tile: its place in the packed records and its rectangle. */
+/** One held tile: its pages and its rectangle. */
 interface Held {
-  first: number;
-  count: number;
+  readonly pages: number[];
+  readonly count: number;
   readonly x: number;
   readonly z: number;
   readonly side: number;
@@ -108,20 +109,19 @@ export class ScatterTiles extends Scatter {
   readonly #drawn: number;
   readonly #leader?: ScatterTiles;
   readonly #followers: ScatterTiles[] = [];
-  /** CPU copy of the packed records (kept for device restoration and repacking) and the held tiles by key. */
-  #records = new Uint32Array(2 * FIRST_CAPACITY);
-  #end = 0;
+  /** CPU copies (kept for device restoration): the records by page, and the page table, header first. */
+  #records = new Uint32Array(2 * PAGE * FIRST_PAGES);
+  #table = new Uint32Array(4 * (1 + FIRST_PAGES));
+  /** Free pages (taken from the end), the held tiles by key, and pages written since the last upload. */
+  #free: number[] = Array.from({ length: FIRST_PAGES }, (_, p) => FIRST_PAGES - 1 - p);
   readonly #held = new Map<string, Held>();
-  /** The tile table as uploaded: header (count, three ring capacities), then two vec4u per tile. */
-  #table: Uint32Array;
+  readonly #written = new Set<number>();
   /** Records the GPU buffer holds and instances each ring holds. */
   #capacity = 0;
   readonly #rings = [0, 0, 0];
   #recordBuffer?: GPUBuffer;
   #tableBuffer?: GPUBuffer;
-  /** Records [from, to) to upload before the next distribute; `#all` uploads every record (after a repack or growth). */
-  #from = Number.POSITIVE_INFINITY;
-  #to = 0;
+  /** Every page uploads on the next frame (after growth or device restoration). */
   #all = true;
   #tableDirty = true;
 
@@ -168,7 +168,7 @@ export class ScatterTiles extends Scatter {
       throw new TypeError('ScatterTiles share must be another ScatterTiles that does not share one itself');
     super(geometry, {
       ...input,
-      count: FIRST_CAPACITY,
+      count: PAGE * FIRST_PAGES,
       area: [bounds[2] - bounds[0], bounds[3] - bounds[1]],
       center: [(bounds[0] + bounds[2]) / 2, 0, (bounds[1] + bounds[3]) / 2],
       scale: [scale, scale],
@@ -178,7 +178,6 @@ export class ScatterTiles extends Scatter {
     this.slotSize = slotSize;
     this.#species = species;
     this.#drawn = drawn;
-    this.#table = new Uint32Array(4 + 8 * slots);
     if (share) {
       this.#leader = share;
       share.#followers.push(this);
@@ -236,44 +235,59 @@ export class ScatterTiles extends Scatter {
     if (n > this.slotSize)
       throw new RangeError('ScatterTiles tile holds more records than slotSize; attach with a larger slotSize');
     this.removeTile(key);
-    // Packed after the last tile; when the end is reached, the held tiles move together first (holes left by removed
-    // tiles close), and the buffer grows when they still do not leave room.
-    if (this.#end + n > this.#records.length >> 1) this.#repack(n);
-    const first = this.#end;
-    for (let k = 0, at = 2 * first; k < words.length; k += 2) {
+    // Whole pages from the free list; the pool grows (with headroom) only when they run out.
+    const need = Math.ceil(n / PAGE),
+      pages: number[] = [];
+    if (need > this.#free.length) this.#grow(need - this.#free.length);
+    for (let q = 0; q < need; q++) pages.push(this.#free.pop()!);
+    const table = this.#table,
+      floats = new Float32Array(table.buffer);
+    let at = 0;
+    for (let k = 0; k < words.length; k += 2) {
       if (this.#species >= 0 && (words[k + 1] & 255) !== this.#species) continue;
-      this.#records[at++] = words[k];
-      this.#records[at++] = words[k + 1];
+      const slot = pages[at >> 6] * PAGE + (at & 63);
+      this.#records[2 * slot] = words[k];
+      this.#records[2 * slot + 1] = words[k + 1];
+      at++;
     }
-    this.#end += n;
-    this.#held.set(key, { first, count: n, x: origin[0], z: origin[1], side });
-    this.#from = Math.min(this.#from, first);
-    this.#to = Math.max(this.#to, this.#end);
+    pages.forEach((p, q) => {
+      const e = 4 * (1 + p);
+      floats[e] = origin[0];
+      floats[e + 1] = origin[1];
+      floats[e + 2] = side;
+      table[e + 3] = Math.min(PAGE, n - q * PAGE);
+      this.#written.add(p);
+    });
+    this.#held.set(key, { pages, count: n, x: origin[0], z: origin[1], side });
     this.#tableDirty = true;
   }
 
   /** Removes a tile; returns whether it was held. */
   removeTile(key: string): boolean {
     if (this.#leader) return this.#leader.removeTile(key);
-    if (!this.#held.delete(key)) return false;
+    const held = this.#held.get(key);
+    if (!held) return false;
+    this.#held.delete(key);
+    // Its pages go back to the free list, marked empty for the shader.
+    for (const p of held.pages) {
+      this.#table[4 * (1 + p) + 3] = 0;
+      this.#free.push(p);
+    }
     this.#tableDirty = true;
     return true;
   }
 
-  /** Moves the held tiles' records together and grows the CPU copy so `extra` more records fit after them. */
-  #repack(extra: number): void {
-    let total = extra;
-    for (const h of this.#held.values()) total += h.count;
-    const size = total > this.#records.length >> 1 ? grown(total) : this.#records.length >> 1,
-      packed = new Uint32Array(2 * size);
-    let end = 0;
-    for (const h of [...this.#held.values()].sort((a, b) => a.first - b.first)) {
-      packed.set(this.#records.subarray(2 * h.first, 2 * (h.first + h.count)), 2 * end);
-      h.first = end;
-      end += h.count;
-    }
-    this.#records = packed;
-    this.#end = end;
+  /** Grows the page pool by at least `extra` pages (with headroom); every page uploads again on the next frame. */
+  #grow(extra: number): void {
+    const before = this.#records.length / (2 * PAGE),
+      after = Math.ceil(grown((before + extra) * PAGE) / PAGE),
+      records = new Uint32Array(2 * PAGE * after),
+      table = new Uint32Array(4 * (1 + after));
+    records.set(this.#records);
+    table.set(this.#table);
+    this.#records = records;
+    this.#table = table;
+    for (let p = after - 1; p >= before; p--) this.#free.push(p);
     this.#all = true;
     this.#tableDirty = true;
   }
@@ -312,10 +326,6 @@ export class ScatterTiles extends Scatter {
     this.#capacity = 0;
     this.#all = true;
     this.#tableDirty = true;
-    this.#tableBuffer = d.createBuffer({
-      size: this.#table.byteLength,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
   }
 
   /**
@@ -343,7 +353,7 @@ export class ScatterTiles extends Scatter {
       return;
     }
     const d = c.device;
-    // Records: the buffer follows the CPU copy's size.
+    // Records: the buffer follows the page pool's size.
     const size = this.#records.length >> 1;
     if (size !== this.#capacity) {
       if (
@@ -359,19 +369,26 @@ export class ScatterTiles extends Scatter {
       this.extraChanged = true;
     }
     if (this.#all) {
-      if (this.#end)
-        d.queue.writeBuffer(this.#recordBuffer!, 0, this.#records as Uint32Array<ArrayBuffer>, 0, 2 * this.#end);
+      d.queue.writeBuffer(this.#recordBuffer!, 0, this.#records as Uint32Array<ArrayBuffer>);
       this.#all = false;
-    } else if (this.#to > this.#from)
-      d.queue.writeBuffer(
-        this.#recordBuffer!,
-        this.#from * 8,
-        this.#records as Uint32Array<ArrayBuffer>,
-        2 * this.#from,
-        2 * (this.#to - this.#from),
-      );
-    this.#from = Number.POSITIVE_INFINITY;
-    this.#to = 0;
+    } else if (this.#written.size) {
+      // One upload per run of neighbouring pages (a new tile's pages usually are one run).
+      const pages = [...this.#written].sort((a, b) => a - b);
+      for (let i = 0; i < pages.length; ) {
+        let j = i + 1;
+        while (j < pages.length && pages[j] === pages[j - 1] + 1) j++;
+        d.queue.writeBuffer(
+          this.#recordBuffer!,
+          pages[i] * PAGE * 8,
+          this.#records as Uint32Array<ArrayBuffer>,
+          2 * PAGE * pages[i],
+          2 * PAGE * (j - i),
+        );
+        i = j;
+      }
+    }
+    this.#written.clear();
+    const tableBytes = this.#table.byteLength;
     // Rings: grown (with headroom) as soon as the held tiles near the camera can fill one, shrunk when a ring uses
     // under a quarter of its buffer, never past `drawn`.
     this.#ringNeeds(c.camera.position, this.#needs);
@@ -392,23 +409,19 @@ export class ScatterTiles extends Scatter {
       this.instancesChanged();
       for (const f of this.#followers) f.#link();
     }
-    if (this.#tableDirty) {
-      const t = this.#table,
-        held = [...this.#held.values()].sort((a, b) => a.first - b.first),
-        floats = new Float32Array(t.buffer);
-      t.fill(0);
-      t[0] = held.length;
+    if (this.#tableDirty || tableBytes !== this.#tableBuffer?.size) {
+      const t = this.#table;
       t[1] = this.#rings[0];
       t[2] = this.#rings[1];
       t[3] = this.#rings[2];
-      held.forEach((h, k) => {
-        const at = 4 + 8 * k;
-        floats[at] = h.x;
-        floats[at + 1] = h.z;
-        floats[at + 2] = h.side;
-        t[at + 3] = h.count;
-        t[at + 4] = h.first;
-      });
+      if (tableBytes !== this.#tableBuffer?.size) {
+        this.#tableBuffer?.destroy();
+        this.#tableBuffer = d.createBuffer({
+          size: tableBytes,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+        this.extraChanged = true;
+      }
       d.queue.writeBuffer(this.#tableBuffer!, 0, t as Uint32Array<ArrayBuffer>);
       this.#tableDirty = false;
     }

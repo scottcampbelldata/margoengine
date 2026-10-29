@@ -212,9 +212,11 @@ const grass = Scatter.attach(engine, blade, {
 `@margoengine/scatter/tiles` draws stored instances per tile: `ScatterTiles` takes 8-byte records (u16 x and z inside the
 tile, palette index, log scale, yaw, variant and age, as `@margoengine/biomes/placement` writes them) and expands them on
 the GPU every frame with scatter's own culling, LOD rings, fades, wind and shading. Add tiles as they stream in and
-remove them as they leave. GPU memory follows what is held: the held tiles' records sit packed in one buffer sized
-from their count (with headroom), and each LOD ring holds as many instances as the held tiles within its distance can
-give, recounted every frame from the camera, so a ring never drops an instance and a sparse species costs little. A
+remove them as they leave. GPU memory follows what is held: records live in pages of 64 taken from a free list (a tile
+wastes less than one page, adding or removing a tile moves nothing else and streaming never repacks; the pool grows
+with headroom only when every page is taken), and each LOD ring holds as many instances as the held tiles within its
+distance can give, recounted every frame from the camera, so a ring never drops an instance and a sparse species
+costs little. A
 second mesh of the same objects (a tree's canopy over its trunk) passes `share` and draws the first one's records,
 culling and rings.
 
@@ -247,8 +249,8 @@ oaks.removeTile('3,4');
 | `scale` | 1 | multiplier on every record's scale |
 | `species` | all | the record palette index this mesh draws |
 
-Memory: 8 bytes per held record on the CPU and the GPU, 32 bytes per instance a ring can draw, plus half again as
-headroom; `tiles.gpuBytes` reports it (0 for a mesh that shares another's).
+Memory: 8 bytes per record slot (pages of 64) on the CPU and the GPU, 32 bytes per instance a ring can draw, plus half
+again as headroom; `tiles.gpuBytes` reports it (0 for a mesh that shares another's).
 
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).

@@ -99,6 +99,8 @@ export interface DensityMap {
   readonly density: number;
   /** u8 per cell, `cells` x `cells` rows of increasing z. */
   readonly data: Uint8Array;
+  /** The same map every `every` cells (`ceil(cells / every)` square), when a worker sampled it for a view. */
+  readonly sampled?: { readonly every: number; readonly data: Uint8Array };
 }
 
 /** One stored object, decoded from its record (floats for rendering; the record holds the decided integers). */
@@ -147,9 +149,42 @@ export interface PlacedTile {
     readonly unresolved: number;
     readonly rounds: Uint32Array;
   };
+  /**
+   * The records grouped by palette index, dead standing trees and logs apart (`dead`), in record order: given when a
+   * worker placed the tile (it splits them there, off the page's thread).
+   */
+  readonly groups?: readonly { readonly species: number; readonly dead: boolean; readonly records: Uint8Array }[];
   /** Calls `visit` with each object, decoded; `out` is reused between calls. */
   forEachInstance(visit: (instance: InstanceView) => void): void;
 }
+
+/** A placed tile from its data (made here or sent by a worker): frozen, with the record decoder. */
+function placed(t: Omit<PlacedTile, 'forEachInstance'>): PlacedTile {
+  const { origin, size: side, instances, count, species } = t;
+  return Object.freeze({
+    ...t,
+    forEachInstance(visit: (instance: InstanceView) => void) {
+      const out = {} as InstanceView;
+      for (let k = 0; k < count; k++) {
+        const at = k * 8;
+        out.x = origin[0] + ((instances[at] | (instances[at + 1] << 8)) * side) / 65536; // float division: render bridge
+        out.z = origin[1] + ((instances[at + 2] | (instances[at + 3] << 8)) * side) / 65536; // float division
+        out.species = instances[at + 4];
+        out.key = species[out.species];
+        out.scale = 2 ** ((instances[at + 5] - 128) / 32); // float division: render bridge
+        out.yaw = (instances[at + 6] * Math.PI) / 128; // float division
+        out.variant = instances[at + 7] & 15;
+        out.age = instances[at + 7] >> 4;
+        visit(out);
+      }
+    },
+  });
+}
+
+/** Placed tiles kept per placement; the least recently used go first. */
+const CACHE = 64;
+/** Ids of placements, for their replicas in a world's workers. */
+let serial = 0;
 
 type Rect = readonly [number, number, number, number];
 
@@ -1099,12 +1134,17 @@ export class BiomePlacement implements Disposable {
   readonly #listeners = new Set<(rect: Rect) => void>();
   readonly #off: () => void;
   #disposed = false;
+  /** The world's workers (tiles are placed there, by a replica of this placement), and this placement's id there. */
+  readonly #workers: BiomeWorld['workers'];
+  readonly #pid = ++serial;
 
   private constructor(world: BiomeWorld, options: PlacementOptions) {
     this.#world = world;
     this.#options = options;
     this.#plan = this.#replan(options);
     this.#shapes = shapesOf(options.exclusions, [world.bounds[0], world.bounds[1]]);
+    this.#workers = world.workers;
+    this.#workers?.attach(this.#pid, options);
     this.#off = world.onChange((rect) => {
       // Biomes or climate may have changed: rebuild the plan, drop the tiles the change reaches.
       const reach = this.#reach;
@@ -1206,6 +1246,7 @@ export class BiomePlacement implements Disposable {
     this.#plan = this.#replan(options);
     this.#options = options;
     this.#shapes = shapes;
+    this.#workers?.update(this.#pid, changes);
     this.#cache.clear();
     for (const listener of [...this.#listeners]) listener(this.#world.bounds);
   }
@@ -1222,7 +1263,17 @@ export class BiomePlacement implements Disposable {
    * The objects of tile (x, z), cached. Makes the world tiles it reads (the tile and its neighbours) first.
    * @throws RangeError for a tile outside the world. Rejects with the signal's reason when aborted.
    */
-  async tile(x: number, z: number, options: { readonly signal?: AbortSignal } = {}): Promise<PlacedTile> {
+  async tile(
+    x: number,
+    z: number,
+    options: {
+      readonly signal?: AbortSignal;
+      /** On a world with workers: lower runs sooner among queued tiles (a view passes the distance). Default 0. */
+      readonly priority?: number;
+      /** On a world with workers: also sample the detail maps every this many cells (`DensityMap.sampled`). */
+      readonly detail?: number;
+    } = {},
+  ): Promise<PlacedTile> {
     this.#live();
     const w = this.#world;
     if (!Number.isInteger(x) || !Number.isInteger(z) || x < 0 || z < 0 || x >= w.tilesX || z >= w.tilesZ)
@@ -1233,10 +1284,24 @@ export class BiomePlacement implements Disposable {
     if (options.signal?.aborted) throw options.signal.reason;
     const key = tileKey(x, z);
     let pending = this.#cache.get(key);
-    if (!pending) {
-      pending = this.#place(x, z, options.signal);
+    if (pending) {
+      // Least recently used goes first: a hit moves to the end.
+      this.#cache.delete(key);
       this.#cache.set(key, pending);
-      pending.catch(() => this.#cache.delete(key));
+    } else {
+      pending = this.#workers
+        ? this.#workers
+            .run<Omit<PlacedTile, 'forEachInstance'>>(
+              { op: 'place', pid: this.#pid, x, z, split: true, detail: options.detail },
+              { near: [x, z], priority: options.priority, signal: options.signal },
+            )
+            .then(placed)
+        : this.#place(x, z, options.signal);
+      this.#cache.set(key, pending);
+      if (this.#cache.size > CACHE) this.#cache.delete(this.#cache.keys().next().value!);
+      pending.catch(() => {
+        if (this.#cache.get(key) === pending) this.#cache.delete(key);
+      });
     }
     return pending;
   }
@@ -1538,7 +1603,7 @@ export class BiomePlacement implements Disposable {
       origin = Object.freeze([w.bounds[0] + tx * w.tileSize, w.bounds[1] + tz * w.tileSize] as const),
       side = w.tileSize,
       count = objects.length;
-    return Object.freeze({
+    return placed({
       x: tx,
       z: tz,
       origin,
@@ -1550,21 +1615,6 @@ export class BiomePlacement implements Disposable {
       exclusion: raster('exclusion', exclusion),
       density: Object.freeze(density),
       stats: Object.freeze({ candidates, accepted: count, unresolved, rounds }),
-      forEachInstance(visit: (instance: InstanceView) => void) {
-        const out = {} as InstanceView;
-        for (let k = 0; k < count; k++) {
-          const at = k * 8;
-          out.x = origin[0] + ((instances[at] | (instances[at + 1] << 8)) * side) / 65536; // float division: render bridge
-          out.z = origin[1] + ((instances[at + 2] | (instances[at + 3] << 8)) * side) / 65536; // float division
-          out.species = instances[at + 4];
-          out.key = species[out.species];
-          out.scale = 2 ** ((instances[at + 5] - 128) / 32); // float division: render bridge
-          out.yaw = (instances[at + 6] * Math.PI) / 128; // float division
-          out.variant = instances[at + 7] & 15;
-          out.age = instances[at + 7] >> 4;
-          visit(out);
-        }
-      },
     });
   }
 
@@ -1639,6 +1689,7 @@ export class BiomePlacement implements Disposable {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#off();
+    this.#workers?.detach(this.#pid);
     this.#cache.clear();
     this.#listeners.clear();
   }

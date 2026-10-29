@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Biome flythrough check</title><style>body{margin:0}canvas{display:block;width:640px;height:360px}</style></head><body><canvas></canvas>
+<script type="module">
+// Goal G3 of the biomes spec: a 300 km/h (83 m/s) flight over the zero-configuration world with its 1 km object radius,
+// tiles made by the world's workers as the camera goes, against the same flight with every tile it meets made before
+// it starts (view.prefetch), three flights of each taking turns. Frames run in real time (requestAnimationFrame); each
+// frame's main-thread work is the time engine.render takes (the view's streaming runs inside it, before the draw). The
+// runner compares the medians of the two kinds.
+import {Engine} from '/packages/core/dist/index.js';
+import {BiomeWorld} from '/packages/biomes/dist/index.js';
+import {BiomeView} from '/packages/biomes/dist/view.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[-1200,260,-1200],target:[-1100,200,-1100],near:0.5,far:4000}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const SPEED=83.3,FROM=[-1200,-1200],TO=[1200,1200],LENGTH=Math.hypot(TO[0]-FROM[0],TO[1]-FROM[1]);
+const place=(s)=>{const t=Math.min(1,s/LENGTH),x=FROM[0]+(TO[0]-FROM[0])*t,z=FROM[1]+(TO[1]-FROM[1])*t;engine.camera.position[0]=x;engine.camera.position[1]=260;engine.camera.position[2]=z;engine.camera.target[0]=x+70;engine.camera.target[1]=200;engine.camera.target[2]=z+70;};
+const frame=()=>new Promise((done)=>requestAnimationFrame(done));
+/** One flight: real-time frames until the camera reaches the end; per frame the render time and the interval. */
+async function fly(view){
+ const times=[],intervals=[];let s=0,last=performance.now();place(0);
+ for(let i=0;i<30;i++){await frame();engine.render({delta:1/60});}
+ await view.whenIdle();view.tileTimes.length=0;view.frameTimes.length=0;last=performance.now();
+ while(s<LENGTH){
+  const now=await frame(),dt=Math.min(0.1,(now-last)/1000);intervals.push(now-last);last=now;s+=SPEED*dt;place(s);
+  const t0=performance.now();engine.render({delta:dt});times.push(performance.now()-t0);
+ }
+ return {times,intervals,tiles:[...view.tileTimes],copies:[...view.frameTimes]};
+}
+window.check={
+ /** Three flights of each kind, taking turns: streamed (tiles made as the camera goes), then prefetched (every tile made first), each on a fresh world. */
+ async run(){
+  const out={streamed:[],prefetched:[]};device.pushErrorScope('validation');
+  for(let round=0;round<3;round++)for(const kind of ['streamed','prefetched']){
+   const world=await BiomeWorld.create();out.workers=world.workers?Math.max(1,Math.min(4,navigator.hardwareConcurrency-1)):0;place(0);
+   const view=await BiomeView.attach(engine,world);await view.ready;
+   if(kind==='prefetched')await view.prefetch([FROM[0]-1300,FROM[1]-1300,TO[0]+1300,TO[1]+1300]);
+   const flight=await fly(view);flight.objects=view.objects.count;out[kind].push(flight);view.dispose();world.dispose();
+  }
+  const error=await device.popErrorScope();out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

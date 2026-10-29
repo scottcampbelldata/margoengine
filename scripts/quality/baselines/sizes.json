@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3997776,
+  "total": 4038591,
   "history": [
     {
       "date": "2026-10-24",
@@ -800,6 +800,18 @@
       "commit": "b0604e04",
       "reason": "biomes/placement +230 B: the integer cell table that halves placement time (G1); scatter/tiles +907 B: records and LOD rings sized from what is held, 117.6 to 6.5 MB of GPU memory (G2), and meshes that share one set of rings",
       "grew": 2
+    },
+    {
+      "date": "2026-10-29",
+      "commit": "9d19da67",
+      "reason": "biomes B7: workers and streaming. Root +295 B (the workers and cache options, an LRU tile cache, routing tiles to worker replicas); /view +2,046 B (per-frame streaming with velocity lookahead, cancellation of stale tiles, a per-frame copy budget, prefetch); /objects +174 B (a tile in small steps); new /workers entry 2,622 B and worker script 33,113 B (lazy: loaded only by a world with workers)",
+      "grew": 5
+    },
+    {
+      "date": "2026-10-29",
+      "commit": "4dd9de84",
+      "reason": "biomes/objects +47 B (bug 64): a byte budget and the device texture limit for detail maps, checked before anything is allocated",
+      "grew": 1
     }
   ],
   "items": {
@@ -813,17 +825,19 @@
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
-    "@margoengine/biomes": 16459,
+    "@margoengine/biomes": 17257,
+    "@margoengine/biomes dist/workers/biomes.js": 34104,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/koppen": 1231,
-    "@margoengine/biomes/objects": 2843,
+    "@margoengine/biomes/objects": 3576,
     "@margoengine/biomes/placement": 11566,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/relief": 2825,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 2880,
-    "@margoengine/biomes/view": 5072,
+    "@margoengine/biomes/view": 7374,
+    "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4000,
     "@margoengine/bvh": 23398,
