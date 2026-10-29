@@ -46,7 +46,7 @@ export interface MargoOptions {
 }
 
 /**
- * Validates and decodes `.margo` bytes without a GPU. CAD vertices and uint16 indices expand once; other geometry
+ * Validates and decodes `.margo` bytes without a GPU. Compact vertices and uint16 indices expand once; other geometry
  * retains the input buffer, so keep the bytes alive and unmodified while the result is used.
  *
  * @example

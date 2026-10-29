@@ -1,7 +1,7 @@
-// Core at 100k / 500k / 1M entities in Node (same Wasm as the browser, fake renderer): the CAD assembly built from the
+// Core at 100k / 500k / 1M entities in Node (same Wasm as the browser, fake renderer): the parts assembly built from the
 // default 1,024-slot store, so the store doubles on demand. Records memory, build/growth/dispose time, kernel tick
 // (static, 1% moving, full recompute) and batch collection.
-// Run (repo root, after build:packages): node examples/package-benchmarks/cad/scale-node.mjs [--sizes=100000,500000,1000000] [--label=x] [--diagnostic]
+// Run (repo root, after build:packages): node examples/package-benchmarks/parts/scale-node.mjs [--sizes=100000,500000,1000000] [--label=x] [--diagnostic]
 // Without --diagnostic it waits for scripts/quiet-gate.mjs first; the JSON goes to results-scale-node[-label].json here.
 import { writeFileSync } from 'node:fs';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';

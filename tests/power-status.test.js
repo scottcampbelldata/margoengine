@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import { test } from 'node:test';
-import { acPower, requireAC } from '../examples/package-benchmarks/cad/power.mjs';
+import { acPower, requireAC } from '../examples/package-benchmarks/parts/power.mjs';
 
 function probe(t, { platform = 'win32', stdout = 'Online\r\n', error } = {}) {
   const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform'),

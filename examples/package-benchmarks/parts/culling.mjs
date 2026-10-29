@@ -1,7 +1,7 @@
 // Real-GPU benchmark and pixel check for @margoengine/culling. From the repository root, after `npm run build:packages`:
-//   node examples/package-benchmarks/cad/culling.mjs [--sizes=10000,50000,max] [--modes=core,none,frustum,occlusion] [--views=orbit,still,grazing] [--layouts=sheet,stack] [--check] [--label=culling]
+//   node examples/package-benchmarks/parts/culling.mjs [--sizes=10000,50000,max] [--modes=core,none,frustum,occlusion] [--views=orbit,still,grazing] [--layouts=sheet,stack] [--check] [--label=culling]
 // Takes test-results/gpu.lock (waits while another GPU run holds it), checks AC power before every run and repeats a run
-// that started or ended on battery. Writes examples/package-benchmarks/cad/results-<label>.json.
+// that started or ended on battery. Writes examples/package-benchmarks/parts/results-<label>.json.
 import { createServer } from 'vite';
 import { writeFile } from 'node:fs/promises';
 import { cpus, totalmem } from 'node:os';
@@ -28,7 +28,7 @@ async function waitForAC() {
   }
 }
 // Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
-const releaseGpu = await acquire({ owner: 'cad-culling', mode: 'exclusive' });
+const releaseGpu = await acquire({ owner: 'parts-culling', mode: 'exclusive' });
 const isolate = (_, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
@@ -84,7 +84,7 @@ try {
       if (process.env.DEBUG) console.log('page:', m.text());
       if (m.type() === 'error') errors.push(m.text());
     });
-    await page.goto(`http://127.0.0.1:${port}/examples/package-benchmarks/cad/culling.html`);
+    await page.goto(`http://127.0.0.1:${port}/examples/package-benchmarks/parts/culling.html`);
     await page.waitForFunction(() => window.ready);
     return { page, errors };
   };
@@ -163,7 +163,7 @@ try {
           );
         }
   await writeFile(new URL(`./results-${label}.json`, import.meta.url), JSON.stringify(out, null, 1));
-  console.log('wrote', `examples/package-benchmarks/cad/results-${label}.json`);
+  console.log('wrote', `examples/package-benchmarks/parts/results-${label}.json`);
 } finally {
   await closeAll({ browser, servers: [server] });
   releaseGpu();

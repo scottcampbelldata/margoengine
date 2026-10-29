@@ -26,7 +26,7 @@ def fixture():
     return document, [[primitive]], [image]
 
 
-def cad_fixture():
+def compact_fixture():
     document, geometry, _ = fixture()
     document["materials"] = [{"doubleSided": True, "pbrMetallicRoughness": {"baseColorFactor": [1, 0.15, 0.1, 1]}}]
     document["textures"] = []
@@ -39,11 +39,11 @@ def cad_fixture():
 
 def mixed_fixture():
     document, geometry, images = fixture()
-    _, cad, _ = cad_fixture()
-    cad[0][0]["material"] = 1
+    _, compact, _ = compact_fixture()
+    compact[0][0]["material"] = 1
     document["materials"].append({"doubleSided": True})
     document["nodes"][1]["mesh"] = 1
-    return document, geometry + cad * 2, images
+    return document, geometry + compact * 2, images
 
 
 class FormatTests(unittest.TestCase):
@@ -53,7 +53,7 @@ class FormatTests(unittest.TestCase):
 
     def test_compact_and_mixed_fixtures_match_writer(self):
         root = Path(__file__).parents[3] / "packages" / "blender" / "tests" / "fixtures"
-        for name, make in (("cad-triangle", cad_fixture), ("mixed-triangle", mixed_fixture)):
+        for name, make in (("compact-triangle", compact_fixture), ("mixed-triangle", mixed_fixture)):
             data = format.encode(*make())
             self.assertEqual((root / f"{name}.margo").read_bytes(), data)
             manifest_offset, manifest_size = struct.unpack_from("<2I", data, 68)
@@ -66,7 +66,7 @@ class FormatTests(unittest.TestCase):
                     self.assertEqual(size, 72 if flag else 240)
                     self.assertNotIn("stride", primitive)
                     flags.append(flag)
-            self.assertEqual(flags, [1] if name == "cad-triangle" else [0, 1, 1])
+            self.assertEqual(flags, [1] if name == "compact-triangle" else [0, 1, 1])
 
     def test_sections_alignment_and_determinism(self):
         document, geometry, images = fixture()
@@ -98,7 +98,7 @@ class FormatTests(unittest.TestCase):
 
     def test_index_formats_at_uint16_boundary_and_invalid_references(self):
         for maximum in (65535, 65536):
-            document, geometry, _ = cad_fixture()
+            document, geometry, _ = compact_fixture()
             primitive = geometry[0][0]
             primitive["vertices"] = struct.pack("<6f", 0, 0, 0, 0, 1, 0) * (maximum + 1)
             primitive["indices"] = struct.pack("<3I", 0, 1, maximum)
@@ -106,7 +106,7 @@ class FormatTests(unittest.TestCase):
             kind, offset, size, flags = struct.unpack_from("<4I", data, 96)
             self.assertEqual((kind, size, flags), (3, 6, 1) if maximum == 65535 else (3, 12, 2))
             self.assertEqual(struct.unpack_from("<3H" if flags == 1 else "<3I", data, offset), (0, 1, maximum))
-        document, geometry, _ = cad_fixture()
+        document, geometry, _ = compact_fixture()
         geometry[0][0]["indices"] = struct.pack("<3I", 0, 1, 3)
         with self.assertRaises(ValueError):
             format.encode(document, geometry)
@@ -117,11 +117,11 @@ class FormatTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             format.png(4097, 1, b"")
         for stride in (0, 48, 100):
-            document, geometry, images = cad_fixture()
+            document, geometry, images = compact_fixture()
             geometry[0][0]["stride"] = stride
             with self.assertRaises(ValueError):
                 format.encode(document, geometry, images)
-        document, geometry, images = cad_fixture()
+        document, geometry, images = compact_fixture()
         geometry[0][0]["vertices"] = geometry[0][0]["vertices"][:-4]
         with self.assertRaises(ValueError):
             format.encode(document, geometry, images)
@@ -145,7 +145,7 @@ class FormatTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    fixtures = {"--fixture": fixture, "--fixture-cad": cad_fixture, "--fixture-mixed": mixed_fixture}
+    fixtures = {"--fixture": fixture, "--fixture-compact": compact_fixture, "--fixture-mixed": mixed_fixture}
     if len(sys.argv) == 3 and sys.argv[1] in fixtures:
         format.write(sys.argv[2], *fixtures[sys.argv[1]]())
     else:

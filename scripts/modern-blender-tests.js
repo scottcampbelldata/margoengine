@@ -11,7 +11,7 @@ import { GLTFAsset } from '../packages/gltf-pro/dist/index.js';
 await mkdir('test-results/blender', { recursive: true });
 const fixtures = [
   await readFile('packages/blender/tests/fixtures/triangle.margo'),
-  await readFile('packages/blender/tests/fixtures/cad-triangle.margo'),
+  await readFile('packages/blender/tests/fixtures/compact-triangle.margo'),
 ];
 if (process.env.MARGO_BLENDER) {
   execFileSync('python', ['tools/blender-addon/package_addon.py'], { stdio: 'inherit' });
@@ -109,11 +109,11 @@ if (process.env.MARGO_BLENDER) {
     Math.abs(centimeters.document.nodes.find((n) => n.name === 'Mirrored').translation[0] - 0.02) < 1e-7,
     'Transform units were not converted to meters',
   );
-  const cad = decodeMargo(await readFile('test-results/blender/cad-instances.margo'));
-  assert.equal(cad.document.nodes.length, 100);
-  assert.equal(cad.geometry.length, 1);
-  assert.equal(cad.geometry[0][0].vertices.length, 60);
-  const overrides = decodeMargo(await readFile('test-results/blender/cad-overrides.margo'));
+  const compact = decodeMargo(await readFile('test-results/blender/compact-instances.margo'));
+  assert.equal(compact.document.nodes.length, 100);
+  assert.equal(compact.geometry.length, 1);
+  assert.equal(compact.geometry[0][0].vertices.length, 60);
+  const overrides = decodeMargo(await readFile('test-results/blender/compact-overrides.margo'));
   assert.equal(overrides.geometry.length, 2);
   fixtures.push(exported);
 }

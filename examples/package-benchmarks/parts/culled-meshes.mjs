@@ -2,13 +2,13 @@
 // the GPU culler (core's CPU culling off), engine B is plain core drawing every part; every step's frames must be identical, the culler must
 // actually drop parts in partial views (an exploded layout, moved, hidden and added parts), and engine.pick must keep working.
 // Run from the repository root after building packages, holding the GPU lock:
-//   node examples/package-benchmarks/cad/culled-meshes.mjs
+//   node examples/package-benchmarks/parts/culled-meshes.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
 const context = await openBrowser({
-    startPath: '/examples/package-benchmarks/cad/culled-meshes.html',
+    startPath: '/examples/package-benchmarks/parts/culled-meshes.html',
     port: 5221,
   }),
   { page, hardware } = context,

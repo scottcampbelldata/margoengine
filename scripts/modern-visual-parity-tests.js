@@ -55,7 +55,7 @@ try {
     const engine = await Engine.create(canvas, { backend: 'webgpu', capacity: 16, camera: { position: [0, 0, 3] } });
     const device = engine.gpu;
     device.pushErrorScope('validation');
-    const bytes = await (await fetch('/packages/blender/tests/fixtures/cad-triangle.margo')).arrayBuffer();
+    const bytes = await (await fetch('/packages/blender/tests/fixtures/compact-triangle.margo')).arrayBuffer();
     const model = await parseMargo(engine, bytes);
     engine.render();
     canvas.style.width = '160px';
@@ -168,7 +168,7 @@ try {
           aces: 'own ACES 1.x RRT + sRGB ODT style fit (packages/shared/aces.js) vs the behaviour table in packages/tonemap/tests/aces.test.js',
         },
         checks: [
-          'MSAA CAD + resize',
+          'MSAA compact mesh + resize',
           'points + EDL',
           'lines',
           'selection',

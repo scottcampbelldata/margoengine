@@ -20,7 +20,7 @@ import { waitForQuiet } from '../../../scripts/quiet-gate.mjs';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 import { bigGLB } from '../../../tests/support/big-glb.js';
-import { acPower } from '../cad/power.mjs';
+import { acPower } from '../parts/power.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const rounds = +arg('rounds', 4),

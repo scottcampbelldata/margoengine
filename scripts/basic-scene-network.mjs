@@ -132,9 +132,9 @@ const built = readdirSync(out, { recursive: true })
   .filter((file) => !file.startsWith('.vite') && statSync(join(out, file)).isFile());
 // Regression (2026-10-27): the stage's class methods put every optional pack into every stage app's build.
 assert.deepEqual(
-  built.filter((file) => /\.wasm$|worker|cad|sky|particles|post|environment|shadows/i.test(file)),
+  built.filter((file) => /\.wasm$|worker|sky|particles|post|environment|shadows/i.test(file)),
   [],
-  'the build emits no Wasm, worker, CAD chunk or optional pack the app does not import',
+  'the build emits no Wasm, worker or optional pack the app does not import',
 );
 
 const release = await acquire({ owner: 'basic-scene-network', poll: 2000 });
@@ -209,9 +209,9 @@ try {
   for (const { path, status } of fetched) assert.equal(status, 200, `${path} answered ${status}`);
   assert.deepEqual(errors, []);
   assert.deepEqual(
-    fetched.map((file) => file.path).filter((file) => /\.wasm$|draco|basis|rapier|recast|ifc|worker|cad/i.test(file)),
+    fetched.map((file) => file.path).filter((file) => /\.wasm$|draco|basis|rapier|recast|ifc|worker/i.test(file)),
     [],
-    'no Wasm, worker or CAD file',
+    'no Wasm, worker or optional decoder file',
   );
   assert.deepEqual(
     [...new Set(fetched.map((file) => file.path))].sort(),

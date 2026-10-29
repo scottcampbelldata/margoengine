@@ -1770,7 +1770,7 @@ export const LABELS = {
   'helmet-filterpcf-cascades1':
     "the shadow setup closest to three's: filter 'pcf', 1 cascade (three: one PCFSoftShadowMap)",
   'p-stl':
-    "parseSTL: STL raw triangles + flat normals (typed arrays, no weld) against three's STLLoader, which copies the file's zero normals (an accepted difference in work); its first runs timed a weld-and-parts path that left with the CAD package",
+    "parseSTL: STL raw triangles + flat normals (typed arrays, no weld) against three's STLLoader, which copies the file's zero normals (an accepted difference in work); its first runs timed a weld-and-parts path that has since been removed",
   'p-stl-normals': "like-for-like with usable normals: parseSTL against three's STLLoader + computeVertexNormals()",
   'p-marching-cubes-dense':
     'dense: the original workload, every ball summed at every grid point (more work than three, whose add-on writes each ball only near it)',

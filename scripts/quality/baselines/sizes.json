@@ -126,7 +126,7 @@
     {
       "date": "2026-10-25",
       "commit": "e542c8f5",
-      "reason": "React stage 2b (item 17): BatchedMesh/BatchedItem, DepthTexture, SceneTargets and SectionPlanes components on the root (their engine packages load lazily)",
+      "reason": "React stage 2b (item 17): BatchedMesh/BatchedItem, DepthTexture and SceneTargets components on the root, and one since removed (their engine packages load lazily)",
       "grew": 1
     },
     {
@@ -240,7 +240,7 @@
     {
       "date": "2026-10-26",
       "commit": "804d2dea",
-      "reason": "DX pass B1: error messages now name their fix and bare Errors became MargoError (machinery, materials); the extra text and bundled MargoError class grow these entries",
+      "reason": "DX pass B1: error messages now name their fix and bare Errors became MargoError (materials and a package since removed); the extra text and bundled MargoError class grow these entries",
       "grew": 13
     },
     {
@@ -426,7 +426,7 @@
     {
       "date": "2026-10-26",
       "commit": "594c45af",
-      "reason": "perf(exporters,machinery,shared): shortest-number search by bisection with a cache and slicing-by-8 CRC-32 (USDZ export 52.8 to 16 ms), lazy part fingerprints in the CAD worker (item 47 rows p-export-usdz, p-stl)",
+      "reason": "perf(exporters,shared): shortest-number search by bisection with a cache and slicing-by-8 CRC-32 (USDZ export 52.8 to 16 ms) (item 47 row p-export-usdz)",
       "grew": 5
     },
     {
@@ -474,7 +474,7 @@
     {
       "date": "2026-10-26",
       "commit": "7425cfd6",
-      "reason": "Error messages now name their fix (item 19): +48 B gzip gltf-pro/prepare, +74 B machinery/cad from the shared validation messages",
+      "reason": "Error messages now name their fix (item 19): +48 B gzip gltf-pro/prepare and +74 B in a package since removed, from the shared validation messages",
       "grew": 2
     },
     {

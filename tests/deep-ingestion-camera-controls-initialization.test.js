@@ -11,7 +11,7 @@ const sourceFile = process.env.DEEP_INGESTION_BASELINE
   ? resolve(process.env.DEEP_INGESTION_BASELINE, 'packages/core/src/controls.ts')
   : fileURLToPath(new URL('../packages/core/src/controls.ts', import.meta.url));
 // Parameter properties need compilation; Node 26 only supports type stripping.
-const directory = await fs.mkdtemp(join(tmpdir(), 'margo-cad-controls-'));
+const directory = await fs.mkdtemp(join(tmpdir(), 'margo-camera-controls-'));
 let source;
 try {
   const config = join(directory, 'tsconfig.json');
@@ -72,7 +72,7 @@ function element(failAt = Infinity) {
     },
   };
 }
-test('Core CAD initialization releases every partially installed listener and restores touch action', () => {
+test('Core camera controls initialization releases every partially installed listener and restores touch action', () => {
   for (let failAt = 1; failAt <= 6; failAt++) {
     const target = element(failAt);
     assert.throws(
@@ -83,7 +83,7 @@ test('Core CAD initialization releases every partially installed listener and re
     assert.equal(target.style.touchAction, 'pan-x');
   }
 });
-test('Core CAD controls retain ordinary navigation and complete listener/pointer cleanup', () => {
+test('Core camera controls retain ordinary navigation and complete listener/pointer cleanup', () => {
   const target = element(),
     camera = new Camera(),
     controls = new CADCameraControls(camera, target);
@@ -103,7 +103,7 @@ test('Core CAD controls retain ordinary navigation and complete listener/pointer
   assert.equal(target.listeners.size, 0);
 });
 
-test('CAD pole pans stay finite and preserve eye-to-target distance', () => {
+test('Camera pole pans stay finite and preserve eye-to-target distance', () => {
   for (const sign of [-1, 1]) {
     const camera = new Camera({ position: [0, sign * 5, 0], target: [0, 0, 0], up: [0, 0, -sign] }),
       controls = new CADCameraControls(camera, element());
@@ -114,7 +114,7 @@ test('CAD pole pans stay finite and preserve eye-to-target distance', () => {
     controls.dispose();
   }
 });
-test('CAD orbit rejects a coincident eye atomically', () => {
+test('Camera orbit rejects a coincident eye atomically', () => {
   const target = element(),
     camera = new Camera(),
     controls = new CADCameraControls(camera, target);
@@ -124,7 +124,7 @@ test('CAD orbit rejects a coincident eye atomically', () => {
   assert.deepEqual(camera.position, before);
   controls.dispose();
 });
-test('CAD capture failure leaves the next pointer usable', () => {
+test('Camera capture failure leaves the next pointer usable', () => {
   const target = element(),
     camera = new Camera({ position: [0, 0, 5] }),
     controls = new CADCameraControls(camera, target);

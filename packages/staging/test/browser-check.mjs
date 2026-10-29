@@ -11,7 +11,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acPower } from '../../../examples/package-benchmarks/cad/power.mjs';
+import { acPower } from '../../../examples/package-benchmarks/parts/power.mjs';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');

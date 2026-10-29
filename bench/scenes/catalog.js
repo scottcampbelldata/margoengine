@@ -154,7 +154,7 @@ export function sky(width = 256, height = 128) {
   return { width, height, data };
 }
 
-export const CAD_MATERIALS = {
+export const PART_MATERIALS = {
   plate: { color: '#8d99a6', roughness: 0.5, metalness: 0.6 },
   bracket: { color: '#4f7cac', roughness: 0.4, metalness: 0.2 },
   bolt: { color: '#c9ccd1', roughness: 0.3, metalness: 0.9 },
@@ -162,12 +162,12 @@ export const CAD_MATERIALS = {
   washer: { color: '#d8d8d8', roughness: 0.3, metalness: 0.9 },
 };
 /**
- * The synthetic CAD assembly of examples/package-benchmarks/cad: modules of 27 parts (plate, two brackets, two
+ * The synthetic parts assembly of examples/package-benchmarks/parts: modules of 27 parts (plate, two brackets, two
  * fastener sets of 4 bolt + washer + nut) and 3 group nodes, zones of 32 modules, 5 levels deep. A flat node list in
  * creation order; `parent` indexes into it (-1 = scene root). `shapes` holds each part's indexed triangle data.
  */
-export async function cad(parts) {
-  const { partShapes } = await import('../../examples/package-benchmarks/cad/assembly.js');
+export async function partsAssembly(parts) {
+  const { partShapes } = await import('../../examples/package-benchmarks/parts/assembly.js');
   const modules = Math.ceil(parts / 27),
     nodes = [],
     columns = Math.ceil(Math.sqrt(modules)),
@@ -267,12 +267,13 @@ export const SCENES = {
     params: { n: 1000, mode: 'mesh' },
     data: (p) => shapes(p.n),
   },
-  cad: {
-    title: 'CAD assembly',
-    draws: 'The synthetic 5-level CAD assembly (plates, brackets, bolts, washers, nuts) with n parts, one object each.',
+  parts: {
+    title: 'Parts assembly',
+    draws:
+      'The synthetic 5-level parts assembly (plates, brackets, bolts, washers, nuts) with n parts, one object each.',
     measures: ['cpuMs', 'gpuMs', 'fps', 'buildMs'],
     params: { n: 10_000 },
-    data: (p) => cad(p.n),
+    data: (p) => partsAssembly(p.n),
   },
   gltf: {
     title: 'glTF load',
@@ -543,9 +544,9 @@ export const STANDARD = {
     { scene: 'gltf', params: { model: 'robot-expressive' } },
     { scene: 'helmet' },
   ],
-  cad: [
-    { scene: 'cad', params: { n: 10_000 } },
-    { scene: 'cad', params: { n: 50_000 } },
+  parts: [
+    { scene: 'parts', params: { n: 10_000 } },
+    { scene: 'parts', params: { n: 50_000 } },
   ],
   memory: [
     { scene: 'boxes', params: { n: 10_000 } },

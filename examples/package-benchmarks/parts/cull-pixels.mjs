@@ -1,7 +1,7 @@
 // Real-GPU check that per-batch back-face culling changes no pixel: core built from a reference commit (default dc0c4ff,
 // the last core without it) and today's core render the same mixed scene through the same edits (cull-pixels.js), and
 // every step's frames must be identical. Run from the repository root after building packages, holding the GPU lock:
-//   node examples/package-benchmarks/cad/cull-pixels.mjs [--ref=<commit>]
+//   node examples/package-benchmarks/parts/cull-pixels.mjs [--ref=<commit>]
 // Builds the reference core with tsc into test-results/core-ref/ (ignored).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -19,7 +19,7 @@ execFileSync(process.execPath, ['node_modules/typescript/bin/tsc', '-p', `${dir}
   stdio: 'inherit',
 });
 
-const context = await openBrowser({ startPath: '/examples/package-benchmarks/cad/cull-pixels.html', port: 5221 }),
+const context = await openBrowser({ startPath: '/examples/package-benchmarks/parts/cull-pixels.html', port: 5221 }),
   { page, hardware } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));

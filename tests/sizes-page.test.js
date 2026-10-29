@@ -137,7 +137,7 @@ test('sizes page shows the basic glTF scene network log from the same build: onl
   assert.deepEqual([network.commit, network.dirty], [sizes.commit, sizes.dirty]);
   const paths = network.files.map((file) => file.path);
   assert.deepEqual(
-    paths.filter((path) => /\.wasm$|draco|basis|rapier|recast|ifc|worker|cad/i.test(path)),
+    paths.filter((path) => /\.wasm$|draco|basis|rapier|recast|ifc|worker/i.test(path)),
     [],
   );
   for (const role of ['Page', 'Entry: core + stage + app', '@margoengine/gltf (addGLTF)', 'Model'])

@@ -49,7 +49,7 @@ buffer with indirect arguments. It then sets `batch.redirect` (core's one GPU-cu
 core's main pass and every replay of it (SSAO, SSR, selection outline...) draw the compacted list with core's own
 pipelines; core still uploads its instance buffer, which the culler reads. `engine.pick` draws from
 core's CPU instance data and is unaffected. With `minRadius: 0` (default) frames are pixel-identical to core
-(`examples/package-benchmarks/cad/culled-meshes.mjs`). Limits: frustum and screen size only (no Hi-Z occlusion yet; use
+(`examples/package-benchmarks/parts/culled-meshes.mjs`). Limits: frustum and screen size only (no Hi-Z occlusion yet; use
 `CulledInstances` for occlusion on static parts); with `engine.render()` (CPU culling on) the GPU test only adds the
 screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies: a dropped part simply disappears, so keep it under the size where a
 part is still recognisable.
@@ -89,7 +89,7 @@ fragments beyond core's single-sided rule or changes core's clip-position line.
 ## Measurements
 
 Intel Arc 140V (Core Ultra 7 258V), headless Edge, 1432x768, 4x MSAA, AC power, GPU lock held:
-`examples/package-benchmarks/cad/results-culling.json`, written by `node examples/package-benchmarks/cad/culling.mjs
+`examples/package-benchmarks/parts/results-culling.json`, written by `node examples/package-benchmarks/parts/culling.mjs
 --check --views=orbit,still,grazing --layouts=sheet,stack`.
 
 | 89,883 parts | core meshes | `none` | `frustum` | `occlusion` |

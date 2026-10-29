@@ -18,7 +18,7 @@ No round overlapped another GPU run: every round held the GPU lock.
 
 Fix B (below) is merged. Core `d96e2d7` draws a geometry batch with a second, back-culled pipeline whose shader has
 no `discard` when every drawn instance is single-sided and unmirrored; core + stage 19,577 -> **19,793 B** gzip (+216).
-Frames are unchanged: `examples/package-benchmarks/cad/cull-pixels.mjs` renders a mixed scene (single-sided closed
+Frames are unchanged: `examples/package-benchmarks/parts/cull-pixels.mjs` renders a mixed scene (single-sided closed
 boxes, open shells showing their inner back faces, a mirrored instance, double-sided parts, `material.set({doubleSided})`
 both ways, material assignment, hide/show) in the pre-change core (`dc0c4ff`) and the new one: 0 of 153,600 pixels differ
 in all 13 steps; `pixels-check.mjs` and `npm run visual:check` (22 views) pass. In the run below, `margo` and
@@ -74,7 +74,7 @@ Reading (diagnostic only; the quiet-PC run decides any claim):
 - **Moving instances**: `CulledInstances.setTransform` is one 64-byte `writeBuffer` per part (187 ms CPU per frame for
   10,000 moving boxes): it is for static assemblies with occasional edits, not for animation. `createInstancedMesh`
   (validated `setMatrixAt`, one ranged upload) costs 6.0 ms against three's 3.3-3.8 ms.
-- **CAD** (`results/vs-threejs-cad-pairs.json`, same conditions; single-sided parts unless noted): fix B, 10k parts
+- **Parts** (`results/vs-threejs-parts-pairs.json`, same conditions; single-sided parts unless noted): fix B, 10k parts
   4.04 -> 2.15 ms GPU (`margo+nocull` -> `margo`), 50k 11.44 -> 12.00 ms (no gain; geometry-bound, as before);
   core's default double-sided material draws the same pipeline as before (`margo+double` 5.24 / 14.73 ms).
   Instanced <-> instanced at 50k: `CulledInstances` 80 FPS / 0.26 ms CPU / 11.0 ms GPU, `createInstancedMesh` 55 /

@@ -5,7 +5,7 @@ import { decodeMargo, parseMargo, loadMargo } from '../dist/index.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 
 const source = await readFile(new URL('./fixtures/triangle.margo', import.meta.url));
-const cadSource = await readFile(new URL('./fixtures/cad-triangle.margo', import.meta.url));
+const compactSource = await readFile(new URL('./fixtures/compact-triangle.margo', import.meta.url));
 const mixedSource = await readFile(new URL('./fixtures/mixed-triangle.margo', import.meta.url));
 const uint16Source = await readFile(new URL('./fixtures/triangle-uint16.margo', import.meta.url));
 const bytes = () => Uint8Array.from(source);
@@ -42,8 +42,8 @@ test('Python fixture retains geometry buffer views, shared meshes, PBR and PNG s
   assert.equal(decodeMargo(padded.subarray(4, 4 + input.length)).geometry[0][0].vertices.buffer, padded.buffer);
 });
 
-test('CAD sections expand positions/normals with PBR defaults and retain shared indices', () => {
-  const input = Uint8Array.from(cadSource),
+test('Compact sections expand positions/normals with PBR defaults and retain shared indices', () => {
+  const input = Uint8Array.from(compactSource),
     asset = decodeMargo(input),
     p = asset.geometry[0][0],
     expected = decodeMargo(bytes()).geometry[0][0];
@@ -58,15 +58,15 @@ test('CAD sections expand positions/normals with PBR defaults and retain shared 
   const mixed = decodeMargo(Uint8Array.from(mixedSource));
   assert.equal(mixed.geometry[0][0].vertices.buffer, mixed.images[0].buffer);
   assert.deepEqual(mixed.geometry[1][0].vertices, p.vertices);
-  assert.equal(mixed.geometry[1][0], mixed.geometry[2][0], 'Shared CAD sections must expand once');
+  assert.equal(mixed.geometry[1][0], mixed.geometry[2][0], 'Shared compact sections must expand once');
   assert.deepEqual(mixed.geometry[0][0].indices, mixed.geometry[1][0].indices);
   const padded = new Uint8Array(input.length + 8);
   padded.set(input, 4);
   assert.deepEqual(decodeMargo(padded.subarray(4, 4 + input.length)).geometry[0][0].vertices, p.vertices);
 });
 
-test('CAD expansion preserves every packed byte without temporary position or normal views', () => {
-  const input = Uint8Array.from(cadSource),
+test('Compact expansion preserves every packed byte without temporary position or normal views', () => {
+  const input = Uint8Array.from(compactSource),
     view = new DataView(input.buffer),
     offset = view.getUint32(84, true);
   view.setFloat32(offset, -0, true);
@@ -94,10 +94,10 @@ test('CAD expansion preserves every packed byte without temporary position or no
   }
   assert.deepEqual(new Uint8Array(result.vertices.buffer), new Uint8Array(expected.buffer));
   assert.ok(Object.is(result.vertices[0], -0));
-  assert.equal(views, 0, 'expansion must not create two temporary views per CAD vertex');
+  assert.equal(views, 0, 'expansion must not create two temporary views per compact vertex');
 });
 
-test('CAD flags, lengths, indices and normals are validated before rendering', () => {
+test('Compact flags, lengths, indices and normals are validated before rendering', () => {
   const vertexEntry = 80,
     indexEntry = 96;
   for (const [offset, value] of [
@@ -106,7 +106,7 @@ test('CAD flags, lengths, indices and normals are validated before rendering', (
     [indexEntry + 12, 2],
     [vertexEntry + 8, 71],
   ]) {
-    const data = Uint8Array.from(cadSource);
+    const data = Uint8Array.from(compactSource);
     new DataView(data.buffer).setUint32(offset, value, true);
     assert.throws(() => decodeMargo(data), /margo/);
   }
@@ -115,13 +115,13 @@ test('CAD flags, lengths, indices and normals are validated before rendering', (
     [3, 5],
     [5, 0],
   ]) {
-    const data = Uint8Array.from(cadSource),
+    const data = Uint8Array.from(compactSource),
       view = new DataView(data.buffer),
       offset = view.getUint32(vertexEntry + 4, true);
     view.setFloat32(offset + field * 4, value, true);
     assert.throws(() => decodeMargo(data), /prepared PBR/);
   }
-  const data = Uint8Array.from(cadSource),
+  const data = Uint8Array.from(compactSource),
     view = new DataView(data.buffer);
   view.setUint16(view.getUint32(indexEntry + 4, true), 3, true);
   assert.throws(() => decodeMargo(data), /prepared PBR geometry/);

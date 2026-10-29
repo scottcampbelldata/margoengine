@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>OIT GPU check</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body>
 <script type="module">
 // Driven by oit-gpu.mjs. Two scenes, each built on a fresh engine and canvas:
-// - 'cad': a 50% translucent housing (gltf-pro BLEND, double-sided, subdivided box) over two opaque gears and one 55%
+// - 'housing': a 50% translucent housing (gltf-pro BLEND, double-sided, subdivided box) over two opaque gears and one 55%
 //   translucent gear, all from parsePreparedPBR. mode 'sorted' = gltf-pro's per-primitive back-to-front path, 'oit' =
 //   OIT.attach + oit.add(model), 'reference' = the translucent parts split into one node per triangle (centroid
 //   translation), so gltf-pro's sort becomes a per-triangle sort: the reference for popping and colour.
@@ -44,7 +44,7 @@ function gear(teeth,outer,inner,depth,at){
   const points=[];for(let i=0;i<teeth*4;i++){const a=i/(teeth*4)*Math.PI*2,r=i%4<2?outer:inner;points.push([Math.cos(a)*r,Math.sin(a)*r]);}
   return translate(extrudeGeometry(new Shape(points),{depth,bevelEnabled:false,curveSegments:1}),[at[0],at[1],at[2]-depth/2]);
 }
-function cadModel(mode){
+function housingModel(mode){
   const materials=[
     {alphaMode:'BLEND',doubleSided:true,pbrMetallicRoughness:{baseColorFactor:[0.55,0.7,0.9,0.5],metallicFactor:0,roughnessFactor:0.35}},
     {pbrMetallicRoughness:{baseColorFactor:[0.9,0.45,0.1,1],metallicFactor:0.5,roughnessFactor:0.4}},
@@ -64,7 +64,7 @@ function layerScene(count,background){
   return meshes;
 }
 window.check={
-  // {scene:'cad'|'layers', mode:'sorted'|'oit'|'reference', samples:1|4, width, height, count, ortho, post, transparent, background}
+  // {scene:'housing'|'layers', mode:'sorted'|'oit'|'reference', samples:1|4, width, height, count, ortho, post, transparent, background}
   async build(o){
     errors=[];globalThis.margoLow=o.samples===1?1:undefined;
     canvas=document.body.appendChild(document.createElement('canvas'));canvas.style.width=o.width+'px';canvas.style.height=o.height+'px';
@@ -74,7 +74,7 @@ window.check={
     if(o.ortho)CameraProjection.attach(engine,{mode:'orthographic'});
     if(o.post)PostStack.attach(engine,[new Bloom({strength:0.3,threshold:0.9}),new FXAA()]);
     if(o.mode==='oit')oit=OIT.attach(engine);
-    if(o.scene==='cad'){model=cadModel(o.mode);if(oit)oit.add(model);}
+    if(o.scene==='housing'){model=housingModel(o.mode);if(oit)oit.add(model);}
     else {const meshes=layerScene(o.count,o.background!==false);if(oit)for(const m of meshes)oit.add(m);}
     if(o.profile)stats=Stats.attach(engine,{profiling:true,parent:document.createElement('div')});
     return {width:canvas.width,height:canvas.height,samples:o.samples};

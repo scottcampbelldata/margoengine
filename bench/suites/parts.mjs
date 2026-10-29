@@ -1,18 +1,18 @@
-// CAD: the kernel tick for the synthetic 5-level assembly at three sizes (Node), and the assembly drawn at 10,000 and
+// Parts: the kernel tick for the synthetic 5-level assembly at three sizes (Node), and the assembly drawn at 10,000 and
 // 50,000 parts (browser).
 import { sceneCases } from '../lib/browser.mjs';
 import { headlessEngine, ms, nodeCase, timed } from '../lib/node.mjs';
 
 export default {
-  name: 'cad',
-  title: 'CAD: assembly kernel tick, assembly drawing',
+  name: 'parts',
+  title: 'Parts: assembly kernel tick, assembly drawing',
   uses: 'gpu',
   async cases(ctx) {
     const state = {};
     const assembly = (modules) =>
       nodeCase(
         `kernel-assembly-${modules * 27}`,
-        `Kernel tick, CAD assembly of ${modules * 27} parts (5 levels)`,
+        `Kernel tick, parts assembly of ${modules * 27} parts (5 levels)`,
         { tickMs: ms(), tickCullMs: ms(false) },
         () => {
           const e = state[modules];
@@ -23,7 +23,7 @@ export default {
         },
         {
           async setup() {
-            const { buildAssembly } = await import('../../examples/package-benchmarks/cad/assembly.js');
+            const { buildAssembly } = await import('../../examples/package-benchmarks/parts/assembly.js');
             const e = await headlessEngine(Math.min(100_000, modules * 30 + Math.ceil(modules / 32) + 1));
             buildAssembly(e, modules);
             e.render();
@@ -35,6 +35,11 @@ export default {
           },
         },
       );
-    return [assembly(371), assembly(1852), assembly(3329), ...sceneCases('cad', { primary: ['cpuMs', 'gpuMs'] })(ctx)];
+    return [
+      assembly(371),
+      assembly(1852),
+      assembly(3329),
+      ...sceneCases('parts', { primary: ['cpuMs', 'gpuMs'] })(ctx),
+    ];
   },
 };

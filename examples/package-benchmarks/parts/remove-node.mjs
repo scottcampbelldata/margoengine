@@ -1,5 +1,5 @@
-// Mesh removal cost at the max CAD size (Node, fake renderer): one leaf, 1,000 leaves, groups, then engine.dispose().
-// Run: node examples/package-benchmarks/cad/remove-node.mjs
+// Mesh removal cost at the max assembly size (Node, fake renderer): one leaf, 1,000 leaves, groups, then engine.dispose().
+// Run: node examples/package-benchmarks/parts/remove-node.mjs
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { buildAssembly } from './assembly.js';
 import { requireAC } from './power.mjs';

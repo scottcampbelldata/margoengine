@@ -1,5 +1,5 @@
-// Kernel tick in Node (same Wasm as the browser): the CAD assembly (5 levels) and the earlier 10-deep chain case.
-// Run: node examples/package-benchmarks/cad/kernel-node.mjs
+// Kernel tick in Node (same Wasm as the browser): the parts assembly (5 levels) and the earlier 10-deep chain case.
+// Run: node examples/package-benchmarks/parts/kernel-node.mjs
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { buildAssembly } from './assembly.js';
 import { requireAC } from './power.mjs';
@@ -28,7 +28,7 @@ for (const modules of [371, 1852, 3329]) {
   const { parts } = buildAssembly(e, modules);
   e.render();
   result.cases.push({
-    case: 'CAD assembly, 5 levels',
+    case: 'Parts assembly, 5 levels',
     parts: parts.length,
     entities: e.meshes.size,
     tickCullMs: tick(e.store, true),

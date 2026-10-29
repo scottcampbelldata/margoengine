@@ -93,19 +93,19 @@ Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Lo
 
   [claims.md](claims.md) (PKG-109) makes no claim from these numbers.
 - **Rerun:**
-  - Pixels: `node examples/package-benchmarks/cad/cull-pixels.mjs` under the GPU lock. It recorded 0 of 153,600 pixels
+  - Pixels: `node examples/package-benchmarks/parts/cull-pixels.mjs` under the GPU lock. It recorded 0 of 153,600 pixels
     different in 13 steps.
   - Speed: the comparison harness was removed under the clean-room rule. Re-running it needs a checkout from before
     2026-10-24.
 - **Guard:**
   - `tests/core-material-setters.test.js`: a geometry batch draws back-culled only while every drawn instance is
     single-sided and unmirrored.
-  - `examples/package-benchmarks/cad/cull-pixels.mjs`.
+  - `examples/package-benchmarks/parts/cull-pixels.mjs`.
 
 ### 3. CAD, 10k single-sided parts
 
 - **Loss:** 4.04 ms GPU per frame without culling.
-  - Source: `examples/package-benchmarks/results/vs-threejs-cad-pairs.json`, `cad-10000`, `margo+nocull`.
+  - Source: `examples/package-benchmarks/results/vs-threejs-parts-pairs.json`, `parts-10000`, `margo+nocull`.
   - Diagnostic, busy machine; Arc 140V, Edge 155.
 - **Cause:** the same as entry 2.
 - **Fix:** `5ab3ce95`.

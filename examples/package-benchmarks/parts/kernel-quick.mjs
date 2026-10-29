@@ -1,5 +1,5 @@
-// Quick kernel tick check at the max CAD size (Node, same Wasm as the browser): static and 1%-moving ticks.
-// Run: node examples/package-benchmarks/cad/kernel-quick.mjs
+// Quick kernel tick check at the max assembly size (Node, same Wasm as the browser): static and 1%-moving ticks.
+// Run: node examples/package-benchmarks/parts/kernel-quick.mjs
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { buildAssembly } from './assembly.js';
 const median = (v) => +v.sort((a, b) => a - b)[v.length >> 1].toFixed(3),

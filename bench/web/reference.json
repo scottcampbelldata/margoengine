@@ -250,19 +250,19 @@
    "gpuMB": 264.89,
    "drawCalls": 2
   },
-  "cad/kernel-assembly-10017": {
+  "parts/kernel-assembly-10017": {
    "tickMs": 0.1257,
    "tickCullMs": 0.1337
   },
-  "cad/kernel-assembly-50004": {
+  "parts/kernel-assembly-50004": {
    "tickMs": 0.6297,
    "tickCullMs": 0.6709
   },
-  "cad/kernel-assembly-89883": {
+  "parts/kernel-assembly-89883": {
    "tickMs": 1.1396,
    "tickCullMs": 1.2205
   },
-  "cad/cad-10000": {
+  "parts/parts-10000": {
    "cpuMs": 0.65,
    "gpuMs": 0.219,
    "fps": 1010.6,
@@ -277,7 +277,7 @@
    "jsBytes": 119669,
    "drawCalls": 5
   },
-  "cad/cad-50000": {
+  "parts/parts-50000": {
    "cpuMs": 3.405,
    "gpuMs": 0.864,
    "fps": 253.3,

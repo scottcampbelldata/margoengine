@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { bigGLB } from '../../../tests/support/big-glb.js';
-import { acPower } from '../cad/power.mjs';
+import { acPower } from '../parts/power.mjs';
 import { binary, grid } from '../../../packages/fbx/test/fixtures.js';
 import { exportUSDZ } from '../../../packages/exporters/dist/usdz.js';
 import { torusKnotGeometry, toGeometry } from '../../../packages/geometry/dist/index.js';

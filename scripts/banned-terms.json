@@ -1,8 +1,59 @@
 {
-  "about": "Terms no tracked text file may contain. Each entry is the first 24 hex digits of SHA-256 of 'margo-banned:' + the lowercased word, so this file never names them. 'tokens' match whole words (as written and with hyphens removed); 'pairs' match 'a/b' path pieces.",
-  "tokens": ["41273cbe89746cba15fe90a2", "5392dc1fdcc32f016e65ff7a", "fc0d8977a6a3f4c17b48aecb"],
-  "pairs": ["3ea53541f37d23ebedd721b1", "ae9dc8497543a38ce91de580"],
-  "allow": [
-    { "path": "AGENTS.md", "reason": "the project rule that says what stays out of public text" }
-  ]
+  "about": "Terms no tracked text file, and no tracked PDF's printed text, may contain (scripts/check-banned-terms.mjs, in verify through tests/banned-terms.test.js). Each entry is the first 24 hex digits of SHA-256 of 'margo-banned:' + the lowercased term, so this file never names them. 'tokens' match whole words (as written and with hyphens removed); 'pairs' match two adjacent pieces of an 'a/b/c' path. 'pathTokens' match, like 'tokens', a whole piece of a tracked file's path (split at every character that is not a letter or digit, and between camelCase words), so a file or folder name cannot bring a removed name back either. 'allow' lists { path, reason } entries; it is empty on purpose.",
+  "tokens": [
+    "41273cbe89746cba15fe90a2",
+    "5392dc1fdcc32f016e65ff7a",
+    "fc0d8977a6a3f4c17b48aecb",
+    "21daf8a691fd7ac7c7a6a42e",
+    "0752e3e5deed497319fb1c63",
+    "0fa0f6eaae0a50ba65b86fa0",
+    "a01cbb3ee8f172bfd6c0cc8f",
+    "74b84867cae987cd2fbe373a",
+    "3ac7edb6021bdeececc7e563",
+    "b0c25ebf8444dc86c747206f",
+    "52a77bffbef489926062edcd",
+    "67956547552b319759309f4f",
+    "165aa7bed8c32e48ab8e5978",
+    "ab32bf95c26ce61fc850631a",
+    "32ced34fc6642e9e5a2c961c",
+    "413cde014792d2edc4dd7cb9",
+    "177f8df33a5c6b87ff793237",
+    "7c15ef516f5e71e7ebede925",
+    "ba6d0dc29d88fda137bb5158",
+    "d0623c2a9d7a5a632f98bc2a",
+    "35a47037b4cd0bd38119f690",
+    "f2d44399c62c47b113ed8efd",
+    "ccb3d28cec0db3ff46d6bbf6",
+    "e94cf06408199acf64336bbc",
+    "fbabd4f7607c23923ad0a463",
+    "f55a398368928ca01136bcd1",
+    "3ed53da9b39a87b3908595b8",
+    "cb69e997d34795d7d2f1e202",
+    "8f378fa875d2f5422e49705b",
+    "946e5d0c69712e603abe0575",
+    "0628ad97157d7e6ad6e5b466",
+    "53c52e705d42eb70518265fb",
+    "4937f1ff2f3f2d9bdb7565e0",
+    "18ba1674aa6b9318a9391aca",
+    "a1b89cfa6a0f754124cfe671",
+    "3c0722be969c153fa29aae00",
+    "a31be0ba2338e5f9255f0fd6",
+    "6aa422a4f12b96d89d6a7d12",
+    "5f9974454789830ff02b1825",
+    "42064a6e03b51377251a041e",
+    "ca83d105581d96a646abc8d9",
+    "3417117123a8422af4fca227",
+    "06f863add81a85f67265e913"
+  ],
+  "pairs": [
+    "3ea53541f37d23ebedd721b1",
+    "ae9dc8497543a38ce91de580",
+    "fabe4d60643fd7bfe3c01d07",
+    "396f67b81b83b2469e9b938f",
+    "db3bc6a29cec43f23e018576"
+  ],
+  "pathTokens": [
+    "cebdbc76e83dbc5a0848aac9"
+  ],
+  "allow": []
 }

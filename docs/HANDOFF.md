@@ -25,7 +25,7 @@
   with no colour emoji font; three Linux GPU suites stopped by heat; the cost of the precise maths; F20 of the
   2026-10-28 outside audit (being fixed) and three netcode room limits (Scott to decide); 16 of its 20 findings are
   fixed.
-- Test count re-measured: 6,373 tests, 6,371 pass, 2 skipped at `ec3f9b52` (`results/test-count.json`).
+- Test count re-measured: 6,490 tests, 6,488 pass, 2 skipped at `d18f2596` (`results/test-count.json`).
 
 ## Landed 2026-10-28: lighting API is hard to misuse (`@margoengine/sky/sun`)
 
@@ -1772,7 +1772,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       (`lods.pickProxies()` reports them); one subtree scan per bake (bake once per distinct design, share the atlas);
       anchors must sit outside the subtree (+1 entity per copy).
    b. [DONE, verified] GPU culling for core meshes with picking still
-      working: `CulledMeshes` (5m.b hook) re-checked on the GPU 2026-10-15 (`cad/culled-meshes.mjs`: 0 differing pixels
+      working: `CulledMeshes` (5m.b hook) re-checked on the GPU 2026-10-15 (`parts/culled-meshes.mjs`: 0 differing pixels
       in 8 steps, pick grid identical). Not done: Hi-Z occlusion for core meshes (it did not pay on this
       layout for CulledInstances); the `engine.start()` switch was added afterwards with Scott's approval (2026-10-15):
       `engine.start({culling: false})`, core + stage 19,922 -> 19,928 B (+6), test in tests/core-hooks.test.js.
@@ -2254,10 +2254,10 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       re-binds views and every `mesh.matrix`, copies values back; failure keeps the old store. Next tick recomputes all
       once; dirty-skip and "failed tick publishes nothing" unchanged. +95 B (19,793 -> 19,888). Memory: 351 B/slot in
       the kernel (the "~66 B" above was only the dirty-skip snapshot), 5 B/slot in the engine: Wasm 44.9 / 176.6 /
-      352.1 MB at 131k / 524k / 1,048k slots. Node (quiet, CAD assembly, `cad/scale-node.mjs`): static tick 3.3 / 20.2
+      352.1 MB at 131k / 524k / 1,048k slots. Node (quiet, CAD assembly, `parts/scale-node.mjs`): static tick 3.3 / 20.2
       / 41.5 ms, 1% moving 4.5 / 26.2 / 43.4 ms, full recompute 14.4 / 74.9 / 138 ms, full collection 8.3 / 33.8 /
       64.5 ms at 100k / 500k / 1M entities. Proofs: 1M-entity Node test bit-exact vs a fresh kernel
-      (`tests/core-dirty-transforms.test.js`), `cad/pixels-check.mjs` (now grows mid-run) and `cad/cull-pixels.mjs
+      (`tests/core-dirty-transforms.test.js`), `parts/pixels-check.mjs` (now grows mid-run) and `parts/cull-pixels.mjs
       --ref=b6a3796` 0 differing pixels. Wasm rebuilt reproducibly from lib.rs (SHA-256 9a7d9a44...). Selection's
       outline flags and XR instance storage follow the grown capacity.
       Still capped at 100,000 by their own input validation (package-side, not core): glTF/gltf-pro nodes and .margo nodes. `docs/limits.md`
@@ -2267,7 +2267,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       private, the only route is writing core's private indirect buffer). Hook: `PassContext.batches` + `Batch.redirect
       = {instances, args}` (+34 B). `CulledMeshes` in @margoengine/culling: GPU frustum (+ optional `minRadius`)
       culling and stable compaction of core batches; picking keeps working
-      (`cad/culled-meshes.mjs`: 0 differing pixels in 8 steps incl. hide, growth; pick grid identical). Not done: Hi-Z occlusion for core meshes (CulledInstances has it;
+      (`parts/culled-meshes.mjs`: 0 differing pixels in 8 steps incl. hide, growth; pick grid identical). Not done: Hi-Z occlusion for core meshes (CulledInstances has it;
       port its prepass), and an engine-level "CPU culling off" switch for `engine.start()` loops (today only
       `render({culling: false})`; about +15 B as `engine.culling`), which is what makes the kept set stable while
       orbiting.
@@ -2512,9 +2512,9 @@ Second set (2026-10-14, evening), all APPROVED by Scott:
   changes (incl. `set({doubleSided})`) and material assignment already force a full re-collection, which recomputes
   it. Un-mirroring a moved mesh leaves its batch on the cull-none pipeline until the next full re-collection
   (conservative, same pixels). Package shader variants, draws with extra bindings, `CulledInstances` and gltf-pro keep
-  their own pipelines. Proof (Arc 140V, Edge 155, AC, GPU lock): `examples/package-benchmarks/cad/cull-pixels.mjs`
+  their own pipelines. Proof (Arc 140V, Edge 155, AC, GPU lock): `examples/package-benchmarks/parts/cull-pixels.mjs`
   (builds core from `dc0c4ff` into test-results/core-ref and renders a mixed scene in both through 13 edits: 0 of
-  153,600 pixels differ at every step), `cad/pixels-check.mjs` passes, `npm run visual:check` 22/22. GPU win (diagnostic,
+  153,600 pixels differ at every step), `parts/pixels-check.mjs` passes, `npm run visual:check` 22/22. GPU win (diagnostic,
   busy, same run; `margo+nocull` = the old GPU work): single-sided boxes 1k/10k/50k 1.64/5.00/10.87 -> 0.46/1.80/6.00
   ms; CAD 10k single-sided 4.04 -> 2.15, 50k no gain. Harness (`vs-threejs`) now pairs mesh <-> mesh and instanced <->
   instanced (`margo-instanced` = materials `createInstancedMesh`, `margo-culled` = culling `CulledInstances`); tables in

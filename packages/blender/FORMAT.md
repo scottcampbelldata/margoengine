@@ -12,12 +12,12 @@ All numeric binary fields are little-endian. Maximum file length is 256 MiB. Off
 | 12 | Section count, 3..4096 |
 | 16 | Section table offset, always `64` |
 | 20 | Flags, always `0` |
-| 24 | Default vertex stride, `80`; a type-2 section's CAD layout flag overrides it to `24` |
+| 24 | Default vertex stride, `80`; a type-2 section's compact layout flag overrides it to `24` |
 | 28..60 | Reserved, always `0` |
 
 ## Section table
 
-Immediately after the header, each section has four uint32 fields: `type`, `offset`, `byteLength`, `flags`. These section headers describe the mesh buffers referenced by each primitive. Type-2 flags select the vertex layout; type-3 flags select the index format. Other section types require zero flags. Unknown values and combined index flags are rejected. Payloads follow the table in table order. Each offset must equal the padded end of the previous payload (or table for the first). Overlapping sections, unknown types, gaps and trailing data are rejected. Shared resources reference the same section ID rather than overlapping table entries. CAD/PBR vertices and uint16/uint32 indices may coexist in one file. Existing v1 files use zero flags and retain their original layouts; older readers reject the new flags explicitly.
+Immediately after the header, each section has four uint32 fields: `type`, `offset`, `byteLength`, `flags`. These section headers describe the mesh buffers referenced by each primitive. Type-2 flags select the vertex layout; type-3 flags select the index format. Other section types require zero flags. Unknown values and combined index flags are rejected. Payloads follow the table in table order. Each offset must equal the padded end of the previous payload (or table for the first). Overlapping sections, unknown types, gaps and trailing data are rejected. Shared resources reference the same section ID rather than overlapping table entries. Compact/PBR vertices and uint16/uint32 indices may coexist in one file. Existing v1 files use zero flags and retain their original layouts; older readers reject the new flags explicitly.
 
 | Type | Content |
 | --- | --- |
@@ -58,7 +58,7 @@ Nodes use TRS (quaternion xyzw) or an affine, non-sheared column-major matrix. T
 
 All values must be finite. Each primitive has 3..1,000,000 vertices and triangle indices within its vertex count. Unit-vector tolerance is 0.001. Positions/UVs use the existing glTF Pro shader layout. Blender Z-up coordinates become `(x,z,-y)` in meters; UV V is inverted for top-down images and tangent handedness follows Blender's glTF exporter. Color/emissive textures use sRGB; normal and metallic-roughness textures use linear channels.
 
-## CAD vertices: 6 Float32 values, 24 bytes (flags `1`)
+## Compact vertices: 6 Float32 values, 24 bytes (flags `1`)
 
 | Float offsets | Meaning |
 | --- | --- |
@@ -67,4 +67,4 @@ All values must be finite. Each primitive has 3..1,000,000 vertices and triangle
 
 Meshes without UVs, tangents or vertex colors use this layout. Positions and normals have the same finite-value, unit-vector and vertex/index limits as PBR vertices. The writer accepts `stride: 24` on a primitive and encodes it as a vertex-section flag, omitting it from the manifest. Omitted stride defaults to `80`.
 
-The reader expands each shared CAD geometry once into the existing PBR renderer layout: position w = 1, normal w = 0, zero tangents/UVs and white vertex color. PBR vertices and uint32 indices remain typed-array views of the input. Aggregate decoded geometry, including expanded vertices and indices, is bounded at 256 MiB before allocation. GPU uploads copy bytes. Unknown versions, default strides and layout flags fail explicitly; this file is not a dump of the engine's Wasm memory or device-specific uniforms.
+The reader expands each shared compact geometry once into the existing PBR renderer layout: position w = 1, normal w = 0, zero tangents/UVs and white vertex color. PBR vertices and uint32 indices remain typed-array views of the input. Aggregate decoded geometry, including expanded vertices and indices, is bounded at 256 MiB before allocation. GPU uploads copy bytes. Unknown versions, default strides and layout flags fail explicitly; this file is not a dump of the engine's Wasm memory or device-specific uniforms.

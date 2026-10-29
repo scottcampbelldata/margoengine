@@ -33,7 +33,7 @@ if (!precompiled)
       },
     },
   );
-// -ocimfs 300: keep the kernel's recompute path out of line so the per-entity unchanged path stays small (CAD, 100k entities: 3.5 vs 4.8 ms per tick).
+// -ocimfs 300: keep the kernel's recompute path out of line so the per-entity unchanged path stays small (parts assembly, 100k entities: 3.5 vs 4.8 ms per tick).
 if (!precompiled)
   execFileSync(
     process.execPath,

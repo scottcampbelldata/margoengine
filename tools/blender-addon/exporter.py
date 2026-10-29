@@ -101,7 +101,7 @@ def export_scene(context, path):
                         failure(material, f"unsupported {socket.name}; expected {expected}")
             pbr = result["pbrMetallicRoughness"]
             base = shader.inputs["Base Color"]
-            # Principled RGB is linear; viewport diffuse_color can differ on CAD materials.
+            # Principled RGB is linear; viewport diffuse_color can differ on imported materials.
             pbr["baseColorFactor"] = list(base.default_value)
             pbr["baseColorFactor"][3] = shader.inputs["Alpha"].default_value
             for name, factor_key in (("Metallic", "metallicFactor"), ("Roughness", "roughnessFactor")):
@@ -189,7 +189,7 @@ def export_scene(context, path):
                 coordinates *= unit_scale
                 normals = normals.reshape(-1, 3)[:, (0, 2, 1)]
                 normals[:, 2] *= -1
-                # CAD tessellation can carry invalid corner normals; export those as +Y.
+                # Imported tessellated meshes can carry invalid corner normals; export those as +Y.
                 with np.errstate(over="ignore", invalid="ignore"):
                     lengths = np.einsum("ij,ij->i", normals, normals)
                 valid = np.isfinite(normals).all(axis=1) & np.isfinite(lengths) & (lengths >= 1e-6)

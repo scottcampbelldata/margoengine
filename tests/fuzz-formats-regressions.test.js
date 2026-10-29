@@ -272,7 +272,7 @@ test('the parse worker counts packed geometry toward the decoded budget, as the 
 
 test('.margo scene JSON that is not JSON, and null scene nodes or materials: named errors', async () => {
   const margo = new Uint8Array(
-      readFileSync(new URL('../packages/blender/tests/fixtures/cad-triangle.margo', import.meta.url)),
+      readFileSync(new URL('../packages/blender/tests/fixtures/compact-triangle.margo', import.meta.url)),
     ),
     view = new DataView(margo.buffer),
     offset = view.getUint32(68, true);

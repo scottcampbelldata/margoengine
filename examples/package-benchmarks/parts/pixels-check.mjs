@@ -1,12 +1,12 @@
 // Real-GPU check that incremental frames (unchanged entities skipped by the kernel, reused instances, patched matrices,
 // partial instance uploads) produce exactly the pixels of a from-scratch render of the same scene, over static parts mixed
 // with moving parts and edits. Run from the repository root after building packages, holding test-results/gpu.lock:
-//   node examples/package-benchmarks/cad/pixels-check.mjs
+//   node examples/package-benchmarks/parts/pixels-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
-const context = await openBrowser({ startPath: '/examples/package-benchmarks/cad/pixels-check.html', port: 5219 }),
+const context = await openBrowser({ startPath: '/examples/package-benchmarks/parts/pixels-check.html', port: 5219 }),
   { page, hardware } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));

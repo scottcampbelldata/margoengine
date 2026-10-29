@@ -1,4 +1,4 @@
-// Synthetic CAD assembly: a few distinct part shapes, many instances, 5-level hierarchy (root > zone > module > fastener set > part).
+// Synthetic parts assembly: a few distinct part shapes, many instances, 5-level hierarchy (root > zone > module > fastener set > part).
 import { PbrMaterial } from '../../../packages/core/dist/index.js';
 import {
   Shape,

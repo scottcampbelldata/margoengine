@@ -109,10 +109,10 @@ unregister()
 
 # Exercise the cache with real Blender data while counting expensive work.
 bpy.ops.wm.read_factory_settings(use_empty=True)
-cad = bpy.data.meshes.new("Shared CAD")
-cad.from_pydata([(-0.6, 0, -0.6), (0.6, 0, -0.6), (0, 0, 0.6)], [], [(0, 1, 2)])
+compact = bpy.data.meshes.new("Shared part")
+compact.from_pydata([(-0.6, 0, -0.6), (0.6, 0, -0.6), (0, 0, 0.6)], [], [(0, 1, 2)])
 for i in range(100):
-    part = bpy.data.objects.new(f"CAD {i}", cad)
+    part = bpy.data.objects.new(f"Part {i}", compact)
     part.location.x = i * 2
     bpy.context.collection.objects.link(part)
 bpy.context.view_layer.update()
@@ -143,17 +143,17 @@ context = SimpleNamespace(scene=bpy.context.scene, view_layer=bpy.context.view_l
                           evaluated_depsgraph_get=lambda: SimpleNamespace(object_instances=instances))
 with patch.object(exporter.hashlib, "sha256", wraps=exporter.hashlib.sha256) as hashes, \
         patch.object(exporter.np, "unique", wraps=exporter.np.unique) as unique:
-    export_scene(context, output / "cad-instances.margo")
+    export_scene(context, output / "compact-instances.margo")
     assert calls == {"to_mesh": 1, "clear": 1}, calls
     assert hashes.call_count == 1, hashes.call_count
     assert sum(c.kwargs.get("return_inverse", False) for c in unique.call_args_list) == 1
-data = (output / "cad-instances.margo").read_bytes()
+data = (output / "compact-instances.margo").read_bytes()
 offset, length = struct.unpack_from("<2I", data, 68)
 manifest = json.loads(data[offset:offset + length])
 assert len(manifest["meshes"]) == 1 and len(manifest["nodes"]) == 100
 assert all(node["mesh"] == 0 for node in manifest["nodes"])
 assert len({tuple(node["translation"]) for node in manifest["nodes"]}) == 100
-assert struct.unpack_from("<I", data, 92)[0] == 1  # CAD vertex-section flag.
+assert struct.unpack_from("<I", data, 92)[0] == 1  # compact vertex-section flag.
 
 red = bpy.data.materials.new("Object override")
 if bpy.app.version < (5, 0, 0):
@@ -162,12 +162,12 @@ red_shader = next(n for n in red.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
 red.diffuse_color = (0, 1, 0, 1)
 red_shader.inputs["Base Color"].default_value = (0.8, 0.2, 0.1, 0.4)
 red_shader.inputs["Alpha"].default_value = 0.75
-cad.materials.append(None)
+compact.materials.append(None)
 part.material_slots[0].link = "OBJECT"
 part.material_slots[0].material = red
 bpy.context.view_layer.update()
-export_scene(bpy.context, output / "cad-overrides.margo")
-data = (output / "cad-overrides.margo").read_bytes()
+export_scene(bpy.context, output / "compact-overrides.margo")
+data = (output / "compact-overrides.margo").read_bytes()
 offset, length = struct.unpack_from("<2I", data, 68)
 manifest = json.loads(data[offset:offset + length])
 assert len(manifest["meshes"]) == 2, "Object material overrides reused the wrong mesh"
@@ -176,16 +176,16 @@ mid = manifest["meshes"][override["mesh"]]["primitives"][0]["material"]
 factor = manifest["materials"][mid]["pbrMetallicRoughness"]["baseColorFactor"]
 assert all(abs(a - b) < 1e-6 for a, b in zip(factor, (0.8, 0.2, 0.1, 0.75))), factor
 assert manifest["materials"][mid]["alphaMode"] == "BLEND"
-color = cad.color_attributes.new(name="Color", type="FLOAT_COLOR", domain="CORNER")
+color = compact.color_attributes.new(name="Color", type="FLOAT_COLOR", domain="CORNER")
 bpy.context.view_layer.update()
-export_scene(bpy.context, output / "cad-colors.margo")
-data = (output / "cad-colors.margo").read_bytes()
+export_scene(bpy.context, output / "compact-colors.margo")
+data = (output / "compact-colors.margo").read_bytes()
 assert struct.unpack_from("<2I", data, 88) == (240, 0), "Vertex colors require the full layout"
-cad.color_attributes.remove(color)
-cad.uv_layers.new(name="UVMap")
+compact.color_attributes.remove(color)
+compact.uv_layers.new(name="UVMap")
 bpy.context.view_layer.update()
-export_scene(bpy.context, output / "cad-uv.margo")
-data = (output / "cad-uv.margo").read_bytes()
+export_scene(bpy.context, output / "compact-uv.margo")
+data = (output / "compact-uv.margo").read_bytes()
 assert struct.unpack_from("<2I", data, 88) == (240, 0), "UVs/tangents require the full layout"
 degenerate = bpy.data.meshes.new("Zero normals")
 degenerate.from_pydata([(0, 0, 0), (1, 0, 0), (2, 0, 0)], [], [(0, 1, 2)])

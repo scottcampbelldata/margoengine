@@ -7,7 +7,7 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, readdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
-import { acPower } from '../cad/power.mjs';
+import { acPower } from '../parts/power.mjs';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');

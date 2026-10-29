@@ -10,7 +10,7 @@ export const SUITES = [
   'math',
   'gltf',
   'loaders',
-  'cad',
+  'parts',
   'voxel',
   'physics',
   'memory',

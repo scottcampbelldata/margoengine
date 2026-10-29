@@ -1,10 +1,10 @@
 // Margo's implementation of every benchmark scene in ./catalog.js. The defaults (WebGPU, 4x MSAA on desktop, DPR 1 in
-// the CLI) are what an app gets. Box and CAD materials are single-sided (doubleSided: false, like other engines'
+// the CLI) are what an app gets. Box and part materials are single-sided (doubleSided: false, like other engines'
 // default front-side materials): the objects are closed solids, and core draws such batches with a back-culled pipeline.
 // Every optional package is imported by the scene that uses it, so a scene's page loads only what that scene needs.
 import { Camera, Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
-import { CAD_MATERIALS, LIGHT, PALETTE, SCENES } from './catalog.js';
+import { PART_MATERIALS, LIGHT, PALETTE, SCENES } from './catalog.js';
 
 /** Scenes this engine implements (the page reports any other as unsupported). */
 export const scenes = [
@@ -15,7 +15,7 @@ export const scenes = [
   'lights',
   'shadows',
   'post',
-  'cad',
+  'parts',
   'gltf',
   'helmet',
   'react',
@@ -254,13 +254,13 @@ const builders = {
     return app(engine, () => {}, { camera: data.camera, note: 'core batches; post passes not counted' });
   },
 
-  async cad(canvas, data, marks) {
+  async parts(canvas, data, marks) {
     const engine = await engineFor(canvas, data.camera, data.nodes.length + 8, marks),
       s = performance.now(),
       { toGeometry } = await import('@margoengine/geometry');
     const geometries = Object.fromEntries(Object.entries(data.shapes).map(([k, v]) => [k, toGeometry(v)])),
       materials = Object.fromEntries(
-        Object.entries(CAD_MATERIALS).map(([k, v]) => [k, new PbrMaterial({ ...v, ...single })]),
+        Object.entries(PART_MATERIALS).map(([k, v]) => [k, new PbrMaterial({ ...v, ...single })]),
       );
     const list = [];
     for (const node of data.nodes) {

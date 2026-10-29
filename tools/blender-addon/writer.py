@@ -43,7 +43,7 @@ def encode(document, geometry, images=()):
             vertex, index = primitive["vertices"], primitive["indices"]
             stride = primitive.get("stride", 80)
             if stride not in (24, 80) or len(vertex) < 3 * stride or len(vertex) % stride or not index or len(index) % 12:
-                raise ValueError("Expected packed CAD/PBR triangle geometry")
+                raise ValueError("Expected packed compact/PBR triangle geometry")
             vertex_count = len(vertex) // stride
             values = array("I")
             values.frombytes(index)

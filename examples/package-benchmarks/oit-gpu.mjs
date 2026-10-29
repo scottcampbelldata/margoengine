@@ -222,7 +222,7 @@ try {
     };
     let background;
     for (const mode of ['reference', 'sorted', 'oit']) {
-      await build({ scene: 'cad', mode, samples: 4, ...size });
+      await build({ scene: 'housing', mode, samples: 4, ...size });
       let previous;
       const errors = [],
         p95 = [],
@@ -312,7 +312,7 @@ try {
       const runs = {};
       for (const mode of ['opaque', 'sorted', 'oit', 'oit', 'sorted', 'opaque']) {
         await build({
-          scene: 'cad',
+          scene: 'housing',
           mode: mode === 'opaque' ? 'sorted' : mode,
           samples: 4,
           width,

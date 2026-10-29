@@ -163,7 +163,7 @@ test('rendered input changes include tracked and untracked sources in every rend
 test('rendered input guard permits only the exact power harness and generated measurements', () => {
   assert.deepEqual(
     renderedInputChanges(
-      'examples/package-benchmarks/cad/power.mjs\0examples/package-benchmarks/results/basic-scene-network.json\0',
+      'examples/package-benchmarks/parts/power.mjs\0examples/package-benchmarks/results/basic-scene-network.json\0',
       'examples/package-benchmarks/results/entry-sizes.json\0',
     ),
     [],
@@ -179,8 +179,8 @@ test('rendered input paths retain whitespace and do not confuse root prefixes or
     'examples/a\nb.js',
     'Packages/Core.ts',
   ]);
-  assert.deepEqual(renderedInputChanges('Examples/package-benchmarks/cad/power.mjs\0', ''), [
-    'Examples/package-benchmarks/cad/power.mjs',
+  assert.deepEqual(renderedInputChanges('Examples/package-benchmarks/parts/power.mjs\0', ''), [
+    'Examples/package-benchmarks/parts/power.mjs',
   ]);
 });
 

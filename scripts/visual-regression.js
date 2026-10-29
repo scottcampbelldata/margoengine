@@ -26,7 +26,7 @@ import { mkdir, rm, readFile, writeFile, copyFile, readdir } from 'node:fs/promi
 import { resolve } from 'node:path';
 import { deflateSync, crc32 } from 'node:zlib';
 import { decodePNG } from '../tests/support/png.js';
-import { acPower } from '../examples/package-benchmarks/cad/power.mjs';
+import { acPower } from '../examples/package-benchmarks/parts/power.mjs';
 import { acquire } from './gpu-lock.mjs';
 import { clearVisualOutput } from './support/visual-output.js';
 import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';

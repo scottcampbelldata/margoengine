@@ -18,7 +18,7 @@ import { resolve } from 'node:path';
 import { build } from 'vite';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acPower } from '../cad/power.mjs';
+import { acPower } from '../parts/power.mjs';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const option = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;

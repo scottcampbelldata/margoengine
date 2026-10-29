@@ -3,7 +3,7 @@
 import { createServer } from 'vite';
 import { writeFile } from 'node:fs/promises';
 import { decodePNG } from '../../../tests/support/png.js';
-import { requireAC } from '../cad/power.mjs';
+import { requireAC } from '../parts/power.mjs';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 

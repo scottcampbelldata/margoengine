@@ -26,7 +26,7 @@ jobs:
       - name: Compile core for the CAD lifecycle regression
         run: node node_modules/typescript/bin/tsc -p packages/core/tsconfig.json
       - name: Verify CAD initialization and disposal on supported Node versions
-        run: node --test tests/deep-ingestion-cad-initialization.test.js
+        run: node --test tests/deep-ingestion-camera-controls-initialization.test.js
   packages:
     runs-on: windows-latest
     steps:

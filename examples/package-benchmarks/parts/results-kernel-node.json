@@ -4,21 +4,21 @@
  "acPower": true,
  "cases": [
   {
-   "case": "CAD assembly, 5 levels",
+   "case": "Parts assembly, 5 levels",
    "parts": 10017,
    "entities": 11143,
    "tickCullMs": 1.525,
    "tickNoCullMs": 1.492
   },
   {
-   "case": "CAD assembly, 5 levels",
+   "case": "Parts assembly, 5 levels",
    "parts": 50004,
    "entities": 55619,
    "tickCullMs": 7.977,
    "tickNoCullMs": 8.087
   },
   {
-   "case": "CAD assembly, 5 levels",
+   "case": "Parts assembly, 5 levels",
    "parts": 89883,
    "entities": 99976,
    "tickCullMs": 15.701,

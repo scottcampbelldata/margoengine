@@ -1,5 +1,5 @@
 // Browser side of the 1d''/1e.f measurements (driven by toggle.mjs). The section-plane toggle and the feature-edge
-// background left with the CAD package (2026-10-29): what stays is the fog toggle and the shader override timings.
+// background were removed from the engine (2026-10-29): what stays is the fog toggle and the shader override timings.
 import { Engine, box } from '/packages/core/dist/extension.js';
 import { loadGLTF } from '/packages/gltf-pro/dist/index.js';
 import { Fog } from '/packages/environment/dist/index.js';

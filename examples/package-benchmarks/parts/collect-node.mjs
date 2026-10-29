@@ -1,5 +1,5 @@
-// Full batch collection cost at the max CAD size (Node, fake renderer): frames forced to re-collect, as when the
-// cull result changes every frame during an orbit. Run: node examples/package-benchmarks/cad/collect-node.mjs
+// Full batch collection cost at the max assembly size (Node, fake renderer): frames forced to re-collect, as when the
+// cull result changes every frame during an orbit. Run: node examples/package-benchmarks/parts/collect-node.mjs
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { buildAssembly } from './assembly.js';
 const fake = { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },

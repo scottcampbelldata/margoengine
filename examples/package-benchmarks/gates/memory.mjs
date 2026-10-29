@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acPower } from '../cad/power.mjs';
+import { acPower } from '../parts/power.mjs';
 import { rich, binary } from '../../../packages/fbx/test/fixtures.js';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
 

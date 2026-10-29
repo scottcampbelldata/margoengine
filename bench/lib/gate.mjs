@@ -5,7 +5,7 @@
 // 3. an idle baseline: whole-machine CPU at or under --quiet-max % for --quiet-hold s (scripts/quiet-gate.mjs), and on
 //    NVIDIA GPUs utilisation at or under --gpu-max % (nvidia-smi).
 // Between cases `settle()` re-checks the CPU and waits again when another job has started.
-import { acPower } from '../../examples/package-benchmarks/cad/power.mjs';
+import { acPower } from '../../examples/package-benchmarks/parts/power.mjs';
 import { acquire, lockDir, status } from '../../scripts/gpu-lock.mjs';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { gpus } from './env.mjs';

@@ -53,7 +53,7 @@ export function assertCaptureEnvironment(firstEnvironment, currentEnvironment) {
 }
 
 const captureHarnessInputs = new Set([
-  'examples/package-benchmarks/cad/power.mjs',
+  'examples/package-benchmarks/parts/power.mjs',
   'examples/package-benchmarks/results/basic-scene-network.json',
   'examples/package-benchmarks/results/entry-sizes.json',
 ]);

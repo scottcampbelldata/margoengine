@@ -130,7 +130,7 @@
     "bench:math": "node bench/cli.mjs math",
     "bench:gltf": "node bench/cli.mjs gltf",
     "bench:loaders": "node bench/cli.mjs loaders",
-    "bench:cad": "node bench/cli.mjs cad",
+    "bench:parts": "node bench/cli.mjs parts",
     "bench:voxel": "node bench/cli.mjs voxel",
     "bench:physics": "node bench/cli.mjs physics",
     "bench:memory": "node bench/cli.mjs memory",
