@@ -230,6 +230,7 @@
     "build:site": "npm run catalog:build && node examples/package-benchmarks/entry-sizes.mjs && npm run test:basic-scene && node scripts/build-site.js",
     "whitepaper:pdf": "node scripts/whitepaper-pdf.mjs",
     "test:basic-scene": "node scripts/basic-scene-network.mjs",
+    "test:frame-alloc:browser": "node scripts/frame-alloc-browser.mjs",
     "site:check": "node scripts/site-check.mjs",
     "dev:ik": "vite --host 127.0.0.1 --port 5191 --strictPort",
     "build:ik": "npm run build:packages && node scripts/build-skinning-ik.mjs",

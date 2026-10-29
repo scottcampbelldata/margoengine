@@ -520,10 +520,12 @@ export class Bloom implements EnginePlugin {
       c.device.queue.writeBuffer(this.weights!, 0, this.weightValues);
     }
     const compute = c.encoder.beginComputePass();
-    for (const [pipeline, group, x, y] of this.steps) {
-      compute.setPipeline(pipeline);
-      compute.setBindGroup(0, group);
-      compute.dispatchWorkgroups(x, y);
+    // By index: destructuring each step ([pipeline, group, x, y]) runs an array iterator, garbage every frame.
+    for (let i = 0; i < this.steps.length; i++) {
+      const step = this.steps[i];
+      compute.setPipeline(step[0]);
+      compute.setBindGroup(0, step[1]);
+      compute.dispatchWorkgroups(step[2], step[3]);
     }
     compute.end();
     this.attachment.view = view;

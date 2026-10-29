@@ -1,6 +1,7 @@
 import { TransformStore, syncStoredRotation } from './kernel.js';
 import { Camera, type CameraOptions, type Vec3 } from './camera.js';
 import { Geometry, PbrMaterial, finite } from './geometry.js';
+import { hypot } from '../../shared/hypot.js';
 import {
   GPURenderer,
   validateRectangle,
@@ -261,7 +262,7 @@ export class Mesh {
     this.check();
     finite(value, 4, 'Quaternion');
     // No spread or map: physics and animation call this for every moving body each frame.
-    const length = Math.hypot(value[0], value[1], value[2], value[3]);
+    const length = hypot(4, value[0], value[1], value[2], value[3]);
     if (!length) throw rangeError('Quaternion nonzero', 'transform');
     const x = value[0] / length,
       y = value[1] / length,
@@ -399,6 +400,8 @@ export class Engine {
   /** Views the frame loop draws each frame instead of the full-canvas camera view; list `engine.camera` to keep it. */
   views?: readonly RenderView[];
   private readonly batches = new Map<Geometry, Batch & { references: number }>();
+  /** The batches in insertion order, iterated by index every frame (a Map iterator would be garbage each time). */
+  private readonly batchList: Batch[] = [];
   private readonly checkedMaterials = new WeakMap<PbrMaterial, number>();
   private materialFrame = 0;
   private readonly free: number[] = [];
@@ -410,7 +413,7 @@ export class Engine {
   /** @internal Meshes with receiveShadow false at the last full collection; shadow plugins patch for them only then. */ unshadowed = 0;
   private collectedScene?: Scene;
   private collectedLayers = -1;
-  private readonly materials = new Set<[PbrMaterial, ...number[]]>();
+  private readonly materials: [PbrMaterial, ...number[]][] = [];
   private seen: Uint8Array;
   private slots: Int32Array;
   private readonly callbacks = new Set<FrameCallback>();
@@ -686,8 +689,10 @@ export class Engine {
   }
   retain(geometry: Geometry): void {
     let batch = this.batches.get(geometry);
-    if (!batch)
+    if (!batch) {
       this.batches.set(geometry, (batch = { geometry, instances: new Float32Array(), count: 0, references: 0 }));
+      this.batchList.push(batch);
+    }
     // Size instance storage to the meshes using this geometry, doubling as it grows, not to the engine capacity.
     if (batch.references++ >= batch.instances.length / 24) {
       const size = batch.references * 2;
@@ -703,6 +708,7 @@ export class Engine {
     if (--batch.references === 0) {
       this.renderer.remove(geometry);
       this.batches.delete(geometry);
+      this.batchList.splice(this.batchList.indexOf(batch), 1);
     }
   }
   private readonly collect = (mesh: Mesh): void => {
@@ -719,7 +725,7 @@ export class Engine {
         if (material[3] !== 1 || material[4] < Math.fround(0.045) || (material[6] !== 0 && material[6] !== 1))
           throw rangeError('Invalid material', 'material');
         this.checkedMaterials.set(mesh.material, this.materialFrame);
-        this.materials.add([mesh.material, ...material]);
+        this.materials.push([mesh.material, ...material]);
       }
       const batch = this.batches.get(mesh.geometry)!,
         offset = batch.count++ * 24;
@@ -763,7 +769,7 @@ export class Engine {
         this.renderer.render(
           camera,
           this.lighting,
-          this.batches.values(),
+          this.batchList,
           this.frameGraph,
           delta,
           // A background or a camera layer mask is passed as a full-canvas view, so passes see it.
@@ -836,23 +842,16 @@ export class Engine {
         cameras.add(view.camera);
         scenes.add(scene);
         if (!this.recovery)
-          this.renderer.render(
-            view.camera,
-            this.lighting,
-            this.batches.values(),
-            this.frameGraph,
-            prepare ? delta : 0,
-            {
-              rect,
-              scissor: view.scissor && this.viewPixels(view.scissor, view.pixels, size),
-              layers: this.layers === -1 ? undefined : this.layers,
-              index: stacked.get(destination(view)) ?? 0,
-              count: counts.get(destination(view))!,
-              id: view.id ?? String(index),
-              clear: view.clear ?? (scene.background === undefined ? undefined : { color: scene.background ?? false }),
-              target: view.target,
-            },
-          );
+          this.renderer.render(view.camera, this.lighting, this.batchList, this.frameGraph, prepare ? delta : 0, {
+            rect,
+            scissor: view.scissor && this.viewPixels(view.scissor, view.pixels, size),
+            layers: this.layers === -1 ? undefined : this.layers,
+            index: stacked.get(destination(view)) ?? 0,
+            count: counts.get(destination(view))!,
+            id: view.id ?? String(index),
+            clear: view.clear ?? (scene.background === undefined ? undefined : { color: scene.background ?? false }),
+            target: view.target,
+          });
         stacked.set(destination(view), (stacked.get(destination(view)) ?? 0) + 1);
         if (!target) drawn.push(view);
       });
@@ -898,24 +897,22 @@ export class Engine {
     this.live();
     if (!Number.isFinite(frameDelta) || frameDelta < 0 || frameDelta > 1)
       throw rangeError('Invalid delta', 'arguments');
-    if (prepare) for (const plugin of this.plugins.values()) plugin.onPreUpdate?.(frameDelta);
+    this.delta = frameDelta;
+    if (prepare) this.plugins.forEach(this.preUpdate);
     if (!rect) this.resize();
     camera.advance(delta);
     camera.update(rect ? rect[2] / rect[3] : this.canvas.width / this.canvas.height, this.backend === 'webgpu');
     this.layers = this.cameraLayers(camera, layers);
     this.store.planes.set(camera.planes);
     this.store.tick(culling);
-    const lighting = this.lighting;
-    finite(lighting.direction, 4, 'Light');
-    finite(lighting.radiance, 4, 'Radiance');
-    if (lighting.ambient !== undefined) finite(lighting.ambient, 3, 'Ambient');
-    if (
-      !Math.hypot(lighting.direction[0], lighting.direction[1], lighting.direction[2]) ||
-      lighting.direction[3] < 0 ||
-      lighting.radiance.some((v) => v < 0) ||
-      lighting.ambient?.some((v) => v < 0)
-    )
-      throw rangeError('Invalid lighting', 'lighting');
+    const { direction, radiance, ambient } = this.lighting;
+    finite(direction, 4, 'Light');
+    finite(radiance, 4, 'Radiance');
+    if (ambient !== undefined) finite(ambient, 3, 'Ambient');
+    // Loops, not some() with a closure: this runs every frame. Finite values have no length only when all are 0.
+    let invalid = !(direction[0] || direction[1] || direction[2]) || direction[3] < 0;
+    for (let i = 0; i < 4; i++) invalid ||= radiance[i] < 0 || (i < 3 && !!ambient && ambient[i] < 0);
+    if (invalid) throw rangeError('Invalid lighting', 'lighting');
     this.collectInstances();
     if (camera === this.camera) this.primaryCulling = culling;
   }
@@ -947,13 +944,13 @@ export class Engine {
       this.collectedLayers !== layers ||
       (layers !== -1 && !!layerRegistry()?.source);
     for (let id = 0; !full && id < this.next; id++) full = visible[id] !== seen[id];
-    for (const values of this.materials)
-      for (let i = 0; !full && i < 8; i++) full = values[0].data[i] !== values[i + 1];
+    for (let m = 0; !full && m < this.materials.length; m++)
+      for (let i = 0, values = this.materials[m]; !full && i < 8; i++) full = values[0].data[i] !== values[i + 1];
     if (full) {
-      for (const batch of this.batches.values()) batch.count = batch.mask = 0;
+      for (const batch of this.batchList) batch.count = batch.mask = 0;
       this.stats.visible = this.unshadowed = 0;
       this.materialFrame++;
-      this.materials.clear();
+      this.materials.length = 0;
       this.slots.fill(-1);
       scene.meshes.forEach(this.collect);
       this.collected = this.revision;
@@ -961,7 +958,7 @@ export class Engine {
       this.collectedLayers = layers;
       seen.set(visible);
       changed.fill(0);
-      for (const batch of this.batches.values()) {
+      for (const batch of this.batchList) {
         batch.start = 0;
         batch.end = batch.count * 24;
       }
@@ -980,7 +977,8 @@ export class Engine {
       }
     // Every frame, with the renderer's own test: a package can claim or release a batch without a new collection.
     this.stats.drawCalls = 0;
-    for (const batch of this.batches.values()) if (batch.count && !batch.claimed) this.stats.drawCalls++;
+    for (let i = 0; i < this.batchList.length; i++)
+      if (this.batchList[i].count && !this.batchList[i].claimed) this.stats.drawCalls++;
   }
   /**
    * The mesh under CSS pixel (x, y), or null. With `view`, picks through that view (null outside its rectangle);
@@ -1047,7 +1045,7 @@ export class Engine {
             .pick(
               camera,
               this.lighting,
-              this.batches.values(),
+              this.batchList,
               this.frameGraph,
               px - (rect?.[0] ?? 0),
               py - (rect?.[1] ?? 0),
@@ -1084,6 +1082,10 @@ export class Engine {
   private readonly wake = (): void => {
     this.last = 0;
   };
+  // Persistent functions for forEach: a for...of over a Set or Map makes an iterator every frame.
+  private delta = 0;
+  private readonly preUpdate = (plugin: EnginePlugin): void => plugin.onPreUpdate?.(this.delta);
+  private readonly call = (callback: FrameCallback): void => callback(this, this.frameOptions.delta);
   private readonly frame = (time: number): void => {
     this.raf = null;
     if (this.disposed || !this.running) return;
@@ -1094,8 +1096,8 @@ export class Engine {
     const delta = this.last ? Math.min((time - this.last) / 1000, this.maxDelta) : 0;
     this.last = time;
     try {
-      for (const callback of this.callbacks) callback(this, delta);
       this.frameOptions.delta = delta;
+      this.callbacks.forEach(this.call);
       this.frameOptions.views = this.views?.length ? this.views : undefined;
       if (!this.disposed) this.render(this.frameOptions);
     } catch (error) {

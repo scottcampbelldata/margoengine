@@ -3,7 +3,7 @@
 Date: 2026-10-24. The table in [threejs-parity.md](threejs-parity.md) was recounted after the parity-closing work:
 **161 features, 153 COVERED, 4 PARTIAL, 4 MISSING** (142 / 13 / 6 before the parity-closing work, 138 / 16 / 6 after
 the visual-parity pass, 117 / 29 / 14 before it). The parity-closing work (2026-10-24) closed eleven rows (BatchedMesh, ArcballControls, MRT, clipping planes, DepthTexture, glTF extensions with `KHR_animation_pointer`, Collada, texture loaders, LoadingManager, USDZExporter, KeyframeTrack) and added hit testing to WebXR AR, which stays partial; multi-view closed three rows (scenes, viewports, ArrayCamera) and the EXR writer split EXRExporter out as covered; core + stage measured 22,253
-bytes gzip with it (22,781 after the 2026-10-26 core fixes, 21,910 after the 2026-10-27 stage feature entries, 21,974 after the 2026-10-27 frame-loop fix (bug 19), 22,116 after the 2026-10-29 multi-view clear fix (bug 61), 2,884 bytes below the 25,000-byte ceiling; the parity work adds none). The rows and the
+bytes gzip with it (22,781 after the 2026-10-26 core fixes, 21,910 after the 2026-10-27 stage feature entries, 21,974 after the 2026-10-27 frame-loop fix (bug 19), 22,116 after the 2026-10-29 multi-view clear fix (bug 61), 22,414 after the 2026-10-29 frame allocation fixes (item 53.1), 2,586 bytes below the 25,000-byte ceiling; the parity work adds none). The rows and the
 [to-do tables](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.
 

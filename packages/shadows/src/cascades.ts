@@ -1,3 +1,4 @@
+import { hypot } from '../../shared/hypot.js';
 import type { Camera, Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 
@@ -72,7 +73,8 @@ export function fitCascades(
     throw new RangeError(
       'Cascade fit needs a positive aspect, an integer resolution of at least 1, a margin of 0 or more and a count from 1 to 4; pass valid values.',
     );
-  const length = Math.hypot(direction[0], direction[1], direction[2]);
+  // hypot, not Math.hypot: this runs every frame and Math.hypot allocates its arguments (the same bits in V8).
+  const length = hypot(3, direction[0], direction[1], direction[2]);
   if (!length) throw new RangeError('Shadow light direction has zero length; pass a nonzero direction vector.');
   const zx = -direction[0] / length,
     zy = -direction[1] / length,
@@ -81,7 +83,7 @@ export function fitCascades(
   let xx = vertical ? -zy : zz,
     xy = vertical ? zx : 0,
     xz = vertical ? 0 : -zx;
-  const xl = Math.hypot(xx, xy, xz);
+  const xl = hypot(3, xx, xy, xz);
   xx /= xl;
   xy /= xl;
   xz /= xl;
@@ -91,7 +93,7 @@ export function fitCascades(
   const fx = camera.target[0] - camera.position[0],
     fy = camera.target[1] - camera.position[1],
     fz = camera.target[2] - camera.position[2],
-    fl = Math.hypot(fx, fy, fz);
+    fl = hypot(3, fx, fy, fz);
   if (!fl)
     throw new RangeError(
       'Shadow camera position and target are the same point; move the target away from the position.',
@@ -109,7 +111,7 @@ export function fitCascades(
       py = camera.position[1] + (fy / fl) * mid,
       pz = camera.position[2] + (fz / fl) * mid;
     // A sphere keeps extents stable under camera rotation; one texel covers snapping error.
-    const radius = (Math.ceil(Math.hypot(end * tan * aspect, end * tan, end - mid) * 16) / 16) * (1 + 2 / resolution),
+    const radius = (Math.ceil(hypot(3, end * tan * aspect, end * tan, end - mid) * 16) / 16) * (1 + 2 / resolution),
       texel = (2 * radius) / resolution;
     const cx = Math.round((px * xx + py * xy + pz * xz) / texel) * texel,
       cy = Math.round((px * yx + py * yy + pz * yz) / texel) * texel,

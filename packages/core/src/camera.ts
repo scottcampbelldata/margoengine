@@ -1,4 +1,5 @@
 import { finite } from './geometry.js';
+import { hypot } from '../../shared/hypot.js';
 import { rangeError } from '../../shared/errors.js';
 /** Three components `[x, y, z]`, usually a point or direction in world units. */
 export type Vec3 = readonly [number, number, number];
@@ -46,7 +47,11 @@ export class Camera {
     finite(this.position, 3, 'Camera position');
     finite(this.target, 3, 'Camera target');
     if (
-      ![aspect, this.fov, this.near, this.far].every(Number.isFinite) ||
+      // One by one: an array of them would be built every frame.
+      !Number.isFinite(aspect) ||
+      !Number.isFinite(this.fov) ||
+      !Number.isFinite(this.near) ||
+      !Number.isFinite(this.far) ||
       aspect <= 0 ||
       this.fov <= 0 ||
       this.fov >= 180 ||
@@ -57,7 +62,7 @@ export class Camera {
     let zx = this.position[0] - this.target[0],
       zy = this.position[1] - this.target[1],
       zz = this.position[2] - this.target[2];
-    const length = Math.hypot(zx, zy, zz);
+    const length = hypot(3, zx, zy, zz);
     if (!length) throw rangeError('Camera at target', 'camera');
     zx /= length;
     zy /= length;
@@ -66,7 +71,7 @@ export class Camera {
     let xx = u[1] * zz - u[2] * zy,
       xy = u[2] * zx - u[0] * zz,
       xz = u[0] * zy - u[1] * zx;
-    const side = Math.hypot(xx, xy, xz);
+    const side = hypot(3, xx, xy, xz);
     if (!side) throw rangeError('Vertical camera', 'camera');
     xx /= side;
     xy /= side;

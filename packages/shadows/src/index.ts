@@ -23,6 +23,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth, nearestDepth, type ShadowFilter } from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { hypot } from '../../shared/hypot.js';
 import {
   casterBuffers,
   casterPipeline,
@@ -170,6 +171,12 @@ interface Source {
   meshPrimitive?: ShadowPrimitive[];
   primitiveBuffers?: ShadowPrimitive[][];
 }
+/** One caster primitive in one depth pass: whether every copy of it is still, and whether it was drawn. */
+interface CasterState {
+  serial: number;
+  still?: boolean;
+  drawn: boolean;
+}
 interface Draw {
   uniforms: GPUBuffer[];
   groups: GPUBindGroup[];
@@ -185,7 +192,10 @@ interface Draw {
 }
 /** Core-mesh casters sharing one geometry, drawn as one instanced draw per cascade (see Shadows.batchable). */
 interface Batch {
+  /** The first `count` are this pass's casters. Never emptied with length = 0: V8 then drops the array's storage and
+   * the next push allocates it again, every pass. */
   primitives: ShadowPrimitive[];
+  count: number;
   matrices: Float32Array;
   buffer?: GPUBuffer;
   groups: GPUBindGroup[];
@@ -199,6 +209,9 @@ const batchDepth = /* wgsl */ `@group(0) @binding(0) var<uniform> camera:mat4x4f
 @group(0) @binding(1) var<storage,read> models:array<mat4x4f>;
 @vertex fn vertex(@location(0) position:vec3f,@builtin(instance_index) k:u32)->@builtin(position) vec4f {return camera*models[k]*vec4f(position,1);}`;
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
+/** A shader cache key: filter, bind group and anisotropy as one number (bit 1 is left for the receive patch). */
+const shaderKey = (filter: string, group: number, anisotropic: boolean) =>
+  group * 16 + (filter === 'soft' ? 0 : filter === 'pcf' ? 4 : 8) + (anisotropic ? 1 : 0);
 const powerOfTwo = (v: number) => Number.isInteger(v) && v >= 16 && Number.isInteger(Math.log2(v));
 /**
  * Directional shadows from the engine's light: up to four cascades (practical splits, stable texel-snapped
@@ -245,11 +258,22 @@ export class Shadows implements EnginePlugin {
   private frameSerial = 0;
   private sources: Source[] = [];
   private primitiveDepth = 0;
+  /** Per nesting level: the pass's sources and their primitives by index, and its batches waiting to draw. */
   private readonly frames: {
-    primitives: Map<Source, readonly ShadowPrimitive[]>;
-    owners: Map<Mesh, Map<object, boolean>>;
-    submitted: Map<Mesh, Set<object>>;
+    records: Source[];
+    primitives: (readonly ShadowPrimitive[])[];
+    /** The first `waiting` batches have casters this pass (kept, not emptied: see Batch.primitives). */
+    pending: Batch[];
+    waiting: number;
   }[] = [];
+  /** Per caster node and primitive key, its state in the latest depth pass (see casterState); dropped with draws. */
+  // One map per nesting level: a depth pass started from a draw callback must not restamp the outer pass's states.
+  private readonly casterStates: Map<Mesh, Map<object, CasterState>>[] = [];
+  private passSerial = 0;
+  /** range() scratch: the casters' world box (min xyz, max xyz), a world sphere, and the centre and radius. */
+  private readonly rangeBox = new Float64Array(6);
+  private readonly sphere = new Float64Array(4);
+  private readonly rangeCenter = new Float64Array(4);
   private readonly cascadeCount: number;
   /** Validated map size, and the size the maps were allocated at. */
   private width = 2048;
@@ -263,7 +287,7 @@ export class Shadows implements EnginePlugin {
     near: 0.1,
     far: 500,
   } as unknown as Camera;
-  private readonly hooks = new Map<string, { declarations: string; direct(direct: string): string }>();
+  private readonly hooks = new Map<number, { declarations: string; direct(direct: string): string }>();
   private readonly lightingOwners = new Map<ShadowSource, { remove: () => void; count: number }>();
   private readonly values = new Float32Array(92);
   private readonly ranges = this.values.subarray(84, 88);
@@ -284,7 +308,7 @@ export class Shadows implements EnginePlugin {
   private readonly shadowContexts = this.cascadeMatrices.map(
     (matrix, cascade) => ({ context: undefined!, pass: undefined!, matrix, cascade }) as ShadowContext,
   );
-  private readonly shaders = new Map<string, Map<string, string>>();
+  private readonly shaders = new Map<number, Map<string, string>>();
   private readonly depthPass = depthPassDescriptor();
   private readonly depthAttachment = this.depthPass.depthStencilAttachment;
   private readonly copySource: GPUTexelCopyTextureInfo = { texture: undefined! };
@@ -501,7 +525,8 @@ export class Shadows implements EnginePlugin {
     const filter = this.options.filter ?? 'soft',
       receive = unshadowedCore(this.engine, source),
       anisotropic = this.anisotropic(),
-      key = filter + group + receive + (anisotropic ? 'a' : '');
+      // A number: a string key built from these would be garbage every frame.
+      key = shaderKey(filter, group, anisotropic) + (receive ? 2 : 0);
     let cache = this.shaders.get(key);
     const cached = cache?.get(source);
     if (cached) return cached;
@@ -528,7 +553,7 @@ export class Shadows implements EnginePlugin {
   pbr(group: number): { declarations: string; direct(direct: string): string } {
     const filter = this.options.filter ?? 'soft',
       anisotropic = this.anisotropic(),
-      key = filter + group + (anisotropic ? 'a' : '');
+      key = shaderKey(filter, group, anisotropic);
     let hooks = this.hooks.get(key);
     if (!hooks)
       this.hooks.set(
@@ -641,7 +666,8 @@ export class Shadows implements EnginePlugin {
           c.bindings.push(...this.bindings().map((entry) => ({ ...entry, binding: entry.binding + base - 1 })));
         } else {
           c.shader = this.shader(c.shader);
-          c.bindings.push(...this.bindings());
+          const entries = this.bindings();
+          for (let i = 0; i < entries.length; i++) c.bindings.push(entries[i]);
         }
       },
     });
@@ -653,59 +679,68 @@ export class Shadows implements EnginePlugin {
     fit.fov = camera.fov;
     fit.near = camera.near;
     fit.far = Math.min(camera.far, this.options.distance ?? 500);
-    if (
-      this.options.distance !== undefined ||
-      !this.sources.length ||
-      !this.sources.every((r) => 'id' in r.source && meshTriangles(r.source)?.kind === 'core')
-    )
-      return fit;
+    let core = this.options.distance === undefined && this.sources.length > 0;
+    for (let i = 0; core && i < this.sources.length; i++) {
+      const source = this.sources[i].source;
+      core = 'id' in source && !!source.geometry;
+    }
+    if (!core) return fit;
     // ponytail: one pass over every core mesh per frame; cache on store revisions if 100k-part scenes leave distance unset.
     // World bounding spheres from core's per-mesh local spheres; their box centre, then the sphere around them all.
-    const store = this.engine!.store,
-      m = store.matrices,
-      s = store.bounds,
-      box = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity],
-      w = [0, 0, 0, 0];
-    const sphere = (id: number) => {
-      const o = id * 16,
-        b = id * 4;
-      for (let k = 0; k < 3; k++)
-        w[k] = m[o + k] * s[b] + m[o + 4 + k] * s[b + 1] + m[o + 8 + k] * s[b + 2] + m[o + 12 + k];
-      w[3] =
-        s[b + 3] *
-        Math.sqrt(
-          Math.max(
-            m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2,
-            m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2,
-            m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2,
-          ),
-        );
-      return w;
-    };
-    for (const [id, mesh] of this.engine!.meshes)
-      if (mesh.geometry) {
-        sphere(id);
-        for (let k = 0; k < 3; k++) {
-          box[k] = Math.min(box[k], w[k] - w[3]);
-          box[k + 3] = Math.max(box[k + 3], w[k] + w[3]);
-        }
-      }
-    const cx = (box[0] + box[3]) / 2,
-      cy = (box[1] + box[4]) / 2,
-      cz = (box[2] + box[5]) / 2;
-    let radius = 0;
-    for (const [id, mesh] of this.engine!.meshes)
-      if (mesh.geometry) {
-        sphere(id);
-        radius = Math.max(radius, Math.hypot(w[0] - cx, w[1] - cy, w[2] - cz) + w[3]);
-      }
-    const d = Math.hypot(cx - camera.position[0], cy - camera.position[1], cz - camera.position[2]);
+    const box = this.rangeBox,
+      center = this.rangeCenter;
+    box.fill(Infinity, 0, 3).fill(-Infinity, 3);
+    this.engine!.meshes.forEach(this.extendBox);
+    const cx = (center[0] = (box[0] + box[3]) / 2),
+      cy = (center[1] = (box[1] + box[4]) / 2),
+      cz = (center[2] = (box[2] + box[5]) / 2);
+    center[3] = 0;
+    this.engine!.meshes.forEach(this.extendRadius);
+    const radius = center[3],
+      d = hypot(3, cx - camera.position[0], cy - camera.position[1], cz - camera.position[2]);
     const far = 2 ** (Math.ceil(Math.log2(d + radius) * 4) / 4),
       near = d > radius ? 2 ** (Math.floor(Math.log2(d - radius) * 4) / 4) : 0;
     if (far < fit.far && far > camera.near) fit.far = far;
     if (near > fit.near && near < fit.far) fit.near = near;
     return fit;
   }
+  /** The world bounding sphere of core mesh `id` (centre, radius) into `this.sphere`, from its local one. */
+  private worldSphere(id: number): Float64Array {
+    const store = this.engine!.store,
+      m = store.matrices,
+      s = store.bounds,
+      w = this.sphere,
+      o = id * 16,
+      b = id * 4;
+    for (let k = 0; k < 3; k++)
+      w[k] = m[o + k] * s[b] + m[o + 4 + k] * s[b + 1] + m[o + 8 + k] * s[b + 2] + m[o + 12 + k];
+    w[3] =
+      s[b + 3] *
+      Math.sqrt(
+        Math.max(
+          m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2,
+          m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2,
+          m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2,
+        ),
+      );
+    return w;
+  }
+  // range()'s two passes over the engine's meshes, made once (Map.forEach callbacks).
+  private readonly extendBox = (mesh: Mesh, id: number): void => {
+    if (!mesh.geometry) return;
+    const w = this.worldSphere(id),
+      box = this.rangeBox;
+    for (let k = 0; k < 3; k++) {
+      box[k] = Math.min(box[k], w[k] - w[3]);
+      box[k + 3] = Math.max(box[k + 3], w[k] + w[3]);
+    }
+  };
+  private readonly extendRadius = (mesh: Mesh, id: number): void => {
+    if (!mesh.geometry) return;
+    const w = this.worldSphere(id),
+      c = this.rangeCenter;
+    c[3] = Math.max(c[3], hypot(3, w[0] - c[0], w[1] - c[1], w[2] - c[2]) + w[3]);
+  };
   private render(c: ShadowPassContext): void {
     this.validate();
     this.frameSerial++;
@@ -840,7 +875,7 @@ export class Shadows implements EnginePlugin {
   private fitBounds(): void {
     const { bounds, frustum } = this.options,
       points = bounds?.points,
-      length = Math.hypot(this.light[0], this.light[1], this.light[2]);
+      length = hypot(3, this.light[0], this.light[1], this.light[2]);
     if (!length)
       throw new RangeError(
         'Shadow light direction has zero length; set engine.lighting.direction to a nonzero vector.',
@@ -852,7 +887,7 @@ export class Shadows implements EnginePlugin {
     let xx = vertical ? -zy : zz,
       xy = vertical ? zx : 0,
       xz = vertical ? 0 : -zx;
-    const xl = Math.hypot(xx, xy, xz);
+    const xl = hypot(3, xx, xy, xz);
     xx /= xl;
     xy /= xl;
     xz /= xl;
@@ -980,11 +1015,13 @@ export class Shadows implements EnginePlugin {
     const source = record.source;
     if (!record.cast || ('drawShadow' in source && source.drawShadow)) return emptyPrimitives;
     if ('id' in source) {
-      const triangles = meshTriangles(source);
-      if (!triangles) return emptyPrimitives;
-      if (triangles.kind === 'pbr') return triangles.source.shadowPrimitives ?? emptyPrimitives;
-      const geometry = triangles.geometry,
-        buffers = this.engine!.geometryBuffers(geometry);
+      // A core mesh is read directly: meshTriangles builds an object on every call, and this runs every pass.
+      const geometry = source.geometry;
+      if (!geometry) {
+        const triangles = meshTriangles(source);
+        return triangles?.kind === 'pbr' ? (triangles.source.shadowPrimitives ?? emptyPrimitives) : emptyPrimitives;
+      }
+      const buffers = this.engine!.geometryBuffers(geometry);
       if (!buffers) return emptyPrimitives;
       record.meshPrimitive ??= [
         {
@@ -995,7 +1032,7 @@ export class Shadows implements EnginePlugin {
           stride: 24,
         },
       ];
-      Object.assign(record.meshPrimitive[0], buffers, { count: geometry.indices.length });
+      Object.assign(record.meshPrimitive[0], buffers).count = geometry.indices.length;
       return record.meshPrimitive;
     }
     const writer = (source as ShadowSource & { [shadowPrimitivesInto]?: (out: ShadowPrimitive[]) => boolean })[
@@ -1014,28 +1051,26 @@ export class Shadows implements EnginePlugin {
     const pass = c.encoder.beginRenderPass(this.depthPass),
       matrix = this.cascadeMatrices[cascade];
     const level = this.primitiveDepth++;
-    const frame = (this.frames[level] ??= { primitives: new Map(), owners: new Map(), submitted: new Map() });
-    const submitted = frame.submitted,
+    // Everything a pass keeps is reused: the per-level arrays, and per caster (node and primitive) one state object
+    // stamped with the pass serial. Maps and sets cleared and refilled every pass were garbage every frame.
+    const frame = (this.frames[level] ??= { records: [], primitives: [], pending: [], waiting: 0 }),
+      serial = ++this.passSerial,
       section = sectionState(c),
       batches = (this.batches[level * 2 + (cached ? 1 : 0)] ??= new Map()),
-      pending: Batch[] = [];
+      pending = frame.pending;
     try {
-      frame.primitives.clear();
-      frame.owners.clear();
-      frame.submitted.clear();
-      for (const record of this.sources) {
-        const primitives = this.casters(record, level);
-        frame.primitives.set(record, primitives);
+      const count = this.sources.length;
+      frame.records.length = frame.primitives.length = count;
+      for (let s = 0; s < count; s++) {
+        const record = this.sources[s],
+          primitives = this.casters(record, level);
+        frame.records[s] = record;
+        frame.primitives[s] = primitives;
         for (let i = 0; i < primitives.length; i++) {
-          const primitive = primitives[i];
-          let owners = frame.owners.get(primitive.node);
-          if (!owners) {
-            owners = new Map();
-            frame.owners.set(primitive.node, owners);
-          }
-          const key = primitive.primitive ?? primitive.index;
-          const still = record.static || !(primitive.dynamic || primitive.instances);
-          if (owners.get(key) !== false) owners.set(key, still);
+          const primitive = primitives[i],
+            state = this.casterState(level, primitive.node, primitive.primitive ?? primitive.index, serial);
+          // Moving wins: a primitive still in one source and moving in another is drawn with the moving ones.
+          if (state.still !== false) state.still = record.static || !(primitive.dynamic || primitive.instances);
         }
       }
 
@@ -1053,7 +1088,7 @@ export class Shadows implements EnginePlugin {
           callback.call(r.source, shadow);
           continue;
         }
-        const primitives = frame.primitives.get(r) ?? emptyPrimitives;
+        const primitives = frame.records[i] === r ? frame.primitives[i] : emptyPrimitives;
         for (let i = 0; i < primitives.length; i++) {
           const primitive = primitives[i],
             node = primitive.node;
@@ -1064,15 +1099,9 @@ export class Shadows implements EnginePlugin {
               'Shadow source belongs to another engine; use objects created by the same engine',
             );
           if (hiddenInTree(this.engine!.store, node.id)) continue;
-          const key = primitive.primitive ?? primitive.index;
-          if (frame.owners.get(node)?.get(key) !== cached) continue;
-          let indices = submitted.get(node);
-          if (indices?.has(key)) continue;
-          if (!indices) {
-            indices = new Set();
-            submitted.set(node, indices);
-          }
-          indices.add(key);
+          const state = this.casterState(level, node, primitive.primitive ?? primitive.index, serial);
+          if (state.still !== cached || state.drawn) continue;
+          state.drawn = true;
           if (!section && this.batchable(primitive)) {
             let byIndex = batches.get(primitive.vertex);
             if (!byIndex) batches.set(primitive.vertex, (byIndex = new Map()));
@@ -1080,23 +1109,26 @@ export class Shadows implements EnginePlugin {
             if (!batch)
               byIndex.set(
                 primitive.index,
-                (batch = { primitives: [], matrices: new Float32Array(0), groups: [], packed: 0 }),
+                (batch = { primitives: [], count: 0, matrices: new Float32Array(0), groups: [], packed: 0 }),
               );
-            if (!batch.primitives.length) pending.push(batch);
-            batch.primitives.push(primitive);
+            if (!batch.count) pending[frame.waiting++] = batch;
+            batch.primitives[batch.count++] = primitive;
           } else this.draw(pass, primitive, matrix, cascade, section);
           if (cached) this.stats.staticDraws++;
           else this.stats.dynamicDraws++;
         }
       }
-      for (const batch of pending) {
-        if (batch.primitives.length < BATCH_MIN)
-          for (const primitive of batch.primitives) this.draw(pass, primitive, matrix, cascade, section);
+      for (let i = 0; i < frame.waiting; i++) {
+        const batch = pending[i];
+        if (batch.count < BATCH_MIN)
+          for (let j = 0; j < batch.count; j++) this.draw(pass, batch.primitives[j], matrix, cascade, section);
         else this.drawBatch(pass, batch, matrix, cascade);
-        batch.primitives.length = 0;
+        batch.count = 0;
       }
+      frame.waiting = 0;
     } catch (error) {
-      for (const batch of pending) batch.primitives.length = 0;
+      for (let i = 0; i < frame.waiting; i++) pending[i].count = 0;
+      frame.waiting = 0;
       try {
         pass.end();
       } catch {}
@@ -1105,6 +1137,20 @@ export class Shadows implements EnginePlugin {
       this.primitiveDepth--;
     }
     pass.end();
+  }
+  /** The state of caster `node`'s primitive `key` in pass `serial`: made once, reset when the pass is new to it. */
+  private casterState(level: number, node: Mesh, key: object, serial: number): CasterState {
+    const states = (this.casterStates[level] ??= new Map());
+    let byKey = states.get(node);
+    if (!byKey) states.set(node, (byKey = new Map()));
+    let state = byKey.get(key);
+    if (!state) byKey.set(key, (state = { serial, still: undefined, drawn: false }));
+    else if (state.serial !== serial) {
+      state.serial = serial;
+      state.still = undefined;
+      state.drawn = false;
+    }
+    return state;
   }
   /** A plain core-mesh caster: 24-byte triangles, no alpha mask, displacement or instances. */
   private batchable(p: ShadowPrimitive): boolean {
@@ -1123,7 +1169,7 @@ export class Shadows implements EnginePlugin {
   /** One instanced draw for every caster of `batch` (one geometry): world matrices packed once per frame and pass. */
   private drawBatch(pass: GPURenderPassEncoder, batch: Batch, matrix: Float32Array, cascade: number): void {
     const device = this.device!,
-      n = batch.primitives.length;
+      n = batch.count;
     if (!this.batchPipeline) {
       const module = device.createShaderModule({ code: batchDepth });
       this.batchPipeline = device.createRenderPipeline({
@@ -1290,6 +1336,7 @@ export class Shadows implements EnginePlugin {
     for (const records of this.draws.values())
       for (const r of records.values()) for (const b of r.uniforms) b.destroy();
     this.draws.clear();
+    this.casterStates.length = 0;
     // Batches hold a geometry's buffers as keys: drop them with the casters they were built for.
     this.clearBatches();
   }

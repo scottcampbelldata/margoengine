@@ -159,7 +159,8 @@ export class FrameGraph {
     if (this.executing) throw fault('state', 'Graph recursion', 'reentrancy');
     this.executing = true;
     try {
-      for (const pass of this.passes) pass.execute(context);
+      // By index: an array iterator would be garbage every frame.
+      for (let i = 0; i < this.passes.length; i++) this.passes[i].execute(context);
     } finally {
       this.executing = false;
     }

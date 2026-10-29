@@ -185,6 +185,7 @@ export class GPURenderer implements Renderer {
   private resolveTarget?: GPUTextureView;
   private preserveMSAA = false;
   private passDescriptor?: GPURenderPassDescriptor;
+  private resolvePass?: GPURenderPassDescriptor;
   private readonly drawBatches: Batch[] = [];
   private readonly commands: GPUCommandBuffer[] = [];
   private passContext?: Extract<PassContext, { backend: 'webgpu' }>;
@@ -353,7 +354,7 @@ export class GPURenderer implements Renderer {
   render(
     camera: Camera,
     lighting: Lighting,
-    batches: Iterable<Batch>,
+    batches: readonly Batch[],
     graph: FrameGraph,
     delta: number,
     view?: ViewDraw,
@@ -373,7 +374,7 @@ export class GPURenderer implements Renderer {
   private renderFrame(
     camera: Camera,
     lighting: Lighting,
-    batches: Iterable<Batch>,
+    batches: readonly Batch[],
     graph: FrameGraph,
     delta: number,
     view?: ViewDraw,
@@ -406,9 +407,9 @@ export class GPURenderer implements Renderer {
     const encoder = this.device.createCommandEncoder();
     this.frameId++;
     const drawBatches = this.drawBatches;
-    let count = 0;
-    for (const batch of batches) drawBatches[count++] = batch;
-    drawBatches.length = count;
+    // By index: the engine passes an array, and an iterator over it would be garbage every frame.
+    for (let i = 0; i < batches.length; i++) drawBatches[i] = batches[i];
+    drawBatches.length = batches.length;
     this.resolveTarget = target?.color.createView() ?? this.context.getCurrentTexture().createView();
     this.msaa = views.length > 1 ? views[0] : undefined;
     const color = this.msaa ?? this.resolveTarget,
@@ -533,7 +534,9 @@ export class GPURenderer implements Renderer {
             tint,
           });
         let current: GPURenderPipeline | undefined;
-        for (const batch of drawBatches)
+        // By index: an array iterator would be garbage every draw.
+        for (let i = 0; i < drawBatches.length; i++) {
+          const batch = drawBatches[i];
           if (batch.count && !batch.claimed) {
             const p = pipeline === this.pipeline && !bindings.length && !batch.mask ? this.culled : pipeline;
             if (p !== current) {
@@ -561,59 +564,54 @@ export class GPURenderer implements Renderer {
               pass.drawIndexedIndirect(resource.indirect, 0);
             } else pass.drawIndexed(batch.geometry.indices.length, batch.count);
           }
+        }
         pass.end();
       },
     } as Extract<PassContext, { backend: 'webgpu' }>);
-    Object.assign(context, {
-      batches: drawBatches,
-      draw: (this.draw ??= context.draw),
-      descriptor: this.descriptor,
-      device: this.device,
-      encoder,
-      color,
-      depth,
+    // Field by field: an object literal to Object.assign from would be garbage every frame.
+    context.batches = drawBatches;
+    context.draw = this.draw ??= context.draw;
+    context.descriptor = this.descriptor;
+    context.device = this.device;
+    context.encoder = encoder;
+    context.color = color;
+    context.depth = depth;
+    context.camera = camera;
+    context.view = view && {
+      id: view.id,
       camera,
-      view: view && {
-        id: view.id,
-        camera,
-        viewport: view.rect,
-        scissor: view.scissor,
-        index: view.index,
-        count: view.count,
-        clear: view.clear,
-        layers: view.layers,
-        target: view.target,
-      },
-      width,
-      height,
-      delta,
-      format,
-      shader: wgsl,
-      bindings: this.bindings,
-      indirect: false,
-    });
+      viewport: view.rect,
+      scissor: view.scissor,
+      index: view.index,
+      count: view.count,
+      clear: view.clear,
+      layers: view.layers,
+      target: view.target,
+    };
+    context.width = width;
+    context.height = height;
+    context.delta = delta;
+    context.format = format;
+    context.shader = wgsl;
+    context.bindings = this.bindings;
+    context.indirect = false;
     this.bindings.length = 0;
     graph.execute(context);
     if (!this.deviceLost && !this.disposed) {
-      if (this.preserveMSAA && !this.holdColor)
-        encoder
-          .beginRenderPass({
-            colorAttachments: [
-              {
-                view: color,
-                resolveTarget: this.resolveTarget,
-                loadOp: 'load',
-                storeOp: stacked ? 'store' : 'discard',
-              },
-            ],
-            depthStencilAttachment: {
-              view: depth,
-              depthLoadOp: 'load',
-              depthStoreOp: keepDepth ? 'store' : 'discard',
-              stencilReadOnly: true,
-            },
-          })
-          .end();
+      if (this.preserveMSAA && !this.holdColor) {
+        // One descriptor, updated: a new one every frame would be garbage.
+        const resolve = (this.resolvePass ??= {
+            colorAttachments: [{ view: color, loadOp: 'load', storeOp: 'store' }],
+            depthStencilAttachment: { view: depth, depthLoadOp: 'load', stencilReadOnly: true },
+          }),
+          attachment = (resolve.colorAttachments as GPURenderPassColorAttachment[])[0];
+        attachment.view = color;
+        attachment.resolveTarget = this.resolveTarget;
+        attachment.storeOp = stacked ? 'store' : 'discard';
+        resolve.depthStencilAttachment!.view = depth;
+        resolve.depthStencilAttachment!.depthStoreOp = keepDepth ? 'store' : 'discard';
+        encoder.beginRenderPass(resolve).end();
+      }
       // Once the last view into this target is drawn.
       if (caller && !direct && !stacked) this.resolveDepth(encoder, caller, samples);
       this.commands[0] = encoder.finish();
@@ -711,7 +709,8 @@ export class GPURenderer implements Renderer {
     key: string,
     descriptor: (module: GPUShaderModule) => GPURenderPipelineDescriptor,
   ): GPURenderPipeline {
-    for (const variant of this.variants) if (variant[0] === code && variant[1] === key) return variant[2];
+    for (let i = 0; i < this.variants.length; i++)
+      if (this.variants[i][0] === code && this.variants[i][1] === key) return this.variants[i][2];
     if (this.variants.length >= 64) throw rangeError('Shader limit: 64', 'limits');
     const pipeline = this.device.createRenderPipeline(descriptor(this.device.createShaderModule({ code })));
     this.variants.push([code, key, pipeline]);

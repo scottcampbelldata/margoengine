@@ -1,5 +1,16 @@
 # Margo Engine handoff
 
+## Landed 2026-10-29: steady-state frames allocate far less, gated in check:merge (item 53.1, part 1)
+
+- `npm run test:frame-alloc:browser` (run by `check:gpu-packages`) measures the JavaScript heap bytes of a median
+  steady-state frame in Edge and fails over a floor: basic 460 B (was 1,428), 10,000 instanced boxes 388 B (was
+  1,076), shadowed 3,508 B (was 26,920), post 2,240 B (was 5,116). Method and the bytes that cannot go (16 B per
+  returned WebGPU object, a boxed frame time): [limits.md](limits.md), "Frame allocation"; claim LIM-031.
+- `tests/frame-alloc.test.js` (in verify) is the Node regression: core under 256 B per frame, shadows add under 512 B.
+- Core grew 68 B gzip (21,000 B, cap 21,504 B); core + stage is 22,414 B.
+- Open (part 2): shadow draw and cascade fit number boxing, the post stack, the per-frame bindings list, and the
+  kernel's transforms per frame in a frame budget.
+
 ## Landed 2026-10-26 to 10-28: second-machine and busy-run bug fixes, written up in the whitepaper
 
 - Written up as perf-history entries 37 to 44 ([whitepaper/perf-history.md](whitepaper/perf-history.md)) and section

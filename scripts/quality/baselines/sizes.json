@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4040515,
+  "total": 4041952,
   "history": [
     {
       "date": "2026-10-24",
@@ -818,6 +818,12 @@
       "commit": "a03b8fed",
       "reason": "webgl2-compat M6: dof, splats and culling load their WebGL2 routes by import() only on the layer (lazy chunks counted; static entries grow by the detection hook only: dof +260 B, splats +167 B, culling +268 B gzip)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-29",
+      "commit": "91cbab8a",
+      "reason": "item 53.1: steady-state frames allocate far less (index loops instead of iterators, persistent callbacks, cached descriptors, hypot without argument arrays); core 21,000 B under its 21,504 B cap",
+      "grew": 2
     }
   ],
   "items": {
@@ -878,13 +884,13 @@
     "@margoengine/controls/profiles": 960,
     "@margoengine/controls/transform": 10210,
     "@margoengine/controls/walk": 13027,
-    "@margoengine/core": 20932,
-    "@margoengine/core/extension": 19995,
+    "@margoengine/core": 21630,
+    "@margoengine/core/extension": 20735,
     "@margoengine/creative": 19177,
     "@margoengine/creative/grass": 6122,
     "@margoengine/creative/particles": 759,
     "@margoengine/creative/planet": 7174,
-    "@margoengine/creative/post": 7136,
+    "@margoengine/creative/post": 7135,
     "@margoengine/creative/stars": 2909,
     "@margoengine/creative/targets": 2821,
     "@margoengine/creative/toon": 1188,

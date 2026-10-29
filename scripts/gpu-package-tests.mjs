@@ -36,6 +36,7 @@ export const ROOT = {
   'test:catalog:browser': 'catalog layout, clicks and clipboard',
   'test:lifecycle:browser': 'background tab, no WebGPU, fractional zoom and device loss on the stage and React',
   'test:python:browser': 'the margoengine Python package in JupyterLab and Notebook 7, camera events and to_png',
+  'test:frame-alloc:browser': 'JavaScript heap bytes of a steady-state frame, per scene, against their floors',
 };
 /** Commands a root suite needs first (it reads their output), run once before it. */
 const PREPARE = {
