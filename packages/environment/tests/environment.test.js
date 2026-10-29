@@ -64,19 +64,24 @@ test('the half lookup table equals halfToFloat for every pattern, and BrightRing
   const bytes = fixture('BrightRings.exr'),
     texels = new Uint16Array(parseEXR(bytes).data.length).map((_, i) => (i * 40503) & 0xffff),
     out = new Float32Array(texels.length),
-    best = (f) => {
-      let ms = Infinity;
-      for (let i = 0; i < 7; i++) {
-        const s = performance.now();
-        f();
-        ms = Math.min(ms, performance.now() - s);
-      }
-      return ms;
+    time = (f) => {
+      const s = performance.now();
+      f();
+      return performance.now() - s;
     },
-    parse = best(() => parseEXR(bytes)),
-    convert = best(() => {
+    convertAll = () => {
       for (let i = 0; i < texels.length; i++) out[i] = halfToFloat(texels[i]);
-    });
+    };
+  // Alternate the two measurements, so a burst of load from other processes lands on both and not on one window.
+  let parse = Infinity,
+    convert = Infinity;
+  for (let i = 0; i < 9; i++) {
+    parse = Math.min(
+      parse,
+      time(() => parseEXR(bytes)),
+    );
+    convert = Math.min(convert, time(convertAll));
+  }
   assert.ok(
     parse < convert,
     `parse ${parse.toFixed(1)} ms is not below halfToFloat per texel ${convert.toFixed(1)} ms`,
