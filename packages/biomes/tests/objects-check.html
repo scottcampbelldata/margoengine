@@ -33,6 +33,18 @@ window.check={
   out.objects=view.objects.count;out.bytes=view.objects.gpuBytes;out.dropped=view.objects.dropped;
   let changed=0;for(let k=0;k<full.length;k+=4){const a=luma(full,k),b=luma(plain,k);if(Math.abs(a-b)>0.1*Math.max(b,0.005))changed++;}
   out.changed=changed/(full.length/4);out.plain=stats(plain);out.full=stats(full);
+  // Regression: objects were given scatter slots for the tiles within their draw distance (300 m for small plants, the
+  // radius for trees), but a view keeps a tile's objects until the tile is a whole tile beyond it, so a slow machine
+  // with tiles queued held more and setTile threw "no free slot" in a frame. Every tile a view may hold must fit:
+  // trees on every tile within radius + a tile, small plants on every tile within 300 m + a tile.
+  {const {BiomePlacement}=await import('/packages/biomes/dist/placement.js'),placement=BiomePlacement.attach(world),side=world.tileSize,p=engine.camera.position;
+   // The camera place (within one tile, every 8 m) that meets the most tiles within each distance.
+   const within=(px,pz,r)=>{const list=[];for(let z=0;z<world.tilesZ;z++)for(let x=0;x<world.tilesX;x++){const x0=world.bounds[0]+x*side,z0=world.bounds[1]+z*side,d=Math.hypot(Math.max(0,x0-px,px-x0-side),Math.max(0,z0-pz,pz-z0-side));if(d<=r)list.push([x,z,d]);}return list;};
+   const most=(r)=>{let best=[];for(let oz=0;oz<side;oz+=8)for(let ox=0;ox<side;ox+=8){const l=within(p[0]+ox,p[2]+oz,r);if(l.length>best.length)best=l;}return best;};
+   const far=most(1000+side),near=most(300+side);
+   out.held={far:far.length,near:near.length,error:null};
+   try{for(const [x,z,d] of far)view.objects.add(await placement.tile(x,z),Math.min(d,1000));for(const [x,z] of near)view.objects.add(await placement.tile(x,z),0);}catch(e){out.held.error=e.message;}
+   placement.dispose();}
   view.dispose();
   out.afterDispose=stats(await shot());
   const error=await device.popErrorScope();out.validation=error?.message??null;out.errors=errors.splice(0);

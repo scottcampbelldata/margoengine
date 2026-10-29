@@ -22,6 +22,9 @@ try {
   assert.deepEqual(r.errors, []);
   assert.deepEqual(pageErrors, []);
   assert.ok(r.objects > 10000, `objects streamed: ${r.objects}`);
+  assert.equal(r.held.error, null, `holding ${r.held.far} tiles of trees and ${r.held.near} of small plants`);
+  // The places that meet the most tiles (more than the 100 and 25 slots the objects had).
+  assert.ok(r.held.far > 98 && r.held.near > 25, `tiles held: ${JSON.stringify(r.held)}`);
   // Objects cover a good share of the frame and add contrast (lit crowns, shadowed sides, trunks).
   assert.ok(r.changed > 0.1, `share of pixels the objects change: ${r.changed}`);
   assert.ok(r.full.sd > 0.015 && r.full.mean > 0.01, `lit and varied: ${JSON.stringify(r.full)}`);

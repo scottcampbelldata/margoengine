@@ -207,7 +207,9 @@ export class BiomeObjects implements Disposable {
       // Canopy trees are drawn within the full radius, smaller plants, rocks and props within 300 m.
       tiles = (key: string, near: boolean) => {
         const r = near ? Math.min(radius, 300) : radius,
-          slots = (Math.ceil((2 * r) / side) + 2) ** 2, // float division: view only
+          // Room for every tile within the draw distance plus a tile: a view keeps a tile's objects until it is a whole
+          // tile beyond (sized for the distance alone, a view with tiles queued ran out of slots in a frame).
+          slots = (Math.ceil((2 * (r + side)) / side) + 2) ** 2, // float division: view only
           // Memory follows the held records, so a tile may hold up to scatter's per-tile limit (no stand is dropped).
           slotSize = Math.min(65536, Math.floor(16777216 / slots)), // float division: view only
           list: ScatterTiles[] = [];
