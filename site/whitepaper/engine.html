@@ -31,13 +31,13 @@
   <p class="eyebrow">Whitepaper · October 2026 · coming soon</p>
   <h1>Margo Engine</h1>
   <p class="deck">A WebGPU engine for the web. Core plus stage is 21,974 bytes gzipped. The catalog lists 92 packages (none published to npm yet), with one install that holds them all. Every number we publish names its source.</p>
-  <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Sizes at commit 51d8786a; tests at d18f2596; other figures name their own commit or date</span><span><a href="./engine.pdf">PDF</a></span></div>
+  <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Sizes at commit 51d8786a; tests at 01836c27; other figures name their own commit or date</span><span><a href="./engine.pdf">PDF</a></span></div>
 </header>
 
 <div class="ledger" role="list">
   <div role="listitem"><b>21,974 B</b><span>core + stage, min + gzip, Wasm kernel and WebGPU backend included; CI fails a change at 25,000</span><i>entry-sizes.json · 51d8786a</i></div>
   <div role="listitem"><b>92</b><span>packages in the catalog, all reachable from <code>npm i margoengine</code> (none published to npm yet)</span><i>docs/catalog.json</i></div>
-  <div role="listitem"><b>6,490</b><span>Node tests in every <code>npm run verify</code>: 6,488 pass, 2 skipped, 0 fail</span><i>results/test-count.json · d18f2596</i></div>
+  <div role="listitem"><b>6,498</b><span>Node tests in every <code>npm run verify</code>: 6,496 pass, 2 skipped, 0 fail</span><i>results/test-count.json · 01836c27</i></div>
   <div role="listitem"><b>153 of 161</b><span>three.js features with an equivalent Margo package; 4 partial, 4 missing</span><i>docs/three-parity-matrix.md · bec8b597</i></div>
 </div>
 
@@ -240,7 +240,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <h2 id="honest"><span class="n">9</span>Keeping the numbers honest</h2>
 <h3>Tests and checks</h3>
 <ul>
-  <li><strong>6,490 Node tests</strong> in every <code>npm run verify</code> at d18f2596: 6,488 pass, 2 skipped, 0 fail, on Node 26.12 (<code>results/test-count.json</code>). An outside audit's run on a second laptop at 74a01810 passed 6,344 of 6,346, with 2 skipped.</li>
+  <li><strong>6,498 Node tests</strong> in every <code>npm run verify</code> at d18f2596: 6,496 pass, 2 skipped, 0 fail, on Node 26.12 (<code>results/test-count.json</code>). An outside audit's run on a second laptop at 74a01810 passed 6,344 of 6,346, with 2 skipped.</li>
   <li><strong>49 GPU-call proofs.</strong> A recording GPU logs every call, descriptor, shader and buffer write, and a proof compares a baseline commit with a candidate exactly. That checks claims such as "attaching nothing from this package leaves core's GPU work unchanged". Each proof is pinned to the commit that made its claim, and 20 run against the working tree in every merge.</li>
   <li><strong>Pixels on a real GPU.</strong> The visual check renders 62 views of sample models and demos and compares them with references captured four times per GPU and browser. A view is never compared with references from another GPU (<code>tests/visual/profiles/</code>).</li>
   <li><strong>Every shader compiled.</strong> <code>npm run check:wgsl</code> compiles every WGSL source the packages hold on the browser's WebGPU, with feature flags both on and off, including shaders no view draws.</li>
@@ -309,7 +309,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <pre><code>npm ci
 npm run build:packages
 npm run measure:size          # core + stage gzip, fails at 25,000
-npm run verify                # the 6,490 tests, quality gates, API reports, current proofs
+npm run verify                # the 6,498 tests, quality gates, API reports, current proofs
 npm run bench                 # every benchmark suite (docs/benchmarking.md)
 npm run proofs                # all 49 pinned GPU-call proofs
 npm run fuzz -- --short       # every parser fuzzer, 4 s each

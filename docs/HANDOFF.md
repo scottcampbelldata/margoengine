@@ -25,7 +25,7 @@
   with no colour emoji font; three Linux GPU suites stopped by heat; the cost of the precise maths; F20 of the
   2026-10-28 outside audit (being fixed) and three netcode room limits (Scott to decide); 16 of its 20 findings are
   fixed.
-- Test count re-measured: 6,490 tests, 6,488 pass, 2 skipped at `d18f2596` (`results/test-count.json`).
+- Test count re-measured: 6,498 tests, 6,496 pass, 2 skipped at `01836c27` (`results/test-count.json`).
 
 ## Landed 2026-10-28: lighting API is hard to misuse (`@margoengine/sky/sun`)
 
