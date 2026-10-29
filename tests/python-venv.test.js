@@ -12,10 +12,14 @@ import {
   compareVersions,
   ensureVenv,
   findPython,
+  missingNeeded,
+  NEEDED_PACKAGES,
   namesToRead,
   parsePins,
   pythonCandidates,
+  requirementsHash,
   SETUP,
+  STAMP,
 } from '../python/tests/venv.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -39,6 +43,7 @@ test('an existing venv is used as it is, with no process started', () => {
       ext = process.platform === 'win32' ? '.exe' : '';
     mkdirSync(join(venv, bin));
     for (const name of ['python', 'jupyter']) writeFileSync(join(venv, bin, name + ext), '');
+    writeFileSync(join(venv, STAMP), `${requirementsHash()}\n`);
     const { exec, calls } = fake(() => ({}));
     const result = ensureVenv({ venv, env: {}, exec, log: quiet });
     assert.equal(result.ok, true);
@@ -271,4 +276,68 @@ test('the pinned requirements install every package the Jupyter check opens (not
     'python/requirements-notebook.txt must pin notebook, or a fresh venv fails that step',
   );
   assert.ok(pins.has('jupyterlab'));
+});
+
+const fakeVenv = (stamp) => {
+  const venv = join(scratch(), 'venv'),
+    bin = process.platform === 'win32' ? 'Scripts' : 'bin',
+    ext = process.platform === 'win32' ? '.exe' : '';
+  mkdirSync(join(venv, bin), { recursive: true });
+  for (const name of ['python', 'jupyter']) writeFileSync(join(venv, bin, name + ext), '');
+  if (stamp) writeFileSync(join(venv, STAMP), stamp);
+  return venv;
+};
+
+test('a venv installed from an older (or unstamped) requirements file is updated in place, then stamped', () => {
+  for (const stamp of [`${'0'.repeat(64)}\n`, undefined]) {
+    const venv = fakeVenv(stamp);
+    const { exec, calls } = fake(() => ({ status: 0 }));
+    const result = ensureVenv({ venv, env: {}, exec, log: quiet });
+    assert.equal(result.ok, true);
+    assert.equal(calls.length, 1, 'one pip run, no new venv');
+    assert.ok(calls[0].args.includes('pip') && calls[0].args.at(-1).endsWith('requirements-notebook.txt'));
+    assert.ok(calls[0].ms > 0, 'hard time limit');
+    assert.equal(readFileSync(join(venv, STAMP), 'utf8').trim(), requirementsHash());
+    assert.equal(ensureVenv({ venv, env: {}, exec, log: quiet }).made, false);
+    assert.equal(calls.length, 1, 'stamped now: nothing runs the second time');
+    rmSync(venv, { recursive: true, force: true });
+  }
+});
+
+test('an update that fails (offline) keeps the old venv, reports the fix, and is not stamped', () => {
+  const venv = fakeVenv('0'.repeat(64));
+  const { exec } = fake(() => ({ status: 1, stderr: 'ERROR: no network' }));
+  const result = ensureVenv({ venv, env: {}, exec, log: quiet });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /updating .* failed \(exit 1\)/);
+  assert.ok(result.reason.includes(SETUP));
+  assert.ok(existsSync(venv), 'the old venv is not deleted');
+  assert.equal(readFileSync(join(venv, STAMP), 'utf8'), '0'.repeat(64));
+  rmSync(venv, { recursive: true, force: true });
+});
+
+test('a venv listing without notebook fails at once with the fix, naming the package (bug 59b)', () => {
+  const listing = new Map([
+    ['jupyterlab', '4.6.4'],
+    ['notebook-shim', '0.2.4'],
+  ]);
+  assert.deepEqual(missingNeeded(listing), [`notebook is not installed in the check's venv: run ${SETUP}`]);
+  listing.set('notebook', '7.6.3');
+  assert.deepEqual(missingNeeded(listing), []);
+  assert.equal(missingNeeded(new Map()).length, NEEDED_PACKAGES.length);
+});
+
+test('every Python package the Jupyter check opens is pinned in the requirements and verified before anything starts', () => {
+  const check = readFileSync(join(root, 'python/tests/jupyter-browser.mjs'), 'utf8');
+  const pins = parsePins(readFileSync(join(root, 'python/requirements-notebook.txt'), 'utf8'));
+  for (const name of NEEDED_PACKAGES)
+    assert.ok(pins.has(name), `${name} is not pinned in python/requirements-notebook.txt`);
+  assert.ok(check.includes('/lab/') && check.includes('/notebooks/'), 'the check opens JupyterLab and Notebook 7');
+  assert.ok(check.includes('missingNeeded('), 'the check stops on a missing package before it opens a page');
+  assert.ok(
+    check.includes('STAMP'),
+    'a venv missing a needed package loses its stamp, so the setup command repairs it',
+  );
+  for (const name of ['ipykernel', 'ipywidgets', 'jupyter-server', 'tornado', 'numpy', 'pandas'])
+    assert.ok(pins.has(name), `${name} is imported by the notebooks but not pinned`);
 });

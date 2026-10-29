@@ -19,7 +19,7 @@ import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { decodePNG } from '../../tests/support/png.js';
 import { killTree, notebookHasKernel, serverPort, startKernel, step } from './jupyter-steps.mjs';
-import { compareVersions, ensureVenv, namesToRead, parsePins, requirements, SETUP, venvDir, venvTools } from './venv.mjs';
+import { compareVersions, ensureVenv, missingNeeded, namesToRead, parsePins, requirements, SETUP, STAMP, venvDir, venvTools } from './venv.mjs';
 
 // Run by a supervisor: this file starts itself as a child under a hard time limit and, on timeout, ends the child and
 // everything it started (the server, kernels, browser) and says so. The child does the work below.
@@ -89,6 +89,10 @@ assert.equal(stack.status, 0, `reading the venv's versions failed: ${stack.stder
 const read = JSON.parse(stack.stdout),
   { line, problems } = compareVersions(pins, new Map(Object.entries(read.versions)));
 versions = `python ${read.python} ${read.exe}; user site ${read.site}; ${line}`;
+// A package the check opens must be there before anything starts: never a 30 s wait for a page that cannot render.
+const absent = missingNeeded(new Map(Object.entries(read.versions)));
+if (absent.length) rmSync(join(venv, STAMP), { force: true }); // so the setup command repairs this venv
+assert.deepEqual(absent, [], absent.join(' | '));
 assert.deepEqual(problems, [], `the venv does not match ${requirements}: run ${SETUP}\n${problems.join('\n')}`);
 console.log(`jupyter: runs on ${versions}`);
 

@@ -6,7 +6,8 @@
 //   MARGO_JUPYTER_VENV=<dir>                use another folder (default: test-results/.venv-data in the main checkout)
 //   MARGO_PYTHON=<python>                   make it with this Python (default: Python 3.12 or 3.13 found by py -3.13 / py -3.12 / python3.13 / python3.12 / python3 / python)
 import { spawnSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -26,6 +27,7 @@ export function venvTools(venv) {
   return python && jupyter ? { python, jupyter } : undefined;
 }
 
+const PIP_ARGS = ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--timeout', '30', '--retries', '2', '-r', requirements];
 const run = (command, args, ms) =>
   spawnSync(command, args, { encoding: 'utf8', timeout: ms, killSignal: 'SIGKILL', windowsHide: true });
 const tail = (text, lines = 12) => (text ?? '').trim().split('\n').slice(-lines).join('\n');
@@ -57,15 +59,51 @@ export function findPython({ env = process.env, exec = run, platform = process.p
   }
 }
 
+/** Stamp file inside the venv: the hash of the requirements file the venv was last installed from. */
+export const STAMP = '.requirements-sha256';
+/** SHA-256 of the requirements file. */
+export const requirementsHash = (file = requirements) => createHash('sha256').update(readFileSync(file)).digest('hex');
+const stampOf = (venv) => {
+  try {
+    return readFileSync(join(venv, STAMP), 'utf8').trim();
+  } catch {
+    return undefined;
+  }
+};
+
+/** Packages the Jupyter check opens or imports itself: each must be pinned in the requirements and installed in the venv. */
+export const NEEDED_PACKAGES = ['jupyterlab', 'notebook'];
+
+/** The needed packages missing from `installed` (normalised name to version or null), as sentences naming the fix. */
+export function missingNeeded(installed, needed = NEEDED_PACKAGES) {
+  return needed.filter((n) => !installed.get(normaliseName(n))).map((n) => `${n} is not installed in the check's venv: run ${SETUP}`);
+}
+
 /**
- * Makes the venv at `venv` from `requirements` (pinned versions) unless it is ready. Returns `{ ok: true, tools, made }`,
+ * Makes the venv at `venv` from `requirements` (pinned versions) unless it is ready. A venv whose stamp (the hash of the
+ * requirements file it was installed from) differs from the file now, or has none, is updated in place with
+ * `pip install -r`: nothing is deleted, so a failed update (say offline) leaves the old venv as it was. Returns `{ ok: true, tools, made }`,
  * or `{ ok: false, reason }` with what failed and the fix; a half-made venv is removed so the next run starts clean.
  * `exec(command, args, ms)` runs a process (spawnSync by default; tests pass a fake, so no network is needed).
  */
 export function ensureVenv({ venv = venvDir(), env = process.env, exec = run, log = console.error } = {}) {
   const ready = venvTools(venv);
-  if (ready) return { ok: true, tools: ready, made: false };
+  const want = requirementsHash();
+  if (ready && stampOf(venv) === want) return { ok: true, tools: ready, made: false };
   const fix = `run \`${SETUP}\` with Python 3 on PATH and network access to PyPI (or set MARGO_PYTHON), then run the check again`;
+  if (ready) {
+    log(`python venv: ${venv} was not installed from the current ${requirements}; updating it in place`);
+    const update = exec(ready.python, PIP_ARGS, 25 * 60_000);
+    if (update.status !== 0) {
+      const timedOut = update.error?.code === 'ETIMEDOUT' || update.signal === 'SIGKILL';
+      return {
+        ok: false,
+        reason: `updating ${venv} from python/requirements-notebook.txt ${timedOut ? 'passed its time limit' : `failed (exit ${update.status})`}\n${tail(update.stderr || update.stdout)}\nIf this machine is offline, PyPI cannot be reached: ${fix}`,
+      };
+    }
+    writeFileSync(join(venv, STAMP), `${want}\n`);
+    return { ok: true, tools: ready, made: false };
+  }
   const python = findPython({ env, exec });
   if (!python)
     return {
@@ -86,17 +124,14 @@ export function ensureVenv({ venv = venvDir(), env = process.env, exec = run, lo
     };
   };
   if (made.status !== 0 || !tools().python) return fail(`\`${python.command.join(' ')} -m venv ${venv}\``, made);
-  const pip = exec(
-    tools().python,
-    ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--timeout', '30', '--retries', '2', '-r', requirements],
-    25 * 60_000,
-  );
+  const pip = exec(tools().python, PIP_ARGS, 25 * 60_000);
   if (pip.status !== 0) return fail('installing python/requirements-notebook.txt', pip);
   const done = venvTools(venv);
   if (!done) {
     rmSync(venv, { recursive: true, force: true });
     return { ok: false, reason: `python/requirements-notebook.txt installed, but ${venv} has no jupyter executable: ${fix}` };
   }
+  writeFileSync(join(venv, STAMP), `${want}\n`);
   return { ok: true, tools: done, made: true };
 }
 
