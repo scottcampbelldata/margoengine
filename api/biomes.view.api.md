@@ -23,6 +23,7 @@ export class BiomeView implements Disposable {
     get streaming(): {
         readonly pending: number;
         readonly arrived: number;
+        readonly plans: number;
     };
     dispose(): void;
     [Symbol.dispose](): void;

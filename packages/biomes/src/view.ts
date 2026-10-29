@@ -339,7 +339,9 @@ export class BiomeView implements Disposable {
   #lastFrame = 0;
   /** The last frame planned and left its sending and copying to this one. */
   #waited = false;
-  #frames = 0;
+  /** Frames since the last plan (a camera that stays put plans again after 30), and plans made so far. */
+  #since = 0;
+  #plans = 0;
   #first?: Set<string>;
   #firstDone?: () => void;
   #idle: (() => void)[] = [];
@@ -494,12 +496,13 @@ export class BiomeView implements Disposable {
    * Before each frame: track the camera, plan when it moved, copy arrived tiles in within the budget. A frame that
    * plans leaves sending and copying to the next frame (a plan comes every few frames and takes a good part of the
    * budget; sending its jobs in the same frame made those frames the slowest 1 percent on a laptop APU), unless the
-   * frame before planned too (a camera that plans every frame still gets its tiles).
+   * frame before planned too (a camera that plans every frame still gets its tiles). The plan of a camera that stays
+   * put comes 30 frames after the last plan, not every 30th frame: that one could come the frame after a plan of the
+   * moving camera, and the second plan then streamed too.
    */
   #frame(delta: number): void {
     if (this.#disposed) return;
     this.#lastFrame = performance.now();
-    this.#frames++;
     const p = this.#engine.camera.position,
       eye: [number, number] = [p[0], p[2]];
     if (this.#eye && delta > 0) {
@@ -508,7 +511,7 @@ export class BiomeView implements Disposable {
     }
     this.#eye = eye;
     const moved = this.#planned ? Math.hypot(eye[0] - this.#planned[0], eye[1] - this.#planned[1]) : Infinity,
-      plan = moved > this.#world.tileSize / 8 || this.#frames % 30 === 0;
+      plan = moved > this.#world.tileSize / 8 || ++this.#since >= 30;
     if (plan) {
       this.#inFrame = true;
       this.#plan(false);
@@ -544,6 +547,8 @@ export class BiomeView implements Disposable {
       tz = (v: number) => Math.min(w.tilesZ - 1, Math.max(0, Math.floor((v - bz) / side))), // float division: view only
       wanted: [number, number, number][] = [];
     this.#planned = eye;
+    this.#since = 0;
+    this.#plans++;
     for (let z = tz(Math.min(eye[1], ahead[1]) - r); z <= tz(Math.max(eye[1], ahead[1]) + r); z++)
       for (let x = tx(Math.min(eye[0], ahead[0]) - r); x <= tx(Math.max(eye[0], ahead[0]) + r); x++) {
         const d = near(x, z, eye);
@@ -935,9 +940,10 @@ export class BiomeView implements Disposable {
     return new Promise((done) => this.#idle.push(done));
   }
 
-  /** Tiles on their way (terrain and objects jobs) and tiles waiting to be copied in. */
-  get streaming(): { readonly pending: number; readonly arrived: number } {
-    return { pending: this.#pending.size, arrived: this.#arrived.length };
+  /** Tiles on their way (terrain and objects jobs), tiles waiting to be copied in, and plans made so far (a plan picks
+   * the tiles to have when the camera moved an eighth of a tile or after 30 frames). */
+  get streaming(): { readonly pending: number; readonly arrived: number; readonly plans: number } {
+    return { pending: this.#pending.size, arrived: this.#arrived.length, plans: this.#plans };
   }
 
   /** Stops streaming and frees the terrain and its textures. */

@@ -90,20 +90,37 @@ window.check.packing=async function(SLOW){
  delete queue.writeTexture;view.dispose();world.dispose();return {copied,short};
 };
 /**
- * A frame that plans (new jobs on their way) sends and copies nothing, unless the frame before planned and did nothing
- * too; it once sent the jobs it planned in the same frame, and on a laptop APU those frames were the slowest 1 percent.
+ * A frame that plans sends and copies nothing, unless the frame before planned and did nothing too; it once sent the
+ * jobs it planned in the same frame, and on a laptop APU those frames were the slowest 1 percent. A flight moves under
+ * an eighth of a tile a frame, so no frame plans right after a plan either. Plans are the view's own count (a plan
+ * that starts no job counts), and a frame copied or sent when it took any streaming step.
  */
 window.check.planFrames=async function(){
  const world=await BiomeWorld.create({workers:4});place(0);
  const view=await BiomeView.attach(engine,world);await view.ready;
  for(let i=0;i<10;i++){await frame();engine.render({delta:1/60});}
  await view.whenIdle();
- let s=0,plans=0,both=0,waited=false,last=await frame();
+ let s=0,plans=0,both=0,after=0,waited=false,was=false,last=await frame();
  while(s<LENGTH/3){const now=await frame(),dt=Math.min(0.1,(now-last)/1000);last=now;s+=SPEED*dt;place(s);
-  const p0=view.streaming.pending,c0=view.frameTimes.length;engine.render({delta:dt});
-  const planned=view.streaming.pending>p0,copied=view.frameTimes.length>c0;
-  if(planned){plans++;if(copied&&!waited)both++;}waited=planned&&!copied;}
- view.dispose();world.dispose();return {plans,both};
+  const p0=view.streaming.plans;view.frameTimes.length=0;engine.render({delta:dt});
+  const planned=view.streaming.plans>p0,copied=view.frameTimes.length>0;
+  if(planned){plans++;if(copied&&!waited)both++;if(was)after++;}waited=planned&&!copied;was=planned;}
+ view.dispose();world.dispose();return {plans,both,after};
+};
+/**
+ * The plan of a camera that stays put comes 30 frames after the last plan: it came every 30th frame, so a camera that
+ * planned (moved an eighth of a tile) the frame before planned twice in a row, and the second plan streamed too. A
+ * camera that moves an eighth of a tile every 29 frames (1.12 m a frame; an eighth of a 256 m tile is 32 m) met that
+ * every 30 frames.
+ */
+window.check.heartbeat=async function(){
+ const world=await BiomeWorld.create({workers:4});place(0);
+ const view=await BiomeView.attach(engine,world);await view.ready;
+ let s=0,plans=0,after=0,was=false;
+ for(let i=0;i<300;i++){await frame();s+=1.12;place(s);
+  const p0=view.streaming.plans;engine.render({delta:1/60});
+  const planned=view.streaming.plans>p0;if(planned){plans++;if(was)after++;}was=planned;}
+ view.dispose();world.dispose();return {plans,after};
 };
 window.ready=true;
 </script></body></html>

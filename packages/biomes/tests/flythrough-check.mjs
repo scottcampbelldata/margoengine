@@ -53,10 +53,22 @@ try {
   // Regression: a frame that planned also sent its new jobs and copied tiles in; plans come every few frames, and on a
   // laptop APU those frames were the slowest 1 percent (p99 +0.3 ms, at the limit). A frame that plans must send and
   // copy nothing, unless the frame before planned and did nothing too.
+  // The check once counted a frame as planning when jobs on their way grew, so a plan that started no job looked like
+  // a frame that did nothing; it counts the view's own plans now.
   const plan = await page.evaluate(() => window.check.planFrames());
-  console.log(`plan frames: ${plan.plans} frames planned, ${plan.both} of them also sent or copied`);
+  console.log(
+    `plan frames: ${plan.plans} frames planned, ${plan.both} of them also sent or copied, ${plan.after} right after a plan`,
+  );
   assert.ok(plan.plans >= 5, `the flight planned ${plan.plans} times`);
   assert.equal(plan.both, 0, `${plan.both} frames that planned also sent or copied`);
+  assert.equal(plan.after, 0, `${plan.after} frames planned right after a frame that planned`);
+  // Regression: the plan of a camera that stays put came every 30th frame, so it could fall the frame after a plan of
+  // the moving camera, and that second plan sent and copied in the same frame (a laptop APU failed 1 run in 5 on it).
+  // It comes 30 frames after the last plan now: a camera that plans every 29 frames never plans twice in a row.
+  const beat = await page.evaluate(() => window.check.heartbeat());
+  console.log(`plan every 29 frames: ${beat.plans} plans, ${beat.after} right after a plan`);
+  assert.ok(beat.plans >= 8, `the camera planned ${beat.plans} times`);
+  assert.equal(beat.after, 0, `${beat.after} frames planned right after a frame that planned`);
   // Regression: a step started whenever any budget was left, so a 2 ms send went out after a cheap copy step in the
   // same frame and the frame ran a whole send past its budget. A send now starts only when the budget left covers what
   // a send took lately: with sends of 2 ms and copying at full speed, a send goes first in its frame, after no texture
