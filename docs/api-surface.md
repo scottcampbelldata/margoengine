@@ -67,7 +67,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/procedural | `.` 34, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 9,489 |
 | @margoengine/quality | `.` 22, `./warm` 3 | 1 |  | 2,449 |
 | @margoengine/ragdoll | `.` 5 | 1 |  | 6,255 |
-| @margoengine/react | `.` 43, `./controls` 12, `./gltf-pro` 5, `./fbx` 2, `./animation` 3, `./environment` 8, `./html` 2, `./shadows` 4, `./sky` 2, `./text` 2, `./geometry` 6, `./materials` 6, `./post` 28, `./dof` 2, `./tonemap` 2, `./taa` 2, `./machinery` 2, `./voxel` 3, `./physics` 34, `./xr` 12 | 44 |  | 6,882 |
+| @margoengine/react | `.` 43, `./controls` 12, `./gltf-pro` 5, `./fbx` 2, `./animation` 3, `./environment` 8, `./html` 2, `./shadows` 4, `./sky` 2, `./text` 2, `./geometry` 6, `./materials` 6, `./post` 28, `./dof` 2, `./tonemap` 2, `./taa` 2, `./machinery` 2, `./voxel` 3, `./physics` 34, `./xr` 12 | 44 |  | 7,168 |
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10 |  |  | 7,638 |
 | @margoengine/road | `.` 3 |  |  | 1,027 |
 | @margoengine/save | `.` 42, `./node` 1 | 2 |  | 6,699 |

@@ -13,16 +13,20 @@ export class ScatterTiles extends Scatter {
     static attach(engine: EngineKernel, geometry: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterTilesOptions | ScatterOptions): ScatterTiles;
     get drawnCapacity(): number;
     get size(): number;
+    get gpuBytes(): number;
     setTile(key: string, origin: readonly [number, number], side: number, records: Uint8Array): void;
     removeTile(key: string): boolean;
     protected cullCode(): string;
     protected ringCapacity(): number;
+    protected dispatched(): number;
     protected extraEntries(): {
         buffer: GPUBuffer;
     }[];
     setup(engine: Engine): void;
     protected beforeDistribute(c: TilesPassContext): void;
+    protected cull(c: TilesPassContext, terrain: GPUTexture): void;
     protected release(): void;
+    dispose(): void;
 }
 
 export interface ScatterTilesOptions extends Omit<ScatterOptions, 'count' | 'area' | 'center' | 'density' | 'densityMap' | 'follow' | 'exclusions' | 'scale'> {
@@ -32,9 +36,10 @@ export interface ScatterTilesOptions extends Omit<ScatterOptions, 'count' | 'are
     readonly drawn?: number;
     readonly scale?: number;
     readonly species?: number;
+    readonly share?: ScatterTiles;
 }
 
-export function tilesCullShader(capacity: number): string;
+export function tilesCullShader(): string;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -60,6 +65,8 @@ class Scatter implements EnginePlugin {
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     registerPasses(graph: FrameGraph): void;
+    protected cull(c: ScatterPassContext, terrain: GPUTexture): void;
+    protected instancesChanged(): void;
     protected cullCode(): string;
     protected extraEntries(): ({
         buffer: GPUBuffer;

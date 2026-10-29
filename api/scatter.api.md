@@ -40,6 +40,8 @@ export class Scatter implements EnginePlugin {
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     registerPasses(graph: FrameGraph): void;
+    protected cull(c: ScatterPassContext, terrain: GPUTexture): void;
+    protected instancesChanged(): void;
     protected cullCode(): string;
     protected extraEntries(): ({
         buffer: GPUBuffer;
