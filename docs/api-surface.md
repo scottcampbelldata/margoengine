@@ -35,11 +35,11 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/ecs | `.` 6 |  |  | 1,495 |
 | @margoengine/environment | `.` 62, `./probes` 8, `./volumetric` 3, `./reflector` 7, `./refractor` 7, `./cube-camera` 4, `./exr-write` 4 | 15 |  | 29,504 |
 | @margoengine/exporters | `.` 61, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./roblox` 16, `./roblox-chunks` 22, `./skin` 9, `./godot` 7, `./godot-addon` 2, `./unity` 12, `./hash` 2, `./import-names` 7, `./godot-lightmap` 3, `./unity-precision` 21, `./unity-precision-importer` 3, `./unity-pixel-art` 2, `./unreal-precision` 23, `./unreal-precision-importer` 2, `./unreal-pixel-art` 2, `./godot-precision-addon` 3, `./godot-precision` 23, `./godot-flipbook` 2, `./roblox-runtime` 25, `./roblox-runtime-restore` 1 | 92 |  | 33,668 |
-| @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  | 18,187 |
+| @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  | 18,197 |
 | @margoengine/fsm | `.` 3 |  |  | 971 |
 | @margoengine/geometry | `.` 64, `./shapes` 20, `./triangulate` 5, `./extrude` 3, `./primitives` 17, `./utils` 21, `./extras` 6 | 15 |  | 20,606 |
-| @margoengine/gltf | `.` 4 |  |  | 6,029 |
-| @margoengine/gltf-pro | `.` 43, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 333 |  | 55,340 |
+| @margoengine/gltf | `.` 4 |  |  | 6,039 |
+| @margoengine/gltf-pro | `.` 43, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 333 |  | 55,352 |
 | @margoengine/html | `.` 7 |  |  | 4,853 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,568 |
 | @margoengine/input | `.` 12 |  |  | 4,912 |
