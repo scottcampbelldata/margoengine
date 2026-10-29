@@ -49,7 +49,23 @@ import { spawn, spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const main = resolve(import.meta.dirname, '..').replace(/[\\/]\.[\w-]+[\\/]worktrees[\\/][^\\/]+$/, '');
+/**
+ * The main checkout of the clone that holds `root`, so every worktree shares one lock folder. A git worktree's `.git`
+ * is a file naming `<main>/.git/worktrees/<name>` wherever the worktree folder is (a worktree outside
+ * `.claude/worktrees` once got a lock of its own and shared no GPU slots and no landing turn with anyone).
+ * @param {string} root A checkout's top folder.
+ */
+export function mainCheckout(root) {
+  const dotGit = join(root, '.git');
+  if (existsSync(dotGit) && statSync(dotGit).isFile()) {
+    const gitdir = /^gitdir:\s*(.+?)\s*$/m.exec(readFileSync(dotGit, 'utf8'))?.[1];
+    const at = gitdir?.replace(/\\/g, '/').search(/\/\.git\/worktrees\/[^/]+$/) ?? -1;
+    if (at > 0) return resolve(root, gitdir.slice(0, at));
+  }
+  return root.replace(/[\\/]\.[\w-]+[\\/]worktrees[\\/][^\\/]+$/, '');
+}
+
+const main = mainCheckout(resolve(import.meta.dirname, '..'));
 export const lockDir = process.env.MARGO_GPU_LOCK ?? join(main, 'test-results', 'gpu.lock');
 const sharedDir = join(lockDir, 'shared'),
   waitingDir = `${lockDir}-waiting`,

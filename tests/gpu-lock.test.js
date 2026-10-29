@@ -317,3 +317,24 @@ test('nested: a child of a shared hold takes nothing and refuses to wait on its 
     assert.equal(gpu.status(), null, 'nothing was taken');
   }, nested('exclusive'));
 });
+
+test('a worktree anywhere shares the main checkout lock folder', async () => {
+  const { mainCheckout } = await import('../scripts/gpu-lock.mjs');
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
+    main = join(folder, 'repo'),
+    outside = join(folder, 'elsewhere', 'wt'),
+    inside = join(main, '.claude', 'worktrees', 'agent-x');
+  try {
+    mkdirSync(join(main, '.git', 'worktrees', 'wt'), { recursive: true });
+    mkdirSync(outside, { recursive: true });
+    mkdirSync(inside, { recursive: true });
+    // Git writes forward slashes on Windows too.
+    writeFileSync(join(outside, '.git'), `gitdir: ${join(main, '.git', 'worktrees', 'wt').replace(/\\/g, '/')}\n`);
+    writeFileSync(join(inside, '.git'), `gitdir: ${join(main, '.git', 'worktrees', 'agent-x')}\n`);
+    assert.equal(mainCheckout(outside), main, 'a worktree outside .claude/worktrees');
+    assert.equal(mainCheckout(inside), main, 'a worktree inside .claude/worktrees');
+    assert.equal(mainCheckout(main), main, 'the main checkout itself');
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
