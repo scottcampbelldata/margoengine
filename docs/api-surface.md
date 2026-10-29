@@ -26,7 +26,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/clustered | `.` 18, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./units` 12 | 80 |  | 13,215 |
 | @margoengine/compute | `.` 35, `./linalg` 5, `./fft` 8, `./signal` 7, `./random` 5, `./autodiff` 3, `./sparse` 13, `./stream` 8, `./frame` 3 | 253 | 18 | 37,897 |
 | @margoengine/controls | `.` 50, `./orbit` 7, `./arcball` 5, `./transform` 5, `./drag` 3, `./profiles` 13, `./walk` 6 | 63 |  | 23,268 |
-| @margoengine/core | `.` 17, `./extension` 26 | 16 |  | 20,547 |
+| @margoengine/core | `.` 17, `./extension` 26 | 16 |  | 20,691 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 19,004 |
 | @margoengine/culling | `.` 6 |  |  | 10,464 |
 | @margoengine/cutscene | `.` 43 |  |  | 6,589 |
@@ -63,7 +63,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/oit | `.` 2 |  |  | 2,962 |
 | @margoengine/physics | `.` 43 | 22 |  | 15,883 |
 | @margoengine/points | `.` 55, `./las` 16, `./laz` 6, `./e57` 13, `./octree` 10 | 20 |  | 20,919 |
-| @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2, `./mrt` 4, `./depth` 2 | 21 |  | 39,189 |
+| @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2, `./mrt` 4, `./depth` 2 | 21 |  | 39,336 |
 | @margoengine/procedural | `.` 34, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 9,489 |
 | @margoengine/quality | `.` 22, `./warm` 3 | 1 |  | 2,449 |
 | @margoengine/ragdoll | `.` 5 | 1 |  | 6,255 |
