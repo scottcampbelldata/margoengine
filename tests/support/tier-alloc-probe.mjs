@@ -6,7 +6,7 @@
 // MARGO_PROBE_ROOT points it at another checkout (to measure a commit before a fix).
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
-import { getHeapStatistics } from 'node:v8';
+import { heapWindows } from './heap-windows.mjs';
 
 const root = process.env.MARGO_PROBE_ROOT ?? resolve(import.meta.dirname, '../..'),
   load = (path) => import(pathToFileURL(resolve(root, path)).href),
@@ -32,16 +32,8 @@ if (name === 'invert') {
   };
 } else throw new TypeError(`Unknown case ${name}`);
 
-for (let i = 0; i < 20_000; i++) call();
-const heap = () => getHeapStatistics().used_heap_size;
-heap();
-const r0 = heap(),
-  read = heap() - r0,
-  bytes = [];
-for (let w = 0; w < 5; w++) {
-  globalThis.gc();
-  const before = heap();
-  for (let i = 0; i < 1000; i++) call();
-  bytes.push((heap() - before - read) / 1000);
-}
-console.log(JSON.stringify({ bytes }));
+const run = (calls) => {
+  for (let i = 0; i < calls; i++) call();
+};
+run(20_000);
+console.log(JSON.stringify({ bytes: heapWindows(run) }));

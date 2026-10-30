@@ -74,4 +74,4 @@ export function App() {
 1. A StrictMode test clicks the mesh and asserts `onClick` runs once, and a drag does not.
 2. A Suspense test shows the fallback until the glTF promise resolves, then removes it. Unmount aborts the load.
 3. `useMargo()` exposes `camera`, `size`, `gl`, and `clock` inside `<Canvas>`.
-4. `npm run measure:size` still reports core plus stage under 25,000 bytes gzip (22,494 B at the last measurement; that is the engine, not your app).
+4. `npm run measure:size` still reports core plus stage under 25,000 bytes gzip (22,581 B at the last measurement; that is the engine, not your app).

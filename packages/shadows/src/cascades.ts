@@ -32,7 +32,9 @@ export function cascadeSplits(
       'Cascade splits need near > 0, far > near, lambda from 0 to 1 and a count from 1 to 4; pass finite values in range.',
     );
   for (let i = 0; i < 4; i++) {
-    const t = Math.min(1, (i + 1) / count);
+    // A compare, not Math.min (V8 13 Maglev boxes its numbers); t is positive and finite.
+    const step = (i + 1) / count,
+      t = step < 1 ? step : 1;
     out[i] = lambda * near * (far / near) ** t + (1 - lambda) * (near + (far - near) * t);
   }
   return out;

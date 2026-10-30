@@ -1,13 +1,19 @@
 import { rangeError, typeError } from '../../shared/errors.js';
 
+/**
+ * Math.fround(v) is finite exactly when |v| < 2 ** 128 - 2 ** 103 (from there on v rounds up past the largest float).
+ * Per-frame checks compare against it: Number.isFinite and Math.fround are calls in V8's middle tier (Maglev), which
+ * boxes each fractional argument and result into a new heap number.
+ */
+export const F32_OVERFLOW = 3.4028235677973366e38;
+
 export function finite(values: ArrayLike<number>, size: number, label: string): void {
   if (values.length !== size) throw typeError(`${label}: ${size} values`, 'transform');
-  let f: number;
   for (let i = 0; i < size; i++) {
     const value = values[i];
-    // f - f is 0 exactly for a finite f. Not Number.isFinite: this runs every frame (the camera matrix, setters), and
-    // V8's optimizing tier below the top one calls it, boxing each fractional value into a new heap number.
-    if (typeof value !== 'number' || (f = Math.fround(value)) - f !== 0)
+    // False for NaN too. Runs every frame (the camera matrix, setters): no call, see F32_OVERFLOW. Math.abs, not two
+    // compares: V8 13 Maglev then keeps a value read from either a typed array or an array unboxed.
+    if (typeof value !== 'number' || !(Math.abs(value) < F32_OVERFLOW))
       throw rangeError(`${label}: finite values`, 'transform');
   }
 }

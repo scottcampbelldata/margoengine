@@ -130,11 +130,11 @@ export function invertMatrixStable<T extends Float32Array | Float64Array>(
     let scale = 0;
     for (let c = 0; c < 8; c++) {
       const v = c < 4 ? m[c * 4 + r] : +(c - 4 === r);
-      // v - v is 0 exactly for a finite v. Not Number.isFinite: cameras invert every frame, and V8's optimizing tier
-      // below the top one calls it, boxing each fractional value into a new heap number.
+      // v - v is 0 exactly for a finite v. Not Number.isFinite, nor Math.max below: cameras invert every frame, and
+      // V8's optimizing tier below the top one (Maglev) calls them, boxing each fractional value into a heap number.
       if (typeof v !== 'number' || v - v !== 0) return null;
       a[r * 8 + c] = v;
-      if (c < 4) scale = Math.max(scale, Math.abs(v));
+      if (c < 4 && Math.abs(v) > scale) scale = Math.abs(v);
     }
     if (!scale) return null;
     a[32 + r] = scale;
@@ -161,10 +161,11 @@ export function invertMatrixStable<T extends Float32Array | Float64Array>(
         for (let k = 0; k < 8; k++) a[r * 8 + k] -= f * a[c * 8 + k];
       }
   }
-  let f: number;
+  const float32 = out instanceof Float32Array;
   for (let i = 0; i < 16; i++) {
     const v = a[(i % 4) * 8 + (i >> 2) + 4];
-    if (v - v !== 0 || (out instanceof Float32Array && (f = Math.fround(v)) - f !== 0)) return null;
+    // Math.fround(v) is finite exactly when |v| < 2 ** 128 - 2 ** 103; a compare, not a Math.fround call (above).
+    if (v - v !== 0 || (float32 && !(Math.abs(v) < 3.4028235677973366e38))) return null;
     a[36 + i] = v;
   }
   for (let i = 0; i < 16; i++) out[i] = a[36 + i];

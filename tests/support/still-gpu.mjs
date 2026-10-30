@@ -138,20 +138,10 @@ export function frameDriver() {
 
 /**
  * JavaScript heap bytes per frame of `run`: five windows of `frames` frames, each after a forced gc (node --expose-gc),
- * less the cost of reading the heap size. Each window's value is exact unless V8 collected garbage inside it.
+ * less the cost of reading the heap size. A window inside which V8 collected garbage is left out and measured again
+ * (heap-windows.mjs): its count would be too low.
  */
 export async function bytesPerFrame(run, frames = 1000) {
-  const { getHeapStatistics } = await import('node:v8');
-  const heap = () => getHeapStatistics().used_heap_size;
-  heap();
-  const r0 = heap(),
-    read = heap() - r0,
-    bytes = [];
-  for (let w = 0; w < 5; w++) {
-    globalThis.gc();
-    const before = heap();
-    run(frames);
-    bytes.push((heap() - before - read) / frames);
-  }
-  return bytes;
+  const { heapWindows } = await import('./heap-windows.mjs');
+  return heapWindows(run, frames);
 }

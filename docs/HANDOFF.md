@@ -1,5 +1,19 @@
 # Margo Engine handoff
 
+## Landed 2026-10-29: the frame allocation limits hold on the minimum Node (24.18) as well as on Node 26
+
+- `tests/frame-alloc.test.js` failed on Node 24 (V8 13.6) and passed only on Node 26 (V8 14.6): V8 13's middle tier
+  (Maglev) calls Math.max, Math.min, Math.fround, Math.sqrt and Math.atan2 with boxed numbers, and a loop sum that
+  fed Math.sqrt was boxed on every step. Core, math, shadows and the shared hypot and view code now use compares (the
+  same numbers, bit for bit) and feed Math.sqrt from an array. In the middle tier, Node 24: core frame 1,572 to 628 B,
+  shadows add 6,665 to 1,081 B, cascade fit 962 to 242 B, matrix inverse 866 to 146 B; Node 26: 716 to 300, 536 to
+  360, 20 to 20, 372 to 20. The CPU (Turbofan) figures stay: core 140 B, shadows add 384 B (Node 26).
+- The Node probes counted low when V8 collected garbage inside a measured window: on Node 24 the shadowed frame read
+  385 B over core where it allocated 6,665 B. Such windows are now left out (`tests/support/heap-windows.mjs`).
+- Two middle-tier limits have a V8 13 row ([limits.md](limits.md), "Frame allocation"): V8 13's Maglev has no
+  inline Math.sqrt, 32 B a call. `npm run test:frame-alloc:nodes` runs the test on every Node it finds and names each
+  version that fails. Hypot now returns Infinity for an infinite term next to a NaN one, as Math.hypot does.
+
 ## Landed 2026-10-29: steady-state frames allocate far less, gated in check:merge (item 53.1, part 1)
 
 - `npm run test:frame-alloc:browser` (run by `check:gpu-packages`) measures the JavaScript heap bytes of a median

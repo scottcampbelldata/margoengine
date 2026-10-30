@@ -6,16 +6,44 @@ import { hypot, hypotOf, hypotTerms } from '../packages/shared/hypot.js';
 import { FLOORS, frameBytes, overFloor } from '../scripts/frame-alloc-browser.mjs';
 
 // The probes run in a fresh process with --expose-gc: inside the test runner, other tests' timers, promises and JIT
-// work share the heap (packages/lod/test/lod.test.js learned this).
+// work share the heap (packages/lod/test/lod.test.js learned this). A 16 MB young generation keeps V8 from collecting
+// inside a measured window, and the probes leave out any window it collected in (support/heap-windows.mjs). With
+// --single-threaded-gc no sweeper thread frees pages while a window counts (Node 24 read a window as -387 B a call).
+const HEAP = ['--min-semi-space-size=16', '--max-semi-space-size=16', '--single-threaded-gc'];
 const probe = (...args) =>
   JSON.parse(
     execFileSync(
       process.execPath,
-      ['--expose-gc', fileURLToPath(new URL('./support/core-frame-alloc-probe.mjs', import.meta.url)), ...args],
+      [
+        '--expose-gc',
+        ...HEAP,
+        fileURLToPath(new URL('./support/core-frame-alloc-probe.mjs', import.meta.url)),
+        ...args,
+      ],
       { encoding: 'utf8', timeout: 240_000 },
     ),
   ).bytes;
 const median = (values) => [...values].sort((a, b) => a - b)[values.length >> 1];
+// Every message names the Node and V8 that measured it: the middle tier differs between V8 versions.
+const host = `Node ${process.version}, V8 ${process.versions.v8}`,
+  v8Major = Number(process.versions.v8.split('.')[0]);
+// Middle-tier limits by V8 major, one row per major measured, the newest row for newer majors. Same limits where a
+// version can reach them; V8 13 (Node 24, the minimum Node) gets its own row only where it provably cannot.
+// V8 13's Maglev has no inline Math.sqrt (V8 14's does): every Math.sqrt of a fractional number is a call that boxes
+// its argument and its result, 32 B. The shadowed frame takes 22 square roots past core's (hypotOf per caster in
+// range(), the seven of fitCascades, two in viewMatrix: 704 B on their own, over 620) and the cascade fit takes 7
+// (224 B, over 128). The results must stay those of Math.sqrt bit for bit, and a square root in JavaScript
+// arithmetic would cost every engine and tier more time than V8 13's Maglev loses in garbage, so these two rows
+// stay. Measured on Node 24.18.0 (V8 13.6.233.17) after the Node 24 fixes: shadows add 1,081 B per frame, the
+// cascade fit 242 B per call; Node 26.12.0 (V8 14.6.202.34): 360 and 20.
+const TIER = {
+  13: { shadows: 1120, cascades: 256 },
+  14: { shadows: 620, cascades: 128 },
+};
+const tier = TIER[Math.min(v8Major, 14)];
+// Node 22's V8 12 ships without Maglev (--no-maglev): its tier between the baseline and Turbofan does not exist, so
+// there is no middle tier to measure (scripts/frame-alloc-nodes.mjs reports it as skipped).
+const noTier = tier ? false : `${host} has no Maglev tier by default`;
 // The same probes with V8 stopped at Maglev (--max-opt=2), the tier a once-per-frame function runs in for its first
 // thousands of frames in a browser: it boxes fractional numbers passed to calls it does not inline, and allocates a
 // closure context on each call of a function whose locals an inner function captures.
@@ -23,7 +51,7 @@ const tierProbe = (script, ...args) =>
   JSON.parse(
     execFileSync(
       process.execPath,
-      ['--expose-gc', '--max-opt=2', fileURLToPath(new URL(`./support/${script}`, import.meta.url)), ...args],
+      ['--expose-gc', ...HEAP, '--max-opt=2', fileURLToPath(new URL(`./support/${script}`, import.meta.url)), ...args],
       { encoding: 'utf8', timeout: 240_000 },
     ),
   ).bytes;
@@ -34,7 +62,7 @@ const tierProbe = (script, ...args) =>
 // and the frame graph's passes. What is left (about 210 B) is V8 boxing the frame delta for each callback it calls.
 test("core's steady-state frame allocates at most 256 bytes on the CPU", { timeout: 300_000 }, () => {
   const bytes = probe();
-  assert.ok(median(bytes) <= 256, `core frame allocated ${bytes.join(', ')} B per frame`);
+  assert.ok(median(bytes) <= 256, `core frame allocated ${bytes.join(', ')} B per frame (${host})`);
 });
 
 // Regression (item 53.1): Shadows' depth passes cleared and refilled Maps and Sets of every caster each pass, and
@@ -44,40 +72,93 @@ test('a shadowed frame (eight moving casters, four cascades) adds at most 512 by
 }, () => {
   const core = median(probe()),
     shadowed = median(probe('--shadows'));
-  assert.ok(shadowed - core <= 512, `shadows added ${shadowed - core} B per frame (${shadowed} against ${core})`);
+  assert.ok(
+    shadowed - core <= 512,
+    `shadows added ${shadowed - core} B per frame (${shadowed} against ${core}; ${host})`,
+  );
 });
 
 // Regression (item 53.1, part 2): in Maglev the frame allocated about 850 B on the CPU: Number.isFinite on every
 // setter value and camera matrix element boxed each fractional value, and hypot's arguments and result were boxed.
-test("core's steady-state frame in V8's middle tier allocates at most 780 bytes", { timeout: 300_000 }, () => {
+// Regression (Node 24): on V8 13 it allocated 1,570 B: V8 13's Maglev also calls Math.max, Math.min and Math.fround
+// with boxed numbers, and a loop sum feeding Math.sqrt was boxed on every step (camera planes, hypotOf).
+test("core's steady-state frame in V8's middle tier allocates at most 780 bytes", {
+  timeout: 300_000,
+  skip: noTier,
+}, () => {
   const bytes = tierProbe('core-frame-alloc-probe.mjs');
-  assert.ok(median(bytes) <= 780, `core frame allocated ${bytes.join(', ')} B per frame at Maglev`);
+  assert.ok(median(bytes) <= 780, `core frame allocated ${bytes.join(', ')} B per frame at Maglev (${host})`);
 });
 
 // Regression (item 53.1, part 2): Shadows added about 715 B per frame in Maglev: a closure context on every draw call
 // (an inner arrow captured draw's pipeline), Number.isFinite and hypot boxing in fitCascades and range(), and core's
 // renderer allocated a some() closure per draw and emptied the plugin bindings list with length = 0.
-test('a shadowed frame in the middle tier adds at most 620 bytes to it', { timeout: 300_000 }, () => {
+// Regression (Node 24): Math.max and Math.min per caster in range() and worldSphere, Math.fround in validate, and
+// viewMatrix's Math.max added about 1,000 B more on V8 13.
+test(`a shadowed frame in the middle tier adds at most ${tier?.shadows} bytes to it`, {
+  timeout: 300_000,
+  skip: noTier,
+}, () => {
   const core = median(tierProbe('core-frame-alloc-probe.mjs')),
     shadowed = median(tierProbe('core-frame-alloc-probe.mjs', '--shadows'));
   assert.ok(
-    shadowed - core <= 620,
-    `shadows added ${shadowed - core} B per frame at Maglev (${shadowed} against ${core})`,
+    shadowed - core <= tier.shadows,
+    `shadows added ${shadowed - core} B per frame at Maglev (${shadowed} against ${core}; ${host})`,
   );
 });
 
 // Regression (item 53.1, part 2): fitCascades boxed 64 matrix elements into Number.isFinite and seven hypot calls'
 // numbers (about 530 B per frame); invertMatrixStable boxed its 48 finiteness checks (about 595 B per call).
-test('the cascade fit and the stable matrix inverse allocate little in the middle tier', { timeout: 300_000 }, () => {
+// Regression (Node 24): on V8 13 the fit took 993 B (Math.max in hypotOf, Math.min in cascadeSplits) and the
+// inverse 865 B (Math.max over the row scales, Math.fround over the result); both are calls there.
+test('the cascade fit and the stable matrix inverse allocate little in the middle tier', {
+  timeout: 300_000,
+  skip: noTier,
+}, () => {
   const cascades = median(tierProbe('tier-alloc-probe.mjs', 'cascades')),
     invert = median(tierProbe('tier-alloc-probe.mjs', 'invert'));
-  assert.ok(cascades <= 128, `cascadeSplits + fitCascades allocated ${cascades} B per frame at Maglev`);
-  assert.ok(invert <= 450, `invertMatrixStable allocated ${invert} B per call at Maglev`);
+  assert.ok(
+    cascades <= tier.cascades,
+    `cascadeSplits + fitCascades allocated ${cascades} B per frame at Maglev (${host})`,
+  );
+  assert.ok(invert <= 450, `invertMatrixStable allocated ${invert} B per call at Maglev (${host})`);
 });
 
 test('the frame probe notices a frame that allocates', { timeout: 300_000 }, () => {
   const bytes = probe('--allocate');
   assert.ok(Math.min(...bytes) > 256, `the probe saw only ${bytes.join(', ')} B per frame from an allocating frame`);
+});
+
+// Regression (Node 24): a window inside which V8 collected garbage read low, so a frame that allocated more could pass
+// (a shadowed frame of about 2,300 B per frame read as 351 B). The probes leave such windows out and measure again,
+// and fail when no window stays clean.
+test('the probes leave out a window in which V8 collected garbage', { timeout: 60_000 }, () => {
+  const windows = JSON.stringify(new URL('./support/heap-windows.mjs', import.meta.url).href),
+    measure = (young, size) =>
+      execFileSync(
+        process.execPath,
+        [
+          '--expose-gc',
+          '--single-threaded-gc',
+          `--max-semi-space-size=${young}`,
+          '--input-type=module',
+          '-e',
+          `import { heapWindows } from ${windows};
+let kept;
+try {
+  const bytes = heapWindows((calls) => { for (let i = 0; i < calls; i++) kept = new Array(${size}).fill(i); });
+  console.log(JSON.stringify(bytes));
+} catch (error) { console.log(error.message); }`,
+        ],
+        { encoding: 'utf8', timeout: 50_000 },
+      );
+  // 4 KB per call, 4 MB per window: a 1 MB young generation collects inside every window.
+  assert.match(measure(1, 512), /collected garbage inside 6 of 6 windows/, host);
+  // A one-element array a call (about 100 B with the loop's own work, unoptimized) stays clean in a 16 MB one, and
+  // every window counts it.
+  const bytes = JSON.parse(measure(16, 1));
+  assert.equal(bytes.length, 5, host);
+  for (const b of bytes) assert.ok(b >= 16 && b <= 256, `${bytes.join(', ')} B per call (${host})`);
 });
 
 test('hypot gives Math.hypot bit for bit (V8) without allocating', () => {
@@ -98,6 +179,11 @@ test('hypot gives Math.hypot bit for bit (V8) without allocating', () => {
   }
   assert.equal(hypot(3, 0, -0, 0), 0);
   assert.equal(hypot(3, Infinity, 1, 2), Infinity);
+  // Regression: an infinite term wins over a NaN one in either order, as in Math.hypot (Math.max made both NaN).
+  assert.equal(hypot(2, Infinity, Number.NaN), Math.hypot(Infinity, Number.NaN));
+  assert.equal(hypot(3, Number.NaN, 1, -Infinity), Infinity);
+  assert.ok(Number.isNaN(hypot(3, 1, Number.NaN, 2)));
+  assert.equal(Object.is(hypot(2, -0, -0), 0), true);
   assert.equal(hypot(3, 1e308, 1e308, 1e308), Math.hypot(1e308, 1e308, 1e308));
   // hypotOf: the same bits through hypotTerms, no number crossing a call.
   for (let i = 0; i < 20_000; i++) {

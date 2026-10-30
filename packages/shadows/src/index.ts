@@ -424,9 +424,9 @@ export class Shadows implements EnginePlugin {
             : i === 2
               ? (o.normalBias ?? 0.02)
               : (o.casterMargin ?? 100);
-      // Runs every frame: f - f is 0 exactly for a finite f, and Number.isFinite would box each fractional f.
-      const f = Math.fround(v);
-      if (f - f !== 0 || v < 0)
+      // Runs every frame, so compares and no call: V8's middle tier (Maglev) boxes a fractional number it passes to
+      // Number.isFinite or Math.fround. Math.fround(v) is finite exactly when |v| < 2 ** 128 - 2 ** 103.
+      if (!(v < 3.4028235677973366e38 && v > -3.4028235677973366e38) || v < 0)
         throw new RangeError(
           'Invalid shadow options; lightSize, bias, normalBias and casterMargin must be finite and 0 or more.',
         );
@@ -680,7 +680,10 @@ export class Shadows implements EnginePlugin {
     fit.target = camera.target;
     fit.fov = camera.fov;
     fit.near = camera.near;
-    fit.far = Math.min(camera.far, this.options.distance ?? 500);
+    // Both are finite and positive (Camera.update and validate check them): a compare gives Math.min's number
+    // without the call, which V8 13 (Node 24) Maglev makes with boxed numbers. So below, for Math.max and Math.min.
+    const distance = this.options.distance ?? 500;
+    fit.far = camera.far < distance ? camera.far : distance;
     let core = this.options.distance === undefined && this.sources.length > 0;
     for (let i = 0; core && i < this.sources.length; i++) {
       const source = this.sources[i].source;
@@ -721,15 +724,12 @@ export class Shadows implements EnginePlugin {
       b = id * 4;
     for (let k = 0; k < 3; k++)
       w[k] = m[o + k] * s[b] + m[o + 4 + k] * s[b + 1] + m[o + 8 + k] * s[b + 2] + m[o + 12 + k];
-    w[3] =
-      s[b + 3] *
-      Math.sqrt(
-        Math.max(
-          m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2,
-          m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2,
-          m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2,
-        ),
-      );
+    // The largest squared axis length; sums of squares are never NaN or -0, so compares match Math.max.
+    const a = m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2,
+      c = m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2,
+      e = m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2,
+      ac = a > c ? a : c;
+    w[3] = s[b + 3] * Math.sqrt(ac > e ? ac : e);
     return w;
   }
   // range()'s two passes over the engine's meshes, made once (Map.forEach callbacks).
@@ -737,9 +737,14 @@ export class Shadows implements EnginePlugin {
     if (!mesh.geometry) return;
     const w = this.worldSphere(id),
       box = this.rangeBox;
+    // Math.min and Math.max exactly, NaN and the sign of zero included.
     for (let k = 0; k < 3; k++) {
-      box[k] = Math.min(box[k], w[k] - w[3]);
-      box[k + 3] = Math.max(box[k + 3], w[k] + w[3]);
+      const low = w[k] - w[3],
+        high = w[k] + w[3],
+        min = box[k],
+        max = box[k + 3];
+      if (low < min || low !== low || (low === 0 && min === 0 && 1 / low < 0)) box[k] = low;
+      if (high > max || high !== high || (high === 0 && max === 0 && 1 / high > 0)) box[k + 3] = high;
     }
   };
   private readonly extendRadius = (mesh: Mesh, id: number): void => {
@@ -751,7 +756,9 @@ export class Shadows implements EnginePlugin {
     h[1] = w[1] - c[1];
     h[2] = w[2] - c[2];
     hypotOf(3);
-    c[3] = Math.max(c[3], h[4] + w[3]);
+    // Math.max exactly: the reach is never -0 (hypotOf gives +0 at least), and a NaN stays.
+    const reach = h[4] + w[3];
+    if (reach > c[3] || reach !== reach) c[3] = reach;
   };
   private render(c: ShadowPassContext): void {
     this.validate();

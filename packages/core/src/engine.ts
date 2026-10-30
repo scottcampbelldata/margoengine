@@ -1,6 +1,6 @@
 import { TransformStore, syncStoredRotation } from './kernel.js';
 import { Camera, type CameraOptions, type Vec3 } from './camera.js';
-import { Geometry, PbrMaterial, finite } from './geometry.js';
+import { F32_OVERFLOW, Geometry, PbrMaterial, finite } from './geometry.js';
 import { hypot } from '../../shared/hypot.js';
 import {
   GPURenderer,
@@ -60,9 +60,14 @@ export class VectorRef {
       : this.mesh.engine.store.transforms[(this.kind === 'scale' ? scaleFields : positionFields)[axis]][this.mesh.id];
   }
   private validate(value: number): void {
-    let f: number;
-    // f - f is 0 exactly for a finite f; Number.isFinite would box each fractional value per setter call (geometry.ts).
-    if (typeof value !== 'number' || (f = Math.fround(value)) - f !== 0 || (this.kind === 'scale' && f === 0))
+    // Compares, not Math.fround: a setter runs per moving mesh each frame (F32_OVERFLOW in geometry.ts). Math.fround(v)
+    // is 0 exactly when |v| <= 2 ** -150 (7.006492321624085e-46: halfway to the least float rounds to 0). No
+    // Math.abs here: V8 13 Maglev calls it for a setter's argument and boxes the result.
+    if (
+      typeof value !== 'number' ||
+      !(value < F32_OVERFLOW && value > -F32_OVERFLOW) ||
+      (this.kind === 'scale' && !(value > 7.006492321624085e-46 || value < -7.006492321624085e-46))
+    )
       throw rangeError('Invalid transform', 'transform');
   }
   private write(axis: number, value: number): void {
@@ -274,7 +279,10 @@ export class Mesh {
     t.qw[id] = w;
     const lanes = this.engine.store.rotations,
       at = id * 3;
-    lanes[at + 1] = Math.asin(Math.max(-1, Math.min(1, 2 * (x * z + w * y))));
+    // A clamp by compares, not Math.max and Math.min: V8 13 (Node 24) Maglev calls them, boxing their numbers. The
+    // value is finite (a unit quaternion), so the compares give the same number, -0 included.
+    const sinPitch = 2 * (x * z + w * y);
+    lanes[at + 1] = Math.asin(sinPitch > 1 ? 1 : sinPitch < -1 ? -1 : sinPitch);
     lanes[at] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
     lanes[at + 2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
     return this;
@@ -969,8 +977,9 @@ export class Engine {
             batch = this.batches.get(mesh.geometry!)!;
           batch.instances.set(mesh.matrix, offset);
           batch.mask! |= keep(mesh);
-          batch.start = Math.min(batch.start!, offset);
-          batch.end = Math.max(batch.end!, offset + 16);
+          // Whole numbers, so compares match Math.min and Math.max (V8 13 Maglev boxes their numbers per moved mesh).
+          if (offset < batch.start!) batch.start = offset;
+          if (offset + 16 > batch.end!) batch.end = offset + 16;
         }
       }
     // Every frame, with the renderer's own test: a package can claim or release a batch without a new collection.
@@ -1091,7 +1100,10 @@ export class Engine {
       this.raf = requestAnimationFrame(this.frame);
       return;
     }
-    const delta = this.last ? Math.min((time - this.last) / 1000, this.maxDelta) : 0;
+    // Math.min by compares (V8 13 Maglev boxes Math.min's numbers), NaN on either side included. step is never -0.
+    const step = (time - this.last) / 1000,
+      most = this.maxDelta,
+      delta = this.last ? (step < most || step !== step ? step : most) : 0;
     this.last = time;
     try {
       this.frameOptions.delta = delta;

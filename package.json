@@ -230,6 +230,7 @@
     "whitepaper:pdf": "node scripts/whitepaper-pdf.mjs",
     "test:basic-scene": "node scripts/basic-scene-network.mjs",
     "test:frame-alloc:browser": "node scripts/frame-alloc-browser.mjs",
+    "test:frame-alloc:nodes": "node scripts/frame-alloc-nodes.mjs",
     "site:check": "node scripts/site-check.mjs",
     "dev:ik": "vite --host 127.0.0.1 --port 5191 --strictPort",
     "build:ik": "npm run build:packages && node scripts/build-skinning-ik.mjs",

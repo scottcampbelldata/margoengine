@@ -7,13 +7,16 @@ export function viewMatrix(out, camera) {
     z = p[2] - camera.target[2];
   // Match Math.hypot's normalized, compensated three-component sum without boxing scalar call arguments.
   // https://github.com/v8/v8/blob/main/src/builtins/math.tq
+  // The largest by compares and NaN by its own test: V8 13 (Node 24) Maglev calls Math.max with boxed numbers. The
+  // NaN is the terms' sum, a number the optimizer keeps unboxed (Number.NaN boxed the result in Turbofan).
   const lengthX = Math.abs(x),
     lengthY = Math.abs(y),
     lengthZ = Math.abs(z),
-    lengthMax = Math.max(Math.max(lengthX, lengthY), lengthZ);
+    lengthXY = lengthX > lengthY ? lengthX : lengthY,
+    lengthMax = lengthXY > lengthZ ? lengthXY : lengthZ;
   let length;
   if (lengthX === Infinity || lengthY === Infinity || lengthZ === Infinity) length = Infinity;
-  else if (lengthMax !== lengthMax) length = lengthMax;
+  else if (lengthX !== lengthX || lengthY !== lengthY || lengthZ !== lengthZ) length = lengthX + lengthY + lengthZ;
   else if (lengthMax === 0) length = 0;
   else {
     const first = (lengthX / lengthMax) * (lengthX / lengthMax),
@@ -31,10 +34,11 @@ export function viewMatrix(out, camera) {
   const sideX = Math.abs(xx),
     sideY = Math.abs(xy),
     sideZ = Math.abs(xz),
-    sideMax = Math.max(Math.max(sideX, sideY), sideZ);
+    sideXY = sideX > sideY ? sideX : sideY,
+    sideMax = sideXY > sideZ ? sideXY : sideZ;
   let side;
   if (sideX === Infinity || sideY === Infinity || sideZ === Infinity) side = Infinity;
-  else if (sideMax !== sideMax) side = sideMax;
+  else if (sideX !== sideX || sideY !== sideY || sideZ !== sideZ) side = sideX + sideY + sideZ;
   else if (sideMax === 0) side = 0;
   else {
     const first = (sideX / sideMax) * (sideX / sideMax),

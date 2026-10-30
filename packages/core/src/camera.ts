@@ -1,6 +1,9 @@
 import { finite } from './geometry.js';
 import { hypot } from '../../shared/hypot.js';
 import { rangeError } from '../../shared/errors.js';
+// Holds a plane's squared length on its way to Math.sqrt. V8 13 (Node 24) Maglev calls Math.sqrt with a boxed
+// number; fed straight from the summing loop, the loop's sum was boxed on every step (288 B per frame), not once.
+const squared = new Float64Array(1);
 /** Three components `[x, y, z]`, usually a point or direction in world units. */
 export type Vec3 = readonly [number, number, number];
 /** Initial {@link Camera} settings. */
@@ -124,7 +127,8 @@ export class Camera {
         this.planes[plane * 4 + c] = value;
         if (c < 3) length2 += value * value;
       }
-      const norm = Math.sqrt(length2);
+      squared[0] = length2;
+      const norm = Math.sqrt(squared[0]);
       if (!norm) throw rangeError('Invalid frustum', 'camera');
       for (let c = 0; c < 4; c++) this.planes[plane * 4 + c] /= norm;
     }
