@@ -2765,6 +2765,18 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### Headless Edge took over 30 s to close once under heavy CPU load
+
+- **What:** `node scripts/frame-alloc-browser.mjs` measured all five scenes within their floors, then failed with
+  `SHUTDOWN_TIMEOUT` ("still open: browser"): `browser.close()` in `closeAll` (`scripts/support/shutdown.mjs`) did not
+  finish within its 30 s budget.
+- **Repro:** seen once in 10 runs of the check (all scenes) beside a 24-thread CPU burner (worker threads in busy
+  loops) on the RTX A6000 PC, Edge 156 headless, 2026-10-30; not seen in about 20 other runs that day.
+- **Cause:** not known yet. Two fit: the browser's GPU or renderer process slow to exit under load (a slow close, so
+  the budget is too short for a loaded machine), or a close that hangs on a pending GPU request (a defect). Next step:
+  rerun under the burner with `DEBUG=pw:browser` and a process list at the timeout, and see whether the browser ends
+  later by itself.
+
 ### Biome trees and shrubs stand in the sea
 
 - **What:** in the wetland preset world (`presetWorlds.wetland`, coast `'west'`) the view's new sea (`water: 'auto'`,
