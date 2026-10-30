@@ -11,11 +11,17 @@
 // (pass, fail or timeout, and the step), ALERT.txt on a failure, and ends its log with a "nightly RESULT" line.
 // Run it from a checkout at the commit to test (the main checkout, after `git pull --ff-only`). Takes the GPU lock exclusively (it
 // includes timed steps) for the whole run (the steps inside nest under it), so landing runs wait their turn.
+// The steps come from the machine profile (MARGO_MACHINE_PROFILE, scripts/support/machine-profiles.json, item 57.1a): the
+// workstation runs the full check and the pinned proofs; a thermally limited machine runs only the GPU package tests,
+// with its own heat watch and exclusions, and a heat stop it could not resume from ends the night as PAUSED-FOR-HEAT
+// (exit 75), never as a failure. The log names the profile and every step it leaves out, with the reason.
 import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { margoError } from '../packages/shared/errors.js';
+import { describeProfile, machineProfile } from './support/machine-profile.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -46,6 +52,38 @@ export const pinnedProofsCommand = () => [
   process.execPath,
   ['scripts/gpu-lock.mjs', 'run', '--owner=nightly-proofs', '--exclusive', '--max=60', '--', 'npm', 'run', 'proofs'],
 ];
+
+/**
+ * Every nightly step a profile can name, by label. 'gpu package tests' runs scripts/gpu-package-tests.mjs on its own
+ * (no outer lock), so its heat pauses release the GPU lock while the machine cools.
+ */
+export const NIGHTLY_STEPS = {
+  'full check:merge': nightlyCommand,
+  'pinned proofs': pinnedProofsCommand,
+  'gpu package tests': () => [process.execPath, ['scripts/gpu-package-tests.mjs']],
+};
+
+/**
+ * The nightly steps `profile` runs, as {label, command}, and the ones it leaves out, as {label, reason}. A label that
+ * NIGHTLY_STEPS does not know throws NIGHTLY_STEP_UNKNOWN.
+ */
+export function nightlySteps(profile) {
+  for (const label of profile.nightly)
+    if (!NIGHTLY_STEPS[label])
+      throw margoError(
+        'NIGHTLY_STEP_UNKNOWN',
+        `machine profile ${profile.name} names nightly step "${label}"; use one of ${Object.keys(NIGHTLY_STEPS).join(', ')} in scripts/support/machine-profiles.json`,
+      );
+  return {
+    steps: profile.nightly.map((label) => ({ label, command: NIGHTLY_STEPS[label]() })),
+    left: Object.keys(NIGHTLY_STEPS)
+      .filter((label) => !profile.nightly.includes(label))
+      .map((label) => ({ label, reason: `not in machine profile ${profile.name}'s nightly plan` })),
+  };
+}
+
+/** Exit code of a step that stopped for heat and could not resume (scripts/gpu-package-tests.mjs, the heat guard). */
+export const HEAT_EXIT = 75;
 
 /** Hard limit for the whole nightly run, in minutes. Override with MARGO_NIGHTLY_DEADLINE_MIN (a positive number). */
 export const defaultDeadlineMin = 240;
@@ -111,7 +149,9 @@ function clearAlert(dir, env) {
 }
 
 /**
- * Runs the steps in order under one overall deadline. Each step is {label, command: [program, args]}. When the
+ * Runs the steps in order under one overall deadline. Each step is {label, command: [program, args]}. `header` lines
+ * open the log (the profile and the steps it leaves out). A step that exits 75 (HEAT_EXIT) is 'paused-for-heat': the
+ * night's result is PAUSED-FOR-HEAT unless a step failed, never FAIL. When the
  * deadline passes, the running step's whole process tree is killed (the GPU lock `run` wrapper is in that tree, and a
  * lock whose holder is dead is reclaimed by the next waiter), the remaining steps are skipped and the result is
  * `timeout`. Writes the dated log and `last-status.json` ({result: pass|fail|timeout, step, ...}) in `dir`, raises
@@ -124,12 +164,14 @@ export async function runNightly({
   env = process.env,
   deadline = deadlineMs(env),
   quiet = false,
+  header = [],
 }) {
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${stamp()}.log`),
     log = createWriteStream(file, { flags: 'a' }),
     began = Date.now(),
     results = [];
+  for (const line of header) log.write(`${line}\n`);
   let code = 0,
     result = 'pass',
     failedStep = null;
@@ -180,10 +222,15 @@ export async function runNightly({
       code = 124;
       break;
     }
-    log.write(`\nnightly ${label} ${status === 0 ? 'PASSED' : `FAILED (exit ${status})`} in ${seconds} s\n`);
-    results.push({ step: label, result: status === 0 ? 'pass' : 'fail', exit: status, seconds });
-    if (status !== 0 && result === 'pass') {
-      result = 'fail';
+    const heat = status === HEAT_EXIT,
+      outcome = status === 0 ? 'pass' : heat ? 'paused-for-heat' : 'fail';
+    log.write(
+      `\nnightly ${label} ${status === 0 ? 'PASSED' : heat ? 'PAUSED FOR HEAT, NOT RESUMED (exit 75, not a failure; its summary names the steps)' : `FAILED (exit ${status})`} in ${seconds} s\n`,
+    );
+    results.push({ step: label, result: outcome, exit: status, seconds });
+    // A failure outranks a heat stop; the first of each kind is the one named.
+    if (outcome !== 'pass' && (result === 'pass' || (result === 'paused-for-heat' && outcome === 'fail'))) {
+      result = outcome;
       failedStep = label;
       code = status;
     }
@@ -210,12 +257,15 @@ export async function runNightly({
 }
 
 async function main() {
+  const profile = machineProfile(),
+    { steps, left } = nightlySteps(profile);
   process.exitCode = await runNightly({
-    steps: [
-      { label: 'full check:merge', command: nightlyCommand() },
-      { label: 'pinned proofs', command: pinnedProofsCommand() },
-    ],
+    steps,
     dir: join(root, 'test-results/nightly'),
+    header: [
+      `nightly plan: ${describeProfile(profile)}`,
+      ...left.map(({ label, reason }) => `nightly ${label}: LEFT OUT (${reason})`),
+    ],
   });
 }
 

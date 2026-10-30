@@ -1,0 +1,31 @@
+{
+  "$comment": "Which GPU tests a machine runs and how it guards its temperature (item 57.1a). Choose one with MARGO_MACHINE_PROFILE=<name>; unset means `default`. Read by scripts/support/machine-profile.mjs for scripts/gpu-package-tests.mjs and scripts/nightly-full.mjs. `heat` null: no heat watch. `heat.stopC` sits below the machine's own heat guard, which stays the safety net. `split`: heavy suites run as short steps (package.json `margo.gpuTestSteps` and `&&` chains). `exclude`: package directory (or `root`) to the stated reason it does not run here. `nightly`: the nightly steps this machine runs (scripts/nightly-full.mjs NIGHTLY_STEPS).",
+  "default": "workstation",
+  "profiles": {
+    "workstation": {
+      "description": "a desktop with a discrete GPU and active cooling, the maintainer's RTX A6000 PC; every test runs as one step",
+      "heat": null,
+      "split": false,
+      "exclude": {},
+      "nightly": ["full check:merge", "pinned proofs"]
+    },
+    "mini-pc": {
+      "description": "a small Windows PC with an AMD iGPU; its elevated temperature logger feeds MARGO_THERMAL_FILE",
+      "heat": { "stopC": 88, "resumeC": 75, "maxWaitMin": 30, "maxResumesPerStep": 2, "pollS": 5 },
+      "split": true,
+      "exclude": {
+        "voxel-pathtracer": "the path tracer froze this machine once; it runs only on the workstation profile"
+      },
+      "nightly": ["gpu package tests"]
+    },
+    "thermal-limited": {
+      "description": "a fanless Linux test server with Intel UHD graphics (Mesa) and a 10 W power cap; its heat guard stops jobs at 82 C",
+      "heat": { "stopC": 80, "resumeC": 70, "maxWaitMin": 45, "maxResumesPerStep": 2, "pollS": 5 },
+      "split": true,
+      "exclude": {
+        "voxel-pathtracer": "path tracing at up to 3840 x 2160 holds the GPU at full load for minutes, past this machine's thermal budget even in short steps; it runs on the workstation profile"
+      },
+      "nightly": ["gpu package tests"]
+    }
+  }
+}

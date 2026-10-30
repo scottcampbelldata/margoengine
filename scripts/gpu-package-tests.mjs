@@ -12,13 +12,24 @@
 // test-results/gpu-packages.json. A test that fails while the Windows event log shows a GPU driver reset runs once more
 // (scripts/support/driver-resets.mjs, bug 25); the reset and the rerun are printed and kept in that file, never hidden:
 // a run that passed only that way ends with a "PASSED WITH A DRIVER RESET" line per test and the file's top-level
-// `passedAfterDriverReset` is true (the file is `{ passedAfterDriverReset, results }`).
+// `passedAfterDriverReset` is true (the file is `{ profile, passedAfterDriverReset, results }`).
+// Machine profiles (MARGO_MACHINE_PROFILE, scripts/support/machine-profiles.json, item 57.1a): a profile can leave
+// packages out (each reported as EXCLUDED BY PROFILE with its stated reason, never a silent skip), run heavy suites as
+// short steps, and watch the temperature: at the profile's stop temperature the running step's process tree is ended,
+// the GPU lock is released, the run waits (at most the profile's maximum) for the resume temperature and runs that same
+// step again, then goes on. Each pause is reported as PAUSED FOR HEAT with the step, the peak, stop and resume
+// temperatures and the time waited; a wait that runs out, or a step that keeps reaching the stop, is PAUSED FOR HEAT:
+// NOT RESUMED with the reason. A run with no failure but a heat stop it did not resume from exits 75 (the heat guard's
+// code), never 1. The default profile has no heat watch and runs every test as one step, as before.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { margoError } from '../packages/shared/errors.js';
 import { acquire, lockDir } from './gpu-lock.mjs';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
+import { coolDown, thermalSource, watchHeat } from './support/heat.mjs';
+import { describeProfile, excludedReason, machineProfile } from './support/machine-profile.mjs';
 import { runLimited, testLimitMs } from './support/run-limited.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -84,6 +95,9 @@ export function plan() {
         cwd: `packages/${dir}`,
         command,
         minutes: json(file).margo?.gpuTestTimeoutMinutes,
+        dir,
+        script: name,
+        ...(json(file).margo?.gpuTestSteps?.[name] && { steps: json(file).margo.gpuTestSteps[name] }),
       });
     }
   }
@@ -103,7 +117,7 @@ export function plan() {
     );
   for (const name of Object.keys(ROOT)) {
     if (!scripts[name]) throw new Error(`ROOT lists ${name}, which package.json no longer has; remove it from ROOT`);
-    tests.push({ label: `root ${name}`, cwd: '.', command: `npm run ${name}`, name });
+    tests.push({ label: `root ${name}`, cwd: '.', command: `npm run ${name}`, name, dir: 'root', script: name });
   }
 
   // Every file under packages/*/{test,tests,scripts} that drives a browser must be run by one of these commands (or by
@@ -168,12 +182,222 @@ function browserFiles() {
 
 /**
  * What a run writes to test-results/gpu-packages.json and the warning lines it ends with. A run in which every test
- * passed, but some only on their rerun after a logged GPU driver reset, has `passedAfterDriverReset: true` and one
- * "PASSED WITH A DRIVER RESET" line per such test; a clean pass or a failed run has false and no lines.
+ * that ran passed, but some only on their rerun after a logged GPU driver reset, has `passedAfterDriverReset: true` and
+ * one "PASSED WITH A DRIVER RESET" line per such test; a clean pass or a failed run has false and no lines. Tests a
+ * profile excluded, or a heat stop left unrun, do not count as runs here (their outcome says what happened).
  */
-export function report(results) {
-  const warnings = results.every((r) => r.ok) ? passedAfterResetLines(results) : [];
-  return { json: { passedAfterDriverReset: warnings.length > 0, results }, warnings };
+export function report(results, profile) {
+  const ran = results.filter((r) => r.outcome !== 'excluded' && r.outcome !== 'not-run');
+  const warnings = ran.every((r) => r.ok) ? passedAfterResetLines(ran) : [];
+  return {
+    json: { ...(profile && { profile: profile.name }), passedAfterDriverReset: warnings.length > 0, results },
+    warnings,
+  };
+}
+
+// A chain part that can run as its own step: a `cd` or one `node <file>` with plain arguments.
+const SIMPLE_PART = /^(cd \S+|node \S+\.m?js(?: [^\s&|;<>]+)*)$/;
+
+/**
+ * The short steps one planned test runs as on a profile with `split` (item 57.1a). A package script that is a chain of
+ * plain `node <file>` commands joined by ` && ` runs one step per command (each keeps the chain's `cd`); a script with
+ * `"margo": { "gpuTestSteps": { "<script>": ["<args>", ...] } }` in its package.json runs once per entry with those
+ * arguments appended, which together cover what the script runs with none. Every other test is one step. Each step
+ * is `{ ...test, label, command, id, part: [i, n] }`; the assertions are the script's own, unchanged.
+ */
+export function splitSteps(test) {
+  const one = { ...test, id: testId(test), part: [1, 1] };
+  const many = (commands, names) =>
+    commands.map((command, i) => ({
+      ...test,
+      command,
+      label: `${test.label} [${i + 1}/${commands.length}] ${names[i]}`,
+      id: `${testId(test)}#${i + 1}`,
+      part: [i + 1, commands.length],
+    }));
+  if (test.steps) {
+    if (!Array.isArray(test.steps) || !test.steps.length || test.steps.some((a) => typeof a !== 'string' || !a.trim()))
+      throw margoError(
+        'GPU_TEST_STEPS_INVALID',
+        `${test.label}: "margo.gpuTestSteps" must be a list of argument strings that together cover the whole script; fix packages/${test.dir}/package.json`,
+      );
+    return many(
+      test.steps.map((args) => `${test.command} ${args}`),
+      test.steps,
+    );
+  }
+  const parts = test.command.split(' && ').map((part) => part.trim());
+  if (!parts.every((part) => SIMPLE_PART.test(part))) return [one];
+  const commands = [],
+    names = [],
+    cds = [];
+  for (const part of parts) {
+    if (part.startsWith('cd ')) cds.push(part);
+    else {
+      commands.push([...cds, part].join(' && '));
+      names.push(basename(part.split(' ')[1]));
+    }
+  }
+  return commands.length > 1 ? many(commands, names) : [one];
+}
+
+/** The steps a profile runs, in plan order: excluded tests stay in the list with their stated reason. */
+export function planSteps(tests, profile) {
+  return tests.flatMap((test) => {
+    const reason = excludedReason(profile, test.dir ?? test.label.split(' ')[0], test.script ?? test.name);
+    if (reason) return [{ ...test, id: testId(test), part: [1, 1], excluded: reason }];
+    return profile.split ? splitSteps(test) : [{ ...test, id: testId(test), part: [1, 1] }];
+  });
+}
+
+const times = (n) => (n === 1 ? 'once' : `${n} times`);
+const pauseText = (p) =>
+  `peak ${p.peakC ?? '?'} C, stopped at ${p.stoppedAtC ?? '?'} C (${p.reason}), ${
+    p.resumed
+      ? `resumed at ${p.resumedAtC} C after ${p.waitedS} s`
+      : p.waitedS === undefined
+        ? 'no wait'
+        : `not resumed after ${p.waitedS} s`
+  }`;
+
+/**
+ * Runs the steps in order and resolves one result per step, each with `outcome`: 'pass', 'fail', 'excluded' (with
+ * `reason`), 'heat-not-resumed' (with `reason`) or 'not-run' (with `reason`), and `pauses` (each heat pause: peak,
+ * stop and resume temperatures, seconds waited). `runStep(step, signal)` runs one step and resolves `{ ok, seconds,
+ * aborted? }`; it must end the step when `signal` aborts. `read()` gives degrees C or null (scripts/support/heat.mjs);
+ * `take()` takes the GPU lock and resolves its release, which is called before every cooldown and taken again after,
+ * so the lock is never held while waiting for heat. A heat profile with no reading at the start throws
+ * THERMAL_SOURCE_MISSING: a run that cannot watch its temperature does not start. `pollMs` overrides the profile's
+ * sample interval (tests).
+ */
+export async function runPlan(
+  steps,
+  { profile, runStep, read = () => null, take = async () => () => {}, log = console.log, pollMs } = {},
+) {
+  const heat = profile.heat,
+    poll = pollMs ?? (heat ? heat.pollS * 1000 : 0),
+    results = [];
+  if (heat && read() === null)
+    throw margoError(
+      'THERMAL_SOURCE_MISSING',
+      `machine profile ${profile.name} watches the temperature but no reading could be had; set MARGO_THERMAL_FILE to a file holding the current temperature, or run on a machine with /sys/class/thermal zones`,
+    );
+  let release = await take(),
+    stopped = null;
+  // Releases the GPU lock, waits (bounded) for the resume temperature, and takes the lock again if it came.
+  const coolFor = async (step, pause) => {
+    release();
+    release = () => {};
+    log(
+      `\nPAUSED FOR HEAT: ${step.label}: ${pause.reason}; peak ${pause.peakC ?? '?'} C. GPU lock released; waiting at most ${heat.maxWaitMin} min for below ${heat.resumeC} C`,
+    );
+    const cool = await coolDown({ read, resumeC: heat.resumeC, maxWaitMs: heat.maxWaitMin * 60_000, pollMs: poll });
+    Object.assign(pause, {
+      resumeC: heat.resumeC,
+      waitedS: cool.waitedS,
+      resumed: cool.resumed,
+      resumedAtC: cool.lastC,
+    });
+    if (cool.resumed) {
+      log(`RESUMED: ${step.label} at ${cool.lastC} C after ${cool.waitedS} s; running this step again from its start`);
+      release = await take();
+    } else
+      pause.notResumed = `still ${cool.lastC ?? 'unreadable'} C after the maximum wait of ${heat.maxWaitMin} min (lowest ${cool.lowestC ?? 'unreadable'} C; resume needs below ${heat.resumeC} C)`;
+    return cool.resumed;
+  };
+  try {
+    for (const step of steps) {
+      if (step.excluded) {
+        results.push({ ...step, outcome: 'excluded', reason: step.excluded });
+        continue;
+      }
+      if (stopped) {
+        results.push({ ...step, outcome: 'not-run', reason: stopped });
+        continue;
+      }
+      const pauses = [];
+      let peakC = null,
+        result = null;
+      while (!result) {
+        // Starting hot only trips the stop at once: cool first (the same bounded wait, reported as a pause).
+        const before = heat ? read() : null;
+        if (heat && (before === null || before >= heat.stopC)) {
+          const pause = {
+            before: true,
+            peakC: before,
+            stoppedAtC: before,
+            reason:
+              before === null
+                ? 'no temperature reading before the start'
+                : `${before} C before the start (stop ${heat.stopC} C)`,
+          };
+          pauses.push(pause);
+          if (!(await coolFor(step, pause))) result = { outcome: 'heat-not-resumed', reason: pause.notResumed };
+          continue;
+        }
+        const controller = new AbortController(),
+          watch = heat ? watchHeat({ read, stopC: heat.stopC, pollMs: poll, onStop: () => controller.abort() }) : null,
+          run = await runStep(step, controller.signal),
+          seen = watch?.stop();
+        if (seen && seen.peakC !== null) peakC = Math.max(peakC ?? seen.peakC, seen.peakC);
+        if (!(run.aborted && seen?.reason)) {
+          result = { ...run, outcome: run.ok ? 'pass' : 'fail' };
+          break;
+        }
+        const pause = { peakC: seen.peakC, stoppedAtC: seen.stoppedAtC, reason: seen.reason, seconds: run.seconds },
+          stops = pauses.filter((p) => !p.before).length + 1;
+        pauses.push(pause);
+        if (stops > heat.maxResumesPerStep) {
+          pause.notResumed = `this step reached the stop ${times(stops)} (at most ${heat.maxResumesPerStep} resumes per step), so it does not fit profile ${profile.name}'s thermal budget; run it on a profile that can take the load, or split it further`;
+          result = { ...run, outcome: 'heat-not-resumed', reason: pause.notResumed };
+        } else if (!(await coolFor(step, pause)))
+          result = { ...run, outcome: 'heat-not-resumed', reason: pause.notResumed };
+      }
+      results.push({ ...step, ...result, ok: result.outcome === 'pass', pauses, peakC });
+      // A machine that did not cool down in time runs nothing more; a step that is only too heavy stops itself.
+      if (result.outcome === 'heat-not-resumed' && pauses.at(-1).resumed === false)
+        stopped = `the run stopped for heat at ${step.label}: ${result.reason}`;
+    }
+  } finally {
+    release();
+  }
+  return results;
+}
+
+/** 1 when any step failed, else 75 (the heat guard's code) when a heat stop was not resumed, else 0. */
+export const exitCode = (results) =>
+  results.some((r) => r.outcome === 'fail')
+    ? 1
+    : results.some((r) => r.outcome === 'heat-not-resumed' || r.outcome === 'not-run')
+      ? 75
+      : 0;
+
+/** The summary lines of a run: one per step, then a count of each outcome other than a plain pass. */
+export function summaryLines(results) {
+  const lines = [];
+  for (const r of results) {
+    const heatNote = r.pauses?.length
+      ? `  (paused for heat ${times(r.pauses.length)}: ${r.pauses.map(pauseText).join('; ')})`
+      : r.peakC !== null && r.peakC !== undefined
+        ? `  (peak ${r.peakC} C)`
+        : '';
+    const reset = r.driverReset ? `  (run again after a ${describeResets(r.driverReset.resets)})` : '';
+    if (r.outcome === 'excluded') lines.push(`  EXCLUDED BY PROFILE  ${r.label}  (${r.reason})`);
+    else if (r.outcome === 'not-run') lines.push(`  NOT RUN  ${r.label}  (${r.reason})`);
+    else if (r.outcome === 'heat-not-resumed')
+      lines.push(`  PAUSED FOR HEAT: NOT RESUMED  ${r.label}  (${r.reason})${heatNote}`);
+    else lines.push(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.label}  ${r.seconds} s${reset}${heatNote}`);
+  }
+  const count = (outcome) => results.filter((r) => r.outcome === outcome).length,
+    resumed = results.filter((r) => r.pauses?.length && (r.outcome === 'pass' || r.outcome === 'fail')).length;
+  if (resumed) lines.push(`  paused for heat and resumed: ${resumed} step(s)`);
+  for (const [outcome, text] of [
+    ['heat-not-resumed', 'paused for heat, not resumed'],
+    ['not-run', 'not run after a heat stop'],
+    ['excluded', 'excluded by profile'],
+  ])
+    if (count(outcome)) lines.push(`  ${text}: ${count(outcome)} step(s)`);
+  return lines;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -183,8 +407,14 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const tests = plan().filter((t) => (!only || t.label.includes(only)) && (!chosen || chosen.has(testId(t))));
   const unknown = chosen ? [...chosen].filter((id) => !tests.some((t) => testId(t) === id)) : [];
   if (unknown.length) throw new Error(`--select names no GPU test: ${unknown.join(', ')}; list them with --list`);
+  const profile = machineProfile(),
+    steps = planSteps(tests, profile);
   if (process.argv.includes('--list')) {
-    for (const t of tests) console.log(`${t.label}: (${t.cwd}) ${t.command}`);
+    console.log(describeProfile(profile));
+    for (const s of steps)
+      console.log(
+        s.excluded ? `${s.label}: EXCLUDED BY PROFILE (${s.excluded})` : `${s.label}: (${s.cwd}) ${s.command}`,
+      );
     process.exit(0);
   }
   // Children taking this same lock run inside it; any other lock they take is still taken. In this gate a Jupyter check
@@ -200,53 +430,61 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     const { status } = spawnSync(command, { cwd: join(root, cwd), shell: true, stdio: 'inherit', env });
     return { ok: status === 0, seconds: Math.round((performance.now() - t0) / 100) / 10 };
   };
+  console.log(describeProfile(profile));
   // The build needs no GPU, so it runs before the lock is taken.
   if (!process.argv.includes('--no-build') && !run('npm run build:packages', '.').ok)
     throw new Error('npm run build:packages failed; fix the build first');
-  // A short poll: other holders often release and take the lock again within seconds.
-  // Held for the whole run (about 10 min alone, 15 with another run beside it), so the hold limit is 60 min.
-  const release = await acquire({ owner: 'check:gpu-packages', mode: 'shared', max: 60, poll: 2000 });
-  const started = performance.now();
-  const results = [],
-    prepared = new Set();
-  try {
-    for (const test of tests) {
+  const started = performance.now(),
+    prepared = new Set(),
+    thermal = profile.heat ? thermalSource() : null;
+  if (thermal) console.log(`temperature from the ${thermal.name}`);
+  const results = await runPlan(steps, {
+    profile,
+    read: thermal?.read,
+    // A short poll: other holders often release and take the lock again within seconds. Held for the whole run (about
+    // 10 min alone, 15 with another run beside it), so the hold limit is 60 min; a heat pause releases it while it waits.
+    take: () => acquire({ owner: 'check:gpu-packages', mode: 'shared', max: 60, poll: 2000 }),
+    runStep: async (step, signal) => {
       // Each preparing command once, however many suites need it.
-      for (const command of PREPARE[test.name] ?? []) {
+      for (const command of PREPARE[step.name] ?? []) {
         if (prepared.has(command)) continue;
-        if (!run(command, '.').ok) throw new Error(`${command} failed (needed by ${test.label}); fix it first`);
+        if (!run(command, '.').ok) throw new Error(`${command} failed (needed by ${step.label}); fix it first`);
         prepared.add(command);
       }
-      console.log(`\n=== ${test.label}`);
-      // A test that fails while the GPU driver resets (bug 25) runs once more; the reset and the rerun are printed.
-      const result = await retryAfterDriverReset(test.label, async () => {
-        const run = await runLimited(test.command, {
-          cwd: join(root, test.cwd),
+      console.log(`\n=== ${step.label}`);
+      const once = async () => {
+        const result = await runLimited(step.command, {
+          cwd: join(root, step.cwd),
           env,
-          limitMs: testLimitMs(test.minutes),
-          label: test.label,
+          limitMs: testLimitMs(step.minutes),
+          label: step.label,
+          signal,
         });
-        if (run.message) console.error(`\nHUNG: ${run.message}`);
-        return run;
-      });
-      results.push({ ...test, ...result });
-    }
-  } finally {
-    release();
-  }
-  const failed = results.filter((r) => !r.ok);
+        if (result.message) console.error(`\nHUNG: ${result.message}`);
+        return result;
+      };
+      // A test that fails while the GPU driver resets (bug 25) runs once more; the reset and the rerun are printed. A
+      // step ended by the heat watch goes back to runPlan as it is: the heat pause, not a reset, explains it.
+      const first = await once();
+      if (first.ok || first.aborted) return first;
+      let used = false;
+      return retryAfterDriverReset(step.label, async () => (used ? once() : ((used = true), first)));
+    },
+  });
   mkdirSync(join(root, 'test-results'), { recursive: true });
-  const { json, warnings } = report(results);
+  const { json, warnings } = report(results, profile);
   writeFileSync(join(root, 'test-results/gpu-packages.json'), JSON.stringify(json, null, 2) + '\n');
-  console.log('\nGPU package tests:');
-  for (const r of results)
-    console.log(
-      `  ${r.ok ? 'PASS' : 'FAIL'}  ${r.label}  ${r.seconds} s${r.driverReset ? `  (run again after a ${describeResets(r.driverReset.resets)})` : ''}`,
-    );
+  console.log(`\nGPU package tests, ${describeProfile(profile)}:`);
+  for (const line of summaryLines(results)) console.log(line);
   console.log(`  total ${Math.round((performance.now() - started) / 1000)} s`);
   for (const line of warnings) console.log(`\n${line}`);
-  if (failed.length) {
+  const failed = results.filter((r) => r.outcome === 'fail'),
+    code = exitCode(results);
+  if (failed.length)
     console.error(`${failed.length} of ${results.length} failed: ${failed.map((r) => r.label).join(', ')}`);
-    process.exitCode = 1;
-  }
+  else if (code === 75)
+    console.error(
+      'No test failed, but a heat stop was not resumed: the run is incomplete (exit 75). Rerun the steps named above when the machine is cool, or on a profile that can take the load.',
+    );
+  process.exitCode = code;
 }

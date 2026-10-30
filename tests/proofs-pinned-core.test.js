@@ -12,7 +12,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { pinnedProofsCommand } from '../scripts/nightly-full.mjs';
+import { nightlySteps, pinnedProofsCommand } from '../scripts/nightly-full.mjs';
+import { machineProfile } from '../scripts/support/machine-profile.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   compare = pathToFileURL(join(root, 'examples/package-benchmarks/proofs/compare.js')).href;
@@ -71,10 +72,13 @@ test('the nightly job runs the pinned proofs after the full check, alone under t
   const [, args] = pinnedProofsCommand();
   assert.deepEqual(args.slice(0, 4), ['scripts/gpu-lock.mjs', 'run', '--owner=nightly-proofs', '--exclusive']);
   assert.deepEqual(args.slice(-3), ['npm', 'run', 'proofs']);
-  assert.match(
-    readFileSync(join(root, 'scripts/nightly-full.mjs'), 'utf8'),
-    /label: 'pinned proofs', command: pinnedProofsCommand()/,
+  // The default (workstation) profile's nightly plan: the full check, then the pinned proofs.
+  const { steps } = nightlySteps(machineProfile({}));
+  assert.deepEqual(
+    steps.map((step) => step.label),
+    ['full check:merge', 'pinned proofs'],
   );
+  assert.deepEqual(steps[1].command, pinnedProofsCommand());
 });
 
 // The stand-in device made 15 new closures for every begin*Pass (since 66d1cb30), about 19 µs a frame in splats' timed

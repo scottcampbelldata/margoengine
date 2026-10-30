@@ -2083,6 +2083,27 @@ done
 wait "$PID"
 ```
 
+The reference guard's cooldown `until` loop has no maximum wait: on a box that never cools below the resume
+temperature it waits forever. Give any copy a hard limit.
+
+Machine profiles and heat pauses in the runner (item 57.1a, `scripts/support/machine-profiles.json`,
+`scripts/support/heat.mjs`): `MARGO_MACHINE_PROFILE` picks `workstation` (default: no heat watch, every test as one
+step), `mini-pc` or `thermal-limited` by name, never by hostname. A heat profile makes `check:gpu-packages` watch the
+same sensor as the guard (hottest thermal zone, or `MARGO_THERMAL_FILE`) a little below the guard's stop, so the guard
+stays the machine-level safety net. Outcomes the runner prints, one line per step in its summary:
+
+| Line | Meaning | Exit |
+| --- | --- | --- |
+| `PASS ... (paused for heat once: peak 81 C, stopped at 81 C (...), resumed at 69 C after 412 s)` | the step reached the stop, its tree was ended, the GPU lock released, the machine cooled within the maximum wait, and the same step ran again and passed | 0 |
+| `PAUSED FOR HEAT: NOT RESUMED <step> (still 72 C after the maximum wait of 45 min ...)` | the cooldown ran out; the rest of the run is `NOT RUN` with that reason | 75 |
+| `PAUSED FOR HEAT: NOT RESUMED <step> (this step reached the stop 3 times ...)` | the step does not fit the thermal budget; the run goes on with the next step | 75 |
+| `EXCLUDED BY PROFILE <step> (excluded by profile thermal-limited: <reason>)` | the profile leaves the package out, with its stated reason | 0 |
+
+A failure stays `FAIL` (exit 1). No limit is raised automatically and every wait is bounded. Split profiles run heavy
+suites as short steps (one step per command of a `node ... && node ...` chain, or the argument sets in a package's
+`margo.gpuTestSteps`), with the assertions unchanged. `scripts/nightly-full.mjs` takes its steps from the profile and
+ends a night with an unresumed heat stop as `PAUSED-FOR-HEAT`.
+
 ### 2.16 Failure modes and what we saw
 
 1. Fixed dev-server port shared by suites: a 5 s check waited silently behind another suite's run and was killed at

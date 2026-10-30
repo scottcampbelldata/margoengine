@@ -7,6 +7,15 @@ import assert from 'node:assert/strict';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 
+// `--samples=4` or `--samples=1` runs one sample count only, a short step on a thermally limited machine (package.json
+// `margo.gpuTestSteps`, item 57.1a); with no flag both run, in this order.
+const SAMPLE_COUNTS = [4, 1],
+  samplesFlag = process.argv.find((a) => a.startsWith('--samples='))?.slice(10),
+  sampleCounts = samplesFlag === undefined ? SAMPLE_COUNTS : samplesFlag.split(',').map(Number);
+if (!sampleCounts.length || sampleCounts.some((n) => !SAMPLE_COUNTS.includes(n)))
+  throw new RangeError(
+    `--samples=${samplesFlag} names no sample count; pass one or more of ${SAMPLE_COUNTS.join(', ')}`,
+  );
 const path = '/packages/voxel/tests/bevel-browser-check.html',
   port = 5227,
   context = await openBrowser({ startPath: path, port }),
@@ -23,7 +32,7 @@ const fail = (label, detail) => {
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
   if (!hardware.webgpu || hardware.webgpu.fallback) fail('physical WebGPU adapter required', hardware.webgpu);
-  for (const samples of [4, 1]) {
+  for (const samples of sampleCounts) {
     await page.goto(`http://127.0.0.1:${port}${path}${samples === 1 ? '?samples=1' : ''}`);
     await page.waitForFunction(() => window.ready, null, { timeout: 180000 });
     const result = await page.evaluate(() => window.check.run());

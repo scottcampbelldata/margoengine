@@ -53,5 +53,19 @@
     "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs",
     "test:gpu:slow-compile": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs agx --pipeline-delay=500",
     "test:gpu:spec-math": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs projections --spec-math-error=1"
+  },
+  "margo": {
+    "gpuTestSteps": {
+      "test:gpu": [
+        "agx groundprecision denoiseholdout compat compile",
+        "preview traversal analytic glasslight sky",
+        "projections arealight dispersion microfacet energy",
+        "environment textures cutout shapes transparent",
+        "determinism convergence denoise denoisepeak denoisehistory",
+        "motion lens viewport bloom capture materialtables",
+        "largemodels",
+        "native4k"
+      ]
+    }
   }
 }

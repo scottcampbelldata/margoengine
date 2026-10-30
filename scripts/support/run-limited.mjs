@@ -22,25 +22,35 @@ export function testLimitMs(packageMinutes, env = process.env) {
 }
 
 /**
- * Runs `command` in `cwd`, output passed through. Resolves `{ ok, timedOut, seconds, message? }`; past `limitMs` the
- * whole process tree is killed and `message` names `label` and how to raise the limit.
+ * Runs `command` in `cwd`, output passed through. Resolves `{ ok, timedOut, aborted, seconds, message? }`; past
+ * `limitMs` the whole process tree is killed and `message` names `label` and how to raise the limit. When `signal`
+ * aborts (the heat watch, scripts/support/heat.mjs) the tree is killed too and `aborted` is true: the caller states why.
  */
-export function runLimited(command, { cwd, env = process.env, limitMs, label = command }) {
+export function runLimited(command, { cwd, env = process.env, limitMs, label = command, signal }) {
   return new Promise((done) => {
     const t0 = performance.now();
     const windows = process.platform === 'win32';
     const child = spawn(command, { cwd, env, shell: true, stdio: 'inherit', detached: !windows });
-    let timedOut = false;
+    let timedOut = false,
+      aborted = false;
     const timer = setTimeout(() => {
       timedOut = true;
       killTree(child.pid);
     }, limitMs);
+    const abort = () => {
+      aborted = true;
+      killTree(child.pid);
+    };
+    if (signal?.aborted) abort();
+    else signal?.addEventListener('abort', abort, { once: true });
     const finish = (code) => {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
       const seconds = Math.round((performance.now() - t0) / 100) / 10;
       done({
-        ok: !timedOut && code === 0,
+        ok: !timedOut && !aborted && code === 0,
         timedOut,
+        aborted,
         seconds,
         ...(timedOut && {
           message: `${label} hung: no result after ${Math.round(limitMs / 1000)} s, process tree killed; find the stuck step (page, server or await) and fix it, or raise the limit with MARGO_GPU_TEST_TIMEOUT_MIN or "margo.gpuTestTimeoutMinutes" in the package's package.json if the test is genuinely slower`,
