@@ -2,7 +2,7 @@
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: in development, milestones M0 to M7 of the [roadmap](../../docs/webgl2-compat-roadmap.md).** This package
+**Status: in development, milestones M0 to M7 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done, M8 (every site demo, docs, release) under way.** Every live demo on margoengine.com loads this layer when the browser has no WebGPU; [webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists how each one compares with native WebGPU. This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels

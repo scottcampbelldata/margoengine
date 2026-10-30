@@ -1,4 +1,4 @@
-// Shadows' route on the WebGL2 compatibility layer, loaded by import() only there (docs/webgl2-compat-roadmap.md,
+// Shadows' route on the WebGL2 compatibility layer, loaded by import() only there (the WebGL2 roadmap,
 // "Package routes"). The PCSS search needs each map layer's nearest depth; the WebGPU kernel (shader.ts
 // `nearestDepth`) reduces it with workgroup memory and atomics, which put it on the layer's CPU tier: the whole map
 // read back and looped over in JavaScript, about 0.5 s a frame for a 2048 x 2048 map whenever a caster moves. Here

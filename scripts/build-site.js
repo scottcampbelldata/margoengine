@@ -81,6 +81,7 @@ const pages = [
   'sciviz-surface',
   'ui-game',
   'weather',
+  'dual-viewport',
 ];
 await site({
   configFile: false,

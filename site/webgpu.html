@@ -1,26 +1,71 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Browsers with WebGPU - Margo Engine</title>
-  <meta name="description" content="Which browser to update so the Margo Engine demos can run: WebGPU ships in current Chrome, Edge and Safari.">
-  <link rel="icon" href="/favicon.ico" sizes="32x32">
-  <link rel="preload" href="/fonts/SourceSans3-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/site.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Running without WebGPU - Margo Engine</title>
+<meta name="description" content="How the Margo Engine demos run on browsers without WebGPU: the WebGL2 compatibility mode, what it downloads, what it cannot run, and which browsers to update.">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="preload" href="/fonts/SourceSans3-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/site.css">
 </head>
 <body>
-  <main>
-    <h1>Your browser needs WebGPU</h1>
-    <p>The Margo Engine demos draw with WebGPU. Update to one of these and reload the demo:</p>
-    <ul>
-      <li>Chrome or Edge 113 or newer on Windows, macOS or ChromeOS; Chrome 121 or newer on Android 12 or newer.</li>
-      <li>Safari 26 or newer on macOS, iOS or iPadOS 26.</li>
-      <li>Firefox 141 or newer on Windows.</li>
-    </ul>
-    <p>Still blocked on a current browser? Turn on hardware acceleration in its settings and update the graphics driver:
-      some older GPUs are left out. On Linux, WebGPU may need to be switched on in the browser's flags.</p>
-    <p><a href="/">Back to margoengine.com</a></p>
-  </main>
+<main>
+<h1>Running without WebGPU</h1>
+<p>The Margo Engine demos draw with WebGPU. If your browser has no WebGPU, or has it but finds no usable GPU, the demo
+downloads the WebGL2 compatibility layer instead and runs the same engine code on WebGL2. A note in the lower left
+corner says "WebGL2 compatibility mode" while it does.</p>
+
+<h2>What you download</h2>
+<p>Only a browser without WebGPU downloads the layer: the demo page checks for WebGPU first and loads the layer with a
+separate request only when the check fails. A browser with WebGPU downloads none of it, and the demos run exactly as
+before. The layer is 93,763 bytes gzip with everything rendering needs; the part that runs compute shaders, 42,210
+bytes gzip of that, loads only when a demo uses compute. Sizes measured by the engine's size records for this
+version.</p>
+
+<h2>What it looks like</h2>
+<p>Most demos draw the same pixels as WebGPU on the same GPU: at most a level or two of difference on a pixel, where
+the two paths compile shaders differently. Some show small differences, for example in particle effects whose random
+numbers come from functions the layer computes on the CPU, and the page lists every demo with its measured difference:
+<a href="/llms/docs/webgl2-compat-demos.md">the demos on the WebGL2 layer</a>. The
+<a href="/demos/dual-viewport.html">side by side demo</a> draws one scene both ways in your browser and shows the
+difference and the frame times as you watch.</p>
+
+<h2>What it cannot run</h2>
+<ul>
+<li>The voxel path tracer (the voxel sandbox's photo mode): WebGL2's shader compiler takes from 20 seconds to several
+minutes for each of its kernels.</li>
+<li>WebXR sessions: WebXR on WebGL2 needs a different kind of layer.</li>
+</ul>
+<p>A demo part that needs either shows a message over the scene naming the error code, MargoError
+<code>unsupported</code>, instead of a blank or frozen view.</p>
+
+<h2>Pages with a Content Security Policy</h2>
+<p>Rendering on the layer needs nothing special. Compute shaders that WebGL2 cannot run on the GPU (atomics, shared
+workgroup memory, barriers) run on the CPU as JavaScript that the layer compiles at run time with
+<code>new Function</code>. A page whose Content Security Policy does not allow <code>'unsafe-eval'</code> gets those
+kernels refused with MargoError code <code>unsupported</code>; everything else still runs. With WebGPU, nothing in the
+engine needs <code>'unsafe-eval'</code>.</p>
+
+<h2>Browsers with WebGPU</h2>
+<p>For the full speed of the demos, update to one of these and reload:</p>
+<ul>
+<li>Chrome or Edge 113 or newer on Windows, macOS or ChromeOS; Chrome 121 or newer on Android 12 or newer.</li>
+<li>Safari 26 or newer on macOS, iOS or iPadOS 26.</li>
+<li>Firefox 141 or newer on Windows.</li>
+</ul>
+<p>Still blocked on a current browser? Turn on hardware acceleration in its settings and update the graphics driver:
+some older GPUs are left out. On Linux, WebGPU may need to be switched on in the browser's flags. A browser with
+neither WebGPU nor WebGL2 (with float render targets) shows "This demo needs a browser with WebGPU" instead.</p>
+
+<h2>In your own app</h2>
+<p>The same takes four lines. Load the layer only where WebGPU is missing, before creating the engine:</p>
+<pre><code>import { Engine } from 'margoengine/core';
+
+const webgpu = 'gpu' in navigator &amp;&amp; (await navigator.gpu.requestAdapter()) !== null;
+if (!webgpu) await (await import('margoengine/webgl2-compat')).install();
+const engine = await Engine.create(document.querySelector('canvas'));</code></pre>
+<p><a href="/">Back to margoengine.com</a></p>
+</main>
 </body>
 </html>

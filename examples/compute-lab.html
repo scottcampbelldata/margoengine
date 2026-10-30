@@ -31,7 +31,8 @@
   <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
   <script type="module">
     import { needsWebGPU } from './needs-webgpu.js';
-    needsWebGPU('#viewport').then((ok) => ok && import('./compute-lab.ts'));
+    // Kept off the WebGL2 layer until its bug there is fixed (docs/known-bugs.md, "WebGL2 layer: compute lab").
+    needsWebGPU('#viewport', { layer: false }).then((ok) => ok && import('./compute-lab.ts'));
   </script>
 </body>
 </html>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WebGPU and WebGL2 side by side · Margo Engine</title>
+  <meta name="description" content="One scene drawn twice: native WebGPU on the left, the WebGL2 compatibility layer on the right, with the measured pixel difference and frame times.">
+  <link rel="stylesheet" href="./multi-view.css">
+  <style>
+    .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .pair figure{margin:0;position:relative;height:56vh;min-height:260px;border-radius:12px;overflow:hidden;background:#080c12}
+    .pair canvas{display:block;width:100%;height:100%}
+    .pair figcaption{position:absolute;top:8px;left:8px;padding:2px 8px;border-radius:4px;background:#0c1118cc;color:#d8e4f5;font-size:14px}
+    .numbers{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:4px 24px;margin:16px 0;font-variant-numeric:tabular-nums}
+    .numbers dt{color:#8fa0b8;font-size:14px}
+    .numbers dd{margin:0 0 8px;font-size:18px;color:#edf2fa}
+    .controls{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin:8px 0 16px}
+    label{color:#d8e4f5}
+    button{min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #62718b;background:#263449;color:#edf2fa;font:inherit;cursor:pointer}
+    @media(max-width:700px){.pair{grid-template-columns:1fr}.pair figure{height:42vh}}
+  </style>
+</head>
+<body>
+  <h1>WebGPU and WebGL2, side by side</h1>
+  <p>The same scene, the same engine code: the left view draws with your browser's WebGPU, the right one with the WebGL2
+    compatibility layer (<code>@margoengine/webgl2-compat</code>), which a browser without WebGPU downloads instead. The
+    numbers below are measured in your browser, on your GPU, while you watch.</p>
+  <div class="controls">
+    <label><input type="checkbox" id="exact" checked> Exact pixels (no MSAA)</label>
+    <label><input type="checkbox" id="spin" checked> Turn the scene</label>
+    <button type="button" id="compare">Compare pixels now</button>
+  </div>
+  <div class="pair">
+    <figure><canvas id="native" aria-label="The scene drawn with native WebGPU"></canvas><figcaption>Native WebGPU</figcaption></figure>
+    <figure><canvas id="layer" aria-label="The same scene drawn on the WebGL2 compatibility layer"></canvas><figcaption>WebGL2 layer</figcaption></figure>
+  </div>
+  <dl class="numbers" id="numbers" aria-live="polite">
+    <div><dt>Pixels that differ (d &gt; 2)</dt><dd id="over2">waiting for a frame</dd></div>
+    <div><dt>Mean and largest difference d</dt><dd id="mean">-</dd></div>
+    <div><dt>Native WebGPU: CPU per frame, until the GPU is done</dt><dd id="time-native">-</dd></div>
+    <div><dt>WebGL2 layer: CPU per frame, until the GPU is done</dt><dd id="time-layer">-</dd></div>
+  </dl>
+  <p>d is the largest red, green or blue difference of a pixel, 0 to 255, between the two views after both have drawn
+    the same frame. Rendering through two shader compilers can move a value by a level or two, so the engine counts a
+    pixel as different only above 2; with MSAA on, the two paths resolve edges with their own sample patterns, which
+    shows along silhouettes. Frame times are medians of the last 60 frames: the CPU time of the engine's render call,
+    and the time until the GPU reports the frame's work done. The layer runs every WebGPU call through WebGL2, so it
+    costs more CPU time. How each site demo compares is in
+    <a href="../webgpu.html">the compatibility page</a>.</p>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU and the WebGL2 layer…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    // Native WebGPU first; without it the page shows the WebGL2 side alone (the gate installs the layer).
+    const native = await navigator.gpu?.requestAdapter().catch(() => null);
+    if (native) import('./dual-viewport.ts');
+    else needsWebGPU('#native').then((ok) => ok && import('./dual-viewport.ts'));
+  </script>
+</body>
+</html>

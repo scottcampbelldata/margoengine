@@ -559,6 +559,8 @@ test('a one-package change narrows the visual demos, the GPU tests and the WGSL 
   const command = (name) => planned.find((p) => stepName(p.command) === name);
   assert.match(command('visual:check').command, /--only=.*\bdof\b/);
   assert.doesNotMatch(command('visual:check').command, /night-citadel|khronos/);
+  assert.match(command('visual:compat').command, /--only=.*\bdof\b/, 'the WebGL2 layer run narrows the same way');
+  assert.doesNotMatch(command('visual:compat').command, /night-citadel|khronos/);
   assert.ok(command('check:views').skip === undefined, 'views draw DOF');
   assert.ok(command('check:depth').skip, 'depth does not use dof');
   assert.match(command('check:wgsl').command, /--packages=.*\bdof\b/);

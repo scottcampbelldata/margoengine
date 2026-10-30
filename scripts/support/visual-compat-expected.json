@@ -1,0 +1,206 @@
+{
+ "demos": {
+  "animation-formats": {
+   "status": "same"
+  },
+  "animator": {
+   "status": "differs",
+   "over2": 0.00649,
+   "mean": 0.198
+  },
+  "batched-mesh": {
+   "status": "same"
+  },
+  "character-animation": {
+   "status": "same"
+  },
+  "clipping-planes": {
+   "status": "same"
+  },
+  "compute-lab": {
+   "status": "webgpu only"
+  },
+  "depth-texture": {
+   "status": "same"
+  },
+  "dof": {
+   "status": "differs",
+   "over2": 0.00661,
+   "mean": 0.0728
+  },
+  "earth": {
+   "status": "same"
+  },
+  "flight-helmet": {
+   "status": "same"
+  },
+  "gameplay-sandbox": {
+   "status": "differs",
+   "over2": 0.0116,
+   "mean": 0.135
+  },
+  "khronos-ABeautifulGame": {
+   "status": "same"
+  },
+  "khronos-AlphaBlendModeTest": {
+   "status": "same"
+  },
+  "khronos-AnisotropyBarnLamp": {
+   "status": "same"
+  },
+  "khronos-BoomBox": {
+   "status": "same"
+  },
+  "khronos-BoxVertexColors": {
+   "status": "same"
+  },
+  "khronos-Cameras": {
+   "status": "same"
+  },
+  "khronos-CommercialRefrigerator": {
+   "status": "same"
+  },
+  "khronos-Corset": {
+   "status": "same"
+  },
+  "khronos-DiffuseTransmissionTeacup": {
+   "status": "same"
+  },
+  "khronos-DirectionalLight": {
+   "status": "same"
+  },
+  "khronos-FlightHelmet": {
+   "status": "same"
+  },
+  "khronos-Fox": {
+   "status": "same"
+  },
+  "khronos-InterpolationTest": {
+   "status": "same"
+  },
+  "khronos-IridescenceLamp": {
+   "status": "same"
+  },
+  "khronos-Lantern": {
+   "status": "same"
+  },
+  "khronos-LightsPunctualLamp": {
+   "status": "same"
+  },
+  "khronos-MaterialsVariantsShoe": {
+   "status": "same"
+  },
+  "khronos-MeshoptCubeTest": {
+   "status": "same"
+  },
+  "khronos-MeshPrimitiveModes": {
+   "status": "same"
+  },
+  "khronos-MetalRoughSpheres": {
+   "status": "same"
+  },
+  "khronos-MorphStressTest": {
+   "status": "same"
+  },
+  "khronos-MultipleScenes": {
+   "status": "same"
+  },
+  "khronos-NegativeScaleTest": {
+   "status": "same"
+  },
+  "khronos-NodePerformanceTest": {
+   "status": "same"
+  },
+  "khronos-NormalTangentMirrorTest": {
+   "status": "same"
+  },
+  "khronos-OrientationTest": {
+   "status": "same"
+  },
+  "khronos-PointLightIntensityTest": {
+   "status": "same"
+  },
+  "khronos-RiggedFigure": {
+   "status": "same"
+  },
+  "khronos-SciFiHelmet": {
+   "status": "same"
+  },
+  "khronos-SheenChair": {
+   "status": "same"
+  },
+  "khronos-TextureTransformTest": {
+   "status": "same"
+  },
+  "khronos-ToyCar": {
+   "status": "same"
+  },
+  "light-keeper": {
+   "status": "differs",
+   "over2": 0.0707,
+   "mean": 0.792
+  },
+  "minimap": {
+   "status": "same"
+  },
+  "night-citadel": {
+   "status": "differs",
+   "over2": 0.00199,
+   "mean": 0.0621
+  },
+  "scene-targets": {
+   "status": "same"
+  },
+  "sciviz-points": {
+   "status": "differs",
+   "over2": 0.00207,
+   "mean": 0.271
+  },
+  "sciviz-surface": {
+   "status": "webgpu only"
+  },
+  "sciviz-volume": {
+   "status": "same"
+  },
+  "split-screen": {
+   "status": "same"
+  },
+  "texture-formats": {
+   "status": "same"
+  },
+  "tonemap": {
+   "status": "same"
+  },
+  "ui-game": {
+   "status": "same"
+  },
+  "voxel-ground": {
+   "status": "differs",
+   "over2": 0.00538,
+   "mean": 0.184
+  },
+  "voxel-night": {
+   "status": "differs",
+   "over2": 0.0145,
+   "mean": 0.163
+  },
+  "voxel-overview": {
+   "status": "differs",
+   "over2": 0.0124,
+   "mean": 0.206
+  },
+  "voxel-shapes": {
+   "status": "differs",
+   "over2": 0.00231,
+   "mean": 0.0779
+  },
+  "weather": {
+   "status": "differs",
+   "over2": 0.0555,
+   "mean": 0.805
+  },
+  "windy-meadow": {
+   "status": "same"
+  }
+ }
+}

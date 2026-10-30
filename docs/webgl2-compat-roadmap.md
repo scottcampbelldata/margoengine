@@ -9,20 +9,22 @@ reports WebGL2 capabilities and tiers; the WGSL corpus is recorded) and M1 (the 
 parses and type-checks, [below](#wgsl-front-end-m1-2026-10-27)) and M2 (the GLSL back end and the device: core renders on
 WebGL2 with the same pixels as native WebGPU, [below](#glsl-back-end-and-device-m2-2026-10-28)) are done, and so are M3 (first
 part), M4 (storage buffers read in render shaders), M5 (compute, [below](#compute-m5-2026-10-28)) and M6 (package
-routes, [below](#package-routes-m6-2026-10-29)); M7 (performance) is next. It was paused
+routes, [below](#package-routes-m6-2026-10-29)) and M7 (performance and hardening); M8 (every site demo, docs and the release,
+[below](#demos-docs-and-release-m8-2026-10-29)) is under way. It was paused
 on 2026-10-24 (the apps built on Margo so far run on Electron, which has WebGPU) and planned for after v1.0.0 before
 that.
 
-## What visitors without WebGPU see today (2026-10-24)
+## What visitors without WebGPU see today (2026-10-29)
 
-- **Site demos.** Every live demo on margoengine.com (Night Citadel, the gameplay sandbox, the voxel sandbox, flight
-  helmet, character animation, robot, windy meadow, Tokyo corner, earth, DOF, tonemap, animator and light-keeper) loads
-  [examples/needs-webgpu.js](../examples/needs-webgpu.js) first. Without WebGPU (no `navigator.gpu`, or
-  `requestAdapter()` answers null) it shows "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the
-  canvas area, with a link to [webgpu.html](../site/webgpu.html) on which browser to update, and the demo's own code
-  is never downloaded. None of the demos runs on the WebGL2 preview: each needs effects, particles, skinning or compute.
-  The landing page draws no scene. `npm run check:no-webgpu` (part of `check:merge`) loads every page both ways and
-  fails on a missing message or any uncaught error.
+- **Site demos.** Every live demo on margoengine.com loads [examples/needs-webgpu.js](../examples/needs-webgpu.js)
+  first. Without WebGPU (no `navigator.gpu`, or `requestAdapter()` answers null) it downloads this layer with a
+  dynamic import, installs it and runs the demo on it, with a "WebGL2 compatibility mode" note linking to
+  [webgpu.html](../site/webgpu.html); a demo part that refuses the layer (MargoError code `unsupported`) shows the
+  refusal over the scene. Only a browser without WebGL2 at the layer's full tier as well gets "This demo needs a
+  browser with WebGPU: Chrome, Edge or Safari." and never downloads the demo's code. The landing page draws no scene.
+  `npm run check:no-webgpu` (part of `check:merge`) loads every page with WebGPU (none of the layer may download), in
+  both no-WebGPU modes (the layer must install, no uncaught error) and with WebGL2 removed too (the message must show).
+  How each demo looks on the layer is [webgl2-compat-demos.md](webgl2-compat-demos.md).
 - **Apps on the engine.** `Engine.create` (and `createStage`) reject with `WebGPU unavailable` unless the app passes
   `fallback: webglRenderer` from `@margoengine/webgl`. With it, core meshes draw on WebGL2 (per-pixel PBR from each
   mesh's constant colour, one directional light plus ambient, no textures, effects or picking). Packages that need
@@ -731,3 +733,39 @@ the browser offers it, the layer, and for the basic scene the milestone M2 layer
 - **Adapter-independent checks (bug 66).** The features check compared compat with native exactly but also held
   three sanity bytes an Intel Arc 140V rounds one level differently (both natively and on the layer); those now
   allow two levels, and the exact comparison with native on the same adapter stays.
+
+## Demos, docs and release (M8, 2026-10-29)
+
+Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL2, Dawn for WebGPU).
+
+- **Site demos load the layer.** The demo pages' gate ([examples/needs-webgpu.js](../examples/needs-webgpu.js))
+  imports `@margoengine/webgl2-compat` only when WebGPU is missing, installs it and runs the demo on it; a part that
+  refuses the layer shows the refusal with its code. `check:no-webgpu` asserts that a browser with WebGPU downloads
+  none of the layer on every page (the dual viewport page excepted, it draws both ways), that without WebGPU each demo
+  installs it with no uncaught error, and that without WebGL2 as well the old message shows.
+- **Every demo compared** (`npm run visual:compat`, in `check:merge`; table in
+  [webgl2-compat-demos.md](webgl2-compat-demos.md)): 60 demos, 28 site demos and 32 Khronos gallery models. All 32
+  models and 15 site demos draw the same pixels as native WebGPU by the parity rule (decision 4); 11 site demos run
+  with differences the table states (0.2% to 7.1% of pixels with d > 2, causes open in
+  [known-bugs.md](known-bugs.md)); compute lab (wrong Philox data on the layer) and sciviz surface (does not start:
+  "Uniform p.time is missing") are kept on WebGPU only, with the message, until their bugs are fixed. Main-thread work
+  per still frame on the layer: 0.2 to 9.9 ms (native 0.2 to 1.2 ms).
+- **Shadows route (bug found by the run).** Soft shadows reduce each map layer to its nearest depth with workgroup
+  memory and atomics, so the layer ran it on the CPU tier, reading the whole 2048 x 2048 map back every frame with a
+  dynamic caster: 480 ms a frame for batched mesh and clipping planes, 168 ms for character animation. The route
+  (`packages/shadows/src/compat.ts`, loaded only on the layer) computes the same minimum with two fragment-tier block
+  passes and one point-draw word per layer: those demos now take 0.4 to 1.3 ms, and `routes-browser.mjs` finds no
+  pixel different from native (regression tests: `routes.test.js` tiers, the route case in `routes-browser.mjs`, and
+  the frame budget of `visual:compat`).
+- **Frame budget.** `visual:compat` fails a demo whose median frame on the layer costs more than 50 ms of main-thread
+  work and more than twice its native frame (`--budget=<ms>`); the run on an integrated GPU (AMD Radeon 680M) is
+  still to be recorded.
+- **Dual viewport** ([examples/dual-viewport.html](../examples/dual-viewport.html), the launch showcase item): one
+  scene with PBR materials and soft shadows, native WebGPU on the left and the layer on the right, with the live pixel
+  difference and both frame times. In exact-pixel mode and with 4x MSAA on this PC no pixel of the 274,176 differs by more than one level.
+- **Docs.** [webgpu.html](../site/webgpu.html) explains the compatibility mode to visitors (what loads and when, the
+  download, what it refuses, the `unsafe-eval` note for the CPU tier); [limits.md](limits.md) and the error page's
+  `compatibility-layer` entry name the site behaviour and the refusals.
+- **Left in M8.** The size shrink (the root with `install()` is 93,763 B gzip in `entry-sizes.json`, against the
+  60,000 B target), the transform-feedback tier for own-index stores, the integrated-GPU budget run, and the causes of
+  the demos that run with differences.

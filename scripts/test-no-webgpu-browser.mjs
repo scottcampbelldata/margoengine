@@ -1,14 +1,17 @@
 // What a visitor without WebGPU sees, in a real browser (headless Edge, else bundled Chromium) with WebGPU removed:
-//   1. every page of site/dist that runs a module script (each live demo and the landing page) shows the shared
-//      "needs WebGPU" message from examples/needs-webgpu.js, or none for a page that draws nothing, and throws no
-//      uncaught error, both with navigator.gpu missing and with requestAdapter() answering null;
-//   2. the @margoengine/webgl preview draws a basic scene (two coloured boxes, one light): pixels are read back.
+//   1. every page of site/dist that runs a module script (each live demo and the landing page) loads the WebGL2
+//      compatibility layer from examples/needs-webgpu.js and runs on it (or, for a page that draws nothing, loads
+//      nothing), and throws no uncaught error, both with navigator.gpu missing and with requestAdapter() answering
+//      null; with WebGL2 missing as well, each demo shows the shared "needs WebGPU" message instead;
+//   2. with WebGPU, no page downloads any of the layer (a browser with WebGPU gets zero bytes of it);
+//   3. the @margoengine/webgl preview draws a basic scene (two coloured boxes, one light): pixels are read back.
+// How each demo looks on the layer against native WebGPU is scripts/visual-compat.mjs's job.
 // Part of `npm run check:merge`, after `npm run build:site`. Takes the GPU lock itself:
 //   npm run check:no-webgpu
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
-import { launchBrowser } from './lib/browser.mjs';
+import { launchBrowser, resolveBrowser } from './lib/browser.mjs';
 import { createServer, preview } from 'vite';
 import { acquire } from './gpu-lock.mjs';
 import { message } from '../examples/needs-webgpu.js';
@@ -36,7 +39,25 @@ const modes = {
   'no adapter': () => {
     if (navigator.gpu) navigator.gpu.requestAdapter = async () => null;
   },
+  // Below the layer's minimum as well: no WebGPU and no WebGL2 (an old browser, or WebGL switched off).
+  'no WebGPU, no WebGL2': () => {
+    delete Navigator.prototype.gpu;
+    if (globalThis.WorkerNavigator) delete WorkerNavigator.prototype.gpu;
+    for (const Canvas of [globalThis.HTMLCanvasElement, globalThis.OffscreenCanvas].filter(Boolean)) {
+      const get = Canvas.prototype.getContext;
+      Canvas.prototype.getContext = function (type, ...rest) {
+        return type === 'webgl2' ? null : get.call(this, type, ...rest);
+      };
+    }
+  },
 };
+// A string only the layer's root entry holds (its extension list): a script response with it is the layer's code.
+const LAYER_MARK = 'WEBGL_draw_instanced_base_vertex_base_instance';
+// Pages that load the layer on purpose with WebGPU too: the dual viewport draws one scene natively and on the layer.
+const BOTH_PATHS = new Set(['demos/dual-viewport.html']);
+// Pages kept off the layer (`needsWebGPU(area, { layer: false })`) while docs/known-bugs.md lists them as wrong there:
+// without WebGPU they show the message, as without WebGL2.
+const NOT_ON_LAYER = new Set(['demos/compute-lab.html', 'demos/sciviz-surface.html']);
 
 async function pages() {
   const found = [];
@@ -89,14 +110,52 @@ try {
   const origin = new URL(site.resolvedUrls.local[0]).origin;
   browser = await launch();
   const report = [];
-  for (const [mode, strip] of Object.entries(modes))
+  // The zero-download check needs a browser with WebGPU (Firefox in Playwright has none: that mode is left out there).
+  const chosen = resolveBrowser(),
+    withWebGPU = chosen.webgpu ? [['WebGPU', null]] : [];
+  if (!withWebGPU.length) report.push(`WebGPU mode skipped: no WebGPU in ${chosen.name}`);
+  for (const [mode, strip] of [...withWebGPU, ...Object.entries(modes)])
     for (const path of demos) {
       const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-      await context.addInitScript(strip);
+      if (strip) await context.addInitScript(strip);
       const page = await context.newPage(),
-        errors = [];
+        errors = [],
+        layer = [];
       page.on('pageerror', (error) => errors.push(error.message));
+      page.on('response', async (response) => {
+        if (!new URL(response.url()).pathname.endsWith('.js')) return;
+        const body = await response.text().catch(() => '');
+        if (body.includes(LAYER_MARK)) layer.push(response.url());
+      });
       await page.goto(`${origin}/${path}`, { waitUntil: 'load' });
+      const landing = path === 'index.html';
+      if (mode === 'WebGPU' || (mode !== 'no WebGPU, no WebGL2' && !landing && !NOT_ON_LAYER.has(path))) {
+        // With WebGPU nothing of the layer loads; without it the page installs the layer and the demo starts on it.
+        const compat = mode !== 'WebGPU';
+        const installed = compat
+          ? await page
+              .waitForFunction(() => 'webgpuCompat' in document.documentElement.dataset, null, { timeout: 60_000 })
+              .then(() => true)
+              .catch(() => false)
+          : // fixed-wait: proves an absence (the layer never installs), so there is no event to wait for
+            (await page.waitForTimeout(3000),
+            await page.evaluate(() => 'webgpuCompat' in document.documentElement.dataset));
+        // Let the demo start on the layer (its first frames, a refusal) and any quiet failure surface.
+        // fixed-wait: proves an absence (no late error or refusal after the install), so there is no event to wait for
+        if (compat) await page.waitForTimeout(3000);
+        const messages = await page.locator('[data-no-webgpu]').count();
+        await context.close();
+        assert.equal(installed, compat, `${path} (${mode}): the WebGL2 layer ${compat ? 'must' : 'must not'} install`);
+        assert.equal(messages, 0, `${path} (${mode}): no needs-WebGPU message`);
+        if (compat) assert.ok(layer.length > 0, `${path} (${mode}): the layer's code was downloaded`);
+        else if (BOTH_PATHS.has(path)) assert.ok(layer.length > 0, `${path} (${mode}): draws on the layer too`);
+        else assert.deepEqual(layer, [], `${path} (${mode}): a browser with WebGPU downloads none of the layer`);
+        assert.deepEqual(errors, [], `${path} (${mode}): no uncaught error`);
+        report.push(
+          `${mode.padEnd(20)} ${path.padEnd(36)} ${compat ? 'runs on the WebGL2 layer' : 'native, layer not downloaded'}`,
+        );
+        continue;
+      }
       const shown = await page
         .waitForSelector('[data-no-webgpu]', { state: 'visible', timeout: 10_000 })
         .then(() => true)
@@ -107,7 +166,6 @@ try {
       // Let a quiet failure (a rejected import, a throw after the message) surface before judging the page.
       await page.waitForTimeout(500);
       await context.close();
-      const landing = path === 'index.html';
       if (landing) assert.equal(shown, false, `${path} (${mode}): the landing page draws nothing, so shows no message`);
       else {
         assert.equal(text, message, `${path} (${mode}): the needs-WebGPU message must show`);
@@ -115,7 +173,7 @@ try {
         assert.equal(link, 'https://margoengine.com/webgpu.html', `${path} (${mode}): help link`);
       }
       assert.deepEqual(errors, [], `${path} (${mode}): no uncaught error`);
-      report.push(`${mode.padEnd(16)} ${path.padEnd(36)} ${landing ? 'no scene, no message' : 'message shown'}`);
+      report.push(`${mode.padEnd(20)} ${path.padEnd(36)} ${landing ? 'no scene, no message' : 'message shown'}`);
     }
 
   // The WebGL2 preview in a real browser: sources served by Vite (the packages' dist builds).
@@ -184,7 +242,7 @@ try {
   report.push(`WebGL2 preview: left ${drawn.left}, right ${drawn.right}, corner ${drawn.corner}`);
   console.log(report.join('\n'));
   console.log(
-    `no-WebGPU check passed: ${demos.length} pages x ${Object.keys(modes).length} modes, ${relative(root, dist)}`,
+    `no-WebGPU check passed: ${demos.length} pages x ${Object.keys(modes).length + 1} modes, ${relative(root, dist)}`,
   );
 } finally {
   await closeAll({ browser, servers: [site, dev] });

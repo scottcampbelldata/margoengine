@@ -65,6 +65,7 @@ const root = resolve(import.meta.dirname, '..');
 /** Steps of `check:merge:steps` that use the GPU and can be narrowed. Every other step runs unchanged. */
 export const GPU_STEPS = [
   'visual:check',
+  'visual:compat',
   'check:views',
   'check:gpu-packages',
   'check:depth',
@@ -109,7 +110,10 @@ export function planSteps({ steps, decision, tests, workspaces, testId, scope })
       skip = (reason) => [{ command, skip: reason }],
       none = 'no affected package uses it';
     switch (name) {
-      case 'visual:check': {
+      // The WebGL2 layer run compares the same demos (every demo imports the layer through its gate, so a change to the
+      // layer reaches all of them); its extra demos (no visual baselines) run in the full check and the nightly.
+      case 'visual:check':
+      case 'visual:compat': {
         const ids = visualIds(decision.hits);
         return ids.length ? [{ command: `${command} --only=${ids.join(',')}` }] : skip(none);
       }
