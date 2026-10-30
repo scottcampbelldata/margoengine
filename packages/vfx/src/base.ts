@@ -417,10 +417,16 @@ export class VFX implements EnginePlugin {
     this.visible = buffer(20, GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
     for (const b of [this.indirect, this.visible])
       this.device.queue.writeBuffer(b, 0, new Uint32Array([3, 0, 0, 0, 0]));
+    // Each scan buffer is owned as soon as it exists, so a later allocation that fails releases the earlier ones.
     const groups = Math.ceil(this.capacity / 256),
-      births = buffer(groups * 4, GPUBufferUsage.STORAGE),
-      drawn = buffer(groups * 4, GPUBufferUsage.STORAGE),
-      listed = buffer(groups * 1024, GPUBufferUsage.STORAGE),
+      owned = (size: number) => {
+        const made = buffer(size, GPUBufferUsage.STORAGE);
+        this.owned.push(made);
+        return made;
+      },
+      births = owned(groups * 4),
+      drawn = owned(groups * 4),
+      listed = owned(groups * 1024),
       module = this.device.createShaderModule({ code: simulation }),
       u = this.uniform!,
       // One pipeline per entry point of the simulation module; buffers[k] goes to binding k (0: none).
@@ -437,7 +443,6 @@ export class VFX implements EnginePlugin {
           }),
         ];
       };
-    this.owned.push(births, drawn, listed);
     [this.simulation, this.computeGroup] = step(
       'main',
       [u, this.particles!, drawn, 0, this.indirect!, births, 0, 0, 0, listed],
