@@ -39,6 +39,8 @@ const context = await openBrowser({ startPath: '/packages/biomes/tests/flythroug
 page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
+  // The page's line per flight (six real-time flights, about 40 s each on the A6000 PC).
+  else if (m.type() === 'info' && m.text().startsWith('flight ')) console.log(m.text());
 });
 await runSuite(
   async () => {

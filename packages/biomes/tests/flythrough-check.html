@@ -32,10 +32,13 @@ window.check={
  async run(workers){
   const out={streamed:[],prefetched:[]};device.pushErrorScope('validation');
   for(let round=0;round<3;round++)for(const kind of ['streamed','prefetched']){
+   const begun=performance.now();
    const world=await BiomeWorld.create(workers?{workers}:{});out.workers=world.workers?.size??0;place(0);
    const view=await BiomeView.attach(engine,world);await view.ready;
    if(kind==='prefetched')await view.prefetch([FROM[0]-1300,FROM[1]-1300,TO[0]+1300,TO[1]+1300]);
-   const flight=await fly(view);flight.objects=view.objects.count;out[kind].push(flight);view.dispose();world.dispose();
+   const flown=performance.now(),flight=await fly(view);flight.objects=view.objects.count;out[kind].push(flight);view.dispose();world.dispose();
+   // One line per flight, so a slow run is never silent for minutes (flythrough-check.mjs prints it).
+   console.info(`flight ${out.streamed.length+out.prefetched.length}/6 ${kind}: ${((performance.now()-begun)/1000).toFixed(1)} s (world, view${kind==='prefetched'?' and prefetch':''} ${((flown-begun)/1000).toFixed(1)} s, flight ${((performance.now()-flown)/1000).toFixed(1)} s, ${flight.times.length} frames)`);
   }
   const error=await device.popErrorScope();out.validation=error?.message??null;out.errors=errors.splice(0);
   return out;
