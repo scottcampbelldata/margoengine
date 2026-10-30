@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Biomes water check</title><style>body{margin:0}canvas{display:block;width:320px;height:200px}</style></head><body><canvas width="320" height="200"></canvas>
+<script type="module">
+// Real-GPU proof for the `water` option of @margoengine/biomes/view: the wetland preset world reaches below sea level on
+// its west side, so the default view (`water: 'auto'`) draws the sea there; with `water: false` (main had no water) the
+// sea floor shows as mud.
+import {Engine} from '/packages/core/dist/index.js';
+import {BiomeWorld} from '/packages/biomes/dist/index.js';
+import {presetWorlds} from '/packages/biomes/dist/presets.js';
+import {BiomeView} from '/packages/biomes/dist/view.js';
+const canvas=document.querySelector('canvas');
+window.check={
+ async run(){
+  const {climate,relief}=presetWorlds.wetland,world=await BiomeWorld.create({climate,height:{relief}});
+  // On land 50 m from the shore (about x = -1,300 m), looking west out to sea.
+  const ground=world.sample(-1250,0).height,out={ground,sea:world.climate.sea/1000};
+  const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[-1250,ground+15,0],target:[-1800,ground-25,0],near:0.5,far:20000}}),device=engine.gpu,errors=[];
+  device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+  device.pushErrorScope('validation');
+  // Share of pixels in the lower third of the frame that are water: blue over red (land here is mud, moss and grass).
+  async function lowerThird(){
+   for(let i=0;i<3;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}
+   engine.render({delta:1/60});
+   const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);
+   const {data}=c.getImageData(0,0,canvas.width,canvas.height);let water=0,n=0;
+   for(let y=Math.floor(canvas.height*2/3);y<canvas.height;y++)for(let x=0;x<canvas.width;x++,n++){const k=(y*canvas.width+x)*4;if(data[k]<data[k+2])water++;}
+   return water/n;
+  }
+  for(const [name,water] of [['auto',undefined],['off',false]]){
+   const view=await BiomeView.attach(engine,world,{objects:false,radius:600,...(water===undefined?{}:{water})});
+   await view.ready;await view.whenIdle();
+   out[name]={water:view.water!==undefined,share:await lowerThird()};
+   view.dispose();
+  }
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  engine.dispose();
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

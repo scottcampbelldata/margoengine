@@ -26,6 +26,12 @@ struct Output {@builtin(position) clip:vec4f,@location(0) position:vec3f,@locati
   var o:Output;o.position=position;o.clip=frame.camera*vec4f(position,1);o.normal=normal;o.color=vec3f(1);o.material=vec4f(0.9,0,1,1);return o;
 }
 `;
+/**
+ * The heightmap covers `frame.map` (origin, size); the outer clipmap rings reach past it, where heights and weights are
+ * only the clamped edge texels (a flat shelf with stretched walls). Fragments there are dropped, so the sky shows past
+ * the terrain's edge (main drew that shelf to the horizon).
+ */
+export const terrainOutside = /* wgsl */ `if(any(i.position.xz<frame.map.xy)||any(i.position.xz>frame.map.xy+frame.map.zw)){discard;}`;
 // Triplanar weights abs(n)^8 (Geiss 2007, GPU Gems 3 ch. 1; exponent 8 is Margo's); GGX + Schlick (F0 0.04) + Lambert
 // sun per glTF 2.0 Appendix B (Walter et al. 2007; Schlick 1994); Khronos PBR Neutral, then sRGB (IEC 61966-2-1).
 export const terrainFragment = /* wgsl */ `${neutralShader}
@@ -44,6 +50,7 @@ fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   return select(fallback,color/max(total,0.00001),total>0.00001);
 }
 @fragment fn fragment(i:Output)->@location(0) vec4f {
+  ${terrainOutside}
   let n=normalize(i.normal);let base=terrainColor(i.position,n);let v=normalize(frame.eye.xyz-i.position);let l=normalize(frame.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
   let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);let a=i.material.x*i.material.x;let a2=a*a;
   let d=${ggxD};let g=${smithG};let fresnel=vec3f(0.04)+vec3f(0.96)*pow(1-vh,5.0);

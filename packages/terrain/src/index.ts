@@ -11,7 +11,7 @@ import { finiteVector } from '@margoengine/math/validate';
 import { margoError } from '../../shared/errors.js';
 import { MargoError } from '@margoengine/math/errors';
 import { clipmapGrid } from './grid.js';
-import { terrainVertex, terrainFragment, weightedFragment } from './shader.js';
+import { terrainVertex, terrainFragment, terrainOutside, weightedFragment } from './shader.js';
 import { applyView } from '../../shared/view-rect.js';
 export { clipmapGrid } from './grid.js';
 export { TerrainColors, type TerrainColorOptions } from './colors.js';
@@ -331,7 +331,10 @@ export class Terrain implements EnginePlugin {
         r.shadowGroups.push(group(buffer));
       }
     }
-    const module = this.device.createShaderModule({ code: terrainVertex });
+    // The shadow pass drops what lies outside the heightmap too: the outer rings' clamped shelf cast shadows inward.
+    const module = this.device.createShaderModule({
+      code: terrainVertex + `@fragment fn outside(i:Output){${terrainOutside}}`,
+    });
     this.shadowPipeline = this.device.createRenderPipeline({
       layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.layout] }),
       vertex: {
@@ -339,6 +342,7 @@ export class Terrain implements EnginePlugin {
         entryPoint: 'vertex',
         buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
       },
+      fragment: { module, entryPoint: 'outside', targets: [] },
       depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
     });
     this.invalidate();
@@ -540,7 +544,7 @@ export class Terrain implements EnginePlugin {
       code =
         declarations +
         lit.replace(head, 'fn margoShade(i:Output)->vec4f {') +
-        `\n@fragment fn capture(i:Output)->MargoSSR {let n=normalize(i.normal);let base=terrainColor(i.position,n);let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
+        `\n@fragment fn capture(i:Output)->MargoSSR {${terrainOutside}let n=normalize(i.normal);let base=terrainColor(i.position,n);let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
       if (this.captureCode.size >= 16) this.captureCode.clear();
       this.captureCode.set(lit, code);
     }

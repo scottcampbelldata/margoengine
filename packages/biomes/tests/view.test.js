@@ -4,13 +4,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BiomeWorld, defineBiome } from '../dist/index.js';
-import { presets } from '../dist/presets.js';
+import { presets, presetWorlds } from '../dist/presets.js';
 import {
   BiomeView,
   MATERIALS,
   MAX_GROUND_MATERIALS,
   groundMaterials,
   groundWeights,
+  overviewWeights,
   terrainColorsFor,
   viewTile,
 } from '../dist/view.js';
@@ -163,4 +164,116 @@ test('more than 16 ground materials is a RangeError at attach naming the count a
   });
   const tile = await world.tile(0, 0);
   assert.throws(() => groundWeights(world, tile, seventeen), RangeError);
+});
+
+// Biome look plan item 3: ground layers ruled by temperature. Main's view read only slope, height, moisture and
+// curvature, so a snow layer ruled by temperature alone had no rule left and showed on every cell, warm or cold.
+test('a temperature ground rule puts snow where it is cold and none where it is warm', async () => {
+  const cold = defineBiome({
+      id: 'cold',
+      climate: {},
+      ground: [{ material: 'tundra' }, { material: 'snow', temperature: [null, -6] }],
+    }),
+    // A ramp from 0 to 4,000 m: about 9 C at the foot, well below -6 C at the top (6.5 C per km).
+    world = await BiomeWorld.create({
+      size: [512, 512],
+      biomes: [cold],
+      height: { field: (x) => ((x + 256) / 512) * 4000 },
+      climate: { latitude: 47, rainfall: 1000 },
+    }),
+    keys = groundMaterials(world.biomes),
+    snow = keys.indexOf('snow');
+  let warm = 0,
+    frozen = 0;
+  for (const [x, z] of [
+    [0, 0],
+    [1, 0],
+  ]) {
+    const tile = await world.tile(x, z),
+      t = tile.layer('temperature'),
+      w = groundWeights(world, tile, keys);
+    for (let k = 0; k < tile.cells * tile.cells; k += 7) {
+      const c = t.data[k] * t.scale;
+      // The open side blends over 1.5 C around -6 C: all snow's share below -6.75, none above -5.25.
+      if (c >= -5.2) {
+        warm++;
+        assert.equal(w[k * 16 + snow], 0, `no snow at ${c.toFixed(2)} C`);
+      } else if (c <= -6.8) {
+        frozen++;
+        assert.ok(w[k * 16 + snow] >= 120, `snow at ${c.toFixed(2)} C: ${w[k * 16 + snow]}`);
+      }
+    }
+  }
+  assert.ok(warm > 1000 && frozen > 1000, `both sides tested: ${warm} warm, ${frozen} frozen cells`);
+});
+
+test('the tundra world lies under snow: snow weight above 25 percent of its cells', async () => {
+  const { climate, relief } = presetWorlds.tundra,
+    world = await BiomeWorld.create({
+      size: [1024, 1024],
+      biomes: Object.values(presets),
+      climate,
+      height: { relief },
+    }),
+    keys = groundMaterials(world.biomes),
+    snow = keys.indexOf('snow');
+  let sum = 0,
+    n = 0;
+  for (let z = 0; z < 4; z += 3)
+    for (let x = 0; x < 4; x += 3) {
+      const tile = await world.tile(x, z),
+        w = groundWeights(world, tile, keys);
+      for (let k = 0; k < tile.cells * tile.cells; k += 5, n++) sum += w[k * 16 + snow];
+    }
+  assert.ok(sum / n / 255 > 0.25, `snow share ${(sum / n / 255).toFixed(3)}`);
+});
+
+// Biome look plan item 6: the overview a view draws before (and beyond) its tiles. Main sampled every 32 m, nearest,
+// and gave each biome its first ground layer only, so far hills were all meadow: against the alpine world's tiles its
+// mean absolute difference was 51/255 for rock and 64/255 for meadow.
+test('the overview runs the ground rules on the region grid and matches made tiles within 40/255 per material', async () => {
+  const { climate, relief } = presetWorlds.alpine,
+    world = await BiomeWorld.create({ climate, height: { relief } }),
+    keys = groundMaterials(world.biomes),
+    ov = overviewWeights(world, keys, 2),
+    o = world.overview();
+  assert.equal(ov.width, 2049);
+  assert.equal(ov.weights.length, 3);
+  for (let t = 0; t < ov.width * ov.depth * 4; t += 4 * 4099) {
+    let sum = 0;
+    for (const w of ov.weights) sum += w[t] + w[t + 1] + w[t + 2] + w[t + 3];
+    assert.equal(sum, 255);
+  }
+  // Tiles over the whole range of the world, the highest (snow) and the lowest among them.
+  const heights = [];
+  for (let z = 0; z < world.tilesZ; z++)
+    for (let x = 0; x < world.tilesX; x++) heights.push([o.height[(z * 16 + 8) * o.width + x * 16 + 8], x, z]);
+  heights.sort((a, b) => a[0] - b[0]);
+  const picks = [0, 0.2, 0.4, 0.6, 0.8, 0.9, 1].map(
+      (f) => heights[Math.min(heights.length - 1, Math.floor(f * heights.length))],
+    ),
+    diff = new Array(keys.length).fill(0);
+  let n = 0;
+  for (const [, tx, tz] of picks) {
+    const tile = await world.tile(tx, tz),
+      g = groundWeights(world, tile, keys);
+    for (let j = 0; j < 256; j += 2)
+      for (let i = 0; i < 256; i += 2, n++) {
+        const t = (((tz * 256 + j) / 2) * ov.width + (tx * 256 + i) / 2) * 4,
+          k = (j * 256 + i) * 16;
+        for (let m = 0; m < keys.length; m++) diff[m] += Math.abs(ov.weights[m >> 2][t + (m & 3)] - g[k + m]);
+      }
+  }
+  const mean = Object.fromEntries(keys.map((key, m) => [key, diff[m] / n]));
+  for (const key of keys) assert.ok(mean[key] < 40, `${key}: ${mean[key].toFixed(1)}/255 (${JSON.stringify(mean)})`);
+  assert.ok(
+    picks.some(([h]) => h > 2800),
+    'a snow tile is among them',
+  );
+  assert.throws(() => overviewWeights(world, keys, 1.5), RangeError);
+});
+
+test('water: a bad option is a TypeError before anything loads', async () => {
+  const world = await BiomeWorld.create({ size: [512, 512] });
+  await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { water: 'yes' }), TypeError);
 });

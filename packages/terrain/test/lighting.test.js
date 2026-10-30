@@ -338,3 +338,31 @@ test('terrain reuses real shadow and clustered bindings and follows restored pro
   }
   assert.ok(h.resources.every((resource) => resource.destroyed));
 });
+
+// Biome look plan item 7: the clipmap's outer rings reach past the heightmap, where heights are the clamped edge texels.
+// The colour pass drops those fragments (edge.browser.mjs checks the pixels); main's depth-only shadow pass had no
+// fragment stage, so that invisible shelf still cast shadows onto the ground inside the map.
+test('the terrain shadow pass drops fragments outside the heightmap, as the colour pass does', () => {
+  const h = harness(),
+    module = terrain(h);
+  try {
+    h.render();
+    const shadow = h.pipelines.find(
+      (p) => p.depthStencil?.format === 'depth32float' && p.vertex.entryPoint === 'vertex',
+    );
+    assert.ok(shadow, 'the shadow pipeline was made');
+    assert.equal(shadow.fragment?.entryPoint, 'outside');
+    assert.deepEqual(shadow.fragment.targets, []);
+    const discard =
+      /if\(any\(i\.position\.xz<frame\.map\.xy\)\|\|any\(i\.position\.xz>frame\.map\.xy\+frame\.map\.zw\)\)\{discard;\}/;
+    assert.match(
+      shadow.fragment.module.code ?? shadow.fragment.module.descriptor?.code ?? '',
+      /fn outside\(i:Output\)/,
+    );
+    assert.match(shadow.fragment.module.code ?? shadow.fragment.module.descriptor?.code ?? '', discard);
+    const colour = h.pipelines.find((p) => p.fragment?.entryPoint === 'fragment');
+    if (colour) assert.match(colour.fragment.module.code ?? colour.fragment.module.descriptor?.code ?? '', discard);
+  } finally {
+    module.dispose();
+  }
+});

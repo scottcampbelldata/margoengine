@@ -10,11 +10,13 @@
 // Ground layer rules use the same Wendland bands as biome envelopes (define.ts); materials are generated textures.
 import type { EngineKernel } from '@margoengine/core';
 import type { Terrain, TerrainColorOptions } from '@margoengine/terrain';
+import type { Water, WaterOptions } from '@margoengine/water';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type BiomeDefinition, type Dimension, fieldDimension } from './define.js';
 // The toolkit comes through the package name, so the view shares the root's copy (a view always has a world).
 import { clampInt, divFloor, hash3, ONE, wendland } from '@margoengine/biomes/toolkit';
 import type { PlacedTile } from './placement.js';
+import type { BiomeSample } from './sample.js';
 import type { BiomeTile, BiomeWorld } from './world.js';
 
 /** The look of a ground material: sRGB colour 0..1 and the contrast of its generated detail 0..1. */
@@ -75,7 +77,19 @@ export interface BiomeViewOptions {
    * mesh (`objects.casters`) to it, and removes them on dispose. Default none.
    */
   readonly shadows?: BiomeShadows;
+  /**
+   * The sea: a `@margoengine/water` surface at the world's `climate.seaLevel`, centred on the origin over the whole
+   * world and out to the horizon, loaded with import() only when drawn. The terrain hides it under land, so its shore
+   * follows the coast, with the water's shoreline foam. `'auto'` draws it when the world's heights reach below sea
+   * level; an object draws it with those `Water` settings (pass `depth: () => bloom.depthTexture` when Bloom, SSAO or
+   * DOF owns the scene depth, and `reflection`, `lights` from a `Sky`). Rivers stay dry valleys (docs/limits.md).
+   * Default `'auto'`.
+   */
+  readonly water?: boolean | 'auto' | BiomeWaterSettings;
 }
+
+/** `Water` settings a view passes on (`@margoengine/water`); the view sets the size, the height and the horizon. */
+export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon' | 'terrain' | 'spray'>;
 
 /** What `BiomeViewOptions.shadows` needs: a `Shadows` (`@margoengine/shadows`), of which only `add` is used. */
 export interface BiomeShadows {
@@ -124,8 +138,11 @@ export function viewTile(world: BiomeWorld, tile: BiomeTile, materials: readonly
   return { x: tile.x, z: tile.z, count, heights, weights: textures };
 }
 
+/** Fields a ground layer rule can test (`GroundLayer`), each a tile layer of the same name. */
+const RULE_FIELDS = ['slope', 'height', 'moisture', 'curvature', 'temperature', 'coldest', 'warmest'] as const;
+
 /** Layers a view tile reads. */
-export const VIEW_LAYERS = Object.freeze(['height', 'slope', 'moisture', 'curvature', 'biome', 'biomeWeight']);
+export const VIEW_LAYERS = Object.freeze([...RULE_FIELDS, 'biome', 'biomeWeight']);
 
 /**
  * Ground material keys of a biome list in first-use order, every one of them (a view draws up to
@@ -162,9 +179,9 @@ function rulesOf(biomes: readonly BiomeDefinition[], materials: readonly string[
         );
       return {
         material,
-        dims: (['slope', 'height', 'moisture', 'curvature'] as const)
-          .filter((k) => g[k] !== undefined)
-          .map((k) => fieldDimension(k, g[k]!)),
+        // Temperature rules too: tundra and alpine snow follow the cold (main read only the first four fields, so a
+        // snow layer ruled by temperature alone showed everywhere).
+        dims: RULE_FIELDS.filter((k) => g[k] !== undefined).map((k) => fieldDimension(k, g[k]!)),
         weight: Math.round((g.weight ?? 1) * ONE),
       };
     }),
@@ -193,36 +210,155 @@ function weightsInto(world: BiomeWorld, tile: BiomeTile, materials: readonly str
     weights = tile.layer('biomeWeight')?.data;
   if (!ids || !weights) throw typeError('groundWeights needs a tile with the biome and biomeWeight layers', 'biomes');
   const data: Record<string, ArrayLike<number>> = {};
-  for (const name of ['slope', 'height', 'moisture', 'curvature'])
-    data[name] = tile.layer(name)?.data ?? new Int32Array(n);
+  for (const name of RULE_FIELDS) data[name] = tile.layer(name)?.data ?? new Int32Array(n);
   const sums = new Int32Array(STRIDE),
     share = new Int32Array(STRIDE);
   for (let k = 0; k < n; k++) {
     sums.fill(0);
     for (let s = 0; s < 4; s++) {
       const w = weights[k * 4 + s];
-      if (!w) continue;
-      const layers = rules[ids[k * 4 + s]];
-      let total = 0;
-      for (const g of layers) {
-        let m = g.weight;
-        for (const d of g.dims) {
-          const v = data[d.layer][k],
-            dist = Math.max(d.lo - v, v - d.hi);
-          m = Math.floor((m * wendland(clampInt(divFloor((dist + (d.width >> 1)) * ONE, d.width), 0, ONE))) / ONE);
-        }
-        share[g.material] += m;
-        total += m;
-      }
-      if (!total) share[layers[0].material] = total = ONE;
-      for (let i = 0; i < STRIDE; i++) {
-        sums[i] += divFloor(share[i] * w, total);
-        share[i] = 0;
-      }
+      if (w) addBiome(rules[ids[k * 4 + s]], data, k, w, sums, share);
     }
     quantise(sums, out, k * STRIDE);
   }
   return out;
+}
+
+/**
+ * Adds one biome's ground layers at cell `k` of `data` (stored units, by layer name) to `sums`, scaled by the biome's
+ * weight `w`: each layer's share is its weight times the Wendland band of every rule (a biome whose rules all miss
+ * gives everything to its first layer). `share` is scratch, left zeroed.
+ */
+function addBiome(
+  layers: Rules[number],
+  data: Readonly<Record<string, ArrayLike<number>>>,
+  k: number,
+  w: number,
+  sums: Int32Array,
+  share: Int32Array,
+): void {
+  let total = 0;
+  for (const g of layers) {
+    let m = g.weight;
+    for (const d of g.dims) {
+      const v = data[d.layer][k],
+        dist = Math.max(d.lo - v, v - d.hi);
+      m = Math.floor((m * wendland(clampInt(divFloor((dist + (d.width >> 1)) * ONE, d.width), 0, ONE))) / ONE);
+    }
+    share[g.material] += m;
+    total += m;
+  }
+  if (!total) share[layers[0].material] = total = ONE;
+  for (let i = 0; i < STRIDE; i++) {
+    sums[i] += divFloor(share[i] * w, total);
+    share[i] = 0;
+  }
+}
+
+/** The ground weights a view starts with, before its tiles: `width` x `depth` texels in the view's weight textures. */
+export interface OverviewWeights {
+  readonly width: number;
+  readonly depth: number;
+  /** 2 to 4 textures, 4 materials each (as `ViewTile.weights`), rows of increasing z. */
+  readonly weights: Uint8Array[];
+}
+
+/**
+ * Ground weights of the whole world at `textureResolution` metres per texel, from the region grid
+ * (`world.regionResolution`, 16 m by default) through the same ground rules as the tiles: the biomes, height, slope,
+ * moisture and temperatures of every grid corner come from `world.sample`, and texels between corners are bilinear. A
+ * view draws these until the 1 m tiles around the camera replace them, so far hills show their rock and snow.
+ * @throws RangeError for a materials list that misses a biome's key or holds more than 16, or a texel size that is not
+ * a positive multiple of the world resolution.
+ */
+export function overviewWeights(
+  world: BiomeWorld,
+  materials: readonly string[],
+  textureResolution = 2,
+): OverviewWeights {
+  const texel = textureResolution,
+    [x0, z0, x1, z1] = world.bounds,
+    steps = texel / world.resolution; // float division: option check
+  if (!(texel > 0) || Math.round(steps) * world.resolution !== texel)
+    throw rangeError('overviewWeights textureResolution must be a positive multiple of the world resolution', 'biomes');
+  const rules = rulesOf(world.biomes, materials),
+    ids = world.biomes.map((b) => b.id),
+    o = world.overview(),
+    res = o.resolution,
+    corners = new Uint8Array(o.width * o.depth * STRIDE),
+    data: Record<string, Int32Array> = {},
+    sums = new Int32Array(STRIDE),
+    share = new Int32Array(STRIDE);
+  for (const name of RULE_FIELDS) data[name] = new Int32Array(1);
+  let s: BiomeSample | undefined;
+  for (let j = 0; j < o.depth; j++)
+    for (let i = 0; i < o.width; i++) {
+      s = world.sample(x0 + i * res, z0 + j * res, s);
+      // Stored units, as the tile layers hold them (LAYERS scales); the region has no curvature (0).
+      data.height[0] = Math.round(s.height * 1000);
+      data.slope[0] = Math.round(s.slope * 256);
+      data.moisture[0] = Math.round(s.moisture * 255);
+      data.curvature[0] = 0;
+      data.temperature[0] = Math.round(s.temperature * 100);
+      data.coldest[0] = Math.round(s.coldest * 100);
+      data.warmest[0] = Math.round(s.warmest * 100);
+      sums.fill(0);
+      for (let b = 0; b < s.biomes.length; b++)
+        addBiome(rules[ids.indexOf(s.biomes[b])], data, 0, Math.round(s.weights[b] * ONE), sums, share);
+      quantise(sums, corners, (j * o.width + i) * STRIDE);
+    }
+  const width = Math.round((x1 - x0) / texel) + 1, // float division: exact
+    depth = Math.round((z1 - z0) / texel) + 1, // float division
+    weights = Array.from({ length: weightTextures(materials.length) }, () => new Uint8Array(width * depth * 4)),
+    ratio = texel / res, // float division: view only
+    m = materials.length,
+    cell = new Float64Array(STRIDE),
+    // Grid cells whose four corners agree (most of a world): their texels copy a corner.
+    uniform = new Uint8Array(o.width * o.depth);
+  for (let k = 0; k + o.width + 1 < o.width * o.depth; k++) {
+    const a = k * STRIDE,
+      c = a + o.width * STRIDE;
+    let same = 1;
+    for (let i = 0; i < m && same; i++)
+      same = +(
+        corners[a + i] === corners[a + STRIDE + i] &&
+        corners[a + i] === corners[c + i] &&
+        corners[a + i] === corners[c + STRIDE + i]
+      );
+    uniform[k] = same;
+  }
+  for (let v = 0; v < depth; v++) {
+    const fz = Math.min(o.depth - 1.001, v * ratio),
+      iz = Math.floor(fz),
+      tz = fz - iz;
+    for (let u = 0; u < width; u++) {
+      const fx = Math.min(o.width - 1.001, u * ratio),
+        ix = Math.floor(fx),
+        tx = fx - ix,
+        a = (iz * o.width + ix) * STRIDE,
+        b = a + STRIDE,
+        c = a + o.width * STRIDE,
+        d = c + STRIDE,
+        t = (v * width + u) * 4;
+      if (uniform[iz * o.width + ix]) {
+        for (let i = 0; i < m; i++) weights[i >> 2][t + (i & 3)] = corners[a + i];
+        continue;
+      }
+      // Bilinear, rounded, with the rounding remainder on the largest weight so the texel still sums to 255.
+      let given = 0,
+        best = 0;
+      for (let i = 0; i < m; i++) {
+        const top = corners[a + i] + (corners[b + i] - corners[a + i]) * tx,
+          bottom = corners[c + i] + (corners[d + i] - corners[c + i]) * tx;
+        cell[i] = Math.round(top + (bottom - top) * tz);
+        given += cell[i];
+        if (cell[i] > cell[best]) best = i;
+      }
+      cell[best] += 255 - given;
+      for (let i = 0; i < m; i++) weights[i >> 2][t + (i & 3)] = cell[i];
+    }
+  }
+  return { width, depth, weights };
 }
 
 /** Writes 16 weights proportional to `w` summing to 255 (largest remainder, ties by index). */
@@ -401,6 +537,7 @@ export class BiomeView implements Disposable {
   readonly tileTimes: number[] = [];
   readonly frameTimes: number[] = [];
   #objects?: import('@margoengine/biomes/objects').BiomeObjects;
+  #water?: Water;
   #disposed = false;
 
   private constructor(
@@ -437,11 +574,7 @@ export class BiomeView implements Disposable {
     while (layerKeys.length < 4) layerKeys.push(layerKeys[layerKeys.length - 1]);
     const pixels = layerKeys.map((key, i) => materialPixels(key, looks[Math.min(i, looks.length - 1)]));
     this.#heights = this.#overviewHeights();
-    this.#weights = Array.from(
-      { length: weightTextures(this.materials.length) },
-      () => new Uint8Array(this.#width * this.#depth * 4),
-    );
-    this.#overviewWeights();
+    this.#weights = overviewWeights(world, this.materials, texel).weights;
     const view = this;
     this.terrain = terrainModule.Terrain.attach(engine, {
       origin: [x0, z0],
@@ -499,6 +632,9 @@ export class BiomeView implements Disposable {
     const shadows = options.shadows;
     if (shadows !== undefined && typeof shadows?.add !== 'function')
       throw typeError('BiomeView shadows must be a Shadows from @margoengine/shadows', 'biomes');
+    const water = options.water ?? 'auto';
+    if (water !== true && water !== false && water !== 'auto' && (typeof water !== 'object' || water === null))
+      throw typeError("BiomeView water must be true, false, 'auto' or Water settings", 'biomes');
     if (options.signal?.aborted) throw options.signal.reason;
     const terrainModule = await import('@margoengine/terrain');
     if (options.signal?.aborted) throw options.signal.reason;
@@ -533,6 +669,20 @@ export class BiomeView implements Disposable {
     if (shadows)
       for (const source of [view.terrain, ...(view.#objects?.casters ?? [])])
         view.#offShadows.push(shadows.add(source));
+    const sea = world.climate.sea / 1000; // float division: mm to metres
+    if (water === true || typeof water === 'object' || (water === 'auto' && view.#heights.some((h) => h < sea))) {
+      const { Water } = await import('@margoengine/water'),
+        [x0, z0, x1, z1] = world.bounds,
+        side = (a: number, b: number) => Math.min(100000, 2 * Math.max(Math.abs(a), Math.abs(b)));
+      // The water grid is centred on the origin: wide enough to cover the world, stretched to the horizon past it.
+      if (!view.#disposed)
+        view.#water = Water.attach(engine, {
+          ...(typeof water === 'object' ? water : {}),
+          size: [side(x0, x1), side(z0, z1)],
+          height: sea,
+          horizon: true,
+        });
+    }
     if (options.signal?.aborted) {
       view.dispose();
       throw options.signal.reason;
@@ -892,35 +1042,6 @@ export class BiomeView implements Disposable {
     return out;
   }
 
-  /** Ground weights from point samples every 32 m (nearest sample), until tiles replace them. */
-  #overviewWeights(): void {
-    const world = this.#world,
-      step = Math.max(1, Math.round(32 / this.textureResolution)), // float division: view only
-      [x0, z0] = world.bounds,
-      rules = rulesOf(world.biomes, this.materials),
-      ids = world.biomes.map((b) => b.id),
-      sums = new Int32Array(STRIDE),
-      bytes = new Uint8Array(STRIDE);
-    for (let v = 0; v < this.#depth; v += step)
-      for (let u = 0; u < this.#width; u += step) {
-        const s = world.sample(x0 + u * this.textureResolution, z0 + v * this.textureResolution);
-        sums.fill(0);
-        s.biomes.forEach((id, i) => {
-          const layers = rules[ids.indexOf(id)];
-          sums[layers[0].material] += Math.round(s.weights[i] * ONE);
-        });
-        quantise(sums, bytes, 0);
-        for (let dv = 0; dv < step && v + dv < this.#depth; dv++)
-          for (let du = 0; du < step && u + du < this.#width; du++) this.#setWeights(u + du, v + dv, bytes, 0);
-      }
-  }
-
-  #setWeights(u: number, v: number, bytes: Uint8Array, at: number): void {
-    const k = (v * this.#width + u) * 4;
-    for (let w = 0; w < this.#weights.length; w++)
-      for (let c = 0; c < 4; c++) this.#weights[w][k + c] = bytes[at + w * 4 + c];
-  }
-
   /**
    * Copies rows `j0` to `j1` of a view tile into the CPU copies of the textures and uploads them straight from the
    * tile's arrays. The terrain is told once the tile's last row is in.
@@ -985,6 +1106,11 @@ export class BiomeView implements Disposable {
     (this.terrain as Terrain | undefined)?.invalidate();
   }
 
+  /** The sea surface the view draws (option `water`), or undefined without one. */
+  get water(): Water | undefined {
+    return this.#water;
+  }
+
   /** The stored objects and detail the view draws (`count`, `gpuBytes`, `dropped`), or undefined with `objects: false`. */
   get objects(): import('@margoengine/biomes/objects').BiomeObjects | undefined {
     return this.#objects;
@@ -1016,6 +1142,7 @@ export class BiomeView implements Disposable {
     if (this.#name) this.#engine.removePlugin(this.#name);
     this.terrain.dispose();
     this.#objects?.dispose();
+    this.#water?.dispose();
     this.#placement?.dispose();
     this.#textures = undefined;
     this.#firstDone?.();

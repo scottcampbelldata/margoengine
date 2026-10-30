@@ -201,8 +201,11 @@ await view.whenIdle();
 works) from the world: the region overview first, then 1 m tiles within `radius` of the camera, nearest first, written
 into the heightmap and into 2 to 4 ground-weight textures (the terrain's optional `weights`, one channel per material),
 and again for every rectangle `world.onChange` reports. Each biome shares its weight among its ground layers by their
-slope, height, moisture and curvature rules; `groundWeights(world, tile, materials)` is the same computation on the CPU
-(16 bytes per cell summing to 255). Materials are generated textures from `MATERIALS` (16 built-in looks, such as
+slope, height, moisture, curvature and temperature rules (`temperature`, `coldest`, `warmest`: tundra snow lies where
+the mean annual temperature is -6 C or less); `groundWeights(world, tile, materials)` is the same computation on the
+CPU (16 bytes per cell summing to 255). The overview runs the same rules on the 16 m region grid, bilinear between its
+corners (`overviewWeights(world, materials)`), so hills beyond `radius` keep their rock and snow. The terrain draws
+nothing outside the world's rectangle: past an edge the sky shows. Materials are generated textures from `MATERIALS` (16 built-in looks, such as
 `grass`, `sand`, `rock`, `snow`; `materials` overrides or adds them). Up to 16 materials per world, the terrain's
 limit (the 8 presets use 15); more is a RangeError from `attach` that names the count.
 `terrainColorsFor(world)` gives `TerrainColors` sand, meadow and stone colours for small scenes drawn as one mesh.
@@ -217,6 +220,7 @@ limit (the 8 presets use 15); more is a RangeError from `attach` that names the 
 | `budget` | 0.25 | milliseconds per frame the page spends copying arrived tiles in (one step always goes in) |
 | `detailBudget` | 128 MiB | most bytes of detail density maps (one byte per texel per detail species, on this thread and the GPU); detail maps coarsen by halves to fit it and the device's largest texture |
 | `signal` | none | rejects `attach` and stops streaming |
+| `water` | `'auto'` | the sea: a `@margoengine/water` surface at `climate.seaLevel` over the world and out to the horizon (`view.water`), loaded on first use; `'auto'` draws it when the world reaches below sea level, `true` always, `false` never; Water settings (`{ depth: () => bloom.depthTexture, reflection, lights }`) draw it with those |
 
 WebGPU only. The view streams before every frame: tiles within `radius` of the camera, and of where the camera will be
 `lookahead` seconds on, are fetched nearest first; tiles that fall out of range on their way are cancelled, and objects
@@ -227,6 +231,23 @@ screen). Measured (goal G3, `packages/biomes/tests/flythrough-check.mjs`, RTX A6
 over the zero-config world adds nothing measurable to the slowest 1 percent of frames or to the worst frame against the
 same flight with every tile made first (medians of three flights each, within the timer's 0.1 ms); copying one arrived
 tile in takes 0.1 ms at the median and 0.3 ms at the 99th percentile on the page's thread.
+
+The sea comes with the world: a world whose relief runs below `climate.seaLevel` (the wetland preset's west coast,
+`coast` on `createRelief`) gets a water surface there with no option. The terrain hides it under land, so the shore
+follows the coastline, with the water's shoreline foam. Rivers stay dry valleys in v1.0.0 (docs/limits.md).
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld } from '@margoengine/biomes';
+import { presetWorlds } from '@margoengine/biomes/presets';
+import { BiomeView } from '@margoengine/biomes/view';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const { climate, relief } = presetWorlds.wetland;
+const world = await BiomeWorld.create({ climate, height: { relief } });
+const view = await BiomeView.attach(engine, world); // water: 'auto' finds the sea on the west side
+console.log(view.water !== undefined); // true
+```
 
 ```ts
 import { Engine } from '@margoengine/core';

@@ -65,7 +65,7 @@ function world(module, options = {}) {
       note(
         'createRenderPipeline',
         d.vertex.module.code,
-        d.fragment?.targets[0].format,
+        d.fragment?.targets[0]?.format,
         d.multisample?.count,
         d.depthStencil.format,
       );

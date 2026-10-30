@@ -91,7 +91,8 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/terrain": "^1.0.0",
     "@margoengine/scatter": "^1.0.0",
-    "@margoengine/procedural": "^1.0.0"
+    "@margoengine/procedural": "^1.0.0",
+    "@margoengine/water": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {
@@ -104,6 +105,9 @@
       "optional": true
     },
     "@margoengine/procedural": {
+      "optional": true
+    },
+    "@margoengine/water": {
       "optional": true
     }
   },
@@ -119,7 +123,7 @@
     "build": "node ../../scripts/build-optional.js biomes",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs",
+    "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs && node packages/biomes/tests/water-check.mjs",
     "test:gpu:objects": "cd ../.. && node packages/biomes/tests/objects-check.mjs",
     "test:gpu:shadows": "cd ../.. && node packages/biomes/tests/shadows-check.mjs",
     "test:gpu:flythrough": "cd ../.. && node packages/biomes/tests/flythrough-check.mjs"
