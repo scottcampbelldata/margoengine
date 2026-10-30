@@ -1,25 +1,45 @@
-// `npm run check:merge`: the pre-push check, with the GPU work narrowed to what the change affects.
-//   npm run check:merge         the affected GPU tests only (core, stage, shared, build and check scripts, package.json
-//                               and lock files, an unclassifiable file, or more than MAX_AFFECTED packages run all)
+// `npm run check:merge`: the pre-push check, with the work narrowed to what the change can affect (session rule 20:
+// never narrow by skipping a test the change can affect; the nightly full run is the backstop).
+//   npm run check:merge         the affected work only
 //   npm run check:merge:full    everything, as before (the nightly job: scripts/nightly-full.mjs); MARGO_FULL=1 does the same
 //   node scripts/check-merge.mjs --plan [--files=a,b]    print the mode, the reason and the commands, run nothing
 //                               (--files pretends those files changed; --base=<ref> diffs against that ref, not origin/main)
-// The steps are the ones in package.json `check:merge:steps`. Verify and the site build always run; each GPU step runs
-// only when its footprint (scripts/support/affected-gpu.mjs) meets the affected packages, or runs on a narrowed list
-// (visual demos, GPU test ids, WGSL package directories). The package tarball test always runs, on the affected
-// packages' README examples (the umbrella smoke test every time), and the bundler matrix runs when a changed package is
-// one it builds or imports (scripts/support/affected-packages.mjs); the full run keeps both whole. The mode and the
-// reason are printed first and written to test-results/check-merge.json. A step that fails while the Windows event log
-// shows a GPU driver reset (scripts/support/driver-resets.mjs, bug 25) runs once more; the reset is printed and recorded
-// with the step, and a second failure fails the run. A run that passed only that way says so: a "PASSED WITH A DRIVER
-// RESET" line per step or GPU test, and `passedAfterDriverReset: true` in check-merge.json.
+// Every changed file has a class (scripts/support/file-classes.mjs; tests/file-classes.test.js fails on a tracked file
+// no class places). Everything runs for core, stage, shared or the umbrella, the root package.json, a lock file or
+// .npmrc, build configuration, the check code (this file, affected-gpu.mjs, affected-packages.mjs,
+// file-classes.mjs, verify.mjs and every file the build:packages chain reaches), a WGSL file outside a package, an
+// unplaceable file or more than MAX_AFFECTED packages. A package file, its own package.json included, runs that
+// package and its dependents. Any other script, test page, fixture or tool runs the steps whose closure holds it
+// (stepClosure: the files each step's command, each verify command, each GPU test and each visual demo reach), and
+// nothing beyond verify when no closure does. A change to the GPU package runner runs RUNNER_SMOKE
+// (scripts/gpu-package-tests.mjs) plus what it affects.
+// The steps are the ones in package.json `check:merge:steps`. Verify, the fresh clone, the site build and the
+// quickstart always run; each GPU step runs only when its footprint (scripts/support/affected-gpu.mjs) meets the
+// affected packages or holds a changed file, or runs on a narrowed list (visual demos, GPU test ids, WGSL package
+// directories). The package tarball test always runs, on the affected packages' README examples (the umbrella smoke
+// test every time; whole when a file it runs changed), and the bundler matrix runs when a changed package is one it
+// builds or imports, or a file it runs changed (scripts/support/affected-packages.mjs); the full run keeps both whole.
+// The mode and the reason are printed first and written to test-results/check-merge.json. A step that fails while the
+// Windows event log shows a GPU driver reset (scripts/support/driver-resets.mjs, bug 25) runs once more; the reset is
+// printed and recorded with the step, and a second failure fails the run. A run that passed only that way says so: a
+// "PASSED WITH A DRIVER RESET" line per step or GPU test, and `passedAfterDriverReset: true` in check-merge.json.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
-import { analyse, buildFootprints, loadWorkspaces, scan, visualIds, wgslPackages } from './support/affected-gpu.mjs';
+import {
+  analyse,
+  buildFootprints,
+  buildCheckCode,
+  loadWorkspaces,
+  mentionIndex,
+  scan,
+  visualIds,
+  wgslPackages,
+} from './support/affected-gpu.mjs';
 import { matrixClosure, packageScopes } from './support/affected-packages.mjs';
+import { PARALLEL, SERIAL } from './verify.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -76,6 +96,7 @@ export function planSteps({ steps, decision, tests, workspaces, testId, scope })
         return ids.length ? [{ command: `${command} --select=${ids.join(',')}` }] : skip(none);
       }
       case 'check:wgsl': {
+        if (hit.has('wgsl')) return [{ command }];
         const dirs = wgslPackages(workspaces, decision.affected);
         return dirs.length ? [{ command: `${command} -- --packages=${dirs.join(',')}` }] : skip(none);
       }
@@ -99,14 +120,54 @@ export function describe(decision, base) {
   }`;
 }
 
+/**
+ * Everything a plan needs from the repository, read once: the steps, the package graph, the GPU tests, the footprints,
+ * the check code files, the RUNNER_SMOKE footprint ids, the name lookup, and the two package-step inputs.
+ */
+export async function planContext(dir = root) {
+  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')),
+    workspaces = loadWorkspaces(dir),
+    { plan, testId, PREPARE, RUNNER_SMOKE } = await import('./gpu-package-tests.mjs'),
+    tests = plan(),
+    footprints = buildFootprints({
+      root: dir,
+      workspaces,
+      tests,
+      scripts: manifest.scripts,
+      verify: [...SERIAL, ...PARALLEL.flat()],
+      prepare: PREPARE,
+    });
+  return {
+    steps: manifest.scripts['check:merge:steps'].split(' && '),
+    workspaces,
+    tests,
+    testId,
+    footprints,
+    checkCode: buildCheckCode(dir, workspaces, manifest.scripts),
+    smoke: RUNNER_SMOKE.map((id) => `gpu/${id}`),
+    mentions: mentionIndex(dir, footprints),
+    browserFiles: scan(dir, ['tests/modern.html'], workspaces).files,
+    matrix: matrixClosure(dir, workspaces),
+  };
+}
+
+/** The decision, the package-step scope and the planned commands for `files` (a full run when `env.MARGO_FULL` is 1). */
+export function planFiles(ctx, files, env = {}) {
+  const { workspaces, footprints, checkCode, smoke, mentions } = ctx;
+  const decision = analyse({ files, workspaces, footprints, env, checkCode, smoke, mentions });
+  return planDecision(ctx, decision, files);
+}
+
+function planDecision(ctx, decision, files) {
+  const { steps, workspaces, tests, testId, browserFiles, matrix } = ctx;
+  const scope = packageScopes({ decision, files, workspaces, browserFiles, closure: matrix });
+  return { decision, scope, planned: planSteps({ steps, decision, tests, workspaces, testId, scope }) };
+}
+
 async function main() {
   const args = process.argv.slice(2),
-    manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')),
-    steps = manifest.scripts['check:merge:steps'].split(' && '),
-    workspaces = loadWorkspaces(root),
-    { plan, testId } = await import('./gpu-package-tests.mjs'),
-    tests = plan(),
-    footprints = buildFootprints({ root, workspaces, tests, scripts: manifest.scripts });
+    ctx = await planContext(),
+    { workspaces, footprints } = ctx;
   const full = (reason) => ({ ...analyse({ files: [], workspaces, footprints, env: { MARGO_FULL: '1' } }), reason });
   let decision,
     base,
@@ -121,19 +182,12 @@ async function main() {
         : changedFiles(root, args.find((a) => a.startsWith('--base='))?.slice(7));
       base = diff.base;
       files = diff.files;
-      decision = analyse({ files: diff.files, workspaces, footprints, env: process.env });
+      decision = planFiles(ctx, files, process.env).decision;
     } catch (error) {
       decision = full(`cannot diff against origin/main (${String(error.message).split('\n')[0]})`);
     }
   }
-  const scope = packageScopes({
-    decision,
-    files,
-    workspaces,
-    browserFiles: scan(root, ['tests/modern.html'], workspaces).files,
-    closure: matrixClosure(root, workspaces),
-  });
-  const planned = planSteps({ steps, decision, tests, workspaces, testId, scope });
+  const { scope, planned } = planDecision(ctx, decision, files);
   console.log(describe(decision, base));
   console.log(
     `  packages: ${scope.packages.full ? 'whole' : 'scoped'} (${scope.packages.reason}); bundlers: ${scope.bundlers.run ? 'run' : 'skip'} (${scope.bundlers.reason})`,

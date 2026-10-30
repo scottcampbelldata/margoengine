@@ -1,23 +1,28 @@
-// Which GPU work a change affects (`npm run check:merge`, scripts/check-merge.mjs).
+// Which GPU work a change affects (`npm run check:merge`, scripts/check-merge.mjs). Session rule 20: check only what a
+// change can affect, and never narrow by skipping a test the change can affect.
 //
-// 1. The changed files (merge base with origin/main) map to workspace packages; every package that depends on them,
-//    transitively, is affected too (the workspace dependency graph).
-// 2. Each GPU step has a footprint: the packages and files it exercises, found by reading its sources (a package's
-//    test dirs, a check script and the pages it opens, a demo's html and the modules it imports). A step runs when
-//    its footprint meets the affected set; the visual check runs only the demos whose footprint does.
-// 3. Anything unsure runs everything: core, stage, shared or the margoengine umbrella; build scripts, check scripts,
-//    package.json and lock files; a WGSL file outside a package; a file nothing classifies; more than MAX_AFFECTED
-//    packages; MARGO_FULL=1.
+// 1. Every changed file has a class (scripts/support/file-classes.mjs). A workspace file maps to its package; every
+//    package that depends on it, transitively, is affected too (the workspace dependency graph). A package's own
+//    package.json counts as that package.
+// 2. Each step has a footprint: the packages and files it exercises, found by reading its sources (a package's test
+//    dirs, a check script and the pages it opens, a demo's html and the modules it imports, and the repo paths those
+//    files name). stepClosure does this for every check:merge step, every verify command and every GPU test, so a
+//    script, test page or fixture runs exactly the steps whose closure holds it, and a file no closure holds runs
+//    nothing beyond verify. A GPU step runs when its footprint meets the affected set or holds a changed file.
+// 3. Everything runs for core, stage, shared or the margoengine umbrella; the root package.json, a lock file or .npmrc;
+//    build configuration; the check code itself (file-classes.mjs CHECK_CODE plus the build:packages closure); a
+//    WGSL file outside a package; an asset no check reaches or names; a file no class places; more than MAX_AFFECTED
+//    packages; MARGO_FULL=1. A change to the GPU package runner (RUNNER) runs RUNNER_SMOKE plus what it affects.
 // Everything here is pure (files and a package graph in, a decision out) except the readers at the bottom.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { baselineDemo, CLASSES, classify, FULL_DIRS, CHECK_CODE, RUNNER, workspaceOf } from './file-classes.mjs';
 import { demos } from './visual-demos.js';
+
+export { FULL_DIRS, workspaceOf };
 
 /** More affected packages than this (dependents included) and the full GPU run is cheaper than being wrong. */
 export const MAX_AFFECTED = 12;
-
-/** Package directories whose change always runs everything: all depend on, or are, the engine's shared floor. */
-export const FULL_DIRS = ['packages/core', 'packages/stage', 'packages/shared', 'packages/margoengine'];
 
 const posix = (path) => path.replaceAll('\\', '/');
 const TEXT = /\.(html|m?js|tsx?|css)$/;
@@ -65,73 +70,59 @@ export function dependents(workspaces, seeds) {
   return out;
 }
 
-/** The workspace whose directory holds `file` (the deepest one), or undefined. */
-export function workspaceOf(workspaces, file) {
-  let best;
-  for (const w of workspaces) if (file.startsWith(`${w.dir}/`) && (!best || w.dir.length > best.dir.length)) best = w;
-  return best;
-}
-
-/** Why a file forces the full run, or undefined. Documents never do; WGSL inside a package belongs to that package. */
-export function fullReason(file, workspaces) {
-  if (file.endsWith('.md') || isQualityBaseline(file)) return undefined;
-  if (
-    /(^|\/)package\.json$/.test(file) ||
-    /(^|\/)(package-lock|npm-shrinkwrap)\.json$/.test(file) ||
-    file.endsWith('.npmrc')
-  )
-    return 'package.json or lock file changed';
-  if (file.startsWith('scripts/')) return 'build or check script changed';
-  if (
-    file.startsWith('.github/') ||
-    /^(biome|tsconfig[\w.-]*|rust-toolchain)\.(json|toml)$/.test(file) ||
-    /^vite\.config\./.test(file)
-  )
-    return 'build configuration changed';
-  const dir = FULL_DIRS.find((d) => file.startsWith(`${d}/`));
-  if (dir) return `${dir.slice(9)} changed`;
-  if (file.endsWith('.wgsl') && !workspaceOf(workspaces, file)) return 'WGSL outside a package changed';
-  return undefined;
-}
-
-/** The quality gate's recorded baselines: data that only `npm run quality` reads, so a new baseline changes no GPU test. */
-export const isQualityBaseline = (file) => /^scripts\/quality\/baselines\/[\w.-]+\.json$/.test(file);
-
-/** True for files that never change what a GPU test draws or checks (documents, licences, site pages, ignore files). */
-export function isInert(file) {
-  return (
-    file.endsWith('.md') ||
-    isQualityBaseline(file) ||
-    /^(LICENSE|NOTICE|\.gitignore|\.gitattributes)$/.test(file) ||
-    file.startsWith('docs/') ||
-    file.startsWith('site/') ||
-    file.startsWith('private/')
-  );
-}
+/** Classes whose file, when no footprint holds it, is looked for by name in the footprints' files (`mentions`). */
+const NAMED = new Set(['script', 'fixture', 'asset', 'root-browser', 'proof']);
 
 /**
  * What a change needs. `footprints`: { [stepId]: { packages: Set<name>, files: Set<path>, patterns: RegExp[], all: boolean } }.
+ * `checkCode`: the files that run everything (buildCheckCode); `smoke`: the footprint ids a RUNNER change runs
+ * (RUNNER_SMOKE as `gpu/<test id>`); `mentions(file)`: footprint ids whose files name a file no footprint holds.
  * Returns { mode: 'full' | 'affected', reason, changed, affected, hits } where hits are the footprint ids to run.
  */
-export function analyse({ files, workspaces, footprints, env = {}, max = MAX_AFFECTED }) {
+export function analyse({
+  files,
+  workspaces,
+  footprints,
+  env = {},
+  max = MAX_AFFECTED,
+  checkCode = CHECK_CODE,
+  smoke = [],
+  mentions,
+}) {
   const full = (reason) => ({ mode: 'full', reason, changed: [], affected: [], hits: Object.keys(footprints) });
   if (env.MARGO_FULL === '1') return full('MARGO_FULL=1');
   const changed = new Set(),
     loose = [];
   for (const raw of files) {
     const file = posix(raw),
-      reason = fullReason(file, workspaces);
-    if (reason) return full(`${reason} (${file})`);
-    const owner = file.endsWith('.md') ? undefined : workspaceOf(workspaces, file);
-    if (owner) changed.add(owner.name);
-    else loose.push(file);
+      c = classify(file, { workspaces, checkCode });
+    if (CLASSES[c.cls] === 'full' && c.cls !== 'asset') return full(`${c.reason} (${file})`);
+    if (c.cls === 'package') changed.add(workspaceOf(workspaces, file).name);
+    else loose.push({ file, cls: c.cls });
   }
-  const fileHit = (print, file) => print.files.has(file) || print.patterns.some((p) => p.test(file)),
-    touched = new Set();
-  for (const file of loose) {
-    const hit = Object.entries(footprints).filter(([, print]) => fileHit(print, file));
-    for (const [id] of hit) touched.add(id);
-    if (!hit.length && !isInert(file)) return full(`cannot classify ${file}`);
+  const ids = Object.keys(footprints),
+    visual = ids.filter((id) => id.startsWith('visual/')),
+    roots = ids.filter((id) => id.startsWith('gpu/root/')),
+    fileHit = (print, file) => print.files.has(file) || print.patterns.some((p) => p.test(file)),
+    touched = new Set(),
+    notes = new Set();
+  for (const { file, cls } of loose) {
+    let hit = ids.filter((id) => fileHit(footprints[id], file));
+    if (!hit.length && mentions && NAMED.has(cls)) hit = mentions(file);
+    if (cls === 'runner') {
+      hit = [...hit, ...smoke];
+      notes.add('GPU package runner changed: RUNNER_SMOKE');
+    } else if (cls === 'visual-baseline') {
+      const id = baselineDemo(
+        file,
+        visual.map((v) => v.slice(7)),
+      );
+      hit = [...hit, ...(id ? [`visual/${id}`] : visual)];
+    } else if (cls === 'visual-record') hit = [...hit, ...visual];
+    else if (cls === 'root-browser' && !hit.length) hit = roots;
+    else if (cls === 'asset' && !hit.length) return full(`no check reaches or names the asset ${file}`);
+    else if (cls === 'unknown') return full(`cannot classify ${file}`);
+    for (const id of hit) touched.add(id);
   }
   const affected = dependents(workspaces, changed);
   if (affected.size > max)
@@ -144,15 +135,28 @@ export function analyse({ files, workspaces, footprints, env = {}, max = MAX_AFF
         touched.has(id) || (affected.size && (print.all || [...print.packages].some((p) => affected.has(p)))),
     )
     .map(([id]) => id);
-  const reason = changed.size
-    ? `changed ${[...changed].join(', ')}; affected ${affected.size} package${affected.size === 1 ? '' : 's'}`
-    : loose.length
-      ? 'no package changed (documents, site pages and demo sources only)'
-      : 'no changed files';
+  const steps = [...touched].filter((id) => !id.includes('/')),
+    reach = steps.length ? `; changed check files reach ${steps.sort().join(', ')}` : '',
+    reason =
+      (changed.size
+        ? `changed ${[...changed].join(', ')}; affected ${affected.size} package${affected.size === 1 ? '' : 's'}`
+        : loose.length
+          ? 'no package changed (documents, scripts, tests and demo sources only)'
+          : 'no changed files') +
+      reach +
+      [...notes].map((n) => `; ${n}`).join('');
   return { mode: 'affected', reason, changed: [...changed], affected: [...affected], hits };
 }
 
 // ---- Footprints: read the sources a GPU step runs. ----
+
+const texts = new Map();
+/** A repo file's text, read once per process (footprints read the same sources many times). */
+function readText(root, file) {
+  const key = join(root, file);
+  if (!texts.has(key)) texts.set(key, readFileSync(key, 'utf8'));
+  return texts.get(key);
+}
 
 /** Files under a path (a file itself, or a directory without node_modules, dist and asset folders), repo-relative. */
 function expand(root, path) {
@@ -190,7 +194,7 @@ export function scan(root, entries, workspaces) {
     if (files.has(file)) continue;
     files.add(file);
     if (!TEXT.test(file)) continue;
-    const text = readFileSync(join(root, file), 'utf8'),
+    const text = readText(root, file),
       owner = workspaceOf(workspaces, file);
     for (const m of text.matchAll(/@margoengine\/([a-z0-9-]+)/g))
       if (byName.has(`@margoengine/${m[1]}`)) packages.add(`@margoengine/${m[1]}`);
@@ -260,29 +264,134 @@ export function demoSources(demo) {
 /** Paths in a command line that are .js/.mjs/.ts files (a `node scripts/x.js` or `node --test tests/x.test.js` command). */
 const commandFiles = (command) => (command.match(/[\w./-]+\.(?:m?js|ts)\b/g) ?? []).map(posix);
 
+/**
+ * The repo files a root command runs, following `npm run <name>` into package.json `scripts` (once each). A part run
+ * in a workspace (`--workspace <dir>`) is that package's own and is left out: its files belong to the package.
+ */
+export function commandEntries(scripts, command, seen = new Set()) {
+  const out = [];
+  for (const part of command.split(/&&|\|\||;/)) {
+    if (/--workspace\b/.test(part)) continue;
+    const name = /\bnpm run ([\w:.-]+)/.exec(part)?.[1];
+    if (name) {
+      if (scripts[name] && !seen.has(name)) {
+        seen.add(name);
+        out.push(...commandEntries(scripts, scripts[name], seen));
+      }
+      continue;
+    }
+    out.push(...commandFiles(part));
+  }
+  return out;
+}
+
+/** A repo path a file names in a string (`'scripts/build-site.js'`, `"tests/fixtures/basic-scene"`). */
+const NAMED_PATH = /['"`/]((?:scripts|tests|examples|bench|tools)\/[\w./-]*[\w-])(?=['"`?#\s)])/g;
+const READABLE = /\.(html|m?js|tsx?|css|json)$/;
+
+/**
+ * scan() of `entries`, then the repo paths its files name in strings (a script it spawns, a page or fixture it loads by
+ * path), scanned in turn until nothing new is named. `packages` and `all` are scan()'s of the entries alone; `files`
+ * holds every file reached either way (files inside a workspace stay that package's). `follow(path)` limits which
+ * named paths are followed.
+ */
+export function closure(root, entries, workspaces, follow = () => true) {
+  const first = scan(root, entries, workspaces),
+    files = new Set(first.files);
+  let frontier = [...first.files];
+  while (frontier.length) {
+    const named = new Set();
+    for (const file of frontier) {
+      if (!READABLE.test(file) || !existsSync(join(root, file))) continue;
+      for (const [, path] of readText(root, file).matchAll(NAMED_PATH))
+        if (!files.has(path) && follow(path) && existsSync(join(root, path)) && !workspaceOf(workspaces, path))
+          named.add(path);
+    }
+    if (!named.size) break;
+    frontier = [];
+    for (const file of scan(root, [...named], workspaces).files)
+      if (!files.has(file) && !workspaceOf(workspaces, file)) {
+        files.add(file);
+        frontier.push(file);
+      }
+  }
+  return { packages: first.packages, files, all: first.all };
+}
+
+/**
+ * Named paths a step follows, when not all: the visual check follows only the scripts it runs (the site build), not
+ * the pages that build makes beside the demos (each demo's own sources are its footprint; bench/ is not captured).
+ */
+const FOLLOW = { 'visual:check': (path) => /^scripts\/.+\.m?js$/.test(path) };
+
+/**
+ * The files each step reaches, keyed by step: every check:merge step by its npm script name (`verify` also through
+ * the verify.mjs SERIAL and PARALLEL commands given as `verify`), and every GPU test by `gpu/<test id>` (its command,
+ * plus the PREPARE commands of a root suite). `tests` is plan() of scripts/gpu-package-tests.mjs. Returns
+ * { [id]: { packages, files, all } } with a non-enumerable `placed(file)`: the ids whose closure holds a file.
+ */
+export function stepClosure(root, workspaces, scripts, { verify = [], tests = [], prepare = {} } = {}) {
+  const out = {},
+    exists = (f) => existsSync(join(root, f));
+  for (const command of (scripts['check:merge:steps'] ?? '').split(' && ')) {
+    const name = /^npm run (\S+)/.exec(command)?.[1];
+    if (!name || !scripts[name]) continue;
+    const entries = commandEntries(scripts, command);
+    if (name === 'verify') for (const c of verify) entries.push(...commandEntries(scripts, c));
+    out[name] = closure(root, [...new Set(entries)].filter(exists), workspaces, FOLLOW[name]);
+  }
+  for (const test of tests) {
+    const id = `gpu/${test.name ? `root/${test.name}` : test.label.replace(' ', '/')}`;
+    const entries = test.name
+      ? [scripts[test.name] ?? '', ...(prepare[test.name] ?? [])].flatMap((c) => commandEntries(scripts, c))
+      : commandFiles(test.command).flatMap((f) => [posix(join(test.cwd, f)), f]);
+    out[id] = closure(root, [...new Set(entries)].filter(exists), workspaces);
+  }
+  Object.defineProperty(out, 'placed', {
+    value: (file) => Object.keys(out).filter((id) => out[id].files.has(posix(file))),
+  });
+  return out;
+}
+
+/** CHECK_CODE plus every file outside a workspace that the build:packages chain reaches: a change there runs everything. */
+export function buildCheckCode(root, workspaces, scripts) {
+  const entries = commandEntries(scripts, 'npm run build:packages').filter((f) => existsSync(join(root, f)));
+  const reached = [...closure(root, entries, workspaces).files].filter((f) => !RUNNER.includes(f));
+  return new Set([...CHECK_CODE, ...reached]);
+}
+
 /** `tests/*.html` pages a check script mentions. */
 const pagesOf = (root, file) =>
   existsSync(join(root, file))
-    ? [...readFileSync(join(root, file), 'utf8').matchAll(/['"`/](tests\/[\w./-]+\.html)\b/g)].map((m) => m[1])
+    ? [...readText(root, file).matchAll(/['"`/](tests\/[\w./-]+\.html)\b/g)].map((m) => m[1])
     : [];
 
 const everything = (print) => ({ ...print, all: true });
+const filesOnly = (print) => ({ packages: new Set(), files: new Set(print?.files ?? []), patterns: [], all: false });
 
 /**
- * Footprints of every GPU step, keyed by id: `visual/<demo id>`, `views`, `depth`, `no-webgpu`, `gpu/<dir>/<script>`
- * (a package's browser or gpu test script), `gpu/root/<script>` (a root suite). `tests` is plan() of
- * scripts/gpu-package-tests.mjs; `roots` its ROOT map. WGSL is not here: it narrows by package directory.
+ * Footprints of every step, keyed by id: `visual/<demo id>`, `views`, `depth`, `no-webgpu`, `gpu/<dir>/<script>`
+ * (a package's browser or gpu test script), `gpu/root/<script>` (a root suite), and, by the files they reach only,
+ * `wgsl` (check:wgsl whole), `packages` (modern:test:packages whole), `bundlers` (modern:test:bundlers runs), and
+ * `verify`, `fresh-clone`, `site`, `quickstart` (steps that always run; the id only places a file). Every visual demo
+ * also holds the visual check's own files (visual-regression.js and the site build it names), and every GPU test the
+ * runner's files other than RUNNER. `tests` is plan() of scripts/gpu-package-tests.mjs; `verify` the verify.mjs
+ * commands; `prepare` its PREPARE map. WGSL by package is not here: it narrows by package directory.
  */
-export function buildFootprints({ root, workspaces, tests, scripts }) {
-  const out = {};
+export function buildFootprints({ root, workspaces, tests, scripts, verify = [], prepare = {} }) {
+  const out = {},
+    steps = stepClosure(root, workspaces, scripts, { verify, tests, prepare }),
+    stepFiles = (name) => [...(steps[name]?.files ?? [])];
+  const visualFiles = stepFiles('visual:check');
   for (const demo of demos) {
-    const sources = demoSources(demo);
-    out[`visual/${demo.id}`] = sources ? scan(root, sources, workspaces) : everything(empty());
-    out[`visual/${demo.id}`].patterns = [];
+    const sources = demoSources(demo),
+      print = sources ? closure(root, sources, workspaces) : everything(empty());
+    for (const file of visualFiles) print.files.add(file);
+    out[`visual/${demo.id}`] = { ...print, patterns: [] };
   }
   const ofScript = (file, extra = []) => {
     const pages = pagesOf(root, file);
-    return scan(root, [file, ...pages, ...extra], workspaces);
+    return closure(root, [file, ...pages, ...extra], workspaces);
   };
   out.views = merge(
     ofScript('scripts/test-views-browser.mjs'),
@@ -290,11 +399,18 @@ export function buildFootprints({ root, workspaces, tests, scripts }) {
   );
   out.depth = ofScript('scripts/test-depth-browser.mjs');
   out['no-webgpu'] = ofScript('scripts/test-no-webgpu-browser.mjs');
+  // It opens every page of site/dist that runs a module script, the landing page included.
+  out['no-webgpu'].patterns = [/^site\/.*\.(html|m?js)$/];
+  const runner = stepFiles('check:gpu-packages').filter((f) => !RUNNER.includes(f));
   for (const test of tests) {
     const id = test.name ? `gpu/root/${test.name}` : `gpu/${test.label.replace(' ', '/')}`;
+    const own = steps[id] ?? empty();
+    let print;
     if (test.name) {
-      const files = commandFiles(scripts[test.name] ?? '');
-      const print = merge(...files.map((f) => ofScript(f)));
+      const entries = [scripts[test.name] ?? '', ...(prepare[test.name] ?? [])]
+        .flatMap((c) => commandEntries(scripts, c))
+        .filter((f) => existsSync(join(root, f)));
+      print = merge(...entries.map((f) => ofScript(f)));
       for (const m of (scripts[test.name] ?? '').matchAll(/examples\/[a-z0-9-]+|apps\/[a-z0-9-]+/g)) {
         const w = workspaces.find((x) => x.dir === m[0]);
         if (w) print.packages.add(w.name);
@@ -303,21 +419,55 @@ export function buildFootprints({ root, workspaces, tests, scripts }) {
       // The Python package is not a workspace: every file under python/ is this suite's.
       if (test.name === 'test:python:browser') print.patterns.push(/^python\//);
       // A suite whose sources name no package at all cannot be mapped: run it whenever a package is affected.
-      out[id] = print.packages.size || print.files.size ? print : everything(print);
+      if (!(print.packages.size || print.files.size)) print = everything(print);
     } else {
-      const dir = test.cwd,
-        own = workspaces.find((w) => w.dir === dir);
-      const entries = commandFiles(test.command)
-        .flatMap((f) => [posix(join(dir, f)), f])
-        .filter((f) => existsSync(join(root, f)));
-      const print = scan(root, entries, workspaces);
-      if (own) print.packages.add(own.name);
-      out[id] = print;
+      print = merge(own);
+      const w = workspaces.find((x) => x.dir === test.cwd);
+      if (w) print.packages.add(w.name);
     }
-    out[id].patterns ??= [];
+    for (const file of [...own.files, ...runner]) print.files.add(file);
+    out[id] = print;
   }
+  out.wgsl = filesOnly(steps['check:wgsl']);
+  out.packages = filesOnly(steps['modern:test:packages']);
+  out.bundlers = filesOnly(steps['modern:test:bundlers']);
+  out.verify = filesOnly(steps.verify);
+  out['fresh-clone'] = filesOnly(steps['check:fresh-clone']);
+  out.site = filesOnly(steps['build:site']);
+  out.quickstart = filesOnly(steps['check:quickstart']);
   for (const print of Object.values(out)) print.patterns ??= [];
   return out;
+}
+
+/** The step ids that only place a file: they always run, so a hit on them runs nothing more. */
+export const PLACEMENT_IDS = ['verify', 'fresh-clone', 'site', 'quickstart'];
+
+/** How a file no footprint holds is looked for by name: its basename, or `parent/basename` for a generic one. */
+export const mentionKey = (file) => {
+  const parts = posix(file).split('/'),
+    base = parts.at(-1);
+  return /^(index|main|README|package|manifest|config)\./.test(base) ? parts.slice(-2).join('/') : base;
+};
+
+/**
+ * `mentions(file)` for analyse(): the footprint ids whose own files name `file` by mentionKey (a fixture or page
+ * loaded by a path built at run time). Placement ids are left out: those steps always run.
+ */
+export function mentionIndex(root, footprints) {
+  const byFile = new Map();
+  for (const [id, print] of Object.entries(footprints)) {
+    if (PLACEMENT_IDS.includes(id)) continue;
+    for (const file of print.files) byFile.set(file, [...(byFile.get(file) ?? []), id]);
+  }
+  return (file) => {
+    const key = mentionKey(file),
+      hit = new Set();
+    for (const [other, ids] of byFile) {
+      if (other === file || !READABLE.test(other) || !existsSync(join(root, other))) continue;
+      if (readText(root, other).includes(key)) for (const id of ids) hit.add(id);
+    }
+    return [...hit];
+  };
 }
 
 /** Package directories (packages/x) among the affected names, for narrowing check:wgsl. */

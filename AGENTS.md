@@ -69,13 +69,18 @@ Several agents push to `main`. Each push must leave it at least as clean as it f
 - `npm run verify` passes. For changes to shaders, anything a demo draws, a package README or package exports, run `npm run check:merge` (adds the site build, the visual check and `modern:test:packages`, which packs every package,
   installs the tarballs into a clean project and type-checks each README example; a few minutes for a one-package
   change).
-- `check:merge` runs only the GPU work the change affects: the packages you changed plus everything that depends on
-  them (their GPU tests, the visual demos and views that import them, the WGSL compile for their shaders). Core, stage,
-  shared, the margoengine umbrella, build and check scripts, package.json or lock files, a file it cannot classify, or
-  more than 12 affected packages run everything. `npm run check:merge:full` (or `MARGO_FULL=1`) forces the full run,
-  and it prints which mode ran and why. A nightly job runs the full one: `node scripts/nightly-full.mjs` (dated log in
-  `test-results/nightly/`). A GPU step skipped as unaffected is not a failure; if you doubt the mapping, run
-  `check:merge:full`.
+- Check only what a change can affect (Scott, 2026-10-30, session rule 20): `check:merge` runs the GPU tests of the
+  changed packages plus their dependents, not every package (their GPU tests, the visual demos and views that import
+  them, the WGSL compile for their shaders). A package's own package.json counts as that package; a script runs only
+  the checks that use it; a new standalone script no check imports runs none. Everything runs only for core, stage,
+  shared code (and the margoengine umbrella), the check code itself, the root package.json or the lock file (also
+  build configuration, a WGSL file outside a package, or more than 12 affected packages). An unplaceable file gets
+  added to the map (`scripts/support/file-classes.mjs`; `tests/file-classes.test.js` fails on any tracked file it
+  cannot place), not a full run. Never narrow by skipping a test the change can affect. A change to the GPU package
+  runner runs its pinned `RUNNER_SMOKE` tests plus what it affects. `npm run check:merge:full` (or `MARGO_FULL=1`)
+  forces the full run, and it prints which mode ran and why. The nightly full run (`node scripts/nightly-full.mjs`,
+  not on the main dev PC; dated log in `test-results/nightly/`) is the backstop. A GPU step skipped as unaffected is
+  not a failure; if you doubt the mapping, run `check:merge:full`.
 - The two package-level steps are narrowed the same way (`scripts/support/affected-packages.mjs`). `verify` builds every
   package once, then runs its other checks side by side. `modern:test:packages` builds nothing again after `verify`
   (check:merge hands it that build), packs all packages in one `npm pack`, reuses the consumer project's third-party

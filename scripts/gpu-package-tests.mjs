@@ -52,7 +52,7 @@ export const ROOT = {
   'test:frame-alloc:browser': 'JavaScript heap bytes of a steady-state frame, per scene, against their floors',
 };
 /** Commands a root suite needs first (it reads their output), run once before it. */
-const PREPARE = {
+export const PREPARE = {
   'modern:test:browser': [
     'npm run build --workspace @margoengine/starter-vite',
     'npm run build --workspace @margoengine/starter-next',
@@ -63,6 +63,22 @@ const PREPARE = {
   ],
   'modern:test:usdz:browser': ['npm run modern:test:usdz'],
 };
+/**
+ * What `npm run check:merge` runs when this runner changes (scripts/support/file-classes.mjs RUNNER): the runner does
+ * not change what a test draws, and its planning, limits, lock modes and heat guard are pinned by unit tests
+ * (heat-containment, gpu-timing-lock, voxel-pathtracer-gpu-split), so one real test of each kind it treats
+ * differently runs, plus every test the change affects through packages. Kinds (tests/check-merge-affected.test.js
+ * checks each is here): a shared package test that splits into steps (shader test:gpu), the exclusive timing test,
+ * which also has a per-script time limit (biomes test:gpu:flythrough, the only one), a split suite (voxel test:gpu), a
+ * root suite (lifecycle) and a root suite with PREPARE commands (usdz).
+ */
+export const RUNNER_SMOKE = [
+  'shader/test:gpu',
+  'biomes/test:gpu:flythrough',
+  'voxel/test:gpu',
+  'root/test:lifecycle:browser',
+  'root/modern:test:usdz:browser',
+];
 /** Browser scripts under packages/ that are tools, not tests (the guard below skips them). */
 const TOOLS = {
   'packages/voxel-pathtracer/tests/magicavoxel/mv-vox.mjs': 'renders .vox files for a side-by-side comparison',

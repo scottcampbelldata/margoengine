@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { exitCode, plan, planSteps, report, runPlan, splitSteps, summaryLines } from '../scripts/gpu-package-tests.mjs';
-import { HEAT_EXIT, nightlySteps, runNightly } from '../scripts/nightly-full.mjs';
+import { HEAT_EXIT, NIGHTLY_STEPS, nightlySteps, runNightly } from '../scripts/nightly-full.mjs';
 import { coolDown, fileTemperature, hottestZone, thermalSource, toCelsius } from '../scripts/support/heat.mjs';
 import { machineProfile, PROFILES_FILE, readProfiles } from '../scripts/support/machine-profile.mjs';
 import { runLimited } from '../scripts/support/run-limited.mjs';
@@ -359,19 +359,51 @@ test('profiles are chosen by name, are checked, and hold no machine names or hom
 
 test('the nightly plan follows the profile and a heat stop ends the night as PAUSED-FOR-HEAT, not FAIL', async () => {
   const work = nightlySteps(machineProfile({ MARGO_MACHINE_PROFILE: 'workstation' })),
-    hot = nightlySteps(machineProfile({ MARGO_MACHINE_PROFILE: 'thermal-limited' }));
+    laptop = nightlySteps(machineProfile({ MARGO_MACHINE_PROFILE: 'laptop' })),
+    light = [
+      'gpu package tests',
+      'check:wgsl',
+      'check:views',
+      'check:depth',
+      'check:no-webgpu',
+      'modern:test:bundlers',
+    ];
   assert.deepEqual(
     work.steps.map((s) => s.label),
     ['full check:merge', 'pinned proofs'],
   );
+  assert.deepEqual(work.after, []);
+  // The laptop is the nightly backstop for check:merge's narrowing (session rule 20): everything, path tracer included.
   assert.deepEqual(
-    hot.steps.map((s) => s.label),
-    ['gpu package tests'],
-  );
-  assert.deepEqual(
-    hot.left.map((s) => s.label),
+    laptop.steps.map((s) => s.label),
     ['full check:merge', 'pinned proofs'],
   );
+  assert.deepEqual(laptop.after, ['nightly-status']);
+  assert.deepEqual(machineProfile({ MARGO_MACHINE_PROFILE: 'laptop' }).exclude, {});
+  // The small machines add the light GPU checks after the package tests, which build every package first.
+  for (const name of ['mini-pc', 'thermal-limited']) {
+    const hot = nightlySteps(machineProfile({ MARGO_MACHINE_PROFILE: name }));
+    assert.deepEqual(
+      hot.steps.map((s) => s.label),
+      light,
+      name,
+    );
+    assert.deepEqual(hot.after, ['nightly-status'], name);
+    assert.deepEqual(
+      hot.left.map((s) => s.label),
+      ['full check:merge', 'pinned proofs'],
+      name,
+    );
+  }
+  // Each light step runs the package.json script of the same name, after what it reads is built.
+  const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts;
+  for (const label of light.slice(1)) {
+    const [command] = NIGHTLY_STEPS[label]();
+    assert.ok(scripts[label], label);
+    assert.match(command, new RegExp(`npm run ${label}$`), label);
+  }
+  assert.match(NIGHTLY_STEPS['check:no-webgpu']()[0], /^npm run build:site && /);
+  assert.match(NIGHTLY_STEPS['modern:test:bundlers']()[0], /^npm run modern:test:packages && /);
   assert.throws(
     () => nightlySteps({ name: 'x', nightly: ['nope'] }),
     (error) => error.code === 'NIGHTLY_STEP_UNKNOWN',

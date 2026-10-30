@@ -5,18 +5,25 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { GPU_STEPS, PLAIN_STEPS, SCOPED_STEPS, describe, planSteps } from '../scripts/check-merge.mjs';
-import { MATRIX_DIRS, matrixClosure, packageScopes } from '../scripts/support/affected-packages.mjs';
+import {
+  GPU_STEPS,
+  PLAIN_STEPS,
+  SCOPED_STEPS,
+  describe,
+  planContext,
+  planFiles,
+  planSteps,
+} from '../scripts/check-merge.mjs';
+import { MATRIX_DIRS, packageScopes } from '../scripts/support/affected-packages.mjs';
 import { PARALLEL, SERIAL, TEST_CONCURRENCY } from '../scripts/verify.mjs';
 import { nightlyCommand, stamp } from '../scripts/nightly-full.mjs';
-import { plan, testId } from '../scripts/gpu-package-tests.mjs';
+import { PREPARE, RUNNER_SMOKE, splitSteps, testId } from '../scripts/gpu-package-tests.mjs';
 import {
   analyse,
-  buildFootprints,
+  commandEntries,
   demoSources,
-  scan,
   dependents,
-  loadWorkspaces,
+  stepClosure,
   visualIds,
   wgslPackages,
 } from '../scripts/support/affected-gpu.mjs';
@@ -66,17 +73,122 @@ test('core, stage, shared and the margoengine umbrella run everything', () => {
   assert.equal(run(['packages/shared/aces.wgsl']).mode, 'full');
 });
 
-test('build scripts, check scripts, package.json and lock files run everything', () => {
+test('the root package.json, lock files, build configuration and the check code run everything', () => {
   for (const file of [
-    'scripts/check-merge.mjs',
-    'scripts/support/visual-demos.js',
     'package.json',
     'package-lock.json',
-    'packages/b/package.json',
+    'examples/next/package-lock.json',
+    '.npmrc',
     'biome.json',
-    '.github/workflows/ci.yml',
+    'tsconfig.base.json',
+    'rust-toolchain.toml',
+    'vite.config.ts',
+    'scripts/check-merge.mjs',
+    'scripts/support/affected-gpu.mjs',
+    'scripts/support/affected-packages.mjs',
+    'scripts/support/file-classes.mjs',
+    'scripts/support/driver-resets.mjs',
+    'scripts/verify.mjs',
   ])
     assert.equal(run([file]).mode, 'full', file);
+  // The build:packages closure, given as `checkCode`, runs everything too.
+  assert.equal(run(['scripts/build-x.js'], { checkCode: new Set(['scripts/build-x.js']) }).mode, 'full');
+  assert.equal(run(['scripts/build-x.js']).mode, 'affected');
+});
+
+test("a package's own package.json runs that package and its dependents, not everything", () => {
+  const result = run(['packages/b/package.json']);
+  assert.equal(result.mode, 'affected');
+  assert.deepEqual(result.affected.sort(), ['b', 'c']);
+  assert.deepEqual(result.hits, ['gpu/b', 'gpu/root/unmapped']);
+  assert.deepEqual(run(['packages/d/package.json']).affected, ['d']);
+});
+
+test('a check file runs the steps whose closure holds it, and a file no closure holds runs no GPU step', () => {
+  const prints = {
+    ...footprints,
+    'gpu/d': print(['d'], ['scripts/support/d-helper.mjs']),
+    wgsl: print([], ['scripts/check-w.mjs']),
+  };
+  const go = (files) => analyse({ files, workspaces: graph, footprints: prints });
+  assert.deepEqual(go(['scripts/support/d-helper.mjs']).hits, ['gpu/d']);
+  assert.deepEqual(go(['scripts/check-w.mjs']).hits, ['wgsl']);
+  for (const file of [
+    'scripts/quiet-gate.mjs',
+    'scripts/benchmark-bvh.js',
+    'bench/lib/x.js',
+    'tools/x/y.js',
+    'tests/support/z.js',
+  ]) {
+    const result = go([file]);
+    assert.equal(result.mode, 'affected', file);
+    assert.deepEqual(result.hits, [], file);
+  }
+});
+
+test('a change to the GPU package runner runs the smoke list plus what the change affects', () => {
+  const smoke = ['gpu/d'];
+  for (const file of [
+    'scripts/gpu-package-tests.mjs',
+    'scripts/support/run-limited.mjs',
+    'scripts/support/heat.mjs',
+    'scripts/support/machine-profile.mjs',
+    'scripts/support/machine-profiles.json',
+  ]) {
+    const result = run([file], { smoke });
+    assert.equal(result.mode, 'affected', file);
+    assert.deepEqual(result.hits, ['gpu/d'], file);
+    assert.match(result.reason, /RUNNER_SMOKE/);
+  }
+  assert.deepEqual(run(['scripts/gpu-package-tests.mjs', 'packages/b/src/x.ts'], { smoke }).hits.sort(), [
+    'gpu/b',
+    'gpu/d',
+    'gpu/root/unmapped',
+  ]);
+});
+
+test('unit tests, proofs, documents, site pages, workflows and API reports run no GPU step', () => {
+  for (const file of [
+    'tests/power-status.test.js',
+    'examples/package-benchmarks/proofs/quality-presets.proof.js',
+    'examples/package-benchmarks/proofs/baselines/quality-presets.json',
+    'examples/package-benchmarks/proofs/run.mjs',
+    'docs/whitepaper/claims.md',
+    'site/index.html',
+    '.github/workflows/ci.yml',
+    'api/dof.api.md',
+    'benchmarks/records/x.json',
+    'public/favicon.ico',
+    '.editorconfig',
+  ]) {
+    const result = run([file]);
+    assert.equal(result.mode, 'affected', file);
+    assert.deepEqual(result.hits, [], file);
+  }
+});
+
+test('a visual baseline runs its own demo, a visual manifest every demo', () => {
+  const prints = { ...footprints, 'visual/dof': print(), 'visual/earth': print(), 'visual/khronos-a': print() };
+  const go = (files) => analyse({ files, workspaces: graph, footprints: prints }).hits;
+  assert.deepEqual(go(['tests/visual/dof-high.png']), ['visual/dof']);
+  assert.deepEqual(go(['tests/visual/profiles/p/khronos-a-model.png']), ['visual/khronos-a']);
+  assert.deepEqual(go(['tests/visual/gone-high.png']).sort(), ['visual/dof', 'visual/earth', 'visual/khronos-a']);
+  assert.deepEqual(go(['tests/visual/manifest.json']).sort(), ['visual/dof', 'visual/earth', 'visual/khronos-a']);
+});
+
+test('a fixture runs the checks that name it, a root browser page every root suite, an unnamed asset everything', () => {
+  const mentions = (file) => (file.endsWith('named.json') ? ['gpu/d'] : []);
+  assert.deepEqual(run(['tests/fixtures/named.json'], { mentions }).hits, ['gpu/d']);
+  assert.deepEqual(run(['tests/fixtures/other.json'], { mentions }).hits, []);
+  assert.deepEqual(run(['tests/browser/x.html'], { mentions }).hits.sort(), [
+    'gpu/root/catalog',
+    'gpu/root/pages',
+    'gpu/root/unmapped',
+  ]);
+  assert.deepEqual(run(['examples/assets/named.json'], { mentions }).hits, ['gpu/d']);
+  const asset = run(['examples/assets/model.glb'], { mentions });
+  assert.equal(asset.mode, 'full');
+  assert.match(asset.reason, /no check reaches or names the asset examples\/assets\/model\.glb/);
 });
 
 test('a WGSL file outside any package runs everything; inside a package it belongs to that package', () => {
@@ -85,9 +197,9 @@ test('a WGSL file outside any package runs everything; inside a package it belon
 });
 
 test('a file nothing classifies runs everything, and says which', () => {
-  const result = run(['packages/d/src/x.ts', 'tests/mystery.test.js']);
+  const result = run(['packages/d/src/x.ts', 'mystery/x.bin']);
   assert.equal(result.mode, 'full');
-  assert.match(result.reason, /cannot classify tests\/mystery\.test\.js/);
+  assert.match(result.reason, /cannot classify mystery\/x\.bin/);
 });
 
 test('MARGO_FULL=1 runs everything even for a documents-only change', () => {
@@ -125,17 +237,11 @@ test('documents, site pages and licences change nothing on the GPU; a catalog as
 
 // ---- The real repository. ----
 const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
-const workspaces = loadWorkspaces(root);
-const tests = plan();
-const real = buildFootprints({ root, workspaces, tests, scripts: manifest.scripts });
-const steps = manifest.scripts['check:merge:steps'].split(' && ');
-const browserFiles = scan(root, ['tests/modern.html'], workspaces).files;
-const closure = matrixClosure(root, workspaces);
-const planFor = (files) => {
-  const decision = analyse({ files, workspaces, footprints: real });
-  const scope = packageScopes({ decision, files, workspaces, browserFiles, closure });
-  return { decision, scope, planned: planSteps({ steps, decision, tests, workspaces, testId, scope }) };
-};
+const ctx = await planContext(root);
+const { workspaces, tests, steps, browserFiles } = ctx;
+const real = ctx.footprints;
+const closure = ctx.matrix;
+const planFor = (files) => planFiles(ctx, files);
 const stepName = (command) => /^npm run (\S+)/.exec(command)?.[1];
 
 test('every check:merge step is either narrowed GPU work or plain; a new step has to be classified', () => {
@@ -341,4 +447,155 @@ test('the nightly job runs check:merge:full under the GPU lock, with a dated log
   const [, args] = nightlyCommand();
   assert.deepEqual(args.slice(0, 3), ['scripts/gpu-lock.mjs', 'run', '--owner=nightly-full']);
   assert.deepEqual(args.slice(-3), ['npm', 'run', 'check:merge:full']);
+});
+
+// ---- Rule 20 on the real repository: the closure scan, the runner smoke list and the five planned cases. ----
+const stepsOf = stepClosure(root, workspaces, manifest.scripts, {
+  verify: [...SERIAL, ...PARALLEL.flat()],
+  tests,
+  prepare: PREPARE,
+});
+const isGpuId = (id) =>
+  ['visual:check', 'check:views', 'check:gpu-packages', 'check:depth', 'check:wgsl', 'check:no-webgpu'].includes(id) ||
+  id.startsWith('gpu/');
+
+test('stepClosure places check files in the steps that run them, and standalone tools in no GPU step', () => {
+  assert.deepEqual(stepsOf.placed('scripts/msaa-blend-repeat-check.mjs'), []);
+  assert.deepEqual(stepsOf.placed('scripts/support/msaa-blend-repeat.html'), []);
+  // The site build makes the bench page, which imports the quiet gate; the site build always runs.
+  assert.deepEqual(stepsOf.placed('scripts/quiet-gate.mjs').filter(isGpuId), []);
+  for (const file of ['scripts/nightly-full.mjs', 'scripts/benchmark-bvh.js', 'scripts/fuzz/run.js'])
+    assert.deepEqual(stepsOf.placed(file).filter(isGpuId), [], file);
+  assert.ok(stepsOf.placed('scripts/gpu-lock.mjs').includes('check:gpu-packages'));
+  assert.ok(stepsOf.placed('scripts/check-wgsl.mjs').includes('check:wgsl'));
+  assert.ok(stepsOf.placed('scripts/modern-package-tests.js').includes('modern:test:packages'));
+  assert.ok(stepsOf.placed('scripts/bundler-matrix.mjs').includes('modern:test:bundlers'));
+  // The visual check runs the site build by path; following the paths a script names finds it.
+  assert.ok(stepsOf['visual:check'].files.has('scripts/build-site.js'));
+  for (const id of Object.keys(real).filter((k) => k.startsWith('visual/'))) {
+    assert.ok(real[id].files.has('scripts/visual-regression.js'), id);
+    assert.ok(real[id].files.has('scripts/build-site.js'), id);
+  }
+  // Every GPU test holds the runner's own files other than RUNNER (the lock it takes, for one).
+  for (const id of Object.keys(real).filter((k) => k.startsWith('gpu/')))
+    assert.ok(real[id].files.has('scripts/gpu-lock.mjs'), id);
+  assert.deepEqual(commandEntries({ a: 'node x.mjs && npm run b', b: 'node y.js --z' }, 'npm run a'), [
+    'x.mjs',
+    'y.js',
+  ]);
+});
+
+test('RUNNER_SMOKE holds one real test of each kind the runner treats differently', () => {
+  const byId = new Map(tests.map((t) => [testId(t), t])),
+    smoke = RUNNER_SMOKE.map((id) => {
+      assert.ok(byId.has(id), `RUNNER_SMOKE names ${id}, which plan() no longer has`);
+      return byId.get(id);
+    });
+  assert.ok(
+    smoke.some((t) => !t.name && !t.exclusive),
+    'a shared package test',
+  );
+  assert.ok(
+    smoke.some((t) => t.exclusive),
+    'an exclusive timing test',
+  );
+  assert.ok(
+    smoke.some((t) => splitSteps(t).length > 1),
+    'a suite that splits into steps',
+  );
+  assert.ok(
+    smoke.some((t) => t.name && !PREPARE[t.name]),
+    'a root suite',
+  );
+  assert.ok(
+    smoke.some((t) => t.name && PREPARE[t.name]),
+    'a root suite with PREPARE commands',
+  );
+  assert.ok(
+    smoke.some((t) => t.minutes !== undefined),
+    'a test with its own time limit',
+  );
+});
+
+const command = (planned, name) => planned.find((p) => stepName(p.command) === name);
+const runs = (planned, name) => !command(planned, name).skip;
+const selected = (planned) => {
+  const c = command(planned, 'check:gpu-packages');
+  return c.skip ? [] : (/--select=(\S+)/.exec(c.command)?.[1].split(',') ?? []);
+};
+
+test('case 1: the quiet gate, benchmark scripts and a unit test run the floor and the voxel views only', () => {
+  const { decision, planned, scope } = planFor([
+    'scripts/quiet-gate.mjs',
+    'scripts/benchmark-bvh.js',
+    'scripts/benchmark-net.js',
+    'tests/power-status.test.js',
+  ]);
+  assert.equal(decision.mode, 'affected');
+  for (const name of ['check:views', 'check:gpu-packages', 'check:depth', 'check:wgsl', 'check:no-webgpu'])
+    assert.ok(!runs(planned, name), name);
+  assert.equal(scope.bundlers.run, false);
+  // examples/voxel-sandbox/bench.mjs imports the quiet gate, and the voxel views scan the whole sandbox folder.
+  assert.match(
+    command(planned, 'visual:check').command,
+    /--only=voxel-overview,voxel-ground,voxel-night,voxel-shapes$/,
+  );
+});
+
+test('cases 2 and 4: a standalone repro check, or a proof and its claim, run the floor only', () => {
+  for (const files of [
+    ['scripts/msaa-blend-repeat-check.mjs', 'scripts/support/msaa-blend-repeat.html'],
+    [
+      'examples/package-benchmarks/proofs/quality-presets.proof.js',
+      'examples/package-benchmarks/proofs/baselines/quality-presets.json',
+      'docs/whitepaper/claims.md',
+    ],
+  ]) {
+    const { decision, planned } = planFor(files);
+    assert.equal(decision.mode, 'affected', files[0]);
+    for (const name of [...GPU_STEPS, 'modern:test:bundlers']) assert.ok(!runs(planned, name), `${files[0]}: ${name}`);
+    for (const name of PLAIN_STEPS) assert.ok(runs(planned, name), `${files[0]}: ${name}`);
+  }
+});
+
+test('case 3: a package.json of one package runs that package and its dependents, not every GPU test', () => {
+  const { decision, planned } = planFor([
+    'packages/voxel-pathtracer/package.json',
+    'tests/voxel-pathtracer-gpu-split.test.js',
+    'docs/known-bugs.md',
+    'site/index.html',
+  ]);
+  assert.equal(decision.mode, 'affected');
+  assert.deepEqual(decision.changed, ['@margoengine/voxel-pathtracer']);
+  const ids = selected(planned);
+  assert.ok(ids.includes('voxel-pathtracer/test:gpu'));
+  for (const id of ['shader/test:gpu', 'water/test:gpu', 'voxel/test:gpu', 'root/test:lifecycle:browser'])
+    assert.ok(!ids.includes(id), id);
+  // The landing page is a site page the no-WebGPU check opens.
+  assert.ok(runs(planned, 'check:no-webgpu'));
+  assert.ok(!runs(planned, 'check:depth'));
+});
+
+test('case 5: runner files run the smoke list plus the tests of the packages that changed', () => {
+  const { decision, planned } = planFor([
+    'scripts/nightly-full.mjs',
+    'scripts/gpu-package-tests.mjs',
+    'scripts/support/run-limited.mjs',
+    'scripts/support/heat.mjs',
+    'scripts/support/machine-profile.mjs',
+    'scripts/support/machine-profiles.json',
+    'packages/voxel/package.json',
+    'packages/voxel-pathtracer/package.json',
+    'tests/heat-containment.test.js',
+    'tests/voxel-pathtracer-gpu-split.test.js',
+  ]);
+  assert.equal(decision.mode, 'affected');
+  const ids = selected(planned);
+  for (const id of RUNNER_SMOKE) assert.ok(ids.includes(id), id);
+  for (const t of tests.filter((x) => x.dir === 'voxel' || x.dir === 'voxel-pathtracer'))
+    assert.ok(ids.includes(testId(t)), testId(t));
+  for (const id of ['water/test:gpu', 'materials/test:gpu', 'root/test:catalog:browser'])
+    assert.ok(!ids.includes(id), id);
+  assert.ok(!runs(planned, 'check:views'));
+  assert.ok(!runs(planned, 'check:depth'));
 });

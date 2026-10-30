@@ -8,7 +8,9 @@
 //                          only when `react` is in that list (or a React doc changed). The full decision keeps it whole.
 //   modern:test:bundlers   builds a tiny app with five bundlers from the packed packages. It runs when a changed package
 //                          is one the matrix builds or imports (react, shadows, controls, stage, core, the umbrella, the
-//                          Vite and Next starters) or one they depend on, and in the full decision.
+//                          Vite and Next starters) or one they depend on, or a file it runs changed (the `bundlers`
+//                          footprint), and in the full decision. A changed file modern:test:packages runs (the
+//                          `packages` footprint) runs it whole.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { scan, workspaceOf } from './affected-gpu.mjs';
@@ -104,6 +106,12 @@ export function packageScopes({ decision, files, workspaces, browserFiles = new 
     if (owner && owner.dir.startsWith('packages/') && file.endsWith('.md')) dirs.add(owner.dir.slice(9));
     if (REACT_DOCS.includes(file)) dirs.add('react');
   }
+  // A changed file that the tarball test runs (the stepClosure footprint `packages`) runs it whole.
+  if ((decision.hits ?? []).includes('packages'))
+    return {
+      packages: { full: true, dirs: [], reason: 'a file modern:test:packages runs changed' },
+      bundlers: bundlerScope(decision, closure),
+    };
   const sorted = [...dirs].sort();
   return {
     packages: {
@@ -116,6 +124,8 @@ export function packageScopes({ decision, files, workspaces, browserFiles = new 
 }
 
 function bundlerScope(decision, closure) {
+  if ((decision.hits ?? []).includes('bundlers'))
+    return { run: true, reason: 'a file the bundler matrix runs changed' };
   const hit = decision.changed.filter((name) => closure.has(name));
   // A package that depends on a changed one is not enough: every package is a dependent of the umbrella.
   if (hit.length) return { run: true, reason: `the matrix builds ${hit.join(', ')}` };

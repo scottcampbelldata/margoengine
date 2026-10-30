@@ -1496,52 +1496,72 @@ export const SCOPED_STEPS = ['modern:test:packages', 'modern:test:bundlers'];
 
 #### 2.10.2 Selection
 
-`scripts/support/affected-gpu.mjs` header at `67ca53a5`:
+Session rule 20 (Scott, 2026-10-30): check only what a change can affect. check:merge runs the GPU tests of the changed
+packages plus their dependents, not every package; a package's own package.json counts as that package; a script
+runs only the checks that use it; a new standalone script no check imports runs none; everything runs only for core,
+stage, shared code, the check code itself, the root package.json or the lock file; an unplaceable file gets
+added to the map, not a full run; never narrow by skipping a test the change can affect; the nightly full run (not on
+the main dev PC) is the backstop.
 
-```js
-// 1. The changed files (merge base with origin/main) map to workspace packages; every package that depends on them,
-//    transitively, is affected too (the workspace dependency graph).
-// 2. Each GPU step has a footprint: the packages and files it exercises, found by reading its sources (a package's
-//    test dirs, a check script and the pages it opens, a demo's html and the modules it imports). A step runs when
-//    its footprint meets the affected set; the visual check runs only the demos whose footprint does.
-// 3. Anything unsure runs everything: core, stage, shared or the margoengine umbrella; build scripts, check scripts,
-//    package.json and lock files; a WGSL file outside a package; a file nothing classifies; more than MAX_AFFECTED
-//    packages; MARGO_FULL=1.
-```
+File classes (`scripts/support/file-classes.mjs`, checked in this order; `classify(file)` gives the class):
 
-Full-run triggers in code:
+| Class | Files | Runs |
+| --- | --- | --- |
+| inert (first) | any `.md`, the quality baselines | nothing beyond verify (a package README still narrows `modern:test:packages`) |
+| lock | root `package.json`, any `package-lock.json`, `npm-shrinkwrap.json`, `.npmrc` | everything; a package that adds a workspace dependency also changes the lock file, so it runs everything (accepted for now) |
+| floor | `FULL_DIRS` (core, stage, shared, the umbrella) and `packages/kernel/**` (the Rust kernel build-modern.js compiles into core) | everything |
+| package | a workspace file, its own `package.json` included | that package and its dependents (MAX_AFFECTED 12 still widens to full) |
+| build-config | `biome.json`, `tsconfig*.json`, `rust-toolchain.toml`, `vite.config.*` | everything |
+| check-code | `CHECK_CODE` (check-merge.mjs, affected-gpu.mjs, affected-packages.mjs, file-classes.mjs, verify.mjs, driver-resets.mjs) plus every file the `build:packages` chain reaches (`buildCheckCode`, found by the scan) | everything |
+| runner | `RUNNER` (gpu-package-tests.mjs, run-limited.mjs, heat.mjs, machine-profile.mjs, machine-profiles.json) | `RUNNER_SMOKE` plus what the change affects |
+| wgsl-loose | a `.wgsl` outside any package | everything |
+| unit | `tests/*.test.js` | nothing beyond verify (verify runs every one) |
+| visual-baseline | `tests/visual/**/<demo>-<tier>.png` | `visual:check --only=<demo>` (every demo when the name matches none) |
+| visual-record | any other file under `tests/visual/` (manifest.json) | the whole visual check |
+| fixture | `tests/fixtures/**` | the steps whose closure holds it or whose files name it, else nothing beyond verify |
+| root-browser | `tests/browser/**` | the root suites whose closure holds it, else every root suite |
+| proof | `examples/package-benchmarks/proofs/**` | nothing beyond verify (`proofs --current`; fresh-clone runs it again) |
+| python | `python/**` | the Python notebook suite |
+| asset | `examples/assets/**` | the steps whose closure holds it or whose files name it, else everything |
+| script | every other file under `scripts/`, `tests/`, `examples/`, `bench/`, `tools/` | the steps whose closure holds it (or, for a page or fixture, whose files name it), else nothing beyond verify |
+| inert | `docs/`, `site/`, `private/`, `api/*.api.md`, `benchmarks/`, `.github/` (no local step runs a workflow; it was a full run before), `public/favicon.ico`, licences, root dotfiles | nothing beyond verify; footprint patterns still apply (catalog data under `docs/` runs the catalog suite; a `site/` page or script runs `check:no-webgpu`, which opens every page of `site/dist`) |
+| unknown | anything else | everything at run time; the class gate makes it unreachable for tracked files |
 
-```js
-export const MAX_AFFECTED = 12;
-export const FULL_DIRS = ['packages/core', 'packages/stage', 'packages/shared', 'packages/margoengine'];
-```
+Closure scan (`stepClosure` in `scripts/support/affected-gpu.mjs`): for every check:merge step command, every verify
+`SERIAL`/`PARALLEL` command, every GPU test command (plus a root suite's `PREPARE` commands) and every visual demo,
+the files it runs are found by `scan()` (relative and root imports, `src`/`href`) and then by the repo paths its files
+name in strings (`'scripts/build-site.js'`, `'tests/fixtures/basic-scene'`), followed until nothing new is named
+(`closure()`). The visual check follows only the scripts it names (the site build), not the other pages that build
+makes. A file in step X's closure runs step X whole; a GPU test or demo runs when its closure holds the file. The
+footprint ids that only place a file are `wgsl` (check:wgsl whole), `packages` (modern:test:packages whole), `bundlers`
+(the matrix runs), and `verify`, `fresh-clone`, `site`, `quickstart` (always run). Every visual demo holds
+`visual-regression.js` and the site build it names; every GPU test holds the runner's own files other than `RUNNER`
+(`gpu-lock.mjs`, `browser.js`, `lib/browser.mjs`: they sit in nearly every closure and so run nearly every GPU test,
+correctly). A fixture, page or asset no closure holds is looked for by name (its basename, or `parent/basename` for
+`index.*`, `main.*` and the like) in every footprint's files (`mentionIndex`), because tests load fixtures by built
+path strings.
 
-```js
-export function fullReason(file, workspaces) {
-  if (file.endsWith('.md') || isQualityBaseline(file)) return undefined;
-  if (
-    /(^|\/)package\.json$/.test(file) ||
-    /(^|\/)(package-lock|npm-shrinkwrap)\.json$/.test(file) ||
-    file.endsWith('.npmrc')
-  )
-    return 'package.json or lock file changed';
-  if (file.startsWith('scripts/')) return 'build or check script changed';
-  if (
-    file.startsWith('.github/') ||
-    /^(biome|tsconfig[\w.-]*|rust-toolchain)\.(json|toml)$/.test(file) ||
-    /^vite\.config\./.test(file)
-  )
-    return 'build configuration changed';
-  const dir = FULL_DIRS.find((d) => file.startsWith(`${d}/`));
-  if (dir) return `${dir.slice(9)} changed`;
-  if (file.endsWith('.wgsl') && !workspaceOf(workspaces, file)) return 'WGSL outside a package changed';
-  return undefined;
-}
-```
-(`scripts/support/affected-gpu.mjs` at `67ca53a5`.) Inert files (never change a GPU result): `.md`, quality baselines,
-`LICENSE`, `NOTICE`, `.gitignore`, `.gitattributes`, anything under `docs/`, `site/`, `private/`. A file that is
-neither inert nor in any footprint forces a full run: "cannot classify <file>". If the diff against `origin/main`
-fails, the run is full ("cannot diff against origin/main (...)").
+RUNNER exception (Scott's decision, 2026-10-30): the GPU package runner does not change what a test draws, and its
+planning, limits, lock modes and heat guard are pinned by unit tests (heat-containment, gpu-timing-lock,
+voxel-pathtracer-gpu-split), so a RUNNER change runs `check:gpu-packages --select=` the pinned `RUNNER_SMOKE` list in
+`scripts/gpu-package-tests.mjs` plus every test the change affects through packages: shader test:gpu (a shared test
+that splits into steps, 10 s), biomes test:gpu:flythrough (the only exclusive timing test, with its own time limit;
+about 400 s), voxel test:gpu (a split suite, 17 s), root test:lifecycle:browser (a root suite, 12 s) and root
+modern:test:usdz:browser (a root suite with PREPARE, 2 s plus its prepare). A unit test checks each kind is present.
+`driver-resets.mjs` is not RUNNER: check-merge.mjs and nearly every GPU check import it, so it is check code.
+
+Class gate: `tests/file-classes.test.js` classifies every tracked file (`git ls-files`, a tree walk without git) and
+fails on any file whose class is unknown, naming the file and the fix ("add a rule for it to classify() in
+scripts/support/file-classes.mjs, or move it under a folder the map knows"). verify runs it, so an unplaceable file
+cannot land.
+
+Planned results (`node scripts/check-merge.mjs --plan --files=...`, 2026-10-30): the quiet gate, benchmark scripts and
+a unit test run the floor plus the four voxel visual views (`examples/voxel-sandbox/bench.mjs` imports the quiet gate
+and the voxel views scan the whole sandbox folder); the MSAA repro check and its page, and a proof with its claim, run
+the floor only; `packages/voxel-pathtracer/package.json` runs the path tracer, its dependents' tests and the voxel
+views (plus `check:no-webgpu` when a site page changed with it); the runner files with the voxel and path tracer
+package.json run RUNNER_SMOKE plus the voxel, path tracer and dependent tests. The floor (verify, fresh clone, site
+build, the packed smoke test, quickstart) is about 500 to 560 s.
 
 How each GPU step is narrowed (`planSteps`): `visual:check --only=<demo ids>`; `check:gpu-packages --select=<test
 ids>`; `check:wgsl -- --packages=<dirs>`; `check:views`, `check:depth`, `check:no-webgpu` run or are skipped as a
@@ -1567,9 +1587,11 @@ Build reuse: `verify` builds every package; `modern:test:packages` then reuses t
 (`MARGOENGINE_PACKAGE_TEST_PREBUILT=1`), and `verify` plants stale marker files (`MARGOENGINE_PLANT_STALE=1`) that no
 pack may contain, so reuse cannot hide a stale-file bug.
 
-Tests: `tests/check-merge-affected.test.js` (25 tests at `67ca53a5`), for example "core, stage, shared and the
-margoengine umbrella run everything", "a file nothing classifies runs everything, and says which", "more affected
-packages than the limit runs everything".
+Tests: `tests/check-merge-affected.test.js` (40 tests), for example "core, stage, shared and the margoengine umbrella
+run everything", "a package's own package.json runs that package and its dependents, not everything", "a change to the
+GPU package runner runs the smoke list plus what the change affects", "RUNNER_SMOKE holds one real test of each kind
+the runner treats differently" and the five planned cases; `tests/file-classes.test.js` (one case per class and the
+class gate).
 
 ### 2.11 Never land dirty, and rerunning one step
 
@@ -1670,6 +1692,30 @@ created again; who created it is not recorded.
 
 Missing pieces to add when copying: the wrapper has no overall timeout of its own (the inner limits are 240 and 60
 minutes per lock hold, which bound it); nothing alerts anyone on failure; the log is only read when someone looks.
+(Since then `nightly-full.mjs` has an overall deadline, last-status.json and ALERT.txt, and the status repository
+below.)
+
+Profile steps (2026-10-30, `scripts/support/machine-profiles.json` `nightly`, labels from `NIGHTLY_STEPS`): this is the
+backstop for check:merge's narrowing (session rule 20).
+
+| Profile | Nightly steps |
+| --- | --- |
+| `laptop` (the Intel Arc laptop) | `full check:merge`, `pinned proofs`, `nightly-status`; nothing excluded, voxel-pathtracer included; heavy suites in short steps under its heat watch. Its visual baselines are captured on the laptop itself, later; until they are committed its visual:check has no matching profile |
+| `mini-pc`, `thermal-limited` | `gpu package tests` (builds every package first; voxel-pathtracer excluded), then the light GPU checks `check:wgsl`, `check:views`, `check:depth`, `check:no-webgpu` (after `npm run build:site`), `modern:test:bundlers` (after `npm run modern:test:packages`), then `nightly-status` |
+| `workstation` | `full check:merge`, `pinned proofs` (its scheduled task is disabled: no nightly on the main dev PC) |
+
+A one-string step runs through the shell (`npm run a && npm run b`); the light checks take the GPU lock themselves.
+
+Status repository (`nightly-status`, `publishStatus` in `nightly-full.mjs`): after the night's record is written it
+copies `last-status.json` and the last 40 lines of the night's log to `<profile>/last-status.json` and
+`<profile>/last-log.txt` in a clone of a private status git repository, commits (`nightly <profile>: <result>`) and
+pushes, so the coordinator reads one place each morning. `MARGO_STATUS_REPO` (the repository URL) and
+`MARGO_STATUS_DIR` (the local clone; cloned when missing, else pulled with `--ff-only`) say where; neither, nor any
+account or machine name, is written in this repository. With either unset it prints one line, "nightly-status:
+skipped, MARGO_STATUS_REPO and MARGO_STATUS_DIR are not both set", and does nothing. Every git command has a 2 min
+limit; a failure prints "nightly-status: FAILED to publish (<reason>)" and raises the local alert (ALERT.txt) without
+changing the night's exit code. The repository itself is created separately (never a branch of margoengine). Tests:
+`tests/nightly-deadline.test.js` (a local bare repository stands in for it).
 
 ### 2.13 Timeouts everywhere
 
