@@ -204,6 +204,7 @@ window.check={
   // Five live frames, the most common sample set kept: a GPU that blends a frame wrongly now and then (the repro's
   // subject) must not decide the reference.
   const sets=new Map();
+  // fixed-wait: five frames are the sample, not a wait; every pipeline is ready after the awaited shot() above
   for(let i=0;i<5;i++){engine.render({delta:0});const e=d.createCommandEncoder();e.copyBufferToBuffer(out,0,staging,0,16);d.queue.submit([e.finish()]);
    await staging.mapAsync(GPUMapMode.READ);const v=[...new Uint32Array(staging.getMappedRange())].map((u)=>[u&255,(u>>>8)&255,(u>>>16)&255].join('.')).join('|');staging.unmap();sets.set(v,(sets.get(v)??0)+1);}
   remove();staging.destroy();out.destroy();renderer.dispose();

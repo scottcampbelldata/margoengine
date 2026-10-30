@@ -2957,6 +2957,26 @@ does not own. Each entry says exactly what is needed to close it.
 - **Second Intel Arc 140V** (an outside audit's laptop, revision 74a01810, 2026-10-28): the same 450-frame repro
   differed on 4 frames (46, 99, 112 and 326), at the same pixel (101, 72), [109, 107, 104] instead of [100, 99, 96], 9
   of 255. The standard voxel check passed there.
+- **Cause of the Arc's pixel (101, 72): below Margo, in the Arc's 4x MSAA blending (traced 2026-10-30, Arc 140V,
+  driver 32.0.101.8860, Edge 156.0.4314.50, main c041238b).** Only sample 0 of that pixel goes wrong, only in the voxel
+  translucent pass, always to 99.96.92 instead of 65.63.62 (samples 1 to 3 stay 112.111.108; the clear, the opaque pass
+  and every queue write are the same each frame). Four glass faces cover the pixel, in draw order: the back face of
+  block (22, 16, 10) on samples 2 and 3, the top face of that block on sample 0 alone, the back face of block
+  (21, 16, 10) on sample 1 and the front face of block 21 on all four. 99.96.92 is, to within rounding in all three
+  channels, the top face blended over the back face's colour (121.118.111) instead of over the clear colour: sample 0
+  takes the destination of samples 2 and 3, which no per-sample blend can do. Each face alone, and the four together
+  (as their own draws), drew the same samples 1000 times in 1000; the whole translucent layer (55 quads, as one draw
+  or as 55) gave the wrong sample 0 in 7 and 8 frames of 1000. One frame of the view recorded (every WebGPU object
+  with its descriptor, shader text and bytes, and the frame's calls) and replayed on a fresh device with no Margo code
+  gave it in 4 of 1000 frames, and in 8 of 1000 with the opaque pass's draws left out, so it needs no Margo code and
+  no opaque content. A synthetic page (in every pixel one blended triangle on samples 2 and 3, then one on sample 0)
+  stayed exact on the Arc in 9 layouts and orders; what more of the real layer it needs is not known.
+- **Repro of the Arc case:** `node scripts/gpu-lock.mjs run --owner=<you> -- node
+  packages/voxel/tests/render-browser-check.mjs --replay=1000` records the still view's frame
+  (`scripts/support/webgpu-trace.js`) and replays it in `scripts/support/webgpu-replay.html` under CPU load; it fails
+  when any replayed frame's samples at (101, 72) differ, after checking that the replay reproduces the live frame
+  (`--skip=1` drops the opaque pass's draws). On the RTX A6000 the same command shows NVIDIA's fault below (all four
+  samples set to their average, about 1 frame in 300).
 - **Khronos ToyCar and IridescenceLamp** (gltf-pro transmission, `examples/khronos-gallery.html?model=Name`, native
   WebGPU, 640x480, 2026-10-30): four captures of the still frame differ on 67 to 153 pixels by 1 of 255 (ToyCar, all
   on the windscreen) and on 0 to 18 pixels by up to 28 of 255 (IridescenceLamp, the glass rim over the base). The page
@@ -2984,9 +3004,8 @@ does not own. Each entry says exactly what is needed to close it.
 - **Three GPUs, same repro, Edge 156.0.4314.50, 2026-10-30:** RTX A6000 (driver 32.0.16.1742): 29 of 30 frames
   differ; Intel Arc 140V (driver 32.0.101.8860): 0 of 30, with `--mask=7` 0 of 30, ToyCar and IridescenceLamp 0 pixels
   in three captures; AMD Radeon 680M (driver 32.0.21030.2001): 0 of 30, 0 of 30, 0 pixels. So the plain-page blend
-  noise is NVIDIA's (hardware or driver), not Dawn's or Chromium's. The Arc's earlier voxel repeat (pixel (101, 72),
-  6 of 450) is not explained by it: the plain page and both Khronos models are exact on that laptop, so that one stays
-  open with its own repro above.
+  noise is NVIDIA's (hardware or driver), not Dawn's or Chromium's. The Arc's voxel pixel (101, 72) is a different
+  fault of the same kind (one sample takes another's destination), traced above with its own replay repro.
 - **Earlier notes on the voxel case:** every differing pixel is seen through
   the glass wall, along glass and terrain edges (pixels whose samples hold more than one surface). Between the frames
   nothing that Margo hands the GPU changes: no buffer write but the frame uniform and indirect arguments, bit for bit
@@ -3003,8 +3022,10 @@ does not own. Each entry says exactly what is needed to close it.
   translucent panes in the other order differ by up to 132 of 255 (`swapped layer order` step), and the mesh arrival
   order step stays a pixel comparison with that tolerance only. The check's output prints the exact count next to the
   tolerant one, and `--repeat` reports both (it still fails on any exact difference: it is the repro).
-- **Needed to close:** the plain-WebGPU page sent to NVIDIA (it repeats on no other GPU tested) and NVIDIA's fix or
-  explanation recorded here; the Arc's voxel pixel (101, 72) traced on its own; then the voxel tolerance can go, and ToyCar and
+- **Needed to close:** the plain-WebGPU page sent to NVIDIA (it repeats on no other GPU tested) and the recorded voxel
+  frame with its replay page sent to Intel (Scott decides both), and their fixes or explanations recorded here; then
+  the voxel tolerance can go (the Arc's 9 of 255 is over it, so the voxel checks can fail now and then on that laptop,
+  as `--repeat` does there), and ToyCar and
   IridescenceLamp get an exact repeat-capture check. Margo has no correct way around it: leaving a sample out of the
   blend, or drawing a full-screen layer first to change the GPU's tile state, changes or adds work to hide the
   symptom.
