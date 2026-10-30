@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { Geometry, PbrMaterial, type EngineKernel } from '@margoengine/core';
 export { ScatterInstances, type ScatterBatch } from './instances.js';
-import { freeLocation } from './instances.js';
+import { centroid, freeLocation } from './instances.js';
 export { randomPlacements, radialPlacements } from './candidates.js';
 export {
   PlacementLayout,
@@ -203,7 +203,7 @@ const renderCode =
   poseShader +
   `
 @group(0) @binding(1) var<storage,read> instances:array<Instance>;
-struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location(1) @interpolate(flat) lodFade:vec2f,@location(2) ground:vec4f,@location(3) shade:f32}
+struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location(1) @interpolate(flat) lodFade:vec2f,@location(2) ${centroid} ground:vec4f,@location(3) ${centroid} shade:f32}
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output{
  let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind);
  return Output(frame.camera*vec4f(pose.world,1),pose.normal,data.rotation.zw,pose.ground,pose.shade);
@@ -230,6 +230,21 @@ struct ScatterInstance {position:vec4f,rotation:vec4f}
  let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,material[3],material[4],frame.eye.xyz,material[2]);
  var o:Output;o.position=pose.world;o.clip=frame.camera*vec4f(o.position,1);o.normal=pose.normal;
  o.color=material[0].rgb${blades ? '*pose.shade' : ''};o.material=vec4f(material[1].xyz,1);${fade ? 'o.lodFade=data.rotation.zw;' : ''}${blades ? 'o.ground=pose.ground;' : ''}return o;
+}
+`;
+// Depth only, for one shadow cascade: the colour pass's pose and wind (frame values 16-19 and 68-79), the light's
+// matrix in place of the camera's. Each LOD ring's culled instances are drawn with that ring's mesh.
+const shadowCode =
+  windShader +
+  poseShader +
+  `
+struct ShadowFrame {light:mat4x4f,eye:vec4f,wind:vec4f,ground:vec4f,blade:vec4f}
+struct Instance {position:vec4f,rotation:vec4f}
+@group(0) @binding(0) var<uniform> frame:ShadowFrame;
+@group(0) @binding(1) var<storage,read> instances:array<Instance>;
+@vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->@builtin(position) vec4f {
+ let data=instances[index];
+ return frame.light*vec4f(scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind).world,1);
 }
 `;
 /** Whether the frame carries the world-rectangle fields (follow offsets and bounds). */
@@ -312,7 +327,11 @@ export class Scatter implements EnginePlugin {
   protected readonly values: Float32Array;
   protected readonly meta: Uint32Array;
   protected readonly geometries: readonly Geometry[];
-  private disposed = false;
+  #disposed = false;
+  /** True after `dispose()` (a `Shadows` then drops this caster). */
+  get disposed(): boolean {
+    return this.#disposed;
+  }
   readonly count: number;
   private readonly materialValues = new Float32Array(20);
   private time = 0;
@@ -331,6 +350,11 @@ export class Scatter implements EnginePlugin {
   private readonly attachment = this.presentation.colorAttachments[0];
   private readonly depthAttachment = this.presentation.depthStencilAttachment;
   protected readonly options: ScatterOptions;
+  private shadowPipeline?: GPURenderPipeline;
+  /** Per cascade: its uniform (light matrix and pose values) and one bind group per LOD ring. */
+  private shadowUniforms: GPUBuffer[] = [];
+  private readonly shadowGroups: GPUBindGroup[][] = [];
+  private readonly shadowValues = new Float32Array(32);
   /** Whether any instance can fade between LOD meshes: shaders keep the dither `discard` only then. */
   private readonly fade: boolean;
   constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input: ScatterOptions = {}) {
@@ -595,6 +619,7 @@ export class Scatter implements EnginePlugin {
   /** Call after replacing `instances`: the bind groups that read them are made again. */
   protected instancesChanged(): void {
     this.renderGroups.clear();
+    this.shadowGroups.length = 0;
     this.computeGroup = undefined;
   }
 
@@ -683,8 +708,10 @@ export class Scatter implements EnginePlugin {
             '@location(3) material:vec4f',
             '@location(3) material:vec4f' +
               (this.fade ? `,@location(${at}) @interpolate(flat) lodFade:vec2f` : '') +
-              (blades ? `,@location(${at + 1}) ground:vec4f` : ''),
+              (blades ? `,@location(${at + 1}) ${centroid} ground:vec4f` : ''),
           )
+          // Blades shade core's colour from root to tip: like the ground weight, read inside the blade (see `centroid`).
+          .replace('@location(2) color:vec3f', `@location(2) ${blades ? centroid + ' ' : ''}color:vec3f`)
           .replace(
             /@vertex fn vertex\([\s\S]*?(?=@fragment)/,
             c.shader.includes('var<uniform> taaCamera:')
@@ -771,6 +798,62 @@ export class Scatter implements EnginePlugin {
     }
     pass.end();
   }
+  /**
+   * Draws this frame's culled instances into one shadow cascade, depth only, with the colour pass's pose, ground fit
+   * and wind: `shadows.add(scatter)` (`@margoengine/shadows`) makes a scatter cast. The instances are the ones culled
+   * against the camera this frame, so an instance outside the view casts no shadow onto ground inside it.
+   */
+  drawShadow({
+    context,
+    pass,
+    matrix,
+    cascade,
+  }: {
+    context: ScatterPassContext;
+    pass: GPURenderPassEncoder;
+    matrix: Float32Array;
+    cascade: number;
+  }): void {
+    if (this.disposed || !this.commands) return;
+    const d = context.device;
+    this.shadowPipeline ??= d.createRenderPipeline({
+      layout: 'auto',
+      vertex: {
+        module: d.createShaderModule({ code: shadowCode }),
+        entryPoint: 'vertex',
+        buffers: [
+          {
+            arrayStride: 24,
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: 'float32x3' },
+              { shaderLocation: 1, offset: 12, format: 'float32x3' },
+            ],
+          },
+        ],
+      },
+      depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
+    });
+    // One uniform per cascade: every cascade's pass is recorded before the queue writes reach the GPU.
+    const uniform = (this.shadowUniforms[cascade] ??= d.createBuffer({
+      size: 128,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    }));
+    const groups = (this.shadowGroups[cascade] ??= this.instances.map((buffer) =>
+      group(d, this.shadowPipeline!, [{ buffer: uniform }, { buffer }]),
+    ));
+    const values = this.shadowValues;
+    values.set(matrix);
+    values.set(this.values.subarray(16, 20), 16); // the eye: blades widen with camera distance, as drawn
+    values.set(this.values.subarray(68, 80), 20); // wind and time, ground fit, blades
+    d.queue.writeBuffer(uniform, 0, values as Float32Array<ArrayBuffer>);
+    pass.setPipeline(this.shadowPipeline);
+    for (let i = 0; i < 3; i++) {
+      pass.setBindGroup(0, groups[i]);
+      pass.setVertexBuffer(0, this.vertices[i]);
+      pass.setIndexBuffer(this.indices[i], 'uint32');
+      pass.drawIndexedIndirect(this.commands, i * 20);
+    }
+  }
   /** Instances each LOD ring can hold: every candidate for the grid. */
   protected ringCapacity(): number {
     return this.count;
@@ -799,14 +882,18 @@ export class Scatter implements EnginePlugin {
     this.terrain = undefined;
     this.computeGroup = undefined;
     this.renderGroups.clear();
+    for (const b of this.shadowUniforms) b.destroy();
+    this.shadowUniforms = [];
+    this.shadowGroups.length = 0;
+    this.shadowPipeline = undefined;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();
     this.setup(engine);
   }
   dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
+    if (this.#disposed) return;
+    this.#disposed = true;
     this.engine?.removePlugin(this.name);
     this.release();
     this.engine = undefined;

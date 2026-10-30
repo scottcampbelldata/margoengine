@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter shadow check</title><style>body{margin:0}canvas{display:block;width:256px;height:256px}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Real-GPU proof that GPU scatter casts into Shadows (shadow.browser.mjs reads the canvas): one 2 x 4 x 2 box, half
+// buried, on a flat floor, the sun 45 degrees up from +X, so its shadow covers x -3..-1, z -1..1 of the floor. Drawn as
+// a `Scatter` and as a `ScatterTiles` record, each with the box added to Shadows and without.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {ScatterTiles} from '/packages/scatter/dist/tiles.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,20,12],target:[0,0,0],near:0.5,far:200}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([1,1,0]);
+const floor=engine.createMesh().setGeometry(box(40,0.1,40)).setPosition([0,-0.05,0]);
+const shadows=Shadows.attach(engine,{distance:60});
+shadows.add(floor,{castShadow:false});
+const geometry=box(2,4,2);
+// One record in the middle of a 40 m tile: x and z 32768 / 65536 of the side, palette 0, log scale 128 (scale 1), yaw 0.
+const record=new Uint8Array(new Uint32Array([32768|(32768<<16),128<<8]).buffer);
+let scatter,remove;
+window.check={
+  async show(kind,cast){
+    remove?.();remove=undefined;scatter?.dispose();
+    device.pushErrorScope('validation');
+    if(kind==='scatter')scatter=Scatter.attach(engine,geometry,{count:1,area:[0.001,0.001],scale:[1,1],color:[0.8,0.8,0.8]});
+    else{scatter=ScatterTiles.attach(engine,geometry,{bounds:[-20,-20,20,20],color:[0.8,0.8,0.8]});scatter.setTile('0,0',[-20,-20],40,record);}
+    if(cast)remove=shadows.add(scatter);
+    for(let i=0;i<3;i++){engine.render({delta:0});await device.queue.onSubmittedWorkDone();}
+    const e=await device.popErrorScope();if(e)errors.push(e.message);
+    return errors.splice(0);
+  },
+  // Where a world point lands on the canvas, 0..1 from the top left.
+  pixel([x,y,z]){const m=engine.camera.matrix,cx=m[0]*x+m[4]*y+m[8]*z+m[12],cy=m[1]*x+m[5]*y+m[9]*z+m[13],w=m[3]*x+m[7]*y+m[11]*z+m[15];return [cx/w*0.5+0.5,0.5-cy/w*0.5];},
+};
+window.ready=true;
+</script></body></html>

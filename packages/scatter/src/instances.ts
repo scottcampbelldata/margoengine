@@ -78,6 +78,13 @@ const translucentLayouts: GPUVertexBufferLayout[] = [
 // the normal so curved canopies light unevenly, plus wrapped diffuse on the shadow side. Unshadowed (a canopy's own
 // shadow map would hide its back-lit side); baked occlusion stands in for thickness.
 // Wrapped diffuse: Green 2004, GPU Gems ch. 16. Distortion 0.4, power 4 and weight 0.3 are Margo tuning.
+/**
+ * Interpolation of a varying that changes across a triangle (a blade's root-to-tip shade, vertex colour, occlusion).
+ * With multisampling a pixel the triangle only partly covers is shaded at its centre, which can lie outside the
+ * triangle, where plain interpolation extrapolates past the vertex values: a 0..1 shade went below 0 at thin blade
+ * edges and drew negative radiance into the HDR scene. Centroid interpolation reads at a covered sample instead.
+ */
+export const centroid = '@interpolate(perspective,centroid)';
 /** The first @location a struct does not use: patches that add varyings to a shared struct must not collide. */
 export const freeLocation = (struct: string): number =>
   Math.max(-1, ...[...struct.matchAll(/@location\((\d+)\)/g)].map((m) => Number(m[1]))) + 1;
@@ -287,12 +294,15 @@ export class ScatterInstances implements EnginePlugin {
             ),
           )
           .replace(/struct Output \{[^}]+\}/, (output) => {
-            // After core's own varyings and any another patch added (terrain's mesh id).
+            // After core's own varyings and any another patch added (terrain's mesh id). Vertex colour and occlusion vary
+            // across a triangle: read them inside it (centroid), as for scatter's blades.
             const at = freeLocation(output);
-            return output.replace(
-              '}',
-              `,@location(${at}) emissive:vec3f,@location(${at + 1}) occlusion:f32${lucent ? `,@location(${at + 2}) @interpolate(flat) translucency:f32` : ''} }`,
-            );
+            return output
+              .replace('@location(2) color:vec3f', `@location(2) ${centroid} color:vec3f`)
+              .replace(
+                '}',
+                `,@location(${at}) emissive:vec3f,@location(${at + 1}) ${centroid} occlusion:f32${lucent ? `,@location(${at + 2}) @interpolate(flat) translucency:f32` : ''} }`,
+              );
           })
           .replace(
             'let p=model*vec4f(i.position,1);',

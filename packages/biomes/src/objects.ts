@@ -222,7 +222,8 @@ export class BiomeObjects implements Disposable {
               slotSize,
               lod: [r * 0.15, r * 0.4, r],
               lodFade: 0,
-              color: part.color,
+              // Lit by the engine's sun and sky and shadowed by an attached Shadows, like the terrain under it.
+              material: this.#material(part.color),
               maxSlope: 90,
               // Plants sway with a light breeze; stone does not.
               ...(part.color === STONE ? {} : { wind: [1, 0, 0.25] as const }),
@@ -256,13 +257,26 @@ export class BiomeObjects implements Disposable {
         lod: [detailRadius * 0.3, detailRadius * 0.6, detailRadius],
         lodFade: 0,
         edgeShrink: detailRadius * 0.2,
-        color: parts[0].color,
+        material: this.#material(parts[0].color),
         maxSlope: 60,
         wind: [1, 0, 0.5],
         ...(parts[0].blades ? { blades: {} } : {}),
       });
       this.#details.push(entry);
     }
+  }
+
+  /** A rough, double-sided PBR material of a part's colour (linear RGB). */
+  #material(color: readonly [number, number, number]) {
+    return new this.#modules.core.PbrMaterial({ color, roughness: 0.85 });
+  }
+
+  /**
+   * Every stored-object mesh: each species' parts (trunk and canopy) and the snags. `BiomeView`'s `shadows` option adds
+   * them to a `Shadows` as casters; detail (grass, ferns) receives shadows but does not cast.
+   */
+  get casters(): readonly ScatterTiles[] {
+    return [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])].flatMap((entry) => entry.tiles);
   }
 
   #detailTexture(data: Uint8Array, width: number, depth: number): GPUTexture | undefined {

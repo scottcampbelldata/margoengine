@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Biome shadows check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof for BiomeView's `shadows` option: a temperate forest at noon drawn without shadows, then with a
+// Shadows that the view fills (terrain and every stored-object mesh). shadows-check.mjs compares the two frames.
+import {Engine} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {BiomeWorld} from '/packages/biomes/dist/index.js';
+import {presets} from '/packages/biomes/dist/presets.js';
+import {BiomeView} from '/packages/biomes/dist/view.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,75,95],target:[0,38,0],near:0.5,far:2000}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+// Towards the sun: about 66 degrees up, as at noon in early summer at latitude 47.
+engine.lighting.direction.set([0.35,1,0.25]);
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+// Fixed frame times: both views see the same wind.
+async function shot(){for(let i=0;i<3;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}return read(post.sceneTexture);}
+const luma=(d)=>{const out=new Float32Array(d.length/4);for(let k=0;k<out.length;k++)out[k]=0.2126*d[k*4]+0.7152*d[k*4+1]+0.0722*d[k*4+2];return out;};
+window.check={
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const world=await BiomeWorld.create({size:[512,512],biomes:[presets.temperate],height:{field:(x,z)=>40+3*Math.sin(x/37)*Math.cos(z/41)},climate:{latitude:47,rainfall:1000}});
+  const plain=await BiomeView.attach(engine,world,{radius:600});await plain.ready;await plain.whenIdle();
+  const a=luma(await shot());out.objects=plain.objects.count;plain.dispose();
+  // The view adds its casters through `add` and removes each on dispose: counted here around a real Shadows.
+  const shadows=Shadows.attach(engine),counts={added:0,removed:0},counted={add(source){counts.added++;const off=shadows.add(source);return()=>{counts.removed++;off();};}};
+  const view=await BiomeView.attach(engine,world,{radius:600,shadows:counted});await view.ready;await view.whenIdle();
+  const b=luma(await shot());
+  out.casters=view.objects.casters.length;out.added=counts.added;
+  view.dispose();out.removed=counts.removed;
+  // Brighter: past 1 percent (the shadowed shader is compiled apart, so unshadowed pixels may round differently).
+  let darker=0,brighter=0,lit=0;const w=post.sceneTexture.width;
+  for(let k=0;k<a.length;k++){if(a[k]>0.002)lit++;if(b[k]<a[k]*0.8)darker++;if(b[k]>a[k]*1.01+1e-4){brighter++;if(!out.bright)out.bright=[];if(out.bright.length<12)out.bright.push([k%w,Math.floor(k/w),a[k],b[k]]);}}
+  out.pixels=a.length;out.darker=darker/a.length;out.brighter=brighter;out.lit=lit/a.length;
+  shadows.dispose();
+  const error=await device.popErrorScope();out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

@@ -78,6 +78,37 @@ the same GPU placement/culling and three indirect LOD draws. Material values are
 uploaded through a retained uniform each frame. Opaque scatter draws before sky
 and water, so water refraction and depth occlusion include grass and rocks.
 
+`shadows.add(scatter)` (`@margoengine/shadows`) makes GPU `Scatter` and
+`ScatterTiles` cast: `drawShadow` draws each LOD ring's instances into every
+cascade, depth only, with the colour pass's pose, ground fit and wind. A lit
+scatter (`material`) also receives. The instances drawn are the ones culled
+against the camera that frame, so an instance outside the view casts no shadow
+onto ground inside it (a tall tree just behind the camera, say), as with the
+unshadowed translucency below. Cost: every cascade draws every visible instance
+with its ring's mesh again, so give distant rings light meshes.
+
+```ts
+import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { Scatter } from '@margoengine/scatter';
+import { Shadows } from '@margoengine/shadows';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const shadows = Shadows.attach(engine);
+const rocks = Scatter.attach(engine, box(1, 1, 1), {
+  count: 2000,
+  area: [60, 60],
+  material: new PbrMaterial({ color: '#8a8580', roughness: 0.9 }),
+});
+const remove = shadows.add(rocks); // casts, and receives through its material
+engine.start();
+```
+
+Thin triangles whose shading changes across them (blade root shade, vertex
+colour, occlusion, the blade ground weight) interpolate those values at a
+covered sample (`centroid`): with multisampling, a pixel a blade only partly
+covers is otherwise shaded at its centre, outside the blade, where the values
+extrapolate past their range and drew negative light at grass edges.
+
 Both `ScatterOptions` and `ScatterBatch` accept `wind: [directionX, directionZ,
 strength]`, where direction is nonzero and strength is 0-1. Omit it for static
 geometry. Rooted GPU bends vary by world position and time, and normals follow

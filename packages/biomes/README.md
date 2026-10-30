@@ -260,6 +260,31 @@ slot and ring was sized for the densest case (`packages/biomes/tests/objects-che
 | --- | --- | --- |
 | `objects` | true | draw stored objects and detail |
 | `detailRadius` | 120 | metres around the camera with grass and ferns |
+| `shadows` | none | a `Shadows` (`@margoengine/shadows`): the view adds its terrain and every stored-object mesh to it and removes them on dispose |
+
+Objects are lit like the terrain: each part draws with a core `PbrMaterial` of its colour (roughness 0.85), so the sun's
+direction and colour and the engine's ambient light reach them, and an attached `Shadows` shadows them. Pass `shadows` to make
+the trees, shrubs, rocks and the terrain cast too; `view.objects.casters` lists the object meshes it adds (each
+species' parts and the snags; grass and ferns receive shadows but do not cast).
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Shadows } from '@margoengine/shadows';
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const shadows = Shadows.attach(engine);
+const view = await BiomeView.attach(engine, await BiomeWorld.create(), { shadows });
+await view.ready;
+console.log(view.objects?.casters.length); // trunks, canopies, shrubs, rocks and snags: one mesh each
+engine.start();
+```
+
+Shadows cost GPU time in proportion to the objects in view: every cascade draws every stored object the camera sees,
+with its full mesh, so on a forest the shadow passes can cost more than the rest of the frame; fewer `Shadows`
+`cascades` cost less and reach less far. Objects outside the view cast no shadow onto ground in it (scatter casts the
+instances it culled for the camera). `packages/biomes/tests/shadows-check.mjs` checks the look.
 
 ## Trees, shrubs, rocks and props
 

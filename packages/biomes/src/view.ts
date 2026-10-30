@@ -70,6 +70,17 @@ export interface BiomeViewOptions {
   /** Most bytes of detail density maps (`BiomeObjects` `detailBudget`); the view coarsens detail maps to fit. Default
    * 128 MiB. */
   readonly detailBudget?: number;
+  /**
+   * A `Shadows` from `@margoengine/shadows`: the view adds its terrain (casting and receiving) and every stored-object
+   * mesh (`objects.casters`) to it, and removes them on dispose. Default none.
+   */
+  readonly shadows?: BiomeShadows;
+}
+
+/** What `BiomeViewOptions.shadows` needs: a `Shadows` (`@margoengine/shadows`), of which only `add` is used. */
+export interface BiomeShadows {
+  /** Adds a caster (and, for the terrain, a receiver); returns its remover. */
+  add(source: object): () => void;
 }
 
 /** Most ground materials a view draws: the terrain's layer limit (4 weights per texture, 4 textures). */
@@ -351,6 +362,8 @@ export class BiomeView implements Disposable {
   #textures?: { device: GPUDevice; height: GPUTexture; weights: GPUTexture[] };
   #off: () => void;
   #offObjects?: () => void;
+  /** Removers of the casters added to `options.shadows`. */
+  #offShadows: (() => void)[] = [];
   /** Streaming: tiles drawn at full detail, tiles whose objects are on the GPU, jobs on their way (`v` view, `p`
    * objects, then `x,z`) with their tile, the frame's streaming work (finished jobs waiting to be copied in, jobs
    * waiting to be sent), the camera's last place and velocity. */
@@ -483,6 +496,9 @@ export class BiomeView implements Disposable {
     checkMaterialCount(groundMaterials(world.biomes));
     if (engine.backend !== 'webgpu')
       throw fault('unsupported', 'BiomeView needs a WebGPU engine; create the engine with WebGPU', 'biomes');
+    const shadows = options.shadows;
+    if (shadows !== undefined && typeof shadows?.add !== 'function')
+      throw typeError('BiomeView shadows must be a Shadows from @margoengine/shadows', 'biomes');
     if (options.signal?.aborted) throw options.signal.reason;
     const terrainModule = await import('@margoengine/terrain');
     if (options.signal?.aborted) throw options.signal.reason;
@@ -514,6 +530,9 @@ export class BiomeView implements Disposable {
       });
       view.#offObjects = placement.onChange((rect) => view.#dirty(rect, 'p'));
     }
+    if (shadows)
+      for (const source of [view.terrain, ...(view.#objects?.casters ?? [])])
+        view.#offShadows.push(shadows.add(source));
     if (options.signal?.aborted) {
       view.dispose();
       throw options.signal.reason;
@@ -989,6 +1008,7 @@ export class BiomeView implements Disposable {
     this.#disposed = true;
     this.#off();
     this.#offObjects?.();
+    for (const off of this.#offShadows.splice(0)) off();
     for (const job of this.#pending.values()) job.controller.abort();
     this.#pending.clear();
     this.#arrived.length = 0;

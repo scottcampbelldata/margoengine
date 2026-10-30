@@ -148,7 +148,10 @@ test('blades shade grass from root to tip and bend lit normals toward the ground
   for (const lodFade of [2, 0]) {
     const lit = build({ lodFade, blades: {}, material: new PbrMaterial({ doubleSided: true }) });
     assert.ok(lit.code.includes(bent), `lodFade ${lodFade}: the shading normal bends after the back-face flip`);
-    assert.match(lit.code, /@location\(5\) ground:vec4f/);
+    // Centroid: with multisampling a partly covered pixel is shaded inside the blade, where the shade and ground
+    // weight stay in range (at the pixel centre they extrapolated and drew negative light at blade edges).
+    assert.match(lit.code, /@location\(5\) @interpolate\(perspective,centroid\) ground:vec4f/);
+    assert.match(lit.code, /@location\(2\) @interpolate\(perspective,centroid\) color:vec3f/);
     assert.match(lit.code, /o\.color=material\[0\]\.rgb\*pose\.shade;/);
     assert.match(lit.code, /o\.ground=pose\.ground;/);
     assert.match(lit.code, /var<uniform> material:array<vec4f,5>/);
@@ -156,13 +159,14 @@ test('blades shade grass from root to tip and bend lit normals toward the ground
     assert.deepEqual(lit.material.slice(16, 20), [0.5, 1 / 120, 2, 1 / 120].map(Math.fround));
     const off = build({ lodFade, material: new PbrMaterial({ doubleSided: true }) });
     assert.ok(off.code.includes('let n=normalize(i.normal)*select(-1.0,1.0,facing);'), 'core normal untouched');
-    assert.doesNotMatch(off.code, /i\.ground|pose\.shade/);
+    assert.doesNotMatch(off.code, /i\.ground|pose\.shade|centroid/);
     const unlit = build({ lodFade, blades: {} });
     assert.match(
       unlit.code,
       /let n=normalize\(mix\(normalize\(i\.normal\)\*select\(-1\.0,1\.0,front\),i\.ground\.xyz,i\.ground\.w\)\);/,
     );
     assert.match(unlit.code, /frame\.color\.rgb\*i\.shade\*/);
+    assert.match(unlit.code, /@location\(3\) @interpolate\(perspective,centroid\) shade:f32/);
   }
 });
 
