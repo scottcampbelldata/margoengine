@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3913343,
+  "total": 3915730,
   "history": [
     {
       "date": "2026-10-24",
@@ -902,6 +902,12 @@
       "commit": "f766d8ee2",
       "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
       "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "0882df471",
+      "reason": "biomes ecotone: painted edges blend over a feathered, warped box (biome look plan 2 item 4)",
+      "grew": 2
     }
   ],
   "items": {
@@ -915,8 +921,8 @@
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
-    "@margoengine/biomes": 17257,
-    "@margoengine/biomes dist/workers/biomes.js": 35235,
+    "@margoengine/biomes": 18360,
+    "@margoengine/biomes dist/workers/biomes.js": 36519,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/koppen": 1231,

@@ -1,7 +1,7 @@
 // Biome classification with smooth blends (spec 2.3), integer only. Memberships are products of Wendland kernels of
 // the signed distance to each envelope bound (Wendland 1995), the climate inputs are warped by low-frequency value
-// noise so borders wander like real ecotones, a 3x3 box blur removes salt-and-pepper, paint layers compose in a fixed
-// order, a cell outside every envelope falls back to the nearest one (ties by priority, then id), and the top 4
+// noise so borders wander like real ecotones, a 3x3 box blur removes salt-and-pepper, paint layers (read at the warped
+// cell through a box the width of the world's ecotone, so painted edges blend and wander too) compose in a fixed order, a cell outside every envelope falls back to the nearest one (ties by priority, then id), and the top 4
 // biomes are stored with weights that sum to exactly 255 (largest remainder, ties by priority, then id). The
 // Whittaker and Holdridge classifiers live in the zones entry and plug in through `ZoneClassifier`.
 import { type BiomeDefinition, type Dimension, envelopeOf } from './define.js';
@@ -217,8 +217,17 @@ function farAt(d: Dims, b: number, values: Int32Array, cells: number, k: number)
 export interface ClassifyInput {
   readonly n: number;
   layer(name: string): ArrayLike<number>;
-  /** A user layer over the grid (0..255 per cell, -1 where unpainted), or undefined when nothing is painted. */
-  user(name: string): ArrayLike<number> | undefined;
+  /**
+   * A user layer over the grid (0..255 per cell, -1 where unpainted), or undefined when nothing is painted. With a
+   * `margin`, over the grid grown by that many cells on every side ((n + 2 margin)^2 cells from (gx - margin,
+   * gz - margin)).
+   */
+  user(name: string, margin?: number): ArrayLike<number> | undefined;
+  /**
+   * Half width in cells of the paint feather (see `classify`); 0 or absent composes paint cell by cell. The paint grids
+   * are then read with a margin of twice this.
+   */
+  readonly ecotone?: number;
   /** Global cell of grid cell (0, 0). */
   readonly gx: number;
   readonly gz: number;
@@ -258,7 +267,10 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     // per cell as a cell-by-cell loop, so the integers are the same and the loops stay small and monomorphic.
     warped = scratch(1, slots * cells),
     dT = scratch(2, cells),
-    n2 = scratch(3, cells);
+    n2 = scratch(3, cells),
+    feather = input.ecotone ?? 0,
+    // The x warp noise, kept per cell only when paint is feathered (it moves where the paint is read).
+    n1s = feather && c.paint.length ? scratch(6, cells) : undefined;
   // Warp noise on the 8-cell lattice covering this grid: lattice point (a, b) is global cell (8 (a0 + a), 8 (b0 + b)).
   // The lattice spans both axes on their own: a point's grid (sample) need not start at the same lattice phase in x
   // and z (a tile's always does).
@@ -291,6 +303,7 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
         bottomB = warpB[at + span] + Math.floor(((warpB[at + span + 1] - warpB[at + span]) * fx) / ONE),
         n1 = topA + Math.floor(((bottomA - topA) * fz) / ONE) - 32768; // -0.5..0.5 in Q16
       n2[k] = topB + Math.floor(((bottomB - topB) * fz) / ONE) - 32768;
+      if (n1s) n1s[k] = n1;
       dT[k] = Math.floor((n1 * 160) / 32768); // +-1.6 K at the extremes, cK
     }
   }
@@ -353,8 +366,15 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     share = new Int32Array(4),
     order = new Int32Array(4),
     paint = c.paint,
-    paintGrid = paint.map((p) => (p.biome < 0 ? undefined : input.user(p.layer))),
-    maskGrid = paint.map((p) => (p.mask ? input.user(p.mask) : undefined));
+    feathered = new Map<string, Int32Array | undefined>(),
+    read = (name: string, neutral: number) => {
+      if (!n1s) return input.user(name);
+      const key = `${neutral}:${name}`;
+      if (!feathered.has(key)) feathered.set(key, featherPaint(input, name, neutral, feather, n1s, n2));
+      return feathered.get(key);
+    },
+    paintGrid = paint.map((p) => (p.biome < 0 ? undefined : read(p.layer, p.mode === 2 ? 255 : 0))),
+    maskGrid = paint.map((p) => (p.mask ? read(p.mask, 0) : undefined));
   for (let j = 0; j < inner; j++)
     for (let i = 0; i < inner; i++) {
       const k = (j + 1) * n + i + 1,
@@ -472,4 +492,92 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
         weights[out + s] = live ? share[order[s]] : 0;
       }
     }
+}
+
+/**
+ * A paint or mask raster as the classification composes it with an ecotone: each cell reads the raster at its warped
+ * position (the same 700 m noise that moves the climate inputs, up to `h` cells in x and z) through a (2h + 1)^2 box
+ * mean, so a painted edge ramps over the box and wanders like the climate borders. Unpainted cells count as `neutral`
+ * (0, or 255 for a multiply layer: what composing nothing gives); a box with no painted cell stays unpainted (-1).
+ * Separable integer sums, rounded to nearest: the same bytes everywhere. Undefined when the layer holds nothing.
+ */
+function featherPaint(
+  input: ClassifyInput,
+  name: string,
+  neutral: number,
+  h: number,
+  n1: Int32Array,
+  n2: Int32Array,
+): Int32Array | undefined {
+  const reach = 2 * h,
+    source = input.user(name, reach);
+  if (!source) return undefined;
+  const n = input.n,
+    side = n + 2 * reach, // the read grid
+    centres = n + reach, // box centres: grid cells moved by -h..h
+    width = 2 * h + 1,
+    area = width * width,
+    rowValue = new Int32Array(side * centres),
+    rowCount = new Int32Array(side * centres);
+  // Horizontal box sums: rowValue[j][c] sums read cells (c..c + 2h, j).
+  for (let j = 0; j < side; j++) {
+    const at = j * side,
+      out = j * centres;
+    let value = 0,
+      count = 0;
+    for (let t = 0; t < width; t++) {
+      const v = source[at + t];
+      if (v < 0) value += neutral;
+      else {
+        value += v;
+        count++;
+      }
+    }
+    for (let c = 0; ; c++) {
+      rowValue[out + c] = value;
+      rowCount[out + c] = count;
+      if (c + 1 === centres) break;
+      const leave = source[at + c],
+        enter = source[at + c + width];
+      if (leave < 0) value -= neutral;
+      else {
+        value -= leave;
+        count--;
+      }
+      if (enter < 0) value += neutral;
+      else {
+        value += enter;
+        count++;
+      }
+    }
+  }
+  // Vertical sums of the row sums, then each grid cell reads the box centred at its warped position.
+  const boxValue = new Int32Array(centres * centres),
+    boxCount = new Int32Array(centres * centres);
+  for (let c = 0; c < centres; c++) {
+    let value = 0,
+      count = 0;
+    for (let t = 0; t < width; t++) {
+      value += rowValue[t * centres + c];
+      count += rowCount[t * centres + c];
+    }
+    for (let r = 0; ; r++) {
+      boxValue[r * centres + c] = value;
+      boxCount[r * centres + c] = count;
+      if (r + 1 === centres) break;
+      value += rowValue[(r + width) * centres + c] - rowValue[r * centres + c];
+      count += rowCount[(r + width) * centres + c] - rowCount[r * centres + c];
+    }
+  }
+  const out = new Int32Array(n * n);
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) {
+      const k = j * n + i,
+        // -0.5..0.5 in Q16 to -h..h cells.
+        dx = clampInt(Math.floor((n1[k] * reach) / ONE), -h, h),
+        dz = clampInt(Math.floor((n2[k] * reach) / ONE), -h, h),
+        at = (j + h + dz) * centres + i + h + dx;
+      out[k] = boxCount[at] ? divFloor(2 * boxValue[at] + area, 2 * area) : -1;
+    }
+  return out;
 }

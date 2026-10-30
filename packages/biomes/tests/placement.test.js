@@ -631,7 +631,11 @@ test('paint: a full-strength desert dab leaves no forest inside; the smooth fall
   const after = await count(hard, hardPlacement),
     full = after.filter((r) => r.desert === 255);
   assert.equal(full.length, 0, `forest records where the desert weight is 255: ${full.length}`);
-  assert.equal(after.filter((r) => Math.hypot(r.x, r.z) < 190).length, 0, 'nothing of the forest inside the dab');
+  // The default 24 m ecotone ramps the edge from about 25 m inside the radius (12 m box, up to 12 m of warp) to 25 m
+  // outside: the core is bare, and the forest thins across the band with the ground's weights.
+  assert.equal(after.filter((r) => Math.hypot(r.x, r.z) < 170).length, 0, 'nothing of the forest inside the dab');
+  const band = ring(after, 180, 220) / ring(before, 180, 220); // float division: test arithmetic
+  assert.ok(band > 0.05 && band < 0.95, `the forest thins across the ecotone band: ${band.toFixed(2)} kept`);
   // The default smooth falloff paints about half at half the radius, and the forest there thins with that share: its
   // stems pass the candidate step in proportion to the forest weight. Fewer candidates also meet fewer neighbours in
   // the hard core, so a dense stand keeps somewhat more than its weight (measured 0.75 at a 0.49 desert share).

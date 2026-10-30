@@ -7,6 +7,7 @@ import { BiomeWorld } from '../dist/index.js';
 import { presets } from '../dist/presets.js';
 import { BiomeEditor } from '../dist/editor.js';
 import { random } from './random.js';
+import { ThreadWebWorker } from './thread-worker.js';
 
 const options = {
   seed: 4,
@@ -202,4 +203,91 @@ test('time budget: an undo and a 50 m dab take under one 60 Hz frame (16.7 ms) o
   editor.undo();
   const undo = performance.now() - start;
   assert.ok(dab < 16.7 && undo < 16.7, `dab ${dab.toFixed(2)} ms, undo ${undo.toFixed(2)} ms`);
+});
+
+// Biome look plan 2 item 4: a painted patch met its neighbour in a one-cell step (paint composed after the climate warp
+// and the 3x3 blur, cell by cell), with none of the wander of the climate borders. The `ecotone` option (default 24 m)
+// reads paint at the warped cell through a box that wide. On main the desert weight below falls 255 to 0 in one cell.
+test('ecotone: a painted edge blends over at least 24 m with no hard step and wanders; ecotone 0 keeps the step', {
+  timeout: 240000,
+}, async () => {
+  const wide = { ...options, size: [2048, 2048] },
+    centre = [0, -300],
+    radius = 200,
+    rays = 32,
+    paint = (w) => BiomeEditor.attach(w).paint('desert', { center: centre, radius, falloff: 'constant' }),
+    // The desert weight (0..255) at world (x, z), from the tile's biome and biomeWeight layers.
+    weightAt = async (w, x, z) => {
+      const gx = Math.floor(x - w.bounds[0]),
+        gz = Math.floor(z - w.bounds[1]),
+        cells = w.tileSize / w.resolution, // float division: test arithmetic
+        tx = Math.floor(gx / cells), // float division: test arithmetic
+        tz = Math.floor(gz / cells), // float division: test arithmetic
+        tile = await w.tile(tx, tz),
+        at = ((gz - tz * cells) * cells + gx - tx * cells) * 4,
+        ids = tile.layer('biome').data,
+        weights = tile.layer('biomeWeight').data,
+        desert = w.biomes.findIndex((b) => b.id === 'desert');
+      for (let s = 0; s < 4; s++) if (ids[at + s] === desert) return weights[at + s];
+      return 0;
+    },
+    // Each ray from the dab centre, 150 to 260 m at 1 m steps: the width of the ramp from the last 255 to the first 0,
+    // the largest step between neighbouring samples and the radius where the weight first drops under 128.
+    profile = async (w) => {
+      const out = [];
+      for (let r = 0; r < rays; r++) {
+        const a = (2 * Math.PI * r) / rays, // float division: test arithmetic
+          weights = [];
+        for (let d = 150; d <= 260; d++)
+          weights.push(await weightAt(w, centre[0] + d * Math.cos(a), centre[1] + d * Math.sin(a)));
+        const last = weights.findLastIndex((v) => v === 255),
+          first = weights.findIndex((v, i) => i > last && v === 0);
+        let step = 0;
+        for (let i = 1; i < weights.length; i++) step = Math.max(step, Math.abs(weights[i] - weights[i - 1]));
+        out.push({ ramp: first - last, step, half: 150 + weights.findIndex((v) => v < 128) });
+      }
+      return out;
+    };
+  const soft = await BiomeWorld.create(wide);
+  assert.equal(soft.ecotone, 24, 'the default ecotone');
+  paint(soft);
+  // Measured: ramps 24..34 m, steps at most 30, the weight-128 radius 194..207 m round the circle.
+  const p = await profile(soft),
+    halves = p.map((q) => q.half);
+  for (const q of p) {
+    assert.ok(q.ramp >= 24, `the desert weight falls 255 to 0 over ${q.ramp} m, under 24`);
+    assert.ok(q.step <= 64, `a step of ${q.step} between neighbouring metres`);
+  }
+  assert.ok(
+    Math.max(...halves) - Math.min(...halves) >= 2,
+    `the weight-128 radius wanders round the circle: ${Math.min(...halves)}..${Math.max(...halves)} m`,
+  );
+  // The same world twice, and on worker replicas, gives the same bytes.
+  const again = await BiomeWorld.create(wide),
+    remote = await BiomeWorld.create({ ...wide, workers: 1, createWorker: () => new ThreadWebWorker() });
+  paint(again);
+  paint(remote);
+  for (const [x, z] of [
+    [4, 2],
+    [3, 3],
+  ]) {
+    const d = await soft.digest(x, z);
+    assert.equal(await again.digest(x, z), d, `tile ${x},${z} again`);
+    assert.equal(await remote.digest(x, z), d, `tile ${x},${z} on a worker`);
+  }
+  remote.dispose();
+  // ecotone 0 composes paint cell by cell: today's one-cell step, and the unpainted digests do not depend on it.
+  const hard = await BiomeWorld.create({ ...wide, ecotone: 0 }),
+    plain = await BiomeWorld.create(wide);
+  assert.equal(await hard.digest(0, 0), await plain.digest(0, 0), 'unpainted tiles are the same at any ecotone');
+  paint(hard);
+  assert.ok(
+    (await profile(hard)).every((q) => q.step > 128),
+    'ecotone 0: the weight drops in one step',
+  );
+  // An unpainted tile far from the dab is the same with or without the feather; settings are checked.
+  assert.equal(await soft.digest(0, 0), await plain.digest(0, 0));
+  await assert.rejects(BiomeWorld.create({ ...wide, ecotone: -1 }), RangeError);
+  await assert.rejects(BiomeWorld.create({ ...wide, ecotone: 200 }), RangeError);
+  await assert.rejects(BiomeWorld.create({ ...wide, ecotone: '24' }), RangeError);
 });

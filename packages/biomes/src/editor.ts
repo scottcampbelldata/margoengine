@@ -6,7 +6,7 @@
 // radius plus the widest cluster spread, research notes 2026-10-28) so later milestones stay inside them.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { clampInt, divFloor, fade, isqrt, ONE } from '@margoengine/biomes/toolkit';
-import { placementReach } from './reach.js';
+import { paintReach, placementReach } from './reach.js';
 import type { BiomeWorld, LayerWrite } from './world.js';
 
 type Rect = readonly [number, number, number, number];
@@ -270,11 +270,13 @@ export class BiomeEditor implements Disposable {
   }
 
   /**
-   * How far beyond its brushed cells an edit can change the world, in metres: one cell for the classification blur
-   * plus, for placement, 6 rounds of 2 x the largest species radius and the widest cluster spread.
+   * How far beyond its brushed cells an edit can change the world, in metres: what classification reads across (one
+   * cell for the blur, or the paint feather of the world's `ecotone`) plus, for placement, 6 rounds of 2 x the largest
+   * species radius and the widest cluster spread.
    */
   margin(): number {
-    return this.#world.resolution + placementReach(this.#world.biomes, ROUNDS);
+    const w = this.#world;
+    return w.resolution * paintReach(w.ecotone, w.resolution) + placementReach(w.biomes, ROUNDS);
   }
 
   /** Every applied edit, then each new one as it is made, until the editor is disposed. */

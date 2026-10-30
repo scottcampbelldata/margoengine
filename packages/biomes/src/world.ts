@@ -9,6 +9,7 @@ import { divFloor, imod } from './fixed.js';
 import { type Heights, type HeightSource, heightsOf } from './height.js';
 import { DEFAULT_LAYERS, LAYERS, type RasterLayer } from './layers.js';
 import type { createRelief } from './relief.js';
+import { featherCells, paintReach } from './reach.js';
 import { buildRegion, type Region } from './region.js';
 import { Scratch } from './scratch.js';
 import { type BiomeSample, readCell, samplePoint } from './sample.js';
@@ -54,6 +55,13 @@ export interface BiomeWorldOptions {
   readonly classifier?: 'envelopes' | ZoneClassifier;
   /** Paint layers in composition order (the editor appends one per biome it paints). Default none. */
   readonly paint?: readonly PaintLayer[];
+  /**
+   * Metres over which a painted edge blends into its neighbour, 0..128. Paint and paint masks are read at the cell the
+   * climate warp moves each cell to (so painted borders wander like the climate ones) through a box this wide, in
+   * whole cells (`2 * floor(ecotone / (2 * resolution)) + 1`); 0 composes paint cell by cell, a one-cell step. Only
+   * worlds with paint change. Default 24.
+   */
+  readonly ecotone?: number;
   /** Rejects `create` with the signal's reason when aborted. */
   readonly signal?: AbortSignal;
   /**
@@ -139,6 +147,8 @@ export class BiomeWorld implements Disposable {
   readonly seed: number;
   /** Tile side in metres. */
   readonly tileSize: number;
+  /** Metres over which a painted edge blends into its neighbour (see {@link BiomeWorldOptions.ecotone}). */
+  readonly ecotone: number;
   /** Tile cell size in metres. */
   readonly resolution: number;
   /** Region cell size in metres. */
@@ -179,7 +189,8 @@ export class BiomeWorld implements Disposable {
       resolution = options.resolution ?? 1,
       regionResolution = options.regionResolution ?? 16,
       backend = options.backend ?? 'auto',
-      cache = options.cache ?? 64;
+      cache = options.cache ?? 64,
+      ecotone = options.ecotone ?? 24;
     if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
       throw rangeError('BiomeWorld seed must be an integer in 0..2^32-1', 'biomes');
     if (!TILE_SIZES.includes(tileSize)) throw rangeError('BiomeWorld tileSize must be 128, 256 or 512', 'biomes');
@@ -209,12 +220,15 @@ export class BiomeWorld implements Disposable {
     if (!BACKENDS.includes(backend)) throw rangeError("BiomeWorld backend must be 'auto', 'gpu' or 'cpu'", 'biomes');
     if (backend === 'gpu')
       throw fault('unsupported', "The biomes GPU backend is not available yet; use backend 'auto' or 'cpu'", 'biomes');
+    if (typeof ecotone !== 'number' || !(ecotone >= 0 && ecotone <= 128))
+      throw rangeError('BiomeWorld ecotone must be a number of metres, 0..128 (0 keeps painted edges hard)', 'biomes');
     if (!Number.isInteger(cache) || cache < 1 || cache > 4096)
       throw rangeError('BiomeWorld cache must be an integer number of tiles, 1..4,096', 'biomes');
     this.#limit = cache;
     this.#given = options;
     this.seed = seed >>> 0;
     this.tileSize = tileSize;
+    this.ecotone = ecotone;
     this.resolution = resolution;
     this.regionResolution = regionResolution;
     this.#origin = [Math.round(origin[0] * 1000), Math.round(origin[1] * 1000)];
@@ -428,7 +442,13 @@ export class BiomeWorld implements Disposable {
           seed: this.seed,
           cell,
           layer: (name) => wide.get(name)!.data,
-          user: (name) => this.#userGrid(name, gx, gz, n, cells),
+          // The feather's wide read stays inside the world (edge cells repeat), so paint keeps full strength up to
+          // the world's edge instead of fading into cells that do not exist.
+          user: (name, margin = 0) =>
+            margin
+              ? this.#userGrid(name, gx - margin, gz - margin, n + 2 * margin, cells, true)
+              : this.#userGrid(name, gx, gz, n, cells),
+          ecotone: featherCells(this.ecotone, this.resolution),
         },
         ids,
         weights,
@@ -463,11 +483,38 @@ export class BiomeWorld implements Disposable {
   }
 
   /** A user layer over an n x n grid of global cells from (gx, gz): 0..255, -1 where unpainted; undefined when the
-   * layer holds nothing. */
-  #userGrid(name: string, gx: number, gz: number, n: number, cells: number): Int16Array | undefined {
+   * layer holds nothing. `clamp` reads a cell outside the world at the nearest cell inside it. */
+  #userGrid(name: string, gx: number, gz: number, n: number, cells: number, clamp = false): Int16Array | undefined {
     const tiles = this.#user.get(name);
     if (!tiles?.size) return undefined;
     const out = new Int16Array(n * n).fill(-1);
+    if (clamp) {
+      // In-world runs per row as below, then the columns and rows past the world's edge copy its edge cells.
+      const lastX = this.tilesX * cells - 1,
+        lastZ = this.tilesZ * cells - 1,
+        i0 = Math.max(0, -gx),
+        i1 = Math.min(n, lastX + 1 - gx),
+        j0 = Math.max(0, -gz),
+        j1 = Math.min(n, lastZ + 1 - gz);
+      for (let j = j0; j < j1; j++) {
+        const tz = divFloor(gz + j, cells),
+          row = (gz + j - tz * cells) * cells,
+          at = j * n;
+        for (let i = i0; i < i1; ) {
+          const tx = divFloor(gx + i, cells),
+            x = gx + i - tx * cells,
+            run = Math.min(i1 - i, cells - x),
+            data = tiles.get(`${tx},${tz}`);
+          if (data) out.set(data.subarray(row + x, row + x + run), at + i);
+          i += run;
+        }
+        out.fill(out[at + i0], at, at + i0);
+        out.fill(out[at + i1 - 1], at + i1, at + n);
+      }
+      for (let j = 0; j < j0; j++) out.copyWithin(j * n, j0 * n, j0 * n + n);
+      for (let j = j1; j < n; j++) out.copyWithin(j * n, (j1 - 1) * n, j1 * n);
+      return out;
+    }
     for (let j = 0; j < n; j++) {
       const tz = divFloor(gz + j, cells),
         row = (gz + j - tz * cells) * cells;
@@ -507,7 +554,8 @@ export class BiomeWorld implements Disposable {
   /**
    * Writes several user layer rasters at once: all are checked first (nothing is written when one is bad), the tiles
    * they can change are recomputed on their next request, and listeners get one rectangle: the union of the changed
-   * cells grown by one cell (the classification blur reads one cell across), clamped to the world.
+   * cells grown by the cells classification reads across (one for the blur, or the paint feather's box and warp, twice
+   * its half width, when the `ecotone` is wider), clamped to the world.
    * @throws RangeError for a bad name, tile or size; MargoError `'state'` from inside an `onChange` listener.
    */
   writeLayers(writes: readonly LayerWrite[]): void {
@@ -521,7 +569,7 @@ export class BiomeWorld implements Disposable {
     if (!Array.isArray(writes)) throw typeError('BiomeWorld writeLayers takes an array of layer writes', 'biomes');
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: exact
       t = this.tileSize,
-      r = this.resolution,
+      r = this.resolution * paintReach(this.ecotone, this.resolution),
       [bx0, bz0, bx1, bz1] = this.bounds;
     for (const w of writes) {
       const paint = /^paint\/([a-z0-9][a-z0-9-]*)$/.exec(w?.name);
@@ -572,7 +620,7 @@ export class BiomeWorld implements Disposable {
       Math.min(bx1, dirty[2]),
       Math.min(bz1, dirty[3]),
     ] as const;
-    // Tiles whose cells (plus the 1-cell blur margin) meet the rectangle.
+    // Tiles whose cells (plus the classification margin) meet the rectangle.
     this.#invalidate(this.#tileRange([rect[0] - r, rect[1] - r, rect[2] + r, rect[3] + r]));
     this.#emit(rect);
   }

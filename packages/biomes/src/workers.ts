@@ -107,6 +107,7 @@ export class BiomeWorkers implements Disposable {
             size: [w.bounds[2] - w.bounds[0], w.bounds[3] - w.bounds[1]],
             tileSize: w.tileSize,
             resolution: w.resolution,
+            ecotone: w.ecotone,
             regionResolution: w.regionResolution,
             climate: s.options.climate,
             height: h && 'samples' in h ? { ...h, samples: copy(h.samples) } : h,

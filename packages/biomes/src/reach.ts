@@ -43,3 +43,13 @@ export function placementReach(
   }
   return Math.max(...reach) + 32 + widest;
 }
+
+/** Half width in cells of the paint feather of an ecotone `metres` wide at `resolution` metres per cell. */
+export const featherCells = (metres: number, resolution: number): number => Math.floor(metres / (2 * resolution)); // float division: options to whole cells
+
+/**
+ * Cells around a user layer change that its classification can reach: the 1-cell blur, or the paint feather's box
+ * and warp (twice its half width) when that is wider.
+ */
+export const paintReach = (metres: number, resolution: number): number =>
+  Math.max(1, 2 * featherCells(metres, resolution));

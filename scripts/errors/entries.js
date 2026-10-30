@@ -540,6 +540,7 @@ export const entries = [
       'BiomeView.attach takes an engine and a BiomeWorld',
       "BiomeWorld backend must be 'auto', 'gpu' or 'cpu'",
       'BiomeWorld cache must be an integer number of tiles, 1..4,096',
+      'BiomeWorld ecotone must be a number of metres, 0..128 (0 keeps painted edges hard)',
       'BiomeWorld biome ids must be unique',
       'BiomeWorld biomes must be 1 to 254 biome definitions',
       "BiomeWorld classifier is 'envelopes' or whittaker or holdridge from '@margoengine/biomes/zones'",

@@ -47,6 +47,7 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 | `tileSize` | 256 | 128, 256 or 512 m |
 | `resolution` | 1 | tile cell size: 0.5, 1, 2 or 4 m |
 | `regionResolution` | 16 | region cell size in metres (power of two, 4 x `resolution` up to `tileSize`) |
+| `ecotone` | 24 | metres, 0..128, over which a painted edge blends into its neighbour: paint and paint masks are read at the warped cell through a box that wide, so painted borders ramp and wander like the climate ones; 0 composes paint cell by cell (a one-cell step) |
 | `backend` | `'auto'` | `'auto'` or `'cpu'`; `'gpu'` is not available yet and throws `unsupported` |
 | `signal` | none | rejects `create` with its reason |
 
@@ -160,7 +161,11 @@ paints a biome, `mask/<name>` writes a mask that envelopes and paint layers can 
 world's `paint` order with a mode: `'replace'` (the default: the painted share replaces the rest), `'add'`,
 `'multiply'` (0 removes a biome; the next nearest envelope takes over if nothing is left) or `'max'`, optionally
 through a mask: `world.update({ paint: [{ biome: 'desert', mode: 'replace', mask: 'mask/dunes' }] })`. Writing a layer
-recomputes that tile and its neighbours and calls the `onChange` listeners. `readLayer` returns a copy. Stored plants
+recomputes that tile and its neighbours and calls the `onChange` listeners. Painted edges blend over the world's
+`ecotone` (default 24 m): each cell reads the paint at the cell the climate warp moves it to, through a box that wide,
+so a constant dab ramps from full strength to nothing across about 24 m and its border wanders by several metres like
+the generated ecotones (`BiomeWorld.create({ ecotone: 0 })` keeps the old one-cell step). Stored plants follow the
+blended weights, so a forest thins across the band. `readLayer` returns a copy. Stored plants
 thin with the painted share: none of a replaced biome stand where its paint reaches 255, and where half is painted a
 dense stand keeps somewhat more than half, because fewer seedlings meet fewer neighbours (a temperate forest keeps 75
 percent at a 49 percent desert share; `tests/placement.test.js`).
@@ -395,8 +400,8 @@ editor.undo(); // the exact bytes from before the erase
 - Edits are plain data (`editor.edits`, `editor.history()` as an async iterator of every edit as it is made), and
   `apply(edit)` replays one exactly: a stroke replayed in another world gives the same digests, so edits can be saved or
   synced.
-- `editor.dirty` covers every cell the last step can change, grown by `editor.margin()`: one cell for the
-  classification blur plus the placement reach (`BiomePlacement.reach` with the default spacing: two spacings per
+- `editor.dirty` covers every cell the last step can change, grown by `editor.margin()`: what classification reads
+  across (one cell for the blur, or twice the half width of the `ecotone` feather, 24 m by default) plus the placement reach (`BiomePlacement.reach` with the default spacing: two spacings per
   Luby round in every layer, the earlier layers each one reads, and the 32 m canopy cells), so tiles outside it are
   guaranteed unchanged. The world reports the same rectangles through `onChange`, and
   `BiomeView` redraws them. Heights edited with `world.update({ height })` dirty the whole world, since rain shadow

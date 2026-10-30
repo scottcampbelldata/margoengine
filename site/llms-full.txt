@@ -5973,6 +5973,7 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 | `tileSize` | 256 | 128, 256 or 512 m |
 | `resolution` | 1 | tile cell size: 0.5, 1, 2 or 4 m |
 | `regionResolution` | 16 | region cell size in metres (power of two, 4 x `resolution` up to `tileSize`) |
+| `ecotone` | 24 | metres, 0..128, over which a painted edge blends into its neighbour: paint and paint masks are read at the warped cell through a box that wide, so painted borders ramp and wander like the climate ones; 0 composes paint cell by cell (a one-cell step) |
 | `backend` | `'auto'` | `'auto'` or `'cpu'`; `'gpu'` is not available yet and throws `unsupported` |
 | `signal` | none | rejects `create` with its reason |
 

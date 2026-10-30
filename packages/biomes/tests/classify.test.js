@@ -140,7 +140,8 @@ test('paint layers: replace, add, multiply and max compose in order, masks scale
     rects = [];
   w.onChange((r) => rects.push(r));
   w.writeLayer('paint/desert', 0, 0, full);
-  assert.deepEqual(rects.at(-1), [-256, -256, 1, 1], 'the tile grown by one cell, clamped to the world');
+  // Grown by the 24 m the default ecotone's feather reads across (12 cells of box, 12 of warp), clamped to the world.
+  assert.deepEqual(rects.at(-1), [-256, -256, 24, 24], 'the tile grown by the paint reach, clamped to the world');
   assert.deepEqual(w.paint, [{ biome: 'desert', mode: 'replace' }]);
   let t = await w.tile(0, 0);
   assert.deepEqual(top(t, 10, 10), [1, 255]);
