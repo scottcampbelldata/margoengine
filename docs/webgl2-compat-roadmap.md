@@ -799,5 +799,6 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   rule: of the 2,000,000 positions sampled on the GPU, 5% of the x coordinates differ by one unit in the last place
   (0.1% of the normal samples already do; the two paths round their float arithmetic differently), and one point
   lands on the next pixel.
-- **Left in M8.** The size shrink (the root with `install()` is 93,763 B gzip in `entry-sizes.json`, against the
-  60,000 B target), the transform-feedback tier for own-index stores and the integrated-GPU budget run.
+- **Left in M8.** The size shrink (measured in two numbers since 2026-10-30, `splits` in `entry-sizes.json`: the base
+  that `install()` loads is 72,500 B gzip against the 60,000 B target, the lazy compute runtime another 22,094 B; the
+  joined root record, 94,046 B, counted both, and the sizes gate now holds each), the transform-feedback tier for own-index stores and the integrated-GPU budget run.

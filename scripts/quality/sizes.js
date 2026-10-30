@@ -8,7 +8,8 @@ import { cpus } from 'node:os';
 import { dirname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { parseSync } from 'rolldown/utils';
-import { bundleBytes } from '../measure-size.js';
+import { LAZY_SPLITS } from '../lazy-files.js';
+import { bundleBytes, bundleSplit } from '../measure-size.js';
 import { slash } from './packages.js';
 
 /** Budget headroom: 3% or 256 bytes, whichever is larger. */
@@ -51,6 +52,18 @@ export async function sizesGate({ root, packages }) {
   jobs.forEach((job, i) => {
     items[job.key] = sizes[i];
   });
+
+  // Entries with a lazy part: the base without it and the lazy part alone, each against its own budget. The joined
+  // entry above stays a budget too, so neither number can grow behind the other.
+  for (const split of LAZY_SPLITS) {
+    const part = await bundleSplit(join(root, split.dist), split.chunk);
+    if (part.staticLazy.length)
+      throw new Error(
+        `${split.specifier}: lazy chunk imported statically (${part.staticLazy.join(', ')}); keep it behind import()`,
+      );
+    items[`${split.specifier} base (without ${split.lazyLabel})`] = gzipSync(part.base).length;
+    items[`${split.specifier} lazy ${split.lazyLabel}`] = gzipSync(part.lazy).length;
+  }
 
   // Leaks: static import graph over dist files.
   const bySpecifier = new Map(packages.flatMap((p) => p.entries.map((e) => [e.specifier, e])));

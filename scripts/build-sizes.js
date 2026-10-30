@@ -6,7 +6,7 @@
 // loads when) and packages/*/package.json (peers). scripts/build-site.js writes it after a fresh measurement.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { LAZY_FILES } from './lazy-files.js';
+import { LAZY_FILES, LAZY_SPLITS } from './lazy-files.js';
 
 const esc = (text) =>
   String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -70,6 +70,24 @@ function lazyFiles(sizes) {
   <h2 id="loaded-later">Loaded later, and what loads it</h2>
   <p class="section-lede">Every file a package fetches or compiles on its own after the entry you import: the stage's packs, workers and Wasm runtimes. Workers, glue scripts and <code>.wasm</code> files are measured as served, because your bundler copies them as they are. The stage's packs, the BVH module worker and the Rapier module are bundled and minified like the entries below (the packs with core left out, since the stage already loaded it). Rapier inlines its Wasm, so it makes no separate <code>.wasm</code> request.</p>
 ${table('loaded-later', 'Files loaded after the entry, in bytes, with the call that loads each', [['File'], ['Kind'], ['Raw (B)', 1], ['Gzip (B)', 1], ['Brotli (B)', 1], ['Loads when']], groups.join('\n'))}
+</section>`;
+}
+
+function splits(sizes) {
+  const rows = LAZY_SPLITS.filter((split) => sizes.splits?.[split.specifier]).flatMap((split) => {
+    const { base, lazy } = sizes.splits[split.specifier];
+    const cells = (part) => `<td class="num">${bytes(part.raw)}</td><td class="num">${bytes(part.gzip)}</td>`;
+    const name = `<th scope="row"><code>${esc(split.specifier)}</code></th>`;
+    return [
+      `<tr>${name}<td>Base: everything the first call of <code>install()</code> loads, without the lazy part</td>${cells(base)}<td>Target ${bytes(base.target)} B</td></tr>`,
+      `<tr>${name}<td>Lazy: ${esc(lazy.name)}</td>${cells(lazy)}<td>${prose(split.when)}</td></tr>`,
+    ];
+  });
+  if (!rows.length) return '';
+  return `<section class="splits" aria-labelledby="split-entries">
+  <h2 id="split-entries">Entries with a lazy part</h2>
+  <p class="section-lede">An entry whose bundle holds a chunk that loads only when a feature is used is measured in two numbers, so the lazy part is not billed to pages that never use it. The entry's row in the tables below joins both.</p>
+${table('split-entries', 'Entries measured as a base and a lazy part, in bytes', [['Package'], ['Part'], ['Raw (B)', 1], ['Min+gzip (B)', 1], ['Note']], `<tbody>\n${rows.join('\n')}\n</tbody>`)}
 </section>`;
 }
 
@@ -178,6 +196,7 @@ ${layers.map((layer) => `          <li><a href="#layer-${slug(layer)}">${esc(lay
 ${basicScene(network)}
 
 ${lazyFiles(sizes)}
+${splits(sizes)}
 
 ${sections.join('\n\n')}
 

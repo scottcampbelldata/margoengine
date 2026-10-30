@@ -15,8 +15,8 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { CORE_STAGE_GZIP_LIMIT } from '../../scripts/core-budget.js';
-import { LAZY_FILES } from '../../scripts/lazy-files.js';
-import { bundleBytes as bundle, measureCoreStage } from '../../scripts/measure-size.js';
+import { LAZY_FILES, LAZY_SPLITS } from '../../scripts/lazy-files.js';
+import { bundleBytes as bundle, bundleSplit, measureCoreStage } from '../../scripts/measure-size.js';
 
 const root = resolve(import.meta.dirname, '../..');
 
@@ -67,6 +67,27 @@ export async function measureEntries({ log = console.log } = {}) {
       brotli: brotliCompressSync(bytes).length,
     };
     log(file, report.lazyFiles[file].gzip);
+  }
+  // An entry with a lazy chunk inside it, measured in two numbers: `base` is everything the entry loads without the
+  // lazy chunk, `lazy` the chunk alone (scripts/lazy-files.js, LAZY_SPLITS). The entry's own record above joins both.
+  report.splits = {};
+  for (const split of LAZY_SPLITS) {
+    const part = await bundleSplit(resolve(root, split.dist), split.chunk),
+      measure = (bytes) => ({ raw: bytes.length, gzip: gzipSync(bytes).length });
+    if (part.staticLazy.length)
+      throw new Error(`${split.specifier}: lazy chunk imported statically: ${part.staticLazy.join(', ')}`);
+    report.splits[split.specifier] = {
+      entry: split.entry,
+      base: { ...measure(part.base), target: split.baseTarget },
+      lazy: { name: split.lazyLabel, ...measure(part.lazy), loadedBy: split.when },
+    };
+    log(
+      split.specifier,
+      'base',
+      report.splits[split.specifier].base.gzip,
+      'lazy',
+      report.splits[split.specifier].lazy.gzip,
+    );
   }
   return report;
 }

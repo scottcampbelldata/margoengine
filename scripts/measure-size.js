@@ -46,8 +46,7 @@ for (const peer of Object.keys(
 /** True for a bare import (another package): entry sizes leave those external, as apps share them. */
 export const bare = (id) => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.test(id) && !id.startsWith('\0');
 
-/** The minified es2022 bundle of `entry` as build-modern makes it, with `external` imports left out. */
-export async function bundleBytes(entry, external = bare) {
+async function bundleChunks(entry, external) {
   const output = await build({
     configFile: false,
     publicDir: false,
@@ -60,12 +59,58 @@ export async function bundleBytes(entry, external = bare) {
       rollupOptions: { external, output: compactOutput },
     },
   });
-  return Buffer.from(
-    (Array.isArray(output) ? output[0] : output).output
-      .filter((item) => item.type === 'chunk')
-      .map((item) => item.code)
-      .join('\n'),
+  return (Array.isArray(output) ? output[0] : output).output.filter((item) => item.type === 'chunk');
+}
+
+/** The minified es2022 bundle of `entry` as build-modern makes it, with `external` imports left out. */
+export async function bundleBytes(entry, external = bare) {
+  return Buffer.from((await bundleChunks(entry, external)).map((item) => item.code).join('\n'));
+}
+
+/**
+ * The same bundle split at a lazy boundary: `lazy` matches the file names of the chunks an `import()` loads on demand
+ * (rollup hashes the names, so it is a pattern such as /^runtime-/). `base` joins every chunk the entry loads without
+ * touching a lazy chunk (static imports and the other dynamic imports, which `install()`-style entries make on first
+ * call); `lazy` joins the chunks only a lazy chunk reaches. `staticLazy` lists lazy chunks that some chunk imports
+ * statically, which would make the boundary a lie.
+ */
+export async function bundleSplit(entry, lazy, external = bare) {
+  const chunks = await bundleChunks(entry, external),
+    byName = new Map(chunks.map((chunk) => [chunk.fileName, chunk])),
+    isLazy = (name) => lazy.test(name);
+  const reach = (starts, skipLazyDynamic) => {
+    const seen = new Set(),
+      visit = (name) => {
+        if (seen.has(name) || !byName.has(name)) return;
+        seen.add(name);
+        const chunk = byName.get(name);
+        for (const next of chunk.imports) visit(next);
+        for (const next of chunk.dynamicImports) if (!(skipLazyDynamic && isLazy(next))) visit(next);
+      };
+    starts.forEach(visit);
+    return seen;
+  };
+  const staticLazy = chunks.flatMap((chunk) =>
+    chunk.imports.filter(isLazy).map((name) => `${chunk.fileName} -> ${name}`),
   );
+  const base = reach([chunks.find((chunk) => chunk.isEntry).fileName], true),
+    lazyOnly = new Set(
+      [
+        ...reach(
+          chunks.filter((chunk) => isLazy(chunk.fileName)).map((chunk) => chunk.fileName),
+          false,
+        ),
+      ].filter((name) => !base.has(name)),
+    );
+  const join = (names) => Buffer.from([...names].map((name) => byName.get(name).code).join('\n'));
+  return {
+    base: join(base),
+    lazy: join(lazyOnly),
+    baseChunks: [...base],
+    lazyChunks: [...lazyOnly],
+    staticLazy,
+    chunks,
+  };
 }
 
 export async function measureCoreStage() {

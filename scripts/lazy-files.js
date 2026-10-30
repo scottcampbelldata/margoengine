@@ -226,6 +226,29 @@ export const LAZY_FILES = [
   },
 ];
 
+/**
+ * Entries whose bundle has a lazy part inside it: a chunk its own `import()` loads only when a feature is used. The
+ * size records and the sizes gate measure the entry in two numbers, `base` (every chunk the entry loads without that
+ * chunk, `install()`-style first calls included) and the lazy chunk alone, so a lazy runtime is not billed to the
+ * apps that never use it. `chunk` matches the lazy chunk's built file name (rollup hashes it); the lazy boundary is
+ * checked at the source by tests/lazy-boundary.test.js. `baseTarget` is the base's gzip target, enforced by the sizes
+ * baseline.
+ * @type {{package: string, entry: string, specifier: string, dist: string, chunk: RegExp, lazyLabel: string, source: string, baseTarget: number, when: string}[]}
+ */
+export const LAZY_SPLITS = [
+  {
+    package: 'webgl2-compat',
+    entry: '.',
+    specifier: '@margoengine/webgl2-compat',
+    dist: 'packages/webgl2-compat/dist/index.js',
+    chunk: /^runtime-/,
+    lazyLabel: 'compute runtime',
+    source: 'packages/webgl2-compat/src/compute/runtime.ts',
+    baseTarget: 60_000,
+    when: 'the first compute pipeline on the layer (import() of compute/runtime.js in device/device.ts)',
+  },
+];
+
 /** Built files that load on their own at runtime; each must be in LAZY_FILES. Paths relative to the repository root. */
 export const isLazyBuildFile = (path) =>
   /^packages\/[^/]+\/dist\/(.*\.wasm|workers\/[^/]+\.js|[^/]*\.worker\.js|(draco|basis)\/[^/]+\.js)$/.test(path);
