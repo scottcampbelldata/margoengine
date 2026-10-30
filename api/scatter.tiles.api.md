@@ -56,6 +56,7 @@ class Scatter implements EnginePlugin {
     protected readonly values: Float32Array;
     protected readonly meta: Uint32Array;
     protected readonly geometries: readonly Geometry[];
+    get disposed(): boolean;
     readonly count: number;
     protected terrain?: GPUTexture;
     protected computeGroup?: GPUBindGroup;
@@ -74,6 +75,12 @@ class Scatter implements EnginePlugin {
     protected extraChanged: boolean;
     protected dispatched(): number;
     protected beforeDistribute(_c: ScatterPassContext): void;
+    drawShadow({ context, pass, matrix, cascade }: {
+        context: ScatterPassContext;
+        pass: GPURenderPassEncoder;
+        matrix: Float32Array;
+        cascade: number;
+    }): void;
     protected ringCapacity(): number;
     protected release(): void;
     onDeviceRestored(engine: Engine): void;

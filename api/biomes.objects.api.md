@@ -4,6 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
+import { ScatterTiles } from "@margoengine/scatter/tiles";
 
 export class BiomeObjects implements Disposable {
     private constructor();
@@ -11,6 +12,7 @@ export class BiomeObjects implements Disposable {
     dropped: number;
     get gpuBytes(): number;
     get count(): number;
+    get casters(): readonly ScatterTiles[];
     stream(rect: readonly [number, number, number, number], options?: {
         readonly signal?: AbortSignal;
     }): Promise<void>;

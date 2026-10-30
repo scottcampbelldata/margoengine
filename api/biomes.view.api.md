@@ -6,6 +6,10 @@
 import { EngineKernel } from "@margoengine/core";
 import { Terrain, TerrainColorOptions } from "@margoengine/terrain";
 
+export interface BiomeShadows {
+    add(source: object): () => void;
+}
+
 export class BiomeView implements Disposable {
     readonly terrain: Terrain;
     readonly materials: readonly string[];
@@ -44,6 +48,7 @@ export interface BiomeViewOptions {
     readonly lookahead?: number;
     readonly budget?: number;
     readonly detailBudget?: number;
+    readonly shadows?: BiomeShadows;
 }
 
 export const MATERIALS: Readonly<Record<string, MaterialLook>>;
