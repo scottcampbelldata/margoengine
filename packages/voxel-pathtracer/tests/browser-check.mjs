@@ -40,9 +40,16 @@
 // - largemodels: a 400-cell glass bar has no interface where 200-cell tiles would meet; a 2048 x 64 x 2048 sparse world;
 // - native4k: a 3840 x 2160 viewport traced at its native size with the default limits, raw and denoised (moving camera).
 // Results go to test-results/voxel-pathtracer-browser-check.json; `pictures` writes PNGs to test-results/voxel-pathtracer.
+// `denoise` runs its four scenes as four cases; `denoise-diffuse`, `denoise-opaque`, `denoise-materials` and
+// `denoise-caustics` name one each (short steps on a slower GPU, package.json `margo.gpuTestSteps`).
+// A case in which no GPU work finishes for MARGO_GPU_STALL_S (120 s) fails at once, naming the case, its last progress
+// step and its render (tests/progress.mjs); each case's time and longest wait for the GPU are printed and kept in the
+// JSON (`timings`). `--stall-in-render=<k>` makes every GPU wait hang once the k-th renderImage has started (the
+// stand-in tests/stall-check.mjs uses).
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { installProgress, stallLimitMs, watched } from './progress.mjs';
 
 const started = performance.now(),
   path = '/packages/voxel-pathtracer/tests/browser-check.html',
@@ -52,10 +59,13 @@ const started = performance.now(),
   args = process.argv.slice(2),
   named = args.filter((a) => !a.startsWith('--')),
   wanted = (name) => (named.length ? named.includes(name) : name !== 'pictures' && name !== 'timing'),
+  stallInRender = Number(args.find((a) => a.startsWith('--stall-in-render='))?.slice(18) ?? 0),
+  stallMs = stallLimitMs(),
   context = await openBrowser({ startPath: path, port }),
   { page, hardware } = context,
   pageErrors = [],
-  report = { hardware, date: new Date().toISOString(), results: {} };
+  timings = {},
+  report = { hardware, date: new Date().toISOString(), results: {}, timings };
 // A slow check says where it is, so a slow run reads differently from a hung one: the page logs `progress ...` lines,
 // shown with the time since the start, and a line is printed at least every 30 s (the last progress line again).
 let lastProgress = 'starting',
@@ -74,20 +84,31 @@ page.on('console', (m) => {
   else if (m.text().startsWith('progress ')) say((lastProgress = m.text()));
 });
 page.setDefaultTimeout(900000);
-const run = async (name, ...params) => {
-  lastProgress = name;
+// `label` names the case in the output (`run` uses the page function's name); the page's GPU progress is watched.
+const runAs = async (label, name, ...params) => {
+  lastProgress = label;
   const t0 = performance.now(),
-    result = await page.evaluate(([n, p]) => window.check[n](...p), [name, params]);
-  report.results[name] = { ...result, png: undefined };
-  console.log(`${name} (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
-  assert.deepEqual(result.errors ?? [], [], `${name}: WebGPU errors`);
+    gaps = {},
+    result = await watched(
+      page,
+      label,
+      page.evaluate(([n, p]) => window.check[n](...p), [name, params]),
+      { stallMs, step: () => lastProgress, gaps },
+    ),
+    seconds = (performance.now() - t0) / 1000;
+  timings[label] = { seconds: Math.round(seconds * 10) / 10, longestGpuWait: Math.round(gaps.longestMs / 1000) };
+  if (label === name) report.results[name] = { ...result, png: undefined };
+  console.log(`${label} (${seconds.toFixed(1)} s; longest wait for the GPU ${timings[label].longestGpuWait} s)`);
+  assert.deepEqual(result.errors ?? [], [], `${label}: WebGPU errors`);
   return result;
 };
+const run = (name, ...params) => runAs(name, name, ...params);
 const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} not within ${tolerance} of ${expected}`);
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.userAgent);
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
+  await installProgress(page, { stallInRender });
   if (wanted('agx')) {
     const r = await run('agx');
     console.log(JSON.stringify(r));
@@ -487,40 +508,46 @@ try {
       }
     }
   }
-  if (wanted('denoise')) {
-    const r = await run('denoise');
-    for (const name of ['diffuse', 'opaque', 'materials', 'caustics']) {
-      const d = r[name],
-        // Error against the converged image: the reference's own noise removed in quadrature.
-        clean = (e) => Math.sqrt(Math.max(e * e - d.refNoise * d.refNoise, 0));
-      for (const n of [4, 16, 64, 1024])
-        console.log(
-          `  ${name} ${n} spp: RMSE raw ${d[n].raw.toFixed(5)} denoised ${d[n].denoised.toFixed(5)} (x${(d[n].raw / d[n].denoised).toFixed(2)}, x${(clean(d[n].raw) / clean(d[n].denoised)).toFixed(2)} without the reference's noise ${d.refNoise.toFixed(5)}); edges raw ${d[n].rawEdges.toFixed(5)} denoised ${d[n].denoisedEdges.toFixed(5)} (${d.edgePixels} px)`,
-        );
-      // The glass scenes (caustics through glass, by mirrors and glossy metal): denoising at least halves the error
-      // on the materials scene and nearly so on the caustics scene (README, "Denoiser").
-      if (name === 'materials' || name === 'caustics')
-        for (const n of [4, 16, 64])
-          assert.ok(
-            clean(d[n].denoised) * (name === 'materials' ? 2 : 1.6) <= clean(d[n].raw),
-            `${name} ${n} spp: denoising reduces error enough`,
-          );
-      // Edges: from 16 samples on the denoised image is no worse than the raw one at object edges (where filtering
-      // blurred detail the samples already resolve, it gives way to the raw mean), within 2% at 1024.
-      for (const n of [16, 64])
-        assert.ok(d[n].denoisedEdges <= d[n].rawEdges, `${name} ${n} spp: edges are not blurred`);
-      assert.ok(d[1024].denoisedEdges <= d[1024].rawEdges * 1.02, `${name} 1024 spp: edges are not blurred`);
-      // More asserted on the diffuse scene.
-      if (name !== 'diffuse') continue;
-      for (const n of [4, 16]) assert.ok(d[n].denoised < d[n].raw * 0.6, `${name} ${n} spp: denoising reduces error`);
-      assert.ok(d[64].denoised < d[64].raw * 0.75, `${name} 64 spp: denoising reduces error`);
-      assert.ok(
-        d[1024].denoised < d[1024].raw * 1.5 + 0.002,
-        `${name}: denoising at high sample counts stays near the converged image`,
+  // One case per scene (`denoise` names all four): as one case they took 196 s on an RTX A6000 (diffuse 14, opaque 15,
+  // materials 82, caustics 85) and did not finish in the 728 s left of the test's 900 s on an Intel Arc 140V, with no
+  // line between them. The Arc ran convergence 4.7 times slower than the A6000, about 915 s for all four.
+  for (const [name, asked] of [
+    ['diffuse', wanted('denoise-diffuse')],
+    ['opaque', wanted('denoise-opaque')],
+    ['materials', wanted('denoise-materials')],
+    ['caustics', wanted('denoise-caustics')],
+  ]) {
+    if (!asked && !named.includes('denoise')) continue;
+    const d = (await runAs(`denoise-${name}`, 'denoise', name))[name],
+      // Error against the converged image: the reference's own noise removed in quadrature.
+      clean = (e) => Math.sqrt(Math.max(e * e - d.refNoise * d.refNoise, 0));
+    report.results.denoise = { ...report.results.denoise, [name]: d };
+    for (const n of [4, 16, 64, 1024])
+      console.log(
+        `  ${name} ${n} spp: RMSE raw ${d[n].raw.toFixed(5)} denoised ${d[n].denoised.toFixed(5)} (x${(d[n].raw / d[n].denoised).toFixed(2)}, x${(clean(d[n].raw) / clean(d[n].denoised)).toFixed(2)} without the reference's noise ${d.refNoise.toFixed(5)}); edges raw ${d[n].rawEdges.toFixed(5)} denoised ${d[n].denoisedEdges.toFixed(5)} (${d.edgePixels} px)`,
       );
-      for (const n of [4, 16, 64, 1024])
-        assert.ok(d[n].denoisedEdges < d[n].rawEdges * 1.25, `${name} ${n} spp: edges are not blurred`);
-    }
+    // The glass scenes (caustics through glass, by mirrors and glossy metal): denoising at least halves the error
+    // on the materials scene and nearly so on the caustics scene (README, "Denoiser").
+    if (name === 'materials' || name === 'caustics')
+      for (const n of [4, 16, 64])
+        assert.ok(
+          clean(d[n].denoised) * (name === 'materials' ? 2 : 1.6) <= clean(d[n].raw),
+          `${name} ${n} spp: denoising reduces error enough`,
+        );
+    // Edges: from 16 samples on the denoised image is no worse than the raw one at object edges (where filtering
+    // blurred detail the samples already resolve, it gives way to the raw mean), within 2% at 1024.
+    for (const n of [16, 64]) assert.ok(d[n].denoisedEdges <= d[n].rawEdges, `${name} ${n} spp: edges are not blurred`);
+    assert.ok(d[1024].denoisedEdges <= d[1024].rawEdges * 1.02, `${name} 1024 spp: edges are not blurred`);
+    // More asserted on the diffuse scene.
+    if (name !== 'diffuse') continue;
+    for (const n of [4, 16]) assert.ok(d[n].denoised < d[n].raw * 0.6, `${name} ${n} spp: denoising reduces error`);
+    assert.ok(d[64].denoised < d[64].raw * 0.75, `${name} 64 spp: denoising reduces error`);
+    assert.ok(
+      d[1024].denoised < d[1024].raw * 1.5 + 0.002,
+      `${name}: denoising at high sample counts stays near the converged image`,
+    );
+    for (const n of [4, 16, 64, 1024])
+      assert.ok(d[n].denoisedEdges < d[n].rawEdges * 1.25, `${name} ${n} spp: edges are not blurred`);
   }
   if (wanted('denoisepeak')) {
     const r = await run('denoisepeak');
@@ -748,6 +775,12 @@ try {
     );
   }
   assert.deepEqual(pageErrors, []);
+  console.log(
+    `case times, slowest first (s, longest GPU wait): ${Object.entries(timings)
+      .sort((a, b) => b[1].seconds - a[1].seconds)
+      .map(([name, t]) => `${name} ${t.seconds.toFixed(1)} (${t.longestGpuWait})`)
+      .join(', ')}`,
+  );
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/voxel-pathtracer-browser-check.json', JSON.stringify(report, null, 1));
   console.log('voxel path tracer browser check passed');

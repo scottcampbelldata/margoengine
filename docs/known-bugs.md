@@ -92,6 +92,27 @@ does not own. Each entry says exactly what is needed to close it.
 - **Needed to close:** the `compute-browser.json` precise-maths results from an Intel PC (steps in
   `private/handoffs/intel-recheck.md`), then this entry removed or turned into the cause found.
 
+### Intel Arc 140V: voxel-pathtracer `denoise` case ran out of time with no output
+
+- **What:** on the Intel Arc 140V laptop, `voxel-pathtracer test:gpu` finished every case before `denoise`, which started
+  at about 172 s and printed nothing until the test runner killed the suite at 900 s (`HUNG: no result after 900 s`).
+  The cases after it never ran there.
+- **Measured on the RTX A6000** (shared GPU, 2026-10-29): the case renders six 480 x 300 references at 16384 samples
+  and took 196 s (diffuse 14, opaque 15, materials 82, caustics 85); the longest wait for any GPU work to finish was
+  1 s. The Arc ran `convergence` in 61.3 s against 13.1 s here (4.7 times slower), which puts `denoise` near 915 s there,
+  more than the 728 s it had. Most likely cause: the case was simply longer than the time limit. A GPU wait that never
+  resolves is not ruled out without an Arc run.
+- **Done:** each scene is its own case (`denoise-diffuse`, `denoise-opaque`, `denoise-materials`,
+  `denoise-caustics`; `denoise` runs all four), with its own short step in `margo.gpuTestSteps`. Every render prints a
+  `progress denoise <scene>: ...` line. A case in which no GPU work finishes for `MARGO_GPU_STALL_S` (120 s) now fails
+  at once, naming the case, the step and the render (`tests/progress.mjs`). Each case prints its time and its longest GPU
+  wait. Regression test: `voxel-pathtracer test:gpu:stall` (`tests/stall-check.mjs`) hangs every GPU wait once the
+  first render starts and expects that named failure. It fails in 17 s with the watchdog; without it the run has not
+  ended at the 180 s limit.
+- **Needed to close:** run `voxel-pathtracer test:gpu` on the Arc with the split steps. If each denoise scene passes,
+  read its time and longest GPU wait and remove this entry. If one stops with `GPU stall`, the message names the render
+  to hunt.
+
 ### Linux (Intel UHD, Mesa): three GPU suites not finished
 
 - **What:** on the Ubuntu test server (Intel N100 with Intel UHD, Chromium on Mesa's Vulkan driver, Node 24, main

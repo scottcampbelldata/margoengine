@@ -940,17 +940,26 @@ window.check={
   return {...out,errors:errors.splice(0)};
  },
  // Denoiser evidence: error against a 16384-sample reference with and without denoising, overall and at object
- // edges (pixels whose 3x3 neighbourhood holds another instance id).
- async denoise(){
+ // edges (pixels whose 3x3 neighbourhood holds another instance id). `names`: the scenes to run (all four by default;
+ // browser-check.mjs runs one per call, so each scene is its own case and can be its own step).
+ // Every render prints a `progress denoise <scene>: ...` line first (browser-check.mjs shows it with the time), so a
+ // slow or stalled run says which scene and which render it is in: on an Intel Arc 140V the case went silent for 728 s.
+ async denoise(...names){
   const out={};
-  for(const name of ['diffuse','opaque','materials','caustics']){
+  for(const name of names.length?names:['diffuse','opaque','materials','caustics']){
+   if(!scenes[name])throw new RangeError(`denoise: no scene ${name}; use diffuse, opaque, materials or caustics`);
+   const step=(text)=>console.log(`progress denoise ${name}: ${text}`);
    look([18,14,26],[-3,3,-2]);
+   step('compiling the tracer');
    out[name]=await withTracer(scenes[name](),{},async(t)=>{
-    const W=480,H=300,reference=await t.renderImage({width:W,height:H,samples:16384,seed:99,aovs:true}),ids=reference.instance,edge=new Uint8Array(W*H);
+    const W=480,H=300;
+    step(`reference, ${W}x${H} at 16384 spp`);
+    const reference=await t.renderImage({width:W,height:H,samples:16384,seed:99,aovs:true}),ids=reference.instance,edge=new Uint8Array(W*H);
     // The glass scenes' reference: the mean of two halves, whose difference measures the reference's own noise (it
     // adds to every error measured against it: refNoise^2).
     let refNoise=0;
     if(name==='materials'||name==='caustics'){
+     step(`second reference half, ${W}x${H} at 16384 spp`);
      const b=await t.renderImage({width:W,height:H,samples:16384,seed:98});let se=0;
      for(let i=0;i<W*H;i++){const d=neutral(lum(reference.color,i))-neutral(lum(b.color,i));se+=d*d;}
      for(let k=0;k<W*H*3;k++)reference.color[k]=(reference.color[k]+b.color[k])/2;
@@ -960,7 +969,10 @@ window.check={
     const masked=(a,m)=>{let se=0,n=0;for(let i=0;i<W*H;i++){if(!m(i))continue;const d=neutral(lum(a.color,i))-neutral(lum(reference.color,i));se+=d*d;n++;}return Math.sqrt(se/n);};
     const r={edgePixels:edge.reduce((a,b)=>a+b,0),refNoise};
     for(const n of [4,16,64,1024]){
-     const raw=await t.renderImage({width:W,height:H,samples:n,seed:1}),den=await t.renderImage({width:W,height:H,samples:n,seed:1,denoise:true});
+     step(`${n} spp raw`);
+     const raw=await t.renderImage({width:W,height:H,samples:n,seed:1});
+     step(`${n} spp denoised`);
+     const den=await t.renderImage({width:W,height:H,samples:n,seed:1,denoise:true});
      r[n]={raw:masked(raw,()=>true),denoised:masked(den,()=>true),rawEdges:masked(raw,(i)=>edge[i]),denoisedEdges:masked(den,(i)=>edge[i])};
     }
     return r;

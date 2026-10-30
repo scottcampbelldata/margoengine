@@ -290,7 +290,7 @@ test('split steps cover the whole suite: every voxel path tracer case, both beve
   const tests = plan(),
     byId = (id) => tests.find((t) => `${t.dir}/${t.script}` === id);
   const source = readFileSync(join(root, 'packages/voxel-pathtracer/tests/browser-check.mjs'), 'utf8'),
-    cases = [...source.matchAll(/wanted\('(\w+)'\)/g)]
+    cases = [...source.matchAll(/wanted\('([\w-]+)'\)/g)]
       .map((m) => m[1])
       .filter((n) => n !== 'pictures' && n !== 'timing'),
     pt = splitSteps(byId('voxel-pathtracer/test:gpu')),
