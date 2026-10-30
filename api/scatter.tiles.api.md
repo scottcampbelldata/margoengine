@@ -75,6 +75,11 @@ class Scatter implements EnginePlugin {
     protected extraChanged: boolean;
     protected dispatched(): number;
     protected beforeDistribute(_c: ScatterPassContext): void;
+    prepareShadow({ context, matrices, cascades }: {
+        context: ScatterPassContext;
+        matrices: Float32Array;
+        cascades: number;
+    }): void;
     drawShadow({ context, pass, matrix, cascade }: {
         context: ScatterPassContext;
         pass: GPURenderPassEncoder;

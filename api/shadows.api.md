@@ -41,6 +41,12 @@ export interface ShadowOptions {
     cascades?: number;
 }
 
+export interface ShadowPrepareContext {
+    context: ShadowPassContext;
+    matrices: Float32Array;
+    cascades: number;
+}
+
 export interface ShadowPrimitive {
     primitive?: object;
     node: Mesh;
@@ -73,6 +79,7 @@ export interface ShadowSource {
     shadowPrimitives?: readonly ShadowPrimitive[];
     shadowVersion?: number;
     drawShadow?(context: ShadowContext): void;
+    prepareShadow?(context: ShadowPrepareContext): void;
     addLighting?(effect: Shadows): () => void;
     disposed?: boolean;
 }

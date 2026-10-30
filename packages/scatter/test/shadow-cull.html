@@ -4,6 +4,7 @@
 // its scatters added to Shadows (culled per cascade by prepareShadow) and with the same scatters behind a plain
 // drawShadow wrapper (no prepareShadow: every cascade draws every camera-culled instance). The shadow maps and the
 // frames are read back for comparison. Rendering uses delta 0, so wind time and every other input stay the same.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {Engine,Geometry,box} from '/packages/core/dist/index.js';
 import {Scatter} from '/packages/scatter/dist/index.js';
 import {ScatterTiles} from '/packages/scatter/dist/tiles.js';
@@ -43,7 +44,7 @@ function raised(g,y){
  return new Geometry(p,m,g.indices);
 }
 let scatters=[],removers=[];const saved={};
-const frames=async()=>{for(let i=0;i<3;i++){engine.render({delta:0});await device.queue.onSubmittedWorkDone();}};
+const frames=()=>waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
 const read=async(buffer,size)=>{
  const out=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();
  e.copyBufferToBuffer(buffer,0,out,0,size);device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);
