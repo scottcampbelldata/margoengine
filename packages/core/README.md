@@ -134,6 +134,22 @@ engine.start();
 - The cause is the driver, not the page. A page that shows many engines (a gallery) should start them one at a time,
   each after the previous has drawn, and dispose engines that leave the screen.
 
+## Choosing the GPU
+
+On a laptop with an integrated and a discrete GPU, `powerPreference` picks one: `'low-power'` saves battery,
+`'high-performance'` asks for the discrete GPU. It is asked again when the device is restored.
+
+```ts
+import { Engine } from '@margoengine/core';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { powerPreference: 'low-power' });
+```
+
+- Default: unset. Core then asks for `'high-performance'`, except on Windows, where it asks for nothing.
+- Chrome and Edge on Windows ignore a set value and log a console warning; choose the GPU per browser in Windows
+  Settings > System > Display > Graphics there.
+
 ## Ambient RGB
 
 Extension users can tint core's diffuse ambient independently of the directional light:

@@ -100,6 +100,12 @@ the stage (`@margoengine/stage/gltf` `addGLTF`, `/sky` `addSky`, `/particles` `a
 plain `import()`), and the root gained `stage.signal`. The stage root shrank (core + stage 22,781 -> 21,910 B gzip).
 Core is untouched. The exception covers this one change; the freeze applies again after it.
 
+**Exception, `powerPreference` (Scott, 2026-10-29, "do the core add i agree"):** core gains one option,
+`EngineOptions.powerPreference` (`'low-power'` | `'high-performance'`), which `GPURenderer.create` passes to
+`requestAdapter` at creation and again on device restore, so an app can pick the integrated or discrete GPU on a
+two-GPU PC. Unset keeps the old request (`'high-performance'`, nothing on Windows). Cost: core 21,077 -> 21,106 B gzip, core + stage 22,494 -> 22,524 B. The exception
+covers this one option; the freeze applies again after it.
+
 ## Names exported by more than one package
 
 A name declared and exported by two packages must mean the same thing, or be renamed. Decisions:

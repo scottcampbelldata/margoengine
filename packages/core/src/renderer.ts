@@ -155,7 +155,7 @@ export interface Renderer {
   dispose(unconfigure?: boolean): void;
 }
 
-type StartupOptions = Pick<EngineOptions, 'signal' | 'startupWarning' | 'startupTimeout'>;
+type StartupOptions = Pick<EngineOptions, 'signal' | 'startupWarning' | 'startupTimeout' | 'powerPreference'>;
 /**
  * One WebGPU startup step that a driver may never settle (several live WebGPU pages in one browser process stalled
  * requestDevice and pipeline compiles on an Intel Arc 140V, with no error): warns once after `startupWarning` ms,
@@ -253,10 +253,18 @@ export class GPURenderer implements Renderer {
     startup: StartupOptions = {},
   ): Promise<GPURenderer> {
     const gpu = navigator.gpu,
+      power = startup.powerPreference,
       adapter =
         gpu &&
         (await settle(
-          gpu.requestAdapter(/Win/.test(navigator.userAgent) ? {} : { powerPreference: 'high-performance' }),
+          // Unset: high-performance, except on Windows, where browsers ignore it and log a console warning.
+          gpu.requestAdapter(
+            power
+              ? { powerPreference: power }
+              : /Win/.test(navigator.userAgent)
+                ? {}
+                : { powerPreference: 'high-performance' },
+          ),
           'requestAdapter',
           startup,
         ));

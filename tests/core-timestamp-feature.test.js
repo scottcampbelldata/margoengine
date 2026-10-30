@@ -143,6 +143,31 @@ test('renderer asks for the high-performance adapter except on Windows, where br
   }
 });
 
+test('EngineOptions.powerPreference reaches requestAdapter on every OS and again on device restore', async (t) => {
+  const dom = new JSDOM('<body></body>');
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  t.after(() => dom.window.close());
+  for (const userAgent of [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0',
+    'Mozilla/5.0 (Macintosh) Chrome/130.0',
+  ])
+    for (const powerPreference of ['low-power', 'high-performance']) {
+      const h = harness(t, []),
+        asked = [],
+        request = navigator.gpu.requestAdapter;
+      navigator.gpu.requestAdapter = (options) => (asked.push(options), request());
+      Object.defineProperty(navigator, 'userAgent', { configurable: true, value: userAgent });
+      const engine = await EngineKernel.create(h.canvas, { capacity: 1, backend: 'webgpu', powerPreference });
+      try {
+        await engine.rebootDevice();
+        assert.deepEqual(asked, [{ powerPreference }, { powerPreference }], `${powerPreference} on ${userAgent}`);
+      } finally {
+        engine.dispose();
+        h.restore();
+      }
+    }
+});
+
 test('renderer preserves the adapter texture-array capability for optional packages', async (t) => {
   for (const maxTextureArrayLayers of [256, 2048]) {
     const h = harness(t, []);

@@ -43,6 +43,13 @@ export interface EngineOptions {
    * 'auto'` then uses `fallback`. Some drivers stall the 3rd or 4th live WebGPU page in one browser. Default 30000.
    */
   startupTimeout?: number;
+  /**
+   * Which GPU to ask the browser for on a PC with two: 'high-performance' (the discrete GPU) or 'low-power' (the
+   * integrated one, which saves battery). Also used when the device is restored. A set value is always passed, but
+   * Chrome and Edge on Windows ignore it and log a warning; choose the GPU in Windows graphics settings there. Default
+   * unset: 'high-performance', and nothing on Windows (so no warning).
+   */
+  powerPreference?: GPUPowerPreference;
 }
 /** Called by the frame loop before each render with the seconds since the previous frame (0 on the first, at most 0.1). */
 export type FrameCallback = (engine: Engine, delta: number) => void;
@@ -395,6 +402,7 @@ export class Engine {
   private readonly claims = new WeakMap<Batch, Map<Scene, [boolean?, Batch['redirect']?]>>();
   /** @internal Features requested at creation, requested again when the device is restored. */ features?: GPUFeatureName[];
   /** @internal 1 for `exactSize` (no MSAA, no resize), else undefined (the quality tier's samples). */ exact?: 1;
+  /** @internal `powerPreference` from creation, asked again when the device is restored. */ power?: GPUPowerPreference;
   get frameGraph(): FrameGraph {
     return this.active.frameGraph;
   }
@@ -445,6 +453,7 @@ export class Engine {
       const engine = new Engine(canvas, store, renderer, options.camera, fallbackReason);
       engine.features = options.features;
       engine.exact = exact;
+      engine.power = options.powerPreference;
       return engine;
     } catch (error) {
       renderer?.dispose();
@@ -476,7 +485,7 @@ export class Engine {
     if (this.recovery) return this.recovery;
     this.recovery = (async () => {
       const previous = this.renderer,
-        next = await GPURenderer.create(this.canvas, this.features, this.exact);
+        next = await GPURenderer.create(this.canvas, this.features, this.exact, { powerPreference: this.power });
       if (this.disposed || this.disposing) {
         next.dispose();
         return;
