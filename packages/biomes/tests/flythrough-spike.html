@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Biome flythrough spike diag</title><style>body{margin:0}canvas{display:block;width:640px;height:360px}</style></head><body><canvas></canvas>
+<script type="module">
+// DIAGNOSTIC (temporary, never land): the slowSends flight of flythrough-check, timed step by step. Per frame of the
+// view's plugin: its total time, whether it planned, every step it took (sends, texture writes with bytes, objects
+// steps), the longest gap between two clock reads inside the simulated sends and writes (a gap there is the thread
+// not running: the OS took it away), the JS heap before and after, and user-timing marks around it for the trace.
+import {Engine} from '/packages/core/dist/index.js';
+import {BiomeWorld} from '/packages/biomes/dist/index.js';
+import {BiomeView} from '/packages/biomes/dist/view.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[-1200,260,-1200],target:[-1100,200,-1100],near:0.5,far:4000}}),device=engine.gpu;
+const SPEED=83.3,FROM=[-1200,-1200],TO=[1200,1200],LENGTH=Math.hypot(TO[0]-FROM[0],TO[1]-FROM[1]);
+const place=(s)=>{const t=Math.min(1,s/LENGTH),x=FROM[0]+(TO[0]-FROM[0])*t,z=FROM[1]+(TO[1]-FROM[1])*t;engine.camera.position[0]=x;engine.camera.position[1]=260;engine.camera.position[2]=z;engine.camera.target[0]=x+70;engine.camera.target[1]=200;engine.camera.target[2]=z+70;};
+const frame=()=>new Promise((done)=>requestAnimationFrame(done));
+const heap=()=>performance.memory?.usedJSHeapSize??-1;
+let flightNo=0;
+window.spike=async function(SEND,COPY,PACE=0){
+ const F=flightNo++;
+ let inView=false,gap=0,ev=null,t0=0;const queue=device.queue,writeTexture=queue.writeTexture;
+ const spin=(ms)=>{let p=performance.now();const end=p+ms;for(;;){const n=performance.now();if(inView&&n-p>gap)gap=n-p;p=n;if(n>=end)break;}};
+ queue.writeTexture=function(dst,data,layout,size){const a=performance.now(),rows=size[1]??size.height??1,kb=(layout.bytesPerRow??0)*rows/1024;spin(COPY*kb);const r=writeTexture.call(this,dst,data,layout,size);if(inView){const d=performance.now()-a;ev.push(['w:'+dst.texture.format,a-t0,d,Math.round(kb),d-COPY*kb]);}return r;};
+ const createWorker=()=>{const w=new Worker('/packages/biomes/dist/workers/biomes.js',{name:'margoengine-biomes'}),post=w.postMessage.bind(w);w.postMessage=(m,t)=>{const a=performance.now();spin(SEND);post(m,t);if(inView){const d=performance.now()-a;ev.push(['post:'+m.op,a-t0,d,0,d-SEND]);}};return w;};
+ const world=await BiomeWorld.create({workers:4,createWorker});place(0);
+ const view=await BiomeView.attach(engine,world);await view.ready;
+ const run=world.workers.run.bind(world.workers);world.workers.run=(...a)=>{const s=performance.now(),r=run(...a);if(inView)ev.push(['run:'+a[0].op,s-t0,performance.now()-s,0]);return r;};
+ const proto=Object.getPrototypeOf(view.objects),steps=proto.steps;
+ proto.steps=function(...a){return steps.apply(this,a).map((f,i,all)=>()=>{const s=performance.now();f();if(inView)ev.push(['obj:'+(i===all.length-1?'last':i),s-t0,performance.now()-s,0]);});};
+ const plugin=[...engine.plugins.values()].find((p)=>p.name.startsWith('biomes-view:')),own=plugin.onPreUpdate,frames=[];
+ let idx=0,lastIv=0;
+ plugin.onPreUpdate=(delta)=>{
+  const p0=view.streaming.plans,a0=view.streaming.arrived,posts0=world.workers.posts,h0=heap();ev=[];gap=0;
+  performance.mark(`vs${F}_${idx}`);t0=performance.now();inView=true;own(delta);inView=false;const total=performance.now()-t0;
+  performance.mark(`ve${F}_${idx}`);
+  frames.push({i:idx++,total,plan:view.streaming.plans>p0,arrived:a0,pending:world.workers.pending,posts:world.workers.posts-posts0,gap,h0,h1:heap(),ev,iv:lastIv});
+ };
+ for(let i=0;i<10;i++){await frame();engine.render({delta:1/60});}
+ await view.whenIdle();frames.length=0;idx=0;
+ let s=0,last=await frame();const wall0=performance.now();
+ while(s<LENGTH/3){if(PACE)await new Promise((d)=>setTimeout(d,PACE));const now=await frame(),dt=Math.min(0.1,(now-last)/1000);lastIv=now-last;last=now;s+=SPEED*dt;place(s);engine.render({delta:dt});}
+ const wall=performance.now()-wall0;
+ delete queue.writeTexture;proto.steps=steps;view.dispose();world.dispose();
+ return {flight:F,wall,frames};
+};
+window.ready=true;
+</script></body></html>
