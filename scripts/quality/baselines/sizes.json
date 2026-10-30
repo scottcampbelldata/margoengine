@@ -1094,6 +1094,12 @@
       "commit": "977870d25",
       "reason": "sky/fog over by 5 B: fog on a 4x capture reads this frame's depth (plaza-tear-report.md, e003bbc24)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "beff7850",
+      "reason": "shadows: the WebGL2 layer route for the PCSS nearest-depth reduction, which ran on the layer CPU tier at about 0.5 s a frame",
+      "grew": 1
     }
   ],
   "items": {

@@ -52,6 +52,18 @@ test('DOF: the CoC, tile and bokeh kernels without workgroup memory run as fragm
   });
 });
 
+test('Shadows: the nearest-depth reduction without workgroup memory or atomics runs on the GPU', async () => {
+  const shadows = await route('shadows');
+  assert.equal(planCompute({ source: shadows.blockShader, entryPoint: 'main' }).tier, 'fragment', 'map blocks');
+  assert.equal(planCompute({ source: shadows.levelShader, entryPoint: 'main' }).tier, 'fragment', 'level blocks');
+  assert.equal(planCompute({ source: shadows.wordShader, entryPoint: 'main' }).tier, 'scatter', 'one word per layer');
+  assert.doesNotMatch(shadows.blockShader + shadows.levelShader + shadows.wordShader, /var<workgroup>|atomic/);
+  // The kernel the route replaces is on the CPU tier, which made every soft-shadow frame with a moving caster read
+  // the whole map back (about 0.5 s a frame for 2048 x 2048).
+  const { nearestDepth } = await import('../../shadows/src/shader.ts');
+  assert.equal(planCompute({ source: nearestDepth, entryPoint: 'main' }).tier, 'cpu');
+});
+
 test('splats: one CPU invocation sorts the projected keys in the order of the 8-pass GPU radix sort', async () => {
   const { cpuSort } = await route('splats');
   assert.equal(planCompute({ source: cpuSort, entryPoint: 'main' }).tier, 'cpu');

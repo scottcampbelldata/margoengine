@@ -23,6 +23,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth, nearestDepth, type ShadowFilter } from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { loadCompatRoute } from '../../shared/compat.js';
 import { hypot, hypotOf, hypotTerms } from '../../shared/hypot.js';
 import {
   casterBuffers,
@@ -262,6 +263,11 @@ export class Shadows implements EnginePlugin {
   private nearestBuffer?: GPUBuffer;
   private nearestPipeline?: GPUComputePipeline;
   private nearestGroup?: GPUBindGroup;
+  /**
+   * On the WebGL2 compatibility layer, the nearest-depth reduction without workgroup memory or atomics (./compat.js,
+   * loaded only there); until it has loaded, the WebGPU kernel runs (on the layer's CPU tier, slowly).
+   */
+  private nearestRoute?: import('./compat.js').NearestRoute;
   /** The map changed since the last reduction (while the filter was not `'soft'`, or before the first frame). */
   private nearestStale = true;
   private readonly nearestSeed = new Uint32Array(4).fill(0x3f800000);
@@ -605,6 +611,10 @@ export class Shadows implements EnginePlugin {
       );
     this.engine = engine;
     this.device = engine.gpu;
+    const device = this.device;
+    loadCompatRoute(device, () => import('./compat.js'))?.then(({ NearestRoute }) => {
+      if (this.device === device) this.nearestRoute = new NearestRoute(device);
+    });
     this.validate();
     this.checkLimits();
     for (const r of this.sources)
@@ -923,6 +933,19 @@ export class Shadows implements EnginePlugin {
       ],
     });
     device.queue.writeBuffer(this.nearestBuffer!, 0, this.nearestSeed);
+    if (this.nearestRoute) {
+      this.nearestRoute.encode(
+        c.encoder,
+        this.combinedView!,
+        this.width,
+        this.height,
+        this.cascadeCount,
+        this.nearestBuffer!,
+      );
+      c.encoder.copyBufferToBuffer(this.nearestBuffer!, 0, this.uniform!, 368, 16);
+      this.nearestStale = false;
+      return;
+    }
     const pass = c.encoder.beginComputePass();
     pass.setPipeline(this.nearestPipeline);
     pass.setBindGroup(0, this.nearestGroup);
@@ -1415,7 +1438,8 @@ export class Shadows implements EnginePlugin {
     for (const texture of [this.cached, this.combined, this.white]) texture?.destroy();
     this.uniform?.destroy();
     this.nearestBuffer?.destroy();
-    this.nearestBuffer = this.nearestPipeline = this.nearestGroup = this.combinedView = undefined;
+    this.nearestRoute?.destroy();
+    this.nearestBuffer = this.nearestPipeline = this.nearestGroup = this.combinedView = this.nearestRoute = undefined;
     this.nearestStale = true;
     this.cached = this.combined = this.white = undefined;
     this.whiteView = undefined;

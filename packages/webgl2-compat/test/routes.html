@@ -39,6 +39,9 @@ const routes = {
   instances: { fragment: 0, scatter: 0, cpu: 0 },
   meshes: { fragment: 0, scatter: 0, cpu: 0 },
   dynamic: { fragment: 0, scatter: 0, cpu: 0 },
+  // Nearest depth: 2048 to 128 to 8 texels, then one word per layer. The casters stand still, so it runs once: the
+  // totals since the start are checked (no CPU-tier dispatch at all).
+  shadows: { fragment: 2, scatter: 1, cpu: 0, once: true },
 };
 const cases = {
   async dof(engine) {
@@ -64,6 +67,15 @@ const cases = {
     for (let i = 0; i < 2000; i++)
       transforms.set([0.3, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0.3, 0, (i % 50) * 0.5 - 12, 0.2, -Math.floor(i / 50) * 0.5 + 4, 1], i * 16);
     CulledInstances.attach(engine, [{ geometry: box(1, 1, 1), material: new PbrMaterial({ color: '#c08040' }), transforms }]);
+  },
+  // Soft shadows with dynamic casters (not `static`), so the nearest-depth reduction runs every frame.
+  async shadows(engine) {
+    boxes(engine);
+    const floor = engine.createMesh().setGeometry(box(14, 0.2, 14)).setMaterial(new PbrMaterial({ color: '#8090a0' })).setPosition([0, -0.1, -4]);
+    const { Shadows } = await import('/packages/shadows/dist/index.js');
+    const shadows = Shadows.attach(engine, { resolution: 2048, distance: 30 });
+    shadows.add(floor, { static: true });
+    for (const mesh of engine.scene.meshes.values()) if (mesh !== floor) shadows.add(mesh);
   },
   async meshes(engine) {
     boxes(engine, 40);
@@ -111,9 +123,9 @@ async function main() {
     async route() {
       await frame();
       if (mode !== 'compat') return { frames: 1 };
-      const want = routes[name];
+      const { once, ...want } = routes[name];
       for (let frames = 1; frames < 200; frames++) {
-        const before = { ...device().dispatches }, stalls = device().stalls;
+        const before = once ? { fragment: 0, scatter: 0, cpu: 0 } : { ...device().dispatches }, stalls = device().stalls;
         await frame();
         const got = Object.fromEntries(Object.entries(device().dispatches).map(([k, v]) => [k, v - before[k]]));
         if (JSON.stringify(got) === JSON.stringify(want)) return { frames, dispatches: got, stalls: device().stalls - stalls };

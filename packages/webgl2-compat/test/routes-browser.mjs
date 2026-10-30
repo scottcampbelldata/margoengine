@@ -56,7 +56,7 @@ function compare(a, b) {
 }
 
 try {
-  for (const name of ['dof', 'splats', 'instances', 'meshes', 'dynamic']) {
+  for (const name of ['dof', 'splats', 'instances', 'meshes', 'dynamic', 'shadows']) {
     const native = await render('native', name);
     const compat = await render('compat', name);
     const m = compare(native.image, compat.image);
