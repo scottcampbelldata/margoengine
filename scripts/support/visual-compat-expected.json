@@ -192,9 +192,8 @@
    "exact": true
   },
   "sciviz-points": {
-   "status": "differs",
-   "over2": 0.00203,
-   "mean": 0.266
+   "status": "same",
+   "exact": true
   },
   "sciviz-surface": {
    "status": "webgpu only"

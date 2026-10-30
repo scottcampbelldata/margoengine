@@ -745,16 +745,17 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   installs it with no uncaught error, and that without WebGL2 as well the old message shows.
 - **Every demo compared** (`npm run visual:compat`, in `check:merge`; table in
   [webgl2-compat-demos.md](webgl2-compat-demos.md)): 60 demos, 28 site demos and 32 Khronos gallery models. All 32
-  models and 17 site demos draw the same pixels as native WebGPU by the parity rule (decision 4); 9 site demos run
+  models and 18 site demos draw the same pixels as native WebGPU by the parity rule (decision 4); 8 site demos run
   with differences the table states (0.2% to 7.1% of pixels with d > 2, causes open in
   [known-bugs.md](known-bugs.md)); compute lab (wrong Philox data on the layer) and sciviz surface (does not start:
   "Uniform p.time is missing") are kept on WebGPU only, with the message, until their bugs are fixed. Main-thread work
   per still frame on the layer: 0.2 to 9.9 ms (native 0.2 to 1.2 ms).
-- **Exact still frames.** 53 of the 60 demos capture the same pixels twice natively, and the check fails when one of
+- **Exact still frames.** 54 of the 60 demos capture the same pixels twice natively, and the check fails when one of
   them stops doing so, so native noise cannot flip a status. ui-game, weather and animator still moved with real time
   under reduced motion (their status flipped between runs); they now hold still and draw the same pixels on the layer.
-  Five still show native noise: gameplay sandbox and two Khronos models (no pixel with d > 2), sciviz points (0.01%
-  of pixels with d > 2) and light keeper (0.03%).
+  Sciviz points differed only in its status line, which states how long the plot took; the check paints it over
+  (and light keeper's live performance panel), and sciviz points now draws the same pixels on the layer. Four still
+  show native noise: gameplay sandbox and two Khronos models (no pixel with d > 2) and light keeper (0.03%).
 - **Shadows route (bug found by the run).** Soft shadows reduce each map layer to its nearest depth with workgroup
   memory and atomics, so the layer ran it on the CPU tier, reading the whole 2048 x 2048 map back every frame with a
   dynamic caster: 480 ms a frame for batched mesh and clipping planes, 168 ms for character animation. The route

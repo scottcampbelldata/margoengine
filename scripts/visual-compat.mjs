@@ -63,9 +63,12 @@ export const extraDemos = [
     id,
     path: `demos/${id}.html`,
     ready: "document.querySelector('canvas')?.dataset.ready==='true'",
+    // Live timings painted over (they change run to run): sciviz points states how long its plot took.
+    mask: id === 'sciviz-points' ? ['#status'] : [],
   })),
   { id: 'animator', path: 'demos/animator/', ready: '!!window.animatorDemo' },
-  { id: 'light-keeper', path: 'demos/light-keeper/', ready: viewportReady },
+  // The workshop's live performance panel (frame times, heap) is painted over.
+  { id: 'light-keeper', path: 'demos/light-keeper/', ready: viewportReady, mask: ['#workshop-performance-panel'] },
 ];
 // One view per demo: the desktop one (the gallery's model view). The robot page is character-animation's old URL.
 const allCases = [...demos, ...extraDemos]
