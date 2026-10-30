@@ -1,0 +1,26 @@
+{
+ "source": "make-crest-fixture.mjs: @margoengine/biomes alpine preset world",
+ "origin": [
+  -1800,
+  -1600
+ ],
+ "count": [
+  426,
+  201
+ ],
+ "step": 2,
+ "offset": 2320,
+ "scale": 0.013107499809262227,
+ "camera": {
+  "position": [
+   -893.9546742186596,
+   2386.334,
+   -693.7088271936798
+  ],
+  "target": [
+   -2000,
+   3252.843,
+   -1552
+  ]
+ }
+}

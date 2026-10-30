@@ -11,21 +11,27 @@ import { pbrShader, extendedPBRShader } from '../packages/gltf-pro/src/shader.ts
 import { terrainFragment } from '../packages/terrain/src/shader.ts';
 
 const hdr = core.replace(/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
-const targets = { core, hdr, meshVertex, gltf: pbrShader, gltfExtended: extendedPBRShader, terrain: terrainFragment };
+const targets = { core, hdr, meshVertex, gltf: pbrShader, gltfExtended: extendedPBRShader, terrain: terrainFragment() };
+// Terrain with TerrainLayer.bump or macro: its shading lines change, so its anchors are held to the same contracts.
+targets.terrainSurface = terrainFragment(true);
 const linearBlock = /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/;
 // [package source file, target shader, anchor]; strings must occur in the target, regexes must match it.
 const contracts = [
   ['shadows/src/index.ts', 'core', 'let linear=direct*'],
   ['shadows/src/index.ts', 'terrain', 'let linear=direct*'],
+  ['shadows/src/index.ts', 'terrainSurface', 'let linear=direct*'],
   ['clustered/src/index.ts', 'core', /let linear=([^;]+);/],
   ['clustered/src/index.ts', 'terrain', /let linear=([^;]+);/],
+  ['clustered/src/index.ts', 'terrainSurface', /let linear=([^;]+);/],
   ['clustered/src/index.ts', 'terrain', 'let base=terrainColor'],
+  ['clustered/src/index.ts', 'terrainSurface', 'let base=terrainColor'],
   ['environment/src/lighting.ts', 'core', /let linear=([^;]+);/],
   ['environment/src/lighting.ts', 'core', 'frame.radiance.w'],
   ['environment/src/lighting.ts', 'core', 'let mapped=pbrNeutral(max(linear,vec3f(0)));'],
   ['environment/src/lighting.ts', 'hdr', 'return vec4f(linear,1);'],
   ['environment/src/hemisphere.ts', 'core', /\*frame\.radiance\.w(?:\*frame\.ambient\.rgb)?/],
   ['environment/src/hemisphere.ts', 'terrain', /\*frame\.radiance\.w(?:\*frame\.ambient\.rgb)?/],
+  ['environment/src/hemisphere.ts', 'terrainSurface', /\*frame\.radiance\.w(?:\*frame\.ambient\.rgb)?/],
   ['sky/src/lighting.ts', 'core', 'frame.radiance.w'],
   ['taa/src/index.ts', 'core', 'o.clip=frame.camera*p'],
   // post (stack, bloom, ssao), creative post, DOF, tonemap and environment captures: shared/display.js linearShader.

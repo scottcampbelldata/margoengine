@@ -92,6 +92,8 @@ export interface TerrainLayer {
     height: readonly [number, number];
     slope: readonly [number, number];
     scale: number;
+    bump?: number;
+    macro?: number;
 }
 
 export interface TerrainLighting {

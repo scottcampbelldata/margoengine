@@ -1,0 +1,58 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Terrain bump and macro check</title><style>body{margin:0}canvas{display:block;width:256px;height:256px}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Real-GPU check for TerrainLayer.bump and macro (bump.browser.mjs reads the results): flat ground, every layer the same
+// grey value-noise texture (4, 16 and 64 cells over one repeat, a full mip chain), the sun 30 degrees up. Each call
+// attaches a terrain with the given layer options, renders once every pipeline is ready, and keeps the canvas pixels.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine} from '/packages/core/dist/index.js';
+import {Terrain} from '/packages/terrain/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[],kept=new Map();
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,6,10],target:[0,0,0],near:0.5,far:2000}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([0.75,0.5,-0.43]);
+// Tileable value noise, 0..1: a hash per lattice point (wrapped to `cells`), smoothstep between them.
+const hash=(x,y,s)=>{let h=(x*374761393+y*668265263+s*982451653)|0;h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967296;};
+const noise=(x,y,cells,s)=>{const f=x*cells/256,g=y*cells/256,i=Math.floor(f),j=Math.floor(g),u=f-i,v=g-j,a=u*u*(3-2*u),b=v*v*(3-2*v),w=(p,q)=>hash(((i+p)%cells+cells)%cells,((j+q)%cells+cells)%cells,s);
+  return (w(0,0)*(1-a)+w(1,0)*a)*(1-b)+(w(0,1)*(1-a)+w(1,1)*a)*b;};
+const levels=[new Uint8Array(256*256*4)];
+for(let y=0;y<256;y++)for(let x=0;x<256;x++){const n=(noise(x,y,4,1)*2+noise(x,y,16,2)+noise(x,y,64,3)*0.5)/3.5,k=(y*256+x)*4,v=Math.round(255*(0.25+0.5*n));levels[0].set([v,v,v,255],k);}
+for(let s=128;s>=1;s>>=1){const p=levels[levels.length-1],q=new Uint8Array(s*s*4),w=s*2;for(let y=0;y<s;y++)for(let x=0;x<s;x++)for(let c=0;c<4;c++){const a=(2*y*w+2*x)*4+c;q[(y*s+x)*4+c]=(p[a]+p[a+4]+p[a+w*4]+p[a+w*4+4]+2)>>2;}levels.push(q);}
+const views={near:{position:[0,6,10],target:[0,0,0]},far:{position:[0,60,20],target:[0,0,0]}};
+window.check={
+  // Attaches a terrain with `layer` options on every layer, renders it from `view` and keeps its pixels as `name`.
+  // `weighted`: through painted weights (two rgba8unorm textures, layer 0 everywhere), as @margoengine/biomes/view draws.
+  async show(name,layer,view,weighted=false){
+    const camera=views[view];engine.camera.position=[...camera.position];engine.camera.target=[...camera.target];
+    device.pushErrorScope('validation');
+    const terrain=Terrain.attach(engine,{origin:[-200,-200],size:[400,400],heightScale:1,
+      layers:Array.from({length:4},()=>({height:[-100,100],slope:[0,1],scale:0.25,...layer})),
+      textures(gpu){
+        const heightmap=gpu.createTexture({size:[8,8],format:'r32float',usage:6}),layers=gpu.createTexture({size:[256,256,4],format:'rgba8unorm',usage:6,mipLevelCount:9});
+        gpu.queue.writeTexture({texture:heightmap},new Float32Array(64),{bytesPerRow:32},[8,8]);
+        levels.forEach((data,mip)=>{const s=256>>mip;for(let l=0;l<4;l++)gpu.queue.writeTexture({texture:layers,mipLevel:mip,origin:[0,0,l]},data,{bytesPerRow:s*4,rowsPerImage:s},[s,s,1]);});
+        if(!weighted)return {heightmap,layers};
+        const weights=[0,1].map(i=>{const w=gpu.createTexture({size:[1,1],format:'rgba8unorm',usage:6});gpu.queue.writeTexture({texture:w},new Uint8Array([i?0:255,0,0,0]),{bytesPerRow:4},[1,1]);return w;});
+        return {heightmap,layers,weights};
+      }});
+    await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+    // Read in the task that renders: a WebGPU canvas keeps its frame only until that task ends.
+    engine.render({delta:0});const c=new OffscreenCanvas(256,256).getContext("2d");c.drawImage(canvas,0,0);kept.set(name,c.getImageData(0,0,256,256).data);
+    terrain.dispose();
+    const e=await device.popErrorScope();if(e)errors.push(e.message);
+    return errors.splice(0);
+  },
+  // sRGB luma statistics of the lower 3/4 of a kept image (ground only): mean, deviation, and the deviation of the 48
+  // means of its 32 x 32 pixel blocks (large-scale variation; the 4 m texture repeat averages out inside a block).
+  stats(name){
+    const d=kept.get(name),luma=(x,y)=>{const k=(y*256+x)*4;return 0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2];};let sum=0,sq=0,n=0;const blocks=new Array(48).fill(0);
+    for(let y=64;y<256;y++)for(let x=0;x<256;x++){const v=luma(x,y);sum+=v;sq+=v*v;n++;blocks[((y-64)>>5)*8+(x>>5)]+=v/1024;}
+    const mean=sum/n,spread=v=>Math.sqrt(Math.max(0,v.reduce((a,b)=>a+b*b,0)/v.length-(v.reduce((a,b)=>a+b,0)/v.length)**2));
+    return {mean,deviation:Math.sqrt(Math.max(0,sq/n-mean*mean)),blocks:spread(blocks)};
+  },
+  // How many pixels of two kept images differ in any channel.
+  differ(a,b){const x=kept.get(a),y=kept.get(b);let n=0;for(let i=0;i<x.length;i+=4)if(x[i]!==y[i]||x[i+1]!==y[i+1]||x[i+2]!==y[i+2])n++;return n;},
+  // A kept image as a PNG data URL, for the evidence file.
+  async png(name){const c=new OffscreenCanvas(256,256),g=c.getContext('2d');g.putImageData(new ImageData(new Uint8ClampedArray(kept.get(name)),256,256),0,0);const b=await c.convertToBlob();return 'data:image/png;base64,'+btoa(String.fromCharCode(...new Uint8Array(await b.arrayBuffer())));},
+};
+window.ready=true;
+</script></body></html>

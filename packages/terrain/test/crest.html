@@ -1,0 +1,80 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Terrain bump crest check</title><style>body{margin:0}canvas{display:block;width:1440px;height:900px}</style></head><body><canvas width="1440" height="900"></canvas>
+<script type="module">
+// Real-GPU check for TerrainLayer.bump on edge-on crest slivers (crest.browser.mjs reads the results). The heights are
+// the biomes alpine world's crests that biome shot 05 looks at (fixtures/alpine-crest.*, made by
+// scripts/make-crest-fixture.mjs), seen from that shot's camera at 1440 x 900 under the noon sun (straight down,
+// intensity 3, ambient 0.04, as Sky at hours 12 lights it). Four layers like the alpine ground: meadow under 25
+// degrees, scree 25 to 40, rock over 35, snow over 2,800 m, each an sRGB value-noise texture of its colour; drawn by
+// rules or by painted weights (as @margoengine/biomes/view draws). Each call attaches a terrain with the given layer
+// options, renders once every pipeline is ready and counts dark specks.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine} from '/packages/core/dist/index.js';
+import {Terrain} from '/packages/terrain/dist/index.js';
+const W=1440,H=900,canvas=document.querySelector('canvas'),errors=[];
+const meta=await (await fetch('/packages/terrain/test/fixtures/alpine-crest.json')).json();
+const heights=Float32Array.from(new Uint16Array(await (await fetch('/packages/terrain/test/fixtures/alpine-crest.bin')).arrayBuffer()),(v)=>meta.offset+v*meta.scale);
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{...meta.camera,fov:60,near:0.3,far:20000}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([0,1,0,3]);engine.lighting.radiance.set([1,1,1,0.04]);engine.scene.background='#80a8e0';
+const [n,m]=meta.count,step=meta.step;
+// Ground layers: [linear colour, detail] for meadow, scree, rock and snow; slope bands are 1 - normal.y.
+const ground=[[[0.42,0.5,0.22],0.35],[[0.55,0.53,0.5],0.35],[[0.45,0.43,0.4],0.35],[[0.92,0.94,0.97],0.35]];
+const slope=(deg)=>1-Math.cos(deg*Math.PI/180);
+const rules=[{height:[-1e6,2800],slope:[0,slope(25)]},{height:[-1e6,2800],slope:[slope(25),slope(40)]},{height:[-1e6,2800],slope:[slope(35),1]},{height:[2800,1e6],slope:[0,1]}];
+// Tileable value noise, 0..1, on a `cells` lattice over 256 texels: a hash per lattice point, smoothstep between them.
+const hash=(x,y,s)=>{let h=(x*374761393+y*668265263+s*982451653)|0;h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967296;};
+const noise=(x,y,cells,s)=>{const f=x*cells/256,g=y*cells/256,i=Math.floor(f),j=Math.floor(g),u=f-i,v=g-j,a=u*u*(3-2*u),b=v*v*(3-2*v),w=(p,q)=>hash(((i+p)%cells+cells)%cells,((j+q)%cells+cells)%cells,s);
+  return (w(0,0)*(1-a)+w(1,0)*a)*(1-b)+(w(0,1)*(1-a)+w(1,1)*a)*b;};
+// One layer's 9 mip levels: its colour scaled by 1 + detail * (noise - 0.5) * 2, box-filtered down.
+const layerLevels=([color,detail],seed)=>{const levels=[new Uint8Array(256*256*4)];
+  for(let y=0;y<256;y++)for(let x=0;x<256;x++){const t=(noise(x,y,4,seed)*2+noise(x,y,16,seed+1)+noise(x,y,64,seed+2)*0.5)/3.5-0.5;levels[0].set([...color.map(c=>Math.min(255,Math.max(0,Math.round(c*255*(1+detail*t*2))))),255],(y*256+x)*4);}
+  for(let s=128;s>=1;s>>=1){const p=levels[levels.length-1],q=new Uint8Array(s*s*4),w=s*2;for(let y=0;y<s;y++)for(let x=0;x<s;x++)for(let c=0;c<4;c++){const a=(2*y*w+2*x)*4+c;q[(y*s+x)*4+c]=(p[a]+p[a+4]+p[a+w*4]+p[a+w*4+4]+2)>>2;}levels.push(q);}
+  return levels;};
+const pixels=ground.map((g)=>layerLevels(g,1));
+// Painted weights for the same bands, per texel from its central-difference slope (3 degrees and 20 m soft edges).
+const band=(v,a,b,e)=>Math.min(Math.max((v-a+e)/(2*e),0),1)*Math.min(Math.max((b+e-v)/(2*e),0),1);
+const painted=new Uint8Array(n*m*4);
+for(let j=0;j<m;j++)for(let i=0;i<n;i++){
+  const h=(a,b)=>heights[Math.min(m-1,Math.max(0,b))*n+Math.min(n-1,Math.max(0,a))],deg=Math.atan(Math.hypot(h(i+1,j)-h(i-1,j),h(i,j+1)-h(i,j-1))/(2*step))*180/Math.PI;
+  const snow=band(h(i,j),2800,1e6,20),w=[band(deg,-90,25,3),band(deg,25,40,3),band(deg,35,180,3)].map(v=>v*(1-snow)).concat(snow),total=w.reduce((a,b)=>a+b)||1;
+  painted.set(w.map(v=>Math.round(255*v/total)),(j*n+i)*4);}
+// sRGB luma of pixel (x, y) of kept RGBA bytes.
+const luma=(d,x,y)=>{const k=(y*W+x)*4;return 0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2];};
+window.check={
+  // Attaches the crest terrain with `layer` options on every layer (by `rules` or painted `weights`), renders it and
+  // returns the dark specks: pixels under 0.4 of their 5 x 5 neighbourhood's mean luma where that mean is over 40.
+  // `uncapped` patches in Mikkelsen's listing 1 as published (no slope cap), to show the scene has edge-on slivers.
+  async show(layer,weighted,uncapped=false){
+    device.pushErrorScope('validation');
+    const terrain=Terrain.attach(engine,{origin:meta.origin,size:[(n-1)*step,(m-1)*step],heightScale:1,cellSize:1,resolution:64,levels:6,
+      layers:rules.map(r=>({...r,scale:0.25,...layer})),
+      textures(gpu){
+        const heightmap=gpu.createTexture({size:[n,m],format:'r32float',usage:6}),layers=gpu.createTexture({size:[256,256,4],format:'rgba8unorm-srgb',usage:6,mipLevelCount:9});
+        gpu.queue.writeTexture({texture:heightmap},heights,{bytesPerRow:n*4,rowsPerImage:m},[n,m]);
+        pixels.forEach((levels,l)=>levels.forEach((data,mip)=>{const s=256>>mip;gpu.queue.writeTexture({texture:layers,mipLevel:mip,origin:[0,0,l]},data,{bytesPerRow:s*4,rowsPerImage:s},[s,s,1]);}));
+        if(!weighted)return {heightmap,layers};
+        const weights=[painted,new Uint8Array(n*m*4)].map(data=>{const w=gpu.createTexture({size:[n,m],format:'rgba8unorm',usage:6});gpu.queue.writeTexture({texture:w},data,{bytesPerRow:n*4,rowsPerImage:m},[n,m]);return w;});
+        return {heightmap,layers,weights};
+      }});
+    let patched=0;
+    if(uncapped)terrain.addLighting({bindings:()=>[],shader:(src)=>src.replace(/fn terrainBump\([^]*?\n\}/,()=>{patched++;return `fn terrainBump(position:vec3f,normal:vec3f)->vec3f {
+  let dx=dpdxFine(position);let dy=dpdyFine(position);let r1=cross(dy,normal);let r2=cross(normal,dx);let det=dot(dx,r1);
+  let bumped=abs(det)*normal-sign(det)*(dpdxFine(terrainRelief)*r1+dpdyFine(terrainRelief)*r2);
+  return select(normal,normalize(bumped),dot(bumped,bumped)>0.0);
+}`;})});
+    await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+    // Read in the task that renders: a WebGPU canvas keeps its frame only until that task ends.
+    engine.render({delta:0});const c=new OffscreenCanvas(W,H).getContext('2d');c.drawImage(canvas,0,0);const d=c.getImageData(0,0,W,H).data;
+    terrain.dispose();
+    const e=await device.popErrorScope();if(e)errors.push(e.message);
+    const specks=[];let ground=0;
+    for(let y=2;y<H-2;y++)for(let x=2;x<W-2;x++){
+      let sum=0;for(let j=-2;j<=2;j++)for(let i=-2;i<=2;i++)sum+=luma(d,x+i,y+j);
+      const k=(y*W+x)*4;if(d[k]!==0x80||d[k+1]!==0xa8||d[k+2]!==0xe0)ground++;
+      if(luma(d,x,y)<0.4*sum/25&&sum/25>40)specks.push([x,y]);
+    }
+    return {specks:specks.length,where:specks.slice(0,20),ground,patched:uncapped?patched>0:undefined,errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

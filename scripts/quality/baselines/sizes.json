@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3915730,
+  "total": 3916564,
   "history": [
     {
       "date": "2026-10-24",
@@ -908,6 +908,12 @@
       "commit": "0882df471",
       "reason": "biomes ecotone: painted edges blend over a feathered, warped box (biome look plan 2 item 4)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "0882df471",
+      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
+      "grew": 1
     }
   ],
   "items": {
@@ -1212,7 +1218,7 @@
     "@margoengine/staging": 6296,
     "@margoengine/stats": 4934,
     "@margoengine/taa": 10390,
-    "@margoengine/terrain": 11095,
+    "@margoengine/terrain": 11929,
     "@margoengine/text": 15890,
     "@margoengine/tiles": 14752,
     "@margoengine/tonemap": 11083,

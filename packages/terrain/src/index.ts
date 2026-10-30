@@ -11,7 +11,14 @@ import { finiteVector } from '@margoengine/math/validate';
 import { margoError } from '../../shared/errors.js';
 import { MargoError } from '@margoengine/math/errors';
 import { clipmapGrid } from './grid.js';
-import { terrainVertex, terrainFragment, terrainOutside, weightedFragment } from './shader.js';
+import {
+  surfaceStruct,
+  terrainVertex,
+  terrainFragment,
+  terrainOutside,
+  terrainShading,
+  weightedFragment,
+} from './shader.js';
 import { applyView } from '../../shared/view-rect.js';
 export { clipmapGrid } from './grid.js';
 export { TerrainColors, type TerrainColorOptions } from './colors.js';
@@ -45,6 +52,19 @@ export interface TerrainLayer {
   slope: readonly [number, number];
   /** Texture repeats per world unit, > 0. */
   scale: number;
+  /**
+   * Relief from the layer's own texture, 0 to 1: its luma becomes a height of up to `bump` halves of one texture repeat
+   * (2 m at scale 0.25), and the shading normal follows that height's slope (derivative bump mapping, Mikkelsen 2010).
+   * No extra texture samples; the mips flatten it with distance. Default 0 (no bump).
+   */
+  bump?: number;
+  /**
+   * Large-scale variation, 0 to 1: a second triplanar sample of the same layer at 1/24 of `scale` (96 m at 0.25)
+   * scales the colour by `1 - macro + macro * luma / meanLuma`, so far slopes keep a pattern where the fine texture
+   * has averaged to its mean. The mean comes from the layer's top mip: give the layers texture a full mip chain.
+   * Default 0 (no macro sample).
+   */
+  macro?: number;
 }
 /** Clipmap terrain settings, fixed at construction. Invalid values throw RangeError. */
 export interface TerrainOptions {
@@ -189,6 +209,8 @@ export class Terrain implements EnginePlugin {
         throw new RangeError(
           'Invalid terrain layer; height must rise, slope must rise within 0..1 and scale must be above 0.',
         );
+      if (![layer.bump ?? 0, layer.macro ?? 0].every((v) => typeof v === 'number' && v >= 0 && v <= 1))
+        throw new RangeError('Invalid terrain layer bump or macro; give each a number from 0 to 1 (default 0).');
     }
   }
   addLighting(effect: TerrainLighting): () => void {
@@ -261,7 +283,9 @@ export class Terrain implements EnginePlugin {
     this.ring = upload(geometry.ring, GPUBufferUsage.INDEX);
     this.centerCount = geometry.center.length;
     this.ringCount = geometry.ring.length;
-    const data = new Float32Array(this.options.layers.length * 8);
+    // 8 floats a layer; 12 with `bump` or `macro` (surfaceStruct: bump metres per unit of luma, macro, macro scale).
+    const stride = this.surface() ? 12 : 8,
+      data = new Float32Array(this.options.layers.length * stride);
     this.options.layers.forEach((layer, i) =>
       data.set(
         [
@@ -271,8 +295,9 @@ export class Terrain implements EnginePlugin {
           Math.max(0.01, (layer.height[1] - layer.height[0]) * 0.05),
           0.05,
           0,
+          ...(stride === 12 ? [((layer.bump ?? 0) * 0.5) / layer.scale, layer.macro ?? 0, layer.scale / 24, 0] : []),
         ],
-        i * 8,
+        i * stride,
       ),
     );
     this.rules = upload(data, GPUBufferUsage.STORAGE);
@@ -410,14 +435,21 @@ export class Terrain implements EnginePlugin {
   }
   /** The lit shader: terrain's own (with `roughness`, when given) through every lighting effect. */
   private shader(): string {
-    const r = this.options.roughness;
+    const r = this.options.roughness,
+      surface = this.surface(),
+      vertex =
+        r === undefined
+          ? terrainVertex
+          : terrainVertex.replace('o.material=vec4f(0.9,0,1,1)', `o.material=vec4f(${r},0,1,1)`);
     let code =
-      (r === undefined
-        ? terrainVertex
-        : terrainVertex.replace('o.material=vec4f(0.9,0,1,1)', `o.material=vec4f(${r},0,1,1)`)) +
-      (this.textures?.weights ? weightedFragment(this.textures.weights.length) : terrainFragment);
+      (surface ? surfaceStruct(vertex) : vertex) +
+      (this.textures?.weights ? weightedFragment(this.textures.weights.length, surface) : terrainFragment(surface));
     for (const effect of this.lighting) code = effect.shader(code, 1);
     return code;
+  }
+  /** Whether any layer sets `bump` or `macro`; without, the shader and rules are what they were before both. */
+  private surface(): boolean {
+    return this.options.layers.some((layer) => (layer.bump ?? 0) > 0 || (layer.macro ?? 0) > 0);
   }
   /** The lighting group's layout entries for `entries` (shadow maps, comparison samplers, buffers). */
   private lightingLayout(device: GPUDevice, entries: GPUBindGroupEntry[]): GPUBindGroupLayout {
@@ -544,7 +576,7 @@ export class Terrain implements EnginePlugin {
       code =
         declarations +
         lit.replace(head, 'fn margoShade(i:Output)->vec4f {') +
-        `\n@fragment fn capture(i:Output)->MargoSSR {${terrainOutside}let n=normalize(i.normal);let base=terrainColor(i.position,n);let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
+        `\n@fragment fn capture(i:Output)->MargoSSR {${terrainOutside}${terrainShading(this.surface())}let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
       if (this.captureCode.size >= 16) this.captureCode.clear();
       this.captureCode.set(lit, code);
     }

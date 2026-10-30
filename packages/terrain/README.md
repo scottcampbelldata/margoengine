@@ -112,6 +112,57 @@ samples there, so 16 layers cost about what the ones that show do. This is how `
 group layout and draw calls are exactly as before (`examples/package-benchmarks/proofs/terrain-ssr.proof.js` checks the
 whole call sequence). Update the textures with `queue.writeTexture` and call `terrain.invalidate()`.
 
+## Relief and far detail: `bump` and `macro`
+
+Past about 50 m a layer texture's mips average it to its mean colour, and the ground is lit by the vertex normal only,
+so rock and snow read as flat grey. Two optional layer settings, each 0 to 1 (`RangeError` outside), keep them
+readable:
+
+- `bump` (default 0): the layer's own luma becomes a height of up to half a texture repeat per unit of luma, times
+  `bump` (2 m at `scale` 0.25 for luma 0 to 1), and the shading normal follows its slope: derivative bump mapping from
+  Mikkelsen's "Bump Mapping Unparametrized Surfaces on the GPU" (2010), screen-space derivatives of the height and the
+  position, no extra texture samples. The mips flatten it with distance, as they flatten the colour.
+- `macro` (default 0): a second triplanar sample of the same layer at 1/24 of its `scale` (a 96 m repeat at 0.25)
+  scales the colour by `1 - macro + macro * luma / mean`, where `mean` is the luma of the layer's top mip, so the
+  average colour stays and far slopes keep a pattern. Give the layers texture a full mip chain for a true mean.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const terrain = Terrain.attach(engine, {
+  size:[100,100], origin:[-50,-50], heightScale:20,
+  layers:[
+    {height:[-20,100],slope:[0,0.3],scale:0.25,bump:0.3,macro:0.35},
+    {height:[-20,100],slope:[0.2,1],scale:0.25,bump:1,macro:0.5},
+    {height:[-20,2],slope:[0,0.4],scale:0.25,bump:0.25,macro:0.3},
+    {height:[10,100],slope:[0,0.5],scale:0.25,bump:0.35,macro:0.15}
+  ],
+  textures:device=>{
+    // 6 = TEXTURE_BINDING | COPY_DST. Use real layer textures with full mip chains here.
+    const heightmap = device.createTexture({size:[4,4],format:'r32float',usage:6});
+    device.queue.writeTexture({texture:heightmap},new Float32Array(16),{bytesPerRow:16},[4,4]);
+    const layers = device.createTexture({size:[1,1,4],format:'rgba8unorm-srgb',usage:6});
+    device.queue.writeTexture({texture:layers},new Uint8Array([
+      60,120,40,255, 110,110,100,255, 120,90,60,255, 240,245,255,255
+    ]),{bytesPerRow:4,rowsPerImage:1},[1,1,4]);
+    return {heightmap,layers};
+  }
+});
+engine.start();
+```
+
+Leaving both out (or 0 on every layer) keeps the shader text, the 8-float rules and so every GPU call exactly as
+before; when any layer sets one, the rules grow to 12 floats a layer and the shader adds the relief and the macro
+sample for every layer whose value is above 0. This works with painted `weights` and SSR's capture. Cost: `bump`
+adds about 30 ALU operations and four derivatives per pixel; `macro` adds three texture samples and one top-mip
+sample per showing layer. Checked on a real GPU by `test/bump.browser.mjs` (in `test:gpu`): on flat ground with one
+grey noise texture, 0 draws the same pixels as leaving them out, `bump: 1` spreads the near ground's luma 4.7 times
+as wide, and `macro: 0.5` spreads the means of 32 px blocks of a view from 60 m 10.7 times as wide (RTX A6000).
+Where a crest is seen edge-on, the relief's slope is limited to what the pixel can resolve, so crests draw no dark
+specks: `test/crest.browser.mjs` (in `test:gpu`) draws alpine crests under the noon sun with `bump: 1` and counts
+none more than without it, by rules and by painted weights.
+
 Resolution is a multiple of four from 8-256; levels range from 1-12. The default is 64 cells and six rings, with doubled cell spacing per level. Geometry buffers are allocated once and reused as the camera moves. Layer slope is `1-normal.y` in 0..1; height is world Y. Rules blend smoothly around their thresholds and fall back to layer zero if none match. Terrain uses GGX directional lighting and the scene's reversed depth.
 
 `shadows.add(terrain,{static:true})` registers depth rendering and reception; moving clipmap origins invalidates its static shadow cache. `clustered.add(terrain)` adds local PBR lights. Call `terrain.invalidate()` after changing height texture contents. Raycasts/foot IK should use your retained height data or collision BVH; rendering performs no GPU height readback. The clipmap does not add physics or streaming. `dispose()`/`destroy()` releases textures and geometry. `clipmapGrid()` is exported for custom grid consumers.

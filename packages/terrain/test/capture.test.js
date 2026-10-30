@@ -109,3 +109,16 @@ test('terrain roughness is optional and validated; onDispose runs once', () => {
   plain.terrain.dispose();
   assert.equal(calls, 1);
 });
+
+test('with TerrainLayer.bump the capture entry shades with the bumped normal, as the lit fragment does', () => {
+  const r = rig({
+    layers: Array.from({ length: 4 }, (_, i) => ({ height: [-10, 10], slope: [0, 1], scale: 1, bump: i ? 0 : 1 })),
+  });
+  r.frame();
+  r.terrain.setCapture(r.hook);
+  const code = modules(r.gpu.record(() => r.terrain.draw(r.view.c, 'capture')))[0],
+    shading =
+      'let terrainN=normalize(i.normal);let base=terrainColor(i.position,terrainN);let n=terrainBump(i.position,terrainN);';
+  assert.equal(code.split(shading).length, 3, 'in margoShade and in capture');
+  assert.match(code, /@fragment fn capture\(i:Output\)->MargoSSR \{if\(any[^\n]*let n=terrainBump/);
+});
