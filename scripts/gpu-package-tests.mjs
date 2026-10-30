@@ -329,7 +329,8 @@ export function planSteps(tests, profile) {
 }
 
 const times = (n) => (n === 1 ? 'once' : `${n} times`);
-const pauseText = (p) =>
+/** One heat pause in words: peak, stop, reason and how the wait ended (also used by scripts/check-merge.mjs). */
+export const pauseText = (p) =>
   `peak ${p.peakC ?? '?'} C, stopped at ${p.stoppedAtC ?? '?'} C (${p.reason}), ${
     p.resumed
       ? `resumed at ${p.resumedAtC} C after ${p.waitedS} s`

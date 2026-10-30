@@ -1700,7 +1700,7 @@ backstop for check:merge's narrowing (session rule 20).
 
 | Profile | Nightly steps |
 | --- | --- |
-| `laptop` (the Intel Arc laptop) | `full check:merge`, `pinned proofs`, `nightly-status`; nothing excluded, voxel-pathtracer included; heavy suites in short steps under its heat watch. Its visual baselines are captured on the laptop itself, later; until they are committed its visual:check has no matching profile |
+| `laptop` (the Intel Arc laptop) | `full check:merge`, `pinned proofs`, `nightly-status`; nothing excluded, voxel-pathtracer included; heavy suites in short steps, and every GPU step of check:merge under its heat watch (2.15.9). Its visual baselines are captured on the laptop itself, later; until they are committed its visual:check has no matching profile |
 | `mini-pc`, `thermal-limited` | `gpu package tests` (builds every package first; voxel-pathtracer excluded), then the light GPU checks `check:wgsl`, `check:views`, `check:depth`, `check:no-webgpu` (after `npm run build:site`), `modern:test:bundlers` (after `npm run modern:test:packages`), then `nightly-status` |
 | `workstation` | `full check:merge`, `pinned proofs` (its scheduled task is disabled: no nightly on the main dev PC) |
 
@@ -2150,6 +2150,20 @@ A failure stays `FAIL` (exit 1). No limit is raised automatically and every wait
 suites as short steps (one step per command of a `node ... && node ...` chain, or the argument sets in a package's
 `margo.gpuTestSteps`), with the assertions unchanged. `scripts/nightly-full.mjs` takes its steps from the profile and
 ends a night with an unresumed heat stop as `PAUSED-FOR-HEAT`.
+
+`check:merge` (and `check:merge:full`) applies the same watch to every other step that drives the GPU (2026-10-30;
+visual:check reached 88.9 C on the laptop with none): `build:site`, `visual:check`, `check:views`, `check:depth`,
+`check:wgsl`, `modern:test:packages`, `check:no-webgpu`, `modern:test:bundlers` and `check:quickstart` each run
+through the runner's own `runPlan`, as one step: at `stopC` the step's process tree is ended, the run waits (at most
+`maxWaitMin`) for `resumeC` and runs that step again from its start, at most `maxResumesPerStep` times. Only
+`verify` and `check:fresh-clone` (no GPU) are unwatched, and `check:gpu-packages` is not watched twice: it watches
+each of its tests itself, and its exit 75 counts as a heat stop. Only a step the watch ended runs again; a step that
+fails on its own is `FAILED at <step>` and is never rerun for heat, so the rerun is not retry-until-green. The
+summary prints `PAUSED FOR HEAT during <step> ...` per pause and ends `PASSED AFTER A HEAT PAUSE`, or
+`PAUSED FOR HEAT: NOT RESUMED at <step>` (exit 75, the rest not run); `test-results/check-merge.json` carries
+`profile`, `pausedForHeat`, `heatStopped` and each step's `pauses`. A heat profile with no reading stops before
+`verify`. The workstation profile (`heat` null) runs every step exactly as before. Pinned by
+`tests/check-merge-heat.test.js`.
 
 ### 2.16 Failure modes and what we saw
 

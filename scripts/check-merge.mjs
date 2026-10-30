@@ -23,12 +23,25 @@
 // Windows event log shows a GPU driver reset (scripts/support/driver-resets.mjs, bug 25) runs once more; the reset is
 // printed and recorded with the step, and a second failure fails the run. A run that passed only that way says so: a
 // "PASSED WITH A DRIVER RESET" line per step or GPU test, and `passedAfterDriverReset: true` in check-merge.json.
+// Heat (machine profiles, MARGO_MACHINE_PROFILE, scripts/support/machine-profiles.json): on a profile with a heat watch
+// every step that drives the GPU (all but NO_GPU_STEPS) runs under the same watch as the GPU package tests (runPlan in
+// scripts/gpu-package-tests.mjs): at the stop temperature the step's process tree is ended, the run waits (bounded) for
+// the resume temperature and runs that step again from its start, at most maxResumesPerStep times. check:gpu-packages
+// watches each of its own tests and is not watched twice. Only a step the watch ended runs again; a step that fails on
+// its own is a failure and is never rerun for heat. Each pause is a "PAUSED FOR HEAT during <step>" line; a stop it
+// could not resume from ends the run as "PAUSED FOR HEAT: NOT RESUMED" with exit 75 (HEAT_EXIT), never a pass, a
+// failure or a skip. The workstation profile (heat null) runs every step exactly as before.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { exitOnHelp } from './support/help.mjs';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
+import { pauseText, runPlan } from './gpu-package-tests.mjs';
+import { HEAT_EXIT } from './nightly-full.mjs';
+import { thermalSource } from './support/heat.mjs';
+import { describeProfile, machineProfile } from './support/machine-profile.mjs';
+import { runLimited } from './support/run-limited.mjs';
 import {
   analyse,
   buildFootprints,
@@ -57,6 +70,15 @@ export const GPU_STEPS = [
 export const PLAIN_STEPS = ['verify', 'check:fresh-clone', 'build:site', 'check:quickstart'];
 /** Package-level steps (no GPU) that always run in some form and are narrowed by packageScopes. */
 export const SCOPED_STEPS = ['modern:test:packages', 'modern:test:bundlers'];
+
+/** Steps that never drive the GPU: no heat watch. */
+export const NO_GPU_STEPS = ['verify', 'check:fresh-clone'];
+/** Steps that watch the heat themselves, per test (scripts/gpu-package-tests.mjs), so check:merge does not watch them. */
+export const SELF_WATCHED_STEPS = ['check:gpu-packages'];
+/** True when check:merge itself watches `name`'s heat on a heat profile: every step but the two lists above. */
+export const heatWatched = (name) => !NO_GPU_STEPS.includes(name) && !SELF_WATCHED_STEPS.includes(name);
+/** Hard limit for one heat-watched step, in minutes (the watch runs it with runLimited, which ends the tree at it). */
+export const WATCHED_STEP_MINUTES = 120;
 
 const stepName = (command) => /^npm run (\S+)/.exec(command)?.[1];
 
@@ -195,96 +217,198 @@ async function main() {
   );
   for (const { command, skip } of planned) console.log(`  ${skip ? `skip (${skip})` : 'run'}  ${command}`);
   if (args.includes('--plan')) return;
-  const results = [],
-    started = performance.now();
-  let failed,
-    built = false;
+  const profile = machineProfile(),
+    thermal = profile.heat ? thermalSource() : null;
+  console.log(describeProfile(profile));
+  // A heat profile that cannot read its temperature stops here, before verify, not at its first GPU step.
+  if (thermal && thermal.read() === null)
+    throw new Error(
+      `machine profile ${profile.name} watches the temperature but the ${thermal.name} gives no reading; set MARGO_THERMAL_FILE to a file holding the current temperature (written within MARGO_THERMAL_MAX_AGE_S, default 60 s), or use a profile without a heat watch`,
+    );
+  if (thermal) console.log(`temperature from the ${thermal.name}`);
+  let built = false;
+  const started = performance.now();
+  const { results, failed, heatStopped } = await runSteps(planned, {
+    profile,
+    read: thermal?.read,
+    run: async (command, name, signal) => {
+      // verify builds every package; the tarball test then reuses that build instead of building again. The stale-file
+      // check still holds: verify plants marker files in two dist folders before its build, and no pack may contain them.
+      const env = { ...process.env };
+      if (name === 'verify' && planned.some((p) => stepName(p.command) === 'modern:test:packages'))
+        env.MARGOENGINE_PLANT_STALE = '1';
+      if (name === 'modern:test:packages' && built) env.MARGOENGINE_PACKAGE_TEST_PREBUILT = '1';
+      // A heat-watched step runs with runLimited, which ends its whole tree when the watch aborts; any other step runs
+      // as it always has.
+      const result = signal
+        ? await runLimited(command, { cwd: root, env, limitMs: WATCHED_STEP_MINUTES * 60_000, label: command, signal })
+        : { status: spawnSync(command, { cwd: root, shell: true, stdio: 'inherit', env }).status };
+      if (!signal) result.ok = result.status === 0;
+      if (result.message) console.error(`\nHUNG: ${result.message}`);
+      if (name === 'verify' && result.ok) built = true;
+      return result;
+    },
+  });
+  // The tests check:gpu-packages ran again after a reset, or paused for heat, from the file it just wrote, so the
+  // summary names them.
+  const gpuStep = results.find((r) => stepName(r.command) === 'check:gpu-packages' && (r.ok || r.heatNotResumed));
+  if (gpuStep) {
+    const inner = JSON.parse(readFileSync(join(root, 'test-results/gpu-packages.json'), 'utf8')).results,
+      resetTests = gpuStep.ok ? inner.filter((r) => r.driverReset) : [],
+      heatTests = inner.filter((r) => r.pauses?.length || r.outcome === 'heat-not-resumed');
+    if (resetTests.length)
+      gpuStep.driverResetTests = resetTests.map(({ label, ok, driverReset }) => ({
+        label,
+        ok,
+        driverReset: { resets: driverReset.resets, rerunOk: driverReset.rerunOk },
+      }));
+    if (heatTests.length)
+      gpuStep.heatTests = heatTests.map(({ label, outcome, reason, pauses }) => ({ label, outcome, reason, pauses }));
+  }
+  const seconds = Math.round((performance.now() - started) / 1000),
+    { passedAfterDriverReset, pausedForHeat, lines } = summary({ results, failed, heatStopped, seconds });
+  mkdirSync(join(root, 'test-results'), { recursive: true });
+  writeFileSync(
+    join(root, 'test-results/check-merge.json'),
+    `${JSON.stringify({ mode: decision.mode, reason: decision.reason, affected: decision.affected, profile: profile.name, passedAfterDriverReset, pausedForHeat, heatStopped: heatStopped ?? null, seconds, results }, null, 2)}\n`,
+  );
+  console.log(`\n${describe(decision, base)}; ${describeProfile(profile)}\n${lines.join('\n')}`);
+  process.exitCode = failed ? 1 : heatStopped ? HEAT_EXIT : 0;
+}
+
+/**
+ * Runs the planned steps in order and stops at the first failure or unresumed heat stop. Resolves `{ results, failed?,
+ * heatStopped? }`: `failed` is the failing command, `heatStopped` the command a heat stop ended for good. Each result is
+ * `{ command, ok, seconds, driverReset?, pauses?, heatNotResumed? }`, or `{ command, skipped }` for a skipped step.
+ * `run(command, name, signal?)` runs one command and resolves `{ ok, status?, aborted? }`; given a `signal` it must end
+ * the command's process tree when the signal aborts and resolve `aborted: true`.
+ * On a profile with `heat`, every heatWatched step runs through runPlan (scripts/gpu-package-tests.mjs, the same code
+ * as the GPU package tests) with `read` (degrees C or null): the step reruns from its start only when the heat watch
+ * ended it (runPlan reruns on `aborted` with a stop reason, never on a plain failure), at most maxResumesPerStep times,
+ * and every pause is kept in `pauses`. check:gpu-packages watches itself; its exit 75 (HEAT_EXIT) is its unresumed heat
+ * stop. A failing step runs once more after a logged GPU driver reset (`retry`, bug 25).
+ */
+export async function runSteps(
+  planned,
+  { profile, read = () => null, run, log = console.log, pollMs, retry = retryAfterDriverReset },
+) {
+  const results = [];
   for (const { command, skip } of planned) {
     if (skip) {
       results.push({ command, skipped: skip });
       continue;
     }
-    console.log(`\n=== ${command}`);
-    // verify builds every package; the tarball test then reuses that build instead of building again. The stale-file
-    // check still holds: verify plants marker files in two dist folders before its build, and no pack may contain them.
+    log(`\n=== ${command}`);
     const name = stepName(command),
-      env = { ...process.env };
-    if (name === 'verify' && planned.some((p) => stepName(p.command) === 'modern:test:packages'))
-      env.MARGOENGINE_PLANT_STALE = '1';
-    if (name === 'modern:test:packages' && built) env.MARGOENGINE_PACKAGE_TEST_PREBUILT = '1';
+      t0 = performance.now();
     // A step that fails while the Windows event log shows a GPU driver reset runs once more, printed and recorded
-    // (bug 25). check:gpu-packages does this per test itself, so a reset there costs one test, not the whole step.
-    const t0 = performance.now(),
-      runStep = async () => ({
-        ok: spawnSync(command, { cwd: root, shell: true, stdio: 'inherit', env }).status === 0,
-      }),
-      { ok, driverReset } =
-        name === 'check:gpu-packages' ? await runStep() : await retryAfterDriverReset(command, runStep);
-    if (name === 'verify' && ok) built = true;
-    // The tests check:gpu-packages ran again after a reset, from the file it just wrote, so the summary names them.
-    const resetTests =
-      name === 'check:gpu-packages' && ok
-        ? JSON.parse(readFileSync(join(root, 'test-results/gpu-packages.json'), 'utf8')).results.filter(
-            (r) => r.driverReset,
-          )
-        : [];
+    // (bug 25). check:gpu-packages does this per test itself, so a reset there costs one test, not the whole step. A
+    // step the heat watch ended goes back to runPlan as it is: the heat pause, not a reset, explains it.
+    const withReset = async (signal) => {
+      const first = await run(command, name, signal);
+      if (first.ok || first.aborted) return first;
+      let used = false;
+      return retry(command, async () => (used ? run(command, name, signal) : ((used = true), first)));
+    };
+    let outcome;
+    if (name === 'check:gpu-packages') {
+      const r = await run(command, name);
+      outcome = {
+        ok: r.ok,
+        ...(r.status === HEAT_EXIT && {
+          heatNotResumed: `it stopped for heat and did not resume (exit ${HEAT_EXIT}); its summary names the tests`,
+        }),
+      };
+    } else if (profile.heat && heatWatched(name)) {
+      const [r] = await runPlan([{ label: command }], {
+        profile,
+        read,
+        pollMs,
+        log,
+        runStep: (_, signal) => withReset(signal),
+      });
+      outcome = {
+        ok: r.outcome === 'pass',
+        driverReset: r.driverReset,
+        ...(r.pauses.length && { pauses: r.pauses }),
+        ...(r.outcome === 'heat-not-resumed' && { heatNotResumed: r.reason }),
+      };
+    } else outcome = await withReset();
+    const { ok, driverReset, pauses, heatNotResumed } = outcome;
     results.push({
       command,
       ok,
       seconds: Math.round((performance.now() - t0) / 100) / 10,
       ...(driverReset && { driverReset: { resets: driverReset.resets, rerunOk: driverReset.rerunOk } }),
-      ...(resetTests.length && {
-        driverResetTests: resetTests.map(({ label, ok, driverReset }) => ({
-          label,
-          ok,
-          driverReset: { resets: driverReset.resets, rerunOk: driverReset.rerunOk },
-        })),
-      }),
+      ...(pauses && { pauses }),
+      ...(heatNotResumed && { heatNotResumed }),
     });
-    if (!ok) {
-      failed = command;
-      break;
-    }
+    if (heatNotResumed) return { results, heatStopped: command };
+    if (!ok) return { results, failed: command };
   }
-  const seconds = Math.round((performance.now() - started) / 1000),
-    { passedAfterDriverReset, lines } = summary({ results, failed, seconds });
-  mkdirSync(join(root, 'test-results'), { recursive: true });
-  writeFileSync(
-    join(root, 'test-results/check-merge.json'),
-    `${JSON.stringify({ mode: decision.mode, reason: decision.reason, affected: decision.affected, passedAfterDriverReset, seconds, results }, null, 2)}\n`,
-  );
-  console.log(`\n${describe(decision, base)}\n${lines.join('\n')}`);
-  if (failed) process.exitCode = 1;
+  return { results };
 }
 
 /**
- * The end of a run: the GPU resets it met, then "PASSED", "FAILED at <step>", or, when it passed only because a step
- * or a check:gpu-packages test passed on its rerun after a logged GPU driver reset, one "PASSED WITH A DRIVER RESET"
- * warning per such step and a last line that says so; `passedAfterDriverReset` is then true (check-merge.json). The
- * exit code does not change: a pass after a rerun passes, a failed rerun has already failed the run.
+ * The end of a run: the GPU resets and heat pauses it met, then "PASSED", "FAILED at <step>", "PAUSED FOR HEAT: NOT
+ * RESUMED at <step>" (exit 75: nothing failed, but the run is incomplete), or, when it passed only because a step or
+ * a check:gpu-packages test passed on its rerun after a logged GPU driver reset, one "PASSED WITH A DRIVER RESET"
+ * warning per such step and a last line that says so; `passedAfterDriverReset` is then true (check-merge.json). A
+ * step the heat watch stopped and ran again gets a "PAUSED FOR HEAT during <step>" line with each pause, and a pass
+ * after one ends "PASSED AFTER A HEAT PAUSE"; `pausedForHeat` is then true. A pass after a rerun still passes, a
+ * failed rerun has already failed the run.
  */
-export function summary({ results, failed, seconds }) {
+export function summary({ results, failed, heatStopped, seconds }) {
   const lines = [];
   for (const { command, driverReset } of results)
     if (driverReset)
       lines.push(
         `GPU RESET during ${command}: ${describeResets(driverReset.resets)}; the rerun ${driverReset.rerunOk ? 'passed' : 'failed'}`,
       );
-  const warnings = failed
-    ? []
-    : passedAfterResetLines(
-        results,
-        results.filter((r) => r.driverResetTests).map((r) => ({ step: r.command, results: r.driverResetTests })),
+  const heatLine = (where, pauses) =>
+    `PAUSED FOR HEAT during ${where} ${pauses.length === 1 ? 'once' : `${pauses.length} times`}: ${pauses.map(pauseText).join('; ')}`;
+  let paused = 0;
+  for (const { command, pauses, heatNotResumed, heatTests } of results) {
+    if (pauses?.length) {
+      paused++;
+      lines.push(
+        `${heatLine(command, pauses)}. The heat watch stopped it, so it ran again from its start: a stopped step is rerun, a failed one never is`,
       );
+    }
+    for (const t of heatTests ?? []) {
+      if (t.pauses?.length) {
+        paused++;
+        lines.push(heatLine(`${command} > ${t.label}`, t.pauses));
+      }
+      if (t.outcome === 'heat-not-resumed')
+        lines.push(`PAUSED FOR HEAT: NOT RESUMED ${command} > ${t.label} (${t.reason})`);
+    }
+    if (heatNotResumed) lines.push(`PAUSED FOR HEAT: NOT RESUMED ${command} (${heatNotResumed})`);
+  }
+  const warnings =
+    failed || heatStopped
+      ? []
+      : passedAfterResetLines(
+          results,
+          results.filter((r) => r.driverResetTests).map((r) => ({ step: r.command, results: r.driverResetTests })),
+        );
   lines.push(...warnings);
+  const reruns = `${warnings.length} rerun${warnings.length > 1 ? 's' : ''} after a GPU driver reset`,
+    heatReruns = `${paused} step${paused > 1 ? 's' : ''} stopped by the heat watch and run again from the start`;
   lines.push(
     failed
       ? `FAILED at ${failed} in ${seconds} s`
-      : warnings.length
-        ? `PASSED WITH A DRIVER RESET in ${seconds} s: ${warnings.length} rerun${warnings.length > 1 ? 's' : ''} after a GPU driver reset, see above`
-        : `PASSED in ${seconds} s`,
+      : heatStopped
+        ? `PAUSED FOR HEAT: NOT RESUMED at ${heatStopped} in ${seconds} s: no step failed, but the run is incomplete (exit ${HEAT_EXIT}); rerun it when the machine is cool, or on a profile that can take the load`
+        : warnings.length && paused
+          ? `PASSED WITH A DRIVER RESET AND A HEAT PAUSE in ${seconds} s: ${reruns}, ${heatReruns}, see above`
+          : warnings.length
+            ? `PASSED WITH A DRIVER RESET in ${seconds} s: ${reruns}, see above`
+            : paused
+              ? `PASSED AFTER A HEAT PAUSE in ${seconds} s: ${heatReruns}, see above`
+              : `PASSED in ${seconds} s`,
   );
-  return { passedAfterDriverReset: warnings.length > 0, lines };
+  return { passedAfterDriverReset: warnings.length > 0, pausedForHeat: paused > 0, lines };
 }
 
 export const USAGE = `usage: node scripts/check-merge.mjs [options]
