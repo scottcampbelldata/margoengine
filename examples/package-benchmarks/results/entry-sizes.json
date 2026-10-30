@@ -1,5 +1,5 @@
 {
-  "commit": "6c9c1545c",
+  "commit": "e9ef1032b",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -58,20 +58,20 @@
     },
     "@margoengine/biomes": {
       ".": {
-        "raw": 43387,
-        "gzip": 17066
+        "raw": 43631,
+        "gzip": 17151
       },
       "./toolkit": {
         "raw": 5697,
         "gzip": 2624
       },
       "./presets": {
-        "raw": 5421,
-        "gzip": 1768
+        "raw": 5474,
+        "gzip": 1787
       },
       "./relief": {
-        "raw": 5183,
-        "gzip": 2569
+        "raw": 5223,
+        "gzip": 2590
       },
       "./digest": {
         "raw": 1091,
@@ -82,12 +82,12 @@
         "gzip": 975
       },
       "./zones": {
-        "raw": 8460,
-        "gzip": 3619
+        "raw": 8551,
+        "gzip": 3635
       },
       "./view": {
-        "raw": 18629,
-        "gzip": 7749
+        "raw": 18720,
+        "gzip": 7766
       },
       "./objects": {
         "raw": 7960,
@@ -98,8 +98,8 @@
         "gzip": 3557
       },
       "./placement": {
-        "raw": 28939,
-        "gzip": 11543
+        "raw": 29030,
+        "gzip": 11563
       },
       "./stats": {
         "raw": 5941,
@@ -107,11 +107,11 @@
       },
       "./workers": {
         "raw": 5964,
-        "gzip": 2696
+        "gzip": 2695
       },
       "dist/workers/biomes.js": {
-        "raw": 91859,
-        "gzip": 33761
+        "raw": 92195,
+        "gzip": 34208
       }
     },
     "@margoengine/blender": {
@@ -1744,9 +1744,9 @@
       "brotli": 2727
     },
     "packages/biomes/dist/workers/biomes.js": {
-      "raw": 90875,
-      "gzip": 33656,
-      "brotli": 29750
+      "raw": 91211,
+      "gzip": 33772,
+      "brotli": 29816
     },
     "packages/voxel/dist/workers/mesher.js": {
       "raw": 13081,
