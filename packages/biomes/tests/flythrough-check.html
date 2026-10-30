@@ -8,6 +8,7 @@
 import {Engine} from '/packages/core/dist/index.js';
 import {BiomeWorld} from '/packages/biomes/dist/index.js';
 import {BiomeView} from '/packages/biomes/dist/view.js';
+import {stallClock} from './flythrough-clock.mjs';
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[-1200,260,-1200],target:[-1100,200,-1100],near:0.5,far:4000}}),device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const SPEED=83.3,FROM=[-1200,-1200],TO=[1200,1200],LENGTH=Math.hypot(TO[0]-FROM[0],TO[1]-FROM[1]);
@@ -49,26 +50,28 @@ window.check={
   * per kB: a third of the flight on 4 workers, timing the view's own work in each frame (its plugin). Jobs a frame
   * starts must go out within the frame budget, and a tile must go in a few rows at a time, not in one frame. With STALL
   * set, the workers' replies are held back for STALL ms out of every 2 x STALL ms, as busy workers on a laptop are:
-  * jobs the view sends meanwhile only wait in the pool's queues.
+  * jobs the view sends meanwhile only wait in the pool's queues. The busy waits run on a clock that keeps apart the time
+  * the thread did not run inside them (flythrough-clock.mjs): the view's time in a frame (max) leaves it out, rawMax and
+  * stalled report it. calls holds the slowest real writeTexture call per texture format, after its wait.
   */
  async slowSends(SEND,COPY,STALL=0){
-  let sends=0,late=0,inView=false,stepped=false,known=false;const queue=device.queue,writeTexture=queue.writeTexture;
-  queue.writeTexture=function(dst,data,layout,size){if(inView)stepped=true;const end=performance.now()+COPY*(layout.bytesPerRow??0)*(size[1]??size.height??1)/1024;while(performance.now()<end);return writeTexture.call(this,dst,data,layout,size);};
-  const createWorker=()=>{const w=new Worker('/packages/biomes/dist/workers/biomes.js',{name:'margoengine-biomes'}),post=w.postMessage.bind(w);if(STALL){let on=null;Object.defineProperty(w,'onmessage',{get:()=>on,set:(f)=>{on=f;}});w.addEventListener('message',(e)=>held?held.push(()=>on?.(e)):on?.(e));}w.postMessage=(m,t)=>{sends++;if(inView){if(stepped&&known)late++;known=true;}const end=performance.now()+SEND;while(performance.now()<end);post(m,t);};return w;};
+  let sends=0,late=0,inView=false,stepped=false,known=false,calls={};const queue=device.queue,writeTexture=queue.writeTexture,clock=stallClock(()=>performance.now());
+  queue.writeTexture=function(dst,data,layout,size){if(inView)stepped=true;clock.wait(COPY*(layout.bytesPerRow??0)*(size[1]??size.height??1)/1024);const t0=performance.now(),r=writeTexture.call(this,dst,data,layout,size),d=performance.now()-t0,f=dst.texture.format;if(inView&&!(calls[f]>=d))calls[f]=d;return r;};
+  const createWorker=()=>{const w=new Worker('/packages/biomes/dist/workers/biomes.js',{name:'margoengine-biomes'}),post=w.postMessage.bind(w);if(STALL){let on=null;Object.defineProperty(w,'onmessage',{get:()=>on,set:(f)=>{on=f;}});w.addEventListener('message',(e)=>held?held.push(()=>on?.(e)):on?.(e));}w.postMessage=(m,t)=>{sends++;if(inView){if(stepped&&known)late++;known=true;}clock.wait(SEND);post(m,t);};return w;};
   let held=null;const world=await BiomeWorld.create({workers:4,createWorker});place(0);
   const view=await BiomeView.attach(engine,world);await view.ready;
   // Every step the view takes marks the frame: a texture write, an objects step, a job handed to the pool (sent or queued).
   const run=world.workers.run.bind(world.workers);world.workers.run=(...a)=>{const r=run(...a);if(inView)stepped=true;return r;};
   const proto=Object.getPrototypeOf(view.objects),steps=proto.steps;proto.steps=function(...a){return steps.apply(this,a).map((f)=>()=>{f();if(inView)stepped=true;});};
   const stall=STALL&&setInterval(()=>{if(held){const go=held;held=null;for(const f of go)setTimeout(f,0);}else held=[];},STALL);
-  const plugin=[...engine.plugins.values()].find((p)=>p.name.startsWith('biomes-view:')),own=plugin.onPreUpdate,times=[];
-  plugin.onPreUpdate=(delta)=>{const t0=performance.now();inView=true;stepped=false;own(delta);inView=false;times.push(performance.now()-t0);};
+  const plugin=[...engine.plugins.values()].find((p)=>p.name.startsWith('biomes-view:')),own=plugin.onPreUpdate,times=[],raw=[],lost=[];
+  plugin.onPreUpdate=(delta)=>{const t=clock.time(()=>{inView=true;stepped=false;own(delta);inView=false;});times.push(t.own);raw.push(t.total);lost.push(t.stalled);};
   for(let i=0;i<10;i++){await frame();engine.render({delta:1/60});}
-  await view.whenIdle();times.length=0;sends=0;late=0;known=false;
+  await view.whenIdle();times.length=0;raw.length=0;lost.length=0;calls={};sends=0;late=0;known=false;
   let s=0,last=await frame();
   while(s<LENGTH/3){const now=await frame(),dt=Math.min(0.1,(now-last)/1000);last=now;s+=SPEED*dt;place(s);engine.render({delta:dt});}
   delete queue.writeTexture;proto.steps=steps;clearInterval(stall);if(held){for(const f of held)f();held=null;}
-  const out={frames:times.length,max:Math.max(...times),sends,late};view.dispose();world.dispose();
+  const out={frames:times.length,max:Math.max(...times),rawMax:Math.max(...raw),stalled:lost.reduce((a,b)=>a+b,0),stalls:lost.filter((x)=>x>0).length,stalledMax:Math.max(0,...lost),calls,sends,late};view.dispose();world.dispose();
   return out;
  }
 };

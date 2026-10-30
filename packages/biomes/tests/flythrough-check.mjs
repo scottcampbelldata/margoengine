@@ -51,9 +51,20 @@ await runSuite(
     // were the slowest 1 percent. With each send slowed to 2 ms and texture writes to 0.02 ms per kB (a whole tile
     // 3.8 ms, a band of rows 1 ms), the view's work per frame must stay within one send plus 1.5 ms (its 0.25 ms budget,
     // the plan, one step that began inside the budget), not one send per job planned or a whole tile.
+    // The check once counted time the thread did not run inside its own busy waits as view work: on an Intel Arc 140V
+    // laptop the thread stopped 2.9 ms inside the wait before a 16 kB r32float write (the write itself took 0.1 ms or
+    // less) and the frame read 4.0 ms. The frame time leaves that out now and reports it (flythrough-clock.mjs); time
+    // lost inside the view or a real write still counts.
     const SEND = 2,
       slow = await page.evaluate(([send, copy]) => window.check.slowSends(send, copy), [SEND, 0.02]);
-    console.log(`slow sends: ${slow.sends} sends over ${slow.frames} frames, view frame max ${slow.max.toFixed(1)} ms`);
+    console.log(
+      `slow sends: ${slow.sends} sends over ${slow.frames} frames, view frame max ${slow.max.toFixed(1)} ms (${slow.rawMax.toFixed(1)} ms on the clock; the thread did not run ${slow.stalled.toFixed(1)} ms inside the check's waits, in ${slow.stalls} frames, at most ${slow.stalledMax.toFixed(1)} ms in one)`,
+    );
+    console.log(
+      `slowest texture write calls: ${Object.entries(slow.calls)
+        .map(([format, ms]) => `${format} ${ms.toFixed(1)} ms`)
+        .join(', ')}`,
+    );
     assert.ok(slow.sends >= 8, `the flight sent ${slow.sends} jobs`);
     assert.ok(
       slow.max <= SEND + 1.5,
