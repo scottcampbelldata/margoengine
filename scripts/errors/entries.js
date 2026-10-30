@@ -42,6 +42,20 @@ export const entries = [
     fix: 'Read the message for the GPU or kernel detail; most failures are recovered by the engine or need smaller inputs.',
   },
   {
+    id: 'timeout',
+    title: 'timeout: a WebGPU startup step never settled',
+    kind: 'code',
+    messages: [
+      'WebGPU requestAdapter never settled',
+      'WebGPU requestDevice never settled',
+      'WebGPU createRenderPipelineAsync never settled',
+      'Margo: still waiting for <step> after 8 s',
+    ],
+    cause:
+      'The browser or GPU driver never answered a step of `Engine.create`: the adapter or device request, or a pipeline compile. Seen on an Intel Arc 140V when 3 or 4 WebGPU pages were alive at once in one browser process: each new page got slower to get a device, and the 4th never did, with no error. The engine warns once after `startupWarning` ms (default 8000) and rejects after `startupTimeout` ms (default 30000).',
+    fix: 'Start fewer engines at once on one page or in one browser (start the next when the previous one has drawn, or close pages you no longer show). With `backend: "auto"` and `fallback: webglRenderer` from `@margoengine/webgl` the page draws on WebGL2 instead. Raise `startupTimeout` for a slow first compile; pass `signal` to cancel creation yourself. Branch on `error.code === "timeout"`.',
+  },
+  {
     id: 'webgpu',
     title: 'WebGPU required or unavailable',
     kind: 'family',

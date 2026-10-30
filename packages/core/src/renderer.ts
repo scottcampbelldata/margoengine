@@ -1,4 +1,5 @@
 import type { Camera } from './camera.js';
+import type { EngineOptions } from './engine.js';
 import type { Geometry } from './geometry.js';
 import type { Scene } from './api.js';
 import { wgsl } from './shaders.js';
@@ -154,6 +155,45 @@ export interface Renderer {
   dispose(unconfigure?: boolean): void;
 }
 
+type StartupOptions = Pick<EngineOptions, 'signal' | 'startupWarning' | 'startupTimeout'>;
+/**
+ * One WebGPU startup step that a driver may never settle (several live WebGPU pages in one browser process stalled
+ * requestDevice and pipeline compiles on an Intel Arc 140V, with no error): warns once after `startupWarning` ms,
+ * rejects with a `timeout` MargoError naming the step after `startupTimeout` ms or with the reason when `signal`
+ * aborts, and hands a result that arrives after that to `late` (a device is destroyed there, not leaked).
+ */
+const settle = <T>(
+  step: Promise<T>,
+  name: string,
+  { signal, startupWarning: wait = 8e3, startupTimeout }: StartupOptions,
+  late?: (value: T) => void,
+) =>
+  new Promise<T>((resolve, reject) => {
+    let open = 1;
+    const done = () => {
+        clearTimeout(warn);
+        clearTimeout(limit);
+        signal?.removeEventListener('abort', abort);
+      },
+      fail = (error: unknown) => {
+        open = 0;
+        done();
+        reject(error);
+      },
+      abort = () => fail(signal!.reason),
+      warn = setTimeout(
+        console.warn,
+        wait,
+        `Margo: still waiting for ${name} after ${wait / 1e3} s; see https://margoengine.com/errors#timeout`,
+      ),
+      limit = setTimeout(fail, startupTimeout ?? 3e4, fault('timeout', `WebGPU ${name} never settled`));
+    signal?.aborted ? abort() : signal?.addEventListener('abort', abort);
+    step.then((value) => {
+      done();
+      open ? resolve(value) : late?.(value);
+    }, fail);
+  });
+
 export class GPURenderer implements Renderer {
   onLost?: (error: Error) => void;
   get gpu(): GPUDevice {
@@ -210,17 +250,28 @@ export class GPURenderer implements Renderer {
     canvas: HTMLCanvasElement,
     features: GPUFeatureName[] = [],
     samples: number = sceneSamples(),
+    startup: StartupOptions = {},
   ): Promise<GPURenderer> {
-    const adapter = await navigator.gpu?.requestAdapter(
-      /Win/.test(navigator.userAgent) ? {} : { powerPreference: 'high-performance' },
-    );
+    const gpu = navigator.gpu,
+      adapter =
+        gpu &&
+        (await settle(
+          gpu.requestAdapter(/Win/.test(navigator.userAgent) ? {} : { powerPreference: 'high-performance' }),
+          'requestAdapter',
+          startup,
+        ));
     if (!adapter) throw fault('unsupported', 'WebGPU adapter unavailable', 'webgpu');
-    const device = await adapter.requestDevice({
-      requiredLimits: { maxTextureArrayLayers: adapter.limits?.maxTextureArrayLayers },
-      requiredFeatures: ['depth32float-stencil8' as GPUFeatureName, ...features].filter((feature) =>
-        adapter.features.has(feature),
-      ),
-    });
+    const device = await settle(
+      adapter.requestDevice({
+        requiredLimits: { maxTextureArrayLayers: adapter.limits?.maxTextureArrayLayers },
+        requiredFeatures: ['depth32float-stencil8' as GPUFeatureName, ...features].filter((feature) =>
+          adapter.features.has(feature),
+        ),
+      }),
+      'requestDevice',
+      startup,
+      (late) => late.destroy(),
+    );
     try {
       const format = navigator.gpu.getPreferredCanvasFormat();
       const module = device.createShaderModule({ code: wgsl });
@@ -256,12 +307,17 @@ export class GPURenderer implements Renderer {
         },
         multisample: { count: samples },
       };
-      const pipeline = await device.createRenderPipelineAsync(descriptor),
-        culled = await device.createRenderPipelineAsync({
-          ...descriptor,
-          primitive: { cullMode: 'back' },
-          fragment: { ...descriptor.fragment!, constants: { C: 1 } },
-        });
+      const compile = 'createRenderPipelineAsync',
+        pipeline = await settle(device.createRenderPipelineAsync(descriptor), compile, startup),
+        culled = await settle(
+          device.createRenderPipelineAsync({
+            ...descriptor,
+            primitive: { cullMode: 'back' },
+            fragment: { ...descriptor.fragment!, constants: { C: 1 } },
+          }),
+          compile,
+          startup,
+        );
       const context = canvas.getContext('webgpu') as GPUCanvasContext | null;
       if (!context) throw fault('unsupported', 'No WebGPU canvas', 'webgpu');
       return new GPURenderer(canvas, device, context, format, pipeline, descriptor, culled);

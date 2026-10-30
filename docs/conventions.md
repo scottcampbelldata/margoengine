@@ -56,6 +56,7 @@ Rules:
 | `state` | not valid right now: re-entrant call from a callback, missing prerequisite, stale handle |
 | `unsupported` | the browser or device lacks something needed: WebGPU, OffscreenCanvas, a shader hook |
 | `failed` | the operation ran and produced no result: no solution within the budget, a failed request |
+| `timeout` | a step that should finish never settled within its time limit: a stalled WebGPU startup step |
 
 Branch on `error.code`, not on the message. Messages name the subject, the problem and the fix, in that order:
 `'Input is disposed; create a new Input'`. Packages bundle their own copy of the class, so `MargoError` matches by

@@ -31,6 +31,18 @@ export interface EngineOptions {
    * A v1.0.0 option.
    */
   exactSize?: boolean | readonly [number, number];
+  /** Aborts `Engine.create`: it rejects with `signal.reason` (no fallback) and releases what it made. Default none. */
+  signal?: AbortSignal;
+  /**
+   * Milliseconds a WebGPU startup step (requestAdapter, requestDevice, a pipeline compile) may take before ONE
+   * `console.warn` names it. Default 8000.
+   */
+  startupWarning?: number;
+  /**
+   * Milliseconds before a startup step that never settles rejects with a `timeout` MargoError naming it; `backend:
+   * 'auto'` then uses `fallback`. Some drivers stall the 3rd or 4th live WebGPU page in one browser. Default 30000.
+   */
+  startupTimeout?: number;
 }
 /** Called by the frame loop before each render with the seconds since the previous frame (0 on the first, at most 0.1). */
 export type FrameCallback = (engine: Engine, delta: number) => void;
@@ -412,11 +424,12 @@ export class Engine {
     let renderer: Renderer | undefined,
       fallbackReason: string | null = null;
     try {
+      options.signal?.throwIfAborted();
       if (backend !== 'webgl2')
         try {
-          renderer = await GPURenderer.create(canvas, options.features, exact);
+          renderer = await GPURenderer.create(canvas, options.features, exact, options);
         } catch (error) {
-          if (backend === 'webgpu') throw error;
+          if (backend === 'webgpu' || options.signal?.aborted) throw error;
           fallbackReason = String(error);
         }
       renderer ??= (

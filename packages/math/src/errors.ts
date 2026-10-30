@@ -8,8 +8,9 @@
  * - `state`: the call is not valid right now (re-entrant call from a callback, missing prerequisite, stale handle).
  * - `unsupported`: the browser or device lacks something the feature needs (WebGPU, OffscreenCanvas, a shader hook).
  * - `failed`: the operation ran and could not produce a result (no solution within the budget, a failed request).
+ * - `timeout`: a step that should have finished never settled within its time limit (a stalled WebGPU startup).
  */
-export type MargoErrorCode = 'disposed' | 'attached' | 'state' | 'unsupported' | 'failed';
+export type MargoErrorCode = 'disposed' | 'attached' | 'state' | 'unsupported' | 'failed' | 'timeout';
 
 /**
  * A Margo error that is not an argument error. The message names the subject, what went wrong and the fix

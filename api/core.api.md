@@ -94,6 +94,9 @@ export interface EngineOptions {
     fallback?: (canvas: HTMLCanvasElement) => Renderer;
     features?: GPUFeatureName[];
     exactSize?: boolean | readonly [number, number];
+    signal?: AbortSignal;
+    startupWarning?: number;
+    startupTimeout?: number;
 }
 
 export interface EnginePlugin {

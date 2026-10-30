@@ -107,6 +107,33 @@ canvas.style.imageRendering = 'pixelated'; // nearest-neighbour scaling, no blur
 - `engine.pick(x, y)` still takes CSS pixels and maps them to backbuffer pixels.
 - The WebGL2 fallback keeps its own context antialiasing; pass `exactSize` to WebGPU engines.
 
+## Startup that never finishes
+
+`Engine.create` waits for the browser at four steps: `requestAdapter`, `requestDevice` and two pipeline compiles. Some
+drivers never answer one of them: on an Intel Arc 140V, with 3 or 4 WebGPU pages alive at once in one browser process,
+each new page got slower to get a device and the 4th never did, with no error. So each step has a time limit:
+
+```ts
+import { Engine } from '@margoengine/core';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, {
+  signal: AbortSignal.timeout(60_000), // cancel creation yourself (here after 60 s); rejects with the signal's reason
+  startupWarning: 8000, // one console.warn naming the step still pending after 8 s (the default)
+  startupTimeout: 30_000, // then reject with MargoError code 'timeout' naming the step (the default)
+}).catch((error) => {
+  if (error.code === 'timeout') console.error('The GPU did not answer; close other 3D tabs and reload');
+  throw error;
+});
+engine.start();
+```
+
+- With `backend: 'auto'` (the default) and a `fallback` (`webglRenderer` from `@margoengine/webgl`), a `timeout`
+  falls back to WebGL2 like any other WebGPU failure; `engine.fallbackReason` says why. An abort never falls back.
+- A device that arrives after the limit is destroyed, not leaked; the warning is printed at most once per step.
+- The cause is the driver, not the page. A page that shows many engines (a gallery) should start them one at a time,
+  each after the previous has drawn, and dispose engines that leave the screen.
+
 ## Ambient RGB
 
 Extension users can tint core's diffuse ambient independently of the directional light:

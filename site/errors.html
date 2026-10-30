@@ -21,6 +21,7 @@
       <li><a href="#unsupported"><code>unsupported</code></a></li>
       <li><a href="#state"><code>state</code></a></li>
       <li><a href="#failed"><code>failed</code></a></li>
+      <li><a href="#timeout"><code>timeout</code></a></li>
     </ul>
     <section id="disposed">
       <h2><a href="#disposed">disposed: used after dispose()</a></h2>
@@ -42,6 +43,12 @@
       <h2><a href="#failed">failed: the operation ran and produced no result</a></h2>
       <p><strong>Cause.</strong> The GPU or the transform kernel could not complete the work. See the GPU lost and limits entries.</p>
       <p><strong>Fix.</strong> Read the message for the GPU or kernel detail; most failures are recovered by the engine or need smaller inputs.</p>
+    </section>
+    <section id="timeout">
+      <h2><a href="#timeout">timeout: a WebGPU startup step never settled</a></h2>
+      <p class="messages"><code>WebGPU requestAdapter never settled</code> <code>WebGPU requestDevice never settled</code> <code>WebGPU createRenderPipelineAsync never settled</code> <code>Margo: still waiting for &lt;step&gt; after 8 s</code></p>
+      <p><strong>Cause.</strong> The browser or GPU driver never answered a step of <code>Engine.create</code>: the adapter or device request, or a pipeline compile. Seen on an Intel Arc 140V when 3 or 4 WebGPU pages were alive at once in one browser process: each new page got slower to get a device, and the 4th never did, with no error. The engine warns once after <code>startupWarning</code> ms (default 8000) and rejects after <code>startupTimeout</code> ms (default 30000).</p>
+      <p><strong>Fix.</strong> Start fewer engines at once on one page or in one browser (start the next when the previous one has drawn, or close pages you no longer show). With <code>backend: "auto"</code> and <code>fallback: webglRenderer</code> from <code>@margoengine/webgl</code> the page draws on WebGL2 instead. Raise <code>startupTimeout</code> for a slow first compile; pass <code>signal</code> to cancel creation yourself. Branch on <code>error.code === "timeout"</code>.</p>
     </section>
     <h2>Messages</h2>
     <section id="webgpu">
