@@ -535,6 +535,7 @@ export const entries = [
       'BiomeView radius must be above 0',
       'BiomeView shadows must be a Shadows from @margoengine/shadows',
       'BiomeView textureResolution must be a positive multiple of the world resolution',
+      'overviewWeights textureResolution must be a positive multiple of the world resolution',
       'BiomeView.attach takes an engine and a BiomeWorld',
       "BiomeWorld backend must be 'auto', 'gpu' or 'cpu'",
       'BiomeWorld cache must be an integer number of tiles, 1..4,096',

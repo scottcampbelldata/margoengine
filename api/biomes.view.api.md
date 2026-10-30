@@ -5,6 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Terrain, TerrainColorOptions } from "@margoengine/terrain";
+import { Water, WaterOptions } from "@margoengine/water";
 
 export interface BiomeShadows {
     add(source: object): () => void;
@@ -22,6 +23,7 @@ export class BiomeView implements Disposable {
     prefetch(rect: readonly [number, number, number, number], options?: {
         readonly signal?: AbortSignal;
     }): Promise<void>;
+    get water(): Water | undefined;
     get objects(): import('@margoengine/biomes/objects').BiomeObjects | undefined;
     whenIdle(): Promise<void>;
     get streaming(): {
@@ -49,7 +51,10 @@ export interface BiomeViewOptions {
     readonly budget?: number;
     readonly detailBudget?: number;
     readonly shadows?: BiomeShadows;
+    readonly water?: boolean | 'auto' | BiomeWaterSettings;
 }
+
+export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon' | 'terrain' | 'spray'>;
 
 export const MATERIALS: Readonly<Record<string, MaterialLook>>;
 
@@ -58,6 +63,12 @@ export const MAX_GROUND_MATERIALS = 16;
 export interface MaterialLook {
     readonly color: readonly [number, number, number];
     readonly detail?: number;
+}
+
+export interface OverviewWeights {
+    readonly width: number;
+    readonly depth: number;
+    readonly weights: Uint8Array[];
 }
 
 export const VIEW_LAYERS: readonly string[];
@@ -73,6 +84,8 @@ export interface ViewTile {
 export function groundMaterials(biomes: readonly BiomeDefinition[]): string[];
 
 export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: readonly string[]): Uint8Array;
+
+export function overviewWeights(world: BiomeWorld, materials: readonly string[], textureResolution?: number): OverviewWeights;
 
 export function terrainColorsFor(world: BiomeWorld, materials?: Readonly<Record<string, MaterialLook>>): Pick<TerrainColorOptions, 'sand' | 'meadow' | 'stone'>;
 
