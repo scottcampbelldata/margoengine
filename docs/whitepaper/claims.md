@@ -288,7 +288,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
 | terrain-ssr | `6c20076d` (before terrain's capture hook) -> `49f3e971` (the water/terrain SSR commit): terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
 | water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `57250a49` |
-| quality-presets | `96daac7` -> `01e5e35` | `667d1a26` |
+| quality-presets | `96daac7` -> `01e5e35` | `33c403984` |
 | post-ssao-perspective | `9c761d5` -> `9702e57`: 3,282 calls | - |
 | probes-decals | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | - |
 | procedural-deps | HISTORICAL: `ed53ec5` -> `fff47af`; the baseline imports simplex-noise and isosurface, since removed from the lockfile, so the runner reports it instead of failing | - |
@@ -426,6 +426,14 @@ under the default `'soft'` filter, a `writeBuffer` seeding the buffer with 1.0, 
 the nearest depth, takes its first search read at the receiver's texel and compares with `min(plane offset, 0)`;
 `'pcf'` and `'hard'` receivers change only by the appended struct member. Against the old references the first
 difference in each story is the uniform's size and the new buffer.
+
+**quality-presets, advanced to `33c403984` on 2026-10-30 (VFX repeatable particle order):** the VFX update kernel took
+respawn tickets and draw-list places with `atomicAdd`, so which dead slots were born and the order of blended particles
+changed from run to run. It now runs four small workgroup prefix-sum passes around the simulation, so births take the
+lowest dead slots and the drawn particles are compacted in slot order (accepted difference in work, Scott 2026-10-30;
+`docs/limits.md`, `docs/whitepaper/perf-history.md` section 6; regression test `packages/vfx/test/browser-check.mjs`,
+the order case). The golden outputs were recaptured with `proofs/capture.mjs` at that commit; the proof's three comparisons (no preset,
+preset against explicit options, explicit against none) still hold, and no other package's code changed.
 
 **taa-velocity, advanced to `8149bf4e` on 2026-10-26 (speed matrix row 13.7):** TAA's object velocities, a render pass per mesh before,
 now draw in one render pass, the PBR snapshots in one compute pass after it, and the camera rows moved out of each
