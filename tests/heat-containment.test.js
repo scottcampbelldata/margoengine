@@ -274,6 +274,14 @@ test('a profile that excludes a package reports it as EXCLUDED BY PROFILE with i
   assert.equal(report(results, profile).json.profile, 'thermal-limited');
 });
 
+test('the laptop profile loads, has a heat watch and excludes nothing', () => {
+  const profile = machineProfile({ MARGO_MACHINE_PROFILE: 'laptop' });
+  assert.equal(profile.name, 'laptop');
+  assert.ok(profile.heat && profile.heat.stopC === 88 && profile.heat.resumeC === 75);
+  assert.equal(profile.split, true);
+  assert.deepEqual(profile.exclude, {});
+});
+
 test('the default profile runs every planned test as one step, exactly as before', () => {
   const profile = machineProfile({}),
     tests = plan(),
@@ -320,7 +328,7 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
 test('profiles are chosen by name, are checked, and hold no machine names or home paths', () => {
   const data = readProfiles(),
     text = readFileSync(PROFILES_FILE, 'utf8');
-  assert.ok(['workstation', 'mini-pc', 'thermal-limited'].every((n) => data.profiles[n]));
+  assert.ok(['workstation', 'mini-pc', 'laptop', 'thermal-limited'].every((n) => data.profiles[n]));
   assert.doesNotMatch(text, /\/home\/|[A-Z]:\\\\|~\/|Users/);
   for (const profile of Object.values(data.profiles))
     if (profile.heat) assert.ok(profile.heat.maxWaitMin > 0 && profile.heat.resumeC < profile.heat.stopC);

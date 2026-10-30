@@ -2089,7 +2089,7 @@ temperature it waits forever. Give any copy a hard limit.
 
 Machine profiles and heat pauses in the runner (item 57.1a, `scripts/support/machine-profiles.json`,
 `scripts/support/heat.mjs`): `MARGO_MACHINE_PROFILE` picks `workstation` (default: no heat watch, every test as one
-step), `mini-pc` or `thermal-limited` by name, never by hostname. A heat profile makes `check:gpu-packages` watch the
+step), `mini-pc`, `laptop` (heat watch at 88 C, excludes nothing) or `thermal-limited` by name, never by hostname. A heat profile makes `check:gpu-packages` watch the
 same sensor as the guard (hottest thermal zone, or `MARGO_THERMAL_FILE`) a little below the guard's stop, so the guard
 stays the machine-level safety net. Outcomes the runner prints, one line per step in its summary:
 

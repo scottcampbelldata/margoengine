@@ -18,6 +18,13 @@
       },
       "nightly": ["gpu package tests"]
     },
+    "laptop": {
+      "description": "a laptop with an integrated GPU (Intel Arc class) and a temperature logger feeding MARGO_THERMAL_FILE; heavy suites run as short steps",
+      "heat": { "stopC": 88, "resumeC": 75, "maxWaitMin": 30, "maxResumesPerStep": 2, "pollS": 5 },
+      "split": true,
+      "exclude": {},
+      "nightly": []
+    },
     "thermal-limited": {
       "description": "a fanless Linux test server with Intel UHD graphics (Mesa) and a 10 W power cap; its heat guard stops jobs at 82 C",
       "heat": { "stopC": 80, "resumeC": 70, "maxWaitMin": 45, "maxResumesPerStep": 2, "pollS": 5 },
