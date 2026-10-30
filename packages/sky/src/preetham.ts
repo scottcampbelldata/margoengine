@@ -6,11 +6,14 @@ import type { SkyFeatures } from './base.js';
 // the model's chromaticity falls up to 0.019 below the CIE daylight locus y = -3x^2 + 2.87x - 0.275 (CIE 15,
 // daylight) and the horizon draws pink (noon, turbidity 2: linear RGB 0.83, 0.785, 0.994). Measured daylight, which
 // that locus fits, does not fall on its pink side, so y is kept at or above it; where the fit already is, nothing changes.
+// Below a turbidity of about 1.65 the luminance distribution's normaliser (1 + A e^B at the zenith) turns negative and the
+// sky draws black, and just above it the horizon blows out (turbidity 1.7: 3.0 at the horizon, 0.76 at 2), so the
+// model reads turbidity below 2 as 2, where the fit is smooth again. Bruneton uses the value as given.
 /** Preetham analytic day model (the default `model`); needs no precomputed tables. */
 export const preetham: NonNullable<SkyFeatures['preetham']> = {
   wgsl: `fn perez(theta:f32,gamma:f32,a:f32,b:f32,c:f32,d:f32,e:f32)->f32{return (1.0+a*exp(b/max(0.01,cos(theta))))*(1.0+c*exp(d*gamma)+e*cos(gamma)*cos(gamma));}
 fn preetham(w:vec3f,s:vec3f)->vec3f {
- let t=frame.settings.z;let theta=acos(clamp(w.y,0.01,1.0));let gamma=acos(clamp(dot(w,s),-1.0,1.0));let z=acos(clamp(s.y,0.01,1.0));let z2=z*z;let z3=z2*z;
+ let t=max(2.0,frame.settings.z);let theta=acos(clamp(w.y,0.01,1.0));let gamma=acos(clamp(dot(w,s),-1.0,1.0));let z=acos(clamp(s.y,0.01,1.0));let z2=z*z;let z3=z2*z;
  let yz=max(0.001,(4.0453*t-4.9710)*tan((4.0/9.0-t/120.0)*(3.14159265-2.0*z))-0.2155*t+2.4192);
  let xz=(0.00165*z3-0.00374*z2+0.00208*z)*t*t+(-0.02902*z3+0.06377*z2-0.03202*z+0.00394)*t+0.11693*z3-0.21196*z2+0.06052*z+0.25885;
  let zz=(0.00275*z3-0.00610*z2+0.00317*z)*t*t+(-0.04214*z3+0.08970*z2-0.04153*z+0.00516)*t+0.15346*z3-0.26756*z2+0.06670*z+0.26688;

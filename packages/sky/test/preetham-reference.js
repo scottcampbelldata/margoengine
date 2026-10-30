@@ -1,15 +1,16 @@
 // CPU reference for the Preetham day sky, written from Preetham, Shirley & Smits 1999 (Appendix A.2: Perez
 // distribution, turbidity coefficients, zenith luminance and chromaticity), the IEC 61966-2-1 XYZ to linear sRGB
 // matrix and the CIE daylight locus y = -3x^2 + 2.87x - 0.275, with the same Margo tuning as src/preetham.ts (0.05
-// luminance scale, 0.01 / 0.001 clamps. Linear RGB radiance toward unit `w` with the
+// luminance scale, 0.01 / 0.001 clamps, turbidity below 2 read as 2). Linear RGB radiance toward unit `w` with the
 // sun toward unit `s`.
 const perez = (theta, gamma, [a, b, c, d, e]) =>
   (1 + a * Math.exp(b / Math.max(0.01, Math.cos(theta)))) * (1 + c * Math.exp(d * gamma) + e * Math.cos(gamma) ** 2);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /** The model's chromaticity x, y and luminance Y; `locus: false` leaves y as the fit gives it. */
-export function preethamXyY(w, s, t, { locus = true } = {}) {
-  const theta = Math.acos(clamp(w[1], 0.01, 1)),
+export function preethamXyY(w, s, turbidity, { locus = true } = {}) {
+  const t = Math.max(2, turbidity),
+    theta = Math.acos(clamp(w[1], 0.01, 1)),
     gamma = Math.acos(clamp(w[0] * s[0] + w[1] * s[1] + w[2] * s[2], -1, 1)),
     z = Math.acos(clamp(s[1], 0.01, 1)),
     z2 = z * z,

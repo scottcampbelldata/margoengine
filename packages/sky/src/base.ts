@@ -109,7 +109,7 @@ export interface SkyOptions {
   hours?: number;
   /** Clock hours per real second, -24..24. Default 1 / 3600 (real time). */
   timeScale?: number;
-  /** Atmospheric haze, 1-10. Default 2. */
+  /** Atmospheric haze, 1-10. Default 2. The Preetham model reads values below 2 as 2 (its fit breaks down below that). */
   turbidity?: number;
   /**
    * Exposure of the sky backdrop only, in stops, -16..16. Default 0. It does not change how bright lit meshes are:

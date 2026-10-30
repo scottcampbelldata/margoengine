@@ -64,10 +64,11 @@ try {
   assert.equal(weather.afterFlash, 0, 'the frame returns to dry after the flash');
   console.log('ok weather: rain', weather.rainChanged, 'snow', weather.snowChanged, 'flash gain', weather.flashGain);
   // Horizon colour: the default sky at noon (and a hazier one) matches the CPU reference just below the horizon,
-  // and is not pink there (red never above green, green never above blue), as on the CIE daylight locus.
+  // and is not pink there (red never above green, green never above blue), as on the CIE daylight locus. Turbidity 1
+  // draws as 2 (below about 1.65 the Preetham fit drew a black sky).
   await page.goto('http://127.0.0.1:5211/packages/sky/test/horizon-check.html');
   await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
-  for (const options of [{}, { turbidity: 5 }]) {
+  for (const options of [{}, { turbidity: 5 }, { turbidity: 1 }]) {
     const r = await page.evaluate((o) => window.check.run(o), options),
       label = `horizon ${JSON.stringify(options)}`;
     assert.equal(r.error, null, label);

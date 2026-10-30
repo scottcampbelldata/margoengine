@@ -25,3 +25,11 @@ test('the day sky keeps its chromaticity off the pink side of the daylight locus
   // Where the fit is already on the daylight side (the zenith at noon), the sky is unchanged.
   assert.deepEqual(preethamRGB(noon, noon, 2), preethamRGB(noon, noon, 2, { locus: false }));
 });
+
+test('the day sky reads turbidity below 2 as 2 instead of drawing black', () => {
+  // The fit's luminance normaliser 1 + A e^B (A = 0.1787 T - 1.463, B = -0.3554 T + 0.4275) is negative below about 1.65.
+  const normaliser = (t) => 1 + (0.1787 * t - 1.463) * Math.exp(-0.3554 * t + 0.4275);
+  assert.ok(normaliser(1) < 0 && normaliser(1.6) < 0 && normaliser(2) > 0.1);
+  assert.match(preetham.wgsl, /let t=max\(2\.0,frame\.settings\.z\);/);
+  assert.deepEqual(preethamRGB(level, noon, 1), preethamRGB(level, noon, 2));
+});
