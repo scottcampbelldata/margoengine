@@ -1,31 +1,31 @@
 {
  "night-citadel": {
-  "digest": "1fda9cfe8fa1ad39",
+  "digest": "59874cc0b306b18b",
   "created": 60,
   "commands": 58
  },
  "stage-sky": {
-  "digest": "83643ea5b3ea31f8",
+  "digest": "5d11d6f75739d18f",
   "created": 52,
   "commands": 34
  },
  "afterlight": {
-  "digest": "acff9f375faac62c",
+  "digest": "60d494459e81c688",
   "created": 86,
   "commands": 381
  },
  "meadow": {
-  "digest": "a91d4464e71b977d",
+  "digest": "8de2779d124ba83b",
   "created": 72,
   "commands": 235
  },
  "preetham": {
-  "digest": "656cf6a4916d03ec",
+  "digest": "f349ef75197c0d68",
   "created": 58,
   "commands": 70
  },
  "preetham-clouds-fog": {
-  "digest": "a8f6b413f17c5501",
+  "digest": "c2b860893014b6e6",
   "created": 60,
   "commands": 58
  }

@@ -1,11 +1,13 @@
 // Real-GPU proof (run from the repository root after building packages, one GPU job at a time):
 //   node packages/sky/test/browser-check.mjs
 // Every demo sky configuration rendered with the full Sky and with `@margoengine/sky/base` plus only the features it
-// uses must produce bit-identical HDR scene pixels (and reflection maps) on every frame, at 4x and at 1x MSAA.
+// uses must produce bit-identical HDR scene pixels (and reflection maps) on every frame, at 4x and at 1x MSAA. The
+// default sky's horizon must match the CPU Preetham reference (preetham-reference.js) and not be pink.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 import { configs } from './configs.js';
+import { preethamRGB } from './preetham-reference.js';
 const context = await openBrowser({ startPath: '/packages/sky/test/browser-check.html', port: 5211 }),
   { page, hardware } = context,
   pageErrors = [],
@@ -61,6 +63,33 @@ try {
   assert.ok(weather.flashGain > 0, `the flash lit the frame: ${JSON.stringify(weather)}`);
   assert.equal(weather.afterFlash, 0, 'the frame returns to dry after the flash');
   console.log('ok weather: rain', weather.rainChanged, 'snow', weather.snowChanged, 'flash gain', weather.flashGain);
+  // Horizon colour: the default sky at noon (and a hazier one) matches the CPU reference just below the horizon,
+  // and is not pink there (red never above green, green never above blue), as on the CIE daylight locus.
+  await page.goto('http://127.0.0.1:5211/packages/sky/test/horizon-check.html');
+  await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+  for (const options of [{}, { turbidity: 5 }]) {
+    const r = await page.evaluate((o) => window.check.run(o), options),
+      label = `horizon ${JSON.stringify(options)}`;
+    assert.equal(r.error, null, label);
+    assert.deepEqual(r.errors, [], label);
+    assert.ok(Math.abs(r.hours - 12) < 1e-3, `${label}: default clock at noon, got ${r.hours}`);
+    const expected = preethamRGB(
+      [0, 0.01 / Math.hypot(1, 0.01), -1 / Math.hypot(1, 0.01)],
+      r.sun,
+      options.turbidity ?? 2,
+    );
+    assert.ok(r.pixels.length > 100, `${label}: ${r.pixels.length} pixels`);
+    for (const [i, p] of r.pixels.entries()) {
+      for (let c = 0; c < 3; c++)
+        assert.ok(
+          Math.abs(p[c] - expected[c]) <= 0.01 * expected[c],
+          `${label} pixel ${i} channel ${c}: ${p[c]} vs CPU ${expected[c]} (rgb ${p}, CPU ${expected})`,
+        );
+      assert.ok(p[0] <= p[1] && p[1] <= p[2], `${label} pixel ${i} is tinted, not daylight: rgb ${p}`);
+    }
+    report.results[label] = { pixel: r.pixels[0], expected };
+    console.log(`ok ${label}: rgb ${r.pixels[0].map((v) => v.toFixed(4))}, CPU ${expected.map((v) => v.toFixed(4))}`);
+  }
   assert.deepEqual(pageErrors, []);
   await writeFile('test-results/sky-entries-browser-check.json', JSON.stringify(report, null, 1));
   console.log('sky entries browser check passed');

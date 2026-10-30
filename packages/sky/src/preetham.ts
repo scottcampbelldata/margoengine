@@ -2,6 +2,10 @@ import type { SkyFeatures } from './base.js';
 // Perez distribution, its turbidity coefficients and the zenith luminance and chromaticity polynomials: Preetham,
 // Shirley & Smits 1999, Appendix A.2; XYZ to linear sRGB matrix: IEC 61966-2-1. The 0.05 luminance scale, the
 // horizon fade smoothstep(-0.2, 0.05, sun.y) and the 0.01 / 0.001 clamps are Margo tuning.
+// The fitted y distribution brightens less than x toward the horizon, so near it (and below a sun some 45 degrees up)
+// the model's chromaticity falls up to 0.019 below the CIE daylight locus y = -3x^2 + 2.87x - 0.275 (CIE 15,
+// daylight) and the horizon draws pink (noon, turbidity 2: linear RGB 0.83, 0.785, 0.994). Measured daylight, which
+// that locus fits, does not fall on its pink side, so y is kept at or above it; where the fit already is, nothing changes.
 /** Preetham analytic day model (the default `model`); needs no precomputed tables. */
 export const preetham: NonNullable<SkyFeatures['preetham']> = {
   wgsl: `fn perez(theta:f32,gamma:f32,a:f32,b:f32,c:f32,d:f32,e:f32)->f32{return (1.0+a*exp(b/max(0.01,cos(theta))))*(1.0+c*exp(d*gamma)+e*cos(gamma)*cos(gamma));}
@@ -12,7 +16,7 @@ fn preetham(w:vec3f,s:vec3f)->vec3f {
  let zz=(0.00275*z3-0.00610*z2+0.00317*z)*t*t+(-0.04214*z3+0.08970*z2-0.04153*z+0.00516)*t+0.15346*z3-0.26756*z2+0.06670*z+0.26688;
  let y=yz*perez(theta,gamma,0.1787*t-1.4630,-0.3554*t+0.4275,-0.0227*t+5.3251,0.1206*t-2.5771,-0.0670*t+0.3703)/perez(0.0,z,0.1787*t-1.4630,-0.3554*t+0.4275,-0.0227*t+5.3251,0.1206*t-2.5771,-0.0670*t+0.3703)*0.05;
  let x=xz*perez(theta,gamma,-0.0193*t-0.2592,-0.0665*t+0.0008,-0.0004*t+0.2125,-0.0641*t-0.8989,-0.0033*t+0.0452)/perez(0.0,z,-0.0193*t-0.2592,-0.0665*t+0.0008,-0.0004*t+0.2125,-0.0641*t-0.8989,-0.0033*t+0.0452);
- let chroma=zz*perez(theta,gamma,-0.0167*t-0.2608,-0.0950*t+0.0092,-0.0079*t+0.2102,-0.0441*t-1.6537,-0.0109*t+0.0529)/perez(0.0,z,-0.0167*t-0.2608,-0.0950*t+0.0092,-0.0079*t+0.2102,-0.0441*t-1.6537,-0.0109*t+0.0529);
+ let chroma=max(-3.0*x*x+2.87*x-0.275,zz*perez(theta,gamma,-0.0167*t-0.2608,-0.0950*t+0.0092,-0.0079*t+0.2102,-0.0441*t-1.6537,-0.0109*t+0.0529)/perez(0.0,z,-0.0167*t-0.2608,-0.0950*t+0.0092,-0.0079*t+0.2102,-0.0441*t-1.6537,-0.0109*t+0.0529));
  let xyz=vec3f(x*y/max(chroma,0.001),y,(1.0-x-chroma)*y/max(chroma,0.001));
  return max(vec3f(0),mat3x3f(vec3f(3.2406,-0.9689,0.0557),vec3f(-1.5372,1.8758,-0.2040),vec3f(-0.4986,0.0415,1.0570))*xyz)*smoothstep(-0.2,0.05,s.y);
 }
