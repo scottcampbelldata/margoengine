@@ -746,15 +746,16 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
 - **Every demo compared** (`npm run visual:compat`, in `check:merge`; table in
   [webgl2-compat-demos.md](webgl2-compat-demos.md)): 60 demos, 28 site demos and 32 Khronos gallery models. All 32
   models and 20 site demos draw the same pixels as native WebGPU by the parity rule (decision 4); 8 site demos run
-  with differences the table states (0.2% to 7.1% of pixels with d > 2, causes open in
-  [known-bugs.md](known-bugs.md)). Main-thread work
+  with differences the table states (0.2% to 7.1% of pixels with d > 2, causes in the last item of this list).
+  Main-thread work
   per still frame on the layer: 0.2 to 9.9 ms (native 0.2 to 1.2 ms).
-- **Exact still frames.** 54 of the 60 demos capture the same pixels twice natively, and the check fails when one of
+- **Exact still frames.** 57 of the 60 demos capture the same pixels twice natively, and the check fails when one of
   them stops doing so, so native noise cannot flip a status. ui-game, weather and animator still moved with real time
   under reduced motion (their status flipped between runs); they now hold still and draw the same pixels on the layer.
   Sciviz points differed only in its status line, which states how long the plot took; the check paints it over
-  (and light keeper's live performance panel), and sciviz points now draws the same pixels on the layer. Four still
-  show native noise: gameplay sandbox and two Khronos models (no pixel with d > 2) and light keeper (0.03%).
+  (and light keeper's live frame time), and sciviz points now draws the same pixels on the layer. Three still show
+  native noise, none with a pixel at d > 2: gameplay sandbox (its VFX particles' draw order) and two Khronos
+  models (ToyCar, IridescenceLamp).
 - **Compute lab and sciviz surface (two bugs found by the run, both fixed).** Sciviz surface did not start on the layer
   ("Uniform p.time is missing"): a browser without a WebGPU adapter may still define the native `GPUBuffer` interface,
   the layer's buffers failed `instanceof GPUBuffer`, and the compute package encoded its own uniform buffer as the
@@ -773,10 +774,12 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   (`packages/shadows/src/compat.ts`, loaded only on the layer) computes the same minimum with two fragment-tier block
   passes and one point-draw word per layer: those demos now take 0.4 to 1.3 ms, and `routes-browser.mjs` finds no
   pixel different from native (regression tests: `routes.test.js` tiers, the route case in `routes-browser.mjs`, and
-  the frame budget of `visual:compat`).
-- **Frame budget.** `visual:compat` fails a demo whose median frame on the layer costs more than 50 ms of main-thread
-  work and more than twice its native frame (`--budget=<ms>`); the run on an integrated GPU (AMD Radeon 680M) is
-  still to be recorded.
+  the frame budget of `visual:compat:budget`).
+- **Frame budget.** `visual:compat:budget` (a check:merge step of its own that holds the GPU exclusively, in chunks
+  of 8 demos) fails a demo whose median frame on the layer costs more than 50 ms of main-thread work and more than
+  twice its native frame (`--budget=<ms>`). It was part of `visual:compat`, in a shared GPU slot, until a landing
+  failed on khronos-NodePerformanceTest at 86 ms beside other GPU suites (2026-10-30). The run on an integrated GPU
+  (AMD Radeon 680M) is still to be recorded.
 - **Dual viewport** ([examples/dual-viewport.html](../examples/dual-viewport.html), the launch showcase item): one
   scene with PBR materials and soft shadows, native WebGPU on the left and the layer on the right, with the live pixel
   difference and both frame times. In exact-pixel mode and with 4x MSAA on this PC no pixel of the 274,176 differs by more than one level.

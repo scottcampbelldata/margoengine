@@ -1,138 +1,39 @@
 // The visual check's WebGL2 compatibility run (docs/webgl2-compat-demos.md, roadmap milestone M8): every site demo and
 // every Khronos gallery model, once on native WebGPU and once on the WebGL2 compatibility layer, in the same browser on
 // the same GPU, compared pixel by pixel.
-//   npm run visual:compat [-- --only=dof,earth] [--no-build] [--write] [--budget=50] [--max-minutes=90]
-// Site demos run the layer the way a visitor without WebGPU gets it: `navigator.gpu` is removed before the page loads,
-// so the page's own gate (examples/needs-webgpu.js) downloads @margoengine/webgl2-compat from the site build and
-// installs it. Khronos models (a dev-server page without the gate) get the layer from scripts/support/compat-shim.js.
-// Per demo: native twice (its run-to-run noise) and the layer once, in exact-pixel captures of the demo's still frame
-// (prefers-reduced-motion, as the visual check). d = max RGB difference per pixel (0 to 255). "same" is the roadmap's
-// parity rule (decision 4): at most 0.1% of pixels with d > 2 and a mean d of at most 0.25; "differs" states the
-// numbers; "refused" means the demo showed the layer's refusal (MargoError code `unsupported`) and names it.
-// Frame cost: the main-thread time of each animation frame's callbacks and the interval between frames, median of 60
-// frames after the capture, both paths. `--budget=<ms>` fails a demo whose median frame on the layer costs more and
-// at least twice its native frame (the per-frame budget check for integrated GPUs; default 50 ms).
+//   npm run visual:compat [-- --only=dof,earth] [--no-build] [--write] [--max-minutes=90]
+// The demos and how a page gets the layer: scripts/support/visual-compat-pages.js. Per demo: native twice (its
+// run-to-run noise) and the layer once, in exact-pixel captures of the demo's still frame (prefers-reduced-motion, as
+// the visual check). d = max RGB difference per pixel (0 to 255). "same" is the roadmap's parity rule (decision 4): at
+// most 0.1% of pixels with d > 2 and a mean d of at most 0.25; "differs" states the numbers; "refused" means the demo
+// showed the layer's refusal (MargoError code `unsupported`) and names it.
 // Gate: each demo's status must match scripts/support/visual-compat-expected.json, and a "differs" demo may not get
-// worse than its recorded share and mean (x1.5 plus 0.001 / 0.25), and a demo recorded with an exact still frame (its two
-// native captures equal pixel for pixel) must keep it, so native noise can never flip its status. `--write` records this run there and rewrites the
-// table in docs/webgl2-compat-demos.md. Takes a shared slot of the GPU lock, like the visual check.
-import { spawnSync, execFileSync } from 'node:child_process';
+// worse than its recorded share and mean (x1.5 plus 0.001 / 0.25), and a demo recorded with an exact still frame (its
+// two native captures equal pixel for pixel) must keep it, so native noise can never flip its status. `--write` records
+// this run there and rewrites the table in docs/webgl2-compat-demos.md (its frame column is the budget step's).
+// Pixels only, so it takes a shared slot of the GPU lock, like the visual check. The frame cost and its budget are
+// npm run visual:compat:budget (scripts/visual-compat-budget.mjs), which holds the GPU exclusively.
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { preview, createServer } from 'vite';
 import { decodePNG } from '../tests/support/png.js';
 import { acquire } from './gpu-lock.mjs';
-import { demos } from './support/visual-demos.js';
-import { compatShim } from './support/compat-shim.js';
-import { compare, downsample, encodePNG } from './support/visual-image.js';
-import { launchBrowser, browserLabel } from './lib/browser.mjs';
+import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
-import { SAME, gateProblems, record, verdict } from './support/visual-compat-status.js';
+import { rewriteTable } from './support/visual-compat-doc.js';
+import { openCase, selectCases, startServers, withQuery } from './support/visual-compat-pages.js';
+import { gateProblems, record, SAME, verdict } from './support/visual-compat-status.js';
+import { compare, downsample, encodePNG } from './support/visual-image.js';
 
 const root = resolve(import.meta.dirname, '..'),
   out = resolve(root, 'test-results/visual-compat'),
-  expectedPath = resolve(root, 'scripts/support/visual-compat-expected.json'),
-  docPath = resolve(root, 'docs/webgl2-compat-demos.md');
+  expectedPath = resolve(root, 'scripts/support/visual-compat-expected.json');
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const only = (arg('only') ?? '').split(',').filter(Boolean),
   write = process.argv.includes('--write'),
-  budget = Number(arg('budget') ?? 50),
   maxMinutes = Number(arg('max-minutes') ?? 90);
 export { SAME };
-
-const iphone =
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
-const views = {
-  high: { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, query: '?quality=high' },
-  phone: {
-    viewport: { width: 390, height: 844 },
-    deviceScaleFactor: 3,
-    isMobile: true,
-    hasTouch: true,
-    userAgent: iphone,
-    query: '',
-  },
-  model: { viewport: { width: 640, height: 480 }, deviceScaleFactor: 1, query: '' },
-};
-const withQuery = (path, query) => (query && path.includes('?') ? `${path}&${query.slice(1)}` : path + query);
-// Site demos the visual check leaves out (no baselines: their native picture is not pinned), compared here all the
-// same, so every demo on the site runs on the layer. The dual viewport page runs both paths itself.
-const viewportReady = "document.querySelector('#viewport')?.dataset.ready==='true'";
-// mask: live readouts painted over (sciviz points' status line states the plot time, light keeper's performance pill
-// its frame rate and heap size).
-export const extraDemos = [
-  ...['compute-lab', 'sciviz-volume', 'sciviz-points', 'sciviz-surface', 'ui-game'].map((id) => ({
-    id,
-    path: `demos/${id}.html`,
-    ready: "document.querySelector('canvas')?.dataset.ready==='true'",
-    // Live timings painted over (they change run to run): sciviz points states how long its plot took.
-    ...(id === 'sciviz-points' ? { mask: ['#status'] } : {}),
-  })),
-  { id: 'animator', path: 'demos/animator/', ready: '!!window.animatorDemo' },
-  // The workshop's live frame time in its performance pill is painted over.
-  {
-    id: 'light-keeper',
-    path: 'demos/light-keeper/',
-    ready: viewportReady,
-    mask: ['[data-workshop-performance-host] button > span:first-child'],
-  },
-];
-// One view per demo: the desktop one (the gallery's model view). The robot page is character-animation's old URL.
-const allCases = [...demos, ...extraDemos]
-  .filter((demo) => demo.id !== 'robot-expressive')
-  .map((demo) => {
-    const view = demo.dev ? 'model' : (demo.views ?? ['high']).includes('high') ? 'high' : demo.views[0];
-    return { id: demo.id, demo, view: views[view], viewName: view };
-  });
-const cases = allCases.filter((c) => !only.length || only.some((o) => c.id.includes(o)));
-
-/** Page init script: the page has no WebGPU, so its gate loads the layer (a visitor without WebGPU). */
-function noWebGPU() {
-  delete Navigator.prototype.gpu;
-  if (globalThis.WorkerNavigator) delete WorkerNavigator.prototype.gpu;
-}
-/** Page init script: times each animation frame's callbacks (main-thread work) and the frames' timestamps. */
-function frameTimer() {
-  const frames = (globalThis.__margoFrames = []),
-    raf = requestAnimationFrame.bind(globalThis);
-  let current;
-  globalThis.requestAnimationFrame = (callback) =>
-    raf((time) => {
-      if (current?.time !== time) frames.push((current = { time, work: 0 }));
-      const start = performance.now();
-      try {
-        callback(time);
-      } finally {
-        current.work += performance.now() - start;
-      }
-    });
-}
-const median = (values) => {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted.length ? sorted[sorted.length >> 1] : NaN;
-};
-/** Median main-thread work and interval over the next 60 frames, in ms. */
-async function frameCost(page) {
-  return page.evaluate(
-    () =>
-      new Promise((done) => {
-        const frames = globalThis.__margoFrames,
-          from = frames.length;
-        const started = performance.now();
-        const wait = () => {
-          // A paused demo (the gameplay sandbox under reduced motion) draws no frame: give up after 3 s without one.
-          const waited = performance.now() - started;
-          if (frames.length - from >= 61 || waited > 20_000 || (waited > 3000 && frames.length === from)) {
-            const list = frames.slice(from, from + 61),
-              work = list.slice(0, -1).map((f) => f.work),
-              interval = list.slice(1).map((f, i) => f.time - list[i].time);
-            done({ frames: work.length, work, interval });
-          } else setTimeout(wait, 100); // fixed-wait: polls the frame list, which only grows when the page draws
-        };
-        wait();
-      }),
-  );
-}
+const cases = selectCases(only);
 
 /** d > 2 share, mean and max over full-resolution captures, plus the visual check's changed and hot shares. */
 function metrics(a, b) {
@@ -164,73 +65,27 @@ const deadline = setTimeout(() => {
 deadline.unref();
 const releaseGpu = await acquire({ owner: 'visual-compat', mode: 'shared' });
 process.on('exit', () => releaseGpu());
-let server, devServer, browser;
+let servers = [],
+  browser;
 let exitCode = 0;
 try {
   await mkdir(out, { recursive: true });
-  if (cases.some((c) => !c.demo.dev))
-    server = await preview({
-      configFile: false,
-      root,
-      build: { outDir: 'site/dist' },
-      preview: { port: 0, strictPort: true },
-      logLevel: 'error',
-    });
-  if (cases.some((c) => c.demo.dev))
-    devServer = await (
-      await createServer({
-        configFile: false,
-        root,
-        logLevel: 'error',
-        optimizeDeps: { noDiscovery: true, include: [] },
-        server: { port: 0, hmr: false, watch: null },
-      })
-    ).listen();
-  const origin = server && new URL(server.resolvedUrls.local[0]).origin,
-    devOrigin = devServer && new URL(devServer.resolvedUrls.local[0]).origin;
+  const started = await startServers(cases);
+  servers = started.servers;
   browser = await launchBrowser({ headless: true, args: ['--enable-unsafe-webgpu'] });
   const environment = { browser: `${browserLabel()} ${browser.version()}` };
   const expected = JSON.parse(await readFile(expectedPath, 'utf8').catch(() => '{"demos":{}}'));
   const rows = [];
-  for (const { id, demo, view, viewName } of cases) {
-    const { query, ...options } = view,
-      url = (demo.dev ? devOrigin : origin) + '/' + withQuery(demo.path, query),
-      row = { id, view: viewName, url: withQuery(demo.path, query), errors: [] };
-    // `timed`: also measure the frame cost (the noise run skips it).
-    const run = async (compat, timed = true) => {
-      const context = await browser.newContext({ ...options, reducedMotion: 'reduce' }),
-        page = await context.newPage(),
-        errors = [];
-      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-      page.on('console', (m) => {
-        if (m.type() === 'error') errors.push(`console: ${m.text()}`);
-      });
-      await page.addInitScript(frameTimer);
-      if (compat) await page.addInitScript(demo.dev ? compatShim : noWebGPU);
-      const t = Date.now();
+  for (const c of cases) {
+    const { id, demo, viewName } = c,
+      row = { id, view: viewName, url: withQuery(demo.path, c.view.query), errors: [] };
+    const run = async (compat) => {
+      let opened;
       try {
-        await page.goto(url, { timeout: 90_000 });
-        // On the layer, a refusal box is an answer too, and so is the needs-WebGPU message of a page kept off the layer.
-        const ready = compat
-          ? `(${demo.ready})||!!document.querySelector('[data-webgpu-refused],[data-no-webgpu]')`
-          : demo.ready;
-        await page.waitForFunction(ready, null, { timeout: compat ? 240_000 : 120_000 });
-        const refusedText = await page
-          .locator('[data-webgpu-refused]')
-          .innerText({ timeout: 1 })
-          .catch(() => null);
-        if (refusedText) return { refused: refusedText.replace(/\s+/g, ' ').trim(), errors, ms: Date.now() - t };
-        if (compat && (await page.locator('[data-no-webgpu]').count()))
-          return { off: true, errors, ms: Date.now() - t };
-        if (compat && !demo.dev) {
-          const marked = await page.evaluate(() => 'webgpuCompat' in document.documentElement.dataset);
-          if (!marked) throw new Error('the page did not install the WebGL2 compatibility layer');
-        }
-        // The page's own 'WebGL2 compatibility mode' note is not part of the scene.
-        await page.addStyleTag({ content: '[data-webgpu-compat-note]{display:none!important}' });
-        // fixed-wait: late UI text settles (the sandbox clock label ticks every 500 ms), as in visual-regression.js
-        await page.waitForTimeout(1000);
-        const cost = timed ? await frameCost(page) : undefined;
+        opened = await openCase(browser, c, { compat, ...started });
+        const { page, errors } = opened;
+        if (opened.refused) return { refused: opened.refused, errors, ms: Date.now() - opened.started };
+        if (opened.off) return { off: true, errors, ms: Date.now() - opened.started };
         const shot = () =>
           page.screenshot({ animations: 'disabled', mask: (demo.mask ?? []).map((s) => page.locator(s)) });
         let last = Buffer.alloc(0),
@@ -243,56 +98,54 @@ try {
           const i = (await navigator.gpu.requestAdapter())?.info ?? {};
           return [i.vendor, i.architecture, i.description].filter(Boolean).join(' ');
         });
-        return { image: await decodePNG(next), cost, gpu, errors, ms: Date.now() - t };
+        return { image: await decodePNG(next), gpu, errors, ms: Date.now() - opened.started };
       } catch (error) {
-        errors.push(`capture: ${String(error.message ?? error).split('\n')[0]}`);
-        await page
-          .screenshot({ path: resolve(out, `${id}.${compat ? 'compat' : 'native'}.failed.png`) })
+        opened ??= error;
+        if (!opened.errors) return { errors: [`capture: ${String(error.message ?? error).split('\n')[0]}`], ms: 0 };
+        if (!opened.errors.some((e) => e.startsWith('capture: ')))
+          opened.errors.push(`capture: ${String(error.message ?? error).split('\n')[0]}`);
+        await opened.page
+          ?.screenshot({ path: resolve(out, `${id}.${compat ? 'compat' : 'native'}.failed.png`) })
           .catch(() => {});
-        return { errors, ms: Date.now() - t };
+        return { errors: opened.errors, ms: Date.now() - opened.started };
       } finally {
-        await context.close();
+        await opened?.context?.close();
       }
     };
     const a = await run(false),
-      b = await run(false, false),
-      c = await run(true);
+      b = await run(false),
+      l = await run(true);
     environment.gpu ??= a.gpu;
-    row.errors.push(...a.errors.map((e) => `native: ${e}`), ...c.errors.map((e) => `layer: ${e}`));
+    row.errors.push(...a.errors.map((e) => `native: ${e}`), ...l.errors.map((e) => `layer: ${e}`));
     if (!a.image || !b.image) row.status = 'native failed';
-    else if (c.refused) row.status = 'refused';
+    else if (l.refused) row.status = 'refused';
     // Kept off the layer by its page (`needsWebGPU(area, { layer: false })`) while a known bug stands.
-    else if (c.off) row.status = 'webgpu only';
-    else if (!c.image) row.status = 'failed';
+    else if (l.off) row.status = 'webgpu only';
+    else if (!l.image) row.status = 'failed';
     else {
       row.noise = metrics(a.image, b.image);
-      row.diff = metrics(a.image, c.image);
+      row.diff = metrics(a.image, l.image);
       row.status = verdict(row.diff);
       await writeFile(resolve(out, `${id}.native.png`), encodePNG(downsample(a.image, 2)));
-      await writeFile(resolve(out, `${id}.compat.png`), encodePNG(downsample(c.image, 2)));
+      await writeFile(resolve(out, `${id}.compat.png`), encodePNG(downsample(l.image, 2)));
       if (row.diff.image) await writeFile(resolve(out, `${id}.diff.png`), encodePNG(downsample(row.diff.image, 2)));
       delete row.noise.image;
       delete row.diff.image;
-      row.frame = {
-        native: { work: median(a.cost.work), interval: median(a.cost.interval) },
-        compat: { work: median(c.cost.work), interval: median(c.cost.interval) },
-      };
     }
-    row.refused = c.refused;
-    row.seconds = { native: a.ms / 1000, compat: c.ms / 1000 };
+    row.refused = l.refused;
+    row.seconds = { native: a.ms / 1000, compat: l.ms / 1000 };
     // The gate (scripts/support/visual-compat-status.js): the recorded status, no worse differences, an exact still
-    // frame stays exact, the frame budget.
+    // frame stays exact.
     const problems =
       row.status === 'native failed' || row.status === 'failed'
         ? [row.errors[0] ?? row.status]
-        : gateProblems(row, expected.demos[id], { write, budget });
+        : gateProblems(row, expected.demos[id], { write });
     if (problems.length) exitCode = 1;
     row.problems = problems;
     rows.push(row);
-    const f = row.frame,
-      d = row.diff;
+    const d = row.diff;
     console.log(
-      `${problems.length ? 'FAIL' : 'ok  '} ${id}: ${row.status}${d ? ` (d>2 ${(d.over2 * 100).toFixed(2)}%, mean ${d.mean}, max ${d.max}; native noise d>2 ${(row.noise.over2 * 100).toFixed(2)}%, mean ${row.noise.mean})` : ''}${row.refused ? ` "${row.refused}"` : ''}${f ? `; frame work ${f.native.work.toFixed(2)} / ${f.compat.work.toFixed(2)} ms, interval ${f.native.interval.toFixed(1)} / ${f.compat.interval.toFixed(1)} ms` : ''}${problems.length ? `: ${problems.join('; ')}` : ''}`,
+      `${problems.length ? 'FAIL' : 'ok  '} ${id}: ${row.status}${d ? ` (d>2 ${(d.over2 * 100).toFixed(2)}%, mean ${d.mean}, max ${d.max}; native noise d>2 ${(row.noise.over2 * 100).toFixed(2)}%, mean ${row.noise.mean})` : ''}${row.refused ? ` "${row.refused}"` : ''}${problems.length ? `: ${problems.join('; ')}` : ''}`,
     );
   }
   environment.date = new Date().toISOString();
@@ -305,7 +158,7 @@ try {
 <h1>WebGL2 layer against native WebGPU</h1><p>${esc(JSON.stringify(environment))}</p><table>${rows
       .map(
         (r) =>
-          `<tr><td><b>${esc(r.status)}</b> ${esc(r.id)}<pre>${esc(JSON.stringify({ diff: r.diff, noise: r.noise, frame: r.frame, refused: r.refused, problems: r.problems }, null, 1))}\n${esc(r.errors.slice(0, 6).join('\n'))}</pre></td>${r.diff ? ['native', 'compat', 'diff'].map((k) => `<td>${k}<img src="${r.id}.${k}.png"></td>`).join('') : ''}</tr>`,
+          `<tr><td><b>${esc(r.status)}</b> ${esc(r.id)}<pre>${esc(JSON.stringify({ diff: r.diff, noise: r.noise, refused: r.refused, problems: r.problems }, null, 1))}\n${esc(r.errors.slice(0, 6).join('\n'))}</pre></td>${r.diff ? ['native', 'compat', 'diff'].map((k) => `<td>${k}<img src="${r.id}.${k}.png"></td>`).join('') : ''}</tr>`,
       )
       .join('\n')}</table>`,
   );
@@ -322,48 +175,33 @@ try {
   console.error(error);
   exitCode = 1;
 } finally {
-  await closeAll({ browser, servers: [server, devServer] }).catch((error) => console.warn(error.message));
+  await closeAll({ browser, servers }).catch((error) => console.warn(error.message));
   releaseGpu();
 }
 process.exit(exitCode);
 
-/** Rewrites the generated table in docs/webgl2-compat-demos.md (between its two markers), keeping rows not rerun. */
+/** Rewrites the pixel columns of the generated table in docs/webgl2-compat-demos.md; a row keeps its frame column. */
 async function writeDoc(rows, environment) {
-  const doc = await readFile(docPath, 'utf8'),
-    start = '<!-- visual-compat table: generated by npm run visual:compat -- --write -->',
-    end = '<!-- end of the visual-compat table -->';
-  const [before, rest] = doc.split(start),
-    after = rest.split(end)[1];
-  const old = new Map([...rest.split(end)[0].matchAll(/^\| `([^`]+)` .*$/gm)].map((m) => [m[1], m[0]]));
-  const pct = (v) => `${(v * 100).toFixed(2)}%`,
-    ms = (v) => (Number.isFinite(v) ? `${v.toFixed(1)} ms` : '-');
-  for (const r of rows) {
-    const result =
-      r.status === 'refused'
-        ? `refused: ${r.refused.replace(/\|/g, '/')}`
-        : r.status === 'same'
-          ? 'runs, same pixels'
-          : r.status === 'differs'
-            ? `runs with differences: d > 2 on ${pct(r.diff.over2)} of pixels, mean d ${r.diff.mean}, max d ${r.diff.max}`
-            : r.status === 'webgpu only'
-              ? 'kept on WebGPU only (shows the needs-WebGPU message) until its bug on the layer is fixed, see known-bugs.md'
-              : r.status;
-    const noise = r.noise
-      ? r.noise.max === 0
-        ? 'exact'
-        : `${pct(r.noise.over2)}, mean ${r.noise.mean}, max d ${r.noise.max}`
-      : '-';
-    const frame = r.frame
-      ? `${ms(r.frame.native.work)} / ${ms(r.frame.compat.work)}; ${ms(r.frame.native.interval)} / ${ms(r.frame.compat.interval)}`
-      : '-';
-    old.set(r.id, `| \`${r.id}\` | ${r.view} | ${result} | ${noise} | ${frame} |`);
-  }
-  const table = [
-    `Last recorded ${environment.date.slice(0, 10)} at ${environment.commit} on ${environment.gpu} (${environment.browser}); a row not rerun then keeps the numbers of its last run on the same machine.`,
-    '',
-    '| Demo | View | On the WebGL2 layer | Native run-to-run (d > 2, mean) | Frame work native / layer; interval native / layer |',
-    '| --- | --- | --- | --- | --- |',
-    ...[...old.entries()].sort(([x], [y]) => x.localeCompare(y)).map(([, line]) => line),
-  ].join('\n');
-  await writeFile(docPath, `${before}${start}\n${table}\n${end}${after}`);
+  const pct = (v) => `${(v * 100).toFixed(2)}%`;
+  await rewriteTable((old) => {
+    for (const r of rows) {
+      const result =
+        r.status === 'refused'
+          ? `refused: ${r.refused.replace(/\|/g, '/')}`
+          : r.status === 'same'
+            ? 'runs, same pixels'
+            : r.status === 'differs'
+              ? `runs with differences: d > 2 on ${pct(r.diff.over2)} of pixels, mean d ${r.diff.mean}, max d ${r.diff.max}`
+              : r.status === 'webgpu only'
+                ? 'kept on WebGPU only (shows the needs-WebGPU message) until its bug on the layer is fixed, see known-bugs.md'
+                : r.status;
+      const noise = r.noise
+        ? r.noise.max === 0
+          ? 'exact'
+          : `${pct(r.noise.over2)}, mean ${r.noise.mean}, max d ${r.noise.max}`
+        : '-';
+      old.set(r.id, [r.id, r.view, result, noise, old.get(r.id)?.[4] ?? '-']);
+    }
+    return `Last recorded ${environment.date.slice(0, 10)} at ${environment.commit} on ${environment.gpu} (${environment.browser}); a row not rerun then keeps the numbers of its last run on the same machine.`;
+  });
 }

@@ -1598,7 +1598,7 @@ in one place (nightly or a single records commit) rather than in every landing w
 ```json
 "check:merge": "node scripts/check-merge.mjs",
 "check:merge:full": "node scripts/check-merge.mjs --full",
-"check:merge:steps": "npm run verify && npm run check:fresh-clone && npm run build:site && npm run visual:check -- --no-build && npm run check:views && npm run check:gpu-packages -- --no-build && npm run check:depth && npm run check:wgsl && npm run modern:test:packages && npm run check:no-webgpu && npm run modern:test:bundlers && npm run check:quickstart",
+"check:merge:steps": "npm run verify && npm run check:fresh-clone && npm run build:site && npm run visual:check -- --no-build && npm run visual:compat -- --no-build && npm run visual:compat:budget -- --chunk=8 && npm run check:views && npm run check:gpu-packages -- --no-build && npm run check:depth && npm run check:wgsl && npm run modern:test:packages && npm run check:no-webgpu && npm run modern:test:bundlers && npm run check:quickstart",
 ```
 
 `check-merge.mjs` splits `check:merge:steps` on ` && ` and runs the steps in order, stopping at the first failure.
@@ -1608,6 +1608,8 @@ work or plain; a new step has to be classified"):
 ```js
 export const GPU_STEPS = [
   'visual:check',
+  'visual:compat',
+  'visual:compat:budget',
   'check:views',
   'check:gpu-packages',
   'check:depth',
@@ -1621,7 +1623,7 @@ export const SCOPED_STEPS = ['modern:test:packages', 'modern:test:bundlers'];
 ```
 (`scripts/check-merge.mjs` at `67ca53a5`.)
 
-**Timing steps.** A check:merge step that measures speed takes the GPU exclusively itself (`await acquire({ owner, mode: 'exclusive' })`), runs alone as its own step, and, when it runs long, holds the GPU in chunks with a hard limit each and releases it between them, so shared GPU work queues for minutes, never for the whole run. `scripts/gpu-package-tests.mjs` `mergeTimingSteps` lists those steps and `lockMode` fails the plan for a GPU step that holds a measured time to a budget from a shared slot (`GPU_TIMING_MEASURED_SHARED`, added 2026-10-30 after visual:compat's frame budget read 86 ms against 50 beside other suites); `tests/gpu-timing-lock.test.js` runs each timing step in a shared slot and expects it to fail at once.
+**Timing steps.** A check:merge step that measures speed takes the GPU exclusively itself (`await acquire({ owner, mode: 'exclusive' })`), runs alone as its own step, and, when it runs long, holds the GPU in chunks with a hard limit each and releases it between them, so shared GPU work queues for minutes, never for the whole run. `scripts/gpu-package-tests.mjs` `mergeTimingSteps` lists those steps and `lockMode` fails the plan for a GPU step that holds a measured time to a budget from a shared slot (`GPU_TIMING_MEASURED_SHARED`, added 2026-10-30 after visual:compat's frame budget read 86 ms against 50 beside other suites); `tests/gpu-timing-lock.test.js` runs each timing step in a shared slot and expects it to fail at once. The first such step is `visual:compat:budget` (`scripts/visual-compat-budget.mjs`): the frame cost of every WebGL2 layer demo, 8 demos per exclusive hold (`--chunk`), each hold limited to 15 min (`--chunk-minutes`, the lock entry's `max` is 2 min more), released between chunks; `visual:compat` itself compares pixels only, in a shared slot. Both narrow to the affected demos like `visual:check`.
 
 #### 2.10.2 Selection
 
@@ -4581,7 +4583,7 @@ export const PARALLEL = [
 ### 5.7 `npm run check:merge`
 
 ```json
-"check:merge:steps": "npm run verify && npm run check:fresh-clone && npm run build:site && npm run visual:check -- --no-build && npm run check:views && npm run check:gpu-packages -- --no-build && npm run check:depth && npm run check:wgsl && npm run modern:test:packages && npm run check:no-webgpu && npm run modern:test:bundlers && npm run check:quickstart"
+"check:merge:steps": "npm run verify && npm run check:fresh-clone && npm run build:site && npm run visual:check -- --no-build && npm run visual:compat -- --no-build && npm run visual:compat:budget -- --chunk=8 && npm run check:views && npm run check:gpu-packages -- --no-build && npm run check:depth && npm run check:wgsl && npm run modern:test:packages && npm run check:no-webgpu && npm run modern:test:bundlers && npm run check:quickstart"
 ```
 
 (`package.json` @ 67ca53a5.)

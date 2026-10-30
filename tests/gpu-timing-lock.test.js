@@ -89,6 +89,14 @@ const start = performance.now();`;
   // The real plan and check:merge's own GPU steps pass: no timing measurement there runs shared.
   assert.doesNotThrow(() => plan());
   assert.doesNotThrow(() => mergeTimingSteps());
+  // visual:compat compares pixels in a shared slot; its frame budget is a timing step of its own.
+  assert.deepEqual(mergeTimingSteps().find((s) => s.label === 'check:merge visual:compat:budget')?.files, [
+    'scripts/visual-compat-budget.mjs',
+  ]);
+  assert.equal(
+    mergeTimingSteps().some((s) => s.label === 'check:merge visual:compat'),
+    false,
+  );
 });
 
 test('the run holds the GPU exclusively only around a timing step and shared around every other', async () => {

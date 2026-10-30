@@ -25,10 +25,10 @@ export function record(row) {
 /**
  * The gate's problems for one measured row against its recorded expectation `want` (undefined when not recorded):
  * the recorded status; a "differs" row no worse than its recorded share and mean (x1.5 plus 0.001 / 0.25); a demo
- * recorded with an exact still frame keeps it (its two native captures equal, so its status cannot flip with noise);
- * and the frame budget, which counts when the layer's median frame is over `budget` ms and at least twice native's.
+ * recorded with an exact still frame keeps it (its two native captures equal, so its status cannot flip with noise).
+ * Pixels only: the frame budget is frameProblems, measured by its own step with the GPU held exclusively.
  */
-export function gateProblems(row, want, { write = false, budget = 50 } = {}) {
+export function gateProblems(row, want, { write = false } = {}) {
   const problems = [];
   if (!write) {
     if (!want) problems.push('not in visual-compat-expected.json (run with --write)');
@@ -44,7 +44,15 @@ export function gateProblems(row, want, { write = false, budget = 50 } = {}) {
         );
     }
   }
-  if (row.frame && row.frame.compat.work > budget && row.frame.compat.work > 2 * row.frame.native.work)
-    problems.push(`median frame on the layer ${row.frame.compat.work.toFixed(1)} ms, over the ${budget} ms budget`);
   return problems;
+}
+
+/**
+ * The frame budget's problems for one demo (scripts/visual-compat-budget.mjs): its median frame on the layer counts
+ * when it is over `budget` ms and at least twice native's. `frame` is `{ native: { work }, compat: { work } }`, in ms.
+ */
+export function frameProblems(frame, budget = 50) {
+  return frame.compat.work > budget && frame.compat.work > 2 * frame.native.work
+    ? [`median frame on the layer ${frame.compat.work.toFixed(1)} ms, over the ${budget} ms budget`]
+    : [];
 }

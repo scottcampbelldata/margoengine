@@ -66,6 +66,7 @@ const root = resolve(import.meta.dirname, '..');
 export const GPU_STEPS = [
   'visual:check',
   'visual:compat',
+  'visual:compat:budget',
   'check:views',
   'check:gpu-packages',
   'check:depth',
@@ -113,7 +114,8 @@ export function planSteps({ steps, decision, tests, workspaces, testId, scope })
       // The WebGL2 layer run compares the same demos (every demo imports the layer through its gate, so a change to the
       // layer reaches all of them); its extra demos (no visual baselines) run in the full check and the nightly.
       case 'visual:check':
-      case 'visual:compat': {
+      case 'visual:compat':
+      case 'visual:compat:budget': {
         const ids = visualIds(decision.hits);
         return ids.length ? [{ command: `${command} --only=${ids.join(',')}` }] : skip(none);
       }
