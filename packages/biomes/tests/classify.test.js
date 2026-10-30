@@ -194,7 +194,11 @@ test('Holdridge zones of known climates, and the holdridge classifier uses zones
     size: [512, 512],
     biomes: ALL,
     classifier: holdridge,
+    // Tropical lowland. Holdridge's tropical belt ends at a biotemperature of 24 C, a few hundred metres up at this
+    // latitude, so on a relief the test cell's belt depends on its height (the 4 km relief fix put it on a 257 m hill
+    // at 25.1 C and 3,077 mm, on the warm-temperate-perhumid edge).
     climate: presetWorlds.tropical.climate,
+    height: { field: () => 20 },
   });
   const t = await w.tile(0, 0);
   assert.equal(w.biomes[top(t, 50, 50)[0]].id, 'tropical');
@@ -359,8 +363,30 @@ test('defineBiome validates shape and values and freezes a copy', () => {
     { ...def, climate: { blend: 0 } },
     { ...def, ground: [] },
     { ...def, plants: [{ id: 'x', mesh: 'y', density: -1, radius: 1 }] },
+    { ...def, ground: [{ material: 'snow', temperature: [0, -6] }] },
+    { ...def, ground: [{ material: 'snow', temprature: [null, -6] }] },
+    { ...def, ground: [{ material: 'snow', rainfall: [0, 300] }] },
   ])
     assert.throws(() => defineBiome(bad), RangeError, JSON.stringify(bad));
+});
+
+test('ground layers take temperature, coldest and warmest ranges; snow follows the cold in tundra and alpine', () => {
+  // Regression: tundra snow needed soil moisture 0.85, which a 300 mm tundra never reaches, and ground rules could not
+  // name the temperature at all (an unknown ground field was silently ignored).
+  const cold = defineBiome({
+    id: 'cold',
+    climate: {},
+    ground: [
+      { material: 'rock' },
+      { material: 'snow', temperature: [null, -6], coldest: [null, -20], warmest: [null, 10], height: [100, null] },
+    ],
+  });
+  assert.deepEqual(cold.ground[1].temperature, [null, -6]);
+  assert.deepEqual(cold.ground[1].warmest, [null, 10]);
+  const snow = (id) => presets[id].ground.find((g) => g.material === 'snow');
+  assert.deepEqual(snow('tundra'), { material: 'snow', temperature: [null, -6] });
+  assert.deepEqual(snow('alpine'), { material: 'snow', height: [2800, null], temperature: [null, -3] });
+  for (const p of Object.values(presets)) defineBiome(p);
 });
 
 test('classification reuses its planes: no multi-megabyte arrays per tile, same bytes in any order', async () => {

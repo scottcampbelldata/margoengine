@@ -63,8 +63,9 @@ const SHELF = 1_500_000,
 
 /**
  * Builds a seeded procedural landscape. Lowlands are 7 octaves of value noise at 2 km, mountains 6 octaves of ridged
- * noise at 1.5 km under a 6 km mask, the coast a noise-warped 1.5 km shelf down to `seaDepth`, and each river a
- * meandering polyline whose valley (250 m half width) is carved down to a bed that rises from 2 m at the mouth.
+ * noise at 1.5 km under a mask at 6 km or half the longest side (whichever is shorter), the coast a noise-warped 1.5 km
+ * shelf down to `seaDepth`, and each river a meandering polyline whose valley (250 m half width) is carved down to a bed
+ * that rises from 2 m at the mouth.
  * @throws TypeError when `options` is not an object; RangeError when a value is out of range.
  * @example
  * const relief = createRelief({ seed: 7, coast: 'west', rivers: 1 });
@@ -143,9 +144,13 @@ export function createRelief(options: ReliefOptions = {}): Relief {
   }
   // Lattice coordinates: Q16 cells of `wavelength` mm.
   const lattice = (p: number, wavelength: number) => divFloor(p * ONE, wavelength);
+  // Mountain mask wavelength: 6 km, or half the longest side when that is shorter, so a small world sees several mask
+  // values instead of about one (a 4 km world at 6 km got 0 to 25 percent of `relief` on most seeds). Worlds of 12 km
+  // and more, R16 included, keep 6 km and their exact heights.
+  const maskWave = Math.min(6_000_000, Math.floor(Math.max(sx, sz) / 2));
   const height = (x: number, z: number): number => {
     const lowland = fbm(seed, lattice(x, 2_048_000), lattice(z, 2_048_000), 7),
-      mask = fbm(seed + 1, lattice(x, 6_000_000), lattice(z, 6_000_000), 3),
+      mask = fbm(seed + 1, lattice(x, maskWave), lattice(z, maskWave), 3),
       // Mountains where the mask passes 0.45, full height from 0.7.
       m = clampInt(Math.floor(((mask - 29491) * ONE) / 16384), 0, ONE),
       ridge = ridged(seed + 2, lattice(x, 1_500_000), lattice(z, 1_500_000), 6);

@@ -130,6 +130,9 @@ console.log(world.biomes[first].id, tile.layer('biomeWeight')!.data[0] / 255, wo
   range is `[min, max]` in plain units; `null` leaves a side open. Membership is the product of Wendland kernels: 1
   well inside, a smooth band centred on each bound (`blend`, default 0.15 of the range; open ranges use a per-field
   width such as 1.5 K or 100 mm), exactly 0 beyond.
+- **Ground layers** take ranges on `slope`, `height`, `moisture`, `curvature`, `temperature`, `coldest` and `warmest`
+  (plus `weight`); every range given must hold, and `defineBiome` rejects any other field. The tundra preset lays snow
+  where the mean annual temperature is -6 C or less, the alpine preset above 2,800 m where it is -3 C or less.
 - **Ecotones that wander**: the climate inputs are warped by smooth integer noise (700 m, up to +-1.6 K and +-8 % of
   rainfall) before classification, so borders do not follow contour lines, and a 3x3 blur removes speckle from noisy
   slopes.
@@ -156,7 +159,10 @@ paints a biome, `mask/<name>` writes a mask that envelopes and paint layers can 
 world's `paint` order with a mode: `'replace'` (the default: the painted share replaces the rest), `'add'`,
 `'multiply'` (0 removes a biome; the next nearest envelope takes over if nothing is left) or `'max'`, optionally
 through a mask: `world.update({ paint: [{ biome: 'desert', mode: 'replace', mask: 'mask/dunes' }] })`. Writing a layer
-recomputes that tile and its neighbours and calls the `onChange` listeners. `readLayer` returns a copy.
+recomputes that tile and its neighbours and calls the `onChange` listeners. `readLayer` returns a copy. Stored plants
+thin with the painted share: none of a replaced biome stand where its paint reaches 255, and where half is painted a
+dense stand keeps somewhat more than half, because fewer seedlings meet fewer neighbours (a temperate forest keeps 75
+percent at a 49 percent desert share; `tests/placement.test.js`).
 
 ### Koppen labels
 
@@ -246,7 +252,7 @@ of the presets, from `@margoengine/procedural`. Pass `objects: false` for terrai
 total and the device's largest texture caps each side, checked before anything is allocated:
 `BiomeObjects.attach` rejects with MargoError `'unsupported'` past either (`detailFits` tells ahead), and `BiomeView`
 coarsens its detail maps until they fit. GPU memory follows what is held: the zero-config
-world's 172,569 streamed objects take 6.5 MB (records 8 bytes each, LOD rings 32 bytes per instance they can draw, both
+world's 172,640 streamed objects take 6.6 MB (records 8 bytes each, LOD rings 32 bytes per instance they can draw, both
 sized from the held tiles with headroom, and a tree's canopy sharing its trunk's), down from 117.6 MB when every tile
 slot and ring was sized for the densest case (`packages/biomes/tests/objects-check.mjs`, RTX A6000).
 
@@ -426,7 +432,9 @@ algorithm and against float references in the package tests.
 ## Procedural relief
 
 `createRelief(options)` (entry `/relief`) is a seeded landscape in integer millimetres: fractal lowlands, ridged
-mountains under a mountain mask, an optional coast and river valleys. It is the default height of a biome world.
+mountains under a mountain mask, an optional coast and river valleys. It is the default height of a biome world. The
+mask has a wavelength of 6 km, or half the longest side of a smaller world, so a 4 km world has mountains somewhere on
+every seed; worlds of 12 km and more, R16 included, keep 6 km.
 
 ```ts
 import { createRelief } from '@margoengine/biomes/relief';

@@ -546,6 +546,107 @@ test('self-thinning: the size-density frontier slope of every preset tree lies i
     }
 });
 
+test('tundra stores dwarf birch and boulders only: under 60,000 objects per km2 (lichen is detail cover)', async () => {
+  // Regression: lichen was a stored shrub at 2,000 per hectare, about 214,000 green blobs per km2 of tundra.
+  const w = await BiomeWorld.create({ size: [1024, 1024], ...presetWorldOptions('tundra') }),
+    p = BiomePlacement.attach(w),
+    species = new Set();
+  let count = 0;
+  for (let x = 0; x < 4; x++)
+    for (let z = 0; z < 4; z++) {
+      const t = await p.tile(x, z);
+      count += t.count;
+      t.forEachInstance((i) => species.add(i.key));
+    }
+  const perKm2 = count / 1.048576; // float division: test arithmetic
+  assert.ok(perKm2 > 5000 && perKm2 < 60000, `tundra objects per km2: ${perKm2.toFixed(0)}`);
+  assert.ok(!species.has('tundra/lichen'), 'lichen is not stored');
+  assert.equal(p.species.find((s) => s.key === 'tundra/dwarf-birch').mesh, 'procedural:tundra-shrub');
+  assert.ok(
+    p.details.some((d) => d.id === 'lichen'),
+    'lichen is a detail species',
+  );
+});
+
+/** Temperate and boreal records of a placement tile, with the desert biome weight (0..255) of each record's cell. */
+async function forestRecords(world, placement, tx, tz) {
+  const desert = world.biomes.findIndex((b) => b.id === 'desert'),
+    cells = await world.tile(tx, tz),
+    ids = cells.layer('biome').data,
+    weights = cells.layer('biomeWeight').data,
+    t = await placement.tile(tx, tz),
+    out = [];
+  t.forEachInstance((i) => {
+    if (!i.key.startsWith('temperate/') && !i.key.startsWith('boreal/')) return;
+    // The world resolution is 1 m: metres from the tile origin are cell indices.
+    const k = Math.floor(i.z - t.origin[1]) * cells.cells + Math.floor(i.x - t.origin[0]);
+    let d = 0;
+    for (let q = 0; q < 4; q++) if (ids[k * 4 + q] === desert) d = weights[k * 4 + q];
+    out.push({ x: i.x, z: i.z, desert: d });
+  });
+  return out;
+}
+
+/** Mean desert weight (0..1) of the cells of a 1024 m world's tiles whose centres lie lo..hi metres from the origin. */
+async function desertShare(world, tiles, lo, hi) {
+  const desert = world.biomes.findIndex((b) => b.id === 'desert');
+  let sum = 0,
+    n = 0;
+  for (const [tx, tz] of tiles) {
+    const t = await world.tile(tx, tz),
+      ids = t.layer('biome').data,
+      weights = t.layer('biomeWeight').data;
+    for (let z = 0; z < t.cells; z++)
+      for (let x = 0; x < t.cells; x++) {
+        const r = Math.hypot(-512 + tx * 256 + x + 0.5, -512 + tz * 256 + z + 0.5);
+        if (r < lo || r >= hi) continue;
+        const k = z * t.cells + x;
+        for (let q = 0; q < 4; q++) if (ids[k * 4 + q] === desert) sum += weights[k * 4 + q];
+        n++;
+      }
+  }
+  return sum / (255 * n); // float division: test arithmetic
+}
+
+test('paint: a full-strength desert dab leaves no forest inside; the smooth falloff thins it by the painted share', async () => {
+  // Shot 08 of the biome look review showed trees inside a painted desert patch. A constant-falloff dab paints 255
+  // everywhere inside its radius, and no temperate or boreal record may stand where the desert weight is 255.
+  const tiles = [
+      [1, 1],
+      [1, 2],
+      [2, 1],
+      [2, 2],
+    ],
+    ring = (records, lo, hi) => records.filter((r) => Math.hypot(r.x, r.z) >= lo && Math.hypot(r.x, r.z) < hi).length,
+    count = async (world, placement) => {
+      const all = [];
+      for (const [x, z] of tiles) all.push(...(await forestRecords(world, placement, x, z)));
+      return all;
+    };
+  const hard = await BiomeWorld.create({ size: [1024, 1024], ...presetWorldOptions('temperate') }),
+    hardPlacement = BiomePlacement.attach(hard),
+    before = await count(hard, hardPlacement);
+  assert.ok(before.filter((r) => Math.hypot(r.x, r.z) < 190).length > 1000, 'a forest stands there before the paint');
+  BiomeEditor.attach(hard).paint('desert', { center: [0, 0], radius: 200, falloff: 'constant' });
+  const after = await count(hard, hardPlacement),
+    full = after.filter((r) => r.desert === 255);
+  assert.equal(full.length, 0, `forest records where the desert weight is 255: ${full.length}`);
+  assert.equal(after.filter((r) => Math.hypot(r.x, r.z) < 190).length, 0, 'nothing of the forest inside the dab');
+  // The default smooth falloff paints about half at half the radius, and the forest there thins with that share: its
+  // stems pass the candidate step in proportion to the forest weight. Fewer candidates also meet fewer neighbours in
+  // the hard core, so a dense stand keeps somewhat more than its weight (measured 0.75 at a 0.49 desert share).
+  const soft = await BiomeWorld.create({ size: [1024, 1024], ...presetWorldOptions('temperate') }),
+    softPlacement = BiomePlacement.attach(soft);
+  BiomeEditor.attach(soft).paint('desert', { center: [0, 0], radius: 200 });
+  const painted = await count(soft, softPlacement),
+    kept = (lo, hi) => ring(painted, lo, hi) / ring(before, lo, hi), // float division: test arithmetic
+    half = kept(85, 115);
+  const desert = await desertShare(soft, tiles, 85, 115);
+  assert.ok(desert >= 0.35 && desert <= 0.65, `desert share at half the radius: ${desert.toFixed(2)}`);
+  assert.ok(half >= 0.35 && half <= 0.85, `share of the forest kept at half the radius: ${half.toFixed(2)}`);
+  assert.ok(kept(40, 60) < half && half < kept(140, 160), 'the forest thins toward the centre of the dab');
+});
+
 test('the editor dirty margin covers the placement reach, and an edit leaves tiles beyond it unchanged', async () => {
   const w = await BiomeWorld.create({ size: [2048, 512], biomes: Object.values(presets) }),
     p = BiomePlacement.attach(w),

@@ -39,7 +39,7 @@ import {
   valueNoise,
   wendland,
 } from '../dist/toolkit.js';
-import { R16 } from '../dist/presets.js';
+import { R16, presetWorlds } from '../dist/presets.js';
 import { createRelief } from '../dist/relief.js';
 import { random } from './random.js';
 
@@ -302,6 +302,36 @@ test('relief: the default and R16 landscapes match their committed golden digest
     const h = r16.height(line[8], line[9]);
     assert.ok(h < 40000, `river bed ${h} mm`);
   }
+});
+
+test('relief: a 4 km world has mountains on every seed, and the alpine preset world rises past the 2,800 m snow line', () => {
+  // Regression: the mountain mask had a 6 km wavelength whatever the world size, so a 4 km world saw about one mask
+  // value and most seeds got 0 to 25 percent of their relief (ranges of 224 to 334 m on seeds 1, 4, 5, 6 and 8). The
+  // mask now has a wavelength of half the longest side up to 6 km: every seed gets its full mountains somewhere.
+  const ranges = [];
+  for (let seed = 1; seed <= 8; seed++) {
+    const relief = createRelief({ seed });
+    let lo = Infinity,
+      hi = -Infinity;
+    for (let z = -2048000; z < 2048000; z += 32000)
+      for (let x = -2048000; x < 2048000; x += 32000) {
+        const h = relief.height(x, z);
+        lo = Math.min(lo, h);
+        hi = Math.max(hi, h);
+      }
+    ranges.push(hi - lo);
+  }
+  // Measured 485 to 1,020 m (on main, 224 to 865 m).
+  assert.ok(
+    ranges.every((r) => r > 450000),
+    `relief ranges in mm: ${ranges}`,
+  );
+  assert.ok(ranges.reduce((a, b) => a + b) / 8 > 750000, `mean relief range in mm: ${ranges}`); // float division: test arithmetic
+  const alpine = createRelief(presetWorlds.alpine.relief);
+  let above = 0;
+  for (let z = -2048000; z < 2048000; z += 32000)
+    for (let x = -2048000; x < 2048000; x += 32000) above += +(alpine.height(x, z) > 2800000);
+  assert.ok(above > 100, `alpine cells above 2,800 m: ${above} of 16,384`);
 });
 
 test('relief: deterministic, seed dependent and validated', () => {

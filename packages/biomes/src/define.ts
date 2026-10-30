@@ -45,7 +45,10 @@ export interface ClimateEnvelope {
   readonly blend?: number;
 }
 
-/** A ground material and where it shows inside the biome (ranges as in {@link ClimateEnvelope}, plus curvature). */
+/**
+ * A ground material and where it shows inside the biome (ranges as in {@link ClimateEnvelope}, plus curvature). Every
+ * range given must hold: a layer with `height` and `temperature` shows where both do.
+ */
 export interface GroundLayer {
   /** Material key, such as `'grass'`, resolved by the view's material table. */
   readonly material: string;
@@ -54,6 +57,10 @@ export interface GroundLayer {
   readonly moisture?: Range;
   /** General curvature, 1/m. */
   readonly curvature?: Range;
+  /** Mean annual, coldest-month and warmest-month temperature, C (snow where it is cold, for example). */
+  readonly temperature?: Range;
+  readonly coldest?: Range;
+  readonly warmest?: Range;
   /** Relative weight where it shows. Default 1. */
   readonly weight?: number;
 }
@@ -229,6 +236,17 @@ export function envelopeOf(definition: BiomeDefinition): readonly Dimension[] {
 
 const ID = /^[a-z0-9][a-z0-9-]*$/;
 
+/** The range fields of a {@link GroundLayer}, in the order views read them. */
+const GROUND_FIELDS = Object.freeze([
+  'slope',
+  'height',
+  'moisture',
+  'curvature',
+  'temperature',
+  'coldest',
+  'warmest',
+] as const);
+
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object') {
     for (const v of Object.values(value)) deepFreeze(v);
@@ -281,7 +299,13 @@ export function defineBiome(definition: BiomeDefinition): BiomeDefinition {
     throw rangeError('A biome needs 1 to 4 ground layers', 'biomes');
   for (const g of d.ground) {
     if (!g || typeof g.material !== 'string') throw typeError('A ground layer needs a string material', 'biomes');
-    for (const key of ['slope', 'height', 'moisture', 'curvature'] as const)
+    for (const key of Object.keys(g))
+      if (key !== 'material' && key !== 'weight' && !(GROUND_FIELDS as readonly string[]).includes(key))
+        throw rangeError(
+          `Unknown ground layer field "${key}"; use material, weight or a range on ${GROUND_FIELDS.join(', ')}`,
+          'biomes',
+        );
+    for (const key of GROUND_FIELDS)
       if (g[key] !== undefined && !isRange(g[key]))
         throw rangeError('A biome envelope range is [min, max] with min <= max (null leaves a side open)', 'biomes');
     if (g.weight !== undefined && !(g.weight >= 0))

@@ -1,5 +1,5 @@
 {
   "$comment": "SHA-256 of createRelief heights on a grid (fixed.test.js reliefDigest). A change here changes every biome world; advance it only with a reason in the commit.",
-  "default": "74fed2f382641a53be71da85e6f3450244afb6bb76cc988bdbcf6aad914be05e",
+  "default": "3a73c5742ea3675c4b911065aa66237d8e5f0768c1bcc75623796c4ef7c27a7e",
   "r16": "5973ebaa44d4b42bdbd1a55460ac37a0d5152b9bc82e6925173357fb6d10faf0"
 }

@@ -95,7 +95,7 @@ export const presets: Readonly<
       { material: 'meadow', slope: [null, 25] },
       { material: 'scree', slope: [25, 40] },
       { material: 'rock', slope: [35, null] },
-      { material: 'snow', height: [2800, null] },
+      { material: 'snow', height: [2800, null], temperature: [null, -3] },
     ],
     plants: [shrub('dwarf-pine', 'shrub', 120, 1.5), shrub('heather', 'shrub', 600, 0.4)],
     rocks: [rock(40)],
@@ -117,11 +117,17 @@ export const presets: Readonly<
     ground: [
       { material: 'tundra' },
       { material: 'gravel', slope: [10, null] },
-      { material: 'snow', moisture: [0.85, null] },
+      // Lying snow follows the cold (a mean annual temperature of -6 C or less), not soil moisture, which a 300 mm
+      // rainfall tundra never reaches.
+      { material: 'snow', temperature: [null, -6] },
     ],
-    plants: [shrub('dwarf-birch', 'shrub', 300, 0.6), shrub('lichen', 'shrub', 2000, 0.2)],
+    plants: [shrub('dwarf-birch', 'tundra-shrub', 300, 0.6)],
     rocks: [rock(25)],
-    details: [{ id: 'sedge', mesh: 'procedural:grass', density: 15 }],
+    // Lichen is low ground cover drawn per frame, not 2,000 stored shrubs per hectare.
+    details: [
+      { id: 'sedge', mesh: 'procedural:grass', density: 15 },
+      { id: 'lichen', mesh: 'procedural:grass', density: 10 },
+    ],
   }),
   desert: freeze<BiomeDefinition>({
     id: 'desert',
@@ -179,7 +185,7 @@ export const presetWorlds: Readonly<
 > = Object.freeze({
   temperate: { climate: { latitude: 47, rainfall: 1000 }, relief: { relief: 500, base: 150 } },
   boreal: { climate: { latitude: 57, rainfall: 650, inland: 1200 }, relief: { relief: 400, base: 150 } },
-  alpine: { climate: { latitude: 46, rainfall: 1400 }, relief: { relief: 2400, base: 1900 } },
+  alpine: { climate: { latitude: 46, rainfall: 1400 }, relief: { relief: 2400, base: 2200 } },
   wetland: { climate: { latitude: 44, rainfall: 1300 }, relief: { relief: 20, base: 12, coast: 'west', rivers: 3 } },
   tundra: { climate: { latitude: 71, rainfall: 300, inland: 2000 }, relief: { relief: 200, base: 60 } },
   desert: { climate: { latitude: 24, rainfall: 80 }, relief: { relief: 600, base: 300 } },
