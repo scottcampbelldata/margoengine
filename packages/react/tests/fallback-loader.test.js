@@ -1,4 +1,5 @@
 // Graceful degradation in the Canvas: `loadFallback` runs only without WebGPU, `fallbackContent` replaces the text.
+// Also the Canvas's engine options: `powerPreference` reaches Engine.create.
 import test, { afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
@@ -225,4 +226,24 @@ test('without fallbackContent the default message stays, and a failed loader sho
   );
   await flush();
   assert.equal(view.getByRole('alert').textContent, 'Poster');
+});
+
+test('powerPreference reaches Engine.create; unset passes nothing; a new value applies to the next engine', async () => {
+  gpu(adapter);
+  const view = render(h(Canvas, { powerPreference: 'low-power' }));
+  await flush();
+  assert.equal(created.length, 1);
+  assert.equal(created[0].options.powerPreference, 'low-power');
+  // A new value alone keeps the engine; the next engine (here after a backend change) gets it.
+  view.rerender(h(Canvas, { powerPreference: 'high-performance' }));
+  await flush();
+  assert.equal(created.length, 1);
+  view.rerender(h(Canvas, { powerPreference: 'high-performance', backend: 'webgpu' }));
+  await flush();
+  assert.equal(created.length, 2);
+  assert.equal(created[1].options.powerPreference, 'high-performance');
+  cleanup();
+  render(h(Canvas));
+  await flush();
+  assert.equal(created[2].options.powerPreference, undefined);
 });

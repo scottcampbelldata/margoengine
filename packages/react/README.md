@@ -522,6 +522,27 @@ A production Vite build of the cube page prints no warnings; `npm run modern:tes
 `react-server` export condition maps to them), so a server component can import `Canvas`. `sideEffects` is `false`, so
 unused exports are dropped. Next.js builds with webpack and Turbopack run in `npm run modern:test:bundlers`.
 
+## Choosing the GPU
+
+On a laptop with an integrated and a discrete GPU, `powerPreference` picks one: `'low-power'` saves battery,
+`'high-performance'` asks for the discrete GPU. The Canvas passes it to `Engine.create`, and the engine asks for the
+same GPU again when the device is restored.
+
+```tsx
+import { Canvas } from '@margoengine/react';
+
+export function BatteryFriendlyViewer() {
+  return <Canvas powerPreference="low-power" style={{ height: 400 }} />;
+}
+```
+
+| Prop | Default | Effect |
+| --- | --- | --- |
+| `powerPreference` | unset: `'high-performance'`, nothing on Windows | `'low-power'` or `'high-performance'`. Read when the engine is created; a new value applies to the next engine. |
+
+Chrome and Edge on Windows ignore a set value and log a console warning; there, the GPU is chosen per browser in
+Windows Settings > System > Display > Graphics.
+
 ## Testing and size
 
 Run `npm run build:packages`, then `npm run modern:test:react` for the React Testing Library and JSDOM lifecycle tests:

@@ -75,6 +75,15 @@ export interface CanvasProps extends EngineOptions {
   style?: CSSProperties;
   className?: string;
   label?: string;
+  /**
+   * Which GPU the engine asks the browser for on a PC with two: `'high-performance'` (the discrete GPU) or
+   * `'low-power'` (the integrated one, which saves battery). Passed to `Engine.create` and asked again when the device
+   * is restored. Chrome and Edge on Windows ignore a set value and log a warning; choose the GPU in Windows graphics
+   * settings there. Read when the engine is created, so a new value applies to the next engine (a change of
+   * `capacity`, `backend` or `fallback` creates one). Default: unset, which asks for `'high-performance'`, and for
+   * nothing on Windows.
+   */
+  powerPreference?: EngineOptions['powerPreference'];
   onCreated?: (stage: StageFacade) => void;
   onError?: (error: unknown) => void;
   frameloop?: 'always' | 'demand';
@@ -145,6 +154,7 @@ export function MargoCanvas({
   capacity = 1024,
   backend = 'auto',
   camera,
+  powerPreference,
   fallback,
   loadFallback,
   fallbackContent,
@@ -205,12 +215,14 @@ export function MargoCanvas({
     return () => disposeAssetCache(assetCache);
   }, [engine, assetCache]);
   const cameraOptions = useRef(camera),
+    powerOption = useRef(powerPreference),
     frameloopOptions = useRef(frameloop),
     engineMode = useRef(frameloop);
   created.current = onCreated;
   errorHandler.current = onError;
   fallbackLoader.current = loadFallback;
   cameraOptions.current = camera;
+  powerOption.current = powerPreference;
   frameloopOptions.current = frameloop;
   const advance = useMemo(
     () => (delta: number) => {
@@ -278,6 +290,7 @@ export function MargoCanvas({
           backend,
           camera: cameraOptions.current,
           fallback: renderer,
+          powerPreference: powerOption.current,
         });
         if (cancelled) {
           instance.dispose();
