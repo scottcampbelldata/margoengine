@@ -317,14 +317,44 @@ does not own. Each entry says exactly what is needed to close it.
 - **Second Intel Arc 140V** (an outside audit's laptop, revision 74a01810, 2026-10-28): the same 450-frame repro
   differed on 4 frames (46, 99, 112 and 326), at the same pixel (101, 72), [109, 107, 104] instead of [100, 99, 96], 9
   of 255. The standard voxel check passed there.
-- **Cause: open, and it may be on Margo's side.** Measured on the A6000 so far: every differing pixel is seen through
+- **Khronos ToyCar and IridescenceLamp** (gltf-pro transmission, `examples/khronos-gallery.html?model=Name`, native
+  WebGPU, 640x480, 2026-10-30): four captures of the still frame differ on 67 to 153 pixels by 1 of 255 (ToyCar, all
+  on the windscreen) and on 0 to 18 pixels by up to 28 of 255 (IridescenceLamp, the glass rim over the base). The page
+  draws every animation frame; two calls of `engine.render()` in a row already differ.
+- **Cause: below Margo, in the GPU's 4x MSAA blending (found 2026-10-30, RTX A6000, Edge 156, Dawn D3D12 and D3D11).**
+  A blended draw over a pixel whose samples hold different colours sometimes writes one value to all four samples,
+  about the average of the four correct per-sample results, and which pixels get it changes from frame to frame (in
+  4x4 and 8x8 pixel blocks along the blended mesh's own edges). Measured in the ToyCar frame: the command stream is
+  the same each frame (pipelines, bind groups, buffers, the two `writeBuffer` calls bit for bit), and the
+  multisampled colour copied at the start of the glass pass is the same each frame, sample for sample. After the
+  transmission tint draw alone (a constant colour, blend `dst x src`) pixel (360, 88), before it
+  `[5e5854, 5e5854, 6b8068, 6b8068]`, holds `[1c4619, 1c4619, 20661f, 20661f]` in one frame (dst x constant per
+  sample, correct) and `[1e561c, 1e561c, 1e561c, 1e561c]` in the next. No input can make a per-sample blend do that.
+  The same happens in plain WebGPU with no Margo code: `scripts/support/msaa-blend-repeat.html` (a clear pass, an
+  opaque pass of flat-coloured triangles, a coarse mesh blended `dst x constant`, a resolve pass) gives 11 of 12
+  frames different after the blended pass, with 0 samples different before it. Without the glass draws, at 1x, or
+  with the blended pipelines' sample mask leaving out any one sample (`mask: 7`, 11, 13 or 14) every frame is the
+  same, in the plain page and in both Khronos models; the mask 15 (all four samples) still differs. The voxel
+  findings above fit it: the pixels are blended glass over edges whose samples differ, a zero destination factor
+  hides it, `max` blending does not.
+- **Repro:** `node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/msaa-blend-repeat-check.mjs` (plain WebGPU,
+  prints the first changed pixel with its samples before and after the blended pass; exit 1 when frames differ),
+  `--mask=7` for the comparison, `--khronos` to also capture ToyCar and IridescenceLamp four times each (after
+  `npm run build:packages`).
+- **Three GPUs, same repro, Edge 156.0.4314.50, 2026-10-30:** RTX A6000 (driver 32.0.16.1742): 29 of 30 frames
+  differ; Intel Arc 140V (driver 32.0.101.8860): 0 of 30, with `--mask=7` 0 of 30, ToyCar and IridescenceLamp 0 pixels
+  in three captures; AMD Radeon 680M (driver 32.0.21030.2001): 0 of 30, 0 of 30, 0 pixels. So the plain-page blend
+  noise is NVIDIA's (hardware or driver), not Dawn's or Chromium's. The Arc's earlier voxel repeat (pixel (101, 72),
+  6 of 450) is not explained by it: the plain page and both Khronos models are exact on that laptop, so that one stays
+  open with its own repro above.
+- **Earlier notes on the voxel case:** every differing pixel is seen through
   the glass wall, along glass and terrain edges (pixels whose samples hold more than one surface). Between the frames
   nothing that Margo hands the GPU changes: no buffer write but the frame uniform and indirect arguments, bit for bit
   the same each frame; the glass quads in the same order. The frames stay identical at 1x, without the glass, with the
   glass drawn unblended, with blending on but the destination factor zero, with the glass drawn in the opaque pass,
   without core's mid-frame resolve and with Dawn's D3D12 render-pass toggle off; they still differ with `max`
   blending, which does not depend on order. Mesh arrival order is not involved: 168 permutations of the mesh replies
-  drew the same pixels on a quiet machine. The NVIDIA report drafted from this is withdrawn.
+  drew the same pixels on a quiet machine.
 - **What the checks do about it (Scott, 2026-10-26):** the voxel GPU checks allow a difference of at most 1 in 8 bits
   (1 half-float ulp on the rgba16float HDR scene) on views that blend a translucent layer at 4x MSAA, and nowhere else:
   1x views, views with no translucent layer, every other check and every other package stay exact. The rule is the named
@@ -333,8 +363,11 @@ does not own. Each entry says exactly what is needed to close it.
   translucent panes in the other order differ by up to 132 of 255 (`swapped layer order` step), and the mesh arrival
   order step stays a pixel comparison with that tolerance only. The check's output prints the exact count next to the
   tolerant one, and `--repeat` reports both (it still fails on any exact difference: it is the repro).
-- **Needed to close:** the cause found (Margo-side or not) with both GPUs' repro results explained, and the fix or the
-  vendor's explanation recorded here; then the tolerance can go.
+- **Needed to close:** the plain-WebGPU page sent to NVIDIA (it repeats on no other GPU tested) and NVIDIA's fix or
+  explanation recorded here; the Arc's voxel pixel (101, 72) traced on its own; then the voxel tolerance can go, and ToyCar and
+  IridescenceLamp get an exact repeat-capture check. Margo has no correct way around it: leaving a sample out of the
+  blend, or drawing a full-screen layer first to change the GPU's tile state, changes or adds work to hide the
+  symptom.
 
 ## Performance losses still open
 
