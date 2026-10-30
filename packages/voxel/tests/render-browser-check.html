@@ -15,6 +15,8 @@ import {meshChunk,meshInput} from '/packages/voxel/dist/mesher.js';
 import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
 import {compareImages,toleranceFor} from '/packages/voxel/tests/blend-tolerance.js';
 if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+// ?trace=1 (the --replay repro): every WebGPU object is recorded so check.trace can hand one frame to the plain replay.
+const tracer=new URLSearchParams(location.search).get('trace')==='1'?(await import('/scripts/support/webgpu-trace.js')).installTrace():undefined;
 const canvas=document.querySelector('canvas'),errors=[],runtime=()=>engineRuntime(engine);
 const watch=(device)=>device.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
 const engine=await Engine.create(canvas,{backend:'webgpu',features:['timestamp-query'],camera:{position:[-14,30,-14],target:[30,10,30],near:0.1,far:400}});
@@ -187,6 +189,25 @@ window.check={
   const v=views.find((x)=>x.name===view),tol=toleranceFor({samples:4,blended:v.blended});look(v);const first=await shot(),differ=[];
   for(let i=0;i<n;i++){const img=await shot(),c=compare(img,first,[0,0,0],tol);if(c.strictDiffering)differ.push({frame:i,...c});}
   renderer.dispose();return {differ,tolerance:tol,errors:errors.splice(0)};
+ },
+ // One frame of the still view recorded for scripts/support/webgpu-replay.html (needs ?trace=1), and the 4 samples of
+ // `pixel` in this page after the voxel translucent pass (order 4.5), which the replay must reproduce.
+ async trace(view,pixel){
+  look(views[0]);renderer=attach(world,keys,'greedy',4);await ready(renderer,world,keys,'greedy');
+  look(views.find((x)=>x.name===view));await shot();await device().queue.onSubmittedWorkDone();
+  const trace=await tracer.record(device(),()=>engine.render({delta:0})),d=device();
+  const out=d.createBuffer({size:16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=d.createBuffer({size:16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),
+   probe=d.createComputePipeline({layout:'auto',compute:{entryPoint:'main',module:d.createShaderModule({code:`@group(0) @binding(0) var ms:texture_multisampled_2d<f32>;@group(0) @binding(1) var<storage,read_write> out:array<u32,4>;
+@compute @workgroup_size(1) fn main(){for(var s=0u;s<4u;s++){out[s]=pack4x8unorm(textureLoad(ms,vec2i(${pixel[0]},${pixel[1]}),i32(s)));}}`})}});
+  const remove=runtime().frameGraph.add({name:'trace probe',order:4.75,execute:(c)=>{const p=c.encoder.beginComputePass();p.setPipeline(probe);
+   p.setBindGroup(0,d.createBindGroup({layout:probe.getBindGroupLayout(0),entries:[{binding:0,resource:c.color},{binding:1,resource:{buffer:out}}]}));p.dispatchWorkgroups(1);p.end();}});
+  // Five live frames, the most common sample set kept: a GPU that blends a frame wrongly now and then (the repro's
+  // subject) must not decide the reference.
+  const sets=new Map();
+  for(let i=0;i<5;i++){engine.render({delta:0});const e=d.createCommandEncoder();e.copyBufferToBuffer(out,0,staging,0,16);d.queue.submit([e.finish()]);
+   await staging.mapAsync(GPUMapMode.READ);const v=[...new Uint32Array(staging.getMappedRange())].map((u)=>[u&255,(u>>>8)&255,(u>>>16)&255].join('.')).join('|');staging.unmap();sets.set(v,(sets.get(v)??0)+1);}
+  remove();staging.destroy();out.destroy();renderer.dispose();
+  return {trace,live:[...sets].sort((a,b)=>b[1]-a[1])[0][0],errors:errors.splice(0)};
  },
  // Draw-order sensitivity of the tolerance: two panes of translucent glass, one in each of two chunks, one behind the
  // other seen along +x; the same panes with the two colours swapped between the chunks. The images differ only by the

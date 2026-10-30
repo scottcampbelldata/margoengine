@@ -18,9 +18,13 @@
 // rough unless run behind scripts/quiet-gate.mjs) and the render bundle record cost. `--repeat=<frames>` runs only
 // this: one still 4x view drawn frame after frame under CPU load, failing on any frame that differs from the first
 // (docs/known-bugs.md, "4x MSAA blending is not repeatable"); it reports the frames that differ exactly and those that
-// differ by more than the blended-4x tolerance.
+// differ by more than the blended-4x tolerance. `--replay=<frames>` [--skip=<pass,...>] [--pixel=x,y] runs only this:
+// one frame of that view recorded (scripts/support/webgpu-trace.js) and replayed on a fresh device with no Margo code
+// (scripts/support/webgpu-replay.html), under the same CPU load; the replay must reproduce the live frame's 4 samples
+// at the pixel (default 101,72), and it fails on any frame whose samples differ (a fault below Margo,
+// docs/known-bugs.md). `--skip` drops those render passes' draws (0 main, 1 voxel opaque, 2 voxel translucent).
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -31,7 +35,8 @@ const path = '/packages/voxel/tests/render-browser-check.html',
   { page, hardware } = context,
   pageErrors = [],
   report = { hardware, results: {} },
-  repeat = Number(process.argv.find((a) => a.startsWith('--repeat='))?.slice(9) ?? 0);
+  repeat = Number(process.argv.find((a) => a.startsWith('--repeat='))?.slice(9) ?? 0),
+  replay = Number(process.argv.find((a) => a.startsWith('--replay='))?.slice(9) ?? 0);
 page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
@@ -43,7 +48,7 @@ const near = (actual, expected, label, tolerance = 2e-3) =>
   );
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
-  for (const samples of repeat ? [] : [4, 1]) {
+  for (const samples of repeat || replay ? [] : [4, 1]) {
     await page.goto(`http://127.0.0.1:${port}${path}${samples === 1 ? '?samples=1' : ''}`);
     await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
     assert.equal(await page.evaluate(() => window.check.samples()), samples);
@@ -179,6 +184,44 @@ try {
       await Promise.all(burners.map((w) => w.terminate()));
     }
   }
+  if (replay) {
+    const pixel = (process.argv.find((a) => a.startsWith('--pixel='))?.slice(8) ?? '101,72').split(',').map(Number),
+      skip = (process.argv.find((a) => a.startsWith('--skip='))?.slice(7) ?? '').split(',').filter(Boolean).map(Number);
+    await page.goto(`http://127.0.0.1:${port}${path}?trace=1`);
+    await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
+    const t = await page.evaluate((p) => window.check.trace('tree and overhang', p), pixel);
+    assert.deepEqual(t.errors, []);
+    await mkdir('test-results', { recursive: true });
+    await writeFile('test-results/voxel-replay-trace.json', JSON.stringify(t.trace));
+    await page.goto(
+      `http://127.0.0.1:${port}/scripts/support/webgpu-replay.html?src=/test-results/voxel-replay-trace.json`,
+    );
+    await page.waitForFunction(() => window.replayReady, null, { timeout: 60000 });
+    const end = Date.now() + 30 * 60_000,
+      burners = Array.from(
+        { length: Math.max(1, availableParallelism() - 1) },
+        () => new Worker(`while (Date.now() < ${end}) for (let i = 0; i < 1e6; i++);`, { eval: true }),
+      );
+    let r;
+    try {
+      r = await page.evaluate(([n, p, k]) => window.replay(n, p, k), [replay, pixel, skip]);
+    } finally {
+      await Promise.all(burners.map((w) => w.terminate()));
+    }
+    console.log(
+      `4x tree and overhang replayed ${replay} times with no Margo code on ${r.gpu}${skip.length ? ` (render passes ${skip} without draws)` : ''}: samples at ${pixel} ${JSON.stringify(r.values)}, live frame ${t.live}`,
+    );
+    assert.deepEqual(r.errors, []);
+    const [common] = [...r.values].sort((a, b) => b[1] - a[1])[0];
+    if (!skip.length)
+      assert.equal(common, t.live, 'the replay does not reproduce the live frame: the trace missed something');
+    assert.equal(
+      r.differ.length,
+      0,
+      `replayed frame: ${r.differ.length} of ${replay} frames differ at ${pixel} (first ${r.differ.slice(0, 8)}): a fault below Margo, docs/known-bugs.md`,
+    );
+    console.log(`ok replay: ${replay} frames drew the same samples`);
+  }
   if (process.argv.includes('--timing')) {
     await page.goto(`http://127.0.0.1:${port}${path}`);
     await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
@@ -188,7 +231,8 @@ try {
     console.log(`timing (rough: no quiet gate) ${JSON.stringify(t)}`);
   }
   assert.deepEqual(pageErrors, []);
-  if (!repeat) await writeFile('test-results/voxel-render-browser-check.json', JSON.stringify(report, null, 1));
+  if (!repeat && !replay)
+    await writeFile('test-results/voxel-render-browser-check.json', JSON.stringify(report, null, 1));
   console.log('voxel render browser check passed');
 } finally {
   await context.close();

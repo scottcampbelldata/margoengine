@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>WebGPU frame replay</title></head>
+<body>
+<script type="module">
+// Plain WebGPU page with no engine code: replays a frame recorded by webgpu-trace.js (`?src=` its JSON) on a fresh
+// device. window.replay(frames, pixel, skip) returns webgpu-replay.js's result with the adapter and any validation
+// errors. Driven by packages/voxel/tests/render-browser-check.mjs --replay.
+import { replayTrace } from './webgpu-replay.js';
+const adapter = await navigator.gpu.requestAdapter(),
+  requiredLimits = {};
+for (const key in adapter.limits) if (typeof adapter.limits[key] === 'number') requiredLimits[key] = adapter.limits[key];
+const device = await adapter.requestDevice({ requiredLimits, requiredFeatures: [...adapter.features] }),
+  errors = [];
+device.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+window.replay = async (frames, pixel, skip) => {
+  const trace = await (await fetch(new URLSearchParams(location.search).get('src'))).json(),
+    result = await replayTrace(device, trace, { frames, pixel, skip }),
+    info = adapter.info ?? {};
+  return { gpu: [info.vendor, info.architecture, info.description].filter(Boolean).join(' '), ...result, errors };
+};
+window.replayReady = true;
+</script>
+</body>
+</html>
