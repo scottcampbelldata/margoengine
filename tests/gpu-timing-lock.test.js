@@ -11,7 +11,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { lockMode, lockOrder, plan, runPlan, TIMING_TEST } from '../scripts/gpu-package-tests.mjs';
+import { lockMode, lockOrder, mergeTimingSteps, plan, runPlan, TIMING_TEST } from '../scripts/gpu-package-tests.mjs';
 import { runLimited } from '../scripts/support/run-limited.mjs';
 import { runSuite } from '../scripts/support/shutdown.mjs';
 
@@ -96,9 +96,18 @@ test('the run holds the GPU exclusively only around a timing step and shared aro
 test('every timing test fails at once when it is run inside a shared GPU slot', () => {
   const lock = mkdtempSync(join(tmpdir(), 'margo-timing-lock-'));
   try {
-    for (const timing of plan().filter((t) => t.exclusive)) {
+    // The GPU package steps' timing tests and those check:merge runs as steps of its own (a frame-budget run that asks
+    // for the GPU exclusively), each file alone.
+    const timings = [
+      ...plan()
+        .filter((t) => t.exclusive)
+        .map((t) => ({ label: t.label, file: /node (\S+\.m?js)/.exec(t.command)[1] })),
+      ...mergeTimingSteps().flatMap((s) => s.files.map((file) => ({ label: s.label, file }))),
+    ];
+    assert.ok(timings.length >= 1);
+    for (const timing of timings) {
       const begun = Date.now(),
-        file = /node (\S+\.m?js)/.exec(timing.command)[1],
+        file = timing.file,
         run = spawnSync(process.execPath, [file], {
           cwd: root,
           encoding: 'utf8',

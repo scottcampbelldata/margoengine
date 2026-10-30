@@ -141,6 +141,9 @@ export function plan() {
     .map((name) => ({ cwd: '.', command: scripts[name] }));
   for (const { cwd, command } of [...tests.filter((t) => !t.name), ...merged])
     for (const file of scriptFiles(cwd, command)) run.add(file);
+  // A check:merge step runs outside this check's hold and takes its own lock: a timing test there asks for the GPU
+  // exclusively itself, and must not share its step with other checks either (this throws when one does).
+  mergeTimingSteps();
   const files = browserFiles();
   // A test that takes test-results/gpu.lock by hand waits forever inside this check's own hold.
   const ownLock = files.filter((file) => {
@@ -172,8 +175,8 @@ function scriptFiles(cwd, command) {
   return files;
 }
 
-/** A timing test: its file asks scripts/gpu-lock.mjs for the GPU exclusively (`acquire({ ..., mode: 'exclusive' })`). */
-export const TIMING_TEST = /\bacquire\(\{[^}]*\bmode:\s*['"]exclusive['"]/;
+/** A timing test: its file awaits an exclusive hold of the GPU from scripts/gpu-lock.mjs's acquire, mode exclusive. */
+export const TIMING_TEST = /\bawait acquire\(\{[^}]*\bmode:\s*['"]exclusive['"]/;
 
 /**
  * The GPU lock mode a planned test runs under: 'exclusive' when the files it runs are timing tests (TIMING_TEST),
@@ -192,6 +195,25 @@ export function lockMode(label, files, read) {
       `${label} runs the timing test ${timing.join(', ')} in one step with ${others.join(', ')}; give the timing test a script of its own (for example "test:gpu:<name>") so it runs alone under the exclusive GPU lock`,
     );
   return 'exclusive';
+}
+
+/**
+ * The timing tests among the check:merge steps (each `npm run <name>` of check:merge:steps whose files ask for the GPU
+ * exclusively): `[{ label, files }]`. Throws GPU_TIMING_TEST_SHARED for a step that runs a timing test together with
+ * other checks.
+ */
+export function mergeTimingSteps() {
+  const scripts = json('package.json').scripts,
+    readText = (file) => readFileSync(join(root, file), 'utf8');
+  return (scripts['check:merge:steps'] ?? '')
+    .split(' && ')
+    .map((part) => /^npm run (\S+)/.exec(part)?.[1])
+    .filter((name) => scripts[name])
+    .flatMap((name) => {
+      const label = `check:merge ${name}`,
+        files = scriptFiles('.', scripts[name]).filter((file) => existsSync(join(root, file)));
+      return lockMode(label, files, readText) === 'exclusive' ? [{ label, files }] : [];
+    });
 }
 
 /** Files under packages/<dir>/{test,tests,scripts}/ (not node tests) that open a browser. */
