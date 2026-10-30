@@ -1,10 +1,10 @@
 {
-  "commit": "b3a08f01",
+  "commit": "8f32778e",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 56219,
-    "gzip": 22482,
+    "raw": 56263,
+    "gzip": 22494,
     "limit": 25000
   },
   "packages": {
@@ -264,12 +264,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 52398,
-        "gzip": 21063
+        "raw": 52442,
+        "gzip": 21077
       },
       "./extension": {
-        "raw": 49245,
-        "gzip": 20182
+        "raw": 49289,
+        "gzip": 20195
       }
     },
     "@margoengine/creative": {
@@ -308,8 +308,12 @@
     },
     "@margoengine/culling": {
       ".": {
-        "raw": 31261,
-        "gzip": 10464
+        "raw": 32061,
+        "gzip": 10745
+      },
+      "./dynamic": {
+        "raw": 19985,
+        "gzip": 7205
       }
     },
     "@margoengine/cutscene": {
