@@ -94,6 +94,17 @@ async function build() {
     }
   });
 
+  // A late frame: 60 frames before recording, one frame stalls 200 ms (past the engine's default maxDelta of 0.1 s), as
+  // frames do on a loaded machine or after a long task. The steady state measured is the one after a late frame, so a
+  // path that deoptimizes on a late frame and leaves the loop in a tier that boxes numbers fails the check whatever the
+  // machine's load (it once failed only when check:merge ran other GPU tests beside it). ?late=0 turns it off.
+  const late = Number(params.get('late') ?? 200),
+    lateAt = warmup - 60;
+  const stall = (ms) => {
+    const end = performance.now() + ms;
+    while (performance.now() < end);
+  };
+
   // Sampling: heap[k] before frame k of the recorded run. `read` is the cost of one sample, measured as the difference
   // between back-to-back reads (the MemoryInfo object each read creates; the first read ever also builds its wrapper
   // template, so it is left out), and subtracted per frame.
@@ -103,6 +114,7 @@ async function build() {
   await new Promise((done) => {
     const stop = engine.onFrame(() => {
       frame++;
+      if (frame === lateAt && late > 0) stall(late);
       if (frame === warmup) {
         // Tells a --profile run to start its sampling heap profile (before the recorded frames).
         if (params.has('profile')) console.info('frame-alloc:record');

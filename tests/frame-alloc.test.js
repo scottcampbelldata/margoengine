@@ -9,20 +9,32 @@ import { FLOORS, frameBytes, overFloor } from '../scripts/frame-alloc-browser.mj
 // work share the heap (packages/lod/test/lod.test.js learned this). A 16 MB young generation keeps V8 from collecting
 // inside a measured window, and the probes leave out any window it collected in (support/heap-windows.mjs). With
 // --single-threaded-gc no sweeper thread frees pages while a window counts (Node 24 read a window as -387 B a call).
-const HEAP = ['--min-semi-space-size=16', '--max-semi-space-size=16', '--single-threaded-gc'];
-const probe = (...args) =>
+// --no-concurrent-recompilation compiles optimized code on the main thread the moment a function earns it, so the tier
+// a window measures depends on the frames run, never on the machine's load: with compiler threads that a parallel
+// package build starved, Turbofan's code arrived after the warm-up and the core frame read 300 B (its Maglev cost)
+// against the 256 B limit. The tiers and their bytes are the same; only the wall-clock race is gone.
+const HEAP = [
+  '--min-semi-space-size=16',
+  '--max-semi-space-size=16',
+  '--single-threaded-gc',
+  '--no-concurrent-recompilation',
+];
+// `flags` go to V8 (before the script), `args` to the probe.
+const probeWith = (flags, ...args) =>
   JSON.parse(
     execFileSync(
       process.execPath,
       [
         '--expose-gc',
         ...HEAP,
+        ...flags,
         fileURLToPath(new URL('./support/core-frame-alloc-probe.mjs', import.meta.url)),
         ...args,
       ],
       { encoding: 'utf8', timeout: 240_000 },
     ),
   ).bytes;
+const probe = (...args) => probeWith([], ...args);
 const median = (values) => [...values].sort((a, b) => a - b)[values.length >> 1];
 // Every message names the Node and V8 that measured it: the middle tier differs between V8 versions.
 const host = `Node ${process.version}, V8 ${process.versions.v8}`,
@@ -122,6 +134,40 @@ test('the cascade fit and the stable matrix inverse allocate little in the middl
     `cascadeSplits + fitCascades allocated ${cascades} B per frame at Maglev (${host})`,
   );
   assert.ok(invert <= 450, `invertMatrixStable allocated ${invert} B per call at Maglev (${host})`);
+});
+
+// Regression (frame-alloc check, 2026-10-30): one late frame deoptimized core's frame loop. Its clamp tested
+// `step < most || step !== step`, so the NaN compare first ran on a frame past maxDelta, had no type feedback, and the
+// optimized loop deoptimized there; a once-per-frame function then runs thousands of frames in a tier that boxes
+// numbers, and the browser check read every scene 24 to 84 B per frame over its floor, but only when check:merge ran
+// other GPU tests beside it (a loaded machine has late frames). Both compares now run on every frame.
+test("one late frame leaves core's frame loop optimized", { timeout: 120_000 }, () => {
+  const status = (...flags) =>
+    JSON.parse(
+      execFileSync(
+        process.execPath,
+        ['--allow-natives-syntax', ...flags, fileURLToPath(new URL('./support/late-frame-probe.mjs', import.meta.url))],
+        { encoding: 'utf8', timeout: 100_000 },
+      ),
+    );
+  // Bit 16 of %GetOptimizationStatus: the function runs optimized code. Default tiers, and V8 stopped at Maglev.
+  for (const flags of [[], ...(noTier ? [] : [['--max-opt=2']])]) {
+    const { before, after } = status(...flags);
+    assert.ok(before & 16, `the frame loop never got optimized (status ${before}; ${flags.join(' ')} ${host})`);
+    assert.ok(
+      after & 16,
+      `a late frame deoptimized the frame loop (status ${before} -> ${after}; ${flags.join(' ')} ${host})`,
+    );
+  }
+});
+
+// Regression (2026-10-30): the core frame test failed only while a package build ran beside it. V8's compiler
+// threads, starved, delivered Turbofan's code after the probe's fixed warm-up, so every window measured Maglev code
+// (300 B against 256). --concurrent-recompilation-delay stands in for the starved threads: with it the probe must
+// still measure the optimized frame.
+test('the frame probe measures the same frame when the compiler threads are slow', { timeout: 300_000 }, () => {
+  const bytes = probeWith(['--concurrent-recompilation-delay=1000']);
+  assert.ok(median(bytes) <= 256, `core frame allocated ${bytes.join(', ')} B per frame with slow compiles (${host})`);
 });
 
 test('the frame probe notices a frame that allocates', { timeout: 300_000 }, () => {

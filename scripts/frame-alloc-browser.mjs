@@ -5,12 +5,16 @@
 // Method: Chromium with --enable-precise-memory-info, so performance.memory.usedJSHeapSize is V8's exact used heap size
 // in bytes, read fresh on every call. The page samples it once per frame from an engine.onFrame callback into a
 // preallocated Float64Array, after 600 warm-up frames (JIT tiers settled, pipelines and caches built), for 600 frames.
+// One warm-up frame, 60 before recording, is late on purpose (it stalls 200 ms, past the engine's maxDelta): an engine
+// path that deoptimizes on a late frame once failed this check only when other GPU tests loaded the machine, so the check
+// now measures the steady state after a late frame on every run.
 // Bytes of frame k = heap[k + 1] - heap[k] - one read's own cost (the MemoryInfo object performance.memory returns,
 // measured by back-to-back reads). A frame in which V8 collected garbage shows a negative difference; those frames are
 // counted and left out. The check fails when a scene's median frame (its steady-state frame) allocates more than its
 // floor in FLOORS below; the mean, which also carries the odd frame with a timer or an idle task in it, is reported.
 //
-// Options: --scenes=basic,instanced,shadowed,post,dynamic (default all), --frames=<n>, --warmup=<n>,
+// Options: --scenes=basic,instanced,shadowed,post,dynamic (default all), --frames=<n>, --warmup=<n>, --late=<ms> (the
+// late warm-up frame's stall, default 200; 0 leaves it out, diagnosis only),
 // --profile (adds a V8 sampling heap profile of the recorded frames, through CDP HeapProfiler.startSampling, and prints
 // the functions that allocate per frame; diagnosis only, not part of the check), --no-check (print, never fail).
 // Results go to test-results/frame-alloc.json. Takes one shared slot of the GPU lock, around the browser only.
@@ -144,9 +148,11 @@ async function main() {
     scenes = option('scenes', Object.keys(FLOORS).join(',')).split(','),
     frames = Number(option('frames', 600)),
     warmup = Number(option('warmup', 600)),
+    late = Number(option('late', 200)),
     profile = args.includes('--profile'),
     check = !args.includes('--no-check');
   for (const scene of scenes) if (!(scene in FLOORS)) throw new TypeError(`Unknown scene ${scene}`);
+  if (!(late >= 0)) throw new RangeError(`Invalid --late=${late}; pass a stall in milliseconds, 0 or more`);
   await build({
     configFile: false,
     root: fixture,
@@ -179,7 +185,7 @@ async function main() {
         errors = [];
       tab.on('pageerror', (error) => errors.push(error.message));
       tab.on('console', (message) => message.type() === 'error' && errors.push(message.text()));
-      const url = `http://127.0.0.1:${server.address().port}/?scene=${scene}&frames=${frames}&warmup=${warmup}${profile ? '&profile' : ''}`;
+      const url = `http://127.0.0.1:${server.address().port}/?scene=${scene}&frames=${frames}&warmup=${warmup}&late=${late}${profile ? '&profile' : ''}`;
       let cdp, sampling;
       if (profile) {
         // The page logs frame-alloc:record on its last warm-up frame; sampling every allocation (interval 1 byte) from
@@ -233,7 +239,7 @@ async function main() {
   mkdirSync(resolve(root, 'test-results'), { recursive: true });
   writeFileSync(
     resolve(root, 'test-results/frame-alloc.json'),
-    `${JSON.stringify({ browser: `${browserLabel()} ${version} headless`, adapter, frames, warmup, results, ...(profile && { sites }) }, null, 2)}\n`,
+    `${JSON.stringify({ browser: `${browserLabel()} ${version} headless`, adapter, frames, warmup, late, results, ...(profile && { sites }) }, null, 2)}\n`,
   );
   const failures = overFloor(results);
   if (failures.length && check) {

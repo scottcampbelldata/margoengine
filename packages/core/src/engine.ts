@@ -1101,9 +1101,11 @@ export class Engine {
       return;
     }
     // Math.min by compares (V8 13 Maglev boxes Math.min's numbers), NaN on either side included. step is never -0.
+    // The NaN test comes first so both compares run on every frame: a compare first met on a late frame has no type
+    // feedback, the optimized loop deoptimizes there and then runs thousands of frames in a tier that boxes numbers.
     const step = (time - this.last) / 1000,
       most = this.maxDelta,
-      delta = this.last ? (step < most || step !== step ? step : most) : 0;
+      delta = this.last ? (step !== step || step < most ? step : most) : 0;
     this.last = time;
     try {
       this.frameOptions.delta = delta;

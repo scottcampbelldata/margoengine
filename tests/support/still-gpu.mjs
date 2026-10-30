@@ -130,10 +130,14 @@ export function frameDriver() {
     return 1;
   };
   globalThis.cancelAnimationFrame = noop;
-  // Whole milliseconds, so the probe's own timestamps are small integers and never allocate.
-  return (frames) => {
-    for (let f = 0; f < frames; f++) next((now += 16));
+  // Whole milliseconds, so the probe's own timestamps are small integers and never allocate. `step` is the gap before
+  // each frame in milliseconds (default 16; a late frame is one past the engine's maxDelta). `run.loop()` is the
+  // engine's own requestAnimationFrame callback (its frame loop), for probes that ask V8 about its tier.
+  const run = (frames, step = 16) => {
+    for (let f = 0; f < frames; f++) next((now += step));
   };
+  run.loop = () => next;
+  return run;
 }
 
 /**
