@@ -15,8 +15,8 @@ Margo replaces three.js.
 
 `@margoengine/webgl2-compat` (milestones M0 to M7 of [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)) puts a WebGPU-shaped
 device on WebGL2 and translates every WGSL shader to GLSL ES 3.00, so core and the optional packages run unchanged at
-zero core bytes. The row stays PARTIAL: M8 (every site demo, docs, release) is open, the layer is 92,467 B gzip against
-a 60,000 B target, the voxel path tracer and XR refuse it, and CPU-tier compute kernels need `unsafe-eval`. The older
+zero core bytes. The row stays PARTIAL: M8 (every site demo, docs, release) is open, the layer's base is 72,500 B gzip (limit
+73,000 B, an accepted difference) with a lazy compute runtime of 22,094 B, the voxel path tracer and XR refuse it, and CPU-tier compute kernels need `unsafe-eval`. The older
 `@margoengine/webgl` preview (core meshes only) still ships; `loadFallback` and `fallbackContent` remain the supported way to degrade today.
 
 ## The 4 MISSING rows

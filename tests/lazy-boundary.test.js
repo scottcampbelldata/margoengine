@@ -90,3 +90,16 @@ test('the base entry reaches none of the compute runtime, even through other imp
       `${rel(file)} is in the base entry (imported by ${rel(base.get(file) ?? '')}); keep compute/ behind the import() in device/device.ts`,
     );
 });
+
+test('the only import() calls in the layer are index.ts to device.ts and device.ts to the compute runtime', () => {
+  // scripts/lazy-files.js picks the lazy chunk by its built file name (split.chunk); any other dynamic import could
+  // add or rename a chunk that pattern misses or wrongly catches, so the set of lazy edges is pinned here.
+  const edges = [];
+  for (const file of reach(join(src, 'index.ts')).keys())
+    for (const next of importsOf(file)) if (next.dynamic) edges.push(`${rel(file)} -> ${rel(next.file)}`);
+  assert.deepEqual(edges.sort(), [
+    'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/compute/runtime.ts',
+    'packages/webgl2-compat/src/index.ts -> packages/webgl2-compat/src/device.ts',
+  ]);
+  assert.ok(split.chunk.test('runtime-AbC123.js') && !split.chunk.test('device-AbC123.js'));
+});

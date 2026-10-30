@@ -799,9 +799,10 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   rule: of the 2,000,000 positions sampled on the GPU, 5% of the x coordinates differ by one unit in the last place
   (0.1% of the normal samples already do; the two paths round their float arithmetic differently), and one point
   lands on the next pixel.
-- **Left in M8.** The size shrink (measured in two numbers since 2026-10-30, `splits` in `entry-sizes.json`: the base
+- **Size in M8.** The size (measured in two numbers since 2026-10-30, `splits` in `entry-sizes.json`: the base
   that `install()` loads is 72,500 B gzip, the lazy compute runtime another 22,094 B; the joined root record, 94,046 B,
   counted both, and the sizes gate now holds each). **Accepted difference (Scott, 2026-10-30):** the base limit is
   73,000 B, not the 60,000 B target, which no gate ever enforced. The base carries the full WGSL to GLSL translator and
   the WGSL checker, both needed on the first frame; native WebGPU always validates shaders, so a build without the
-  checker would behave differently from it. The lazy compute runtime is measured and gated on its own, the transform-feedback tier for own-index stores and the integrated-GPU budget run.
+  checker would behave differently from it. The lazy compute runtime is measured and gated on its own.
+- **Also left in M8.** The transform-feedback tier for own-index stores, and the integrated-GPU budget run.
