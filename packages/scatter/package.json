@@ -52,6 +52,7 @@
     "test:browser:edges": "cd ../.. && node packages/scatter/test/edges.browser.mjs",
     "test:browser:shadow": "cd ../.. && node packages/scatter/test/shadow.browser.mjs",
     "test:browser:shadow-cull": "cd ../.. && node packages/scatter/test/shadow-cull.browser.mjs",
+    "test:browser:variation": "cd ../.. && node packages/scatter/test/variation.browser.mjs",
     "prepack": "npm run build"
   }
 }

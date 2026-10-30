@@ -115,6 +115,36 @@ const remove = shadows.add(rocks); // casts, and receives through its material
 engine.start();
 ```
 
+One mesh in one colour reads as a forest of copies. Two options of a lit scatter
+(`material`) break that up, and both default to off, which draws exactly as
+before. `variation: { hue, value }` tints each instance from a hash of its world
+position, so the tint stays put across frames, culling and LOD rings: its hue
+turns around the grey axis by up to `hue` of the colour wheel either way (0-0.5,
+default 0) and its brightness changes by up to `value` either way (0-1, default
+0). `clusters` (mesh units, default 0: off) cuts the mesh into cubic cells of that
+size: each vertex is lightened or darkened by up to `variation.value` from a hash
+of its cell and its instance, and its normal bends away from the cell's centre,
+so a smooth canopy shades as clumps of leaves. Both run in the vertex stage (a
+few operations each, through spare slots of the material uniform, no new
+binding); the shadow pass is unchanged. Without `material` they throw a
+RangeError. Both work on `ScatterTiles` too.
+
+```ts
+import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { Scatter } from '@margoengine/scatter';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const canopy = box(2, 2, 2);
+const trees = Scatter.attach(engine, canopy, {
+  count: 500,
+  area: [80, 80],
+  material: new PbrMaterial({ color: '#3f7a2a', roughness: 0.9 }),
+  variation: { hue: 0.06, value: 0.15 }, // each tree its own green
+  clusters: 0.6, // leaf clumps about 0.6 units across
+});
+engine.start();
+```
+
 Thin triangles whose shading changes across them (blade root shade, vertex
 colour, occlusion, the blade ground weight) interpolate those values at a
 covered sample (`centroid`): with multisampling, a pixel a blade only partly

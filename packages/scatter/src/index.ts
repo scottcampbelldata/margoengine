@@ -55,6 +55,16 @@ export interface ScatterBlades {
    */
   widen?: number;
 }
+/**
+ * Colour spread for lit GPU `Scatter` and `ScatterTiles` (see `ScatterOptions.variation`). Each instance draws its two
+ * random numbers from a hash of its world position, so its tint stays put across frames, culling and LOD rings.
+ */
+export interface ScatterVariation {
+  /** Largest hue turn either way around the grey axis, as a fraction of the colour wheel, 0-0.5 (default 0). */
+  hue?: number;
+  /** Largest brightness change either way, 0-1 (default 0): the albedo scales by a factor from 1 - value to 1 + value. */
+  value?: number;
+}
 /** GPU scatter rules, fixed at construction (out of range throws RangeError). Distances are world units. */
 export interface ScatterOptions {
   /** Candidate instances on a stratified grid, an integer 1-1,000,000 (GPU memory: three buffers of this many). Default 10,000. */
@@ -135,6 +145,19 @@ export interface ScatterOptions {
    * `bounds` when a `heightmap` or `densityMap` is given.
    */
   follow?: boolean;
+  /**
+   * Tints each instance from a hash of its world position (default none: every instance takes the material colour):
+   * a hue turn of up to `hue` and a brightness change of up to `value` either way, so a forest of one mesh does not
+   * read as one colour. Needs `material`. Cost: a few vertex operations; no extra binding.
+   */
+  variation?: ScatterVariation;
+  /**
+   * Cell size in mesh units for leaf-cluster shading (default 0: off). The mesh is cut into cubic cells; each vertex
+   * is lightened or darkened by up to `variation.value` from a hash of its cell and its instance, and its normal bends
+   * away from its cell's centre, so a canopy shades as clumps instead of one smooth blob. Needs `material`. Cost:
+   * about ten vertex operations; the shadow pass is unchanged.
+   */
+  clusters?: number;
 }
 const frame = `
 struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f,blade:vec4f}
@@ -219,18 +242,44 @@ const solidCode = renderCode
   .replace(',@location(1) @interpolate(flat) lodFade:vec2f', '')
   .replace(',data.rotation.zw,', ',')
   .replace('if(!lodVisible(i.clip.xy,i.lodFade)){discard;}', '');
-/** Lit vertex stage: `fade` writes the LOD fade varying, `blades` the root shade and the ground-normal varying. */
-const pbrVertex = (fade: boolean, blades: boolean) =>
+/**
+ * WGSL of `variation` and `clusters`: an integer hash to 0..1 (the cull pass's mixer over three keys) and a hue turn
+ * about the grey axis (Rodrigues; a turn of 0 returns the colour unchanged).
+ */
+const lookShader = `
+fn scatterHash(v:vec3u)->f32 {var x=(v.x*0x8da6b343u)^(v.y*0xd8163841u)^(v.z*0xcb1ab31fu);x=(x^(x>>16u))*0x7feb352du;x=(x^(x>>15u))*0x846ca68bu;x=x^(x>>16u);return f32(x)/4294967296.0;}
+fn scatterHue(c:vec3f,turn:f32)->vec3f {let k=vec3f(0.57735027);let a=turn*6.2831853;return max(c*cos(a)+cross(k,c)*sin(a)+k*dot(k,c)*(1.0-cos(a)),vec3f(0));}
+`;
+/**
+ * The `variation` and `clusters` vertex code, before the pose: `tint` is the instance's colour, and with clusters
+ * `bent` the cell-shaded normal. The key is the instance's quarter-unit world XZ cell, so it survives culling and the
+ * LOD rings; uniform slots: hue in material[0].w, value in material[1].w, cell size in material[3].w (ground.w).
+ */
+const lookCode = (clusters: boolean) =>
+  'let key=vec3u(bitcast<vec2u>(vec2i(floor(data.position.xz*4.0))),1u);' +
+  'var tint=scatterHue(material[0].rgb,(scatterHash(key)*2.0-1.0)*material[0].w)*(1.0+(scatterHash(key+vec3u(0,0,1u))*2.0-1.0)*material[1].w);' +
+  (clusters
+    ? 'let cell=floor(p/material[3].w);let away=p-(cell+0.5)*material[3].w;' +
+      'tint*=1.0+(scatterHash(bitcast<vec3u>(vec3i(cell))+key*31u)*2.0-1.0)*material[1].w;' +
+      'let bent=normalize(n+away*(0.5/max(length(away),1e-6)));'
+    : '');
+/**
+ * Lit vertex stage: `fade` writes the LOD fade varying, `blades` the root shade and the ground-normal varying, `tint`
+ * the `variation` colour and `clusters` the cluster shade and normal. Without `tint` and `clusters` the text is the
+ * original, byte for byte.
+ */
+const pbrVertex = (fade: boolean, blades: boolean, tint = false, clusters = false) =>
   windShader +
   poseShader +
+  (tint ? lookShader : '') +
   `
 struct ScatterInstance {position:vec4f,rotation:vec4f}
 @group(1) @binding(0) var<storage,read> instances:array<ScatterInstance>;
 @group(1) @binding(1) var<uniform> material:array<vec4f,5>;
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output {
- let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,material[3],material[4],frame.eye.xyz,material[2]);
+ let data=instances[index];${tint ? lookCode(clusters) : ''}let pose=scatterPose(p,${clusters ? 'bent' : 'n'},data.position,data.rotation,material[3],material[4],frame.eye.xyz,material[2]);
  var o:Output;o.position=pose.world;o.clip=frame.camera*vec4f(o.position,1);o.normal=pose.normal;
- o.color=material[0].rgb${blades ? '*pose.shade' : ''};o.material=vec4f(material[1].xyz,1);${fade ? 'o.lodFade=data.rotation.zw;' : ''}${blades ? 'o.ground=pose.ground;' : ''}return o;
+ o.color=${tint ? 'tint' : 'material[0].rgb'}${blades ? '*pose.shade' : ''};o.material=vec4f(material[1].xyz,1);${fade ? 'o.lodFade=data.rotation.zw;' : ''}${blades ? 'o.ground=pose.ground;' : ''}return o;
 }
 `;
 // Depth only, for one shadow cascade: the colour pass's pose and wind (frame values 16-19 and 68-79), the light's
@@ -359,7 +408,7 @@ let serial = 0;
  * every frame into three distance LOD rings drawn with indexed indirect draws. Pass one Geometry or one per ring
  * (near, middle, far). `Scatter.attach(engine, geometry, options)`; WebGPU only.
  * @throws RangeError when an option is out of range (constructor) or the buffers exceed device limits (attach);
- * TypeError when `material` is not a core PbrMaterial or `blades` is not an object.
+ * TypeError when `material` is not a core PbrMaterial or `blades` or `variation` is not an object.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` during a frame when
  * the heightmap is not a sampleable height texture.
  */
@@ -427,6 +476,8 @@ export class Scatter implements EnginePlugin {
   private readonly listOffsets = new Uint32Array(this.cullValues.buffer, 256, 4);
   /** Whether any instance can fade between LOD meshes: shaders keep the dither `discard` only then. */
   private readonly fade: boolean;
+  /** `variation` hue and value; both 0 (and no `clusters`) keep the original lit vertex stage. */
+  private readonly tint: readonly [number, number];
   constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input: ScatterOptions = {}) {
     this.options = preset('scatter', input);
     const options = this.options;
@@ -553,6 +604,18 @@ export class Scatter implements EnginePlugin {
       this.values.set([rootShade, widen / lod[2], 1 / top, 1 / lod[2]], 76);
       this.values[35] *= 1 + widen; // cull bounds include the widest blades
     }
+    const { variation, clusters = 0 } = options;
+    if (variation !== undefined && (typeof variation !== 'object' || variation === null))
+      throw new TypeError('Scatter variation must be an options object; pass { hue, value }');
+    const { hue = 0, value = 0 } = variation ?? {};
+    if (![hue, value].every(Number.isFinite) || hue < 0 || hue > 0.5 || value < 0 || value > 1)
+      throw new RangeError('Scatter variation needs hue 0-0.5 and value 0-1; pass numbers in those ranges');
+    if (!Number.isFinite(clusters) || clusters < 0 || clusters > 100000)
+      throw new RangeError('Scatter clusters must be a cell size from 0 to 100000; pass 0 to turn it off');
+    if ((hue > 0 || value > 0 || clusters > 0) && !options.material)
+      throw new RangeError('Scatter variation and clusters shade through a material; pass material: new PbrMaterial()');
+    this.tint = [hue, value];
+    this.values[75] = clusters; // ground.w: read only by the clusters vertex code
     // Compute emits fading instances only for a nonzero width between rings that use different meshes.
     this.fade = this.values[31] > 0 && this.meta[39] !== 0;
   }
@@ -734,7 +797,9 @@ export class Scatter implements EnginePlugin {
     const lit = !!this.options.material;
     if (lit) {
       this.materialValues.set(this.options.material!.data);
-      this.materialValues.set(this.values.subarray(68, 80), 8); // wind, ground fit, blades
+      // The material's alpha and spare slot, which the lit vertex stage does not read: `variation` hue and value.
+      if (this.looks()) [this.materialValues[3], this.materialValues[7]] = this.tint;
+      this.materialValues.set(this.values.subarray(68, 80), 8); // wind, ground fit, blades, clusters
       c.device.queue.writeBuffer(this.materialUniform!, 0, this.materialValues as Float32Array<ArrayBuffer>);
       if (this.pbrShader !== c.shader) {
         this.pipelines.clear();
@@ -769,7 +834,7 @@ export class Scatter implements EnginePlugin {
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const blades = this.values[78] > 0,
-        vertex = pbrVertex(this.fade, blades);
+        vertex = pbrVertex(this.fade, blades, this.looks(), this.values[75] > 0);
       let code = !lit ? (this.fade ? renderCode : solidCode) : c.shader.replace(/struct Input \{[^}]+\}/, '');
       if (lit) {
         // After core's varyings and any a patch added to its Output (terrain's mesh id): 4 and 5 on a plain shader.
@@ -992,6 +1057,10 @@ export class Scatter implements EnginePlugin {
       if (culled) pass.drawIndexedIndirect(cull!.commands!, (cascade * 3 + i) * 20);
       else pass.drawIndexedIndirect(this.commands, i * 20);
     }
+  }
+  /** Whether `variation` or `clusters` changes the lit vertex stage. */
+  private looks(): boolean {
+    return this.tint[0] > 0 || this.tint[1] > 0 || this.values[75] > 0;
   }
   /** Instances each LOD ring can hold: every candidate for the grid. */
   protected ringCapacity(): number {

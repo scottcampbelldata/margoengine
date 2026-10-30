@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter variation check</title><style>body{margin:0}canvas{display:block;width:256px;height:256px}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Real-GPU proof of lit scatter `variation` and `clusters` (variation.browser.mjs reads the canvas): 400 green boxes or
+// smooth spheres seen from above, drawn as a `Scatter` and as a `ScatterTiles` grid of records, with the options given.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,Geometry,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {ScatterTiles} from '/packages/scatter/dist/tiles.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,48,0.01],target:[0,0,0],near:1,far:200}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([0.4,1,0.3]);
+// A UV sphere of radius 0.9 with smooth normals: clusters cut it into cells and bend each cell's normals.
+function sphere(radius,rings,segments){
+  const p=[],n=[],index=[];
+  for(let r=0;r<=rings;r++)for(let s=0;s<=segments;s++){
+    const t=r/rings*Math.PI,f=s/segments*2*Math.PI,v=[Math.sin(t)*Math.cos(f),Math.cos(t),Math.sin(t)*Math.sin(f)];
+    p.push(...v.map(c=>c*radius));n.push(...v);
+  }
+  for(let r=0;r<rings;r++)for(let s=0;s<segments;s++){const a=r*(segments+1)+s,b=a+segments+1;index.push(a,a+1,b,a+1,b+1,b);}
+  return new Geometry(p,n,index);
+}
+const shapes={box:box(1.2,1.2,1.2),sphere:sphere(0.9,24,32)};
+// 400 records on a 20 x 20 grid 2 m apart over a 40 m tile: palette 0, log scale 128 (scale 1), yaw 0.
+const records=new Uint32Array(800);
+for(let i=0;i<400;i++){const x=Math.round(((i%20)+0.5)/20*65535),z=Math.round((Math.floor(i/20)+0.5)/20*65535);records[i*2]=x|(z<<16);records[i*2+1]=128<<8;}
+let scatter;
+window.check={
+  async show(kind,shape,look){
+    scatter?.dispose();
+    // Boxes over the whole grid; spheres closer, about 45 pixels across, so their shading spans many pixels.
+    engine.camera.position=shape==='box'?[0,48,0.01]:[0,10,0.01];
+    device.pushErrorScope('validation');
+    const material=new PbrMaterial({color:'#4a8a2a',roughness:0.9});
+    if(kind==='scatter')scatter=Scatter.attach(engine,shapes[shape],{count:400,area:[40,40],scale:[1,1],lod:[60,80,100],material,...look});
+    else{scatter=ScatterTiles.attach(engine,shapes[shape],{bounds:[-20,-20,20,20],lod:[60,80,100],material,...look});scatter.setTile('0,0',[-20,-20],40,new Uint8Array(records.buffer));}
+    await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+    const e=await device.popErrorScope();if(e)errors.push(e.message);
+    return errors.splice(0);
+  },
+};
+window.ready=true;
+</script></body></html>

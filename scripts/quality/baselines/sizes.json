@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3912622,
+  "total": 3912320,
   "history": [
     {
       "date": "2026-10-24",
@@ -890,6 +890,12 @@
       "commit": "0882df471",
       "reason": "procedural: detail 0|1|2 mesh levels (lobe merging, per-level segment counts, normal mixing) for far LOD rings; opt-in, default mesh unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "0882df471",
+      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
+      "grew": 1
     }
   ],
   "items": {
@@ -1154,7 +1160,7 @@
     "@margoengine/road": 1171,
     "@margoengine/save": 6955,
     "@margoengine/save/node": 939,
-    "@margoengine/scatter": 14550,
+    "@margoengine/scatter": 14248,
     "@margoengine/scatter/tiles": 3448,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,

@@ -170,6 +170,59 @@ test('blades shade grass from root to tip and bend lit normals toward the ground
   }
 });
 
+test('variation and clusters tint lit instances and cluster their shading only when asked', () => {
+  const material = () => new PbrMaterial({ color: [0.2, 0.5, 0.1] });
+  for (const variation of [{ hue: 0.6 }, { hue: -0.1 }, { value: 1.5 }, { value: NaN }])
+    assert.throws(() => new Scatter(box(), { material: material(), variation }), {
+      name: 'RangeError',
+      message: /hue 0-0.5 and value 0-1/,
+    });
+  assert.throws(() => new Scatter(box(), { material: material(), variation: 1 }), {
+    name: 'TypeError',
+    message: /options object/,
+  });
+  for (const clusters of [-1, NaN, Infinity])
+    assert.throws(() => new Scatter(box(), { material: material(), clusters }), {
+      name: 'RangeError',
+      message: /clusters must be/,
+    });
+  for (const look of [{ variation: { hue: 0.1 } }, { clusters: 0.5 }])
+    assert.throws(() => new Scatter(box(), look), { name: 'RangeError', message: /pass material/ });
+  // Off (unset or zero) needs no material and changes nothing.
+  assert.equal(new Scatter(box(), { variation: { hue: 0, value: 0 }, clusters: 0 }).values[75], 0);
+  const build = (options) => {
+    const h = optionalGPU();
+    h.engine.lighting = { direction: new Float32Array([0, 1, 0, 1]), radiance: new Float32Array([1, 1, 1, 0]) };
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    const effect = new Scatter(box(), { count: 4, material: material(), ...options });
+    h.engine.use(effect);
+    h.engine.frameGraph.execute(h.context);
+    const code = h.pipelines.find((p) => p.fragment).vertex.module.code,
+      values = Array.from(new Float32Array(effect.materialUniform.data));
+    effect.dispose();
+    return { code, values };
+  };
+  const plain = build({}),
+    zero = build({ variation: { hue: 0, value: 0 }, clusters: 0 });
+  assert.equal(zero.code, plain.code, 'zero is the original shader, byte for byte');
+  assert.deepEqual(zero.values, plain.values, 'and the original uniform');
+  assert.doesNotMatch(plain.code, /scatterHash|tint|bent/);
+  assert.match(plain.code, /o\.color=material\[0\]\.rgb;/);
+  const tinted = build({ variation: { hue: 0.06, value: 0.15 } });
+  assert.match(tinted.code, /fn scatterHue\(/);
+  assert.match(tinted.code, /floor\(data\.position\.xz\*4\.0\)/, 'keyed by world position, not the instance index');
+  assert.match(tinted.code, /o\.color=tint;/);
+  assert.match(tinted.code, /scatterPose\(p,n,/, 'no clusters: the mesh normal');
+  assert.deepEqual([tinted.values[3], tinted.values[7]], [0.06, 0.15].map(Math.fround), 'hue and value slots');
+  assert.deepEqual(tinted.values.slice(0, 3), plain.values.slice(0, 3), 'the material colour itself is unchanged');
+  const clustered = build({ variation: { value: 0.2 }, clusters: 0.6, blades: {} });
+  assert.match(clustered.code, /let cell=floor\(p\/material\[3\]\.w\);/);
+  assert.match(clustered.code, /scatterPose\(p,bent,/, 'the cluster normal is posed like the mesh normal');
+  assert.match(clustered.code, /o\.color=tint\*pose\.shade;/, 'blades still shade the tinted colour');
+  assert.equal(clustered.values[15], Math.fround(0.6), 'cell size in ground.w');
+});
+
 test('scatter frustum bounds include geometry displaced from its local origin', () => {
   const h = optionalGPU(),
     geometry = new Geometry([10, 0, 0, 11, 0, 0, 10, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]),
