@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3906195,
+  "total": 3907268,
   "history": [
     {
       "date": "2026-10-24",
@@ -848,6 +848,12 @@
       "commit": "81063f03",
       "reason": "item 53.2: new entry @margoengine/culling/dynamic (DynamicInstances: GPU-driven moving instances, compute shaders, shadow and pick passes)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "ba7ec2cf",
+      "reason": "vfx: deterministic slot order (births to the lowest dead slots, draw list compacted by workgroup prefix sums instead of atomic tickets), so the same frames give the same particles and blended pixels on every run; base and root grow with the four slot-order passes and their wiring, the feature entries shrink (frame and settle moved out of the shader chunk); growth accepted by Scott 2026-10-30 (docs/limits.md, VFX repeatable particle order)",
+      "grew": 2
     }
   ],
   "items": {
@@ -1164,14 +1170,14 @@
     "@margoengine/usdz": 8792,
     "@margoengine/usdz dist/workers/usdz.js": 65883,
     "@margoengine/usdz/worker": 9856,
-    "@margoengine/vfx": 12721,
-    "@margoengine/vfx/base": 7572,
+    "@margoengine/vfx": 13389,
+    "@margoengine/vfx/base": 8234,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/emitter": 2656,
-    "@margoengine/vfx/obstacles": 1401,
-    "@margoengine/vfx/sort": 1401,
+    "@margoengine/vfx/obstacles": 1364,
+    "@margoengine/vfx/sort": 1356,
     "@margoengine/vfx/texture": 1527,
-    "@margoengine/vfx/wrap": 671,
+    "@margoengine/vfx/wrap": 496,
     "@margoengine/video": 2199,
     "@margoengine/viewcube": 3608,
     "@margoengine/voxel": 6167,

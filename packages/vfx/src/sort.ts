@@ -1,4 +1,4 @@
-import { frame } from './shader.js';
+import { frame } from './frame.js';
 import { extra } from './extra.js';
 import type { VFXFeatures } from './base.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };

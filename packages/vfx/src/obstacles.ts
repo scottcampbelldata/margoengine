@@ -1,5 +1,5 @@
 import { finiteVector } from '@margoengine/math/validate';
-import { settle } from './shader.js';
+import { settle } from './frame.js';
 import { extra } from './extra.js';
 import type { VFXFeatures } from './base.js';
 /** Outward normal (xyz) and signed distance (w) from obstacle i, a sphere or a box. */

@@ -63,6 +63,19 @@ try {
     assert.deepEqual(r.failures, [], name);
     console.log(`ok ${name}: ${JSON.stringify(r.summary)}`);
   }
+  {
+    const r = await page.evaluate(() => window.checkOrder());
+    report.results.order = r;
+    assert.equal(r.error, null, 'order');
+    assert.deepEqual(r.errors, [], 'order');
+    assert.equal(r.born, 40000, 'order: the first frame births exactly its budget');
+    assert.ok(r.bornLowest, 'order: births take the lowest dead slots');
+    assert.ok(r.drawn > 10000 && r.lit > 1000, `order: the scene draws (${r.drawn} particles, ${r.lit} lit pixels)`);
+    assert.ok(r.ascending, 'order: the draw list is in slot order');
+    assert.ok(r.sameList, 'order: two runs list the same particles in the same order');
+    assert.equal(r.differing, 0, 'order: two runs give the same pixels');
+    console.log(`ok order: ${r.drawn} drawn in slot order, ${r.lit} lit pixels, 0 differ between two runs`);
+  }
   assert.deepEqual(pageErrors, []);
   await writeFile('test-results/vfx-browser-check.json', JSON.stringify(report, null, 1));
   console.log('vfx browser check passed');

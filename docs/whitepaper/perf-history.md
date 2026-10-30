@@ -146,6 +146,15 @@ The code this entry measured is no longer part of Margo Engine, so its cases are
 - **After:** 2.46 ms (1x) and 2.40 ms (4x), same sources.
 - **Rerun:** `node examples/package-benchmarks/vfx-gpu.mjs --a=test-results/vfx-base --b=packages/vfx/dist`.
 - **Guard:** `packages/vfx/test/traces.js` with its `fixtures/traces.json`.
+- **Accepted difference in work (Scott, 2026-10-30):** births and the draw list now follow slot order instead of atomic
+  counters, so two runs of the same frames draw the same pixels (before, two runs of one still frame differed on up to
+  5,965 of 65,536 pixels, and the gameplay sandbox still on 41 to 57). The extra work is four small compute passes of
+  workgroup prefix sums around the simulation. RTX A6000, Edge 156, 8 alternating rounds against the atomic build:
+  simulate compute 0.094 to 0.184 ms at 1,000,000 particles and 0.010 to 0.031 ms at 100,000; draw unchanged. WebGL2
+  layer (CPU tier) simulate wall time 290 to 58 ms at 20,000 and 370 to 250 ms at 100,000. `@margoengine/vfx/base` grew
+  from 7,339 to 7,978 B gzip and the root from 12,376 to 12,999 B; the size limit growth in
+  `scripts/quality/baselines/sizes.json` was approved by Scott on 2026-10-30. Guard: the order case of
+  `packages/vfx/test/browser-check.mjs`. See [limits.md](../limits.md).
 
 ### 7. Voxel sandbox world fill
 

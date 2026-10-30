@@ -164,5 +164,47 @@ window.checkEmitter=async kind=>{
  effect.dispose();readback.destroy();
  return {error:error?.message??null,errors:errors.splice(0),failures,summary};
 };
+// Order: the same seeded emission run twice gives the same draw list and pixels. 65,536 slots (256 workgroups), 40,000
+// births on the first frame (fewer births than dead slots, so which slots are born matters), then four more frames
+// at 6,000 births a second with deaths; overlapping translucent particles, so a different draw order blends to other pixels.
+// The births take the lowest dead slots and the draw list is in slot order (both used atomic tickets before).
+window.checkOrder=async()=>{
+ const slots=65536,run=async()=>{
+  const effect=new VFX({capacity:slots,initialCount:40000,rate:0,position:[0,0,0],emissionExtent:[1.5,1.5,0.5],velocity:[0,0,0],spread:0.4,gravity:[0,0,0],turbulence:0.5,ground:-100,size:0.25,lifetime:[0.04,0.4],color:[1,0.6,0.3,0.35]});
+  device.pushErrorScope('validation');
+  effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+  const target=(format,usage)=>device.createTexture({size:[size,size],format,usage}),
+   color=target('rgba8unorm',GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC),depth=target('depth32float',GPUTextureUsage.RENDER_ATTACHMENT),
+   pixels=device.createBuffer({size:size*size*4,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),
+   state=device.createBuffer({size:slots*4+32+slots*32,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),firstLives=[];
+  for(let frame=0;frame<5;frame++){
+   const encoder=device.createCommandEncoder(),last=frame===4;
+   const context={backend:'webgpu',device,delta:1/60,camera,width:size,height:size,format:'rgba8unorm',color:color.createView(),depth:depth.createView(),descriptor:{multisample:{count:1},depthStencil:{format:'depth32float'}},encoder};
+   effect.simulate(context);
+   if(frame===0){encoder.copyBufferToBuffer(effect.gpuState.particles,0,state,slots*4+32,slots*32);effect.options.rate=6000;}
+   if(last){
+    encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,1]}],depthStencilAttachment:{view:depth.createView(),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:0}}).end();
+    effect.draw(context);
+    encoder.copyTextureToBuffer({texture:color},{buffer:pixels,bytesPerRow:size*4},[size,size]);
+    encoder.copyBufferToBuffer(effect.gpuState.alive,0,state,0,slots*4);
+    encoder.copyBufferToBuffer(effect.gpuState.visible,0,state,slots*4,20);
+   }
+   device.queue.submit([encoder.finish()]);
+   if(frame===0){await state.mapAsync(GPUMapMode.READ);const f=new Float32Array(state.getMappedRange(slots*4+32,slots*32));for(let i=0;i<slots;i++)firstLives.push(f[i*8+3]);state.unmap();}
+  }
+  await Promise.all([pixels.mapAsync(GPUMapMode.READ),state.mapAsync(GPUMapMode.READ)]);
+  const image=new Uint8Array(pixels.getMappedRange().slice(0)),words=new Uint32Array(state.getMappedRange(0,slots*4+20).slice(0)),count=words[slots+1];
+  const error=await device.popErrorScope();
+  effect.dispose();color.destroy();depth.destroy();pixels.destroy();state.destroy();
+  return {error:error?.message??null,image,list:Array.from(words.subarray(0,count)),firstLives};
+ };
+ const a=await run(),b=await run();
+ let differing=0;for(let i=0;i<a.image.length;i+=4)if(a.image[i]!==b.image[i]||a.image[i+1]!==b.image[i+1]||a.image[i+2]!==b.image[i+2])differing++;
+ const born=a.firstLives.map((life,i)=>life>0?i:-1).filter(i=>i>=0),lit=a.image.filter((v,i)=>i%4===0&&v>0).length;
+ return {error:a.error??b.error,errors:errors.splice(0),drawn:a.list.length,lit,differing,
+  sameList:a.list.length===b.list.length&&a.list.every((v,i)=>v===b.list[i]),
+  ascending:a.list.every((v,i)=>i===0||v>a.list[i-1]),
+  born:born.length,bornLowest:born.length===40000&&born[born.length-1]===39999};
+};
 window.ready=true;
 </script></body></html>

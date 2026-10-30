@@ -1,4 +1,4 @@
-import { settle } from './shader.js';
+import { settle } from './frame.js';
 import type { VFXFeatures } from './base.js';
 /** `wrap` option: keeps a field inside the emission box; re-entering particles restart at the emitter velocity. */
 export const wrap: NonNullable<VFXFeatures['wrap']> = {

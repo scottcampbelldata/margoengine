@@ -2,7 +2,7 @@
 
 Import `margoengine/vfx` from the `margoengine` package, or `@margoengine/vfx` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Optional GPU particle simulation and indirect billboard rendering, with capacity up to 1,000,000. One storage buffer holds particle position/life, velocity/size, color and rotation (birth angle, angular velocity, initial lifetime); each invocation owns one particle. Workgroups of 256 integrate gravity, analytic curl turbulence and ground-plane collisions, touching only position/life and velocity/size after birth. Atomic counters respawn dead slots, count live particles and compact the ones whose billboard can reach the screen into the indirect draw, one triangle per particle.
+Optional GPU particle simulation and indirect billboard rendering, with capacity up to 1,000,000. One storage buffer holds particle position/life, velocity/size, color and rotation (birth angle, angular velocity, initial lifetime); each invocation owns one particle. Workgroups of 256 integrate gravity, analytic curl turbulence and ground-plane collisions, touching only position/life and velocity/size after birth. Births take the dead slots in slot order and the particles whose billboard can reach the screen are listed in slot order for the indirect draw, one triangle per particle (workgroup prefix sums, not atomic tickets), so the same frames give the same particles, the same draw order and the same blended pixels on every run.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
@@ -155,14 +155,20 @@ In the island demo itself (light tier, 1M particles) the particle passes went fr
 span from 15.7 to 13.5 ms. Same particle state and pixels within the old renderer's own run-to-run blend-order noise
 (numbers, scripts and the pixel comparison: `examples/package-benchmarks/vfx-gpu.mjs`, `vfx-island.mjs`, `results/`).
 
+Since then births and the draw list follow slot order (four small passes of workgroup prefix sums around the
+simulation instead of atomic tickets), so two runs of the same frames draw the same pixels; before, two runs of
+one still frame differed on up to 6,000 of 65,536 pixels in the browser check. The simulation's compute time on an RTX
+A6000 (Edge, 8 alternating rounds against the atomic build) went from 0.094 to 0.184 ms at 1,000,000 particles and
+from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
+
 ### Load only what you use
 
-`VFX` from `@margoengine/vfx` (about 12.4 kB min+gzip) carries all six features. An effect that uses none of them can
-import the same class from `@margoengine/vfx/base` (about 7.3 kB); add features as a second argument from their own
-entries: `/obstacles` (1.4 kB alone), `/wrap` (0.7 kB), `/sort` (1.4 kB), `/texture` (1.5 kB; it exports
+`VFX` from `@margoengine/vfx` (about 13.0 kB min+gzip) carries all six features. An effect that uses none of them can
+import the same class from `@margoengine/vfx/base` (about 8.0 kB); add features as a second argument from their own
+entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
 `textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB) and `/emitter` (2.4 kB). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
-bundle that combines them adds less: the whole root is 12.4 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
+bundle that combines them adds less: the whole root is 13.0 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
 
 ```ts

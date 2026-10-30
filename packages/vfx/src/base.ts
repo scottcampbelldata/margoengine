@@ -160,6 +160,8 @@ export interface ParticleAtlas {
 }
 /** Features add each GPU object they create here at once, so a setup that fails part-way still releases it. */
 type OwnedResources = { destroy(): void }[];
+/** One compute dispatch of the slot-order passes. */
+type Step = [GPUComputePipeline, GPUBindGroup];
 /**
  * The optional parts of a particle effect. Pass the exports of the feature entries, for example `{sort}` from
  * `@margoengine/vfx/sort`; the shapes are internal. Effects without a feature compile the same WGSL as before.
@@ -231,6 +233,8 @@ export class VFX implements EnginePlugin {
   private respawn?: GPUBuffer;
   private simulation?: GPUComputePipeline;
   private computeGroup?: GPUBindGroup;
+  private births?: Step[];
+  private listing?: Step[];
   private renderGroups = new Map<GPURenderPipeline, GPUBindGroup>();
   private renders = new Map<string, GPURenderPipeline>();
   private billboard = '';
@@ -407,29 +411,50 @@ export class VFX implements EnginePlugin {
     }
     this.alive = buffer(size * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.indirect = buffer(20, GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
-    this.respawn = buffer(4, GPUBufferUsage.STORAGE);
+    // respawn receives the births scan's sum (unused); births and drawn hold one count, then offset, per workgroup.
+    this.respawn = buffer(20, GPUBufferUsage.STORAGE);
     // indirect counts live particles; visible holds the draw's [vertexCount, instanceCount, firstVertex, firstInstance] for the on-screen ones listed in alive.
     this.visible = buffer(20, GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
     for (const b of [this.indirect, this.visible])
       this.device.queue.writeBuffer(b, 0, new Uint32Array([3, 0, 0, 0, 0]));
-    this.simulation = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: { module: this.device.createShaderModule({ code: simulation }), entryPoint: 'main' },
-    });
-    this.computeGroup = this.device.createBindGroup({
-      layout: this.simulation.getBindGroupLayout(0),
-      entries: [
-        ...[this.uniform!, this.particles!, this.alive!, this.indirect!, this.respawn!].map(
-          (buffer, binding): GPUBindGroupEntry => ({
-            binding: binding < 2 ? binding : binding + 1,
-            resource: { buffer },
+    const groups = Math.ceil(this.capacity / 256),
+      births = buffer(groups * 4, GPUBufferUsage.STORAGE),
+      drawn = buffer(groups * 4, GPUBufferUsage.STORAGE),
+      listed = buffer(groups * 1024, GPUBufferUsage.STORAGE),
+      module = this.device.createShaderModule({ code: simulation }),
+      u = this.uniform!,
+      // One pipeline per entry point of the simulation module; buffers[k] goes to binding k (0: none).
+      step = (entryPoint: string, buffers: (GPUBuffer | 0)[], more: GPUBindGroupEntry[] = []): Step => {
+        const p = this.device!.createComputePipeline({ layout: 'auto', compute: { module, entryPoint } });
+        return [
+          p,
+          this.device!.createBindGroup({
+            layout: p.getBindGroupLayout(0),
+            entries: [
+              ...buffers.flatMap((buffer, binding) => (buffer ? [{ binding, resource: { buffer } }] : [])),
+              ...more,
+            ],
           }),
-        ),
-        { binding: 2, resource: { buffer: this.visible } },
+        ];
+      };
+    this.owned.push(births, drawn, listed);
+    [this.simulation, this.computeGroup] = step(
+      'main',
+      [u, this.particles!, drawn, 0, this.indirect!, births, 0, 0, 0, listed],
+      [
         ...(o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : []),
         ...(this.emitterRuntime?.entries ?? []),
       ],
-    });
+    );
+    // Slot order (shader.ts): deaths and the births scan before main; the drawn scan and compact after it.
+    this.births = [
+      step('deaths', [u, this.particles!, births]),
+      step('scan', [u, 0, births, 0, 0, 0, 0, 0, 0, 0, this.respawn!]),
+    ];
+    this.listing = [
+      step('scan', [u, 0, drawn, 0, 0, 0, 0, 0, 0, 0, this.visible!]),
+      step('compact', [u, 0, drawn, this.alive!, 0, 0, 0, 0, 0, listed, this.visible!]),
+    ];
     if (o.sort)
       this.sorter = f.sort!.create(
         this.device,
@@ -510,12 +535,22 @@ export class VFX implements EnginePlugin {
     if (o.curves) this.curveRuntime!.write(c.device.queue, o.curves);
     if (o.emitter) this.emitterRuntime!.write(c.device.queue, o.emitter);
     c.encoder.clearBuffer(this.indirect!, 4, 4);
-    c.encoder.clearBuffer(this.visible!, 4, 4);
-    c.encoder.clearBuffer(this.respawn!, 0, 4);
-    const pass = c.encoder.beginComputePass();
-    pass.setPipeline(this.simulation!);
-    pass.setBindGroup(0, this.computeGroup!);
-    pass.dispatchWorkgroups(Math.ceil(this.capacity / 256));
+    const pass = c.encoder.beginComputePass(),
+      groups = Math.ceil(this.capacity / 256),
+      step = ([pipeline, group]: Step, count: number) => {
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, group);
+        pass.dispatchWorkgroups(count);
+      },
+      [deaths, births] = this.births!,
+      [scan, compact] = this.listing!;
+    if (budget) {
+      step(deaths, groups);
+      step(births, 1);
+    }
+    step([this.simulation!, this.computeGroup!], groups);
+    step(scan, 1);
+    step(compact, groups);
     this.sorter?.run(pass);
     pass.end();
   }
@@ -619,7 +654,7 @@ export class VFX implements EnginePlugin {
     this.curveRuntime = this.emitterRuntime = undefined;
     this.extra = this.sorter = undefined;
     this.uniform = this.particles = this.alive = this.indirect = this.visible = this.respawn = undefined;
-    this.computeGroup = undefined;
+    this.computeGroup = this.births = this.listing = undefined;
     this.renderGroups.clear();
     this.renders.clear();
     this.simulation = undefined;
