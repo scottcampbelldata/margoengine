@@ -269,7 +269,7 @@ Relative sizes are planning guesses, not measurements: S (days), M (one to two w
 ## Size and speed targets
 
 Targets, not measurements: the compat package's root entry (install, adapter, device, resources, commands, GLSL back
-end) stays under 60 KB gzip, the CPU compute runner loads separately, and a forced-compat basic scene runs within 1.5x
+end) stays under 60 KB gzip (superseded 2026-10-30: the limit is 73,000 B, an accepted difference, see "Left in M8" below), the CPU compute runner loads separately, and a forced-compat basic scene runs within 1.5x
 of native frame time on the desktop GPU. M7 replaces these with measured numbers.
 
 ## Risks
@@ -800,5 +800,8 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   (0.1% of the normal samples already do; the two paths round their float arithmetic differently), and one point
   lands on the next pixel.
 - **Left in M8.** The size shrink (measured in two numbers since 2026-10-30, `splits` in `entry-sizes.json`: the base
-  that `install()` loads is 72,500 B gzip against the 60,000 B target, the lazy compute runtime another 22,094 B; the
-  joined root record, 94,046 B, counted both, and the sizes gate now holds each), the transform-feedback tier for own-index stores and the integrated-GPU budget run.
+  that `install()` loads is 72,500 B gzip, the lazy compute runtime another 22,094 B; the joined root record, 94,046 B,
+  counted both, and the sizes gate now holds each). **Accepted difference (Scott, 2026-10-30):** the base limit is
+  73,000 B, not the 60,000 B target, which no gate ever enforced. The base carries the full WGSL to GLSL translator and
+  the WGSL checker, both needed on the first frame; native WebGPU always validates shaders, so a build without the
+  checker would behave differently from it. The lazy compute runtime is measured and gated on its own, the transform-feedback tier for own-index stores and the integrated-GPU budget run.
