@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter clusters colour check</title><style>body{margin:0}canvas{display:block;width:256px;height:256px}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Real-GPU proof that clustered colour stays inside its triangle (variation.browser.mjs runs it): 4,000 finely cut
+// spheres (6,144 triangles each) seen from 50 m, so most triangles are thinner than a pixel, drawn lit with clusters and
+// brightness variation 1 (vertex colours from 0 to 4 times the material colour). window.check.run(look) returns the
+// linear scene pixels (Bloom capture) with a channel below 0, and the lowest channel.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,30,40],target:[0,0,0],near:1,far:500}}),device=engine.gpu;
+engine.lighting.direction.set([0.4,1,0.3]);
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+// A finely cut UV sphere of radius 2 with smooth normals (6,144 triangles).
+function sphere(radius,rings,segments){
+  const p=[],n=[],index=[];
+  for(let r=0;r<=rings;r++)for(let s=0;s<=segments;s++){
+    const t=r/rings*Math.PI,f=s/segments*2*Math.PI,v=[Math.sin(t)*Math.cos(f),Math.cos(t),Math.sin(t)*Math.sin(f)];
+    p.push(...v.map(c=>c*radius));n.push(...v);
+  }
+  for(let r=0;r<rings;r++)for(let s=0;s<segments;s++){const a=r*(segments+1)+s,b=a+segments+1;index.push(a,a+1,b,a+1,b+1,b);}
+  return new Geometry(p,n,index);
+}
+const canopy=sphere(2,48,64);
+window.check={async run(opts){
+ const s=Scatter.attach(engine,canopy,{count:4000,area:[80,80],lod:[200,300,400],lodFade:0,material:new PbrMaterial({color:[0.11,0.28,0.06],roughness:0.85}),...opts});
+ await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+ const d=await read(post.sceneTexture);s.dispose();
+ let neg=0,min=0;for(let k=0;k<d.length;k+=4){const m=Math.min(d[k],d[k+1],d[k+2]);if(m<0)neg++;if(m<min)min=m;}
+ return {negative:neg,lowest:min};}};
+window.ready=true;
+</script></body></html>

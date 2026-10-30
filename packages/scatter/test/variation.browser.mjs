@@ -103,6 +103,16 @@ await runSuite(
         step: step.map((v) => +v.toFixed(2)),
       });
     }
+    // Regression (found by the biomes shadows check, 2026-10-30): with clusters each vertex of a mesh has its own
+    // colour, and multisampling reads a pixel's colour at its centre even when the centre lies outside a thin triangle,
+    // so the colour extrapolated past its vertices and went negative (dark specks, 1,068 pixels of 65,536 below 0 here
+    // and as low as -2.6 before the colour was read at a covered sample).
+    await page.goto(new URL('/packages/scatter/test/clusters-colour.html', page.url()).href);
+    await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+    for (const clusters of [0.1, 0.3]) {
+      const r = await page.evaluate((look) => window.check.run(look), { variation: { hue: 0, value: 1 }, clusters });
+      assert.equal(r.negative, 0, `clusters ${clusters}: ${r.negative} pixels below 0 (lowest ${r.lowest})`);
+    }
     assert.deepEqual(pageErrors, []);
     console.log('ok scatter variation', JSON.stringify(results));
   },

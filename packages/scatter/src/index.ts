@@ -834,7 +834,8 @@ export class Scatter implements EnginePlugin {
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const blades = this.values[78] > 0,
-        vertex = pbrVertex(this.fade, blades, this.looks(), this.values[75] > 0);
+        clusters = this.values[75] > 0,
+        vertex = pbrVertex(this.fade, blades, this.looks(), clusters);
       let code = !lit ? (this.fade ? renderCode : solidCode) : c.shader.replace(/struct Input \{[^}]+\}/, '');
       if (lit) {
         // After core's varyings and any a patch added to its Output (terrain's mesh id): 4 and 5 on a plain shader.
@@ -846,8 +847,10 @@ export class Scatter implements EnginePlugin {
               (this.fade ? `,@location(${at}) @interpolate(flat) lodFade:vec2f` : '') +
               (blades ? `,@location(${at + 1}) ${centroid} ground:vec4f` : ''),
           )
-          // Blades shade core's colour from root to tip: like the ground weight, read inside the blade (see `centroid`).
-          .replace('@location(2) color:vec3f', `@location(2) ${blades ? centroid + ' ' : ''}color:vec3f`)
+          // Blades shade core's colour from root to tip, and clusters change it from vertex to vertex: like the ground
+          // weight, read inside the triangle (see `centroid`). Read at a pixel centre outside a thin triangle, a
+          // clustered colour extrapolated past its vertices and went negative (dark specks on far canopies).
+          .replace('@location(2) color:vec3f', `@location(2) ${blades || clusters ? centroid + ' ' : ''}color:vec3f`)
           .replace(
             /@vertex fn vertex\([\s\S]*?(?=@fragment)/,
             c.shader.includes('var<uniform> taaCamera:')

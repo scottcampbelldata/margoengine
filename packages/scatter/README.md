@@ -146,7 +146,7 @@ engine.start();
 ```
 
 Thin triangles whose shading changes across them (blade root shade, vertex
-colour, occlusion, the blade ground weight) interpolate those values at a
+colour, occlusion, the blade ground weight, the `clusters` colour) interpolate those values at a
 covered sample (`centroid`): with multisampling, a pixel a blade only partly
 covers is otherwise shaded at its centre, outside the blade, where the values
 extrapolate past their range and drew negative light at grass edges.
