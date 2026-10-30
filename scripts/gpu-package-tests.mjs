@@ -32,7 +32,7 @@ import { acquire, lockDir } from './gpu-lock.mjs';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { coolDown, thermalSource, watchHeat } from './support/heat.mjs';
 import { describeProfile, excludedReason, machineProfile } from './support/machine-profile.mjs';
-import { runLimited, testLimitMs } from './support/run-limited.mjs';
+import { packageMinutes, runLimited, testLimitMs } from './support/run-limited.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const json = (file) => JSON.parse(readFileSync(join(root, file), 'utf8'));
@@ -96,7 +96,7 @@ export function plan() {
         label: `${dir} ${name}`,
         cwd: `packages/${dir}`,
         command,
-        minutes: json(file).margo?.gpuTestTimeoutMinutes,
+        minutes: packageMinutes(json(file).margo?.gpuTestTimeoutMinutes, name),
         dir,
         script: name,
         ...(json(file).margo?.gpuTestSteps?.[name] && { steps: json(file).margo.gpuTestSteps[name] }),

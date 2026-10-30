@@ -8,8 +8,18 @@ import { killTree } from '../gpu-lock.mjs';
 export const DEFAULT_TEST_MINUTES = 10;
 
 /**
+ * The minutes a package sets for one of its scripts: `"margo": { "gpuTestTimeoutMinutes": n }` applies to every script,
+ * and `{ "<script>": n, "default": m }` sets it per script (a script not listed gets `default`, or the global default).
+ */
+export function packageMinutes(setting, script) {
+  if (setting !== null && typeof setting === 'object') return setting[script] ?? setting.default;
+  return setting;
+}
+
+/**
  * The limit in milliseconds for one test: `MARGO_GPU_TEST_TIMEOUT_MIN` (all tests) wins over the package's own
- * `"margo": { "gpuTestTimeoutMinutes": n }` in its package.json, which wins over the default.
+ * `"margo": { "gpuTestTimeoutMinutes": n }` in its package.json (a number, or an object per script, see
+ * `packageMinutes`), which wins over the default.
  */
 export function testLimitMs(packageMinutes, env = process.env) {
   const value = env.MARGO_GPU_TEST_TIMEOUT_MIN ?? packageMinutes ?? DEFAULT_TEST_MINUTES;

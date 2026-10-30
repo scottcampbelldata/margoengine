@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { lockMode, lockOrder, mergeTimingSteps, plan, runPlan, TIMING_TEST } from '../scripts/gpu-package-tests.mjs';
-import { runLimited } from '../scripts/support/run-limited.mjs';
+import { packageMinutes, runLimited, testLimitMs } from '../scripts/support/run-limited.mjs';
 import { runSuite } from '../scripts/support/shutdown.mjs';
 
 const root = join(import.meta.dirname, '..');
@@ -195,4 +195,22 @@ watchExit();
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('a package sets a GPU test limit as one number or per script, and the biomes flythrough gets 12.5 minutes', () => {
+  // The plain number applies to every script of the package.
+  assert.equal(packageMinutes(20, 'test:gpu'), 20);
+  assert.equal(packageMinutes(undefined, 'test:gpu'), undefined);
+  // The object form sets one script and leaves the others on "default", or on the global default when it has none.
+  const perScript = { 'test:gpu:flythrough': 12.5, default: 15 };
+  assert.equal(packageMinutes(perScript, 'test:gpu:flythrough'), 12.5);
+  assert.equal(packageMinutes(perScript, 'test:gpu'), 15);
+  assert.equal(packageMinutes({ 'test:gpu:flythrough': 12.5 }, 'test:gpu'), undefined);
+  assert.equal(testLimitMs(packageMinutes({ 'test:gpu:flythrough': 12.5 }, 'test:gpu'), {}), 10 * 60_000);
+  assert.equal(testLimitMs(packageMinutes({ 'test:gpu:flythrough': 12.5 }, 'test:gpu:flythrough'), {}), 750_000);
+  // The real plan: Scott's ruling (2026-10-30), flythrough 750 s, the view and objects checks keep 600 s.
+  const limit = (label) => testLimitMs(plan().find((t) => t.label === label)?.minutes, {});
+  assert.equal(limit('biomes test:gpu:flythrough'), 750_000);
+  assert.equal(limit('biomes test:gpu'), 600_000);
+  assert.equal(limit('biomes test:gpu:objects'), 600_000);
 });

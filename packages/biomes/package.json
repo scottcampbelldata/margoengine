@@ -110,6 +110,11 @@
   "dependencies": {
     "@margoengine/math": "^1.0.0"
   },
+  "margo": {
+    "gpuTestTimeoutMinutes": {
+      "test:gpu:flythrough": 12.5
+    }
+  },
   "scripts": {
     "build": "node ../../scripts/build-optional.js biomes",
     "test": "npm run build && node --test tests/*.test.js",

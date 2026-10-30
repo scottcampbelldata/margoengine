@@ -182,6 +182,10 @@ does not own. Each entry says exactly what is needed to close it.
   3 kills at 8bd1fb40 came after 'packing:', which fits an assertion that failed there and then the unbounded WGSL wait
   in close() (cause 1). Open: the laptop's line-49 check (one frame with 2 ms sends: 5.8 ms seen once standalone, limit
   3.5 ms, 2.3 to 2.4 ms before); not loosened.
+- **Since 2026-10-30 (Scott's ruling):** the flythrough step has a 750 s (12.5 min) limit, set per script in
+  `packages/biomes/package.json` (`"margo": { "gpuTestTimeoutMinutes": { "test:gpu:flythrough": 12.5 } }`, read by
+  `packageMinutes` in `scripts/support/run-limited.mjs`); the view and objects steps keep 600 s. Test:
+  `tests/gpu-timing-lock.test.js`.
 
 ### BiomeView: a world or placement change while a tile waits to be copied in can leave the old tile drawn
 
