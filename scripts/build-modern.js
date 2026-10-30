@@ -1,4 +1,5 @@
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { availableParallelism } from 'node:os';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { build } from 'vite';
 import { resolve, dirname } from 'node:path';
@@ -6,7 +7,7 @@ import assert from 'node:assert/strict';
 import { gzipSync, deflateRawSync, inflateRawSync } from 'node:zlib';
 import { compactPackage } from './compact-package.js';
 import { compactOutput, external, measureCoreStage } from './measure-size.js';
-import { packageOrder } from './package-order.js';
+import { buildInDependencyOrder, packageDependencies, packageOrder } from './package-order.js';
 import { buildWorkers, restoreWorkerUrls } from './build-workers.js';
 import { packageDeclarations, packageRuntime } from './package-declarations.js';
 import { writeServerEntries } from './react-server-entries.js';
@@ -77,10 +78,23 @@ if (!precompiled)
 // Build every workspace package in dependency order (scripts/package-order.js reads package.json; a package that needs
 // another's dist at build time must declare it). A package with its own `build` script runs it; the rest use the
 // pipeline below: tsc + compaction for core and the stage facade, tsc for react, a Vite library build + tsc otherwise.
-const tsc = async (name) => {
-  execFileSync(process.execPath, ['node_modules/typescript/bin/tsc', '-p', `packages/${name}/tsconfig.json`], {
-    stdio: 'inherit',
+// Packages that do not depend on each other build side by side (MARGOENGINE_BUILD_JOBS, default: the CPU count up to 8;
+// 1 builds one at a time as before). A child process's output is printed whole when it ends, so lines never interleave.
+const jobs = Math.max(1, Number(process.env.MARGOENGINE_BUILD_JOBS) || Math.min(8, availableParallelism()));
+const runChild = (command, args, options) =>
+  new Promise((done, fail) => {
+    const child = spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] }),
+      chunks = [];
+    child.stdout.on('data', (data) => chunks.push([process.stdout, data]));
+    child.stderr.on('data', (data) => chunks.push([process.stderr, data]));
+    child.on('error', fail);
+    child.on('close', (code) => {
+      for (const [stream, data] of chunks) stream.write(data);
+      code === 0 ? done() : fail(new Error(`${command} ${args.join(' ')} exited with ${code}`));
+    });
   });
+const tsc = async (name) => {
+  await runChild(process.execPath, ['node_modules/typescript/bin/tsc', '-p', `packages/${name}/tsconfig.json`]);
   await packageDeclarations(resolve(`packages/${name}`));
 };
 const manifests = new Map();
@@ -88,13 +102,12 @@ for (const dir of JSON.parse(await readFile('package.json', 'utf8')).workspaces.
   dir.startsWith('packages/'),
 ))
   manifests.set(dir.slice('packages/'.length), JSON.parse(await readFile(`${dir}/package.json`, 'utf8')));
-for (const name of packageOrder(manifests)) {
-  if (only && !only.includes(name)) continue;
+async function buildPackage(name) {
   const manifest = manifests.get(name);
   if (manifest.scripts?.build) {
-    execSync(manifest.scripts.build, { cwd: `packages/${name}`, stdio: 'inherit' });
+    await runChild(manifest.scripts.build, [], { cwd: `packages/${name}`, shell: true });
     await packageDeclarations(resolve(`packages/${name}`));
-    continue;
+    return;
   }
   const output = resolve(`packages/${name}/dist`);
   assert.equal(dirname(output), resolve(`packages/${name}`), 'Output escaped its package');
@@ -103,20 +116,20 @@ for (const name of packageOrder(manifests)) {
   if (name === 'core' || name === 'stage') {
     await tsc(name);
     await compactPackage(name);
-    continue;
+    return;
   }
   // margoengine is the one-install package: generated re-exports of every package (scripts/umbrella.mjs).
   if (name === 'margoengine') {
     await tsc(name);
     // For pages without a bundler: every entry of every package on a CDN (docs/guides/imports.md).
     await writeFile(`packages/${name}/dist/importmap.json`, `${JSON.stringify(importMap(), null, 2)}\n`);
-    continue;
+    return;
   }
   if (name === 'react') {
     await tsc(name);
     await packageRuntime(resolve('packages/react'));
     await writeServerEntries(resolve('packages/react'));
-    continue;
+    return;
   }
   const entry = Object.fromEntries(
     Object.values(manifest.exports).map(({ import: target }) => {
@@ -166,6 +179,12 @@ for (const name of packageOrder(manifests)) {
   await tsc(name);
   await restoreWorkerUrls(output);
 }
+await buildInDependencyOrder(
+  packageOrder(manifests).filter((name) => !only || only.includes(name)),
+  packageDependencies(manifests),
+  jobs,
+  buildPackage,
+);
 if (only) process.exit(0);
 // Size records and leak checks only; build order comes from package.json above.
 const featurePackages = [

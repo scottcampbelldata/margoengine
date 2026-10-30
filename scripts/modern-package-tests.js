@@ -161,6 +161,20 @@ if (!reuseTarballs) {
     ),
   );
   for (const pack of JSON.parse(fromArray(out))) packs.set(pack.name, pack);
+  // The build runs packages side by side (scripts/build-modern.js); the tarball set must still be exactly one per
+  // workspace package, each named after its manifest, so a package that was skipped or built twice shows up here.
+  assert.deepEqual(
+    [...packs.values()].map((pack) => pack.filename).sort(),
+    (
+      await Promise.all(
+        packedNames.map(async (name) => {
+          const { version } = JSON.parse(await readFile(`packages/${name}/package.json`, 'utf8'));
+          return packageName(name).replace(/^@/, '').replace('/', '-') + '-' + version + '.tgz';
+        }),
+      )
+    ).sort(),
+    'npm pack must write exactly one tarball per workspace package',
+  );
 }
 for (const name of packedNames) {
   let pack, manifest;

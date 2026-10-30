@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { packageOrder } from '../scripts/package-order.js';
+import { buildInDependencyOrder, packageDependencies, packageOrder } from '../scripts/package-order.js';
 
 const manifest = (name, peers = [], deps = [], dev = []) => ({
   name,
@@ -56,4 +56,53 @@ test('a cycle fails and names its members', () => {
       ),
     /cycle: a -> b -> c -> a/,
   );
+});
+
+test('the parallel build starts a package only after its dependencies, never exceeds the job limit and builds each once', async () => {
+  const manifests = new Map(),
+    root = new URL('../', import.meta.url);
+  for (const dir of JSON.parse(await readFile(new URL('package.json', root), 'utf8')).workspaces.filter((dir) =>
+    dir.startsWith('packages/'),
+  ))
+    manifests.set(
+      dir.slice('packages/'.length),
+      JSON.parse(await readFile(new URL(`${dir}/package.json`, root), 'utf8')),
+    );
+  const dependencies = packageDependencies(manifests),
+    names = packageOrder(manifests);
+  for (const jobs of [1, 3, 8]) {
+    const started = [],
+      finished = new Set();
+    let active = 0,
+      peak = 0;
+    await buildInDependencyOrder(names, dependencies, jobs, async (name) => {
+      for (const dep of dependencies.get(name)) assert.ok(finished.has(dep), `${name} started before ${dep} finished`);
+      started.push(name);
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((done) => setTimeout(done, Math.random() * 3));
+      active--;
+      finished.add(name);
+    });
+    assert.deepEqual([...started].sort(), [...names].sort(), `jobs=${jobs}: every package builds exactly once`);
+    assert.ok(peak <= jobs, `jobs=${jobs}: peak ${peak}`);
+    if (jobs > 1) assert.ok(peak > 1, 'independent packages should overlap');
+  }
+});
+
+test('a failed package build rejects and starts nothing new', async () => {
+  const dependencies = new Map([
+      ['a', new Set()],
+      ['b', new Set(['a'])],
+      ['c', new Set()],
+    ]),
+    started = [];
+  await assert.rejects(
+    buildInDependencyOrder(['a', 'b', 'c'], dependencies, 1, async (name) => {
+      started.push(name);
+      if (name === 'a') throw new Error('a failed');
+    }),
+    /a failed/,
+  );
+  assert.deepEqual(started, ['a']);
 });
