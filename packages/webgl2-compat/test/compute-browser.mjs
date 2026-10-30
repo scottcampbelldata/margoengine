@@ -11,6 +11,7 @@ const TIERS = {
   fragmentStore: 'fragment',
   fragmentLayers: 'fragment',
   fragmentReadWrite: 'fragment',
+  fragmentMipViews: 'fragment',
   scatterStructs: 'scatter',
   scatterTargets: 'scatter',
   cpuAtomics: 'cpu',

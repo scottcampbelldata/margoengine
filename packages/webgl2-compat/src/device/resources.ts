@@ -517,9 +517,11 @@ export class CompatTexture {
 
   /**
    * The storage a view reads when sampled: the primary, or a copy when GL cannot sample the primary as the view asks
-   * (another format, a 2D view of a layer, a cube view of an array, an array view of a cube or 2D texture).
+   * (another format, a 2D view of a layer, a cube view of an array, an array view of a cube or 2D texture). `alias` 1
+   * and up name further copies of the same kind: GL keeps one base and max level per texture object, so a draw that
+   * samples two mip ranges of one texture reads the second through a copy of its own.
    */
-  sampled(v: CompatTextureView): TextureStorage {
+  sampled(v: CompatTextureView, alias = 0): TextureStorage {
     const gl = this.device.gl,
       p = this.primary as TextureStorage;
     let target = p.target,
@@ -534,7 +536,7 @@ export class CompatTexture {
       layer = v.baseArrayLayer;
       layers = 6;
     } else if (v.dimension === '2d-array' && target !== gl.TEXTURE_2D_ARRAY) target = gl.TEXTURE_2D_ARRAY;
-    return this.copy(v.format, target, layer, layers);
+    return this.copy(v.format, target, layer, layers, alias);
   }
 
   /** The storage a render pass writes through a view: the primary, or the copy of the view's format. */
@@ -543,10 +545,10 @@ export class CompatTexture {
     return v.format === this.format ? p : this.copy(v.format, p.target, 0, this.layers);
   }
 
-  private copy(format: GPUTextureFormat, target: number, layer: number, layers: number): TextureStorage {
+  private copy(format: GPUTextureFormat, target: number, layer: number, layers: number, alias = 0): TextureStorage {
     const p = this.primary as TextureStorage;
-    if (format === this.format && target === p.target) return p;
-    const key = `${format}:${target}:${layer}`;
+    if (!alias && format === this.format && target === p.target) return p;
+    const key = `${format}:${target}:${layer}:${alias}`;
     let s = this.copies?.get(key);
     if (s) return s;
     const info = FORMATS.get(format) as FormatInfo;

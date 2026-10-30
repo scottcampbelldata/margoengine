@@ -1505,6 +1505,7 @@ export class Replayer {
     }
     // Phase 1: what each unit will hold, with copies, resolves and uploads made now.
     const plan: { unit: number; target: number; texture: WebGLTexture | null; sampler: WebGLSampler }[] = [];
+    const ranges = new Map<TextureStorage, string>();
     for (const t of p.textures) {
       const found = lookup(t.group, t.binding);
       if (!found || found.bound.kind !== 'view') {
@@ -1539,9 +1540,14 @@ export class Replayer {
         this.resolveForSampling(tex);
         plan.push({ unit: t.unit, target: gl.TEXTURE_2D, texture: tex.resolved, sampler });
       } else {
-        const storage = tex.sampled(view);
-        tex.read(storage, view.baseMipLevel, view.mipLevelCount, view.baseArrayLayer, view.arrayLayerCount, this.sync);
         const range = `${view.baseMipLevel}:${view.baseMipLevel + levels - 1}`;
+        let storage = tex.sampled(view);
+        // GL keeps one base and max level per texture object: another range of a texture this draw already samples
+        // (Bloom's last up step reads two levels of its down chain) reads a copy of its own.
+        for (let alias = 1; ranges.has(storage) && ranges.get(storage) !== range; alias++)
+          storage = tex.sampled(view, alias);
+        ranges.set(storage, range);
+        tex.read(storage, view.baseMipLevel, view.mipLevelCount, view.baseArrayLayer, view.arrayLayerCount, this.sync);
         if (storage.levels !== range) {
           s.scratch(storage.target, storage.gl);
           gl.texParameteri(storage.target, gl.TEXTURE_BASE_LEVEL, view.baseMipLevel);

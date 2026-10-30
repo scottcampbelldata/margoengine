@@ -45,7 +45,7 @@
   "gameplay-sandbox": {
    "status": "differs",
    "over2": 0.0116,
-   "mean": 0.135
+   "mean": 0.132
   },
   "khronos-ABeautifulGame": {
    "status": "same",
@@ -175,8 +175,9 @@
   },
   "light-keeper": {
    "status": "differs",
-   "over2": 0.0707,
-   "mean": 0.791
+   "over2": 0.0702,
+   "mean": 0.758,
+   "exact": true
   },
   "minimap": {
    "status": "same",
@@ -184,8 +185,8 @@
   },
   "night-citadel": {
    "status": "differs",
-   "over2": 0.00199,
-   "mean": 0.0621,
+   "over2": 0.00201,
+   "mean": 0.0333,
    "exact": true
   },
   "scene-targets": {
@@ -222,14 +223,14 @@
   },
   "voxel-ground": {
    "status": "differs",
-   "over2": 0.00538,
-   "mean": 0.184,
+   "over2": 0.00411,
+   "mean": 0.121,
    "exact": true
   },
   "voxel-night": {
    "status": "differs",
-   "over2": 0.0145,
-   "mean": 0.163,
+   "over2": 0.00223,
+   "mean": 0.0323,
    "exact": true
   },
   "voxel-overview": {

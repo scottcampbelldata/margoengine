@@ -137,6 +137,18 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### VFX: blended particles draw in a different order each frame
+
+- **What:** the gameplay sandbox's still frame (prefers-reduced-motion, `?quality=high`, 1280 x 720) is not repeatable
+  natively: two captures differ by 1 level on 41 to 57 pixels, over the sea and the beach (Edge 156, RTX A6000,
+  2026-10-30). With its particles off (`#particles` set to 0) four captures are equal pixel for pixel.
+- **Repro:** `npm run visual:compat -- --only=gameplay-sandbox` prints native noise above 0 (mean 0.00005).
+- **Cause:** VFX's update kernel appends each live particle to the draw list with `atomicAdd` (packages/vfx/src/shader.ts),
+  so the list's order, and with it the order in which overlapping blended particles add up, changes from frame to
+  frame; float blending rounds differently in another order.
+- **Needed to close:** a draw order that does not depend on atomics (a stable compaction by particle index), with a
+  check that draws one still frame twice and compares it pixel for pixel.
+
 ### `KHR_materials_specular` weight does not scale Fresnel at grazing angles on gltf-pro's native paths
 
 - **What:** the spec's Fresnel is `specular * (f0 + (1 - f0) * (1 - v.h)^5)`, so `specularFactor` 0 reflects nothing at any
@@ -200,20 +212,6 @@ does not own. Each entry says exactly what is needed to close it.
   the budget is too short for a loaded machine), or a close that hangs on a pending GPU request (a defect). Next step:
   rerun under the burner with `DEBUG=pw:browser` and a process list at the timeout, and see whether the browser ends
   later by itself.
-### WebGL2 layer: demos that run with differences
-
-- **What:** `npm run visual:compat` (table in [webgl2-compat-demos.md](webgl2-compat-demos.md)) records demos that
-  run on the layer with more than the parity rule's difference: light-keeper (7.1% of pixels, d > 2, speckle over lit
-  surfaces and rings around the head), voxel views (0.2% to 1.5%, the far terrain) and sciviz points (0.2%). The voxel
-  views differ as much at 1x MSAA (`?quality=light`: voxel night 1.51%), so they are not the accepted multisample
-  difference that DOF, gameplay sandbox and night citadel show
-  ([webgl2-compat-demos.md](webgl2-compat-demos.md#accepted-difference-per-sample-reads-of-multisampled-textures));
-  light keeper and sciviz points have no 1x setting, so that class is not ruled out for them yet.
-- **Cause:** not found yet for each. Leads: CPU-tier transcendental functions differ from the GPU in the last bits, and
-  a `fract(sin(x) * k)` hash turns that into other random values (particles, haze); light keeper's speckle is not the
-  bloom dither's phase (the layer's `@builtin(position)` matches WebGPU's). Each needs its cause shown, then a fix or
-  a recorded accepted difference.
-
 ### Findings of the outside audit (2026-10-28)
 
 - **What:** an outside audit of revision 74a01810 (a source review, canary tests on a second laptop with temporary

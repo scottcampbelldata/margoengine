@@ -7,7 +7,8 @@
 <body>
 <script type="module">
 // Milestone M5 cases (compute-browser.mjs runs each on native WebGPU and on the layer and compares): the fragment tier
-// (own-texel stores into 2D, array, 3D and mip-level storage views, a read-write storage texture), the scatter tier
+// (own-texel stores into 2D, array, 3D and mip-level storage views, a read-write storage texture, two mip views of one
+// texture read in one dispatch), the scatter tier
 // (struct stores at data-dependent indexes, word stores, texel stores at other coordinates, two targets at once), the
 // CPU tier (atomics, workgroup memory and barriers, texture reads and stores, sampling, stores in loops), indirect
 // dispatch, and queue order around the first compute pipeline (whose runtime loads lazily). Each case takes a device
@@ -152,6 +153,29 @@ const cases = {
     const t = texture(device, { size: [4, 4], format: 'r32float', usage: U.STORAGE_BINDING | U.COPY_SRC | U.COPY_DST, data: new Float32Array(16).map((_, i) => i) });
     run(device, p, [group(device, p, [t])], 1, 1);
     return { values: f32(await readTexture(device, t, { bytes: 4 })), tier: tierOf(p) };
+  },
+  // Two mip views of one texture in one dispatch, as Bloom's last up step reads its down chain: GL keeps one base level
+  // per texture object, so the layer gave both views the level of the one bound last (the voxel night view's glow).
+  async fragmentMipViews(device) {
+    const p = compute(device, `
+      @group(0) @binding(0) var fine: texture_2d<f32>;
+      @group(0) @binding(1) var coarse: texture_2d<f32>;
+      @group(0) @binding(2) var samp: sampler;
+      @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+      @compute @workgroup_size(4, 4) fn main(@builtin(global_invocation_id) id: vec3u) {
+        let uv = (vec2f(id.xy) + 0.5) / 4.0;
+        let sizes = vec2f(f32(textureDimensions(fine).x), f32(textureDimensions(coarse).x));
+        textureStore(dst, id.xy, vec4f(textureLoad(fine, id.xy, 0).r, textureSampleLevel(coarse, samp, uv, 0.0).r, sizes));
+      }`);
+    const src = texture(device, { size: [16, 16], mips: 3 });
+    for (let level = 0; level < 3; level++) {
+      const w = 16 >> level;
+      device.queue.writeTexture({ texture: src, mipLevel: level }, pattern(w * w * 4, (i) => (level * 80 + (i >> 2) * 3) & 255), { bytesPerRow: w * 4 }, [w, w]);
+    }
+    const dst = texture(device, { size: [4, 4], format: 'rgba32float', usage: U.STORAGE_BINDING | U.COPY_SRC });
+    const view = (level) => src.createView({ baseMipLevel: level, mipLevelCount: 1 });
+    run(device, p, [group(device, p, [view(1), view(2), device.createSampler(), dst])], 1, 1);
+    return { values: f32(await readTexture(device, dst, { bytes: 16 })), tier: tierOf(p) };
   },
   async scatterStructs(device) {
     const p = compute(device, `

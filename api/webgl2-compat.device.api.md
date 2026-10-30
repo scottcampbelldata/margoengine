@@ -413,7 +413,7 @@ export class CompatTexture {
     readonly framebuffers: Set<string>;
     readonly layers: number;
     constructor(device: CompatDevice, descriptor: GPUTextureDescriptor);
-    sampled(v: CompatTextureView): TextureStorage;
+    sampled(v: CompatTextureView, alias?: number): TextureStorage;
     attached(v: CompatTextureView): TextureStorage;
     read(s: TextureStorage, level: number, levels: number, layer: number, layers: number, sync: (from: TextureStorage, to: TextureStorage, level: number, layer: number) => void): void;
     wrote(s: TextureStorage, level: number, levels: number, layer: number, layers: number): void;

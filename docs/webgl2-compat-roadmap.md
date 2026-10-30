@@ -783,6 +783,18 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
 - **Docs.** [webgpu.html](../site/webgpu.html) explains the compatibility mode to visitors (what loads and when, the
   download, what it refuses, the `unsafe-eval` note for the CPU tier); [limits.md](limits.md) and the error page's
   `compatibility-layer` entry name the site behaviour and the refusals.
+- **Two mip ranges of one texture in one draw (bug, fixed 2026-10-30).** GL keeps one base and max level per texture
+  object, and the layer set them per binding, so a draw that sampled two views of one texture with different levels
+  read both at the level of the one bound last. Bloom's last up step reads two levels of its down chain, so every
+  Bloom glow on the layer was wrong at its widest level (the voxel night view's sky glow: d > 2 on 1.45% of pixels,
+  now 0.22%). Such a binding now reads a copy of its own, brought up to date only when its levels changed; the compute
+  check's `fragmentMipViews` case fails without the fix.
+- **Causes of the demos that run with differences, all found.** Light keeper (SSAO) and the four voxel views (fog)
+  read the scene's resolved depth, which keeps each pixel's nearest of 4 samples natively and one sample on WebGL2: the
+  accepted per-sample MSAA difference ([webgl2-compat-demos.md](webgl2-compat-demos.md#accepted-difference-per-sample-reads-of-multisampled-textures)).
+  Sciviz points (its status line, which states the plot time, now masked) differs by 16 pixels, within the parity
+  rule: of the 2,000,000 positions sampled on the GPU, 5% of the x coordinates differ by one unit in the last place
+  (0.1% of the normal samples already do; the two paths round their float arithmetic differently), and one point
+  lands on the next pixel.
 - **Left in M8.** The size shrink (the root with `install()` is 93,763 B gzip in `entry-sizes.json`, against the
-  60,000 B target), the transform-feedback tier for own-index stores, the integrated-GPU budget run, and the causes of
-  the demos that run with differences.
+  60,000 B target), the transform-feedback tier for own-index stores and the integrated-GPU budget run.
