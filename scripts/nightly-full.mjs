@@ -10,13 +10,15 @@
 // tree is killed, the result is TIMEOUT (exit 124) and the alert is raised. Every run writes test-results/nightly/last-status.json
 // (pass, fail or timeout, and the step), ALERT.txt on a failure, and ends its log with a "nightly RESULT" line.
 // Run it from a checkout at the commit to test (the main checkout, after `git pull --ff-only`). Takes the GPU lock exclusively (it
-// includes timed steps) for the whole run (the steps inside nest under it), so landing runs wait their turn.
+// includes timed steps) for the whole run (the steps inside nest under it), so landing runs wait their turn; on a heat
+// profile the full check holds no outer lock instead (heatFullCommand says why).
 // The steps come from the machine profile (MARGO_MACHINE_PROFILE, scripts/support/machine-profiles.json, item 57.1a): the
 // laptop runs the full check and the pinned proofs (the backstop for check:merge's narrowing, session rule 20); the
 // small machines run the GPU package tests, with their own heat watch and exclusions, then the light GPU checks
 // (check:wgsl, check:views, check:depth, check:no-webgpu after a site build, modern:test:bundlers after the tarball
-// test). A heat stop it could not resume from ends the night as PAUSED-FOR-HEAT (exit 75), never as a failure. The log
-// names the profile and every step it leaves out, with the reason.
+// test) through check:merge --steps, under the same heat watch. On a heat profile the full check holds no outer lock,
+// so no lock is held while the machine cools. A heat stop it could not resume from ends the night as PAUSED-FOR-HEAT
+// (exit 75), never as a failure. The log names the profile and every step it leaves out, with the reason.
 // `nightly-status` in a profile copies last-status.json and the last 40 log lines, after the run, to a private status
 // git repository so one place shows every machine's night: MARGO_STATUS_REPO (its URL) and MARGO_STATUS_DIR (its local
 // clone) say where; neither is ever written in this repository. Unset, it skips with one line.
@@ -53,6 +55,21 @@ export const nightlyCommand = () => [
   ],
 ];
 
+/**
+ * The full check on a profile with a heat watch: check:merge:full with no outer lock. Its steps take the GPU lock
+ * themselves, as in any check:merge (timing tests exclusively), and a step the heat watch stops has its tree ended, so
+ * its hold goes with it: no lock is held while the machine cools, and no hold limit has to cover a cooldown. Holding
+ * one exclusive lock over the whole run would make its cap cover every possible cooldown (check:gpu-packages can pause
+ * each of its tests), which is a cap of many hours that no longer guards anything.
+ */
+export const heatFullCommand = () => [process.execPath, ['scripts/check-merge.mjs', '--full']];
+
+/**
+ * A light nightly GPU check: those check:merge steps, whole and in order, through check:merge's step runner
+ * (`--steps`, runSteps), so they run under the profile's heat watch exactly as in check:merge.
+ */
+export const stepsCommand = (...names) => [process.execPath, ['scripts/check-merge.mjs', `--steps=${names.join(',')}`]];
+
 /** The command that runs the pinned proofs after it, holding the GPU lock exclusively so the timed rounds run quiet. */
 export const pinnedProofsCommand = () => [
   process.execPath,
@@ -62,19 +79,21 @@ export const pinnedProofsCommand = () => [
 /**
  * Every nightly step a profile can name, by label. 'gpu package tests' runs scripts/gpu-package-tests.mjs on its own
  * (no outer lock), so its heat pauses release the GPU lock while the machine cools; it builds every package first, so
- * the light GPU checks come after it. Those take the GPU lock themselves and run through the shell (a one-string
- * command): check:no-webgpu opens the built site, so the site is built first, and the bundler matrix installs the
- * packed packages, so the tarball test runs first. `nightly-status` runs after the run (publishStatus).
+ * the light GPU checks come after it. Those take the GPU lock themselves and run through check:merge's step runner
+ * (stepsCommand), so the profile's heat watch covers them too: check:no-webgpu opens the built site, so the site is
+ * built first, and the bundler matrix installs the packed packages, so the tarball test runs first. On a heat profile
+ * the full check runs with no outer lock (heatFullCommand says why); on the workstation it runs under one exclusive
+ * hold, as before. `nightly-status` runs after the run (publishStatus).
  */
 export const NIGHTLY_STEPS = {
-  'full check:merge': nightlyCommand,
+  'full check:merge': (profile) => (profile?.heat ? heatFullCommand() : nightlyCommand()),
   'pinned proofs': pinnedProofsCommand,
   'gpu package tests': () => [process.execPath, ['scripts/gpu-package-tests.mjs']],
-  'check:wgsl': () => ['npm run check:wgsl'],
-  'check:views': () => ['npm run check:views'],
-  'check:depth': () => ['npm run check:depth'],
-  'check:no-webgpu': () => ['npm run build:site && npm run check:no-webgpu'],
-  'modern:test:bundlers': () => ['npm run modern:test:packages && npm run modern:test:bundlers'],
+  'check:wgsl': () => stepsCommand('check:wgsl'),
+  'check:views': () => stepsCommand('check:views'),
+  'check:depth': () => stepsCommand('check:depth'),
+  'check:no-webgpu': () => stepsCommand('build:site', 'check:no-webgpu'),
+  'modern:test:bundlers': () => stepsCommand('modern:test:packages', 'modern:test:bundlers'),
   'nightly-status': null,
 };
 
@@ -95,7 +114,7 @@ export function nightlySteps(profile) {
   return {
     steps: profile.nightly
       .filter((label) => !AFTER_STEPS.includes(label))
-      .map((label) => ({ label, command: NIGHTLY_STEPS[label]() })),
+      .map((label) => ({ label, command: NIGHTLY_STEPS[label](profile) })),
     after: profile.nightly.filter((label) => AFTER_STEPS.includes(label)),
     left: Object.keys(NIGHTLY_STEPS)
       .filter((label) => !profile.nightly.includes(label))

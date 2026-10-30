@@ -395,15 +395,17 @@ test('the nightly plan follows the profile and a heat stop ends the night as PAU
       name,
     );
   }
-  // Each light step runs the package.json script of the same name, after what it reads is built.
+  // Each light step runs the package.json script of the same name, after what it reads is built, through check:merge's
+  // step runner (--steps), so the profile's heat watch covers it (tests/check-merge-heat.test.js).
   const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts;
   for (const label of light.slice(1)) {
-    const [command] = NIGHTLY_STEPS[label]();
+    const [, args] = NIGHTLY_STEPS[label]();
     assert.ok(scripts[label], label);
-    assert.match(command, new RegExp(`npm run ${label}$`), label);
+    assert.equal(args[0], 'scripts/check-merge.mjs', label);
+    assert.ok(args[1].startsWith('--steps=') && args[1].endsWith(label), label);
   }
-  assert.match(NIGHTLY_STEPS['check:no-webgpu']()[0], /^npm run build:site && /);
-  assert.match(NIGHTLY_STEPS['modern:test:bundlers']()[0], /^npm run modern:test:packages && /);
+  assert.equal(NIGHTLY_STEPS['check:no-webgpu']()[1][1], '--steps=build:site,check:no-webgpu');
+  assert.equal(NIGHTLY_STEPS['modern:test:bundlers']()[1][1], '--steps=modern:test:packages,modern:test:bundlers');
   assert.throws(
     () => nightlySteps({ name: 'x', nightly: ['nope'] }),
     (error) => error.code === 'NIGHTLY_STEP_UNKNOWN',

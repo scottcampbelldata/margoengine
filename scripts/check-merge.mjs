@@ -2,6 +2,8 @@
 // never narrow by skipping a test the change can affect; the nightly full run is the backstop).
 //   npm run check:merge         the affected work only
 //   npm run check:merge:full    everything, as before (the nightly job: scripts/nightly-full.mjs); MARGO_FULL=1 does the same
+//   node scripts/check-merge.mjs --steps=a,b   exactly those check:merge steps, whole, under the same heat watch (the
+//                               nightly's light GPU checks on the small machines)
 //   node scripts/check-merge.mjs --plan [--files=a,b]    print the mode, the reason and the commands, run nothing
 //                               (--files pretends those files changed; --base=<ref> diffs against that ref, not origin/main)
 // Every changed file has a class (scripts/support/file-classes.mjs; tests/file-classes.test.js fails on a tracked file
@@ -36,6 +38,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { exitOnHelp } from './support/help.mjs';
+import { margoError } from '../packages/shared/errors.js';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { pauseText, runPlan } from './gpu-package-tests.mjs';
 import { HEAT_EXIT } from './nightly-full.mjs';
@@ -138,6 +141,7 @@ export function planSteps({ steps, decision, tests, workspaces, testId, scope })
 /** One line for the log: the mode and why. */
 export function describe(decision, base) {
   if (decision.mode === 'full') return `check:merge: FULL GPU run, because ${decision.reason}`;
+  if (decision.mode === 'steps') return `check:merge: the named steps only, whole (${decision.reason})`;
   return `check:merge: AFFECTED GPU run vs ${base?.slice(0, 8) ?? 'origin/main'}: ${decision.reason}${
     decision.affected.length ? ` [${decision.affected.join(', ')}]` : ''
   }`;
@@ -187,9 +191,28 @@ function planDecision(ctx, decision, files) {
   return { decision, scope, planned: planSteps({ steps, decision, tests, workspaces, testId, scope }) };
 }
 
-async function main() {
-  const args = process.argv.slice(2),
-    ctx = await planContext(),
+/**
+ * The plan for `--steps=<name>,<name>`: exactly those check:merge steps, in that order, whole (no narrowing), through
+ * the same runner and heat watch as a full check:merge. The nightly's light GPU checks on the small machines run this
+ * way (scripts/nightly-full.mjs). A name that is not a step of `check:merge:steps` throws CHECK_MERGE_STEP_UNKNOWN.
+ */
+export function stepsPlan(names, steps) {
+  const known = steps.map(stepName),
+    unknown = names.filter((name) => !known.includes(name));
+  if (!names.length || unknown.length)
+    throw margoError(
+      'CHECK_MERGE_STEP_UNKNOWN',
+      `--steps names ${unknown.length ? `${unknown.join(', ')}, not a check:merge step` : 'no step'}; use some of ${known.join(', ')}`,
+    );
+  return {
+    decision: { mode: 'steps', reason: `--steps=${names.join(',')}`, affected: [] },
+    planned: names.map((name) => ({ command: steps[known.indexOf(name)] })),
+  };
+}
+
+/** The usual plan: the full run, or the steps the changed files can affect; printed with the mode and the reason. */
+async function planRun(args) {
+  const ctx = await planContext(),
     { workspaces, footprints } = ctx;
   const full = (reason) => ({ ...analyse({ files: [], workspaces, footprints, env: { MARGO_FULL: '1' } }), reason });
   let decision,
@@ -216,6 +239,22 @@ async function main() {
     `  packages: ${scope.packages.full ? 'whole' : 'scoped'} (${scope.packages.reason}); bundlers: ${scope.bundlers.run ? 'run' : 'skip'} (${scope.bundlers.reason})`,
   );
   for (const { command, skip } of planned) console.log(`  ${skip ? `skip (${skip})` : 'run'}  ${command}`);
+  return { decision, base, planned };
+}
+
+async function main() {
+  const args = process.argv.slice(2),
+    only = args.find((a) => a.startsWith('--steps='));
+  let decision, base, planned;
+  if (only) {
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+    ({ decision, planned } = stepsPlan(
+      only.slice(8).split(',').filter(Boolean),
+      manifest.scripts['check:merge:steps'].split(' && '),
+    ));
+    console.log(describe(decision));
+    for (const { command } of planned) console.log(`  run  ${command}`);
+  } else ({ decision, base, planned } = await planRun(args));
   if (args.includes('--plan')) return;
   const profile = machineProfile(),
     thermal = profile.heat ? thermalSource() : null;

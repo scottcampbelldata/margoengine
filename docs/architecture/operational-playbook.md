@@ -1679,7 +1679,12 @@ node scripts\nightly-full.mjs >> <projects>\margoengine-nightly\last-run.log 2>&
 Design points:
 
 - Runs in its own detached worktree at `origin/main`, never in anyone's working tree.
-- Takes the GPU lock exclusively for each run, so landings wait their turn and the timed proofs run quiet.
+- On the workstation profile, takes the GPU lock exclusively for each run, so landings wait their turn and the timed
+  proofs run quiet. On a heat profile the full check holds no outer lock (`heatFullCommand`): its steps take the GPU
+  lock themselves, as in any check:merge, and a heat-stopped step's tree ends, so nothing is held while the machine
+  cools. One whole-run hold would need a cap covering every possible cooldown (check:gpu-packages can pause each of its
+  tests), hours that would guard nothing. The pinned proofs keep their exclusive hold. Cooldowns still count against
+  the overall deadline (`MARGO_NIGHTLY_DEADLINE_MIN`); a night they push past it ends as TIMEOUT with the alert.
 - Costs no model tokens.
 - Timing: the full check runs at 10:00 and long benchmarks are scheduled 12:00 to 20:00 (global rules).
 - The pinned proofs run only here, not in every landing: about 40 of them time a speed-up with margins near 5 percent,
@@ -1704,7 +1709,8 @@ backstop for check:merge's narrowing (session rule 20).
 | `mini-pc`, `thermal-limited` | `gpu package tests` (builds every package first; voxel-pathtracer excluded), then the light GPU checks `check:wgsl`, `check:views`, `check:depth`, `check:no-webgpu` (after `npm run build:site`), `modern:test:bundlers` (after `npm run modern:test:packages`), then `nightly-status` |
 | `workstation` | `full check:merge`, `pinned proofs` (its scheduled task is disabled: no nightly on the main dev PC) |
 
-A one-string step runs through the shell (`npm run a && npm run b`); the light checks take the GPU lock themselves.
+The light checks run through `node scripts/check-merge.mjs --steps=<a>,<b>` (`stepsCommand`), check:merge's own step
+runner, so the profile's heat watch covers them as in check:merge (2.15.9); they take the GPU lock themselves.
 
 Status repository (`nightly-status`, `publishStatus` in `nightly-full.mjs`): after the night's record is written it
 copies `last-status.json` and the last 40 lines of the night's log to `<profile>/last-status.json` and
