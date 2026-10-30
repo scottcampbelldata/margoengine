@@ -38,6 +38,17 @@ For the biome presets there are more plants: `generatePalmMesh()`, `generateBirc
 `generateSnagMesh()` (a dead standing tree, empty canopy) return `{ trunk, canopy }` like `generateTreeMesh`, and
 `generateCactusMesh()`, `generateReedMesh(stems = 9)` (double sided) and `generateTundraShrubMesh()` return one
 `GeometryData`; each is rooted at the origin, +Y up, in metres.
+Mesh levels for distance: `generateTreeMesh(kind, options)`, `generateShrubMesh`, `generateTundraShrubMesh`,
+`generatePalmMesh`, `generateBirchMesh` and `generateAcaciaMesh` take `{ detail: 0 | 1 | 2 }` (default 2, the full
+mesh, unchanged byte for byte). Level 1 keeps the shape with coarser lobes (a broadleaf canopy goes from 6,240 to
+3,180 triangles); level 0 merges lobes into a few coarse ones for the far rings (400 triangles). Each axis of the
+canopy box stays within 20 percent of level 2. An invalid level throws a `RangeError`.
+
+```ts
+import {generateTreeMesh} from 'margoengine/procedural';
+const rings = [2, 1, 0].map((detail) => generateTreeMesh('broadleaf', {detail})); // near, middle, far
+```
+
 `contactAO(y, groundY)` gives bounded ground-contact occlusion, and
 `radialAO(x,y,z,center,radius)` shades enclosed canopy volumes. Use their output
 with `pbrVertexStream()` from geometry to bake ambient occlusion into vertex alpha

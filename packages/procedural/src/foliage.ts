@@ -58,6 +58,29 @@ function radialNormals(data: GeometryData, cx = 0, cy = 0, cz = 0): GeometryData
   return data;
 }
 
+/** Mixes 40 percent of each part's own radial direction into the canopy normals; `parts` lie in `data` in order. */
+function mixLobeNormals(data: GeometryData, parts: readonly GeometryData[], centers: readonly number[][]): void {
+  let vertex = 0;
+  parts.forEach((part, k) => {
+    const [cx, cy, cz] = centers[k],
+      end = vertex + part.positions.length / 3;
+    for (; vertex < end; vertex++) {
+      const i = vertex * 3,
+        x = data.positions[i] - cx,
+        y = data.positions[i + 1] - cy,
+        z = data.positions[i + 2] - cz,
+        length = Math.hypot(x, y, z) || 1,
+        nx = 0.6 * data.normals[i] + (0.4 * x) / length,
+        ny = 0.6 * data.normals[i + 1] + (0.4 * y) / length,
+        nz = 0.6 * data.normals[i + 2] + (0.4 * z) / length,
+        norm = Math.hypot(nx, ny, nz) || 1;
+      data.normals[i] = nx / norm;
+      data.normals[i + 1] = ny / norm;
+      data.normals[i + 2] = nz / norm;
+    }
+  });
+}
+
 /** Radius factor of a lumpy lobe at unit direction (x, y, z): three octaves of smooth bumps. */
 function lump(x: number, y: number, z: number): number {
   let radius = 1;
@@ -76,6 +99,64 @@ export function perturb(data: GeometryData): GeometryData {
     data.positions[i + 2] *= radius;
   }
   return data;
+}
+
+/** Mesh detail level: 2 is the full mesh (the default), 1 about half its triangles, 0 the far-ring silhouette. */
+export type MeshDetail = 0 | 1 | 2;
+
+/** Options shared by the tree, shrub and plant mesh generators. */
+export interface MeshDetailOptions {
+  /**
+   * Triangle budget: 2 keeps the full mesh, 1 uses coarser lobes and fewer leaf clumps (about half the triangles),
+   * 0 merges the lobes into a handful of coarse ones for far LOD rings (a few percent of the triangles, same
+   * silhouette within about 25 percent of its size). Default 2.
+   */
+  detail?: MeshDetail;
+}
+
+/** Validates `options.detail`; returns the level (2 when absent). */
+export function resolveDetail(options: MeshDetailOptions | undefined): MeshDetail {
+  const detail = options?.detail === undefined ? 2 : options.detail;
+  if (detail !== 0 && detail !== 1 && detail !== 2) throw new RangeError('Invalid mesh detail; pass 0, 1 or 2.');
+  return detail;
+}
+
+/** One lumpy ellipsoid lobe: centre, radii and yaw. */
+export interface LobeSpec {
+  x: number;
+  y: number;
+  z: number;
+  sx: number;
+  sy: number;
+  sz: number;
+  yaw: number;
+}
+
+/** Merges each group of lobes into one lobe that covers them (centre of the group, per-axis extent, 0.85 fit). */
+export function mergeLobeGroups(lobes: readonly LobeSpec[], groups: readonly (readonly number[])[]): LobeSpec[] {
+  return groups.map((group) => {
+    const members = group.map((i) => lobes[i]),
+      n = members.length,
+      x = members.reduce((a, m) => a + m.x, 0) / n,
+      y = members.reduce((a, m) => a + m.y, 0) / n,
+      z = members.reduce((a, m) => a + m.z, 0) / n;
+    let sx = 0,
+      sy = 0,
+      sz = 0;
+    for (const m of members) {
+      sx = Math.max(sx, Math.abs(m.x - x) + m.sx);
+      sy = Math.max(sy, Math.abs(m.y - y) + m.sy);
+      sz = Math.max(sz, Math.abs(m.z - z) + m.sz);
+    }
+    return { x, y, z, sx: sx * 0.85, sy: sy * 0.85, sz: sz * 0.85, yaw: 0 };
+  });
+}
+
+/** Consecutive groups of `size` indices from 0 to `count`: [[0,1,2],[3,4,5],...]. */
+export function consecutiveGroups(count: number, size: number): number[][] {
+  const groups: number[][] = [];
+  for (let i = 0; i < count; i += size) groups.push(Array.from({ length: Math.min(size, count - i) }, (_, k) => i + k));
+  return groups;
 }
 
 /**
@@ -138,13 +219,17 @@ function leafClumps(x: number, y: number, z: number, size: number, phase: number
 /**
  * Initialization-only tree geometry with smooth foliage and enclosed pine supports. Broadleaf canopies are fifteen
  * lumpy lobes plus 24 opaque leaf clumps per lobe that break the outline; every canopy vertex's normal radiates from
- * the canopy centre.
+ * the canopy centre. `options.detail` (default 2, the mesh above) trades triangles for distance: level 1 uses coarser
+ * lobes with 8 clumps each, level 0 five merged coarse lobes (broadleaf) or 6-sided tiers (conifer); at levels 0 and 1
+ * each broadleaf lobe vertex's normal mixes 40 percent toward its own lobe centre so the canopy keeps a clustered look.
+ * @throws RangeError when `kind` is not a tree kind or `options.detail` is not 0, 1 or 2.
  */
-export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
+export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: MeshDetailOptions) {
   if (kind !== 'conifer' && kind !== 'broadleaf')
     throw new RangeError("Invalid tree kind; pass 'conifer' or 'broadleaf'.");
-  const trunkHeight = kind === 'conifer' ? 6.2 : 5.3,
-    trunk = cylinderGeometry(0.11, 0.32, trunkHeight, 8, 6);
+  const detail = resolveDetail(options),
+    trunkHeight = kind === 'conifer' ? 6.2 : 5.3,
+    trunk = cylinderGeometry(0.11, 0.32, trunkHeight, [5, 6, 8][detail], [2, 4, 6][detail]);
   for (let i = 0; i < trunk.positions.length; i += 3) {
     const y = trunk.positions[i + 1] + trunkHeight / 2,
       angle = y * 0.055,
@@ -157,11 +242,12 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
   }
   const wood = [computeVertexNormals(toNonIndexed(trunk))],
     leaves: GeometryData[] = [],
-    clumps: GeometryData[] = [];
+    clumps: GeometryData[] = [],
+    lobeCenters: number[][] = [];
   if (kind === 'conifer') {
     for (let tier = 0; tier < 6; tier++) {
       const r = 2.05 * (1 - tier * 0.115),
-        skirt = coneGeometry(r, 2, 12, 2);
+        skirt = coneGeometry(r, 2, [6, 8, 12][detail], 2);
       for (let i = 0; i < skirt.positions.length; i += 3) {
         const x = skirt.positions[i],
           y = skirt.positions[i + 1],
@@ -181,7 +267,7 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
       }
       const y = 1.8 + tier * 0.9;
       leaves.push(placed(radialNormals(skirt), y * y * 0.008, y, Math.sin(y * 0.7) * 0.1, 1, 1, 1, tier * 0.37));
-      if (y + 0.12 < trunkHeight) {
+      if (detail > 0 && y + 0.12 < trunkHeight) {
         const angle = tier * 2.399963,
           length = r * 0.28,
           branchY = y + 0.12;
@@ -190,7 +276,7 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
         // Short supports sit above the underside cap and inside even the narrowest jagged rim.
         wood.push(
           placed(
-            cylinderGeometry(0.015, 0.065, length, 8),
+            cylinderGeometry(0.015, 0.065, length, detail === 2 ? 8 : 6),
             x + (Math.cos(angle) * length) / 2,
             branchY,
             z + (Math.sin(angle) * length) / 2,
@@ -204,13 +290,14 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
       }
     }
   } else {
+    const specs: LobeSpec[] = [];
     for (let limb = 0; limb < 3; limb++) {
       const angle = (limb * Math.PI * 2) / 3,
         c = Math.cos(angle),
         s = Math.sin(angle);
       wood.push(
         placed(
-          cylinderGeometry(0.065, 0.18, 2.5, 8, 2),
+          cylinderGeometry(0.065, 0.18, 2.5, detail === 2 ? 8 : 6, detail === 2 ? 2 : 1),
           0.13 + c * 0.884,
           4.234,
           0.03 + s * 0.884,
@@ -224,14 +311,28 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
       for (let lobe = 0; lobe < 5; lobe++) {
         const t = 0.35 + lobe * 0.17,
           phase = angle + lobe * 2.399963,
-          size = 1.1 + (lobe % 3) * 0.13,
-          x = 0.13 + c * (0.4 + t * 1.9) + Math.cos(phase) * 0.4,
-          y = 4.05 + t * 1.9 + (lobe % 2) * 0.35,
-          z = 0.03 + s * (0.4 + t * 1.9) + Math.sin(phase) * 0.4;
-        leaves.push(placed(perturb(icosahedronGeometry(1, 3)), x, y, z, size, size * 0.87, size));
-        clumps.push(leafClumps(x, y, z, size, phase));
+          size = 1.1 + (lobe % 3) * 0.13;
+        specs.push({
+          x: 0.13 + c * (0.4 + t * 1.9) + Math.cos(phase) * 0.4,
+          y: 4.05 + t * 1.9 + (lobe % 2) * 0.35,
+          z: 0.03 + s * (0.4 + t * 1.9) + Math.sin(phase) * 0.4,
+          sx: size,
+          sy: size * 0.87,
+          sz: size,
+          yaw: phase,
+        });
       }
     }
+    // Level 0 draws five coarse lobes that each cover three neighbours; the others draw all fifteen.
+    const drawn = detail === 0 ? mergeLobeGroups(specs, consecutiveGroups(specs.length, 3)) : specs;
+    drawn.forEach((lobe, i) => {
+      const mesh = perturb(icosahedronGeometry(1, detail === 2 ? 3 : detail === 1 ? 2 : 1));
+      leaves.push(placed(mesh, lobe.x, lobe.y, lobe.z, lobe.sx, lobe.sy, lobe.sz));
+      lobeCenters.push([lobe.x, lobe.y, lobe.z]);
+      // The full mesh keeps its historical clump phase (the lobe's own yaw); lower levels have 8 clumps or none.
+      if (detail === 2) clumps.push(leafClumps(lobe.x, lobe.y, lobe.z, lobe.sx, specs[i].yaw));
+      else if (detail === 1) clumps.push(leafClumps(lobe.x, lobe.y, lobe.z, lobe.sx, lobe.yaw, 8));
+    });
   }
   // Lobes first, then their leaf clumps (broadleaf only), so lobe i keeps its index range.
   const canopy = mergeGeometries([...leaves, ...clumps]),
@@ -239,7 +340,11 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
     count = canopy.positions.length / 3;
   for (let i = 0; i < canopy.positions.length; i++) center[i % 3] += canopy.positions[i] / count;
   // Broadleaf clouds share a single lighting volume, including vertices on inward-facing lobe surfaces.
-  if (kind === 'broadleaf') radialNormals(canopy, center[0], center[1], center[2]);
+  if (kind === 'broadleaf') {
+    radialNormals(canopy, center[0], center[1], center[2]);
+    if (detail < 2)
+      mixLobeNormals(canopy, [...leaves, ...clumps], [...lobeCenters, ...lobeCenters.slice(0, clumps.length)]);
+  }
   let radius = 0;
   for (let i = 0; i < canopy.positions.length; i += 3)
     radius = Math.max(
@@ -253,15 +358,20 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
   return { trunk: computeTangents(mergeGeometries(wood)), canopy: computeTangents(canopy), center, radius };
 }
 
-/** Compact asymmetric hemispherical foliage with continuous smooth normals. */
-export function generateShrubMesh(): GeometryData {
-  const lobes: GeometryData[] = [];
+/**
+ * Compact asymmetric hemispherical foliage with continuous smooth normals. `options.detail` (default 2, the full mesh)
+ * lowers the lobes' segment counts at 1 and 0.
+ * @throws RangeError when `options.detail` is not 0, 1 or 2.
+ */
+export function generateShrubMesh(options?: MeshDetailOptions): GeometryData {
+  const detail = resolveDetail(options),
+    lobes: GeometryData[] = [];
   for (let i = 0; i < 3; i++) {
     const angle = i * 2.399963,
       r = i === 2 ? 0 : 0.23;
     lobes.push(
       placed(
-        perturb(sphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)),
+        perturb(sphereGeometry(1, [6, 10, 16][detail], [2, 4, 8][detail], 0, Math.PI * 2, 0, Math.PI / 2)),
         Math.cos(angle) * r,
         -0.04,
         Math.sin(angle) * r,

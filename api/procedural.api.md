@@ -23,6 +23,12 @@ export interface MarchingCubesOptions {
     level?: number;
 }
 
+export type MeshDetail = 0 | 1 | 2;
+
+export interface MeshDetailOptions {
+    detail?: MeshDetail;
+}
+
 export class Noise {
     readonly seed: number;
     readonly perm: Uint8Array;
@@ -69,9 +75,9 @@ export function domainWarp(noise: NoiseFunction, { warp, strength, dimensions }?
 
 export function fbm(noise: NoiseFunction, options?: FractalOptions): NoiseFunction;
 
-export function generateAcaciaMesh(): TreeMesh;
+export function generateAcaciaMesh(options?: MeshDetailOptions): TreeMesh;
 
-export function generateBirchMesh(): TreeMesh;
+export function generateBirchMesh(options?: MeshDetailOptions): TreeMesh;
 
 export function generateCabinMesh(height: HeightField, position?: readonly [number, number]): {
     floor: number;
@@ -87,24 +93,24 @@ export function generateFernMesh(): GeometryData;
 
 export function generateGrassMesh(blades?: number): GeometryData;
 
-export function generatePalmMesh(): TreeMesh;
+export function generatePalmMesh(options?: MeshDetailOptions): TreeMesh;
 
 export function generateReedMesh(stems?: number): GeometryData;
 
 export function generateRockMesh(): GeometryData;
 
-export function generateShrubMesh(): GeometryData;
+export function generateShrubMesh(options?: MeshDetailOptions): GeometryData;
 
 export function generateSnagMesh(): TreeMesh;
 
-export function generateTreeMesh(kind: 'conifer' | 'broadleaf'): {
+export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: MeshDetailOptions): {
     trunk: GeometryData;
     canopy: GeometryData;
     center: Float32Array<ArrayBuffer>;
     radius: number;
 };
 
-export function generateTundraShrubMesh(): GeometryData;
+export function generateTundraShrubMesh(options?: MeshDetailOptions): GeometryData;
 
 export function marchingCubes(field: DensityField | ArrayLike<number>, { resolution, bounds, level }?: MarchingCubesOptions): Geometry | null;
 

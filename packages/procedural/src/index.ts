@@ -9,6 +9,8 @@ export {
   generateGrassMesh,
   contactAO,
   radialAO,
+  type MeshDetail,
+  type MeshDetailOptions,
 } from './foliage.js';
 export {
   generateAcaciaMesh,

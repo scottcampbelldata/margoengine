@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3911923,
+  "total": 3912622,
   "history": [
     {
       "date": "2026-10-24",
@@ -884,6 +884,12 @@
       "commit": "3342bf02f",
       "reason": "biomes: placement keeps every species above sea level (+36 B); the view makes its overview on the workers in row bands, off the page's thread (+111 B)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "0882df471",
+      "reason": "procedural: detail 0|1|2 mesh levels (lobe merging, per-level segment counts, normal mixing) for far LOD rings; opt-in, default mesh unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -1115,7 +1121,7 @@
     "@margoengine/post/ssgi": 11862,
     "@margoengine/post/ssr": 11154,
     "@margoengine/post/stack": 4001,
-    "@margoengine/procedural": 9774,
+    "@margoengine/procedural": 10473,
     "@margoengine/procedural/expression": 4720,
     "@margoengine/procedural/lsystem": 2454,
     "@margoengine/procedural/noise": 2314,
