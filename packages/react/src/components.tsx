@@ -45,6 +45,10 @@ import {
   type ShadowsLoader,
 } from './internal.js';
 export type { MargoPointerEvent, PointerHandlers } from './internal.js';
+import { warnLowercaseTags, warnPickingWithoutWebGPU } from './dev-warnings.js';
+import { capPixelRatio } from './pixel-ratio.js';
+// Bundlers replace process.env.NODE_ENV; without one `process` is absent and the development hints stay off.
+declare const process: { env: { NODE_ENV?: string } } | undefined;
 
 /** What {@link useMargo} returns: the stage, canvas, camera, size and engine, plus `invalidate()`. */
 export interface MargoContextValue {
@@ -74,6 +78,16 @@ export interface CanvasProps extends EngineOptions {
   onCreated?: (stage: StageFacade) => void;
   onError?: (error: unknown) => void;
   frameloop?: 'always' | 'demand';
+  /**
+   * Caps the canvas pixel ratio below the engine's own limit of 2, for example `1` on a laptop that struggles at
+   * retina size. Core has no per-canvas option for this, so the Canvas uses the engine's light tier (the
+   * `globalThis.margoLow` pixel-ratio cap), which also turns off MSAA and applies to every canvas on the page while one
+   * with `maxDpr` is mounted (the lowest value wins; the previous setting returns when the last one unmounts). A value
+   * of 2 or more changes nothing, because the engine never goes above 2. A `margoLow` you set yourself still counts.
+   * Changing it recreates the engine. A value that is not a number above 0 reaches `onError` as a `RangeError`.
+   * Default: none (engine limit of 2, MSAA on desktop).
+   */
+  maxDpr?: number;
   /**
    * Loads the renderer factory for browsers without WebGPU, for example `() => import('margoengine/webgl')`. The Canvas
    * checks for WebGPU itself (`navigator.gpu` and a successful `requestAdapter()`) before it creates the engine and
@@ -135,6 +149,7 @@ export function MargoCanvas({
   loadFallback,
   fallbackContent,
   frameloop = 'always',
+  maxDpr,
   onCreated,
   onError,
 }: CanvasProps) {
@@ -161,7 +176,25 @@ export function MargoCanvas({
   );
   const engine = stage?.engine as unknown as Engine | null;
   const cameraOverrides = useMemo(() => new Set<() => void>(), [engine]);
-  const pointerHandlers = useMemo(() => new Map<number, PointerHandlers>(), [engine]);
+  const pointerHandlers = useMemo(() => {
+    const handlers = new Map<number, PointerHandlers>();
+    if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production' && engine?.backend === 'webgl2') {
+      const set = handlers.set.bind(handlers);
+      handlers.set = (id, value) => {
+        if (value.onClick || value.onPointerOver || value.onPointerOut) warnPickingWithoutWebGPU();
+        return set(id, value);
+      };
+    }
+    return handlers;
+  }, [engine]);
+  useEffect(() => {
+    const parent = canvas.current?.parentElement;
+    if (!engine || !parent || typeof process === 'undefined' || process.env.NODE_ENV === 'production') return;
+    if (warnLowercaseTags(parent) || typeof MutationObserver === 'undefined') return;
+    const watch = new MutationObserver(() => warnLowercaseTags(parent) && watch.disconnect());
+    watch.observe(parent, { childList: true, subtree: true });
+    return () => watch.disconnect();
+  }, [engine]);
   const frames = useMemo<Frames>(() => ({ elapsed: 0, last: null, mode: frameloop, callbacks: new Set() }), [engine]);
   frames.mode = frameloop;
   const assetCache = useMemo(() => createAssetCache(engine as unknown as EngineKernel | null), [engine]);
@@ -227,10 +260,12 @@ export function MargoCanvas({
         errorHandler.current?.(error);
       }
     };
+    let releasePixelRatio = () => {};
     queue.current = queue.current
       .catch(() => {})
       .then(async () => {
         if (cancelled) return;
+        if (maxDpr !== undefined) releasePixelRatio = capPixelRatio(maxDpr);
         let renderer = fallback;
         const load = fallbackLoader.current;
         if (!renderer && load && backend !== 'webgpu' && (backend === 'webgl2' || !(await hasWebGPU()))) {
@@ -278,8 +313,9 @@ export function MargoCanvas({
       abort.abort();
       observer?.disconnect();
       current?.dispose();
+      releasePixelRatio();
     };
-  }, [capacity, backend, fallback]);
+  }, [capacity, backend, fallback, maxDpr]);
   useCommit(() => {
     if (engine) return engine.onFrame((_, delta) => advance(delta));
   }, [engine, advance]);

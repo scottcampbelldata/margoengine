@@ -159,7 +159,10 @@ from the DOM. These rules come from the code in `src/components.tsx` and apply t
   the mesh that is drawn, and use one handler function for several meshes if they share behaviour.
 - **An orbit drag is not a click.** A click needs the pointer to move no more than 3 CSS pixels between press and
   release, and only the primary button counts.
-- **WebGPU only.** On the WebGL2 fallback no handler fires.
+- **WebGPU only.** `engine.pick` needs WebGPU, so on the WebGL2 fallback no handler fires. In development the Canvas
+  prints one `MargoError` (code `unsupported`) the first time a handler is registered on the fallback, and nothing in a
+  production build. The fix is to handle input on the canvas element yourself, or to show `fallbackContent` instead of
+  a scene that depends on clicks when WebGPU is missing.
 - **Handlers get** `nativeEvent`, `object` (also `mesh` and `target`: the hit mesh), `x` and `y` (canvas pixels) and
   `clientX` and `clientY`.
 
@@ -479,6 +482,40 @@ export function Viewer() {
 | `loadFallback` | none | `(signal: AbortSignal) => Promise<factory \| { webglRenderer }>`. Called once per engine, only without WebGPU (or with `backend="webgl2"`); `signal` aborts on unmount. A rejection reaches `onError` as a `MargoError` with code `unsupported`. Ignored when `fallback` or `backend="webgpu"` is set. |
 | `fallbackContent` | the plain "needs a browser with WebGPU" text | Shown in place of the text for the `unsupported` error; `onError` still receives it. |
 
+## Pixel ratio and GPU choice
+
+`maxDpr` lowers the canvas pixel ratio below the engine's own cap of 2. Core has no per-canvas option, so the Canvas uses
+the engine's light tier, the `globalThis.margoLow` pixel-ratio cap. That has three consequences: MSAA is off while it
+applies, it covers every canvas on the page while a Canvas with `maxDpr` is mounted (the lowest value wins and the
+previous setting returns after the last one unmounts), and a value of 2 or more changes nothing. A `margoLow` you set
+yourself still counts. Changing `maxDpr` recreates the engine, and a value that is not a number above 0 reaches
+`onError` as a `RangeError`. The default is no cap beyond the engine's: 2, with MSAA on desktop.
+
+```tsx
+import { Canvas } from '@margoengine/react';
+
+export function LightViewer() {
+  return <Canvas maxDpr={1} style={{ height: 400 }} />;
+}
+```
+
+| Prop | Default | Effect |
+| --- | --- | --- |
+| `maxDpr` | none | Pixel ratio cap below 2, for example `1`. Page-wide while mounted; turns MSAA off. |
+
+There is no `powerPreference` prop. The WebGPU renderer asks for its adapter inside core (high performance, except on
+Windows where the browser chooses), and core takes no option for it, so a prop here would only pretend.
+
+## Development hints
+
+In development (any build where `process.env.NODE_ENV` is not `'production'`) the Canvas prints each of these once as a
+`MargoError`. A production bundle contains none of them.
+
+- **A lowercase R3F tag** such as `<mesh>`, `<group>` or `<boxGeometry>` inside the Canvas. React renders it as an unknown
+  DOM element, so nothing draws. The message names the Margo component to use (`<Mesh>`, `<Group>`, `<BoxGeometry>`,
+  `<PbrMaterial>`, `<Sun>`) or the namespace form `<Margo.mesh>`.
+- **Pointer handlers on the WebGL2 fallback**: see [Pointer events and picking](#pointer-events-and-picking).
+
 ## Build warnings
 
 A production Vite build of the cube page prints no warnings; `npm run modern:test:bundlers` checks it from the installed packages on every merge check and fails on any warning. Only the generated `rsc/` entries carry `'use client'` (the
@@ -511,7 +548,7 @@ The measured breakdown of a React build, package by package, is in [docs/limits.
 - **No WebGPU, graceful fallback.** `<Canvas loadFallback={() => import('margoengine/webgl')} fallbackContent={<img src="/scene.png" alt="Scene preview" />}>`: the Canvas checks `navigator.gpu` and `requestAdapter()` itself before creating the engine and calls `loadFallback` only when WebGPU is missing, so WebGPU visitors download none of `@margoengine/webgl` (it is a separate chunk). The loader gets an `AbortSignal` (aborted on unmount) and may resolve the renderer factory or a module with `webglRenderer`; a rejection reaches `onError` as a `MargoError` with code `unsupported`. When no renderer is usable, `fallbackContent` (an SVG, skeleton or image) replaces the default text, a bit like a Suspense fallback, and `onError` still gets the coded error. `fallback` (a factory you import yourself) works as before and wins over `loadFallback`.
 - **"WebGPU unavailable".** The browser has no WebGPU. Pass an `onError` handler to show your own message.
 - **A component does nothing.** React treats a bare lowercase `<mesh>` as a DOM element. Use `<Mesh>`, or the
-  namespace form `<Margo.mesh>`.
+  namespace form `<Margo.mesh>`. In development the Canvas prints a warning that names the component to use.
 - **A hook throws a `state` error.** `useMargo`, `usePhysics` and `useXR` work only inside their provider (`<Canvas>`, `<Physics>`, `<XR>`).
 - **The scene re-renders constantly.** Per-frame values belong in refs: see [State vs the frame loop](#state-vs-the-frame-loop).
 - **A click handler never runs, or a test sees the old state.** Picking is asynchronous and does not bubble: see [Pointer events and picking](#pointer-events-and-picking). Handlers need WebGPU.
