@@ -28,6 +28,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { margoError } from '../packages/shared/errors.js';
+import { exitOnHelp } from './support/help.mjs';
 import { acquire, lockDir } from './gpu-lock.mjs';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { coolDown, thermalSource, watchHeat } from './support/heat.mjs';
@@ -493,7 +494,22 @@ export function summaryLines(results) {
   return lines;
 }
 
+export const USAGE = `usage: node scripts/gpu-package-tests.mjs [options]
+
+Runs every real-GPU browser test once, after building the packages, holding shared slots of the GPU lock.
+
+Options:
+  --no-build                 dist is current; skip the package build
+  --only=<substring>         run the tests whose label contains the substring
+  --select=<id>,<id>         run exactly these tests; an id is <dir>/<script> or root/<script>
+  --list                     print the plan and the machine profile, run nothing
+  -h, --help                 print this help and exit
+
+Example:
+  node scripts/gpu-package-tests.mjs --no-build --select=sky/test:gpu,root/test:basic-scene`;
+
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  exitOnHelp(USAGE);
   const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
   const select = process.argv.find((a) => a.startsWith('--select='))?.slice(9);
   const chosen = select === undefined ? undefined : new Set(select.split(',').filter(Boolean));

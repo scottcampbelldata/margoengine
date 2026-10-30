@@ -25,6 +25,7 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFi
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { exitOnHelp } from './support/help.mjs';
 import { margoError } from '../packages/shared/errors.js';
 import { describeProfile, machineProfile } from './support/machine-profile.mjs';
 
@@ -363,4 +364,15 @@ async function main() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();
+export const USAGE = `usage: node scripts/nightly-full.mjs
+
+The nightly full GPU run: check:merge:full under the exclusive GPU lock, then the pinned proofs, with a dated log in
+test-results/nightly/. Takes no other options.
+
+Options:
+  -h, --help                 print this help and exit`;
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  exitOnHelp(USAGE);
+  await main();
+}

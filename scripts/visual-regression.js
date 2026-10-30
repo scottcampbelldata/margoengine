@@ -44,6 +44,22 @@ import {
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
 import { lastAdapterChoice } from './lib/gpu-adapter.mjs';
 import { closeAll } from './support/shutdown.mjs';
+import { exitOnHelp } from './support/help.mjs';
+
+exitOnHelp(`usage: node scripts/visual-regression.js [options]
+
+Compares (or, with --update, re-captures) the visual baselines of the site demos on a real GPU.
+
+Options:
+  --only=<id>,<id>           only these views, for example --only=earth,dof-high
+  --runs=<n>                 captures per view (default 1; 4 with --update)
+  --update                   re-capture baselines and noise tolerances
+  --device-loss              destroy the GPU device mid-frame in every site demo and check it recovers
+  --no-build                 do not build the site first
+  -h, --help                 print this help and exit
+
+Example:
+  node scripts/visual-regression.js --only=earth --no-build`);
 
 const root = resolve(import.meta.dirname, '..'),
   baselineRoot = resolve(root, 'tests/visual'),

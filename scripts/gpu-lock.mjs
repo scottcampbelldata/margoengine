@@ -48,6 +48,7 @@ import {
 import { spawn, spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { exitOnHelp } from './support/help.mjs';
 
 /**
  * The main checkout of the clone that holds `root`, so every worktree shares one lock folder. A git worktree's `.git`
@@ -473,8 +474,26 @@ export function windowsCommandLine(args) {
   return out;
 }
 
+export const USAGE = `usage: node scripts/gpu-lock.mjs run [--exclusive] [--max=<min>] [--wait-max=<min>] --owner=<id> -- <command...>
+       node scripts/gpu-lock.mjs status
+
+Runs a command while holding the GPU lock (test-results/gpu.lock of the main checkout), or prints the holders.
+
+Options:
+  --exclusive                hold the whole GPU (benchmarks do this automatically)
+  --max=<min>                hold limit in minutes (default 20 shared, 60 exclusive)
+  --wait-max=<min>           give up waiting after this many minutes (default 60)
+  --owner=<id>              name shown to other waiters
+  -h, --help                 print this help and exit
+
+Example:
+  node scripts/gpu-lock.mjs run --owner=me --max=15 -- node packages/sky/test/browser-check.mjs`;
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [verb, ...rest] = process.argv.slice(2);
+  // Help counts only before the `--` that starts the wrapped command, which may take its own --help.
+  const own = process.argv.slice(2, process.argv.indexOf('--') < 0 ? undefined : process.argv.indexOf('--'));
+  exitOnHelp(USAGE, own);
   if (verb === 'status') console.log(JSON.stringify(status()));
   else if (verb === 'beat') {
     // The heartbeat process: node gpu-lock.mjs beat <entry file> <token> <holder pid> <deadline ms>

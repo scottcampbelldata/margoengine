@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { exitOnHelp } from './support/help.mjs';
 import { changedRecords, DERIVED, RATCHET } from './support/derived-records.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -94,7 +95,18 @@ function main() {
   console.log(`land-records: committed in ${Math.round((performance.now() - started) / 1000)} s`);
 }
 
+export const USAGE = `usage: node scripts/land-records.mjs [--no-build] [--no-commit]
+
+Regenerates the generated records on the rebased tree and makes one records commit. Run it inside the landing lock
+from a clean tree.
+
+Options:
+  --no-build                 skip building the packages (verify just built them)
+  --no-commit                regenerate, but do not commit
+  -h, --help                 print this help and exit`;
+
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  exitOnHelp(USAGE);
   try {
     main();
   } catch (error) {

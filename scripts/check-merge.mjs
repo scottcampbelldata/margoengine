@@ -27,6 +27,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { exitOnHelp } from './support/help.mjs';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import {
   analyse,
@@ -286,4 +287,20 @@ export function summary({ results, failed, seconds }) {
   return { passedAfterDriverReset: warnings.length > 0, lines };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();
+export const USAGE = `usage: node scripts/check-merge.mjs [options]
+
+The full pre-merge check, narrowed to the packages the change affects (npm run check:merge).
+
+Options:
+  --full                     run every GPU step, no narrowing (npm run check:merge:full; or MARGO_FULL=1)
+  --base=<ref>               compare against this ref instead of origin/main
+  --files=<a>,<b>            treat exactly these files as the change
+  -h, --help                 print this help and exit
+
+Example:
+  node scripts/check-merge.mjs --base=origin/main`;
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  exitOnHelp(USAGE);
+  await main();
+}
