@@ -147,6 +147,8 @@ const builders = {
       throw new RangeError(`boxes views=${views}: 1, or 4 with mode=mesh`);
     if (mode === 'instanced') return instancedBoxes(canvas, data, marks, { n, move });
     if (mode === 'culled') return culledBoxes(canvas, data, marks, { n, move });
+    if (mode === 'dynamic' || mode === 'dynamic-rows')
+      return dynamicBoxes(canvas, data, marks, { n, move, rows: mode === 'dynamic-rows' });
     const engine = await engineFor(canvas, data.camera, n + 8, marks),
       s = performance.now(),
       list = meshes(engine, data, palette(data));
@@ -436,6 +438,58 @@ async function culledBoxes(canvas, data, marks, { n, move }) {
       }
     },
     { camera: data.camera, draws: parts.starts.length },
+  );
+}
+
+async function dynamicBoxes(canvas, data, marks, { n, move, rows }) {
+  // @margoengine/culling DynamicInstances: one batch, GPU matrices, frustum culling and indirect draws, the palette as a
+  // per-instance tint. Moving boxes compose the same matrix per box on the CPU as the instanced cases (three.js
+  // InstancedMesh.setMatrixAt included), then setMatrixAt, which also checks each matrix (finite, affine, not mirrored).
+  // mode=dynamic-rows copies the same matrix into the row array unchecked and marks all rows once (update()): the
+  // like-for-like row against InstancedMesh.setMatrixAt, which copies without checks.
+  const engine = await engineFor(canvas, data.camera, 64, marks),
+    s = performance.now(),
+    at = await composer(),
+    [{ DynamicInstances }, { PbrMaterial: Material }] = await Promise.all([
+      import('@margoengine/culling/dynamic'),
+      import('@margoengine/core'),
+    ]);
+  const crowd = DynamicInstances.attach(engine, {
+    geometry: box(data.size, data.size, data.size),
+    material: new Material({ color: '#ffffff', ...data.material, ...single }),
+    capacity: n,
+  });
+  data.items.forEach((b) =>
+    crowd.setColorAt(crowd.addInstance(at(b.position, b.rotation).elements), linear(PALETTE[b.color])),
+  );
+  marks.buildMs = +(performance.now() - s).toFixed(1);
+  const turn = await mover(),
+    moving = move ? n : 0;
+  return app(
+    engine,
+    (t) => {
+      if (rows) {
+        const m = crowd.matrices;
+        for (let i = 0; i < moving; i++) {
+          const e = turn(data.items[i], data.items[i].rotation[1] + t),
+            at = i * 12;
+          m[at] = e[0];
+          m[at + 1] = e[1];
+          m[at + 2] = e[2];
+          m[at + 3] = e[4];
+          m[at + 4] = e[5];
+          m[at + 5] = e[6];
+          m[at + 6] = e[8];
+          m[at + 7] = e[9];
+          m[at + 8] = e[10];
+          m[at + 9] = e[12];
+          m[at + 10] = e[13];
+          m[at + 11] = e[14];
+        }
+        if (moving) crowd.update();
+      } else for (let i = 0; i < moving; i++) crowd.setMatrixAt(i, turn(data.items[i], data.items[i].rotation[1] + t));
+    },
+    { camera: data.camera, draws: 1 },
   );
 }
 

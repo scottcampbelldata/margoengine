@@ -1,7 +1,7 @@
 // Milestone M6 package routes check (run by `npm run test:gpu`, part of check:merge). Each package with a route of its
 // own on the WebGL2 layer draws the same scene natively and on the layer (install({force: true})), in exact-pixel
 // mode on the same GPU and browser: DOF (its CoC and bokeh kernels as fragment draws), splats (the depth sort as one
-// CPU dispatch), CulledInstances and CulledMeshes (frustum culling on the CPU, no compute). On the layer the page
+// CPU dispatch), CulledInstances, CulledMeshes and DynamicInstances (frustum culling on the CPU, no compute). On the layer the page
 // renders until a frame's dispatches are exactly the route's, then the canvases are compared with the roadmap's
 // measure (decision 4: at most 0.1% of pixels with d > 2, mean d at most 0.25, d the largest RGB difference). Neither
 // side may report a page error; the layer must report no GL error. Frame times of both are printed.
@@ -56,7 +56,7 @@ function compare(a, b) {
 }
 
 try {
-  for (const name of ['dof', 'splats', 'instances', 'meshes']) {
+  for (const name of ['dof', 'splats', 'instances', 'meshes', 'dynamic']) {
     const native = await render('native', name);
     const compat = await render('compat', name);
     const m = compare(native.image, compat.image);

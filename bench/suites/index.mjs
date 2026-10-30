@@ -7,6 +7,7 @@ export const SUITES = [
   'objects',
   'instanced',
   'scaling',
+  'dynamic',
   'math',
   'gltf',
   'loaders',

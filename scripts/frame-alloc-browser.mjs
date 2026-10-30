@@ -10,7 +10,7 @@
 // counted and left out. The check fails when a scene's median frame (its steady-state frame) allocates more than its
 // floor in FLOORS below; the mean, which also carries the odd frame with a timer or an idle task in it, is reported.
 //
-// Options: --scenes=basic,instanced,shadowed,post (default all), --frames=<n>, --warmup=<n>,
+// Options: --scenes=basic,instanced,shadowed,post,dynamic (default all), --frames=<n>, --warmup=<n>,
 // --profile (adds a V8 sampling heap profile of the recorded frames, through CDP HeapProfiler.startSampling, and prints
 // the functions that allocate per frame; diagnosis only, not part of the check), --no-check (print, never fail).
 // Results go to test-results/frame-alloc.json. Takes one shared slot of the GPU lock, around the browser only.
@@ -39,6 +39,7 @@ export const FLOORS = {
   instanced: { median: 292 },
   shadowed: { median: 860 },
   post: { median: 1528 },
+  dynamic: { median: 396 },
 };
 
 /** Per-frame bytes from per-frame heap samples: { median, mean, max, min, gcFrames, frames }. `read` is subtracted. */

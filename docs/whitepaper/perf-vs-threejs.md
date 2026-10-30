@@ -209,7 +209,7 @@ fetched for the scene.
 | 15.4 | ViewHelper (examples) | faster | faster | `p-view-helper` |  |
 | 16.1 | Raycaster | slower | slower | `p-raycast` `p-raycast-mesh` |  |
 | 16.2 | GPU picking | slower | slower | `p-gpu-pick` | core GPURenderer.pick compiled a shader module and pipeline on every call and rewrote every instance (960 KB for 10,000 boxes); both fixed. Still slower, measured (CPU profile: 0.15 ms of JS a pick, the main thread idle the rest): each pick waits for its own GPU pass and mapAsync readback, about 3.1 ms here, and engine.pick answers overlapping calls one at a time by contract (each reads the scene when its turn comes). three's WebGL readRenderTargetPixels is a synchronous readPixels; three's WebGPU readback is slower than Margo's (423 ms). [known bug](../known-bugs.md#gpu-picking-waits-for-one-readback-per-pick). fixed in 2d541368 (trade-off: pick pipelines count toward the 64 cached shader variants), rerun `npm run bench -- parity --cases=p-gpu-pick --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5` |
-| 17.1 | InstancedMesh | three missing | three missing | `boxes-10000-instanced` | measured by margo-bench (docs/whitepaper/boxes-vs-threejs.md) |
+| 17.1 | InstancedMesh | three missing | three missing | `boxes-10000-instanced` | measured by margo-bench (docs/whitepaper/boxes-vs-threejs.md); moving instances against InstancedMesh at 10,000 to 250,000: "Moving instances on the GPU (item 53.2)", DynamicInstances in @margoengine/culling/dynamic, GPU loss open in known-bugs.md |
 | 17.2 | BatchedMesh | faster | faster | `shapes-10000-batched` |  |
 | 17.3 | LOD | faster | faster | `p-lod` |  |
 | 17.4 | Points | slower | slower | `p-points-1000000` |  |

@@ -976,7 +976,7 @@ export class Engine {
     // Every frame, with the renderer's own test: a package can claim or release a batch without a new collection.
     this.stats.drawCalls = 0;
     for (let i = 0; i < this.batchList.length; i++)
-      if (this.batchList[i].count && !this.batchList[i].claimed) this.stats.drawCalls++;
+      if ((this.batchList[i].count || this.batchList[i].redirect) && !this.batchList[i].claimed) this.stats.drawCalls++;
   }
   /**
    * The mesh under CSS pixel (x, y), or null. With `view`, picks through that view (null outside its rectangle);

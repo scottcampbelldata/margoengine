@@ -152,6 +152,34 @@ Reading (diagnostic only):
   cost; 0.038-0.039 against 0.030 ms), and CPU for moving instances (1.2-1.3 against 0.62 ms; three's WebGPU
   renderer 0.91 ms).
 
+## Moving instances on the GPU (item 53.2, 2026-10-29; diagnostic, busy machine)
+
+`npm run bench -- dynamic --engines=margo,three-webgpu` (suite `bench/suites/dynamic.mjs`): boxes on a grid, every
+box's matrix set every frame, all of them in view. RTX A6000, Ryzen 9 9950X, Edge 156 headless, 1280 x 720, medians of
+5 runs. A first run with three.js was stopped at its 250,000 core-mesh case (about 1.4 s a frame), so it wrote no
+result file; its printed medians are the 10,000 and 100,000 rows and the three.js column here. The rows and 250,000
+Margo cases are run `20261030-010010-28e2c5b8-dev`, which the gate marked invalid for spread on three cases: all of
+this is diagnostic. CPU ms / GPU ms per frame:
+
+| Moving boxes | DynamicInstances, `setMatrixAt` | DynamicInstances, rows (like for like) | DynamicInstances, none moving | core meshes | `createInstancedMesh` | three.js WebGPU `InstancedMesh` |
+| --- | --- | --- | --- | --- | --- | --- |
+| 10,000 | 0.96 / 0.10 | 0.90 / 0.10 | 0.05 / 0.10 | 1.37 / 0.10 | 1.15 / 0.16 | 0.91 / 0.13 |
+| 100,000 | 7.66 / 1.52 | 6.67 / 1.55 | 0.06 / 0.65 | 15.6 / 2.75 | 8.64 / 1.88 | 6.11 / 1.26 |
+| 250,000 | 18.8 / 2.79 | 16.2 / 3.26 | 0.05 / 1.55 | 45.7 / 6.02 | 21.1 / 4.26 | 15.7 / 2.45 |
+
+- The engine's own CPU work per frame is fixed: 0.05 ms at 10,000 and at 250,000 with nothing moving (one upload pass
+  over the dirty-block map, two uniform writes, one compute pass, one draw). With every box moving, nearly all the CPU
+  is the app's matrix maths per box, the same in every column (Euler to quaternion to matrix).
+- Like for like (rows copied unchecked, as three's `setMatrixAt` copies): even at 10,000, 9% over three at 100,000
+  and 3% over at 250,000. The checked `setMatrixAt` costs about 15% more (finite, affine and mirror checks per call):
+  an accepted difference in work.
+- Against the core mesh path: 2.0x less CPU and 1.8x less GPU at 100,000, 2.4x and 1.8x at 250,000.
+- GPU: 23-33% over three at 100,000 and 250,000, a loss with a partial reason (per-instance frustum culling three does
+  not do, which pays back in partial views) and a part with none (each record written twice). Open in
+  [known-bugs.md](../known-bugs.md), "DynamicInstances: about 25-35% more GPU time".
+- three.js core meshes (`Mesh` per box) at 100,000 moving: 546 ms CPU per frame on WebGPU; the 250,000 case was not
+  run (about 1.4 s a frame).
+
 ## Update 2026-10-26: 10,000 separate materials meshes (diagnostic, busy machine)
 
 Not an instanced path: 10,000 `UnlitMaterial` meshes from `@margoengine/materials` (speed-matrix scene `p-unlit`).

@@ -7,7 +7,7 @@
 <body style="margin:0">
 <canvas style="width:400px;height:300px"></canvas>
 <script type="module">
-// Milestone M6: one package route per page load, ?mode=native|compat&case=dof|splats|instances|meshes, in exact-pixel
+// Milestone M6: one package route per page load, ?mode=native|compat&case=dof|splats|instances|meshes|dynamic, in exact-pixel
 // mode (exactSize, one sample). On the layer each package loads its route lazily; until then it runs its WebGPU route
 // on the layer's generic tiers, so the page renders frames until a frame's compute dispatches are the route's own
 // (`window.check.route`), then the driver compares the canvas with the native one.
@@ -38,6 +38,7 @@ const routes = {
   splats: { fragment: 0, scatter: 1, cpu: 1 }, // projection on the GPU, the sort on the CPU
   instances: { fragment: 0, scatter: 0, cpu: 0 },
   meshes: { fragment: 0, scatter: 0, cpu: 0 },
+  dynamic: { fragment: 0, scatter: 0, cpu: 0 },
 };
 const cases = {
   async dof(engine) {
@@ -68,6 +69,21 @@ const cases = {
     boxes(engine, 40);
     const { CulledMeshes } = await import('/packages/culling/dist/index.js');
     CulledMeshes.attach(engine);
+  },
+  async dynamic(engine) {
+    const { DynamicInstances } = await import('/packages/culling/dist/dynamic.js');
+    const crowd = DynamicInstances.attach(engine, {
+      geometry: box(1, 1, 1),
+      material: new PbrMaterial({ color: '#ffffff', roughness: 0.5 }),
+      capacity: 2048,
+    });
+    // The same 50 x 40 sheet as 'instances', tinted, every 7th hidden and every 13th deleted.
+    for (let i = 0; i < 2000; i++) {
+      const id = crowd.addInstance([0.3, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0.3, 0, (i % 50) * 0.5 - 12, 0.2, -Math.floor(i / 50) * 0.5 + 4, 1]);
+      crowd.setColorAt(id, [0.3 + (i % 3) * 0.3, 0.8 - (i % 4) * 0.15, 0.3 + (i % 5) * 0.12]);
+      if (i % 7 === 0) crowd.setVisibleAt(id, false);
+    }
+    for (let i = 0; i < 2000; i += 13) crowd.deleteInstance(i);
   },
 };
 

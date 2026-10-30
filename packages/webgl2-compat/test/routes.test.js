@@ -3,16 +3,24 @@
 // (routes-browser.mjs) draws each one natively and on the layer and compares the pixels.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { planCompute, runComputeOnCPU } from '../dist/compute.js';
 import { COMPAT_VENDOR as layerVendor } from '../dist/device.js';
 import { COMPAT_VENDOR, compatTier, loadCompatRoute } from '../../shared/compat.js';
 
 const packages = fileURLToPath(new URL('../../', import.meta.url));
-/** The compat chunk the package's build split off for its `import('./compat.js')`. */
+/**
+ * The compat chunk the package's build split off for its `import('./compat.js')`: the one its root imports lazily (a
+ * package with several entries may also get packages/shared/compat.js as a chunk of the same name stem).
+ */
 async function route(name) {
-  const file = readdirSync(`${packages}${name}/dist`).find((f) => /^compat-[\w-]+\.js$/.test(f));
+  const root = readFileSync(`${packages}${name}/dist/index.js`, 'utf8'),
+    file = readdirSync(`${packages}${name}/dist`).find(
+      (f) =>
+        /^compat-[\w-]+\.js$/.test(f) &&
+        new RegExp(`import\\(\\s*["'\`]\\./${f.replace('.', '\\.')}["'\`]\\s*\\)`).test(root),
+    );
   assert.ok(file, `${name} builds its route into its own chunk`);
   return import(`../../${name}/dist/${file}`);
 }

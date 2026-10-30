@@ -94,7 +94,13 @@ test("packages' WebGL2 routes load by import() only: their roots' static graphs 
     const all = distReach(entry),
       fixed = distReach(entry, true);
     assert.match(all.text, /margo-webgl2/, `${pkg} detects the layer`);
-    const chunk = readdirSync(join(root, 'packages', pkg, 'dist')).find((f) => /^compat-[\w-]+\.js$/.test(f));
+    // The route chunk is the compat chunk the root imports with import(); with several entries the build may also split
+    // packages/shared/compat.js into a chunk of the same name stem (culling: its root and its dynamic entry share it).
+    const chunk = readdirSync(join(root, 'packages', pkg, 'dist')).find(
+      (f) =>
+        /^compat-[\w-]+\.js$/.test(f) &&
+        new RegExp(`import\\(\\s*["'\`]\\./${f.replace('.', '\\.')}["'\`]\\s*\\)`).test(all.text),
+    );
     assert.ok(chunk, `${pkg} builds its route into a chunk of its own`);
     assert.match(
       all.text,

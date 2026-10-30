@@ -54,6 +54,70 @@ core's CPU instance data and is unaffected. With `minRadius: 0` (default) frames
 screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies: a dropped part simply disappears, so keep it under the size where a
 part is still recognisable.
 
+## Moving objects: `DynamicInstances`
+
+Tens or hundreds of thousands of objects that move, hide, appear and go, with a fixed amount of engine CPU work per
+frame however many of them change. Import it from `margoengine/culling/dynamic` (or `@margoengine/culling/dynamic`), so
+pages that use only `CulledInstances` or `CulledMeshes` do not download it.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {DynamicInstances} from 'margoengine/culling/dynamic';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const crowd = DynamicInstances.attach(engine, {
+  geometry: box(0.5, 0.5, 0.5),
+  material: new PbrMaterial({color: '#ffffff', roughness: 0.6}),
+  capacity: 100_000,
+});
+for (let i = 0; i < 100_000; i++) {
+  const id = crowd.addInstance([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 316) - 158, 0, Math.floor(i / 316) - 158, 1]);
+  crowd.setColorAt(id, [Math.random(), 0.5, 0.8]);   // linear rgb tint of the material colour
+}
+crowd.setVisibleAt(7, false);                        // hide without deleting
+crowd.deleteInstance(8);                             // its index is reused by the next addInstance
+
+// Bulk writers (physics, animation) write rows of `matrices` (12 floats: the matrix without its last row) and mark them.
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  for (let i = 0; i < 1000; i++) crowd.matrices[i * 12 + 10] = Math.sin(time + i);  // translation y
+  crowd.update(0, 1000);
+});
+engine.start();
+console.log(await crowd.readCount());   // instances drawn in the last frame (a GPU readback; for tests and tools)
+console.log(await crowd.pick(200, 150)); // the instance index under a CSS pixel, or null
+```
+
+Each frame, before any core draw, the plugin uploads the blocks of 256 rows that were written (one `writeBuffer` per run
+of them) and runs one compute pass: each live row's 96-byte core instance record is built on the GPU, its bounding
+sphere (the kernel's bound, padded for float32) is tested against the frustum and, with `minRadius`, its size on
+screen, and the kept rows are compacted in index order with indirect draw arguments. Core then draws them as one batch
+through `Batch.redirect`, core's GPU-culling hook: a batch with a redirect is drawn even when core collected no
+instances for it, which is the one line of core this class needs. So the instances draw in core's main pass and every
+replay of it (SSAO, outline, post) with core's own shader and every shader patch, shadow receiving included.
+
+- Shadows: `shadows.add(crowd)` (@margoengine/shadows) casts every live, shown instance, including those outside the
+  camera view (one draw of all rows per cascade).
+- Picking: `engine.pick` never returns instances (they are not core meshes); `crowd.pick(x, y)` returns the index.
+- GPU-side motion: `crowd.transforms` is the GPU copy of `matrices`; an app compute pass that writes it animates
+  instances with no upload at all.
+- Mirrored matrices need `mirrored: true` (single-sided instances otherwise draw back-face culled, and `setMatrixAt`
+  refuses a mirror). Rows with non-finite values draw nothing.
+- WebGL2 compatibility layer: the same test runs on the CPU from the rows (O(n) per frame), the records are uploaded.
+  The `@margoengine/webgl` renderer is not supported (`MargoError` `'unsupported'`).
+
+Pixel check on the GPU (`npm run test:gpu -w @margoengine/culling`, `packages/culling/test/gpu/dynamic-check.mjs`): 576
+boxes drawn as DynamicInstances and as core meshes, through moves, hides, deletes, adds into freed and new rows and
+camera moves, with and without shadows: 0 differing pixels in every frame, and `crowd.pick` names the box `engine.pick`
+names. RTX A6000, Edge 156.
+
+Measured (diagnostic, busy machine; RTX A6000, Edge 156, 1280 x 720; `npm run bench -- dynamic`): with nothing moving the plugin's CPU work is 0.05 ms per frame at 10,000 and at
+250,000 instances. With every box moving and its matrix set each frame, 7.7 ms CPU and 1.5 ms GPU at 100,000 boxes
+against 15.6 and 2.7 ms as core meshes; 18.8 and 2.8 ms at 250,000 against 45.7 and 6.0 ms. The GPU time is still
+above a plain instanced draw with no culling: [known-bugs.md](../../docs/known-bugs.md), "DynamicInstances: about
+25-35% more GPU time".
+
 ## Modes
 
 - `'frustum'` (default): bounding spheres against the six frustum planes (the same planes core's kernel uses).

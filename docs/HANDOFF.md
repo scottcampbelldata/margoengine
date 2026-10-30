@@ -7,7 +7,7 @@
   1,076), shadowed 860 B (was 26,920), post 1,528 B (was 5,116). Method and the bytes that cannot go (16 B per
   returned WebGPU object, a boxed frame time): [limits.md](limits.md), "Frame allocation"; claim LIM-031.
 - `tests/frame-alloc.test.js` (in verify) is the Node regression: core under 256 B per frame, shadows add under 512 B.
-- Core is 21,063 B gzip (cap 21,504 B); core + stage is 22,482 B.
+- Core is 21,077 B gzip (cap 21,504 B); core + stage is 22,494 B.
 - Part 2: V8 middle-tier number boxing removed from core, shadows and math (probes in `tests/frame-alloc.test.js`);
   `examples/package-benchmarks/transforms-budget.mjs` finds 14,500 moving transforms per frame within 4 ms of CPU
   (claim LIM-032).

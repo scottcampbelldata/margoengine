@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./dynamic": {
+      "types": "./dist/dynamic.d.ts",
+      "import": "./dist/dynamic.js"
     }
   },
   "files": [
@@ -44,6 +48,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js culling",
     "test": "npm run build && node --test test/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/culling/test/gpu/dynamic-check.mjs"
   }
 }

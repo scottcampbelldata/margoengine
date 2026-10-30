@@ -54,7 +54,9 @@ export function validateRectangle(rectangle: readonly number[] | undefined, widt
  * own pass draw the batch with its back-culled pipeline (absent counts as 0).
  * `redirect`: set by a GPU-culling package for the frame (core never sets it): every core draw of the batch reads instances
  * from `instances` and its drawIndexedIndirect arguments from `args` (offset 0) instead of core's instance buffer and
- * `count`; core still uploads the batch into its own buffer, which stays the source the package reads.
+ * `count`; core still uploads the batch into its own buffer, which stays the source the package reads. A batch with a
+ * redirect is drawn even when core collected no instances for it, so a package can supply all of a batch's instances
+ * and their visibility on the GPU (`DynamicInstances` in @margoengine/culling).
  * `claimed`: set by a package that draws these instances itself (core never sets it, and it persists until the package
  * clears it): core's draws neither bind nor encode the batch and `engine.stats.drawCalls` leaves it out. Pick passes
  * still draw it. */
@@ -536,7 +538,7 @@ export class GPURenderer implements Renderer {
         // By index: an array iterator would be garbage every draw.
         for (let i = 0; i < drawBatches.length; i++) {
           const batch = drawBatches[i];
-          if (batch.count && !batch.claimed) {
+          if ((batch.count || batch.redirect) && !batch.claimed) {
             const p = pipeline === this.pipeline && !bindings.length && !batch.mask ? this.culled : pipeline;
             if (p !== current) {
               current = p;

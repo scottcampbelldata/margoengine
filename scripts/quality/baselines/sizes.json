@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3898734,
+  "total": 3906195,
   "history": [
     {
       "date": "2026-10-24",
@@ -842,6 +842,12 @@
       "commit": "80dbc26b",
       "reason": "biomes/view 7,493 B gzip, over its 7,374 B budget: laptop APU flythrough fixes (frames send the jobs they plan within the streaming budget, a frame that plans leaves sending to the next, a send waits for the budget a send to a worker takes, terrain tiles go in a band of rows at a time, a view tile reuses its ground weights array); Scott accepted up to 7,516 B on 2026-10-29",
       "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "81063f03",
+      "reason": "item 53.2: new entry @margoengine/culling/dynamic (DynamicInstances: GPU-driven moving instances, compute shaders, shadow and pick passes)",
+      "grew": 1
     }
   ],
   "items": {
@@ -913,6 +919,7 @@
     "@margoengine/creative/targets": 2821,
     "@margoengine/creative/toon": 1188,
     "@margoengine/culling": 10778,
+    "@margoengine/culling/dynamic": 7461,
     "@margoengine/cutscene": 6845,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,

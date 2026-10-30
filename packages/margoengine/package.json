@@ -306,6 +306,10 @@
       "types": "./dist/culling.d.ts",
       "import": "./dist/culling.js"
     },
+    "./culling/dynamic": {
+      "types": "./dist/culling/dynamic.d.ts",
+      "import": "./dist/culling/dynamic.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"

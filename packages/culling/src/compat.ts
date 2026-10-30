@@ -82,36 +82,38 @@ export function cullMeshes(
   frame: Float32Array,
   drawn: Float32Array,
 ): number {
-  const planes = frame.subarray(16, 40),
-    scale = frame[41],
-    least = frame[42],
-    [x, y, z, radius] = [sphere[0], sphere[1], sphere[2], sphere[3]];
   let kept = 0;
-  for (let i = 0; i < count; i++) {
-    const at = i * 24,
-      m = records;
-    const cx = m[at] * x + m[at + 4] * y + m[at + 8] * z + m[at + 12],
-      cy = m[at + 1] * x + m[at + 5] * y + m[at + 9] * z + m[at + 13],
-      cz = m[at + 2] * x + m[at + 6] * y + m[at + 10] * z + m[at + 14];
-    // sqrt(norm1 * normInf) of the 3x3, as core's kernel bounds the radius.
-    const cols = Math.max(
-        Math.abs(m[at]) + Math.abs(m[at + 1]) + Math.abs(m[at + 2]),
-        Math.abs(m[at + 4]) + Math.abs(m[at + 5]) + Math.abs(m[at + 6]),
-        Math.abs(m[at + 8]) + Math.abs(m[at + 9]) + Math.abs(m[at + 10]),
-      ),
-      rows = Math.max(
-        Math.abs(m[at]) + Math.abs(m[at + 4]) + Math.abs(m[at + 8]),
-        Math.abs(m[at + 1]) + Math.abs(m[at + 5]) + Math.abs(m[at + 9]),
-        Math.abs(m[at + 2]) + Math.abs(m[at + 6]) + Math.abs(m[at + 10]),
-      );
-    let r = radius * Math.sqrt(cols * rows);
-    r += 1e-5 * (Math.hypot(cx, cy, cz) + r);
-    if (!inside(planes, cx, cy, cz, r)) continue;
-    const w = frame[3] * cx + frame[7] * cy + frame[11] * cz + frame[15];
-    if (!(least <= 0 || w <= r || (r * scale) / w >= least)) continue;
-    drawn.set(records.subarray(at, at + 24), kept++ * 24);
-  }
+  for (let i = 0; i < count; i++)
+    if (keeps(records, i * 24, sphere, frame)) drawn.set(records.subarray(i * 24, i * 24 + 24), kept++ * 24);
   return kept;
+}
+
+/** Whether the record at float `at` of `m` passes `CulledMeshes`' frustum and screen-size test (see cullMeshes). */
+function keeps(m: Float32Array, at: number, sphere: ArrayLike<number>, frame: Float32Array): boolean {
+  const x = sphere[0],
+    y = sphere[1],
+    z = sphere[2];
+  const cx = m[at] * x + m[at + 4] * y + m[at + 8] * z + m[at + 12],
+    cy = m[at + 1] * x + m[at + 5] * y + m[at + 9] * z + m[at + 13],
+    cz = m[at + 2] * x + m[at + 6] * y + m[at + 10] * z + m[at + 14];
+  // sqrt(norm1 * normInf) of the 3x3, as core's kernel bounds the radius.
+  const cols = Math.max(
+      Math.abs(m[at]) + Math.abs(m[at + 1]) + Math.abs(m[at + 2]),
+      Math.abs(m[at + 4]) + Math.abs(m[at + 5]) + Math.abs(m[at + 6]),
+      Math.abs(m[at + 8]) + Math.abs(m[at + 9]) + Math.abs(m[at + 10]),
+    ),
+    rows = Math.max(
+      Math.abs(m[at]) + Math.abs(m[at + 4]) + Math.abs(m[at + 8]),
+      Math.abs(m[at + 1]) + Math.abs(m[at + 5]) + Math.abs(m[at + 9]),
+      Math.abs(m[at + 2]) + Math.abs(m[at + 6]) + Math.abs(m[at + 10]),
+    );
+  let r = sphere[3] * Math.sqrt(cols * rows);
+  r += 1e-5 * (Math.hypot(cx, cy, cz) + r);
+  for (let p = 16; p < 40; p += 4)
+    if (frame[p] * cx + frame[p + 1] * cy + frame[p + 2] * cz + frame[p + 3] < -r) return false;
+  const w = frame[3] * cx + frame[7] * cy + frame[11] * cz + frame[15],
+    least = frame[42];
+  return least <= 0 || w <= r || (r * frame[41]) / w >= least;
 }
 
 /** `CulledInstances`' route: culls its parts on the CPU each frame and uploads the kept records and the arguments. */
@@ -155,5 +157,62 @@ export function meshesRoute() {
     args[0] = batch.geometry.indices.length;
     args[1] = kept;
     device.queue.writeBuffer(argsBuffer, 0, args);
+  };
+}
+
+/**
+ * `DynamicInstances`' route: its cull kernel on the CPU from the rows it keeps there. Every live, shown, finite row's
+ * 96-byte record goes to `world` (shadows and picking read it; other rows are zero), the kept ones in index order to
+ * `drawn`, and the count to the indirect arguments. `part` is the kernel's uniform as floats (count and index count
+ * as words at 0 and 1, sphere at 4, factors at 8, material colour at 12).
+ */
+export function dynamicRoute(capacity: number) {
+  const world = new Float32Array(capacity * 24),
+    drawn = new Float32Array(capacity * 24),
+    args = new Uint32Array(5);
+  let states: Uint32Array | undefined;
+  return (
+    device: GPUDevice,
+    high: number,
+    matrices: Float32Array,
+    tints: Float32Array,
+    buffers: { world: GPUBuffer; drawn: GPUBuffer; args: GPUBuffer },
+    frame: Float32Array,
+    part: Float32Array,
+    sphere: Float32Array,
+    indices: number,
+  ): void => {
+    // The state word of each row shares the tints' buffer (Uint32 view, made once).
+    if (states?.buffer !== tints.buffer) states = new Uint32Array(tints.buffer, tints.byteOffset, tints.length);
+    let kept = 0;
+    for (let i = 0; i < high; i++) {
+      const at = i * 12,
+        out = i * 24;
+      let ok = states[i * 4 + 3] === 1;
+      for (let j = 0; ok && j < 12; j++) ok = Number.isFinite(matrices[at + j]);
+      if (!ok) {
+        world.fill(0, out, out + 24);
+        continue;
+      }
+      for (let c = 0; c < 4; c++) {
+        world[out + c * 4] = matrices[at + c * 3];
+        world[out + c * 4 + 1] = matrices[at + c * 3 + 1];
+        world[out + c * 4 + 2] = matrices[at + c * 3 + 2];
+        world[out + c * 4 + 3] = c === 3 ? 1 : 0;
+      }
+      for (let k = 0; k < 3; k++) world[out + 16 + k] = part[12 + k] * tints[i * 4 + k];
+      world[out + 19] = 1;
+      for (let k = 0; k < 4; k++) world[out + 20 + k] = part[8 + k];
+      if (keeps(world, out, sphere, frame)) {
+        // A loop, not set(subarray): a view per kept row would be garbage every frame.
+        for (let k = 0; k < 24; k++) drawn[kept * 24 + k] = world[out + k];
+        kept++;
+      }
+    }
+    if (high) device.queue.writeBuffer(buffers.world, 0, world as Float32Array<ArrayBuffer>, 0, high * 24);
+    if (kept) device.queue.writeBuffer(buffers.drawn, 0, drawn as Float32Array<ArrayBuffer>, 0, kept * 24);
+    args[0] = indices;
+    args[1] = kept;
+    device.queue.writeBuffer(buffers.args, 0, args);
   };
 }

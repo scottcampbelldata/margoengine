@@ -223,7 +223,9 @@ export const SCENES = {
     draws:
       'n boxes of 0.5 m on a cubic grid with 16 colours and an orbiting camera. move=1 spins every box every frame; ' +
       'mode=instanced draws them through the engine instancing API (static matrices, one batch); mode=culled through ' +
-      'its GPU-culled instancing, where it has one (Margo: @margoengine/culling CulledInstances). views=4 draws the ' +
+      'its GPU-culled instancing, where it has one (Margo: @margoengine/culling CulledInstances); mode=dynamic through ' +
+      'its GPU-driven moving instances (Margo: @margoengine/culling DynamicInstances, matrices set per box with ' +
+      'setMatrixAt as InstancedMesh does; mode=dynamic-rows copies them into its row array unchecked). views=4 draws the ' +
       'boxes four times a frame, one quarter of the canvas each (split screen), through four cameras on the same ' +
       'orbit a quarter turn apart.',
     measures: ['cpuMs', 'gpuMs', 'fps', 'buildMs', 'drawCalls'],
@@ -528,6 +530,15 @@ export const STANDARD = {
     ),
     ...['instanced', 'culled'].map((mode) => ({ scene: 'boxes', params: { n: 10_000, mode, move: 1 } })),
   ],
+  // Item 53.2: moving boxes at 10,000 to 250,000 through the GPU-driven path, the core mesh path and CPU instancing.
+  // The still cases (move=0) give the engine's own per-frame CPU work, with no app writes.
+  dynamic: [10_000, 100_000, 250_000].flatMap((n) => [
+    ...['dynamic', 'dynamic-rows', 'instanced', 'mesh'].map((mode) => ({
+      scene: 'boxes',
+      params: { n, mode, move: 1 },
+    })),
+    { scene: 'boxes', params: { n, mode: 'dynamic' } },
+  ]),
   scaling: [
     ...[1, 100, 1000, 10_000, 100_000].map((n) => ({ scene: 'boxes', params: { n } })),
     ...[100_000, 250_000].map((n) => ({ scene: 'boxes', params: { n, mode: 'instanced' } })),
