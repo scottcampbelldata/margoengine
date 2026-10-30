@@ -39,6 +39,10 @@ await runSuite(
     assert.equal(r.allMaterials.length, 15);
     const [dr, dg, db] = r.allDesert;
     assert.ok(dr > dg && dr > db * 1.3, `desert ground with all 8 presets is sand: ${r.allDesert}`);
+    // The default temperate ground at noon, as the canvas shows it: bright enough and varied (main: luma 0.31 and spread
+    // 0.008, one dark olive; the palette of 2026-10-30: 0.42 and 0.016).
+    assert.ok(r.noon.luma > 0.25, `temperate noon ground luma (sRGB): ${r.noon.luma}`);
+    assert.ok(r.noon.spread > 0.012, `temperate noon ground colour spread (sRGB): ${r.noon.spread}`);
     assert.deepEqual(pageErrors, []);
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-browser-check.json', JSON.stringify({ hardware, result: r }, null, 1));
@@ -49,6 +53,10 @@ await runSuite(
       r.after.map((v) => v.toFixed(3)),
       'all presets desert',
       r.allDesert.map((v) => v.toFixed(3)),
+      'noon ground luma',
+      r.noon.luma.toFixed(3),
+      'spread',
+      r.noon.spread.toFixed(4),
     );
   },
   () => context.close(),

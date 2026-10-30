@@ -28,22 +28,22 @@ export interface MaterialLook {
 
 /** Built-in material looks, by key (the materials the presets use). Unknown keys get a neutral grey-brown. */
 export const MATERIALS: Readonly<Record<string, MaterialLook>> = Object.freeze({
-  grass: { color: [0.29, 0.42, 0.16] },
-  meadow: { color: [0.42, 0.5, 0.22] },
-  'leaf-litter': { color: [0.36, 0.27, 0.16] },
-  needles: { color: [0.33, 0.24, 0.15] },
-  moss: { color: [0.24, 0.35, 0.14] },
-  mud: { color: [0.25, 0.2, 0.15], detail: 0.15 },
-  sand: { color: [0.82, 0.72, 0.5], detail: 0.12 },
-  'red-sand': { color: [0.74, 0.45, 0.27], detail: 0.12 },
-  'dry-grass': { color: [0.66, 0.58, 0.33] },
-  laterite: { color: [0.6, 0.33, 0.2] },
-  rock: { color: [0.45, 0.43, 0.4], detail: 0.35 },
-  scree: { color: [0.55, 0.53, 0.5], detail: 0.4 },
-  gravel: { color: [0.52, 0.5, 0.46], detail: 0.4 },
-  snow: { color: [0.92, 0.94, 0.97], detail: 0.05 },
-  tundra: { color: [0.45, 0.43, 0.3] },
-  heather: { color: [0.45, 0.3, 0.38] },
+  grass: { color: [0.4, 0.55, 0.2], detail: 0.4 },
+  meadow: { color: [0.56, 0.62, 0.28], detail: 0.4 },
+  'leaf-litter': { color: [0.52, 0.37, 0.2], detail: 0.4 },
+  needles: { color: [0.46, 0.32, 0.18], detail: 0.35 },
+  moss: { color: [0.32, 0.5, 0.2], detail: 0.4 },
+  mud: { color: [0.4, 0.31, 0.21], detail: 0.25 },
+  sand: { color: [0.9, 0.8, 0.58], detail: 0.15 },
+  'red-sand': { color: [0.82, 0.5, 0.3], detail: 0.2 },
+  'dry-grass': { color: [0.78, 0.67, 0.38], detail: 0.35 },
+  laterite: { color: [0.68, 0.38, 0.22], detail: 0.25 },
+  rock: { color: [0.54, 0.51, 0.47], detail: 0.4 },
+  scree: { color: [0.64, 0.61, 0.57], detail: 0.45 },
+  gravel: { color: [0.6, 0.57, 0.52], detail: 0.45 },
+  snow: { color: [0.95, 0.97, 1], detail: 0.05 },
+  tundra: { color: [0.54, 0.5, 0.34], detail: 0.35 },
+  heather: { color: [0.52, 0.36, 0.4], detail: 0.35 },
 });
 
 /** Settings of {@link BiomeView.attach}. */
@@ -447,9 +447,13 @@ function materialPixels(key: string, m: MaterialLook): Uint8Array[] {
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
       // Two octaves of tileable lattice noise (16 and 64 cells over the texture).
-      const n = (cellNoise(seed, x, y, 16) * 2 + cellNoise(seed + 1, x, y, 64)) / 3 - 0.5, // float division: view only
-        k = (y * size + x) * 4;
-      for (let c = 0; c < 3; c++) base[k + c] = clampInt(Math.round(m.color[c] * 255 * (1 + detail * n * 2)), 0, 255);
+      // Red and green share one noise and blue has its own, so patches shift between warm and cool, not only light and dark.
+      const k = (y * size + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const n =
+          (cellNoise(seed + 2 * (c >> 1), x, y, 16) * 2 + cellNoise(seed + 1 + 2 * (c >> 1), x, y, 64)) / 3 - 0.5; // float division: view only
+        base[k + c] = clampInt(Math.round(m.color[c] * 255 * (1 + detail * n * 2)), 0, 255);
+      }
       base[k + 3] = 255;
     }
   const levels = [base];

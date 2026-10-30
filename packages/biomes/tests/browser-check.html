@@ -4,6 +4,7 @@
 // biome shows that biome's ground layer where it was painted, also with all 8 presets (15 materials).
 import {Engine} from '/packages/core/dist/index.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
 import {BiomeWorld} from '/packages/biomes/dist/index.js';
 import {presets} from '/packages/biomes/dist/presets.js';
 import {BiomeView} from '/packages/biomes/dist/view.js';
@@ -22,6 +23,22 @@ async function read(texture){
 async function shot(){for(let i=0;i<2;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}return read(post.sceneTexture);}
 // Mean linear colour of the central quarter of the frame.
 function mean({data,width,height}){let r=0,g=0,b=0,n=0;for(let y=height>>2;y<height*3>>2;y++)for(let x=width>>2;x<width*3>>2;x++){const k=(y*width+x)*4;r+=data[k];g+=data[k+1];b+=data[k+2];n++;}return [r/n,g/n,b/n];}
+// Mean sRGB luma (0..1) and colour spread (mean over channels of the standard deviation, 0..1) of the ground in the
+// lower 60 percent of a canvas frame (the horizon sits above it).
+async function noonGround(world){
+ const canvas=document.createElement('canvas');canvas.width=640;canvas.height=400;document.body.append(canvas);
+ const e=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,52,60],target:[0,38,0],near:0.5,far:4000}}),sky=Sky.attach(e,{hours:12,timeScale:0,lighting:{intensity:3},environment:true});
+ const view=await BiomeView.attach(e,world,{radius:600,objects:false});await view.ready;await view.whenIdle();
+ for(let i=0;i<3;i++){e.render({delta:1/60});await e.gpu.queue.onSubmittedWorkDone();}
+ e.render({delta:1/60});
+ const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);
+ const {data}=c.getImageData(0,Math.floor(canvas.height*0.4),canvas.width,Math.ceil(canvas.height*0.6));
+ const n=data.length/4,m=[0,0,0],q=[0,0,0];let luma=0;
+ for(let k=0;k<data.length;k+=4){for(let i=0;i<3;i++){const v=data[k+i]/255;m[i]+=v;q[i]+=v*v;}luma+=(0.2126*data[k]+0.7152*data[k+1]+0.0722*data[k+2])/255;}
+ let spread=0;for(let i=0;i<3;i++){m[i]/=n;spread+=Math.sqrt(Math.max(0,q[i]/n-m[i]*m[i]));}
+ view.dispose();sky.dispose();e.dispose();canvas.remove();
+ return {luma:luma/n,spread:spread/3,mean:m};
+}
 window.check={
  async run(){
   const out={};device.pushErrorScope('validation');
@@ -48,6 +65,9 @@ window.check={
   await all.ready;await all.whenIdle();
   out.allMaterials=all.materials;out.allDesert=mean(await shot());
   all.dispose();
+  // Temperate ground at noon, as the canvas shows it (sRGB pixels of a second engine with the Sky's sun and sky light and
+  // no Bloom), looked at from 12 m up over the world's rolling ground: how bright and how varied the default ground reads.
+  out.noon=await noonGround(world);
   const error=await device.popErrorScope();
   out.validation=error?.message??null;out.errors=errors.splice(0);
   return out;

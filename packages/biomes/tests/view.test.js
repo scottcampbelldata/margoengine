@@ -76,7 +76,7 @@ test('terrainColorsFor gives linear sand, meadow and stone colours from the worl
     assert.ok(v.every((x) => x >= 0 && x <= 1));
   }
   assert.ok(c.meadow[0][1] > c.meadow[0][0], 'meadow is green');
-  assert.ok(Math.abs(c.stone[0] - ((0.45 + 0.055) / 1.055) ** 2.4) < 1e-6, 'stone is linear rock');
+  assert.ok(Math.abs(c.stone[0] - ((MATERIALS.rock.color[0] + 0.055) / 1.055) ** 2.4) < 1e-6, 'stone is linear rock');
   assert.deepEqual(terrainColorsFor(world, { rock: { color: [1, 0, 0] } }).stone, [1, 0, 0]);
 });
 

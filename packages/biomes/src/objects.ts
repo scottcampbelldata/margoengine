@@ -49,11 +49,13 @@ export function detailFits(
 }
 
 /** Colours (linear RGB) of the procedural meshes' parts. */
-const BARK = [0.16, 0.1, 0.06] as const,
-  LEAF = [0.08, 0.2, 0.05] as const,
-  NEEDLE = [0.05, 0.14, 0.06] as const,
-  STONE = [0.32, 0.31, 0.29] as const,
-  DRY = [0.3, 0.24, 0.1] as const;
+const BARK = [0.22, 0.14, 0.08] as const,
+  LEAF = [0.14, 0.3, 0.05] as const,
+  BIRCH = [0.26, 0.36, 0.07] as const,
+  PALM = [0.1, 0.32, 0.07] as const,
+  NEEDLE = [0.04, 0.17, 0.07] as const,
+  STONE = [0.4, 0.37, 0.33] as const,
+  DRY = [0.45, 0.33, 0.11] as const;
 
 type Procedural = typeof import('@margoengine/procedural');
 type Part = { geometry: Geometry; color: readonly [number, number, number]; blades?: boolean };
@@ -84,9 +86,9 @@ function partsOf(
     case 'conifer':
       return tree(p.generateTreeMesh('conifer'), NEEDLE);
     case 'palm':
-      return tree(p.generatePalmMesh(), LEAF);
+      return tree(p.generatePalmMesh(), PALM);
     case 'birch':
-      return tree(p.generateBirchMesh(), LEAF);
+      return tree(p.generateBirchMesh(), BIRCH);
     case 'acacia':
       return tree(p.generateAcaciaMesh(), DRY);
     case 'snag':
@@ -94,15 +96,15 @@ function partsOf(
     case 'rock':
       return [{ geometry: make(p.generateRockMesh()), color: STONE }];
     case 'cactus':
-      return [{ geometry: make(p.generateCactusMesh()), color: [0.1, 0.22, 0.08] }];
+      return [{ geometry: make(p.generateCactusMesh()), color: [0.13, 0.3, 0.1] }];
     case 'tundra-shrub':
-      return [{ geometry: make(p.generateTundraShrubMesh()), color: [0.18, 0.14, 0.06] }];
+      return [{ geometry: make(p.generateTundraShrubMesh()), color: [0.3, 0.17, 0.07] }];
     case 'grass':
-      return [{ geometry: make(p.generateGrassMesh(3)), color: [0.1, 0.24, 0.05], blades: true }];
+      return [{ geometry: make(p.generateGrassMesh(3)), color: [0.2, 0.4, 0.06], blades: true }];
     case 'fern':
-      return [{ geometry: make(p.generateFernMesh()), color: [0.06, 0.2, 0.05] }];
+      return [{ geometry: make(p.generateFernMesh()), color: [0.08, 0.28, 0.07] }];
     case 'reeds':
-      return [{ geometry: make(p.generateReedMesh()), color: [0.2, 0.22, 0.08], blades: true }];
+      return [{ geometry: make(p.generateReedMesh()), color: [0.36, 0.34, 0.11], blades: true }];
     default:
       return [{ geometry: make(p.generateShrubMesh()), color: LEAF }];
   }
