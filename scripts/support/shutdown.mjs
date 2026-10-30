@@ -43,6 +43,32 @@ export function watchExit(ms = SHUTDOWN_BUDGET_MS, { exit = process.exit, report
   }, ms).unref();
 }
 
+/**
+ * Runs a suite's checks, then its teardown, on every path. A failed check stays the error the suite exits with: a
+ * teardown that fails after it (a bounded close that ran out, say) is printed beside it, never in its place, so an
+ * assertion is not reported as a shutdown error. With every check passed, a failed teardown is the error. Node exits
+ * at once (code 1) on the throw, whatever is still open, so a failed suite never sits until the runner kills it.
+ * @template T
+ * @param {() => Promise<T>} checks
+ * @param {() => Promise<unknown>} teardown
+ * @returns {Promise<T>}
+ */
+export async function runSuite(checks, teardown, { report = console.error } = {}) {
+  let result;
+  try {
+    result = await checks();
+  } catch (error) {
+    try {
+      await teardown();
+    } catch (closeError) {
+      report(`the suite failed (its error follows), and its teardown failed too: ${closeError.message}`);
+    }
+    throw error;
+  }
+  await teardown();
+  return result;
+}
+
 /** Drops every connection of an http server and waits for it to stop listening. */
 async function closeServer(server) {
   const http = httpServerOf(server);

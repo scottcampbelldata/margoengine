@@ -126,6 +126,7 @@ The numbers that drive it, all from the project's own notes:
 | --- | --- | --- |
 | GPU lock, correctness tests | 3 shared slots (`MARGO_GPU_SLOTS`, default 3) | one GPU test, default limit 10 min (`scripts/support/run-limited.mjs`) |
 | GPU lock, benchmarks | 1 exclusive holder, nobody else | default limit 60 min |
+| GPU lock, timing tests in `check:gpu-packages` | 1 exclusive holder, one step per hold | a test whose file calls `acquire({ mode: 'exclusive' })` (the biomes flythrough) runs after the shared tests as its own step; the hold is its step limit plus 5 min, released after it. A timing test chained with other checks fails the plan (`GPU_TIMING_TEST_SHARED`); one run in a shared slot throws at once |
 | Landing lock | 1 exclusive holder | "About 40 min of lock per landing; queue is the bottleneck." (coordinator handoff). NOT VERIFIED as an average; the live holder in 2.3 had `maxMinutes` 170. |
 | A full `check:merge` | runs before the landing lock in the newer pattern, inside it in the newest (see 2.6) | 5400 s hard limit in the landing scripts |
 

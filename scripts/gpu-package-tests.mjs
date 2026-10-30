@@ -8,7 +8,9 @@
 // `<dir>/<script>` or `root/<script>`, see testId; check:merge passes the ones a change affects), --list (print the plan).
 // Every test has a hard time limit (10 min; MARGO_GPU_TEST_TIMEOUT_MIN, or "margo": { "gpuTestTimeoutMinutes": n } in the
 // package's package.json): a hung test has its whole process tree killed, is named in the output and fails the step.
-// Holds one shared slot of the GPU lock (scripts/gpu-lock.mjs, up to 3 at once) for the whole run; each test's result and time go to
+// Holds one shared slot of the GPU lock (scripts/gpu-lock.mjs, up to 3 at once) for its shared tests; a timing test (one whose file
+// asks for the GPU exclusively, see lockMode) runs after them as its own step under its own exclusive hold, released
+// after it. Each test's result and time go to
 // test-results/gpu-packages.json. A test that fails while the Windows event log shows a GPU driver reset runs once more
 // (scripts/support/driver-resets.mjs, bug 25); the reset and the rerun are printed and kept in that file, never hidden:
 // a run that passed only that way ends with a "PASSED WITH A DRIVER RESET" line per test and the file's top-level
@@ -119,6 +121,15 @@ export function plan() {
     if (!scripts[name]) throw new Error(`ROOT lists ${name}, which package.json no longer has; remove it from ROOT`);
     tests.push({ label: `root ${name}`, cwd: '.', command: `npm run ${name}`, name, dir: 'root', script: name });
   }
+  // A timing test takes the GPU exclusively itself; it runs as its own step under the exclusive hold, never in a
+  // shared slot beside other suites (or its measurements carry their load).
+  for (const test of tests) {
+    const files = (test.name ? scriptFiles('.', scripts[test.name]) : scriptFiles(test.cwd, test.command)).filter(
+      (file) => existsSync(join(root, file)),
+    );
+    if (lockMode(test.label, files, (file) => readFileSync(join(root, file), 'utf8')) === 'exclusive')
+      test.exclusive = true;
+  }
 
   // Every file under packages/*/{test,tests,scripts} that drives a browser must be run by one of these commands (or by
   // a check:merge script): a GPU test with no script is the gap this check closes.
@@ -159,6 +170,28 @@ function scriptFiles(cwd, command) {
       files.push(relative(root, resolve(root, dir, token)).replaceAll('\\', '/'));
   });
   return files;
+}
+
+/** A timing test: its file asks scripts/gpu-lock.mjs for the GPU exclusively (`acquire({ ..., mode: 'exclusive' })`). */
+export const TIMING_TEST = /\bacquire\(\{[^}]*\bmode:\s*['"]exclusive['"]/;
+
+/**
+ * The GPU lock mode a planned test runs under: 'exclusive' when the files it runs are timing tests (TIMING_TEST),
+ * else 'shared'. A test whose files mix a timing test with other checks throws GPU_TIMING_TEST_SHARED: in one step the
+ * other checks would hold the exclusive GPU for nothing, or the timing test would run in a shared slot. `read(file)`
+ * gives a repo-relative file's text.
+ */
+export function lockMode(label, files, read) {
+  const texts = files.map((file) => [file, read(file)]);
+  const timing = texts.filter(([, text]) => TIMING_TEST.test(text)).map(([file]) => file);
+  if (!timing.length) return 'shared';
+  const others = texts.map(([file]) => file).filter((file) => !timing.includes(file));
+  if (others.length)
+    throw margoError(
+      'GPU_TIMING_TEST_SHARED',
+      `${label} runs the timing test ${timing.join(', ')} in one step with ${others.join(', ')}; give the timing test a script of its own (for example "test:gpu:<name>") so it runs alone under the exclusive GPU lock`,
+    );
+  return 'exclusive';
 }
 
 /** Files under packages/<dir>/{test,tests,scripts}/ (not node tests) that open a browser. */
@@ -241,6 +274,12 @@ export function splitSteps(test) {
   return commands.length > 1 ? many(commands, names) : [one];
 }
 
+/**
+ * The steps in run order: every shared step first, then the timing steps (`exclusive`), each in plan order, so the run
+ * gives up its shared slot once and the timing steps wait for the GPU alone at the end, not in the middle of the run.
+ */
+export const lockOrder = (steps) => [...steps.filter((s) => !s.exclusive), ...steps.filter((s) => s.exclusive)];
+
 /** The steps a profile runs, in plan order: excluded tests stay in the list with their stated reason. */
 export function planSteps(tests, profile) {
   return tests.flatMap((test) => {
@@ -265,8 +304,9 @@ const pauseText = (p) =>
  * `reason`), 'heat-not-resumed' (with `reason`) or 'not-run' (with `reason`), and `pauses` (each heat pause: peak,
  * stop and resume temperatures, seconds waited). `runStep(step, signal)` runs one step and resolves `{ ok, seconds,
  * aborted? }`; it must end the step when `signal` aborts. `read()` gives degrees C or null (scripts/support/heat.mjs);
- * `take()` takes the GPU lock and resolves its release, which is called before every cooldown and taken again after,
- * so the lock is never held while waiting for heat. A heat profile with no reading at the start throws
+ * `take(mode, step)` takes the GPU lock in `mode` ('shared', or 'exclusive' for a step with `exclusive`, a timing
+ * test) and resolves its release, which is called before every cooldown and taken again after, so the lock is never
+ * held while waiting for heat; the run switches holds between a shared step and an exclusive one. A heat profile with no reading at the start throws
  * THERMAL_SOURCE_MISSING: a run that cannot watch its temperature does not start. `pollMs` overrides the profile's
  * sample interval (tests).
  */
@@ -282,8 +322,22 @@ export async function runPlan(
       'THERMAL_SOURCE_MISSING',
       `machine profile ${profile.name} watches the temperature but no reading could be had; set MARGO_THERMAL_FILE to a file holding the current temperature, or run on a machine with /sys/class/thermal zones`,
     );
-  let release = await take(),
+  // A timing step (`exclusive`) runs under its own exclusive hold of the GPU, taken just before it and released just
+  // after; every other step runs under the shared hold. take(mode, step) resolves the release of a hold in that mode.
+  const modeOf = (step) => (step?.exclusive ? 'exclusive' : 'shared');
+  let held = modeOf(steps.find((s) => !s.excluded)),
+    release = await take(
+      held,
+      steps.find((s) => !s.excluded),
+    ),
     stopped = null;
+  const hold = async (step) => {
+    if (modeOf(step) === held) return;
+    release();
+    release = () => {};
+    held = modeOf(step);
+    release = await take(held, step);
+  };
   // Releases the GPU lock, waits (bounded) for the resume temperature, and takes the lock again if it came.
   const coolFor = async (step, pause) => {
     release();
@@ -300,7 +354,7 @@ export async function runPlan(
     });
     if (cool.resumed) {
       log(`RESUMED: ${step.label} at ${cool.lastC} C after ${cool.waitedS} s; running this step again from its start`);
-      release = await take();
+      release = await take(held, step);
     } else
       pause.notResumed = `still ${cool.lastC ?? 'unreadable'} C after the maximum wait of ${heat.maxWaitMin} min (lowest ${cool.lowestC ?? 'unreadable'} C; resume needs below ${heat.resumeC} C)`;
     return cool.resumed;
@@ -315,6 +369,7 @@ export async function runPlan(
         results.push({ ...step, outcome: 'not-run', reason: stopped });
         continue;
       }
+      await hold(step);
       const pauses = [];
       let peakC = null,
         result = null;
@@ -408,12 +463,14 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const unknown = chosen ? [...chosen].filter((id) => !tests.some((t) => testId(t) === id)) : [];
   if (unknown.length) throw new Error(`--select names no GPU test: ${unknown.join(', ')}; list them with --list`);
   const profile = machineProfile(),
-    steps = planSteps(tests, profile);
+    steps = lockOrder(planSteps(tests, profile));
   if (process.argv.includes('--list')) {
     console.log(describeProfile(profile));
     for (const s of steps)
       console.log(
-        s.excluded ? `${s.label}: EXCLUDED BY PROFILE (${s.excluded})` : `${s.label}: (${s.cwd}) ${s.command}`,
+        s.excluded
+          ? `${s.label}: EXCLUDED BY PROFILE (${s.excluded})`
+          : `${s.label}: (${s.cwd}) ${s.command}${s.exclusive ? '  [timing: exclusive GPU, own step]' : ''}`,
       );
     process.exit(0);
   }
@@ -443,7 +500,15 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     read: thermal?.read,
     // A short poll: other holders often release and take the lock again within seconds. Held for the whole run (about
     // 10 min alone, 15 with another run beside it), so the hold limit is 60 min; a heat pause releases it while it waits.
-    take: () => acquire({ owner: 'check:gpu-packages', mode: 'shared', max: 60, poll: 2000 }),
+    // A timing step holds the GPU exclusively for itself alone: the hold limit is its own time limit plus 5 min, the
+    // heartbeat keeps it, and it is released as soon as the step ends.
+    take: (mode, step) =>
+      acquire({
+        owner: mode === 'exclusive' ? `check:gpu-packages ${step.label}` : 'check:gpu-packages',
+        mode,
+        max: mode === 'exclusive' ? Math.ceil(testLimitMs(step.minutes) / 60_000) + 5 : 60,
+        poll: 2000,
+      }),
     runStep: async (step, signal) => {
       // Each preparing command once, however many suites need it.
       for (const command of PREPARE[step.name] ?? []) {
@@ -455,7 +520,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
       const once = async () => {
         const result = await runLimited(step.command, {
           cwd: join(root, step.cwd),
-          env,
+          env: { ...env, MARGO_GPU_LOCK_NESTED_MODE: step.exclusive ? 'exclusive' : 'shared' },
           limitMs: testLimitMs(step.minutes),
           label: step.label,
           signal,

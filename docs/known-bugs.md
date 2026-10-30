@@ -175,6 +175,13 @@ does not own. Each entry says exactly what is needed to close it.
   step's wall time (gpu-packages.json `seconds`, and the time the flythrough's OK line printed) decides between
   splitting the chain into one step per check and a measured `margo.gpuTestTimeoutMinutes` for biomes, which is
   Scott's call.
+- **Since 2026-10-30:** the chain is split, one step per check (`test:gpu` view, `test:gpu:objects`,
+  `test:gpu:flythrough`), each with its own 10 min limit; the flythrough, a timing test, runs last under the exclusive
+  GPU lock (it failed at +2.6 ms worst frame in a shared slot beside other suites). A failed check exits at once with
+  its own error (`runSuite`, `scripts/support/shutdown.mjs`), its teardown bounded and printed beside it: the laptop's
+  3 kills at 8bd1fb40 came after 'packing:', which fits an assertion that failed there and then the unbounded WGSL wait
+  in close() (cause 1). Open: the laptop's line-49 check (one frame with 2 ms sends: 5.8 ms seen once standalone, limit
+  3.5 ms, 2.3 to 2.4 ms before); not loosened.
 
 ### BiomeView: a world or placement change while a tile waits to be copied in can leave the old tile drawn
 
