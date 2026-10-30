@@ -3,9 +3,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const alive = (pid) => {
@@ -109,13 +119,34 @@ test('a holder that called acquire() itself and hangs in a synchronous loop is e
   }
 });
 
-test('a heartbeat keeps a holder alive, and a stale heartbeat is reclaimed even though the process lives', () =>
+// The heartbeat is a process of its own, so its first beat comes after a Node start-up: about 0.2 s here, but seconds
+// on a machine busy with a package build, past this test's 2 s lease (production leases are 2 min). The test waits
+// for the first beat, then checks that a beating holder outlives two leases.
+async function firstBeat(lock) {
+  const dir = join(lock, 'shared'),
+    entry = join(
+      dir,
+      readdirSync(dir).find((name) => name.endsWith('.json')),
+    ),
+    written = statSync(entry).mtimeMs,
+    until = Date.now() + 30_000;
+  while (statSync(entry).mtimeMs === written) {
+    assert.ok(Date.now() < until, 'the heartbeat process never refreshed the entry');
+    await sleep(10);
+  }
+}
+
+const heartbeatKeepsHolder = (env) =>
   withLock(
     async (gpu, lock) => {
       const held = await gpu.acquire({ owner: 'holder', poll: 10, log: quiet });
+      await firstBeat(lock);
       // Longer than the lease: only the heartbeat process keeps the entry fresh.
-      const waiter = gpu.acquire({ owner: 'bench', mode: 'exclusive', poll: 10, log: quiet });
+      const waited = [],
+        waiter = gpu.acquire({ owner: 'bench', mode: 'exclusive', poll: 10, log: (m) => waited.push(m) });
       assert.equal(await settled(waiter, 4000), 'waiting', 'a live heartbeat is not reclaimed');
+      // A reclaimed holder's slot is not handed over at once, so 'waiting' alone does not prove it was kept.
+      assert.doesNotMatch(waited.join(' | '), /removing stale/, 'a live heartbeat is not reclaimed');
       held();
       (await waiter)();
       // A holder whose process is alive (this one) but whose heartbeat stopped long ago.
@@ -140,8 +171,25 @@ test('a heartbeat keeps a holder alive, and a stale heartbeat is reclaimed even 
       assert.deepEqual(readdirSync(join(lock, 'shared')), []);
       taken();
     },
-    { MARGO_GPU_LEASE_MS: '2000' },
-  ));
+    { MARGO_GPU_LEASE_MS: '2000', ...env },
+  );
+
+test('a heartbeat keeps a holder alive, and a stale heartbeat is reclaimed even though the process lives', () =>
+  heartbeatKeepsHolder());
+
+// Regression (2026-10-30): this test failed only while a package build ran beside it: the waiter started counting
+// at once, and the heartbeat process, slow to start on the busy machine, beat for the first time after the 2 s lease.
+// A start-up delay in the heartbeat process (NODE_OPTIONS reaches it, as the environment does) stands in for the load.
+test('a heartbeat process that starts slowly still keeps its holder alive', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-slow-')),
+    slow = join(folder, 'slow-start.mjs');
+  try {
+    writeFileSync(slow, 'const end = Date.now() + 2500; while (Date.now() < end);');
+    await heartbeatKeepsHolder({ NODE_OPTIONS: `--import=${pathToFileURL(slow).href}` });
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
 
 test('a waiter gives up after --wait-max and names the holder and its command', () =>
   withLock(async (gpu) => {
