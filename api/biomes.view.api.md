@@ -48,6 +48,8 @@ export interface BiomeViewOptions {
 
 export const MATERIALS: Readonly<Record<string, MaterialLook>>;
 
+export const MAX_GROUND_MATERIALS = 16;
+
 export interface MaterialLook {
     readonly color: readonly [number, number, number];
     readonly detail?: number;
@@ -60,7 +62,7 @@ export interface ViewTile {
     readonly z: number;
     readonly count: number;
     readonly heights: Float32Array;
-    readonly weights: readonly [Uint8Array, Uint8Array];
+    readonly weights: readonly Uint8Array[];
 }
 
 export function groundMaterials(biomes: readonly BiomeDefinition[]): string[];

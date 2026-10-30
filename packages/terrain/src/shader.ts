@@ -62,10 +62,6 @@ fn terrainLayerSample(position:vec3f,projection:vec3f,dx:vec3f,dy:vec3f,layer:u3
   let z=textureSampleGrad(terrainLayers,terrainSampler,p.xy,i32(layer),dx.xy*scale,dy.xy*scale).rgb;
   return x*projection.x+y*projection.y+z*projection.z;
 }`;
-const ruleColor = terrainFragment.slice(
-  terrainFragment.indexOf('fn terrainColor('),
-  terrainFragment.indexOf('@fragment fn fragment('),
-);
 
 /**
  * The fragment shader with `TerrainTextures.weights` (`count` textures, 2 to 4): layer i's weight is channel i % 4 of
@@ -75,7 +71,12 @@ const ruleColor = terrainFragment.slice(
  * so importing anything else from this package keeps no shader text.
  */
 export const weightedFragment = (count: number): string => {
-  const n = Math.min(4, Math.max(1, Math.floor(count))),
+  // Inside the function, so a bundle that never calls it drops `terrainFragment` too (no module-scope work).
+  const ruleColor = terrainFragment.slice(
+      terrainFragment.indexOf('fn terrainColor('),
+      terrainFragment.indexOf('@fragment fn fragment('),
+    ),
+    n = Math.min(4, Math.max(1, Math.floor(count))),
     ids = Array.from({ length: n }, (_, i) => i);
   return /* wgsl */ `
 ${ids.map((i) => `@group(0) @binding(${6 + i}) var terrainWeights${i}:texture_2d<f32>;`).join('\n')}

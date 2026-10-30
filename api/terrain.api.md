@@ -117,7 +117,7 @@ export interface TerrainTextures {
     heightmap: GPUTexture;
     normalmap?: GPUTexture;
     layers: GPUTexture;
-    weights?: readonly [GPUTexture, GPUTexture];
+    weights?: readonly GPUTexture[];
 }
 
 export function clipmapGrid(resolution: number): {
