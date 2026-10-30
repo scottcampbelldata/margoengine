@@ -81,24 +81,24 @@
   "gameplay-sandbox-high": {
    "url": "gameplay-sandbox/?quality=high",
    "size": "640x360",
-   "runs": 3,
+   "runs": 4,
    "noise": {
-    "changed": 0.0000694,
+    "changed": 0,
     "hot": 0,
-    "mean": 0.0000694,
-    "max": 1
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.000708,
+    "changed": 0.0005,
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 156.0.4314.42",
+    "browser": "msedge 156.0.4314.50",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-27T11:31:15.557Z",
-    "commit": "2434db027dd1f5e49e5ea7997e6ccb1278794e2f",
+    "date": "2026-10-30T18:43:18.532Z",
+    "commit": "5571774346013701fe378ddfaec9288d6d741d7c",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -2169,8 +2169,8 @@
   "gpu": "nvidia ampere",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-30T17:21:34.880Z",
-  "commit": "aa50b3279cddf2da6dadff2f1f6dcd2897d60b85",
+  "date": "2026-10-30T18:43:18.532Z",
+  "commit": "5571774346013701fe378ddfaec9288d6d741d7c",
   "packagesDirty": false,
   "renderedInputsDirty": false,
   "renderedInputChanges": []
