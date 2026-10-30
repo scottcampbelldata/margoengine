@@ -3,6 +3,7 @@
 // Real-GPU proof that GPU scatter casts into Shadows (shadow.browser.mjs reads the canvas): one 2 x 4 x 2 box, half
 // buried, on a flat floor, the sun 45 degrees up from +X, so its shadow covers x -3..-1, z -1..1 of the floor. Drawn as
 // a `Scatter` and as a `ScatterTiles` record, each with the box added to Shadows and without.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {Engine,box} from '/packages/core/dist/index.js';
 import {Scatter} from '/packages/scatter/dist/index.js';
 import {ScatterTiles} from '/packages/scatter/dist/tiles.js';
@@ -25,7 +26,7 @@ window.check={
     if(kind==='scatter')scatter=Scatter.attach(engine,geometry,{count:1,area:[0.001,0.001],scale:[1,1],color:[0.8,0.8,0.8]});
     else{scatter=ScatterTiles.attach(engine,geometry,{bounds:[-20,-20,20,20],color:[0.8,0.8,0.8]});scatter.setTile('0,0',[-20,-20],40,record);}
     if(cast)remove=shadows.add(scatter);
-    for(let i=0;i<3;i++){engine.render({delta:0});await device.queue.onSubmittedWorkDone();}
+    await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
     const e=await device.popErrorScope();if(e)errors.push(e.message);
     return errors.splice(0);
   },

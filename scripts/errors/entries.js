@@ -533,6 +533,7 @@ export const entries = [
       'BiomeView lookahead must be 0 or more seconds and budget above 0 ms',
       'BiomeView prefetch takes a [minX, minZ, maxX, maxZ] rectangle in metres',
       'BiomeView radius must be above 0',
+      'BiomeView shadows must be a Shadows from @margoengine/shadows',
       'BiomeView textureResolution must be a positive multiple of the world resolution',
       'BiomeView.attach takes an engine and a BiomeWorld',
       "BiomeWorld backend must be 'auto', 'gpu' or 'cpu'",

@@ -6,6 +6,7 @@
 // extrapolates a 0..1 shade below 0 (biome grass blades drew negative pixels).
 import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {Scatter,ScatterInstances} from '/packages/scatter/dist/index.js';
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,6,26],target:[0,0,0],near:0.5,far:200}}),device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -21,7 +22,7 @@ async function read(texture){
 }
 // Pixels with a negative or non-finite channel, and pixels the triangles changed from the empty frame.
 async function shot(empty){
- device.pushErrorScope('validation');for(let i=0;i<2;i++){engine.render({delta:0});await device.queue.onSubmittedWorkDone();}
+ device.pushErrorScope('validation');await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
  const e=await device.popErrorScope();if(e)errors.push(e.message);
  const d=await read(post.sceneTexture);let bad=0,drawn=0;
  for(let k=0;k<d.length;k+=4){if(!(d[k]>=0&&d[k+1]>=0&&d[k+2]>=0))bad++;if(empty&&(d[k]!==empty[k]||d[k+1]!==empty[k+1]))drawn++;}
