@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3916564,
+  "total": 3916826,
   "history": [
     {
       "date": "2026-10-24",
@@ -875,12 +875,6 @@
     },
     {
       "date": "2026-10-30",
-      "commit": "3b4921002",
-      "reason": "scatter: per-cascade GPU shadow culling (prepareShadow, cull shader, list draws) cuts the biome world's four-cascade shadow frame from 72.9 to 44 ms with an identical shadow map",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-30",
       "commit": "3342bf02f",
       "reason": "biomes: placement keeps every species above sea level (+36 B); the view makes its overview on the workers in row bands, off the page's thread (+111 B)",
       "grew": 2
@@ -895,6 +889,12 @@
       "date": "2026-10-30",
       "commit": "0882df471",
       "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "3b4921002",
+      "reason": "scatter: per-cascade GPU shadow culling (prepareShadow, cull shader, list draws) cuts the biome world's four-cascade shadow frame from 72.9 to 44 ms with an identical shadow map",
       "grew": 1
     },
     {
@@ -914,6 +914,12 @@
       "commit": "0882df471",
       "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
       "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "2711ad501",
+      "reason": "biomes objects: per-part LOD mesh chains, variation and clusters (biome look round 2, landing D)",
+      "grew": 1
     }
   ],
   "items": {
@@ -932,7 +938,7 @@
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/koppen": 1231,
-    "@margoengine/biomes/objects": 3576,
+    "@margoengine/biomes/objects": 3838,
     "@margoengine/biomes/placement": 11951,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/relief": 2825,

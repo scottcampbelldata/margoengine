@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Biome objects look check</title><style>body{margin:0}canvas{display:block;width:1280px;height:800px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof of the objects' look (biome look round 2, landing D): a forest of one species (the temperate oak,
+// broadleaf, 80 stems a hectare, no clustering, no shrubs, rocks or ground cover) seen from 40 m over the ground. Each
+// tree is a connected region of the pixels the objects change against the same view without objects (its inner
+// pixels: all four neighbours covered too). window.check.run() returns per tree its luma texture (the standard deviation
+// of sRGB luma less its 7x7 local mean over the tree, the leaf clusters with the large lit-to-shaded gradient taken out)
+// and the hue of its brighter half (the lit leaves), read from the linear scene texture before display.
+import {Engine} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {BiomeWorld} from '/packages/biomes/dist/index.js';
+import {BiomeView} from '/packages/biomes/dist/view.js';
+import {presets} from '/packages/biomes/dist/presets.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,300,250],target:[0,120,0],near:0.3,far:4000}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return {data,width:texture.width,height:texture.height};
+}
+const frame=async()=>{engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();};
+async function shot(view){await view.ready;await view.whenIdle();await waitForPipelines(frame);return read(post.sceneTexture);}
+const srgb=(c)=>c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055;
+const luma=(d,k)=>0.2126*srgb(d[k])+0.7152*srgb(d[k+1])+0.0722*srgb(d[k+2]);
+function hue(r,g,b){const M=Math.max(r,g,b),m=Math.min(r,g,b),c=M-m;if(c<1e-9)return NaN;const h=M===r?((g-b)/c)%6:M===g?(b-r)/c+2:(r-g)/c+4;return h/6;}
+window.check={
+ async run(){
+  device.pushErrorScope('validation');
+  const t=presets.temperate,world=await BiomeWorld.create({biomes:[{...t,plants:[{...t.plants[0],density:80,cluster:undefined}],rocks:[],details:[]}]});
+  const ground=(x,z)=>world.sample(x,z).height,p=engine.camera.position,target=engine.camera.target;
+  p[0]=-300;p[1]=ground(-300,200)+40;p[2]=200;target[0]=-300;target[1]=ground(-300,-100);target[2]=-100;
+  let view=await BiomeView.attach(engine,world,{objects:false});const bare=await shot(view);view.dispose();
+  view=await BiomeView.attach(engine,world);const full=await shot(view);view.dispose();world.dispose();
+  const {width:W,height:H}=full,mask=new Uint8Array(W*H),seen=new Uint8Array(W*H),L=new Float32Array(W*H),trees=[];
+  for(let i=0;i<W*H;i++){L[i]=luma(full.data,i*4);mask[i]=Math.abs(L[i]-luma(bare.data,i*4))>0.02?1:0;}
+  for(let i=0;i<W*H;i++){
+   if(!mask[i]||seen[i])continue;const stack=[i],region=[];seen[i]=1;
+   while(stack.length){const j=stack.pop(),x=j%W,y=(j-x)/W;region.push(j);for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const u=x+dx,v=y+dy,k=v*W+u;if(u>=0&&v>=0&&u<W&&v<H&&mask[k]&&!seen[k]){seen[k]=1;stack.push(k);}}}
+   const inner=region.filter(j=>{const x=j%W,y=(j-x)/W;return x>0&&y>0&&x<W-1&&y<H-1&&mask[j-1]&&mask[j+1]&&mask[j-W]&&mask[j+W];});
+   if(inner.length<100)continue;
+   let texture=0;for(const j of inner){const x=j%W,y=(j-x)/W;let sum=0,n=0;for(let v=Math.max(0,y-3);v<=Math.min(H-1,y+3);v++)for(let u=Math.max(0,x-3);u<=Math.min(W-1,x+3);u++){const k=v*W+u;if(mask[k]){sum+=L[k];n++;}}texture+=(L[j]-sum/n)**2;}
+   const lit=[...inner].sort((a,b)=>L[b]-L[a]).slice(0,inner.length>>1);let r=0,g=0,b=0;for(const j of lit){r+=full.data[j*4];g+=full.data[j*4+1];b+=full.data[j*4+2];}
+   trees.push({pixels:inner.length,texture:Math.sqrt(texture/inner.length),hue:hue(r,g,b)});
+  }
+  const error=await device.popErrorScope();
+  return {trees,validation:error?.message??null,errors:errors.splice(0)};
+ }
+};
+window.ready=true;
+</script></body></html>

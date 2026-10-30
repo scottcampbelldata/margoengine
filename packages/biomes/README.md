@@ -310,8 +310,43 @@ console.log(view.objects?.casters.length); // trunks, canopies, shrubs, rocks an
 engine.start();
 ```
 
+Each tree, palm, birch, acacia and shrub part draws `@margoengine/procedural`'s `detail` 2, 1 and 0 meshes in its
+three LOD rings (150, 400 and 1,000 m for canopy trees, 45, 120 and 300 m for the rest; a broadleaf canopy goes from
+6,240 to 3,180 to 400 triangles), switched hard: a dithered fade between them cost 1.2 to 5.6 ms a frame with shadows.
+Rocks, cacti and snags have one mesh. Every part takes scatter's `variation` from a hash of its position, so no two
+trees share a colour: leaves `{ hue: 0.06, value: 0.15 }` with `clusters: 0.6` (canopies shade as clumps about 0.6 m
+across), bark and stone `{ hue: 0.02, value: 0.1 }`. Broadleaf, birch, palm and conifer each have their own green. At the
+zero-config world's wide view, 1440x900 on an RTX A6000, a frame went from 53 to 9.0 ms with shadows (20 to 4.1 ms
+without; `packages/biomes/tests/objects-frame-check.mjs`), and `objects-check.mjs` checks the leaf texture and the
+spread of tints. To draw a species of your own the same way:
+
+```ts
+import { Engine, Geometry, PbrMaterial } from '@margoengine/core';
+import { generateTreeMesh } from '@margoengine/procedural';
+import { ScatterTiles } from '@margoengine/scatter/tiles';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const levels = ([2, 1, 0] as const).map((detail) => generateTreeMesh('broadleaf', { detail })); // near, middle, far
+const rings = (part: 'trunk' | 'canopy') =>
+  levels.map((t) => new Geometry(t[part].positions, t[part].normals, t[part].indices)) as [Geometry, Geometry, Geometry];
+const look = { bounds: [-2048, -2048, 2048, 2048], lod: [150, 400, 1000], lodFade: 0 } as const;
+const trunks = ScatterTiles.attach(engine, rings('trunk'), {
+  ...look,
+  material: new PbrMaterial({ color: [0.22, 0.14, 0.08], roughness: 0.85 }),
+  variation: { hue: 0.02, value: 0.1 },
+});
+ScatterTiles.attach(engine, rings('canopy'), {
+  ...look,
+  material: new PbrMaterial({ color: [0.14, 0.3, 0.05], roughness: 0.85 }),
+  variation: { hue: 0.06, value: 0.15 },
+  clusters: 0.6,
+  share: trunks, // the same trees: one set of records, culling and rings
+});
+engine.start();
+```
+
 Shadows cost GPU time in proportion to the objects in view: every cascade draws every stored object the camera sees,
-with its full mesh, so on a forest the shadow passes can cost more than the rest of the frame; fewer `Shadows`
+with its ring's mesh, so on a forest the shadow passes can cost more than the rest of the frame; fewer `Shadows`
 `cascades` cost less and reach less far. Objects outside the view cast no shadow onto ground in it (scatter casts the
 instances it culled for the camera). `packages/biomes/tests/shadows-check.mjs` checks the look.
 

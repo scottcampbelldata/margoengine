@@ -48,7 +48,10 @@ export function detailFits(
   return width <= limit && depth <= limit && width * depth * species <= budget;
 }
 
-/** Colours (linear RGB) of the procedural meshes' parts. */
+/**
+ * Colours (linear RGB) of the procedural meshes' parts. Each canopy tree has its own green: broadleaf a mid green,
+ * birch a lighter yellow green, palm a fresh green, conifer a darker blue green (needles).
+ */
 const BARK = [0.22, 0.14, 0.08] as const,
   LEAF = [0.14, 0.3, 0.05] as const,
   BIRCH = [0.26, 0.36, 0.07] as const,
@@ -57,8 +60,29 @@ const BARK = [0.22, 0.14, 0.08] as const,
   STONE = [0.4, 0.37, 0.33] as const,
   DRY = [0.45, 0.33, 0.11] as const;
 
+/**
+ * Per-instance tint and leaf-cluster shading of each kind of part (scatter's `variation` and `clusters`): leaves vary
+ * most and shade as clumps about 0.6 m across; bark and stone vary a little and stay smooth.
+ */
+const OBJECT_LOOKS = {
+  foliage: { variation: { hue: 0.06, value: 0.15 }, clusters: 0.6 },
+  bark: { variation: { hue: 0.02, value: 0.1 } },
+  stone: { variation: { hue: 0.02, value: 0.1 } },
+} as const;
+
+/** The mesh detail level of each LOD ring (near, middle, far) of stored objects: `@margoengine/procedural`'s `detail`. */
+const OBJECT_LOD_DETAIL = [2, 1, 0] as const;
+
 type Procedural = typeof import('@margoengine/procedural');
-type Part = { geometry: Geometry; color: readonly [number, number, number]; blades?: boolean };
+type Data = { positions: ArrayLike<number>; normals: ArrayLike<number>; indices: ArrayLike<number> };
+type Kind = keyof typeof OBJECT_LOOKS;
+/** A mesh part: one geometry, or one per LOD ring (near, middle, far) for meshes with detail levels. */
+type Part = {
+  geometry: Geometry | readonly [Geometry, Geometry, Geometry];
+  color: readonly [number, number, number];
+  kind: Kind;
+  blades?: boolean;
+};
 type Modules = {
   tiles: typeof import('@margoengine/scatter/tiles');
   scatter: typeof import('@margoengine/scatter');
@@ -66,47 +90,77 @@ type Modules = {
   core: typeof import('@margoengine/core');
 };
 
-/** The parts of a mesh key: trees are wood and foliage, the rest one mesh. Unknown keys draw as a shrub. */
-function partsOf(
-  key: string,
-  p: Procedural,
-  make: (data: { positions: ArrayLike<number>; normals: ArrayLike<number>; indices: ArrayLike<number> }) => Geometry,
-): Part[] {
+/**
+ * The parts of a mesh key: trees are wood and foliage, the rest one mesh. Unknown keys draw as a shrub. Meshes with
+ * detail levels (trees, palms, birch, acacia, shrubs) give each part the {@link OBJECT_LOD_DETAIL} chain, one geometry
+ * per LOD ring; the others (rocks, cacti, snags, ground cover) one geometry for every ring.
+ */
+function partsOf(key: string, p: Procedural, make: (data: Data) => Geometry): Part[] {
   const name = key.startsWith('procedural:') ? key.slice(11) : key,
+    chain = <T>(level: (detail: 0 | 1 | 2) => T) => OBJECT_LOD_DETAIL.map(level) as [T, T, T],
+    rings = (list: readonly [Data, Data, Data]) => list.map(make) as unknown as [Geometry, Geometry, Geometry],
     tree = (
-      t: { trunk: Parameters<typeof make>[0]; canopy: Parameters<typeof make>[0] },
+      levels: [{ trunk: Data; canopy: Data }, ...{ trunk: Data; canopy: Data }[]],
       leaf: readonly [number, number, number],
-    ) => [
-      { geometry: make(t.trunk), color: BARK },
-      ...(t.canopy.indices.length ? [{ geometry: make(t.canopy), color: leaf }] : []),
-    ];
+    ) => {
+      const many = levels.length === 3,
+        pick = (part: 'trunk' | 'canopy') =>
+          many ? rings(levels.map((t) => t[part]) as unknown as [Data, Data, Data]) : make(levels[0][part]);
+      return [
+        { geometry: pick('trunk'), color: BARK, kind: 'bark' as const },
+        ...(levels[0].canopy.indices.length
+          ? [{ geometry: pick('canopy'), color: leaf, kind: 'foliage' as const }]
+          : []),
+      ];
+    };
   switch (name) {
     case 'broadleaf':
-      return tree(p.generateTreeMesh('broadleaf'), LEAF);
+      return tree(
+        chain((detail) => p.generateTreeMesh('broadleaf', { detail })),
+        LEAF,
+      );
     case 'conifer':
-      return tree(p.generateTreeMesh('conifer'), NEEDLE);
+      return tree(
+        chain((detail) => p.generateTreeMesh('conifer', { detail })),
+        NEEDLE,
+      );
     case 'palm':
-      return tree(p.generatePalmMesh(), PALM);
+      return tree(
+        chain((detail) => p.generatePalmMesh({ detail })),
+        PALM,
+      );
     case 'birch':
-      return tree(p.generateBirchMesh(), BIRCH);
+      return tree(
+        chain((detail) => p.generateBirchMesh({ detail })),
+        BIRCH,
+      );
     case 'acacia':
-      return tree(p.generateAcaciaMesh(), DRY);
+      return tree(
+        chain((detail) => p.generateAcaciaMesh({ detail })),
+        DRY,
+      );
     case 'snag':
-      return tree(p.generateSnagMesh(), LEAF);
+      return tree([p.generateSnagMesh()], LEAF);
     case 'rock':
-      return [{ geometry: make(p.generateRockMesh()), color: STONE }];
+      return [{ geometry: make(p.generateRockMesh()), color: STONE, kind: 'stone' }];
     case 'cactus':
-      return [{ geometry: make(p.generateCactusMesh()), color: [0.13, 0.3, 0.1] }];
+      return [{ geometry: make(p.generateCactusMesh()), color: [0.13, 0.3, 0.1], kind: 'bark' }];
     case 'tundra-shrub':
-      return [{ geometry: make(p.generateTundraShrubMesh()), color: [0.3, 0.17, 0.07] }];
+      return [
+        {
+          geometry: rings(chain((detail) => p.generateTundraShrubMesh({ detail }))),
+          color: [0.3, 0.17, 0.07],
+          kind: 'foliage',
+        },
+      ];
     case 'grass':
-      return [{ geometry: make(p.generateGrassMesh(3)), color: [0.2, 0.4, 0.06], blades: true }];
+      return [{ geometry: make(p.generateGrassMesh(3)), color: [0.2, 0.4, 0.06], kind: 'foliage', blades: true }];
     case 'fern':
-      return [{ geometry: make(p.generateFernMesh()), color: [0.08, 0.28, 0.07] }];
+      return [{ geometry: make(p.generateFernMesh()), color: [0.08, 0.28, 0.07], kind: 'foliage' }];
     case 'reeds':
-      return [{ geometry: make(p.generateReedMesh()), color: [0.36, 0.34, 0.11], blades: true }];
+      return [{ geometry: make(p.generateReedMesh()), color: [0.36, 0.34, 0.11], kind: 'foliage', blades: true }];
     default:
-      return [{ geometry: make(p.generateShrubMesh()), color: LEAF }];
+      return [{ geometry: rings(chain((detail) => p.generateShrubMesh({ detail }))), color: LEAF, kind: 'foliage' }];
   }
 }
 
@@ -200,8 +254,7 @@ export class BiomeObjects implements Disposable {
     return n;
   }
 
-  #make = (d: { positions: ArrayLike<number>; normals: ArrayLike<number>; indices: ArrayLike<number> }): Geometry =>
-    new this.#modules.core.Geometry(d.positions, d.normals, d.indices);
+  #make = (d: Data): Geometry => new this.#modules.core.Geometry(d.positions, d.normals, d.indices);
 
   #build(): void {
     const { radius, detailRadius, detailResolution, bounds, heightmap } = this.#options,
@@ -226,9 +279,11 @@ export class BiomeObjects implements Disposable {
               lodFade: 0,
               // Lit by the engine's sun and sky and shadowed by an attached Shadows, like the terrain under it.
               material: this.#material(part.color),
+              // Each object its own tint; leaves shade as clusters (a few vertex operations, shadows unchanged).
+              ...OBJECT_LOOKS[part.kind],
               maxSlope: 90,
               // Plants sway with a light breeze; stone does not.
-              ...(part.color === STONE ? {} : { wind: [1, 0, 0.25] as const }),
+              ...(part.kind === 'stone' ? {} : { wind: [1, 0, 0.25] as const }),
               // A tree's canopy draws the trunk's objects: one set of records, culling and rings for both.
               ...(list.length ? { share: list[0] } : {}),
             }),

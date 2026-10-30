@@ -42,6 +42,36 @@ await runSuite(
       r.full.mean.toFixed(3),
       r.full.sd.toFixed(3),
     );
+    // Biome look round 2 (landing D): leaves shade as clusters and every tree has its own tint. Before it each canopy
+    // was one smooth mesh in one colour (objects-look.html). Measured on the RTX A6000 (about 100 green trees, with the
+    // round 1 palette): median tree luma texture 0.056 before and 0.069 after, hue spread over the trees 0.0044 before
+    // and 0.027 after (about 6 times). A whole tree's luma standard deviation was 0.10 before already (lit and shaded
+    // sides), so the texture takes out each pixel's 7x7 local mean. Limits: texture above 0.062 (between the two),
+    // spread above three times 0.0044.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(new URL('/packages/biomes/tests/objects-look.html', page.url()).href);
+    await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+    const look = await page.evaluate(() => window.check.run()),
+      green = look.trees.filter((t) => t.hue > 0.15 && t.hue < 0.5),
+      middle = (list) => [...list].sort((a, b) => a - b)[list.length >> 1],
+      texture = middle(green.map((t) => t.texture)),
+      mean = green.reduce((a, t) => a + t.hue, 0) / green.length,
+      spread = Math.sqrt(green.reduce((a, t) => a + (t.hue - mean) ** 2, 0) / green.length);
+    await writeFile('test-results/biomes-objects-look.json', JSON.stringify({ hardware, look }, null, 1));
+    assert.equal(look.validation, null);
+    assert.deepEqual(look.errors, []);
+    assert.deepEqual(pageErrors, []);
+    assert.ok(green.length >= 40, `green trees measured: ${green.length} of ${look.trees.length}`);
+    assert.ok(texture > 0.062, `median tree luma texture ${texture.toFixed(4)}: the canopy shades as one smooth blob`);
+    assert.ok(spread > 3 * 0.0044, `hue spread over the trees ${spread.toFixed(4)}: the trees share one colour`);
+    console.log(
+      'ok biomes objects look:',
+      green.length,
+      'trees, luma texture',
+      texture.toFixed(4),
+      'hue spread',
+      spread.toFixed(4),
+    );
   },
   () => context.close(),
 );

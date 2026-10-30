@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Biome objects frame check</title><style>body{margin:0;background:#000}canvas{display:block;width:1440px;height:900px}</style></head><body><canvas width="1440" height="900"></canvas>
+<script type="module">
+// Frame time of the zero-configuration world at the biome shots' cameras 01 (wide, 330 m up) and 02 (on the ground),
+// 1440x900, Sky at noon with lighting and environment, water 'auto', with an attached Shadows and without.
+// window.check.frame(name, shadows) returns the median and mean of 150 frames, each rendered and waited for on the GPU.
+import {Engine} from '/packages/core/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {BiomeWorld} from '/packages/biomes/dist/index.js';
+import {BiomeView} from '/packages/biomes/dist/view.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,300,900],target:[0,60,0],near:0.3,far:20000}});
+Sky.attach(engine,{hours:12,timeScale:0,lighting:{intensity:3},environment:true});
+const errors=[];engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const world=await BiomeWorld.create(),ground=(x,z)=>world.sample(x,z).height;
+const CAMERAS={
+ '01':{position:[0,ground(0,0)+330,1000],target:[0,ground(0,-400)-20,-400]},
+ '02':{position:[-300,ground(-300,200)+1.8,200],target:[-100,ground(-300,200)+1.8,-200]},
+};
+const frame=async()=>{engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();};
+window.check={
+ async frame(name,withShadows){
+  const camera=CAMERAS[name],shadows=withShadows?Shadows.attach(engine):undefined;
+  for(let i=0;i<3;i++){engine.camera.position[i]=camera.position[i];engine.camera.target[i]=camera.target[i];}
+  const view=await BiomeView.attach(engine,world,{...(shadows?{shadows}:{}),water:'auto'});
+  await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();await waitForPipelines(frame);
+  // fixed-wait: warm-up before the timed frames (clocks and caches settle; the measurement is the point of the check)
+  for(let i=0;i<30;i++)await frame();
+  const times=[];
+  // fixed-wait: the timed frames themselves
+  for(let i=0;i<150;i++){const t=performance.now();await frame();times.push(performance.now()-t);}
+  view.dispose();shadows?.dispose();await frame();
+  times.sort((a,b)=>a-b);
+  return {median:times[times.length>>1],mean:times.reduce((a,b)=>a+b,0)/times.length,errors:errors.splice(0)};
+ },
+};
+window.ready=true;
+</script></body></html>
