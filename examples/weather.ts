@@ -135,6 +135,22 @@ try {
       sync();
     },
   });
+  if (still) {
+    // Reduced motion: the weather clock stays at t = 0, so rain, hail and lightning hold still, while frames keep coming
+    // for the camera controls. The engine's own loop would hand the weather each frame's real time.
+    stage.engine.stop();
+    const frame = () => {
+      if (life.signal.aborted) return;
+      try {
+        stage.engine.render({ delta: 0 });
+      } catch (error) {
+        status.textContent = String(error);
+        return;
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
   window.weatherDemo = { machine, weather: sky, hail };
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   canvas.dataset.ready = 'true';

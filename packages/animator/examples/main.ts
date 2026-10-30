@@ -227,6 +227,12 @@ try {
     iterations = $<HTMLInputElement>('iterations'),
     weight = $<HTMLInputElement>('weight'),
     on = { signal: life.signal };
+  // Under prefers-reduced-motion (and so in the visual checks' still frame) the clip and the target start held still;
+  // both boxes turn them on.
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    sway.checked = wander.checked = false;
+    animator.playing = false;
+  }
   reach.addEventListener('change', () => (chain.reach = reach.checked), on);
   limits.addEventListener(
     'change',

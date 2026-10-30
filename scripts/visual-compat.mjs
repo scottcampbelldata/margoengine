@@ -13,7 +13,8 @@
 // frames after the capture, both paths. `--budget=<ms>` fails a demo whose median frame on the layer costs more and
 // at least twice its native frame (the per-frame budget check for integrated GPUs; default 50 ms).
 // Gate: each demo's status must match scripts/support/visual-compat-expected.json, and a "differs" demo may not get
-// worse than its recorded share and mean (x1.5 plus 0.001 / 0.25). `--write` records this run there and rewrites the
+// worse than its recorded share and mean (x1.5 plus 0.001 / 0.25), and a demo recorded with an exact still frame (its two
+// native captures equal pixel for pixel) must keep it, so native noise can never flip its status. `--write` records this run there and rewrites the
 // table in docs/webgl2-compat-demos.md. Takes a shared slot of the GPU lock, like the visual check.
 import { spawnSync, execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -26,6 +27,7 @@ import { compatShim } from './support/compat-shim.js';
 import { compare, downsample, encodePNG } from './support/visual-image.js';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
+import { SAME, gateProblems, record, verdict } from './support/visual-compat-status.js';
 
 const root = resolve(import.meta.dirname, '..'),
   out = resolve(root, 'test-results/visual-compat'),
@@ -36,8 +38,7 @@ const only = (arg('only') ?? '').split(',').filter(Boolean),
   write = process.argv.includes('--write'),
   budget = Number(arg('budget') ?? 50),
   maxMinutes = Number(arg('max-minutes') ?? 90);
-/** The roadmap's parity rule (decision 4). */
-export const SAME = { over2: 0.001, mean: 0.25 };
+export { SAME };
 
 const iphone =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
@@ -140,7 +141,6 @@ function metrics(a, b) {
   const r = (v) => Number(v.toPrecision(3));
   return { over2: r(over2 / (a.width * a.height)), mean: r(m.mean), max: m.max, hot: r(m.hot), image: m.image };
 }
-const verdict = (d) => (d.over2 <= SAME.over2 && d.mean <= SAME.mean ? 'same' : 'differs');
 
 if (!process.argv.includes('--no-build') && cases.some((c) => !c.demo.dev)) {
   const built = spawnSync(process.execPath, ['scripts/build-site.js'], { cwd: root, stdio: 'inherit' });
@@ -270,22 +270,12 @@ try {
     }
     row.refused = c.refused;
     row.seconds = { native: a.ms / 1000, compat: c.ms / 1000 };
-    // The gate: the recorded status, no worse differences, the frame budget.
-    const want = expected.demos[id],
-      problems = [];
-    if (row.status === 'native failed' || row.status === 'failed') problems.push(row.errors[0] ?? row.status);
-    else if (!write) {
-      if (!want) problems.push('not in visual-compat-expected.json (run with --write)');
-      else if (want.status !== row.status) problems.push(`expected ${want.status}, got ${row.status}`);
-      else if (row.status === 'differs')
-        for (const k of ['over2', 'mean'])
-          if (row.diff[k] > want[k] * 1.5 + (k === 'over2' ? 0.001 : 0.25))
-            problems.push(`${k} ${row.diff[k]} over the recorded ${want[k]}`);
-    }
-    // Over the budget counts when the layer at least doubles the native frame: a page whose own frame is slow
-    // natively (a heavy glTF stress model) is not the layer's cost.
-    if (row.frame && row.frame.compat.work > budget && row.frame.compat.work > 2 * row.frame.native.work)
-      problems.push(`median frame on the layer ${row.frame.compat.work.toFixed(1)} ms, over the ${budget} ms budget`);
+    // The gate (scripts/support/visual-compat-status.js): the recorded status, no worse differences, an exact still
+    // frame stays exact, the frame budget.
+    const problems =
+      row.status === 'native failed' || row.status === 'failed'
+        ? [row.errors[0] ?? row.status]
+        : gateProblems(row, expected.demos[id], { write, budget });
     if (problems.length) exitCode = 1;
     row.problems = problems;
     rows.push(row);
@@ -310,13 +300,7 @@ try {
       .join('\n')}</table>`,
   );
   if (write) {
-    for (const r of rows)
-      if (r.status !== 'failed' && r.status !== 'native failed')
-        expected.demos[r.id] = {
-          status: r.status,
-          ...(r.status === 'differs' ? { over2: r.diff.over2, mean: r.diff.mean } : {}),
-          ...(r.refused ? { refused: r.refused } : {}),
-        };
+    for (const r of rows) if (r.status !== 'failed' && r.status !== 'native failed') expected.demos[r.id] = record(r);
     expected.demos = Object.fromEntries(Object.entries(expected.demos).sort(([x], [y]) => x.localeCompare(y)));
     await writeFile(expectedPath, JSON.stringify(expected, null, 1) + '\n');
     await writeDoc(rows, environment);
@@ -354,7 +338,11 @@ async function writeDoc(rows, environment) {
             : r.status === 'webgpu only'
               ? 'kept on WebGPU only (shows the needs-WebGPU message) until its bug on the layer is fixed, see known-bugs.md'
               : r.status;
-    const noise = r.noise ? `${pct(r.noise.over2)}, mean ${r.noise.mean}` : '-';
+    const noise = r.noise
+      ? r.noise.max === 0
+        ? 'exact'
+        : `${pct(r.noise.over2)}, mean ${r.noise.mean}, max d ${r.noise.max}`
+      : '-';
     const frame = r.frame
       ? `${ms(r.frame.native.work)} / ${ms(r.frame.compat.work)}; ${ms(r.frame.native.interval)} / ${ms(r.frame.compat.interval)}`
       : '-';

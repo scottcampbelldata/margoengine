@@ -225,7 +225,7 @@ does not own. Each entry says exactly what is needed to close it.
 - **What:** `npm run visual:compat` (table in [webgl2-compat-demos.md](webgl2-compat-demos.md)) records demos that
   run on the layer with more than the parity rule's difference while their native noise is 0: light-keeper (7.1% of
   pixels, d > 2), voxel views (0.2% to 1.5%, the far terrain), gameplay sandbox (1.2%), DOF (0.7%, edges), night
-  citadel (0.2%, embers and haze), weather and others.
+  citadel (0.2%, embers and haze) and others.
 - **Cause:** not found yet for each. Leads: CPU-tier transcendental functions differ from the GPU in the last bits, and
   a `fract(sin(x) * k)` hash turns that into other random values (particles, haze); MSAA depth is resolved by one
   sample on the layer (DOF edges). Each needs its cause shown, then a fix or a recorded accepted difference.

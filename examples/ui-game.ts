@@ -37,7 +37,10 @@ try {
     app.box({ size: [1.1, 1.1, 1.1], color: i ? '#e69f00' : '#56b4e9', position: [x, -0.4, 0] }),
   );
   app.fit();
+  // The backdrop holds still under prefers-reduced-motion (and so in the visual checks' still frame).
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   app.onTick((delta) => {
+    if (reduced.matches) return;
     orb.setRotation([0, orb.rotation.y + delta * 0.6, 0]);
     crates.forEach((crate, i) => crate.setRotation([0, crate.rotation.y + delta * (i ? -0.9 : 0.9), 0]));
   });
