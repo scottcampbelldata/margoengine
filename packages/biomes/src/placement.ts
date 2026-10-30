@@ -824,6 +824,8 @@ class Run {
       /** log2 of tileTicks and of cellTicks (both powers of two). */
       tileShift: number;
       cellShift: number;
+      /** Sea level, mm (the world's `climate.sea`): no species grows on ground below it. */
+      sea: number;
     },
     readonly shapes: Shapes,
     /** Pools of earlier runs to reuse (a run goes start to finish in one call, so one run uses them at a time). */
@@ -959,6 +961,8 @@ class Run {
             if (!this.at(x, z, look)) continue;
             const f = look.f!,
               k = look.k;
+            // Land only: species model land plants, rocks and props (none is aquatic), so none stands below sea level.
+            if (f.layers.height[k] < this.geometry.sea) continue;
             // Biome weight of the species' biome here (0 when it is not among the cell's four).
             let w = 0;
             for (let q = 0; q < 4; q++) if (f.ids[k * 4 + q] === sp.biomeIndex) w = f.weights[k * 4 + q];
@@ -1415,6 +1419,7 @@ export class BiomePlacement implements Disposable {
         worldZ: w.tilesZ * tileTicks,
         tileShift: 31 - Math.clz32(tileTicks),
         cellShift: 31 - Math.clz32(w.resolution * TICK),
+        sea: w.climate.sea,
       },
       this.#shapes,
       this.#pools,
@@ -1602,7 +1607,7 @@ export class BiomePlacement implements Disposable {
         if (!d.parts.some((part) => f.present[part.biome]))
           return Object.freeze({ id: d.id, mesh: d.mesh, density: d.density, data });
         for (let k = 0; k < n; k++) {
-          if (exclusion[k]) continue;
+          if (exclusion[k] || f.layers.height[k] < w.climate.sea) continue;
           let sum = 0;
           for (const part of d.parts) {
             let wt = 0;

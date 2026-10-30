@@ -681,3 +681,72 @@ test('time budget (G1): one preset forest tile placed in under 400 ms on one thr
   const each = (performance.now() - start) / 2;
   assert.ok(each < 400, `placement took ${each.toFixed(0)} ms per tile`);
 });
+
+test('sea level: no species stands on ground below the sea, and inland objects do not move', async () => {
+  // Regression: placement read climate fields only, so the wetland coast had alders, willows, oaks and hazels standing
+  // on the sea floor under the view's water (5,524 of 11,573 records on these four coast tiles). No species is aquatic,
+  // so none grows below `climate.seaLevel`: stored objects and detail cover alike. Removing the submerged candidates
+  // only frees room for plants within a few metres of the shore (they were killed by phantom trees in the water).
+  const { createHash } = await import('node:crypto'),
+    w = await BiomeWorld.create({ size: [2048, 2048], ...presetWorldOptions('wetland') }),
+    p = BiomePlacement.attach(w),
+    sea = w.climate.sea,
+    side = w.tileSize, // 256 cells of 1 m
+    heights = new Map();
+  for (let tz = 1; tz <= 4; tz++)
+    for (let tx = 2; tx <= 5; tx++) heights.set(`${tx},${tz}`, (await w.tile(tx, tz)).layer('height').data);
+  // Summed submerged cells over the 4 x 4 tiles around the coast tiles, to ask "any sea within 30 m?" per record.
+  const n = 4 * side,
+    sum = new Int32Array((n + 1) * (n + 1));
+  for (let z = 0; z < n; z++)
+    for (let x = 0; x < n; x++) {
+      const h = heights.get(`${2 + (x >> 8)},${1 + (z >> 8)}`)[(z & 255) * side + (x & 255)];
+      sum[(z + 1) * (n + 1) + x + 1] =
+        (h < sea ? 1 : 0) + sum[z * (n + 1) + x + 1] + sum[(z + 1) * (n + 1) + x] - sum[z * (n + 1) + x];
+    }
+  const wetNear = (gx, gz, r) => {
+    const x0 = Math.max(0, gx - r),
+      z0 = Math.max(0, gz - r),
+      x1 = Math.min(n, gx + r + 1),
+      z1 = Math.min(n, gz + r + 1);
+    return sum[z1 * (n + 1) + x1] - sum[z0 * (n + 1) + x1] - sum[z1 * (n + 1) + x0] + sum[z0 * (n + 1) + x0] > 0;
+  };
+  let below = 0,
+    land = 0,
+    wetDetail = 0;
+  const inland = [];
+  for (const [tx, tz] of [
+    [3, 2],
+    [4, 2],
+    [3, 3],
+    [4, 3],
+  ]) {
+    const h = heights.get(`${tx},${tz}`),
+      t = await p.tile(tx, tz);
+    for (const d of t.density) for (let k = 0; k < d.data.length; k++) if (h[k] < sea && d.data[k]) wetDetail++;
+    let r = 0;
+    t.forEachInstance((i) => {
+      const cx = Math.floor(i.x - t.origin[0]),
+        cz = Math.floor(i.z - t.origin[1]),
+        at = r++ * 8;
+      if (h[cz * side + cx] < sea) below++;
+      else {
+        land++;
+        // Grid position in the 4 x 4 tile block (tile 2, 1 is its corner).
+        if (!wetNear((tx - 2) * side + cx, (tz - 1) * side + cz, 30))
+          inland.push(`${i.key}:${[...t.instances.subarray(at, at + 8)].join(',')}`);
+      }
+    });
+  }
+  assert.equal(below, 0, 'records on ground below sea level');
+  assert.equal(wetDetail, 0, 'detail cover on submerged cells');
+  // Land objects: the 6,049 of the unfixed placement, plus a few on the shore line where water candidates blocked them.
+  assert.ok(land >= 6049 && land <= 6049 * 1.01, `land objects ${land}`);
+  const digest = createHash('sha256').update(inland.join('\n')).digest('hex');
+  if (process.env.MARGO_RECORD) console.log('wetland-coast-inland', inland.length, digest);
+  assert.equal(
+    digest,
+    golden['wetland-coast-inland'],
+    'objects more than 30 m from the sea are those of the unfixed placement',
+  );
+});

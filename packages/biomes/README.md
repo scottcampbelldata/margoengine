@@ -329,6 +329,8 @@ How it works, per tile and each layer in turn (rocks, canopy trees, understory, 
 
 - **Candidates** on world-anchored cells, Poisson counts and positions from integer hashes of (seed, species, cell),
   kept with probability density x biome weight x suitability (Wendland bands on the species' ranges, as envelopes).
+  **Land only**: no species is aquatic, so nothing (stored object or detail cover) grows on a cell below
+  `climate.seaLevel`, whatever its biome; a coast's plants stop at the shore line under the view's sea.
 - **Clusters** (`cluster`): `parents * offspring` plants per hectare cluster around hashed parents, by a Thomas
   (Gaussian), Matern (disc) or Clark 2Dt (fat-tailed: clusters with scattered outliers) kernel; the rest of the
   density is random. This is a shot-noise Cox process, the Neyman-Scott process with Poisson offspring.
