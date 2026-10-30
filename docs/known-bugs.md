@@ -203,12 +203,16 @@ does not own. Each entry says exactly what is needed to close it.
 ### WebGL2 layer: demos that run with differences
 
 - **What:** `npm run visual:compat` (table in [webgl2-compat-demos.md](webgl2-compat-demos.md)) records demos that
-  run on the layer with more than the parity rule's difference while their native noise is 0: light-keeper (7.1% of
-  pixels, d > 2), voxel views (0.2% to 1.5%, the far terrain), gameplay sandbox (1.2%), DOF (0.7%, edges), night
-  citadel (0.2%, embers and haze) and others.
+  run on the layer with more than the parity rule's difference: light-keeper (7.1% of pixels, d > 2, speckle over lit
+  surfaces and rings around the head), voxel views (0.2% to 1.5%, the far terrain) and sciviz points (0.2%). The voxel
+  views differ as much at 1x MSAA (`?quality=light`: voxel night 1.51%), so they are not the accepted multisample
+  difference that DOF, gameplay sandbox and night citadel show
+  ([webgl2-compat-demos.md](webgl2-compat-demos.md#accepted-difference-per-sample-reads-of-multisampled-textures));
+  light keeper and sciviz points have no 1x setting, so that class is not ruled out for them yet.
 - **Cause:** not found yet for each. Leads: CPU-tier transcendental functions differ from the GPU in the last bits, and
-  a `fract(sin(x) * k)` hash turns that into other random values (particles, haze); MSAA depth is resolved by one
-  sample on the layer (DOF edges). Each needs its cause shown, then a fix or a recorded accepted difference.
+  a `fract(sin(x) * k)` hash turns that into other random values (particles, haze); light keeper's speckle is not the
+  bloom dither's phase (the layer's `@builtin(position)` matches WebGPU's). Each needs its cause shown, then a fix or
+  a recorded accepted difference.
 
 ### Findings of the outside audit (2026-10-28)
 

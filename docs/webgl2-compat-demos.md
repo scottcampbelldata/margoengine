@@ -87,3 +87,22 @@ Last recorded 2026-10-30 at bd313fd62 on nvidia ampere (msedge 156.0.4314.50); a
 | `weather` | high | runs, same pixels | exact | 0.3 ms / 0.5 ms; 16.7 ms / 16.7 ms |
 | `windy-meadow` | high | runs, same pixels | exact | - / -; - / - |
 <!-- end of the visual-compat table -->
+
+## Accepted difference: per-sample reads of multisampled textures
+
+WebGL2's shading language (GLSL ES 3.00) cannot read one sample of a multisampled texture. The layer resolves such a
+texture with a blit before a shader samples it, so `textureLoad(t, p, i)` returns the same resolved value for every
+`i`. Native WebGPU reads each sample: core's depth resolve (`resolveDepth` in packages/core/src/renderer.ts) keeps
+each pixel's nearest of the 4 samples, and fog, volumetrics, decals and TAA read samples too. The difference stays on
+silhouette edges. Like for like, the same page at 1x MSAA (`?quality=light`, no multisampled textures), Edge 156 on
+the RTX A6000, 2026-10-30:
+
+| Demo | 4x MSAA (the table above): d > 2 | 1x MSAA: d > 2, max d |
+| --- | --- | --- |
+| `dof` | 0.66% | 0.000%, 1 |
+| `gameplay-sandbox` | 1.16% | 0.006%, 98 (13 pixels with d > 2) |
+| `night-citadel` | 0.20% | 0.000%, 2 |
+
+At 1x MSAA all three are within the parity rule. Of the others that differ, the voxel views differ as much at 1x
+MSAA (voxel night 1.51%); light keeper and sciviz points have no 1x setting. Their causes are open in
+[known-bugs.md](known-bugs.md).
