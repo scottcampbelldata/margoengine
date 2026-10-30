@@ -1,0 +1,89 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter shadow culling check</title><style>body{margin:0}canvas{display:block;width:384px;height:384px}</style></head><body><canvas width="384" height="384"></canvas>
+<script type="module">
+// Real-GPU proof for scatter's per-cascade shadow culling (shadow-cull.browser.mjs drives it): each scene is drawn with
+// its scatters added to Shadows (culled per cascade by prepareShadow) and with the same scatters behind a plain
+// drawShadow wrapper (no prepareShadow: every cascade draws every camera-culled instance). The shadow maps and the
+// frames are read back for comparison. Rendering uses delta 0, so wind time and every other input stay the same.
+import {Engine,Geometry,box} from '/packages/core/dist/index.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {ScatterTiles} from '/packages/scatter/dist/tiles.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,15,40],target:[0,0,-40],near:0.5,far:600}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([0.6,1,0.3]);
+const floor=engine.createMesh().setGeometry(box(800,0.1,800)).setPosition([0,-0.05,0]);
+const shadows=Shadows.attach(engine,{resolution:1024,distance:120});
+shadows.add(floor,{castShadow:false});
+// One tile over the whole floor; x and z in metres, scale 1, yaw `turn` of 256.
+const bounds=[-400,-400,400,400];
+// Record coordinates are 16-bit steps of the tile; `at` is where the GPU puts one.
+const q=(v)=>Math.round((v+400)/800*65536),at=(v)=>-400+q(v)*800/65536;
+const records=(points)=>{const w=new Uint32Array(points.length*2);points.forEach(([x,z,turn=0],i)=>{w[i*2]=q(x)|(q(z)<<16);w[i*2+1]=(128<<8)|(turn<<16);});return new Uint8Array(w.buffer);};
+// Near: a 7 x 7 grid within 15 m of the origin. Far: the same 300 m further along the view, past the 120 m shadows.
+const near=[],far=[];
+for(let i=0;i<7;i++)for(let j=0;j<7;j++){near.push([i*5-15,j*5-15,(i*37+j*11)&255]);far.push([i*5-15,j*5-315,(i*13+j*29)&255]);}
+const scenes={
+ // Three LOD meshes with fades between them, random scales and strong wind: instances in every ring and both fade halves.
+ scatter:()=>[Scatter.attach(engine,[box(1,4,1),box(1.4,3,1.4),box(2,2,2)],{count:5000,area:[320,320],scale:[0.5,2],lod:[40,100,280],lodFade:6,wind:[1,0.3,0.9],color:[0.8,0.8,0.8]})],
+ // Grass blades widen with distance (cull radius times 1 + widen) and bend in the wind.
+ blades:()=>[Scatter.attach(engine,box(0.3,1.6,0.06),{count:40000,area:[220,220],lod:[20,60,180],wind:[0.4,1,1],blades:{widen:3},color:[0.3,0.6,0.2]})],
+ // A trunk and a sharing canopy: the canopy culls with its own radius from the trunk's rings.
+ tiles:()=>{
+  const trunk=ScatterTiles.attach(engine,box(1,6,1),{bounds,lod:[40,100,400],color:[0.5,0.4,0.3]});
+  const canopy=ScatterTiles.attach(engine,raised(box(4,3,4),5),{bounds,lod:[40,100,400],share:trunk,color:[0.2,0.5,0.2]});
+  trunk.setTile('all',[-400,-400],800,records([...near,...far]));
+  return [trunk,canopy];
+ },
+};
+// A mesh moved up by `y`, so its bounds sit off its origin (the cull radius counts the centre's distance too).
+function raised(g,y){
+ const v=g.vertices,n=v.length/6,p=new Float32Array(n*3),m=new Float32Array(n*3);
+ for(let i=0;i<n;i++)for(let a=0;a<3;a++){p[i*3+a]=v[i*6+a]+(a===1?y:0);m[i*3+a]=v[i*6+3+a];}
+ return new Geometry(p,m,g.indices);
+}
+let scatters=[],removers=[];const saved={};
+const frames=async()=>{for(let i=0;i<3;i++){engine.render({delta:0});await device.queue.onSubmittedWorkDone();}};
+const read=async(buffer,size)=>{
+ const out=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();
+ e.copyBufferToBuffer(buffer,0,out,0,size);device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);
+ const data=new Uint32Array(out.getMappedRange().slice(0));out.destroy();return data;
+};
+const readDepth=async()=>{
+ const t=shadows.depthTexture,size=t.width*t.height*t.depthOrArrayLayers*4,out=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();
+ e.copyTextureToBuffer({texture:t,aspect:'depth-only'},{buffer:out,bytesPerRow:t.width*4,rowsPerImage:t.height},[t.width,t.height,t.depthOrArrayLayers]);
+ device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);const data=new Float32Array(out.getMappedRange().slice(0));out.destroy();return data;
+};
+window.check={
+ // Builds a scene's scatters (dropping the last scene's) and adds them as `mode`: 'culled' or 'full'.
+ async show(scene,mode){
+  removers.forEach(r=>r());removers=[];
+  if(mode==='new'){scatters.forEach(s=>s.dispose());scatters=scenes[scene]();return errors.splice(0);}
+  device.pushErrorScope('validation');
+  for(const s of scatters)removers.push(shadows.add(mode==='culled'?s:{drawShadow:(c)=>s.drawShadow(c)}));
+  await frames();
+  const e=await device.popErrorScope();if(e)errors.push(e.message);
+  return errors.splice(0);
+ },
+ // Keeps the shadow map (every cascade) under `tag`; with `against`, compares the two bit for bit.
+ async depth(tag,against){
+  const d=await readDepth();saved[tag]=d;if(!against)return null;
+  const a=new Uint32Array(d.buffer),b=new Uint32Array(saved[against].buffer),layers=shadows.depthTexture.depthOrArrayLayers,layer=d.length/layers,covered=new Array(layers).fill(0);
+  let mismatches=0,first=-1;
+  for(let i=0;i<a.length;i++){if(a[i]!==b[i]){mismatches++;if(first<0)first=i;}if(d[i]<1)covered[Math.floor(i/layer)]++;}
+  return {mismatches,first,layers,covered:covered.map(c=>+(c/layer).toFixed(4))};
+ },
+ // Per scatter: camera-culled instances per ring, and per cascade the instances its indirect draws name.
+ async counts(){
+  const out=[];
+  for(const s of scatters){
+   const camera=await read(s.commands,60),cull=s.cascadeCull.commands,cascades=await read(cull,cull.size);
+   out.push({camera:[1,6,11].map(k=>camera[k]),cascades:[0,1,2,3].map(c=>[0,1,2].map(r=>cascades[(c*3+r)*5+1])),radius:s.values[35]});
+  }
+  return out;
+ },
+ // The tiles scene's instances and Shadows' cascade matrices, for the CPU classification in the driver.
+ layout(){const place=(list)=>list.map(([x,z])=>[at(x),at(z)]);return {near:place(near),far:place(far),matrices:Array.from(shadows.matrices)};},
+};
+window.ready=true;
+</script></body></html>

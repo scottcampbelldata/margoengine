@@ -40,6 +40,7 @@ declare const GPUBufferUsage: {
   INDIRECT: number;
   UNIFORM: number;
   COPY_DST: number;
+  COPY_SRC: number;
 };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type ScatterPassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -247,6 +248,55 @@ struct Instance {position:vec4f,rotation:vec4f}
  return frame.light*vec4f(scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind).world,1);
 }
 `;
+// The same, drawing only the instances the cascade's list names (see `shadowCullCode`).
+const shadowListCode = shadowCode
+  .replace('@vertex', '@group(0) @binding(2) var<storage,read> list:array<u32>;\n@vertex')
+  .replace('instances[index]', 'instances[list[index]]');
+// Per shadow cascade and LOD ring: the camera-culled instances that can reach the cascade, and their draw counts. A posed
+// instance stays inside a sphere around its root of the distribute pass's radius per unit scale (frame value 35: the
+// meshes' reach, doubled for wind, widened for blades) times its scale. A sphere wholly outside one of the six clip
+// planes of a cascade's light matrix (rows w + x, w - x, w + y, w - y, z and w - z) clips away entirely there, so
+// leaving it out keeps the cascade's depth. The radius is padded for float32 rounding; order is free in a depth pass.
+// u.size: (cascades, radius); u.lists: each ring's offset in a cascade's list and the cascade stride.
+const shadowCullCode = `
+struct Cull {light:array<mat4x4f,4>,lists:vec4u,size:vec4f}
+@group(0) @binding(0) var<uniform> u:Cull;
+@group(0) @binding(1) var<storage,read> counts:array<u32,15>;
+@group(0) @binding(2) var<storage,read> near:array<vec4f>;
+@group(0) @binding(3) var<storage,read> middle:array<vec4f>;
+@group(0) @binding(4) var<storage,read> far:array<vec4f>;
+@group(0) @binding(5) var<storage,read_write> lists:array<u32>;
+@group(0) @binding(6) var<storage,read_write> commands:array<atomic<u32>>;
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){
+ let ring=id.y;let i=id.x;if(i>=counts[ring*5u+1u]){return;}
+ var p:vec4f;if(ring==0u){p=near[i*2u];}else if(ring==1u){p=middle[i*2u];}else{p=far[i*2u];}
+ let r=u.size.y*p.w;let radius=r+1e-5*(length(p.xyz)+r);
+ for(var c=0u;c<u32(u.size.x);c++){
+  let m=transpose(u.light[c]);var planes=array(m[3]+m[0],m[3]-m[0],m[3]+m[1],m[3]-m[1],m[2],m[3]-m[2]);var k=0u;
+  while(k<6u&&dot(planes[k].xyz,p.xyz)+planes[k].w>=-radius*length(planes[k].xyz)){k++;}
+  if(k==6u){lists[c*u.lists.w+u.lists[ring]+atomicAdd(&commands[(c*3u+ring)*5u+1u],1u)]=i;}
+ }
+}`;
+/** The depth-only pipeline of a shadow vertex shader (24-byte core vertices). */
+function shadowDepth(d: GPUDevice, code: string): GPURenderPipeline {
+  return d.createRenderPipeline({
+    layout: 'auto',
+    vertex: {
+      module: d.createShaderModule({ code }),
+      entryPoint: 'vertex',
+      buffers: [
+        {
+          arrayStride: 24,
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: 'float32x3' },
+            { shaderLocation: 1, offset: 12, format: 'float32x3' },
+          ],
+        },
+      ],
+    },
+    depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
+  });
+}
 /** Whether the frame carries the world-rectangle fields (follow offsets and bounds). */
 const extended = (o: ScatterOptions) => !!(o.bounds || o.follow || o.densityMap);
 
@@ -355,6 +405,26 @@ export class Scatter implements EnginePlugin {
   private shadowUniforms: GPUBuffer[] = [];
   private readonly shadowGroups: GPUBindGroup[][] = [];
   private readonly shadowValues = new Float32Array(32);
+  /**
+   * Per-cascade culling (`prepareShadow`): the ring buffers and cascade count its lists were made for, the lists and
+   * indirect draws (none when too large to bind), the draw bind groups, and the frame's encoder once it culled.
+   */
+  private cascadeCull?: {
+    rings: GPUBuffer[];
+    cascades: number;
+    lists?: GPUBuffer;
+    commands?: GPUBuffer;
+    group?: GPUBindGroup;
+    draws: GPUBindGroup[][];
+    threads: number;
+    encoder?: GPUCommandEncoder;
+  };
+  private cullPipeline?: GPUComputePipeline;
+  private listPipeline?: GPURenderPipeline;
+  private cullUniform?: GPUBuffer;
+  /** Four light matrices, then each ring's list offset and the cascade stride (u32), then cascades and radius. */
+  private readonly cullValues = new Float32Array(72);
+  private readonly listOffsets = new Uint32Array(this.cullValues.buffer, 256, 4);
   /** Whether any instance can fade between LOD meshes: shaders keep the dither `discard` only then. */
   private readonly fade: boolean;
   constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input: ScatterOptions = {}) {
@@ -523,9 +593,10 @@ export class Scatter implements EnginePlugin {
       this.materialUniform = d.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       this.materialValues.set(this.options.material.data);
     }
+    // Readable (COPY_SRC) so a test or tool can read how many instances each ring drew.
     this.commands = d.createBuffer({
       size: 60,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     });
     const commands = new Uint32Array(15);
     for (let i = 0; i < 3; i++) {
@@ -799,9 +870,79 @@ export class Scatter implements EnginePlugin {
     pass.end();
   }
   /**
+   * Culls this frame's instances per shadow cascade on the GPU, before the cascades draw: `Shadows` calls it once per
+   * frame with every cascade's matrix. Each cascade then draws, per LOD ring, only the instances whose posed bounds reach
+   * its light box; the others would clip away there, so the shadow map is the same. Without this call in the frame (a
+   * caller that only uses `drawShadow`), every cascade draws every camera-culled instance.
+   */
+  prepareShadow({
+    context,
+    matrices,
+    cascades,
+  }: {
+    context: ScatterPassContext;
+    matrices: Float32Array;
+    cascades: number;
+  }): void {
+    if (this.disposed || !this.commands) return;
+    const d = context.device,
+      rings = this.instances,
+      o = this.listOffsets;
+    let cull = this.cascadeCull;
+    // Made again for another cascade count or new ring buffers (a ScatterTiles ring grew or shrank).
+    if (
+      cull?.cascades !== cascades ||
+      rings[0] !== cull.rings[0] ||
+      rings[1] !== cull.rings[1] ||
+      rings[2] !== cull.rings[2]
+    ) {
+      cull?.lists?.destroy();
+      cull?.commands?.destroy();
+      // Each ring's list 256-byte aligned, so a draw binds its own range.
+      const sizes = rings.map((b) => Math.ceil(b.size / 2048) * 64),
+        stride = sizes[0] + sizes[1] + sizes[2],
+        bytes = cascades * stride * 4,
+        commands = new Uint32Array(cascades * 15);
+      cull = this.cascadeCull = { rings: [...rings], cascades, draws: [], threads: Math.max(...sizes) };
+      // Lists the GPU cannot bind leave every cascade drawing every camera-culled instance.
+      if (bytes > Math.min(d.limits.maxStorageBufferBindingSize, d.limits.maxBufferSize)) return;
+      cull.lists = d.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE });
+      for (let i = 0; i < cascades * 3; i++) commands[i * 5] = this.geometries[i % 3].indices.length;
+      cull.commands = d.createBuffer({
+        size: commands.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+      });
+      d.queue.writeBuffer(cull.commands, 0, commands);
+      o.set([0, sizes[0], sizes[0] + sizes[1], stride]);
+    }
+    cull.encoder = undefined;
+    if (!cull.lists) return;
+    const v = this.cullValues;
+    this.cullPipeline ??= compute(d, shadowCullCode);
+    this.cullUniform ??= d.createBuffer({
+      size: v.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    cull.group ??= group(d, this.cullPipeline, [
+      { buffer: this.cullUniform },
+      { buffer: this.commands },
+      ...rings.map((buffer) => ({ buffer })),
+      { buffer: cull.lists },
+      { buffer: cull.commands! },
+    ]);
+    for (let i = 0; i < cascades * 16; i++) v[i] = matrices[i];
+    v[68] = cascades;
+    v[69] = this.values[35];
+    d.queue.writeBuffer(this.cullUniform, 0, v as Float32Array<ArrayBuffer>);
+    for (let i = 0; i < cascades * 3; i++) context.encoder.clearBuffer(cull.commands!, i * 20 + 4, 4);
+    dispatch(context, this.cullPipeline, cull.group, Math.ceil(cull.threads / 64), 3);
+    cull.encoder = context.encoder;
+  }
+  /**
    * Draws this frame's culled instances into one shadow cascade, depth only, with the colour pass's pose, ground fit
    * and wind: `shadows.add(scatter)` (`@margoengine/shadows`) makes a scatter cast. The instances are the ones culled
-   * against the camera this frame, so an instance outside the view casts no shadow onto ground inside it.
+   * against the camera this frame, so an instance outside the view casts no shadow onto ground inside it; after
+   * `prepareShadow` in the same frame, only those that reach this cascade.
    */
   drawShadow({
     context,
@@ -815,43 +956,41 @@ export class Scatter implements EnginePlugin {
     cascade: number;
   }): void {
     if (this.disposed || !this.commands) return;
-    const d = context.device;
-    this.shadowPipeline ??= d.createRenderPipeline({
-      layout: 'auto',
-      vertex: {
-        module: d.createShaderModule({ code: shadowCode }),
-        entryPoint: 'vertex',
-        buffers: [
-          {
-            arrayStride: 24,
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: 'float32x3' },
-              { shaderLocation: 1, offset: 12, format: 'float32x3' },
-            ],
-          },
-        ],
-      },
-      depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
-    });
+    const d = context.device,
+      cull = this.cascadeCull,
+      culled = !!cull && context.encoder === cull.encoder && cascade < cull.cascades,
+      pipeline = culled
+        ? (this.listPipeline ??= shadowDepth(d, shadowListCode))
+        : (this.shadowPipeline ??= shadowDepth(d, shadowCode));
     // One uniform per cascade: every cascade's pass is recorded before the queue writes reach the GPU.
     const uniform = (this.shadowUniforms[cascade] ??= d.createBuffer({
       size: 128,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     }));
-    const groups = (this.shadowGroups[cascade] ??= this.instances.map((buffer) =>
-      group(d, this.shadowPipeline!, [{ buffer: uniform }, { buffer }]),
-    ));
+    const o = this.listOffsets,
+      groups = culled
+        ? (cull!.draws[cascade] ??= this.instances.map((buffer, ring) =>
+            group(d, pipeline, [
+              { buffer: uniform },
+              { buffer },
+              { buffer: cull!.lists!, offset: (cascade * o[3] + o[ring]) * 4, size: (o[ring + 1] - o[ring]) * 4 },
+            ]),
+          ))
+        : (this.shadowGroups[cascade] ??= this.instances.map((buffer) =>
+            group(d, pipeline, [{ buffer: uniform }, { buffer }]),
+          ));
     const values = this.shadowValues;
     values.set(matrix);
     values.set(this.values.subarray(16, 20), 16); // the eye: blades widen with camera distance, as drawn
     values.set(this.values.subarray(68, 80), 20); // wind and time, ground fit, blades
     d.queue.writeBuffer(uniform, 0, values as Float32Array<ArrayBuffer>);
-    pass.setPipeline(this.shadowPipeline);
+    pass.setPipeline(pipeline);
     for (let i = 0; i < 3; i++) {
       pass.setBindGroup(0, groups[i]);
       pass.setVertexBuffer(0, this.vertices[i]);
       pass.setIndexBuffer(this.indices[i], 'uint32');
-      pass.drawIndexedIndirect(this.commands, i * 20);
+      if (culled) pass.drawIndexedIndirect(cull!.commands!, (cascade * 3 + i) * 20);
+      else pass.drawIndexedIndirect(this.commands, i * 20);
     }
   }
   /** Instances each LOD ring can hold: every candidate for the grid. */
@@ -886,6 +1025,10 @@ export class Scatter implements EnginePlugin {
     this.shadowUniforms = [];
     this.shadowGroups.length = 0;
     this.shadowPipeline = undefined;
+    this.cascadeCull?.lists?.destroy();
+    this.cascadeCull?.commands?.destroy();
+    this.cullUniform?.destroy();
+    this.cascadeCull = this.cullUniform = this.cullPipeline = this.listPipeline = undefined;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();

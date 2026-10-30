@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3909911,
+  "total": 3911162,
   "history": [
     {
       "date": "2026-10-24",
@@ -872,6 +872,12 @@
       "commit": "8024c345a",
       "reason": "biomes view: the overview runs the ground rules on the region grid (bilinear), temperature ground rules, and the water option that loads @margoengine/water by import() (biome look plan L5)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "3b4921002",
+      "reason": "scatter: per-cascade GPU shadow culling (prepareShadow, cull shader, list draws) cuts the biome world's four-cascade shadow frame from 72.9 to 44 ms with an identical shadow map",
+      "grew": 1
     }
   ],
   "items": {
@@ -1136,7 +1142,7 @@
     "@margoengine/road": 1171,
     "@margoengine/save": 6955,
     "@margoengine/save/node": 939,
-    "@margoengine/scatter": 13299,
+    "@margoengine/scatter": 14550,
     "@margoengine/scatter/tiles": 3448,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,

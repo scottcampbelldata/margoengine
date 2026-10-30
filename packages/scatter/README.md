@@ -84,8 +84,20 @@ cascade, depth only, with the colour pass's pose, ground fit and wind. A lit
 scatter (`material`) also receives. The instances drawn are the ones culled
 against the camera that frame, so an instance outside the view casts no shadow
 onto ground inside it (a tall tree just behind the camera, say), as with the
-unshadowed translucency below. Cost: every cascade draws every visible instance
-with its ring's mesh again, so give distant rings light meshes.
+unshadowed translucency below. Before the cascades draw, `prepareShadow` (which
+`Shadows` calls once per frame) culls those instances per cascade in one compute
+pass: an instance whose posed bounds (the meshes' reach, doubled for wind and
+widened for blades, times its scale) lie wholly outside a cascade's light box
+would clip away there, so that cascade's indirect draw leaves it out and the
+shadow map is unchanged, bit for bit. Instances past the shadow `distance` are
+drawn in no cascade, and near cascades draw a small share. The zero-config biome
+world (1440 x 900, RTX A6000, camera 25 m up) went from 72.9 to 43 to 44 ms per
+frame with four cascades and from 50.1 to 39 to 40 ms with two; it draws in 27 ms
+without shadows and 28 to 29 ms with only the terrain casting. Most of what is
+left is the last cascade, whose light box holds most trees in view.
+Cascades still draw each instance they reach with its ring's full mesh (no
+coarser mesh per cascade, which would change the shadow), so light distant rings
+still help. The lists cost 4 bytes per ring slot per cascade.
 
 ```ts
 import { Engine, PbrMaterial, box } from '@margoengine/core';

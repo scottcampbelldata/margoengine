@@ -48,6 +48,32 @@ covering a square region, so a non-square map there just gives the two axes diff
 
 Core meshes receive shadows automatically. `shadows.add(pbrModel)` or `shadows.add(loadedMesh)` adds the owning model's lighting hook and reads current stride-80 buffers after animation compute. Registering both draws each primitive once; a dynamic registration takes precedence over a cached registration. Removing one registration preserves the remaining lighting hook. Alpha-masked PBR casters honor their base map, vertex alpha, UV set, texture transform and cutoff; blended casters are omitted. A caster primitive with `displacement` (materials meshes with a `displacementMap`) is drawn displaced along its normals, as its beauty pass is, and redraws every frame so live scale and bias edits show. No duplicate core geometry is created. `shadows.add(clipmapTerrain)` uses its GPU height sampling for depth and its lighting hook for reception. Custom sources can implement `drawShadow(ShadowContext)`.
 
+A custom source may also implement `prepareShadow(ShadowPrepareContext)`. Shadows calls it once per frame, before any
+cascade's depth pass opens and only on frames the source draws, with every cascade's light matrix (`matrices`, 16
+floats per cascade) and the cascade count. No pass is open on `context.encoder` then, so the source can record compute
+work the cascades share. GPU `Scatter` uses it to cull its instances per cascade: each cascade then draws only the
+instances whose bounds reach its light box, so the shadow map comes out the same with fewer draws.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { Shadows, type ShadowContext, type ShadowPrepareContext } from 'margoengine/shadows';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const shadows = Shadows.attach(engine, { cascades: 2 });
+const lights: Float32Array[] = [];
+shadows.add({
+  // Once per frame, no pass open: record compute work here (scatter culls per cascade).
+  prepareShadow({ matrices, cascades }: ShadowPrepareContext) {
+    for (let i = 0; i < cascades; i++) lights[i] = matrices.slice(i * 16, i * 16 + 16);
+  },
+  // Then once per cascade, inside its open depth-only pass.
+  drawShadow({ pass, cascade }: ShadowContext) {
+    // Draw this cascade's share with lights[cascade] (setPipeline, setBindGroup, draw...).
+    pass.insertDebugMarker(`cascade ${cascade}`);
+  },
+});
+engine.start();
+```
+
 Per object, as Crocotile's Cast Shadows and Receive Shadows (both default on): `shadows.add(source, {castShadow: false})` lights the object with the shadow map but leaves it out of the map, and `{receiveShadow: false}` draws it into the map but keeps its own lighting unshadowed (no lighting hook is added). Receiving is per object for sources with their own lighting hook (glTF-pro models, materials meshes, clipmap terrain) and for core meshes: `receiveShadow: false` on a core mesh sets core's `mesh.receiveShadow = false` and the remover restores the earlier value. Setting `mesh.receiveShadow` directly works too, for meshes added or not:
 
 ```ts

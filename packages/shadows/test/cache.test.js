@@ -417,3 +417,75 @@ test('wireframe directional casters select line depth pipelines and invalidate s
     h.cleanup();
   }
 });
+
+test('prepareShadow runs once per frame before any depth pass, with every cascade matrix, on the frames its source draws', () => {
+  const h = optionalGPU(),
+    engine = h.engine,
+    log = [],
+    render = h.context.encoder.beginRenderPass;
+  engine.gpu.limits.maxTextureDimension2D = 8192;
+  engine.gpu.limits.maxTextureArrayLayers = 256;
+  engine.lighting = { direction: new Float32Array([1, 2, 3, 3]) };
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    log.push('pass');
+    return render(descriptor);
+  };
+  const shadows = new Shadows({ resolution: 64, cascades: 2 }),
+    seen = [];
+  const moving = {
+      prepareShadow(context) {
+        log.push('prepare moving');
+        seen.push({ cascades: context.cascades, matrices: Array.from(context.matrices.subarray(0, 32)) });
+        assert.equal(context.context, h.context);
+      },
+      drawShadow(context) {
+        log.push(`draw moving ${context.cascade}`);
+      },
+    },
+    still = {
+      shadowVersion: 0,
+      prepareShadow() {
+        log.push('prepare still');
+      },
+      drawShadow(context) {
+        log.push(`draw still ${context.cascade}`);
+      },
+    },
+    hidden = {
+      prepareShadow() {
+        log.push('prepare hidden');
+      },
+      drawShadow() {},
+    };
+  shadows.add(moving);
+  shadows.add(still, { static: true });
+  shadows.add(hidden, { castShadow: false });
+  engine.use(shadows);
+  const frame = () => {
+    log.length = 0;
+    h.context.shader = 'let linear=direct*vec3f(1);';
+    h.context.bindings.length = 0;
+    engine.frameGraph.execute(h.context);
+    return [...log];
+  };
+  // First frame: the cached map renders, so the static source prepares too; both before the first pass.
+  assert.deepEqual(frame(), [
+    'prepare moving',
+    'prepare still',
+    'pass',
+    'draw still 0',
+    'pass',
+    'draw still 1',
+    'pass',
+    'draw moving 0',
+    'pass',
+    'draw moving 1',
+  ]);
+  assert.equal(seen[0].cascades, 2);
+  assert.deepEqual(seen[0].matrices, Array.from(shadows.matrices.subarray(0, 32)));
+  // Cached map unchanged: the static source neither prepares nor draws; a caster that does not cast never prepares.
+  assert.deepEqual(frame(), ['prepare moving', 'pass', 'draw moving 0', 'pass', 'draw moving 1']);
+  still.shadowVersion++;
+  assert.deepEqual(frame().slice(0, 3), ['prepare moving', 'prepare still', 'pass']);
+  shadows.dispose();
+});

@@ -105,6 +105,18 @@ export interface ShadowContext {
   /** Cascade index, 0-3. */
   cascade: number;
 }
+/**
+ * What a custom `ShadowSource.prepareShadow` receives once per shadow frame, before any cascade's depth pass opens.
+ * Borrowed: use it synchronously.
+ */
+export interface ShadowPrepareContext {
+  /** The frame's WebGPU pass context; no pass is open on its encoder, so compute passes can be recorded. */
+  context: ShadowPassContext;
+  /** Every cascade's light view-projection matrix, 16 floats each (column-major), cascade 0 first. */
+  matrices: Float32Array;
+  /** Cascades drawn this frame, 1-4: the source's `drawShadow` is called once for each. */
+  cascades: number;
+}
 /** One drawable shadow caster (the contract gltf-pro models, materials meshes and terrain expose as `shadowPrimitives`). */
 export interface ShadowPrimitive {
   /** Identity of the primitive's cached draw (default: its index buffer). */
@@ -156,6 +168,11 @@ export interface ShadowSource {
   shadowVersion?: number;
   /** Custom depth drawing for one cascade. */
   drawShadow?(context: ShadowContext): void;
+  /**
+   * Called once per frame before this source's `drawShadow` calls, with every cascade's matrix: GPU work that the
+   * cascades share (scatter culls its instances per cascade here). Not called on frames this source draws nothing.
+   */
+  prepareShadow?(context: ShadowPrepareContext): void;
   /** Lets the source receive shadows (patches its shader); returns the remover. */
   addLighting?(effect: Shadows): () => void;
   /** True once disposed; such a source is rejected, or dropped once added. */
@@ -308,6 +325,11 @@ export class Shadows implements EnginePlugin {
   private readonly shadowContexts = this.cascadeMatrices.map(
     (matrix, cascade) => ({ context: undefined!, pass: undefined!, matrix, cascade }) as ShadowContext,
   );
+  private readonly prepareContext = {
+    context: undefined!,
+    matrices: this.matrices,
+    cascades: 0,
+  } as ShadowPrepareContext;
   private readonly shaders = new Map<number, Map<string, string>>();
   private readonly depthPass = depthPassDescriptor();
   private readonly depthAttachment = this.depthPass.depthStencilAttachment;
@@ -850,6 +872,16 @@ export class Shadows implements EnginePlugin {
     this.values[91] = c.height / (2 * Math.tan((c.camera.fov * Math.PI) / 360));
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.stats.staticDraws = this.stats.dynamicDraws = 0;
+    // Before any depth pass opens: a caster's shared per-cascade work, on the frames it draws (a static one only when the
+    // cached map renders again).
+    const prepare = this.prepareContext;
+    prepare.context = c;
+    prepare.cascades = this.cascadeCount;
+    for (let i = 0; i < this.sources.length; i++) {
+      const r = this.sources[i];
+      if (r.cast && 'prepareShadow' in r.source && r.source.prepareShadow && (this.dirty || !r.static))
+        r.source.prepareShadow(prepare);
+    }
     const rendered = this.dirty;
     if (this.dirty) {
       for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, true);
