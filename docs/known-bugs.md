@@ -137,6 +137,19 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### Biome trees and shrubs stand in the sea
+
+- **What:** in the wetland preset world (`presetWorlds.wetland`, coast `'west'`) the view's new sea (`water: 'auto'`,
+  biome look plan L5) shows alders and willows standing in open water off the shore: placement puts stored plants on
+  the sea floor below `climate.seaLevel` (down to -40 m), where the wetland biome's envelope (moisture, slope,
+  treeline) still holds.
+- **Repro:** `BiomeWorld.create({ climate, height: { relief } })` with `presetWorlds.wetland`, `BiomeView.attach` with
+  defaults, camera at x = -1,250 m, 15 m above the ground, looking west (shot `after-wetland-shore.png` of L5's frame
+  harness); or count `@margoengine/biomes/placement` records on tile (0, 8) whose ground height is below 0 m.
+- **Cause:** no biome envelope or placement rule knows the sea: classification and `Run` in `placement.ts` read climate
+  fields only, so cells under sea level get plants. Fix in biomes placement (no plant below `climate.seaLevel`, or a
+  sea mask the classifier gives no land biome), with a regression test counting records below sea level.
+
 ### Findings of the outside audit (2026-10-28)
 
 - **What:** an outside audit of revision 74a01810 (a source review, canary tests on a second laptop with temporary

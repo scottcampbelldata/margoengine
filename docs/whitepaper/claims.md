@@ -427,6 +427,17 @@ the nearest depth, takes its first search read at the receiver's texel and compa
 `'pcf'` and `'hard'` receivers change only by the appended struct member. Against the old references the first
 difference in each story is the uniform's size and the new buffer.
 
+**terrain-ssr, advanced to `ba7a0fc89` on 2026-10-30 (biome look plan L5, item 7):** the clipmap's outer rings
+reach past the heightmap, where main drew a shelf of clamped edge heights to the horizon (and cast its shadows inward).
+Terrain now discards fragments outside the heightmap rectangle, so with neither the SSR hook nor `roughness` 11 calls
+per story differ from `6c20076d` (of 2,269, 1,311 and 4,189), every one a `createRenderPipeline` whose shader text
+changed: the colour fragment and the capture entry start with the out-of-map
+`discard`, and the depth-only shadow pipeline gains a fragment stage (`outside`, no colour targets) that does the same.
+Call counts, bind groups, buffers and every buffer write are unchanged. The proof's stand-in device read
+`d.fragment?.targets[0].format`, which threw on a fragment with no targets; it reads `targets[0]?.format` now.
+`packages/terrain/test/edge.browser.mjs` checks the pixels on a real GPU (sky only past a corner) and
+`packages/terrain/test/lighting.test.js` the shadow pipeline.
+
 **quality-presets, advanced to `33c403984` on 2026-10-30 (VFX repeatable particle order):** the VFX update kernel took
 respawn tickets and draw-list places with `atomicAdd`, so which dead slots were born and the order of blended particles
 changed from run to run. It now runs four small workgroup prefix-sum passes around the simulation, so births take the
