@@ -20,7 +20,6 @@
 // LightProbes({environment}) match EnvironmentLighting.
 // Writes results/probes-gpu.json and test-results/probes-*.png.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
@@ -28,20 +27,11 @@ import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { pbrNeutral } from '../../packages/shared/display.js';
 import { halfToFloat, shBasis, SH_IRRADIANCE_BANDS } from '../../packages/environment/dist/index.js';
+import { powerOnlineText as ac } from './parts/power.mjs';
 
 const bench = process.argv.includes('--bench');
-const ac = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim();
 const powerBefore = ac();
-assert.equal(powerBefore, 'True', 'run on AC power only');
+assert.notEqual(powerBefore, 'False', 'run on AC power only');
 // Checks collect their failures so one run reports every one; the run fails at the end.
 const failures = [],
   expect = (ok, message) => {
@@ -605,7 +595,7 @@ const report = {
   }
 }
 report.powerOnline.after = ac();
-assert.equal(report.powerOnline.after, 'True', 'still on AC power');
+assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
 assert.deepEqual(failures, [], 'probe checks failed');
 await writeFile(resolve(import.meta.dirname, 'results/probes-gpu.json'), JSON.stringify(report, null, 2) + '\n');
 console.log('probes GPU check passed');

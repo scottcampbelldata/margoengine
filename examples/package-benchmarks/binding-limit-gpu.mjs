@@ -13,22 +13,13 @@ import { isAbsolute, resolve } from 'node:path';
 import { build } from 'vite';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
+import { powerOnlineText as ac } from './parts/power.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
   ref = process.argv[2] ?? 'e017d50',
   slash = (v) => v.replaceAll('\\', '/');
-const ac = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim();
 const powerBefore = ac();
-assert.equal(powerBefore, 'True', 'measure on AC power only');
+assert.notEqual(powerBefore, 'False', 'measure on AC power only');
 
 // environment's src at `ref`, bundled to one module (bare imports resolved by the page's dev server).
 const source = slash(resolve(root, 'packages/environment/src')) + '/';
@@ -184,6 +175,6 @@ try {
   await context.close();
 }
 report.powerOnline.after = ac();
-assert.equal(report.powerOnline.after, 'True', 'still on AC power');
+assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
 await writeFile(resolve(import.meta.dirname, 'results/binding-limit-gpu.json'), JSON.stringify(report, null, 2) + '\n');
 console.log('binding limit GPU check passed');

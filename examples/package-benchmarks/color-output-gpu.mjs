@@ -3,21 +3,11 @@
 //   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/color-output-gpu.mjs
 // MARGO_BROWSER=chrome for Chrome (default Edge on Windows, see docs/benchmarking.md). Writes examples/package-benchmarks/results/color-output-gpu-<channel>.json.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { openBrowser } from '../../scripts/browser.js';
+import { powerOnlineText as ac } from './parts/power.mjs';
 
-const ac = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim();
-assert.equal(ac(), 'True', 'run on AC power only');
+assert.notEqual(ac(), 'False', 'run on AC power only');
 const context = await openBrowser({
     startPath: '/examples/package-benchmarks/color-output.html',
     port: 5231,
@@ -62,7 +52,7 @@ try {
 } finally {
   await context.close();
 }
-assert.equal(ac(), 'True', 'still on AC power');
+assert.notEqual(ac(), 'False', 'still on AC power');
 
 const s = report.scenarios,
   p3 = (name, patch) => s[name].p3.unorm8.values[patch],

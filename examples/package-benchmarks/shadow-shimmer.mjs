@@ -20,19 +20,11 @@ import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { acquire } from '../../scripts/gpu-lock.mjs';
+import { acPower } from './parts/power.mjs';
 
 const frames = +(process.argv.find((a) => a.startsWith('--frames='))?.slice(9) ?? 64),
   low = process.argv.includes('--low');
-const power = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim() === 'True';
+const power = () => acPower() !== false;
 assert.ok(power(), 'On battery: run on AC power');
 // Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
 const releaseGpu = await acquire({ owner: 'shadow-shimmer', mode: 'exclusive' });

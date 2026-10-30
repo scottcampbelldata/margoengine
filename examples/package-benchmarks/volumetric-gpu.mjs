@@ -12,25 +12,15 @@
 //    scripts/quiet-gate.mjs (labelled diagnostic when the machine did not get quiet).
 // Writes results/volumetric-gpu.json and frames to test-results/volumetric-*.png.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
+import { powerOnlineText as ac } from './parts/power.mjs';
 
-const ac = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim();
 const powerBefore = ac();
-assert.equal(powerBefore, 'True', 'measure on AC power only');
+assert.notEqual(powerBefore, 'False', 'measure on AC power only');
 const timing = !process.argv.includes('--no-timing'),
   port = 5231;
 const context = await openBrowser({ startPath: '/examples/package-benchmarks/volumetric.html', port }),
@@ -306,7 +296,7 @@ try {
   await context.close();
 }
 report.powerOnline.after = ac();
-assert.equal(report.powerOnline.after, 'True', 'still on AC power');
+assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
 await writeFile(resolve(import.meta.dirname, 'results/volumetric-gpu.json'), JSON.stringify(report, null, 2) + '\n');
 for (const check of deferred) check();
 console.log('volumetric GPU check passed');

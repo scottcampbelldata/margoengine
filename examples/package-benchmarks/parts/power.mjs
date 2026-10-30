@@ -25,3 +25,8 @@ export function requireAC() {
     throw new Error('On battery: timings would be throttled. Plug in, or set BENCH_ALLOW_BATTERY=1 to record anyway.');
   return power;
 }
+/** The power state as the text the benchmark reports record: 'True' on mains (also a desktop with no battery), 'False' on battery, 'Unknown' when it cannot be read. */
+export function powerOnlineText() {
+  const power = acPower();
+  return power === true ? 'True' : power === false ? 'False' : 'Unknown';
+}

@@ -3,8 +3,8 @@
 // Whole-machine CPU threshold, not per-process attribution; good enough to wait out other builds.
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { acPower } from '../examples/package-benchmarks/parts/power.mjs';
 
-// stderr ignored: on a desktop without a battery the BatteryStatus class is missing and PowerShell prints an error.
 const ps = (script) =>
   execFileSync('powershell', ['-NoProfile', '-Command', script], {
     encoding: 'utf8',
@@ -12,8 +12,7 @@ const ps = (script) =>
   }).trim();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const onAC = () =>
-  ps('(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline') !== 'False';
+export const onAC = () => acPower() !== false;
 // The processor-time performance counter, as Task Manager shows it. Win32_Processor.LoadPercentage misreads on some
 // machines: 18-97% from one call to the next on an idle 32-thread desktop whose counter read 4-8% (2026-10-19); it
 // stays as the fallback where the counter class is missing.

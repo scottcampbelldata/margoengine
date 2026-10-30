@@ -11,23 +11,13 @@
 //    plus the full-source convolution) for comparison.
 // Writes examples/package-benchmarks/results/probes-live-gpu.json and test-results/probes-live-*.png.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
+import { powerOnlineText as ac } from './parts/power.mjs';
 
 const bench = process.argv.includes('--bench');
-const ac = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-  ).trim();
 const powerBefore = ac();
 assert.notEqual(powerBefore, 'False', 'run on AC power only');
 const failures = [],

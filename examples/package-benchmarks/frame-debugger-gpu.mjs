@@ -4,21 +4,11 @@
 // timestamp queries, checks the report, and writes test-results/frame-debugger-report.json and
 // test-results/frame-debugger-panel.png (the DOM panel over the scene).
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../scripts/browser.js';
+import { powerOnlineText as ac } from './parts/power.mjs';
 
-const ac = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim();
-assert.equal(ac(), 'True', 'run on AC power only');
+assert.notEqual(ac(), 'False', 'run on AC power only');
 const context = await openBrowser({ startPath: '/examples/package-benchmarks/frame-debugger.html', port: 5231 }),
   { page, hardware } = context,
   pageErrors = [];
@@ -85,5 +75,5 @@ try {
 } finally {
   await context.close();
 }
-assert.equal(ac(), 'True', 'still on AC power');
+assert.notEqual(ac(), 'False', 'still on AC power');
 console.log('frame debugger GPU check passed');

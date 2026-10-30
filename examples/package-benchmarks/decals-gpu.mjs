@@ -11,26 +11,16 @@
 // 5. No Decals equals an empty Decals.
 // Writes results/decals-gpu.json and test-results/decals-*.png.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
+import { powerOnlineText as ac } from './parts/power.mjs';
 
 const bench = process.argv.includes('--bench');
-const ac = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim();
 const powerBefore = ac();
-assert.equal(powerBefore, 'True', 'run on AC power only');
+assert.notEqual(powerBefore, 'False', 'run on AC power only');
 // Checks collect their failures so one run reports every one; the run fails at the end.
 const problems = [],
   expect = (ok, message) => {
@@ -301,7 +291,7 @@ for (const msaa of ['4', '1']) {
   report.runs.push(run);
 }
 report.powerOnline.after = ac();
-assert.equal(report.powerOnline.after, 'True', 'still on AC power');
+assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
 assert.deepEqual(problems, [], 'decal checks failed');
 await writeFile(resolve(import.meta.dirname, 'results/decals-gpu.json'), JSON.stringify(report, null, 2) + '\n');
 console.log('decals GPU check passed');

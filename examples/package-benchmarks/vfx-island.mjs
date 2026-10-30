@@ -14,6 +14,7 @@ import { createServer } from 'vite';
 import { acquire } from '../../scripts/gpu-lock.mjs';
 import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
+import { acPower } from './parts/power.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
   arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -30,16 +31,7 @@ const config = {
   seconds: +arg('seconds', 6),
   label: arg('label', 'run'),
 };
-const power = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim() === 'True';
+const power = () => acPower() !== false;
 // Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
 const releaseGpu = await acquire({ owner: 'vfx-island', mode: 'exclusive' });
 let server, browser;

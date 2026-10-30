@@ -12,26 +12,16 @@
 //    validation errors or throws gltf-pro's named texture-limit error (a glTF physical material has 13 textures of its own).
 // Every frame is checked for 0 WebGPU validation errors. Writes results/physical-gpu.json and test-results/physical-*.png.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { invertMatrix } from '../../packages/math/dist/mat4.js';
 import * as ref from '../../packages/materials/test/physical-reference.js';
+import { powerOnlineText as ac } from './parts/power.mjs';
 
-const ac = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim();
 const powerBefore = ac();
-assert.equal(powerBefore, 'True', 'run on AC power only');
+assert.notEqual(powerBefore, 'False', 'run on AC power only');
 const context = await openBrowser({ startPath: '/examples/package-benchmarks/physical.html', port: 5237 }),
   { page, hardware } = context,
   pageErrors = [];
@@ -343,5 +333,5 @@ try {
   await context.close();
 }
 assert.deepEqual(pageErrors, []);
-assert.equal(report.powerOnline.after, 'True', 'lost AC power during the run');
+assert.notEqual(report.powerOnline.after, 'False', 'lost AC power during the run');
 console.log('physical-gpu: ok');

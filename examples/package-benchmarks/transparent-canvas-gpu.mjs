@@ -8,21 +8,11 @@
 // 2. Opaque canvas: FXAA, Bloom, SSAO and the stack render byte-identical frames before and after the alpha fixes.
 // Frames go to test-results/transparent-*.png.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
+import { powerOnlineText as ac } from './parts/power.mjs';
 
-const ac = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim();
-assert.equal(ac(), 'True', 'measure on AC power only');
+assert.notEqual(ac(), 'False', 'measure on AC power only');
 const context = await openBrowser({ startPath: '/examples/package-benchmarks/transparent-canvas.html', port: 5223 }),
   { page, hardware } = context,
   pageErrors = [];
@@ -117,7 +107,7 @@ try {
 } finally {
   await context.close();
 }
-assert.equal(ac(), 'True', 'still on AC power');
+assert.notEqual(ac(), 'False', 'still on AC power');
 for (const effect of ['none', 'restore', 'webgl'])
   assert.equal(report.transparent[effect].fringePixels, 0, `${effect}: premultiplied edges`);
 for (const [effect, row] of Object.entries(report.opaque))

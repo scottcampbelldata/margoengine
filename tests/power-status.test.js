@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import { test } from 'node:test';
-import { acPower, requireAC } from '../examples/package-benchmarks/parts/power.mjs';
+import { acPower, powerOnlineText, requireAC } from '../examples/package-benchmarks/parts/power.mjs';
 
 function probe(t, { platform = 'win32', stdout = 'Online\r\n', error } = {}) {
   const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform'),
@@ -75,4 +75,22 @@ test('Windows queries the power line with terminating errors and quiet captured 
   assert.match(query, /PowerStatus\)?\.PowerLineStatus/);
   assert.match(query, /-ErrorAction Stop/);
   assert.deepEqual(options.stdio, ['ignore', 'pipe', 'ignore']);
+});
+
+test('powerOnlineText: no battery (desktop) is mains, mains is mains, battery is refused', (t) => {
+  // A desktop with no battery reports an Online power line; it must never read as battery.
+  probe(t, { stdout: 'Online\r\n' });
+  assert.equal(powerOnlineText(), 'True');
+  probe(t, { stdout: 'Offline\r\n' });
+  assert.equal(powerOnlineText(), 'False');
+  probe(t, { error: new Error('no power class') });
+  assert.equal(powerOnlineText(), 'Unknown');
+});
+
+test('no benchmark script reads the battery-only WMI class, which is empty on desktops', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../examples/package-benchmarks/', import.meta.url);
+  for (const name of readdirSync(dir).filter((n) => n.endsWith('.mjs')))
+    assert.doesNotMatch(readFileSync(new URL(name, dir), 'utf8'), /BatteryStatus/, name);
+  assert.doesNotMatch(readFileSync(new URL('../scripts/quiet-gate.mjs', import.meta.url), 'utf8'), /BatteryStatus/);
 });

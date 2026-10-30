@@ -12,7 +12,6 @@
 // 4. --bench: GPU pass time (timestamp queries, median) at 1280x720 with no AreaLights, an empty one, and 1/4/16 lights.
 // Writes results/area-lights-gpu.json and the frames to test-results/area-lights-*.png.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
@@ -21,21 +20,12 @@ import { decodePNG } from '../../tests/support/png.js';
 import { pbrNeutral } from '../../packages/shared/display.js';
 import { AreaLights } from '../../packages/clustered/dist/area.js';
 import { ltc, bruteForce } from '../../packages/clustered/test/ltc-reference.js';
+import { powerOnlineText as ac } from './parts/power.mjs';
 
 const bench = process.argv.includes('--bench'),
   benchOnly = process.argv.includes('--bench-only');
-const ac = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim();
 const powerBefore = ac();
-assert.equal(powerBefore, 'True', 'run on AC power only');
+assert.notEqual(powerBefore, 'False', 'run on AC power only');
 const pack = (light) => {
   const a = new AreaLights({ lights: { setLights() {} } });
   a.setLights([light]);
@@ -249,7 +239,7 @@ try {
   await context.close();
 }
 report.powerOnline.after = ac();
-assert.equal(report.powerOnline.after, 'True', 'still on AC power');
+assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
 if (!benchOnly)
   await writeFile(resolve(import.meta.dirname, 'results/area-lights-gpu.json'), JSON.stringify(report, null, 2) + '\n');
 console.log('area lights GPU check passed');
