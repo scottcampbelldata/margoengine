@@ -76,7 +76,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/selection | `.` 25 | 2 |  | 17,897 |
 | @margoengine/shader | `.` 142, `./noise` 9, `./graph` 17, `./readback` 4, `./raw` 13, `./effects` 19, `./editor` 24 | 147 |  | 12,275 |
 | @margoengine/shadows | `.` 8 | 1 |  | 14,547 |
-| @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 8, `./sun` 16 | 97 |  | 15,542 |
+| @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 8, `./sun` 16 | 97 |  | 15,570 |
 | @margoengine/splats | `.` 19, `./data` 17 |  |  | 24,850 |
 | @margoengine/splines | `.` 3 |  |  | 1,382 |
 | @margoengine/stage | `.` 23, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1 | 15 |  | 1,984 |
