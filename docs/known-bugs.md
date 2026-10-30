@@ -151,6 +151,31 @@ does not own. Each entry says exactly what is needed to close it.
   font is present.
 
 
+### biomes test:gpu on the Intel Arc laptop: every check OK, then killed at 600 s (not reproduced)
+
+- **Repro:** on the Intel laptop (Arc 140V) at 6a8607de, `biomes test:gpu` in the GPU package tests printed all three
+  checks OK (view; objects 172569; flythrough p99 +0.00 ms) and then "HUNG: no result after 600 s, process tree
+  killed". Not seen on the RTX A6000 PC; the laptop reruns it 3 times.
+- **Measured here** (RTX A6000, 9950X, one run in a shared GPU slot): the chain takes 431.5 s of its 600 s limit
+  (view 2.8 s, objects 14.9 s, flythrough 413.7 s, of it the six timed flights 298 s); the flythrough's close took
+  0.2 s. Earlier check:merge runs here: 326 to 431 s.
+- **Two causes fit; which one is not known yet:**
+  1. A teardown wait with no limit: `close()` in `scripts/browser.js` waited for the WGSL compilation reports with a
+     bare `page.evaluate`, which never times out, so a `getCompilationInfo` the GPU process never answered (Arc has
+     WebGPU promises that never settle, see the startup-hang fix) or a page that never answered held the suite
+     silently. Fixed: `settleWgslReports` (`scripts/support/wgsl-guard.js`) fails within 30 s naming the modules
+     still waiting, or the page; and the biomes checks call `watchExit` (`scripts/support/shutdown.mjs`), which names
+     what is still open (`process.getActiveResourcesInfo()`) and exits 1 when a finished suite does not end within
+     30 s. Tests: `tests/wgsl-guard.test.js`, `tests/shutdown.test.js`.
+  2. The chain is near its limit: the whole `test:gpu` (three checks) is one step with the default 10 min limit, and
+     on the fastest PC it already takes 72 percent of it; the flights run in real time, but world creation, prefetch
+     and idle waits scale with the CPU, so on the laptop the chain can reach 600 s right as the flythrough ends.
+- **Needed to close:** the laptop's three reruns at the commit that carries the fix above. A `SHUTDOWN_TIMEOUT` or
+  "did not exit" message names the stuck handle (cause 1, fix it there). A kill with no such message is cause 2: the
+  step's wall time (gpu-packages.json `seconds`, and the time the flythrough's OK line printed) decides between
+  splitting the chain into one step per check and a measured `margo.gpuTestTimeoutMinutes` for biomes, which is
+  Scott's call.
+
 ### BiomeView: a world or placement change while a tile waits to be copied in can leave the old tile drawn
 
 - **Repro:** on a `BiomeView` with workers, paint or edit a rectangle (or change the placement) in the short time a

@@ -3,7 +3,8 @@
 // unexpected success when it compiles cleanly. Runs the guard against a stand-in GPUDevice.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { watchWgsl, wgslGuard } from '../scripts/support/wgsl-guard.js';
+import { readFile } from 'node:fs/promises';
+import { settleWgslReports, watchWgsl, wgslGuard } from '../scripts/support/wgsl-guard.js';
 
 async function compile(modules) {
   const lines = [],
@@ -44,6 +45,75 @@ test('a shader that fails to compile is an error', async () => {
   assert.equal(watched.errors.length, 1);
   assert.match(watched.errors[0], /^normal 1:1 unresolved value/);
   assert.equal(watched.modules.size, 2);
+});
+
+// A page stand-in that runs page functions in this realm, where the guard ran.
+const here = { evaluate: async (fn) => fn() };
+
+test('settleWgslReports waits for reports that arrive', async () => {
+  delete globalThis.__margoWgslReports;
+  delete globalThis.__margoWgslPending;
+  await compile([{ code: 'fine', label: 'ok' }]);
+  await settleWgslReports(here, { budgetMs: 1000 });
+  assert.equal(globalThis.__margoWgslPending.size, 0, 'a settled report leaves the pending list');
+});
+
+// Regression: biomes test:gpu on an Intel Arc laptop printed every check OK, then the suite never ended and the runner
+// killed it after 600 s. close() waited for the compilation reports with a bare page.evaluate, which has no time
+// limit, so a report the GPU process never sent (or a page that never answered) held the suite for ever, silently.
+test('a compilation report that never arrives fails within the budget, naming its module', async () => {
+  delete globalThis.__margoWgslReports;
+  delete globalThis.__margoWgslPending;
+  const original = console.debug;
+  console.debug = () => {};
+  globalThis.GPUDevice = class {
+    createShaderModule({ code }) {
+      return {
+        getCompilationInfo: () => (code === 'stuck' ? new Promise(() => {}) : Promise.resolve({ messages: [] })),
+      };
+    }
+  };
+  try {
+    wgslGuard();
+    const device = new GPUDevice();
+    device.createShaderModule({ code: 'fine', label: 'terrain' });
+    device.createShaderModule({ code: 'stuck', label: 'objects scatter' });
+  } finally {
+    console.debug = original;
+    delete globalThis.GPUDevice;
+  }
+  const begun = Date.now();
+  await assert.rejects(settleWgslReports(here, { budgetMs: 200 }), (error) => {
+    assert.equal(error.code, 'SHUTDOWN_TIMEOUT');
+    assert.match(error.message, /1 shader module\(s\) never arrived within 200 ms: objects scatter\b/);
+    assert.deepEqual(error.open, ['compilation info of objects scatter']);
+    return true;
+  });
+  assert.ok(Date.now() - begun < 1500, `took ${Date.now() - begun} ms`);
+});
+
+test('a page that never answers fails within the budget, saying so', async () => {
+  const silent = { evaluate: () => new Promise(() => {}) },
+    begun = Date.now();
+  await assert.rejects(settleWgslReports(silent, { budgetMs: 200 }), (error) => {
+    assert.equal(error.code, 'SHUTDOWN_TIMEOUT');
+    assert.match(error.message, /the page did not answer within 200 ms/);
+    assert.deepEqual(error.open, ['page']);
+    return true;
+  });
+  assert.ok(Date.now() - begun < 3500, `took ${Date.now() - begun} ms`);
+});
+
+test('a page that is gone has no reports left to wait for', async () => {
+  await settleWgslReports({
+    evaluate: () => Promise.reject(new Error('Target page, context or browser has been closed')),
+  });
+});
+
+test('the browser harness waits for compilation reports only through the bounded settleWgslReports', async () => {
+  const source = await readFile(new URL('../scripts/browser.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /__margoWgslReports/, 'a bare page.evaluate on the reports has no limit');
+  assert.match(source, /await settleWgslReports\(page\)/);
 });
 
 test('expect-error excuses only the labelled shader, and only when it fails', async () => {

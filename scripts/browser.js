@@ -6,7 +6,7 @@ import { createServer as createNetServer } from 'node:net';
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
-import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
+import { settleWgslReports, watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { trackPipelines } from './support/gpu-ready.js';
 import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
 import { compatRun, compatShim } from './support/compat-shim.js';
@@ -592,12 +592,19 @@ export async function openBrowser({
       deviceLoss,
       async close() {
         // Compilation info arrives asynchronously: wait for every report (wgsl-guard keeps them) before reading them.
-        await page.evaluate(() => Promise.all(globalThis.__margoWgslReports ?? [])).catch(() => {});
+        // Bounded: a report that never arrives fails the close naming its module, after the browser and server close.
+        let unsettled;
+        try {
+          await settleWgslReports(page);
+        } catch (error) {
+          unsettled = error;
+        }
         try {
           await closeAll({ browser });
         } finally {
           await closeServer();
         }
+        if (unsettled) throw unsettled;
         if (wgsl.modules.size)
           console.log(`WGSL: ${wgsl.modules.size} distinct shader modules compiled, ${wgsl.errors.length} errors`);
         if (wgsl.errors.length) throw new Error(`WGSL compile errors:\n${wgsl.errors.slice(0, 20).join('\n')}`);

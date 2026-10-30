@@ -29,7 +29,11 @@ export function wgslGuard() {
     if (!seen.has(key) && !label.startsWith('check-wgsl:')) {
       seen.add(key);
       console.debug(`[wgsl] module ${key}`);
-      // Kept until settled, so a harness can wait for every report (scripts/browser.js close()).
+      // Kept until settled, so a harness can wait for every report (scripts/browser.js close()); the ones still
+      // waiting are named in __margoWgslPending, so a report that never arrives names its module (settleWgslReports).
+      const pending = (globalThis.__margoWgslPending ??= new Map()),
+        id = globalThis.__margoWgslReports?.length ?? 0;
+      pending.set(id, label || key);
       const report = module.getCompilationInfo().then((info) => {
         const lines = code.split('\n'),
           errors = info.messages.filter((m) => m.type === 'error');
@@ -42,12 +46,56 @@ export function wgslGuard() {
             `[wgsl] error ${descriptor.label ?? key} ${m.lineNum}:${m.linePos} ${m.message} | ${(lines[m.lineNum - 1] ?? '').trim().slice(0, 160)}`,
           );
       });
-      (globalThis.__margoWgslReports ??= []).push(report.catch(() => {}));
+      (globalThis.__margoWgslReports ??= []).push(report.catch(() => {}).finally(() => pending.delete(id)));
     }
     return module;
   };
   guarded.margoWgslGuard = true;
   GPUDevice.prototype.createShaderModule = guarded;
+}
+
+/** How long `settleWgslReports` waits for a page's compilation reports before it throws. */
+export const WGSL_SETTLE_MS = 30_000;
+
+/**
+ * Waits for every compilation report `wgslGuard` started in `page`, so a suite reads them all before it judges. Bounded:
+ * the wait was a bare `page.evaluate`, which has no time limit, so a report that never arrived (the GPU process never
+ * answered `getCompilationInfo`) or a page whose main thread never answered held a suite whose every assertion passed
+ * until the runner killed it ("no result after 600 s"). Past `budgetMs` it throws an error with code `SHUTDOWN_TIMEOUT`
+ * naming the modules whose reports are still out, or saying that the page itself did not answer. A page that is gone
+ * (closed or crashed) has no reports left to read; its loss was reported where it happened.
+ * @param {{ evaluate(fn: () => unknown): Promise<unknown> }} page
+ */
+export async function settleWgslReports(page, { budgetMs = WGSL_SETTLE_MS } = {}) {
+  let timer;
+  const after = (ms) => new Promise((resolve) => (timer = setTimeout(() => resolve('late'), ms)));
+  const outcome = await Promise.race([
+    page
+      .evaluate(() => Promise.all(globalThis.__margoWgslReports ?? []))
+      .then(
+        () => 'done',
+        () => 'gone',
+      ),
+    after(budgetMs),
+  ]);
+  clearTimeout(timer);
+  if (outcome !== 'late') return;
+  // A second, short question tells a report that never came from a page that answers nothing.
+  const pending = await Promise.race([
+    page.evaluate(() => [...(globalThis.__margoWgslPending?.values() ?? [])]).catch(() => null),
+    after(2000).then(() => null),
+  ]);
+  clearTimeout(timer);
+  // They came after all, just late.
+  if (pending?.length === 0) return;
+  const error = new Error(
+    pending
+      ? `the compilation info of ${pending.length} shader module(s) never arrived within ${budgetMs} ms: ${pending.slice(0, 10).join(', ')}. The GPU process never answered getCompilationInfo for them; find what holds it (a pipeline compile or device request that never settled)`
+      : `the page did not answer within ${budgetMs} ms while the suite waited for its WGSL compilation reports: its main thread is blocked or its renderer hung`,
+  );
+  error.code = 'SHUTDOWN_TIMEOUT';
+  error.open = pending ? pending.map((name) => `compilation info of ${name}`) : ['page'];
+  throw error;
 }
 
 /**

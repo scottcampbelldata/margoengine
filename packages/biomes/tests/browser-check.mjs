@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { watchExit } from '../../../scripts/support/shutdown.mjs';
 
 const context = await openBrowser({ startPath: '/packages/biomes/tests/browser-check.html', port: 'free' }),
   { page, hardware } = context,
@@ -44,3 +45,5 @@ try {
 } finally {
   await context.close();
 }
+// A suite still alive after its last step names what it left open (biomes test:gpu once sat until killed at 600 s).
+watchExit();

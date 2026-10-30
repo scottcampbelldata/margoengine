@@ -27,6 +27,22 @@ export async function killTree(child) {
     await new Promise((resolve) => child.once('exit', resolve));
 }
 
+/**
+ * Call after a suite's last step: a process still alive `ms` later holds something it never closed, and would sit
+ * silent until the runner kills it ("no result after 600 s"). It then prints the kinds of resource still open
+ * (`process.getActiveResourcesInfo()`: TCPServerWrap a server, ProcessWrap a child process, PipeWrap a pipe, Timeout a
+ * timer) and exits 1. The timer does not hold the process itself, so a suite that ends cleanly never waits for it.
+ */
+export function watchExit(ms = SHUTDOWN_BUDGET_MS, { exit = process.exit, report = console.error } = {}) {
+  setTimeout(() => {
+    const open = process.getActiveResourcesInfo();
+    report(
+      `the suite finished but did not exit within ${ms} ms; still open: ${open.join(', ') || 'nothing Node can name (a native handle)'}. Close it before the suite ends`,
+    );
+    exit(1);
+  }, ms).unref();
+}
+
 /** Drops every connection of an http server and waits for it to stop listening. */
 async function closeServer(server) {
   const http = httpServerOf(server);

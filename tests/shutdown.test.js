@@ -124,3 +124,35 @@ test('a Vite-style server (httpServer plus its own close) is closed once, with a
     client.stop();
   }
 });
+
+// A suite script that has finished its last step: `leak` keeps a server listening, as a handle a teardown missed would.
+const finished = (leak) => {
+  const shutdown = new URL('../scripts/support/shutdown.mjs', import.meta.url).href;
+  return `import { watchExit } from ${JSON.stringify(shutdown)}; import { createServer } from 'node:http';
+${leak ? "createServer().listen(0, '127.0.0.1');" : ''} console.log('ok suite'); watchExit(300);`;
+};
+const runScript = (source) =>
+  new Promise((resolve) => {
+    const begun = Date.now(),
+      child = spawn(process.execPath, ['--input-type=module', '-e', source], { windowsHide: true });
+    let err = '';
+    child.stderr.on('data', (d) => (err += d));
+    const limit = setTimeout(() => child.kill(), 10_000);
+    child.on('close', (code) => (clearTimeout(limit), resolve({ code, err, ms: Date.now() - begun })));
+  });
+
+// Regression: biomes test:gpu on an Intel Arc laptop printed every check OK and then sat until the runner killed it after
+// 600 s, with nothing to say what was still open. A suite that does not exit after its last step now names it.
+test('watchExit ends a finished suite that something holds open, naming what', async () => {
+  const { code, err, ms } = await runScript(finished(true));
+  assert.equal(code, 1, err);
+  assert.match(err, /did not exit within 300 ms; still open: .*TCPServerWrap/);
+  assert.ok(ms < 5000, `took ${ms} ms`);
+});
+
+test('watchExit never holds a suite that ends cleanly', async () => {
+  const { code, err, ms } = await runScript(finished(false));
+  assert.equal(code, 0, err);
+  assert.equal(err, '');
+  assert.ok(ms < 5000, `took ${ms} ms`);
+});

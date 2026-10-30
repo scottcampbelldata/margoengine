@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { watchExit } from '../../../scripts/support/shutdown.mjs';
 import { MAX_LIMIT, P99_LIMIT, settle } from './flythrough-limits.mjs';
 
 const quantile = (list, q) => {
@@ -155,3 +156,5 @@ try {
 } finally {
   await context.close();
 }
+// Every check printed OK on a laptop and the suite then sat until the runner killed it (600 s): what is open is named.
+watchExit();
