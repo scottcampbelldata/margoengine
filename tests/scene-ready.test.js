@@ -2,9 +2,17 @@
 // GPU (an Intel Arc laptop) they were completely blank. Pictures are now taken when the scene shows, and a page that
 // never draws fails with a message that names what was missing.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
-import { describeHardware, hardwareLine, waitForPicture } from '../scripts/support/scene-ready.mjs';
+import {
+  describeHardware,
+  dumpEvidence,
+  hardwareLine,
+  settleOneAtATime,
+  waitForPicture,
+} from '../scripts/support/scene-ready.mjs';
 
 const blank = { lum: new Float32Array([0, 0]), drawn: false },
   drawn = { lum: new Float32Array([5, 9]), drawn: true };
@@ -54,6 +62,114 @@ test('a page that never draws fails naming the page, what was missing and what t
       return true;
     },
   );
+});
+
+// The Intel Arc startup hang (2026-10-30): the 4th live WebGPU page never started, the check said only "the ball is
+// not drawn" after 120 s and left no evidence. A hung page now leaves a screenshot and its state, in bounded time.
+test('a hung page leaves a screenshot and its state, and fails by name within its limit', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'scene-ready-'));
+  try {
+    const page = {
+      problems: [],
+      url: () => 'http://127.0.0.1:5173/notexture.html',
+      shoot: async () => blank,
+      evaluate: async () => ({
+        visibilityState: 'visible',
+        canvases: [{ width: 300, height: 150, clientWidth: 1280, clientHeight: 720 }],
+        rafTicksPerSecond: 60,
+        status: 'Loading',
+        webgpu: true,
+      }),
+    };
+    const started = Date.now();
+    await assert.rejects(
+      waitForPicture(page, {
+        ...options(page, { label: 'the no-texture page', timeoutMs: 200, intervalMs: 10 }),
+        shoot: async () => Buffer.from('png bytes'),
+        pixels: async () => blank,
+        evidenceDir: dir,
+      }),
+      (error) => {
+        assert.match(error.message, /the no-texture page was not ready after \d+ s: the ball is not drawn/);
+        assert.match(error.message, /evidence in .*failed-the-no-texture-page\.json/);
+        return true;
+      },
+    );
+    assert.ok(Date.now() - started < 3000, 'the wait and the dump end near the limit');
+    const evidence = JSON.parse(readFileSync(join(dir, 'failed-the-no-texture-page.json'), 'utf8'));
+    assert.equal(evidence.visibilityState, 'visible');
+    assert.deepEqual([evidence.canvases[0].width, evidence.canvases[0].height], [300, 150]);
+    assert.equal(evidence.rafTicksPerSecond, 60);
+    assert.match(evidence.reason, /the ball is not drawn/);
+    assert.equal(readFileSync(join(dir, 'failed-the-no-texture-page.png'), 'utf8'), 'png bytes');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the dump itself is bounded: a page that answers nothing still gets a file', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'scene-ready-'));
+  try {
+    const never = () => new Promise(() => {});
+    const page = { problems: ['console warning: x'], evaluate: never },
+      started = Date.now(),
+      file = await dumpEvidence(page, { dir, name: 'stuck', shoot: never, reason: 'test', stepMs: 50 });
+    assert.ok(Date.now() - started < 2000);
+    const evidence = JSON.parse(readFileSync(file, 'utf8'));
+    assert.match(evidence.screenshot, /no screenshot within 50 ms/);
+    assert.match(evidence.probe, /did not answer within 50 ms/);
+    assert.deepEqual(evidence.problems, ['console warning: x']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('reference pages are opened, settled and closed one at a time, in order, also on a failure', async () => {
+  const log = [];
+  let alive = 0;
+  const open = async (name) => {
+    alive++;
+    log.push(`open ${name} (${alive} alive)`);
+    return { name };
+  };
+  const close = async (page) => {
+    alive--;
+    log.push(`close ${page.name}`);
+  };
+  const results = await settleOneAtATime(['frozen', 'noshadow', 'notexture'], {
+    open,
+    close,
+    settle: async (page) => `${page.name} shot`,
+  });
+  assert.deepEqual(results, ['frozen shot', 'noshadow shot', 'notexture shot']);
+  assert.deepEqual(log, [
+    'open frozen (1 alive)',
+    'close frozen',
+    'open noshadow (1 alive)',
+    'close noshadow',
+    'open notexture (1 alive)',
+    'close notexture',
+  ]);
+  log.length = 0;
+  await assert.rejects(
+    settleOneAtATime(['frozen', 'noshadow'], {
+      open,
+      close,
+      settle: async (page) => {
+        throw new Error(`${page.name} hung`);
+      },
+    }),
+    /frozen hung/,
+  );
+  assert.deepEqual(log, ['open frozen (1 alive)', 'close frozen'], 'the failing page is closed; no later one opens');
+  assert.equal(alive, 0);
+});
+
+test('check:quickstart settles its reference pages one at a time and closes them', () => {
+  const source = readFileSync(new URL('../scripts/quickstart-timing.mjs', import.meta.url), 'utf8');
+  assert.match(source, /await settleOneAtATime\(/);
+  assert.doesNotMatch(source, /off = await open\(/, 'the reference pages are not opened together');
+  assert.match(source, /evidenceDir: shotDir/);
 });
 
 test('the report names the hardware: processor, memory and the adapter the page was given', async () => {

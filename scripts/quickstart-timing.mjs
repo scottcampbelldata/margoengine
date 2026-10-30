@@ -40,7 +40,7 @@ import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import sharp from 'sharp';
 import { acquire, killTree, windowsCommandLine } from './gpu-lock.mjs';
 import { quickstartFiles } from './support/doc-snippets.mjs';
-import { describeHardware, hardwareLine, waitForPicture } from './support/scene-ready.mjs';
+import { describeHardware, hardwareLine, settleOneAtATime, waitForPicture } from './support/scene-ready.mjs';
 import { closeAll } from './support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -445,12 +445,16 @@ export async function main() {
         pixels,
         ready,
         stable,
+        evidenceDir: shotDir,
       });
       writeFileSync(join(shotDir, `${label}.png`), last);
       return shot;
     };
     /** Polls `probe` (a picture of the page) until it holds, failing with `what` and the page's problems past 30 s. */
-    const until = (page, what, ready) => waitForPicture(page, { label: what, shoot, pixels, ready, timeoutMs: 30_000 });
+    const until = (page, what, ready) =>
+      waitForPicture(page, { label: what, shoot, pixels, ready, timeoutMs: 30_000, evidenceDir: shotDir });
+    /** Closes a page with its own browser context, in a bounded time (a stuck page fails the check by name). */
+    const close = (p) => closeAll({ context: p.context(), budgetMs: 15_000 });
 
     // 5a. The shipped page: first frame = the first screenshot that is not one colour.
     const page = await open(pageUrl('readme'));
@@ -466,6 +470,7 @@ export async function main() {
               ? true
               : 'the floor shows no checker edges',
         timeoutMs: 30_000,
+        evidenceDir: shotDir,
       });
     } catch (error) {
       const answer = await fetch(page.url()).then(
@@ -485,15 +490,17 @@ export async function main() {
     const status = () => page.textContent('#status');
     assert.match(await status(), /Drag to orbit/, 'the status line must still show its first text');
 
-    // Reference scenes (frozen crate; with and without shadows; without texture).
-    const frozen = await open(pageUrl('frozen')),
-      off = await open(pageUrl('noshadow')),
-      plain = await open(pageUrl('notexture'));
-    const [shotOn, shotOff, shotPlain] = [
-      await settle(frozen, 'frozen', { stable: true }),
-      await settle(off, 'no-shadow', { stable: true }),
-      await settle(plain, 'no-texture', { stable: true }),
-    ];
+    // Reference scenes (frozen crate; with and without shadows; without texture), ONE AT A TIME beside the shipped
+    // page, each closed once its picture is taken: on an Intel Arc 140V the 4th WebGPU page alive at once in one
+    // browser process never finished starting (no error anywhere), and the check must measure the README, not that.
+    const [shotOn, shotOff, shotPlain] = await settleOneAtATime(
+      [
+        ['frozen', 'frozen'],
+        ['noshadow', 'no-shadow'],
+        ['notexture', 'no-texture'],
+      ],
+      { open: ([name]) => open(pageUrl(name)), settle: (p, [, label]) => settle(p, label, { stable: true }), close },
+    );
     const shipped = await settle(page, 'shipped');
 
     // TEXTURE: sharp checker edges on the floor band, many with the texture and (nearly) none without.
@@ -593,6 +600,7 @@ export async function main() {
     assert.doesNotMatch(await status(), /Picked/, 'an orbit drag must not pick');
     const secondsToInteractive = mark('interaction verified (pick handler, outline, orbit)');
     assert.deepEqual(page.problems, [], 'the shipped page logs no warning, error or failed request');
+    await close(page);
 
     // FAILURE PATH: no WebGPU shows the README's own message and then stops.
     const none = await open(pageUrl('readme'), { noGpu: true });
@@ -607,6 +615,7 @@ export async function main() {
       'the message points at a README heading that does not exist',
     );
     notes.push(`no-WebGPU message: ${message}`);
+    await close(none);
     // A browser that has WebGPU but no usable GPU (a blocklisted driver, a remote desktop): the adapter request answers null.
     const blind = await open(pageUrl('readme'), { noAdapter: true });
     await blind
@@ -621,6 +630,7 @@ export async function main() {
     const reason = await blind.textContent('#status');
     assert.match(reason, /WebGPU unavailable.*Browser support/);
     notes.push(`no-adapter message: ${reason}`);
+    await close(blind);
 
     // Gate. The timeline minus the later checks is the reader's machine time to the first interactive frame.
     const firstFrame = timeline.find((t) => t.step.startsWith('first frame')).seconds;
