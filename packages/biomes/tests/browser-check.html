@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Biomes browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
 <script type="module">
 // Real-GPU proof for @margoengine/biomes/view: a biome world draws as terrain with its ground layer, and painting a
-// biome shows that biome's ground layer where it was painted.
+// biome shows that biome's ground layer where it was painted, also with all 8 presets (15 materials).
 import {Engine} from '/packages/core/dist/index.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
 import {BiomeWorld} from '/packages/biomes/dist/index.js';
@@ -40,6 +40,14 @@ window.check={
   out.cleared=mean(await shot());
   view.dispose();
   out.afterDispose=mean(await shot());
+  // All 8 presets: 15 ground materials, 4 weight textures. Painted desert must draw as sand (main cut the list at 8 and
+  // drew sand, the 12th, as grass).
+  const every=await BiomeWorld.create({size:[512,512],biomes:Object.values(presets),height:{field:(x,z)=>40+3*Math.sin(x/37)*Math.cos(z/41)},climate:{latitude:47,rainfall:1000}});
+  for(let z=0;z<2;z++)for(let x=0;x<2;x++)every.writeLayer('paint/desert',x,z,full);
+  const all=await BiomeView.attach(engine,every,{radius:600,objects:false});
+  await all.ready;await all.whenIdle();
+  out.allMaterials=all.materials;out.allDesert=mean(await shot());
+  all.dispose();
   const error=await device.popErrorScope();
   out.validation=error?.message??null;out.errors=errors.splice(0);
   return out;

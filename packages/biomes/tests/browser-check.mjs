@@ -1,7 +1,8 @@
 // Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
 //   node packages/biomes/tests/browser-check.mjs
 // A biome world draws as terrain with its ground layer (temperate grass), painting the desert biome turns the painted
-// ground to the desert's sand, clearing the paint brings the grass back, and a disposed view leaves no terrain.
+// ground to the desert's sand, clearing the paint brings the grass back, a disposed view leaves no terrain, and with all
+// 8 presets (15 ground materials) painted desert is still sand.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -34,6 +35,10 @@ await runSuite(
       r.afterDispose.every((v, c) => Math.abs(v - r.before[c]) > 1e-3),
       'a disposed view draws no terrain',
     );
+    // All 8 presets (15 materials, 4 weight textures): painted desert ground is sand, red over green (main: grass).
+    assert.equal(r.allMaterials.length, 15);
+    const [dr, dg, db] = r.allDesert;
+    assert.ok(dr > dg && dr > db * 1.3, `desert ground with all 8 presets is sand: ${r.allDesert}`);
     assert.deepEqual(pageErrors, []);
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-browser-check.json', JSON.stringify({ hardware, result: r }, null, 1));
@@ -42,6 +47,8 @@ await runSuite(
       r.before.map((v) => v.toFixed(3)),
       'painted sand',
       r.after.map((v) => v.toFixed(3)),
+      'all presets desert',
+      r.allDesert.map((v) => v.toFixed(3)),
     );
   },
   () => context.close(),

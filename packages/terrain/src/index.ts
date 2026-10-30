@@ -29,12 +29,13 @@ export interface TerrainTextures {
   /** Layer colours, one array layer per `TerrainLayer`: `rgba8unorm-srgb`, `rgba8unorm` or `rgba16float`. */
   layers: GPUTexture;
   /**
-   * Optional painted layer weights over the heightmap's bounds, two `rgba8unorm` 2D textures: layer i's weight is
-   * channel i % 4 of texture i / 4 (pass the same texture twice for 4 layers). When present they replace the height
-   * and slope rules (each rule's `scale` still sets its texture repeat), as `@margoengine/biomes/view` uses for biome
-   * ground layers. Without them the terrain shader and bindings are unchanged. Default: none.
+   * Optional painted layer weights over the heightmap's bounds, 2 to 4 `rgba8unorm` 2D textures, enough for the layers
+   * (4 per texture, up to 16): layer i's weight is channel i % 4 of texture i / 4 (pass the same texture twice for 4
+   * layers). When present they replace the height and slope rules (each rule's `scale` still sets its texture repeat),
+   * as `@margoengine/biomes/view` uses for biome ground layers; a layer whose weight is 0 at a pixel skips its texture
+   * samples there. Without them the terrain shader and bindings are unchanged. Default: none.
    */
-  weights?: readonly [GPUTexture, GPUTexture];
+  weights?: readonly GPUTexture[];
 }
 /** A splat rule: where layer i's texture shows. Rules blend smoothly around their bounds; layer 0 is the fallback. */
 export interface TerrainLayer {
@@ -49,7 +50,7 @@ export interface TerrainLayer {
 export interface TerrainOptions {
   /** Creates the textures, at attach and again after device restoration (recreate them from retained data). */
   textures: (device: GPUDevice) => TerrainTextures;
-  /** 4-8 splat rules, one per `layers` texture layer. */
+  /** 4 to 16 splat rules, one per `layers` texture layer. */
   layers: readonly TerrainLayer[];
   /** World XZ of the heightmap's minimum corner. Default [0, 0]. */
   origin?: readonly [number, number];
@@ -107,7 +108,7 @@ interface LightingGroup {
 let nextId = 0;
 /**
  * Geometry-clipmap terrain: concentric rings that follow the camera, heights sampled from a texture in the vertex
- * shader, 4-8 slope/height texture layers with triplanar cliffs, GGX sun lighting. Works with `Shadows` and
+ * shader, 4 to 16 slope/height texture layers with triplanar cliffs, GGX sun lighting. Works with `Shadows` and
  * `Clustered` (`shadows.add(terrain)`, `clustered.add(terrain)`). `Terrain.attach(engine, options)`; WebGPU only.
  * @throws RangeError from the constructor when an option is out of range.
  * @throws TypeError when the textures have the wrong dimension, format, usage or layer count.
@@ -165,10 +166,10 @@ export class Terrain implements EnginePlugin {
       !Number.isFinite(Math.fround(o.heightOffset ?? 0)) ||
       !Array.isArray(o.layers) ||
       o.layers.length < 4 ||
-      o.layers.length > 8
+      o.layers.length > 16
     )
       throw new RangeError(
-        'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), cellSize above 0, finite heightScale and heightOffset, and 4 to 8 layers.',
+        'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), cellSize above 0, finite heightScale and heightOffset, and 4 to 16 layers.',
       );
     finiteVector(o.origin ?? [0, 0], 2, 'Terrain origin');
     finiteVector(o.size, 2, 'Terrain size');
@@ -217,9 +218,15 @@ export class Terrain implements EnginePlugin {
     this.textures = this.options.textures(this.device);
     const t = this.textures;
     const weights = t.weights;
-    if (weights !== undefined && (!Array.isArray(weights) || weights.length !== 2))
+    if (
+      weights !== undefined &&
+      (!Array.isArray(weights) ||
+        weights.length < 2 ||
+        weights.length > 4 ||
+        weights.length * 4 < this.options.layers.length)
+    )
       throw new TypeError(
-        'Terrain weights must be two rgba8unorm 2D textures; pass the same texture twice for 4 layers',
+        'Terrain weights must be 2 to 4 rgba8unorm 2D textures, one per 4 layers; pass the same texture twice for 4 layers',
       );
     for (const texture of [t.heightmap, t.layers, ...(t.normalmap ? [t.normalmap] : []), ...(weights ?? [])])
       if (texture.dimension !== '2d' || !(texture.usage & GPUTextureUsage.TEXTURE_BINDING) || texture.sampleCount !== 1)
@@ -286,12 +293,7 @@ export class Terrain implements EnginePlugin {
         { binding: 3, visibility: fragment, texture: { viewDimension: '2d-array' } },
         { binding: 4, visibility: fragment, sampler: { type: 'filtering' } },
         { binding: 5, visibility: fragment, buffer: { type: 'read-only-storage' } },
-        ...(weights
-          ? [
-              { binding: 6, visibility: fragment, texture: {} },
-              { binding: 7, visibility: fragment, texture: {} },
-            ]
-          : []),
+        ...(weights ?? []).map((_, i) => ({ binding: 6 + i, visibility: fragment, texture: {} })),
       ],
     });
     const resources = [
@@ -409,7 +411,7 @@ export class Terrain implements EnginePlugin {
       (r === undefined
         ? terrainVertex
         : terrainVertex.replace('o.material=vec4f(0.9,0,1,1)', `o.material=vec4f(${r},0,1,1)`)) +
-      (this.textures?.weights ? weightedFragment() : terrainFragment);
+      (this.textures?.weights ? weightedFragment(this.textures.weights.length) : terrainFragment);
     for (const effect of this.lighting) code = effect.shader(code, 1);
     return code;
   }

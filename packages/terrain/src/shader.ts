@@ -53,20 +53,44 @@ fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   let mapped=pbrNeutral(max(linear,vec3f(0)));return vec4f(select(mapped*12.92,1.055*pow(mapped,vec3f(1.0/2.4))-0.055,mapped>=vec3f(0.0031308)),1);
 }`;
 
+/** One layer's triplanar colour: its three projections blended by the normal (`terrainColor` and the weighted one). */
+const layerSample = /* wgsl */ `
+fn terrainLayerSample(position:vec3f,projection:vec3f,dx:vec3f,dy:vec3f,layer:u32)->vec3f {
+  let scale=layerRules[layer].params.x;let p=position*scale;
+  let x=textureSampleGrad(terrainLayers,terrainSampler,p.zy,i32(layer),dx.zy*scale,dy.zy*scale).rgb;
+  let y=textureSampleGrad(terrainLayers,terrainSampler,p.xz,i32(layer),dx.xz*scale,dy.xz*scale).rgb;
+  let z=textureSampleGrad(terrainLayers,terrainSampler,p.xy,i32(layer),dx.xy*scale,dy.xy*scale).rgb;
+  return x*projection.x+y*projection.y+z*projection.z;
+}`;
+const ruleColor = terrainFragment.slice(
+  terrainFragment.indexOf('fn terrainColor('),
+  terrainFragment.indexOf('@fragment fn fragment('),
+);
+
 /**
- * The fragment shader with `TerrainTextures.weights`: layer i's weight is channel i % 4 of weight texture i / 4,
- * sampled bilinearly over the heightmap's bounds, in place of the height and slope rules (which still set each
- * layer's texture scale). A function, so importing anything else from this package keeps no shader text.
+ * The fragment shader with `TerrainTextures.weights` (`count` textures, 2 to 4): layer i's weight is channel i % 4 of
+ * weight texture i / 4, sampled bilinearly once per fragment over the heightmap's bounds, in place of the height and
+ * slope rules (which still set each layer's texture scale). A layer whose weight is 0 skips its three triplanar
+ * samples, so 16 layers cost what the ones that show do; the colour is the same as sampling every layer. A function,
+ * so importing anything else from this package keeps no shader text.
  */
-export const weightedFragment = (): string => /* wgsl */ `
-@group(0) @binding(6) var terrainWeightsA:texture_2d<f32>;
-@group(0) @binding(7) var terrainWeightsB:texture_2d<f32>;
-fn terrainWeight(layer:u32,p:vec3f)->f32 {
-  let d=vec2f(textureDimensions(terrainWeightsA));let uv=clamp((p.xz-frame.map.xy)/frame.map.zw,vec2f(0.5)/d,vec2f(1)-vec2f(0.5)/d);
-  let w=select(textureSampleLevel(terrainWeightsB,terrainSampler,uv,0),textureSampleLevel(terrainWeightsA,terrainSampler,uv,0),layer<4u);
-  return w[layer%4u];
+export const weightedFragment = (count: number): string => {
+  const n = Math.min(4, Math.max(1, Math.floor(count))),
+    ids = Array.from({ length: n }, (_, i) => i);
+  return /* wgsl */ `
+${ids.map((i) => `@group(0) @binding(${6 + i}) var terrainWeights${i}:texture_2d<f32>;`).join('\n')}
+${layerSample}
+fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
+  let axes=pow(abs(normal),vec3f(8));let projection=axes/max(axes.x+axes.y+axes.z,0.00001);let dx=dpdx(position);let dy=dpdy(position);
+  let d=vec2f(textureDimensions(terrainWeights0));let uv=clamp((position.xz-frame.map.xy)/frame.map.zw,vec2f(0.5)/d,vec2f(1)-vec2f(0.5)/d);
+  var packed=array<vec4f,4>(${[0, 1, 2, 3].map((i) => (i < n ? `textureSampleLevel(terrainWeights${i},terrainSampler,uv,0)` : 'vec4f(0)')).join(',')});
+  var color=vec3f(0);var total=0.0;
+  for(var layer=0u;layer<u32(frame.heights.z);layer++){
+    let weight=packed[layer/4u][layer%4u];if(weight<=0.0){continue;}
+    color+=terrainLayerSample(position,projection,dx,dy,layer)*weight;total+=weight;
+  }
+  if(total>0.00001){return color/total;}
+  return terrainLayerSample(position,projection,dx,dy,0u);
 }
-${terrainFragment.replace(
-  `let weight=smoothstep(hs.x-h,hs.x+h,position.y)*(1-smoothstep(hs.y-h,hs.y+h,position.y))*smoothstep(hs.z-s,hs.z+s,slope)*(1-smoothstep(hs.w-s,hs.w+s,slope));`,
-  'let weight=terrainWeight(layer,position);',
-)}`;
+${terrainFragment.replace(ruleColor, '')}`;
+};

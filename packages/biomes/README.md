@@ -193,11 +193,12 @@ await view.whenIdle();
 
 `BiomeView.attach(engine, world, options)` builds a clipmap `Terrain` (`view.terrain`, so `shadows.add(view.terrain)`
 works) from the world: the region overview first, then 1 m tiles within `radius` of the camera, nearest first, written
-into the heightmap and into two ground-weight textures (the terrain's optional `weights`, one channel per material),
+into the heightmap and into 2 to 4 ground-weight textures (the terrain's optional `weights`, one channel per material),
 and again for every rectangle `world.onChange` reports. Each biome shares its weight among its ground layers by their
 slope, height, moisture and curvature rules; `groundWeights(world, tile, materials)` is the same computation on the CPU
-(8 bytes per cell summing to 255). Materials are generated textures from `MATERIALS` (16 built-in looks, such as
-`grass`, `sand`, `rock`, `snow`; `materials` overrides or adds them). Up to 8 materials per world, the terrain's limit.
+(16 bytes per cell summing to 255). Materials are generated textures from `MATERIALS` (16 built-in looks, such as
+`grass`, `sand`, `rock`, `snow`; `materials` overrides or adds them). Up to 16 materials per world, the terrain's
+limit (the 8 presets use 15); more is a RangeError from `attach` that names the count.
 `terrainColorsFor(world)` gives `TerrainColors` sand, meadow and stone colours for small scenes drawn as one mesh.
 
 | `BiomeView.attach` option | Default | Meaning |

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3907268,
+  "total": 3908097,
   "history": [
     {
       "date": "2026-10-24",
@@ -854,6 +854,12 @@
       "commit": "ba7ec2cf",
       "reason": "vfx: deterministic slot order (births to the lowest dead slots, draw list compacted by workgroup prefix sums instead of atomic tickets), so the same frames give the same particles and blended pixels on every run; base and root grow with the four slot-order passes and their wiring, the feature entries shrink (frame and settle moved out of the shader chunk); growth accepted by Scott 2026-10-30 (docs/limits.md, VFX repeatable particle order)",
       "grew": 2
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "cb42459a3",
+      "reason": "biome look L1: terrain takes 2 to 4 weight textures (up to 16 layers) and skips zero-weight layers; biomes view draws up to 16 ground materials instead of cutting at 8 (a dropped material drew as the first)",
+      "grew": 2
     }
   ],
   "items": {
@@ -878,7 +884,7 @@
     "@margoengine/biomes/relief": 2825,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 2880,
-    "@margoengine/biomes/view": 7676,
+    "@margoengine/biomes/view": 8005,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4000,
@@ -1158,7 +1164,7 @@
     "@margoengine/staging": 6296,
     "@margoengine/stats": 4934,
     "@margoengine/taa": 10390,
-    "@margoengine/terrain": 10598,
+    "@margoengine/terrain": 11098,
     "@margoengine/text": 15890,
     "@margoengine/tiles": 14752,
     "@margoengine/tonemap": 11083,

@@ -72,13 +72,22 @@ export interface BiomeViewOptions {
   readonly detailBudget?: number;
 }
 
-/** What a view draws of one tile: heights in metres and the two ground weight textures, `count` x `count` texels. */
+/** Most ground materials a view draws: the terrain's layer limit (4 weights per texture, 4 textures). */
+export const MAX_GROUND_MATERIALS = 16;
+
+/** Weight textures for `n` ground materials: 4 materials each, at least 2 (the terrain takes 2 to 4). */
+const weightTextures = (n: number): number => Math.max(2, (n + 3) >> 2);
+
+/**
+ * What a view draws of one tile: heights in metres and the ground weight textures (2 to 4, 4 materials each, as many
+ * as the materials need), `count` x `count` texels.
+ */
 export interface ViewTile {
   readonly x: number;
   readonly z: number;
   readonly count: number;
   readonly heights: Float32Array;
-  readonly weights: readonly [Uint8Array, Uint8Array];
+  readonly weights: readonly Uint8Array[];
 }
 
 /** Ground weights of the last view tile made on this thread, reused (a worker makes one tile after another). */
@@ -86,61 +95,86 @@ let ground: Uint8Array | undefined;
 
 /** A view tile made on this thread (a world without workers): the same arrays a worker sends. */
 export function viewTile(world: BiomeWorld, tile: BiomeTile, materials: readonly string[], step: number): ViewTile {
-  const n = tile.cells * tile.cells * 8;
+  const n = tile.cells * tile.cells * STRIDE;
   if (!ground || ground.length < n) ground = new Uint8Array(n);
   const count = Math.floor(tile.cells / step), // float division: exact multiple
     weights = weightsInto(world, tile, materials, ground),
     height = tile.layer('height')!,
     heights = new Float32Array(count * count),
-    a = new Uint8Array(count * count * 4),
-    b = new Uint8Array(count * count * 4);
+    textures = Array.from({ length: weightTextures(materials.length) }, () => new Uint8Array(count * count * 4));
   for (let j = 0; j < count; j++)
     for (let i = 0; i < count; i++) {
       const k = j * step * tile.cells + i * step,
         t = j * count + i;
       heights[t] = height.data[k] * height.scale;
-      a.set(weights.subarray(k * 8, k * 8 + 4), t * 4);
-      b.set(weights.subarray(k * 8 + 4, k * 8 + 8), t * 4);
+      for (let w = 0; w < textures.length; w++)
+        textures[w].set(weights.subarray(k * STRIDE + w * 4, k * STRIDE + w * 4 + 4), t * 4);
     }
-  return { x: tile.x, z: tile.z, count, heights, weights: [a, b] };
+  return { x: tile.x, z: tile.z, count, heights, weights: textures };
 }
 
 /** Layers a view tile reads. */
 export const VIEW_LAYERS = Object.freeze(['height', 'slope', 'moisture', 'curvature', 'biome', 'biomeWeight']);
 
-/** Ground material keys of a biome list in first-use order, at most 8 (the terrain's layer limit). */
+/**
+ * Ground material keys of a biome list in first-use order, every one of them (a view draws up to
+ * `MAX_GROUND_MATERIALS`, 16; the 8 presets use 15).
+ */
 export function groundMaterials(biomes: readonly BiomeDefinition[]): string[] {
   const keys: string[] = [];
-  for (const b of biomes)
-    for (const g of b.ground) if (!keys.includes(g.material) && keys.length < 8) keys.push(g.material);
+  for (const b of biomes) for (const g of b.ground) if (!keys.includes(g.material)) keys.push(g.material);
   return keys;
+}
+
+/** Throws the RangeError a view gives for more ground materials than the terrain draws. */
+function checkMaterialCount(materials: readonly string[]): void {
+  if (materials.length > MAX_GROUND_MATERIALS)
+    throw rangeError(
+      `BiomeView draws up to ${MAX_GROUND_MATERIALS} ground materials and these biomes use ${materials.length}: ${materials.join(', ')}; give ground layers that look alike one material key (the \`materials\` option sets each key's look)`,
+      'biomes',
+    );
 }
 
 /** Per biome, per ground layer: material index, quantised rule and weight (Q16). */
 type Rules = readonly (readonly { material: number; dims: readonly Dimension[]; weight: number }[])[];
 
 function rulesOf(biomes: readonly BiomeDefinition[], materials: readonly string[]): Rules {
+  checkMaterialCount(materials);
   return biomes.map((b) =>
-    b.ground.map((g) => ({
-      material: Math.max(0, materials.indexOf(g.material)),
-      dims: (['slope', 'height', 'moisture', 'curvature'] as const)
-        .filter((k) => g[k] !== undefined)
-        .map((k) => fieldDimension(k, g[k]!)),
-      weight: Math.round((g.weight ?? 1) * ONE),
-    })),
+    b.ground.map((g) => {
+      const material = materials.indexOf(g.material);
+      // A missing key once drew as material 0 (the default world's 9th material, boreal needles, drew as grass).
+      if (material < 0)
+        throw rangeError(
+          `Ground material '${g.material}' of biome '${b.id}' is not in the materials list; pass groundMaterials(world.biomes)`,
+          'biomes',
+        );
+      return {
+        material,
+        dims: (['slope', 'height', 'moisture', 'curvature'] as const)
+          .filter((k) => g[k] !== undefined)
+          .map((k) => fieldDimension(k, g[k]!)),
+        weight: Math.round((g.weight ?? 1) * ONE),
+      };
+    }),
   );
 }
 
+/** Bytes per cell of `groundWeights`: one per material, up to `MAX_GROUND_MATERIALS`. */
+const STRIDE = MAX_GROUND_MATERIALS;
+
 /**
- * Ground material weights of a tile: 8 bytes per cell (materials 0..7, `groundMaterials` order) summing to 255. Each of
+ * Ground material weights of a tile: 16 bytes per cell (materials 0..15, `groundMaterials` order; the bytes past the
+ * materials are 0) summing to 255. Each of
  * the cell's biomes shares its weight among its ground layers by their rules (Wendland bands like envelopes; a biome
  * whose rules all miss uses its first layer). Integer only.
+ * @throws RangeError when a biome's ground material is not in `materials`, or for more than 16 materials.
  */
 export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: readonly string[]): Uint8Array {
-  return weightsInto(world, tile, materials, new Uint8Array(tile.cells * tile.cells * 8));
+  return weightsInto(world, tile, materials, new Uint8Array(tile.cells * tile.cells * STRIDE));
 }
 
-/** `groundWeights` written into `out` (8 bytes per cell or more; every byte of the cells is written). */
+/** `groundWeights` written into `out` (16 bytes per cell or more; every byte of the cells is written). */
 function weightsInto(world: BiomeWorld, tile: BiomeTile, materials: readonly string[], out: Uint8Array): Uint8Array {
   const rules = rulesOf(world.biomes, materials),
     n = tile.cells * tile.cells,
@@ -150,8 +184,8 @@ function weightsInto(world: BiomeWorld, tile: BiomeTile, materials: readonly str
   const data: Record<string, ArrayLike<number>> = {};
   for (const name of ['slope', 'height', 'moisture', 'curvature'])
     data[name] = tile.layer(name)?.data ?? new Int32Array(n);
-  const sums = new Int32Array(8),
-    share = new Int32Array(8);
+  const sums = new Int32Array(STRIDE),
+    share = new Int32Array(STRIDE);
   for (let k = 0; k < n; k++) {
     sums.fill(0);
     for (let s = 0; s < 4; s++) {
@@ -170,34 +204,34 @@ function weightsInto(world: BiomeWorld, tile: BiomeTile, materials: readonly str
         total += m;
       }
       if (!total) share[layers[0].material] = total = ONE;
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < STRIDE; i++) {
         sums[i] += divFloor(share[i] * w, total);
         share[i] = 0;
       }
     }
-    quantise(sums, out, k * 8);
+    quantise(sums, out, k * STRIDE);
   }
   return out;
 }
 
-/** Writes 8 weights proportional to `w` summing to 255 (largest remainder, ties by index). */
+/** Writes 16 weights proportional to `w` summing to 255 (largest remainder, ties by index). */
 function quantise(w: Int32Array, out: Uint8Array, at: number): void {
   let total = 0;
-  for (let i = 0; i < 8; i++) total += w[i];
+  for (let i = 0; i < STRIDE; i++) total += w[i];
   if (!total) {
-    // All to the first material, the other seven 0 (the array may be reused).
-    out.fill(0, at + 1, at + 8)[at] = 255;
+    // All to the first material, the other fifteen 0 (the array may be reused).
+    out.fill(0, at + 1, at + STRIDE)[at] = 255;
     return;
   }
   let given = 0;
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < STRIDE; i++) {
     out[at + i] = divFloor(w[i] * 255, total);
     given += out[at + i];
   }
   for (let left = 255 - given; left > 0; left--) {
     let best = 0,
       rem = -1;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < STRIDE; i++) {
       const r = w[i] * 255 - out[at + i] * total;
       if (r > rem) [best, rem] = [i, r];
     }
@@ -306,14 +340,15 @@ export class BiomeView implements Disposable {
   readonly #width: number;
   readonly #depth: number;
   readonly #heights: Float32Array;
-  readonly #weights: [Uint8Array, Uint8Array];
+  /** CPU copies of the weight textures, 4 bytes per texel each. */
+  readonly #weights: Uint8Array[];
   readonly #radius: number;
   readonly #signal?: AbortSignal;
   readonly #lookahead: number;
   readonly #budget: number;
   /** Distance within which small plants, rocks and props are drawn (BiomeObjects' near radius). */
   readonly #near: number;
-  #textures?: { device: GPUDevice; height: GPUTexture; weights: [GPUTexture, GPUTexture] };
+  #textures?: { device: GPUDevice; height: GPUTexture; weights: GPUTexture[] };
   #off: () => void;
   #offObjects?: () => void;
   /** Streaming: tiles drawn at full detail, tiles whose objects are on the GPU, jobs on their way (`v` view, `p`
@@ -382,13 +417,17 @@ export class BiomeView implements Disposable {
     this.#width = Math.round((x1 - x0) / texel) + 1; // float division: exact
     this.#depth = Math.round((z1 - z0) / texel) + 1; // float division
     this.materials = Object.freeze(groundMaterials(world.biomes));
+    checkMaterialCount(this.materials);
     const looks = this.materials.map((key) => look(key, options.materials)),
-      // The terrain needs 4 to 8 layers: repeat the last material when there are fewer.
+      // The terrain needs 4 to 16 layers: repeat the last material when there are fewer.
       layerKeys = [...this.materials];
     while (layerKeys.length < 4) layerKeys.push(layerKeys[layerKeys.length - 1]);
     const pixels = layerKeys.map((key, i) => materialPixels(key, looks[Math.min(i, looks.length - 1)]));
     this.#heights = this.#overviewHeights();
-    this.#weights = [new Uint8Array(this.#width * this.#depth * 4), new Uint8Array(this.#width * this.#depth * 4)];
+    this.#weights = Array.from(
+      { length: weightTextures(this.materials.length) },
+      () => new Uint8Array(this.#width * this.#depth * 4),
+    );
     this.#overviewWeights();
     const view = this;
     this.terrain = terrainModule.Terrain.attach(engine, {
@@ -404,10 +443,7 @@ export class BiomeView implements Disposable {
         const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
           size = [view.#width, view.#depth],
           height = device.createTexture({ size, format: 'r32float', usage }),
-          weights = [0, 1].map(() => device.createTexture({ size, format: 'rgba8unorm', usage })) as [
-            GPUTexture,
-            GPUTexture,
-          ],
+          weights = view.#weights.map(() => device.createTexture({ size, format: 'rgba8unorm', usage })),
           layers = device.createTexture({
             size: [256, 256, layerKeys.length],
             format: 'rgba8unorm-srgb',
@@ -438,11 +474,13 @@ export class BiomeView implements Disposable {
 
   /**
    * Draws a biome world as terrain on a WebGPU engine. Loads `@margoengine/terrain` on first use.
-   * @throws MargoError `'unsupported'` on a WebGL engine; RangeError for bad options. Rejects with the signal's reason.
+   * @throws MargoError `'unsupported'` on a WebGL engine; RangeError for bad options and for biomes with more than 16
+   * ground materials (`groundMaterials`). Rejects with the signal's reason.
    */
   static async attach(engine: EngineKernel, world: BiomeWorld, options: BiomeViewOptions = {}): Promise<BiomeView> {
     if (!engine || !world || typeof world.tile !== 'function')
       throw typeError('BiomeView.attach takes an engine and a BiomeWorld', 'biomes');
+    checkMaterialCount(groundMaterials(world.biomes));
     if (engine.backend !== 'webgpu')
       throw fault('unsupported', 'BiomeView needs a WebGPU engine; create the engine with WebGPU', 'biomes');
     if (options.signal?.aborted) throw options.signal.reason;
@@ -842,8 +880,8 @@ export class BiomeView implements Disposable {
       [x0, z0] = world.bounds,
       rules = rulesOf(world.biomes, this.materials),
       ids = world.biomes.map((b) => b.id),
-      sums = new Int32Array(8),
-      bytes = new Uint8Array(8);
+      sums = new Int32Array(STRIDE),
+      bytes = new Uint8Array(STRIDE);
     for (let v = 0; v < this.#depth; v += step)
       for (let u = 0; u < this.#width; u += step) {
         const s = world.sample(x0 + u * this.textureResolution, z0 + v * this.textureResolution);
@@ -860,10 +898,8 @@ export class BiomeView implements Disposable {
 
   #setWeights(u: number, v: number, bytes: Uint8Array, at: number): void {
     const k = (v * this.#width + u) * 4;
-    for (let c = 0; c < 4; c++) {
-      this.#weights[0][k + c] = bytes[at + c];
-      this.#weights[1][k + c] = bytes[at + 4 + c];
-    }
+    for (let w = 0; w < this.#weights.length; w++)
+      for (let c = 0; c < 4; c++) this.#weights[w][k + c] = bytes[at + w * 4 + c];
   }
 
   /**
@@ -882,13 +918,13 @@ export class BiomeView implements Disposable {
     for (let j = j0; j < end; j++) {
       const row = (v0 + j) * this.#width + u0;
       this.#heights.set(tile.heights.subarray(j * tile.count, j * tile.count + cw), row);
-      this.#weights[0].set(tile.weights[0].subarray(j * tile.count * 4, (j * tile.count + cw) * 4), row * 4);
-      this.#weights[1].set(tile.weights[1].subarray(j * tile.count * 4, (j * tile.count + cw) * 4), row * 4);
+      for (let w = 0; w < this.#weights.length; w++)
+        this.#weights[w].set(tile.weights[w].subarray(j * tile.count * 4, (j * tile.count + cw) * 4), row * 4);
     }
     const t = this.#textures;
     if (!t || cw <= 0 || end <= j0) return;
     if (cw === tile.count) {
-      // The tile's own arrays are the texel rectangle: no staging copy (4 bytes per texel in all three).
+      // The tile's own arrays are the texel rectangle: no staging copy (4 bytes per texel in all of them).
       const write = (texture: GPUTexture, data: Float32Array | Uint8Array) =>
         t.device.queue.writeTexture(
           { texture, origin: [u0, v0 + j0] },
@@ -897,8 +933,7 @@ export class BiomeView implements Disposable {
           [cw, end - j0],
         );
       write(t.height, tile.heights);
-      write(t.weights[0], tile.weights[0]);
-      write(t.weights[1], tile.weights[1]);
+      t.weights.forEach((texture, w) => write(texture, tile.weights[w]));
       if (end === cd) (this.terrain as Terrain | undefined)?.invalidate();
     } else this.#upload(u0, v0 + j0, cw, end - j0);
   }
@@ -908,12 +943,15 @@ export class BiomeView implements Disposable {
     const t = this.#textures;
     if (!t || w <= 0 || d <= 0) return;
     const rows = new Float32Array(w * d),
-      a = new Uint8Array(w * d * 4),
-      b = new Uint8Array(w * d * 4);
+      packed = this.#weights.map(() => new Uint8Array(w * d * 4));
     for (let j = 0; j < d; j++) {
       rows.set(this.#heights.subarray((v + j) * this.#width + u, (v + j) * this.#width + u + w), j * w);
-      a.set(this.#weights[0].subarray(((v + j) * this.#width + u) * 4, ((v + j) * this.#width + u + w) * 4), j * w * 4);
-      b.set(this.#weights[1].subarray(((v + j) * this.#width + u) * 4, ((v + j) * this.#width + u + w) * 4), j * w * 4);
+      packed.forEach((out, i) =>
+        out.set(
+          this.#weights[i].subarray(((v + j) * this.#width + u) * 4, ((v + j) * this.#width + u + w) * 4),
+          j * w * 4,
+        ),
+      );
     }
     const write = (texture: GPUTexture, data: Float32Array | Uint8Array) =>
       t.device.queue.writeTexture(
@@ -923,8 +961,7 @@ export class BiomeView implements Disposable {
         [w, d],
       );
     write(t.height, rows);
-    write(t.weights[0], a);
-    write(t.weights[1], b);
+    t.weights.forEach((texture, i) => write(texture, packed[i]));
     // The terrain calls `textures` while it attaches, before `this.terrain` is set.
     (this.terrain as Terrain | undefined)?.invalidate();
   }

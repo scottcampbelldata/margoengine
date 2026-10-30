@@ -74,7 +74,7 @@ flat output location 6 in the standard PBR shader. No core changes are required.
 Physical WebGPU regression: `node packages/terrain/test/wetness.browser.mjs` from
 the repository root after building the packages.
 
-Optional geometry clipmaps with vertex texture height/normal sampling and 4-8 terrain layers. Fixed grids form a center and concentric rings. Uniform origins follow the camera, inner ring edges follow the finer grid, and outer-edge vertices collapse onto the next coarser lattice to close seams. Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting; normalized slope/height weights blend an sRGB texture array.
+Optional geometry clipmaps with vertex texture height/normal sampling and 4 to 16 terrain layers. Fixed grids form a center and concentric rings. Uniform origins follow the camera, inner ring edges follow the finer grid, and outer-edge vertices collapse onto the next coarser lattice to close seams. Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting; normalized slope/height weights blend an sRGB texture array.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
@@ -104,10 +104,11 @@ engine.start();
 
 The texture factory runs at attachment and after device restoration. Terrain owns and destroys returned textures; recreate them from retained asset data. Height maps support `r32float`, `rgba16float`, or `rgba8unorm` (R channel); optional normal maps support `rgba8unorm` or `rgba16float`, with XYZ encoded in 0..1. Without a normal map, the vertex shader samples neighboring heights. Layer arrays support `rgba8unorm-srgb`, `rgba8unorm`, or `rgba16float` and must contain exactly as many layers as the rules. Supply mipmaps for real assets. `heightScale`/`heightOffset` map samples to world Y; origin/size define XZ texture coverage. Heights clamp at map boundaries.
 
-Optional painted weights: return `weights: [a, b]` from the factory, two `rgba8unorm` 2D textures over the same
-bounds as the heightmap (pass the same texture twice for up to 4 layers). Layer i's weight is channel `i % 4` of texture
-`i / 4`, sampled bilinearly, and replaces the height and slope rules; each rule's `scale` still sets that layer's
-texture repeat. This is how `@margoengine/biomes/view` draws biome ground layers. Without `weights` the shader, bind
+Optional painted weights: return `weights: [a, b]` from the factory, 2 to 4 `rgba8unorm` 2D textures over the same
+bounds as the heightmap, one per 4 layers, so up to 16 layers (pass the same texture twice for up to 4 layers). Layer
+i's weight is channel `i % 4` of texture `i / 4`, sampled bilinearly, and replaces the height and slope rules; each
+rule's `scale` still sets that layer's texture repeat. A layer whose weight is 0 at a pixel skips its three triplanar
+samples there, so 16 layers cost about what the ones that show do. This is how `@margoengine/biomes/view` draws biome ground layers. Without `weights` the shader, bind
 group layout and draw calls are exactly as before (`examples/package-benchmarks/proofs/terrain-ssr.proof.js` checks the
 whole call sequence). Update the textures with `queue.writeTexture` and call `terrain.invalidate()`.
 
