@@ -99,7 +99,17 @@ test('the 8 presets give 15 materials and every one draws as itself: painted des
   world.writeLayer('paint/desert', 0, 0, new Uint8Array(256 * 256).fill(255));
   const tile = await world.tile(0, 0),
     w = groundWeights(world, tile, keys),
-    k = (100 * 256 + 100) * 16;
+    // Relief scaled to world size makes part of this tile steep rock; the check reads a painted texel that is flat sand
+    // (the view tile has half the resolution, so texel (i, j) there is (2i, 2j) here).
+    flat = (() => {
+      for (let j = 0; j < 128; j++)
+        for (let i = 0; i < 128; i++) {
+          const at = (2 * j * 256 + 2 * i) * 16;
+          if (w[at + sand] + w[at + keys.indexOf('red-sand')] > 200) return { i, j };
+        }
+      throw new Error('no flat sand texel on the painted tile');
+    })(),
+    k = (2 * flat.j * 256 + 2 * flat.i) * 16;
   // Desert ground is sand and red sand; their weight sits at their own index and grass has none.
   assert.ok(w[k + sand] + w[k + keys.indexOf('red-sand')] > 200, `desert is sand: ${[...w.subarray(k, k + 16)]}`);
   assert.equal(w[k + keys.indexOf('grass')], 0, 'and not grass');
@@ -107,7 +117,7 @@ test('the 8 presets give 15 materials and every one draws as itself: painted des
   // The view tile packs 4 materials per texture: 4 textures for 15, sand in texture 2 (index 11), channel 3.
   const t = viewTile(world, tile, keys, 2);
   assert.equal(t.weights.length, 4);
-  const texel = (50 * t.count + 50) * 4;
+  const texel = (flat.j * t.count + flat.i) * 4;
   assert.equal(t.weights[sand >> 2][texel + (sand & 3)], w[k + sand]);
   // Fewer materials keep 2 textures (the terrain's least).
   const small = await BiomeWorld.create({ size: [512, 512], biomes: [presets.temperate] });

@@ -243,6 +243,9 @@ interface GroundLayer {
     readonly height?: Range;
     readonly moisture?: Range;
     readonly curvature?: Range;
+    readonly temperature?: Range;
+    readonly coldest?: Range;
+    readonly warmest?: Range;
     readonly weight?: number;
 }
 
