@@ -4,6 +4,12 @@
 // (1 + A e^(B / cos theta)) (1 + C e^(D gamma) + E cos^2 gamma) with the paper's coefficients linear in turbidity for
 // luminance Y and chromaticity x, y; zenith luminance (kcd/m^2) and chromaticity from its fits in turbidity and sun
 // zenith angle; xyY converted to linear sRGB (IEC 61966-2-1). Pure CPU code.
+// Two faults of the published fit are corrected here as in @margoengine/sky (src/preetham.ts, the same model in WGSL;
+// keep the two in step). Toward the horizon the fitted y falls below the CIE daylight locus y = -3x^2 + 2.87x - 0.275
+// (noon, turbidity 2: x 0.3009, y 0.3037 against 0.3170), so the horizon drew pink (red above green); measured
+// daylight does not fall on that side, so y is kept at or above the locus and is unchanged where the fit already is.
+// The luminance normaliser 1 + A e^B turns negative below a turbidity of about 1.65 (black sky) and blows the horizon
+// out just above it (1.7: four times the horizon at 2), so turbidity below 2 is read as 2.
 
 /** Baked map size: about 0.35 degrees per texel. */
 export const SKY_WIDTH = 1024,
@@ -28,8 +34,8 @@ const XZ = [0.00166, -0.00375, 0.00209, 0, -0.02903, 0.06377, -0.03202, 0.00394,
 
 /**
  * Linear sRGB sky radiance (3 floats per texel, rows from straight up, the centre column facing -Z, three quarters
- * +X: the environment map convention) for turbidity `turbidity`, sun direction `sun` (unit; below the horizon it is
- * taken on the horizon) and radiance scale `intensity` per kcd/m^2. Below the horizon the sky is black, or with
+ * +X: the environment map convention) for turbidity `turbidity` (below 2 read as 2), sun direction `sun` (unit; below
+ * the horizon it is taken on the horizon) and radiance scale `intensity` per kcd/m^2. Below the horizon the sky is black, or with
  * `horizonBelow` the horizon row repeated.
  */
 export function bakeSky(
@@ -38,7 +44,7 @@ export function bakeSky(
   intensity: number,
   horizonBelow = false,
 ): Float32Array {
-  const t = turbidity,
+  const t = Math.max(2, turbidity),
     s = Math.acos(Math.min(1, Math.max(0, sun[1]))),
     h = Math.hypot(sun[0], sun[2]),
     // The sun direction used for gamma, lifted to the horizon when below it.
@@ -63,7 +69,7 @@ export function bakeSky(
         gamma = Math.acos(Math.min(1, Math.max(-1, d[0] * sd[0] + d[1] * sd[1] + d[2] * sd[2]))),
         Y = (yz * perez(cy, theta, gamma)) / fy,
         x = (xz * perez(cx, theta, gamma)) / fx,
-        y = (yzc * perez(cyy, theta, gamma)) / fyy;
+        y = Math.max(-3 * x * x + 2.87 * x - 0.275, (yzc * perez(cyy, theta, gamma)) / fyy);
       if (!(Y > 0 && y > 0)) continue;
       const X = (x * Y) / y,
         Z = ((1 - x - y) * Y) / y,

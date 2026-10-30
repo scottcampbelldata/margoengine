@@ -295,7 +295,7 @@ export interface TraceFog {
 
 /** Compatible addition: the Preetham daylight sky of {@link TraceEnvironment.physicalSky}. */
 export interface TracePhysicalSky {
-  /** Atmospheric turbidity, 1.7 (very clear) to 10 (hazy). Default 3. */
+  /** Atmospheric turbidity, 1.7 (very clear) to 10 (hazy). Default 3. Values below 2 are read as 2 (the model's fit breaks down below that). */
   turbidity?: number;
   /** Radiance per kcd/m^2 of the model's luminance, 0 or more. Default 0.1 (a clear noon zenith is then about 0.6). */
   intensity?: number;
