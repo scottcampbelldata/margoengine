@@ -1,5 +1,5 @@
 {
-  "commit": "39a06501d",
+  "commit": "fda3b8498",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1248,16 +1248,16 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 43453,
-        "gzip": 15542
+        "raw": 43489,
+        "gzip": 15570
       },
       "./base": {
         "raw": 16621,
         "gzip": 6443
       },
       "./preetham": {
-        "raw": 1621,
-        "gzip": 697
+        "raw": 1657,
+        "gzip": 719
       },
       "./bruneton": {
         "raw": 6389,
