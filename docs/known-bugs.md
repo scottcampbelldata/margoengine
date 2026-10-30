@@ -200,26 +200,6 @@ does not own. Each entry says exactly what is needed to close it.
   the budget is too short for a loaded machine), or a close that hangs on a pending GPU request (a defect). Next step:
   rerun under the burner with `DEBUG=pw:browser` and a process list at the timeout, and see whether the browser ends
   later by itself.
-### WebGL2 layer: compute lab
-
-- **What:** the compute lab demo (`examples/compute-lab.html`, @margoengine/compute: Philox samples, histogram, sort,
-  moments) computes different data on the WebGL2 compatibility layer than on native WebGPU on the same GPU: 14.6% of
-  pixels differ by more than 2 levels (mean d 24.9), with native run-to-run noise 0 (`npm run visual:compat --
-  --only=compute-lab` before the page was kept off the layer).
-- **Cause:** not found yet. Native noise is 0, so a kernel gives other values on the layer: a translator or CPU-tier
-  semantics difference in the Philox integer arithmetic (32-bit multiply high, bit casts) or in the sort or scan.
-- **Until fixed:** the page calls `needsWebGPU('#viewport', { layer: false })`, so a browser without WebGPU shows the
-  needs-WebGPU message instead of wrong numbers. Fix it, drop the option, rerun `npm run visual:compat -- --write`.
-
-### WebGL2 layer: sciviz surface
-
-- **What:** the sciviz surface demo (`examples/sciviz-surface.html`) does not start on the WebGL2 layer: the page shows
-  "Could not start: Uniform p.time is missing; pass every struct member" (MargoError from @margoengine/compute), where
-  native WebGPU runs. Repro: `npm run visual:compat -- --only=sciviz-surface` with the option below removed.
-- **Cause:** not found yet. The compute package checks the uniforms against the kernel's struct; on the layer that
-  check sees a struct without the `time` member the demo passes, so the reflection the package reads differs there.
-- **Until fixed:** kept off the layer the same way (`{ layer: false }`).
-
 ### WebGL2 layer: demos that run with differences
 
 - **What:** `npm run visual:compat` (table in [webgl2-compat-demos.md](webgl2-compat-demos.md)) records demos that

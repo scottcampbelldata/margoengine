@@ -26,7 +26,9 @@ engine.render();
 ```
 
 `install()` makes `navigator.gpu` a WebGPU-shaped GPU on WebGL2, makes `canvas.getContext('webgpu')` return its canvas
-context, and defines `GPUBufferUsage` and the other flag objects where the browser lacks them. Where the browser's own
+context, defines `GPUBufferUsage` and the other flag objects where the browser lacks them, and names its classes as
+the WebGPU interfaces (`GPUBuffer`, `GPUDevice` and the rest) while installed, so `instanceof GPUBuffer` holds for its
+objects, also in a browser that defines those interfaces without an adapter. Where the browser's own
 WebGPU has an adapter it does nothing (it resolves `{ installed: false, reason: 'webgpu' }`) unless you pass
 `{ force: true }`, which the layer's tests use to compare both paths on one machine. It rejects with MargoError code
 `unsupported` on a browser whose WebGL2 is below the full tier, naming what is missing. `uninstall()` puts everything

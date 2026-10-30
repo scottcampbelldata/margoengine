@@ -21,7 +21,8 @@
    "exact": true
   },
   "compute-lab": {
-   "status": "webgpu only"
+   "status": "same",
+   "exact": true
   },
   "depth-texture": {
    "status": "same",
@@ -196,7 +197,8 @@
    "exact": true
   },
   "sciviz-surface": {
-   "status": "webgpu only"
+   "status": "same",
+   "exact": true
   },
   "sciviz-volume": {
    "status": "same",

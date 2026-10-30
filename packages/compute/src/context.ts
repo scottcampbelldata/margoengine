@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { loadCompatRoute } from '../../shared/compat.js';
 import { GpuArray, checkShape } from './array.js';
 import { DTYPES, bytesOf, dtypeOf, type DType } from './dtype.js';
 import { Expr, Operand, fuse, where, type AxisOptions, type OperandLike } from './expr.js';
@@ -175,7 +176,7 @@ export class ComputeContext {
   readonly #arrays = new Set<GpuArray>();
   readonly #programs = new Map<string, Program>();
   readonly #staging = new Set<GPUBuffer>();
-  #errors: Promise<GPUError | null>[] = [];
+  #errors: { kind: string; error: Promise<GPUError | null> }[] = [];
   #disposed = false;
   // While profiling: the timestamps of each timed submit, read once the submits' error scopes have resolved.
   #timings: { staging: GPUBuffer; queries: GPUQuerySet; labels: string[] }[] | undefined;
@@ -183,12 +184,23 @@ export class ComputeContext {
   /** True when element-wise functions use the WGSL builtins (`createCompute({ fastMath })`). */
   readonly fastMath: boolean;
 
+  /** @internal The sort kernel of the WebGL2 layer's route (./compat.ts), once loaded; only on the layer. */
+  sortRoute: string | undefined;
+  /** @internal Resolves once the layer's route has loaded (at once on native WebGPU). */
+  readonly routeReady: Promise<void>;
+
   /** @internal Use {@link createCompute}. */
   constructor(device: GPUDevice, ownsDevice: boolean, fastMath = false) {
     this.device = device;
     this.ownsDevice = ownsDevice;
     this.lost = device.lost;
     this.fastMath = fastMath;
+    // On the WebGL2 layer: the sort route, loaded by import() there only; createCompute waits for it.
+    this.routeReady = (loadCompatRoute(device, () => import('./compat.js')) ?? Promise.resolve(undefined)).then(
+      (route) => {
+        this.sortRoute = route?.sortShader;
+      },
+    );
   }
 
   /** True after `dispose()`. */
@@ -473,14 +485,17 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
     return program;
   }
 
-  /** @internal Runs `work` inside validation and out-of-memory error scopes, reported by the next wait. */
+  /** @internal Runs `work` inside validation, out-of-memory and internal error scopes, reported by the next wait. */
   scoped<T>(work: () => T): T {
     this.device.pushErrorScope('validation');
     this.device.pushErrorScope('out-of-memory');
+    this.device.pushErrorScope('internal');
     try {
       return work();
     } finally {
-      this.#errors.push(this.device.popErrorScope(), this.device.popErrorScope());
+      // Popped innermost first.
+      for (const kind of ['internal error', 'out of memory', 'validation error'])
+        this.#errors.push({ kind, error: this.device.popErrorScope() });
     }
   }
 
@@ -669,13 +684,14 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
   // finished work; asked for after the round trip, about 0.3 ms (measured on Edge, docs/benchmarking.md "compute").
   async #flush(): Promise<void> {
     this.device.pushErrorScope('validation');
-    const pending = [...this.#errors, this.device.popErrorScope()];
+    const pending = [...this.#errors, { kind: 'validation error', error: this.device.popErrorScope() }];
     this.#errors = [];
-    const error = (await Promise.all(pending)).find((e) => e);
-    if (error)
+    const errors = await Promise.all(pending.map((p) => p.error)),
+      at = errors.findIndex((e) => e);
+    if (at >= 0)
       throw fault(
         'failed',
-        `GPU ${error.constructor?.name === 'GPUOutOfMemoryError' ? 'out of memory' : 'validation error'}: ${error.message.trim()}; fix the kernel WGSL or its bindings (or use smaller arrays)`,
+        `GPU ${pending[at].kind}: ${errors[at]!.message.trim()}; fix the kernel WGSL or its bindings (or use smaller arrays)`,
         'compute',
       );
   }
@@ -986,6 +1002,12 @@ const cpu = async (signal: AbortSignal | undefined): Promise<ComputeContext> => 
   return cpuContext();
 };
 
+/** The context once its WebGL2 layer route (if any) has loaded. */
+async function ready(context: ComputeContext): Promise<ComputeContext> {
+  await context.routeReady;
+  return context;
+}
+
 /**
  * Opens a compute context. With `engine` (WebGPU backend) or `device` it shares that device; otherwise it opens a
  * headless device of its own with the adapter's largest buffer limits (so big arrays fit) and, where available, the
@@ -1003,7 +1025,7 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
   if (options.fastMath !== undefined && typeof options.fastMath !== 'boolean')
     throw typeError(`createCompute fastMath must be true or false, got ${String(options.fastMath)}`, 'compute');
   const fast = options.fastMath === true;
-  if (options.device) return new ComputeContext(options.device, false, fast);
+  if (options.device) return ready(new ComputeContext(options.device, false, fast));
   if (options.engine) {
     const device = (options.engine as unknown as { gpu: GPUDevice | null }).gpu;
     if (!device)
@@ -1012,7 +1034,7 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
         'Engine has no WebGPU device (WebGL2 fallback); create the context without an engine',
         'compute',
       );
-    return new ComputeContext(device, false, fast);
+    return ready(new ComputeContext(device, false, fast));
   }
   if (backend === 'cpu') return cpu(options.signal);
   const nav = globalThis.navigator as Navigator | undefined,
@@ -1047,5 +1069,5 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
     device.destroy();
     throw options.signal.reason;
   }
-  return new ComputeContext(device, true, fast);
+  return ready(new ComputeContext(device, true, fast));
 }

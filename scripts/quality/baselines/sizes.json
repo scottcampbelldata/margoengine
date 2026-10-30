@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3975758,
+  "total": 3981759,
   "history": [
     {
       "date": "2026-10-24",
@@ -851,6 +851,12 @@
     },
     {
       "date": "2026-10-30",
+      "commit": "beff7850",
+      "reason": "shadows: the WebGL2 layer route for the PCSS nearest-depth reduction, which ran on the layer CPU tier at about 0.5 s a frame",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-30",
       "commit": "ba7ec2cf",
       "reason": "vfx: deterministic slot order (births to the lowest dead slots, draw list compacted by workgroup prefix sums instead of atomic tickets), so the same frames give the same particles and blended pixels on every run; base and root grow with the four slot-order passes and their wiring, the feature entries shrink (frame and settle moved out of the shader chunk); growth accepted by Scott 2026-10-30 (docs/limits.md, VFX repeatable particle order)",
       "grew": 2
@@ -1097,9 +1103,9 @@
     },
     {
       "date": "2026-10-30",
-      "commit": "beff7850",
-      "reason": "shadows: the WebGL2 layer route for the PCSS nearest-depth reduction, which ran on the layer CPU tier at about 0.5 s a frame",
-      "grew": 1
+      "commit": "c017aa23",
+      "reason": "webgl2-compat names its classes as the WebGPU interfaces while installed (instanceof GPUBuffer held false for layer objects in a browser that defines the native interface: the sciviz surface bug), +182 B",
+      "grew": 2
     }
   ],
   "items": {
@@ -1466,9 +1472,9 @@
     "@margoengine/weather": 5252,
     "@margoengine/weather/hail": 4287,
     "@margoengine/webgl": 3277,
-    "@margoengine/webgl2-compat": 93801,
+    "@margoengine/webgl2-compat": 96803,
     "@margoengine/webgl2-compat/compute": 42734,
-    "@margoengine/webgl2-compat/device": 93629,
+    "@margoengine/webgl2-compat/device": 96628,
     "@margoengine/webgl2-compat/glsl": 43666,
     "@margoengine/webgl2-compat/wgsl": 27240,
     "@margoengine/wfc": 1878,

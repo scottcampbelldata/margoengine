@@ -4,7 +4,37 @@
 import { fault } from '../../shared/errors.js';
 import { probeWebGL2, type InstallOptions, type InstallResult } from './index.js';
 import { CompatCanvasContext } from './device/canvas.js';
-import { COMPAT_VENDOR, CompatAdapter, CompatDevice, CompatGPU, type CompatGPUOptions } from './device/device.js';
+import {
+  COMPAT_VENDOR,
+  CompatAdapter,
+  CompatDevice,
+  CompatGPU,
+  type CompatGPUOptions,
+  CompatInternalError,
+  CompatQueue,
+  CompatValidationError,
+} from './device/device.js';
+import { CompatComputePassEncoder, CompatComputePipeline } from './device/compute.js';
+import {
+  CompatBindGroup,
+  CompatBindGroupLayout,
+  CompatBuffer,
+  CompatExternalTexture,
+  CompatPipelineLayout,
+  CompatSampler,
+  CompatShaderModule,
+  CompatTexture,
+  CompatTextureView,
+} from './device/resources.js';
+import {
+  CompatCommandBuffer,
+  CompatCommandEncoder,
+  CompatQuerySet,
+  CompatRenderBundle,
+  CompatRenderBundleEncoder,
+  CompatRenderPassEncoder,
+  CompatRenderPipeline,
+} from './device/render.js';
 
 /** The WGSL front end's types, under the names its own entry gives them (the IR this entry's types refer to). */
 export type * from './wgsl.js';
@@ -68,6 +98,39 @@ const FLAGS: Record<string, Record<string, number>> = {
   GPUColorWrite: { RED: 1, GREEN: 2, BLUE: 4, ALPHA: 8, ALL: 15 },
 };
 
+/**
+ * The WebGPU interface each layer class stands for. install() names them so, while it is installed: WebGPU code tells
+ * its objects apart with `instanceof GPUBuffer` and the like (the compute package's bindings do), and a browser
+ * without an adapter may still define the native interfaces, which the layer's objects are not instances of.
+ */
+const INTERFACES: Record<string, unknown> = {
+  GPU: CompatGPU,
+  GPUAdapter: CompatAdapter,
+  GPUDevice: CompatDevice,
+  GPUQueue: CompatQueue,
+  GPUBuffer: CompatBuffer,
+  GPUTexture: CompatTexture,
+  GPUTextureView: CompatTextureView,
+  GPUExternalTexture: CompatExternalTexture,
+  GPUSampler: CompatSampler,
+  GPUShaderModule: CompatShaderModule,
+  GPUBindGroupLayout: CompatBindGroupLayout,
+  GPUPipelineLayout: CompatPipelineLayout,
+  GPUBindGroup: CompatBindGroup,
+  GPURenderPipeline: CompatRenderPipeline,
+  GPUComputePipeline: CompatComputePipeline,
+  GPUCommandEncoder: CompatCommandEncoder,
+  GPUCommandBuffer: CompatCommandBuffer,
+  GPURenderPassEncoder: CompatRenderPassEncoder,
+  GPUComputePassEncoder: CompatComputePassEncoder,
+  GPURenderBundleEncoder: CompatRenderBundleEncoder,
+  GPURenderBundle: CompatRenderBundle,
+  GPUQuerySet: CompatQuerySet,
+  GPUCanvasContext: CompatCanvasContext,
+  GPUValidationError: CompatValidationError,
+  GPUInternalError: CompatInternalError,
+};
+
 type Restore = () => void;
 let installed: { gpu: CompatGPU; restore: Restore[] } | null = null;
 
@@ -120,6 +183,14 @@ export async function installCompat(options: InstallOptions = {}): Promise<Insta
       });
       restore.push(() => delete (globalThis as unknown as Record<string, unknown>)[name]);
     }
+  for (const [name, value] of Object.entries(INTERFACES)) {
+    const own = Object.getOwnPropertyDescriptor(globalThis, name);
+    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true, enumerable: false });
+    restore.push(() => {
+      if (own) Object.defineProperty(globalThis, name, own);
+      else delete (globalThis as unknown as Record<string, unknown>)[name];
+    });
+  }
   installed = { gpu, restore };
   return { installed: true, reason: 'installed', gpu };
 }

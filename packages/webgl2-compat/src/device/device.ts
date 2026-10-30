@@ -356,9 +356,11 @@ export class CompatDevice extends EventTarget {
         this.scopes[i].error ??= error;
         return;
       }
-    const event = Object.assign(new Event('uncapturederror'), { error });
+    const event = Object.assign(new Event('uncapturederror', { cancelable: true }), { error });
     this.dispatchEvent(event);
     this.onuncapturederror?.(event);
+    // As browsers do: an uncaptured error nobody prevented shows in the console, so dropped work is never silent.
+    if (!event.defaultPrevented) console.warn(`WebGL2 compatibility: uncaptured ${error.name}: ${error.message}`);
   }
 
   // ---------------------------------------------------------------- lifetime

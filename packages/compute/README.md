@@ -351,6 +351,10 @@ The CPU backend has the same API and the same results as the GPU path:
 The browser test compares the two backends on the same inputs. The CPU runs on the calling thread and is much slower
 than a GPU: the `compute` benchmark suite times both ([docs/benchmarking.md](../../docs/benchmarking.md#gpu-compute)).
 
+On the WebGL2 compatibility layer (`@margoengine/webgl2-compat`), `gpu.backend` is `'webgpu'` and everything runs as
+on WebGPU, with one route of its own: sorts run as a single-invocation radix sort (loaded with `import()` only there),
+since the layer has no workgroup memory. The order is the same stable order.
+
 ```ts
 import { createCompute } from '@margoengine/compute';
 
@@ -363,7 +367,8 @@ console.log(gpu.backend, await gpu.sort(x).read(), await x.mean().item()); // 'c
 
 Operations queue GPU work and return at once. Anything that waits (`read`, `item`, `done`, `profile`, `filter`) takes
 an `AbortSignal`. When queued work failed on the GPU (a WGSL error in a kernel or expression, or out of memory), it
-rejects with a `MargoError` whose `code` is `failed` and whose message includes the GPU's diagnostic. Argument
+rejects with a `MargoError` whose `code` is `failed` and whose message includes the GPU's diagnostic (validation,
+out-of-memory and internal errors alike). Argument
 mistakes throw `TypeError` or `RangeError` at once, naming the fix, and every message links to
 [margoengine.com/errors](https://margoengine.com/errors#compute).
 

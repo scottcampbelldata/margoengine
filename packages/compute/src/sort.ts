@@ -63,12 +63,7 @@ function radix(
     valuesA = temp(hasValues ? padded : 1),
     valuesB = temp(hasValues ? padded : 1);
   if (n === 0) return { keys: keysA, values: hasValues ? valuesA : undefined, scratch };
-  const local = temp(padded),
-    localValues = temp(hasValues ? padded : 1),
-    counts = temp(16 * blocks),
-    offsets = temp(16 * blocks),
-    starts = temp(16 * blocks),
-    passes: Pass[] = [],
+  const passes: Pass[] = [],
     copies: Copy[] = [];
   const src = fuse(input, 0, ctx.maxStorage(2), scratch);
   passes.push({
@@ -90,6 +85,28 @@ function radix(
     copies.push([v.buffer, v.offset * 4, valuesA.buffer, 0, n * 4]);
     ctx.submit([], copies.splice(0));
   }
+  if (ctx.sortRoute) {
+    // The WebGL2 layer's route (./compat.ts): one invocation sorts by the same low bits (a multiple of 4) in place.
+    const low = Math.ceil(bits / 4) * 4;
+    passes.push({
+      program: ctx.program(ctx.sortRoute, undefined, 'sort.layer'),
+      resources: {
+        keys: keysA,
+        values: valuesA,
+        spareKeys: keysB,
+        spareValues: valuesB,
+        sort: new Uint32Array([n, low === 32 ? 0xffffffff : 2 ** low - 1, Math.ceil(low / 8), hasValues ? 1 : 0]),
+      },
+      workgroups: [1, 1, 1],
+    });
+    ctx.submit(passes);
+    return { keys: keysA, values: hasValues ? valuesA : undefined, scratch };
+  }
+  const local = temp(padded),
+    localValues = temp(hasValues ? padded : 1),
+    counts = temp(16 * blocks),
+    offsets = temp(16 * blocks),
+    starts = temp(16 * blocks);
   const localProgram = ctx.program(radixLocalShader, undefined, 'sort.local'),
     scatterProgram = ctx.program(radixScatterShader, undefined, 'sort.scatter'),
     grid = ctx.grid(blocks);

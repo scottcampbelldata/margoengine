@@ -117,3 +117,67 @@ test('requestDevice refuses features and limits the adapter lacks; isCompatDevic
   assert.equal(isCompatDevice({}), false);
   assert.equal(isCompatDevice(null), false);
 });
+
+// Bug (sciviz surface on the layer: "Uniform p.time is missing"): a browser without a WebGPU adapter may still define
+// the native GPUBuffer interface, so the layer's buffers failed `instanceof GPUBuffer` and the compute package encoded
+// its own uniform buffer as if it were the uniform's value. install() now names the layer's classes as the interfaces.
+test('install() names the layer classes as the WebGPU interfaces while installed, and uninstall() restores them', async () => {
+  const { installCompat, uninstallCompat, CompatBuffer, CompatDevice, CompatTexture } = await import(
+    '../dist/device.js'
+  );
+  const saved = ['navigator', 'OffscreenCanvas', 'GPUBuffer', 'GPUDevice'].map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  ]);
+  class NativeBuffer {}
+  Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'GPUBuffer', { value: NativeBuffer, configurable: true, writable: true });
+  delete globalThis.GPUDevice;
+  globalThis.OffscreenCanvas = class {
+    getContext() {
+      return fakeContext();
+    }
+  };
+  try {
+    const result = await installCompat();
+    assert.equal(result.installed, true);
+    assert.equal(globalThis.GPUBuffer, CompatBuffer, 'the native interface is replaced while installed');
+    assert.equal(globalThis.GPUTexture, CompatTexture);
+    assert.ok(Object.create(CompatBuffer.prototype) instanceof GPUBuffer);
+    assert.ok(Object.create(CompatDevice.prototype) instanceof GPUDevice);
+    assert.equal(uninstallCompat(), true);
+    assert.equal(globalThis.GPUBuffer, NativeBuffer, 'uninstall() puts the native interface back');
+    assert.equal('GPUDevice' in globalThis, false, 'an interface the browser lacked is removed again');
+  } finally {
+    uninstallCompat();
+    for (const [name, own] of saved)
+      if (own) Object.defineProperty(globalThis, name, own);
+      else delete globalThis[name];
+  }
+});
+
+// Bug (the compute lab's sort came back unsorted with nothing in the console): an uncaptured error nobody prevented
+// was dropped silently; browsers show it in the console, and so does the layer now.
+test('an uncaptured error shows in the console unless a listener prevents it, as in browsers', async () => {
+  // A device needs a whole context: the stand-in answers every other GL call with an empty object.
+  const gl = new Proxy(fakeContext(), { get: (context, key) => (key in context ? context[key] : () => ({})) });
+  const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
+  const device = await adapter.requestDevice();
+  const warned = [],
+    warn = console.warn;
+  console.warn = (message) => warned.push(message);
+  try {
+    device.internalError('over the work budget');
+    assert.deepEqual(warned, ['WebGL2 compatibility: uncaptured GPUInternalError: over the work budget']);
+    const seen = [];
+    device.addEventListener('uncapturederror', (event) => {
+      seen.push(event.error.message);
+      event.preventDefault();
+    });
+    device.validationError('handled');
+    assert.deepEqual(seen, ['handled']);
+    assert.equal(warned.length, 1, 'a prevented error is not shown');
+  } finally {
+    console.warn = warn;
+  }
+});

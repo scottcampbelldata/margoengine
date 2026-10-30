@@ -117,6 +117,8 @@ class ComputeContext {
     readonly ownsDevice: boolean;
     readonly lost: Promise<GPUDeviceLostInfo>;
     readonly fastMath: boolean;
+    sortRoute: string | undefined;
+    readonly routeReady: Promise<void>;
     constructor(device: GPUDevice, ownsDevice: boolean, fastMath?: boolean);
     get disposed(): boolean;
     get backend(): 'webgpu' | 'cpu';

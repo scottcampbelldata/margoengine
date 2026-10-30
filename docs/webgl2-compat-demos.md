@@ -31,7 +31,7 @@ Last recorded 2026-10-30 at bd313fd62 on nvidia ampere (msedge 156.0.4314.50); a
 | `batched-mesh` | high | runs, same pixels | exact | 0.4 ms / 0.7 ms; 16.7 ms / 16.7 ms |
 | `character-animation` | high | runs, same pixels | exact | 0.7 ms / 1.0 ms; 16.7 ms / 16.7 ms |
 | `clipping-planes` | high | runs, same pixels | exact | 0.7 ms / 0.9 ms; 16.7 ms / 16.7 ms |
-| `compute-lab` | high | kept on WebGPU only (shows the needs-WebGPU message) until its bug on the layer is fixed, see known-bugs.md | - | - |
+| `compute-lab` | high | runs, same pixels | exact | - / -; - / - |
 | `depth-texture` | high | runs, same pixels | exact | 0.4 ms / 0.5 ms; 16.7 ms / 16.7 ms |
 | `dof` | high | runs with differences: d > 2 on 0.66% of pixels, mean d 0.0728, max d 113 | exact | 0.2 ms / 0.5 ms; 16.7 ms / 16.7 ms |
 | `earth` | high | runs, same pixels | exact | 0.3 ms / 0.5 ms; 16.7 ms / 16.7 ms |
@@ -74,7 +74,7 @@ Last recorded 2026-10-30 at bd313fd62 on nvidia ampere (msedge 156.0.4314.50); a
 | `night-citadel` | high | runs with differences: d > 2 on 0.20% of pixels, mean d 0.0621, max d 235 | exact | 0.6 ms / 12.0 ms; 16.7 ms / 16.7 ms |
 | `scene-targets` | high | runs, same pixels | exact | 0.4 ms / 0.5 ms; 16.7 ms / 16.7 ms |
 | `sciviz-points` | high | runs, same pixels | exact | 0.4 ms / 0.7 ms; 16.7 ms / 16.7 ms |
-| `sciviz-surface` | high | kept on WebGPU only (shows the needs-WebGPU message) until its bug on the layer is fixed, see known-bugs.md | - | - |
+| `sciviz-surface` | high | runs, same pixels | exact | 0.3 ms / 0.4 ms; 16.7 ms / 16.7 ms |
 | `sciviz-volume` | high | runs, same pixels | exact | 0.3 ms / 0.4 ms; 16.7 ms / 16.7 ms |
 | `split-screen` | high | runs, same pixels | exact | 0.3 ms / 0.5 ms; 16.7 ms / 16.7 ms |
 | `texture-formats` | high | runs, same pixels | exact | 0.2 ms / 0.4 ms; 16.7 ms / 16.7 ms |
