@@ -55,11 +55,12 @@ work the cascades share. GPU `Scatter` uses it to cull its instances per cascade
 instances whose bounds reach its light box, so the shadow map comes out the same with fewer draws.
 
 ```ts
-import { EngineKernel } from 'margoengine/core';
+import { EngineKernel, box } from 'margoengine/core';
 import { Shadows, type ShadowContext, type ShadowPrepareContext } from 'margoengine/shadows';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
 const shadows = Shadows.attach(engine, { cascades: 2 });
 const lights: Float32Array[] = [];
+shadows.add(engine.createMesh().setGeometry(box())); // core meshes cast as before
 shadows.add({
   // Once per frame, no pass open: record compute work here (scatter culls per cascade).
   prepareShadow({ matrices, cascades }: ShadowPrepareContext) {
