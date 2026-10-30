@@ -286,17 +286,11 @@ test('the default profile runs every planned test as one step, exactly as before
   );
 });
 
-test('split steps cover the whole suite: every voxel path tracer case, both bevel sample counts, each chain part', () => {
+// The voxel path tracer's cases are split into package scripts (tests/voxel-pathtracer-gpu-split.test.js checks they
+// cover every case once), so it has no `margo.gpuTestSteps` of its own.
+test('split steps cover the whole suite: both bevel sample counts, each chain part', () => {
   const tests = plan(),
     byId = (id) => tests.find((t) => `${t.dir}/${t.script}` === id);
-  const source = readFileSync(join(root, 'packages/voxel-pathtracer/tests/browser-check.mjs'), 'utf8'),
-    cases = [...source.matchAll(/wanted\('([\w-]+)'\)/g)]
-      .map((m) => m[1])
-      .filter((n) => n !== 'pictures' && n !== 'timing'),
-    pt = splitSteps(byId('voxel-pathtracer/test:gpu')),
-    named = pt.flatMap((s) => s.command.split(' ').slice(5));
-  assert.deepEqual([...named].sort(), [...new Set(cases)].sort(), 'the steps name every default case once');
-  assert.equal(named.length, new Set(named).size);
   const bevel = readFileSync(join(root, 'packages/voxel/tests/bevel-browser-check.mjs'), 'utf8'),
     counts = JSON.parse(/SAMPLE_COUNTS = (\[[^\]]*\])/.exec(bevel)[1]);
   for (const script of ['test:gpu:slow-compile', 'test:gpu:slow-mesh']) {

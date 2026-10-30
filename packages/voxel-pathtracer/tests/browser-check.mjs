@@ -39,9 +39,13 @@
 // - materialtables: model material tables render as one shared table does (bit for bit); 300 models with 300 colours;
 // - largemodels: a 400-cell glass bar has no interface where 200-cell tiles would meet; a 2048 x 64 x 2048 sparse world;
 // - native4k: a 3840 x 2160 viewport traced at its native size with the default limits, raw and denoised (moving camera).
-// Results go to test-results/voxel-pathtracer-browser-check.json; `pictures` writes PNGs to test-results/voxel-pathtracer.
+// Results go to test-results/voxel-pathtracer-browser-check.json (or -<name>.json, see `--report`); `pictures` writes PNGs to test-results/voxel-pathtracer.
 // `denoise` runs its four scenes as four cases; `denoise-diffuse`, `denoise-opaque`, `denoise-materials` and
-// `denoise-caustics` name one each (short steps on a slower GPU, package.json `margo.gpuTestSteps`).
+// `denoise-caustics` name one each. With no case named every case but `pictures` and `timing` runs; the package's
+// check runs them as five scripts (test:gpu, test:gpu:denoise, test:gpu:denoise-materials, test:gpu:denoise-caustics,
+// test:gpu:viewport), each within its time limit on an Intel Arc 140V (tests/voxel-pathtracer-gpu-split.test.js
+// checks they name every case once). `--report=<name>` writes the results to
+// test-results/voxel-pathtracer-browser-check-<name>.json. An unknown case name fails the run.
 // A case in which no GPU work finishes for MARGO_GPU_STALL_S (120 s) fails at once, naming the case, its last progress
 // step and its render (tests/progress.mjs); each case's time and longest wait for the GPU are printed and kept in the
 // JSON (`timings`). `--stall-in-render=<k>` makes every GPU wait hang once the k-th renderImage has started (the
@@ -58,7 +62,11 @@ const started = performance.now(),
   port = 'free',
   args = process.argv.slice(2),
   named = args.filter((a) => !a.startsWith('--')),
-  wanted = (name) => (named.length ? named.includes(name) : name !== 'pictures' && name !== 'timing'),
+  asked = new Set(['denoise']),
+  wanted = (name) => (asked.add(name), named.length ? named.includes(name) : name !== 'pictures' && name !== 'timing'),
+  // Each package script names its cases and its own results file (`--report=<name>`), so the split scripts do not
+  // overwrite one another's results.
+  reportName = args.find((a) => a.startsWith('--report='))?.slice(9),
   stallInRender = Number(args.find((a) => a.startsWith('--stall-in-render='))?.slice(18) ?? 0),
   stallMs = stallLimitMs(),
   context = await openBrowser({ startPath: path, port }),
@@ -774,6 +782,12 @@ try {
       `  dense 256^3 model: ${r.dense.occupied} voxels; attach + pack ${r.dense.attachAndPackMs.toFixed(0)} ms; repack (new revision) ${r.dense.repackMs.toFixed(0)} ms`,
     );
   }
+  // A case name no check above knows (a typo in a package script) would otherwise run nothing and pass.
+  assert.deepEqual(
+    named.filter((n) => !asked.has(n)),
+    [],
+    'unknown case name(s); use the names in the wanted() checks of this file',
+  );
   assert.deepEqual(pageErrors, []);
   console.log(
     `case times, slowest first (s, longest GPU wait): ${Object.entries(timings)
@@ -782,7 +796,10 @@ try {
       .join(', ')}`,
   );
   await mkdir('test-results', { recursive: true });
-  await writeFile('test-results/voxel-pathtracer-browser-check.json', JSON.stringify(report, null, 1));
+  await writeFile(
+    `test-results/voxel-pathtracer-browser-check${reportName ? `-${reportName}` : ''}.json`,
+    JSON.stringify(report, null, 1),
+  );
   console.log('voxel path tracer browser check passed');
 } finally {
   await context.close();

@@ -50,25 +50,22 @@
     "build": "node ../../scripts/build-optional.js voxel-pathtracer",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs",
+    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=base agx groundprecision denoiseholdout compat compile preview traversal analytic glasslight sky projections arealight dispersion microfacet energy environment textures cutout shapes transparent determinism convergence",
+    "test:gpu:denoise": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise denoise-diffuse denoise-opaque denoisepeak denoisehistory",
+    "test:gpu:denoise-materials": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise-materials denoise-materials",
+    "test:gpu:denoise-caustics": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise-caustics denoise-caustics",
+    "test:gpu:viewport": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=viewport motion lens viewport bloom capture materialtables largemodels native4k",
     "test:gpu:slow-compile": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs agx --pipeline-delay=500",
     "test:gpu:spec-math": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs projections --spec-math-error=1",
     "test:gpu:stall": "cd ../.. && node packages/voxel-pathtracer/tests/stall-check.mjs"
   },
   "margo": {
-    "gpuTestSteps": {
-      "test:gpu": [
-        "agx groundprecision denoiseholdout compat compile",
-        "preview traversal analytic glasslight sky",
-        "projections arealight dispersion microfacet energy",
-        "environment textures cutout shapes transparent",
-        "determinism convergence denoise-diffuse denoise-opaque denoisepeak denoisehistory",
-        "denoise-materials",
-        "denoise-caustics",
-        "motion lens viewport bloom capture materialtables",
-        "largemodels",
-        "native4k"
-      ]
+    "gpuTestTimeoutMinutes": {
+      "test:gpu": 10,
+      "test:gpu:denoise": 10,
+      "test:gpu:denoise-materials": 15,
+      "test:gpu:denoise-caustics": 15,
+      "test:gpu:viewport": 10
     }
   }
 }

@@ -103,15 +103,28 @@ does not own. Each entry says exactly what is needed to close it.
   more than the 728 s it had. Most likely cause: the case was simply longer than the time limit. A GPU wait that never
   resolves is not ruled out without an Arc run.
 - **Done:** each scene is its own case (`denoise-diffuse`, `denoise-opaque`, `denoise-materials`,
-  `denoise-caustics`; `denoise` runs all four), with its own short step in `margo.gpuTestSteps`. Every render prints a
+  `denoise-caustics`; `denoise` runs all four). Every render prints a
   `progress denoise <scene>: ...` line. A case in which no GPU work finishes for `MARGO_GPU_STALL_S` (120 s) now fails
   at once, naming the case, the step and the render (`tests/progress.mjs`). Each case prints its time and its longest GPU
   wait. Regression test: `voxel-pathtracer test:gpu:stall` (`tests/stall-check.mjs`) hangs every GPU wait once the
   first render starts and expects that named failure. It fails in 17 s with the watchdog; without it the run has not
   ended at the 180 s limit.
-- **Needed to close:** run `voxel-pathtracer test:gpu` on the Arc with the split steps. If each denoise scene passes,
-  read its time and longest GPU wait and remove this entry. If one stops with `GPU stall`, the message names the render
-  to hunt.
+- **Measured again on the Arc** (origin/main cb42459a, mains, Edge 156): `test:gpu` still hit its 900 s limit with no
+  `GPU stall` line, so the GPU kept finishing work: the denoise references started at 147 s (diffuse), 242 s
+  (opaque), 327 s (materials) and 748 s (caustics), and the caustics case was still running at 898 s. Slow, not hung.
+  `denoisepeak`, `denoisehistory`, `lens`, `viewport`, `capture`, `materialtables`, `largemodels` and `native4k`
+  never ran there.
+- **Done (split, 2026-10-30):** the check runs as five package scripts that name their cases, each with its own limit
+  in `margo.gpuTestTimeoutMinutes`; same cases, samples and tolerances. A6000 time, Arc estimate (from the run above),
+  limit: `test:gpu` (agx to convergence) 57 s, about 150 s, 10 min; `test:gpu:denoise` (diffuse, opaque, denoisepeak,
+  denoisehistory) 46 s, about 240 s, 10 min; `test:gpu:denoise-materials` 99 s, about 450 s, 15 min;
+  `test:gpu:denoise-caustics` 109 s, about 500 s, 15 min; `test:gpu:viewport` (motion, lens, viewport, bloom, capture,
+  materialtables, largemodels, native4k) 36 s, about 200 s, 10 min. `tests/voxel-pathtracer-gpu-split.test.js` fails
+  if a split script is missing, if their cases are not exactly the check's case list (each once), if a script runs the
+  whole check with no case named, or if check:merge would not run one when the package is affected. An unknown case
+  name now fails the browser check instead of running nothing.
+- **Needed to close:** run the five scripts on the Arc (`private/handoffs/voxpt-split-laptop-run.md`). If each passes
+  inside its limit, remove this entry. If one stops with `GPU stall`, the message names the render to hunt.
 
 ### Linux (Intel UHD, Mesa): three GPU suites not finished
 

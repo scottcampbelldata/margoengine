@@ -1687,7 +1687,7 @@ Where each limit lives, at `67ca53a5`:
 | Holder that hangs inside `acquire()` | deadline plus 15 s grace | `beat` process | holder tree killed, entry removed, line in `gpu-lock-timeouts.log` |
 | Lock wait | 60 min default; landings pass 240 | `--wait-max` | ticket removed, message names holder and command, exit 2 |
 | Mutex | 10 s | `locked()` | removed as left by a crash |
-| One GPU test | 10 min default (`MARGO_GPU_TEST_TIMEOUT_MIN`, or package `margo.gpuTestTimeoutMinutes`, a number or an object per script; biomes `test:gpu:flythrough` has 12.5 min, 750 s) | `scripts/support/run-limited.mjs` | tree killed, result names the test and the fix |
+| One GPU test | 10 min default (`MARGO_GPU_TEST_TIMEOUT_MIN`, or package `margo.gpuTestTimeoutMinutes`, a number or an object per script; biomes `test:gpu:flythrough` has 12.5 min, 750 s; voxel-pathtracer splits its check into five scripts, 10 or 15 min each) | `scripts/support/run-limited.mjs` | tree killed, result names the test and the fix |
 | Browser suite teardown | 30 s | `scripts/support/shutdown.mjs SHUTDOWN_BUDGET_MS` | throws `SHUTDOWN_TIMEOUT` naming what is still open |
 | Page waits | 30 s default | `scripts/browser.js`, `page.setDefaultTimeout(30000)` | Playwright timeout; a lost device fails it at once (2.15.4) |
 | Port wait | 20 min | `listenWhenFree` | throws naming the port and `netstat -ano` |
