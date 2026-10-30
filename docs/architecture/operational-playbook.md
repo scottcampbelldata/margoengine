@@ -130,7 +130,7 @@ The numbers that drive it, all from the project's own notes:
 | --- | --- | --- |
 | GPU lock, correctness tests | 3 shared slots (`MARGO_GPU_SLOTS`, default 3) | one GPU test, default limit 10 min (`scripts/support/run-limited.mjs`) |
 | GPU lock, benchmarks | 1 exclusive holder, nobody else | default limit 60 min |
-| GPU lock, timing tests in `check:gpu-packages` | 1 exclusive holder, one step per hold | a test whose file calls `acquire({ mode: 'exclusive' })` (the biomes flythrough) runs after the shared tests as its own step; the hold is its step limit plus 5 min, released after it. A timing test chained with other checks fails the plan (`GPU_TIMING_TEST_SHARED`); one run in a shared slot throws at once |
+| GPU lock, timing tests in `check:gpu-packages` | 1 exclusive holder, one step per hold | a test whose file calls `acquire({ mode: 'exclusive' })` (the biomes flythrough) runs after the shared tests as its own step; the hold is its step limit plus 5 min, released after it. A timing test chained with other checks fails the plan (`GPU_TIMING_TEST_SHARED`); one run in a shared slot throws at once. A GPU file (a package GPU test, or a check:merge step file that uses `gpu-lock.mjs`) that reads `performance.now()` and holds it to a time budget without an exclusive hold fails the plan too (`GPU_TIMING_MEASURED_SHARED`, `measuresTiming`); a clock that times something else carries a `gpu-timing: none (<reason>)` comment |
 | Landing lock | 1 exclusive holder | "About 40 min of lock per landing; queue is the bottleneck." (coordinator handoff). NOT VERIFIED as an average; the live holder in 2.3 had `maxMinutes` 170. |
 | A full `check:merge` | runs before the landing lock in the newer pattern, inside it in the newest (see 2.6) | 5400 s hard limit in the landing scripts |
 
@@ -1620,6 +1620,8 @@ export const PLAIN_STEPS = ['verify', 'check:fresh-clone', 'build:site', 'check:
 export const SCOPED_STEPS = ['modern:test:packages', 'modern:test:bundlers'];
 ```
 (`scripts/check-merge.mjs` at `67ca53a5`.)
+
+**Timing steps.** A check:merge step that measures speed takes the GPU exclusively itself (`await acquire({ owner, mode: 'exclusive' })`), runs alone as its own step, and, when it runs long, holds the GPU in chunks with a hard limit each and releases it between them, so shared GPU work queues for minutes, never for the whole run. `scripts/gpu-package-tests.mjs` `mergeTimingSteps` lists those steps and `lockMode` fails the plan for a GPU step that holds a measured time to a budget from a shared slot (`GPU_TIMING_MEASURED_SHARED`, added 2026-10-30 after visual:compat's frame budget read 86 ms against 50 beside other suites); `tests/gpu-timing-lock.test.js` runs each timing step in a shared slot and expects it to fail at once.
 
 #### 2.10.2 Selection
 

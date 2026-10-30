@@ -62,6 +62,35 @@ test('a timing test in one step with other checks fails the plan, naming both', 
   );
 });
 
+// visual:compat's frame budget (2026-10-30) measured frame cost from a shared slot and failed at 86 ms against 50 beside
+// other suites. A file that holds a measured time to a budget must be a timing test, whatever step runs it.
+test('a GPU file that holds a measured time to a budget from a shared slot fails the plan, naming it', () => {
+  const frameBudget = `const release = await acquire({ owner: 'compat', mode: 'shared' });
+// \`--budget=<ms>\` fails a demo whose median frame costs more.
+const start = performance.now();`;
+  const files = {
+    'a/frames.mjs': frameBudget,
+    'a/exclusive.mjs': frameBudget.replace("mode: 'shared'", "mode: 'exclusive'"),
+    'a/progress.mjs': `${frameBudget}\n// gpu-timing: none (the clock only prints progress; the budget is a pixel count)`,
+    'a/pixels.mjs': `const t = performance.now();\nassert.ok(n <= 1 << 20, 'budget 2^20 pixels');`,
+  };
+  const read = (f) => files[f];
+  assert.throws(
+    () => lockMode('a test:gpu', ['a/frames.mjs'], read),
+    (error) => {
+      assert.equal(error.code, 'GPU_TIMING_MEASURED_SHARED');
+      assert.match(error.message, /a test:gpu runs a\/frames\.mjs, which holds a time it measures to a budget/);
+      return true;
+    },
+  );
+  assert.equal(lockMode('a x', ['a/exclusive.mjs'], read), 'exclusive');
+  assert.equal(lockMode('a y', ['a/progress.mjs'], read), 'shared');
+  assert.equal(lockMode('a z', ['a/pixels.mjs'], read), 'shared');
+  // The real plan and check:merge's own GPU steps pass: no timing measurement there runs shared.
+  assert.doesNotThrow(() => plan());
+  assert.doesNotThrow(() => mergeTimingSteps());
+});
+
 test('the run holds the GPU exclusively only around a timing step and shared around every other', async () => {
   const events = [];
   let open = 0;

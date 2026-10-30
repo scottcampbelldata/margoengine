@@ -288,13 +288,31 @@ function scriptFiles(cwd, command) {
 export const TIMING_TEST = /\bawait acquire\(\{[^}]*\bmode:\s*['"]exclusive['"]/;
 
 /**
+ * A timing measurement on the GPU: a file that reads the clock (`performance.now()`) and holds what it read to a time
+ * budget (a budget in ms, a frame budget). In a shared slot the other slots' GPU work lands in its numbers (visual:compat's frame budget read 86 ms against 50
+ * beside other suites, 2026-10-30), so such a file must be a timing test (TIMING_TEST). A GPU file that reads the clock
+ * for something else (its own steps' wall time, a teardown budget) says so in a comment, `gpu-timing: none (<reason>)`.
+ */
+export const measuresTiming = (text) =>
+  /\bperformance\.now\(\)/.test(text) &&
+  /budget[^\n]{0,80}\bms\b|\bms\b[^\n]{0,80}budget|frame budget|budgetMs/i.test(text) &&
+  !/gpu-timing: none \(\S[^)]*\)/.test(text);
+
+/**
  * The GPU lock mode a planned test runs under: 'exclusive' when the files it runs are timing tests (TIMING_TEST),
  * else 'shared'. A test whose files mix a timing test with other checks throws GPU_TIMING_TEST_SHARED: in one step the
- * other checks would hold the exclusive GPU for nothing, or the timing test would run in a shared slot. `read(file)`
- * gives a repo-relative file's text.
+ * other checks would hold the exclusive GPU for nothing, or the timing test would run in a shared slot. A file that
+ * measures timing (measuresTiming) but is no timing test throws GPU_TIMING_MEASURED_SHARED: it would hold a
+ * measurement to a budget from a shared slot. `read(file)` gives a repo-relative file's text.
  */
 export function lockMode(label, files, read) {
   const texts = files.map((file) => [file, read(file)]);
+  const shared = texts.filter(([, text]) => measuresTiming(text) && !TIMING_TEST.test(text)).map(([file]) => file);
+  if (shared.length)
+    throw margoError(
+      'GPU_TIMING_MEASURED_SHARED',
+      `${label} runs ${shared.join(', ')}, which holds a time it measures to a budget but takes no exclusive GPU hold; await an exclusive hold from scripts/gpu-lock.mjs's acquire (mode exclusive) in a step of its own (in chunks if it runs long), or, if that clock times something other than GPU work, say so with a "gpu-timing: none (<reason>)" comment`,
+    );
   const timing = texts.filter(([, text]) => TIMING_TEST.test(text)).map(([file]) => file);
   if (!timing.length) return 'shared';
   const others = texts.map(([file]) => file).filter((file) => !timing.includes(file));
@@ -309,7 +327,7 @@ export function lockMode(label, files, read) {
 /**
  * The timing tests among the check:merge steps (each `npm run <name>` of check:merge:steps whose files ask for the GPU
  * exclusively): `[{ label, files }]`. Throws GPU_TIMING_TEST_SHARED for a step that runs a timing test together with
- * other checks.
+ * other checks, and GPU_TIMING_MEASURED_SHARED for a GPU step that holds a measured time to a budget in a shared slot.
  */
 export function mergeTimingSteps() {
   const scripts = json('package.json').scripts,
@@ -321,7 +339,9 @@ export function mergeTimingSteps() {
     .flatMap((name) => {
       const label = `check:merge ${name}`,
         files = scriptFiles('.', scripts[name]).filter((file) => existsSync(join(root, file)));
-      return lockMode(label, files, readText) === 'exclusive' ? [{ label, files }] : [];
+      // Only a file that takes the GPU lock does GPU work here; a CPU step (the bundler matrix) may time itself.
+      const gpu = files.filter((file) => readText(file).includes('gpu-lock.mjs'));
+      return lockMode(label, gpu, readText) === 'exclusive' ? [{ label, files: gpu }] : [];
     });
 }
 
