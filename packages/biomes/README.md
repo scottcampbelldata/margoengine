@@ -31,7 +31,8 @@ world.dispose(); // or `using world = await BiomeWorld.create()` inside a block
 ```
 
 `world.sample(x, z)` answers point queries for gameplay (synchronous: exact from a finished tile, otherwise from
-the region fields). `world.tiles(rect, { focus })` yields the tiles of a rectangle nearest first. `world.digest(x, z)`
+the region fields; `world.sampleRegion(x, z)` always from the region fields, whatever tiles were made).
+`world.tiles(rect, { focus })` yields the tiles of a rectangle nearest first. `world.digest(x, z)`
 is the SHA-256 of a tile's canonical bytes: the same options give the same digest on every machine, and the package
 tests lock several of them. `world.update({ climate, height })` recomputes and calls `onChange` listeners with the
 dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
@@ -204,7 +205,9 @@ and again for every rectangle `world.onChange` reports. Each biome shares its we
 slope, height, moisture, curvature and temperature rules (`temperature`, `coldest`, `warmest`: tundra snow lies where
 the mean annual temperature is -6 C or less); `groundWeights(world, tile, materials)` is the same computation on the
 CPU (16 bytes per cell summing to 255). The overview runs the same rules on the 16 m region grid, bilinear between its
-corners (`overviewWeights(world, materials)`), so hills beyond `radius` keep their rock and snow. The terrain draws
+corners (`overviewWeights(world, materials)`, from `sampleRegion`, so it does not depend on the tiles made before), so
+hills beyond `radius` keep their rock and snow. With workers, `attach` makes it there, one band of texel rows per worker
+(`overviewRows`, the same bytes), instead of blocking the page (about 650 ms of the zero-config attach on an RTX A6000 PC, now about 200). The terrain draws
 nothing outside the world's rectangle: past an edge the sky shows. Materials are generated textures from `MATERIALS` (16 built-in looks, such as
 `grass`, `sand`, `rock`, `snow`; `materials` overrides or adds them). Up to 16 materials per world, the terrain's
 limit (the 8 presets use 15); more is a RangeError from `attach` that names the count.

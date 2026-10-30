@@ -5,7 +5,7 @@
 import { typeError } from '../../shared/errors.js';
 import { type BiomeTile, BiomeWorld, type BiomeWorldOptions } from './world.js';
 import { BiomePlacement, type PlacedTile, type PlacementOptions } from './placement.js';
-import { viewTile } from './view.js';
+import { overviewRows, viewTile } from './view.js';
 
 let world: BiomeWorld | undefined,
   /** Why the replica could not be made: every later job rejects with it. */
@@ -137,6 +137,9 @@ async function run(m: Message): Promise<unknown> {
       const t = await world!.tile(m.x as number, m.z as number);
       return viewTile(world!, t, m.materials as string[], m.step as number);
     }
+    case 'overview':
+      // A band of texel rows of a view's far-field ground weights (from the region fields, never a cached tile).
+      return overviewRows(world!, m.materials as string[], m.texel as number, m.v0 as number, m.v1 as number);
     default:
       throw typeError('Unknown biome worker job; load the page and the worker script from one build', 'biomes');
   }

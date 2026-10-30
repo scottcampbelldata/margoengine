@@ -11,6 +11,7 @@ import {
   MAX_GROUND_MATERIALS,
   groundMaterials,
   groundWeights,
+  overviewRows,
   overviewWeights,
   terrainColorsFor,
   viewTile,
@@ -271,6 +272,38 @@ test('the overview runs the ground rules on the region grid and matches made til
     'a snow tile is among them',
   );
   assert.throws(() => overviewWeights(world, keys, 1.5), RangeError);
+});
+
+// Regression: the overview sampled the world with world.sample, which answers from a cached tile where one exists, so
+// the far field depended on which tiles the page had made before (268,452 bytes of the zero-config overview changed
+// after 16 tiles were made), and a worker replica with other tiles cached would give other bytes.
+test('the overview is the same whatever tiles were made, and its row bands are the bytes of the whole', async () => {
+  const world = await BiomeWorld.create({ size: [1024, 1024] }),
+    keys = groundMaterials(world.biomes),
+    before = overviewWeights(world, keys, 2);
+  for (let x = 0; x < 4; x++) for (let z = 0; z < 4; z++) await world.tile(x, z);
+  const after = overviewWeights(world, keys, 2);
+  assert.deepEqual(after.weights, before.weights, 'cached tiles change nothing');
+  const s = world.sample(100, 100),
+    r = world.sampleRegion(100, 100);
+  assert.notEqual(s.height, r.height, 'sample reads the cached tile, sampleRegion the region');
+  // Bands of uneven sizes, an empty one and one past the end, joined, are the whole.
+  const joined = before.weights.map((w) => new Uint8Array(w.length));
+  for (const [v0, v1] of [
+    [0, 1],
+    [1, 200],
+    [200, 200],
+    [200, 333],
+    [333, 9999],
+  ]) {
+    const band = overviewRows(world, keys, 2, v0, v1);
+    assert.equal(band.v1 - band.v0, Math.max(0, Math.min(before.depth, v1) - v0));
+    band.weights.forEach((w, i) => {
+      assert.equal(w.length, (band.v1 - band.v0) * before.width * 4);
+      joined[i].set(w, band.v0 * before.width * 4);
+    });
+  }
+  assert.deepEqual(joined, before.weights);
 });
 
 test('water: a bad option is a TypeError before anything loads', async () => {

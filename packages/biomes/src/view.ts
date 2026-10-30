@@ -266,8 +266,9 @@ export interface OverviewWeights {
 /**
  * Ground weights of the whole world at `textureResolution` metres per texel, from the region grid
  * (`world.regionResolution`, 16 m by default) through the same ground rules as the tiles: the biomes, height, slope,
- * moisture and temperatures of every grid corner come from `world.sample`, and texels between corners are bilinear. A
- * view draws these until the 1 m tiles around the camera replace them, so far hills show their rock and snow.
+ * moisture and temperatures of every grid corner come from `world.sampleRegion` (never a cached tile, so the answer
+ * does not depend on which tiles were made), and texels between corners are bilinear. A view draws these until the
+ * 1 m tiles around the camera replace them, so far hills show their rock and snow.
  * @throws RangeError for a materials list that misses a biome's key or holds more than 16, or a texel size that is not
  * a positive multiple of the world resolution.
  */
@@ -276,6 +277,20 @@ export function overviewWeights(
   materials: readonly string[],
   textureResolution = 2,
 ): OverviewWeights {
+  return overviewRows(world, materials, textureResolution, 0, Number.POSITIVE_INFINITY);
+}
+
+/**
+ * Texel rows `v0` to `v1 - 1` of {@link overviewWeights} (clamped to the texture), sampling only the grid rows they
+ * read: the same bytes as those rows of the whole, so workers can each make a band. `weights` hold the band's rows.
+ */
+export function overviewRows(
+  world: BiomeWorld,
+  materials: readonly string[],
+  textureResolution: number,
+  v0: number,
+  v1: number,
+): OverviewWeights & { readonly v0: number; readonly v1: number } {
   const texel = textureResolution,
     [x0, z0, x1, z1] = world.bounds,
     steps = texel / world.resolution; // float division: option check
@@ -285,15 +300,24 @@ export function overviewWeights(
     ids = world.biomes.map((b) => b.id),
     o = world.overview(),
     res = o.resolution,
-    corners = new Uint8Array(o.width * o.depth * STRIDE),
+    width = Math.round((x1 - x0) / texel) + 1, // float division: exact
+    depth = Math.round((z1 - z0) / texel) + 1, // float division
+    ratio = texel / res, // float division: view only
+    row = (v: number) => Math.floor(Math.min(o.depth - 1.001, v * ratio)),
+    first = Math.max(0, Math.min(depth, v0)),
+    last = Math.max(first, Math.min(depth, v1)),
+    // Grid rows the band reads: each texel row reads its row and the next.
+    j0 = first < last ? row(first) : 0,
+    j1 = first < last ? 1 + row(last - 1) : -1,
+    corners = new Uint8Array(o.width * Math.max(0, j1 - j0 + 1) * STRIDE),
     data: Record<string, Int32Array> = {},
     sums = new Int32Array(STRIDE),
     share = new Int32Array(STRIDE);
   for (const name of RULE_FIELDS) data[name] = new Int32Array(1);
   let s: BiomeSample | undefined;
-  for (let j = 0; j < o.depth; j++)
+  for (let j = j0; j <= j1; j++)
     for (let i = 0; i < o.width; i++) {
-      s = world.sample(x0 + i * res, z0 + j * res, s);
+      s = world.sampleRegion(x0 + i * res, z0 + j * res, s);
       // Stored units, as the tile layers hold them (LAYERS scales); the region has no curvature (0).
       data.height[0] = Math.round(s.height * 1000);
       data.slope[0] = Math.round(s.slope * 256);
@@ -305,18 +329,21 @@ export function overviewWeights(
       sums.fill(0);
       for (let b = 0; b < s.biomes.length; b++)
         addBiome(rules[ids.indexOf(s.biomes[b])], data, 0, Math.round(s.weights[b] * ONE), sums, share);
-      quantise(sums, corners, (j * o.width + i) * STRIDE);
+      quantise(sums, corners, ((j - j0) * o.width + i) * STRIDE);
     }
-  const width = Math.round((x1 - x0) / texel) + 1, // float division: exact
-    depth = Math.round((z1 - z0) / texel) + 1, // float division
-    weights = Array.from({ length: weightTextures(materials.length) }, () => new Uint8Array(width * depth * 4)),
-    ratio = texel / res, // float division: view only
+  const weights = Array.from(
+      { length: weightTextures(materials.length) },
+      () => new Uint8Array(width * (last - first) * 4),
+    ),
     m = materials.length,
     cell = new Float64Array(STRIDE),
-    // Grid cells whose four corners agree (most of a world): their texels copy a corner.
-    uniform = new Uint8Array(o.width * o.depth);
-  for (let k = 0; k + o.width + 1 < o.width * o.depth; k++) {
-    const a = k * STRIDE,
+    total = o.width * o.depth,
+    // Grid cells whose four corners agree (most of a world): their texels copy a corner. Indices are the band's.
+    uniform = new Uint8Array(o.width * Math.max(0, j1 - j0));
+  for (let q = 0; q < uniform.length; q++) {
+    // A cell whose lower corners are the grid's last ones has no upper row: never uniform (as over the whole grid).
+    if (q + j0 * o.width + o.width + 1 >= total) continue;
+    const a = q * STRIDE,
       c = a + o.width * STRIDE;
     let same = 1;
     for (let i = 0; i < m && same; i++)
@@ -325,9 +352,9 @@ export function overviewWeights(
         corners[a + i] === corners[c + i] &&
         corners[a + i] === corners[c + STRIDE + i]
       );
-    uniform[k] = same;
+    uniform[q] = same;
   }
-  for (let v = 0; v < depth; v++) {
+  for (let v = first; v < last; v++) {
     const fz = Math.min(o.depth - 1.001, v * ratio),
       iz = Math.floor(fz),
       tz = fz - iz;
@@ -335,12 +362,12 @@ export function overviewWeights(
       const fx = Math.min(o.width - 1.001, u * ratio),
         ix = Math.floor(fx),
         tx = fx - ix,
-        a = (iz * o.width + ix) * STRIDE,
+        a = ((iz - j0) * o.width + ix) * STRIDE,
         b = a + STRIDE,
         c = a + o.width * STRIDE,
         d = c + STRIDE,
-        t = (v * width + u) * 4;
-      if (uniform[iz * o.width + ix]) {
+        t = ((v - first) * width + u) * 4;
+      if (uniform[(iz - j0) * o.width + ix]) {
         for (let i = 0; i < m; i++) weights[i >> 2][t + (i & 3)] = corners[a + i];
         continue;
       }
@@ -358,7 +385,7 @@ export function overviewWeights(
       for (let i = 0; i < m; i++) weights[i >> 2][t + (i & 3)] = cell[i];
     }
   }
-  return { width, depth, weights };
+  return { width, depth, weights, v0: first, v1: last };
 }
 
 /** Writes 16 weights proportional to `w` summing to 255 (largest remainder, ties by index). */
@@ -574,7 +601,11 @@ export class BiomeView implements Disposable {
     while (layerKeys.length < 4) layerKeys.push(layerKeys[layerKeys.length - 1]);
     const pixels = layerKeys.map((key, i) => materialPixels(key, looks[Math.min(i, looks.length - 1)]));
     this.#heights = this.#overviewHeights();
-    this.#weights = overviewWeights(world, this.materials, texel).weights;
+    // The far-field ground weights arrive in `#overview` (on the workers when the world has them), before any tile.
+    this.#weights = Array.from(
+      { length: weightTextures(this.materials.length) },
+      () => new Uint8Array(this.#width * this.#depth * 4),
+    );
     const view = this;
     this.terrain = terrainModule.Terrain.attach(engine, {
       origin: [x0, z0],
@@ -639,7 +670,11 @@ export class BiomeView implements Disposable {
     const terrainModule = await import('@margoengine/terrain');
     if (options.signal?.aborted) throw options.signal.reason;
     const limit = (engine as unknown as { gpu?: GPUDevice }).gpu?.limits.maxTextureDimension2D ?? 8192;
-    const view = new BiomeView(engine, world, options, terrainModule, limit);
+    const view = new BiomeView(engine, world, options, terrainModule, limit),
+      // The overview runs while the objects load: on the workers off this thread, or here when there are none.
+      overview = view.#overview(options.signal);
+    // A failed attach must not leave the overview's rejection unhandled; it is awaited below.
+    overview.catch(() => {});
     if (options.objects ?? true) {
       // Placement and its drawing are their own entries, loaded only for a view that draws objects.
       const [{ BiomePlacement }, { BiomeObjects, detailFits }] = await Promise.all([
@@ -665,6 +700,12 @@ export class BiomeView implements Disposable {
         detailBudget: options.detailBudget,
       });
       view.#offObjects = placement.onChange((rect) => view.#dirty(rect, 'p'));
+    }
+    try {
+      await overview;
+    } catch (error) {
+      view.dispose();
+      throw error;
     }
     if (shadows)
       for (const source of [view.terrain, ...(view.#objects?.casters ?? [])])
@@ -692,6 +733,48 @@ export class BiomeView implements Disposable {
     view.#name = `biomes-view:${views}`;
     view.#plan(true);
     return view;
+  }
+
+  /**
+   * Fills the far-field ground weights (`overviewWeights`) and uploads them. With workers the texel rows go out in one
+   * band per worker (`overviewRows`, the same bytes as the whole), so the page's thread only copies the bands in.
+   */
+  async #overview(signal?: AbortSignal): Promise<void> {
+    const world = this.#world,
+      workers = world.workers,
+      texel = this.textureResolution,
+      width = this.#width,
+      depth = this.#depth;
+    if (!workers)
+      overviewWeights(world, this.materials, texel).weights.forEach((data, i) => this.#weights[i].set(data));
+    else {
+      const n = workers.size,
+        bands = await Promise.all(
+          Array.from({ length: n }, (_, b) =>
+            workers.run<OverviewWeights & { v0: number; v1: number }>(
+              {
+                op: 'overview',
+                materials: [...this.materials],
+                texel,
+                v0: divFloor(b * depth, n),
+                v1: divFloor((b + 1) * depth, n),
+              },
+              { signal },
+            ),
+          ),
+        );
+      if (this.#disposed) return;
+      for (const band of bands) band.weights.forEach((data, i) => this.#weights[i].set(data, band.v0 * width * 4));
+    }
+    const t = this.#textures;
+    if (!t || this.#disposed) return;
+    for (let i = 0; i < t.weights.length; i++)
+      t.device.queue.writeTexture(
+        { texture: t.weights[i] },
+        this.#weights[i] as Uint8Array<ArrayBuffer>,
+        { bytesPerRow: width * 4 },
+        [width, depth],
+      );
   }
 
   #placement?: import('@margoengine/biomes/placement').BiomePlacement;

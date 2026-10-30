@@ -187,7 +187,7 @@ export class BiomeWorkers implements Disposable {
 
   /**
    * Runs `message` on a worker. `near` is the tile the job is about (it goes to that tile's worker unless that one is
-   * busier by more than a job); `priority` orders queued jobs, lower first.
+   * busier by more than a job; without it, to the least loaded worker); `priority` orders queued jobs, lower first.
    */
   run<T>(
     message: WorkerMessage,
@@ -243,7 +243,10 @@ export class BiomeWorkers implements Disposable {
     }
   }
 
-  /** The slot for a job near tile (x, z): its affinity worker (blocks of 4 x 4 tiles), unless it is busier. */
+  /**
+   * The slot for a job near tile (x, z): its affinity worker (blocks of 4 x 4 tiles), unless it is busier. A job about
+   * no tile goes to the least loaded worker (the first of equals), so jobs sent together spread over the workers.
+   */
   #pick(near?: readonly [number, number]): Slot {
     const load = (s: Slot | undefined) => (s ? s.queue.length + (s.busy ? 1 : 0) : 0);
     let at = 0;
@@ -252,7 +255,8 @@ export class BiomeWorkers implements Disposable {
       at = umod(h, this.size);
     }
     let best = at;
-    for (let i = 0; i < this.size; i++) if (load(this.#slots[i]) + 1 < load(this.#slots[best])) best = i;
+    const margin = near ? 1 : 0;
+    for (let i = 0; i < this.size; i++) if (load(this.#slots[i]) + margin < load(this.#slots[best])) best = i;
     let slot = this.#slots[best];
     if (!slot) {
       slot = { worker: undefined as unknown as Worker, queue: [] };

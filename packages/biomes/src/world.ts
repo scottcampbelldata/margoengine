@@ -638,6 +638,20 @@ export class BiomeWorld implements Disposable {
       cells = this.tileSize / this.resolution, // float division: exact
       tile = this.#ready.get(`${Math.floor(gx / cells)},${Math.floor(gz / cells)}`); // float division
     if (tile) return readCell(tile, gx - tile.x * cells, gz - tile.z * cells, this.#classifier.ids, out);
+    return this.sampleRegion(x, z, out);
+  }
+
+  /**
+   * Point query from the region fields only, synchronous: what {@link BiomeWorld.sample} answers where no tile is
+   * cached, the same whatever tiles were made before (views build their far-field overview from it).
+   */
+  sampleRegion(x: number, z: number, out?: BiomeSample): BiomeSample {
+    this.#live();
+    if (!Number.isFinite(x) || !Number.isFinite(z))
+      throw rangeError('BiomeWorld sampleRegion needs finite x and z', 'biomes');
+    const gx = Math.floor((x - this.bounds[0]) / this.resolution), // float division: metres to cells
+      gz = Math.floor((z - this.bounds[1]) / this.resolution), // float division
+      cells = this.tileSize / this.resolution; // float division: exact
     return samplePoint(
       this.#climate,
       this.#region,

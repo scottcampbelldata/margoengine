@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { BiomeWorld } from '../dist/index.js';
 import { BiomePlacement } from '../dist/placement.js';
 import { presets } from '../dist/presets.js';
-import { groundMaterials, VIEW_LAYERS, viewTile } from '../dist/view.js';
+import { groundMaterials, overviewWeights, VIEW_LAYERS, viewTile } from '../dist/view.js';
 import { BiomeWorkers, defaultWorkers } from '../dist/workers.js';
 import { whittaker } from '../dist/zones.js';
 import { ThreadWebWorker } from './thread-worker.js';
@@ -202,5 +202,43 @@ test('editing on a world with workers: brush strokes, undo and the tiles they di
     assert.equal(await remote.digest(x, z), await main.digest(x, z), `fields ${x},${z} after the stroke`);
     assert.equal(await q.digest(x, z), await p.digest(x, z), `placement ${x},${z} after the stroke`);
   }
+  remote.dispose();
+});
+
+test('overview bands made on the workers are the main thread overview bytes, spread over the workers', {
+  timeout: 240000,
+}, async () => {
+  // BiomeView.attach sends one band of overview rows per worker (biome look L5 made the overview 450 ms of the page's
+  // thread). The replicas hold other cached tiles than the page; the bytes must not depend on that.
+  let made = 0;
+  const main = await BiomeWorld.create({ ...options, workers: false }),
+    remote = await BiomeWorld.create({
+      ...options,
+      workers: 2,
+      createWorker: () => (made++, new ThreadWebWorker()),
+    });
+  await remote.digest(1, 1);
+  assert.equal(made, 1, 'one tile, one worker');
+  const keys = groundMaterials(main.biomes),
+    whole = overviewWeights(main, keys, 2),
+    joined = whole.weights.map((w) => new Uint8Array(w.length)),
+    posts = [];
+  const n = remote.workers.size,
+    bands = await Promise.all(
+      Array.from({ length: n }, (_, b) => {
+        const v0 = Math.floor((b * whole.depth) / n),
+          v1 = Math.floor(((b + 1) * whole.depth) / n);
+        posts.push([v0, v1]);
+        return remote.workers.run({ op: 'overview', materials: keys, texel: 2, v0, v1 });
+      }),
+    );
+  for (const band of bands) band.weights.forEach((w, i) => joined[i].set(w, band.v0 * whole.width * 4));
+  assert.deepEqual(joined, whole.weights);
+  assert.deepEqual(
+    bands.map((b) => [b.v0, b.v1]),
+    posts,
+  );
+  assert.equal(made, 2, 'bands about no tile go to the least loaded worker, not all to the first');
+  main.dispose();
   remote.dispose();
 });
