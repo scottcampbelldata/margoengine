@@ -14,6 +14,7 @@ import { createServer } from 'vite';
 import { decodePNG } from '../tests/support/png.js';
 import { acquire } from './gpu-lock.mjs';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
+import { closeAll } from './support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const arg = (name, fallback) => {
@@ -101,7 +102,6 @@ try {
     if (counts.some(Boolean)) failed = true;
   }
 } finally {
-  await browser?.close();
-  await server?.close();
+  await closeAll({ browser, servers: [server] });
 }
 process.exit(failed ? 1 : 0);
