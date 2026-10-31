@@ -85,6 +85,11 @@ export function groundMaterials(biomes: readonly BiomeDefinition[]): string[];
 
 export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: readonly string[]): Uint8Array;
 
+export function overviewRows(world: BiomeWorld, materials: readonly string[], textureResolution: number, v0: number, v1: number): OverviewWeights & {
+    readonly v0: number;
+    readonly v1: number;
+};
+
 export function overviewWeights(world: BiomeWorld, materials: readonly string[], textureResolution?: number): OverviewWeights;
 
 export function terrainColorsFor(world: BiomeWorld, materials?: Readonly<Record<string, MaterialLook>>): Pick<TerrainColorOptions, 'sand' | 'meadow' | 'stone'>;
@@ -168,6 +173,7 @@ class BiomeWorld implements Disposable {
         readonly focus?: readonly [number, number];
     }): AsyncIterableIterator<BiomeTile>;
     sample(x: number, z: number, out?: BiomeSample): BiomeSample;
+    sampleRegion(x: number, z: number, out?: BiomeSample): BiomeSample;
     update(changes: Partial<Pick<BiomeWorldOptions, 'biomes' | 'climate' | 'classifier' | 'paint' | 'height'>>): void;
     onChange(listener: (rect: Rect) => void): () => void;
     digest(x: number, z: number, options?: {

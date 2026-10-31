@@ -155,6 +155,7 @@ class BiomeWorld implements Disposable {
         readonly focus?: readonly [number, number];
     }): AsyncIterableIterator<BiomeTile>;
     sample(x: number, z: number, out?: BiomeSample): BiomeSample;
+    sampleRegion(x: number, z: number, out?: BiomeSample): BiomeSample;
     update(changes: Partial<Pick<BiomeWorldOptions, 'biomes' | 'climate' | 'classifier' | 'paint' | 'height'>>): void;
     onChange(listener: (rect: Rect) => void): () => void;
     digest(x: number, z: number, options?: {
