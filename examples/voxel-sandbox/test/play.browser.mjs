@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { VoxelBot } from '@margoengine/voxel-net/bot';
 import { freePort, openBrowser } from '../../../scripts/browser.js';
-import { killTree } from '../../../scripts/support/shutdown.mjs';
+import { killTree, watchExit } from '../../../scripts/support/shutdown.mjs';
 import { defineBlocks } from '../src/blocks.ts';
 import { NOTICE_EVERY, PROTECTED_MESSAGE, REFUSED_MESSAGE } from '../src/multiplayer.ts';
 import { isPlazaProtected, PLAZA_WALL_TOP } from '../src/plaza-area.ts';
@@ -165,6 +165,7 @@ try {
   console.log('voxel sandbox play test passed');
 } finally {
   await closeAll();
+  watchExit();
 }
 
 async function closeAll() {
@@ -541,14 +542,16 @@ async function loadOrder() {
       response.setHeader('content-type', 'application/json');
       asked.push(performance.now());
       response.end(JSON.stringify({ url: `ws://127.0.0.1:${pipe.port}`, shard: 1, world: 'a' }));
-    });
+    }),
+    closeRouter = () => new Promise((done) => (routerServer.closeAllConnections(), routerServer.close(done)));
   await new Promise((done) => routerServer.listen(0, '127.0.0.1', done));
-  cleanup.push(() => new Promise((done) => (routerServer.closeAllConnections(), routerServer.close(done))));
+  cleanup.push(closeRouter);
   const browser = page.context().browser(),
     context2 = await browser.newContext({ viewport: { width: 960, height: 540 } }),
     tab = await context2.newPage(),
     requests = [];
-  cleanup.push(() => context2.close());
+  const closeContext = () => context2.close();
+  cleanup.push(closeContext);
   tab.on('request', (request) => requests.push([request.url().replace(/\?.*$/, ''), performance.now()]));
   // The adapter answers late, at a moment the test chooses.
   await tab.addInitScript(() => {
@@ -625,11 +628,9 @@ async function loadOrder() {
   assert.equal(await page.evaluate(() => !!document.getElementById('timing') || !!window.voxelSandbox.timing), false);
   assert.ok(!plainRequests.some((u) => /timing/.test(u)), 'the timing code was not downloaded');
   console.log('ok no panel and no timing code without ?timing');
-  await context2.close();
-  cleanup.splice(
-    cleanup.findIndex((c) => String(c).includes('context2')),
-    1,
-  );
+  await closeContext();
+  await closeRouter();
+  for (const done of [closeContext, closeRouter]) cleanup.splice(cleanup.indexOf(done), 1);
   await killTree(shard.child);
 }
 
@@ -1097,7 +1098,10 @@ async function plazaEdits() {
     await pause(1600);
     await tab.mouse.up({ button });
   }
-  for (let i = 0; i < 5; i++) {
+  // Aiming again each time: what the held buttons left in front of the player depends on the seed, and a click at nothing
+  // sends nothing.
+  for (let i = 0; i < 5 || ((await sentCount()) < 8 && i < 20); i++) {
+    assert.ok(await aimDown(), 'a block in reach');
     await click(i % 2 ? 'right' : 'left');
     await pause(700);
   }
@@ -1109,9 +1113,16 @@ async function plazaEdits() {
   console.log(`ok a held button and a slow stream: ${edits} edits, all stand, no notice`);
 
   // An edit the shard refuses for another reason (too fast: 5 in a burst, 10 a second): put back, and the page says so.
+  // Cells of air around and over the player: the world's seed and the spawn are new each run, and a tree or an earlier
+  // block in a cell is refused for that reason, using up the burst the test counts.
   const [px, py, pz] = (await pos()).map(Math.floor),
     cells = [];
-  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) cells.push([px + dx, py + 3, pz + dz]);
+  for (let up = 2; up <= 4; up++)
+    for (let dx = -3; dx <= 3; dx++)
+      for (let dz = -3; dz <= 3; dz++)
+        if (cells.length < 25 && (await state([px + dx, py + up, pz + dz])) === 0)
+          cells.push([px + dx, py + up, pz + dz]);
+  assert.equal(cells.length, 25, 'enough air around the player');
   const brick = await ev(() => window.voxelSandbox.world.blocks.id('bricks')),
     sentBefore = await sentCount();
   assert.ok(isPlazaProtected(...cells[0], floor) === false, 'the cells over the spawn are outside the square');
