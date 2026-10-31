@@ -13,7 +13,7 @@ const filesIn = (root, dir, extensions) =>
     .sort();
 
 /** Folders of examples/ whose .ts files are checked by the project `examples`. */
-export const EXAMPLE_FOLDERS = ['blender-loader', 'quickstart', 'skinning-ik', 'usdz-loader', 'webxr-orbit'];
+export const EXAMPLE_FOLDERS = ['blender-loader', 'boulder', 'gallery', 'quickstart', 'usdz-loader', 'webxr-orbit'];
 
 /**
  * Every project: { id, config, entries(root) }. `js` is checkJs without strict mode: the JavaScript demos are untyped

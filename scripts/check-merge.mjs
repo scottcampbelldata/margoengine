@@ -488,6 +488,7 @@ export async function runSteps(
  */
 export const STEP_AFTER = {
   'build:site': ['verify'],
+  'check:examples-types': ['verify'],
   'check:fresh-clone': ['verify'],
   'check:quickstart': ['verify'],
   'modern:test:packages': ['verify'],

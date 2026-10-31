@@ -399,6 +399,10 @@ export const entries = [
     title: '@margoengine/sciviz: figures, layers and colour maps',
     kind: 'family',
     messages: [
+      'Bricked volume disposed; create a new one',
+      'A bricked volume needs range: [min, max], from the option or the source',
+      'A bricked volume needs a source: { dims: [nx, ny, nz], read(request) }, or arraySource(data, dims)',
+      'arraySource needs dims: [nx, ny, nz]',
       'Colormap needs a sample(t) function returning [r, g, b]',
       'A custom colour map needs at least two stops',
       'Colour map stops are [t, colour] pairs or colours',

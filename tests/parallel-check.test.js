@@ -343,7 +343,8 @@ test('check:merge steps: each placed, nothing lost, verify alone, timing last an
   );
   // A step on a suite's fixed port would make that suite wait in its GPU slot.
   const all = new Set(Object.values(resources).flat());
-  for (const port of [5293, 5297, 5317, 5259]) assert.ok(!all.has(`port:${port}`), `port ${port}`);
+  const basicScene = Number(readFileSync('scripts/basic-scene-network.mjs', 'utf8').match(/\bport = (\d+)/)[1]);
+  for (const port of [5293, 5297, 5317, basicScene]) assert.ok(!all.has(`port:${port}`), `port ${port}`);
 });
 
 test('runStepsParallel: verify first and alone, then the rest; a skip stays a skip; one result per planned step', async () => {

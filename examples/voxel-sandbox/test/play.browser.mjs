@@ -242,10 +242,11 @@ async function plaza() {
     return { yaw: s.look.yaw, wanted: Math.atan2(-(other[0] - me[0]), -(other[2] - me[2])) };
   });
   await page.mouse.move(480 + (aim.yaw - aim.wanted) / 0.0024, 270);
-  await page.waitForFunction(async () => (await window.voxelSandbox.figures.crowd.readCount()) >= 6, null, {
-    timeout: 15_000,
-    polling: 200,
-  });
+  // The count is read back from the GPU, and waitForFunction does not await a predicate, so this polls from here.
+  for (const end = Date.now() + 15_000; (await sandbox(() => window.voxelSandbox.figures.crowd.readCount())) < 6; ) {
+    assert.ok(Date.now() < end, 'six figures drawn');
+    await wait(200); // fixed-wait: a poll of a GPU readback, which nothing announces
+  }
   await page.screenshot({ path: 'test-results/plaza-figures.png' });
   console.log('ok the figure draws (test-results/plaza-figures.png)');
 
@@ -611,7 +612,8 @@ async function rejoin() {
     clearInterval(botLoop);
     bot.close();
   });
-  while (!bot.client.spawned || !bot.client.loaded) await wait(50); // polling a value in this process
+  // fixed-wait: polling a value in this process, which only a turn of the event loop can change
+  while (!bot.client.spawned || !bot.client.loaded) await wait(50);
   const [bx, by, bz] = bot.client.player.position.map(Math.floor);
   let cell;
   for (let up = 3; !cell; up++) if (!bot.world.getBlock(bx + 2, by + up, bz)) cell = [bx + 2, by + up, bz];

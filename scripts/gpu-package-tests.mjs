@@ -122,6 +122,10 @@ export const RUNNER_SMOKE = [
 ];
 /** Browser scripts under packages/ that are tools, not tests (the guard below skips them). */
 const TOOLS = {
+  'packages/biomes/tests/flythrough-spike.mjs':
+    'diagnostic: times the flythrough check slowSends flight step by step (test:gpu runs the flight itself)',
+  'packages/vfx/test/bench-soft.mjs':
+    'benchmark of soft particles with the GPU held exclusively (test:gpu checks the pixels)',
   'packages/voxel-pathtracer/tests/magicavoxel/mv-vox.mjs': 'renders .vox files for a side-by-side comparison',
   'packages/webgl2-compat/scripts/capabilities.mjs':
     'prints the WebGL2 report of every installed browser and ANGLE back end (test:browser checks the default one)',

@@ -13,8 +13,9 @@
   "include": [
     "*.ts",
     "blender-loader/*.ts",
+    "boulder/*.ts",
+    "gallery/*.ts",
     "quickstart/*.ts",
-    "skinning-ik/*.ts",
     "usdz-loader/*.ts",
     "webxr-orbit/*.ts"
   ]

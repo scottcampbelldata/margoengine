@@ -34,7 +34,7 @@ function show(area, kind, lines) {
     `position:${page ? 'fixed' : 'absolute'};inset:0;z-index:1000;display:grid;place-content:center;gap:8px;padding:24px;text-align:center;` +
     'background:#101418;color:#f2f4f6;font:16px/1.5 system-ui,sans-serif';
   for (const [text, href] of lines) {
-    const line = document.createElement(href ? 'a' : 'p');
+    const line = /** @type {HTMLAnchorElement} */ (document.createElement(href ? 'a' : 'p'));
     line.textContent = text;
     if (href) {
       line.href = href;
@@ -44,7 +44,8 @@ function show(area, kind, lines) {
   }
   parent.append(box);
   // Loading lines would otherwise wait forever beside the message.
-  for (const element of document.querySelectorAll('[data-webgpu-status]')) element.style.display = 'none';
+  for (const element of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-webgpu-status]')))
+    element.style.display = 'none';
   return box;
 }
 

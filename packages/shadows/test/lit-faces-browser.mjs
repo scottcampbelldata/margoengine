@@ -34,12 +34,14 @@ const LIT_MARGIN = 16,
 
 // The dev server serves the repository root, whichever folder the script starts in.
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const virtual = process.argv.includes('--page=virtual'),
+const virtualPort = 5273,
+  plainPort = 5267,
+  virtual = process.argv.includes('--page=virtual'),
   name = virtual ? 'virtual-lit-faces' : 'shadows-lit-faces';
 const release = await acquire({ owner: name });
 const context = await openBrowser({
     startPath: `/packages/shadows/test/${virtual ? 'virtual-' : ''}lit-faces.html`,
-    port: virtual ? 5273 : 5267,
+    port: virtual ? virtualPort : plainPort,
   }),
   { page } = context,
   pageErrors = [];

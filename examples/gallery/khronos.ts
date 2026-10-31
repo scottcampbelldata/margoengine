@@ -1,6 +1,7 @@
 // The model cabinet: the published Khronos sample models on the gallery template. examples/khronos-gallery.html stays the
 // check page (every model, and the visual baselines); this one is what visitors see. scripts/build-site.js copies the
 // models named by the section buttons to gallery/models/ and nothing else, so the 250 MB set stays out of the site.
+import { engineRuntime } from '@margoengine/core/extension';
 import { createStage } from 'margoengine';
 import { applyGLTFLights, loadGLTF, viewGLTFCamera } from '@margoengine/gltf-pro';
 import { ColorBackground, Environment, EnvironmentLighting } from '@margoengine/environment';
@@ -57,8 +58,9 @@ async function main() {
     camera: { position: [0.6, 0.8, 3], target: [0, 0, 0] },
   });
   const engine = stage.engine,
-    device = engine.gpu;
-  device.addEventListener('uncapturederror', (event) => {
+    runtime = engineRuntime(engine),
+    device = runtime.gpu as GPUDevice;
+  device.addEventListener('uncapturederror', (event: Event) => {
     console.error('GPU validation error:', (event as GPUUncapturedErrorEvent).error.message);
   });
   ColorBackground.attach(engine, { color: '#efeadf', bottom: '#d3ccbc' });
@@ -71,7 +73,7 @@ async function main() {
   document.body.append(statsHost);
   const stats = Stats.attach(engine, { parent: statsHost, profiling: true });
   const camera = engine.camera,
-    light = [engine.lighting.direction.slice(), engine.lighting.radiance.slice()];
+    light = [runtime.lighting.direction.slice(), runtime.lighting.radiance.slice()];
   let clustered: Clustered | undefined, model: Awaited<ReturnType<typeof loadGLTF>> | undefined;
 
   variantSelect.addEventListener('change', () => {
@@ -98,8 +100,8 @@ async function main() {
     }
     model?.dispose();
     model = next;
-    engine.lighting.direction.set(light[0]);
-    engine.lighting.radiance.set(light[1]);
+    runtime.lighting.direction.set(light[0]);
+    runtime.lighting.radiance.set(light[1]);
     lighting.add(model);
     const sun = model.lights.find((l) => l.type === 'directional');
     if (model.clusteredLights().length) clustered ??= (await import('@margoengine/clustered')).Clustered.attach(engine);
