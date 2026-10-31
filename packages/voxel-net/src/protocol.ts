@@ -8,7 +8,13 @@ import type { VoxelMoveIntent } from '@margoengine/voxel/query';
 import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js';
 
 /** Version of this wire format; a server closes connections that say another. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
+
+/** Bytes of the token that resumes a dropped connection. */
+export const RESUME_TOKEN_BYTES = 16;
+
+/** Most chunks a resuming client may ask to have sent again for its own edits. */
+export const MAX_STALE_CHUNKS = 64;
 
 /** Most bytes of an `app` message's payload, on the wire and for `VoxelServer.send` and `broadcast`. */
 export const MAX_APP_BYTES = 16384;
@@ -57,10 +63,23 @@ export interface InputRun {
   pitch: number;
 }
 
+/** What a client tells the server when it comes back after a dropped connection. */
+export interface ResumeHello {
+  /** The token of its last welcome, {@link RESUME_TOKEN_BYTES} bytes. Good once. */
+  token: Uint8Array;
+  /** Chunk messages it has received in all, so the server can tell which ones the dead socket lost. */
+  chunks: number;
+  /** Chunks (cx, cy, cz) of its latest edits, at most {@link MAX_STALE_CHUNKS}, which the server may never have seen. */
+  stale: (readonly [cx: number, cy: number, cz: number])[];
+}
+
 /** A message from a client to the server. */
 export type ClientMessage =
-  /** First message: the client's protocol, wanted view distance in chunks and display name (at most 32 bytes). */
-  | { type: 'hello'; version: number; view: number; name: string }
+  /**
+   * First message: the client's protocol, wanted view distance in chunks and display name (at most 32 bytes), and
+   * `resume` when it takes back a dropped player instead of joining.
+   */
+  | { type: 'hello'; version: number; view: number; name: string; resume?: ResumeHello }
   /**
    * Movement steps `step`, `step + 1`, ... with their inputs, and where the client's own simulation ended up after the
    * last of them. `acked` is the step of the last correction the client applied (0 for none).
@@ -86,6 +105,10 @@ export type ServerMessage =
       blocks: number;
       /** Whether flying is allowed. */
       flight: boolean;
+      /** The token that resumes this player if the connection drops, or no bytes when the server does not resume. */
+      resume: Uint8Array;
+      /** After a resume: how many chunks the server marked to send again; 0 on a join. */
+      resent: number;
     }
   /** Chunk (cx, cy, cz) as `encodeChunk` bytes (without light). */
   | { type: 'chunk'; cx: number; cy: number; cz: number; data: Uint8Array }
@@ -165,6 +188,10 @@ class Reader extends ByteReader {
       throw this.fail('has a name that is not UTF-8');
     }
   }
+  copy(n: number): Uint8Array {
+    this.need(n);
+    return new Uint8Array(this.bytes.subarray(this.at, (this.at += n)));
+  }
   rest(): Uint8Array {
     const out = this.bytes.slice(this.at);
     this.at = this.bytes.length;
@@ -200,6 +227,7 @@ const vector = (what: string, v: unknown): Vec3 => {
 };
 const cell = (what: string, v: unknown): number => integer(what, v, -(2 ** 31), 2 ** 31 - 1);
 const chunk = (what: string, v: unknown): number => integer(what, v, -(2 ** 26), 2 ** 26 - 1);
+const inChunks = (c: number): boolean => (c << 5) >> 5 === c;
 const bytesOf = (what: string, v: unknown): Uint8Array => {
   if (!(v instanceof Uint8Array)) throw new TypeError(`${what} must be a Uint8Array`);
   return v;
@@ -253,6 +281,17 @@ export function encodeClientMessage(message: ClientMessage): Uint8Array {
       w.varint(integer('hello view', message.view, 0, 64));
       w.varint(name.length);
       w.raw(name);
+      if (message.resume) {
+        const { token, chunks, stale } = message.resume;
+        if (bytesOf('resume token', token).length !== RESUME_TOKEN_BYTES)
+          throw new RangeError(`Resume token is ${token.length} bytes; send the ${RESUME_TOKEN_BYTES} of the welcome`);
+        if (stale.length > MAX_STALE_CHUNKS)
+          throw new RangeError(`Resume lists ${stale.length} stale chunks; send at most ${MAX_STALE_CHUNKS}`);
+        w.raw(token);
+        w.varint(integer('resume chunks', chunks, 0, 2 ** 53 - 1));
+        w.varint(stale.length);
+        for (const key of stale) for (const c of key) w.varint(zigzag(chunk('resume stale chunk', c)));
+      }
       break;
     }
     case 'input': {
@@ -301,6 +340,20 @@ export function decodeClientMessage(bytes: Uint8Array): ClientMessage {
     const version = r.varint(),
       view = r.varint();
     message = { type: 'hello', version, view, name: r.name() };
+    // Past the name: protocol 3 stops there, and is refused for its version rather than as unreadable.
+    if (r.at < bytes.length) {
+      const token = r.copy(RESUME_TOKEN_BYTES),
+        chunks = r.varint(),
+        n = r.varint();
+      if (n > MAX_STALE_CHUNKS) throw r.fail(`lists ${n} stale chunks, over ${MAX_STALE_CHUNKS}`);
+      const stale: [number, number, number][] = [];
+      for (let i = 0; i < n; i++) {
+        const key: [number, number, number] = [r.int(), r.int(), r.int()];
+        if (!key.every(inChunks)) throw r.fail(`names chunk ${key}, out of range`);
+        stale.push(key);
+      }
+      message.resume = { token, chunks, stale };
+    }
   } else if (type === INPUT) {
     const step = r.varint(),
       acked = r.varint(),
@@ -349,6 +402,13 @@ export function encodeServerMessage(message: ServerMessage): Uint8Array {
         w.varint(integer(`welcome ${key}`, message[key], 0, 2 ** 32 - 1));
       w.u32(integer('welcome blocks', message.blocks, 0, 2 ** 32 - 1));
       w.u8(message.flight ? 1 : 0);
+      if (bytesOf('welcome resume', message.resume).length && message.resume.length !== RESUME_TOKEN_BYTES)
+        throw new RangeError(
+          `Welcome resume is ${message.resume.length} bytes; send ${RESUME_TOKEN_BYTES}, or none to turn resuming off`,
+        );
+      w.varint(message.resume.length);
+      w.raw(message.resume);
+      w.varint(integer('welcome resent', message.resent, 0, 2 ** 32 - 1));
       break;
     case 'chunk':
     case 'unload':
@@ -441,13 +501,18 @@ export function decodeServerMessage(bytes: Uint8Array): ServerMessage {
       playerDistance,
       blocks: r.u32(),
       flight: r.u8() === 1,
+      resume: new Uint8Array(0),
+      resent: 0,
     };
+    const n = r.varint();
+    if (n && n !== RESUME_TOKEN_BYTES) throw r.fail(`has a resume token of ${n} bytes`);
+    message.resume = r.copy(n);
+    message.resent = r.varint();
   } else if (type === CHUNK || type === UNLOAD) {
     const cx = r.int(),
       cy = r.int(),
       cz = r.int();
-    if (![cx, cy, cz].every((c) => (c << 5) >> 5 === c))
-      throw r.fail(`names chunk (${cx}, ${cy}, ${cz}), out of range`);
+    if (![cx, cy, cz].every(inChunks)) throw r.fail(`names chunk (${cx}, ${cy}, ${cz}), out of range`);
     message = type === CHUNK ? { type: 'chunk', cx, cy, cz, data: r.rest() } : { type: 'unload', cx, cy, cz };
   } else if (type === STATE) {
     const spawn = r.u8() === 1,

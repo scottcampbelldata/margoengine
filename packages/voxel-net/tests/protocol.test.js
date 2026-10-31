@@ -18,6 +18,20 @@ import { testBlocks } from './blocks.js';
 const client = [
   { type: 'hello', version: 1, view: 6, name: 'Ada Ł' },
   {
+    type: 'hello',
+    version: 4,
+    view: 6,
+    name: 'Ada',
+    resume: {
+      token: Uint8Array.from({ length: 16 }, (_, i) => i * 7),
+      chunks: 123456,
+      stale: [
+        [1, -2, 3],
+        [-(2 ** 26), 2 ** 26 - 1, 0],
+      ],
+    },
+  },
+  {
     type: 'input',
     step: 1,
     acked: 0,
@@ -42,6 +56,23 @@ const server = [
     playerDistance: 96,
     blocks: 0xdeadbeef,
     flight: true,
+    resume: Uint8Array.from({ length: 16 }, (_, i) => 255 - i),
+    resent: 300,
+  },
+  {
+    type: 'welcome',
+    version: 1,
+    id: 8,
+    tickRate: 20,
+    view: 6,
+    viewHeight: 3,
+    simulation: 3,
+    simulationHeight: 2,
+    playerDistance: 96,
+    blocks: 1,
+    flight: false,
+    resume: new Uint8Array(0),
+    resent: 0,
   },
   { type: 'chunk', cx: -3, cy: 2 ** 26 - 1, cz: -(2 ** 26), data: new Uint8Array([1, 0, 1, 0, 0]) },
   { type: 'unload', cx: 1, cy: -1, cz: 0 },
@@ -72,7 +103,7 @@ test('truncated, trailing and unknown bytes throw RangeError', () => {
   assert.throws(() => decodeClientMessage([1, 2]), TypeError);
   // An input claiming more runs than it carries, a non-finite position, a name that is not UTF-8.
   assert.throws(() => decodeClientMessage(new Uint8Array([2, 1, 0, 200, 7])), RangeError);
-  const input = encodeClientMessage(client[1]);
+  const input = encodeClientMessage(client[2]);
   new DataView(input.buffer).setFloat64(input.length - 8, Number.NaN, true);
   assert.throws(() => decodeClientMessage(input), /non-finite/);
   assert.throws(() => decodeClientMessage(new Uint8Array([1, 1, 6, 1, 0xff])), /UTF-8/);
@@ -80,8 +111,8 @@ test('truncated, trailing and unknown bytes throw RangeError', () => {
 
 test('encoders check their fields', () => {
   assert.throws(() => encodeClientMessage({ type: 'hello', version: 1, view: 6, name: 'x'.repeat(33) }), RangeError);
-  assert.throws(() => encodeClientMessage({ ...client[1], runs: [] }), RangeError);
-  assert.throws(() => encodeClientMessage({ ...client[1], position: [0, Number.POSITIVE_INFINITY, 0] }), RangeError);
+  assert.throws(() => encodeClientMessage({ ...client[2], runs: [] }), RangeError);
+  assert.throws(() => encodeClientMessage({ ...client[2], position: [0, Number.POSITIVE_INFINITY, 0] }), RangeError);
   assert.throws(() => encodeClientMessage({ type: 'edit', x: 0.5, y: 0, z: 0, state: 1 }), RangeError);
   assert.throws(() => encodeClientMessage({ type: 'nope' }), TypeError);
   assert.throws(
@@ -99,7 +130,7 @@ test('names round-trip, and hostile names messages throw', () => {
     bytes = encodeServerMessage({ type: 'names', names });
   assert.deepEqual(decodeServerMessage(bytes), { type: 'names', names });
   assert.equal(bytes[0], 23);
-  assert.equal(PROTOCOL_VERSION, 3);
+  assert.equal(PROTOCOL_VERSION, 4);
   assert.equal(MAX_NAME_BYTES, 32);
   // No entries, more entries than it carries, a name over 32 bytes, past the end, not UTF-8, trailing bytes.
   for (const hostile of [
@@ -177,4 +208,61 @@ test('the block table hash follows names and the solid and liquid flags', () => 
   assert.equal(blockTableHash(a), blockTableHash(b));
   b.define('glass');
   assert.notEqual(blockTableHash(a), blockTableHash(b));
+});
+
+test('protocol 4: a hello without resume is the bytes protocol 3 sent, so an old page still hears its version refused', () => {
+  const name = new TextEncoder().encode('Ada'),
+    bytes = Uint8Array.from([1, 3, 6, name.length, ...name]);
+  assert.deepEqual(decodeClientMessage(bytes), { type: 'hello', version: 3, view: 6, name: 'Ada' });
+  assert.deepEqual(encodeClientMessage({ type: 'hello', version: 3, view: 6, name: 'Ada' }), bytes);
+});
+
+test('protocol 4: the resume fields are range checked both ways', () => {
+  const resume = (over) => ({
+      type: 'hello',
+      version: 4,
+      view: 6,
+      name: '',
+      resume: { token: new Uint8Array(16), chunks: 0, stale: [], ...over },
+    }),
+    welcome = (over) => ({
+      type: 'welcome',
+      version: 4,
+      id: 1,
+      tickRate: 20,
+      view: 6,
+      viewHeight: 3,
+      simulation: 3,
+      simulationHeight: 2,
+      playerDistance: 96,
+      blocks: 1,
+      flight: false,
+      resume: new Uint8Array(16),
+      resent: 0,
+      ...over,
+    });
+  assert.throws(() => encodeClientMessage(resume({ token: new Uint8Array(15) })), RangeError);
+  assert.throws(() => encodeClientMessage(resume({ token: 'x' })), TypeError);
+  assert.throws(() => encodeClientMessage(resume({ chunks: -1 })), RangeError);
+  const many = Array.from({ length: 65 }, () => [0, 0, 0]);
+  assert.throws(() => encodeClientMessage(resume({ stale: many })), RangeError);
+  assert.throws(() => encodeClientMessage(resume({ stale: [[2 ** 26, 0, 0]] })), RangeError);
+  assert.throws(() => encodeServerMessage(welcome({ resume: new Uint8Array(8) })), RangeError);
+  assert.throws(() => encodeServerMessage(welcome({ resent: -1 })), RangeError);
+  // On the wire: a token cut short, too many stale chunks, a stale chunk out of range, a token of the wrong length.
+  const good = encodeClientMessage(resume({ stale: [[1, 2, 3]] })),
+    start = good.length - 16 - 2 - 3; // past the name: where the resume fields begin
+  for (let end = start + 1; end < good.length; end++)
+    assert.throws(() => decodeClientMessage(good.subarray(0, end)), RangeError, `hello cut at ${end}`);
+  const head = [...good.subarray(0, start + 16)];
+  assert.throws(() => decodeClientMessage(Uint8Array.from([...head, 0, 65, ...new Array(195).fill(0)])), RangeError);
+  assert.throws(() => decodeClientMessage(Uint8Array.from([...head, 0, 1, 128, 128, 128, 128, 2, 0, 0])), RangeError);
+  const bytes = encodeServerMessage(welcome({ resume: new Uint8Array(0) })),
+    at = bytes.length - 2; // the token's length, then resent
+  const wrong = Uint8Array.from([...bytes.subarray(0, at), 8, ...new Uint8Array(8), 0]);
+  assert.throws(() => decodeServerMessage(wrong), RangeError);
+  // Bytes the decoder hands out are a plain copy: a Node Buffer's slice would share the socket's memory.
+  const token = decodeClientMessage(Buffer.from(encodeClientMessage(resume({ token: new Uint8Array(16).fill(9) }))))
+    .resume.token;
+  assert.equal(token.constructor, Uint8Array);
 });

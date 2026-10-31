@@ -205,13 +205,13 @@ test('filterName replaces names; one that throws or returns nonsense closes the 
 
 test('an older protocol is kicked with a reason, and connectVoxelNet reports a refused connection', async (t) => {
   const { server, url } = await start(t, { authenticate: (_req, hello) => !hello || hello.name !== 'refused' });
-  assert.equal(PROTOCOL_VERSION, 3);
+  assert.equal(PROTOCOL_VERSION, 4);
   const old = await connectWebSocket(url),
     closed = closeOf(old);
   old.send(encodeClientMessage({ type: 'hello', version: 1, view: 2, name: 'old page' }));
   const { code, reason } = await closed;
   assert.equal(code, 1008);
-  assert.equal(reason, 'protocol 1, server speaks 3');
+  assert.equal(reason, 'protocol 1, server speaks 4');
   assert.equal(server.players.length, 0);
   // The browser path: without this, the page never learns why nothing arrives.
   const refused = connectVoxelNet(url, new VoxelWorld({ blocks }), { name: 'refused' }),
