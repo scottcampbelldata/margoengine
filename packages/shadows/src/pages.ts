@@ -188,11 +188,6 @@ export class PagePool {
   private requestInWindow(level: number, ix: number, iy: number, centers: ArrayLike<number>): void {
     if (inWindow(ix, centers[level * 2]) && inWindow(iy, centers[level * 2 + 1])) this.request(level, ix, iy);
   }
-  /** Marks stale every page requested this frame. */
-  staleRequested(): void {
-    for (let slot = 0; slot < this.capacity; slot++)
-      if (this.used[slot] && this.lastUsed[slot] === this.frame) this.stale[slot] = 1;
-  }
   private evict(): number {
     let best = EMPTY;
     for (let slot = 0; slot < this.capacity; slot++) {

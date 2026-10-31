@@ -46,6 +46,10 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
 fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal);}
 `;
 }
+// A page copy inside a render pass: a partial copy of a depth texture is not allowed in WebGPU (depth copies take the
+// whole subresource), so the same pixel of the still pool is written as depth. Both pools address a page alike.
+export const pageCopy = /* wgsl */ `@group(0) @binding(0) var still:texture_depth_2d;
+@fragment fn fragment(@builtin(position) at:vec4f)->@builtin(frag_depth) f32 {return textureLoad(still,vec2i(at.xy),0);}`;
 // A depth-only triangle over the viewport at the far plane: clears one page inside the frame's render pass.
 export const pageClear = /* wgsl */ `@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(f32(i&1u)*4-1,f32(i&2u)*2-1,1,1);}`;
 // Marks the pages this view needs from a half-size (a quarter of the pixels) depth of the receivers. A pixel's level has

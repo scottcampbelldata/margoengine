@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Virtual shadows: page cache</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body><canvas width="1280" height="720"></canvas>
+<script type="module">
+// A box on a plane and a second box that moves. window.check drives frames one at a time and reports what each drew, so the
+// browser test can compare page counts with the set the caster's bounds predict.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[-5,5,-6],target:[0,0,0]}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const floor=engine.createMesh().setGeometry(box(12,0.1,12)).setPosition([0,-0.05,0]);
+const still=engine.createMesh().setGeometry(box(1.2,1.5,1.6)).setPosition([0,0.75,0]);
+const mover=engine.createMesh().setGeometry(box(0.4,0.4,0.4)).setPosition([-2,0.6,1]);
+let shadows;
+const frame=async(n=1)=>{const seen=[];device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();await new Promise(r=>setTimeout(r));seen.push(shadows.stats.pagesRendered);}const e=await device.popErrorScope();if(e)errors.push(e.message);return seen;};
+// The light-space circle of a core mesh, as the effect's basis and core's world bounds give it.
+const circle=(mesh)=>{const g=mesh.geometry.bounds,m=mesh.matrix,x=m[0]*g[0]+m[4]*g[1]+m[8]*g[2]+m[12],y=m[1]*g[0]+m[5]*g[1]+m[9]*g[2]+m[13],z=m[2]*g[0]+m[6]*g[1]+m[10]*g[2]+m[14],r=shadows.right,u=shadows.up;return {x:x*r[0]+y*r[1]+z*r[2],y:x*u[0]+y*u[1]+z*u[2],radius:g[3]*Math.hypot(m[0],m[1],m[2])};};
+// Resident slots the circles reach, by the allocator's own test of a page against a circle.
+const predicted=(circles)=>{const p=shadows.pages;let n=0;for(let s=0;s<p.capacity;s++)if(p.isUsed(s)&&circles.some(c=>p.reaches(s,c.x,c.y,c.radius)))n++;return n;};
+const out=(extra)=>({errors:errors.splice(0),stats:{...shadows.stats},...extra});
+// A caster the effect cannot bound: the mover's geometry drawn as a dynamic primitive.
+const dynamicSource=()=>{const b=engine.geometryBuffers(mover.geometry);return {shadowPrimitives:[{node:mover,vertex:b.vertex,index:b.index,count:mover.geometry.indices.length,stride:24,dynamic:true}]};};
+window.check={
+  async start(at=[-2,0.6,1],dynamic=false){shadows?.dispose();mover.setPosition(at);shadows=VirtualShadows.attach(engine,{filter:'hard'});shadows.add(still);shadows.add(floor,{castShadow:false});if(dynamic)shadows.add(dynamicSource());else shadows.add(mover);return out({frames:await frame(6)});},
+  async idle(n){return out({frames:await frame(n)});},
+  async move(to){const before=circle(mover);mover.setPosition(to);const seen=await frame(1);return out({frames:seen,predicted:predicted([before,circle(mover)])});},
+  async invalidate(){const resident=shadows.pages.resident;shadows.invalidate();return out({frames:await frame(1),resident});},
+};
+window.ready=true;
+</script></body></html>

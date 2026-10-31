@@ -149,7 +149,7 @@ try {
   await writeFile('test-results/virtual-sampling.json', JSON.stringify(result, null, 2));
   assert.deepEqual(pageErrors, []);
   assert.ok(pixels > 200000 && shaded > 5000, `too few measured pixels: ${JSON.stringify(result)}`);
-  assert.ok(states.virtual.stats.pagesRendered > 0, 'no page rendered');
+  assert.ok(states.virtual.stats.residentPages > 0, 'no page resident');
   assert.ok(result.agreementWithMask >= AGREEMENT, `mask agreement ${result.agreementWithMask}`);
   assert.ok(result.agreementWithCascades >= AGREEMENT, `cascades agreement ${result.agreementWithCascades}`);
   console.log('shadows virtual sampling: ok');

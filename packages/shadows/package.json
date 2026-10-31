@@ -29,6 +29,7 @@
     "test:gpu:cutout-casters": "cd ../.. && node packages/shadows/test/cutout-casters-browser.mjs",
     "test:gpu:virtual": "cd ../.. && node packages/shadows/test/virtual-sampling-browser.mjs",
     "test:gpu:virtual-feedback": "cd ../.. && node packages/shadows/test/virtual-feedback-browser.mjs",
+    "test:gpu:virtual-cache": "cd ../.. && node packages/shadows/test/virtual-cache-browser.mjs",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
