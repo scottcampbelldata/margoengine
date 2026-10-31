@@ -13,6 +13,7 @@ import { packageDeclarations, packageRuntime } from './package-declarations.js';
 import { writeServerEntries } from './react-server-entries.js';
 import { importMap } from './umbrella.mjs';
 import { copyLegal } from './package-legal.js';
+import { recordScope } from './support/record-reads.mjs';
 const precompiled = process.argv.includes('--precompiled');
 // --only=post,lines rebuilds just those packages (their dependencies must already be built) and skips the size records.
 const only = process.argv
@@ -186,6 +187,7 @@ await buildInDependencyOrder(
   buildPackage,
 );
 if (only) process.exit(0);
+recordScope('size-records');
 // Size records and leak checks only; build order comes from package.json above.
 const featurePackages = [
   'gltf-pro',

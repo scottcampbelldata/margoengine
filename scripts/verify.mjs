@@ -4,6 +4,8 @@
 //      its tests, the unit tests, the size measurement and the proofs. None of them writes a file another one reads, so
 //      the wall time is the longest of them instead of their sum. The first failure stops the rest and prints its output.
 //   node scripts/verify.mjs --serial    one step at a time, in the order the steps are listed (to read one step's output)
+// Every step always runs. Shadow mode (scripts/support/result-cache.mjs) records what each one read and reports what a
+// result cache would have served; MARGO_RESULT_CACHE=off stops the recording.
 // MARGOENGINE_PLANT_STALE=1 (set by check:merge) puts a stale file in two dist folders before the build; the tarball
 // test later asserts that no pack contains it, which proves the build cleans dist.
 import { spawn, spawnSync } from 'node:child_process';
@@ -11,6 +13,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { ResultStore, ShadowRun, servingRequested, shadowEnabled } from './support/result-cache.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -35,6 +38,27 @@ export const PARALLEL = [
   ['npm run proofs -- --current'],
 ];
 
+/** What a command is to the result cache: the steps with their own keys. The hygiene gate is seconds and stays out. */
+export function cacheKind(command) {
+  if (command === 'npm run build:packages') return 'builds';
+  if (command.includes(' --test ') && command.includes('tests/*.test.js')) return 'tests';
+  return PARALLEL.flat().includes(command) ? 'step' : undefined;
+}
+
+/** Records one finished step and prints what the store would have done with it. */
+function settle(shadow, { command, code, seconds, recordDir }) {
+  if (!shadow || !recordDir) return;
+  const kind = cacheKind(command),
+    rows = shadow.finish(command, recordDir, { kind, code, seconds });
+  if (kind !== 'step') {
+    const hits = rows.filter((row) => row.cache.wouldHit).length;
+    console.log(`  cache: ${command.slice(0, 40)}: ${hits} of ${rows.length} would hit`);
+    return;
+  }
+  const { from } = rows[0].cache;
+  if (from) console.log(`  WOULD BE CACHED from ${from.commit} ${from.date}: ${command}`);
+}
+
 const rounded = (since) => Math.round((performance.now() - since) / 100) / 10;
 
 /** Ends a command and everything it started (a shell command is a tree of processes). */
@@ -48,14 +72,25 @@ async function main() {
   const serial = process.argv.includes('--serial'),
     started = performance.now(),
     times = [];
+  const shadow = shadowEnabled() ? new ShadowRun({ root, store: new ResultStore() }) : undefined;
+  if (shadow && servingRequested())
+    console.log(
+      'MARGO_RESULT_CACHE_SERVE=1: serving is not built yet (phase 1 is shadow only); every step still runs.',
+    );
   const run = (command) =>
     new Promise((done) => {
-      const since = performance.now(),
+      const recorded = shadow && cacheKind(command) ? shadow.stepEnv(cacheKind(command) === 'tests') : undefined,
+        since = performance.now(),
         chunks = [],
-        child = spawn(command, { cwd: root, shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        child = spawn(command, {
+          cwd: root,
+          shell: true,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          ...(recorded ? { env: recorded.env } : {}),
+        });
       const finish = (code) => {
         const output = Buffer.concat(chunks).toString();
-        done({ command, code, output, seconds: rounded(since), child });
+        done({ command, code, output, seconds: rounded(since), child, recordDir: recorded?.dir });
       };
       for (const stream of [child.stdout, child.stderr])
         stream.on('data', (chunk) => {
@@ -81,6 +116,7 @@ async function main() {
     console.log(`\n=== ${command}`);
     const result = await run(command);
     times.push([command, result.seconds]);
+    settle(shadow, result);
     if (result.code !== 0) {
       console.log(`\nverify FAILED at ${command} (${rounded(started)} s)`);
       process.exitCode = 1;
@@ -99,7 +135,9 @@ async function main() {
           { code, output, seconds } = result;
         running.delete(result.child);
         times.push([command, seconds]);
+        // A step ended by another step's failure has no result to record.
         if (failed) return;
+        settle(shadow, result);
         console.log(`\n--- ${code === 0 ? 'passed' : 'FAILED'}: ${command} (${seconds} s)\n${output.trimEnd()}`);
         if (code !== 0) {
           failed = command;
@@ -113,6 +151,12 @@ async function main() {
     `\nverify ${failed ? `FAILED at ${failed}` : 'PASSED'} in ${rounded(started)} s\n${times.map(([c, s]) => `  ${String(s).padStart(6)} s  ${c}`).join('\n')}`,
   );
   if (failed) process.exitCode = 1;
+  if (shadow) {
+    const summary = shadow.report();
+    console.log(
+      `\nresult cache (shadow, nothing skipped): ${summary.wouldHit} of ${summary.steps} would hit, about ${summary.wouldSaveSeconds} s of work; ${summary.uncacheable} uncacheable; ${summary.disagreements} disagreements (test-results/cache/shadow-report.json)`,
+    );
+  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();
