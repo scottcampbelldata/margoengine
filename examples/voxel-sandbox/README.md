@@ -198,7 +198,9 @@ node examples/voxel-sandbox/server/admin.mjs status --data=plaza-data
 | `--max-shards` | 2 | Shards at most; another starts only while a core is free. |
 | `--per-identity` | 8 | Players at once from one address; raise it only for a bench. |
 | `--idle-minutes` | 10 | A player with no movement and no edit for this long is closed with code 4410, reason `idle`; 0 is no limit. |
+| `--peer` | none | Base URL of a second box's router, such as `https://box2.example`. A `/join` with no place on this box goes there, and the answer names that box as `router`. Needs `PLAZA_PEER_SECRET`. Without it the router works alone. |
 | env `PLAZA_METRICS_TOKEN` | none | Bearer token for `GET /metrics`; without one it answers 404. |
+| env `PLAZA_PEER_SECRET` | none | The secret both boxes share, for `GET /peer/status` and `GET /peer/join`, sent as a Bearer header; without one they answer 404. They never get CORS headers. |
 
 A world lasts 6 hours. Its edited chunks are saved every 10 minutes, so a crash loses at most that; a world's end closes
 each client with 1001, and the page asks `/join` again. A player idle for 10 minutes (no movement, no edit; a hidden tab still answers pings, so pings do not count) is closed with code 4410 and reason `idle`, which frees its place; a page must not rejoin on that code. Worlds get a stone square at the origin that players cannot edit
@@ -209,6 +211,8 @@ player reads "The square is protected. Build outside it." (at most once every 4 
 any other reason (too fast, out of reach, someone standing there, a frozen area) is put back by the server and the page
 says "That change did not go through." A page joined with a bare `?server=` has no floor, so it shows no seed and
 leaves the rule to the server.
+
+With a second box, the first stays the only front door. Each box runs its own router and shards; the first asks the second for its room every 5 s and marks it down after two misses, and a `/join` it cannot place itself goes to the second with a 1.5 s limit. Any failure there gives the answer the first box would give alone. `/counters` and `/metrics` then add the second box's online count, and `/metrics` gains `peer: { up, online, room, forwards, failures }`. `blocksToday`, `worldsFinished` and `/finished/index.json` stay each box's own.
 
 ## Tests
 
