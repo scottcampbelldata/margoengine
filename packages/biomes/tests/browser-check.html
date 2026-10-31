@@ -85,6 +85,7 @@ async function alpine(){
  const s=await shotEngine(position,[hx,hh-60,hz]),W=s.canvas.width,H=s.canvas.height;
  const look=await s.pixels(world),flat=c=>({color:c,detail:0}),
   mask=await s.pixels(world,{materials:{rock:flat([0.35,0,0]),snow:flat([0,0,0.35]),scree:flat([0.35,0.35,0]),meadow:flat([0,0.35,0])}});
+ const white=await s.pixels(world,{materials:{snow:flat([1,1,1])}});
  const rock=new Uint8Array(W*H),snow=new Uint8Array(W*H),high=new Int8Array((W>>1)*(H>>1)).fill(-1);
  // Ground height per 2 x 2 pixel block, marched only where the mask shows rock.
  const above=(x,y)=>{const b=(y>>1)*(W>>1)+(x>>1);if(high[b]<0){const q=hit(world,position,s.ray(x&~1,y&~1));high[b]=+(q!==null&&q[1]>2600);}return high[b];};
@@ -93,10 +94,10 @@ async function alpine(){
   if(b>r&&b>3*gg&&b>20)snow[i]=1;
   else if(r>10*gg&&r>10*b&&r>20)rock[i]=above(x,y);
  }
- let n=0,sum=0,sq=0,sn=0,ss=0;
+ let n=0,sum=0,sq=0,sn=0,ss=0,sw=0;
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
   const i=y*W+x;
-  if(snow[i]){sn++;ss+=luma(look,i*4);}
+  if(snow[i]){sn++;ss+=luma(look,i*4);sw+=luma(white,i*4);}
   if(!rock[i])continue;
   // The look's luma over the flat mask's red: the light (sun, sky, the vertex normal) cancels, the ground's own light and
   // dark (texture, relief, macro tone) stays.
@@ -104,7 +105,7 @@ async function alpine(){
  }
  const mean=sum/Math.max(1,n),errors=s.errs.splice(0);
  s.dispose();world.dispose();
- return {rock:n/(W*H),rockSd:Math.sqrt(Math.max(0,sq/Math.max(1,n)-mean*mean)),saturated:mask.filter((v,k)=>k%4===0&&v===255).length,snow:sn/(W*H),snowLuma:ss/Math.max(1,sn),errors};
+ return {rock:n/(W*H),rockSd:Math.sqrt(Math.max(0,sq/Math.max(1,n)-mean*mean)),saturated:mask.filter((v,k)=>k%4===0&&v===255).length,snow:sn/(W*H),snowLuma:ss/Math.max(1,sn),snowWhite:sw/Math.max(1,sn),errors};
 }
 // Shot 08: the temperate world with desert painted (constant, radius 260 m at [0, -300]) from 110 m over [0, 500]. On the
 // screen row through the circle's centre, the largest change between neighbouring pixels (the sum of the absolute R, G

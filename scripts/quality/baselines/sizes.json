@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3962647,
+  "total": 3963231,
   "history": [
     {
       "date": "2026-10-24",
@@ -1013,15 +1013,21 @@
     },
     {
       "date": "2026-10-31",
+      "commit": "175c6ec2d",
+      "reason": "new optional package @margoengine/pixel: pixel camera and layer compositor (row 25, J2; budget 8 KB)",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
       "commit": "4f309c27a",
       "reason": "react: Canvas maxDpr (pixel-ratio cap through the light tier) and the development hints for lowercase R3F tags and WebGL2 pointer handlers add 832 B gzip to the react entry (7,168 to 8,000 B); core and stage are unchanged",
       "grew": 1
     },
     {
       "date": "2026-10-31",
-      "commit": "175c6ec2d",
-      "reason": "new optional package @margoengine/pixel: pixel camera and layer compositor (row 25, J2; budget 8 KB)",
-      "grew": 1
+      "commit": "554adb340",
+      "reason": "ridged simplex noise in biomes/relief and biomes/toolkit: the fix for the rounded-square ridges, 32 and 40 B, r3-l8-report",
+      "grew": 2
     }
   ],
   "items": {
@@ -1043,9 +1049,9 @@
     "@margoengine/biomes/objects": 3838,
     "@margoengine/biomes/placement": 11951,
     "@margoengine/biomes/presets": 2024,
-    "@margoengine/biomes/relief": 4265,
+    "@margoengine/biomes/relief": 4553,
     "@margoengine/biomes/stats": 2755,
-    "@margoengine/biomes/toolkit": 2880,
+    "@margoengine/biomes/toolkit": 3176,
     "@margoengine/biomes/view": 9492,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,

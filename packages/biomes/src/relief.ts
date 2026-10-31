@@ -1,8 +1,8 @@
 // A seeded procedural landscape in integer millimetres (entry `@margoengine/biomes/relief`, loaded by BiomeWorld.create
 // only when a world uses it): fractal lowlands, ridged mountains under a mountain mask, an
 // optional coast or islands and river valleys. It is the default height of a BiomeWorld and the terrain of the reference world
-// R16. Every step works on integers below 2^53 with plain arithmetic, floors and integer square roots (value noise from
-// hash.ts), which every JavaScript engine computes identically, so the same options give the same heights everywhere. Our own layout; the noise is cited in hash.ts.
+// R16. Every step works on integers below 2^53 with plain arithmetic, floors and integer square roots (value and simplex noise
+// from hash.ts), which every JavaScript engine computes identically, so the same options give the same heights everywhere. Our own layout; the noise is cited in hash.ts.
 import { rangeError, typeError } from '../../shared/errors.js';
 import { clampInt, divFloor, divWide, imod, isqrt, ONE, sincos } from './fixed.js';
 import { fbm, hash3, ridged } from './hash.js';
@@ -135,7 +135,7 @@ interface Isle {
 
 /**
  * Builds a seeded procedural landscape. Lowlands are 7 octaves of value noise at 2 km, mountains 6 octaves of ridged
- * noise at 1.5 km under a mask at 6 km or half the longest side (whichever is shorter), the coast a noise-warped 1.5 km
+ * simplex noise at 1.5 km under a mask at 6 km or half the longest side (whichever is shorter), the coast a noise-warped 1.5 km
  * shelf down to `seaDepth`, and each river a meandering polyline whose valley (250 m half width) is carved down to a bed
  * that rises from 2 m at the mouth. `coast: 'island'` instead raises islands from a sea floor on every side: each an
  * ellipse warped by noise into bays and headlands, a shelf up to a 1 to 4 m beach ring, then land with a peak and ridge
@@ -366,12 +366,12 @@ export function createRelief(options: ReliefOptions = {}): Relief {
     let h: number;
     if (isle) {
       const mask = fbm(seed + 1, lattice(x - ox, maskWave), lattice(z - oz, maskWave), 3);
-      h = islandHeight(x, z, clampInt(Math.floor(((mask - 29491) * ONE) / 16384), 0, ONE));
+      h = islandHeight(x, z, smooth(clampInt(Math.floor(((mask - 29491) * ONE) / 16384), 0, ONE)));
     } else {
       const lowland = fbm(seed, lattice(x, 2_048_000), lattice(z, 2_048_000), 7),
         mask = fbm(seed + 1, lattice(x, maskWave), lattice(z, maskWave), 3),
-        // Mountains where the mask passes 0.45, full height from 0.7.
-        m = clampInt(Math.floor(((mask - 29491) * ONE) / 16384), 0, ONE),
+        // Mountains where the mask passes 0.45, full height from 0.7, eased at both ends so the foot of a range has no crease.
+        m = smooth(clampInt(Math.floor(((mask - 29491) * ONE) / 16384), 0, ONE)),
         ridge = ridged(seed + 2, lattice(x, 1_500_000), lattice(z, 1_500_000), 6);
       h =
         baseMm +

@@ -48,15 +48,19 @@ await runSuite(
     // 2,600 m: the spread of its own light and dark with the lighting divided out (see alpine() in the page); BASE
     // b88424755 (one flat grey at that distance) 0.0415 on an RTX A6000, now 0.158 (bump, macro, detail 0.6). Snow: BASE
     // had no pixel where snow outweighs rock (alpine snow and rock shared steep high ground half and half, a grey peak);
-    // the alpine preset's snow now has weight 3, 2 percent of the frame, mean luma 0.55 (0.61 even pure white: the peak's
-    // steep faces take the noon sun at a grazing angle, so 0.8 is past what the palette can reach).
+    // the alpine preset's snow now has weight 3, over 1 percent of the frame. Its brightness is read against the same
+    // pixels with pure white snow, 0.90 at the time (0.55 of 0.61): how far a steep peak's faces take the noon sun depends on
+    // which peak the seed makes, so an absolute luma would measure the peak and not the snow.
     const alpine = r.alpine;
     assert.deepEqual(alpine.errors, []);
     assert.equal(alpine.saturated, 0, 'the mask look stays under 255 red');
     assert.ok(alpine.rock > 0.005, `rock above 2,600 m in the frame: ${alpine.rock}`);
     assert.ok(alpine.rockSd > 3 * 0.0415, `rock light and dark above 3x BASE's 0.0415: ${alpine.rockSd}`);
     assert.ok(alpine.snow > 0.01, `snow outweighs rock on over 1 percent of the frame: ${alpine.snow}`);
-    assert.ok(alpine.snowLuma > 0.5, `snow mean sRGB luma above 0.5: ${alpine.snowLuma}`);
+    assert.ok(
+      alpine.snowLuma > 0.8 * alpine.snowWhite,
+      `snow mean sRGB luma ${alpine.snowLuma} over 0.8 of pure white on the same pixels ${alpine.snowWhite}`,
+    );
     // Landing F's painted edge (ecotone, default 24 m) at shot 08's camera: no neighbouring-pixel jump above 60 where
     // the row crosses the painted patch's edge (41 to 42 on the A6000); with ecotone 0 the one-cell step is back (154 to
     // 214), which the same measure must catch.

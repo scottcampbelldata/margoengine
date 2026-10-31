@@ -1,12 +1,13 @@
 // Islands and relief options (biome look plan 3, item C1): `coast: 'island'` with sea on every side, an irregular
 // outline, a beach ring and a peak; `shelf` and `valley: { width, floor, mouth }` for every coast; the beach preset and
-// the island preset world. The default and R16 digests stay in fixed.test.js (they must not move).
+// the island preset world. The default and R16 digests stay in fixed.test.js.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BiomeWorld } from '../dist/index.js';
 import { defineBiome } from '../dist/index.js';
 import { presets, presetWorlds } from '../dist/presets.js';
 import { createRelief } from '../dist/relief.js';
+import { hash3, ONE, ridged, valueNoise } from '../dist/toolkit.js';
 
 const island = (extra = {}) => createRelief({ ...presetWorlds.island.relief, ...extra });
 
@@ -213,4 +214,133 @@ test('presets.beach and the island preset world: sand by the sea, every edge of 
       }
     }
   assert.ok(beach >= 6, `beach found on ${beach} of 8 rays`);
+});
+
+// Bug found by look item L4: a CPU hill shade of the relief alone drew blocky rounded-square ridges. `ridged` took its
+// crests from value noise, whose product of fades draws level lines as rounded squares round the lattice points, so
+// gradients crowd onto the axes. Each octave turns by 14 degrees, which hides the bias from a plain histogram of the
+// fine gradient (every octave adds the same gradient energy), hence the two measures below: one octave, and the heights
+// with the fine octaves averaged away, the ones a viewer reads as the shape of a range.
+
+/** The four-fold harmonic of the gradient directions, weighted by energy: 0 when isotropic, 1 when all lie on the axes. */
+function fourFold(gradients) {
+  let c = 0,
+    s = 0,
+    e = 0;
+  for (const [gx, gz] of gradients) {
+    const m = gx * gx + gz * gz,
+      a = Math.atan2(gz, gx);
+    c += m * Math.cos(4 * a);
+    s += m * Math.sin(4 * a);
+    e += m;
+  }
+  return { cos: c / e, sin: s / e, size: Math.hypot(c, s) / e }; // float division: test statistics
+}
+
+function* gridGradients(f) {
+  const q = Math.round(0.004 * ONE);
+  for (let b = 0; b < 300; b++)
+    for (let a = 0; a < 300; a++) {
+      const x = Math.round((a * 0.041 + 0.123) * ONE),
+        z = Math.round((b * 0.041 + 0.377) * ONE);
+      yield [f(x + q, z) - f(x - q, z), f(x, z + q) - f(x, z - q)];
+    }
+}
+
+test('ridged: one octave has no axis bias, within what isotropic noise gives (value noise reads 0.5)', () => {
+  // The controls show the measure can tell: the same ridge over value noise, and random waves in every direction.
+  const overValue = (x, z) => {
+      const r = ONE - Math.abs(2 * valueNoise(7, x, z) - ONE);
+      return (r * r) / ONE; // float division: test control
+    },
+    waves = Array.from({ length: 64 }, (_, i) => {
+      const a = (hash3(1, 2, i) / 2 ** 32) * 2 * Math.PI,
+        w = (2 * Math.PI) / ONE;
+      return [Math.cos(a) * w, Math.sin(a) * w, hash3(3, 4, i) / 2 ** 16];
+    }),
+    isotropic = (x, z) => waves.reduce((sum, [kx, kz, p]) => sum + Math.sin(kx * x + kz * z + p), 0) * 1000;
+  assert.ok(fourFold(gridGradients(overValue)).size > 0.4, 'the measure sees value noise');
+  const reference = fourFold(gridGradients(isotropic)).size;
+  assert.ok(reference < 0.1, `isotropic reference ${reference}`);
+  for (const seed of [1, 7, 42]) {
+    const got = fourFold(gridGradients((x, z) => ridged(seed, x, z, 1))).size;
+    assert.ok(got < 0.1, `seed ${seed}: four-fold ${got}, isotropic ${reference}`);
+  }
+});
+
+test('relief: gradients of the heights at 200 m show no axis bias on any seed (before the fix +0.06 on each)', () => {
+  // Block means of 200 m keep the 1.5 km and 750 m ridges, the forms a viewer reads as the shape of a range.
+  const block = 200_000,
+    sub = 4,
+    n = 300;
+  let sum = 0;
+  const seeds = [1, 2, 3];
+  for (const seed of seeds) {
+    const r = createRelief({ seed, size: [65536, 65536] }),
+      means = new Float64Array(n * n);
+    for (let b = 0; b < n; b++)
+      for (let a = 0; a < n; a++) {
+        let s = 0;
+        for (let j = 0; j < sub; j++)
+          for (let i = 0; i < sub; i++)
+            s += r.height(
+              -30_000_000 + a * block + (i * block) / sub, // float division: whole millimetres
+              -30_000_000 + b * block + (j * block) / sub, // float division: whole millimetres
+            );
+        means[b * n + a] = s;
+      }
+    const gradients = [];
+    for (let b = 1; b < n - 1; b++)
+      for (let a = 1; a < n - 1; a++)
+        gradients.push([means[b * n + a + 1] - means[b * n + a - 1], means[(b + 1) * n + a] - means[(b - 1) * n + a]]);
+    sum += fourFold(gradients).cos;
+  }
+  const mean = sum / seeds.length; // float division: test statistics
+  assert.ok(mean < 0.03, `axis share ${mean} (isotropic 0)`);
+});
+
+test('ridged: continuous far from the origin too, with no lattice drift and no wrapped coordinate', () => {
+  // Guards the integer simplex lattice: an unskew constant's rounding carried by the cell index, or an octave offset near
+  // 2^31, draws long straight steps in the heights. 1,000 km at 1.5 km cells is about 2^25.4.
+  for (const [ax, az] of [
+    [0, 0],
+    [1 << 25, -(1 << 25)],
+    [-(44 << 20), 44 << 20],
+  ]) {
+    let worst = 0;
+    for (let k = 0; k < 40_000; k++) {
+      const x = ax + k * 97,
+        z = az + k * 61,
+        here = ridged(1, x, z, 6);
+      worst = Math.max(worst, Math.abs(ridged(1, x + 1, z, 6) - here), Math.abs(ridged(1, x, z + 1, 6) - here));
+    }
+    assert.ok(worst < 64, `at ${ax}, ${az}: ${worst} per unit`);
+  }
+});
+
+test('relief: the foot of a mountain range starts level, with no crease', () => {
+  // The mountain part is the height with relief less the height without. A linear mask ramp starts it at full slope, a
+  // crease round each range: the rise over the first 20 m was a quarter of that over 80 m. An eased ramp starts level.
+  const hills = createRelief({ seed: 2, relief: 0 }),
+    range = createRelief({ seed: 2, relief: 900 }),
+    part = (x, z) => range.height(x, z) - hills.height(x, z),
+    shares = [];
+  for (let z = -2_000_000; z < 2_000_000; z += 8000) {
+    let was = part(-2_000_000, z);
+    for (let x = -2_000_000 + 4000; x < 2_000_000 - 100_000; x += 4000) {
+      const now = part(x, z);
+      if (was === 0 && now > 0) {
+        // Walk back to the last metre with no mountain.
+        let foot = x;
+        while (foot > x - 4000 && part(foot - 1000, z) > 0) foot -= 1000;
+        const far = part(foot + 80_000, z);
+        if (far > 500) shares.push(part(foot + 20_000, z) / far); // float division: test ratio
+      }
+      was = now;
+    }
+  }
+  shares.sort((a, b) => a - b);
+  assert.ok(shares.length > 30, `${shares.length} feet`);
+  const median = shares[shares.length >> 1];
+  assert.ok(median < 0.12, `median rise over 20 m is ${median} of that over 80 m`);
 });

@@ -252,17 +252,20 @@ test('determinism: any tile order, tile size 128, 256 or 512, and the region sam
     const x = 4 + (k & 1),
       z = k >> 1;
     const small = await b.tile(4 + (k & 1), k >> 1);
-    for (const name of DEFAULT_LAYERS)
+    for (const name of DEFAULT_LAYERS) {
+      const per = LAYERS[name].format === 'rgba8' ? 4 : 1;
       for (let j = 0; j < 128; j += 9)
         for (let i = 0; i < 128; i += 7) {
           const gi = (x - 4) * 128 + i,
             gj = z * 128 + j;
-          assert.equal(
-            small.layer(name).data[j * 128 + i],
-            big.layer(name).data[gj * 512 + gi],
-            `${name} at ${gi},${gj}`,
-          );
+          for (let c = 0; c < per; c++)
+            assert.equal(
+              small.layer(name).data[(j * 128 + i) * per + c],
+              big.layer(name).data[(gj * 512 + gi) * per + c],
+              `${name} at ${gi},${gj}`,
+            );
         }
+    }
   }
   const t = await a.tile(2, 0);
   for (const name of DEFAULT_LAYERS) {

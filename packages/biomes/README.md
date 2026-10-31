@@ -548,7 +548,7 @@ console.log(quarter, log, grown, cos, sin, roll);
 | `degreesToAngle(deg)` | degrees to a binary angle, by plain arithmetic | exact |
 | `wendland(r)`, `fade(t)` | Wendland C2 kernel, Perlin's quintic fade, on Q16.16 | 8 units; 2 units |
 | `pcg(v)`, `hash2` to `hash5` | PCG output hash and nested multi-input hashes | exact |
-| `valueNoise(seed, x, z)`, `fbm(...)`, `ridged(...)` | smooth 2D value noise and fractal sums in Q16.16 | exact |
+| `valueNoise(seed, x, z)`, `fbm(...)`, `ridged(...)` | smooth 2D value noise, its fractal sum, and ridged simplex noise (crests in every direction) in Q16.16 | exact |
 
 Q16.16 means an i32 where 65,536 (`ONE`) is 1.0. Division follows WGSL's integer rules even for a zero divisor, where
 JavaScript's `(x / 0) | 0` would give 0, so the CPU and a GPU kernel can never disagree; the package test bans any other
