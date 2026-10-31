@@ -1,5 +1,5 @@
 {
-  "commit": "ff738e977",
+  "commit": "7c1c1aab8",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -558,8 +558,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 176295,
-        "gzip": 55452
+        "raw": 176885,
+        "gzip": 55658
       },
       "./asset": {
         "raw": 17265,
@@ -582,16 +582,16 @@
         "gzip": 17071
       },
       "./progressive": {
-        "raw": 194184,
-        "gzip": 61838
+        "raw": 194775,
+        "gzip": 62021
       },
       "./coordinates": {
         "raw": 1380,
         "gzip": 563
       },
       "./worker": {
-        "raw": 178089,
-        "gzip": 55840
+        "raw": 178681,
+        "gzip": 56041
       },
       "dist/workers/gltf.js": {
         "raw": 62073,
@@ -734,16 +734,16 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 191569,
-        "gzip": 59434
+        "raw": 191667,
+        "gzip": 59476
       },
       "./atlas": {
         "raw": 4025,
         "gzip": 1811
       },
       "./transmission": {
-        "raw": 18680,
-        "gzip": 6914
+        "raw": 18686,
+        "gzip": 6917
       },
       "./batched": {
         "raw": 115305,
@@ -1418,8 +1418,8 @@
         "gzip": 9568
       },
       "dist/workers/usdz.js": {
-        "raw": 197482,
-        "gzip": 64296
+        "raw": 198074,
+        "gzip": 64491
       }
     },
     "@margoengine/vfx": {
@@ -1729,9 +1729,9 @@
       "brotli": 44872
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 195075,
-      "gzip": 64133,
-      "brotli": 55381
+      "raw": 195667,
+      "gzip": 64318,
+      "brotli": 55541
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 20756,
