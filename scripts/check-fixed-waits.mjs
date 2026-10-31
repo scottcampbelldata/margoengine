@@ -108,10 +108,13 @@ function walk(dir, out = []) {
   return out;
 }
 
+/** Every check file in the tree, as repository paths, sorted. */
+export const checkFiles = () => walk(root).sort();
+
 /** { file: [waits] } for every check file with a fixed wait. */
 export function scan() {
   const result = {};
-  for (const file of walk(root).sort()) {
+  for (const file of checkFiles()) {
     const waits = fixedWaits(readFileSync(join(root, file), 'utf8')).filter(
       (wait) => wait.kind !== 'frames' || !file.endsWith('.test.js'),
     );

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import test from 'node:test';
 import {
   BatchTable,
@@ -159,7 +160,7 @@ test('fuzz: truncated or corrupt content never crashes or hangs; errors are Type
   ];
   let seed = 7;
   const random = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
-  const started = performance.now();
+  const cpu = cpuTimer();
   let thrown = 0;
   for (const sample of samples)
     for (let i = 0; i < 400; i++) {
@@ -178,7 +179,7 @@ test('fuzz: truncated or corrupt content never crashes or hangs; errors are Type
       }
     }
   assert.ok(thrown > 500, `most corrupt inputs are rejected (${thrown})`);
-  assert.ok(performance.now() - started < 10_000, 'fuzzing finishes quickly');
+  assert.ok(cpu() < 150, 'fuzzing finishes quickly');
 });
 
 test('implicit tiling: Morton order, availability indices, templates, subtree bitstreams and subdivision', async () => {

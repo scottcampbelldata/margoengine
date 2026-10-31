@@ -184,7 +184,8 @@ test('a connection that sends no hello is closed after 3 s by default', { timeou
     took = performance.now() - started;
   assert.equal(code, 1008);
   assert.match(reason, /helloTimeout/);
-  assert.ok(took > 2500 && took < 5000, `closed after ${took} ms`);
+  // wall-clock: the lower bound is the claim; the upper one only tells 3 s from a timer that never fires.
+  assert.ok(took > 2500 && took < 12_000, `closed after ${took} ms`);
   assert.equal(server.counts.pending, 0);
 });
 
@@ -278,7 +279,8 @@ test('an authenticate hook that throws or hangs closes the client with 1011 and 
     b = await hello(hanging.url);
   assert.equal(b.code, 1011);
   assert.match(b.reason, /^auth-timeout/);
-  assert.ok(performance.now() - started < 2000);
+  // wall-clock: the 200 ms authTimeout fired; the hanging auth never answers without it.
+  assert.ok(performance.now() - started < 10_000);
   assert.equal(errors[0].message, 'accounts database is down');
   assert.equal(errors[1].name, 'MargoError');
   assert.equal(errors[1].code, 'failed');

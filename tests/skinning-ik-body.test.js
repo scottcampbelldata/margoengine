@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../scripts/support/cpu-budget.mjs';
 import { readFileSync, mkdirSync, mkdtempSync, writeFileSync, unlinkSync, rmdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -309,13 +310,13 @@ test('stationary targets are deterministic and model placement remains correct',
       [-0.24, 1.69, 0],
     ]) {
       const first = rig.solver.solve(target),
-        start = performance.now();
+        cpu = cpuTimer();
       for (let i = 0; i < 100; i++) {
         rig.resample();
         const result = rig.solver.solve(target);
         assert.ok(distance(first.orb, result.orb) < 1e-7);
       }
-      assert.ok(performance.now() - start < 1000, 'cached stationary target must avoid repeating pole search');
+      assert.ok(cpu() < 150, 'cached stationary target must avoid repeating pole search');
       held(rig);
     }
     rig.frame.setPosition([3, -0.5, 2]).setRotation([0.25, -0.6, 0.15]).setScale([1.7, 1.7, 1.7]);

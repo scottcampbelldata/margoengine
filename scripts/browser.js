@@ -25,6 +25,7 @@ export async function listenWhenFree(start, { port, waitMs = 20 * 60_000, poll =
       return await start();
     } catch (error) {
       if (error?.code !== 'EADDRINUSE' && !/already in use/i.test(error?.message ?? '')) throw error;
+      // wall-clock: a bound on the wait for the browser port, far from normal.
       if (Date.now() - begun > waitMs)
         throw new Error(
           `port ${port} stayed in use for ${Math.round((Date.now() - begun) / 1000)} s; find what holds it (netstat -ano | findstr :${port}) and stop it`,

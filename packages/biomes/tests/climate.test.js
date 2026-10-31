@@ -3,6 +3,7 @@
 // treeline, determinism across tile order and tile size, golden digests and a time budget.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import { readFileSync } from 'node:fs';
 import {
   BiomeWorld,
@@ -367,11 +368,11 @@ test('validation, abort, update, onChange and dispose', async () => {
   assert.throws(() => w.sample(0, 0), { name: 'MargoError', code: 'disposed' });
 });
 
-test('time budget: one default 256 m tile at 1 m in under 400 ms (measured about 37 ms on the reference PC)', async () => {
+test('time budget: one default 256 m tile at 1 m in under 150 ms of CPU (measured about 30 ms on the reference PC)', async () => {
   const w = await BiomeWorld.create({ seed: 5 });
   await w.tile(0, 0);
-  const start = performance.now();
+  const cpu = cpuTimer();
   for (let i = 1; i <= 4; i++) await w.tile(i, 0);
-  const each = (performance.now() - start) / 4;
-  assert.ok(each < 400, `tile fields took ${each.toFixed(1)} ms`);
+  const each = cpu() / 4;
+  assert.ok(each < 150, `tile fields took ${each.toFixed(1)} ms of CPU`);
 });

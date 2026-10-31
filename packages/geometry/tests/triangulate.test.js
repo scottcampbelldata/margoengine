@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import { readFileSync } from 'node:fs';
 import { triangulate } from '../dist/index.js';
 
@@ -152,16 +153,16 @@ test('a 20,000-vertex ring triangulates exactly in well under a second', () => {
     data.push(r * Math.cos(a), r * Math.sin(a));
   }
   triangulate(data); // warm up
-  const start = performance.now(),
+  const cpu = cpuTimer(),
     indices = triangulate(data),
-    ms = performance.now() - start,
+    ms = cpu(),
     m = measure(data, indices);
   assert.equal(m.triangles, n - 2);
   assert.equal(m.used, n);
   assert.equal(m.notCCW, 0);
   relClose(m.area, Math.abs(ringArea(rings(data)[0])), 1e-9, 'area');
-  // About 40 ms in Node on the development laptop; the budget leaves room for slow CI machines.
-  assert.ok(ms < 1000, `took ${ms.toFixed(0)} ms`);
+  // About 16 ms of CPU on the reference PC; the budget leaves room for slower machines.
+  assert.ok(ms < 150, `took ${ms.toFixed(0)} ms of CPU`);
 });
 
 test('bad dim and hole boundaries throw RangeError before any work', () => {
@@ -296,14 +297,14 @@ test('typed arrays and plain arrays give the same triangles', () => {
   assert.deepEqual(triangulate(Float64Array.from(data), Uint32Array.from(holes)), triangulate(data, holes));
 });
 
-/** Best of three wall-clock runs, in ms. */
+/** Best of three runs, in ms of CPU. */
 function bestTime(data) {
   let best = Infinity,
     out;
   for (let k = 0; k < 3; k++) {
-    const start = performance.now();
+    const cpu = cpuTimer();
     out = triangulate(data);
-    best = Math.min(best, performance.now() - start);
+    best = Math.min(best, cpu());
   }
   return { ms: best, out };
 }

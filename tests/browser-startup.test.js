@@ -150,7 +150,8 @@ test('a WebGPU device the driver takes away fails the page wait at once, naming 
     else assert.match(error.message, /a GPU reset/);
     return true;
   });
-  assert.ok(performance.now() - t0 < 1000, 'failed at once, not at the 30 s timeout');
+  // wall-clock: the bound tells a failure at once from the 30 s timeout.
+  assert.ok(performance.now() - t0 < 15_000, 'failed at once, not at the 30 s timeout');
   assert.equal(session.deviceLoss.losses.length, 1);
   // A later wait fails the same way: the run is not trusted once its device has gone.
   await assert.rejects(

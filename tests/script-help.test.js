@@ -39,6 +39,7 @@ for (const [name, mentions] of Object.entries(scripts))
         for (const text of mentions) assert.ok(run.stdout.includes(text), `usage mentions ${text}`);
         assert.doesNotMatch(out, /build:packages|vite v|check:merge: (FULL|AFFECTED)/);
         assert.deepEqual(readdirSync(lockDir), [], 'no lock was taken');
+        // wall-clock: --help printed and left; a script that started its work runs for minutes.
         assert.ok(Date.now() - started < 20_000, 'returned quickly');
       } finally {
         rmSync(lockDir, { recursive: true, force: true });

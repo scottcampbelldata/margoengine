@@ -4,6 +4,7 @@
 // packages/inspector/test/frame.test.js ("security: ...").
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../scripts/support/cpu-budget.mjs';
 import { readdir, readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 import { assetURL, checkRedirect } from '../packages/shared/asset-url.js';
@@ -301,9 +302,10 @@ test('glTF loaders fetch only URIs inside the model directory (light and gltf-pr
 
 test('STL text with unterminated facets is rejected in linear time (ReDoS)', () => {
   const text = new TextEncoder().encode('solid x\n' + 'facet normal 0 0 1\n'.repeat(200_000) + 'endsolid x\n'),
-    started = performance.now();
+    cpu = cpuTimer();
   assert.throws(() => parseSTL(text), /not closed with "endfacet"/);
-  assert.ok(performance.now() - started < 2000, `took ${performance.now() - started} ms`);
+  const took = cpu();
+  assert.ok(took < 150, `took ${took} ms of CPU`);
 });
 
 test('USDA property metadata named __proto__ stays data', async () => {

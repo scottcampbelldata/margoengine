@@ -80,6 +80,7 @@ test('a GPU step that reaches the stop is ended, waits for the resume temperatur
       pollMs: 20,
       retry: noRetry,
     });
+    // wall-clock: the child runs 20 s unless the watch ends it.
     assert.ok(performance.now() - t0 < 10_000, 'the child was ended by the watch, not left to run 20 s');
     assert.equal(failed, undefined);
     assert.equal(heatStopped, undefined);

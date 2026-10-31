@@ -79,7 +79,8 @@ async function renderUntil(done, why, views) {
     engine.render(views ? { delta: 0, views } : { delta: 0 });
     await device().queue.onSubmittedWorkDone();
     if (done()) return performance.now() - t0;
-    if (performance.now() - t0 > 20000) throw new Error(why());
+    // wall-clock: polling bound, the page is expected to be ready long before.
+      if (performance.now() - t0 > 20000) throw new Error(why());
     await new Promise((resolve) => setTimeout(resolve, 1));
   }
 }

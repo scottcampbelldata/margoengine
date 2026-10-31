@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import { readFileSync } from 'node:fs';
 import {
   boxGeometry,
@@ -120,13 +121,13 @@ test('non-manifold fan: a repeated direction is ignored, the opposite one closes
 
 test('closed meshes have no boundary edges and reading uses positions and indices only', () => {
   const sphere = sphereGeometry(1, 128, 64),
-    start = performance.now(),
+    cpu = cpuTimer(),
     pairs = edgesGeometry(
       { positions: sphere.positions, normals: sphere.positions, uvs: new Float32Array(0), indices: sphere.indices },
       30,
     );
   assert.equal(pairs.length, 0, 'a smooth closed sphere has no feature edges');
-  assert.ok(performance.now() - start < 500, 'linear time on 8,385 vertices');
+  assert.ok(cpu() < 150, 'linear time on 8,385 vertices');
   // Threshold 0 returns every welded edge of a closed box once: 12 cube edges + 6 face diagonals.
   assert.equal(edgesGeometry(boxGeometry(1, 1, 1), 0).length / 2, 18);
 });

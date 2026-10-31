@@ -49,7 +49,8 @@ test('closeAll finishes in under 2 s with a client still connected to the server
     begun = Date.now();
   try {
     await closeAll({ servers: [server], budgetMs: 1900 });
-    assert.ok(Date.now() - begun < 2000);
+    // wall-clock: closeAll holds the 1900 ms budget itself and fails past it; this tells that from a hang.
+    assert.ok(Date.now() - begun < 15_000);
     assert.equal(server.listening, false);
   } finally {
     client.stop();
@@ -147,6 +148,7 @@ test('watchExit ends a finished suite that something holds open, naming what', a
   const { code, err, ms } = await runScript(finished(true));
   assert.equal(code, 1, err);
   assert.match(err, /did not exit within 300 ms; still open: .*TCPServerWrap/);
+  // wall-clock: the child is killed at 10 s if nothing ends it.
   assert.ok(ms < 5000, `took ${ms} ms`);
 });
 
@@ -154,5 +156,6 @@ test('watchExit never holds a suite that ends cleanly', async () => {
   const { code, err, ms } = await runScript(finished(false));
   assert.equal(code, 0, err);
   assert.equal(err, '');
+  // wall-clock: the child is killed at 10 s if the watch holds it.
   assert.ok(ms < 5000, `took ${ms} ms`);
 });

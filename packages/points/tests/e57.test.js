@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import test from 'node:test';
 import { crc32c, parseE57, parseXML, readE57Header, writeE57 } from '../dist/e57.js';
 
@@ -90,7 +91,7 @@ test('E57 integrity: a flipped byte fails its page checksum; truncated or corrup
   );
   let s = 21;
   const random = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
-  const started = performance.now();
+  const cpu = cpuTimer();
   for (let i = 0; i < 300; i++) {
     const bytes = i < 150 ? file.slice(0, Math.floor(random() * file.length)) : file.slice();
     if (i >= 150)
@@ -104,5 +105,5 @@ test('E57 integrity: a flipped byte fails its page checksum; truncated or corrup
       );
     }
   }
-  assert.ok(performance.now() - started < 15_000);
+  assert.ok(cpu() < 300);
 });

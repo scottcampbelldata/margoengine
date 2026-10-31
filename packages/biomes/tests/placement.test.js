@@ -6,6 +6,7 @@
 // size-density frontier inside each preset's self-thinning band. Plus the CPU time budget (G1).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import { readFileSync } from 'node:fs';
 import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { BiomeEditor } from '../dist/editor.js';
@@ -675,7 +676,7 @@ test('the editor dirty margin covers the placement reach, and an edit leaves til
   assert.notEqual(await p.digest(7, 1), near);
 });
 
-test('time budget (G1): one preset forest tile placed in under 400 ms on one thread (measured about 27 ms on the reference PC)', async () => {
+test('time budget (G1): one preset forest tile placed in under 150 ms of CPU on one thread (measured about 30 ms on the reference PC)', async () => {
   const w = await BiomeWorld.create({ size: [1024, 1024], ...presetWorldOptions('temperate') }),
     p = BiomePlacement.attach(w);
   await p.tile(0, 0);
@@ -686,11 +687,11 @@ test('time budget (G1): one preset forest tile placed in under 400 ms on one thr
   ])
     await w.tile(x, z);
   for (let x = 0; x <= 3; x++) for (let z = 0; z <= 3; z++) await w.tile(x, z);
-  const start = performance.now();
+  const cpu = cpuTimer();
   await p.tile(1, 1);
   await p.tile(2, 1);
-  const each = (performance.now() - start) / 2;
-  assert.ok(each < 400, `placement took ${each.toFixed(0)} ms per tile`);
+  const each = cpu() / 2;
+  assert.ok(each < 150, `placement took ${each.toFixed(0)} ms of CPU per tile`);
 });
 
 test('sea level: no species stands on ground below the sea, and inland objects do not move', async () => {

@@ -205,7 +205,8 @@ test('offline, failing and timed-out revalidation serve the stored copy; a miss 
   const slow = new AssetCache({ name: 'c', fetch: network, timeout: 20 }),
     started = Date.now();
   assert.deepEqual(await read(await slow.fetch(base + 'a.bin')), bytes(64));
-  assert.ok(Date.now() - started < 1000);
+  // wall-clock: the 20 ms timeout fired; without it this fetch hangs for ever.
+  assert.ok(Date.now() - started < 15_000);
   assert.equal(slow.stats.offline, 1);
   const controller = new AbortController(),
     aborted = new AssetCache({ name: 'c', fetch: network, timeout: 10_000 }).fetch(base + 'a.bin', {

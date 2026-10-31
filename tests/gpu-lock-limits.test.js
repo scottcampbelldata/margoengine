@@ -91,6 +91,7 @@ test('run: a command past --max is killed with its children, the lock is freed, 
     assert.notEqual(run.status, 0);
     assert.equal(run.status, 124, run.stderr);
     assert.match(run.stderr, /TIMEOUT after 0\.04 min: .*setTimeout/);
+    // wall-clock: the command runs 120 s unless the 2.4 s limit ends it.
     assert.ok(Date.now() - started < 30_000, 'it did not wait for the command to finish by itself');
     const [child, grandchild] = readFileSync(pidFile, 'utf8').split(',').map(Number);
     await waitUntil(() => !alive(child), 'the command is gone');

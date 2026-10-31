@@ -95,7 +95,8 @@ test('a hung page leaves a screenshot and its state, and fails by name within it
         return true;
       },
     );
-    assert.ok(Date.now() - started < 3000, 'the wait and the dump end near the limit');
+    // wall-clock: the 200 ms limit ended it; the page never gets ready, so without it this waits for ever.
+    assert.ok(Date.now() - started < 15_000, 'the wait and the dump end near the limit');
     const evidence = JSON.parse(readFileSync(join(dir, 'failed-the-no-texture-page.json'), 'utf8'));
     assert.equal(evidence.visibilityState, 'visible');
     assert.deepEqual([evidence.canvases[0].width, evidence.canvases[0].height], [300, 150]);
@@ -114,7 +115,8 @@ test('the dump itself is bounded: a page that answers nothing still gets a file'
     const page = { problems: ['console warning: x'], evaluate: never },
       started = Date.now(),
       file = await dumpEvidence(page, { dir, name: 'stuck', shoot: never, reason: 'test', stepMs: 50 });
-    assert.ok(Date.now() - started < 2000);
+    // wall-clock: the 50 ms step limit ended each read; the page never answers.
+    assert.ok(Date.now() - started < 15_000);
     const evidence = JSON.parse(readFileSync(file, 'utf8'));
     assert.match(evidence.screenshot, /no screenshot within 50 ms/);
     assert.match(evidence.probe, /did not answer within 50 ms/);

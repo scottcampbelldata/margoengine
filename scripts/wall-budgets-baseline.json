@@ -1,0 +1,8 @@
+{
+  "about": "Wall-clock budgets in checks left when scripts/check-wall-budgets.mjs began (2026-10-31), per file. Counts only go down: use cpuTimer() from scripts/support/cpu-budget.mjs, move the budget to a bench, or for a bound on a wait keep it near the hang and mark it // wall-clock: <reason>.",
+  "files": {
+    "examples/voxel-sandbox/test/finds.test.js": 1,
+    "examples/voxel-sandbox/test/plaza-router.test.js": 2,
+    "tests/core-startup-watchdog.test.js": 1
+  }
+}

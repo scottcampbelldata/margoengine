@@ -3,6 +3,7 @@
 // brush modes, history, validation, and the undo time budget (G5: undo within one frame).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import { BiomeWorld } from '../dist/index.js';
 import { presets } from '../dist/presets.js';
 import { BiomeEditor } from '../dist/editor.js';
@@ -192,17 +193,18 @@ test('validation, nested strokes and an edit inside onChange', async () => {
   assert.deepEqual(editor.dirty, []);
 });
 
-test('time budget: an undo and a 50 m dab take under one 60 Hz frame (16.7 ms) of CPU before tiles are remade', async () => {
+test('time budget: an undo and a 50 m dab take under 2 ms of CPU, far inside one 60 Hz frame, before tiles are remade', async () => {
   const w = await world(),
     editor = BiomeEditor.attach(w);
   editor.paint('desert', { center: [0, 0], radius: 50 });
-  let start = performance.now();
-  for (let i = 0; i < 10; i++) editor.paint('desert', { center: [i, i], radius: 50 });
-  const dab = (performance.now() - start) / 10;
-  start = performance.now();
-  editor.undo();
-  const undo = performance.now() - start;
-  assert.ok(dab < 16.7 && undo < 16.7, `dab ${dab.toFixed(2)} ms, undo ${undo.toFixed(2)} ms`);
+  let cpu = cpuTimer();
+  // A hundred of each: Windows charges CPU time by the 15.6 ms clock tick, too coarse to read one.
+  for (let i = 0; i < 100; i++) editor.paint('desert', { center: [i, i], radius: 50 });
+  const dab = cpu() / 100;
+  cpu = cpuTimer();
+  for (let i = 0; i < 100; i++) editor.undo();
+  const undo = cpu() / 100;
+  assert.ok(dab < 2 && undo < 2, `dab ${dab.toFixed(2)} ms, undo ${undo.toFixed(2)} ms of CPU`);
 });
 
 // Biome look plan 2 item 4: a painted patch met its neighbour in a one-cell step (paint composed after the climate warp

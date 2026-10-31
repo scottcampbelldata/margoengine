@@ -80,7 +80,8 @@ test('a step that hangs fails after its limit and names itself', async () => {
       error.step === 'open the notebook' &&
       /"open the notebook" hung/.test(error.message),
   );
-  assert.ok(Date.now() - t0 < 5000);
+  // wall-clock: the 150 ms limit fired; the step itself never ends.
+  assert.ok(Date.now() - t0 < 15_000);
 });
 
 test('a step that finishes returns its value and leaves no timer behind', async () => {

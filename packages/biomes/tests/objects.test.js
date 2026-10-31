@@ -1,6 +1,7 @@
 // The objects entry without a GPU: argument checks (its drawing is proved on a real GPU by objects-check.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import { BiomeObjects } from '../dist/objects.js';
 
 test('BiomeObjects.attach checks its engine, placement, heightmap, bounds and distances', async () => {
@@ -24,12 +25,12 @@ test('detail maps have a byte budget and the device texture limit, checked befor
   // The zero-config world (4 km, 2 m texels, five detail species) fits.
   assert.ok(detailFits([-2049, -2049, 2049, 2049], 2, 5, 8192));
   // A 1,000 km world at 1 cm would ask for 10^16 bytes per species: refused with the coded error, at once.
-  const start = performance.now();
+  const cpu = cpuTimer();
   await assert.rejects(
     BiomeObjects.attach(engine, placement, { heightmap, bounds: [0, 0, 1e6, 1e6], detailResolution: 0.01 }),
     (error) => error.code === 'unsupported' && /detailBudget/.test(error.message),
   );
-  assert.ok(performance.now() - start < 100, 'no allocation before the check');
+  assert.ok(cpu() < 100, 'no allocation before the check');
   // Within the texture limit but over the default budget; a raised budget lets it through the check.
   const bounds = [0, 0, 8000, 8000];
   assert.ok(!detailFits(bounds, 1, 3, 8192));

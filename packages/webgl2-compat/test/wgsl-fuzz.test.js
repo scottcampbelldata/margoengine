@@ -5,6 +5,7 @@
 // the type they were built for. Seeded, so a failure repeats; the seed and the source are in the message.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import { checkWGSL, parseWGSL, WGSLError, wgslAlignOf, wgslSizeOf } from '../dist/wgsl.js';
 import { readCorpus } from './corpus/store.mjs';
 
@@ -42,7 +43,7 @@ function position(text, offset) {
 
 /** Checks `source`; it must pass or throw a well-formed WGSLError. Returns 'ok' or the error code. */
 function contract(source, what) {
-  const t0 = performance.now();
+  const cpu = cpuTimer();
   let outcome = 'ok';
   try {
     checkWGSL(source);
@@ -59,8 +60,8 @@ function contract(source, what) {
     );
     outcome = error.code;
   }
-  const ms = performance.now() - t0;
-  assert.ok(ms < 2000, `${what}: took ${Math.round(ms)} ms`);
+  const ms = cpu();
+  assert.ok(ms < 400, `${what}: took ${Math.round(ms)} ms of CPU`);
   return outcome;
 }
 

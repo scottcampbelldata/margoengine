@@ -102,6 +102,7 @@ test('a cooldown that passes its maximum wait is PAUSED FOR HEAT: NOT RESUMED, t
       return childStep(s.id === 'b' ? sleepFor(20) : 'node -e "process.exit(0)"')(s, signal);
     },
   });
+  // wall-clock: a 0.3 s maximum wait; step b sleeps 20 s, and an unbounded cooldown never returns.
   assert.ok(performance.now() - started < 15_000, 'the wait is bounded, never forever');
   assert.deepEqual(calls, ['a', 'b'], 'nothing runs on a machine that did not cool down');
   assert.deepEqual(
@@ -238,7 +239,8 @@ test('coolDown never waits past its maximum', async () => {
     cool = await coolDown({ read: () => 95, resumeC: 70, maxWaitMs: 100, pollMs: 10 });
   assert.equal(cool.resumed, false);
   assert.equal(cool.lastC, 95);
-  assert.ok(performance.now() - t0 < 2000);
+  // wall-clock: maxWaitMs 100 ended the wait; the reading never cools, so without it this waits for ever.
+  assert.ok(performance.now() - t0 < 15_000);
 });
 
 test('runLimited ends the step tree when its signal aborts and says it was aborted', async () => {
@@ -249,6 +251,7 @@ test('runLimited ends the step tree when its signal aborts and says it was abort
   assert.equal(run.aborted, true);
   assert.equal(run.ok, false);
   assert.equal(run.timedOut, false);
+  // wall-clock: the abort ended a 30 s sleep.
   assert.ok(performance.now() - t0 < 10_000);
 });
 

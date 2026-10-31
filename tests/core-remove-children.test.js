@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../scripts/support/cpu-budget.mjs';
 import { Engine } from '../packages/core/dist/engine.js';
 import { TransformStore } from '../packages/core/dist/kernel.js';
 
@@ -46,9 +47,9 @@ test('removing many meshes does not scan every slot per mesh', async () => {
   using engine = await create(1 << 19);
   const root = engine.createMesh(),
     meshes = Array.from({ length: 30_000 }, (_, i) => engine.createMesh(i % 2 ? root : undefined));
-  const start = performance.now();
+  const cpu = cpuTimer();
   for (const mesh of meshes) mesh.dispose();
   root.dispose();
-  const ms = performance.now() - start;
-  assert.ok(ms < 1000, `removing 30,001 meshes took ${ms.toFixed(0)} ms`);
+  const ms = cpu();
+  assert.ok(ms < 150, `removing 30,001 meshes took ${ms.toFixed(0)} ms of CPU`);
 });

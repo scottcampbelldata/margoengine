@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -1730,9 +1731,9 @@ test('security: file-supplied names never resolve or swap prototypes (gate 11b)'
     parse3MF(package3MF(modelXML({ items: '<item objectid="1"/>' }).replace('Test &amp; model', '&constructor;'))),
     /unknown entity/,
   );
-  const started = performance.now();
+  const cpu = cpuTimer();
   await parse3MF(package3MF(modelXML({ items: `<item objectid="1" ${'x'.repeat(200_000)}/>` })));
-  assert.ok(performance.now() - started < 2000, 'XML attribute scan must stay linear');
+  assert.ok(cpu() < 150, 'XML attribute scan must stay linear');
   // PLY: `property constructor w` is not a type (it made every binary truncation check NaN).
   const ply = (type) =>
     `ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nproperty ${type} w\nend_header\n0 0 0 1\n1 0 0 1\n0 1 0 1\n`;

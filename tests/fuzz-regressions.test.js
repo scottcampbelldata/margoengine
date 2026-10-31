@@ -3,6 +3,7 @@
 // quickly (a generous 10 s bound: these were hangs) and without allocating far beyond its size; valid inputs nearby still parse.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../scripts/support/cpu-budget.mjs';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { deflateSync } from 'node:zlib';
@@ -34,10 +35,11 @@ async function loaderError(run, code, maxMiB = 16) {
   );
   assert.ok(process.memoryUsage().arrayBuffers - before < maxMiB * 2 ** 20, 'allocated before validating');
 }
-const quick = async (label, run, ms = 10_000) => {
-  const start = performance.now();
+const quick = async (label, run, ms = 600) => {
+  const cpu = cpuTimer();
   await run();
-  assert.ok(performance.now() - start < ms, `${label} took ${performance.now() - start} ms`);
+  const took = cpu();
+  assert.ok(took < ms, `${label} took ${took} ms of CPU`);
 };
 
 test('PLY and OFF: a short body cannot claim millions of elements (allocation before validation)', async () => {
@@ -170,7 +172,7 @@ test('FBX ASCII: large arrays parse in linear time under the decoded budget', as
   const fbx = text(
     `; FBX 7.4.0 project file\nFBXHeaderExtension:  {\n\tFBXVersion: 7400\n}\nObjects:  {\n\tGeometry: 1, "Geometry::g", "Mesh" {\n\t\tVertices: *1 {\n\t\t\ta: ${values}0\n\t\t}\n\t}\n}\n`,
   );
-  await quick('ASCII FBX array', () => assert.rejects(convertFBX(fbx), /FBX/), 10_000);
+  await quick('ASCII FBX array', () => assert.rejects(convertFBX(fbx), /FBX/));
 });
 
 test('USDC: hostile path jump tables, deep paths and non-UTF-8 USDA are USD errors', async () => {

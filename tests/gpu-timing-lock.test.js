@@ -121,6 +121,7 @@ test('every timing test fails at once when it is run inside a shared GPU slot', 
         });
       assert.notEqual(run.status, 0, `${timing.label} ran in a shared slot`);
       assert.match(run.stderr, /needs the GPU exclusively/, timing.label);
+      // wall-clock: refused at the door; a step that ran instead takes minutes.
       assert.ok(Date.now() - begun < 30_000, `${timing.label} took ${Date.now() - begun} ms to fail`);
     }
   } finally {

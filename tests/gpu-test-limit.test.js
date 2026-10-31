@@ -30,6 +30,7 @@ test('a hanging test is killed with its child process, within the limit, and nam
       limitMs: 1500,
       label: 'fake-package test:browser',
     });
+    // wall-clock: the 1.5 s limit fired; the test itself never ends.
     assert.ok(Date.now() - t0 < 20_000, 'returned long after the limit');
     assert.equal(result.ok, false);
     assert.equal(result.timedOut, true);

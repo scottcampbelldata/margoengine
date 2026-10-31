@@ -3,6 +3,7 @@
 // uploaded, and which views bind). scripts/mat-more-gpu-check.js samples them on a real adapter.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { P3_TO_SRGB } from '../../math/dist/color.js';
 import { pbrShader } from '../../gltf-pro/src/shader.ts';
@@ -74,9 +75,9 @@ test('bulk half conversion equals toHalf per value and is fast on large images (
     assert.deepEqual(toHalfArray(values, native), expected, `native ${native}`);
     const big = new Float32Array(4_194_304).map((_, i) => (i % 9973) * 0.37 - 900);
     toHalfArray(big, native);
-    const s = performance.now();
+    const cpu = cpuTimer();
     toHalfArray(big, native);
-    const ms = performance.now() - s;
+    const ms = cpu();
     assert.ok(ms < 120, `4M values took ${ms.toFixed(0)} ms (native ${native}); the per-value callback took ~400`);
   }
 });

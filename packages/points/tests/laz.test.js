@@ -1,6 +1,7 @@
 // LAZ decoder tests. Every file here comes from tests/laz-encoder.js, a separate encoder written from the same public description. A round trip proves
 // that the decoder inverts that reading of the specification; it does not prove byte compatibility with LASzip.
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import test from 'node:test';
 import { parseLAS, readLASHeader, writeLAS } from '../dist/las.js';
 import { createLazDecoder, lazChunks, lazInfo } from '../dist/laz.js';
@@ -358,7 +359,7 @@ test('LAZ: an AbortSignal stops decoding between chunks', async () => {
 test('fuzz: corrupt and truncated LAZ only ever throws coded errors, never hangs or reads out of range', async () => {
   const random = rng(77),
     decoder = createLazDecoder(),
-    started = performance.now();
+    cpu = cpuTimer();
   let decoded = 0,
     thrown = 0;
   for (const format of [1, 3, 6, 7, 8]) {
@@ -396,7 +397,7 @@ test('fuzz: corrupt and truncated LAZ only ever throws coded errors, never hangs
     }
   }
   assert.ok(thrown > 0 && decoded > 0, `${thrown} thrown, ${decoded} decoded`);
-  assert.ok(performance.now() - started < 60_000);
+  assert.ok(cpu() < 8000);
 });
 
 test('property: random point counts, chunkings and seeds always round-trip byte for byte', async () => {

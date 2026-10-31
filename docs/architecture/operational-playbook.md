@@ -4137,6 +4137,7 @@ function restore(engine: EngineLike) {
 | Wrong adapter on a two-GPU PC | visual check found no baseline | Windows lists the display GPU first; Remote Desktop changes it | `--use-adapter-luid` for the largest GPU (`85c96a55`, bug 33), `MARGO_GPU` |
 | On-demand app blank after restore | empty canvas | nothing rendered after recovery | `redrawAfterRestore` |
 | Tier check waited a fixed number of frames | failed on slower GPUs | timing assumptions | `scripts/check-fixed-waits.mjs` gate (`tests/check-fixed-waits.test.js` in verify) and `waitForPipelines` |
+| Unit test limited one biomes tile to 400 ms of wall time | a landing stopped at 714.8 ms beside GPU jobs (about 30 ms alone) | a wall clock counts waiting for a CPU | `cpuTimer()` reads this thread's CPU time; `scripts/check-wall-budgets.mjs` gate |
 
 ---
 
@@ -4169,6 +4170,7 @@ function restore(engine: EngineLike) {
 | Quickstart | `npm run check:quickstart` | `scripts/quickstart-timing.mjs` | check:merge | the README quickstart, followed line by line in a temp folder, does not render a textured, shadowed, pickable scene |
 | Public truth | `node --test tests/public-truth.test.js` | `scripts/support/public-truth.mjs` | verify (unit tests) | licence statement or package count mismatch |
 | Fixed waits | `tests/check-fixed-waits.test.js` | `scripts/check-fixed-waits.mjs` | verify | a new fixed frame count or sleep without `// fixed-wait: <reason>` |
+| Wall-clock budgets | `tests/check-wall-budgets.test.js` | `scripts/check-wall-budgets.mjs` | verify | a new assert of elapsed wall time against a number: code speed reads `cpuTimer()` from `scripts/support/cpu-budget.mjs`, a bound on a wait says `// wall-clock: <reason>` |
 | Dropped promises | `tests/support-async-calls.test.js` | the test itself | verify | an async test or script helper is called without `await` or `return` (a dropped promise; added after a React extras test failed this way) |
 | Node versions | `node --test tests/proofs-golden.test.js tests/node-apis.test.js` | | CI node-compat | digests differ on a Node; API not on the minimum Node |
 | Kernel | `npm run test:kernel` | cargo | CI kernel job | any Rust test |

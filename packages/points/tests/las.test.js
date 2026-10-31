@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import test from 'node:test';
 import { LAS_RECORD_SIZES, decodePoints, lasCrs, parseLAS, readLASHeader, writeLAS } from '../dist/las.js';
 
@@ -98,7 +99,7 @@ test('fuzz: truncated and corrupt LAS never crashes or hangs; errors are TypeErr
   const file = writeLAS({ ...survey(64), wkt: 'GEOGCS["x"]', epsg: 4326 });
   let s = 11;
   const random = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
-  const started = performance.now();
+  const cpu = cpuTimer();
   for (let i = 0; i < 600; i++) {
     const bytes = i < 300 ? file.slice(0, Math.floor(random() * file.length)) : file.slice();
     if (i >= 300) for (let k = 0; k < 1 + (i % 8); k++) bytes[Math.floor(random() * 400)] = Math.floor(random() * 256);
@@ -112,7 +113,7 @@ test('fuzz: truncated and corrupt LAS never crashes or hangs; errors are TypeErr
       );
     }
   }
-  assert.ok(performance.now() - started < 10_000);
+  assert.ok(cpu() < 150);
 });
 
 test('decodePoints reads the records a LAZ decoder returns', () => {
