@@ -171,6 +171,19 @@ test('processAudio: web keeps files, mobile mixes to mono at 22.05 kHz, others p
   assert.match(processAudio(adpcm, '.wav', preset('mobile').audio, { ffmpeg: null }).note, /cannot read/);
 });
 
+// Whole-argument lookups: a joined command line also holds the random temp folder, whose name can contain "-ac".
+const flagValue = (args, flag) => args[args.indexOf(flag) + 1];
+
+test('argument checks look at whole arguments, not text inside a temp folder name', () => {
+  const tempName = ['-i', 'C:/tmp/margo-audio-acCdpS/in.wav', '-ar', '22050', 'C:/tmp/margo-audio-acCdpS/out.ogg'];
+  // The old assertion fails on this command line although no -ac argument is passed.
+  assert.throws(() => assert.doesNotMatch(tempName.join(' '), /-ac/));
+  assert.ok(!tempName.includes('-ac'));
+  const real = [...tempName, '-ac', '1'];
+  assert.ok(real.includes('-ac'));
+  assert.equal(flagValue(real, '-ac'), '1');
+});
+
 test('processAudio with ffmpeg: Ogg Vorbis for WAV and FLAC with the preset mono and rate, otherwise left alone', () => {
   const wav = stereo();
   const calls = [];
@@ -186,15 +199,15 @@ test('processAudio with ffmpeg: Ogg Vorbis for WAV and FLAC with the preset mono
   assert.equal(out.extension, '.ogg');
   assert.equal(out.status, 'built');
   assert.equal(out.bytes.length, 200);
-  const args = calls[0].join(' ');
-  assert.match(args, /-ac 1/);
-  assert.match(args, /-ar 22050/);
-  assert.match(args, /-c:a libvorbis/);
-  assert.match(args, /-i \S+in\.wav/);
+  const args = calls[0];
+  assert.equal(flagValue(args, '-ac'), '1');
+  assert.equal(flagValue(args, '-ar'), '22050');
+  assert.equal(flagValue(args, '-c:a'), 'libvorbis');
+  assert.match(flagValue(args, '-i'), /in\.wav$/);
 
   const web = processAudio(wav, '.wav', preset('web').audio, ok);
   assert.equal(web.extension, '.ogg');
-  assert.doesNotMatch(calls[1].join(' '), /-ac/);
+  assert.ok(!calls[1].includes('-ac'), 'the web preset keeps the channel count');
 
   // Already a web format: not touched.
   const mp3 = Uint8Array.from([1, 2, 3, 4]);
