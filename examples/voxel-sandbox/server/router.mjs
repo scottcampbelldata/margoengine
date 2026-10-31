@@ -6,7 +6,7 @@
 //   POST /report              a griefing report, { shard, x, z }
 // It listens on 127.0.0.1 only, behind nginx. `admin.mjs` talks to it over a local socket nginx cannot reach.
 //   node examples/voxel-sandbox/server/router.mjs --data=DIR [--port=8790] [--shard-port=8800] [--proxied]
-//     [--origins=a,b or *] [--public-url=wss://host/s/{i}] [--capacity=200] [--max-shards=2] [--per-identity=8]
+//     [--origins=a,b or * (default https://margoengine.com)] [--public-url=wss://host/s/{i}] [--capacity=200] [--max-shards=2] [--per-identity=8]
 // Run `npm run build:packages` first: the shards import the built packages.
 import { fork } from 'node:child_process';
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -36,11 +36,14 @@ const SHARD_FILE = fileURLToPath(new URL('./shard.mjs', import.meta.url)),
   FINISHED_KEPT = 64,
   ID = /^s\d+-[0-9a-z]+$/;
 
+/** The page that talks to the router in production: the only origin allowed unless --origins says otherwise. */
+export const PRODUCTION_ORIGIN = 'https://margoengine.com';
+
 export const ROUTER_DEFAULTS = Object.freeze({
   port: 0,
   shardPort: 0, // 0: any free port. Fixed in production: nginx maps /s/{i} to shardPort + i.
   proxied: false,
-  origins: ['http://127.0.0.1:5173', 'http://localhost:5173'],
+  origins: [PRODUCTION_ORIGIN],
   publicUrl: undefined, // wss://host/s/{i}; default the shard's own ws://127.0.0.1:port
   capacity: 200,
   maxShards: 2,
@@ -583,7 +586,10 @@ export class PlazaRouter {
     return true;
   }
 
+  // CORS for the page's calls (/join, /report, /counters, /finished): only the allowed origins, or any with `*`. Never
+  // for /metrics, which is for the operator's token and not for pages.
   #cors(req) {
+    if (new URL(req.url, 'http://plaza.invalid').pathname === '/metrics') return {};
     const origin = req.headers.origin;
     if (this.#o.origins === '*') return { 'Access-Control-Allow-Origin': '*' };
     return origin !== undefined && this.#o.origins.includes(origin)

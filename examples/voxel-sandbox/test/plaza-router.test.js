@@ -10,7 +10,7 @@ import test from 'node:test';
 import { VoxelWorld } from '@margoengine/voxel';
 import { VoxelNetClient } from '@margoengine/voxel-net';
 import { adminRequest, commandFrom, timeOfDay } from '../server/admin.mjs';
-import { fromArguments, PlazaRouter, pickShard } from '../server/router.mjs';
+import { fromArguments, PlazaRouter, PRODUCTION_ORIGIN, pickShard, ROUTER_DEFAULTS } from '../server/router.mjs';
 import { defineBlocks } from '../src/blocks.ts';
 
 const { blocks } = defineBlocks(),
@@ -134,6 +134,51 @@ test('counters have their shape; /join says where; /metrics wants the token', TI
   assert.equal((await plaza.get('/nothing')).status, 404);
   assert.deepEqual(await (await plaza.get('/finished/index.json')).json(), []);
   assert.equal(plaza.router.address.address, '127.0.0.1');
+});
+
+test('CORS: the production origin by default, allowed origins only, never on /metrics', TIMEOUT, async (t) => {
+  assert.deepEqual(ROUTER_DEFAULTS.origins, ['https://margoengine.com']);
+  assert.deepEqual(fromArguments(['--data=d']).origins, [PRODUCTION_ORIGIN]);
+  const plaza = await startRouter(t, { origins: [PRODUCTION_ORIGIN] }),
+    answer = await joinAnswer(plaza),
+    allow = (res) => res.headers.get('access-control-allow-origin'),
+    other = 'https://elsewhere.test';
+  for (const path of ['/join', '/counters', '/finished/index.json']) {
+    const ok = await plaza.get(path, { headers: { Origin: PRODUCTION_ORIGIN } });
+    assert.equal(allow(ok), PRODUCTION_ORIGIN, path);
+    assert.equal(ok.headers.get('vary'), 'Origin', path);
+    assert.equal(allow(await plaza.get(path, { headers: { Origin: other } })), null, `${path} from another origin`);
+    assert.equal(allow(await plaza.get(path)), null, `${path} with no origin`);
+  }
+  // The preflight says the same.
+  assert.equal(
+    allow(await plaza.get('/report', { method: 'OPTIONS', headers: { Origin: PRODUCTION_ORIGIN } })),
+    PRODUCTION_ORIGIN,
+  );
+  assert.equal(allow(await plaza.get('/report', { method: 'OPTIONS', headers: { Origin: other } })), null);
+
+  // POST /report arrives as text/plain from the page (no preflight): the origin is checked and the body limit holds.
+  const report = (origin, body) =>
+    plaza.get('/report', { method: 'POST', headers: { 'Content-Type': 'text/plain', Origin: origin }, body });
+  const refused = await report(other, JSON.stringify({ shard: answer.shard, x: 0, z: 40 }));
+  assert.equal(refused.status, 403);
+  assert.equal(allow(refused), null);
+  const fromPage = await report(PRODUCTION_ORIGIN, JSON.stringify({ shard: answer.shard, x: 0, z: 40 }));
+  assert.equal(allow(fromPage), PRODUCTION_ORIGIN, 'the page can read the answer');
+  assert.equal(fromPage.status, 403, 'not in this world, but answered');
+  const big = await report(PRODUCTION_ORIGIN, 'x'.repeat(257));
+  assert.equal(big.status, 413);
+  assert.equal(allow(big), PRODUCTION_ORIGIN);
+
+  // The metrics are for the token alone, whoever asks.
+  const bearer = { Authorization: 'Bearer test-metrics-token' };
+  for (const headers of [{ ...bearer, Origin: PRODUCTION_ORIGIN }, { Origin: PRODUCTION_ORIGIN }, bearer]) {
+    const res = await plaza.get('/metrics', { headers });
+    assert.equal(allow(res), null, 'no CORS header on /metrics');
+  }
+  assert.equal(allow(await plaza.get('/metrics', { method: 'OPTIONS', headers: { Origin: PRODUCTION_ORIGIN } })), null);
+  const wild = await startRouter(t, { origins: '*' });
+  assert.equal(allow(await wild.get('/metrics', { headers: { ...bearer, Origin: other } })), null, 'not even with *');
 });
 
 test('/metrics is off without a token', TIMEOUT, async (t) => {

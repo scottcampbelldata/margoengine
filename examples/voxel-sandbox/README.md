@@ -191,7 +191,7 @@ node examples/voxel-sandbox/server/admin.mjs status --data=plaza-data
 | `--port` | 8790 | The router's port. |
 | `--shard-port` | 8800 | Shard `i` listens on this plus `i`. |
 | `--proxied` | off | Take the client's address from `X-Real-IP`; without it, from the socket. |
-| `--origins` | the dev server | Pages that may connect, comma separated, or `*`. |
+| `--origins` | `https://margoengine.com` | Pages that may call `/join`, `/report` and `/counters` and connect to a shard, comma separated, or `*`. `/metrics` never gets CORS headers. |
 | `--public-url` | the shard's own `ws://` | What `/join` answers, with `{i}` for the shard, such as `wss://example.com/s/{i}`. |
 | `--capacity` | 200 | Players per shard. |
 | `--max-shards` | 2 | Shards at most; another starts only while a core is free. |
