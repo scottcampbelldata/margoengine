@@ -73,6 +73,34 @@ export const displacementGroup = (device, layout, displacement) =>
       })
     : undefined;
 
+/**
+ * A caster depth shader (80-byte PBR vertices, the fragment reading its alpha map at `i.uv`) whose cut-out also
+ * multiplies by a material's opacity map (materials `alphaMap`, green channel, its own UV rows 0 and 1 of the feature
+ * uniform): the uniform, view and sampler at bindings 4-6 of `group`. Apply it after `instancedDepth`.
+ */
+export function opacityDepth(code, group) {
+  const out = code
+    .replace(/struct (\w*Out) \{/, 'struct $1 {@location(3) margoUV:vec4f,')
+    .replace('o.uv=select(', 'o.margoUV=i.uv;o.uv=select(')
+    .replace('o.uv=o.uv*i.uvt.xy+i.uvt.zw;', '$&o.margoUV=o.margoUV*i.uvt.xyxy+i.uvt.zwzw;')
+    .replace(/textureSampleLevel\(\w+,\w+,i\.uv,0\)\.a\*/, '$&margoOpacityAt(i.margoUV)*');
+  if (!out.includes('o.margoUV=i.uv;') || !out.includes('margoOpacityAt(i.margoUV)*'))
+    throw new TypeError('Opacity-mapped shadow casters need 80-byte vertices; draw them with a PBR depth shader');
+  return `struct MargoOpacity {values:vec4f,uvt:array<vec4f,8>}
+@group(${group}) @binding(4) var<uniform> margoOpacity:MargoOpacity;
+@group(${group}) @binding(5) var margoOpacityMap:texture_2d<f32>;
+@group(${group}) @binding(6) var margoOpacitySampler:sampler;
+fn margoOpacityAt(uv:vec4f)->f32 {let a=margoOpacity.uvt[0]; let p=vec3f(select(uv.xy,uv.zw,a.w>0.5),1); return textureSampleLevel(margoOpacityMap,margoOpacitySampler,vec2f(dot(a.xyz,p),dot(margoOpacity.uvt[1].xyz,p)),0.0).g;}
+${out}`;
+}
+
+/** The bind group entries of a caster's `opacity` (see `opacityDepth`). */
+export const opacityEntries = (opacity) => [
+  { binding: 4, resource: { buffer: opacity.buffer } },
+  { binding: 5, resource: opacity.view },
+  { binding: 6, resource: opacity.sampler },
+];
+
 /** A cleared depth-only pass descriptor; set `depthStencilAttachment.view` before each use. */
 export const depthPassDescriptor = () => ({
   colorAttachments: [],
@@ -110,4 +138,5 @@ export const staleCaster = (record, p, pipeline, displacement) =>
   record.pipeline !== pipeline ||
   record.alpha !== p.alphaTexture ||
   record.sampler !== p.alphaSampler ||
-  record.displacement !== displacement;
+  record.displacement !== displacement ||
+  record.opacity !== p.opacity;

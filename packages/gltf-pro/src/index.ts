@@ -930,6 +930,18 @@ export interface PBRMaterial extends GLTFMaterial {
    * to clip too: a uniform of up to 6 world planes in the scene `section` binding's layout (plane count in settings.x).
    */
   clip?: GPUBufferBinding;
+  /**
+   * The cut-out a material draws from its own maps (`@margoengine/materials` map and alphaMap with alphaTest), for shadow
+   * casters to cut alike in place of `maps[0]`: the map's view and sampler, its UV set and affine rows, and an opacity map
+   * if any (the materials feature uniform, its view and sampler). Absent for anything uncut, which draws as ever.
+   */
+  castMask?: {
+    readonly view: GPUTextureView;
+    readonly sampler: GPUSampler;
+    readonly texCoord: 0 | 1;
+    readonly transform: Float32Array;
+    readonly opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  };
   /** Use the retained UV-transform frame layout for constructed optional materials. */
   extendedFrame?: boolean;
 }
@@ -1086,6 +1098,7 @@ interface ShadowCasterRecord {
   alphaTransform?: Float32Array;
   instances?: PBRInstances;
   displacement?: PBRMaterial['displacement'];
+  opacity?: NonNullable<PBRMaterial['castMask']>['opacity'];
   clip?: GPUBufferBinding;
   dynamic: boolean;
 }
@@ -1158,13 +1171,18 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   if (wireframe) value.topology = 'line-list';
   else delete value.topology;
   value.stride = 80;
-  value.alphaTexture = r.views[0];
-  value.alphaSampler = r.samplers[0];
+  const mask = m.castMask;
+  value.alphaTexture = mask ? mask.view : r.views[0];
+  value.alphaSampler = mask ? mask.sampler : r.samplers[0];
   value.alpha = m.base[3];
   value.cutoff = m.settings[0] === 1 ? m.settings[1] : 0;
-  value.texCoord = m.maps[0] ? textureCoordinates(m.maps[0]).texCoord : 0;
-  if (m.maps[0]?.extensions?.KHR_texture_transform) value.alphaTransform = coordinates?.transform;
+  value.texCoord = mask ? mask.texCoord : m.maps[0] ? textureCoordinates(m.maps[0]).texCoord : 0;
+  if (mask) value.alphaTransform = mask.transform;
+  else if (m.maps[0]?.extensions?.KHR_texture_transform) value.alphaTransform = coordinates?.transform;
   else delete value.alphaTransform;
+  const opacity = mask?.opacity;
+  if (opacity) value.opacity = opacity;
+  else delete value.opacity;
   value.instances = p.instances;
   const displacement = m.displacement,
     clip = m.clip;
@@ -1178,6 +1196,7 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
     !r.batch &&
     (!!r.edited ||
       !!displacement ||
+      !!opacity ||
       !!clip ||
       p.definition.attributes?.JOINTS_0 !== undefined ||
       !!p.definition.targets?.length ||

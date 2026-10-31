@@ -32,6 +32,8 @@ import {
   depthPassDescriptor,
   displacementGroup,
   drawCaster,
+  opacityDepth,
+  opacityEntries,
   staleCaster,
 } from '../../shared/caster.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
@@ -154,6 +156,11 @@ export interface ShadowPrimitive {
   clip?: GPUBufferBinding;
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices): bound at group 1. */
   displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /**
+   * Opacity map of the cut-out (materials `alphaMap`, 80-byte vertices): its green channel, through UV rows 0 and 1 of
+   * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Such a caster redraws every frame.
+   */
+  opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** Skinned, morphed, instanced, or deformed casters redraw every frame. Unset casters are cached while they stay put. */
   dynamic?: boolean;
 }
@@ -206,6 +213,7 @@ interface Draw {
   section?: GPUBuffer;
   displacement?: ShadowPrimitive['displacement'];
   displaced?: GPUBindGroup;
+  opacity?: ShadowPrimitive['opacity'];
 }
 /** Core-mesh casters sharing one geometry, drawn as one instanced draw per cascade (see Shadows.batchable). */
 interface Batch {
@@ -1211,6 +1219,7 @@ export class Shadows implements EnginePlugin {
       !p.instances &&
       !p.displacement &&
       !p.clip &&
+      !p.opacity &&
       !p.alphaTexture &&
       p.alphaTransform === undefined &&
       p.topology !== 'line-list' &&
@@ -1299,6 +1308,8 @@ export class Shadows implements EnginePlugin {
         p.stride !== 80)
     )
       throw new TypeError('Shadow alpha transform requires finite affine rows and PBR vertices');
+    const opacity = p.opacity;
+    if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped shadow casters need 80-byte vertices');
     const lines = p.topology === 'line-list',
       key =
         p.stride +
@@ -1307,12 +1318,14 @@ export class Shadows implements EnginePlugin {
         (lines ? 4 : 0) +
         (section ? 8 : 0) +
         (displacement ? 16 : 0) +
-        (material ? 32 : 0);
+        (material ? 32 : 0) +
+        (opacity ? 64 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
       if (displacement) code = displacedDepth(code, 1);
       if (inst) code = instancedDepth(code);
+      if (opacity) code = opacityDepth(code, 0);
       if (section) {
         code = code
           .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
@@ -1350,6 +1363,7 @@ export class Shadows implements EnginePlugin {
                 { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
                 { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
                 ...(section ? [{ binding: 3, resource: section }] : []),
+                ...(opacity ? opacityEntries(opacity) : []),
               ],
             }),
           );
@@ -1369,6 +1383,7 @@ export class Shadows implements EnginePlugin {
         sampler: p.alphaSampler,
         section: section?.buffer,
         displacement,
+        opacity,
         displaced: displacementGroup(this.device!, () => made.getBindGroupLayout(1), displacement),
       };
       records.set(identity, record);

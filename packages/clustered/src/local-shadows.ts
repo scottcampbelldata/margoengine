@@ -12,6 +12,8 @@ import {
   nodeRecords,
   depthPassDescriptor,
   displacementGroup,
+  opacityDepth,
+  opacityEntries,
   drawCaster,
   staleCaster,
 } from '../../shared/caster.js';
@@ -93,6 +95,11 @@ export interface LocalShadowPrimitive {
   instances?: { readonly count: number; upload(device: GPUDevice): GPUBuffer };
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices), bound at group 1. */
   displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /**
+   * Opacity map of the cut-out (materials `alphaMap`, 80-byte vertices): its green channel, through UV rows 0 and 1 of
+   * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Requires 80-byte vertices.
+   */
+  opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
 }
 /**
  * A caster `Clustered.addShadowCaster` takes besides a core mesh: an object with `shadowPrimitives` (gltf-pro models,
@@ -130,6 +137,7 @@ interface Draw {
   sampler?: GPUSampler;
   epoch: number;
   displacement?: LocalShadowPrimitive['displacement'];
+  opacity?: LocalShadowPrimitive['opacity'];
   displaced?: GPUBindGroup;
 }
 const emptyPrimitives: readonly LocalShadowPrimitive[] = [];
@@ -533,6 +541,8 @@ export class LocalShadowMaps {
       throw new RangeError('Unsupported local shadow vertex stride; use core (24-byte) or PBR (80-byte) vertices');
     const displacement = p.displacement;
     if (displacement && p.stride !== 80) throw new RangeError('Displaced local shadow casters need PBR vertices');
+    const opacity = p.opacity;
+    if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped local shadow casters need PBR vertices');
     if (
       transform !== undefined &&
       (!(transform instanceof Float32Array) ||
@@ -552,19 +562,19 @@ export class LocalShadowMaps {
         'Invalid local shadow primitive; set texCoord to 0 or 1 and alpha and cutoff to finite numbers',
       );
     const lines = p.topology === 'line-list',
-      key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0) + (displacement ? 8 : 0);
+      key =
+        p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0) + (displacement ? 8 : 0) + (opacity ? 16 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const depth = depthShader(p.stride === 80, !!transform),
         code = displacement ? displacedDepth(depth, 1) : depth,
-        module = this.device!.createShaderModule({
-          code: inst
-            ? instancedDepth(code).replace(
-                'localDepth.model*vec4f(',
-                'localDepth.model*mat4x4f(i.m0,i.m1,i.m2,i.m3)*vec4f(',
-              )
-            : code,
-        });
+        placed = inst
+          ? instancedDepth(code).replace(
+              'localDepth.model*vec4f(',
+              'localDepth.model*mat4x4f(i.m0,i.m1,i.m2,i.m3)*vec4f(',
+            )
+          : code,
+        module = this.device!.createShaderModule({ code: opacity ? opacityDepth(placed, 0) : placed });
       pipeline = casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);
       this.pipelines.set(key, pipeline);
     }
@@ -583,6 +593,7 @@ export class LocalShadowMaps {
         sampler: p.alphaSampler,
         epoch: this.epoch,
         displacement,
+        opacity,
         displaced: displacementGroup(this.device!, () => pipeline.getBindGroupLayout(1), displacement),
       };
       records.set(identity, record);
@@ -602,6 +613,7 @@ export class LocalShadowMaps {
               { binding: 0, resource: { buffer: uniform } },
               { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
               { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
+              ...(opacity ? opacityEntries(opacity) : []),
             ],
           }),
         };

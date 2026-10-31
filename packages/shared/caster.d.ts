@@ -19,6 +19,14 @@ export function displacementGroup(
   layout: () => GPUBindGroupLayout,
   displacement: { buffer: GPUBuffer; view: GPUTextureView; sampler: GPUSampler } | undefined,
 ): GPUBindGroup | undefined;
+/** A caster depth shader whose cut-out also multiplies by an opacity map's green channel, bound at 4-6 of `group`. */
+export function opacityDepth(code: string, group: number): string;
+/** The bind group entries of a caster's `opacity`, bindings 4-6. */
+export function opacityEntries(opacity: {
+  buffer: GPUBuffer;
+  view: GPUTextureView;
+  sampler: GPUSampler;
+}): GPUBindGroupEntry[];
 /** A cleared depth-only pass descriptor; set `depthStencilAttachment.view` before each use. */
 export function depthPassDescriptor(): GPURenderPassDescriptor & {
   depthStencilAttachment: GPURenderPassDepthStencilAttachment;
@@ -50,7 +58,7 @@ export function drawCaster(
 /** Whether a caster's cached draw `record` no longer fits primitive `p` drawn with `pipeline` and `displacement`. */
 export function staleCaster<R extends object>(
   record: R | undefined,
-  p: { vertex: GPUBuffer; alphaTexture?: unknown; alphaSampler?: unknown },
+  p: { vertex: GPUBuffer; alphaTexture?: unknown; alphaSampler?: unknown; opacity?: unknown },
   pipeline: GPURenderPipeline,
   displacement: unknown,
 ): record is undefined;

@@ -27,7 +27,7 @@
     "build": "node ../../scripts/build-optional.js materials",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/materials/test/browser-check.mjs"
+    "test:gpu": "cd ../.. && node packages/materials/test/browser-check.mjs && node packages/shadows/test/cutout-casters-browser.mjs"
   },
   "sideEffects": false,
   "exports": {

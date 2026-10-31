@@ -1,0 +1,101 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shadows: cut-out casters</title><style>body{margin:0;background:#000}canvas{width:640px;height:360px;display:block}</style></head><body><canvas width="640" height="360"></canvas>
+<script type="module">
+// A horizontal quad over a floor, the light from the side so its shadow falls clear of it. The quad's left half is solid
+// and its right half cut out, so the two halves' shadows land on known floor points. cutout-casters-browser.mjs reads them.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {PbrMaterial,Texture,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LocalShadows} from '/packages/clustered/dist/shadows.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const camera={position:[0,10,5],target:[0,0,0],fov:60};
+const engine=await Engine.create(canvas,{backend:'webgpu',camera}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.createMesh().setGeometry(box(14,0.1,14)).setPosition([0,-0.05,0]);
+const radiance=Float32Array.from(engine.lighting.radiance);
+engine.lighting.direction.set([-1,1,0].map(v=>v*Math.SQRT1_2));
+const quad=(x0=-3,x1=-1,y=2,z0=-1,z1=1)=>({positions:[x0,y,z1,x1,y,z1,x1,y,z0,x0,y,z0],normals:[0,1,0,0,1,0,0,1,0,0,1,0],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]});
+// Texels left, right; nearest, so the edge sits at u = 0.5.
+const split=(left,right,options)=>new Texture({data:new Uint8Array([...left,...right,...left,...right]),width:2,height:2},{magFilter:'nearest',minFilter:'nearest',mipmaps:false,...options});
+const white=[255,255,255];
+const casters={
+  // Base colour map, alpha cut-out: the gap this test closes.
+  map:()=>new PbrMaterial({map:split([...white,255],[...white,0]),alphaTest:0.5}),
+  // The same texture with no cut-out: the colour pass draws the whole quad, so the shadow does too.
+  opaque:()=>new PbrMaterial({map:split([...white,255],[...white,0])}),
+  // Texel alpha 0.6 and 0.2: 0.5 keeps the left half, 0.7 keeps nothing; the colour pass's own threshold.
+  threshold:()=>new PbrMaterial({map:split([...white,153],[...white,51]),alphaTest:0.5}),
+  above:()=>new PbrMaterial({map:split([...white,153],[...white,51]),alphaTest:0.7}),
+  // The opacity factor multiplies the texel: 0.6 x 1 keeps at 0.5, 0.6 x 0.5 cuts.
+  opacity:()=>new PbrMaterial({map:split([...white,255],[...white,128]),alphaTest:0.5,opacity:0.6}),
+  // The map's UV transform moves the cut-out: half a repeat swaps the solid and cut halves.
+  transform:()=>new PbrMaterial({map:split([...white,255],[...white,0],{wrapS:'repeat'}),alphaTest:0.5,uvTransform:{offset:[0.5,0]}}),
+  // alphaMap: its green channel, over an opaque base map.
+  alphaMap:()=>new PbrMaterial({map:split([...white,255],[...white,255]),alphaMap:split([0,255,0,255],[0,0,0,255]),alphaTest:0.5}),
+  // alphaMap with no base map.
+  alphaOnly:()=>new PbrMaterial({alphaMap:split([0,255,0,255],[0,0,0,255]),alphaTest:0.5}),
+};
+let plugins=[],removers=[],mesh,current;
+const clear=()=>{removers.forEach(r=>r());removers=[];plugins.forEach(p=>p.dispose());plugins=[];mesh?.dispose?.();mesh=undefined;};
+const render=async(n=3)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const spot={position:[-6,6,0],direction:[1,-1,0],range:40,innerAngle:0.5,outerAngle:0.9,intensity:400,color:[1,1,1]};
+const point={position:[-6,6,0],range:40,intensity:400,color:[1,1,1]};
+const sunOff=()=>engine.lighting.radiance.fill(0);
+// LocalShadows (clustered/shadows): point and spot layers in one map array.
+const separate=(light,add)=>{sunOff();const l=Clustered.attach(engine,{grid:[4,4,4]}),s=LocalShadows.attach(engine,{lights:l,resolution:1024});plugins.push(s,l);if(add)removers.push(l.add(add),s.add(add));l.setLights([{...light,castShadow:true}]);};
+// Clustered's integrated local shadow maps (`shadows` option, addShadowCaster).
+const integrated=(light,add)=>{sunOff();const l=Clustered.attach(engine,{grid:[4,4,4],shadows:{resolution:512,maxLights:2}});plugins.push(l);if(add)removers.push(l.add(add),l.addShadowCaster(add));l.setLights([{...light,shadow:true}]);};
+const passes={
+  directional(add){engine.lighting.radiance.set(radiance.subarray(0,3));const s=Shadows.attach(engine,{resolution:1024,bounds:{min:[-7,-1,-7],max:[7,3,7]}});plugins.push(s);if(add)removers.push(s.add(add));},
+  spot:add=>separate(spot,add),
+  point:add=>separate(point,add),
+  integratedSpot:add=>integrated(spot,add),
+  integratedPoint:add=>integrated(point,add),
+};
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],unit=v=>{const l=Math.hypot(...v);return v.map(x=>x/l);};
+window.check={
+  async show(pass,caster,instanced){
+    clear();
+    if(caster){
+      const material=current=casters[caster]();
+      if(instanced){mesh=createInstancedMesh(engine,quad(),material,1);mesh.instances.setMatrices(0,new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]));}
+      else mesh=createMesh(engine,quad(),material);
+    }
+    passes[pass](mesh);
+    await render();
+    return errors.splice(0);
+  },
+  // Live edits of the cached caster: applied, then one render.
+  async edit(name){
+    const m=current;
+    if(name==='noTest')m.alphaTest=0;
+    if(name==='test')m.alphaTest=0.5;
+    if(name==='swap'){m.map=split([...white,0],[...white,255]);}
+    await render();
+    return errors.splice(0);
+  },
+  // Canvas pixel of world point p.
+  pixel(p){
+    const e=camera.position,d=unit([camera.target[0]-e[0],camera.target[1]-e[1],camera.target[2]-e[2]]),r=unit(cross(d,[0,1,0])),u=cross(r,d),v=[p[0]-e[0],p[1]-e[1],p[2]-e[2]];
+    const depth=v[0]*d[0]+v[1]*d[1]+v[2]*d[2],t=Math.tan(camera.fov*Math.PI/360)*depth,a=canvas.width/canvas.height;
+    const x=(v[0]*r[0]+v[1]*r[1]+v[2]*r[2])/(t*a),y=(v[0]*u[0]+v[1]*u[1]+v[2]*u[2])/t;
+    return [Math.round((x+1)/2*canvas.width),Math.round((1-y)/2*canvas.height)];
+  },
+  // Frame cost on a scene of `n` casters, all redrawn every frame into the sun's four cascades.
+  async cost(kind,n,frames){
+    clear();engine.lighting.radiance.set(radiance.subarray(0,3));
+    const s=Shadows.attach(engine,{resolution:2048});plugins.push(s);
+    const material=kind==='cutout'?new PbrMaterial({map:split([...white,255],[...white,0]),alphaTest:0.5}):new PbrMaterial({map:split([...white,255],[...white,255])}),list=[];
+    const place=(i,y)=>list[i].root.setPosition([(i%20)-10,y,(i/20|0)-5]);
+    for(let i=0;i<n;i++){const m=createMesh(engine,quad(-0.4,0.4,2),material);list.push(m);place(i,0);removers.push(s.add(m));}
+    await render(5);
+    let cpu=0;const start=performance.now();
+    for(let f=0;f<frames;f++){for(let i=0;i<n;i++)place(i,(f%2)*0.01);const t=performance.now();engine.render();cpu+=performance.now()-t;await device.queue.onSubmittedWorkDone();}
+    const total=(performance.now()-start)/frames;
+    removers.forEach(r=>r());removers=[];list.forEach(m=>m.dispose());
+    return {kind,n,frames,cpuMs:+(cpu/frames).toFixed(3),frameMs:+total.toFixed(3),draws:s.stats.staticDraws+s.stats.dynamicDraws,errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

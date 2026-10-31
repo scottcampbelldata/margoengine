@@ -46,7 +46,23 @@ covering a square region, so a non-square map there just gives the two axes diff
 
 `lambda:0` gives uniform splits; `lambda:1` gives logarithmic splits. `lightSize` is the tangent of the sun's angular radius; `bias` is normalized depth and `normalBias` is world distance. `casterMargin` extends the depth bounds to include casters outside the camera slice. Shadows follow the engine's directional light.
 
-Core meshes receive shadows automatically. `shadows.add(pbrModel)` or `shadows.add(loadedMesh)` adds the owning model's lighting hook and reads current stride-80 buffers after animation compute. Registering both draws each primitive once; a dynamic registration takes precedence over a cached registration. Removing one registration preserves the remaining lighting hook. Alpha-masked PBR casters honor their base map, vertex alpha, UV set, texture transform and cutoff; blended casters are omitted. A caster primitive with `displacement` (materials meshes with a `displacementMap`) is drawn displaced along its normals, as its beauty pass is, and redraws every frame so live scale and bias edits show. No duplicate core geometry is created. `shadows.add(clipmapTerrain)` uses its GPU height sampling for depth and its lighting hook for reception. Custom sources can implement `drawShadow(ShadowContext)`.
+Core meshes receive shadows automatically. `shadows.add(pbrModel)` or `shadows.add(loadedMesh)` adds the owning model's lighting hook and reads current stride-80 buffers after animation compute. Registering both draws each primitive once; a dynamic registration takes precedence over a cached registration. Removing one registration preserves the remaining lighting hook. Alpha-masked PBR casters honor their base map, vertex alpha, UV set, texture transform and cutoff, and a materials mesh's `map` and `alphaMap` under its `alphaTest`, the threshold its colour pass uses; blended casters are omitted. Opaque casters keep their plain draw. A `triplanar` material's map follows world space, which a caster's UVs cannot, so it casts its whole surface. A map still loading casts as white; a caster added with `static: true` needs `invalidate()` once it has loaded, others redraw by themselves. A caster with an `alphaMap` redraws every frame.
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { PbrMaterial, Texture, createMesh } from 'margoengine/materials';
+import { planeGeometry } from 'margoengine/geometry';
+import { Shadows } from 'margoengine/shadows';
+
+declare const canvas: HTMLCanvasElement;
+declare const leafImage: ImageBitmap;
+const engine = await Engine.create(canvas);
+engine.createMesh().setGeometry(box(10, 0.1, 10));
+const leaf = createMesh(engine, planeGeometry(2, 2), new PbrMaterial({ map: new Texture(leafImage), alphaTest: 0.5 }));
+leaf.root.setPosition([0, 2, 0]);
+Shadows.attach(engine).add(leaf); // the shadow has the leaf's outline, not the quad's
+```
+ A caster primitive with `displacement` (materials meshes with a `displacementMap`) is drawn displaced along its normals, as its beauty pass is, and redraws every frame so live scale and bias edits show. No duplicate core geometry is created. `shadows.add(clipmapTerrain)` uses its GPU height sampling for depth and its lighting hook for reception. Custom sources can implement `drawShadow(ShadowContext)`.
 
 A custom source may also implement `prepareShadow(ShadowPrepareContext)`. Shadows calls it once per frame, before any
 cascade's depth pass opens and only on frames the source draws, with every cascade's light matrix (`matrices`, 16

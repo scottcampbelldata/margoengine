@@ -415,6 +415,19 @@ does not own. Each entry says exactly what is needed to close it.
   blend, or drawing a full-screen layer first to change the GPU's tile state, changes or adds work to hide the
   symptom.
 
+### Cut-outs on materials meshes: passes the shadow fix did not reach
+
+Found while fixing shadow cut-outs (2026-10-31). Each comes from reading the code; none has been run as a repro yet.
+
+- **Picking:** `PBRModel.pickingPrimitives` (gltf-pro) binds `r.views[0]`, the default white, so a click on a materials
+  mesh's cut-out hole still hits it. Repro: `new PbrMaterial({map, alphaTest: 0.5})`, pick through a transparent texel.
+  Fix: use `castMask` there too.
+- **Contact shadows:** `@margoengine/staging` samples `alphaTexture` at the raw UVs (no `alphaTransform`, glTF
+  `KHR_texture_transform` included) and ignores `opacity`. Repro: a cut-out with `uvTransform` or an `alphaMap`.
+- **TAA velocity:** `@margoengine/taa` ignores a caster's `opacity`, so an `alphaMap` hole writes the quad's velocity.
+- **`vertexColors: false`:** the colour pass reads vertex alpha as 1, but the caster depth shaders still multiply it in.
+  Repro: geometry with RGBA colours below `alphaTest`, `vertexColors: false`: drawn, yet casts nothing.
+
 ## Performance losses still open
 
 Measured but not fixed. Their history, sources and rerun commands are in

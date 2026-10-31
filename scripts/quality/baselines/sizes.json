@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3932451,
+  "total": 3933928,
   "history": [
     {
       "date": "2026-10-24",
@@ -894,13 +894,7 @@
     {
       "date": "2026-10-30",
       "commit": "0882df471",
-      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "f766d8ee2",
-      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
+      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
       "grew": 1
     },
     {
@@ -912,7 +906,13 @@
     {
       "date": "2026-10-30",
       "commit": "0882df471",
-      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
+      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "f766d8ee2",
+      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
       "grew": 1
     },
     {
@@ -959,15 +959,21 @@
     },
     {
       "date": "2026-10-31",
+      "commit": "a66ee4d82",
+      "reason": "light keeper P2: animator look-at gains origin (aim from an eye or lens off the bone origin), holds the last aim inside 1 mm instead of throwing, and solves with no allocation per frame (own array-only quaternion helpers, as ccd.ts; tree-shaken when unused)",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
       "commit": "3074fddf9",
       "reason": "tween: smoothDamp (exact critically damped vector filter with a speed limit and safe huge dt) adds 367 B gzip to the tween root; new entry rigging/hulls (jointHulls, 2,503 B gzip) with its quickhull import external, so rigging root and other entries are unchanged",
       "grew": 2
     },
     {
       "date": "2026-10-31",
-      "commit": "a66ee4d82",
-      "reason": "light keeper P2: animator look-at gains origin (aim from an eye or lens off the bone origin), holds the last aim inside 1 mm instead of throwing, and solves with no allocation per frame (own array-only quaternion helpers, as ccd.ts; tree-shaken when unused)",
-      "grew": 1
+      "commit": "6e1988522",
+      "reason": "shadows: map and alphaMap cut-outs of materials meshes reach the directional, spot and point shadow passes (opacity variant of the caster depth shader, shared/caster.js); opaque casters run the same draw",
+      "grew": 3
     }
   ],
   "items": {
@@ -1005,12 +1011,12 @@
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/origin": 1514,
     "@margoengine/cinematic": 2076,
-    "@margoengine/clustered": 13573,
+    "@margoengine/clustered": 13989,
     "@margoengine/clustered/area": 10461,
     "@margoengine/clustered/directional": 2563,
     "@margoengine/clustered/ies": 3953,
     "@margoengine/clustered/projector": 2874,
-    "@margoengine/clustered/shadows": 11243,
+    "@margoengine/clustered/shadows": 11774,
     "@margoengine/clustered/units": 1089,
     "@margoengine/compute": 38960,
     "@margoengine/compute/autodiff": 5865,
@@ -1248,7 +1254,7 @@
     "@margoengine/shader/noise": 4753,
     "@margoengine/shader/raw": 9906,
     "@margoengine/shader/readback": 7620,
-    "@margoengine/shadows": 14810,
+    "@margoengine/shadows": 15340,
     "@margoengine/sky": 16485,
     "@margoengine/sky/base": 7119,
     "@margoengine/sky/bruneton": 2627,

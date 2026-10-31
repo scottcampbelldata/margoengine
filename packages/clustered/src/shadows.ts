@@ -27,7 +27,7 @@ import {
 } from './light-shadow-math.js';
 import { MargoError } from '@margoengine/math/errors';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { casterBuffers, casterRuntime, displacementGroup } from '../../shared/caster.js';
+import { casterBuffers, casterRuntime, displacementGroup, opacityDepth, opacityEntries } from '../../shared/caster.js';
 import { worldRadius } from '../../shared/sphere.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
@@ -77,6 +77,11 @@ export interface LocalShadowPrimitive {
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices), bound at group 2. */
   displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /**
+   * Opacity map of the cut-out (materials `alphaMap`, 80-byte vertices): its green channel, through UV rows 0 and 1 of
+   * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Such a caster redraws every frame.
+   */
+  opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /**
    * Bounding sphere of the vertices in the node's local space: centre x, y, z and radius (core `Geometry.bounds`).
    * With it, each shadow map draws the caster only when the sphere reaches its light's frustum; without it (and for
    * instanced or displaced casters) every map draws it. Core meshes added with `add` get theirs from their geometry.
@@ -114,6 +119,7 @@ interface Draw {
   p?: LocalShadowPrimitive;
   key: string;
   displacement?: LocalShadowPrimitive['displacement'];
+  opacity?: LocalShadowPrimitive['opacity'];
   displaced?: GPUBindGroup;
   /** World bounding sphere (x, y, z, radius); a NaN radius is unknown: drawn into every map. */
   sphere: Float32Array;
@@ -350,6 +356,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private alphaSampler?: GPUSampler;
   private cameraLayout?: GPUBindGroupLayout;
   private drawLayout?: GPUBindGroupLayout;
+  private opacityLayout?: GPUBindGroupLayout;
   private displaceLayout?: GPUBindGroupLayout;
   private cameraGroup?: GPUBindGroup;
   private layerViews: GPUTextureView[] = [];
@@ -768,7 +775,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         if (p.alphaTransform) for (let k = 0; k < 8; k++) if (d.values[20 + k] !== p.alphaTransform[k]) moved = true;
         // ponytail: displaced casters redraw every frame (live scale and bias live in a GPU buffer); compare their
         // values on the CPU if many static displaced casters make that costly.
-        if (p.displacement) moved = true;
+        if (p.displacement || p.opacity) moved = true;
         if (moved) {
           casters = true;
           d.matrix.set(node.matrix);
@@ -967,7 +974,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       throw new TypeError('Local shadow alpha transform requires finite affine rows and PBR vertices');
     const identity = p.primitive ?? p.index,
       displacement = p.displacement,
-      key = `${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}${displacement ? 'd' : ''}`;
+      opacity = p.opacity,
+      key = `${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}${displacement ? 'd' : ''}${opacity ? 'o' : ''}`;
+    if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped shadow casters need 80-byte vertices');
     if (displacement && p.stride !== 80) throw new RangeError('Displaced shadow casters need 80-byte vertices');
     let records = this.draws.get(p.node);
     if (!records) this.draws.set(p.node, (records = new Map()));
@@ -979,7 +988,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       d.alpha !== p.alphaTexture ||
       d.sampler !== p.alphaSampler ||
       d.key !== key ||
-      d.displacement !== displacement
+      d.displacement !== displacement ||
+      d.opacity !== opacity
     ) {
       d?.uniform.destroy();
       const uniform = this.device!.createBuffer({
@@ -988,11 +998,12 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       });
       try {
         const group = this.device!.createBindGroup({
-          layout: this.drawLayout!,
+          layout: opacity ? this.opacityDrawLayout() : this.drawLayout!,
           entries: [
             { binding: 0, resource: { buffer: uniform } },
             { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
             { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
+            ...(opacity ? opacityEntries(opacity) : []),
           ],
         });
         d = {
@@ -1010,6 +1021,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           seen: true,
           key,
           displacement,
+          opacity,
           displaced: displacementGroup(this.device!, () => this.displacementLayout(), displacement),
           sphere: new Float32Array([0, 0, 0, Number.NaN]),
           stale: true,
@@ -1022,6 +1034,21 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       }
     }
     return d;
+  }
+  /** Group 1 of an opacity-mapped caster (shared/caster.js `opacityDepth`): the draw's bindings and the map's. */
+  private opacityDrawLayout(): GPUBindGroupLayout {
+    const V = GPUShaderStage.VERTEX,
+      F = GPUShaderStage.FRAGMENT;
+    return (this.opacityLayout ??= this.device!.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: V | F, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: F, texture: { sampleType: 'float' } },
+        { binding: 2, visibility: F, sampler: { type: 'filtering' } },
+        { binding: 4, visibility: F, buffer: { type: 'uniform' } },
+        { binding: 5, visibility: F, texture: { sampleType: 'float' } },
+        { binding: 6, visibility: F, sampler: { type: 'filtering' } },
+      ],
+    }));
   }
   /** Group 2 of a displaced caster (shared/displacement.js `displacedDepth`): its uniform, map and sampler. */
   private displacementLayout(): GPUBindGroupLayout {
@@ -1040,11 +1067,17 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     const pbr = key.startsWith('80'),
       displaced = key.includes('d'),
       plain = depth(pbr, key.includes('t')),
+      opacity = key.includes('o'),
       code = displaced ? displacedDepth(plain, 2) : plain,
-      module = this.device!.createShaderModule({ code: key.includes('i') ? instancedDepth(code) : code });
+      placed = key.includes('i') ? instancedDepth(code) : code,
+      module = this.device!.createShaderModule({ code: opacity ? opacityDepth(placed, 1) : placed });
     pipeline = this.device!.createRenderPipeline({
       layout: this.device!.createPipelineLayout({
-        bindGroupLayouts: [this.cameraLayout!, this.drawLayout!, ...(displaced ? [this.displacementLayout()] : [])],
+        bindGroupLayouts: [
+          this.cameraLayout!,
+          opacity ? this.opacityDrawLayout() : this.drawLayout!,
+          ...(displaced ? [this.displacementLayout()] : []),
+        ],
       }),
       vertex: {
         module,
@@ -1070,6 +1103,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.alphaSampler =
       this.cameraLayout =
       this.drawLayout =
+      this.opacityLayout =
       this.displaceLayout =
       this.cameraGroup =
         undefined;
