@@ -196,10 +196,11 @@ node examples/voxel-sandbox/server/admin.mjs status --data=plaza-data
 | `--capacity` | 200 | Players per shard. |
 | `--max-shards` | 2 | Shards at most; another starts only while a core is free. |
 | `--per-identity` | 8 | Players at once from one address; raise it only for a bench. |
+| `--idle-minutes` | 10 | A player with no movement and no edit for this long is closed with code 4410, reason `idle`; 0 is no limit. |
 | env `PLAZA_METRICS_TOKEN` | none | Bearer token for `GET /metrics`; without one it answers 404. |
 
 A world lasts 6 hours. Its edited chunks are saved every 10 minutes, so a crash loses at most that; a world's end closes
-each client with 1001, and the page asks `/join` again. Worlds get a stone square at the origin that players cannot edit
+each client with 1001, and the page asks `/join` again. A player idle for 10 minutes (no movement, no edit; a hidden tab still answers pings, so pings do not count) is closed with code 4410 and reason `idle`, which frees its place; a page must not rejoin on that code. Worlds get a stone square at the origin that players cannot edit
 (`src/plaza.ts`, only with `plaza=1` in the generator's URL), and names come from two word lists (`src/names.ts`).
 
 ## Tests

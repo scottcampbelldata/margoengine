@@ -5,13 +5,13 @@ import { tmpdir } from 'node:os';
 import { join as pathJoin } from 'node:path';
 import test from 'node:test';
 import { VoxelWorld } from '@margoengine/voxel';
-import { VoxelNetClient } from '@margoengine/voxel-net';
+import { Keys, VoxelNetClient } from '@margoengine/voxel-net';
 import { connectWebSocket } from '@margoengine/voxel-net/server';
 import { defineBlocks } from '../src/blocks.ts';
 import { FIRST_WORDS, isPlazaName, SECOND_WORDS } from '../src/names.ts';
 import { isPlazaProtected, plazaSpawnRing } from '../src/plaza.ts';
 import { readSnapshot } from '../server/snapshots.mjs';
-import { HOST, PlazaShard } from '../server/shard.mjs';
+import { HOST, IDLE_CLOSE_CODE, IDLE_REASON, PlazaShard } from '../server/shard.mjs';
 
 const { blocks } = defineBlocks(),
   BRICKS = blocks.id('bricks'),
@@ -371,4 +371,62 @@ test('a new world gets a seed with a dry ring', async (t) => {
   t.after(() => shard.shutdown());
   await shard.start();
   assert.ok(plazaSpawnRing(shard.world.seed, blocks.table).length >= 32);
+});
+
+test('a player with no movement and no edit is closed with 4410 idle and its place freed; movers and builders stay', async (t) => {
+  // The real clock and a short limit, in a room for three: the idle one goes, the mover and the builder do not.
+  const { shard, url } = await startShard(t, {
+      now: Date.now,
+      idleMs: 700,
+      idleCheckMs: 40,
+      capacity: 3,
+      spawn: () => [0, 30],
+    }),
+    sleeper = await joined(shard, url),
+    mover = await joined(shard, url),
+    builder = await joined(shard, url),
+    full = await join(url);
+  assert.equal((await closes(full.conn)).code, 1013, 'the room is full');
+  for (const c of [sleeper, mover, builder]) c.conn.onclose = (code, reason) => (c.ended = { code, reason });
+  let placed = 0,
+    nextEdit = 0,
+    last = performance.now();
+  // One frame of all three: the mover alternates forward and back, the builder places and breaks a block, the sleeper
+  // only sends its steady input with no keys.
+  const frame = async (live) => {
+    await wait(16);
+    const now = performance.now(),
+      dt = (now - last) / 1000;
+    last = now;
+    for (const c of live)
+      c.client.update(dt, {
+        keys: c === mover ? (Math.floor(now / 150) % 2 ? Keys.forward : Keys.back) : 0,
+        yaw: 0,
+        pitch: 0,
+      });
+    if (live.includes(builder) && now > nextEdit) {
+      nextEdit = now + 100;
+      builder.client.edit(...airNear(builder, standing(shard, builder)), placed++ % 2 ? 0 : BRICKS);
+    }
+  };
+  for (const end = performance.now() + 15_000; !sleeper.ended && performance.now() < end; )
+    await frame([sleeper, mover, builder]);
+  assert.deepEqual(sleeper.ended, { code: IDLE_CLOSE_CODE, reason: IDLE_REASON });
+  assert.equal(IDLE_CLOSE_CODE, 4410);
+  // Twice the limit more, still busy: the other two are there.
+  for (const stay = performance.now() + 1400; performance.now() < stay; ) await frame([mover, builder]);
+  assert.equal(mover.ended, undefined);
+  assert.equal(builder.ended, undefined);
+  assert.equal(shard.server.players.length, 2, 'its place is free');
+  const again = await joined(shard, url);
+  assert.ok(again.client.spawned, 'a new player takes the place');
+  for (const c of [mover, builder, again]) c.client.close();
+});
+
+test('idleMs 0 turns the limit off', async (t) => {
+  const { shard, url } = await startShard(t, { now: Date.now, idleMs: 0, idleCheckMs: 20 }),
+    a = await joined(shard, url);
+  assert.equal(shard.closeIdle(), 0);
+  assert.equal(shard.server.players.length, 1);
+  a.client.close();
 });

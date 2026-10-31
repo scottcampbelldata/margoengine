@@ -421,6 +421,8 @@ test('the command line: data folder required, proxied and limits passed on, bad 
   assert.deepEqual(options.origins, ['https://a.test', 'https://b.test']);
   assert.deepEqual(options.shard, { perIdentity: 600 });
   assert.deepEqual(fromArguments(['--data=d']).shard, {});
+  assert.deepEqual(fromArguments(['--data=d', '--idle-minutes=3']).shard, { idleMs: 180_000 });
+  assert.equal(fromArguments(['--data=d', '--idle-minutes=0']).shard.idleMs, 0);
   assert.equal(fromArguments(['--data=d']).proxied, false);
   assert.equal(fromArguments(['--data=d', '--origins=*']).origins, '*');
 });

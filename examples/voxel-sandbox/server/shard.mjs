@@ -17,6 +17,10 @@ import { listRolling, pruneRolling, rollingAtOrBefore, writeRolling, writeSnapsh
 
 export { HOST };
 
+/** The application close code of a player idle for `idleMs`, sent with the reason `IDLE_REASON`. A page must not rejoin on it. */
+export const IDLE_CLOSE_CODE = 4410;
+export const IDLE_REASON = 'idle';
+
 export const SHARD_DEFAULTS = Object.freeze({
   capacity: 200, // plan: 200 until the real network bench measures it
   spanMs: 6 * 3600_000,
@@ -26,8 +30,10 @@ export const SHARD_DEFAULTS = Object.freeze({
   maxEditedChunks: 16_384, // about 160 MB at worst; past it edits to further chunks are refused
   perIdentity: 8, // same as nginx's limit_conn
   beatMs: 1000,
+  idleMs: 10 * 60_000, // no movement and no edit for this long closes the player; 0 turns the limit off
 });
 const TICKS_KEPT = 1200; // 60 s at 20 ticks a second
+const MOVED = 0.05; // blocks; less than this between two looks is a player standing still
 
 const percentile = (sorted, p) =>
   sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] : 0;
@@ -63,6 +69,10 @@ export class PlazaShard {
   #closed = false;
   #snapshotFailures = 0;
   #ring = [];
+  // The last sign of life of each player: when it last moved or edited, and where it stood. Keyed by the server's own
+  // player object, so an entry goes with its player.
+  #activity = new WeakMap();
+  #idleClosed = 0;
 
   /**
    * @param {object} options
@@ -74,6 +84,9 @@ export class PlazaShard {
    * @param {() => number} [options.now] The clock, in ms. Default Date.now.
    * @param {(id: number) => readonly [number, number]} [options.spawn] Replaces the ring (tests).
    * @param {boolean} [options.quiet] Logs nothing (tests).
+   * @param {number} [options.idleMs] A player with no movement and no edit for this long is closed with
+   *   `IDLE_CLOSE_CODE` and reason `'idle'`, freeing its place. Heartbeats and pongs do not count. Default 10 minutes; 0 is no limit.
+   * @param {number} [options.idleCheckMs] How often idle players are looked for. Default a quarter of `idleMs`, at most 10 s.
    * @param {number} [options.seed] The world's seed instead of a random one (tests).
    */
   constructor(options) {
@@ -127,7 +140,11 @@ export class PlazaShard {
       spawn: this.#o.spawn ?? (() => this.#ringSpawn()),
       authenticate: (req) => this.#authenticate(req),
       filterName: (name) => (isPlazaName(name) ? name : randomName()),
-      allowEdit: (_player, x, y, z) => this.canEdit(x, y, z),
+      allowEdit: (player, x, y, z) => {
+        // An edit tried is a sign of life, whether or not the rule lets it land.
+        this.#touch(player);
+        return this.canEdit(x, y, z);
+      },
     });
     this.server.onError = (error) => this.#o.log(`shard ${this.#o.index}: ${error?.message ?? error}`);
     if (restored.edits.size) await this.server.importEdits(restored.edits);
@@ -141,6 +158,8 @@ export class PlazaShard {
       }),
     );
     this.#every(this.#o.beatMs, () => this.#beat());
+    if (this.#o.idleMs > 0)
+      this.#every(this.#o.idleCheckMs ?? Math.min(10_000, Math.ceil(this.#o.idleMs / 4)), () => this.closeIdle());
     this.#o.log(
       `shard ${this.#o.index}: world ${this.world.id} seed ${this.world.seed} on ${HOST}:${this.address.port}, ${restored.edits.size} edited chunks restored`,
     );
@@ -159,6 +178,48 @@ export class PlazaShard {
         if (area.until > now && Math.abs(cx - area.cx) <= 1 && Math.abs(cz - area.cz) <= 1) return false;
     }
     return true;
+  }
+
+  /**
+   * Closes every player with no movement and no edit for `idleMs`, and returns how many. Runs on a timer, on the
+   * `now` clock of the options; a first look at a player counts as its first sign of life. Movement is a change of
+   * position since the last look, because the server tells its hooks about edits and nothing else: a player holding a
+   * key against a wall, or only turning its head, counts as idle.
+   */
+  closeIdle() {
+    if (!this.server || this.#closed || !(this.#o.idleMs > 0)) return 0;
+    const now = this.#o.now();
+    let closed = 0;
+    for (const player of this.server.players) {
+      const [x, y, z] = player.character.position,
+        seen = this.#activity.get(player);
+      if (!seen) {
+        this.#activity.set(player, { at: now, x, y, z });
+        continue;
+      }
+      if ((x - seen.x) ** 2 + (y - seen.y) ** 2 + (z - seen.z) ** 2 > MOVED * MOVED) {
+        seen.at = now;
+        seen.x = x;
+        seen.y = y;
+        seen.z = z;
+      } else if (now - seen.at >= this.#o.idleMs && !seen.closed) {
+        // VoxelServer has no public way to close one player, so this uses the connection on the object it hands out.
+        // The place is freed when the socket has finished closing.
+        seen.closed = true;
+        player.conn.close(IDLE_CLOSE_CODE, IDLE_REASON);
+        this.#idleClosed++;
+        closed++;
+      }
+    }
+    return closed;
+  }
+  #touch(player) {
+    const seen = this.#activity.get(player);
+    if (seen) seen.at = this.#o.now();
+    else {
+      const [x, y, z] = player.character.position;
+      this.#activity.set(player, { at: this.#o.now(), x, y, z });
+    }
   }
 
   /** Whether a player with `identity` is in this world within `distance` blocks of column (x, z). */
@@ -337,6 +398,7 @@ export class PlazaShard {
         joins: m.joins,
         chunksGenerated: m.chunksGenerated,
         snapshotFailures: this.#snapshotFailures,
+        idleClosed: this.#idleClosed,
         rss: process.memoryUsage.rss(),
       };
     // The metrics arrays grow with every tick: this reset is what keeps them from holding six hours of ticks.
