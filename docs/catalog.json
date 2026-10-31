@@ -2410,9 +2410,7 @@
     "imports": "import { Keys } from '@margoengine/voxel-net';",
     "exports": [
       "Keys",
-      "MAX_APP_BYTES",
       "MAX_NAME_BYTES",
-      "MAX_STALE_CHUNKS",
       "PLAYER_SCHEMA",
       "PROTOCOL_VERSION",
       "RESUME_TOKEN_BYTES",
