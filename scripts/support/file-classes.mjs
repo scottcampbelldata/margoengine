@@ -34,6 +34,7 @@ export const CHECK_CODE = [
   'scripts/support/affected-gpu.mjs',
   'scripts/support/affected-packages.mjs',
   'scripts/support/file-classes.mjs',
+  'scripts/support/umbrella-change.mjs',
   'scripts/verify.mjs',
   // check-merge.mjs and nearly every GPU check (visual, views, depth, wgsl, the tarball test, the package tests)
   // import it to rerun a step after a GPU driver reset, so a change to it can change any of them.

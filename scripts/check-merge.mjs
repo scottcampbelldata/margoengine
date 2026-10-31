@@ -7,7 +7,8 @@
 //   node scripts/check-merge.mjs --plan [--files=a,b]    print the mode, the reason and the commands, run nothing
 //                               (--files pretends those files changed; --base=<ref> diffs against that ref, not origin/main)
 // Every changed file has a class (scripts/support/file-classes.mjs; tests/file-classes.test.js fails on a tracked file
-// no class places). Everything runs for core, stage, shared or the umbrella, the root package.json, a lock file or
+// no class places). Everything runs for core, stage, shared or the umbrella (not when the umbrella only gains or loses
+// `export * from` entries: umbrella-change.mjs), the root package.json, a lock file or
 // .npmrc, build configuration, the check code (this file, affected-gpu.mjs, affected-packages.mjs,
 // file-classes.mjs, verify.mjs and every file the build:packages chain reaches), a WGSL file outside a package, an
 // unplaceable file or more than MAX_AFFECTED packages. A package file, its own package.json included, runs that
@@ -34,7 +35,7 @@
 // could not resume from ends the run as "PAUSED FOR HEAT: NOT RESUMED" with exit 75 (HEAT_EXIT), never a pass, a
 // failure or a skip. The workstation profile (heat null) runs every step exactly as before.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { exitOnHelp } from './support/help.mjs';
@@ -56,6 +57,7 @@ import {
   wgslPackages,
 } from './support/affected-gpu.mjs';
 import { matrixClosure, packageScopes } from './support/affected-packages.mjs';
+import { changedUmbrellaReader, umbrellaChangeIsReexportOnly } from './support/umbrella-change.mjs';
 import { PARALLEL, SERIAL } from './verify.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -180,8 +182,8 @@ export async function planContext(dir = root) {
 
 /** The decision, the package-step scope and the planned commands for `files` (a full run when `env.MARGO_FULL` is 1). */
 export function planFiles(ctx, files, env = {}) {
-  const { workspaces, footprints, checkCode, smoke, mentions } = ctx;
-  const decision = analyse({ files, workspaces, footprints, env, checkCode, smoke, mentions });
+  const { workspaces, footprints, checkCode, smoke, mentions, umbrellaReexport } = ctx;
+  const decision = analyse({ files, workspaces, footprints, env, checkCode, smoke, mentions, umbrellaReexport });
   return planDecision(ctx, decision, files);
 }
 
@@ -228,6 +230,8 @@ async function planRun(args) {
         : changedFiles(root, args.find((a) => a.startsWith('--base='))?.slice(7));
       base = diff.base;
       files = diff.files;
+      const reader = changedUmbrellaReader(root, base ?? 'origin/main', { existsSync, readFileSync });
+      ctx.umbrellaReexport = (file) => umbrellaChangeIsReexportOnly(file, reader.read, reader.usedBy);
       decision = planFiles(ctx, files, process.env).decision;
     } catch (error) {
       decision = full(`cannot diff against origin/main (${String(error.message).split('\n')[0]})`);

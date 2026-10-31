@@ -73,7 +73,7 @@ Several agents push to `main`. Each push must leave it at least as clean as it f
   changed packages plus their dependents, not every package (their GPU tests, the visual demos and views that import
   them, the WGSL compile for their shaders). A package's own package.json counts as that package; a script runs only
   the checks that use it; a new standalone script no check imports runs none. Everything runs only for core, stage,
-  shared code (and the margoengine umbrella), the check code itself, the root package.json or the lock file (also
+  shared code (and the margoengine umbrella, unless it only adds or removes `export * from` entries: its package.json exports, the matching thin files and its README; any other umbrella source change or a dependency change stays full, and the umbrella smoke test always runs), the check code itself, the root package.json or the lock file (also
   build configuration, a WGSL file outside a package, or more than 12 affected packages). An unplaceable file gets
   added to the map (`scripts/support/file-classes.mjs`; `tests/file-classes.test.js` fails on any tracked file it
   cannot place), not a full run. Never narrow by skipping a test the change can affect. A change to the GPU package

@@ -12,7 +12,9 @@
 // 3. Everything runs for core, stage, shared or the margoengine umbrella; the root package.json, a lock file or .npmrc;
 //    build configuration; the check code itself (file-classes.mjs CHECK_CODE plus the build:packages closure); a
 //    WGSL file outside a package; an asset no check reaches or names; a file no class places; more than MAX_AFFECTED
-//    packages; MARGO_FULL=1. A change to the GPU package runner (RUNNER) runs RUNNER_SMOKE plus what it affects.
+//    packages; MARGO_FULL=1. An umbrella change that only adds or removes `export * from` entries (its package.json
+//    exports and the matching thin files; umbrella-change.mjs) is not one of these: the packages that gained the
+//    entries are the change, and the umbrella smoke test always runs. A change to the GPU package runner (RUNNER) runs RUNNER_SMOKE plus what it affects.
 // Everything here is pure (files and a package graph in, a decision out) except the readers at the bottom.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -88,14 +90,20 @@ export function analyse({
   checkCode = CHECK_CODE,
   smoke = [],
   mentions,
+  umbrellaReexport,
 }) {
   const full = (reason) => ({ mode: 'full', reason, changed: [], affected: [], hits: Object.keys(footprints) });
   if (env.MARGO_FULL === '1') return full('MARGO_FULL=1');
   const changed = new Set(),
     loose = [];
   for (const raw of files) {
-    const file = posix(raw),
-      c = classify(file, { workspaces, checkCode });
+    const file = posix(raw);
+    // An umbrella change that only adds or removes re-export entries is not a floor change (umbrella-change.mjs).
+    if (file.startsWith('packages/margoengine/') && !file.endsWith('.md') && umbrellaReexport?.(file)) {
+      loose.push({ file, cls: 'umbrella-reexport' });
+      continue;
+    }
+    const c = classify(file, { workspaces, checkCode });
     if (CLASSES[c.cls] === 'full' && c.cls !== 'asset') return full(`${c.reason} (${file})`);
     if (c.cls === 'package') changed.add(workspaceOf(workspaces, file).name);
     else loose.push({ file, cls: c.cls });
