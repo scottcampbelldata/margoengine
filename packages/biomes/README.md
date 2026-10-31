@@ -140,6 +140,9 @@ console.log(world.biomes[first].id, tile.layer('biomeWeight')!.data[0] / 255, wo
   slopes.
 - **Nothing is ever empty**: a cell outside every envelope gets the nearest one by normalised distance (ties: higher
   `priority`, then id).
+- **Weight**: `weight` (0.1 to 10, default 1) on a biome multiplies its membership of every cell before the top 4 are
+  chosen, so on a cell two biomes cover equally, a weight 3 biome stores three times the share of a weight 1 biome
+  (`priority` only breaks exact ties). A biome that is a member of a cell stays a member at any weight.
 - **Whittaker and Holdridge** (entry `/zones`): `classifier: whittaker` weights each biome by the Whittaker classes in
   its `zones` (`WHITTAKER`, our rectangles over mean temperature and rainfall from the published diagram); `holdridge`
   by Holdridge life zones (`holdridgeZone(biotemperature, rainfall)`, nearest hexagon in log biotemperature, rainfall
@@ -228,7 +231,7 @@ RangeError from `attach` that names the count.
 | `textureResolution` | 2 | metres per heightmap and weights texel, a multiple of the world resolution; raised to fit the device |
 | `radius` | 1,000 | tiles within this many metres of the camera are drawn at full detail |
 | `materials` | none | `{ key: { color: [r, g, b] (sRGB 0..1), detail?, bump?, macro? } }` over `MATERIALS`; `detail` 0..1 (default 0.25), `bump` and `macro` 0..1 (default 0, a RangeError outside) |
-| `clipmap` | cell 1 m, 64 cells, 6 rings | `cellSize`, `resolution` and `levels` of the terrain |
+| `clipmap` | cell 1 m, 64 cells, rings by world size | `cellSize`, `resolution` and `levels` of the terrain. With no `levels` the view takes the fewest rings (`clipmapLevels`, 1 to 12) that reach the far corner of the world and `radius`: 9 for a 4 km world, 12 for 65 km. A `levels` that reaches less than `radius` is a RangeError |
 | `lookahead` | 3 | seconds ahead along the camera's velocity that tiles are fetched early |
 | `budget` | 0.25 | milliseconds per frame the page spends copying arrived tiles in (one step always goes in) |
 | `detailBudget` | 128 MiB | most bytes of detail density maps (one byte per texel per detail species, on this thread and the GPU); detail maps coarsen by halves to fit it and the device's largest texture |

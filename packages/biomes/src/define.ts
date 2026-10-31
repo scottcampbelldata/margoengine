@@ -150,6 +150,13 @@ export interface BiomeDefinition {
   readonly tint?: ColorVariation;
   /** Breaks equal weights (higher wins). Default 0. */
   readonly priority?: number;
+  /**
+   * How strongly this biome claims a cell it shares with others, 0.1 to 10. Default 1. A cell's membership in this
+   * biome (envelope or zone) is multiplied by it before the top 4 are chosen and their shares computed, so a biome
+   * with weight 3 stores three times the share of a weight 1 biome on a cell both cover equally. `priority` still
+   * only breaks ties.
+   */
+  readonly weight?: number;
   /** Whittaker biome classes or Holdridge life zones this biome stands for (the `'whittaker'` and `'holdridge'`
    * classifiers weight biomes by them; see `WHITTAKER` and `holdridgeZone`). */
   readonly zones?: readonly string[];
@@ -318,6 +325,8 @@ export function defineBiome(definition: BiomeDefinition): BiomeDefinition {
     throw typeError('Biome details must be an array of detail rules', 'biomes');
   if (d.priority !== undefined && !Number.isFinite(d.priority))
     throw rangeError('A biome priority must be a finite number', 'biomes');
+  if (d.weight !== undefined && !(Number.isFinite(d.weight) && d.weight >= 0.1 && d.weight <= 10))
+    throw rangeError('A biome weight is a number from 0.1 to 10 (1 leaves the classification as it is)', 'biomes');
   if (d.zones !== undefined && (!Array.isArray(d.zones) || !d.zones.every((z) => typeof z === 'string')))
     throw typeError('Biome zones must be an array of class or life-zone names', 'biomes');
   return deepFreeze(d);

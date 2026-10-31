@@ -41,6 +41,8 @@ export interface Classifier {
   readonly ids: readonly string[];
   /** Tie order: higher priority first, then id; rank[b] is b's place in it. */
   readonly rank: Int32Array;
+  /** Per biome, its `weight` in Q16 (ONE = 1.0), applied to the cell memberships. */
+  readonly claim: Int32Array;
   /** Layers the classifier reads, in slot order. */
   readonly inputs: readonly string[];
   /** Per input slot, how the ecotone warp moves it (see `classify`). */
@@ -111,6 +113,7 @@ export function classifier(
     kind: kind === 'envelopes' ? kind : kind.kind,
     ids,
     rank,
+    claim: Int32Array.from(biomes, (b) => Math.floor((b.weight ?? 1) * ONE + 0.5)),
     inputs,
     modes: Int32Array.from(inputs, (name) =>
       name.startsWith('mask/')
@@ -360,7 +363,10 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     for (let j = 1; j <= inner; j++)
       for (let i = 1, k = j * n + 1; i <= inner; i++, k++) box[base + k] = rowSum[k - n] + rowSum[k] + rowSum[k + n];
   }
-  const w = new Int32Array(count),
+  // Biome weights scale the memberships; with every weight at 1.0 the memberships are used as they are.
+  const claim = c.claim,
+    claimed = claim.some((q) => q !== ONE),
+    w = new Int32Array(count),
     pick = new Int32Array(count),
     blocked = new Uint8Array(count),
     share = new Int32Array(4),
@@ -384,8 +390,10 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
         some = 0;
       for (let b = 0; b < count; b++) {
         const v = Math.floor(box[b * cells + k] / 9);
-        w[b] = v;
-        total += v;
+        // A member biome keeps at least 1 after scaling, so a weight below 1 never removes a biome from a cell.
+        const scaled = claimed && v ? Math.max(1, divFloor(v * claim[b], ONE)) : v;
+        w[b] = scaled;
+        total += scaled;
         if (v) {
           some++;
           only = b;

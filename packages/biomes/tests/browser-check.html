@@ -128,6 +128,20 @@ async function edge(ecotone){
  const errors=s.errs.splice(0);s.dispose();world.dispose();
  return {row,first,last,jump,errors};
 }
+// Finding 1: a coast-west world seen from its south-west corner at radius 1,600 with the default clipmap. The terrain's
+// outer ring used to stop at about 1 km (6 rings of 64 cells), so land past it was not drawn while the sea and the sky
+// were: the frame must now equal the one with 12 rings (the most the terrain takes, 63 km of reach), and a clipmap that
+// reaches less than the radius is a RangeError. Returns the share of pixels (any channel off by more than 8) where two
+// frames differ.
+async function clip(){
+ const world=await BiomeWorld.create({biomes:[presets.temperate],climate:{latitude:44,rainfall:1100},height:{relief:{seed:9,relief:900,base:160,coast:'west',seaDepth:60}}});
+ const g=(x,z)=>world.sample(x,z).height,s=await shotEngine([-1850,g(-1850,1750)+30,1750],[-1150,110,-300]),W=s.canvas.width,H=s.canvas.height;
+ const diff=(a,b)=>{let n=0;for(let i=0;i<W*H*4;i+=4)if(Math.abs(a[i]-b[i])>8||Math.abs(a[i+1]-b[i+1])>8||Math.abs(a[i+2]-b[i+2])>8)n++;return n/(W*H);};
+ const auto=await s.pixels(world,{radius:1600}),full=await s.pixels(world,{radius:1600,clipmap:{levels:12}});
+ let error=null;try{await BiomeView.attach(s.e,world,{radius:1600,objects:false,clipmap:{levels:5}});}catch(e){error=e.message;}
+ const errors=s.errs.splice(0);s.dispose();world.dispose();
+ return {autoVsFull:diff(auto,full),error,errors};
+}
 window.check={
  async run(){
   const out={};device.pushErrorScope('validation');
@@ -158,6 +172,7 @@ window.check={
   // no Bloom), looked at from 12 m up over the world's rolling ground: how bright and how varied the default ground reads.
   out.noon=await noonGround(world);
   out.alpine=await alpine();
+  out.clip=await clip();
   out.edge=await edge(24);out.edgeOff=await edge(0);
   const error=await device.popErrorScope();
   out.validation=error?.message??null;out.errors=errors.splice(0);

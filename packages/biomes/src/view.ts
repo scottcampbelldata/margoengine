@@ -65,7 +65,9 @@ export interface BiomeViewOptions {
   readonly radius?: number;
   /** Material looks by key, over `MATERIALS`. Default none. */
   readonly materials?: Readonly<Record<string, MaterialLook>>;
-  /** Clipmap settings passed to the terrain. Default cell 1 m, 64 cells per ring, 6 rings. */
+  /** Clipmap settings passed to the terrain. Default cell 1 m, 64 cells per ring, and as many rings as the world and
+   * `radius` need (`clipmapLevels`: 9 for a 4 km world). Explicit settings that reach less than `radius` are a
+   * RangeError. */
   readonly clipmap?: { readonly cellSize?: number; readonly resolution?: number; readonly levels?: number };
   /** Rejects `attach` and stops streaming when aborted. */
   readonly signal?: AbortSignal;
@@ -88,8 +90,8 @@ export interface BiomeViewOptions {
    */
   readonly shadows?: BiomeShadows;
   /**
-   * The sea: a `@margoengine/water` surface at the world's `climate.seaLevel`, centred on the origin over the whole
-   * world and out to the horizon, loaded with import() only when drawn. The terrain hides it under land, so its shore
+   * The sea: a `@margoengine/water` surface at the world's `climate.seaLevel`, covering the whole world and out to
+   * the horizon, loaded with import() only when drawn. The terrain hides it under land, so its shore
    * follows the coast, with the water's shoreline foam. `'auto'` draws it when the world's heights reach below sea
    * level; an object draws it with those `Water` settings over the sea defaults (`SEA`; pass
    * `depth: () => bloom.depthTexture` when Bloom, SSAO or DOF owns the scene depth). Rivers stay dry valleys
@@ -183,6 +185,39 @@ const RULE_FIELDS = ['slope', 'height', 'moisture', 'curvature', 'temperature', 
 
 /** Layers a view tile reads. */
 export const VIEW_LAYERS = Object.freeze([...RULE_FIELDS, 'biome', 'biomeWeight']);
+
+/**
+ * The number of clipmap rings a view needs. The terrain's ring `i` has cells of `cellSize * 2^i` and `resolution` of
+ * them, centred on the camera snapped to that spacing, so the outer ring is guaranteed to cover
+ * `(resolution / 2 - 1) * cellSize * 2^(levels - 1)` metres in every direction. With no `levels` given this is the
+ * fewest rings (1 to 12) whose outer ring reaches the far corner of the world from anywhere inside it and at least
+ * `radius`: 9 for a 4 km world, 12 (the most the terrain takes) for 65 km. A `levels` the caller gives is kept.
+ * @param bounds The world's `[minX, minZ, maxX, maxZ]` in metres.
+ * @param radius The view's full-detail distance in metres.
+ * @param clipmap The view's `clipmap` option, if any.
+ * @throws RangeError when `clipmap.levels` is given and its outer ring reaches less than `radius`.
+ */
+export function clipmapLevels(
+  bounds: readonly [number, number, number, number],
+  radius: number,
+  clipmap?: { readonly cellSize?: number; readonly resolution?: number; readonly levels?: number },
+): number {
+  const cell = clipmap?.cellSize ?? 1,
+    resolution = clipmap?.resolution ?? 64,
+    reach = (levels: number) => (resolution / 2 - 1) * cell * 2 ** (levels - 1); // float division: option maths
+  if (clipmap?.levels !== undefined) {
+    if (reach(clipmap.levels) < radius)
+      throw rangeError(
+        `BiomeView clipmap reaches ${Math.floor(reach(clipmap.levels))} m but radius is ${radius} m; add levels, enlarge cellSize or resolution, or leave levels out`,
+        'biomes',
+      );
+    return clipmap.levels;
+  }
+  const need = Math.max(radius, Math.hypot(bounds[2] - bounds[0], bounds[3] - bounds[1]));
+  let levels = 1;
+  while (levels < 12 && reach(levels) < need) levels++;
+  return levels;
+}
 
 /**
  * Ground material keys of a biome list in first-use order, every one of them (a view draws up to
@@ -666,7 +701,7 @@ export class BiomeView implements Disposable {
       heightScale: 1,
       cellSize: options.clipmap?.cellSize ?? 1,
       resolution: options.clipmap?.resolution ?? 64,
-      levels: options.clipmap?.levels ?? 6,
+      levels: clipmapLevels(world.bounds, this.#radius, options.clipmap),
       // Weights replace the rules; the rules only set each material's texture repeat (4 m), relief and macro tone.
       layers: layerKeys.map((_, i) => {
         const { bump = 0, macro = 0 } = looks[Math.min(i, looks.length - 1)];
@@ -783,7 +818,7 @@ export class BiomeView implements Disposable {
       const { Water } = await import('@margoengine/water'),
         [x0, z0, x1, z1] = world.bounds,
         side = (a: number, b: number) => Math.min(100000, 2 * Math.max(Math.abs(a), Math.abs(b)));
-      // The water grid is centred on the origin: wide enough to cover the world, stretched to the horizon past it.
+      // The water surface is sized to cover the whole world from the origin; the horizon rows reach out past it.
       if (!view.#disposed)
         view.#water = Water.attach(engine, {
           ...SEA,

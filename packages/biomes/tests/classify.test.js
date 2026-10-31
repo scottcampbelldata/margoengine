@@ -422,3 +422,72 @@ test('classification reuses its planes: no multi-megabyte arrays per tile, same 
   for (const name of ['biome', 'biomeWeight'])
     assert.deepEqual(second.layer(name).data, fresh.layer(name).data, `${name} after reuse`);
 });
+
+test("biome weight scales the share a biome stores on a cell several biomes cover; weight 1 is today's bytes", async () => {
+  const make = (wA, wB) => [
+      defineBiome({ id: 'a', climate: {}, ground: [{ material: 'x' }], weight: wA }),
+      defineBiome({ id: 'b', climate: {}, ground: [{ material: 'x' }], weight: wB }),
+    ],
+    shares = async (biomes) => {
+      const t = await (await BiomeWorld.create({ seed: 4, size: [512, 512], biomes })).tile(1, 1),
+        ids = t.layer('biome').data,
+        weights = t.layer('biomeWeight').data,
+        out = [];
+      for (let k = 0; k < ids.length; k += 4 * 97) {
+        const share = { a: 0, b: 0 };
+        for (let s = 0; s < 4; s++) if (ids[k + s] !== 255) share[ids[k + s] === 0 ? 'a' : 'b'] = weights[k + s];
+        out.push(share);
+      }
+      return out;
+    },
+    even = await shares(make(undefined, undefined)),
+    explicit = await shares(make(1, 1)),
+    heavy = await shares(make(3, 1));
+  assert.deepEqual(explicit, even, 'weight 1 gives the unweighted bytes');
+  assert.ok(
+    even.every((s) => s.a === s.b || Math.abs(s.a - s.b) === 1),
+    'equal biomes split a cell evenly',
+  );
+  for (const s of heavy) {
+    assert.equal(s.a + s.b, 255);
+    assert.ok(s.a >= 3 * s.b - 3, `weight 3 stores about 3x the share: ${s.a} vs ${s.b}`);
+  }
+  // A weight under 1 never removes a biome from a cell it is a member of.
+  for (const s of await shares(make(0.1, 1))) assert.ok(s.a > 0 && s.b > s.a);
+});
+
+test('regression: biome weight is validated 0.1 to 10 and reaches zone classifiers too', async () => {
+  const def = { id: 'heath', climate: { moistureIndex: [0.4, 0.8] }, ground: [{ material: 'heather' }] };
+  for (const bad of [0, 0.05, 11, Number.NaN, Infinity])
+    assert.throws(() => defineBiome({ ...def, weight: bad }), RangeError);
+  assert.equal(defineBiome({ ...def, weight: 10 }).weight, 10);
+  const zoned = (wa) => [
+      defineBiome({ id: 'a', climate: {}, ground: [{ material: 'x' }], zones: Object.keys(WHITTAKER), weight: wa }),
+      defineBiome({ id: 'b', climate: {}, ground: [{ material: 'x' }], zones: Object.keys(WHITTAKER) }),
+    ],
+    sum = async (wa) => {
+      const t = await (
+        await BiomeWorld.create({
+          seed: 4,
+          size: [512, 512],
+          biomes: zoned(wa),
+          classifier: whittaker,
+          climate: { latitude: 70 },
+        })
+      ).tile(1, 1);
+      const ids = t.layer('biome').data,
+        w = t.layer('biomeWeight').data;
+      let a = 0,
+        b = 0;
+      for (let k = 0; k < ids.length; k += 4)
+        for (let s = 0; s < 4; s++) {
+          if (ids[k + s] === 0) a += w[k + s];
+          if (ids[k + s] === 1) b += w[k + s];
+        }
+      return [a, b];
+    },
+    [a1, b1] = await sum(1),
+    [a3, b3] = await sum(3);
+  assert.ok(Math.abs(a1 - b1) <= a1 * 0.02 + 5, 'equal zones split evenly');
+  assert.ok(a3 > 2.5 * b3, `weight 3 wins the zone path too: ${a3} vs ${b3}`);
+});

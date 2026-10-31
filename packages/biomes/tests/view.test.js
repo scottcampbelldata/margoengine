@@ -10,6 +10,7 @@ import {
   BiomeView,
   MATERIALS,
   MAX_GROUND_MATERIALS,
+  clipmapLevels,
   SEA,
   groundMaterials,
   materialPixels,
@@ -369,5 +370,27 @@ test('ground looks: rock and snow have relief and macro tone, textures have a fi
       .digest('hex')
       .slice(0, 16),
     'd55e967f053eed4a',
+  );
+});
+
+test('regression: clipmapLevels reaches the whole world, so the terrain no longer ends at 1 km (main drew 6 rings)', () => {
+  const world = (side) => [-side / 2, -side / 2, side / 2, side / 2],
+    // The guaranteed reach of the outer ring: the camera snaps to its spacing, so 31 cells of 64 are safe.
+    reach = (levels, cell = 1, res = 64) => (res / 2 - 1) * cell * 2 ** (levels - 1);
+  assert.equal(clipmapLevels(world(4000), 1000), 9, '4 km world: diagonal 5.7 km');
+  assert.equal(clipmapLevels(world(65000), 1000), 12, '65 km world: the most the terrain takes');
+  assert.equal(clipmapLevels(world(256), 100), 5, 'small world: the fewest rings that reach its corner');
+  assert.equal(clipmapLevels(world(256), 3000), 8, 'radius larger than the world wins');
+  assert.equal(clipmapLevels(world(4000), 1000, { cellSize: 2, resolution: 32 }), 9);
+  for (const side of [100, 1000, 4000, 20000]) {
+    const levels = clipmapLevels(world(side), 500);
+    assert.ok(reach(levels) >= Math.hypot(side, side) || levels === 12, `${side} m reached`);
+    assert.ok(levels === 1 || reach(levels - 1) < Math.max(500, Math.hypot(side, side)), `${side} m fewest`);
+  }
+  // Explicit settings are kept, and a short one is a coded RangeError naming both distances.
+  assert.equal(clipmapLevels(world(4000), 1000, { levels: 7 }), 7);
+  assert.throws(
+    () => clipmapLevels(world(4000), 1000, { levels: 5 }),
+    (e) => e instanceof RangeError && /reaches 496 m but radius is 1000 m/.test(e.message),
   );
 });

@@ -576,6 +576,7 @@ export const entries = [
       'A biome needs 1 to 4 ground layers',
       'A biome needs a climate envelope object',
       'A biome priority must be a finite number',
+      'A biome weight is a number from 0.1 to 10 (1 leaves the classification as it is)',
       'A brush mode is add, subtract, set, max or min and a falloff smooth, linear or constant',
       'A brush needs a finite [x, z] centre and a radius in 0..65,536 m (above 0)',
       'A brush strength is 0..1',

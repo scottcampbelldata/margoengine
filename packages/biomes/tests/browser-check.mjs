@@ -64,6 +64,12 @@ await runSuite(
     assert.ok(r.edge.last - r.edge.first > 100, `the row crosses the painted patch: ${r.edge.first}..${r.edge.last}`);
     assert.ok(r.edge.jump <= 60, `painted edge, ecotone 24: largest jump ${r.edge.jump}`);
     assert.ok(r.edgeOff.jump > 60, `painted edge, ecotone 0: largest jump ${r.edgeOff.jump}`);
+    // Finding 1 (biome look plan 3, A1): the default clipmap reaches the whole world. On the base (6 rings, 992 m) the
+    // frame differed from the 12-ring frame; now it is the same frame, and a clipmap that reaches less than the radius
+    // is a RangeError.
+    assert.deepEqual(r.clip.errors, []);
+    assert.ok(r.clip.autoVsFull < 0.001, `default clipmap draws what 12 rings draw: ${r.clip.autoVsFull} of pixels differ`);
+    assert.match(r.clip.error ?? '', /clipmap reaches 496 m but radius is 1600 m/);
     assert.deepEqual(pageErrors, []);
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-browser-check.json', JSON.stringify({ hardware, result: r }, null, 1));
