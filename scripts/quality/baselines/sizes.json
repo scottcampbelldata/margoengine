@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3955961,
+  "total": 3957878,
   "history": [
     {
       "date": "2026-10-24",
@@ -971,6 +971,12 @@
     },
     {
       "date": "2026-10-31",
+      "commit": "175c6ec2d",
+      "reason": "new package @margoengine/physics2d (row 25 J5): 2D Rapier plugin, bodies, joints, queries, character controller and tile map colliders, 7.7 kB",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
       "commit": "a66ee4d82",
       "reason": "light keeper P2: animator look-at gains origin (aim from an eye or lens off the bone origin), holds the last aim inside 1 mm instead of throwing, and solves with no allocation per frame (own array-only quaternion helpers, as ccd.ts; tree-shaken when unused)",
       "grew": 1
@@ -995,8 +1001,8 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "175c6ec2d",
-      "reason": "new package @margoengine/physics2d (row 25 J5): 2D Rapier plugin, bodies, joints, queries, character controller and tile map colliders, 7.7 kB",
+      "commit": "dd392f8c8",
+      "reason": "Line picking gap fix (Scott, threejs-gallery-plan S3): new optional entry bvh/lines; no existing entry grows",
       "grew": 1
     },
     {
@@ -1007,15 +1013,15 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "dd392f8c8",
-      "reason": "Line picking gap fix (Scott, threejs-gallery-plan S3): new optional entry bvh/lines; no existing entry grows",
-      "grew": 1
+      "commit": "175c6ec2d",
+      "reason": "animation/sampling gains ClipMarkers, validateMarkers, compressTrack, quantizeTrack and dequantizeTrack (row 21.6 job 1); animation/pointer +35 B for clip.markers validation; both entries stay optional",
+      "grew": 2
     }
   ],
   "items": {
     "@margoengine/animation": 22595,
-    "@margoengine/animation/pointer": 6858,
-    "@margoengine/animation/sampling": 1177,
+    "@margoengine/animation/pointer": 7149,
+    "@margoengine/animation/sampling": 2803,
     "@margoengine/animation/skeleton-utils": 8966,
     "@margoengine/animation/vat": 8130,
     "@margoengine/animator": 18656,

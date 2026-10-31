@@ -1,5 +1,6 @@
 import type { PBRModel } from '@margoengine/gltf-pro';
 import { normalizeQuaternion } from '@margoengine/math/quat';
+import { type ClipMarker, validateMarkers } from './sampling.js';
 import { finite, Skeleton } from './skin.js';
 
 const rotation = new Float64Array(4); // normalizeQuaternion scratch (typed, like the samples it sits beside)
@@ -85,6 +86,8 @@ export interface PropertyTrackData {
 export interface KeyframeClipData {
   name?: string;
   tracks: readonly (KeyframeTrackData | PropertyTrackData)[];
+  /** Named moments (footsteps, hits) in seconds, each within the clip's duration. Play them with `ClipMarkers` from `@margoengine/animation/sampling`. */
+  markers?: readonly ClipMarker[];
 }
 /** A validated track: key times, 3 or 4 values per key (weights: one per morph target), and each key's interpolation. */
 export interface KeyframeTrack {
@@ -125,6 +128,8 @@ export interface KeyframeClip {
   readonly tracks: readonly KeyframeTrack[];
   /** Property tracks, in data order (absent on clips built by hand before property tracks existed). */
   readonly properties?: readonly PropertyKeyframeTrack[];
+  /** The clip's markers sorted by time (empty when none were given; absent on clips built by hand). */
+  readonly markers?: readonly ClipMarker[];
 }
 /** One glTF animation channel from {@link bakeKeyframeClip}: the shape of exporters' `AnimationChannelData`. */
 export interface BakedChannel<N> {
@@ -355,12 +360,11 @@ export function createKeyframeClip(data: KeyframeClipData): KeyframeClip {
     const parsed = parseKeys(label, keys, width, path === 'rotation');
     tracks.push({ target, path, ...parsed, ...(blend === undefined ? {} : { blend }) });
   });
-  return {
-    name: data.name ?? '',
-    duration: Math.max(0, ...[...tracks, ...properties].map((track) => track.times[track.times.length - 1])),
-    tracks,
-    properties,
-  };
+  const duration = Math.max(0, ...[...tracks, ...properties].map((track) => track.times[track.times.length - 1])),
+    markers = validateMarkers(data.markers ?? []);
+  if (markers.some((m) => m.time > duration))
+    throw new RangeError('Keyframe clip marker is past the last key; move it inside the clip or add a key there');
+  return { name: data.name ?? '', duration, tracks, properties, markers };
 }
 
 /**

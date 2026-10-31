@@ -304,6 +304,50 @@ const values = new Float32Array([0, 0, 0, 10, 0, 0]); // x, y, z per key
 const position = sampleTrack(times, values, 3, 0.5, 'LINEAR'); // Float32Array [5, 0, 0]
 ```
 
+### Clip markers
+
+`ClipMarkers` reports the named moments a play position passes: footsteps, hits, sound cues. A marker counts as passed
+once the position is at or beyond it, so moving forward from a to b reports markers in (a, b], moving back reports (b, a],
+and a loop repeats them every lap (a step longer than the clip reports every lap). `seek` is silent unless you pass
+`fire`. `createKeyframeClip` takes `markers` and sorts them onto `clip.markers`.
+
+```ts
+import {ClipMarkers} from 'margoengine/animation/sampling';
+import {createKeyframeClip} from 'margoengine/animation';
+
+const clip = createKeyframeClip({
+  tracks: [{target: 'hips', path: 'translation', keys: [{time: 0, value: [0, 0, 0]}, {time: 1, value: [0, 0, 2]}]}],
+  markers: [{time: 0.25, name: 'footstep'}, {time: 0.75, name: 'footstep'}],
+});
+const player = new ClipMarkers(clip.markers ?? [], clip.duration); // loops by default
+player.advance(0.5).map((m) => m.time); // [0.25]
+player.advance(0.5).map((m) => m.time); // [0.75]
+player.advance(-0.5).map((m) => m.time); // [0.75] (leaving 0.75 backward)
+```
+
+### Clip compression
+
+`compressTrack` removes keys a track does not need and `quantizeTrack` stores what is left as 16-bit integers. Both keep
+the sampling call the same (`dequantizeTrack` gives the Float32 track back), and both report the error you can check:
+after `compressTrack(track, tolerance)` every original key time samples within `tolerance` per component
+(`result.error` is the measured maximum); quantisation adds at most half a `step` (range / 131070) per component.
+`LINEAR` and `STEP` tracks only; rotation tracks take `quaternion: true`. On six KayKit Rig_Medium clips (rotations and
+translations, 0.0005 tolerance) the keys went from 4,589 to 3,441 and the bytes from 88,440 to 50,832; a 2 second, 60 fps
+walk bob at 1 cm keeps 33 of 121 keys and shrinks from 1,936 to 354 bytes (`tests/clip-tools.test.js`).
+
+```ts
+import {compressTrack, dequantizeTrack, quantizeTrack, sampleTrack} from 'margoengine/animation/sampling';
+
+const times = Float32Array.from({length: 61}, (_, i) => i / 30);
+const values = Float32Array.from(times, (t) => Math.sin(t * 3));
+const track = {times, values, width: 1, interpolation: 'LINEAR' as const};
+
+const small = compressTrack(track, 0.001); // fewer keys, small.error <= 0.001
+const packed = quantizeTrack(small); // packed.data is a Uint16Array
+const back = dequantizeTrack(packed);
+const x = sampleTrack(back.times, back.values, 1, 0.5, 'LINEAR'); // within 0.001 plus half a step of sin(1.5)
+```
+
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
 
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:
