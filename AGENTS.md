@@ -66,6 +66,8 @@ Scott's decision (2026-10-29): CAD import and CAD tooling are not part of this r
 
 ## Before every push to main (Scott approved D1 to D7, 2026-10-31)
 
+Pre-alpha (Scott, 2026-10-31): the repo is private and he is the only user, so `main` being broken for two hours is fine. A stricter check before every push may come back at public release; that is his call then.
+
 Agents never push. One integrator (`scripts/integrate.mjs`, run by the coordinator or a cheap runner) is the only pusher, one at a time. Until that script and `scripts/tier2-loop.mjs` exist, the coordinator pushes batches by hand with the tier 1 steps below.
 
 - Tier 0, in the agent before it declares READY: `npm run lint`, `npm run hygiene`, `npm run verify` once (build, typecheck, `api:check`, quality, `proofs -- --current`, size gate, unit tests), and the GPU test of the package you changed. A change that alters exports commits the `npm run api:update` output. No `check:merge`, narrowed or full.
