@@ -97,8 +97,33 @@ ceiling.
   was measured with the fix.
 - **Fixed in code, not measured**: a page playing alone asked `/join` every 30 s and each ask held a place for 5 s. It now uses
   `?peek=1`, which holds nothing.
-- **Open**: unexplained 1006 closes on connections older than about 15 minutes. See
-  [known-bugs.md](known-bugs.md).
+- **Open, not a server bug**: the 1006 closes on old connections come from the CDN proxy. See "Old connections" below.
+
+## Old connections
+
+A 45 minute hold, on one test shard with about 140 players at most, all at once from 12:10 UTC. Ends with no close frame:
+
+| Path | Bots | Gone after 45 min |
+| --- | ---: | ---: |
+| N100, home line, CDN, nginx, shard | 40 | 26 |
+| 9950X, home line, CDN, nginx, shard | 30 | 20 |
+| The server itself, CDN, nginx, shard | 30 | 20 |
+| The server itself, nginx on loopback, shard | 20 | 0 |
+| The server itself, shard | 20 | 0 |
+
+- **Who closed first:** the CDN. Packets on the server, for the 30 closes captured whole: the FIN comes in from a CDN address, nginx's
+  FIN reaches the shard within 0.5 ms, and only then come the shard's and nginx's own. nginx sent first in none. The shard's writes were never behind (0 bytes buffered at every close).
+- **What it depends on:** age, not load or traffic. The youngest of the 66 was 1,073 s, and the earlier load run's was 902 s. A plain
+  echo server with no Margo code, run through the same proxy, lost its first connection at 949 s, with 12 of 40 gone within
+  20 minutes: 5 of 20 sending 20 messages a second and 7 of 20 sending one every 20 s. Of 20 sockets in a real browser, one was
+  cut at 925 s (code 1006, not clean) in the 19 minutes they were held.
+- **What is not known:** why this waits for about 15 minutes. The CDN's documents say restarts end WebSockets and that clients must
+  expect it, and give no age.
+- **The bots' home line is not the cause:** bots on the server, reaching a different CDN location, were cut at the same rate.
+- **A real player:** should expect the same, since nothing about these paths is specific to bots. The page shows "The connection
+  dropped" and reloads, and the player comes back at another spawn point within seconds.
+
+To repeat this, or to check a new host or proxy setting: `packages/voxel-net/bench/long-hold.mjs`.
 
 ## Transfer (worked out from the rows above)
 
@@ -107,7 +132,8 @@ players around the clock. Three days at 540 players use about 1.8 TB.
 
 ## Caveats
 
-- All bots came from one home line and one address, so all used one proxy location. Real players use many.
+- All load bots came from one home line and one address, so all used one proxy location. Real players use many. The old
+  connections hold above also used a second location.
 - Bots do not render, so client frame rates are not here. They edit every 2 s.
 - Tick figures read a rolling 60 s window from `/metrics`, so p95 is the median of that window across the hold.
 - Each step ran on the same world, with more edits as it went. Memory grew with them.

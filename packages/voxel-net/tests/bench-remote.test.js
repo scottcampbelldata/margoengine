@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
-import { parseSteps, parseTarget, summarizeSamples } from '../bench/remote-args.mjs';
+import { hold, serve } from '../bench/long-hold.mjs';
+import { parseSteps, parseTarget, summarizeCloses, summarizeSamples } from '../bench/remote-args.mjs';
 import { acceptWebSocket, connectWebSocket } from '../dist/server.js';
 
 test('parseTarget: no path is the router, a path is one shard', () => {
@@ -71,4 +72,50 @@ test('connectWebSocket refuses other protocols and a pong reaches onpong', async
   conn.close();
   server.closeAllConnections();
   server.close();
+});
+
+test('summarizeCloses counts causes and gives the ages, so a wait for an age shows', () => {
+  assert.deepEqual(summarizeCloses([]), { closed: 0, byCause: {}, ageSeconds: null });
+  assert.deepEqual(
+    summarizeCloses([
+      { code: 1006, reason: 'socket ended', age: 902.4 },
+      { code: 1006, reason: 'socket ended', age: 1500 },
+      { code: 1008, reason: 'client-silent', age: 1100 },
+    ]),
+    {
+      closed: 3,
+      byCause: { '1006 socket ended': 2, '1008 client-silent': 1 },
+      ageSeconds: { youngest: 902, median: 1100, oldest: 1500 },
+    },
+  );
+});
+
+// What the Plaza closes looked like from a bot: the far end stops with no close frame. The hold must report it as a 1006
+// with its age and still count who stayed, or the check could not tell a path that cuts connections from one that does not.
+test('long-hold reports a connection cut with no close frame, and the ones still held', async () => {
+  const ends = [],
+    sockets = [],
+    server = await serve({ port: 0, log: (line) => ends.push(line) });
+  server.on('upgrade', (_, socket) => sockets.push(socket));
+  const lines = [],
+    summary = hold({
+      url: `ws://127.0.0.1:${server.address().port}/s`,
+      count: 3,
+      mode: 'busy',
+      seconds: 1,
+      joinMs: 10,
+      log: (line) => lines.push(line),
+    });
+  await new Promise((done) => setTimeout(done, 400));
+  assert.equal(sockets.length, 3);
+  sockets[1].end();
+  const result = await summary;
+  assert.equal(result.closed, 1);
+  assert.deepEqual(result.byCause, { '1006 socket ended': 1 });
+  assert.equal(result.held, 2);
+  assert.equal(result.failed, 0);
+  assert.match(lines[0], /^close 1006 socket ended age \d+ s at /);
+  server.closeAllConnections();
+  server.close();
+  assert.match(ends[0], /^end 1006 socket \w+ busy age \d+ s at /);
 });

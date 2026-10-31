@@ -10,7 +10,7 @@ import { fork } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { availableParallelism, cpus, freemem, setPriority, totalmem } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { parseSteps, parseTarget, summarizeSamples } from './remote-args.mjs';
+import { parseSteps, parseTarget, summarizeCloses, summarizeSamples } from './remote-args.mjs';
 
 const BOTS_PER_PROCESS = 50,
   wait = (ms) => new Promise((done) => setTimeout(done, ms)),
@@ -368,6 +368,9 @@ function summarizeStep(
         3,
       ),
       closes: closes(holdReports),
+      closeAges: summarizeCloses(
+        holdReports.flatMap((rep) => rep.closes.map(([code, reason, age]) => ({ code, reason, age }))),
+      ),
       joinDuringHold: joinSide(holdReports),
     },
     bots: {

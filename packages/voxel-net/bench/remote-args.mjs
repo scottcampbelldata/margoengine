@@ -89,3 +89,24 @@ export function summarizeSamples(samples, settleMs = 60_000) {
   const busy = shards.filter((s) => s.players > 0);
   return { shards, inBudget: busy.length > 0 && busy.every((s) => s.inBudget) };
 }
+
+/**
+ * How connections ended, from `{ code, reason, age }` (age in seconds): the count by code and reason, and the youngest,
+ * median and oldest age. Whether closes wait for an age is what tells a path's timer from load.
+ */
+export function summarizeCloses(closes) {
+  const byCause = {},
+    ages = closes.map((close) => close.age);
+  for (const { code, reason } of closes) byCause[`${code} ${reason}`] = (byCause[`${code} ${reason}`] ?? 0) + 1;
+  return {
+    closed: closes.length,
+    byCause,
+    ageSeconds: ages.length
+      ? {
+          youngest: Math.round(Math.min(...ages)),
+          median: Math.round(median(ages)),
+          oldest: Math.round(Math.max(...ages)),
+        }
+      : null,
+  };
+}

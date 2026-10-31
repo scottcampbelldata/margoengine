@@ -156,7 +156,7 @@ async function play(id) {
     const closed = bot.connection.onclose;
     bot.connection.onclose = (code, reason) => {
       closed(code, reason);
-      window.closes.push([code, reason]);
+      window.closes.push([code, reason, (clock() - asked) / 1000]);
       console.log(
         `close ${code} ${reason} age ${Math.round((clock() - asked) / 1000)} s, ${bot.connection.bytesIn} bytes in, at ${new Date().toISOString()}`,
       );
