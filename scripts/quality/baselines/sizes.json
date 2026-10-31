@@ -1178,6 +1178,12 @@
       "commit": "3c9501329",
       "reason": "new entry @margoengine/tilemap/tiled: the Tiled JSON importer (parseTiled, fromTMX, MapImportError), 4.0 kB, with tests",
       "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "534c1b668",
+      "reason": "re-measured from a real build (npm run build:packages, then the gate's own bundle, min+gzip, 2026-10-31); no limit changes, the reasons of earlier entries are corrected here. webgl2-compat 94,046 B and webgl2-compat/device 93,857 B (docs/limits.md and entry-sizes.json say 94,046), limits 96,803 and 96,628 are 2,757 and 2,771 B above, inside the 3% margin the file's rule gives (2,822 and 2,816 B). The 3,000 B step of 7fcd4c561 was that margin replacing an exact limit (93,801), not growth: the one real change in it is the class names, +182 B, and the layer measured 93,763 B before it, 94,046 B now. procedural 12,602 B, limit 12,981 = measured + 3% (379 B); the jetty and boat generators took it from 10,570 B, +2,032 B against the 1.7 kB the jetty report gave, and the roughly 330 B over the report is still not traced to a commit. @margoengine/shadows/virtual 14,186 B, limit 14,601 is 415 B above, inside the 3% margin (426 B): this is over the 9 kB gzip budget the entry's first line set, by 5,186 B (58%). Its own chunk (dist/virtual.js) is 11,547 B alone, 2,547 B over 9 kB, and the shared caster chunk it loads is 5,480 B; the earlier note that it is 'about 9 kB of its own' is not borne out by the chunk. The budget was not met and is not raised here, the limit only follows the measured bytes",
+      "grew": 0
     }
   ],
   "items": {
