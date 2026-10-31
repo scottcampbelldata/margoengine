@@ -141,7 +141,10 @@ async function play(id) {
       home,
       leash: o.leash,
       travelHome: o.scenario === 'spread' && o.travel === 'fly',
-      headers: { Origin: o.target.origin },
+      headers: {
+        Origin: o.target.origin,
+        ...(o.fakeAddresses ? { 'X-Real-IP': `10.${(id >> 16) & 255}.${(id >> 8) & 255}.${id & 255}` } : {}),
+      },
     });
     bot.id = id;
     bot.home = home;

@@ -2,7 +2,9 @@
 // front of it, in rising steps, staying connected from one step to the next. Server numbers come from its /metrics.
 //   node bench/run.mjs --url=wss://host --metrics=https://host/metrics --blocks=path/to/blocks.ts
 //     [--scenario=crowd|spread] [--counts=25,50,100] [--join-rate=3] [--window=300] or [--steps=100@1.7:120,300@3.3:120]
-//     [--view=8] [--edit-interval=2] [--spread-radius=1024] [--travel=walk|fly] [--drop-after=N] [--max-seconds=10800] [--nice=10] [--out=FILE]
+//     [--view=8] [--edit-interval=2] [--spread-radius=1024] [--travel=walk|fly] [--drop-after=N] [--fake-addresses] [--max-seconds=10800] [--nice=10] [--out=FILE]
+// --fake-addresses: each bot sends its own X-Real-IP, so a shard run with --proxied counts them as separate people. Only for
+// a shard on this machine's loopback (a proxied shard reads that header from loopback connections only).
 // The metrics token comes from the environment, PLAZA_METRICS_TOKEN, never from an argument.
 import { fork } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -60,6 +62,7 @@ export async function runRemote(arg) {
       editInterval: Number(arg('edit-interval', 2)),
       spreadRadius: Number(arg('spread-radius', 1024)),
       travel: arg('travel', 'walk'),
+      fakeAddresses: !!arg('fake-addresses'),
       leash: scenario === 'spread' ? 32 : 64,
       observerEvery: 8,
       blocks,
