@@ -20,12 +20,26 @@ export const linkedEntries = (names) =>
     (name) => name !== '@margoengine' && name !== 'margoengine' && (!name.startsWith('.') || name === '.bin'),
   );
 
+/** Root dependencies the main checkout has not installed: a stale install would otherwise fail later as a missing import. */
+export const missingDependencies = (manifest, installed) =>
+  Object.keys({ ...manifest.dependencies, ...manifest.devDependencies }).filter(
+    (name) => !name.startsWith('@margoengine/') && name !== 'margoengine' && !installed(name),
+  );
+
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
   const root = resolve(git('rev-parse', '--show-toplevel')),
     main = resolve(dirname(resolve(root, git('rev-parse', '--git-common-dir'))));
   if (root === main) throw new Error('Run this in a worktree, not the main checkout');
   if (!existsSync(join(main, 'node_modules'))) throw new Error(`Run npm install in the main checkout first: ${main}`);
+
+  const missing = missingDependencies(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')), (name) =>
+    existsSync(join(main, 'node_modules', name)),
+  );
+  if (missing.length)
+    throw new Error(
+      `The main checkout's install is older than this worktree: run npm install there. Missing: ${missing.join(', ')}`,
+    );
 
   const target = join(root, 'node_modules');
   rmSync(target, { recursive: true, force: true });
