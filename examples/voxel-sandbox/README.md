@@ -212,6 +212,18 @@ cave mouths about every 40 x 40 blocks (always near the spawn ring), each a 3 x 
 glow caps; glow caps on tunnel floors; veins of tin (2 to 24 deep), silver (8 to 40), malachite (4 to 30) and amber (1 to 6,
 in dirt and sand); and exactly 1,000 opals on tunnel floors within 512 blocks, worked out from the seed without generating a
 chunk. None of it touches the square, the sign or a spawn ring column.
+
+The shard keeps what each player finds (`server/counts.mjs`). The rules ask the server's own block state, never the client:
+digging a natural ore or opal adds one to the digger's count; placing one needs a count and spends it; a placed one breaks
+only for the person who placed it, who gets it back, so placing and breaking your own earns nothing, and other people cannot
+take a build apart. Each dug cell pays once, even if a rollback or a crash brings the block back. A placed block a rollback
+removes goes back to its owner. The world's opal count (`found` of 1,000) only goes up, and a placed opal never moves it.
+A player is the salted hash of their address (`server/identity.mjs`), so a household shares one count, more than one tab
+shares it too, and a new address starts from nothing and cannot break what the old one placed. Counts live in the world's
+`state.json`, written every 30 seconds when they changed and with each snapshot, so a restart keeps them and a crash loses at
+most the last 30 seconds. They belong to one world: when the 6 hours end each page gets its last counts, and then the state
+file is deleted, so nobody's counts carry over to the next world and only `found` and `total` stay, in the final `<id>.json`,
+`/finished/index.json` and, for the live world, `/join`. The page hears through one app message (`src/counts.ts`).
 The router's `/join` answer carries the world's `seed` and `floor`; the page keeps `floor` and asks the shard's own
 rule (`isPlazaProtected`, `src/plaza-area.ts`) before it predicts an edit, so a protected cell never flashes and the
 player reads "The square is protected. Build outside it." (at most once every 4 seconds). An edit the shard refuses for

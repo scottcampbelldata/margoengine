@@ -4,8 +4,20 @@ import { performance } from 'node:perf_hooks';
 import { clock, VoxelBot } from '../dist/bot.js';
 import { testBlocks } from '../tests/blocks.js';
 
-const { url, count, first, joinRate, scenario, observerEvery, editInterval } = JSON.parse(process.argv[2]);
-const blocks = testBlocks(),
+const {
+  url,
+  count,
+  first,
+  joinRate,
+  scenario,
+  observerEvery,
+  editInterval,
+  home,
+  leash,
+  place,
+  blocks: blocksFile,
+} = JSON.parse(process.argv[2]);
+const blocks = blocksFile ? (await import(blocksFile)).default() : testBlocks(),
   bots = [],
   receipts = []; // [bot index, time, x, y, z, state] of edits observers received in the window
 let measuring = false,
@@ -90,7 +102,8 @@ for (let i = 0; i < count; i++) {
     name: `bot${id}`,
     players: observer,
     editInterval,
-    ...(scenario === 'crowd' ? { home: [0, 0], leash: 64 } : {}),
+    ...(scenario === 'crowd' ? { home: home ?? [0, 0], leash: leash ?? 64 } : {}),
+    ...(place ? { place: blocks.id(place) } : {}),
   }).then(
     (bot) => {
       bot.id = id;

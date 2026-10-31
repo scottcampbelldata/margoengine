@@ -6,6 +6,9 @@
 //   node bench/run.mjs [--scenarios=spread,crowd] [--counts=50,100,200,400] [--window=30] [--join-rate=25]
 //                      [--until-break=1] [--max=3000] [--workers=8] [--out=bench/results.json] [--profile=dir]
 // --profile writes a V8 CPU profile of each server process into that folder.
+// --server=file forks that instead of server-process.mjs, with --server-options=json added to its argument (it must answer
+// as server-window.mjs does). --bot-options=json goes to bot-process.mjs: blocks (a module whose default export is a function
+// giving the block types), place (a block name), home and leash.
 import { fork } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { availableParallelism, cpus, totalmem } from 'node:os';
@@ -30,6 +33,9 @@ const options = {
   workers: arg('workers') ? Number(arg('workers')) : undefined,
   out: arg('out', fileURLToPath(new URL('./results.json', import.meta.url))),
   profile: arg('profile'),
+  server: arg('server'),
+  serverOptions: JSON.parse(arg('server-options', '{}')),
+  botOptions: JSON.parse(arg('bot-options', '{}')),
   observerEvery: 8,
   editInterval: 2,
   botsPerProcess: 50,
@@ -55,12 +61,16 @@ const next = (child, type) =>
   });
 
 async function run(scenario, count) {
-  const server = fork(here('./server-process.mjs'), [JSON.stringify({ scenario, workers: options.workers })], {
-      serialization: 'advanced',
-      execArgv: options.profile
-        ? ['--cpu-prof', `--cpu-prof-dir=${options.profile}`, `--cpu-prof-name=${scenario}-${count}.cpuprofile`]
-        : [],
-    }),
+  const server = fork(
+      options.server ?? here('./server-process.mjs'),
+      [JSON.stringify({ scenario, workers: options.workers, ...options.serverOptions })],
+      {
+        serialization: 'advanced',
+        execArgv: options.profile
+          ? ['--cpu-prof', `--cpu-prof-dir=${options.profile}`, `--cpu-prof-name=${scenario}-${count}.cpuprofile`]
+          : [],
+      },
+    ),
     { port } = await next(server, 'ready'),
     processes = Math.min(options.maxProcesses, Math.ceil(count / options.botsPerProcess)),
     bots = [],
@@ -78,6 +88,7 @@ async function run(scenario, count) {
             scenario,
             observerEvery: options.observerEvery,
             editInterval: options.editInterval,
+            ...options.botOptions,
           }),
         ],
         { serialization: 'advanced' },
@@ -105,7 +116,7 @@ async function run(scenario, count) {
   const joinSeconds = (performance.now() - began) / 1000,
     joinStatus = { joined: sum('joined'), spawned: sum('spawned'), loaded: sum('loaded'), failed: sum('failed') };
   server.send({ type: 'join-ticks' });
-  const joinTicks = (await next(server, 'join-ticks')).tickTimes;
+  const { tickTimes: joinTicks, bytesOut: joinBytes } = await next(server, 'join-ticks');
   // Measured window.
   server.send({ type: 'start' });
   await next(server, 'started');
@@ -120,10 +131,10 @@ async function run(scenario, count) {
   for (const child of [...bots, server]) child.send({ type: 'exit' });
   await wait(1500);
   for (const child of [...bots, server]) if (child.exitCode === null) child.kill();
-  return summarize(scenario, count, joinSeconds, joinStatus, joinTicks, s, b);
+  return summarize(scenario, count, joinSeconds, joinStatus, joinTicks, joinBytes, s, b);
 }
 
-function summarize(scenario, count, joinSeconds, joinStatus, joinTicks, s, reports) {
+function summarize(scenario, count, joinSeconds, joinStatus, joinTicks, joinBytes, s, reports) {
   const players = s.counts.players,
     allBots = reports.flatMap((r) => r.bots),
     rate = s.ticks / s.seconds,
@@ -162,6 +173,7 @@ function summarize(scenario, count, joinSeconds, joinStatus, joinTicks, s, repor
       spawnMs: quantiles(allBots.filter((x) => x.times.spawn).map((x) => x.times.spawn - x.times.connect)),
       fullViewMs: quantiles(allBots.filter((x) => x.times.loaded).map((x) => x.times.loaded - x.times.connect)),
       tickMsDuringJoin: quantiles(joinTicks),
+      bytesOutByType: joinBytes,
     },
     window: {
       seconds: round(s.seconds, 1),

@@ -9,8 +9,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VoxelServer } from '@margoengine/voxel-net/server';
 import { defineBlocks } from '../src/blocks.ts';
+import { encodeCounts } from '../src/counts.ts';
+import { plazaFinds } from '../src/finds.ts';
 import { isPlazaName, randomName } from '../src/names.ts';
 import { isPlazaProtected, PLAZA_RING_CANDIDATES, plazaFloor, plazaSpawnRing } from '../src/plaza.ts';
+import { GEM_TOTAL } from '../src/plaza-area.ts';
+import { PlazaCounts } from './counts.mjs';
 import { HOST, identityOfRequest, loadSalt } from './identity.mjs';
 import { areaOf } from './reports.mjs';
 import { listRolling, pruneRolling, rollingAtOrBefore, writeRolling, writeSnapshot, writeWhole } from './snapshots.mjs';
@@ -32,9 +36,12 @@ export const SHARD_DEFAULTS = Object.freeze({
   workers: 1, // generator threads
   beatMs: 1000,
   idleMs: 10 * 60_000, // no movement and no edit for this long closes the player; 0 turns the limit off
+  countsSaveMs: 30_000, // finds are written this often when they changed, so a crash loses at most this much of them
+  greetMs: 250, // how often new players are looked for: the server has no event for a spawn
 });
 const TICKS_KEPT = 1200; // 60 s at 20 ticks a second
 const MOVED = 0.05; // blocks; less than this between two looks is a player standing still
+const END_DELIVERY_MS = 500; // at most this long for one tick to carry the world's last message
 
 const percentile = (sorted, p) =>
   sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] : 0;
@@ -83,6 +90,12 @@ export class PlazaShard {
     chunksResent: 0,
     fullResends: 0,
   };
+  /** @type {PlazaCounts | undefined} */
+  #counts;
+  #savedCounts; // what state.json held, until the counts are made from it
+  // Players who have had their first counts. Keyed by the server's own player object, so an entry goes with its player.
+  #greeted = new WeakSet();
+  #flushing = false;
 
   /**
    * @param {object} options
@@ -98,6 +111,8 @@ export class PlazaShard {
    *   `IDLE_CLOSE_CODE` and reason `'idle'`, freeing its place. Heartbeats and pongs do not count. Default 10 minutes; 0 is no limit.
    * @param {number} [options.idleCheckMs] How often idle players are looked for. Default a quarter of `idleMs`, at most 10 s.
    * @param {number} [options.seed] The world's seed instead of a random one (tests).
+   * @param {number} [options.countsSaveMs] How often changed finds are written to state.json. Default 30 s.
+   * @param {number} [options.greetMs] How often players who just spawned are looked for, to send their counts. Default 250 ms.
    */
   constructor(options) {
     this.#o = { ...SHARD_DEFAULTS, port: 0, proxied: false, origins: [], now: Date.now, log: console.log, ...options };
@@ -126,6 +141,11 @@ export class PlazaShard {
     const restored = await rollingAtOrBefore(this.#worldDir, Number.MAX_SAFE_INTEGER, (path, error) =>
       this.#o.log(`shard ${this.#o.index}: snapshot ${path} is damaged, using an older one: ${error.message}`),
     );
+    this.#counts = new PlazaCounts({
+      blocks: this.#blocks,
+      isGem: (x, y, z) => plazaFinds(this.world.seed).isGem(x, y, z),
+      saved: this.#savedCounts,
+    });
     this.#edits = this.world.edits ?? 0;
     this.#saved = this.#edits;
     if (this.#o.now() >= this.world.endsAt) {
@@ -150,14 +170,21 @@ export class PlazaShard {
       spawn: this.#o.spawn ?? (() => this.#ringSpawn()),
       authenticate: (req) => this.#authenticate(req),
       filterName: (name) => (isPlazaName(name) ? name : randomName()),
-      allowEdit: (player, x, y, z) => {
+      allowEdit: (player, x, y, z, state, previous) => {
         // An edit tried is a sign of life, whether or not the rule lets it land.
         this.#touch(player);
-        return this.canEdit(x, y, z);
+        return this.canEdit(x, y, z) && this.#counts.allow(player.identity, x, y, z, state, previous);
       },
     });
+    this.server.world.onChange((x, y, z, state) => {
+      if (this.#counts.landed(x, y, z, state)) this.#flushSoon();
+    });
+    // Worked out here, once, rather than in the middle of a tick when the first opal is dug.
+    plazaFinds(this.world.seed).gems;
     this.server.onError = (error) => this.#o.log(`shard ${this.#o.index}: ${error?.message ?? error}`);
     if (restored.edits.size) await this.server.importEdits(restored.edits);
+    // The counts are saved more often than the chunks, so after a crash they can be ahead of this world.
+    if (this.#counts.reconcile(restored.edits)) await this.#writeState();
     this.address = await this.server.listen(this.#o.port, HOST);
     this.#later(this.world.endsAt - this.#o.now(), () => this.endWorld());
     // A failed snapshot (a full disk) must not end a live world: it is logged and counted in /metrics, and tried again.
@@ -168,6 +195,8 @@ export class PlazaShard {
       }),
     );
     this.#every(this.#o.beatMs, () => this.#beat());
+    this.#every(this.#o.greetMs, () => this.#greet());
+    this.#every(this.#o.countsSaveMs, () => this.#saveCounts());
     if (this.#o.idleMs > 0)
       this.#every(this.#o.idleCheckMs ?? Math.min(10_000, Math.ceil(this.#o.idleMs / 4)), () => this.closeIdle());
     this.#o.log(
@@ -243,6 +272,11 @@ export class PlazaShard {
     });
   }
 
+  /** Opals dug out of the ground in this world. */
+  get found() {
+    return this.#counts?.found ?? 0;
+  }
+
   /** Writes a rolling snapshot when something changed since the last, and forgets those past the keep time. */
   snapshot() {
     return this.#serial(async () => {
@@ -278,6 +312,9 @@ export class PlazaShard {
             }
         }
         await this.server.importEdits(edits);
+        // A rare block the rollback took away goes back to its owner; one it brought back pays nobody a second time.
+        this.#counts.reconcile(edits);
+        this.#flushSoon();
         const now = this.#o.now();
         this.world.frozen = this.world.frozen.filter((held) => held.until > now);
         if (area && freezeMs > 0) this.world.frozen.push({ cx: area.cx, cz: area.cz, until: now + freezeMs });
@@ -302,6 +339,7 @@ export class PlazaShard {
       if (!this.server || this.#closed) return;
       this.#gate = true;
       this.#clearTimers();
+      await this.#sayEnded();
       const edits = await this.server.exportEdits();
       this.#edits = this.#countedEdits();
       await this.#finish(edits);
@@ -381,6 +419,58 @@ export class PlazaShard {
     }
   }
 
+  // Sends the counts to players who have spawned since the last look.
+  #greet() {
+    if (this.#closed) return;
+    for (const player of this.server.players)
+      if (player.spawned && !this.#greeted.has(player)) {
+        this.#greeted.add(player);
+        this.server.send(player, this.#message(player.identity));
+      }
+  }
+  #message(identity, ended = false) {
+    return encodeCounts({
+      found: this.#counts.found,
+      total: GEM_TOTAL,
+      counts: this.#counts.countsOf(identity),
+      ended,
+    });
+  }
+  // Counts go out at most once per tick, however many edits a tick holds.
+  #flushSoon() {
+    if (this.#flushing) return;
+    this.#flushing = true;
+    setImmediate(() => {
+      this.#flushing = false;
+      if (!this.#closed) this.#flush();
+    });
+  }
+  #flush() {
+    const { identities, found } = this.#counts.takeChanges();
+    if (found) this.server.broadcast(encodeCounts({ found: this.#counts.found, total: GEM_TOTAL }));
+    if (!identities.size) return;
+    const messages = new Map();
+    for (const player of this.server.players) {
+      // One who has not had its first counts gets them from #greet, with these changes in them.
+      if (!identities.has(player.identity) || !this.#greeted.has(player)) continue;
+      let message = messages.get(player.identity);
+      if (!message) messages.set(player.identity, (message = this.#message(player.identity)));
+      this.server.send(player, message);
+    }
+  }
+  // Every player's last counts, delivered with a tick, so before the close that follows.
+  async #sayEnded() {
+    for (const player of this.server.players) this.server.send(player, this.#message(player.identity, true));
+    const tick = this.server.tick,
+      deadline = performance.now() + END_DELIVERY_MS;
+    while (this.server.tick === tick && performance.now() < deadline) await new Promise((done) => setTimeout(done, 5));
+  }
+  #saveCounts() {
+    return this.#serial(async () => {
+      if (!this.#closed && !this.#gate && this.#counts.dirty) await this.#writeState();
+    });
+  }
+
   #countedEdits() {
     return this.#edits + (this.server?.metrics.editsAccepted ?? 0);
   }
@@ -416,6 +506,7 @@ export class PlazaShard {
         joins: m.joins,
         chunksGenerated: m.chunksGenerated,
         snapshotFailures: this.#snapshotFailures,
+        found: this.#counts.found,
         idleClosed: this.#idleClosed,
         parkedNow: server.counts.parked,
         resume: this.#resume,
@@ -446,15 +537,20 @@ export class PlazaShard {
     await this.#writeState();
     await pruneRolling(this.#worldDir, at - this.#o.keepMs);
   }
-  #writeState() {
-    return writeWhole(this.#stateFile, JSON.stringify(this.world));
+  // The counts sit beside the world, not in it: `this.world` also goes to the router, and identities need not.
+  async #writeState() {
+    await writeWhole(this.#stateFile, JSON.stringify({ ...this.world, counts: this.#counts?.toJSON() }));
+    this.#counts?.saved();
   }
   async #loadWorld() {
     const text = await readFile(this.#stateFile, 'utf8').catch((error) => {
       if (error.code === 'ENOENT') return undefined;
       throw error;
     });
-    return text === undefined ? undefined : JSON.parse(text);
+    if (text === undefined) return undefined;
+    const { counts, ...world } = JSON.parse(text);
+    this.#savedCounts = counts;
+    return world;
   }
   async #newWorld() {
     // Whatever an earlier run left behind belongs to no world any more; a stale snapshot must never load into this one.
@@ -492,6 +588,9 @@ export class PlazaShard {
           endedAt: this.#o.now(),
           chunks: edits.size,
           edits: this.#edits,
+          // The goal is all that outlives a world: who found what goes with its state file.
+          found: this.#counts?.found ?? 0,
+          total: GEM_TOTAL,
         }),
       );
     }
@@ -540,7 +639,15 @@ async function main() {
       send({ type: 'reply', id: message.id, error: error.message });
     }
   });
-  if (await shard.start()) send({ type: 'ready', host: HOST, port: shard.address.port, world: shard.world });
+  if (await shard.start())
+    send({
+      type: 'ready',
+      host: HOST,
+      port: shard.address.port,
+      world: shard.world,
+      found: shard.found,
+      total: GEM_TOTAL,
+    });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url))

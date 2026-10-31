@@ -112,6 +112,8 @@ test('counters have their shape; /join says where; /metrics wants the token', TI
   assert.equal(answer.shard, 0);
   assert.equal(typeof answer.world, 'string');
   assert.ok(answer.worldEndsAt > answer.now);
+  assert.equal(answer.found, 0);
+  assert.equal(answer.total, 1000);
 
   const counters = await (await plaza.get('/counters')).json();
   assert.deepEqual(Object.keys(counters).sort(), ['blocksToday', 'online', 'worldEndsAt', 'worldsFinished']);
@@ -507,7 +509,8 @@ test(
     t.after(() => rmSync(dataDir, { recursive: true, force: true }));
     mkdirSync(join(dataDir, 'final'));
     mkdirSync(join(dataDir, 'finished'));
-    const meta = (id, endedAt) => JSON.stringify({ id, seed: 7, floor: 9, startedAt: 1, endedAt, chunks: 1, edits: 5 });
+    const meta = (id, endedAt) =>
+      JSON.stringify({ id, seed: 7, floor: 9, startedAt: 1, endedAt, chunks: 1, edits: 5, found: 12, total: 1000 });
     writeFileSync(join(dataDir, 'final', 's0-aaa.json'), meta('s0-aaa', 100));
     writeFileSync(join(dataDir, 'final', 's0-bbb.json'), meta('s0-bbb', 200));
     writeFileSync(join(dataDir, 'final', 's0-ccc.json'), meta('s0-ccc', 300));
@@ -518,8 +521,8 @@ test(
     assert.equal(plaza.router.counters().worldsFinished, 3);
     const index = await (await plaza.get('/finished/index.json')).json();
     assert.deepEqual(index, [
-      { id: 's0-bbb', seed: 7, endedAt: 200, edits: 5, webp: 's0-bbb.webp', png: 's0-bbb.png' },
-      { id: 's0-aaa', seed: 7, endedAt: 100, edits: 5, webp: 's0-aaa.webp' },
+      { id: 's0-bbb', seed: 7, endedAt: 200, edits: 5, found: 12, total: 1000, webp: 's0-bbb.webp', png: 's0-bbb.png' },
+      { id: 's0-aaa', seed: 7, endedAt: 100, edits: 5, found: 12, total: 1000, webp: 's0-aaa.webp' },
     ]);
     assert.deepEqual(JSON.parse(readFileSync(join(dataDir, 'finished', 'index.json'), 'utf8')), index);
   },

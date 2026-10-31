@@ -240,6 +240,8 @@ export class PlazaRouter {
         seed: world.seed,
         floor: world.floor,
         worldEndsAt: world.endsAt,
+        found: shard.found,
+        total: shard.total,
         now,
         online: this.#online(),
       },
@@ -326,10 +328,13 @@ export class PlazaRouter {
         shard.state = 'ready';
         shard.port = message.port;
         shard.world = message.world;
+        shard.found = message.found;
+        shard.total = message.total;
         break;
       case 'beat':
         shard.beat = message.beat;
         shard.online = message.beat.players;
+        shard.found = message.beat.found;
         this.#countBlocks(message.beat.edits);
         break;
       case 'ended':
@@ -608,6 +613,8 @@ export class PlazaRouter {
         seed: meta.seed,
         endedAt: meta.endedAt,
         edits: meta.edits,
+        found: meta.found,
+        total: meta.total,
         webp: `${id}.webp`,
         ...(files.has(`${id}.png`) ? { png: `${id}.png` } : {}),
       });
