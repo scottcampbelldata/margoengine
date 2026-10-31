@@ -153,6 +153,39 @@ console.log(solved.status, solved.elbow, solved.target);
 
 Root motion and look-at / aim constraints live with the Animator: `addRootMotion`, `addLookAt` and `addAimConstraint` in [`@margoengine/animator`](../animator/README.md).
 
+## Joint hulls (`margoengine/rigging/hulls`)
+
+`jointHulls(model, options)` finds the convex hull of the vertices each joint carries, from a skinned mesh in its bind pose. A hull is a short list of corners, so a clearance or collision test can use the real shape of a torso, head or forearm instead of a sphere or capsule. Run it once at load. It uses `@margoengine/geometry`'s quickhull, and only this entry imports it.
+
+```ts
+import { jointHulls } from 'margoengine/rigging/hulls';
+
+// A column of four rings of box corners; the lower two rings follow joint 0, the upper two follow joint 1.
+const positions: number[] = [];
+const joints: number[] = [];
+for (let ring = 0; ring < 4; ring++)
+  for (const x of [-0.5, 0.5])
+    for (const z of [-0.5, 0.5]) {
+      positions.push(x, ring, z);
+      joints.push(ring < 2 ? 0 : 1);
+    }
+const skin = { joints: Uint16Array.from(joints), weights: new Float32Array(joints.length).fill(1), influences: 1 };
+
+// Joint 1 sits at y = 2 in the bind pose; its inverse bind matrix (glTF column-major) moves the world down by 2.
+const translateDown = (y: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -y, 0, 1];
+const inverseBindMatrices = [...translateDown(0), ...translateDown(2)];
+for (const hull of jointHulls({ positions, skin }, { inverseBindMatrices }))
+  console.log(hull.joint, hull.vertexCount, hull.points.length / 3); // 0 8 8, then 1 8 8
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `minWeight` | `0.5` | A vertex counts toward a joint when the joint carries at least this much of it (0 to 1). The default gives each vertex to its main joint, so neighbouring hulls meet without overlapping; lower it so blended vertices (an elbow) reach into both. |
+| `maxPoints` | `64` | Most corners a hull keeps (8-1,024). Larger hulls keep the corners that reach farthest in directions spread over the sphere; every kept point is still a corner of the full hull, so the reduced hull lies inside it. |
+| `inverseBindMatrices` | none | 16 numbers per joint. With them each hull is in its joint's own space, so the joint's world matrix places it; without them the corners stay in mesh space. |
+
+The model is `{positions, skin}`: bind-pose `positions` (xyz per vertex) and `skin` as a `WeightMap` or per-vertex influences (`{joints, weights, influences?}`). A joint repeated in several slots of one vertex counts its weights together. Joints that own fewer than four vertices, or whose vertices lie on a line or plane, have no hull and are left out of the result. Positions or weights that are not finite, a skin whose vertex count differs from the positions, and a joint with no inverse bind matrix throw a `RangeError` that names the fix.
+
 ## Retarget presets (`margoengine/rigging/retarget`)
 
 Clips made for one skeleton play on another: `prepareRetarget(source, target)` recognises each rig's naming (Mixamo with any `mixamorig` prefix, Godot's humanoid profile, Roblox R15, the joints of `@margoengine/exporters/skin`'s `humanoidJoints()`, or the 55 humanoid bone names themselves), maps every target bone to its source bone, and by default turns the target's reference pose so each bone points the way the source's does at rest (an A-pose character driven by T-pose clips). Pass the result to `@margoengine/animation`'s `Retarget`:

@@ -1046,6 +1046,10 @@
       "types": "./dist/rigging/retarget.d.ts",
       "import": "./dist/rigging/retarget.js"
     },
+    "./rigging/hulls": {
+      "types": "./dist/rigging/hulls.d.ts",
+      "import": "./dist/rigging/hulls.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

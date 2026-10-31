@@ -7,6 +7,8 @@ export interface ArrayTweenOptions extends TweenOptions {
     interpolate?: (out: number[] | Float32Array | Float64Array, a: ArrayLike<number>, b: ArrayLike<number>, t: number) => void;
 }
 
+export type DampArray = number[] | Float32Array | Float64Array;
+
 export type Easing = (time: number) => number;
 
 export class Spring {
@@ -155,6 +157,8 @@ export const linear: Easing;
 export function parseHexColor(hex: string): [number, number, number, number];
 
 export function slerpArray(out: number[] | Float32Array | Float64Array, a: ArrayLike<number>, b: ArrayLike<number>, t: number): void;
+
+export function smoothDamp<T extends DampArray>(current: ArrayLike<number>, target: ArrayLike<number>, velocity: DampArray, smoothTime: number, maxSpeed: number, dt: number, out: T): T;
 
 export function steps(count: number, jumpStart?: boolean): Easing;
 

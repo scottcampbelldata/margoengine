@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3927785,
+  "total": 3931167,
   "history": [
     {
       "date": "2026-10-24",
@@ -956,6 +956,12 @@
       "commit": "d27f31df4",
       "reason": "kinematics-constraints: ConvexHullVolume (GJK and an expanding polytope) and link hulls in AvoidanceSolver; a page that imports only capsules and spheres pays for neither kernel",
       "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "3074fddf9",
+      "reason": "tween: smoothDamp (exact critically damped vector filter with a speed limit and safe huge dt) adds 367 B gzip to the tween root; new entry rigging/hulls (jointHulls, 2,503 B gzip) with its quickhull import external, so rigging root and other entries are unchanged",
+      "grew": 2
     }
   ],
   "items": {
@@ -1215,6 +1221,7 @@
     "@margoengine/react/voxel": 2200,
     "@margoengine/react/xr": 3818,
     "@margoengine/rigging": 7879,
+    "@margoengine/rigging/hulls": 2759,
     "@margoengine/rigging/ik": 3740,
     "@margoengine/rigging/retarget": 2862,
     "@margoengine/road": 1171,
@@ -1266,7 +1273,7 @@
     "@margoengine/tonemap": 11083,
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4339,
-    "@margoengine/tween": 4877,
+    "@margoengine/tween": 5500,
     "@margoengine/ui": 28622,
     "@margoengine/ui/react": 28708,
     "@margoengine/usdz": 8792,

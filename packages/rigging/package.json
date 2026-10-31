@@ -35,6 +35,10 @@
     "./retarget": {
       "types": "./dist/retarget.d.ts",
       "import": "./dist/retarget.js"
+    },
+    "./hulls": {
+      "types": "./dist/hulls.d.ts",
+      "import": "./dist/hulls.js"
     }
   },
   "files": [
@@ -47,6 +51,7 @@
   },
   "dependencies": {
     "@margoengine/bvh": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
     "@margoengine/math": "^1.0.0"
   },
   "peerDependencies": {
