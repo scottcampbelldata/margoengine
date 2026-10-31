@@ -55,13 +55,15 @@ export interface TerrainLayer {
   /**
    * Relief from the layer's own texture, 0 to 1: its luma becomes a height of up to `bump` halves of one texture repeat
    * (2 m at scale 0.25), and the shading normal follows that height's slope (derivative bump mapping, Mikkelsen 2010).
-   * No extra texture samples; the mips flatten it with distance. Default 0 (no bump).
+   * No extra texture samples; the mips flatten it with distance, and its slope falls once a pixel covers over 1/64 of a
+   * repeat on the ground. Default 0 (no bump).
    */
   bump?: number;
   /**
-   * Large-scale variation, 0 to 1: a second triplanar sample of the same layer at 1/24 of `scale` (96 m at 0.25)
-   * scales the colour by `1 - macro + macro * luma / meanLuma`, so far slopes keep a pattern where the fine texture
-   * has averaged to its mean. The mean comes from the layer's top mip: give the layers texture a full mip chain.
+   * Large-scale variation, 0 to 1: the same layer at 1/24 of `scale` (96 m at 0.25) scales the colour by
+   * `1 - macro + macro * luma / meanLuma`, so far slopes keep a pattern where the fine texture has averaged to its mean.
+   * A smooth sample about 318 m wide picks that repeat's offset, so it draws no grid. The mean comes from the layer's
+   * top mip: give the layers texture a full mip chain.
    * Default 0 (no macro sample).
    */
   macro?: number;

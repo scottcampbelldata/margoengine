@@ -121,10 +121,14 @@ readable:
 - `bump` (default 0): the layer's own luma becomes a height of up to half a texture repeat per unit of luma, times
   `bump` (2 m at `scale` 0.25 for luma 0 to 1), and the shading normal follows its slope: derivative bump mapping from
   Mikkelsen's "Bump Mapping Unparametrized Surfaces on the GPU" (2010), screen-space derivatives of the height and the
-  position, no extra texture samples. The mips flatten it with distance, as they flatten the colour.
-- `macro` (default 0): a second triplanar sample of the same layer at 1/24 of its `scale` (a 96 m repeat at 0.25)
-  scales the colour by `1 - macro + macro * luma / mean`, where `mean` is the luma of the layer's top mip, so the
-  average colour stays and far slopes keep a pattern. Give the layers texture a full mip chain for a true mean.
+  position, no extra texture samples. The mips flatten it with distance, as they flatten the colour, and past a footprint
+  of 1/64 of a repeat (6 cm at 0.25) its slope falls with the longer of the pixel's two sides on the ground, so distant or
+  grazing ground draws no pixel grain.
+- `macro` (default 0): the same layer at 1/24 of its `scale` (a 96 m repeat at 0.25) scales the colour by
+  `1 - macro + macro * luma / mean`, where `mean` is the luma of the layer's top mip, so the average colour stays and far
+  slopes keep a pattern. A much larger, smooth sample of the layer (about 318 m at 0.25, four mips below the top) adds
+  slow variation and picks the repeat's offset, two offsets blended at a time (after Quilez's "Texture Repetition"), so
+  the 96 m repeat never lines up into a grid. Give the layers texture a full mip chain for a true mean.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
@@ -155,10 +159,12 @@ engine.start();
 Leaving both out (or 0 on every layer) keeps the shader text, the 8-float rules and so every GPU call exactly as
 before; when any layer sets one, the rules grow to 12 floats a layer and the shader adds the relief and the macro
 sample for every layer whose value is above 0. This works with painted `weights` and SSR's capture. Cost: `bump`
-adds about 30 ALU operations and four derivatives per pixel; `macro` adds three texture samples and one top-mip
-sample per showing layer. Checked on a real GPU by `test/bump.browser.mjs` (in `test:gpu`): on flat ground with one
-grey noise texture, 0 draws the same pixels as leaving them out, `bump: 1` spreads the near ground's luma 4.7 times
-as wide, and `macro: 0.5` spreads the means of 32 px blocks of a view from 60 m 10.7 times as wide (RTX A6000).
+adds about 30 ALU operations and four derivatives per pixel; `macro` adds, per showing layer, one top-mip sample and
+three texture samples for each triplanar axis that shows (one axis on most of the ground, all three at most). Checked on
+a real GPU by `test/bump.browser.mjs` (in `test:gpu`): on flat ground with one grey noise texture, 0 draws the same pixels
+as leaving them out, `bump: 1` spreads the near ground's luma 4.3 times as wide, `macro: 0.5` spreads the means of 32 px
+blocks of a view from 60 m 9 times as wide, and straight down from 1.5 km the luma at a 96 m lag correlates under 0.2
+(RTX A6000).
 Where a crest is seen edge-on, the relief's slope is limited to what the pixel can resolve, so crests draw no dark
 specks: `test/crest.browser.mjs` (in `test:gpu`) draws alpine crests under the noon sun with `bump: 1` and counts
 none more than without it, by rules and by painted weights.

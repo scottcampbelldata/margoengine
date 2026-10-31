@@ -17,18 +17,21 @@ const noise=(x,y,cells,s)=>{const f=x*cells/256,g=y*cells/256,i=Math.floor(f),j=
 const levels=[new Uint8Array(256*256*4)];
 for(let y=0;y<256;y++)for(let x=0;x<256;x++){const n=(noise(x,y,4,1)*2+noise(x,y,16,2)+noise(x,y,64,3)*0.5)/3.5,k=(y*256+x)*4,v=Math.round(255*(0.25+0.5*n));levels[0].set([v,v,v,255],k);}
 for(let s=128;s>=1;s>>=1){const p=levels[levels.length-1],q=new Uint8Array(s*s*4),w=s*2;for(let y=0;y<s;y++)for(let x=0;x<s;x++)for(let c=0;c<4;c++){const a=(2*y*w+2*x)*4+c;q[(y*s+x)*4+c]=(p[a]+p[a+4]+p[a+w*4]+p[a+w*4+4]+2)>>2;}levels.push(q);}
-const views={near:{position:[0,6,10],target:[0,0,0]},far:{position:[0,60,20],target:[0,0,0]}};
+// `slope`: 20 degrees off a 55 degree face, its fall line up the screen. `high`: straight down from 1.52 km, where 96 m is 14 pixels.
+const views={near:{position:[0,6,10],target:[0,0,0]},far:{position:[0,60,20],target:[0,0,0]},slope:{position:[24.58,-17.2,0],target:[0,0,0]},high:{position:[0,1520.3,0.01],target:[0,0,0]}};
+const SLOPE=Math.tan(55*Math.PI/180),scenes={slope:{size:400,height:(x)=>-x*SLOPE},high:{size:8000,height:()=>0}};
 window.check={
   // Attaches a terrain with `layer` options on every layer, renders it from `view` and keeps its pixels as `name`.
   // `weighted`: through painted weights (two rgba8unorm textures, layer 0 everywhere), as @margoengine/biomes/view draws.
   async show(name,layer,view,weighted=false){
-    const camera=views[view];engine.camera.position=[...camera.position];engine.camera.target=[...camera.target];
+    const camera=views[view],scene=scenes[view]??{size:400,height:()=>0},half=scene.size/2;engine.camera.position=[...camera.position];engine.camera.target=[...camera.target];
     device.pushErrorScope('validation');
-    const terrain=Terrain.attach(engine,{origin:[-200,-200],size:[400,400],heightScale:1,
-      layers:Array.from({length:4},()=>({height:[-100,100],slope:[0,1],scale:0.25,...layer})),
+    const terrain=Terrain.attach(engine,{origin:[-half,-half],size:[scene.size,scene.size],heightScale:1,
+      layers:Array.from({length:4},()=>({height:[-1000,1000],slope:[0,1],scale:0.25,...layer})),
       textures(gpu){
         const heightmap=gpu.createTexture({size:[8,8],format:'r32float',usage:6}),layers=gpu.createTexture({size:[256,256,4],format:'rgba8unorm',usage:6,mipLevelCount:9});
-        gpu.queue.writeTexture({texture:heightmap},new Float32Array(64),{bytesPerRow:32},[8,8]);
+        const heights=new Float32Array(64);for(let j=0;j<8;j++)for(let i=0;i<8;i++)heights[j*8+i]=scene.height(-half+i*scene.size/7);
+        gpu.queue.writeTexture({texture:heightmap},heights,{bytesPerRow:32},[8,8]);
         levels.forEach((data,mip)=>{const s=256>>mip;for(let l=0;l<4;l++)gpu.queue.writeTexture({texture:layers,mipLevel:mip,origin:[0,0,l]},data,{bytesPerRow:s*4,rowsPerImage:s},[s,s,1]);});
         if(!weighted)return {heightmap,layers};
         const weights=[0,1].map(i=>{const w=gpu.createTexture({size:[1,1],format:'rgba8unorm',usage:6});gpu.queue.writeTexture({texture:w},new Uint8Array([i?0:255,0,0,0]),{bytesPerRow:4},[1,1]);return w;});
@@ -48,6 +51,13 @@ window.check={
     for(let y=64;y<256;y++)for(let x=0;x<256;x++){const v=luma(x,y);sum+=v;sq+=v*v;n++;blocks[((y-64)>>5)*8+(x>>5)]+=v/1024;}
     const mean=sum/n,spread=v=>Math.sqrt(Math.max(0,v.reduce((a,b)=>a+b*b,0)/v.length-(v.reduce((a,b)=>a+b,0)/v.length)**2));
     return {mean,deviation:Math.sqrt(Math.max(0,sq/n-mean*mean)),blocks:spread(blocks)};
+  },
+  // The luma autocorrelation of the middle of a kept image at a lag of (dx, dy) pixels.
+  correlation(name,dx,dy){
+    const d=kept.get(name),luma=(x,y)=>{const k=(y*256+x)*4;return 0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2];},from=64,to=224-Math.max(dx,dy);let m=0,n=0;
+    for(let y=from;y<to;y++)for(let x=from;x<to;x++){m+=luma(x,y);n++;}m/=n;let a=0,b=0;
+    for(let y=from;y<to;y++)for(let x=from;x<to;x++){const v=luma(x,y)-m;a+=v*(luma(x+dx,y+dy)-m);b+=v*v;}
+    return a/Math.max(b,1e-9);
   },
   // How many pixels of two kept images differ in any channel.
   differ(a,b){const x=kept.get(a),y=kept.get(b);let n=0;for(let i=0;i<x.length;i+=4)if(x[i]!==y[i]||x[i+1]!==y[i+1]||x[i+2]!==y[i+2])n++;return n;},

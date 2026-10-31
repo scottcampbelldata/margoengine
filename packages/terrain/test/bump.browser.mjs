@@ -8,6 +8,12 @@
 // least 4 times as wide (4.7 on an RTX A6000); macro 0.5 spreads the means of 32 px blocks of the view from 60 m, where
 // the 4 m repeat averages out, at least 4 times as wide and over 2/255 (0.40 to 4.25). On main both options were
 // ignored, so both checks failed there.
+// Biome look plan round 3, item A4 and B2. Straight down from 1.52 km, where 96 m is 14 pixels, macro 1 tiled into a
+// grid: the luma correlated 0.999 at that lag; now under 0.2 on both axes (0.12 and -0.03 on an RTX A6000). 20 degrees
+// off a 55 degree face from 30 m, a pixel's long side covers about 1/10 of a repeat and bump 1 kept its full slope there;
+// the luma spread over the unbumped one must stay under 1.6 times. The same view guards against streaks down the fall
+// line: the correlation 8 pixels along it stays within 1.3 times the one across (main passed this too: the bump never
+// drew those streaks; they are the relief's gullies, which flat colour without bump draws as well).
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -32,6 +38,11 @@ await runSuite(
       ['nearWeighted', {}, 'near', true],
       ['nearBumpWeighted', { bump: 1 }, 'near', true],
       ['farMacroWeighted', { macro: 0.5 }, 'far', true],
+      ['slopeOff', {}, 'slope'],
+      ['slopeBump', { bump: 1 }, 'slope'],
+      ['slopeBumpWeighted', { bump: 1 }, 'slope', true],
+      ['high', { macro: 1 }, 'high'],
+      ['highWeighted', { macro: 1 }, 'high', true],
     ];
     for (const [name, ...shot] of shots)
       assert.deepEqual(await page.evaluate((a) => window.check.show(...a), [name, ...shot]), [], name);
@@ -51,6 +62,18 @@ await runSuite(
         weighted,
         bumpRatio: stats.nearBump.deviation / stats.near.deviation,
         macroRatio: stats.farMacro.blocks / stats.far.blocks,
+        slopeRatio: stats.slopeBump.deviation / stats.slopeOff.deviation,
+        slopeWeightedRatio: stats.slopeBumpWeighted.deviation / stats.slopeOff.deviation,
+        fallLine: await page.evaluate(() => [
+          window.check.correlation('slopeBump', 0, 8),
+          window.check.correlation('slopeBump', 8, 0),
+        ]),
+        tile: await page.evaluate(() =>
+          ['high', 'highWeighted'].flatMap((n) => [
+            window.check.correlation(n, 14, 0),
+            window.check.correlation(n, 0, 14),
+          ]),
+        ),
         stats,
       };
     await mkdir('test-results/terrain-bump', { recursive: true });
@@ -72,8 +95,20 @@ await runSuite(
       result.macroRatio > 4 && stats.farMacro.blocks > 2,
       `macro 0.5 spreads the 32 px block means ${result.macroRatio.toFixed(2)} times (over 4), to ${stats.farMacro.blocks.toFixed(2)} (over 2)`,
     );
+    assert.ok(
+      result.tile.every((c) => c < 0.2),
+      `macro 1 from 1.5 km draws no 96 m grid: correlation at the lag ${result.tile.map((c) => c.toFixed(3))} (under 0.2)`,
+    );
+    assert.ok(
+      result.slopeRatio < 1.6 && result.slopeWeightedRatio < 1.6,
+      `bump 1 fades with the footprint: spread x${result.slopeRatio.toFixed(2)}, weights x${result.slopeWeightedRatio.toFixed(2)} (under 1.6)`,
+    );
+    assert.ok(
+      result.fallLine[0] <= 1.3 * Math.max(result.fallLine[1], 0.05),
+      `no streaks down the fall line: correlation 8 px along ${result.fallLine[0].toFixed(3)}, across ${result.fallLine[1].toFixed(3)}`,
+    );
     console.log(
-      `ok terrain bump and macro: bump x${result.bumpRatio.toFixed(2)}, macro block spread x${result.macroRatio.toFixed(2)}`,
+      `ok terrain bump and macro: bump x${result.bumpRatio.toFixed(2)}, macro block spread x${result.macroRatio.toFixed(2)}, tile ${Math.max(...result.tile).toFixed(3)}, slope x${result.slopeRatio.toFixed(2)}`,
     );
   },
   () => context.close(),

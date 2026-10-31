@@ -35,8 +35,12 @@ export const terrainOutside = /* wgsl */ `if(any(i.position.xz<frame.map.xy)||an
 /**
  * `TerrainLayer.bump` and `macro`, compiled in only when some layer sets one (otherwise every shader is the text it was).
  * Rules grow to 12 floats: `surface` is (bump height in metres per unit of luma, macro amount, macro texture scale, 0).
- * `terrainSurface` takes a layer's triplanar colour and returns it scaled by the macro sample (the same layer at 1/24 of
- * its scale; its luma over the layer's mean from the top mip, so the average colour stays) with the bump height in w.
+ * `terrainSurface` takes a layer's triplanar colour and returns it scaled by the macro tone (`terrainMacro`, one
+ * triplanar axis at a time; the mean from the top mip keeps the average colour) with the bump height in w.
+ * `terrainMacro` is the layer at 1/24 of its scale, whose one repeat tiled into a grid a kilometre away (luma correlated
+ * 0.999 at the 96 m lag, test/bump.browser.mjs). A smooth coarse mip of the layer at a repeat 3.31 times longer varies the
+ * tone slowly and picks an offset for the repeat, two blended by its fraction: Quilez, "Texture Repetition", technique 3.
+ * Warping the coordinates instead drew wood grain, a finer second sample left the grid.
  * `terrainBump` is Mikkelsen 2010, "Bump Mapping Unparametrized Surfaces on the GPU" (JGT 15(1)), listing 1: the
  * surface gradient of that height from its screen-space derivatives and the position's, no extra texture samples. Each
  * screen axis is first divided by its position derivative's length (the formula is homogeneous in each axis), so det
@@ -47,6 +51,9 @@ export const terrainOutside = /* wgsl */ `if(any(i.position.xz<frame.map.xy)||an
  * The slope the gradient may give is therefore capped at min(1, 4 det), what the pixel can resolve. Uncapped, alpine
  * crests under the noon sun got slopes of 1.5 to over 8 and drew dotted lines of near-black pixels
  * (test/crest.browser.mjs: 21 specks against 0 without bump; capped, 0).
+ * A slope estimated across one pixel holds only what that pixel resolves: mips average the height, not its slope, and
+ * the relief is up to half a repeat high, so the estimate stayed large at every distance and drew pixel grain on far and
+ * grazing ground. Past a footprint of 1/64 of a repeat it falls with the longer side of the pixel on the ground.
  */
 export const surfaceStruct = (code: string): string =>
   code.replace(
@@ -54,23 +61,30 @@ export const surfaceStruct = (code: string): string =>
     'struct Layer {heightSlope:vec4f,params:vec4f,surface:vec4f}',
   );
 const surfaceFunctions = /* wgsl */ `
-var<private> terrainRelief:f32;
+var<private> terrainRelief:f32;var<private> terrainRepeat:f32;
+fn terrainMacro(p:vec2f,q:vec2f,dx:vec2f,dy:vec2f,m:f32,layer:u32,top:f32,norm:f32)->f32 {
+  let luma=vec3f(0.2126,0.7152,0.0722);let w=dot(textureSampleLevel(terrainLayers,terrainSampler,q,i32(layer),max(top-3.0,0.0)).rgb,luma)*norm;
+  let k=w*16.0;let i=floor(k);let t=smoothstep(0.2,0.8,k-i);
+  let a=textureSampleGrad(terrainLayers,terrainSampler,p+sin(vec2f(3,7)*i),i32(layer),dx*m,dy*m).rgb;
+  let b=textureSampleGrad(terrainLayers,terrainSampler,p+sin(vec2f(3,7)*(i+1.0)),i32(layer),dx*m,dy*m).rgb;
+  return dot(mix(a,b,t),luma)*norm*w;
+}
 fn terrainSurface(sample:vec3f,position:vec3f,projection:vec3f,dx:vec3f,dy:vec3f,layer:u32)->vec4f {
   let s=layerRules[layer].surface;let luma=vec3f(0.2126,0.7152,0.0722);var color=sample;
   if(s.y>0.0){
-    let m=s.z;let p=position*m;
-    let x=textureSampleGrad(terrainLayers,terrainSampler,p.zy,i32(layer),dx.zy*m,dy.zy*m).rgb;
-    let y=textureSampleGrad(terrainLayers,terrainSampler,p.xz,i32(layer),dx.xz*m,dy.xz*m).rgb;
-    let z=textureSampleGrad(terrainLayers,terrainSampler,p.xy,i32(layer),dx.xy*m,dy.xy*m).rgb;
-    let mean=textureSampleLevel(terrainLayers,terrainSampler,vec2f(0.5),i32(layer),f32(textureNumLevels(terrainLayers)-1u)).rgb;
-    color*=max(1.0-s.y+s.y*dot(x*projection.x+y*projection.y+z*projection.z,luma)/max(dot(mean,luma),0.0001),0.0);
+    let top=f32(textureNumLevels(terrainLayers)-1u);let norm=1.0/max(dot(textureSampleLevel(terrainLayers,terrainSampler,vec2f(0.5),i32(layer),top).rgb,luma),0.0001);
+    let m=s.z;let p=position*m;let q=position*m*0.302;var tone=0.0;
+    if(projection.x>0.01){tone+=projection.x*terrainMacro(p.zy,q.yz,dx.zy,dy.zy,m,layer,top,norm);}
+    if(projection.y>0.01){tone+=projection.y*terrainMacro(p.xz,q.zx,dx.xz,dy.xz,m,layer,top,norm);}
+    if(projection.z>0.01){tone+=projection.z*terrainMacro(p.xy,q.yx,dx.xy,dy.xy,m,layer,top,norm);}
+    color*=max(1.0-s.y+s.y*tone,0.0);
   }
   return vec4f(color,dot(sample,luma)*s.x);
 }
 fn terrainBump(position:vec3f,normal:vec3f)->vec3f {
   let px=dpdxFine(position);let py=dpdyFine(position);let ax=1.0/max(length(px),1e-20);let ay=1.0/max(length(py),1e-20);
   let dx=px*ax;let dy=py*ay;let r1=cross(dy,normal);let r2=cross(normal,dx);let det=dot(dx,r1);
-  let g=sign(det)*(dpdxFine(terrainRelief)*ax*r1+dpdyFine(terrainRelief)*ay*r2);
+  let g=sign(det)*(dpdxFine(terrainRelief)*ax*r1+dpdyFine(terrainRelief)*ay*r2)*min(1.0,1.0/max(64.0*terrainRepeat*max(length(px),length(py)),1e-20));
   let bumped=abs(det)*normal-g*min(1.0,min(1.0,4.0*abs(det))*abs(det)/max(length(g),1e-20));
   return select(normal,normalize(bumped),dot(bumped,bumped)>0.0);
 }`;
@@ -87,18 +101,18 @@ export const terrainFragment = (
   surface = false,
 ): string => /* wgsl */ `${neutralShader}${surface ? surfaceFunctions : ''}
 fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
-  let slope=1-clamp(normal.y,0.0,1.0);let axes=pow(abs(normal),vec3f(8));let projection=axes/max(axes.x+axes.y+axes.z,0.00001);let dx=dpdx(position);let dy=dpdy(position);var color=vec3f(0);var total=0.0;var fallback=vec3f(0);${surface ? 'var relief=0.0;var fallbackRelief=0.0;' : ''}
+  let slope=1-clamp(normal.y,0.0,1.0);let axes=pow(abs(normal),vec3f(8));let projection=axes/max(axes.x+axes.y+axes.z,0.00001);let dx=dpdx(position);let dy=dpdy(position);var color=vec3f(0);var total=0.0;var fallback=vec3f(0);${surface ? 'var relief=0.0;var fallbackRelief=0.0;var repeat=0.0;' : ''}
   for(var layer=0u;layer<u32(frame.heights.z);layer++){
     let rule=layerRules[layer];let hs=rule.heightSlope;let scale=rule.params.x;let p=position*scale;
     let x=textureSampleGrad(terrainLayers,terrainSampler,p.zy,i32(layer),dx.zy*scale,dy.zy*scale).rgb;
     let y=textureSampleGrad(terrainLayers,terrainSampler,p.xz,i32(layer),dx.xz*scale,dy.xz*scale).rgb;
     let z=textureSampleGrad(terrainLayers,terrainSampler,p.xy,i32(layer),dx.xy*scale,dy.xy*scale).rgb;
-    ${surface ? 'let surface=terrainSurface(x*projection.x+y*projection.y+z*projection.z,position,projection,dx,dy,layer);let sample=surface.rgb;if(layer==0){fallback=sample;fallbackRelief=surface.w;}' : 'let sample=x*projection.x+y*projection.y+z*projection.z;if(layer==0){fallback=sample;}'}
+    ${surface ? 'let surface=terrainSurface(x*projection.x+y*projection.y+z*projection.z,position,projection,dx,dy,layer);let sample=surface.rgb;if(layer==0){fallback=sample;fallbackRelief=surface.w;terrainRepeat=scale;}' : 'let sample=x*projection.x+y*projection.y+z*projection.z;if(layer==0){fallback=sample;}'}
     let h=rule.params.y;let s=rule.params.z;
     let weight=smoothstep(hs.x-h,hs.x+h,position.y)*(1-smoothstep(hs.y-h,hs.y+h,position.y))*smoothstep(hs.z-s,hs.z+s,slope)*(1-smoothstep(hs.w-s,hs.w+s,slope));
-    color+=sample*weight;total+=weight;${surface ? 'relief+=surface.w*weight;' : ''}
+    color+=sample*weight;total+=weight;${surface ? 'relief+=surface.w*weight;repeat+=scale*weight;' : ''}
   }
-  ${surface ? 'terrainRelief=select(fallbackRelief,relief/max(total,0.00001),total>0.00001);' : ''}return select(fallback,color/max(total,0.00001),total>0.00001);
+  ${surface ? 'terrainRelief=select(fallbackRelief,relief/max(total,0.00001),total>0.00001);if(total>0.00001){terrainRepeat=repeat/total;}' : ''}return select(fallback,color/max(total,0.00001),total>0.00001);
 }
 @fragment fn fragment(i:Output)->@location(0) vec4f {
   ${terrainOutside}
@@ -140,13 +154,13 @@ fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   let axes=pow(abs(normal),vec3f(8));let projection=axes/max(axes.x+axes.y+axes.z,0.00001);let dx=dpdx(position);let dy=dpdy(position);
   let d=vec2f(textureDimensions(terrainWeights0));let uv=clamp((position.xz-frame.map.xy)/frame.map.zw,vec2f(0.5)/d,vec2f(1)-vec2f(0.5)/d);
   var packed=array<vec4f,4>(${[0, 1, 2, 3].map((i) => (i < n ? `textureSampleLevel(terrainWeights${i},terrainSampler,uv,0)` : 'vec4f(0)')).join(',')});
-  var color=vec3f(0);var total=0.0;${surface ? 'var relief=0.0;' : ''}
+  var color=vec3f(0);var total=0.0;${surface ? 'var relief=0.0;var repeat=0.0;' : ''}
   for(var layer=0u;layer<u32(frame.heights.z);layer++){
     let weight=packed[layer/4u][layer%4u];if(weight<=0.0){continue;}
-    ${surface ? 'let surface=terrainSurface(terrainLayerSample(position,projection,dx,dy,layer),position,projection,dx,dy,layer);color+=surface.rgb*weight;relief+=surface.w*weight;total+=weight;' : 'color+=terrainLayerSample(position,projection,dx,dy,layer)*weight;total+=weight;'}
+    ${surface ? 'let surface=terrainSurface(terrainLayerSample(position,projection,dx,dy,layer),position,projection,dx,dy,layer);color+=surface.rgb*weight;relief+=surface.w*weight;repeat+=layerRules[layer].params.x*weight;total+=weight;' : 'color+=terrainLayerSample(position,projection,dx,dy,layer)*weight;total+=weight;'}
   }
-  ${surface ? 'if(total>0.00001){terrainRelief=relief/total;return color/total;}' : 'if(total>0.00001){return color/total;}'}
-  ${surface ? 'let surface=terrainSurface(terrainLayerSample(position,projection,dx,dy,0u),position,projection,dx,dy,0u);terrainRelief=surface.w;return surface.rgb;' : 'return terrainLayerSample(position,projection,dx,dy,0u);'}
+  ${surface ? 'if(total>0.00001){terrainRelief=relief/total;terrainRepeat=repeat/total;return color/total;}' : 'if(total>0.00001){return color/total;}'}
+  ${surface ? 'let surface=terrainSurface(terrainLayerSample(position,projection,dx,dy,0u),position,projection,dx,dy,0u);terrainRelief=surface.w;terrainRepeat=layerRules[0].params.x;return surface.rgb;' : 'return terrainLayerSample(position,projection,dx,dy,0u);'}
 }
 ${rules.replace(ruleColor, '')}`;
 };
