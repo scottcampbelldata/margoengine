@@ -4,9 +4,9 @@
 // protected.
 
 /** What the sign says, word for word. */
-export const PLAZA_SIGN = 'Margo engine ❤️ made for Margie';
+export const PLAZA_SIGN = 'Margo Engine ❤️ made for Margie';
 /** The sign's lines, top first; joined with spaces they are {@link PLAZA_SIGN}. */
-export const PLAZA_SIGN_LINES: readonly string[] = ['Margo engine', '❤️ made for', 'Margie'];
+export const PLAZA_SIGN_LINES: readonly string[] = ['Margo Engine', '❤️ made for', 'Margie'];
 /** Radius of the stone disc in blocks, around the origin. */
 export const PLAZA_RADIUS = 24;
 /** Cells up to this far above the floor are protected over the whole disc. */
@@ -29,6 +29,7 @@ export const PLAZA_GLYPH_ROWS = 7 + PLAZA_GLYPH_DESCENT;
  * and one with fewer is padded with empty rows. Tests read the sign back with them.
  */
 export const PLAZA_GLYPHS: Readonly<Record<string, readonly string[]>> = {
+  E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
   M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
   a: ['00000', '00000', '01110', '00001', '01111', '10001', '01111'],
   d: ['00001', '00001', '01101', '10011', '10001', '10001', '01111'],

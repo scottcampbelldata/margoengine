@@ -48,7 +48,7 @@ function worldReader(generator) {
 }
 
 test('the sign is the exact dedication, heart and variation selector included', () => {
-  assert.equal(PLAZA_SIGN, 'Margo engine ❤️ made for Margie');
+  assert.equal(PLAZA_SIGN, 'Margo Engine ❤️ made for Margie');
   assert.equal(PLAZA_SIGN_LINES.join(' '), PLAZA_SIGN);
 });
 
@@ -93,7 +93,7 @@ test('generated chunks spell the sign, in glowstone letters and a red heart, in 
     text.push(out);
   }
   assert.equal(text.join(' '), PLAZA_SIGN);
-  assert.equal(text[0], 'Margo engine');
+  assert.equal(text[0], 'Margo Engine');
   assert.equal(text[2], 'Margie');
 });
 
