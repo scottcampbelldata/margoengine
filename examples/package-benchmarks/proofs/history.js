@@ -4,14 +4,32 @@
 // runner documents. Ongoing guarantees (`--current`) never come here for their baseline: they read the golden outputs
 // in baselines/ (golden.js), which every clone has. A golden-mode proof that still asks Git for a missing revision is a
 // bug in the proof and fails instead.
-import { execFileSync } from 'node:child_process';
+//
+// HISTORICAL passes, so only Git's own answer "no such commit" may lead to it. Git that did not answer (it could not start
+// on a loaded machine, or could not read a file another process was replacing) throws here and fails the proof, with
+// Git's message: it says nothing about what this clone holds. The same goes for a missing file in show() and a
+// non-ancestor in isAncestor(), which would otherwise read the working tree or decide a claim on a guess.
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { basename, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '../../..');
-const git = (args) =>
-  execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 28 });
+const run = (args) =>
+  spawnSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 28 });
+const failed = (args, result) =>
+  new Error(
+    `git ${args.join(' ')} gave no answer (${result.error?.code ?? `status ${result.status}`}): ${result.stderr?.trim() || result.error?.message}`,
+  );
+/** Git's output, or undefined where `no` is the exit status this command answers "no" with; anything else throws. */
+const git = (args, no) => {
+  const result = run(args);
+  if (result.status === 0) return result.stdout;
+  if (no !== undefined && result.status === no) return undefined;
+  throw failed(args, result);
+};
+/** The object id of `name`, or undefined when Git answers that it has none (--verify --quiet: status 1, no message). */
+const object = (name) => git(['rev-parse', '--verify', '--quiet', '--end-of-options', name], 1)?.trim();
 const proof = () => basename(process.argv[1] ?? 'proof').replace(/\.proof\.js$|\.m?js$/, '');
 
 /** True while a --current proof reads golden outputs (golden.js): then a missing revision is an error, not HISTORICAL. */
@@ -31,26 +49,35 @@ export function historical(ref) {
   process.exit(0);
 }
 
+/** Whether this clone holds commit `ref`. Throws when Git gives no answer. */
+export const holds = (ref) => object(`${ref}^{commit}`) !== undefined;
+
+// Each ref a run names is resolved once: one proof reads one commit throughout, whatever HEAD does meanwhile, and the
+// hundreds of show() calls of a build do not each ask Git the same question again.
+const revisions = new Map();
+
 /** The full commit id of `ref`, or HISTORICAL (historical()) when this clone does not hold it. */
 export function revision(ref) {
   // Golden mode reads nothing from Git, even where this clone holds the commit, so every clone runs the same thing.
   if (strict.value) return historical(ref);
-  try {
-    return git(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`]).trim();
-  } catch {
-    return historical(ref);
+  if (!revisions.has(ref)) {
+    const id = object(`${ref}^{commit}`);
+    if (id === undefined) return historical(ref);
+    revisions.set(ref, id).set(id, id);
   }
+  return revisions.get(ref);
 }
 
 /** A repository file's text at commit `ref` (`path` relative to the repository, forward slashes), or undefined when the
  * commit has no such file. */
 export function show(ref, path) {
-  const id = revision(ref);
-  try {
-    return git(['show', `${id}:${path}`]);
-  } catch {
-    return;
-  }
+  const name = `${revision(ref)}:${path}`,
+    args = ['show', name],
+    result = run(args);
+  if (result.status === 0) return result.stdout;
+  // `git show` has one status for every failure, so a missing file is what Git answers when asked about the file alone.
+  if (object(name) === undefined) return;
+  throw failed(args, result);
 }
 
 /** The names directly inside directory `dir` at commit `ref`, as `git ls-tree --name-only`. */
@@ -63,12 +90,7 @@ export const list = (ref, dir) =>
 export function isAncestor(ancestor, ref) {
   const id = revision(ref),
     of = revision(ancestor);
-  try {
-    git(['merge-base', '--is-ancestor', of, id]);
-    return true;
-  } catch {
-    return false;
-  }
+  return git(['merge-base', '--is-ancestor', of, id], 1) !== undefined;
 }
 
 /** Git's blob id of a working-tree file's text (LF line ends), as `git hash-object` gives it in a checkout. */

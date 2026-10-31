@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { strict } from './history.js';
+import { holds, strict } from './history.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   // PROOFS_BASELINES: another folder (the golden tests use a temporary one).
@@ -130,14 +130,6 @@ export function stored(proof) {
 
 const git = (...args) =>
   execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-const has = (ref) => {
-  try {
-    git('rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 /** Golden-output state of this proof run, set by begin() (compare.js refs() in --current mode). */
 const state = {
@@ -270,7 +262,7 @@ export function begin(ref, env = process.env) {
   state.proof = basename(process.argv[1] ?? '').replace(/\.proof\.js$/, '');
   state.ref = ref;
   if (env.PROOFS_GOLDEN_CAPTURE === '1') state.mode = 'capture';
-  else if (env.PROOFS_GOLDEN === '1' || !has(ref)) state.mode = 'read';
+  else if (env.PROOFS_GOLDEN === '1' || !holds(ref)) state.mode = 'read';
   else state.mode = 'check';
   if (state.mode === 'read') {
     strict.value = true;

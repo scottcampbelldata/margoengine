@@ -58,14 +58,32 @@ test("a pinned run's packages import @margoengine/core built at the pin, not tod
   }
 });
 
+// This test once returned status 0 in a landing: a `git` the pinned bundle ran failed for a moment, because another
+// worktree was rewriting the shared .git/config, and history.js took any failure for "this clone lacks the commit": a
+// false HISTORICAL, exit 0, before coreAt() was reached. What it checks needs no history: every bundle() counts, and
+// coreAt() refuses before it looks at its pin. So PATH is empty here and Git cannot run. The test below checks history.js.
 test('coreAt() after a package was built fails, so one story never mixes two cores', () => {
   const run = script(`
-    const pin = proof.commit('HEAD');
-    await proof.bundle('post', 'src/index.ts', pin);
-    await proof.coreAt(pin);
+    process.env.PATH = '';
+    await proof.bundle('post', 'src/index.ts');
+    await proof.coreAt('HEAD');
+    console.log('coreAt() did not refuse');
   `);
-  assert.notEqual(run.status, 0);
+  assert.notEqual(run.status, 0, run.out.slice(-3000));
   assert.match(run.out, /coreAt\(\) must come before the proof builds any package/);
+  assert.doesNotMatch(run.out, /HISTORICAL|did not refuse/);
+});
+
+test('a git that stops answering during a pinned build fails the run, it is never a false HISTORICAL', () => {
+  const run = script(`
+    const pin = proof.commit('HEAD');
+    process.env.PATH = '';
+    await proof.bundle('post', 'src/index.ts', pin);
+    console.log('built without git');
+  `);
+  assert.notEqual(run.status, 0, run.out.slice(-3000));
+  assert.match(run.out, /git .* gave no answer/);
+  assert.doesNotMatch(run.out, /HISTORICAL|built without git/);
 });
 
 test('the nightly job runs the pinned proofs after the full check, alone under the GPU lock', () => {

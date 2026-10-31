@@ -5,10 +5,10 @@
 // refusing Git, and pinned runs reporting HISTORICAL for a commit the clone lacks. They also cover canonicalNaN, the
 // fix for geometry.proof.js failing at random on NaN bit patterns.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { canonicalNaN, decode, digest, encode, exactMath } from '../examples/package-benchmarks/proofs/golden.js';
@@ -171,6 +171,98 @@ test('a pinned run whose commit this clone lacks is HISTORICAL with the commit n
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// A proof that exits 0 as HISTORICAL passes, so only Git's own "no" may lead there. Any other failure of `git` once meant
+// the same (a landing's proofs-pinned-core test returned 0 while another worktree rewrote .git/config), and a failed
+// `git show` silently read the working tree in place of the pinned file.
+const history = (body, env = {}) => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-golden-'));
+  try {
+    return proof(
+      dir,
+      `import { holds, isAncestor, revision, show } from ${JSON.stringify(url('history.js'))};\n${body}`,
+      env,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+};
+// Two ways Git gives no answer, whatever the question: it cannot start, and it starts and cannot read the repository.
+const noAnswer = {
+  'git cannot start': `process.env.PATH = '';`,
+  'git cannot read the repository': `process.env.GIT_DIR = 'no-such-directory';`,
+};
+const questions = {
+  revision: `revision('HEAD~1')`,
+  holds: `holds('HEAD')`,
+  show: `show(id, 'package.json')`,
+  'show of a missing file': `show(id, 'no/such/file')`,
+  isAncestor: `isAncestor(id, id)`,
+};
+
+for (const [name, cause] of Object.entries(noAnswer))
+  for (const [question, ask] of Object.entries(questions))
+    test(`${question} throws when ${name}, and is never HISTORICAL`, () => {
+      const run = history(`const id = revision('HEAD');\n${cause}\nconsole.log('answered', ${ask});`);
+      assert.notEqual(run.status, 0, run.out);
+      assert.match(run.out, /gave no answer/);
+      assert.doesNotMatch(run.out, /HISTORICAL|answered/);
+    });
+
+test("Git's own answers stand: a file the commit lacks, a commit that is no ancestor, a commit the clone lacks", () => {
+  // A repository of its own: the fresh-clone check runs this test in a clone of one parentless commit.
+  const dir = mkdtempSync(join(tmpdir(), 'margo-golden-'));
+  try {
+    const git = (...args) =>
+      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], {
+        cwd: dir,
+        encoding: 'utf8',
+        stdio: 'pipe',
+      });
+    git('init', '-q', '-b', 'main');
+    writeFileSync(join(dir, 'file.txt'), 'text');
+    git('add', '.');
+    git('commit', '-q', '-m', 'first');
+    git('commit', '-q', '--allow-empty', '-m', 'second');
+    const copy = join(dir, 'examples/package-benchmarks/proofs/history.js');
+    mkdirSync(dirname(copy), { recursive: true });
+    cpSync(join(proofs, 'history.js'), copy);
+    const run = proof(
+      dir,
+      `import { holds, isAncestor, revision, show } from ${JSON.stringify(pathToFileURL(copy).href)};
+      const id = revision('HEAD'), parent = revision('HEAD~1');
+      console.log(JSON.stringify({
+        file: show(id, 'file.txt'),
+        missing: show(id, 'no/such/file') === undefined,
+        ancestor: isAncestor(parent, id),
+        notAncestor: isAncestor(id, parent),
+        holds: holds(id),
+        lacks: holds('0000000000000000000000000000000000000001'),
+      }));`,
+    );
+    assert.equal(run.status, 0, run.out);
+    assert.deepEqual(JSON.parse(run.out.match(/^\{.*\}$/m)[0]), {
+      file: 'text',
+      missing: true,
+      ancestor: true,
+      notAncestor: false,
+      holds: true,
+      lacks: false,
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a ref is resolved once: a run keeps reading the commit it started with, without asking Git again', () => {
+  const run = history(`
+    const id = revision('HEAD');
+    process.env.PATH = '';
+    console.log(revision('HEAD') === id, revision(id) === id);
+  `);
+  assert.equal(run.status, 0, run.out);
+  assert.match(run.out, /^true true$/m);
 });
 
 // Bug 17 (2026-10-27): math-consolidation passed on this PC (Node 26.12, V8 14.6) and failed on Node 22.22.1 (V8 12.4)
