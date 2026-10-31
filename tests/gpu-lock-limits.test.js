@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -16,6 +17,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { killTree } from '../scripts/gpu-lock.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const alive = (pid) => {
@@ -28,6 +30,19 @@ const alive = (pid) => {
 };
 const settled = (promise, ms = 200) => Promise.race([promise.then(() => 'got'), sleep(ms).then(() => 'waiting')]);
 const quiet = () => {};
+// `promise`, or a failure saying `message` past `ms`. The timer is cleared, so it keeps nothing running.
+const bounded = (promise, ms, message) => {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, fail) => {
+      timer = setTimeout(() => fail(new Error(message)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+};
+const waitUntil = async (condition, message, ms = 20_000) => {
+  for (const end = Date.now() + ms; !condition(); await sleep(10)) assert.ok(Date.now() < end, message);
+};
 const FAST = { MARGO_GPU_BEAT_MS: '50', MARGO_GPU_GRACE_MS: '200' };
 
 let copies = 0;
@@ -49,7 +64,6 @@ async function withLock(body, env = {}) {
       if (saved[key] === undefined) delete process.env[key];
       else process.env[key] = saved[key];
     }
-    await sleep(150); // the heartbeat processes see the release and end
     rmSync(folder, { recursive: true, force: true });
   }
 }
@@ -79,9 +93,8 @@ test('run: a command past --max is killed with its children, the lock is freed, 
     assert.match(run.stderr, /TIMEOUT after 0\.04 min: .*setTimeout/);
     assert.ok(Date.now() - started < 30_000, 'it did not wait for the command to finish by itself');
     const [child, grandchild] = readFileSync(pidFile, 'utf8').split(',').map(Number);
-    await sleep(500);
-    assert.equal(alive(child), false, 'the command is gone');
-    assert.equal(alive(grandchild), false, "the command's child is gone");
+    await waitUntil(() => !alive(child), 'the command is gone');
+    await waitUntil(() => !alive(grandchild), "the command's child is gone");
     assert.ok(!readdirSync(folder).includes('gpu-lock-timeouts.log'), 'the wrapper ended it, not a racing heartbeat');
     // Freed: a new holder gets the lock at once, and nothing is left in the folder.
     const next = spawnSync(process.execPath, ['scripts/gpu-lock.mjs', 'status'], {
@@ -97,24 +110,30 @@ test('run: a command past --max is killed with its children, the lock is freed, 
 test('a holder that called acquire() itself and hangs in a synchronous loop is ended by its heartbeat process', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
     lock = join(folder, 'gpu.lock');
+  let child;
   try {
     const hog =
       "const m = await import('./scripts/gpu-lock.mjs'); await m.acquire({ owner: 'hog', max: 0.01, command: 'busy loop' }); for (;;) {}";
-    const child = spawn(process.execPath, ['--input-type=module', '-e', hog], {
+    child = spawn(process.execPath, ['--input-type=module', '-e', hog], {
       stdio: 'ignore',
       env: { ...process.env, MARGO_GPU_LOCK: lock, MARGO_GPU_LOCK_NESTED: '', ...FAST },
     });
     const closed = new Promise((done) => child.on('close', (code, signal) => done({ code, signal })));
-    const outcome = await Promise.race([closed, sleep(20_000).then(() => 'still running')]);
-    assert.notEqual(outcome, 'still running', 'the heartbeat process ended the hung holder');
+    const outcome = await bounded(closed, 20_000, 'the hung holder is still running');
     assert.ok(outcome.code !== 0, 'it did not exit cleanly');
-    await sleep(300);
-    const status = spawnSync(process.execPath, ['scripts/gpu-lock.mjs', 'status'], {
-      encoding: 'utf8',
-      env: { ...process.env, MARGO_GPU_LOCK: lock },
-    });
-    assert.equal(JSON.parse(status.stdout), null, 'its entry is gone');
+    // The last thing the heartbeat does. Regression (2026-10-31): on Windows `taskkill /T` took the heartbeat down with
+    // the holder, every time, so this line was never written; about 2 runs in 100 under load the taskkill died with
+    // the heartbeat before it reached the holder, which spun on past its limit and this test timed out.
+    const log = join(folder, 'gpu-lock-timeouts.log');
+    await waitUntil(() => existsSync(log), 'the heartbeat outlives the holder and logs the timeout');
+    await waitUntil(
+      () => /TIMEOUT after 0\.01 min: hog: busy loop/.test(readFileSync(log, 'utf8')),
+      'the line is whole',
+    );
+    assert.deepEqual(readdirSync(join(lock, 'shared')), [], 'its entry is gone');
   } finally {
+    // Whatever failed above, a spinning holder must not outlive the test (it kept the test file from ending at all).
+    if (child && child.exitCode === null && child.signalCode === null) killTree(child.pid);
     rmSync(folder, { recursive: true, force: true });
   }
 });
@@ -144,6 +163,7 @@ const heartbeatKeepsHolder = (env) =>
       // Longer than the lease: only the heartbeat process keeps the entry fresh.
       const waited = [],
         waiter = gpu.acquire({ owner: 'bench', mode: 'exclusive', poll: 10, log: (m) => waited.push(m) });
+      // fixed-wait: two leases must pass with the holder still in
       assert.equal(await settled(waiter, 4000), 'waiting', 'a live heartbeat is not reclaimed');
       // A reclaimed holder's slot is not handed over at once, so 'waiting' alone does not prove it was kept.
       assert.doesNotMatch(waited.join(' | '), /removing stale/, 'a live heartbeat is not reclaimed');

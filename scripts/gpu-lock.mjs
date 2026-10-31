@@ -335,15 +335,22 @@ const describe = (entry) =>
     ? `${entry.owner} (${entry.mode ?? 'exclusive'}${entry.takenAt ? `, since ${entry.takenAt}` : ''}${entry.command ? `, running: ${entry.command}` : ''})`
     : 'an unlabelled holder';
 
+const spawnBeat = (verb, args) =>
+  spawn(process.execPath, [import.meta.filename, verb, ...args], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+    env: { ...process.env, MARGO_GPU_LOCK: lockDir },
+  }).unref();
+
 // Starts the process that keeps a holder's entry fresh and ends the holder if it overruns. It is separate from the holder
 // because a holder busy in a long synchronous call (spawnSync) cannot refresh anything itself.
+// On Windows it must not be the holder's child: `taskkill /T` follows parent ids, so ending the holder ended the heartbeat
+// too, and that closed the job object Node keeps its children in, which ended the taskkill. Whether taskkill reached the
+// holder first was a race (about 2 runs in 100 on a busy machine: the holder ran on past its limit, and on all runs the
+// heartbeat died before it could write gpu-lock-timeouts.log). So a starter that exits at once stands between them.
 function startHeartbeat(file, token, deadline) {
-  const child = spawn(
-    process.execPath,
-    [import.meta.filename, 'beat', file, token, String(process.pid), String(deadline)],
-    { detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, MARGO_GPU_LOCK: lockDir } },
-  );
-  child.unref();
+  spawnBeat(process.platform === 'win32' ? 'beat-start' : 'beat', [file, token, String(process.pid), String(deadline)]);
 }
 
 /**
@@ -495,9 +502,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const own = process.argv.slice(2, process.argv.indexOf('--') < 0 ? undefined : process.argv.indexOf('--'));
   exitOnHelp(USAGE, own);
   if (verb === 'status') console.log(JSON.stringify(status()));
+  else if (verb === 'beat-start') spawnBeat('beat', [...rest, String(process.pid)]);
   else if (verb === 'beat') {
-    // The heartbeat process: node gpu-lock.mjs beat <entry file> <token> <holder pid> <deadline ms>
-    const [file, token, parent, deadline] = rest;
+    // The heartbeat process: node gpu-lock.mjs beat <entry file> <token> <holder pid> <deadline ms> [<starter pid>]
+    const [file, token, parent, deadline, starter] = rest;
     const grace = Number(process.env.MARGO_GPU_GRACE_MS ?? 15_000);
     setInterval(() => {
       const entry = read(file);
@@ -507,6 +515,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         process.exit(0);
       }
       if (Date.now() > Number(deadline) + grace) {
+        // While the starter lives this process is still in the holder's tree. It exits as soon as it has started this
+        // one; the bound is for its pid having gone to another process.
+        if (starter && alive(Number(starter)) && Date.now() < Number(deadline) + grace + MIN) return;
         killTree(Number(parent));
         rmSync(file, { force: true });
         try {
