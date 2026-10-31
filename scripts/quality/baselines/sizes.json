@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3936659,
+  "total": 3941795,
   "history": [
     {
       "date": "2026-10-24",
@@ -894,7 +894,13 @@
     {
       "date": "2026-10-30",
       "commit": "0882df471",
-      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
+      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "f766d8ee2",
+      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
       "grew": 1
     },
     {
@@ -906,13 +912,7 @@
     {
       "date": "2026-10-30",
       "commit": "0882df471",
-      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "f766d8ee2",
-      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
+      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
       "grew": 1
     },
     {
@@ -983,6 +983,12 @@
     },
     {
       "date": "2026-10-31",
+      "commit": "175c6ec2d",
+      "reason": "new package @margoengine/tilemap (row 25 J3a): types and small helpers, 1.4 kB",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
       "commit": "4f309c27a",
       "reason": "react: Canvas maxDpr (pixel-ratio cap through the light tier) and the development hints for lowercase R3F tags and WebGL2 pointer handlers add 832 B gzip to the react entry (7,168 to 8,000 B); core and stage are unchanged",
       "grew": 1
@@ -990,7 +996,7 @@
     {
       "date": "2026-10-31",
       "commit": "175c6ec2d",
-      "reason": "new package @margoengine/tilemap (row 25 J3a): types and small helpers, 1.4 kB",
+      "reason": "new optional package @margoengine/sprites: 2D sprites at exact pixels, one instanced draw per layer (row 25, J1; budget 9 KB)",
       "grew": 1
     }
   ],
@@ -1287,6 +1293,7 @@
     "@margoengine/splats": 24851,
     "@margoengine/splats/data": 17665,
     "@margoengine/splines": 1555,
+    "@margoengine/sprites": 5136,
     "@margoengine/stage": 2240,
     "@margoengine/stage/effects": 727,
     "@margoengine/stage/environment": 747,

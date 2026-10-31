@@ -111,6 +111,7 @@
     "packages/tiles",
     "packages/cutscene",
     "packages/ragdoll",
+    "packages/sprites",
     "packages/save",
     "packages/mixer",
     "packages/webgl2-compat",

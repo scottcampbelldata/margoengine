@@ -1182,6 +1182,10 @@
       "types": "./dist/splines.d.ts",
       "import": "./dist/splines.js"
     },
+    "./sprites": {
+      "types": "./dist/sprites.d.ts",
+      "import": "./dist/sprites.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"
@@ -1545,6 +1549,7 @@
     "@margoengine/sky": "^1.0.0",
     "@margoengine/splats": "^1.0.0",
     "@margoengine/splines": "^1.0.0",
+    "@margoengine/sprites": "^1.0.0",
     "@margoengine/stage": "^1.0.0",
     "@margoengine/staging": "^1.0.0",
     "@margoengine/stats": "^1.0.0",

@@ -128,6 +128,18 @@
       <p><strong>Cause.</strong> <code>exactSize</code> was an array that is not two whole numbers from 1 to 8192.</p>
       <p><strong>Fix.</strong> Pass <code>exactSize: [width, height]</code> in backbuffer pixels (for example <code>[320, 180]</code>), or <code>true</code> to keep the canvas <code>width</code> and <code>height</code> attributes. Zoom with CSS: set the canvas size to a whole multiple and <code>image-rendering: pixelated</code>.</p>
     </section>
+    <section id="sprite-options">
+      <h2><a href="#sprite-options">Sprite options and sprite fields</a></h2>
+      <p class="messages"><code>Invalid sprite</code> <code>Invalid sprite rect</code> <code>Invalid sprite tint</code> <code>Invalid sprite camera</code> <code>Invalid sprite capacity</code> <code>Invalid sprite order</code> <code>Invalid sprite clear</code> <code>Invalid sprite pixels</code> <code>SpriteLayer needs an atlas</code> <code>Sprite normal atlas differs in size</code> <code>Too many sprites in a layer</code></p>
+      <p><strong>Cause.</strong> A <code>SpriteLayer</code> option or a <code>Sprite</code> field is out of range. Sprite fields are read each frame, so a bad value throws from the frame that first reads it: a non-finite position, an <code>alpha</code> outside 0 to 1, or a <code>rect</code> that is not whole texels inside the atlas.</p>
+      <p><strong>Fix.</strong> Keep <code>x</code>, <code>y</code>, <code>z</code>, scale, pivot and <code>rotation</code> finite, <code>alpha</code> from 0 to 1, and <code>rect</code> as <code>[x, y, width, height]</code> in whole texels inside the atlas. <code>camera.zoom</code> must be above 0, <code>tint</code> is <code>0xrrggbb</code>, <code>#rrggbb</code> or <code>#rgb</code>, atlas bytes are <code>width * height * 4</code> long, and a normal atlas is the size of the colour atlas. For too many sprites, split them across layers.</p>
+    </section>
+    <section id="sprite-state">
+      <h2><a href="#sprite-state">Sprite layer state</a></h2>
+      <p class="messages"><code>Sprite already in a layer</code> <code>Sprite atlas lost with the device; call setAtlas</code> <code>Sprite normals need one sample and a same-size target</code></p>
+      <p><strong>Cause.</strong> A sprite was added to a second layer, a layer built on a plain <code>GPUTexture</code> atlas drew after a device loss (the texture died with the old device), or a normal target does not match the colour target.</p>
+      <p><strong>Fix.</strong> Call <code>remove</code> before adding a sprite to another layer. Call <code>setAtlas</code> after a device loss, or pass bytes, an <code>ImageBitmap</code> or <code>(device) =&gt; GPUTexture</code>, which come back by themselves. For normals, draw at one sample per pixel (<code>exactSize</code> on the engine, or your own <code>target</code>) with a single-sample normal target of the same size.</p>
+    </section>
     <section id="limits">
       <h2><a href="#limits">Capacity and GPU limits</a></h2>
       <p class="messages"><code>Capacity: 1..8388608</code> <code>Capacity</code> <code>Transform allocation</code> <code>GPU buffer limit</code> <code>Shader limit: 64</code></p>

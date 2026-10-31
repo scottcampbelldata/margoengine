@@ -332,7 +332,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/splats`](packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |
 | [`@margoengine/tiles`](packages/tiles/README.md) | Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf-pro. |
 
-### Rendering and lighting (20)
+### Rendering and lighting (21)
 
 | Package | What it is |
 | --- | --- |
@@ -349,6 +349,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/lod`](packages/lod/README.md) | Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas. |
 | [`@margoengine/culling`](packages/culling/README.md) | GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame. |
 | [`@margoengine/points`](packages/points/README.md) | Large point clouds (PointCloud, PointsMaterial) and instanced sprites (SpriteBatch, SpriteMaterial) for Margo Engine, WebGPU. |
+| [`@margoengine/sprites`](packages/sprites/README.md) | 2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target. |
 | [`@margoengine/lines`](packages/lines/README.md) | Fat lines (Line, LineMaterial) and debug helpers for Margo Engine, WebGPU. |
 | [`@margoengine/text`](packages/text/README.md) | GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU. |
 | [`@margoengine/labels`](packages/labels/README.md) | HTML labels and CSS 3D objects positioned over a Margo Engine canvas. |

@@ -1,0 +1,74 @@
+# @margoengine/sprites
+
+Import `margoengine/sprites` from the `margoengine` package, or `@margoengine/sprites` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+2D sprites that land on exact pixels. A `SpriteLayer` holds any number of `Sprite`s and draws them in one instanced draw
+from a storage buffer. Texels are read with no filtering and no colour conversion, so with one sample per pixel what you
+put in the atlas is what reaches the screen, byte for byte. Core stays the same size: an app that does not import this
+package ships none of it.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { SpriteLayer } from 'margoengine/sprites';
+
+// exactSize keeps the backbuffer at 64 x 32 with no MSAA; CSS scales the canvas up.
+const canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+canvas.style.imageRendering = 'pixelated';
+const engine = await EngineKernel.create(canvas, { exactSize: [64, 32] });
+
+// A 2 x 2 atlas: red, green, blue, white. An ImageBitmap or a GPUTexture works the same way.
+const data = new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
+const layer = SpriteLayer.attach(engine, { atlas: { width: 2, height: 2, data }, ySort: true });
+
+const hero = layer.add({ x: 10, y: 7, pivotX: 0.5, pivotY: 1, scaleX: 4, scaleY: 4 });
+const coin = layer.add({ x: 30, y: 7, rect: [0, 0, 1, 1], tint: '#ffd040' });
+engine.start();
+
+// Change any field whenever you like: only the bytes that changed go to the GPU.
+hero.x = 12.4; // draws at whole pixels until snap is set to false
+hero.flipX = true;
+coin.visible = false;
+```
+
+## Sprite
+
+| Field | Default | What it does |
+| --- | --- | --- |
+| `x`, `y` | 0 | World position of the pivot, y down |
+| `z` | 0 | Higher draws over lower |
+| `pivotX`, `pivotY` | 0 | Pivot across and down the image, 0 to 1 |
+| `scaleX`, `scaleY` | 1 | Scale; negative mirrors about the pivot |
+| `flipX`, `flipY` | false | Mirrors the image inside its rectangle |
+| `rotation` | 0 | Clockwise turn about the pivot, radians; pixels stay nearest, never blended |
+| `tint` | white | `0xrrggbb`, `'#rrggbb'` or `'#rgb'`, multiplied with the atlas bytes |
+| `alpha` | 1 | Opacity, 0 to 1 |
+| `rect` | whole atlas | `[x, y, width, height]` in whole atlas texels |
+| `visible` | true | False leaves it out of the draw |
+
+## SpriteLayer
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `atlas` | required | `{width, height, data}` RGBA8 bytes, `ImageBitmap`, `GPUTexture` or `(device) => GPUTexture` |
+| `camera` | `{x: 0, y: 0, zoom: 1}` | World point at the top-left and pixels per world unit, read each frame |
+| `snap` | true | Rounds each image's corner to a whole pixel after the camera, read each frame |
+| `ySort` | false | Among equal `z`, sorts by `y`, then by add order; read each frame |
+| `target` | frame's colour | A texture, or a function returning one, to draw into instead |
+| `clear` | `[0, 0, 0, 0]` | With `target`: the clear colour, or false to draw over it |
+| `normals` | none | `{atlas, target, clear}`: a second colour target for 2D lighting |
+| `order` | 10 | Frame-graph order, after the scene at 0 |
+| `layers` | 1 | Render-layer bits; a view with `layers` that shares none skips this layer |
+| `capacity` | 256 | Sprites before the buffer grows |
+| `name` | `sprites-1`, ... | Plugin name, unique per scene |
+
+Methods: `add(sprite or options)`, `remove(sprite)`, `clearSprites()`, `setAtlas(atlas)`, `dispose()` (or `using`). Read
+`sprites` for the list in draw order.
+
+Exact pixels need one sample per pixel: `exactSize` on the engine, or your own single-sample `target`. A `Tonemap`
+grades whatever is drawn before its order of 31, so set `order: 40` to keep a layer's bytes out of it.
+
+Atlas textures made from bytes or an `ImageBitmap` come back by themselves after a device loss, and so does a function.
+A plain `GPUTexture` belonged to the lost device: the next frame throws `MargoError` `'state'` until you call `setAtlas`.
+
+Normals write `n * 0.5 + 0.5` from a same-size normal atlas, turned and flipped with the sprite, with alpha 1 where a
+sprite covers the pixel. They need a single-sample colour target and a single-sample normal target of the same size.

@@ -1033,6 +1033,27 @@
     "category": "Rendering and lighting"
   },
   {
+    "id": "sprites",
+    "title": "Sprites",
+    "category": "Rendering and lighting",
+    "package": "@margoengine/sprites",
+    "version": "1.0.0",
+    "published": false,
+    "description": "2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "sprites",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/sprites@1.0.0",
+    "imports": "import { SPRITE_FLOATS } from '@margoengine/sprites';",
+    "exports": [
+      "SPRITE_FLOATS",
+      "Sprite",
+      "SpriteLayer",
+      "packSprites",
+      "snapToPixel",
+      "sortSprites"
+    ]
+  },
+  {
     "id": "lines",
     "title": "Lines",
     "package": "@margoengine/lines",

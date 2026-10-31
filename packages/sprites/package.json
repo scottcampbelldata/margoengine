@@ -1,0 +1,48 @@
+{
+  "name": "@margoengine/sprites",
+  "version": "1.0.0",
+  "description": "2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "2d",
+    "sprites",
+    "pixel-art"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/sprites"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js sprites",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:gpu": "cd ../.. && node packages/sprites/tests/browser-check.mjs",
+    "prepack": "npm run build"
+  }
+}

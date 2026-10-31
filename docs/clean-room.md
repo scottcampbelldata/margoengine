@@ -826,3 +826,9 @@ only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is us
 | Limit projection | T. Jakobsen, "Advanced Character Physics", GDC 2001 (projecting a violated constraint back by moving the body), here a turn of the child about its joint |
 | Capsule inertia | Solid cylinder moments of inertia (standard mechanics tables) |
 | Bodies from bones and blending back | Our own design: one capsule per bone in the bone's world frame, joints at the bone origins, kinematic hit boxes that follow the animation, and a per-bone slerp from the frozen physics pose to the animated pose |
+
+## 2D sprites: `@margoengine/sprites`
+
+Written from the WebGPU and WGSL specifications only (instanced triangle strips, `textureLoad`, straight-alpha blending).
+No other engine's sprite code was read. Snapping rounds an image's corner after the camera, so half-pixel pivots still
+cover whole pixels; the tests compare every frame byte for byte with an image composed on the CPU in the test itself.

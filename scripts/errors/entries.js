@@ -191,6 +191,40 @@ export const entries = [
     fix: 'Pass `exactSize: [width, height]` in backbuffer pixels (for example `[320, 180]`), or `true` to keep the canvas `width` and `height` attributes. Zoom with CSS: set the canvas size to a whole multiple and `image-rendering: pixelated`.',
   },
   {
+    id: 'sprite-options',
+    title: 'Sprite options and sprite fields',
+    kind: 'family',
+    messages: [
+      'Invalid sprite',
+      'Invalid sprite rect',
+      'Invalid sprite tint',
+      'Invalid sprite camera',
+      'Invalid sprite capacity',
+      'Invalid sprite order',
+      'Invalid sprite clear',
+      'Invalid sprite pixels',
+      'SpriteLayer needs an atlas',
+      'Sprite normal atlas differs in size',
+      'Too many sprites in a layer',
+    ],
+    cause:
+      'A `SpriteLayer` option or a `Sprite` field is out of range. Sprite fields are read each frame, so a bad value throws from the frame that first reads it: a non-finite position, an `alpha` outside 0 to 1, or a `rect` that is not whole texels inside the atlas.',
+    fix: 'Keep `x`, `y`, `z`, scale, pivot and `rotation` finite, `alpha` from 0 to 1, and `rect` as `[x, y, width, height]` in whole texels inside the atlas. `camera.zoom` must be above 0, `tint` is `0xrrggbb`, `#rrggbb` or `#rgb`, atlas bytes are `width * height * 4` long, and a normal atlas is the size of the colour atlas. For too many sprites, split them across layers.',
+  },
+  {
+    id: 'sprite-state',
+    title: 'Sprite layer state',
+    kind: 'family',
+    messages: [
+      'Sprite already in a layer',
+      'Sprite atlas lost with the device; call setAtlas',
+      'Sprite normals need one sample and a same-size target',
+    ],
+    cause:
+      'A sprite was added to a second layer, a layer built on a plain `GPUTexture` atlas drew after a device loss (the texture died with the old device), or a normal target does not match the colour target.',
+    fix: 'Call `remove` before adding a sprite to another layer. Call `setAtlas` after a device loss, or pass bytes, an `ImageBitmap` or `(device) => GPUTexture`, which come back by themselves. For normals, draw at one sample per pixel (`exactSize` on the engine, or your own `target`) with a single-sample normal target of the same size.',
+  },
+  {
     id: 'limits',
     title: 'Capacity and GPU limits',
     kind: 'family',

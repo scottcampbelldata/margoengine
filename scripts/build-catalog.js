@@ -62,6 +62,7 @@ const layers = {
     'lod',
     'culling',
     'points',
+    'sprites',
     'lines',
     'text',
     'labels',
