@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4080099,
+  "total": 4087886,
   "history": [
     {
       "date": "2026-10-24",
@@ -958,6 +958,12 @@
       "grew": 1
     },
     {
+      "date": "2026-10-31",
+      "commit": "175c6ec2d",
+      "reason": "@margoengine/shadows/virtual: new optional entry, virtual shadow maps (row 21.6), stage 1 page bookkeeping; 9 kB gzip budget for the whole feature (allocator 2, feedback 2, render 2.5, shader 2.5); the root entry is unchanged",
+      "grew": 1
+    },
+    {
       "date": "2026-10-30",
       "commit": "beff7850",
       "reason": "shadows: the WebGL2 layer route for the PCSS nearest-depth reduction, which ran on the layer CPU tier at about 0.5 s a frame",
@@ -1115,8 +1121,8 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "175c6ec2d",
-      "reason": "@margoengine/shadows/virtual: new optional entry, virtual shadow maps (row 21.6), stage 1 page bookkeeping; 9 kB gzip budget for the whole feature (allocator 2, feedback 2, render 2.5, shader 2.5); the root entry is unchanged",
+      "commit": "79f059015",
+      "reason": "@margoengine/shadows/virtual stage 2: page rendering and hard sampling",
       "grew": 1
     }
   ],
@@ -1402,7 +1408,7 @@
     "@margoengine/shader/raw": 9906,
     "@margoengine/shader/readback": 7620,
     "@margoengine/shadows": 15340,
-    "@margoengine/shadows/virtual": 2583,
+    "@margoengine/shadows/virtual": 10370,
     "@margoengine/sky": 16485,
     "@margoengine/sky/base": 7066,
     "@margoengine/sky/bruneton": 2557,

@@ -1,0 +1,30 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Virtual shadows: hard sampling</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body><canvas width="1280" height="720"></canvas>
+<script type="module">
+// A box on a plane, as the CPU ray cast in virtual-sampling-browser.mjs knows them. window.check.show renders one state.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const CAMERA={position:[-5,5,-6],target:[0,0,0]};
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:CAMERA}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const BOX={min:[-0.6,0,-0.8],max:[0.6,1.5,0.8]},FLOOR=6;
+const floor=engine.createMesh().setGeometry(box(2*FLOOR,0.1,2*FLOOR)).setPosition([0,-0.05,0]);
+const block=engine.createMesh().setGeometry(box(1.2,1.5,1.6)).setPosition([0,0.75,0]);
+const radiance=Float32Array.from(engine.lighting.radiance);
+let shadows;
+const render=async(n=3)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const attach=(make)=>{shadows?.dispose();shadows=undefined;if(!make)return;shadows=make();shadows.add(block);shadows.add(floor,{castShadow:false});};
+const d=engine.lighting.direction,l=Math.hypot(d[0],d[1],d[2]),sun=[d[0]/l,d[1]/l,d[2]/l];
+window.check={
+  async show(state){
+    engine.lighting.radiance.set(state==='dark'?[0,0,0]:radiance.subarray(0,3));
+    // One level: its window covers the whole floor, so the finest level is the only one needed before feedback exists.
+    attach(state==='virtual'?()=>VirtualShadows.attach(engine,{filter:'hard',distance:12,levels:1}):state==='cascades'?()=>Shadows.attach(engine,{filter:'hard',distance:40}):undefined);
+    await render();
+    return {errors:errors.splice(0),stats:shadows?.stats?{...shadows.stats}:undefined,memory:shadows?.memoryBytes};
+  },
+  scene(){const c=engine.camera;return {position:[...c.position],target:[...c.target],fov:c.fov,sun,box:BOX,floor:FLOOR};},
+};
+window.ready=true;
+</script></body></html>
