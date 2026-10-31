@@ -22,7 +22,10 @@ const DEMOS = {
   plaza: {
     root: 'examples/voxel-sandbox',
     budget: PLAZA_BUDGET,
-    build: { rollupOptions: { input: resolve(root, 'examples/voxel-sandbox/src/main.ts') } },
+    // main.ts exports start(), which index.html calls; dropping an entry's exports would shake the whole page away.
+    build: {
+      rollupOptions: { input: resolve(root, 'examples/voxel-sandbox/src/main.ts'), preserveEntrySignatures: 'strict' },
+    },
   },
   'night-citadel': { root: 'apps/showcase-night-citadel' },
   afterlight: { root: 'examples/gameplay-sandbox' },
@@ -159,6 +162,9 @@ export default {
         async run() {
           const { budget, ...build } = config,
             values = await demoBytes(build);
+          // Far under the budget means the build lost code, not that the page got small: the budget would check nothing.
+          if (budget !== undefined && values.eagerGzip < budget / 2)
+            throw new Error(`${demo}: ${values.eagerGzip} B of eager JS is too little; the build lost the page's code`);
           if (budget !== undefined && values.eagerGzip > budget)
             throw new Error(`${demo}: ${values.eagerGzip} B of eager JS is over its budget of ${budget} B`);
           return { values };
