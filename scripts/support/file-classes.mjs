@@ -39,6 +39,10 @@ export const CHECK_CODE = [
   // check-merge.mjs and nearly every GPU check (visual, views, depth, wgsl, the tarball test, the package tests)
   // import it to rerun a step after a GPU driver reset, so a change to it can change any of them.
   'scripts/support/driver-resets.mjs',
+  // The side-by-side scheduler and what it reads a suite's shared ports and outputs from: they decide what runs together.
+  'scripts/support/parallel-run.mjs',
+  'scripts/support/suite-resources.mjs',
+  'scripts/fresh-clone-check.mjs',
 ];
 
 /**

@@ -106,6 +106,7 @@ Several agents push to `main`. Each push must leave it at least as clean as it f
   commit and makes one `records:` commit. Then run `verify` and push. Commit nothing else by hand in those files.
   `build:site` and `test:basic-scene` take the GPU lock themselves, only around the browser; do not wrap them in it.
 - GPU tests share 3 slots; benchmarks take the GPU exclusively; every lock hold has a time limit.
+- `check:merge -- --parallel` (or `MARGO_CHECK_PARALLEL=1`) runs the same steps and suites side by side: verify alone first, each GPU suite in its own slot, never two on one fixed port or output, timing tests last and alone. `--serial` or `MARGO_CHECK_SERIAL=1` forces one at a time; heat and split profiles always do. `node scripts/compare-check-runs.mjs --serial=<folder>` compares a run with a serial one.
 
 ## How agents are run
 

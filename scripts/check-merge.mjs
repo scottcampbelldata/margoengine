@@ -34,14 +34,23 @@
 // its own is a failure and is never rerun for heat. Each pause is a "PAUSED FOR HEAT during <step>" line; a stop it
 // could not resume from ends the run as "PAUSED FOR HEAT: NOT RESUMED" with exit 75 (HEAT_EXIT), never a pass, a
 // failure or a skip. The workstation profile (heat null) runs every step exactly as before.
+// Side by side (--parallel or MARGO_CHECK_PARALLEL=1; --serial, MARGO_CHECK_SERIAL=1 and heat or split profiles stay one
+// at a time): the same steps. Verify runs first and alone, the fresh-clone snapshot is taken right after it, then the
+// rest beside each other in STEP_AFTER's order, the GPU suites each in their own slot (scripts/gpu-package-tests.mjs),
+// and the timing tests last with nothing beside them. Each step's output goes to test-results/check-merge-logs/. The
+// first failure stops the run, names the step and prints the end of its log. Compare a run with a serial one:
+// node scripts/compare-check-runs.mjs --serial=<dir> --parallel=test-results
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { exitOnHelp } from './support/help.mjs';
 import { margoError } from '../packages/shared/errors.js';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
-import { pauseText, runPlan } from './gpu-package-tests.mjs';
+import { snapshot } from './fresh-clone-check.mjs';
+import { pauseText, plan, runPlan, testId } from './gpu-package-tests.mjs';
+import { parallelMode, runJobs, tailOf } from './support/parallel-run.mjs';
 import { HEAT_EXIT } from './nightly-full.mjs';
 import { thermalSource } from './support/heat.mjs';
 import { describeProfile, machineProfile } from './support/machine-profile.mjs';
@@ -265,9 +274,23 @@ async function main() {
     console.log(describe(decision));
     for (const { command } of planned) console.log(`  run  ${command}`);
   } else ({ decision, base, planned } = await planRun(args));
-  if (args.includes('--plan')) return;
   const profile = machineProfile(),
-    thermal = profile.heat ? thermalSource() : null;
+    thermal = profile.heat ? thermalSource() : null,
+    sideBySide = parallelMode({ argv: args, env: process.env, profile }),
+    timingTests = plan()
+      .filter((t) => t.exclusive)
+      .map(testId),
+    hasTiming = (command) => {
+      const select = /--select=(\S+)/.exec(command)?.[1]?.split(',');
+      return timingTests.some((id) => !select || select.includes(id));
+    };
+  console.log(`steps: ${sideBySide ? 'side by side' : 'one at a time'} (--parallel, --serial)`);
+  if (sideBySide)
+    for (const job of stepJobs(planned, hasTiming))
+      console.log(
+        `  ${job.label}${job.after.length ? `  after ${job.after.join(', ')}` : ''}${job.exclusive ? '  alone, last' : ''}`,
+      );
+  if (args.includes('--plan')) return;
   console.log(describeProfile(profile));
   // A heat profile that cannot read its temperature stops here, before verify, not at its first GPU step.
   if (thermal && thermal.read() === null)
@@ -277,27 +300,73 @@ async function main() {
   if (thermal) console.log(`temperature from the ${thermal.name}`);
   let built = false;
   const started = performance.now();
-  const { results, failed, heatStopped } = await runSteps(planned, {
-    profile,
-    read: thermal?.read,
-    run: async (command, name, signal) => {
-      // verify builds every package; the tarball test then reuses that build instead of building again. The stale-file
-      // check still holds: verify plants marker files in two dist folders before its build, and no pack may contain them.
-      const env = { ...process.env };
-      if (name === 'verify' && planned.some((p) => stepName(p.command) === 'modern:test:packages'))
-        env.MARGOENGINE_PLANT_STALE = '1';
-      if (name === 'modern:test:packages' && built) env.MARGOENGINE_PACKAGE_TEST_PREBUILT = '1';
-      // A heat-watched step runs with runLimited, which ends its whole tree when the watch aborts; any other step runs
-      // as it always has.
-      const result = signal
-        ? await runLimited(command, { cwd: root, env, limitMs: WATCHED_STEP_MINUTES * 60_000, label: command, signal })
-        : { status: spawnSync(command, { cwd: root, shell: true, stdio: 'inherit', env }).status };
-      if (!signal) result.ok = result.status === 0;
-      if (result.message) console.error(`\nHUNG: ${result.message}`);
-      if (name === 'verify' && result.ok) built = true;
-      return result;
-    },
-  });
+  const logDir = join(root, 'test-results/check-merge-logs');
+  let cloneCommit;
+  const parallelRun = () =>
+    runStepsParallel(planned, {
+      hasTiming,
+      logFor: (id) => join(logDir, `${id.replace(/[^\w.-]+/g, '_')}.log`),
+      before: () => {
+        if (!planned.some((p) => stepName(p.command) === 'check:fresh-clone' && !p.skip)) return;
+        const scratch = mkdtempSync(join(tmpdir(), 'margo-snapshot-'));
+        try {
+          cloneCommit = snapshot(scratch);
+        } finally {
+          rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+      run: async (command, name, signal, logFile) => {
+        const env = { ...process.env, MARGO_CHECK_PARALLEL: '1' };
+        if (name === 'verify' && planned.some((p) => stepName(p.command) === 'modern:test:packages'))
+          env.MARGOENGINE_PLANT_STALE = '1';
+        if (name === 'modern:test:packages' && built) env.MARGOENGINE_PACKAGE_TEST_PREBUILT = '1';
+        if (name === 'check:fresh-clone' && cloneCommit) env.MARGO_FRESH_CLONE_COMMIT = cloneCommit;
+        if (logFile) {
+          mkdirSync(logDir, { recursive: true });
+          writeFileSync(logFile, `=== ${command}\n`);
+        }
+        const result = await runLimited(command, {
+          cwd: root,
+          env,
+          limitMs: WATCHED_STEP_MINUTES * 60_000,
+          label: command,
+          signal,
+          logFile,
+        });
+        if (result.message) console.error(`\nHUNG: ${result.message}`);
+        if (name === 'verify' && result.ok) built = true;
+        return result;
+      },
+    });
+  const { results, failed, heatStopped, failedLog } = sideBySide
+    ? await parallelRun()
+    : await runSteps(planned, {
+        profile,
+        read: thermal?.read,
+        run: async (command, name, signal) => {
+          // verify builds every package; the tarball test then reuses that build instead of building again. The stale-file
+          // check still holds: verify plants marker files in two dist folders before its build, and no pack may contain them.
+          const env = { ...process.env };
+          if (name === 'verify' && planned.some((p) => stepName(p.command) === 'modern:test:packages'))
+            env.MARGOENGINE_PLANT_STALE = '1';
+          if (name === 'modern:test:packages' && built) env.MARGOENGINE_PACKAGE_TEST_PREBUILT = '1';
+          // A heat-watched step runs with runLimited, which ends its whole tree when the watch aborts; any other step runs
+          // as it always has.
+          const result = signal
+            ? await runLimited(command, {
+                cwd: root,
+                env,
+                limitMs: WATCHED_STEP_MINUTES * 60_000,
+                label: command,
+                signal,
+              })
+            : { status: spawnSync(command, { cwd: root, shell: true, stdio: 'inherit', env }).status };
+          if (!signal) result.ok = result.status === 0;
+          if (result.message) console.error(`\nHUNG: ${result.message}`);
+          if (name === 'verify' && result.ok) built = true;
+          return result;
+        },
+      });
   // The tests check:gpu-packages ran again after a reset, or paused for heat, from the file it just wrote, so the
   // summary names them.
   const gpuStep = results.find((r) => stepName(r.command) === 'check:gpu-packages' && (r.ok || r.heatNotResumed));
@@ -319,10 +388,18 @@ async function main() {
   mkdirSync(join(root, 'test-results'), { recursive: true });
   writeFileSync(
     join(root, 'test-results/check-merge.json'),
-    `${JSON.stringify({ mode: decision.mode, reason: decision.reason, affected: decision.affected, profile: profile.name, passedAfterDriverReset, pausedForHeat, heatStopped: heatStopped ?? null, seconds, results }, null, 2)}\n`,
+    `${JSON.stringify({ parallel: sideBySide, mode: decision.mode, reason: decision.reason, affected: decision.affected, profile: profile.name, passedAfterDriverReset, pausedForHeat, heatStopped: heatStopped ?? null, seconds, results }, null, 2)}\n`,
   );
   console.log(`\n${describe(decision, base)}; ${describeProfile(profile)}\n${lines.join('\n')}`);
   process.exitCode = failed ? 1 : heatStopped ? HEAT_EXIT : 0;
+  if (sideBySide) {
+    if (failed) console.error(`\nFAILED: ${failed}\nlog: ${failedLog}\n${tailOf(failedLog)}`);
+    const logs = results.filter((r) => r.log);
+    if (logs.length)
+      console.log(
+        `\nStep logs (GPU suites: test-results/gpu-suites):\n${logs.map((r) => `  ${r.command}: ${r.log}`).join('\n')}`,
+      );
+  }
 }
 
 /**
@@ -399,6 +476,119 @@ export async function runSteps(
 }
 
 /**
+ * What needs what when the steps run side by side, from the serial order: a GPU step reads what build:site made (site/dist,
+ * catalog pages, records), and the bundler matrix installs what the tarball test packed.
+ */
+export const STEP_AFTER = {
+  'build:site': ['verify'],
+  'check:fresh-clone': ['verify'],
+  'check:quickstart': ['verify'],
+  'modern:test:packages': ['verify'],
+  'modern:test:bundlers': ['modern:test:packages'],
+  ...Object.fromEntries(GPU_STEPS.map((step) => [step, ['build:site']])),
+};
+
+/** The id of the last part of check:gpu-packages: its timing tests, after every other step, with nothing beside them. */
+export const TIMING_JOB = 'check:gpu-packages:timing';
+
+/**
+ * Side-by-side jobs for the planned steps, after verify: `{ id, label, command, step, after, exclusive? }`. The GPU suites
+ * split in two so that nothing else, CPU work included, runs beside a timing test: `--phase=shared` in the lane,
+ * `--phase=timing` last, when `hasTiming(command)` says the selection holds one. Skipped steps have no job.
+ */
+export function stepJobs(planned, hasTiming = () => true) {
+  const run = planned.filter((p) => !p.skip && stepName(p.command) !== 'verify'),
+    names = new Set(run.map((p) => stepName(p.command)));
+  const jobs = run.map(({ command }) => {
+    const name = stepName(command),
+      gpu = name === 'check:gpu-packages',
+      after = (STEP_AFTER[name] ?? []).filter((d) => names.has(d));
+    if (!(name in STEP_AFTER))
+      throw margoError(
+        'CHECK_MERGE_STEP_UNPLACED',
+        `${name} is a check:merge step with no entry in STEP_AFTER; say what it reads so it runs after that`,
+      );
+    return { id: name, label: name, step: command, command: gpu ? `${command} --phase=shared` : command, after };
+  });
+  const gpu = run.find((p) => stepName(p.command) === 'check:gpu-packages');
+  if (gpu && hasTiming(gpu.command))
+    jobs.push({
+      id: TIMING_JOB,
+      label: TIMING_JOB,
+      step: gpu.command,
+      command: `${gpu.command} --phase=timing`,
+      after: ['check:gpu-packages'],
+      exclusive: true,
+    });
+  return jobs;
+}
+
+/**
+ * Runs the planned steps side by side: verify first and alone (it builds and plants the stale markers), then `before()`,
+ * then stepJobs. Resolves like runSteps, in the planned order, one result per step; a step that did not get to finish has
+ * `notRun`. `run(command, name, signal, logFile)` as in runSteps; `logFor(name)` names a step's log. The first failure
+ * stops the rest. A step that fails during a GPU driver reset runs once more (`retry`), as in the serial path.
+ */
+export async function runStepsParallel(
+  planned,
+  { run, logFor, before = () => {}, hasTiming, retry = retryAfterDriverReset, log = console.log },
+) {
+  const results = new Map(),
+    t0 = performance.now(),
+    verify = planned.find((p) => stepName(p.command) === 'verify' && !p.skip);
+  const attempt = async (command, name, signal, logFile) => {
+    const first = await run(command, name, signal, logFile);
+    if (first.ok || first.aborted) return first;
+    let used = false;
+    return retry(command, async () => (used ? run(command, name, signal, logFile) : ((used = true), first)));
+  };
+  const elapsed = (from) => Math.round((performance.now() - from) / 100) / 10;
+  if (verify) {
+    log(`\n=== ${verify.command}`);
+    const r = await attempt(verify.command, 'verify');
+    results.set(verify.command, { command: verify.command, ok: r.ok, seconds: elapsed(t0) });
+    if (!r.ok) return { results: [...results.values()], failed: verify.command };
+  }
+  await before();
+  const jobs = stepJobs(planned, hasTiming);
+  log(`\nside by side: ${jobs.map((j) => j.label).join(', ')}`);
+  const done = await runJobs(jobs, {
+    limit: jobs.length || 1,
+    log: (line) => log(line),
+    run: async (job, signal) => {
+      log(`start  ${job.label}`);
+      const name = stepName(job.command),
+        logFile = logFor(job.id),
+        r = await attempt(job.command, name, signal, logFile);
+      log(`${r.ok ? 'pass' : r.aborted ? 'ended' : 'FAIL'}   ${job.label}`);
+      return { ...r, log: logFile };
+    },
+  });
+  // Both parts of the GPU suites are one step of the plan: it passed when both did.
+  for (const job of done) {
+    const had = results.get(job.step),
+      seconds = job.startedAt ? Math.round((job.endedAt - job.startedAt) / 100) / 10 : 0;
+    results.set(job.step, {
+      command: job.step,
+      ok: job.ok && (had?.ok ?? true),
+      seconds: seconds + (had?.seconds ?? 0),
+      log: had?.log ?? job.log ?? logFor(job.id),
+      ...(job.outcome === 'not-run' && { notRun: job.reason }),
+      ...(job.driverReset && { driverReset: { resets: job.driverReset.resets, rerunOk: job.driverReset.rerunOk } }),
+    });
+  }
+  const ordered = planned.map(({ command, skip }) =>
+    skip ? { command, skipped: skip } : (results.get(command) ?? { command, ok: false, notRun: 'never started' }),
+  );
+  const failedJob = done.find((j) => j.outcome === 'fail');
+  return {
+    results: ordered,
+    ...(failedJob && { failed: failedJob.step }),
+    ...(failedJob && { failedLog: failedJob.log }),
+  };
+}
+
+/**
  * The end of a run: the GPU resets and heat pauses it met, then "PASSED", "FAILED at <step>", "PAUSED FOR HEAT: NOT
  * RESUMED at <step>" (exit 75: nothing failed, but the run is incomplete), or, when it passed only because a step or
  * a check:gpu-packages test passed on its rerun after a logged GPU driver reset, one "PASSED WITH A DRIVER RESET"
@@ -468,6 +658,8 @@ Options:
   --full                     run every GPU step, no narrowing (npm run check:merge:full; or MARGO_FULL=1)
   --base=<ref>               compare against this ref instead of origin/main
   --files=<a>,<b>            treat exactly these files as the change
+  --parallel                 run steps and GPU suites side by side (or MARGO_CHECK_PARALLEL=1)
+  --serial                   one at a time, whatever else is set (or MARGO_CHECK_SERIAL=1)
   -h, --help                 print this help and exit
 
 Example:

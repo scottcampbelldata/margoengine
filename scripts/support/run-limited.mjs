@@ -2,6 +2,7 @@
 // otherwise hold the GPU lock and block a whole check:merge until the overall limit; here its whole process tree
 // (shell, node, browser, servers) is ended at the limit and the result names the test and the fix.
 import { spawn } from 'node:child_process';
+import { closeSync, openSync } from 'node:fs';
 import { killTree } from '../gpu-lock.mjs';
 
 /** Default limit for one GPU test, in minutes. The slowest real test takes under 5. */
@@ -34,13 +35,23 @@ export function testLimitMs(packageMinutes, env = process.env) {
 /**
  * Runs `command` in `cwd`, output passed through. Resolves `{ ok, timedOut, aborted, seconds, message? }`; past
  * `limitMs` the whole process tree is killed and `message` names `label` and how to raise the limit. When `signal`
- * aborts (the heat watch, scripts/support/heat.mjs) the tree is killed too and `aborted` is true: the caller states why.
+ * aborts (the heat watch, scripts/support/heat.mjs; a stopped side-by-side run) the tree is killed too and `aborted` is
+ * true: the caller states why. With `logFile` the output is appended there instead of passed through, so suites running
+ * side by side keep their logs apart.
  */
-export function runLimited(command, { cwd, env = process.env, limitMs, label = command, signal }) {
+export function runLimited(command, { cwd, env = process.env, limitMs, label = command, signal, logFile }) {
   return new Promise((done) => {
     const t0 = performance.now();
     const windows = process.platform === 'win32';
-    const child = spawn(command, { cwd, env, shell: true, stdio: 'inherit', detached: !windows });
+    const log = logFile ? openSync(logFile, 'a') : null;
+    const child = spawn(command, {
+      cwd,
+      env,
+      shell: true,
+      stdio: log === null ? 'inherit' : ['ignore', log, log],
+      detached: !windows,
+    });
+    if (log !== null) closeSync(log);
     let timedOut = false,
       aborted = false;
     const timer = setTimeout(() => {

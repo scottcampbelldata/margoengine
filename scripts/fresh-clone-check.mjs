@@ -77,7 +77,7 @@ const must = (command, args, options) => {
 
 /** A parentless commit of the working tree (tracked and untracked files, not ignored), made with a copy of the index
  * so the checkout's own index and refs are untouched. */
-function snapshot(scratch) {
+export function snapshot(scratch) {
   const index = join(scratch, 'index');
   copyFileSync(resolve(root, must('git', ['rev-parse', '--git-path', 'index']).trim()), index);
   const env = { GIT_INDEX_FILE: index };
@@ -137,7 +137,9 @@ async function main() {
   const folder = mkdtempSync(join(tmpdir(), 'margo-fresh-clone-')),
     clone = join(folder, 'clone');
   try {
-    const commit = snapshot(folder);
+    // A side-by-side check:merge snapshots right after verify, as the serial order does, before any step beside this
+    // one writes to the tree (build:site rewrites tracked records), and hands the commit over.
+    const commit = process.env.MARGO_FRESH_CLONE_COMMIT || snapshot(folder);
     must('git', ['init', '-q', clone]);
     const url = pathToFileURL(root).href;
     must(

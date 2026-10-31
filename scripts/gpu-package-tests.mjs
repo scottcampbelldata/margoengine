@@ -23,13 +23,20 @@
 // temperatures and the time waited; a wait that runs out, or a step that keeps reaching the stop, is PAUSED FOR HEAT:
 // NOT RESUMED with the reason. A run with no failure but a heat stop it did not resume from exits 75 (the heat guard's
 // code), never 1. The default profile has no heat watch and runs every test as one step, as before.
+// Side by side (--parallel or MARGO_CHECK_PARALLEL=1; --serial or MARGO_CHECK_SERIAL=1 and every heat or split profile
+// run one at a time): the same tests under scripts/support/parallel-run.mjs, longest first, each holding its own shared
+// slot, none beside another with the same fixed port or output (scripts/support/suite-resources.mjs), each with its log
+// in test-results/gpu-suites/. Timing tests still run last, alone, under an exclusive hold. The first failure stops the
+// run, names the suite and prints its log; a serial run goes on to the end and reports all failures.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { margoError } from '../packages/shared/errors.js';
 import { exitOnHelp } from './support/help.mjs';
-import { acquire, lockDir } from './gpu-lock.mjs';
+import { acquire, lockDir, slots } from './gpu-lock.mjs';
+import { parallelMode, runJobs, tailOf } from './support/parallel-run.mjs';
+import { suiteResources } from './support/suite-resources.mjs';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { coolDown, thermalSource, watchHeat } from './support/heat.mjs';
 import { describeProfile, excludedReason, machineProfile } from './support/machine-profile.mjs';
@@ -607,6 +614,103 @@ export function summaryLines(results) {
   return lines;
 }
 
+/** Measured seconds of the suites that bound a run (a full run, 2026-10-29); the last run's own times win. Others: 5 s. */
+export const MEASURED_SECONDS = {
+  'biomes test:gpu': 431,
+  'voxel-pathtracer test:gpu': 271,
+  'voxel test:gpu:slow-compile': 247,
+  'voxel test:gpu': 160,
+  'webgl2-compat test:gpu': 158,
+  'webgl2-compat test:browser': 87,
+  'root test:frame-alloc:browser': 83,
+  'lod test:gpu': 62,
+  'root test:docs:browser': 47,
+  'voxel-pathtracer test:gpu:slow-compile': 45,
+  'root test:python:browser': 40,
+};
+
+/**
+ * The scheduler's jobs for the planned steps, not the excluded ones: each with its `resources` (`resourcesOf`: step id
+ * to names) and its `estimate` (`last`: label to the seconds of the last run, then MEASURED_SECONDS, then 5).
+ */
+export function suiteJobs(steps, resourcesOf, last = {}) {
+  return steps
+    .filter((s) => !s.excluded)
+    .map((s) => ({
+      ...s,
+      resources: resourcesOf[s.id] ?? [],
+      estimate: last[s.label] ?? MEASURED_SECONDS[s.label] ?? 5,
+    }));
+}
+
+/** A hold's limit in minutes: a run and its rerun after a driver reset, plus room for the PREPARE builds. */
+export const holdMinutes = (step) =>
+  Math.ceil((2 * testLimitMs(step.minutes)) / 60_000) + (PREPARE[step.name] ? 25 : 5);
+
+/** The suites side by side: each in its own slot of the GPU lock with its own log; the first failure stops the run. */
+export async function runSideBySide(steps, { env, phase, logs = join(root, 'test-results/gpu-suites') }) {
+  const record = join(root, 'test-results/gpu-packages.json'),
+    scripts = json('package.json').scripts,
+    last = existsSync(record)
+      ? Object.fromEntries(JSON.parse(readFileSync(record, 'utf8')).results.map((r) => [r.label, r.seconds]))
+      : {},
+    resources = suiteResources(root, steps, { scripts, prepare: PREPARE });
+  if (phase !== 'timing') rmSync(logs, { recursive: true, force: true });
+  mkdirSync(logs, { recursive: true });
+  const prepared = new Map();
+  const prepare = (command, logFile, signal) => {
+    if (!prepared.has(command))
+      prepared.set(
+        command,
+        runLimited(command, { cwd: root, env, limitMs: testLimitMs(), label: command, signal, logFile }),
+      );
+    return prepared.get(command);
+  };
+  const jobs = suiteJobs(steps, resources, last);
+  const done = await runJobs(jobs, {
+    limit: slots(),
+    log: (line) => console.error(line),
+    take: (mode, step) =>
+      acquire({
+        owner: `check:gpu-packages ${step.label}`,
+        mode,
+        max: holdMinutes(step),
+        poll: 2000,
+        command: step.command,
+      }),
+    run: async (step, signal) => {
+      const logFile = join(logs, `${step.id.replace(/[^\w.-]+/g, '_')}.log`);
+      writeFileSync(logFile, `=== ${step.label}\n`);
+      console.log(`start  ${step.label}`);
+      for (const command of PREPARE[step.name] ?? [])
+        if (!(await prepare(command, logFile, signal)).ok)
+          return { ok: false, log: logFile, message: `${command} failed (needed by ${step.label}); see ${logFile}` };
+      const once = async () => {
+        const result = await runLimited(step.command, {
+          cwd: join(root, step.cwd),
+          env: { ...env, MARGO_GPU_LOCK_NESTED_MODE: step.exclusive ? 'exclusive' : 'shared' },
+          limitMs: testLimitMs(step.minutes),
+          label: step.label,
+          signal,
+          logFile,
+        });
+        if (result.message) console.error(`\nHUNG: ${result.message}`);
+        return { ...result, log: logFile };
+      };
+      const first = await once();
+      if (first.ok || first.aborted) return first;
+      let used = false;
+      const result = await retryAfterDriverReset(step.label, async () => (used ? once() : ((used = true), first)));
+      console.log(`${result.ok ? 'pass' : 'FAIL'}   ${step.label}  ${result.seconds} s`);
+      return result;
+    },
+  });
+  const byId = new Map(done.map((r) => [r.id, r]));
+  return steps.map((s) =>
+    s.excluded ? { ...s, outcome: 'excluded', reason: s.excluded } : { ...byId.get(s.id), pauses: [], peakC: null },
+  );
+}
+
 export const USAGE = `usage: node scripts/gpu-package-tests.mjs [options]
 
 Runs every real-GPU browser test once, after building the packages, holding shared slots of the GPU lock.
@@ -616,6 +720,9 @@ Options:
   --only=<substring>         run the tests whose label contains the substring
   --select=<id>,<id>         run exactly these tests; an id is <dir>/<script> or root/<script>
   --list                     print the plan and the machine profile, run nothing
+  --parallel                 run suites side by side, each in its own GPU slot (or MARGO_CHECK_PARALLEL=1)
+  --serial                   one suite at a time, whatever else is set (or MARGO_CHECK_SERIAL=1)
+  --phase=shared|timing      only the shared suites, or only the timing suites added to the shared phase's results (check:merge)
   -h, --help                 print this help and exit
 
 Example:
@@ -630,7 +737,13 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const unknown = chosen ? [...chosen].filter((id) => !tests.some((t) => testId(t) === id)) : [];
   if (unknown.length) throw new Error(`--select names no GPU test: ${unknown.join(', ')}; list them with --list`);
   const profile = machineProfile(),
-    steps = lockOrder(planSteps(tests, profile));
+    phase = process.argv.find((a) => a.startsWith('--phase='))?.slice(8),
+    steps = lockOrder(planSteps(tests, profile)).filter(
+      (s) => !phase || (phase === 'timing' ? s.exclusive : !s.exclusive),
+    ),
+    sideBySide = parallelMode({ argv: process.argv, env: process.env, profile });
+  if (phase && phase !== 'shared' && phase !== 'timing')
+    throw new RangeError(`--phase must be shared or timing, got ${phase}`);
   if (process.argv.includes('--list')) {
     console.log(describeProfile(profile));
     for (const s of steps)
@@ -662,52 +775,67 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     prepared = new Set(),
     thermal = profile.heat ? thermalSource() : null;
   if (thermal) console.log(`temperature from the ${thermal.name}`);
-  const results = await runPlan(steps, {
-    profile,
-    read: thermal?.read,
-    // A short poll: other holders often release and take the lock again within seconds. Held for the whole run (about
-    // 10 min alone, 15 with another run beside it), so the hold limit is 60 min; a heat pause releases it while it waits.
-    // A timing step holds the GPU exclusively for itself alone: the hold limit is its own time limit plus 5 min, the
-    // heartbeat keeps it, and it is released as soon as the step ends.
-    take: (mode, step) =>
-      acquire({
-        owner: mode === 'exclusive' ? `check:gpu-packages ${step.label}` : 'check:gpu-packages',
-        mode,
-        max: mode === 'exclusive' ? Math.ceil(testLimitMs(step.minutes) / 60_000) + 5 : 60,
-        poll: 2000,
-      }),
-    runStep: async (step, signal) => {
-      // Each preparing command once, however many suites need it.
-      for (const command of PREPARE[step.name] ?? []) {
-        if (prepared.has(command)) continue;
-        if (!run(command, '.').ok) throw new Error(`${command} failed (needed by ${step.label}); fix it first`);
-        prepared.add(command);
-      }
-      console.log(`\n=== ${step.label}`);
-      const once = async () => {
-        const result = await runLimited(step.command, {
-          cwd: join(root, step.cwd),
-          env: { ...env, MARGO_GPU_LOCK_NESTED_MODE: step.exclusive ? 'exclusive' : 'shared' },
-          limitMs: testLimitMs(step.minutes),
-          label: step.label,
-          signal,
-        });
-        if (result.message) console.error(`\nHUNG: ${result.message}`);
-        return result;
-      };
-      // A test that fails while the GPU driver resets (bug 25) runs once more; the reset and the rerun are printed. A
-      // step ended by the heat watch goes back to runPlan as it is: the heat pause, not a reset, explains it.
-      const first = await once();
-      if (first.ok || first.aborted) return first;
-      let used = false;
-      return retryAfterDriverReset(step.label, async () => (used ? once() : ((used = true), first)));
-    },
-  });
+  const results = sideBySide
+    ? await runSideBySide(steps, { env, phase })
+    : await runPlan(steps, {
+        profile,
+        read: thermal?.read,
+        // A short poll: other holders often release and take the lock again within seconds. Held for the whole run (about
+        // 10 min alone, 15 with another run beside it), so the hold limit is 60 min; a heat pause releases it while it waits.
+        // A timing step holds the GPU exclusively for itself alone: the hold limit is its own time limit plus 5 min, the
+        // heartbeat keeps it, and it is released as soon as the step ends.
+        take: (mode, step) =>
+          acquire({
+            owner: mode === 'exclusive' ? `check:gpu-packages ${step.label}` : 'check:gpu-packages',
+            mode,
+            max: mode === 'exclusive' ? Math.ceil(testLimitMs(step.minutes) / 60_000) + 5 : 60,
+            poll: 2000,
+          }),
+        runStep: async (step, signal) => {
+          // Each preparing command once, however many suites need it.
+          for (const command of PREPARE[step.name] ?? []) {
+            if (prepared.has(command)) continue;
+            if (!run(command, '.').ok) throw new Error(`${command} failed (needed by ${step.label}); fix it first`);
+            prepared.add(command);
+          }
+          console.log(`\n=== ${step.label}`);
+          const once = async () => {
+            const result = await runLimited(step.command, {
+              cwd: join(root, step.cwd),
+              env: { ...env, MARGO_GPU_LOCK_NESTED_MODE: step.exclusive ? 'exclusive' : 'shared' },
+              limitMs: testLimitMs(step.minutes),
+              label: step.label,
+              signal,
+            });
+            if (result.message) console.error(`\nHUNG: ${result.message}`);
+            return result;
+          };
+          // A test that fails while the GPU driver resets (bug 25) runs once more; the reset and the rerun are printed. A
+          // step ended by the heat watch goes back to runPlan as it is: the heat pause, not a reset, explains it.
+          const first = await once();
+          if (first.ok || first.aborted) return first;
+          let used = false;
+          return retryAfterDriverReset(step.label, async () => (used ? once() : ((used = true), first)));
+        },
+      });
   mkdirSync(join(root, 'test-results'), { recursive: true });
-  const { json, warnings } = report(results, profile);
-  writeFileSync(join(root, 'test-results/gpu-packages.json'), JSON.stringify(json, null, 2) + '\n');
-  console.log(`\nGPU package tests, ${describeProfile(profile)}:`);
+  // The timing phase adds to what the shared phase wrote, so one file holds the run.
+  const recordFile = join(root, 'test-results/gpu-packages.json'),
+    earlier = phase === 'timing' ? JSON.parse(readFileSync(recordFile, 'utf8')).results : [],
+    { json, warnings } = report([...earlier, ...results], profile);
+  writeFileSync(recordFile, JSON.stringify({ ...json, parallel: sideBySide }, null, 2) + '\n');
+  console.log(`\nGPU package tests, ${describeProfile(profile)}${sideBySide ? ', side by side' : ''}:`);
   for (const line of summaryLines(results)) console.log(line);
+  if (sideBySide) {
+    const failedHere = results.filter((r) => r.outcome === 'fail');
+    for (const r of failedHere) console.error(`\nFAILED: ${r.label}\nlog: ${r.log}\n${tailOf(r.log)}`);
+    console.log(
+      `\nSuite logs:\n${results
+        .filter((r) => r.log)
+        .map((r) => `  ${r.label}: ${r.log}`)
+        .join('\n')}`,
+    );
+  }
   console.log(`  total ${Math.round((performance.now() - started) / 1000)} s`);
   for (const line of warnings) console.log(`\n${line}`);
   const failed = results.filter((r) => r.outcome === 'fail'),
@@ -719,4 +847,6 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
       'No test failed, but a heat stop was not resumed: the run is incomplete (exit 75). Rerun the steps named above when the machine is cool, or on a profile that can take the load.',
     );
   process.exitCode = code;
+  // A stopped run may still be queued for a slot it no longer wants: end now, nothing else is left to do.
+  if (sideBySide && code) process.exit(code);
 }
