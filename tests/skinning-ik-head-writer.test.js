@@ -55,7 +55,7 @@ const pose = (f) =>
       f.store.transforms.qz[node.id],
       f.store.transforms.qw[node.id],
     ],
-    euler: [...node.euler],
+    euler: [node.rotation.x, node.rotation.y, node.rotation.z],
     matrix: [...node.matrix],
   }));
 const snapshot = (f) => ({

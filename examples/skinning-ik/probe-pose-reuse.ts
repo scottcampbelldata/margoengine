@@ -84,7 +84,7 @@ export class PresentedPoseSnapshot {
         else if (!Object.is(values[at], value)) return false;
       }
       for (let j = 0; j < 3; j++, at++) {
-        const value = node.euler[j];
+        const value = store.rotations[id * 3 + j];
         if (!Number.isFinite(value)) return false;
         if (copy) values[at] = value;
         else if (!Object.is(values[at], value)) return false;

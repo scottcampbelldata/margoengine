@@ -448,7 +448,7 @@ export class HeadAim {
     const input = this.cachedInput,
       matrix = this.head.matrix,
       t = this.head.engine.store.transforms,
-      euler = this.head.euler,
+      rotations = this.head.engine.store.rotations,
       id = this.head.id;
     for (let i = 0; i < 3; i++) if (!Object.is(input[i], this.target[i])) return false;
     if (
@@ -462,9 +462,9 @@ export class HeadAim {
       !Object.is(input[10], t.qz[id]) ||
       !Object.is(input[11], t.qw[id]) ||
       !Object.is(input[12], this.maxAngle) ||
-      !Object.is(input[13], euler[0]) ||
-      !Object.is(input[14], euler[1]) ||
-      !Object.is(input[15], euler[2])
+      !Object.is(input[13], rotations[id * 3]) ||
+      !Object.is(input[14], rotations[id * 3 + 1]) ||
+      !Object.is(input[15], rotations[id * 3 + 2])
     )
       return false;
     for (let i = 0; i < 16; i++) if (!Object.is(this.cachedMatrix[i], matrix[i])) return false;
@@ -484,7 +484,7 @@ export class HeadAim {
   private rememberAim(): void {
     const input = this.cachedInput,
       t = this.head.engine.store.transforms,
-      euler = this.head.euler,
+      rotations = this.head.engine.store.rotations,
       id = this.head.id;
     for (let i = 0; i < 3; i++) input[i] = this.target[i];
     input[3] = this.rx;
@@ -497,9 +497,9 @@ export class HeadAim {
     input[10] = t.qz[id];
     input[11] = t.qw[id];
     input[12] = this.maxAngle;
-    input[13] = euler[0];
-    input[14] = euler[1];
-    input[15] = euler[2];
+    input[13] = rotations[id * 3];
+    input[14] = rotations[id * 3 + 1];
+    input[15] = rotations[id * 3 + 2];
     this.cachedMatrix.set(this.head.matrix);
     const result = this.cachedDiagnostics;
     for (let i = 0; i < 3; i++) {
@@ -610,7 +610,7 @@ export class HeadAim {
 
   private commit(rotation: Rotation): void {
     const t = this.head.engine.store.transforms,
-      euler = this.head.euler,
+      rotations = this.head.engine.store.rotations,
       id = this.head.id;
     if (
       rotation[0] !== this.previous[0] ||
@@ -621,9 +621,9 @@ export class HeadAim {
       t.qy[id] !== this.committed[1] ||
       t.qz[id] !== this.committed[2] ||
       t.qw[id] !== this.committed[3] ||
-      !Object.is(euler[0], this.committedEuler[0]) ||
-      !Object.is(euler[1], this.committedEuler[1]) ||
-      !Object.is(euler[2], this.committedEuler[2])
+      !Object.is(rotations[id * 3], this.committedEuler[0]) ||
+      !Object.is(rotations[id * 3 + 1], this.committedEuler[1]) ||
+      !Object.is(rotations[id * 3 + 2], this.committedEuler[2])
     ) {
       if (this.writeRotation) this.writeRotation(rotation);
       else this.head.setQuaternion(rotation);
@@ -632,9 +632,9 @@ export class HeadAim {
       this.committed[1] = t.qy[id];
       this.committed[2] = t.qz[id];
       this.committed[3] = t.qw[id];
-      this.committedEuler[0] = euler[0];
-      this.committedEuler[1] = euler[1];
-      this.committedEuler[2] = euler[2];
+      this.committedEuler[0] = rotations[id * 3];
+      this.committedEuler[1] = rotations[id * 3 + 1];
+      this.committedEuler[2] = rotations[id * 3 + 2];
     }
     this.head.engine.store.tick(false);
   }

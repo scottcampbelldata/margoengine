@@ -50,7 +50,11 @@ test('the shared XYZ quaternion table matches immediate Mesh.setRotation and a c
       for (let lane = 0; lane < 4; lane++) store.transforms[lanes[lane]][clamped.id] = lane === 0 ? 1 : 0;
       store.constrained[clamped.id] = 56;
       store.tick(false);
-      assert.deepEqual([...clamped.euler], angles.map(Math.fround), label + ' clamps all three Euler lanes');
+      assert.deepEqual(
+        [clamped.rotation.x, clamped.rotation.y, clamped.rotation.z],
+        angles.map(Math.fround),
+        label + ' clamps all three Euler lanes',
+      );
       for (let lane = 0; lane < 4; lane++)
         assert.ok(
           Math.abs(store.transforms[lanes[lane]][clamped.id] - beforeTick[lane]) <= 1e-7,
@@ -69,15 +73,13 @@ test('the shared XYZ quaternion table matches immediate Mesh.setRotation and a c
   }
 });
 
-test('an Euler index write matches setRotation and setQuaternion keeps the quaternion it stored', async () => {
+test('a rotation component write matches setRotation and setQuaternion keeps the quaternion it stored', async () => {
   const engine = await engineFor(1),
     mesh = engine.createMesh(),
     read = () => lanes.map((lane) => engine.store.transforms[lane][mesh.id]);
   try {
-    assert.equal(mesh.euler.length, 3);
-    assert.equal(mesh.euler.buffer, engine.store.rotations.buffer);
-    mesh.euler[0] = 0.3;
-    mesh.euler[2] = -0.2;
+    mesh.rotation.x = 0.3;
+    mesh.rotation.z = -0.2;
     const viaIndex = read();
     mesh.setRotation([0.3, 0, -0.2]);
     assert.deepEqual(read(), viaIndex);

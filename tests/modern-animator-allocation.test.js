@@ -117,7 +117,7 @@ test('single-clip pose reuse matches independent blending through holds, externa
         t.sx[id],
         t.sy[id],
         t.sz[id],
-        ...model.nodes.find((node) => node.id === id).euler,
+        ...engine.store.rotations.subarray(id * 3, id * 3 + 3),
       ])
       .concat(model.primitives.map((p) => [...p.weights]));
   };

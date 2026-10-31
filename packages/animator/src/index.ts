@@ -647,7 +647,9 @@ export class Animator implements EnginePlugin {
       p = pose.position[index],
       s = pose.scale[index],
       q = pose.rotation[index],
-      e = node.euler;
+      // The node's Euler lanes (what mesh.rotation reads), straight from the store like the transforms above.
+      r = node.engine.store.rotations,
+      e = id * 3;
     if (
       p.length !== 3 ||
       p[0] !== cache[0] ||
@@ -692,9 +694,9 @@ export class Animator implements EnginePlugin {
       t.qy[id] !== cache[20] ||
       t.qz[id] !== cache[21] ||
       t.qw[id] !== cache[22] ||
-      e[0] !== cache[23] ||
-      e[1] !== cache[24] ||
-      e[2] !== cache[25]
+      r[e] !== cache[23] ||
+      r[e + 1] !== cache[24] ||
+      r[e + 2] !== cache[25]
     ) {
       this.commitRotation(node, q);
       cache[6] = q[0];
@@ -705,9 +707,9 @@ export class Animator implements EnginePlugin {
       cache[20] = t.qy[id];
       cache[21] = t.qz[id];
       cache[22] = t.qw[id];
-      cache[23] = e[0];
-      cache[24] = e[1];
-      cache[25] = e[2];
+      cache[23] = r[e];
+      cache[24] = r[e + 1];
+      cache[25] = r[e + 2];
     }
   }
   private commitRotation(node: Mesh, rotation: readonly number[]): void {

@@ -2775,8 +2775,7 @@ The class comment states the contract for callers:
   Capacity` and `next` is rolled back.
 - A reused slot is reset field by field (translation 0, quaternion identity, scale 1, no parent, no constraint, not
   hidden, Euler 0). Bounds are written later by `setGeometry`.
-- `views(mesh)` rebinds `mesh.matrix` (a `subarray` of `store.matrices`) and `mesh.euler` for every live mesh after a
-  growth.
+- `views(mesh)` rebinds `mesh.matrix` (a `subarray` of `store.matrices`) for every live mesh after a growth.
 
 ### 3.5 Growth step by step
 
@@ -2982,7 +2981,7 @@ rounds ties away from zero. The native unit tests and the shipped Wasm could the
 | --- | --- | --- |
 | `mesh.position.x = v`, `.set(x, y, z)`, `setPosition` | `store.transforms.x/y/z[id]` | none |
 | `mesh.scale...`, `setScale` | `store.transforms.sx/sy/sz[id]` | none |
-| `mesh.rotation.x = v`, `.set`, `setRotation`, `mesh.euler[i] = v` | `store.rotations[id*3 + axis]` | one `kernel_sync_rotation` per write (per `set` call for `.set`) |
+| `mesh.rotation.x = v`, `.set`, `setRotation` | `store.rotations[id*3 + axis]` | one `kernel_sync_rotation` per write (per `set` call for `.set`) |
 | `setQuaternion(q)` | qx..qw (normalised) and the Euler lanes (computed in JS with `asin`/`atan2`) | none |
 | `setParent(p)` | `store.parents[id]` after a JS cycle and depth walk (max 64) | none |
 | `mesh.visible = b` | `store.hidden[id]` | none |

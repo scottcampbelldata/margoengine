@@ -127,7 +127,9 @@ function snapshot(f) {
       t.qy[n.id],
       t.qz[n.id],
       t.qw[n.id],
-      ...n.euler,
+      n.rotation.x,
+      n.rotation.y,
+      n.rotation.z,
       ...n.matrix,
     ]),
     weights: f.model.primitives.map((p) => [...p.weights]),
@@ -169,7 +171,7 @@ test('explicit writer matches all stored bits through clips, blend trees, interr
       if (frame % 29 === 0)
         f.animator.transition(states[Math.floor(frame / 29) % states.length], frame % 58 ? 0.35 : 0);
       if (frame % 23 === 0) f.model.nodes[0].setRotation([0.2, -0.3, 0.1]);
-      if (frame % 47 === 0) f.model.nodes[0].euler[2] += 0.125;
+      if (frame % 47 === 0) f.model.nodes[0].rotation.z += 0.125;
       if (frame === 110) for (let i = 0; i < 40; i++) f.engine.createMesh();
     }
     if (frame === 150)

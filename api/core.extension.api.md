@@ -179,14 +179,6 @@ export class Mesh {
     readonly position: VectorRef;
     readonly rotation: VectorRef;
     readonly scale: VectorRef;
-    readonly euler: {
-        0: number;
-        1: number;
-        2: number;
-        readonly length: 3;
-        readonly buffer: ArrayBufferLike;
-        [Symbol.iterator](): IterableIterator<number>;
-    };
     readonly matrix: Float32Array;
     geometry: Geometry | null;
     get material(): PbrMaterial;

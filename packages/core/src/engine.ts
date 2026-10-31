@@ -125,50 +125,9 @@ const keep = ({ matrix: m, material }: Mesh) =>
     material.data[6] > 0 ||
     m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]) < 0
   );
-class EulerView {
-  constructor(private readonly mesh: Mesh) {}
-  private write(axis: number, value: number): void {
-    this.mesh.engine.store.rotations[this.mesh.id * 3 + axis] = value;
-    syncStoredRotation(this.mesh.engine.store, this.mesh.id);
-  }
-  private lane(axis: number): number {
-    return this.mesh.engine.store.rotations[this.mesh.id * 3 + axis];
-  }
-  get 0(): number {
-    return this.lane(0);
-  }
-  set 0(value: number) {
-    this.write(0, value);
-  }
-  get 1(): number {
-    return this.lane(1);
-  }
-  set 1(value: number) {
-    this.write(1, value);
-  }
-  get 2(): number {
-    return this.lane(2);
-  }
-  set 2(value: number) {
-    this.write(2, value);
-  }
-  get length(): 3 {
-    return 3;
-  }
-  get buffer(): ArrayBufferLike {
-    return this.mesh.engine.store.rotations.buffer;
-  }
-  *[Symbol.iterator](): IterableIterator<number> {
-    yield this[0];
-    yield this[1];
-    yield this[2];
-  }
-}
-const eulerView = (mesh: Mesh) => new EulerView(mesh);
 const views = (mesh: Mesh) =>
   Object.assign(mesh, {
     matrix: mesh.engine.store.matrices.subarray(mesh.id * 16, mesh.id * 16 + 16),
-    euler: eulerView(mesh),
   });
 /**
  * Runtime mesh: a slot `id` in its engine's transform store plus geometry and material. Create it with
@@ -184,19 +143,6 @@ export class Mesh {
   readonly position = new VectorRef(this, 'position');
   readonly rotation = new VectorRef(this, 'rotation');
   readonly scale = new VectorRef(this, 'scale');
-  /**
-   * Euler XYZ radians for this mesh. An index write updates the quaternion. `setQuaternion` writes the lanes after
-   * the quaternion and leaves that quaternion in place. `createMesh` replaces this object when the store grows; a
-   * kept view still reads the current lanes.
-   */
-  declare readonly euler: {
-    0: number;
-    1: number;
-    2: number;
-    readonly length: 3;
-    readonly buffer: ArrayBufferLike;
-    [Symbol.iterator](): IterableIterator<number>;
-  };
   /** World matrix view into the store. `createMesh` replaces it when the store grows, so read it, never keep it. */
   declare readonly matrix: Float32Array;
   geometry: Geometry | null = null;

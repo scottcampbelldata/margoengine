@@ -49,7 +49,11 @@ async function fixture(t) {
 function rotation(mesh) {
   const t = mesh.engine.store.transforms,
     id = mesh.id;
-  return { q: [t.qx[id], t.qy[id], t.qz[id], t.qw[id]], euler: [...mesh.euler], matrix: [...mesh.matrix] };
+  return {
+    q: [t.qx[id], t.qy[id], t.qz[id], t.qw[id]],
+    euler: [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z],
+    matrix: [...mesh.matrix],
+  };
 }
 function snapshot(f) {
   return {
@@ -94,7 +98,7 @@ test('zero-delta torso holds and head cache restore Euler writes through store g
   assert.deepEqual(snapshot(a), expected);
   a.store.rotations[a.body.id * 3] = -0;
   a.torso.applyHeld();
-  assert.equal(Object.is(a.body.euler[0], b.body.euler[0]), true, 'held Euler signed zero is restored too');
+  assert.equal(Object.is(a.body.rotation.x, b.body.rotation.x), true, 'held Euler signed zero is restored too');
   // Component setters consume all three Euler fields: stale fields would change this quaternion.
   for (const f of [a, b]) {
     f.body.rotation.z += 0.03125;
@@ -115,13 +119,13 @@ test('aim reset repairs stale Euler fields and rejected input still leaves the p
   a.store.rotations[a.head.id * 3 + 1] = NaN;
   const q = rotation(a.head).q;
   assert.throws(() => a.aim.update([NaN, 1, 0]), /finite/);
-  assert.equal(Number.isNaN(a.head.euler[1]), true);
+  assert.equal(Number.isNaN(a.head.rotation.y), true);
   assert.deepEqual(rotation(a.head).q, q);
   a.aim.reset(target);
   b.aim.reset(target);
   a.store.rotations[a.body.id * 3] = NaN;
   assert.throws(() => a.torso.update(torsoTarget, -1), /dt/);
-  assert.equal(Number.isNaN(a.body.euler[0]), true);
+  assert.equal(Number.isNaN(a.body.rotation.x), true);
   a.torso.reset();
   b.torso.reset();
   a.aim.reset(target);
@@ -129,9 +133,9 @@ test('aim reset repairs stale Euler fields and rejected input still leaves the p
   assert.deepEqual(snapshot(a), snapshot(b));
   a.store.rotations[a.head.id * 3] += 0.25;
   a.store.transforms.sx[a.root.id] = 0;
-  const rejectedEuler = [...a.head.euler];
+  const rejectedEuler = [a.head.rotation.x, a.head.rotation.y, a.head.rotation.z];
   assert.throws(() => a.aim.update(target), /positive uniform/);
-  assert.deepEqual([...a.head.euler], rejectedEuler);
+  assert.deepEqual([a.head.rotation.x, a.head.rotation.y, a.head.rotation.z], rejectedEuler);
   a.store.transforms.sx[a.root.id] = 1;
   a.aim.update(target);
   b.aim.update(target);

@@ -35,7 +35,7 @@ const quaternion = (f) => {
 const snapshot = (f) => ({
   quaternion: quaternion(f),
   matrix: [...f.head.matrix],
-  euler: [...f.head.euler],
+  euler: [f.head.rotation.x, f.head.rotation.y, f.head.rotation.z],
   origin: [...f.aim.origin],
   forward: [...f.aim.forward],
   limited: f.aim.limited,

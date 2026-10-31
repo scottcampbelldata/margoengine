@@ -56,8 +56,8 @@ test('target, joint, ancestor, raw Euler, matrix, parent and caller state change
     () => (f.parent.rotation.y = 0),
   );
   check(
-    () => (f.child.euler[0] += 0.25),
-    () => (f.child.euler[0] -= 0.25),
+    () => (f.child.rotation.x += 0.25),
+    () => (f.child.rotation.x -= 0.25),
   );
   check(() => (f.child.matrix[12] += 0.25));
   check(
@@ -318,7 +318,7 @@ test('actual Animator results match ordinary replay through control modes and su
         solves,
         pose: nodes.map((node) => ({
           matrix: [...node.matrix],
-          euler: [...node.euler],
+          euler: [node.rotation.x, node.rotation.y, node.rotation.z],
           transform: ['x', 'y', 'z', 'qx', 'qy', 'qz', 'qw', 'sx', 'sy', 'sz'].map((key) => tr[key][node.id]),
         })),
         weights: model.primitives.map((p) => [...p.weights]),
@@ -464,7 +464,7 @@ test('real demo controls run before the adjacent pose hooks; unknown intervening
   };
   const pose = () => ({
     matrix: [...joint.matrix],
-    euler: [...joint.euler],
+    euler: [joint.rotation.x, joint.rotation.y, joint.rotation.z],
     x: joint.position.x,
     y: joint.position.y,
     z: joint.position.z,

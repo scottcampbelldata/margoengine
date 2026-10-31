@@ -156,7 +156,7 @@ export class TorsoAim {
     out[2] = r[0] * sine + r[2] * cosine;
     out[3] = r[3] * cosine - r[1] * sine;
     const t = this.body.engine.store.transforms,
-      euler = this.body.euler,
+      rotations = this.body.engine.store.rotations,
       id = this.body.id;
     if (
       out[0] !== this.previous[0] ||
@@ -167,9 +167,9 @@ export class TorsoAim {
       t.qy[id] !== this.committed[1] ||
       t.qz[id] !== this.committed[2] ||
       t.qw[id] !== this.committed[3] ||
-      !Object.is(euler[0], this.committedEuler[0]) ||
-      !Object.is(euler[1], this.committedEuler[1]) ||
-      !Object.is(euler[2], this.committedEuler[2])
+      !Object.is(rotations[id * 3], this.committedEuler[0]) ||
+      !Object.is(rotations[id * 3 + 1], this.committedEuler[1]) ||
+      !Object.is(rotations[id * 3 + 2], this.committedEuler[2])
     ) {
       if (this.writeRotation) this.writeRotation(out);
       else this.body.setQuaternion(out);
@@ -178,9 +178,9 @@ export class TorsoAim {
       this.committed[1] = t.qy[id];
       this.committed[2] = t.qz[id];
       this.committed[3] = t.qw[id];
-      this.committedEuler[0] = euler[0];
-      this.committedEuler[1] = euler[1];
-      this.committedEuler[2] = euler[2];
+      this.committedEuler[0] = rotations[id * 3];
+      this.committedEuler[1] = rotations[id * 3 + 1];
+      this.committedEuler[2] = rotations[id * 3 + 2];
     }
     this.body.engine.store.tick(false);
     return this;

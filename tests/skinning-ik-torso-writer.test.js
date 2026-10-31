@@ -74,7 +74,16 @@ async function robot(optIn = false, before) {
 function bodyState(f) {
   const t = f.store.transforms,
     id = f.body.id;
-  return [t.qx[id], t.qy[id], t.qz[id], t.qw[id], ...f.body.euler, ...f.body.matrix];
+  return [
+    t.qx[id],
+    t.qy[id],
+    t.qz[id],
+    t.qw[id],
+    f.body.rotation.x,
+    f.body.rotation.y,
+    f.body.rotation.z,
+    ...f.body.matrix,
+  ];
 }
 function snapshot(f) {
   const t = f.store.transforms;
@@ -96,7 +105,9 @@ function snapshot(f) {
         t.sx[id],
         t.sy[id],
         t.sz[id],
-        ...node.euler,
+        node.rotation.x,
+        node.rotation.y,
+        node.rotation.z,
         ...node.matrix,
       ];
     }),
@@ -125,7 +136,7 @@ test('explicit torso writer is bit-exact for 2400 authored control/reversal fram
         .setPosition([Math.sin(angle) * 0.3, -0.2, Math.cos(angle) * 0.2])
         .setRotation([Math.sin(angle) * 0.1, -0.55, Math.cos(angle) * 0.07])
         .setScale([scale, scale, scale]);
-      if (frame % 53 === 0) f.body.euler[0] += 0.125;
+      if (frame % 53 === 0) f.body.rotation.x += 0.125;
       if (frame === 800) for (let i = 0; i < 80; i++) f.engine.createMesh();
       if (frame % 211 === 0) f.torso.reset();
       else f.torso.update(target, dt);
