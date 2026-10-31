@@ -550,6 +550,7 @@ export const entries = [
       'BiomeWorld regionResolution must be a power of two from 4 x resolution up to tileSize',
       'BiomeWorld resolution must be 0.5, 1, 2 or 4',
       'BiomeWorld sample needs finite x and z',
+      'BiomeWorld sampleRegion needs finite x and z',
       'BiomeWorld seed must be an integer in 0..2^32-1',
       'BiomeWorld size must be [x, z] in metres, 256..65,536, multiples of regionResolution',
       'BiomeWorld tile indices must be integers inside the world (0..tilesX - 1, 0..tilesZ - 1)',
