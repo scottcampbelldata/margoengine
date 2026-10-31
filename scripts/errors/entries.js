@@ -684,4 +684,27 @@ export const entries = [
       'A `ConvexHullVolume` got points or a matrix it cannot use, such as a raw mesh over the point limit or a matrix holding NaN from a broken bone. Or an `AvoidanceSolver` with `links` got a hull frame or a collider it cannot check against a hull.',
     fix: 'Pass hull corners as flat `x, y, z` values (`convexGeometry` makes them from a mesh) and raise `maxPoints` above 64 only if you need to. Pass a column-major affine matrix of 16 finite values to `setTransform`. Give each link a separate hull with `axis` and `hinge` not parallel. A custom collider in a solver with link hulls implements `hullClearanceInto(hull, outDistance)`.',
   },
+  {
+    id: 'voxel-net-names-snapshots',
+    title: 'voxel-net: names, snapshots and refused connections',
+    kind: 'family',
+    messages: [
+      'The voxel-net server closed the connection with <code>; check that it is running and that server and client are the same version',
+      'VoxelServer closed during importEdits, so nothing was imported; call importEdits before close',
+      'VoxelServer filterName must be a function (name, id) => string',
+      "VoxelServer filterName returned <type>; return the name to show, or '' for none",
+      'VoxelServer importEdits chunk <key> uses block state <state>, not in the block types; import a snapshot of this game',
+      'VoxelServer importEdits got <n> chunks over maxEditedChunks (<max>); raise maxEditedChunks or pass a store',
+      "VoxelServer importEdits key <key> is not a chunk 'cx,cy,cz' inside the world; use exportEdits keys",
+      'VoxelServer importEdits keys must be strings like "0,-1,2"',
+      'VoxelServer importEdits must put chunks back to the generator, so the store needs delete(key); add it to your VoxelEditStore',
+      'VoxelServer importEdits needs a Map; pass what exportEdits returned',
+      'VoxelServer is closed; call importEdits before close',
+      'names must be an array of PlayerName',
+      'names name must be a string',
+    ],
+    cause:
+      'A client and server of different protocol versions met, or the server refused the page or stopped; a `filterName` hook returned something other than a string; or `importEdits` got something other than the output of `exportEdits` for this game.',
+    fix: 'Build server and client from the same voxel-net version (`PROTOCOL_VERSION`), and read the close reason in the message. Return a string from `filterName`. Pass `importEdits` the `Map` that `exportEdits` returned, on a server with the same block types, and give a `VoxelEditStore` a `delete(key)` when chunks must go back to the generator.',
+  },
 ];

@@ -8,14 +8,16 @@ export type {
   VoxelNetTransport,
 } from './client.js';
 export { connectVoxelNet, VoxelNetClient } from './client.js';
-export type { ClientMessage, InputRun, PlayerState, ServerMessage } from './protocol.js';
+export type { ClientMessage, InputRun, PlayerName, PlayerState, ServerMessage } from './protocol.js';
 export {
   blockTableHash,
+  cleanPlayerName,
   decodeClientMessage,
   decodeServerMessage,
   encodeClientMessage,
   encodeServerMessage,
   Keys,
+  MAX_NAME_BYTES,
   moveIntent,
   PLAYER_SCHEMA,
   PROTOCOL_VERSION,

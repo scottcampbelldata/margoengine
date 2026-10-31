@@ -17,10 +17,12 @@ import { VoxelCharacter, type VoxelCharacterOptions } from '@margoengine/voxel/q
 import {
   blockTableHash,
   type ClientMessage,
+  cleanPlayerName,
   decodeClientMessage,
   encodeServerMessage,
   Keys,
   moveIntent,
+  type PlayerName,
   PLAYER_SCHEMA,
   PROTOCOL_VERSION,
   STEP_SECONDS,
@@ -110,6 +112,12 @@ export interface VoxelServerOptions {
   store?: VoxelEditStore;
   /** Body of every player; clients must use the same options. */
   character?: VoxelCharacterOptions;
+  /**
+   * Your rule for display names: gets the hello's name, already through `cleanPlayerName`, and the player's id, and
+   * returns the name to show (`''` for none); the result is cleaned too. A throw or a result that is not a string goes
+   * to `onError` and closes the client with 1011 `'name-failed'`. Default none: the cleaned name stands.
+   */
+  filterName?: (name: string, id: number) => string;
   /** Game rules for edits, after the built-in ones: return false to refuse. */
   allowEdit?: (player: VoxelServerPlayer, x: number, y: number, z: number, state: number, previous: number) => boolean;
 }
@@ -145,6 +153,11 @@ export interface VoxelEditStore {
   save(key: string, chunk: PackedChunk): void | Promise<void>;
   /** The chunk last saved under `key`, or undefined when there is none (the generator makes it). */
   load(key: string): PackedChunk | undefined | Promise<PackedChunk | undefined>;
+  /**
+   * Forgets `key`, so `load` gives undefined again. Only {@link VoxelServer.importEdits} calls it, for a chunk that goes
+   * back to the generator's, and it refuses to do that without this. A throw or rejection goes to `onError`.
+   */
+  delete?(key: string): void | Promise<void>;
 }
 
 /** A player as the server holds it. */
@@ -248,6 +261,7 @@ const NAMES: Record<number, ServerMessage['type']> = {
     20: 'blocks',
     21: 'players',
     22: 'loaded',
+    23: 'names',
   },
   BANK = 60, // movement steps a client may save up: 0.5 s
   DRIFT = 1 / 64, // blocks of disagreement before a correction
@@ -262,6 +276,17 @@ const NAMES: Record<number, ServerMessage['type']> = {
   RETRY_MS = 250, // wait before the second try; it doubles for each further one
   FAILED_KEPT = 4096; // most chunks whose failures are remembered
 const TIMED_OUT: unique symbol = Symbol('timed out');
+
+const sameArray = (a: ArrayLike<number>, b: ArrayLike<number>): boolean => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
+const samePacked = (a: PackedChunk, b: PackedChunk): boolean =>
+  a.bits === b.bits &&
+  sameArray(a.palette, b.palette) &&
+  sameArray(a.words, b.words) &&
+  (typeof a.light === 'number' || typeof b.light === 'number' ? a.light === b.light : sameArray(a.light, b.light));
 
 const later = (ms: number): Promise<void> => new Promise((done) => setTimeout(done, ms).unref());
 
@@ -482,9 +507,14 @@ export class VoxelServer {
   readonly #saving = new Map<string, PackedChunk>();
   /** The last store save of each key still running, so saves of one key run in order. */
   readonly #writes = new Map<string, Promise<void>>();
+  /** Keys this server saved to the store and dropped from memory. */
+  readonly #evicted = new Set<string>();
+  /** Keys whose store copy is being deleted: never read back. */
+  readonly #reverted = new Set<string>();
   #editLimitReported = false;
   readonly #characterOptions: VoxelCharacterOptions | undefined;
   readonly #allowEdit: VoxelServerOptions['allowEdit'];
+  readonly #filterName: VoxelServerOptions['filterName'];
   readonly #pool: GeneratorPool;
   readonly #codec = new EntityCodec(PLAYER_SCHEMA);
   readonly #hash: number;
@@ -556,6 +586,9 @@ export class VoxelServer {
     this.#store = o.store;
     this.#characterOptions = o.character;
     this.#allowEdit = o.allowEdit;
+    if (o.filterName !== undefined && typeof o.filterName !== 'function')
+      throw new TypeError('VoxelServer filterName must be a function (name, id) => string');
+    this.#filterName = o.filterName;
     this.#hash = blockTableHash(o.blocks);
     const generator = o.generator ?? {},
       data: GeneratorData = { voxelNetGenerator: true, blocks: o.blocks.table.map((type) => ({ ...type })) };
@@ -636,6 +669,92 @@ export class VoxelServer {
     this.metrics = VoxelServer.#emptyMetrics();
   }
   /**
+   * A copy of every chunk edited since this server started, by `'cx,cy,cz'`: what {@link VoxelServer.importEdits} takes
+   * back, and typed arrays `v8.serialize` can write to disk. Chunks in memory are copied at the call; those past
+   * `maxEditedChunks` are read back from the store. A store cannot be listed, so chunks it holds from an earlier run
+   * that were not edited in this one are left out.
+   * @throws what the store's `load` throws (rejects).
+   */
+  async exportEdits(): Promise<Map<string, PackedChunk>> {
+    const edits = new Map<string, PackedChunk>();
+    for (const [key, chunk] of this.#edited) edits.set(key, chunk.pack());
+    const stored = [...this.#evicted].filter((key) => !edits.has(key));
+    await Promise.all(
+      stored.map(async (key) => {
+        const packed = await this.#stored(key);
+        if (packed) edits.set(key, VoxelChunk.unpack(packed).pack());
+      }),
+    );
+    return edits;
+  }
+  /**
+   * Makes the edited chunks exactly `edits`, the output of {@link VoxelServer.exportEdits}: a chunk in `edits` replaces
+   * what the world holds, an edited chunk not in it goes back to the generator's, and one that already matches is left
+   * alone. All of it happens between two ticks, or nothing does. Every client holding a changed chunk gets it again;
+   * players stay where they are (a player inside a restored block can walk out). Works before {@link VoxelServer.listen},
+   * to start from a saved snapshot.
+   * @throws MargoError `'state'` (rejects) when the server is closed, or when a chunk must go back to the generator's
+   * and the store has no `delete`.
+   * @throws TypeError (rejects) when `edits` is not a Map, or for a key or chunk of the wrong type.
+   * @throws RangeError (rejects) for a key that is not `'cx,cy,cz'` inside the world, a chunk that does not unpack or
+   * uses a block outside the block types, or more chunks than `maxEditedChunks` without a store.
+   * @throws what the generator throws (rejects); nothing has changed then.
+   */
+  async importEdits(edits: ReadonlyMap<string, PackedChunk>): Promise<void> {
+    if (this.#closed) throw new MargoError('state', 'VoxelServer is closed; call importEdits before close');
+    if (!(edits instanceof Map))
+      throw new TypeError('VoxelServer importEdits needs a Map; pass what exportEdits returned');
+    if (!this.#store && edits.size > this.#maxEdited)
+      throw new RangeError(
+        `VoxelServer importEdits got ${edits.size} chunks over maxEditedChunks (${this.#maxEdited}); raise maxEditedChunks or pass a store`,
+      );
+    const chunks = new Map<string, VoxelChunk>();
+    for (const [key, packed] of edits) {
+      this.#position(key);
+      const chunk = VoxelChunk.unpack(packed);
+      for (const state of packed.palette)
+        if (state !== 0 && !this.blocks.table[state & 0xffff])
+          throw new RangeError(
+            `VoxelServer importEdits chunk ${key} uses block state ${state}, not in the block types; import a snapshot of this game`,
+          );
+      chunks.set(key, chunk);
+    }
+    // The generator's chunks first, so a failure changes nothing; edits made meanwhile may add to the list.
+    const fresh = new Map<string, VoxelChunk>();
+    for (;;) {
+      const missing = [...this.#edited.keys(), ...this.#evicted].filter((key) => !chunks.has(key) && !fresh.has(key));
+      if (!missing.length) break;
+      if (this.#store && !this.#store.delete)
+        throw new MargoError(
+          'state',
+          'VoxelServer importEdits must put chunks back to the generator, so the store needs delete(key); add it to your VoxelEditStore',
+        );
+      await Promise.all(missing.map(async (key) => void fresh.set(key, await this.#pristine(key))));
+      if (this.#closed)
+        throw new MargoError(
+          'state',
+          'VoxelServer closed during importEdits, so nothing was imported; call importEdits before close',
+        );
+    }
+    const deletes: Promise<void>[] = [];
+    for (const [key, chunk] of chunks) {
+      const had = this.#edited.get(key);
+      if (had && samePacked(had.pack(), edits.get(key) as PackedChunk)) continue;
+      this.#replace(key, chunk);
+      this.#edited.delete(key);
+      this.#edited.set(key, chunk);
+    }
+    for (const [key, chunk] of fresh) {
+      this.#replace(key, chunk);
+      this.#edited.delete(key);
+      this.#evicted.delete(key);
+      if (this.#store) deletes.push(this.#forget(key));
+    }
+    this.#editLimitReported = false;
+    if (this.#edited.size > this.#maxEdited) this.#evict('');
+    await Promise.all(deletes);
+  }
+  /**
    * Starts accepting WebSocket clients on `port` (0: any free port) and `host`, and starts the tick.
    * @throws MargoError `'state'` (rejects) when already listening or closed; the server's error when it cannot listen.
    */
@@ -685,6 +804,7 @@ export class VoxelServer {
       new Promise<void>((done) => (this.#http ? this.#http.close(() => done()) : done())),
       this.#pool.close(),
       ...saves,
+      ...this.#writes.values(),
     ]);
   }
 
@@ -693,7 +813,7 @@ export class VoxelServer {
       tickTimes: [],
       tickStarts: [],
       skipped: 0,
-      bytesOut: { welcome: 0, chunk: 0, unload: 0, state: 0, blocks: 0, players: 0, loaded: 0 },
+      bytesOut: { welcome: 0, chunk: 0, unload: 0, state: 0, blocks: 0, players: 0, loaded: 0, names: 0 },
       bytesIn: 0,
       corrections: 0,
       editsAccepted: 0,
@@ -835,17 +955,30 @@ export class VoxelServer {
     clearTimeout(c.timer);
     if (m.version !== PROTOCOL_VERSION)
       return this.#kick(c, 1008, `protocol ${m.version}, server speaks ${PROTOCOL_VERSION}`);
+    // Hostile until cleaned: other players are shown this.
+    c.name = cleanPlayerName(m.name);
     if (!this.#authenticate) return this.#join(c, m);
     c.phase = 'auth';
     void (async () => {
       if (!(await c.upgradeAuth) || c.phase !== 'auth') return;
-      if ((await this.#authorize(c, { name: m.name })) && c.phase === 'auth') this.#join(c, m);
+      if ((await this.#authorize(c, { name: c.name })) && c.phase === 'auth') this.#join(c, m);
     })();
   }
   #join(c: Client, m: Extract<ClientMessage, { type: 'hello' }>): void {
     if (this.players.length >= this.#maxPlayers) return this.#kick(c, 1013, 'server full');
+    if (this.#filterName)
+      try {
+        const name = this.#filterName(c.name, c.id);
+        if (typeof name !== 'string')
+          throw new TypeError(
+            `VoxelServer filterName returned ${typeof name}; return the name to show, or '' for none`,
+          );
+        c.name = cleanPlayerName(name);
+      } catch (error) {
+        this.onError(error);
+        return this.#kick(c, 1011, 'name-failed: filterName threw');
+      }
     this.#settle(c);
-    c.name = m.name;
     c.view = Math.max(2, Math.min(this.#maxView, m.view || this.#view));
     c.phase = 'joining';
     this.metrics.joins++;
@@ -1065,7 +1198,69 @@ export class VoxelServer {
   }
   // An edited chunk that is not in memory: on its way to the store, or read back from it.
   async #stored(key: string): Promise<PackedChunk | undefined> {
-    return this.#saving.get(key) ?? (await (this.#store as VoxelEditStore).load(key)) ?? undefined;
+    const saving = this.#saving.get(key);
+    if (saving || this.#reverted.has(key)) return saving;
+    return (await (this.#store as VoxelEditStore).load(key)) ?? undefined;
+  }
+  // The position of a chunk key, or the error importEdits rejects with.
+  #position(key: string): [number, number, number] {
+    if (typeof key !== 'string') throw new TypeError('VoxelServer importEdits keys must be strings like "0,-1,2"');
+    const [cx, cy, cz] = key.split(',').map(Number);
+    if (
+      chunkKey(cx, cy, cz) !== key ||
+      ![cx, cy, cz].every((c) => Number.isInteger(c) && (c << 5) >> 5 === c) ||
+      cy * 32 > this.world.maxY ||
+      cy * 32 + 31 < this.world.minY
+    )
+      throw new RangeError(
+        `VoxelServer importEdits key ${key} is not a chunk 'cx,cy,cz' inside the world; use exportEdits keys`,
+      );
+    return [cx, cy, cz];
+  }
+  // The chunk as nobody edited it.
+  async #pristine(key: string): Promise<VoxelChunk> {
+    const [cx, cy, cz] = this.#position(key),
+      spot = { key, cx, cy, cz, d: 0 };
+    return this.#aboveCeiling(spot)
+      ? new VoxelChunk()
+      : VoxelChunk.unpack((await this.#generate(spot, true, false)).packed);
+  }
+  // Swaps a chunk everywhere the server keeps it, with no hole for physics, and has clients get it again.
+  #replace(key: string, chunk: VoxelChunk): void {
+    const [cx, cy, cz] = this.#position(key);
+    if (this.world.removeChunk(cx, cy, cz) || this.#refs.has(key)) this.world.addChunk(cx, cy, cz, chunk);
+    this.#versions.set(key, (this.#versions.get(key) ?? 0) + 1);
+    const cached = this.#cache.get(key);
+    if (cached) {
+      this.#cacheBytes -= cached.message.length;
+      this.#cache.delete(key);
+    }
+    this.#changes.delete(key);
+    for (const c of this.#clients)
+      if (c.sent.delete(key)) {
+        c.cursor = 0;
+        // Sent chunks may lie one chunk past the view, where #sendChunks would not replace them.
+        if ((cx - c.cx) ** 2 + (cz - c.cz) ** 2 > c.view ** 2 || Math.abs(cy - c.cy) > this.#viewHeight)
+          c.out.push(encodeServerMessage({ type: 'unload', cx, cy, cz }));
+      }
+  }
+  // Takes a chunk out of the store, in order with its saves; it reads as absent from now on. Never rejects.
+  #forget(key: string): Promise<void> {
+    const store = this.#store as VoxelEditStore,
+      before = this.#writes.get(key) ?? Promise.resolve();
+    this.#saving.delete(key);
+    this.#reverted.add(key);
+    const done = before
+      .then(() => store.delete?.(key))
+      .then(
+        () => void this.#reverted.delete(key),
+        (error) => this.onError(error),
+      )
+      .finally(() => {
+        if (this.#writes.get(key) === done) this.#writes.delete(key);
+      });
+    this.#writes.set(key, done);
+    return done;
   }
   // Saves the least recently edited chunks to the store and drops them, until maxEditedChunks are held. A chunk a
   // load, fetch or generator job is busy with stays, so no old message of it can be cached after it leaves.
@@ -1075,6 +1270,7 @@ export class VoxelServer {
       if (this.#edited.size <= this.#maxEdited) return;
       if (key === current || this.#loading.has(key) || this.#fetching.has(key) || this.#jobs.has(key)) continue;
       this.#edited.delete(key);
+      this.#evicted.add(key);
       this.#versions.delete(key);
       const cached = this.#cache.get(key);
       if (cached) {
@@ -1090,6 +1286,7 @@ export class VoxelServer {
     const store = this.#store as VoxelEditStore,
       before = this.#writes.get(key) ?? Promise.resolve();
     this.#saving.set(key, packed);
+    this.#reverted.delete(key);
     const done = before
       .then(() => store.save(key, packed))
       .then(
@@ -1178,6 +1375,7 @@ export class VoxelServer {
           px = Math.floor(p[0]) >> 5,
           pz = Math.floor(p[2]) >> 5,
           nearby = new Map<number, PreparedEntity>();
+        let names: PlayerName[] | undefined;
         for (let dz = -reach; dz <= reach; dz++)
           for (let dx = -reach; dx <= reach; dx++) {
             const list = grid.get(`${px + dx},${pz + dz}`);
@@ -1185,10 +1383,14 @@ export class VoxelServer {
               for (const other of list) {
                 if (other === c) continue;
                 const q = other.character.position;
-                if ((q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2 <= d2)
+                if ((q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2 <= d2) {
                   nearby.set(other.id, states.get(other.id) as PreparedEntity);
+                  if (other.name && !c.baseline.has(other.id)) (names ??= []).push({ id: other.id, name: other.name });
+                }
               }
           }
+        // Before its first state, so a client's RemotePlayer has its name from the start.
+        if (names) this.#write(c, encodeServerMessage({ type: 'names', names }));
         const data = this.#codec.encode(nearby, c.baseline);
         c.baseline = nearby;
         if (data.length > 1) this.#write(c, encodeServerMessage({ type: 'players', tick: this.#tick, data }));

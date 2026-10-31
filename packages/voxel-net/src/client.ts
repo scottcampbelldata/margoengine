@@ -65,6 +65,8 @@ export interface VoxelNetControls {
 export interface RemotePlayer {
   /** The server's id of the player. */
   readonly id: number;
+  /** Its display name as the server cleaned it, `''` when it has none. Show it as text, never as HTML. */
+  name: string;
   /** Its snapshots, by server time in seconds. */
   readonly buffer: SnapshotBuffer;
   /** Where to draw it, filled by {@link VoxelNetClient.samplePlayers}. */
@@ -125,7 +127,7 @@ export class VoxelNetClient {
   readonly players = new Map<number, RemotePlayer>();
   /** Counters for tests and benchmarks. */
   readonly stats: VoxelNetClientStats = {
-    received: { welcome: 0, chunk: 0, unload: 0, state: 0, blocks: 0, players: 0, loaded: 0 },
+    received: { welcome: 0, chunk: 0, unload: 0, state: 0, blocks: 0, players: 0, loaded: 0, names: 0 },
     sent: 0,
     corrections: 0,
     chunks: 0,
@@ -151,6 +153,7 @@ export class VoxelNetClient {
   readonly #codec = new EntityCodec(PLAYER_SCHEMA);
   readonly #chunks = new Map<string, Entry>();
   #entities = new Map<number, PlayerState>();
+  readonly #names = new Map<number, string>(); // by id, while the player is in range
   #step = 0; // last step simulated
   #acked = 0; // step of the last correction applied
   #time = 0; // simulated time not yet stepped
@@ -325,6 +328,14 @@ export class VoxelNetClient {
         this.loaded = true;
         this.onLoaded();
         break;
+      case 'names':
+        if (this.#decodePlayers)
+          for (const { id, name } of m.names) {
+            this.#names.set(id, name);
+            const other = this.players.get(id);
+            if (other) other.name = name;
+          }
+        break;
     }
   }
   #drop(key: string): void {
@@ -435,7 +446,12 @@ export class VoxelNetClient {
       if (id === this.welcome?.id) continue;
       let other = this.players.get(id);
       if (!other) {
-        other = { id, buffer: new SnapshotBuffer(32, 0.25), snapshot: createSnapshot() };
+        other = {
+          id,
+          name: this.#names.get(id) ?? '',
+          buffer: new SnapshotBuffer(32, 0.25),
+          snapshot: createSnapshot(),
+        };
         this.players.set(id, other);
       }
       // Every player every message (a still one too), so the buffer does not extrapolate a stopped player onwards.
@@ -445,13 +461,19 @@ export class VoxelNetClient {
         velocity = last && span > 0 ? p.map((v, i) => (v - last.position[i]) / span) : [0, 0, 0];
       if (other.buffer.push(time, p, state.rotation, velocity)) other.last = { time, position: [p[0], p[1], p[2]] };
     }
-    for (const id of this.players.keys()) if (!decoded.has(id)) this.players.delete(id);
+    for (const id of this.players.keys())
+      if (!decoded.has(id)) {
+        this.players.delete(id);
+        this.#names.delete(id); // the server names it again when it comes back
+      }
     this.#entities = decoded;
   }
 }
 
 /**
- * Connects a {@link VoxelNetClient} to a voxel-net server with the browser's WebSocket.
+ * Connects a {@link VoxelNetClient} to a voxel-net server with the browser's WebSocket. When the server refuses or drops
+ * the connection (any close but 1000 and 1001, for example another protocol version), `onError` gets a MargoError
+ * `'failed'` holding the close code and reason.
  * @throws MargoError `'unsupported'` where there is no global WebSocket.
  * @throws as the {@link VoxelNetClient} constructor.
  */
@@ -465,11 +487,15 @@ export function connectVoxelNet(
   const socket = new WebSocket(url),
     queue: Uint8Array[] = [];
   socket.binaryType = 'arraybuffer';
+  let closing = false;
   const client = new VoxelNetClient(
     world,
     {
       send: (data) => (socket.readyState === 1 ? socket.send(data as Uint8Array<ArrayBuffer>) : queue.push(data)),
-      close: () => socket.close(),
+      close: () => {
+        closing = true;
+        socket.close();
+      },
     },
     options,
   );
@@ -477,6 +503,15 @@ export function connectVoxelNet(
     for (const data of queue.splice(0)) socket.send(data as Uint8Array<ArrayBuffer>);
   });
   socket.addEventListener('message', (event) => client.receive(new Uint8Array(event.data as ArrayBuffer)));
-  socket.addEventListener('close', () => client.close());
+  socket.addEventListener('close', ({ code, reason }) => {
+    if (!closing && code !== 1000 && code !== 1001)
+      client.onError(
+        new MargoError(
+          'failed',
+          `The voxel-net server closed the connection with ${code}${reason ? ` (${reason})` : ''}; check that it is running and that server and client are the same version`,
+        ),
+      );
+    client.close();
+  });
   return client;
 }

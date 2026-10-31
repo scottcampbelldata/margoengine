@@ -8,7 +8,10 @@ import type { VoxelMoveIntent } from '@margoengine/voxel/query';
 import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js';
 
 /** Version of this wire format; a server closes connections that say another. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
+
+/** Most UTF-8 bytes of a player's display name, on the wire and after {@link cleanPlayerName}. */
+export const MAX_NAME_BYTES = 32;
 
 /** Seconds of one movement step: client and server both run `VoxelCharacter` at 120 steps per second. */
 export const STEP_SECONDS = 1 / 120;
@@ -30,6 +33,14 @@ export const Keys = {
   sprint: 64,
   fly: 128,
 } as const;
+
+/** A player's id and display name, as the {@link ServerMessage} `names` carries them. */
+export interface PlayerName {
+  /** The player's id, as in the players messages. */
+  id: number;
+  /** Its display name, at most {@link MAX_NAME_BYTES} UTF-8 bytes. */
+  name: string;
+}
 
 /** Consecutive movement steps with the same input. */
 export interface InputRun {
@@ -87,7 +98,9 @@ export type ServerMessage =
   /** Server tick `tick`, then `EntityCodec` bytes of the nearby players against the previous players message. */
   | { type: 'players'; tick: number; data: Uint8Array }
   /** The whole view has been sent once since joining. */
-  | { type: 'loaded' };
+  | { type: 'loaded' }
+  /** Names of the players about to enter this client's players messages; players without a name are left out. */
+  | { type: 'names'; names: PlayerName[] };
 
 const HELLO = 1,
   INPUT = 2,
@@ -99,8 +112,9 @@ const HELLO = 1,
   BLOCKS = 20,
   PLAYERS = 21,
   LOADED = 22,
-  NAME_BYTES = 32,
+  NAMES = 23,
   MAX_RUNS = 1024,
+  MAX_NAMES = 65535, // VoxelServer's largest maxPlayers
   encoder = new TextEncoder(),
   decoder = new TextDecoder('utf-8', { fatal: true });
 
@@ -125,6 +139,16 @@ class Reader extends ByteReader {
     this.need(8);
     this.at += 8;
     return this.finite(this.view.getFloat64(this.at - 8, true));
+  }
+  name(): string {
+    const n = this.varint();
+    if (n > MAX_NAME_BYTES) throw this.fail(`has a name of ${n} bytes, over ${MAX_NAME_BYTES}`);
+    this.need(n);
+    try {
+      return decoder.decode(this.bytes.subarray(this.at, (this.at += n)));
+    } catch {
+      throw this.fail('has a name that is not UTF-8');
+    }
   }
   rest(): Uint8Array {
     const out = this.bytes.slice(this.at);
@@ -166,6 +190,36 @@ const bytesOf = (what: string, v: unknown): Uint8Array => {
   return v;
 };
 
+// Characters a name never shows: controls and format marks (bidi overrides, zero widths), surrogates left alone,
+// private use, unassigned, blank letters that look like nothing, and the angle brackets of markup.
+const UNSHOWN = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}<>\u115f\u1160\u17b4\u17b5\u2800\u3164\uffa0]/gu;
+
+/**
+ * `name` as safe to show other players: NFC, without invisible characters (controls, bidi overrides, zero widths, blank
+ * letters), angle brackets or stacks of more than 2 combining marks, its whitespace collapsed and trimmed, cut on a
+ * character boundary to {@link MAX_NAME_BYTES} bytes. `VoxelServer` runs every hello's name through it. Anything but a
+ * string, or a name with nothing visible left, gives `''`. Still show the result as text, never as HTML.
+ */
+export function cleanPlayerName(name: unknown): string {
+  if (typeof name !== 'string') return '';
+  const clean = name
+    .normalize('NFC')
+    .replace(/[\p{Z}\t\n\v\f\r\u0085]+/gu, ' ') // first: a line break must leave a space, not join two words
+    .replace(UNSHOWN, '')
+    .replace(/(\p{M}{2})\p{M}+/gu, '$1')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+  if (encoder.encode(clean).length <= MAX_NAME_BYTES) return clean;
+  let cut = '',
+    bytes = 0;
+  for (const c of clean) {
+    bytes += encoder.encode(c).length;
+    if (bytes > MAX_NAME_BYTES) break;
+    cut += c;
+  }
+  return cut.trimEnd();
+}
+
 /**
  * Bytes of a {@link ClientMessage}.
  * @throws TypeError for a message of unknown type or a field of the wrong type.
@@ -177,8 +231,8 @@ export function encodeClientMessage(message: ClientMessage): Uint8Array {
   switch (message?.type) {
     case 'hello': {
       const name = encoder.encode(String(message.name ?? ''));
-      if (name.length > NAME_BYTES)
-        throw new RangeError(`Player name is ${name.length} bytes; use at most ${NAME_BYTES}`);
+      if (name.length > MAX_NAME_BYTES)
+        throw new RangeError(`Player name is ${name.length} bytes; use at most ${MAX_NAME_BYTES}`);
       w.u8(HELLO);
       w.varint(integer('hello version', message.version, 0, 2 ** 32 - 1));
       w.varint(integer('hello view', message.view, 0, 64));
@@ -230,17 +284,8 @@ export function decodeClientMessage(bytes: Uint8Array): ClientMessage {
   let message: ClientMessage;
   if (type === HELLO) {
     const version = r.varint(),
-      view = r.varint(),
-      n = r.varint();
-    if (n > NAME_BYTES) throw r.fail(`has a name of ${n} bytes, over ${NAME_BYTES}`);
-    r.need(n);
-    let name: string;
-    try {
-      name = decoder.decode(bytes.subarray(r.at, (r.at += n)));
-    } catch {
-      throw r.fail('has a name that is not UTF-8');
-    }
-    message = { type: 'hello', version, view, name };
+      view = r.varint();
+    message = { type: 'hello', version, view, name: r.name() };
   } else if (type === INPUT) {
     const step = r.varint(),
       acked = r.varint(),
@@ -268,7 +313,8 @@ export function decodeClientMessage(bytes: Uint8Array): ClientMessage {
 /**
  * Bytes of a {@link ServerMessage}.
  * @throws TypeError for a message of unknown type or a field of the wrong type.
- * @throws RangeError for a field out of range.
+ * @throws RangeError for a field out of range: a chunk past the 27-bit chunk positions, a names message with no entry
+ * or more than 65,535, a name over 32 UTF-8 bytes.
  */
 export function encodeServerMessage(message: ServerMessage): Uint8Array {
   const w = new Writer();
@@ -317,6 +363,24 @@ export function encodeServerMessage(message: ServerMessage): Uint8Array {
     case 'loaded':
       w.u8(LOADED);
       break;
+    case 'names': {
+      const names = message.names;
+      if (!Array.isArray(names)) throw new TypeError('names must be an array of PlayerName');
+      if (!names.length || names.length > MAX_NAMES)
+        throw new RangeError(`names has ${names.length} entries; send 1..${MAX_NAMES} per message`);
+      w.u8(NAMES);
+      w.varint(names.length);
+      for (const entry of names) {
+        w.varint(integer('names id', entry?.id, 0, 2 ** 32 - 1));
+        if (typeof entry.name !== 'string') throw new TypeError('names name must be a string');
+        const name = encoder.encode(entry.name);
+        if (name.length > MAX_NAME_BYTES)
+          throw new RangeError(`Player name is ${name.length} bytes; use at most ${MAX_NAME_BYTES}`);
+        w.varint(name.length);
+        w.raw(name);
+      }
+      break;
+    }
     default:
       throw new TypeError(
         `Unknown server message type ${String((message as { type?: unknown })?.type)}; use one of the ServerMessage types`,
@@ -368,7 +432,16 @@ export function decodeServerMessage(bytes: Uint8Array): ServerMessage {
   } else if (type === BLOCKS) message = { type: 'blocks', data: r.rest() };
   else if (type === PLAYERS) message = { type: 'players', tick: r.varint(), data: r.rest() };
   else if (type === LOADED) message = { type: 'loaded' };
-  else throw r.fail(`has unknown type ${type}`);
+  else if (type === NAMES) {
+    const n = r.varint();
+    if (!n || n > MAX_NAMES) throw r.fail(`has ${n} names`);
+    const names: PlayerName[] = [];
+    for (let i = 0; i < n; i++) {
+      const id = r.varint();
+      names.push({ id, name: r.name() });
+    }
+    message = { type: 'names', names };
+  } else throw r.fail(`has unknown type ${type}`);
   r.end();
   return message;
 }

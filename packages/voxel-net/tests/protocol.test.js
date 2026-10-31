@@ -2,12 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   blockTableHash,
+  cleanPlayerName,
   decodeClientMessage,
   decodeServerMessage,
   encodeClientMessage,
   encodeServerMessage,
   Keys,
+  MAX_NAME_BYTES,
   moveIntent,
+  PROTOCOL_VERSION,
   quantizeYaw,
 } from '../dist/index.js';
 import { testBlocks } from './blocks.js';
@@ -85,6 +88,76 @@ test('encoders check their fields', () => {
     () => encodeServerMessage({ type: 'chunk', cx: 2 ** 26, cy: 0, cz: 0, data: new Uint8Array() }),
     RangeError,
   );
+});
+
+test('names round-trip, and hostile names messages throw', () => {
+  const names = [
+      { id: 7, name: 'Ada Ł' },
+      { id: 2 ** 32 - 1, name: '' },
+      { id: 0, name: 'é'.repeat(16) },
+    ],
+    bytes = encodeServerMessage({ type: 'names', names });
+  assert.deepEqual(decodeServerMessage(bytes), { type: 'names', names });
+  assert.equal(bytes[0], 23);
+  assert.equal(PROTOCOL_VERSION, 2);
+  assert.equal(MAX_NAME_BYTES, 32);
+  // No entries, more entries than it carries, a name over 32 bytes, past the end, not UTF-8, trailing bytes.
+  for (const hostile of [
+    [23, 0],
+    [23, 200, 1, 1, 0],
+    [23, 1, 1, 33, ...new Uint8Array(33).fill(97)],
+    [23, 1, 1, 200, 1, 97],
+    [23, 1, 1, 5, 97],
+    [23, 1, 1, 2, 0xc0, 0xaf],
+    [23, 1, 1, 1, 97, 0],
+    [23, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
+  ])
+    assert.throws(() => decodeServerMessage(Uint8Array.from(hostile)), RangeError, String(hostile));
+  // A hello with the same faults.
+  assert.throws(() => decodeClientMessage(Uint8Array.from([1, 2, 6, 33, ...new Uint8Array(33)])), /over 32/);
+  for (const [names, error] of [
+    [undefined, TypeError],
+    ['Ada', TypeError],
+    [[], RangeError],
+    [[{ id: 1, name: 'x'.repeat(33) }], RangeError],
+    [[{ id: -1, name: 'x' }], RangeError],
+    [[{ id: 1.5, name: 'x' }], RangeError],
+    [[{ id: 1, name: 7 }], TypeError],
+    [[null], TypeError],
+    [new Array(65536).fill({ id: 1, name: '' }), RangeError],
+  ])
+    assert.throws(() => encodeServerMessage({ type: 'names', names }), error);
+});
+
+test('cleanPlayerName leaves names people can read and nothing else', () => {
+  for (const [hostile, clean] of [
+    ['Ada', 'Ada'],
+    ['  quiet   otter\t', 'quiet otter'],
+    ['Zoë', 'Zoë'],
+    ['Zoë', 'Zoë'], // NFC
+    ['李小龙', '李小龙'],
+    ['‮evil‬', 'evil'], // bidi override
+    ['a​‍﻿b', 'ab'], // zero widths, byte order mark
+    ['a\u0000b\u0007\u001b[31m', 'ab[31m'], // controls, terminal colours
+    ['line\nbreak\r\nthree four', 'line break three four'],
+    [' 　nbsp ', 'nbsp'],
+    ['<img src=x onerror=alert(1)>', 'img src=x onerror=alert(1)'],
+    ['ㅤ⠀ᅟﾠ', ''], // blank letters
+    ['á̂̃̄̅', 'á̂̃'], // stacked marks: NFC takes the first in, then 2
+    ['\ud800lone', 'lone'], // lone surrogate
+    ['private', 'private'],
+    ['\u{10ffff}none', 'none'],
+    ['x'.repeat(100), 'x'.repeat(32)],
+    [`${'x'.repeat(31)}é`, 'x'.repeat(31)], // never cuts a character in two
+    [`${'é'.repeat(16)}é`, 'é'.repeat(16)],
+    [`${'x'.repeat(31)} y`, 'x'.repeat(31)], // and leaves no trailing space
+    ['', ''],
+  ])
+    assert.equal(cleanPlayerName(hostile), clean, JSON.stringify(hostile));
+  for (const value of [undefined, null, 7, {}, ['Ada'], Symbol.iterator]) assert.equal(cleanPlayerName(value), '');
+  // The result always fits the wire.
+  for (const name of ['é'.repeat(40), '😀'.repeat(20), 'á'.repeat(40)])
+    encodeServerMessage({ type: 'names', names: [{ id: 1, name: cleanPlayerName(name) }] });
 });
 
 test('moveIntent turns the keys by the 16-bit yaw as the sandbox does', () => {

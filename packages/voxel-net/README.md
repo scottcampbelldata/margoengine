@@ -45,7 +45,7 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
   eye plus 1 of slack), that a placed block replaces air, liquid or a plant and overlaps no player, and that a break hits
   a block, then sends the change to every client holding that chunk. A refused edit sends the cell back.
 - **Other players**: `client.samplePlayers()` interpolates each one from a `@margoengine/net` `SnapshotBuffer`, 100 ms
-  behind the newest snapshot.
+  behind the newest snapshot. `other.name` holds its display name (see below).
 - **Wire format** (`.`): one type byte and a varint body per WebSocket message. `encodeClientMessage`,
   `decodeClientMessage`, `encodeServerMessage` and `decodeServerMessage` check every length; chunks, block changes
   and players carry the `@margoengine/voxel/codec` bytes. Chunks go out without light (clients light them).
@@ -97,6 +97,42 @@ const server = new VoxelServer({
 });
 await server.listen(8787, '0.0.0.0');
 ```
+
+## Names and snapshots
+
+A player's `name` reaches other clients as `RemotePlayer.name`, in a `names` message sent just before the player's
+first state each time it comes into range. A client that passes `players: false` ignores them.
+
+Names come from clients, so the server treats them as hostile. A hello whose name is over 32 UTF-8 bytes or is not
+UTF-8 closes the connection (1002). Every other name goes through `cleanPlayerName` before `authenticate`,
+`filterName`, `player.name` or anyone else sees it: NFC, without controls, bidi overrides, zero widths, blank letters
+or angle brackets, at most 2 stacked combining marks, whitespace collapsed. Still show names as text, never as HTML.
+
+| Option or method | Default | What it does |
+| --- | --- | --- |
+| `filterName` | none | `(name, id) => string`: your rule for names, such as a word list or a fallback. Its result is cleaned too. A throw, or a result that is not a string, goes to `onError` and closes the client with 1011 `'name-failed'`. |
+| `server.exportEdits()` | | Resolves to a `Map` of `'cx,cy,cz'` to a copy of each chunk edited since the server started, including those past `maxEditedChunks` in the `store`. A store cannot be listed, so what it holds from an earlier run and nobody edited in this one is left out. |
+| `server.importEdits(map)` | | Makes the edited chunks exactly `map`: its chunks replace what the world holds, other edited chunks go back to the generator's, matching ones are left alone. Clients holding a changed chunk get it again. Everything is checked first, so a rejection changes nothing. Works before `listen`. With a `store`, going back to the generator's needs the store's `delete(key)`. |
+
+```ts
+import { readFile, writeFile } from 'node:fs/promises';
+import { deserialize, serialize } from 'node:v8';
+import { BlockTypes } from 'margoengine/voxel';
+import { VoxelServer } from 'margoengine/voxel-net/server';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand']) blocks.define(name);
+const server = new VoxelServer({ blocks, filterName: (name, id) => name || `guest ${id}` });
+await server.listen(8787, '0.0.0.0');
+// A snapshot on disk: typed arrays in a Map, so v8.serialize writes it as it is.
+await writeFile('world.snapshot', serialize(await server.exportEdits()));
+// Back to it later, or in a new server before it listens.
+await server.importEdits(deserialize(await readFile('world.snapshot')));
+await server.close();
+```
+
+Breaking change (2026-10-31): `PROTOCOL_VERSION` is 2. Server and clients must be built from the same version; a client
+on another one is closed with 1008 and a reason naming both, which `connectVoxelNet` now passes to `onError`.
 
 ## Limits of the prototype
 

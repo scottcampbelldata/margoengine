@@ -88,6 +88,7 @@ unless stated.
 | server → client | `spawn` / `correct` | last step number applied, position (3 x f64), velocity (3 x f32), flying |
 | server → client | `blocks` | `encodeBlockChanges` bytes |
 | server → client | `players` | tick, then `EntityCodec` bytes for schema `{position: 'position', rotation: 'rotation'}` |
+| server → client | `names` | count, then (player id, name length, UTF-8 bytes, at most 32) for each named player coming into range, just before its first `players` state |
 | server → client | `loaded` | marks the first time the whole view has been sent (used to measure join time) |
 
 The connection is TCP, so every message arrives, in order. That lets `EntityCodec` use "the last state I sent you" as
