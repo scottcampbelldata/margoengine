@@ -134,12 +134,13 @@ var<private> materialTransmissionF0:f32=0.04;
 // The share lobes composed over transmission compute in place of the one below (materialLobesTransmitted, in the
 // output hook); negative while no lobe has set it.
 var<private> materialTransmissionLobes:vec3f=vec3f(-1.0);
-// Share of the light behind that enters: the dielectric part less the Schlick Fresnel reflection (glTF 2.0 Appendix B).
+// Share of the light behind that enters: the dielectric part less its own Schlick Fresnel reflection. glTF 2.0 Appendix B
+// has material = mix(dielectric_brdf, metal_brdf, metallic), so the metal's F0 takes none of this light a second time.
 fn materialTransmissionWeight(s:Surface,v:vec3f,n:vec3f,factor:f32)->vec3f {
   if(materialTransmissionLobes.x>=0.0){return factor*materialTransmissionLobes${coat};}
-  let f0=mix(vec3f(materialTransmissionF0),clamp(s.base.rgb,vec3f(0),vec3f(1)),s.metal);
+  let f0=materialTransmissionF0;
   let q=1.0-clamp(dot(n,v),0.0,1.0); let q2=q*q;
-  return factor*(1.0-s.metal)*(1.0-(f0+(1.0-f0)*q2*q2*q))${coat};
+  return vec3f(factor*(1.0-s.metal)*(1.0-(f0+(1.0-f0)*q2*q2*q))${coat});
 }
 fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool,factor:f32,ior:f32,thickness:f32,attenuation:vec3f,inverseDistance:f32,dispersion:f32)->vec3f {
   let v=normalize(f.eye.xyz-i.position);

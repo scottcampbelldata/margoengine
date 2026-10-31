@@ -79,9 +79,9 @@ fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
     let t=margoVolume.yzw;
     transmittance=select(select(pow(max(t,vec3f(0.000001)),vec3f(path)),vec3f(0.0),t<=vec3f(0.0)),vec3f(1.0),t>=vec3f(1.0));
   }
-  let f0=mix(s.f0,s.base.rgb,s.metal);
+  // The dielectric's Fresnel: glTF 2.0 Appendix B mixes the metal part in beside this one, not over it.
   let q=1.0-clamp(dot(s.n,v),0.0,1.0); let q2=q*q;
-  let fresnel=f0+(1.0-f0)*q2*q2*q;
+  let fresnel=s.f0+(1.0-s.f0)*q2*q2*q;
   return (1.0-s.metal)*s.tr*(1.0-fresnel)*s.base.rgb*transmittance*behind;
 }
 `;

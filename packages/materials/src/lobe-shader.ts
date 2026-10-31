@@ -219,22 +219,17 @@ fn materialLobesAmbient(s:Surface,baseline:vec3f,material:MaterialLobeInputs)->v
 }
 ${
   composites
-    ? `// The share of the light behind that enters, for materialTransmissionWeight (comment above lobeShader).
+    ? `// The share of the light behind that enters, for materialTransmissionWeight (comment above lobeShader). The Fresnel is
+// the dielectric's whatever the metal: Appendix B mixes the metal part in beside the dielectric part, not over it.
 fn materialLobesTransmitted(s:Surface,material:MaterialLobeInputs)->vec3f {
-  let materialWeight=pow(1.0-material.viewCos,5.0);
-  let materialBaseF0=mix(s.f0,s.base.rgb,s.metal);
-  var materialShare=(1.0-s.metal)*(1.0-(materialBaseF0+(1.0-materialBaseF0)*materialWeight));
-  if(materialLobesSpecularActive(s,material)||materialLobesFilmActive(material)){
-    let materialDielectricF0=materialLobesDielectricF0(s,material);
-    var materialDielectric=(materialDielectricF0+(1.0-materialDielectricF0)*materialWeight)*material.specular.a;
-    ${
-      iridescence
-        ? `if(materialLobesFilmActive(material)){materialDielectric=mix(materialDielectric,materialIridescenceFresnel(material.viewCos,1.0,material.iridescence.y,material.iridescence.z,materialDielectricF0)*material.specular.a,material.iridescence.x);}`
-        : ''
-    }
-    materialShare=vec3f((1.0-materialLobesMax(materialDielectric))*(1.0-s.metal));
+  let materialDielectricF0=materialLobesDielectricF0(s,material);
+  var materialDielectric=(materialDielectricF0+(1.0-materialDielectricF0)*pow(1.0-material.viewCos,5.0))*material.specular.a;
+  ${
+    iridescence
+      ? `if(materialLobesFilmActive(material)){materialDielectric=mix(materialDielectric,materialIridescenceFresnel(material.viewCos,1.0,material.iridescence.y,material.iridescence.z,materialDielectricF0)*material.specular.a,material.iridescence.x);}`
+      : ''
   }
-  return materialShare*max(0.0,1.0-materialLobesMax(material.sheen.rgb)*materialLobesSheenAlbedo(material.viewCos,material.sheen.a));
+  return vec3f((1.0-materialLobesMax(materialDielectric))*(1.0-s.metal)*max(0.0,1.0-materialLobesMax(material.sheen.rgb)*materialLobesSheenAlbedo(material.viewCos,material.sheen.a)));
 }
 `
     : ''

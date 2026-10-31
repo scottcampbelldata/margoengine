@@ -147,7 +147,7 @@ test('thin glass keeps its sightline at any IOR: its own pixel, no conversion, w
   close(out, expected, 1e-7, 'display thin');
 });
 
-test('F0 comes from the IOR: IOR 1 transmits everything at normal incidence, metal still mixes toward the base', () => {
+test('F0 comes from the IOR: IOR 1 transmits everything at normal incidence, metal leaves its share of the dielectric', () => {
   const p = [0.1, -0.1, 0];
   for (const ior of [1, 1.33, 1.5, 2.4]) {
     const { out, pixel } = extension({ factor: 1, ior }).shade(p);
@@ -160,12 +160,32 @@ test('F0 comes from the IOR: IOR 1 transmits everything at normal incidence, met
   assert.ok(Math.abs(dielectric(1.5) - 0.04) < 1e-12);
   const base = [1, 0.5, 0.25],
     { out, pixel } = extension({ factor: 1, ior: 1 }).shade(p, [0, 0, 1], { base, metal: 0.5 });
+  // glTF 2.0 Appendix B: material = mix(dielectric_brdf, metal_brdf, metallic), so the transmitted light is
+  // (1 - metal) x (1 - the dielectric's F). Taking the mixed F0 here as well lost a quarter of the light on half metal.
   close(
     out,
-    base.map((b, k) => 0.5 * (1 - 0.5 * b) * b * texel(pixel)[k]),
+    base.map((b, k) => 0.5 * b * texel(pixel)[k]),
     1e-6,
-    'F0 = mix(dielectric, base, metal)',
+    'the dielectric share of half metal at IOR 1',
   );
+  const { out: glass, pixel: at } = extension({ factor: 1, ior: 1.5 }).shade(p, [0, 0, 1], { metal: 0.5 });
+  close(
+    glass,
+    texel(at)
+      .slice(0, 3)
+      .map((c) => 0.5 * (1 - 0.04) * c),
+    1e-6,
+    'half metal at IOR 1.5',
+  );
+});
+
+test('white half metal glass keeps all the light: what it reflects and what it transmits add to one', () => {
+  const { shade } = extension({ factor: 1, ior: 1.5 }),
+    { out, pixel } = shade([0.1, -0.1, 0], [0, 0, 1], { metal: 0.5 }),
+    transmitted = out[0] / texel(pixel)[0],
+    // The host's reflection at normal incidence, F0 = mix(0.04, base, metal) for a white base.
+    reflected = 0.5 * 0.04 + 0.5 * 1;
+  assert.ok(Math.abs(reflected + transmitted - 1) < 1e-6, `${reflected} + ${transmitted}`);
 });
 
 test('the weight is factor x (1 - metal) x (1 - Schlick Fresnel) and adds to the lit colour', () => {
@@ -405,6 +425,21 @@ test('pass hook: binding declarations, straight read with no path and no blur at
   const flat = hook({ ext: [0, 1.5, 0, 0] }, [0, 1, 1, 1]);
   flat.shader.call('margoTransmission', surface({ th: 0 }), v, { position: p });
   close(flat.samples[0].uv, own, 1e-6, 'zero path is the fragment itself');
+});
+
+test('pass hook: half metal transmits (1 - metal) x (1 - the dielectric F), its own F0 taking none of it again', () => {
+  const p = [0.4, -0.3, 0],
+    v = unit(sub(eye, p)),
+    own = project(p).map((x, k) => x / [W, H][k]),
+    { shader } = hook({ ext: [0, 1, 0, 0] }, [1, 1, 1, 1]),
+    out = shader.call('margoTransmission', surface({ metal: 0.5, f0: [0, 0, 0] }), v, { position: p }),
+    fresnel = (1 - v[2]) ** 5;
+  close(
+    out,
+    [own[0], own[1], 0.5].map((c) => 0.5 * (1 - fresnel) * c),
+    1e-6,
+    'half metal through the pass',
+  );
 });
 
 test('pass hook: blur grows with roughness, Beer uses margoVolume per world unit, dispersion splits channels', () => {

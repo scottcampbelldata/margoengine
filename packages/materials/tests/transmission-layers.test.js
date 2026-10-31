@@ -49,6 +49,10 @@ const CASES = [
   ['sheen over specular 0', { sheen: [1, 1, 1], sheenRoughness: 0.5, factor: 0, nv: 0.25 }],
   ['IOR 1 with a sheen still loses what the sheen takes', { sheen: [0.5, 0.5, 0.5], sheenRoughness: 0.5, ior: 1 }],
   ['half metal', { metal: 0.5, factor: 0.5 }],
+  // A black sheen composes the lobes and leaves the specular as it is, which took the mixed F0 in a branch of its own:
+  // 0.24 against the 0.48 of a specular factor of 0.999.
+  ['half metal with no specular change', { metal: 0.5, sheen: [0, 0, 0], sheenRoughness: 0.5 }],
+  ['half metal at a grazing view', { metal: 0.5, sheen: [0, 0, 0], sheenRoughness: 0.5, nv: 0.25 }],
 ];
 const lobesOf = (c) => ({
   ior: c.ior ?? 1.5,
@@ -138,7 +142,7 @@ test('a clearcoat under transmission scales the transmitted light by 1 - clearco
     for (let k = 0; k < extension.factors.length; k += 4) rows.push([...extension.factors.slice(k, k + 4)]);
     assert.match(
       extension.declarations,
-      /return factor\*\(1\.0-s\.metal\)\*\(1\.0-\(f0\+\(1\.0-f0\)\*q2\*q2\*q\)\)\*materialCoatKeep;/,
+      /return vec3f\(factor\*\(1\.0-s\.metal\)\*\(1\.0-\(f0\+\(1\.0-f0\)\*q2\*q2\*q\)\)\*materialCoatKeep\);/,
     );
     const view = [Math.sqrt(1 - nv * nv), 0, nv],
       n = [0, 0, 1],
