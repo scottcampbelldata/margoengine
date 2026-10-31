@@ -969,9 +969,13 @@ export class VoxelServer {
     }
     return true;
   }
-  #receive(c: Client, bytes: Uint8Array): void {
+  // Every byte counts when it is seen, also a pong, which reaches no #receive.
+  #countIn(c: Client): void {
     this.metrics.bytesIn += c.conn.bytesIn - c.bytesIn;
     c.bytesIn = c.conn.bytesIn;
+  }
+  #receive(c: Client, bytes: Uint8Array): void {
+    this.#countIn(c);
     let m: ClientMessage;
     try {
       m = decodeClientMessage(bytes);
@@ -1397,6 +1401,7 @@ export class VoxelServer {
       // After the hello: until then helloTimeout rules. Ticks, not a clock: bytes that came while this thread was
       // stuck wait in the socket and are read right after this tick, so a long stall counts as one tick.
       const joined = c.phase !== 'hello';
+      this.#countIn(c);
       if (c.conn.bytesIn !== c.heardBytes) {
         c.heardBytes = c.conn.bytesIn;
         c.silentTicks = 0;

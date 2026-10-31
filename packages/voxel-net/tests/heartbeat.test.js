@@ -211,6 +211,17 @@ test('an idle lone player sending nothing is told the server lives and is not dr
   page.client.close();
 });
 
+// Pongs reach no message handler, so the count must not wait for the next message to include them.
+test('metrics count the pongs of a player sending no messages', async (t) => {
+  const { server, url } = await start(t, { heartbeatInterval: 100, clientTimeout: 500, spawn: () => [0, 0] }),
+    page = connect(url); // never calls update(): only its WebSocket answers
+  await until(() => page.client.loaded, 'the view arrived');
+  server.resetMetrics();
+  await until(() => server.metrics.bytesIn >= 3 * 6, 'three pongs counted');
+  assert.equal(server.counts.players, 1);
+  page.client.close();
+});
+
 test('a background tab whose timers are throttled does not count the wait it slept through', async (t) => {
   const { url } = await silentServer(t),
     serverTimeout = 150,
