@@ -53,6 +53,7 @@ export interface BiomeTile {
 export class BiomeWorld implements Disposable {
     readonly seed: number;
     readonly tileSize: number;
+    readonly ecotone: number;
     readonly resolution: number;
     readonly regionResolution: number;
     readonly bounds: Rect;
@@ -101,6 +102,7 @@ export interface BiomeWorldOptions {
     readonly biomes?: readonly BiomeDefinition[];
     readonly classifier?: 'envelopes' | ZoneClassifier;
     readonly paint?: readonly PaintLayer[];
+    readonly ecotone?: number;
     readonly signal?: AbortSignal;
     readonly workers?: number | false;
     readonly createWorker?: () => Worker;

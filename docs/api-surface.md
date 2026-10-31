@@ -70,7 +70,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10 |  |  | 7,638 |
 | @margoengine/road | `.` 3 |  |  | 1,027 |
 | @margoengine/save | `.` 42, `./node` 1 | 2 |  | 6,699 |
-| @margoengine/scatter | `.` 20, `./tiles` 3 | 10 |  | 14,126 |
+| @margoengine/scatter | `.` 20, `./tiles` 3 | 10 |  | 14,826 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
 | @margoengine/sciviz | `.` 70, `./colormaps` 11, `./maths` 37 | 3 |  | 35,730 |
 | @margoengine/selection | `.` 25 | 2 |  | 17,897 |
