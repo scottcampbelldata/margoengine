@@ -16,6 +16,10 @@ GitHub's asset server. The original GLBs retain their geometry, materials and an
 - `tokyo-diorama.glb`: original work for Margo Engine (Apache-2.0), built by `npm run build:tokyo`. Its baked textures use
   Poly Haven CC0 textures and its lettering uses Noto Sans CJK (SIL OFL 1.1). See [its credits](tokyo-diorama-CREDITS.md).
 
+- `boulder-robot.glb`: original work for Margo Engine (Apache-2.0), the Boulder demo climber (a Light Keeper robot with legs),
+  built from `source/skinning_ik/build_robot.py` in Blender and `scripts/build-boulder-assets.mjs`. No third-party files.
+  See [its license note](boulder-robot-LICENSE.md).
+
 Regenerate the desktop helmet GLB with `node scripts/optimize-demo-assets.js`. This uses
 the image tools already installed in this workspace and validates the GLB
 (Khronos glTF-Validator: 0 errors, 0 warnings). The phone GLB is not regenerated.

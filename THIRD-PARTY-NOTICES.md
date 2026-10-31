@@ -181,6 +181,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | [`examples/assets/kaykit/LICENSE-dungeon.txt`](examples/assets/kaykit/LICENSE-dungeon.txt) | KayKit Dungeon (Kay Lousberg, CC0) |
 | [`packages/creative/examples/earth/assets/ATTRIBUTION.md`](packages/creative/examples/earth/assets/ATTRIBUTION.md) | Earth demo: NASA Blue Marble, Solar System Scope textures (CC BY 4.0) |
 | [`examples/assets/scifi-helmet-CREDITS.md`](examples/assets/scifi-helmet-CREDITS.md) | SciFiHelmet test and benchmark model (Michael Pavlovic, Norbert Nopper, CC0 1.0) |
+| [`examples/assets/boulder-robot-LICENSE.md`](examples/assets/boulder-robot-LICENSE.md) | Boulder demo climber: Margo-made model and rig, no third-party files |
 | [`examples/assets/skinning-ik-LICENSE.md`](examples/assets/skinning-ik-LICENSE.md) | Light Keeper workshop demo: Margo-made model and rig, Poly Haven surface textures (CC0 1.0) |
 | [`tools/create-margo/templates/game/public/pete-LICENSE.txt`](tools/create-margo/templates/game/public/pete-LICENSE.txt) | game starter character (Kay Lousberg, KayKit, CC0) |
 | [`packages/environment/tests/fixtures/NOTICE.md`](packages/environment/tests/fixtures/NOTICE.md) | test fixtures: OpenEXR test images (BSD-3-Clause) |

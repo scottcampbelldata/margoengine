@@ -73,3 +73,20 @@ node owns its corresponding rigid geometry; the shade owns its diffuser and
 short service lead. Runtime joint rotations articulate the lamp independently
 of the robot skin. `workshop.build(ctx)` supports `ctx["only_lamp"] = True` for
 targeted lamp regeneration with the same geometry and pivots as a full build.
+
+## Boulder (the robot with legs)
+
+`build_robot.py` also authors Boulder, the climber of the Boulder demo: the same robot with a `Hips` bone, two legs
+(`LeftUpperLeg`, `LeftLowerLeg`, `LeftFoot`, `LeftToe` and the right side), climbing shoes, and `LeftFootTarget` and
+`RightFootTarget` markers for foot IK. There is no workshop, no texture and no orb. It builds in its own new Blender
+scene, never saves the open file and removes what it made, so it is safe to run next to other work:
+
+```python
+import bpy, runpy
+script = r"C:/path/to/margoengine/examples/assets/source/skinning_ik/build_robot.py"
+runpy.run_path(script, init_globals={"VARIANT": "boulder", "PREVIEW": r"C:/path/preview"}, run_name="__main__")
+```
+
+`PREVIEW` is optional (it renders `preview-rest.png` and `preview-climb.png`). The raw export lands in
+`test-results/boulder/boulder-robot.raw.glb`; then `node scripts/build-boulder-assets.mjs` writes the shipped
+`../boulder-robot.glb` (meshopt, Khronos-validated).

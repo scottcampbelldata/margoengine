@@ -115,6 +115,7 @@ const ASSETS = [
     'examples/assets/scifi-helmet-CREDITS.md',
     'SciFiHelmet test and benchmark model (Michael Pavlovic, Norbert Nopper, CC0 1.0)',
   ],
+  ['examples/assets/boulder-robot-LICENSE.md', 'Boulder demo climber: Margo-made model and rig, no third-party files'],
   [
     'examples/assets/skinning-ik-LICENSE.md',
     'Light Keeper workshop demo: Margo-made model and rig, Poly Haven surface textures (CC0 1.0)',
