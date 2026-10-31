@@ -6,8 +6,8 @@
 //   node examples/voxel-sandbox/loadtime.mjs [--profiles=a,b] [--runs=3] [--out=file] [--no-build] [--headed] [--bots=n]
 // --first-visit=profile times one new visitor on the light tier, then moving up by reloading: how long the GPU reading
 // takes, the frames on each tier, and the wait a reload costs.
-// --reading=WxH repeats the light tier's GPU reading at that canvas size: the rule's own 120 submissions and its verdict,
-// the same on a settled scene, GPU use on the machine, and a bare page's empty submissions as the control for time spent
+// --reading=WxH repeats the light tier's GPU reading at that canvas size: the watcher's own reading (`reading`, ms) and its
+// verdict (`stored`), what submit to done read over the same frames (`rule`) and on a settled scene, GPU use on the machine, and a bare page's empty submissions as the control for time spent
 // waiting on other work. --rival adds a second page on the high tier during the reading.
 // --bots=n has n walking, building bots on the shard during every run, each in their own view of it.
 // Run it from a checkout after `npm run build:packages`, holding a GPU slot. Emulation is not a phone: relative numbers.
@@ -18,8 +18,8 @@ import { createConnection, createServer } from 'node:net';
 import { cpus, tmpdir } from 'node:os';
 import { extname, join, normalize, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { chromium } from '@playwright/test';
 import { freePort } from '../../scripts/browser.js';
+import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { killTree } from '../../scripts/support/shutdown.mjs';
 
 const option = (name, fallback) => {
@@ -323,7 +323,7 @@ async function firstVisit(browser, profile, pipes) {
         return {
           tier: s.tier,
           marks: s.timing.read().marks,
-          stored: localStorage.getItem('margoQuality'),
+          stored: localStorage.getItem(`margoQuality:${location.pathname}`),
           downloaded: performance.getEntriesByType('resource').reduce((sum, e) => sum + e.encodedBodySize, 0),
         };
       });
@@ -331,8 +331,13 @@ async function firstVisit(browser, profile, pipes) {
   await meshed();
   const first = await state();
   const lightFrames = await frames();
-  await page.waitForFunction(() => localStorage.getItem('margoQuality'), null, { timeout: 20_000 }).catch(() => {});
-  const stored = await page.evaluate(() => [localStorage.getItem('margoQuality'), performance.now()]);
+  await page
+    .waitForFunction(() => localStorage.getItem(`margoQuality:${location.pathname}`), null, { timeout: 20_000 })
+    .catch(() => {});
+  const stored = await page.evaluate(() => [
+    localStorage.getItem(`margoQuality:${location.pathname}`),
+    performance.now(),
+  ]);
   // The visit's own clock from here to the new page's first frame is the whole wait a reload costs.
   await page.goto(url, { waitUntil: 'commit' });
   await meshed();
@@ -448,16 +453,20 @@ async function gpuReading(browser, pipes, size) {
   await page.waitForFunction(() => window.voxelSandbox?.timing?.marks.meshed, null, { timeout: 150_000, polling: 100 });
   const during = await nvidia();
   await page
-    .waitForFunction(() => localStorage.getItem('margoQuality') || performance.now() > 40_000, null, {
-      timeout: 60_000,
-      polling: 200,
-    })
+    .waitForFunction(
+      () => localStorage.getItem(`margoQuality:${location.pathname}`) || performance.now() > 40_000,
+      null,
+      {
+        timeout: 60_000,
+        polling: 200,
+      },
+    )
     .catch(() => {});
   // The rule ends at 10 s of frames at the latest; a slow reading stores nothing, so the time decides.
   await page.waitForFunction(
     () => {
       const end = window.voxelSandbox.timing.read().marks.meshed + 12_500;
-      return localStorage.getItem('margoQuality') || performance.now() > end;
+      return localStorage.getItem(`margoQuality:${location.pathname}`) || performance.now() > end;
     },
     null,
     { timeout: 60_000, polling: 200 },
@@ -471,11 +480,19 @@ async function gpuReading(browser, pipes, size) {
       p90: +sorted[Math.floor(list.length * 0.9)].toFixed(2),
     };
   };
-  const got = await page.evaluate(() => ({
+  const got = await page.evaluate(async () => ({
     subs: window.__subs,
-    tier: window.voxelSandbox.tier,
+    tier: globalThis.margoLow === undefined ? 'high' : 'light',
+    adapter: await navigator.gpu.requestAdapter().then((adapter) => ({
+      vendor: adapter.info.vendor,
+      architecture: adapter.info.architecture,
+      description: adapter.info.description,
+      fallback: adapter.info.isFallbackAdapter,
+      timestamps: adapter.features.has('timestamp-query'),
+    })),
     meshed: window.voxelSandbox.timing.read().marks.meshed,
-    stored: localStorage.getItem('margoQuality'),
+    stored: localStorage.getItem(`margoQuality:${location.pathname}`),
+    reading: window.voxelSandbox.gpuReading,
     canvas: [document.getElementById('scene').width, document.getElementById('scene').height],
     nowMs: performance.now(),
     passes: (window.__passes ?? []).slice(-120),
@@ -545,9 +562,11 @@ async function gpuReading(browser, pipes, size) {
     highPasses: stats(highGot.passes),
     lightPasses: stats(got.passes),
     rival: !!option('rival'),
+    adapter: got.adapter,
     tier: got.tier,
     canvas: got.canvas,
     stored: got.stored,
+    reading: got.reading,
     rule: stats(window120.map((v) => v[1])),
     settled: stats(settled.map((v) => v[1])),
     control: stats(control),
@@ -643,8 +662,7 @@ pipes.page = await relay(() => http.address().port);
 pipes.router = await relay(() => routerTarget);
 pipes.shard = await relay(() => shardTarget);
 
-const browser = await chromium.launch({
-  channel: 'msedge',
+const browser = await launchBrowser({
   headless: HEADLESS,
   args: ['--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
 });

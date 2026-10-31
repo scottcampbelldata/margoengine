@@ -177,6 +177,8 @@ interface Sandbox {
   fillFrames: number[];
   fly(count: number, speed: number): Promise<{ cpu: number[]; stats: Record<string, number | string | boolean> }>;
   gpuTiming(count: number): Promise<number[] | null>;
+  /** The light tier's GPU reading once it ended: milliseconds per frame (90th percentile). */
+  readonly gpuReading: number | undefined;
   /** With `?timing`: where the seconds of loading went (timing.ts). */
   readonly timing: LoadTiming | undefined;
 }
@@ -783,6 +785,7 @@ async function boot(): Promise<void> {
   // game with unsaved edits, so it is not watched.
   let settled = false,
     watching = false;
+  let gpuReading: number | undefined;
   function playing(): void {
     if (settled) return;
     settled = true;
@@ -793,7 +796,7 @@ async function boot(): Promise<void> {
     lighting.budget = 16384;
     if (!deterministic && tier === 'light' && !watching) {
       watching = true;
-      watchQuality();
+      watchQuality({ onReading: (ms) => (gpuReading = ms) });
     }
   }
 
@@ -940,6 +943,9 @@ async function boot(): Promise<void> {
   });
   const sandbox: Sandbox = {
     ready: false,
+    get gpuReading() {
+      return gpuReading;
+    },
     get spawned() {
       return spawned;
     },
