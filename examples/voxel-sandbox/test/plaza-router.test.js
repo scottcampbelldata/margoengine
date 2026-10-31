@@ -1,7 +1,7 @@
 // The router over real sockets, forking real shard processes: join, counters, limits, the world's end as a page sees
 // it, a crashed shard coming back with its world, and reports through a stand-in for nginx.
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -252,6 +252,7 @@ test('a new shard starts only while a core is free', TIMEOUT, async (t) => {
   const busy = await startRouter(t, { capacity: 1, maxShards: 2, load: () => 16, cores: () => 16 });
   await joinAnswer(busy);
   await (await busy.get('/join')).json();
+  // fixed-wait: nothing to wait for, this checks that nothing starts.
   await wait(50);
   assert.equal(busy.router.shards.filter(Boolean).length, 1, 'no core free, no second shard');
 
@@ -304,9 +305,12 @@ test('a killed shard restarts with its world, up to the last snapshot', TIMEOUT,
     cells.find((c) => page.world.getChunk(c[0] >> 5, c[1] >> 5, c[2] >> 5) && page.world.getBlock(...c) === 0),
   );
   assert.ok(page.client.edit(...cell, BRICKS));
-  // The edit is in a snapshot once the counter shows it and another snapshot time has passed.
-  await until('the edit to count', () => plaza.router.counters().blocksToday > 0);
-  await wait(400);
+  // A world with no edit writes no snapshot, so the first file there holds the edit, and it appears whole.
+  const worldDir = join(plaza.dataDir, 'shard-0', answer.world);
+  await until(
+    'the edit in a snapshot',
+    () => existsSync(worldDir) && readdirSync(worldDir).some((n) => /^snap-\d+\.bin$/.test(n)),
+  );
   plaza.router.shards[0].child.kill('SIGKILL');
   assert.equal((await page.closed).code, 1006);
   await until('the router to see it', () => plaza.router.shards[0].crashes === 1);

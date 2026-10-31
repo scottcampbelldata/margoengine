@@ -37,6 +37,9 @@ async function startShard(t, options = {}) {
       log: () => {},
       beatMs: 3_600_000,
       seed: SEED,
+      // A fixed place too. The ring spot is random, and what these tests build on is not the same at every spot: on 2 spots
+      // of the 64 a cell above an air cell is rock, and an edit beside one player can be out of the next player's view.
+      spawn: () => [0, 30],
       snapshotMs: 3_600_000,
       ...options,
     });
@@ -306,6 +309,34 @@ test('a world comes back from its newest good snapshot after a crash, with the s
   c.client.close();
 });
 
+// The order the test above once met by chance on the random ring (6 runs in 30, and 15 s each to time out): the player
+// after the crash stands too far off to have the edited chunk in view. Here it is on purpose.
+test('after a crash an edit out of every view is kept, and reaches the server world when a player comes near', async (t) => {
+  const dir = dataDir(t),
+    first = await startShard(t, { dataDir: dir }),
+    a = await joined(first.shard, first.url),
+    cell = airNear(a, standing(first.shard, a));
+  assert.ok(a.client.edit(...cell, BRICKS));
+  assert.ok(await drive([a.client], () => first.shard.server.metrics.editsAccepted > 0));
+  await first.shard.snapshot();
+  a.client.close();
+  await first.shard.shutdown();
+
+  let spot = [0, -300];
+  const second = await startShard(t, { dataDir: dir, spawn: () => spot }),
+    far = await joined(second.shard, second.url),
+    { server } = second.shard,
+    chunk = [cell[0] >> 5, cell[1] >> 5, cell[2] >> 5];
+  assert.equal((await server.exportEdits()).size, 1, 'held, though nobody sees it');
+  assert.equal(server.world.getChunk(...chunk), undefined, 'out of view');
+  spot = [0, 30];
+  const near = await joined(second.shard, second.url);
+  assert.ok(await drive([far.client, near.client], () => server.world.getChunk(...chunk)), 'in view now');
+  assert.equal(server.world.getBlock(...cell) & 0xffff, BRICKS);
+  far.client.close();
+  near.client.close();
+});
+
 test('a world past its end when the shard starts ends at once from its snapshot', async (t) => {
   const dir = dataDir(t),
     first = await startShard(t, { dataDir: dir, spanMs: 60_000 }),
@@ -377,25 +408,28 @@ test('a new world gets a seed with a dry ring', async (t) => {
 });
 
 test('a player with no movement and no edit is closed with 4410 idle and its place freed; movers and builders stay', async (t) => {
-  // The real clock and a short limit, in a room for three: the idle one goes, the mover and the builder do not.
-  const { shard, url } = await startShard(t, {
-      now: Date.now,
-      idleMs: 700,
-      idleCheckMs: 40,
-      capacity: 3,
-      spawn: () => [0, 30],
-    }),
+  // This clock moves only when the test says, however long the machine takes to bring three players in. On the real
+  // clock with a 700 ms limit a busy machine closed the first player while the third was still joining (2026-10-31:
+  // "spawned with its chunk" and "the room is full" failed 3 runs in 12 at 8 CPU hogs on 4 logical CPUs).
+  const IDLE = 60_000,
+    spots = [
+      [-24, 30],
+      [24, 30],
+      [0, 30],
+    ],
+    { shard, clock, url } = await startShard(t, { idleMs: IDLE, capacity: 3, spawn: () => spots.shift() ?? [0, 30] }),
     sleeper = await joined(shard, url),
     mover = await joined(shard, url),
     builder = await joined(shard, url),
     full = await join(url);
   assert.equal((await closes(full.conn)).code, 1013, 'the room is full');
-  for (const c of [sleeper, mover, builder]) c.conn.onclose = (code, reason) => (c.ended = { code, reason });
-  let placed = 0,
-    nextEdit = 0,
-    last = performance.now();
-  // One frame of all three: the mover alternates forward and back, the builder places and breaks a block, the sleeper
-  // only sends its steady input with no keys.
+  const ended = new Map(),
+    position = (c) => shard.server.players.find((p) => p.id === c.client.welcome.id).character.position;
+  for (const c of [sleeper, mover, builder]) c.conn.onclose = (code, reason) => ended.set(c, { code, reason });
+  assert.equal(shard.closeIdle(), 0, 'a first look is a first sign of life');
+  let last = performance.now(),
+    looked = [...position(mover)]; // where the mover was at the last look, which is what the check compares with
+  // One frame: the mover alternates forward and back; the others only send their steady input with no keys.
   const frame = async (live) => {
     await wait(16);
     const now = performance.now(),
@@ -403,24 +437,41 @@ test('a player with no movement and no edit is closed with 4410 idle and its pla
     last = now;
     for (const c of live)
       c.client.update(dt, {
-        keys: c === mover ? (Math.floor(now / 150) % 2 ? Keys.forward : Keys.back) : 0,
+        keys: c !== mover ? 0 : Math.floor(now / 1000) % 2 ? Keys.forward : Keys.back,
         yaw: 0,
         pitch: 0,
       });
-    if (live.includes(builder) && now > nextEdit) {
-      nextEdit = now + 100;
-      builder.client.edit(...airNear(builder, standing(shard, builder)), placed++ % 2 ? 0 : BRICKS);
-    }
   };
-  for (const end = performance.now() + 15_000; !sleeper.ended && performance.now() < end; )
-    await frame([sleeper, mover, builder]);
-  assert.deepEqual(sleeper.ended, { code: IDLE_CLOSE_CODE, reason: IDLE_REASON });
+  // The limit passes, then the mover has moved and the builder has built, seen by the server, and the check runs.
+  const pass = async (live) => {
+    clock.now += IDLE;
+    const accepted = shard.server.metrics.editsAccepted,
+      moved = () => Math.hypot(...position(mover).map((v, i) => v - looked[i])) > 1,
+      cell = airNear(builder, standing(shard, builder));
+    assert.ok(builder.client.edit(...cell, BRICKS));
+    for (const end = performance.now() + 15_000; shard.server.metrics.editsAccepted === accepted || !moved(); ) {
+      assert.ok(performance.now() < end, 'the mover moved and the builder built');
+      await frame(live);
+    }
+    looked = [...position(mover)];
+    return shard.closeIdle();
+  };
+  // A sleeper still settling on its feet at the first look counts as moved once, so it goes on the first or second pass.
+  assert.ok(
+    (await pass([sleeper, mover, builder])) + (await pass([sleeper, mover, builder])) === 1,
+    'the sleeper alone goes',
+  );
+  for (const end = performance.now() + 15_000; !ended.has(sleeper); await frame([mover, builder]))
+    assert.ok(performance.now() < end, 'the sleeper was told');
+  assert.deepEqual(ended.get(sleeper), { code: IDLE_CLOSE_CODE, reason: IDLE_REASON });
   assert.equal(IDLE_CLOSE_CODE, 4410);
   // Twice the limit more, still busy: the other two are there.
-  for (const stay = performance.now() + 1400; performance.now() < stay; ) await frame([mover, builder]);
-  assert.equal(mover.ended, undefined);
-  assert.equal(builder.ended, undefined);
-  assert.equal(shard.server.players.length, 2, 'its place is free');
+  assert.equal(await pass([mover, builder]), 0);
+  assert.equal(await pass([mover, builder]), 0);
+  assert.equal(ended.has(mover), false);
+  assert.equal(ended.has(builder), false);
+  for (const end = performance.now() + 15_000; shard.server.players.length !== 2; await frame([mover, builder]))
+    assert.ok(performance.now() < end, 'its place is free');
   const again = await joined(shard, url);
   assert.ok(again.client.spawned, 'a new player takes the place');
   for (const c of [mover, builder, again]) c.client.close();
@@ -499,6 +550,16 @@ test('beats carry the parks and resumes, and keep them after the next beat', asy
   assert.equal(last.parkedNow, 0);
   page.onClose = () => {};
   page.close();
+});
+
+test('the idle check runs by itself on its timer', async (t) => {
+  const { shard, clock, url } = await startShard(t, { idleMs: 1000, idleCheckMs: 10 }),
+    a = await joined(shard, url),
+    closed = closes(a.conn);
+  // The check's first look comes on its own; from then on every look finds the limit passed.
+  const ticking = setInterval(() => (clock.now += 1000), 10);
+  t.after(() => clearInterval(ticking));
+  assert.deepEqual(await closed, { code: IDLE_CLOSE_CODE, reason: IDLE_REASON });
 });
 
 test('idleMs 0 turns the limit off', async (t) => {
