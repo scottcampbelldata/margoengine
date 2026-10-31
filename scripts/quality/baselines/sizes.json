@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3931167,
+  "total": 3932451,
   "history": [
     {
       "date": "2026-10-24",
@@ -962,6 +962,12 @@
       "commit": "3074fddf9",
       "reason": "tween: smoothDamp (exact critically damped vector filter with a speed limit and safe huge dt) adds 367 B gzip to the tween root; new entry rigging/hulls (jointHulls, 2,503 B gzip) with its quickhull import external, so rigging root and other entries are unchanged",
       "grew": 2
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "a66ee4d82",
+      "reason": "light keeper P2: animator look-at gains origin (aim from an eye or lens off the bone origin), holds the last aim inside 1 mm instead of throwing, and solves with no allocation per frame (own array-only quaternion helpers, as ccd.ts; tree-shaken when unused)",
+      "grew": 1
     }
   ],
   "items": {
@@ -970,7 +976,7 @@
     "@margoengine/animation/sampling": 1177,
     "@margoengine/animation/skeleton-utils": 8966,
     "@margoengine/animation/vat": 8130,
-    "@margoengine/animator": 17372,
+    "@margoengine/animator": 18656,
     "@margoengine/animator/graph": 8290,
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 9000,

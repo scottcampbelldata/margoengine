@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { GCProfiler, setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { GLTFAsset, PBRModel } from '../packages/gltf-pro/dist/index.js';
 import { Animation } from '../packages/animation/dist/index.js';
-import { Animator } from '../packages/animator/dist/index.js';
+import { Animator, addLookAt } from '../packages/animator/dist/index.js';
 import { animatedTriangle } from './support/gltf-pro-fixture.js';
 
 test('blending avoids redundant pose copies and keeps transition snapshots intact', async () => {
@@ -191,5 +193,87 @@ test('single-clip pose reuse matches independent blending through holds, externa
       scene.model.dispose();
       scene.engine.dispose();
     }
+  }
+});
+
+// Regression (light keeper P2): every look-at solve allocated a dozen arrays per bone (positions, rotations, the
+// options object read() returned, map() and every() closures), garbage at 60 frames a second for a head that only turns.
+test('look-at solves allocate nothing', async () => {
+  const store = await TransformStore.create(16),
+    engine = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, store, {
+      backend: 'webgl2',
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    });
+  const fixture = animatedTriangle();
+  fixture.doc.nodes[1].children = [2];
+  fixture.doc.nodes.push(
+    { name: 'Spine', translation: [0, 0.2, 0], children: [3] },
+    { name: 'Neck', translation: [0, 1, 0], children: [4] },
+    { name: 'Head', translation: [0, 0.3, 0] },
+  );
+  fixture.doc.skins[0].joints = [1, 2, 3, 4];
+  const model = new PBRModel(engine, new GLTFAsset(fixture.doc, fixture.buffers)),
+    animation = new Animation(model),
+    animator = new Animator(animation, { initial: 'move', states: { move: 'Move' } });
+  engine.use({ name: animation.name, setup() {} });
+  engine.use(animator);
+  // The solve on its own: the pose sampling before it is measured by the tests above.
+  const steps = [],
+    addSolver = animator.addSolver;
+  animator.addSolver = function (step) {
+    steps.push(step);
+    return addSolver.call(this, step);
+  };
+  // Every option at once, the target written into as the README shows.
+  const look = {
+    joints: [2, 3, 4],
+    target: [0.5, 1.5, 0.5],
+    shares: [1, 2, 4],
+    origin: [0.05, 0.02, 0.08],
+    maxAngle: 1.2,
+    weight: 0.8,
+  };
+  addLookAt(animator, look);
+  animator.onPreUpdate(0.3);
+  // Targets all round the head: some beyond maxAngle, some inside 1 mm of the bone (the held aim), some inside the
+  // lens's reach.
+  const head = model.nodes[4].matrix,
+    targets = Array.from({ length: 64 }, (_, i) => {
+      const r = i % 8 === 0 ? 0.0004 : i % 8 === 1 ? 0.05 : 0.5 + i / 16,
+        a = i * 2.39996;
+      return [head[12] + r * Math.cos(a), head[13] + r * Math.sin(i * 0.7), head[14] + r * Math.sin(a)];
+    });
+  const solve = (i) => {
+    const target = targets[i & 63];
+    look.target[0] = target[0];
+    look.target[1] = target[1];
+    look.target[2] = target[2];
+    steps[0]();
+  };
+  try {
+    for (let i = 0; i < 10000; i++) solve(i);
+    setFlagsFromString('--expose-gc');
+    const gc = runInNewContext('gc'),
+      windows = [];
+    // As the CCD test: one clean window of five passes, a solve allocating 16 bytes fills 320 KB over 20,000 solves.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      gc();
+      const profiler = new GCProfiler(),
+        before = process.memoryUsage().heapUsed;
+      profiler.start();
+      for (let i = 0; i < 20000; i++) solve(i);
+      const { statistics } = profiler.stop(),
+        grown = process.memoryUsage().heapUsed - before;
+      windows.push({ collections: statistics.length, grown });
+      if (statistics.length === 0 && grown < 64 * 1024) return;
+    }
+    assert.fail(`every window of 20,000 look-at solves allocated: ${JSON.stringify(windows)}`);
+  } finally {
+    animator.dispose();
+    model.dispose();
+    engine.dispose();
   }
 });

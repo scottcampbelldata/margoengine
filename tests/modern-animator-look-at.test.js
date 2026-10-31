@@ -164,3 +164,120 @@ test('look-at input checks', async (t) => {
   assert.throws(() => addLookAt(f.animator, { joints: [4], target: [0, 0, 1], weight: 2 }), RangeError);
   assert.throws(() => addAimConstraint(f.animator, null), TypeError);
 });
+
+// Regression (light keeper P2): a chain whose earlier bone carries the last bone onto the aim point threw
+// RangeError('Look-at direction ...') from the frame loop. The neck turns the head half a turn about the neck, so the
+// head lands on the target (its antipode), and the head's own share then had no direction to look in.
+test('a chain that carries the eye onto the target holds a defined pose instead of throwing', async (t) => {
+  const f = await animated();
+  t.after(() => f.release());
+  f.animator.onPreUpdate(0);
+  const neck = f.frame(3).position,
+    head = f.frame(4).position,
+    look = {
+      joints: [3, 4],
+      target: [2 * neck[0] - head[0], 2 * neck[1] - head[1], 2 * neck[2] - head[2]],
+      shares: [1, 1e-20], // the neck takes the whole turn: 1 + 1e-20 rounds to 1
+      axis: [0, 1, 0], // look along the bone, away from the neck
+      up: null,
+    };
+  addLookAt(f.animator, look);
+  f.animator.onPreUpdate(0);
+  look.target = f.frame(4).position; // where the neck's half turn puts the head, to the last bit
+  for (let frame = 0; frame < 3; frame++) {
+    assert.doesNotThrow(() => f.animator.onPreUpdate(0), `frame ${frame}`);
+    const solved = f.frame(4);
+    assert.ok(solved.y.every(Number.isFinite) && solved.position.every(Number.isFinite));
+    assert.ok(dot(solved.y, [0, -1, 0]) > 1 - 1e-9, 'the neck still took the half turn');
+  }
+});
+
+// Regression (light keeper P2): inside 1 mm of the bone the target gives no usable direction. Exactly at the bone the
+// solve stopped and the head snapped back to the animated pose; just off it the head swung to wherever the last
+// fraction of a millimetre pointed. It now holds the last aim until the target is 1 mm or more away again.
+test('a target inside 1 mm of the bone holds the last aim', async (t) => {
+  const f = await animated();
+  t.after(() => f.release());
+  f.animator.onPreUpdate(0.5);
+  const pivot = f.frame(4).position,
+    toward = [Math.SQRT1_2, 0, Math.SQRT1_2],
+    at = (d, v) => [pivot[0] + v[0] * d, pivot[1] + v[1] * d, pivot[2] + v[2] * d],
+    look = { joints: [4], target: at(0.01, toward), up: null };
+  addLookAt(f.animator, look);
+  f.animator.onPreUpdate(0);
+  assert.ok(dot(f.frame(4).z, toward) > 1 - 1e-9, 'aims at a target 1 cm away');
+  for (const target of [at(0, toward), at(0.0005, [0, 0, -1]), at(0.0009, [-1, 0, 0])]) {
+    look.target = target;
+    f.animator.onPreUpdate(0);
+    assert.ok(dot(f.frame(4).z, toward) > 1 - 1e-9, `holds the last aim at ${target}`);
+  }
+  look.target = at(0.002, [-1, 0, 0]);
+  f.animator.onPreUpdate(0);
+  assert.ok(dot(f.frame(4).z, [-1, 0, 0]) > 1 - 1e-9, 'aims again from 1 mm out');
+});
+
+test('a fresh look-at with its target inside 1 mm keeps the animated pose until it has an aim', async (t) => {
+  const f = await animated();
+  t.after(() => f.release());
+  f.animator.onPreUpdate(0.5);
+  const animated0 = f.frame(4);
+  addLookAt(f.animator, { joints: [3, 4], target: animated0.position.map((v) => v + 1e-4) });
+  f.animator.onPreUpdate(0);
+  assert.ok(dot(f.frame(4).z, animated0.z) > 1 - 1e-12);
+});
+
+// `origin` aims from a point in the last bone's space (an eye or a lens off the neck pivot): the ray from that point
+// along `axis` passes through the target, at any root scale and in a chain.
+test('origin aims the ray from a point off the bone origin through the target', async (t) => {
+  const f = await animated();
+  t.after(() => f.release());
+  f.model.root.setPosition([0.5, 0, -1]);
+  f.model.root.setQuaternion([0, Math.sin(0.4), 0, Math.cos(0.4)]);
+  f.model.root.setScale([2, 2, 2]);
+  const origin = [0.08, 0.05, 0.1],
+    look = { joints: [3, 4], target: [3, 2.5, 2], shares: [1, 2], origin };
+  addLookAt(f.animator, look);
+  const lens = () => {
+    const m = f.model.nodes[4].matrix;
+    return [0, 1, 2].map((r) => m[r] * origin[0] + m[4 + r] * origin[1] + m[8 + r] * origin[2] + m[12 + r]);
+  };
+  for (let frame = 0; frame < 20; frame++) {
+    look.target[1] = 2.5 + Math.sin(frame / 3);
+    look.target[0] = frame % 2 ? 0.9 : 3;
+    f.animator.onPreUpdate(1 / 30);
+    const head = f.frame(4);
+    assert.ok(dot(head.z, direction(lens(), look.target)) > 1 - 1e-9, `frame ${frame}`);
+    // The pivot-based aim misses: the lens is off the pivot.
+    assert.ok(dot(head.z, direction(head.position, look.target)) < 1 - 1e-6, `frame ${frame}: not the pivot ray`);
+  }
+});
+
+test('origin: inside the lens orbit the look is defined, and [0, 0, 0] matches no origin', async (t) => {
+  const a = await animated(),
+    b = await animated();
+  t.after(() => {
+    a.release();
+    b.release();
+  });
+  a.animator.onPreUpdate(0.5);
+  const pivot = a.frame(4).position,
+    look = { joints: [4], origin: [0.2, 0, 0], target: [pivot[0], pivot[1] + 0.05, pivot[2] + 0.05] };
+  addLookAt(a.animator, look);
+  assert.doesNotThrow(() => a.animator.onPreUpdate(0));
+  const inside = a.frame(4);
+  assert.ok(inside.z.every(Number.isFinite));
+  // The nearest the lens ray gets to the target: the ray's point nearest the pivot, turned toward the target.
+  const m = a.model.nodes[4].matrix,
+    offset = [0, 1, 2].map((r) => m[r] * 0.2),
+    lensDir = direction([0, 0, 0], offset);
+  assert.ok(dot(lensDir, direction(pivot, look.target)) > 1 - 1e-9, 'lens offset turned toward the target');
+  const same = { joints: [3, 4], target: [1, 2, 3], shares: [1, 2] };
+  addLookAt(a.animator, { ...same, target: [1, 2, 3], origin: [0, 0, 0] });
+  addLookAt(b.animator, same);
+  look.weight = 0;
+  b.animator.onPreUpdate(0.5);
+  a.animator.onPreUpdate(0);
+  assert.deepEqual(a.frame(4), b.frame(4));
+  assert.throws(() => addLookAt(a.animator, { joints: [4], target: [0, 0, 1], origin: [0, NaN, 0] }), RangeError);
+  assert.throws(() => addLookAt(a.animator, { joints: [4], target: [0, 0, 1], origin: [0, 0] }), RangeError);
+});

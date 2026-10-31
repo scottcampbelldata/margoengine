@@ -214,6 +214,7 @@ export interface LookAt {
     target: Vec3;
     shares?: readonly number[];
     axis?: Vec3;
+    origin?: Vec3;
     up?: Vec3 | null;
     worldUp?: Vec3;
     maxAngle?: number;
