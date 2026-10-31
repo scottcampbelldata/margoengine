@@ -574,8 +574,10 @@ test('the light-tier reading skips two seconds and gives up after ten, at any re
         if (gpu.wrote && firstWrite === undefined) firstWrite = (refresh * 1000) / hz;
         refresh++;
       }
-      assert.ok(firstWrite > 2000 && firstWrite <= 2000 + 2000 / hz, `${hz} Hz: starts after 2 s (${firstWrite})`);
-      assert.ok(Math.abs(refresh / hz - 10) <= 4 / hz, `${hz} Hz: stops after 10 s (${refresh / hz})`);
+      assert.ok(firstWrite > 2000 && firstWrite <= 2000 + 1000 / hz, `${hz} Hz: starts after 2 s (${firstWrite})`);
+      // Three frames over 10 s: frame 0 at time 0, the tick past the limit that closes the reading, the clean-up frame.
+      // Counted in whole frames: 603 / 60 - 10 is 0.05000000000000071 in doubles, over 3 / 60 by rounding alone.
+      assert.ok(Math.abs(refresh - 10 * hz) <= 3, `${hz} Hz: stops after 10 s (${refresh} frames)`);
       assert.deepEqual(stored, [], 'too few samples store nothing');
       assert.deepEqual(readings, [undefined]);
     }
