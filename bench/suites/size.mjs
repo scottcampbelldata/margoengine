@@ -17,7 +17,9 @@ const bytes = (primary = false) => ({ unit: 'B', better: 'lower', exact: true, t
 // Plaza's budget (private plan V2): the sandbox's JS before the page split, 215,262 B, minus the tracer's lazy chunk,
 // 78,383 B, plus at most 12,000 B. Its entry is main.ts itself: index.html only checks WebGPU and imports it, so what the
 // page really starts with is main.ts and its static imports. Lazy: the tracer (P) and the figures (joining a server).
-const PLAZA_BUDGET = 148_879;
+// Then +1,348 B on 2026-10-31, to the 150,227 B measured: every socket is cut by the CDN at about 15 minutes, so resuming
+// in place is part of the page (it was 148,736 B before, so the code costs 1,491 B).
+const PLAZA_BUDGET = 150_227;
 const DEMOS = {
   plaza: {
     root: 'examples/voxel-sandbox',
