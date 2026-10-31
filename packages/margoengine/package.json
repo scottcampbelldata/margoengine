@@ -834,6 +834,10 @@
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"
     },
+    "./physics2d": {
+      "types": "./dist/physics2d.d.ts",
+      "import": "./dist/physics2d.js"
+    },
     "./points": {
       "types": "./dist/points.d.ts",
       "import": "./dist/points.js"
@@ -1531,6 +1535,7 @@
     "@margoengine/netcode": "^1.0.0",
     "@margoengine/oit": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
+    "@margoengine/physics2d": "^1.0.0",
     "@margoengine/points": "^1.0.0",
     "@margoengine/post": "^1.0.0",
     "@margoengine/procedural": "^1.0.0",
@@ -1579,12 +1584,16 @@
     "@margoengine/xr": "^1.0.0"
   },
   "peerDependencies": {
+    "@dimforge/rapier2d-compat": ">=0.14.0 <1",
     "@dimforge/rapier3d-compat": ">=0.14.0 <1",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
     "web-ifc": "^0.0.78"
   },
   "peerDependenciesMeta": {
+    "@dimforge/rapier2d-compat": {
+      "optional": true
+    },
     "@dimforge/rapier3d-compat": {
       "optional": true
     },

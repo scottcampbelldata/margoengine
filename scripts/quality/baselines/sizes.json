@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3941795,
+  "total": 3949788,
   "history": [
     {
       "date": "2026-10-24",
@@ -959,6 +959,12 @@
     },
     {
       "date": "2026-10-31",
+      "commit": "175c6ec2d",
+      "reason": "new package @margoengine/tilemap (row 25 J3a): types and small helpers, 1.4 kB",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
       "commit": "a66ee4d82",
       "reason": "light keeper P2: animator look-at gains origin (aim from an eye or lens off the bone origin), holds the last aim inside 1 mm instead of throwing, and solves with no allocation per frame (own array-only quaternion helpers, as ccd.ts; tree-shaken when unused)",
       "grew": 1
@@ -984,7 +990,7 @@
     {
       "date": "2026-10-31",
       "commit": "175c6ec2d",
-      "reason": "new package @margoengine/tilemap (row 25 J3a): types and small helpers, 1.4 kB",
+      "reason": "new optional package @margoengine/sprites: 2D sprites at exact pixels, one instanced draw per layer (row 25, J1; budget 9 KB)",
       "grew": 1
     },
     {
@@ -996,7 +1002,7 @@
     {
       "date": "2026-10-31",
       "commit": "175c6ec2d",
-      "reason": "new optional package @margoengine/sprites: 2D sprites at exact pixels, one instanced draw per layer (row 25, J1; budget 9 KB)",
+      "reason": "new package @margoengine/physics2d (row 25 J5): 2D Rapier plugin, bodies, joints, queries, character controller and tile map colliders, 7.7 kB",
       "grew": 1
     }
   ],
@@ -1206,6 +1212,7 @@
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/oit": 3199,
     "@margoengine/physics": 16247,
+    "@margoengine/physics2d": 7993,
     "@margoengine/points": 21547,
     "@margoengine/points/e57": 6545,
     "@margoengine/points/las": 5116,

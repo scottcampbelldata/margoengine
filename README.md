@@ -408,11 +408,12 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |
 | [`@margoengine/mixer`](packages/mixer/README.md) | Audio mixing and effects: buses with gain, mute, solo, sends and ducking; equaliser, filter, compressor, limiter, delay and reverb on Web Audio; positional emitters; deterministic offline rendering. |
 
-### Simulation and games (10)
+### Simulation and games (11)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/physics`](packages/physics/README.md) | Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller. |
+| [`@margoengine/physics2d`](packages/physics2d/README.md) | 2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders. |
 | [`@margoengine/ragdoll`](packages/ragdoll/README.md) | Ragdolls on Rapier physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation. |
 | [`@margoengine/navmesh`](packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build). |
 | [`@margoengine/ecs`](packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |

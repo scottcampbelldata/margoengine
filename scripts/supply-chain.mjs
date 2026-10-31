@@ -26,6 +26,7 @@ const EXCEPTIONS = { 'web-ifc': 'MPL-2.0' };
 /** Why each external runtime dependency or peer exists. A new one fails --check until it is added here. */
 const WHY = {
   '@dimforge/rapier3d-compat': 'Rapier rigid-body solver; optional, the app installs and initializes it',
+  '@dimforge/rapier2d-compat': 'Rapier 2D rigid-body solver; optional, the app installs and initializes it',
   'web-ifc': 'IFC (BIM) parser; the app installs and initializes it, the package only reads its output',
   react: 'React component bindings for the stage',
   'react-dom': 'React DOM root and portal rendering for scene and HTML components',

@@ -39,6 +39,7 @@ const requested = [
   'points',
   'audio',
   'physics',
+  'physics2d',
   'terrain',
 ];
 const npm = process.env.npm_execpath;

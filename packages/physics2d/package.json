@@ -1,0 +1,56 @@
+{
+  "name": "@margoengine/physics2d",
+  "version": "1.0.0",
+  "description": "2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "2d",
+    "physics",
+    "rapier"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/physics2d"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js physics2d",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@dimforge/rapier2d-compat": ">=0.14.0 <1"
+  },
+  "peerDependenciesMeta": {
+    "@dimforge/rapier2d-compat": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
+}

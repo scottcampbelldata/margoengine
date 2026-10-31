@@ -2150,6 +2150,26 @@
     "category": "Simulation and games"
   },
   {
+    "id": "physics2d",
+    "title": "Physics2d",
+    "package": "@margoengine/physics2d",
+    "version": "1.0.0",
+    "published": false,
+    "description": "2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "physics2d",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/physics2d@1.0.0",
+    "imports": "import { Body2D } from '@margoengine/physics2d';",
+    "exports": [
+      "Body2D",
+      "CharacterController2D",
+      "Joint2D",
+      "Physics2D",
+      "interactionGroups"
+    ],
+    "category": "Simulation and games"
+  },
+  {
     "id": "ragdoll",
     "title": "Ragdoll",
     "category": "Simulation and games",

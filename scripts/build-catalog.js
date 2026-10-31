@@ -108,6 +108,7 @@ const layers = {
   ],
   'Simulation and games': [
     'physics',
+    'physics2d',
     'ragdoll',
     'navmesh',
     'ecs',
