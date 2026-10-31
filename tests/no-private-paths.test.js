@@ -8,6 +8,8 @@ const MAY_NAME_PRIVATE = new Map([
   ['AGENTS.md', 'the agents’ own rules name the queue and control files'],
   ['docs/architecture/operational-playbook.md', 'the playbook names the folders agents write to'],
   ['scripts/session-start.mjs', 'reads private/control.json'],
+  ['scripts/integrate.mjs', 'reads and writes private/queue and private/control.json'],
+  ['scripts/tier2-loop.mjs', 'writes private/queue/RED.json and its state'],
   ['scripts/support/result-cache.mjs', 'excludes private/ from the tree it hashes'],
   ['tests/file-classes.test.js', 'classifies private/ as an inert path'],
   ['tests/no-private-paths.test.js', 'this test'],
