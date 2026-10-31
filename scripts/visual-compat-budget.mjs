@@ -5,8 +5,8 @@
 // Frame cost: the main-thread time of each animation frame's callbacks (the layer translates and replays the frame's GL
 // calls there) and the interval between frames, median of 60 frames after the still frame settles. A demo fails when
 // its median frame on the layer costs more than `--budget=<ms>` (default 50, the per-frame budget check for integrated
-// GPUs) and at least twice its native frame. A demo that refuses the layer, or that its page keeps on WebGPU, has no
-// frame on the layer and is only reported.
+// GPUs) and at least twice its native frame, or when it drew too few frames to give a median on either path. A demo that
+// refuses the layer, or that its page keeps on WebGPU, has no frame on the layer and is only reported.
 // Timing on a shared GPU measures the other slots' work too (khronos-NodePerformanceTest read 86 ms against 50 beside
 // other suites, 2026-10-30), so this step holds the GPU exclusively, and in chunks: `--chunk` demos per hold (default
 // 8), each hold with a hard limit of `--chunk-minutes` (default 15; over it the run stops and fails, naming the chunk),
@@ -20,7 +20,7 @@ import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
 import { rewriteTable } from './support/visual-compat-doc.js';
 import { frameCost, openCase, selectCases, startServers } from './support/visual-compat-pages.js';
-import { frameProblems } from './support/visual-compat-status.js';
+import { frameProblems, noFrameProblems } from './support/visual-compat-status.js';
 
 const root = resolve(import.meta.dirname, '..'),
   out = resolve(root, 'test-results/visual-compat');
@@ -113,11 +113,7 @@ async function measure(c) {
     layer = native.cost ? await timed(true) : {};
   if (native.cost && layer.cost) row.frame = { native: native.cost, compat: layer.cost };
   row.skipped = layer.skipped;
-  row.problems = row.frame
-    ? frameProblems(row.frame, budget)
-    : layer.skipped
-      ? []
-      : [row.errors.find((e) => e.includes('capture: ')) ?? 'no frame measured'];
+  row.problems = row.frame ? frameProblems(row.frame, budget) : layer.skipped ? [] : noFrameProblems(row.errors);
   const f = row.frame;
   console.log(
     `${row.problems.length ? 'FAIL' : 'ok  '} ${c.id}: ${f ? `frame work ${f.native.work.toFixed(2)} / ${f.compat.work.toFixed(2)} ms, interval ${f.native.interval.toFixed(1)} / ${f.compat.interval.toFixed(1)} ms` : (row.skipped ?? 'no frame')}${row.problems.length ? `: ${row.problems.join('; ')}` : ''}`,

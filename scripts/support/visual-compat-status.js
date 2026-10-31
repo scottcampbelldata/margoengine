@@ -48,11 +48,28 @@ export function gateProblems(row, want, { write = false } = {}) {
 }
 
 /**
- * The frame budget's problems for one demo (scripts/visual-compat-budget.mjs): its median frame on the layer counts
- * when it is over `budget` ms and at least twice native's. `frame` is `{ native: { work }, compat: { work } }`, in ms.
+ * The frame budget's problems for one demo (scripts/visual-compat-budget.mjs): a path that drew too few frames to give
+ * a median measured nothing, which is never a pass; else its median frame on the layer counts when it is over `budget`
+ * ms and at least twice native's. `frame` is `{ native: { work, interval }, compat: { work, interval } }`, in ms.
  */
 export function frameProblems(frame, budget = 50) {
+  const unmeasured = Object.entries({ native: frame.native, layer: frame.compat })
+    .filter(([, cost]) => !Number.isFinite(cost.work) || !Number.isFinite(cost.interval))
+    .map(([path]) => path);
+  if (unmeasured.length)
+    return [
+      `no frame measured on ${unmeasured.join(' and ')}: the page draws no frames (paused under reduced motion? see PAUSED_DEMOS in visual-compat-pages.js)`,
+    ];
   return frame.compat.work > budget && frame.compat.work > 2 * frame.native.work
     ? [`median frame on the layer ${frame.compat.work.toFixed(1)} ms, over the ${budget} ms budget`]
     : [];
+}
+
+/**
+ * The problems of a demo with no frame at all: why opening it failed, and the page's own uncaught error, which is
+ * usually the cause of the timeout. `errors` are the run's lines for the demo ('layer: capture: ...', 'layer: pageerror: ...').
+ */
+export function noFrameProblems(errors) {
+  const thrown = errors.find((e) => e.includes('pageerror: '));
+  return [errors.find((e) => e.includes('capture: ')) ?? 'no frame measured', ...(thrown ? [thrown] : [])];
 }

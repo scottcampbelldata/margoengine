@@ -44,6 +44,9 @@ export const allCases = [...demos, ...extraDemos]
     const view = demo.dev ? 'model' : (demo.views ?? ['high']).includes('high') ? 'high' : demo.views[0];
     return { id: demo.id, demo, view: views[view], viewName: view };
   });
+// Demos that stop their frame loop under reduced motion and draw on demand: their still frame has no frames to time, so
+// the timed run opens them with motion on and times the running demo, the most they ask of a frame.
+const PAUSED_DEMOS = new Set(['gameplay-sandbox', 'windy-meadow']);
 /** The cases `--only=<a>,<b>` picks (an id containing one of them), or every case. */
 export const selectCases = (only) => allCases.filter((c) => !only.length || only.some((o) => c.id.includes(o)));
 
@@ -81,7 +84,7 @@ export async function frameCost(page) {
           from = frames.length;
         const started = performance.now();
         const wait = () => {
-          // A paused demo (the gameplay sandbox under reduced motion) draws no frame: give up after 3 s without one.
+          // A page that draws no frame gives no median: give up after 3 s without one, and the budget step fails it.
           const waited = performance.now() - started;
           if (frames.length - from >= 61 || waited > 20_000 || (waited > 3000 && frames.length === from)) {
             const list = frames.slice(from, from + 61),
@@ -133,7 +136,10 @@ export async function startServers(cases) {
 export async function openCase(browser, { demo, view }, { compat, origin, devOrigin, timed = false }) {
   const { query, ...options } = view,
     url = (demo.dev ? devOrigin : origin) + '/' + withQuery(demo.path, query);
-  const context = await browser.newContext({ ...options, reducedMotion: 'reduce' }),
+  const context = await browser.newContext({
+      ...options,
+      reducedMotion: timed && PAUSED_DEMOS.has(demo.id) ? 'no-preference' : 'reduce',
+    }),
     page = await context.newPage(),
     errors = [],
     started = Date.now();

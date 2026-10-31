@@ -13,7 +13,8 @@ as the still frame the visual check uses (prefers-reduced-motion). Per pixel, d 
 "Runs with differences" states the numbers, and "refused" quotes what the page shows: the part of the demo that needs
 WebGPU refuses the layer with MargoError code `unsupported`. Frame work is the main-thread time of one animation
 frame's callbacks (the layer translates and replays the frame's GL calls there), median of 60 frames; the interval is
-the time between frames. Both are for the still frame, not a moving camera, and are measured by a step of their own,
+the time between frames. Both are for the still frame, not a moving camera (`gameplay-sandbox` and `windy-meadow` stop
+drawing under reduced motion, so theirs are for the running demo), and are measured by a step of their own,
 `npm run visual:compat:budget` ([scripts/visual-compat-budget.mjs](../scripts/visual-compat-budget.mjs)), which holds
 the GPU exclusively in chunks of 8 demos: measured beside other GPU work, a frame time counts that work too.
 
@@ -21,7 +22,7 @@ The check runs in `npm run check:merge` and fails when a demo's status changes, 
 worse than its recorded numbers, when a demo recorded with an exact still frame ("exact" in the native column: its two
 native captures equal pixel for pixel) no longer has one. Its budget step fails when a demo's median frame on the
 layer costs more than the budget (50 ms by default; `--budget=<ms>` for an integrated GPU) and more than twice its
-native frame. `npm run visual:compat -- --write` records a new run's pixels here and in
+native frame, and when a demo draws too few frames to give a median on either path. `npm run visual:compat -- --write` records a new run's pixels here and in
 [scripts/support/visual-compat-expected.json](../scripts/support/visual-compat-expected.json), and
 `npm run visual:compat:budget -- --write` the frame column. Record either only with nothing else on the GPU.
 

@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { formatTable, parseTable } from '../scripts/support/visual-compat-doc.js';
-import { exact, frameProblems, gateProblems, record, verdict } from '../scripts/support/visual-compat-status.js';
+import {
+  exact,
+  frameProblems,
+  gateProblems,
+  noFrameProblems,
+  record,
+  verdict,
+} from '../scripts/support/visual-compat-status.js';
 
 const m = (over2, mean, max) => ({ over2, mean, max });
 
@@ -55,13 +62,35 @@ test('--write records an exact still frame, and an unrecorded demo fails without
 });
 
 test('the frame budget counts only when the layer is over it and at least twice native, and only in its own step', () => {
-  const frame = (native, compat) => ({ native: { work: native }, compat: { work: compat } });
+  const frame = (native, compat) => ({
+    native: { work: native, interval: 16.7 },
+    compat: { work: compat, interval: 16.7 },
+  });
   assert.deepEqual(frameProblems(frame(10, 40), 33), ['median frame on the layer 40.0 ms, over the 33 ms budget']);
   assert.deepEqual(frameProblems(frame(30, 40), 33), []);
   assert.deepEqual(frameProblems(frame(10, 30), 33), []);
   assert.deepEqual(frameProblems(frame(1, 86)), ['median frame on the layer 86.0 ms, over the 50 ms budget']);
   // The pixel gate runs in a shared GPU slot and holds no frame to a budget, whatever the row carries.
   assert.deepEqual(gateProblems({ status: 'same', frame: frame(1, 86) }, { status: 'same' }), []);
+});
+
+test('a demo that draws no frames measured nothing, and that fails the budget instead of passing it', () => {
+  const none = { frames: 0, work: NaN, interval: NaN },
+    drawn = { frames: 60, work: 2, interval: 16.7 };
+  assert.match(frameProblems({ native: none, compat: none })[0], /no frame measured on native and layer/);
+  assert.match(frameProblems({ native: drawn, compat: none })[0], /no frame measured on layer/);
+  assert.match(frameProblems({ native: none, compat: drawn })[0], /no frame measured on native/);
+  // One frame has work but no interval: still no median to judge.
+  assert.match(frameProblems({ native: drawn, compat: { frames: 1, work: 3, interval: NaN } })[0], /on layer/);
+  assert.deepEqual(frameProblems({ native: drawn, compat: drawn }), []);
+});
+
+test('a demo with no frame reports the uncaught page error behind its timeout', () => {
+  const capture = 'layer: capture: page.waitForFunction: Timeout 240000ms exceeded.',
+    thrown = "layer: pageerror: Cannot read properties of undefined (reading 'start')";
+  assert.deepEqual(noFrameProblems([thrown, capture]), [capture, thrown]);
+  assert.deepEqual(noFrameProblems([capture]), [capture]);
+  assert.deepEqual(noFrameProblems([]), ['no frame measured']);
 });
 
 test('the demos table round-trips, and each step rewrites only its own columns', () => {
