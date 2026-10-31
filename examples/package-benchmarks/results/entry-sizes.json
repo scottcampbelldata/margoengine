@@ -1,5 +1,5 @@
 {
-  "commit": "9204ad356",
+  "commit": "d92b10dac",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1248,12 +1248,12 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 43489,
-        "gzip": 15570
+        "raw": 44209,
+        "gzip": 16004
       },
       "./base": {
-        "raw": 16621,
-        "gzip": 6443
+        "raw": 17341,
+        "gzip": 6863
       },
       "./preetham": {
         "raw": 1657,
@@ -1664,9 +1664,9 @@
       "brotli": 5433
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 22170,
-      "gzip": 8800,
-      "brotli": 7867
+      "raw": 22890,
+      "gzip": 9208,
+      "brotli": 8268
     },
     "packages/creative/dist/particles.js": {
       "raw": 32763,

@@ -99,7 +99,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./assist` 3, `./library` 6 | 73 |  | 7,533 |
 | @margoengine/voxel-net | `.` 23, `./server` 13, `./bot` 4 | 10 |  | 5,395 |
 | @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 78,618 |
-| @margoengine/water | `.` 8 |  |  | 18,698 |
+| @margoengine/water | `.` 8 |  |  | 19,005 |
 | @margoengine/weather | `.` 37, `./hail` 6 |  |  | 4,998 |
 | @margoengine/webgl | `.` 3 |  |  | 3,132 |
 | @margoengine/webgl2-compat | `.` 15, `./compute` 83, `./device` 106, `./glsl` 90, `./wgsl` 76 | 44 |  | 93,763 |
