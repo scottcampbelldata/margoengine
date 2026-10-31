@@ -4,6 +4,7 @@
 
 - Treat `@margoengine/core` and the stage facade as feature-frozen for v1.0.0. Do not add features to either, including material graphs, skinning math, or post-processing passes.
 - Freeze = no new features; core bug fixes go in core (Scott, 2026-10-24). Fix a bug or unsafe API in core itself, with a test, within the size gate; never leave it because core is frozen. Details: `docs/conventions.md#core-freeze`.
+- Core is the last resort (Scott, 2026-10-31): change `@margoengine/core` only when no package can hold the change AND it fixes a bug or flaw that will cause an engine failure. Looks, quality, options and features go in packages. A core change states in its commit why no package can hold it and which failure it prevents; ask the coordinator first.
 - Exception (Scott, 2026-10-27): the stage facade was lifted from the freeze for ONE restructuring, a bug against "pay only for what you import": its optional-package methods moved out of the `Stage` class into feature entries (`@margoengine/stage/gltf` `addGLTF`, `/sky`, `/particles`, `/effects`, `/environment`, `/shadows`; the `./cad` entry was removed on Scott's go, 2026-10-29), so the stage root holds no `import()` of an optional package. Core stays untouched; the freeze applies again after this change.
 - CI must automatically fail any pull request that pushes the combined core + stage gzip size to **25,000 bytes or above**. A measured result from 22,000 through 24,999 bytes is inside the allowed band.
 - Build future capabilities strictly in separate, optional, tree-shakable packages:
@@ -97,12 +98,22 @@ Several agents push to `main`. Each push must leave it at least as clean as it f
   baselines) no longer conflict on a rebase. `node scripts/worktree-node-modules.mjs` (main checkout:
   `node scripts/setup-merge-drivers.mjs`) registers two merge drivers once per clone: the generated files keep main's
   copy, the baselines merge item by item (limits only shrink, every reasoned history entry stays). Do not resolve them
-  by hand. Inside the landing lock, right after the rebase and from a clean tree, run `node scripts/land-records.mjs`:
+  by hand. Inside the landing lock, right after the rebase and from a clean tree, run `node scripts/land-records.mjs --no-build`:
   it rebuilds, rewrites the API reports, shrinks the baselines (a baseline that would grow stops it, as
   `npm run quality -- --update` does), measures both size records at the rebased `HEAD`, checks that they name one
   commit and makes one `records:` commit. Then run `verify` and push. Commit nothing else by hand in those files.
   `build:site` and `test:basic-scene` take the GPU lock themselves, only around the browser; do not wrap them in it.
 - GPU tests share 3 slots; benchmarks take the GPU exclusively; every lock hold has a time limit.
+
+## How agents are run
+
+Details in `docs/architecture/operational-playbook.md`.
+
+- Coordinators run Opus 5.5 at high effort. Design-heavy or risky work gets a planner first (playbook 1.2).
+- The to-do list sets what is built, in its order; work not on it is left alone (playbook 1.11). Demo work is stopped until the engine is done; never stop a running service without the maintainer's word.
+- Builders never run `check:merge`. It runs once, at landing, in the mode it prints; landings are batched (playbook 2.6.5). Anything to be proven with a check is proven by a run that was happening anyway, and a check never runs twice for the same tree.
+- Quick checks before a branch is READY: quality, hygiene, the tests you touched, the root unit tests (`node --test tests/*.test.js`) and `npm run api:check`. A change that alters exports commits the `npm run api:update` output.
+- Every worktree shares one `.git/config`: add worktrees with `--no-track` and never write git config from a worktree.
 
 ## One branch: main
 

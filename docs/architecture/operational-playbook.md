@@ -34,8 +34,7 @@ After the five systems: [Known gaps](#known-gaps), [Sources and commits](#source
   Intel graphics, a small Windows test PC with an AMD iGPU, and a laptop with an Intel Arc GPU.
 - Code blocks that name a path and a commit (for example `<path> @ 67ca53a5`) are copied from that file at that
   commit; a cut is marked `// ...` (or `# ...`). Local paths and identities in copied text are replaced by
-  placeholders. In the lock script, the flag and the JSON field that name the agent holding a lock are written
-  `--holder` and `holder` throughout this document; use whatever spelling your own copy defines. A few other words in copied code and messages were reworded for neutrality (for example a test message); the logic is unchanged.
+  placeholders. The lock script's flag and JSON field that name the agent holding a lock are `--owner` and `owner` (the generic reference lock in 2.5 spells its own flag `--holder`). A few other words in copied code and messages were reworded for neutrality (for example a test message); the logic is unchanged.
 - Snippets marked `generic reference version, not from the repo` were written for this playbook.
 - The commit identity used in examples is `<noreply-id>+<github-user>@users.noreply.github.com` with the name
   `<author name>`.
@@ -51,8 +50,9 @@ After the five systems: [Known gaps](#known-gaps), [Sources and commits](#source
 | Role | What it does | What it never does | Model and effort (rule in 1.2) |
 | --- | --- | --- | --- |
 | Maintainer | Sets goals, gives rulings, approves pushes, downloads, publishing, system settings, hardware actions. Talks only to the coordinator. | Nothing is assumed approved without the maintainer saying so in chat. | n/a |
-| Coordinator | Keeps the queue, starts and stops helpers, writes briefs, keeps `RESUME.md`, the bug queue and the dashboard current, reports to the maintainer in short lines. Plans around shared bottlenecks. | Never runs two agents on one task. Never polls helpers. Never relays every helper message. Never trusts a "landed" claim without checking `origin/main`. | Strongest model when planning or scheduling is hard; it must say so to the maintainer if its own model is too weak for a decision. |
+| Coordinator | Keeps the queue, starts and stops helpers, writes briefs, keeps `RESUME.md`, the bug queue and the dashboard current, reports to the maintainer in short lines. Plans around shared bottlenecks. | Never runs two agents on one task. Never polls helpers. Never relays every helper message. Never trusts a "landed" claim without checking `origin/main`. | Opus 5.5, high effort (never Sonnet or Haiku; never the planner model, which is too token-hungry for an all-day role; it makes the high-level choices). A successor coordinator is the same. It says so to the maintainer if it finds itself on a weaker model or lower effort. |
 | Helper (feature or fix) | One task in its own worktree on its own branch cut from current main: code, regression tests, quick checks, one full `check:merge`, landing through the landing lock. Reports once, at the end. | No progress messages. No shared scratch files. No hand edits of generated records. Never deletes a lock. Never stops or waits silently: when it has no next job or needs a decision it asks the coordinator, not the maintainer. | Picked per job: see 1.2. |
+| Planner (only for design-heavy or risky work, rule in 1.2) | Reads the code, writes a plan file under about 60 lines in the handoff folder, ends with one line: `PLAN: <path>`. | Never implements, never lands, never touches the landing lock. | Fable 5.1, high effort (Opus 5.5 high if unavailable). |
 | Bug-hunt agent | A dedicated agent for a bug whose cause is not obvious (GPU or timing, concurrency, maths, unclear responsible package, failed once already). Finds the root cause, fixes it in the owning package, adds a regression test. | Not the cheap model that happened to find the bug. Never a band-aid (retry, loosened tolerance, skip). | Opus, high effort when truly hard. |
 | Planning agent | Writes a plan file and prepares work, with no push and no landing until the maintainer says go. | Executes nothing irreversible. | Opus, medium or high. |
 | Investigator | A read-only probe into a host or tool behaviour (which GPU a browser picks, why a reset happened). Writes notes and probe scripts into `handoffs/<topic>/`. | Changes no repo code unless re-briefed as a fixer. | Opus high for hard host questions. |
@@ -89,6 +89,10 @@ As a table:
 | Mechanical | docs, renames, landing an already-checked branch, running a suite or benchmark, worktree cleanup, handoff continuation, status checks | Haiku or Sonnet | low or medium |
 | Normal feature | a new optional package from a written design, DX passes over packages | Sonnet or Opus | medium |
 | Hard | GPU or timing bugs, concurrency, maths precision, performance diagnosis, architecture, risky refactors | Opus | high (extra-high or max only when truly needed) |
+
+Coordinators run Opus 5.5 at high effort (the maintainer, 2026-10-29): they make the high-level choices, so they are never a cheaper model, and not the planner model either, which uses too many tokens for an all-day role. The same goes for the coordinator started at a handoff.
+
+**Planner helper (maintainer, 2026-10-29).** For design-heavy or risky work (new architecture, changes across several packages, size-gate tradeoffs, a bug that already failed once, anything where a wrong approach costs a full `check:merge` round) the coordinator first starts a planner on the strongest model (Fable 5.1, `claude-fable-5-1`, at high effort; max only when truly stuck; Opus 5.5 high if Fable is unavailable). The planner reads the code and writes a plan file under about 60 lines in the project's handoff folder (files, approach, what is ruled out, how to test, size and lock use). It does not implement. A helper on the right tier (Sonnet or Opus medium) then builds from that file. No planner for chores, landings, docs, renames or obvious fixes.
 
 Two rules that keep this honest:
 
@@ -171,35 +175,58 @@ table in `RESUME.md`, and the handoff files in `handoffs/`):
 8. Report once: what to report, in one short paragraph, at the end; `HANDOFF at <tokens>: <path>` if it hands off.
 9. `model` and `effort`.
 
+Every brief also carries these, each from a trap that cost a landing round (2026-10-30 and 2026-10-31):
+
+- The quick checks a builder runs before it calls the work ready are `npm run quality`, `npm run hygiene`, the unit
+  tests of what it touched, the unit tests at the repository root (`node --test tests/*.test.js`, which hold repo-wide
+  gates such as fixed waits, error-page entries, teardown and file classes) and `npm run api:check`. Helpers that ran
+  only their package tests failed these at landing three times in one day.
+- A change that alters exports commits the output of `npm run api:update`. Skipping it because `land-records`
+  regenerates the API reports fails: `check:merge` runs `verify`, and so `api:check`, before `land-records` runs.
+- After a README change, `npm run modern:test:packages -- --packages=<pkg>`. README examples are type-checked there,
+  which sits late in `check:merge` (about 27 minutes in on one run), so a failure otherwise costs a whole run.
+- Builders never run `check:merge`, narrowed or full (session rule 24). It runs once, at landing, in the mode it
+  prints. There is no exception: anything to be proven with a check is proven by a run that was happening anyway, and a
+  check never runs twice for the same tree.
+- A landing that re-records a visual baseline on the workstation also queues the same views for re-record on the
+  laptop profile, or the laptop's nightly fails on them.
+- Pictures: do not judge colour or banding from a PNG over 3,932,160 bytes (session rule 23, section 1.16).
+- Check scripts run from a current worktree. The main checkout can be 100 or more commits behind `origin/main` and
+  holds old check code.
+- Notes carry the real time from `date -u`, never an estimated one. A handoff once held invented times.
+
 When the brief asks a peer machine to run a test, it gives the exact commit, the exact commands and the exact lines to
 report, and asks for the lines that match the new checks by name. A report filter once hid the lines that decided the
 run, so ask for the raw matching lines, not a summary.
 
 #### 1.4.2 The rules file every brief carries
 
-`handoffs/session-rules.txt` has 15 numbered rules. The ones that belong in this part, quoted:
+`handoffs/session-rules.txt` has 24 numbered rules. The ones that belong in this part, quoted:
 
 ```text
 1. Quiet: don't send "waiting" or progress messages. Run long checks in the background and message the coordinator only when something lands, when you're blocked, or when you need a decision. One short paragraph.
 2. One landing at a time: wrap your final `git pull --rebase` + post-rebase checks + push in the landing lock, so no one rebases onto a moving main:
    Put the rebase+checks+push steps in a script file inside your worktree (e.g. .tmp/land.sh), then run:
-   MARGO_GPU_LOCK=<repo>/test-results/land.lock node scripts/gpu-lock.mjs run --holder=<you> -- bash .tmp/land.sh
+   MARGO_GPU_LOCK=<repo>/test-results/land.lock node scripts/gpu-lock.mjs run --owner=<you> -- bash .tmp/land.sh
    with the script itself setting MARGO_GPU_LOCK=<repo>/test-results/gpu.lock before its GPU steps.
    (Do not pass a quoted bash -c string: on Windows the lock wrapper runs the command through cmd.exe and splits it.)
-   Run the full check:merge before you take the lock. Inside the lock, after a clean rebase, run only verify plus the tests of what you touched (the existing post-rebase rule). Never hold it while waiting for anything else.
-3. Fail fast: before a full check:merge, run npm run quality, npm run hygiene and the unit tests for what you touched (minutes, not 15). Only then run the full check, once.
+   The landing runner runs check:merge once inside the lock, after the rebase, in the mode it prints (rule 24, section 2.6.5). Never hold the lock while waiting for anything else.
+3. Fail fast: before you call work ready, run npm run quality, npm run hygiene, the unit tests for what you touched, the root unit tests (node --test tests/*.test.js) and npm run api:check (minutes, not 15). Builders never run check:merge (rule 24).
 4. Own files only: keep scripts and logs inside your own worktree (e.g. .tmp/ there), never in a shared scratchpad or /tmp; other agents may overwrite them.
 5. Timeouts: every long command you run (tests, checks, benchmarks, waits) gets a hard time limit (e.g. timeout 1800 cmd). Never hold the GPU or landing lock without one; if something hangs, kill the process tree, release the lock and report it.
 ```
-(`handoffs/session-rules.txt`, rules 1 to 5; the two absolute lock paths replaced by `<repo>`.)
+(`handoffs/session-rules.txt`, rules 1 to 5; the two absolute lock paths replaced by `<repo>`; rules 2 and 3 as reworded for batch landings, 2026-10-31.)
 
 Rules 6 to 12 (never land dirty, failures are yours, public-release bug rule, mandatory regression test, rerun of one
 step, never skip work for speed, accepted differences) are quoted where they apply: sections 1.12, 1.13 and 2.11.
-Rules 13 to 15 are website design rules and are out of scope here.
+Rules 13 to 15 are website design rules and are out of scope here. Rules 16 to 24 are the per-job model and effort
+tiers (1.2), never stopping or sitting idle (1.1), the coordinator model and the planner (1.2), narrowing (2.10.2),
+core as the last resort, the shared git config, pictures and builders never running `check:merge` (sections 1.16 and
+2.6.5).
 
-Note: rule 2 still says "Run the full check:merge before you take the lock." The newest landing scripts
-(section 2.6, used from 2026-10-29) run the full `check:merge` inside the lock instead, after the rebase. The rules
-file was not updated to match. Treat section 2.6 as the current practice and update rule 2 when you copy this system.
+Rule 2 once said to run the full `check:merge` before taking the lock. The landing scripts have run it inside the lock,
+after the rebase, since 2026-10-29, and since 2026-10-31 the landing runner owns that run (rule 24). The quoted text
+above is the current wording.
 
 #### 1.4.3 Brief template
 
@@ -208,15 +235,17 @@ Generic reference version, not from the repo:
 ```markdown
 Task: <one line>. Model <model>, effort <effort>.
 Goal and done: <measurable result>; done = landed on main (commit on origin/main) with regression tests.
-Read first: AGENTS.md; <handoff or design file>; bug-queue row <n>. Known: <facts>. Ruled out: <list>.
+Read first: AGENTS.md; <plan file from the planner, if one was run (rule 1.2)>; <handoff or design file>; bug-queue row <n>. Known: <facts>. Ruled out: <list>.
 Rules: <paste session-rules.txt>.
 Setup: worktree <path> (or create one from origin/main); node scripts/worktree-node-modules.mjs; git lfs checkout.
 Shared resources: GPU shared slot for <tests> (<minutes>); landing lock once (about 40 min).
-Landing: write <worktree>/test-results/land-<task>.sh from the pattern in playbook 2.6, start it in the BACKGROUND:
-  MARGO_GPU_LOCK=<repo>/test-results/land.lock node scripts/gpu-lock.mjs run --max=170 --wait-max=240 --holder=<task> -- bash <script>
+Landing: you do not run check:merge. End READY: the work committed on your branch, rebased on current origin/main, quick
+  checks (1.4.1) passed. The landing runner puts it in a batch (playbook 2.6.5). A lone landing, when the coordinator
+  asks for one, uses the pattern in playbook 2.6, started in the BACKGROUND:
+  MARGO_GPU_LOCK=<repo>/test-results/land.lock node scripts/gpu-lock.mjs run --max=170 --wait-max=240 --owner=<task> -- bash <script>
 Hand off at 300,000 tokens (or about 150 tool calls, or at a compaction): write <repo>/handoffs/<task>-handoff.md
   from the template and end with one line: HANDOFF at <tokens>: <path>.
-Report once at the end, one paragraph: commits, what landed (or the script, log and lock holder still running), bugs found.
+Report once at the end, one paragraph: commits, READY <hash> or BLOCKED <why> (or what landed, or the script, log and lock holder still running), bugs found.
 ```
 
 ### 1.5 Quiet sessions
@@ -278,8 +307,8 @@ worse. Some Margo Engine helpers ran past 800,000 tokens. A fresh agent with a g
 - **The successor** reads the note first, checks the real state (git status, logs, running processes) instead of
   trusting memory, then carries on. It reports once at the end and names the handoffs it came from.
 - **The coordinator** keeps the chain: records each handoff in the resume notes, never runs two agents on one task,
-  and stops the old one first. The same rule applies to the coordinator session itself at 300,000 tokens: write the
-  resume file and continue in a fresh session.
+  and stops the old one first. The coordinator session itself hands off at 500,000 tokens (the maintainer,
+  2026-10-30): write the resume file and continue in a fresh session. Helpers stay at 300,000.
 ```
 
 #### 1.6.2 Why a fresh agent is cheaper (and better)
@@ -307,6 +336,7 @@ worse. Some Margo Engine helpers ran past 800,000 tokens. A fresh agent with a g
 | Usage on a helper's notification | the coordinator | may be a running total, so it can read high | coordinator tells the helper to hand off when it passes 300,000; early is fine |
 | About 150 tool calls | the agent, by counting | proxy | hand off |
 | A compaction happened | the agent | proxy | hand off |
+| The host's usage query | the coordinator | the real context figure, when the host offers one | use it for the coordinator's own 500,000 and when a helper's notification figure is doubtful |
 
 NOT VERIFIED: whether the notification figure on this host is a running total or the live context. The rule assumes it
 may be either.
@@ -319,7 +349,14 @@ may be either.
 
 #### 1.6.5 Coordinator handoff
 
-The coordinator follows the same rule. On 2026-10-29 the coordinator wrote
+The coordinator follows the same rule, with a higher threshold: about 500,000 tokens (the maintainer, 2026-10-30), and
+also at its first automatic compaction. On the host used here the window compacts at 368,000 of 400,000 tokens
+(observed 2026-10-31; NOT VERIFIED on other hosts), so a 500,000 trigger by itself never shows. The real figure comes
+from the host's usage query, not from the coordinator's own guess. Over a remote-control link the host app refuses to
+start a new session; only a message typed in the desktop app can, so the coordinator writes the resume file first and
+asks the maintainer to start the successor. The successor is again Opus 5.5 at high effort (1.2).
+
+On 2026-10-29 the coordinator wrote
 `handoffs/coordinator-handoff-2026-10-29.md` (46 lines) and added a pointer at the end of `RESUME.md`:
 
 ```text
@@ -475,6 +512,10 @@ commit: the leak scrub was reported landed as a hash that was another landing's 
 reached main. After the ancestor check, look at what the landing was meant to change on `origin/main` (files gone or
 changed, `git log origin/main --grep='<subject words>'`) and treat a mismatch as NOT landed.
 
+More traps from 2026-10-31: run check scripts from a current worktree, because the main checkout can be 100 or more
+commits behind; write the real `date -u` in every note; and a runner's report can leave list rows unrecorded, so check
+the landed hashes against the dashboard's `items.json` (1.11).
+
 Why "never trust the note or memory" is literal here: on 2026-10-29 the main checkout was 91 commits behind
 `origin/main`, so a session that read files from the working tree instead of `origin/main` would have documented a
 version of `scripts/gpu-lock.mjs`, `scripts/check-merge.mjs` and others that no longer existed.
@@ -555,6 +596,11 @@ Update procedure (coordinator handoff, "Dashboard"): edit the two files; publish
 file per call); then point the page's `datasets/items` and `datasets/stats` records at the new file, passing the
 expected record version so a concurrent edit is refused rather than overwritten. Update after each landing.
 
+The to-do list is the plan (the maintainer, 2026-10-31): `items.json` sets what is built, in its order. All work gets a
+row first. The coordinator's own ideas are proposed to the maintainer, not started. Work that is not on the list is
+left alone, and built work that is on it is committed. Keep `Running` true: 18 of 24 rows marked Running had no helper
+on them when counted.
+
 Rules that make it trustworthy:
 
 - `result` holds a commit hash only after `origin/main` shows it (1.8).
@@ -592,6 +638,11 @@ And `AGENTS.md`, "Bugs: fix the cause, properly":
 - A bug you cannot fix now goes into `docs/known-bugs.md` with a repro and its cause. That list must be empty
   before release.
 ```
+
+Core is the last resort (the maintainer, 2026-10-31; session rule 21). A change to `@margoengine/core` is made only when
+no package can hold it and it fixes a bug or flaw that will cause an engine failure. Look or quality improvements,
+options and features go in packages. The report and commit message of a core change say why no package can hold it and
+which failure it prevents, and the helper asks the coordinator before writing one. `AGENTS.md` carries the same rule.
 
 Note the one sanctioned retry: rerunning a step once after a GPU driver reset that the Windows event log confirms
 (2.15.3). It is a host-fault rule, printed and recorded, never a hidden retry of a failing test.
@@ -710,6 +761,28 @@ echo "== node and browser processes"
 if command -v tasklist >/dev/null; then tasklist | grep -iE '^(node|bash|msedge|python)' ; else ps -eo pid,etime,cmd | grep -E 'node|msedge|chrom|python' | grep -v grep; fi
 ```
 
+### 1.16 Standing rulings that shape the queue
+
+Rulings from the maintainer that every brief inherits (session rules 21 to 24 and the rulings of 2026-10-31):
+
+1. Every new branch is cut from current `main`, built work lands, and no branch is held back. A job that needs an
+   unlanded branch waits for it to land, or is written so it does not need it. Trap seen: three builders cut from
+   unlanded branches and had to be stopped or re-cut. Only pairs already built on each other land as one landing with
+   one check.
+2. Demo work stops until the engine is done. Stopping demo work never means stopping a running service: a running
+   server is stopped only on the maintainer's explicit word.
+3. The to-do list sets what is built (1.11).
+4. Core is the last resort (1.12.1).
+5. Shared git config (session rule 22). Every worktree shares one `.git/config`, and on Windows a git command that reads
+   it while another process replaces it fails with status 128 ("Permission denied" on `.git/config`). Never write
+   `git config` from a worktree, add worktrees with `--no-track`, and avoid `git push -u` and `git branch -m` while
+   checks run. A check that names `.git/config` in a failure is reported to the coordinator, not retried silently.
+6. Pictures (session rule 23). The tool that shows a picture to an agent re-encodes any file over 3,932,160 bytes with a
+   reduced palette, which shows false bands and colour shifts. Judge colour or banding from numbers or from
+   `scripts/review-png.mjs` (a lossless rewrite that proves the pixels equal), never from a large PNG.
+7. Builders never run `check:merge` (session rule 24); landings are batched (2.6.5). In plain words: anything to be proven
+   with a check is proven by a run that was happening anyway, and a check never runs twice for the same tree.
+
 ---
 
 ## 2. Process integrity, lock queues and crash protections
@@ -748,7 +821,7 @@ name is not `gpu.lock` is exclusive.
 //               its holder and the command it runs.
 // Layout of the lock folder: shared/<token>.json per shared holder, exclusive.json for the exclusive holder and mutex/
 // (a mkdir held for microseconds around every state change). Queued exclusive requests are <ts>-<token>.json in the
-// folder beside it, gpu.lock-waiting/, which an old client's release (it removes the whole lock folder) leaves alone. A holder, waiter or legacy holder.json whose process is gone is stale and removed. Release removes
+// folder beside it, gpu.lock-waiting/, which an old client's release (it removes the whole lock folder) leaves alone. A holder, waiter or legacy owner.json whose process is gone is stale and removed. Release removes
 // only our own entry: never delete an entry you don't own.
 ```
 (`scripts/gpu-lock.mjs` lines 1 to 20 at `67ca53a5`; the remainder of the header covers compatibility with the older
@@ -777,11 +850,11 @@ test-results/
 The entry is written by `acquire()`:
 
 ```js
-  const token = `${holder.replace(/[^\w.-]/g, '_')}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  const token = `${owner.replace(/[^\w.-]/g, '_')}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     entry = (beats = true) => {
       const now = Date.now();
       return JSON.stringify({
-        holder,
+        owner,
         pid: process.pid,
         token,
         mode,
@@ -797,7 +870,7 @@ The entry is written by `acquire()`:
 
 | Field | Meaning |
 | --- | --- |
-| `holder` | the `--holder=` given; required ("gpu-lock: pass an holder (agent id)") |
+| `owner` | the `--owner=` given; required ("gpu-lock: pass an owner (agent id)") |
 | `pid` | the process that called `acquire()` (for `run`, the lock wrapper itself) |
 | `token` | holder, pid, time and a random suffix; release removes the entry only if the token matches |
 | `mode` | `shared` or `exclusive` |
@@ -913,7 +986,7 @@ Waiters' tickets have `beats: false`, so they are reclaimed only when their proc
         try {
           appendFileSync(
             join(dirname(lockDir), 'gpu-lock-timeouts.log'),
-            `${new Date().toISOString()} TIMEOUT after ${entry.maxMinutes} min: ${entry.holder}: ${entry.command}\n`,
+            `${new Date().toISOString()} TIMEOUT after ${entry.maxMinutes} min: ${entry.owner}: ${entry.command}\n`,
           );
         } catch {}
         process.exit(0);
@@ -964,13 +1037,13 @@ waiting it prints `gpu-lock: <mode> request waiting for <holders>` at once and t
 #### 2.2.9 CLI, flags and environment
 
 ```text
-node scripts/gpu-lock.mjs run [--exclusive] [--max=<min>] [--wait-max=<min>] --holder=<agent id> -- <command...>
+node scripts/gpu-lock.mjs run [--exclusive] [--max=<min>] [--wait-max=<min>] --owner=<agent id> -- <command...>
 node scripts/gpu-lock.mjs status
 ```
 
 | Flag or variable | Effect |
 | --- | --- |
-| `--holder=<id>` | required; names the holder in every message |
+| `--owner=<id>` | required; names the holder in every message |
 | `--exclusive` | exclusive on `gpu.lock` (other locks are always exclusive) |
 | `--max=<min>` | hold limit; must be positive |
 | `--wait-max=<min>` | wait limit; must be positive |
@@ -1041,18 +1114,18 @@ At `67ca53a5`: `tests/gpu-lock.test.js` (14 tests), `tests/gpu-lock-limits.test.
 Snapshot of `test-results/` in the main checkout, 2026-10-29 about 00:57 local:
 
 ```json
-{"holder":"biomes-g1b7","pid":48724,"token":"biomes-g1b7-48724-1793247167748-v501wd","mode":"exclusive","command":"sh .tmp/land2.sh 3d394de9","takenAt":"2026-10-29T04:55:04.716Z","maxMinutes":170,"deadline":1793259904716,"beats":true}
+{"owner":"biomes-g1b7","pid":48724,"token":"biomes-g1b7-48724-1793247167748-v501wd","mode":"exclusive","command":"sh .tmp/land2.sh 3d394de9","takenAt":"2026-10-29T04:55:04.716Z","maxMinutes":170,"deadline":1793259904716,"beats":true}
 ```
 (`test-results/land.lock/exclusive.json`.)
 
 ```json
-{"holder":"hard-g1","pid":50136,"token":"hard-g1-50136-1793247194722-3hjyfb","mode":"exclusive","command":"bash test-results/land-g1.sh","takenAt":"2026-10-29T04:13:14.729Z","maxMinutes":170,"deadline":1793257394729,"beats":false}
+{"owner":"hard-g1","pid":50136,"token":"hard-g1-50136-1793247194722-3hjyfb","mode":"exclusive","command":"bash test-results/land-g1.sh","takenAt":"2026-10-29T04:13:14.729Z","maxMinutes":170,"deadline":1793257394729,"beats":false}
 ```
 (`test-results/land.lock-waiting/001793247194722-hard-g1-50136-1793247194722-3hjyfb.json`; two more tickets, for
 `hard-g3` and `bug61-msaa-clear`, were queued behind it.)
 
 ```json
-{"holder":"no-webgpu-browser","pid":4436,"token":"no-webgpu-browser-4436-1793249800061-c9ninv","mode":"shared","command":"<repo>-wt/webgl2-m6/scripts/test-no-webgpu-browser.mjs","takenAt":"2026-10-29T04:56:40.062Z","maxMinutes":20,"deadline":1793251000062,"beats":true}
+{"owner":"no-webgpu-browser","pid":4436,"token":"no-webgpu-browser-4436-1793249800061-c9ninv","mode":"shared","command":"<repo>-wt/webgl2-m6/scripts/test-no-webgpu-browser.mjs","takenAt":"2026-10-29T04:56:40.062Z","maxMinutes":20,"deadline":1793251000062,"beats":true}
 ```
 (`test-results/gpu.lock/shared/no-webgpu-browser-4436-....json`; path replaced.)
 
@@ -1073,6 +1146,12 @@ written on grant.
 6. Every push to main goes through the landing lock, docs-only pushes included. A push made outside it moves main under
    the holder, whose own push is then rejected as non-fast-forward and has to queue and run again (2026-10-29: a
    docs-only playbook push outside the lock cost the leak-scrub landing a full rerun, about 40 minutes of lock time).
+
+7. Never run more than one full `check:merge` pipeline at a time on one machine. On 2026-10-30 about eight parallel
+   pipelines exhausted the Windows process table (bash fork: "Resource temporarily unavailable"), killed a landing
+   mid check and forced a reboot. Landing pipelines go through one serial runner.
+8. Logs: every run of a pipeline or landing writes a new dated log, or appends. A restart never overwrites the log of the
+   run that failed (the cause of one failed first verify was lost this way, 2026-10-30).
 
 ### 2.5 Generic reference lock (for a new project)
 
@@ -1218,6 +1297,9 @@ git push origin HEAD:main
 echo LANDED $(git rev-parse HEAD)
 ```
 
+This script is the form of 2026-10-29. Since 2026-10-31 `land-records` runs with `--no-build` (the build is `verify`'s)
+and landings are batched (2.6.5).
+
 The coordinator's reference pattern `<repo>-wt-nbreq/test-results/land-full.sh` is the same without the identity
 check and with one extra line, `export MARGO_JUPYTER_VENV="$PWD/test-results/.venv-fresh"`, specific to that fix.
 
@@ -1246,7 +1328,7 @@ Line by line:
 From the coordinator handoff (paths replaced):
 
 ```bash
-MARGO_GPU_LOCK=<repo>/test-results/land.lock node scripts/gpu-lock.mjs run --max=170 --wait-max=240 --holder=<x> -- bash <script>
+MARGO_GPU_LOCK=<repo>/test-results/land.lock node scripts/gpu-lock.mjs run --max=170 --wait-max=240 --owner=<x> -- bash <script>
 ```
 
 Start it in the background with its output to a log in the worktree, for example
@@ -1271,20 +1353,54 @@ git push origin HEAD:main
 ran before taking the lock and only `verify` ran inside. The newer one runs the full `check:merge` inside, after the
 rebase, at the cost of a longer hold (the queue got slower; the push is checked against the exact main it lands on).
 
+#### 2.6.5 Batch landings (the rule since 2026-10-31)
+
+The maintainer approved batching ("Batch them"). A queue of finished branches lands in batches: one `check:merge` on the
+batch tip, one records commit, and every branch keeps its own commits and author.
+
+- A batch is built in the first branch's worktree, on that branch (no extra branch, per `AGENTS.md`). Each further branch
+  is rebased onto the batch tip in a stated order, with its special steps folded in (regenerated llms files, a record
+  re-amended for that branch, a size raise with its reason). Rebase and conflict work for the next batch happens off the
+  GPU while the current batch checks.
+- Then one `check:merge` in the mode it prints for the whole diff, `land-records --no-build`, `verify`, the identity
+  check and the push. The landing runner owns this. Builders end READY and never run `check:merge` (session rule 24).
+- Batches group branches so the mode is honest: fixes and check code together, new packages and tooling together
+  (the lock file and the root `package.json` force a full run), core together, and branches that touch one narrow area
+  together so the affected run stays narrow.
+- A failure in a batch: find the root cause first, never a plain rerun. A failing suite or golden names a package, which
+  names a branch. Drop that branch, rebuild the batch without it, rerun; the dropped branch gets its own hunt and lands
+  later alone. A flake is a bug: its fix goes into the batch, then the rerun. Only when the failure names no branch is
+  the batch halved.
+- Conflict-heavy rebases (core, a shared render path) go to a stronger model, off the GPU. The runner itself is a cheaper
+  model.
+- During a landing check, no new GPU builder starts, and at most two stay running, so a GPU slot is always free for the
+  check. A slot wait once cost a check 457 seconds on a step that takes about 3.
+
+The land script is a per-batch bash file in the batch worktree's `test-results/` (own files only). It leaves out what
+`verify` and `check:merge` already run on the same tree: no `build:packages`, `api:check`, `quality`, `proofs`, unit
+tests or `modern:test:packages` before `check:merge`. Measured on one queue, those repeats took about 3.5 minutes of a
+roughly 9 minute wrapper; `verify` is the first step of `check:merge` and fails in under 4 minutes, so fail-fast holds.
+It keeps what nothing else covers: the llms regeneration with the errors-page commit, the fixed-waits check and the
+identity check. `check:fresh-clone` is not a repeat either (it proves the committed tree builds without untracked,
+ignored or LFS-pointer files). The verify after `land-records` stays whole, because `AGENTS.md` says to run `verify`
+before pushing. The batch script template is in 2.17.
+
 ### 2.7 The complete landing procedure
 
 1. Worktree per agent, from current main:
-   `git -C <repo> fetch -q origin && git -C <repo> worktree add <path> -b <branch> origin/main`.
+   `git -C <repo> fetch -q origin && git -C <repo> worktree add --no-track <path> -b <branch> origin/main` (`--no-track`: 1.16 item 5).
    Branch names follow the host convention (`worktree-agent-<id>`); no extra branches (`AGENTS.md`, "One branch: main").
 2. Set up the worktree: `node scripts/worktree-node-modules.mjs` (2.7.1), then `git lfs checkout` (fresh worktrees hold
    LFS pointers).
 3. Work; commit often with the noreply identity; keep scripts and logs in the worktree's `.tmp/` or `test-results/`.
-4. Fail fast: `npm run quality`, `npm run hygiene`, the unit tests of what you touched (session rule 3).
-5. Write the landing script (2.6.2) into `<worktree>/test-results/`.
+4. Fail fast: `npm run quality`, `npm run hygiene`, the unit tests of what you touched, the root unit tests, and
+   `npm run api:check` (session rule 3; 1.4.1 has the traps behind each).
+5. Write the landing script (2.6.2, or the batch form in 2.6.5) into `<worktree>/test-results/`. Builders stop at READY;
+   the landing runner lands (2.6.5).
 6. Start it in the background under the landing lock (2.6.3). Report to the coordinator once: script path, log path,
    lock holder name.
 7. The script: fetch, rebase, regenerate llms files and amend, relink `node_modules`, full `check:merge`, discard the
-   rewritten size records, `land-records`, `verify`, identity check, push.
+   rewritten size records, `land-records --no-build`, `verify`, identity check, push.
 8. If any step fails: the lock is released when the script exits. Fix the cause (2.11), commit, start the script again.
    Never edit the script to skip the failing step.
 9. Confirm the landing on `origin/main` (1.8), not from the log alone.
@@ -1459,6 +1575,11 @@ noreply identity set through `GIT_AUTHOR_*` and `GIT_COMMITTER_*`; the GPU step 
 its environment so it takes the shared GPU lock, not the landing lock. The resulting commit subject is
 `records: entry sizes, API reports and baselines at <short HEAD>` (visible throughout `git log origin/main`).
 
+Run it with `--no-build` from a landing script: `verify` just built the packages and `dist` is still that build. The API
+reports are checked by `api:check` in `verify` before this step, so a change that alters exports must already carry the
+`api:update` output (1.4.1). Planned, not built: reuse the entry-size and basic-scene results that `build:site` measured on
+the same tree (about 25 to 35 seconds a landing, an estimate); it is a change to the check machinery.
+
 Why one place: "Generated records (sizes, baselines) that every change rewrites cause rebase conflicts; regenerate them
 in one place (nightly or a single records commit) rather than in every landing where possible" (global rules).
 
@@ -1496,7 +1617,7 @@ export const SCOPED_STEPS = ['modern:test:packages', 'modern:test:bundlers'];
 
 #### 2.10.2 Selection
 
-Session rule 20 (Scott, 2026-10-30): check only what a change can affect. check:merge runs the GPU tests of the changed
+Session rule 20 (the maintainer, 2026-10-30): check only what a change can affect. check:merge runs the GPU tests of the changed
 packages plus their dependents, not every package; a package's own package.json counts as that package; a script
 runs only the checks that use it; a new standalone script no check imports runs none; everything runs only for core,
 stage, shared code, the check code itself, the root package.json or the lock file; an unplaceable file gets
@@ -1541,7 +1662,7 @@ correctly). A fixture, page or asset no closure holds is looked for by name (its
 `index.*`, `main.*` and the like) in every footprint's files (`mentionIndex`), because tests load fixtures by built
 path strings.
 
-RUNNER exception (Scott's decision, 2026-10-30): the GPU package runner does not change what a test draws, and its
+RUNNER exception (the maintainer's decision, 2026-10-30): the GPU package runner does not change what a test draws, and its
 planning, limits, lock modes and heat guard are pinned by unit tests (heat-containment, gpu-timing-lock,
 voxel-pathtracer-gpu-split), so a RUNNER change runs `check:gpu-packages --select=` the pinned `RUNNER_SMOKE` list in
 `scripts/gpu-package-tests.mjs` plus every test the change affects through packages: shader test:gpu (a shared test
@@ -1586,6 +1707,17 @@ and per-step `results` (`command`, `ok` or `skipped`, `seconds`, `driverReset`, 
 Build reuse: `verify` builds every package; `modern:test:packages` then reuses that build
 (`MARGOENGINE_PACKAGE_TEST_PREBUILT=1`), and `verify` plants stale marker files (`MARGOENGINE_PLANT_STALE=1`) that no
 pack may contain, so reuse cannot hide a stale-file bug.
+
+#### 2.10.3 Parallel suites inside check:merge (under way)
+
+Work is under way to run suites in parallel inside `check:merge`; there is no result yet. The measured starting point:
+on the development PC the GPU package suites run one at a time, with the GPU about 39 percent busy and 4.8 of 48 GB of
+GPU memory in use during the longest suite (a biomes test), while the CPU and memory are far from full. Over three full
+runs the 68 to 69 GPU suites summed to 1,289 to 1,947 seconds, and 59 of them took under 30 seconds each.
+
+What the design has to respect: each running suite takes its own shared GPU slot; each browser gets its own temporary
+profile directory; no two suites start on one fixed port at once (70 test files name a port, and a busy port is waited
+for up to 20 minutes); timing tests keep running alone under the exclusive hold after the shared ones. Proof, once built: the parallel run happens inside a batch's own check (2.6.5), with no extra run, and its step list, suite labels and results are compared with the serial record of the previous batch: the same steps, the same suites, every one ok and none skipped. Until it matches, the serial run stays the rule. Any time it should save is a goal, not a measurement.
 
 Tests: `tests/check-merge-affected.test.js` (40 tests), for example "core, stage, shared and the margoengine umbrella
 run everything", "a package's own package.json runs that package and its dependents, not everything", "a change to the
@@ -1632,7 +1764,7 @@ export const nightlyCommand = () => [
   [
     'scripts/gpu-lock.mjs',
     'run',
-    '--holder=nightly-full',
+    '--owner=nightly-full',
     '--exclusive',
     '--max=240',
     '--',
@@ -1645,7 +1777,7 @@ export const nightlyCommand = () => [
 /** The command that runs the pinned proofs after it, holding the GPU lock exclusively so the timed rounds run quiet. */
 export const pinnedProofsCommand = () => [
   process.execPath,
-  ['scripts/gpu-lock.mjs', 'run', '--holder=nightly-proofs', '--exclusive', '--max=60', '--', 'npm', 'run', 'proofs'],
+  ['scripts/gpu-lock.mjs', 'run', '--owner=nightly-proofs', '--exclusive', '--max=60', '--', 'npm', 'run', 'proofs'],
 ];
 ```
 
@@ -2239,13 +2371,14 @@ cd "<worktree>"
 ID="<you>@users.noreply.example"
 export GIT_AUTHOR_EMAIL=$ID GIT_COMMITTER_EMAIL=$ID
 git fetch -q origin
-git rebase origin/main
+git rebase origin/main                         # a batch: rebase each branch onto the batch tip in order (2.6.5)
+# No build, API check, quality, proofs, unit tests or package pack here: check:merge starts with verify and runs them.
 node scripts/regenerate-docs.mjs && git add -A docs/generated && { git diff --cached --quiet || git commit --amend --no-edit -q; }
 node scripts/worktree-setup.mjs
 timeout 5400 npm run check:merge
 git checkout -- records/                       # discard records the checks rewrote
 test -z "$(git status --porcelain)" || { git status --short; echo "DIRTY TREE"; exit 1; }
-node scripts/land-records.mjs                  # one records commit at HEAD
+node scripts/land-records.mjs --no-build      # one records commit at HEAD; verify's build is still current
 timeout 3000 npm run verify
 bad=$(git log --format='%ae %ce' origin/main..HEAD | grep -v "^$ID $ID\$" || true)
 [ -z "$bad" ] || { echo "WRONG IDENTITY: $bad"; exit 1; }
