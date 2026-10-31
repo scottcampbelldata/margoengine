@@ -93,6 +93,8 @@ Last recorded 2026-10-30 at 38445c65 on nvidia ampere (msedge 156.0.4314.50); a 
 
 ## Accepted difference: per-sample reads of multisampled textures
 
+Scott accepted, 2026-10-31.
+
 WebGL2's shading language (GLSL ES 3.00) cannot read one sample of a multisampled texture. The layer resolves such a
 texture with a blit before a shader samples it, so `textureLoad(t, p, i)` returns the same resolved value for every
 `i`. Native WebGPU reads each sample: core's depth resolve (`resolveDepth` in packages/core/src/renderer.ts) and the post
