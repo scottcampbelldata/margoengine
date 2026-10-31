@@ -4,6 +4,11 @@
 // (Chromium's own network emulation does not reliably cover them). Each new connection waits 2 round trips, for TCP and
 // TLS. CPU throttling is Chromium's, applied to the page and its workers; the GPU stays this PC's.
 //   node examples/voxel-sandbox/loadtime.mjs [--profiles=a,b] [--runs=3] [--out=file] [--no-build] [--headed] [--bots=n]
+// --first-visit=profile times one new visitor on the light tier, then moving up by reloading: how long the GPU reading
+// takes, the frames on each tier, and the wait a reload costs.
+// --reading=WxH repeats the light tier's GPU reading at that canvas size: the rule's own 120 submissions and its verdict,
+// the same on a settled scene, GPU use on the machine, and a bare page's empty submissions as the control for time spent
+// waiting on other work. --rival adds a second page on the high tier during the reading.
 // --bots=n has n walking, building bots on the shard during every run, each in their own view of it.
 // Run it from a checkout after `npm run build:packages`, holding a GPU slot. Emulation is not a phone: relative numbers.
 import { spawn } from 'node:child_process';
@@ -126,7 +131,9 @@ function serve() {
     response.writeHead(200, {
       'content-type': TYPES[extname(file)] ?? 'application/octet-stream',
       'content-encoding': 'gzip',
-      'cache-control': 'no-store',
+      // Every run downloads everything, except that --first-visit's second load finds what a real visitor's cache would
+      // hold with hashed files cached for good.
+      'cache-control': option('first-visit') && path.includes('/assets/') ? 'max-age=31536000, immutable' : 'no-store',
       // The page's resource timing reads sizes across its own origin only; this is one origin.
       vary: 'accept-encoding',
     });
@@ -264,6 +271,291 @@ async function run(browser, name, profile, pipes, router, repeat) {
   };
 }
 
+// One visitor: the first load on the light tier until the GPU reading is stored, frames there, then a load of the page
+// again, as moving up by reloading would, and frames on the high tier.
+async function firstVisit(browser, profile, pipes) {
+  const context = await browser.newContext(profile.context),
+    page = await context.newPage(),
+    url = `http://127.0.0.1:${pipes.page.port}/plaza/?plaza=http://127.0.0.1:${pipes.router.port}&timing`,
+    meshed = () =>
+      page.waitForFunction(() => window.voxelSandbox?.timing?.marks.meshed, null, { timeout: 150_000, polling: 100 }),
+    // 300 submissions: the middle and 90th percentile GPU time, frame time and the longest gap between frames.
+    frames = () =>
+      page.evaluate(
+        () =>
+          new Promise((done) => {
+            const queue = GPUQueue.prototype,
+              submit = queue.submit,
+              gpu = [],
+              gaps = [];
+            let last = performance.now(),
+              raf = true;
+            const tick = (now) => {
+              gaps.push(now - last);
+              last = now;
+              if (raf) requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+            queue.submit = function (buffers) {
+              const start = performance.now(),
+                result = submit.call(this, buffers);
+              this.onSubmittedWorkDone().then(() => {
+                gpu.push(performance.now() - start);
+                if (gpu.length === 300) {
+                  queue.submit = submit;
+                  raf = false;
+                  const at = (list, q) => [...list].sort((a, b) => a - b)[Math.floor(list.length * q)];
+                  done({
+                    gpuMiddle: +at(gpu, 0.5).toFixed(2),
+                    gpu90: +at(gpu, 0.9).toFixed(2),
+                    frameMiddle: +at(gaps, 0.5).toFixed(2),
+                    longestGap: +Math.max(...gaps).toFixed(1),
+                  });
+                }
+              });
+              return result;
+            };
+          }),
+      ),
+    state = () =>
+      page.evaluate(() => {
+        const s = window.voxelSandbox;
+        return {
+          tier: s.tier,
+          marks: s.timing.read().marks,
+          stored: localStorage.getItem('margoQuality'),
+          downloaded: performance.getEntriesByType('resource').reduce((sum, e) => sum + e.encodedBodySize, 0),
+        };
+      });
+  await page.goto(url, { waitUntil: 'commit' });
+  await meshed();
+  const first = await state();
+  const lightFrames = await frames();
+  await page.waitForFunction(() => localStorage.getItem('margoQuality'), null, { timeout: 20_000 }).catch(() => {});
+  const stored = await page.evaluate(() => [localStorage.getItem('margoQuality'), performance.now()]);
+  // The visit's own clock from here to the new page's first frame is the whole wait a reload costs.
+  await page.goto(url, { waitUntil: 'commit' });
+  await meshed();
+  const second = await state();
+  const highFrames = await frames();
+  await context.close();
+  return {
+    light: { tier: first.tier, marks: first.marks, downloaded: first.downloaded, frames: lightFrames },
+    reading: { stored: stored[0], at: Math.round(stored[1]) },
+    high: { tier: second.tier, marks: second.marks, downloaded: second.downloaded, frames: highFrames },
+  };
+}
+
+// In the page: each frame's real GPU time, the sum of its passes by timestamp queries, in window.__passes.
+function timePasses() {
+  window.__passes = [];
+  const ask = GPUAdapter.prototype.requestDevice;
+  GPUAdapter.prototype.requestDevice = function (descriptor = {}) {
+    const requiredFeatures = [...(descriptor.requiredFeatures ?? [])];
+    if (this.features.has('timestamp-query') && !requiredFeatures.includes('timestamp-query'))
+      requiredFeatures.push('timestamp-query');
+    return ask.call(this, { ...descriptor, requiredFeatures });
+  };
+  const open = new WeakMap(),
+    done = new WeakMap(),
+    wrap = (name) => {
+      const begin = GPUCommandEncoder.prototype[name];
+      GPUCommandEncoder.prototype[name] = function (descriptor = {}) {
+        let entry = open.get(this);
+        if (!entry)
+          open.set(this, (entry = { set: this.__device.createQuerySet({ type: 'timestamp', count: 64 }), n: 0 }));
+        if (descriptor.timestampWrites || entry.n >= 64) return begin.call(this, descriptor);
+        const at = entry.n;
+        entry.n += 2;
+        return begin.call(this, {
+          ...descriptor,
+          timestampWrites: { querySet: entry.set, beginningOfPassWriteIndex: at, endOfPassWriteIndex: at + 1 },
+        });
+      };
+    };
+  wrap('beginRenderPass');
+  wrap('beginComputePass');
+  const create = GPUDevice.prototype.createCommandEncoder;
+  GPUDevice.prototype.createCommandEncoder = function (descriptor) {
+    const encoder = create.call(this, descriptor);
+    encoder.__device = this;
+    return encoder;
+  };
+  const finish = GPUCommandEncoder.prototype.finish;
+  GPUCommandEncoder.prototype.finish = function (descriptor) {
+    const entry = open.get(this);
+    if (entry?.n) {
+      const device = this.__device,
+        resolve = device.createBuffer({
+          size: entry.n * 8,
+          usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+        }),
+        read = device.createBuffer({ size: entry.n * 8, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+      this.resolveQuerySet(entry.set, 0, entry.n, resolve, 0);
+      this.copyBufferToBuffer(resolve, 0, read, 0, entry.n * 8);
+      const buffer = finish.call(this, descriptor);
+      done.set(buffer, { read, resolve, n: entry.n, set: entry.set });
+      return buffer;
+    }
+    return finish.call(this, descriptor);
+  };
+  const submit = GPUQueue.prototype.submit;
+  GPUQueue.prototype.submit = function (buffers) {
+    const result = submit.call(this, buffers);
+    for (const buffer of buffers) {
+      const entry = done.get(buffer);
+      if (!entry) continue;
+      entry.read.mapAsync(GPUMapMode.READ).then(() => {
+        const t = new BigInt64Array(entry.read.getMappedRange());
+        let sum = 0;
+        for (let i = 0; i < entry.n; i += 2) if (t[i + 1] > t[i]) sum += Number(t[i + 1] - t[i]);
+        window.__passes.push(sum / 1e6);
+        entry.read.destroy();
+        entry.resolve.destroy();
+        entry.set.destroy();
+      });
+    }
+    return result;
+  };
+}
+
+// What watchQuality reads on one visit: every submission's time, the 120 it uses (from two seconds after loading ended),
+// its verdict; then the same machine with the scene gone and a bare page submitting nothing.
+async function gpuReading(browser, pipes, size) {
+  const [width, height] = size.split('x').map(Number),
+    context = await browser.newContext({ viewport: { width, height } }),
+    page = await context.newPage(),
+    base = `http://127.0.0.1:${pipes.page.port}/plaza/`,
+    url = `${base}?plaza=http://127.0.0.1:${pipes.router.port}&timing`;
+  if (option('passes')) await page.addInitScript(timePasses);
+  await page.addInitScript(() => {
+    const queue = GPUQueue.prototype,
+      submit = queue.submit;
+    window.__subs = [];
+    queue.submit = function (buffers) {
+      const start = performance.now(),
+        result = submit.call(this, buffers);
+      this.onSubmittedWorkDone().then(() => window.__subs.push([start, performance.now() - start]));
+      return result;
+    };
+  });
+  let rival;
+  if (option('rival')) {
+    rival = await browser.newContext({ viewport: { width, height } });
+    await (await rival.newPage()).goto(`${url}&quality=high`, { waitUntil: 'commit' });
+  }
+  await page.goto(url, { waitUntil: 'commit' });
+  await page.waitForFunction(() => window.voxelSandbox?.timing?.marks.meshed, null, { timeout: 150_000, polling: 100 });
+  const during = await nvidia();
+  await page
+    .waitForFunction(() => localStorage.getItem('margoQuality') || performance.now() > 40_000, null, {
+      timeout: 60_000,
+      polling: 200,
+    })
+    .catch(() => {});
+  // The rule ends at 10 s of frames at the latest; a slow reading stores nothing, so the time decides.
+  await page.waitForFunction(
+    () => {
+      const end = window.voxelSandbox.timing.read().marks.meshed + 12_500;
+      return localStorage.getItem('margoQuality') || performance.now() > end;
+    },
+    null,
+    { timeout: 60_000, polling: 200 },
+  );
+  const stats = (list) => {
+    if (!list.length) return { n: 0 };
+    const sorted = [...list].sort((a, b) => a - b);
+    return {
+      n: list.length,
+      middle: +sorted[list.length >> 1].toFixed(2),
+      p90: +sorted[Math.floor(list.length * 0.9)].toFixed(2),
+    };
+  };
+  const got = await page.evaluate(() => ({
+    subs: window.__subs,
+    tier: window.voxelSandbox.tier,
+    meshed: window.voxelSandbox.timing.read().marks.meshed,
+    stored: localStorage.getItem('margoQuality'),
+    canvas: [document.getElementById('scene').width, document.getElementById('scene').height],
+    nowMs: performance.now(),
+    passes: (window.__passes ?? []).slice(-120),
+  }));
+  // Later, settled: the same scene, nothing left to load.
+  const window120 = got.subs.filter(([at]) => at > got.meshed + 2000).slice(0, 120),
+    settled = got.subs.slice(-120);
+  await rival?.close();
+  await context.close();
+  const bareContext = await browser.newContext({ viewport: { width: 400, height: 300 } }),
+    bare = await bareContext.newPage();
+  await bare.route('**/bare', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html>' }));
+  await bare.goto(`${base}bare`);
+  const control = await bare.evaluate(
+    () =>
+      new Promise(async (done) => {
+        const device = await (await navigator.gpu.requestAdapter()).requestDevice(),
+          times = [];
+        const tick = async () => {
+          const start = performance.now();
+          device.queue.submit([]);
+          await device.queue.onSubmittedWorkDone();
+          times.push(performance.now() - start);
+          if (times.length === 120) done(times);
+          else requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+  );
+  await bareContext.close();
+  // The same canvas on the high tier, for the frames it would really give.
+  const highContext = await browser.newContext({ viewport: { width, height } }),
+    high = await highContext.newPage();
+  if (option('passes')) await high.addInitScript(timePasses);
+  await high.addInitScript(() => {
+    const queue = GPUQueue.prototype,
+      submit = queue.submit;
+    window.__subs = [];
+    window.__gaps = [];
+    let last = 0;
+    const tick = (now) => {
+      if (last) window.__gaps.push(now - last);
+      last = now;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    queue.submit = function (buffers) {
+      const start = performance.now(),
+        result = submit.call(this, buffers);
+      this.onSubmittedWorkDone().then(() => window.__subs.push(performance.now() - start));
+      return result;
+    };
+  });
+  await high.goto(`${url}&quality=high`, { waitUntil: 'commit' });
+  await high.waitForFunction(() => window.voxelSandbox?.timing?.marks.meshed, null, { timeout: 150_000, polling: 100 });
+  await high.waitForTimeout(5000); // fixed-wait: frames to measure, on a scene with nothing left to load
+  const highGot = await high.evaluate(() => ({
+    subs: window.__subs.slice(-120),
+    gaps: window.__gaps.slice(-120),
+    passes: (window.__passes ?? []).slice(-120),
+  }));
+  await highContext.close();
+  return {
+    size,
+    highGpu: stats(highGot.subs),
+    highFrame: stats(highGot.gaps),
+    highPasses: stats(highGot.passes),
+    lightPasses: stats(got.passes),
+    rival: !!option('rival'),
+    tier: got.tier,
+    canvas: got.canvas,
+    stored: got.stored,
+    rule: stats(window120.map((v) => v[1])),
+    settled: stats(settled.map((v) => v[1])),
+    control: stats(control),
+    gpuUse: during,
+    afterMeshedMs: Math.round(got.nowMs - got.meshed),
+  };
+}
+
 const median = (list) => {
   const s = list.filter((v) => v !== undefined).sort((a, b) => a - b);
   return s.length ? s[Math.floor(s.length / 2)] : undefined;
@@ -358,6 +650,38 @@ const browser = await chromium.launch({
 });
 try {
   console.log(`gpu: ${await nvidia()}`);
+  if (option('reading')) {
+    const name = 'desktop-open';
+    link.set(PROFILES[name]);
+    const router = (globalThis.router = await startRouter(() => pipes.shard.port));
+    routerTarget = router.routerPort;
+    shardTarget = router.shardPort;
+    for (let i = 0; i < RUNS; i++) {
+      const result = await gpuReading(browser, pipes, option('reading'));
+      console.log(JSON.stringify(result));
+      all.push(result);
+      writeFileSync(out, JSON.stringify(all, null, 1));
+    }
+    await browser.close();
+    await router.close();
+    process.exit(0);
+  }
+  if (option('first-visit')) {
+    const name = option('first-visit');
+    link.set(PROFILES[name]);
+    const router = (globalThis.router = await startRouter(() => pipes.shard.port));
+    routerTarget = router.routerPort;
+    shardTarget = router.shardPort;
+    for (let i = 0; i < RUNS; i++) {
+      const result = await firstVisit(browser, PROFILES[name], pipes);
+      console.log(JSON.stringify(result));
+      all.push(result);
+      writeFileSync(out, JSON.stringify(all, null, 1));
+    }
+    await browser.close();
+    await router.close();
+    process.exit(0);
+  }
   for (const name of wanted) {
     const profile = PROFILES[name];
     if (!profile) throw new RangeError(`No profile ${name}; use ${Object.keys(PROFILES)}`);
