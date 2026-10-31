@@ -215,7 +215,8 @@ async function boot(): Promise<void> {
       lightBlocks: blocks.table.flatMap((type, id) => (type.light > 0 ? [id] : [])),
       shadows: !phone,
     }),
-    lines = new Lines();
+    // Before the translucent pass (order 4.5), whose surfaces then write depth: an outlined block under water stays seen.
+    lines = new Lines({ order: 4 });
   engine.use(lines);
   const outline = lines.add(new Line({ mode: 'segments', positions: cellBox(0, 0, 0), color: '#000000', width: 2 }));
   outline.material.opacity = 0.55;
