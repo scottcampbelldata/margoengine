@@ -300,7 +300,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-92 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+96 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -338,7 +338,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/splats`](packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |
 | [`@margoengine/tiles`](packages/tiles/README.md) | Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf-pro. |
 
-### Rendering and lighting (20)
+### Rendering and lighting (22)
 
 | Package | What it is |
 | --- | --- |
@@ -355,8 +355,10 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/lod`](packages/lod/README.md) | Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas. |
 | [`@margoengine/culling`](packages/culling/README.md) | GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame. |
 | [`@margoengine/points`](packages/points/README.md) | Large point clouds (PointCloud, PointsMaterial) and instanced sprites (SpriteBatch, SpriteMaterial) for Margo Engine, WebGPU. |
+| [`@margoengine/sprites`](packages/sprites/README.md) | 2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target. |
 | [`@margoengine/lines`](packages/lines/README.md) | Fat lines (Line, LineMaterial) and debug helpers for Margo Engine, WebGPU. |
 | [`@margoengine/text`](packages/text/README.md) | GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU. |
+| [`@margoengine/pixel`](packages/pixel/README.md) | Pixel art rendering: a pixel camera with integer zoom and parallax, and a layer compositor that scales low-res layers by whole numbers and turns them with every output pixel one source pixel. |
 | [`@margoengine/labels`](packages/labels/README.md) | HTML labels and CSS 3D objects positioned over a Margo Engine canvas. |
 | [`@margoengine/html`](packages/html/README.md) | World-space DOM anchors, CSS3D placement and scene-depth occlusion. |
 | [`@margoengine/video`](packages/video/README.md) | WebGPU external video textures and optional Web Audio sampling. |
@@ -373,7 +375,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/taa`](packages/taa/README.md) | Optional temporal anti-aliasing with motion vectors and YCoCg history clamping. |
 | [`@margoengine/transitions`](packages/transitions/README.md) | WebGPU scene wipes, noise dissolves and chromatic displacement. |
 
-### World and effects (14)
+### World and effects (15)
 
 | Package | What it is |
 | --- | --- |
@@ -386,6 +388,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/scenery`](packages/scenery/README.md) | Procedural moonlit skies and scenery passes for Margo Engine. |
 | [`@margoengine/scatter`](packages/scatter/README.md) | Seeded instancing, distance-based LOD and procedural wind. |
 | [`@margoengine/road`](packages/road/README.md) | Arc-length spline road surfaces, raised curbs and tiled UVs. |
+| [`@margoengine/tilemap`](packages/tilemap/README.md) | 2D tile maps for Margo Engine: the TileMapData format (tilesets, animated tiles, collision shapes, tile and object layers, parallax) shared by the renderer, auto-tiling and the Tiled and LDtk importers. |
 | [`@margoengine/vfx`](packages/vfx/README.md) | GPU particle simulation and indirect billboards, with curves over life and sphere, cone and mesh-surface emitters. |
 | [`@margoengine/creative`](packages/creative/README.md) | WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine. |
 | [`@margoengine/procedural`](packages/procedural/README.md) | Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language. |
@@ -412,11 +415,12 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |
 | [`@margoengine/mixer`](packages/mixer/README.md) | Audio mixing and effects: buses with gain, mute, solo, sends and ducking; equaliser, filter, compressor, limiter, delay and reverb on Web Audio; positional emitters; deterministic offline rendering. |
 
-### Simulation and games (10)
+### Simulation and games (11)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/physics`](packages/physics/README.md) | Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller. |
+| [`@margoengine/physics2d`](packages/physics2d/README.md) | 2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders. |
 | [`@margoengine/ragdoll`](packages/ragdoll/README.md) | Ragdolls on Rapier physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation. |
 | [`@margoengine/navmesh`](packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build). |
 | [`@margoengine/ecs`](packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |
@@ -2940,28 +2944,6 @@ does not own. Each entry says exactly what is needed to close it.
   bindings while the new composition compiles, or compile the compositions without each effect ahead of time; either
   with a check that the frame right after an out-of-order removal is drawn.
 
-### The packed-browser step of `modern:test:packages` can miss its 30 s page-load limit on a busy machine
-
-- **What:** `scripts/modern-package-tests.js` (`packedBrowser`) waits 30 s for `window.modern` after the first page load,
-  and a cold dev server transforming every package can exceed that when several agents share the CPU and GPU.
-- **Repro:** run `npm run check:merge` while other check:merge runs are active; seen once on 2026-10-27 ("Packed browser
-  failure: state null", `page.waitForFunction` timeout), and the same step passed on a rerun with the machine quieter.
-- **Cause:** a fixed timeout against load, not a wrong result. Fix: wait on the dev server's readiness (as `listenWhenFree`
-  and the pipeline-ready helper do) instead of a fixed time, and add a test that holds the load back.
-
-### `npm run dev:examples` refuses every page from a checkout reached through an 8.3 short path
-
-- **Repro (Windows):** open a terminal in the repository through its short name (`cd C:\DEVELO~1\Projects\MARGOE~1`,
-  or any clone under `os.tmpdir()`, which is `C:\Users\\...` on this PC), run `npm run dev:examples` and open
-  any page, for example `/packages/netcode/examples/arena/`: Vite answers 403 "outside of Vite serving allow list".
-  The same command from the long path serves 200 (measured with both paths on the same worktree).
-- **Cause:** with no Vite config at the repository root, Vite's file-serving allow list holds the working directory
-  as given (the short name) and compares it with each file's real long path, so no file matches.
-- **Fix needed:** a root `server.fs.allow` built from `realpathSync.native(process.cwd())` (a root `vite.config.js`, or
-  the same option passed by a small `dev:examples` wrapper), with a check that serves a page from a short-path cwd.
-  Not done in the netcode landing because a root Vite config changes every root `vite` command; the arena test runs
-  the README command from the canonical path meanwhile (`packages/netcode/tests/arena.test.js`).
-
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 
 - **What:** the Windows System log shows nine `nvlddmkm` event 153 entries ("Error occurred on GPUID: 100") on
@@ -3349,6 +3331,8 @@ All were found by `npm run modern:test:extensions` and the other `test:release` 
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| The packed-browser step of `modern:test:packages` missed its fixed 30 s page-load limit on a busy machine ("Packed browser failure: state null") | a fixed time against load: a cold dev server transforming every package took longer while other check:merge runs shared the CPU | the step waits on the dev server (`waitForRequestsIdle`) and then gives the page 10 s; a 10 minute hard limit fails a real hang naming the server state and page errors, and the browser and server close (`scripts/support/page-ready.js`) | `tests/page-ready.test.js` (holds the last module back in a real dev server: the fixed wait fails, the new wait passes) |
+| `npm run dev:examples` refused every page (403) from a checkout reached through an 8.3 short path | Vite's file-serving allow list held the working directory as given and compared it with each file's real path | `dev:examples` runs `scripts/dev-examples.mjs`, which starts Vite in `realpathSync.native(process.cwd())`; no root Vite config, so every other root `vite` command is unchanged | `tests/dev-examples.test.js` (short-path cwd serves 200, a file outside the repository stays 403) |
 | `modern:test:extensions` sat silent until the 30 min GPU lock limit | Chromium (Edge 156, RTX A6000) leaves a `getCompilationInfo()` asked once the device is idle pending until another GPU request runs; `material-extension-tests.js` asked for 41 modules then, inside a `page.evaluate` with no time limit, and the eight suites ran in one process with no limit | the WGSL guard asks every module at creation and answers later calls with that (`scripts/support/wgsl-guard.js`); each suite runs alone under `runLimited` (`scripts/modern-extension-suite.mjs`); engine source must ask at creation | `tests/wgsl-guard.test.js`, `tests/modern-extension-suite.test.js`, `tests/compilation-info-at-creation.test.js` |
 | IOR 1 transmission (materials) drew a 13-step highlight over the background | since `dc883a59` the host keeps reflections under extension transmission, but its F0 stayed 0.04 whatever `KHR_materials_ior` said | the extension slot takes an `ior` expression and the host sets `s.f0` from it (gltf-pro); transmission and node transmission pass it (materials) | `packages/materials/tests/transmission-ior.test.js`, `scripts/materials-transmission-tests.js` |
 | Transmission with a sheen or specular lobe drew about 148 steps of white on a fully transmissive surface | the lobes recompute diffuse light at full strength, ignoring the transmitted share `s.tr` | lobes composed over transmission scale their diffuse by 1 - `s.tr`; `install` composes transmission first (materials) | same two |
@@ -5386,6 +5370,83 @@ canvas.addEventListener('click', event => {
 
 [README continues: https://margoengine.com/llms/packages/points.md]
 
+=== @margoengine/sprites (packages/sprites/README.md) ===
+
+# @margoengine/sprites
+
+Import `margoengine/sprites` from the `margoengine` package, or `@margoengine/sprites` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+2D sprites that land on exact pixels. A `SpriteLayer` holds any number of `Sprite`s and draws them in one instanced draw
+from a storage buffer. Texels are read with no filtering and no colour conversion, so with one sample per pixel what you
+put in the atlas is what reaches the screen, byte for byte. Core stays the same size: an app that does not import this
+package ships none of it.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { SpriteLayer } from 'margoengine/sprites';
+
+// exactSize keeps the backbuffer at 64 x 32 with no MSAA; CSS scales the canvas up.
+const canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+canvas.style.imageRendering = 'pixelated';
+const engine = await EngineKernel.create(canvas, { exactSize: [64, 32] });
+
+// A 2 x 2 atlas: red, green, blue, white. An ImageBitmap or a GPUTexture works the same way.
+const data = new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
+const layer = SpriteLayer.attach(engine, { atlas: { width: 2, height: 2, data }, ySort: true });
+
+const hero = layer.add({ x: 10, y: 7, pivotX: 0.5, pivotY: 1, scaleX: 4, scaleY: 4 });
+const coin = layer.add({ x: 30, y: 7, rect: [0, 0, 1, 1], tint: '#ffd040' });
+engine.start();
+
+// Change any field whenever you like: only the bytes that changed go to the GPU.
+hero.x = 12.4; // draws at whole pixels until snap is set to false
+hero.flipX = true;
+coin.visible = false;
+```
+
+## Sprite
+
+| Field | Default | What it does |
+| --- | --- | --- |
+| `x`, `y` | 0 | World position of the pivot, y down |
+| `z` | 0 | Higher draws over lower |
+| `pivotX`, `pivotY` | 0 | Pivot across and down the image, 0 to 1 |
+| `scaleX`, `scaleY` | 1 | Scale; negative mirrors about the pivot |
+| `flipX`, `flipY` | false | Mirrors the image inside its rectangle |
+| `rotation` | 0 | Clockwise turn about the pivot, radians; pixels stay nearest, never blended |
+| `tint` | white | `0xrrggbb`, `'#rrggbb'` or `'#rgb'`, multiplied with the atlas bytes |
+| `alpha` | 1 | Opacity, 0 to 1 |
+| `rect` | whole atlas | `[x, y, width, height]` in whole atlas texels |
+| `visible` | true | False leaves it out of the draw |
+
+## SpriteLayer
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `atlas` | required | `{width, height, data}` RGBA8 bytes, `ImageBitmap`, `GPUTexture` or `(device) => GPUTexture` |
+| `camera` | `{x: 0, y: 0, zoom: 1}` | World point at the top-left and pixels per world unit, read each frame |
+| `snap` | true | Rounds each image's corner to a whole pixel after the camera, read each frame |
+| `ySort` | false | Among equal `z`, sorts by `y`, then by add order; read each frame |
+| `target` | frame's colour | A texture, or a function returning one, to draw into instead |
+| `clear` | `[0, 0, 0, 0]` | With `target`: the clear colour, or false to draw over it |
+| `normals` | none | `{atlas, target, clear}`: a second colour target for 2D lighting |
+| `order` | 10 | Frame-graph order, after the scene at 0 |
+| `layers` | 1 | Render-layer bits; a view with `layers` that shares none skips this layer |
+| `capacity` | 256 | Sprites before the buffer grows |
+| `name` | `sprites-1`, ... | Plugin name, unique per scene |
+
+Methods: `add(sprite or options)`, `remove(sprite)`, `clearSprites()`, `setAtlas(atlas)`, `dispose()` (or `using`). Read
+`sprites` for the list in draw order.
+
+Exact pixels need one sample per pixel: `exactSize` on the engine, or your own single-sample `target`. A `Tonemap`
+grades whatever is drawn before its order of 31, so set `order: 40` to keep a layer's bytes out of it.
+
+Atlas textures made from bytes or an `ImageBitmap` come back by themselves after a device loss, and so does a function.
+A plain `GPUTexture` belonged to the lost device: the next frame throws `MargoError` `'state'` until you call `setAtlas`.
+
+Normals write `n * 0.5 + 0.5` from a same-size normal atlas, turned and flipped with the sprite, with alpha 1 where a
+sprite covers the pixel. They need a single-sample colour target and a single-sample normal target of the same size.
+
 === @margoengine/lines (packages/lines/README.md) ===
 
 # @margoengine/lines
@@ -5503,6 +5564,98 @@ title.layout.bounds;                  // {left, right, top, bottom}
 ## Options
 
 [README continues: https://margoengine.com/llms/packages/text.md]
+
+=== @margoengine/pixel (packages/pixel/README.md) ===
+
+# @margoengine/pixel
+
+Import `margoengine/pixel` from the `margoengine` package, or `@margoengine/pixel` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+Pixel art that stays crisp. A `PixelCamera` scrolls by whole low-res pixels with parallax per layer and a whole-number
+zoom. A `LayerCompositor` gives each layer its own low-res target and puts them on the screen with no filtering. Each
+output pixel works out which source pixel it shows, so even a layer turned 30 degrees is made only of source colours.
+Core stays the same size: an app that does not import this package ships none of it.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { LayerCompositor } from 'margoengine/pixel';
+
+const canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+const engine = await EngineKernel.create(canvas, { exactSize: [640, 360] });
+
+// A 160 x 90 view. With no zoom set it takes the largest whole number that fits: 4 here.
+const compositor = LayerCompositor.attach(engine, { camera: { width: 160, height: 90 } });
+
+// A picture fixed in the world, at half the camera's speed. An ImageBitmap works too.
+const data = new Uint8Array(160 * 90 * 4).fill(255);
+const hills = compositor.addLayer({ anchor: 'world', parallax: 0.5 });
+hills.write({ width: 160, height: 90, data });
+
+// A layer on top of it, turned 30 degrees about the middle of the view and half see-through.
+const glow = compositor.addLayer({ anchor: 'world', blend: 'add', opacity: 0.5, rotation: Math.PI / 6 });
+glow.write({ width: 160, height: 90, data });
+
+engine.start();
+
+// Moves nothing until the scroll reaches a whole low-res pixel.
+compositor.camera.x += 0.5;
+```
+
+Draw into a layer with `@margoengine/sprites`, which reads the layer's target and camera each frame, or with a core view.
+A sprite layer's order must be below the compositor's, and its default of 10 is. Views into layers come before the canvas:
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { LayerCompositor } from 'margoengine/pixel';
+
+const canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+const engine = await EngineKernel.create(canvas, { exactSize: [320, 180] });
+const compositor = LayerCompositor.attach(engine, { camera: { width: 160, height: 90 } });
+const actors = compositor.addLayer();
+
+// With sprites: SpriteLayer.attach(engine, { atlas, target: actors.target, camera: actors.camera });
+engine.render({
+  views: [
+    { camera: engine.camera, viewport: [0, 0, 1, 1], target: { color: actors.texture } },
+    { camera: engine.camera, viewport: [0, 0, 1, 1] },
+  ],
+});
+```
+
+## PixelCamera
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `width`, `height` | required | Low-res view size, whole numbers |
+| `x`, `y` | 0 | World position at the top-left, y down, read each frame |
+| `zoom` | fits the canvas | Output pixels per low-res pixel. Anything but a whole number throws `RangeError` |
+| `minZoom`, `maxZoom` | 1, 64 | Bounds of `zoom` and of `fit` |
+| `unitsPerPixel` | 1 | World units in one low-res pixel |
+| `smooth` | false | Carries scroll below a low-res pixel into the composite, in whole output pixels |
+
+Methods: `fit(width, height)` sets the largest zoom that fits and returns it; `pixelX(parallax)` and `pixelY(parallax)`
+are the whole pixels scrolled; `scroll(parallax)` also gives the rest. `projection(parallax)` gives orthographic bounds
+for `CameraProjection` in `@margoengine/cameras`, so 3D views line up with the same pixels.
+
+The scroll goes down to the whole pixel below it, in both directions: `x = 0.9` shows pixel 0 and `x = -0.1` shows
+pixel -1, so a step of one world pixel always moves the picture by one.
+
+## LayerCompositor
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `camera` | required | A `PixelCamera`, or its options |
+| `order` | 30 | Frame-graph order. A `Tonemap` at 31 grades what is drawn before it, so set 40 to keep bytes exact |
+| `layers` | 1 | Render-layer bits; a canvas view with `layers` that shares none gets no composite |
+| `name` | `pixel-1`, ... | Plugin name, unique per scene |
+
+Methods: `addLayer(options)`, `removeLayer(layer)`, `dispose()` (or `using`). Read `layers` for the list in draw order.
+The picture sits in the middle of the canvas or view. Views into a texture get no composite, since they may be drawing a
+layer.
+
+## PixelLayer
+
+[README continues: https://margoengine.com/llms/packages/pixel.md]
 
 === @margoengine/labels (packages/labels/README.md) ===
 
@@ -6473,6 +6626,32 @@ Custom crossSection entries are [lateralOffset, height]. UV V follows distance /
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/road
+
+=== @margoengine/tilemap (packages/tilemap/README.md) ===
+
+# @margoengine/tilemap
+
+Import `margoengine/tilemap` from the `margoengine` package, or `@margoengine/tilemap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. This entry has types and small helpers only: no renderer, auto-tiling or importers yet. Orthogonal maps only. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
+
+```ts
+import {createTileLayer, encodeTile, FLIP_H, tileAt, validateTileMap, type TileMapData} from 'margoengine/tilemap';
+const ground = createTileLayer('ground', 2, 2, Uint32Array.of(1, encodeTile(2, FLIP_H), 0, 1));
+const map: TileMapData = {
+  width: 2, height: 2, tileWidth: 16, tileHeight: 16, layers: [ground],
+  tilesets: [{name: 'grass', firstGid: 1, tileWidth: 16, tileHeight: 16, tileCount: 2, columns: 2,
+    image: {source: 'grass.png', width: 32, height: 16}, tiles: [{id: 1, properties: {solid: true}}]}],
+};
+validateTileMap(map);
+console.log(tileAt(ground, 1, 0)); // 2147483650: tile 2, mirrored left to right
+```
+
+Layer values keep the low 28 bits for the global tile id (0 is empty) and the top bits for `FLIP_H`, `FLIP_V` and `FLIP_D`, exactly as Tiled stores them, so imported data is used as is. `decodeTile` and `encodeTile` split and join them; `tilesetForGid` and `tileDefForGid` find the tileset and the per-tile entry; `validateTileMap` throws a `TypeError` or `RangeError` that names the field.
+
+Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0.
+
+Build and unit tests: npm test --workspace @margoengine/tilemap
 
 === @margoengine/vfx (packages/vfx/README.md) ===
 
@@ -7817,6 +7996,54 @@ physics.addJoint(hook, bob, {type: 'spring', restLength: 1, stiffness: 50, dampi
 ```
 
 [README continues: https://margoengine.com/llms/packages/physics.md]
+
+=== @margoengine/physics2d (packages/physics2d/README.md) ===
+
+# @margoengine/physics2d
+
+Import `margoengine/physics2d` from the `margoengine` package, or `@margoengine/physics2d` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+2D rigid-body physics for Margo Engine on [Rapier](https://rapier.rs): a fixed-step engine plugin with interpolation, bodies that drive sprites, box, circle, capsule and polygon colliders, joints, scene queries, collision events, a character controller and tile map colliders in one call. Rapier is not bundled: you install `@dimforge/rapier2d-compat` (Apache-2.0) yourself and pass the initialized module in.
+
+World units are sprite pixels, y points down and angles are radians, clockwise on screen. `pixelsPerMeter` (default 32) maps them to Rapier's metres, so a 16 pixel tile is half a metre. Mass, density, force and impulse use Rapier's units.
+
+```ts
+import RAPIER from '@dimforge/rapier2d-compat';
+import {Physics2D} from 'margoengine/physics2d';
+
+await RAPIER.init();
+const physics = new Physics2D(null, {rapier: RAPIER}); // or new Physics2D(engine, ...) to step with the engine
+
+// A tile map: tiles with collision shapes (or a `solid: true` property) become one fixed body.
+physics.addTileMap({
+  tileWidth: 16, tileHeight: 16,
+  tilesets: [{firstGid: 1, tileCount: 1, tileWidth: 16, tileHeight: 16, tiles: [{id: 0, properties: {solid: true}}]}],
+  layers: [{type: 'tile', name: 'ground', width: 8, height: 4, data: new Uint32Array(32).fill(1, 24)}],
+});
+
+// A body that drives a sprite: each frame the interpolated pose is written to sprite.x, sprite.y and sprite.rotation.
+const sprite = {x: 64, y: 0, rotation: 0};
+const crate = physics.addBody(sprite, {colliders: {shape: 'box', width: 16, height: 16, restitution: 0.2}});
+physics.on('contactstart', ({bodyA, bodyB}) => {});
+physics.update(1 / 60); // or let the engine call it every frame
+crate.applyImpulse([0, -2]);
+physics.raycast([64, 0], [0, 1])?.point;
+
+// A hinge with limits, and a character on a kinematic body.
+const pole = physics.addBody(null, {type: 'fixed', position: [32, 8], colliders: []});
+physics.addJoint(pole, crate, {type: 'revolute', anchorB: [-8, 0], limits: [-1, 1]});
+const hero = physics.addBody({x: 20, y: 40, rotation: 0}, {type: 'kinematicPosition', colliders: {shape: 'capsule', radius: 5, height: 20}});
+const controller = physics.createCharacterController(hero, {snapToGround: 2});
+physics.on('beforestep', dt => controller.move([60 * dt, 200 * dt]));
+```
+
+It exports `Physics2D`, `Body2D`, `Joint2D`, `CharacterController2D` and `interactionGroups`. `addTileMap` accepts a `TileMapData` from `@margoengine/tilemap`, or any object of the `TileMapSource` shape. Whole-cell solid tiles merge into outline loops so bodies slide across tile seams without catching; other collision shapes (rectangles, ellipses, polygons, polylines), tile flips and layer offsets are kept. Very fast bodies on a tile map need `ccd: true`, because outlines have no thickness.
+
+Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step: they bring Rapier's broad phase up to date with a zero-length step first, which moves nothing and raises no events.
+
+Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier peer optional.
+
+Build and unit tests: npm test --workspace @margoengine/physics2d
 
 === @margoengine/ragdoll (packages/ragdoll/README.md) ===
 

@@ -153,6 +153,12 @@ interface Clip {
     bound?: KeyframeClip;
 }
 
+interface ClipMarker {
+    time: number;
+    name: string;
+    data?: unknown;
+}
+
 type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
@@ -168,6 +174,7 @@ interface KeyframeClip {
     readonly duration: number;
     readonly tracks: readonly KeyframeTrack[];
     readonly properties?: readonly PropertyKeyframeTrack[];
+    readonly markers?: readonly ClipMarker[];
 }
 
 type KeyframePath = 'translation' | 'rotation' | 'scale' | 'weights';

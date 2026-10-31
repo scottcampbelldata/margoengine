@@ -68,6 +68,12 @@ interface BonePose {
     scale?: Vec3;
 }
 
+interface ClipMarker {
+    time: number;
+    name: string;
+    data?: unknown;
+}
+
 type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'cubicSpline';
 
 type KeyframeBlend = 'delta' | 'weighted';
@@ -77,6 +83,7 @@ interface KeyframeClip {
     readonly duration: number;
     readonly tracks: readonly KeyframeTrack[];
     readonly properties?: readonly PropertyKeyframeTrack[];
+    readonly markers?: readonly ClipMarker[];
 }
 
 type KeyframePath = 'translation' | 'rotation' | 'scale' | 'weights';

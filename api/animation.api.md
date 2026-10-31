@@ -105,6 +105,12 @@ export interface BonePose {
     scale?: Vec3;
 }
 
+export interface ClipMarker {
+    time: number;
+    name: string;
+    data?: unknown;
+}
+
 export type Interpolation = 'STEP' | 'LINEAR' | 'CUBICSPLINE';
 
 export type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'cubicSpline';
@@ -124,11 +130,13 @@ export interface KeyframeClip {
     readonly duration: number;
     readonly tracks: readonly KeyframeTrack[];
     readonly properties?: readonly PropertyKeyframeTrack[];
+    readonly markers?: readonly ClipMarker[];
 }
 
 export interface KeyframeClipData {
     name?: string;
     tracks: readonly (KeyframeTrackData | PropertyTrackData)[];
+    markers?: readonly ClipMarker[];
 }
 
 export interface KeyframeModelTarget {
