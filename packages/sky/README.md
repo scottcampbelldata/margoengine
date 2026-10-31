@@ -199,6 +199,9 @@ const sky = Sky.attach(engine);
 sky.options.fog = {depth: () => bloom.depthTexture, start: 45, density: 0.008};
 ```
 
+A 4x capture resolves `depthTexture` only when it presents, after the fog, so over Bloom or a PostStack the fog reads
+the capture's own samples of this frame.
+
 `start` is a clear distance in world meters (default 40); `density` is inverse
 meters (default 0.01, range 0-1). Visibility is
 `exp(-((max(0, distance - start) * density) ** 2))`; zero density disables the pass.

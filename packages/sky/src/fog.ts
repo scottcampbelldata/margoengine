@@ -1,5 +1,6 @@
 import { finiteVector } from '@margoengine/math/validate';
 import type { SkyFeatures } from './base.js';
+import { sceneTarget } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
@@ -47,7 +48,7 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
     let uniform: GPUBuffer | undefined,
       pipeline: GPURenderPipeline | undefined,
       bind: GPUBindGroup | undefined,
-      bound: GPUTexture | undefined,
+      bound: GPUTextureView | GPUTexture | undefined,
       key = '';
     return {
       draw(c, fog, entries) {
@@ -64,11 +65,16 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
           (depth.sampleCount !== 1 && depth.sampleCount !== samples)
         )
           throw new RangeError('Sky fog requires matching sampleable scene depth');
-        const next = c.format + ':' + samples + ':' + depth.sampleCount;
+        // A 4x capture resolves its 1x depth only when it presents, after this pass, so that texture still holds the last
+        // frame: fog over it follows every silhouette a frame behind while the view turns. Read the capture's own samples.
+        const target = sceneTarget(c),
+          live = target?.samples === 4 && target.resolvedDepth === depth ? target.depthSource : undefined,
+          depthSamples = live ? 4 : depth.sampleCount,
+          next = c.format + ':' + samples + ':' + depthSamples;
         uniform ??= c.device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         if (key !== next) {
           const source =
-            depth.sampleCount === 1
+            depthSamples === 1
               ? shader
               : shader
                   .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
@@ -96,16 +102,16 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
           key = next;
           bound = undefined;
         }
-        if (bound !== depth) {
+        if (bound !== (live ?? depth)) {
           bind = c.device.createBindGroup({
             layout: pipeline!.getBindGroupLayout(0),
             entries: [
               ...entries,
-              { binding: 3, resource: depth.createView({ aspect: 'depth-only' }) },
+              { binding: 3, resource: live ?? depth.createView({ aspect: 'depth-only' }) },
               { binding: 4, resource: { buffer: uniform } },
             ],
           });
-          bound = depth;
+          bound = live ?? depth;
         }
         values[0] = fog.density ?? 0.01;
         values[1] = fog.start ?? 40;

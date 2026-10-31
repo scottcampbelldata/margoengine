@@ -323,6 +323,48 @@ test('distance fog borrows scene depth, caches resources and rebinds after resiz
   assert.throws(() => new Sky({ fog: { depth: () => undefined, color: [1, NaN, 0] } }), /Fog color/);
 });
 
+test('fog over a 4x capture reads this frame: the capture samples, not its 1x depth, which resolves after the fog', () => {
+  const h = optionalGPU(),
+    depth = Object.assign(
+      h.engine.gpu.createTexture({
+        size: [128, 96],
+        format: 'depth32float',
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+      }),
+      { depthOrArrayLayers: 1 },
+    ),
+    samples = { label: 'this frame' },
+    sky = new Sky({ fog: { depth: () => depth, density: 0.008, start: 45 } });
+  h.engine.use(sky);
+  // What a capture (Bloom, a PostStack) leaves on the pass context between its begin() and its resolve.
+  h.engine.use({
+    name: 'capture',
+    setup() {},
+    registerPasses(graph) {
+      graph.add({
+        name: 'capture',
+        order: -60,
+        execute: (c) => {
+          c[Symbol.for('margoengine.optional.msaa')] = {
+            samples: 4,
+            resolvedDepth: depth,
+            depthSource: samples,
+            color: c.color,
+            depth: c.depth,
+          };
+        },
+      });
+    },
+  });
+  h.frame();
+  const fog = h.pipelines.findLast((p) => p.fragment?.entryPoint === 'fogFragment');
+  assert.match(fog.fragment.module.code, /texture_depth_multisampled_2d/);
+  assert.match(fog.fragment.module.code, /@builtin\(sample_index\)/);
+  assert.equal(h.groups.at(-1).entries.find((e) => e.binding === 3).resource, samples);
+  sky.dispose();
+  depth.destroy();
+});
+
 test('exponential height fog with a fixed colour packs its uniform every frame', () => {
   const h = optionalGPU(),
     depth = Object.assign(

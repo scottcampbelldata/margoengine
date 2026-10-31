@@ -63,6 +63,23 @@ try {
   assert.ok(weather.flashGain > 0, `the flash lit the frame: ${JSON.stringify(weather)}`);
   assert.equal(weather.afterFlash, 0, 'the frame returns to dry after the flash');
   console.log('ok weather: rain', weather.rainChanged, 'snow', weather.snowChanged, 'flash gain', weather.flashGain);
+  // Fog while the view turns: a frame that has just moved equals the still frame of the same camera, at 4x and 1x. Fog
+  // reading a stale depth leaves a band of unfogged scene along every silhouette (Plaza, 2026-10-31).
+  for (const samples of [4, 1]) {
+    await page.goto(
+      `http://127.0.0.1:5211/packages/sky/test/fog-motion-check.html${samples === 1 ? '?samples=1' : ''}`,
+    );
+    await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+    const r = await page.evaluate(() => window.check.run());
+    report.results[`fog motion ${samples}x`] = r;
+    assert.equal(r.samples, samples);
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    assert.ok(r.fogged > 1000, `fog drew too little: ${JSON.stringify(r)}`);
+    assert.ok(r.moved > 100, `the turn moved too little: ${JSON.stringify(r)}`);
+    assert.equal(r.differing, 0, `${samples}x fog lags a turning view: ${JSON.stringify(r)}`);
+    console.log(`ok ${samples}x fog while turning: 0 of ${r.pixels} pixels differ from the still frame`);
+  }
   // Horizon colour: the default sky at noon (and a hazier one) matches the CPU reference just below the horizon,
   // and is not pink there (red never above green, green never above blue), as on the CIE daylight locus. Turbidity 1
   // draws as 2 (below about 1.65 the Preetham fit drew a black sky).
