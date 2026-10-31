@@ -6,7 +6,13 @@ import { preview } from 'vite';
 import { listenWhenFree, openBrowser } from './browser.js';
 import { serverUrl } from './support/server-url.mjs';
 import { closeAll } from './support/shutdown.mjs';
+import { missingStarterBuilds, starterBuildMessage } from './support/starter-builds.mjs';
 import { decodePNG } from '../tests/support/png.js';
+const notBuilt = starterBuildMessage(missingStarterBuilds(resolve('.')));
+if (notBuilt) {
+  console.error(`modern:test:browser: ${notBuilt}`);
+  process.exit(1);
+}
 const context = await openBrowser({ startPath: '/tests/modern.html' }),
   { page, hardware } = context,
   errors = [];
