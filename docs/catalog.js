@@ -5,6 +5,8 @@ const feedback = document.querySelector('#copy-status');
 const cards = [];
 const sources = new Map();
 let feedbackTimer;
+// Counts copy clicks. The example copy fetches first, so a later click can finish before it; the last click wins.
+let copyTurn = 0;
 
 function filter() {
   const terms = search.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -23,6 +25,7 @@ function filter() {
 }
 
 async function copy(text, button, code) {
+  copyTurn++;
   clearTimeout(feedbackTimer);
   const label = button.dataset.label || button.textContent;
   button.dataset.label = label;
@@ -131,8 +134,12 @@ async function load() {
       copyExample.setAttribute('aria-label', `Copy example for ${entry.title}`);
       copyExample.addEventListener('click', async () => {
         copyExample.disabled = true;
-        try { await copy(await exampleSource(entry, card), copyExample, card.querySelector('.example-code')); }
-        catch { feedback.textContent = 'Could not copy the example. Use Run example to open the file.'; }
+        const turn = ++copyTurn;
+        try {
+          const text = await exampleSource(entry, card);
+          if (turn === copyTurn) await copy(text, copyExample, card.querySelector('.example-code'));
+        }
+        catch { if (turn === copyTurn) feedback.textContent = 'Could not copy the example. Use Run example to open the file.'; }
         finally { copyExample.disabled = false; }
       });
       const text = [entry.title, entry.category, entry.package, entry.description, entry.requirements, entry.keywords, ...entry.exports].join(' ').toLowerCase();

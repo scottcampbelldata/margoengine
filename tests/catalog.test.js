@@ -6,7 +6,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { launchBrowser } from '../scripts/lib/browser.mjs';
 import { server } from '../scripts/serve-catalog.js';
 
-let url;
+let url, browser;
 const entries = JSON.parse(await readFile(new URL('../docs/catalog.json', import.meta.url), 'utf8'));
 before(async () => {
   // Node's fetch reuses idle sockets; if the server's 5 s keep-alive timer closes one first (seconds pass between the
@@ -15,8 +15,16 @@ before(async () => {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   url = `http://127.0.0.1:${server.address().port}`;
+  // One browser for the file: closing Edge is the slow step on a loaded machine (docs/known-bugs.md), so do it once.
+  browser = await launchBrowser({ headless: true });
 });
-after(() => new Promise((resolve) => server.close(resolve)));
+after(async () => {
+  try {
+    await browser?.close();
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
 
 test('catalog covers every public package with matching versions and imports, and no repository links', async () => {
   for (const id of await readdir(new URL('../packages/', import.meta.url))) {
@@ -76,48 +84,161 @@ test('preview serves static files and rejects escaped paths and unsupported meth
 // A loaded machine slows the browser by minutes (see tests/browser/catalog.test.js), so every browser step may take up
 // to STEP_TIMEOUT before it fails naming the step; the test as a whole has a hard limit of 15 minutes.
 const STEP_TIMEOUT = 5 * 60_000;
+
+/** A context whose pages record clipboard writes and status messages. */
+async function catalogContext() {
+  const context = await browser.newContext();
+  context.setDefaultTimeout(STEP_TIMEOUT);
+  // The page clears #copy-status 7 s after each copy, so reading it later fails on a slow machine: record every
+  // message it shows instead.
+  // The Windows system clipboard is shared by every process, so any other browser or app can overwrite it between a
+  // write and a read. Each page gets its own clipboard that records every writeText call; the copy buttons still call
+  // navigator.clipboard.writeText and the test reads back exactly what they wrote.
+  await context.addInitScript(() => {
+    window.written = [];
+    window.clipboardPolls = 0;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text) => {
+          window.written.push(String(text));
+        },
+        readText: async () => window.written.at(-1) ?? '',
+      },
+    });
+    window.statuses = [];
+    addEventListener('DOMContentLoaded', () => {
+      const status = document.querySelector('#copy-status');
+      new MutationObserver(() => window.statuses.push(status.textContent)).observe(status, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+    });
+  });
+  return context;
+}
+
+const clipboardOf = async (page) => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
+// The predicate must be synchronous: Playwright does not await it, and a promise counts as true at once. The example
+// copy fetches before it writes, so a wait that ends early reads the copy before it.
+const clipboardHolds = (page, expected) =>
+  page.waitForFunction(
+    (expected) => {
+      window.clipboardPolls++;
+      return (window.written.at(-1) ?? '').replace(/\r\n/g, '\n') === expected;
+    },
+    expected,
+    { timeout: STEP_TIMEOUT },
+  );
+
+const isExample = (target) => target.pathname.startsWith('/examples/');
+
+/**
+ * Holds every fetch of an example page until `release()`, which lets it through or, with `answer` 'abort', fails it.
+ * `arrived` settles when the page has asked for it, and `done()` removes the hold.
+ */
+async function holdExample(page, answer = 'continue') {
+  let release, arrive;
+  const released = new Promise((resolve) => (release = resolve)),
+    arrived = new Promise((resolve) => (arrive = resolve));
+  await page.route(isExample, async (route) => {
+    arrive();
+    await released;
+    await route[answer]();
+  });
+  return { release, arrived, done: () => page.unroute(isExample) };
+}
+
+// Regression (2026-10-31): the clipboard wait never waited, and one loaded landing read the imports copied just before.
+test('the clipboard wait holds until a slow example has been written', { timeout: 15 * 60_000 }, async () => {
+  const context = await catalogContext();
+  try {
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.waitForFunction(() => !document.querySelector('#search').disabled);
+    const card = page.locator('#gltf');
+    const imports = await card.locator('.imports').textContent();
+    await card.locator('[data-copy="imports"]').click();
+    await clipboardHolds(page, imports);
+    const example = await card.locator('.run').getAttribute('href');
+    const expected = (await (await fetch(new URL(example, url))).text()).replace(/\r\n/g, '\n');
+    const held = await holdExample(page);
+    await card.locator('.source summary').click();
+    await held.arrived;
+    await card.locator('[data-copy="example"]').click();
+    await page.evaluate(() => {
+      window.clipboardPolls = 0;
+    });
+    const waited = clipboardHolds(page, expected);
+    // The wait has to be seen answering false while the example is held, with no clock in this: a wait that does not
+    // wait finishes first.
+    const polled = page.waitForFunction(() => window.clipboardPolls > 2 && window.written.length === 1);
+    polled.catch(() => {});
+    const ended = await Promise.race([waited.then(() => true), polled.then(() => false)]);
+    assert.equal(ended, false, 'the clipboard wait ended while the example was still on its way');
+    assert.equal(await clipboardOf(page), imports);
+    held.release();
+    await waited;
+    assert.equal(await clipboardOf(page), expected);
+  } finally {
+    await context.close();
+  }
+});
+
+// Regression (2026-10-31): a slow example that finished after a later copy overwrote what the person copied last.
+test('the last copy click wins over an example still loading, and a stale failure says nothing', {
+  timeout: 15 * 60_000,
+}, async () => {
+  const context = await catalogContext();
+  try {
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.waitForFunction(() => !document.querySelector('#search').disabled);
+    const card = page.locator('#gltf');
+    const install = await card.locator('.install').textContent();
+    const held = await holdExample(page);
+    await card.locator('.source summary').click();
+    await held.arrived;
+    await card.locator('[data-copy="example"]').click();
+    await card.locator('[data-copy="install"]').click();
+    await clipboardHolds(page, install);
+    held.release();
+    await page.waitForFunction(() => !document.querySelector('#gltf [data-copy="example"]').disabled);
+    await held.done();
+    assert.deepEqual(await page.evaluate(() => window.written), [install]);
+    // The late example still fills the open source view; only the clipboard stays with the last click.
+    assert.match(await card.locator('.example-code').textContent(), /^<!doctype html>/);
+
+    // A second card, this time the fetch fails after a later copy: its failure message must not replace that copy's.
+    const other = page.locator('#core');
+    const refused = await holdExample(page, 'abort');
+    await other.locator('.source summary').click();
+    await refused.arrived;
+    await other.locator('[data-copy="example"]').click();
+    await other.locator('[data-copy="install"]').click();
+    await clipboardHolds(page, await other.locator('.install').textContent());
+    refused.release();
+    await page.waitForFunction(() => !document.querySelector('#core [data-copy="example"]').disabled);
+    assert.doesNotMatch((await page.evaluate(() => window.statuses)).join('\n'), /Could not copy the example/);
+
+    // With nothing later, the same failure is reported: the guard only silences a copy that was overtaken.
+    await other.locator('[data-copy="example"]').click();
+    await page.waitForFunction(() => window.statuses.some((text) => /Could not copy the example/.test(text)));
+    await refused.done();
+  } finally {
+    await context.close();
+  }
+});
+
 test('catalog searches, copies exact text, links examples, and handles clipboard denial', {
   timeout: 15 * 60_000,
 }, async () => {
-  let browser;
-  browser = await launchBrowser({ headless: true });
+  const context = await catalogContext();
   try {
-    const context = await browser.newContext();
-    context.setDefaultTimeout(STEP_TIMEOUT);
-    // The page clears #copy-status 7 s after each copy, so reading it later fails on a slow machine: record every
-    // message it shows instead.
-    // The Windows system clipboard is shared by every process, so any other browser or app can overwrite it between a
-    // write and a read. Each page gets its own clipboard that records every writeText call; the copy buttons still call
-    // navigator.clipboard.writeText and the test reads back exactly what they wrote.
-    await context.addInitScript(() => {
-      const written = [];
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: {
-          writeText: async (text) => {
-            written.push(String(text));
-          },
-          readText: async () => written.at(-1) ?? '',
-        },
-      });
-      window.statuses = [];
-      addEventListener('DOMContentLoaded', () => {
-        const status = document.querySelector('#copy-status');
-        new MutationObserver(() => window.statuses.push(status.textContent)).observe(status, {
-          childList: true,
-          characterData: true,
-          subtree: true,
-        });
-      });
-    });
     const page = await context.newPage();
-    const clipboard = async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
-    const waitForClipboard = (expected) =>
-      page.waitForFunction(
-        async (expected) => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n') === expected,
-        expected,
-        { timeout: STEP_TIMEOUT },
-      );
+    const clipboard = () => clipboardOf(page);
+    const waitForClipboard = (expected) => clipboardHolds(page, expected);
     const errors = [];
     const requests = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -196,8 +317,7 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
       false,
       'catalog must not load engine packages',
     );
-    await context.close();
   } finally {
-    await browser.close();
+    await context.close();
   }
 });

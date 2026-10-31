@@ -47,6 +47,21 @@ test('a fixed-wait: comment with a reason, on the line or the line above, allows
   assert.deepEqual(kinds('// fixed-wait:\nfor (let i = 0; i < 5; i++) engine.render();'), ['2:frames']);
 });
 
+// Regression (2026-10-31): tests/catalog.test.js passed an async predicate, so its clipboard wait ended at once and a
+// loaded run read the previous copy. Playwright does not await a predicate; a promise is truthy.
+test('an async waitForFunction predicate never waits, and no comment allows it', () => {
+  assert.deepEqual(kinds('await page.waitForFunction(async () => ready());'), ['1:async predicate']);
+  assert.deepEqual(kinds('page.waitForFunction(\n  async (want) => (await read()) === want,\n  want,\n);'), [
+    '1:async predicate',
+  ]);
+  assert.deepEqual(kinds('await page.waitForFunction(async function () { return ready(); });'), ['1:async predicate']);
+  assert.deepEqual(kinds('// fixed-wait: reason\nawait page.waitForFunction(async () => ready());'), [
+    '2:async predicate',
+  ]);
+  assert.deepEqual(kinds('await page.waitForFunction(() => window.ready);'), []);
+  assert.deepEqual(kinds('await page.waitForFunction((want) => window.written.at(-1) === want, want);'), []);
+});
+
 test('the check reads test folders, unit tests too, and the browser drivers in scripts/, not benchmarks or builds', () => {
   assert.ok(isCheckFile('packages/voxel/tests/bevel-browser-check.html'));
   assert.ok(isCheckFile('packages/sky/test/browser-check.html'));

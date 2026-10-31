@@ -9,6 +9,9 @@
 // a unit test step a mock, so only sleeps count there.)
 // A wait that really is about time (an animation clock, a debounce, a settle period the test measures, a check that
 // nothing happens) carries a `// fixed-wait: <reason>` comment on its line or the line above.
+// The opposite slip counts too: Playwright's page.waitForFunction does not await its predicate, so an async predicate
+// returns a promise, which is truthy, and the wait ends at once whatever the condition says (tests/catalog.test.js read
+// the clipboard that way, 2026-10-31). No comment allows it: such a wait never has a reason to exist.
 // The waits that were there when this check began are counted per file in scripts/fixed-waits-baseline.json; a file
 // may not gain one, and when one goes the count must go down with it (`--update` writes the lower counts). Unit tests
 // and helper-named sleeps joined on 2026-10-31, with what was there then.
@@ -46,6 +49,8 @@ const SLEEP =
   /waitForTimeout\s*\(\s*([\d_]+)\s*\)|setTimeout\s*\(\s*(?:\w+|\(\)\s*=>\s*\w+\(\))\s*,\s*([\d_]+)\s*\)|\b(?:sleep|wait|delay)\(\s*([\d_]+)\s*\)|\bsettled\(.*?,\s*([\d_]+)\s*\)/g;
 /** Sleeps shorter than this are poll intervals inside a loop that checks a condition, not a wait on their own. */
 export const MIN_SLEEP_MS = 50;
+// An async predicate given to waitForFunction, on one line or split over several: a wait that ends at once.
+const ASYNC_PREDICATE = /\bwaitForFunction\s*\(\s*async\b/g;
 
 /** The loop body after a `for (...)` header ending at `from`: the braced block or the single statement. */
 function bodyAt(source, from) {
@@ -63,7 +68,8 @@ function bodyAt(source, from) {
  * The fixed waits in `source`: [{ line, kind, text }]. `frames`: a counted loop of 2 or more whose body draws or
  * waits for a frame (a body that times itself with performance.now() is a measurement, and one that renders with a
  * non-zero delta steps time; both pass). `ms`: a sleep of
- * MIN_SLEEP_MS or more. A `fixed-wait: <reason>` comment on the line or the line above allows it.
+ * MIN_SLEEP_MS or more. A `fixed-wait: <reason>` comment on the line or the line above allows either. `async
+ * predicate`: a waitForFunction that cannot wait; no comment allows it.
  */
 export function fixedWaits(source) {
   const lines = source.split('\n'),
@@ -84,6 +90,10 @@ export function fixedWaits(source) {
       n = lineOf(m.index);
     if (ms >= MIN_SLEEP_MS && !allowed(n)) found.push({ line: n, kind: 'ms', text: lines[n - 1].trim() });
   }
+  for (const m of source.matchAll(ASYNC_PREDICATE)) {
+    const n = lineOf(m.index);
+    found.push({ line: n, kind: 'async predicate', text: lines[n - 1].trim() });
+  }
   return found.sort((a, b) => a.line - b.line);
 }
 
@@ -103,7 +113,7 @@ export function scan() {
   const result = {};
   for (const file of walk(root).sort()) {
     const waits = fixedWaits(readFileSync(join(root, file), 'utf8')).filter(
-      (wait) => wait.kind === 'ms' || !file.endsWith('.test.js'),
+      (wait) => wait.kind !== 'frames' || !file.endsWith('.test.js'),
     );
     if (waits.length) result[file] = waits;
   }
