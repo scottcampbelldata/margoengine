@@ -454,6 +454,7 @@ that your bundler copies as an asset.
 import { VoxelMesher } from 'margoengine/voxel/mesher';
 
 const mesher = new VoxelMesher(); // {workers}: default half the logical cores minus one, 1 to 4
+mesher.warm(); // optional: start the workers now, so their code is not fetched beside the first chunks
 for (const key of world.dirty) {
   world.dirty.delete(key);
   mesher.mesh(world, key, distanceToCamera(key), camera.position).then((mesh) => {

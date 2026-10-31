@@ -127,6 +127,45 @@ test('sortQuads orders quads back to front by centre distance, stable, as a perm
   assert.throws(() => sortQuads(new Uint32Array(3), [0, 0]), TypeError);
 });
 
+test('VoxelMesher.warm starts every worker before any job, the jobs use those, and one that fails to start is replaced', async (t) => {
+  const previous = globalThis.Worker,
+    started = [];
+  globalThis.Worker = class extends NodeWebWorker {
+    constructor(url) {
+      super(url);
+      started.push(this);
+    }
+    addEventListener(type, listener) {
+      if (type === 'error') this.fail = listener;
+    }
+  };
+  t.after(() => (globalThis.Worker = previous));
+  const mesher = new VoxelMesher({ workers: 2 });
+  t.after(() => mesher.dispose());
+  assert.equal(started.length, 0, 'nothing starts by itself');
+  mesher.warm();
+  mesher.warm();
+  assert.equal(started.length, 2, 'warm starts the pool, once');
+  started[1].fail(); // the download of this one failed: it leaves, and warm or a job starts another
+  const { world, keys } = terrainWorld(2);
+
+  const meshes = await Promise.all(keys.slice(0, 2).map((key) => mesher.mesh(world, key)));
+  assert.ok(meshes.every((mesh) => mesh));
+  assert.equal(started.length, 3, 'the two jobs took the one left and one new worker');
+  mesher.dispose();
+  const unused = new VoxelMesher({ workers: 1 });
+  unused.warm();
+  const last = started.at(-1);
+  let ended = false;
+  const terminate = last.terminate.bind(last);
+  last.terminate = () => {
+    ended = true;
+    terminate();
+  };
+  unused.dispose();
+  assert.equal(ended, true, 'dispose stops a worker no job took');
+});
+
 test('VoxelMesher on worker_threads: same meshes as meshChunk, lowest priority first, newest call per key wins', async (t) => {
   const previous = globalThis.Worker;
   globalThis.Worker = NodeWebWorker;

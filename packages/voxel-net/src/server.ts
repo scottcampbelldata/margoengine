@@ -287,6 +287,7 @@ const NAMES: Record<number, ServerMessage['type']> = {
   TOO_SLOW = 8 * 1024 * 1024, // drop a client this far behind
   WINDOW = 64, // unsent chunks looked at per client per tick
   CHUNKS_PER_TICK = 64,
+  SPAWN_REACH = 3, // squared chunks from the player: the 3 x 3 x 3 chunks #trySpawn waits for
   BYTES_PER_TICK = 128 * 1024,
   MAX_STEPS = 240, // movement steps in one input message
   GENERATE_TRIES = 3, // a chunk's generation is tried this often before the players who need it are closed
@@ -391,9 +392,11 @@ async function generatorThread(data: GeneratorData): Promise<void> {
 /** How long a closing generator thread may take over the jobs it has: a chunk takes milliseconds, this is for a hung one. */
 const DRAIN_MS = 10_000;
 
-// Worker threads running the generator: urgent jobs (chunks a player stands in) go before the others.
+// Worker threads running the generator: first the ground a joining player waits to spawn on, then urgent jobs (chunks a
+// player stands in), then the others.
 class GeneratorPool {
   readonly #workers: { worker: Worker; busy: number }[] = [];
+  readonly #first: (() => void)[] = [];
   readonly #urgent: (() => void)[] = [];
   readonly #normal: (() => void)[] = [];
   readonly #jobs = new Map<number, { resolve: (g: Generated) => void; reject: (e: Error) => void; worker: number }>();
@@ -403,9 +406,9 @@ class GeneratorPool {
     readonly size: number,
     readonly data: GeneratorData,
   ) {}
-  run(cx: number, cy: number, cz: number, urgent: boolean): Promise<Generated> {
+  run(cx: number, cy: number, cz: number, urgent: boolean, first = false): Promise<Generated> {
     return new Promise((resolve, reject) => {
-      (urgent ? this.#urgent : this.#normal).push(() => {
+      (first ? this.#first : urgent ? this.#urgent : this.#normal).push(() => {
         const index = this.#pick(),
           slot = this.#workers[index],
           id = ++this.#next;
@@ -417,7 +420,7 @@ class GeneratorPool {
     });
   }
   get queued(): number {
-    return this.#urgent.length + this.#normal.length;
+    return this.#first.length + this.#urgent.length + this.#normal.length;
   }
   // Each thread finishes the jobs it has and ends by itself. Terminating one that is compressing aborts the whole
   // process in Node ("close before init", a native assertion nothing can catch), so terminate() is only for a generator
@@ -474,7 +477,7 @@ class GeneratorPool {
       this.queued &&
       (this.#workers.length < this.size || this.#workers.some((slot) => slot.busy < 2))
     )
-      ((this.#urgent.length ? this.#urgent : this.#normal).shift() as () => void)();
+      ((this.#first.length ? this.#first : this.#urgent.length ? this.#urgent : this.#normal).shift() as () => void)();
   }
 }
 
@@ -1071,7 +1074,7 @@ export class VoxelServer {
     c.sim.add(spot.key);
     const n = (this.#refs.get(spot.key) ?? 0) + 1;
     this.#refs.set(spot.key, n);
-    if (n === 1) this.#load(spot);
+    if (n === 1) this.#load(spot, c.phase === 'spawning' && spot.d <= SPAWN_REACH);
   }
   #unref(c: Client, key: string): void {
     if (!c.sim.delete(key)) return;
@@ -1081,7 +1084,7 @@ export class VoxelServer {
     const [cx, cy, cz] = key.split(',').map(Number);
     this.world.removeChunk(cx, cy, cz); // an edited chunk lives on in #edited
   }
-  #load(spot: Spot): void {
+  #load(spot: Spot, first = false): void {
     const { key, cx, cy, cz } = spot;
     if (this.world.getChunk(cx, cy, cz) || this.#loading.has(key)) return;
     const edited = this.#edited.get(key);
@@ -1099,7 +1102,8 @@ export class VoxelServer {
           const stored = this.#store ? await this.#stored(key) : undefined;
           let chunk: VoxelChunk | undefined;
           if (stored) chunk = VoxelChunk.unpack(stored);
-          else if (!this.#aboveCeiling(spot)) chunk = VoxelChunk.unpack((await this.#generate(spot, true)).packed);
+          else if (!this.#aboveCeiling(spot))
+            chunk = VoxelChunk.unpack((await this.#generate(spot, true, true, first)).packed);
           if (this.#refs.has(key) && !this.world.getChunk(cx, cy, cz))
             this.world.addChunk(cx, cy, cz, this.#edited.get(key) ?? chunk);
           return;
@@ -1131,10 +1135,10 @@ export class VoxelServer {
   }
   // A generator job for the chunk; an urgent one overtakes a queued ordinary one (that one still runs and is dropped).
   // `cache`: put the message in the cache when the chunk was never edited.
-  #generate(spot: Spot, urgent: boolean, cache = true): Promise<Generated> {
+  #generate(spot: Spot, urgent: boolean, cache = true, first = false): Promise<Generated> {
     const running = this.#jobs.get(spot.key);
     if (running && (running.urgent || !urgent)) return running.job;
-    const job = this.#pool.run(spot.cx, spot.cy, spot.cz, urgent).then(
+    const job = this.#pool.run(spot.cx, spot.cy, spot.cz, urgent, first).then(
       (g) => {
         if (this.#jobs.get(spot.key)?.job === job) this.#jobs.delete(spot.key);
         this.metrics.chunksGenerated++;
@@ -1597,7 +1601,8 @@ export class VoxelServer {
     c.cz = cz;
     const sim = new Set<string>(),
       S = this.#simulation,
-      fits = (y: number) => y * 32 <= this.world.maxY && y * 32 + 31 >= this.world.minY;
+      fits = (y: number) => y * 32 <= this.world.maxY && y * 32 + 31 >= this.world.minY,
+      range: Spot[] = [];
     for (let dz = -S; dz <= S; dz++)
       for (let dx = -S; dx <= S; dx++) {
         if (dx * dx + dz * dz > S * S) continue;
@@ -1605,9 +1610,12 @@ export class VoxelServer {
           if (!fits(cy + dy)) continue;
           const key = chunkKey(cx + dx, cy + dy, cz + dz);
           sim.add(key);
-          this.#ref(c, { key, cx: cx + dx, cy: cy + dy, cz: cz + dz, d: 0 });
+          range.push({ key, cx: cx + dx, cy: cy + dy, cz: cz + dz, d: dx * dx + dz * dz + dy * dy });
         }
       }
+    // Nearest first: what the player stands on is generated before the far edge of the range.
+    range.sort((a, b) => a.d - b.d);
+    for (const spot of range) this.#ref(c, spot);
     for (const key of [...c.sim]) if (!sim.has(key)) this.#unref(c, key);
     const V = c.view,
       H = this.#viewHeight,
@@ -1674,6 +1682,9 @@ export class VoxelServer {
       scanned = 0;
     for (let i = c.cursor; i < want.length && scanned < WINDOW; i++) {
       const spot = want[i];
+      // Until the player spawns, only what spawning needs (the chunks within one of it, the nearest in the view): bytes
+      // queued on a slow socket would hold back the spawn message behind chunks the player does not need yet.
+      if (c.phase === 'spawning' && spot.d > SPAWN_REACH) break;
       if (c.sent.has(spot.key)) continue;
       scanned++;
       const message = this.#cached(spot.key);

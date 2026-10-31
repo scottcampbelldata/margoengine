@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3967792,
+  "total": 3968245,
   "history": [
     {
       "date": "2026-10-24",
@@ -916,6 +916,12 @@
       "grew": 2
     },
     {
+      "date": "2026-10-31",
+      "commit": "c065fe3e1",
+      "reason": "voxel-net heartbeat, both ways: a dead network reaches onClose with SERVER_SILENT_CODE (serverTimeout), dead clients freed (clientTimeout, pings), close linger; gzip client +271 B, server +342 B, bot +79 B",
+      "grew": 2
+    },
+    {
       "date": "2026-10-30",
       "commit": "0882df471",
       "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
@@ -971,9 +977,9 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "c065fe3e1",
-      "reason": "voxel-net heartbeat, both ways: a dead network reaches onClose with SERVER_SILENT_CODE (serverTimeout), dead clients freed (clientTimeout, pings), close linger; gzip client +271 B, server +342 B, bot +79 B",
-      "grew": 2
+      "commit": "563e62410",
+      "reason": "watchQuality reads real GPU time by timestamp queries (plaza-tier, Scott's option A), one key per page; the reading itself is a lazy chunk, this figure counts it",
+      "grew": 1
     },
     {
       "date": "2026-10-31",
@@ -1049,8 +1055,8 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "563e62410",
-      "reason": "watchQuality reads real GPU time by timestamp queries (plaza-tier, Scott's option A), one key per page; the reading itself is a lazy chunk, this figure counts it",
+      "commit": "677d2b8b8",
+      "reason": "voxel-net server: a joining player's ground is generated and sent first, 15 B",
       "grew": 1
     }
   ],
@@ -1400,7 +1406,7 @@
     "@margoengine/voxel-edit/vox": 12202,
     "@margoengine/voxel-net": 6513,
     "@margoengine/voxel-net/bot": 7936,
-    "@margoengine/voxel-net/server": 14553,
+    "@margoengine/voxel-net/server": 15006,
     "@margoengine/voxel-pathtracer": 80311,
     "@margoengine/voxel-pathtracer/studio": 1313,
     "@margoengine/voxel/bevel": 2457,

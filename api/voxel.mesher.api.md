@@ -43,6 +43,7 @@ export const QUAD_WORDS = 3;
 export class VoxelMesher {
     readonly workers: number;
     constructor(options?: VoxelMesherOptions);
+    warm(): void;
     mesh(world: VoxelWorld, key: string, priority?: number, eye?: Vec3): Promise<ChunkMesh | null>;
     cancel(key: string): void;
     dispose(): void;

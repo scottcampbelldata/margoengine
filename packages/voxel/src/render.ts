@@ -1003,6 +1003,7 @@ export class VoxelRenderer implements EnginePlugin {
   /** @internal Engine plugin hook. */
   setup(engine: Engine): void {
     if (this.#disposed) throw new MargoError('disposed', 'VoxelRenderer is disposed; attach a new one');
+    this.#mesher.warm();
     const device = engine.gpu;
     if (!device)
       throw new MargoError('unsupported', 'VoxelRenderer needs the WebGPU backend; create the engine with WebGPU');

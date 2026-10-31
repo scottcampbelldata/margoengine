@@ -86,6 +86,56 @@ test('two players join, see each other, and an edit reaches the other one', asyn
   await server.close();
 });
 
+// On a slow socket everything already written goes first, so the spawn message must not follow the whole view.
+test('a joining player is sent only the chunks spawning needs before the spawn message, then the rest', async (t) => {
+  const { url } = await start(t),
+    conn = await connectWebSocket(url),
+    order = [];
+  t.after(() => conn.close());
+  conn.onmessage = (bytes) => {
+    const m = decodeServerMessage(bytes);
+    if (m.type === 'chunk') order.push([m.cx, m.cy, m.cz]);
+    else if (m.type === 'state' && m.spawn) order.push({ spawn: m.position.map((v) => Math.floor(v) >> 5) });
+    else if (m.type === 'loaded') order.push('loaded');
+  };
+  conn.send(encodeClientMessage({ type: 'hello', version: PROTOCOL_VERSION, view: 4, name: 'slow' }));
+  for (let i = 0; i < 400 && !order.includes('loaded'); i++) await wait(25);
+  const spawnAt = order.findIndex((entry) => entry.spawn);
+  assert.ok(spawnAt > 0, 'the player spawned');
+  const [x, y, z] = order[spawnAt].spawn,
+    before = order.slice(0, spawnAt);
+  for (const [cx, cy, cz] of before)
+    assert.ok(
+      Math.abs(cx - x) <= 1 && Math.abs(cy - y) <= 1 && Math.abs(cz - z) <= 1,
+      `chunk ${cx},${cy},${cz} came before the spawn at ${x},${y},${z}`,
+    );
+  assert.equal(new Set(before.map(String)).size, before.length, 'each chunk once');
+  const after = order.slice(spawnAt + 1).filter(Array.isArray);
+  assert.ok(
+    after.length > before.length,
+    `the rest of the view follows: ${after.length} after, ${before.length} before`,
+  );
+  assert.ok(order.includes('loaded'), 'and the view completes');
+});
+
+// The generator takes a while here, so what it does first shows: a player's ground, and a second player's before the far
+// edge of the first player's range.
+test('the ground a player spawns on is generated first, ahead of other players and the far range', async (t) => {
+  const { server, url } = await start(t, {
+      workers: 1,
+      generator: new URL('./slow-generator.js', import.meta.url),
+      spawn: (id) => [id * 1024, 8],
+    }),
+    a = await join(url, { name: 'a' }),
+    b = await join(url, { name: 'b' }),
+    at = {};
+  a.client.onSpawn = () => (at.a = server.metrics.chunksGenerated);
+  b.client.onSpawn = () => (at.b = server.metrics.chunksGenerated);
+  await drive([a.client, b.client], 20_000, undefined, () => at.a !== undefined && at.b !== undefined);
+  assert.ok(at.a < 70, `a spawned after ${at.a} chunks, of about 170 in the two ranges`);
+  assert.ok(at.b < 70, `b spawned after ${at.b} chunks, of about 170 in the two ranges`);
+});
+
 test('edits out of reach, too fast, or into a body are refused and undone', async (t) => {
   const { server, url } = await start(t, { editRate: 1, editBurst: 2 }),
     a = await join(url),

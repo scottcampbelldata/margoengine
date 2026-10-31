@@ -1038,6 +1038,7 @@ export class VoxelMesher {
   readonly workers: number;
   #pool: JobPool;
   #jobs = new Map<string, AbortController>();
+  #warm: Worker[] = []; // started, not yet taken by the pool
   #disposed = false;
 
   /**
@@ -1055,13 +1056,33 @@ export class VoxelMesher {
         'VoxelMesher needs Web Workers; mesh on this thread with meshChunk(meshInput(world, key))',
       );
     this.workers = workers;
-    this.#pool = new JobPool(
-      () =>
-        new Worker(new URL(/* @vite-ignore */ './workers/mesher.js?no-inline', import.meta.url), {
-          name: 'margoengine-mesher',
-        }),
-      workers,
-    );
+    this.#pool = new JobPool(() => this.#warm.pop() ?? this.#startWorker(), workers);
+  }
+
+  #startWorker(): Worker {
+    return new Worker(new URL(/* @vite-ignore */ './workers/mesher.js?no-inline', import.meta.url), {
+      name: 'margoengine-mesher',
+    });
+  }
+
+  /**
+   * Starts the workers now rather than with the first jobs, so their code downloads before the chunks arrive to compete
+   * with it and the first mesh does not wait for it. Meshing is otherwise the same. A worker that fails to start is
+   * dropped here: the first job starts another and reports its failure.
+   */
+  warm(): void {
+    if (this.#disposed) throw new MargoError('disposed', 'VoxelMesher is disposed; create a new VoxelMesher');
+    while (this.#warm.length < this.workers) {
+      const worker = this.#startWorker(),
+        failed = () => {
+          const at = this.#warm.indexOf(worker);
+          if (at < 0) return; // the pool has it now, and its own handler hears
+          this.#warm.splice(at, 1);
+          worker.terminate();
+        };
+      worker.addEventListener?.('error', failed, { once: true });
+      this.#warm.push(worker);
+    }
   }
 
   /**
@@ -1121,6 +1142,7 @@ export class VoxelMesher {
     for (const job of this.#jobs.values()) job.abort();
     this.#jobs.clear();
     this.#pool.dispose();
+    for (const worker of this.#warm.splice(0)) worker.terminate();
   }
 
   [Symbol.dispose](): void {
