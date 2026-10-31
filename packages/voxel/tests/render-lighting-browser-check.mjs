@@ -6,7 +6,8 @@
 //   unchanged; still frames reuse the cached map; removing the slab lights the floor again within a few frames;
 // - the sun inside the shadow range ignores sky visibility (the map decides), beyond it is scaled by it;
 // - a clustered point light lights the floor inside its range only, falling off with distance, and stops on removal
-//   from the very next frame, which is drawn; a light taken out and another added lights from the new one;
+//   from the very next frame, which is drawn; a light taken out and another added lights from the new one; either of
+//   shadows and a light taken out and disposed at once draws the next frame, every pixel the settled one;
 // - fog mixes toward its colour by distance over its range; IBL ambient is scaled by the voxel occlusion (daylight 0
 //   over 1 is 0.03 / 1.03), as is the hemisphere ambient without it; block light is exactly `blockLightColor`;
 // - texture animation shows frame 0, then frame 1 after a second; a liquid's surface rises and falls 0.08 blocks;
@@ -96,6 +97,31 @@ try {
       `ok ${samples}x clustered: ${fixed(u.under)} under, ${fixed(u.d2)} at 2, ${fixed(u.d4)} at 4, 0 outside; ` +
         'dark the first frame after removal',
     );
+
+    // Either effect of two taken out and disposed at once. The frame right after the remover is drawn from the
+    // composition without it, compiled ahead: every pixel what the settled frame shows, the other effect still on.
+    // Before the fix it had 0 draws and the clear colour, for about 9 frames here (an RTX A6000, 3 ms frames).
+    for (const first of ['shadows', 'clustered']) {
+      const m = await page.evaluate(([n, a]) => window.check[n](a), ['effectRemoval', first]);
+      report.results[`${samples}x effectRemoval ${first}`] = m;
+      assert.deepEqual(m.errors, [], `${samples}x effectRemoval ${first}`);
+      assert.ok(
+        !m.removedStats.compiling && m.removedStats.draws > 0,
+        `${first} removed: drawn at once: ${JSON.stringify(m.removedStats)}`,
+      );
+      assert.equal(m.differing, 0, `${first} removed: ${m.differing} pixels off the settled frame by ${m.biggest}`);
+      if (first === 'shadows') {
+        assert.ok(m.removed.under[0] > m.withBoth.under[0] * 2, `slab shadow gone: ${JSON.stringify(m)}`);
+        assert.ok(m.removed.lamp[0] > m.removed.far[0] * 1.2, `the light still on: ${JSON.stringify(m.removed)}`);
+      } else {
+        assert.ok(m.removed.lamp[0] < m.withBoth.lamp[0] * 0.9, `the light gone: ${JSON.stringify(m)}`);
+        assert.ok(m.removed.under[0] < m.removed.far[0] * 0.5, `the shadow still on: ${JSON.stringify(m.removed)}`);
+      }
+      console.log(
+        `ok ${samples}x ${first} taken out: drawn at once, ${m.differing} pixels off the settled frame; ` +
+          `floor under the slab ${fixed(m.removed.under)}, by the lamp ${fixed(m.removed.lamp)}`,
+      );
+    }
 
     // A light swapped for another of the same kind: the shader is the same, the bindings must be the new light's.
     const sw = await run('swap');

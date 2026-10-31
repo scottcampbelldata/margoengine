@@ -352,7 +352,8 @@ export interface VoxelRendererStats {
   readonly draws: number;
   /**
    * True while the pipelines of the current composition (target, lightmap, lighting effects) compile in the
-   * background; the previous ones keep drawing meanwhile, or nothing on the first frames (`draws` is 0).
+   * background; the previous ones keep drawing meanwhile, or nothing on the first frames (`draws` is 0). Taking out one
+   * effect draws at once: the compositions without each effect are compiled ahead, once the current one is ready.
    */
   readonly compiling: boolean;
   /**
@@ -455,6 +456,8 @@ interface Pipelines {
   effects: VoxelRendererEffect[];
   /** Whether the lightmap is composed in (bindings 8-10). */
   lit: boolean;
+  /** The compositions without each of these effects are compiled or compiling. */
+  ahead?: boolean;
   groups?: GPUBindGroup[];
   bevelGroups?: GPUBindGroup[];
   groupVersion?: number;
@@ -527,11 +530,11 @@ function touch(cache: PipelineCache, key: string, entry: { ready?: Pipelines }):
   cache.delete(key);
   cache.set(key, entry);
 }
-/** Drops all but the `KEPT` most recently used compiled entries for `target`, `key` (just compiled) among them. */
-function retain(cache: PipelineCache, target: string, key: string): void {
+/** Drops all but the `keep` most recently used compiled entries for `target`, `key` (just compiled) among them. */
+function retain(cache: PipelineCache, target: string, key: string, keep = KEPT): void {
   let kept = 1;
   for (const [k, e] of [...cache].reverse())
-    if (k !== key && e.ready?.target === target && ++kept > KEPT) cache.delete(k);
+    if (k !== key && e.ready?.target === target && ++kept > keep) cache.delete(k);
 }
 const isNumber = (value: unknown, name: string, fix: string): number => {
   if (typeof value !== 'number') throw new TypeError(`VoxelRenderer ${name} must be a number; ${fix}`);
@@ -890,7 +893,9 @@ export class VoxelRenderer implements EnginePlugin {
   /**
    * Lights the voxels with an effect's glTF-pro lighting hooks: `shadows.add(voxels, {static: true})`,
    * `clustered.add(voxels)`, `fog.add(voxels)` and `environment.add(voxels)` call this. The shader is composed again
-   * and compiled in the background; until it is ready the previous one keeps drawing. Returns a remover.
+   * and compiled in the background; until it is ready the previous one keeps drawing. Returns a remover: once the
+   * composition is ready, those without each one effect compile in the background too, so a removed effect's frame is
+   * drawn at once without its resources, which its owner may dispose right away.
    * @throws TypeError when `effect` has no `pbr` and `bindings` functions.
    * @throws MargoError `attached` when the effect belongs to another engine, `disposed` after `dispose()`.
    */
@@ -1538,44 +1543,56 @@ export class VoxelRenderer implements EnginePlugin {
     return s;
   }
 
-  // This frame's shaders: the quad (and with a bevel the triangle) shader composed with every added effect that is ready
-  // (pbr(1) gives hooks), the lightmap and the shadowed sun; and those effects (their bindings fill group 1 in order).
-  // Hooks and their compositions are cached by the effects and lightPBR; the rest is redone only when they change, and
-  // `id` names the result in pipeline keys.
-  #composition(): { code: string; bevel: string; effects: VoxelRendererEffect[]; id: number; lit: boolean } {
+  // The quad (and with a bevel the triangle) shader composed with those of `list` that are ready (pbr(1) gives hooks).
+  #hooked(list: Iterable<VoxelRendererEffect>): { code: string; bevel: string; effects: VoxelRendererEffect[] } {
     let code = SHADER,
       bevel = this.#bevel ? `${LIT}${MATERIALS}${this.#bevel.shader}${SHADE}` : '';
-    const effects: VoxelRendererEffect[] = [],
-      lit = !!this.#lightmap,
-      c = this.#composed;
-    for (const effect of this.#effects) {
+    const effects: VoxelRendererEffect[] = [];
+    for (const effect of list) {
       const hooks = effect.pbr(1) as PBRHooks | undefined;
       if (!hooks) continue;
       code = lightPBR(code, hooks);
       if (bevel) bevel = lightPBR(bevel, hooks);
       effects.push(effect);
     }
-    const shaders = c.from !== code || c.lit !== lit;
+    return { code, bevel, effects };
+  }
+
+  // A composed shader with the lightmap and the shadowed sun.
+  #finish(text: string): string {
+    const baked = this.#lightmap ? this.#lightmap.shader(text) : text;
+    return baked.includes('var<uniform> shadowFrame') ? baked.replace(SUN, SHADOWED_SUN) : baked;
+  }
+
+  // The number naming a composition in pipeline keys. The effect objects are part of the name: two effects with the same
+  // hooks (one Clustered taken out, another added) compose the same shader but bind different resources.
+  #named(effects: VoxelRendererEffect[], lit: boolean, code: string, bevel: string): number {
+    const c = this.#composed,
+      identity = `${effects.map(serialOf).join(',')}|${lit}|${code}|${bevel}`,
+      id = c.ids.get(identity) ?? ++c.next;
+    c.ids.delete(identity);
+    c.ids.set(identity, id);
+    for (const old of c.ids.keys()) if (c.ids.size > 4 * KEPT) c.ids.delete(old);
+    return id;
+  }
+
+  // This frame's shaders and the effects in them (their bindings fill group 1 in order). Hooks and their compositions
+  // are cached by the effects and lightPBR; the rest is redone only when they change, and `id` names the result in
+  // pipeline keys.
+  #composition(): { code: string; bevel: string; effects: VoxelRendererEffect[]; id: number; lit: boolean } {
+    const { code, bevel, effects } = this.#hooked(this.#effects),
+      lit = !!this.#lightmap,
+      c = this.#composed,
+      shaders = c.from !== code || c.lit !== lit;
     if (shaders || effects.length !== c.effects.length || effects.some((e, i) => e !== c.effects[i])) {
       if (shaders) {
-        const finish = (text: string) => {
-          const baked = lit ? this.#lightmap!.shader(text) : text;
-          return baked.includes('var<uniform> shadowFrame') ? baked.replace(SUN, SHADOWED_SUN) : baked;
-        };
         c.from = code;
         c.lit = lit;
-        c.code = finish(code);
-        c.bevel = bevel && finish(bevel);
+        c.code = this.#finish(code);
+        c.bevel = bevel && this.#finish(bevel);
       }
-      // The effect objects are part of the name: two effects with the same hooks (one Clustered taken out, another
-      // added) compose the same shader but bind different resources.
       c.effects = effects;
-      const identity = `${effects.map(serialOf).join(',')}|${lit}|${c.code}|${c.bevel}`,
-        known = c.ids.get(identity);
-      c.id = known ?? ++c.next;
-      c.ids.delete(identity);
-      c.ids.set(identity, c.id);
-      for (const old of c.ids.keys()) if (c.ids.size > 4 * KEPT) c.ids.delete(old);
+      c.id = this.#named(effects, lit, c.code, c.bevel);
     }
     return { code: c.code, bevel: c.bevel, effects, id: c.id, lit };
   }
@@ -1660,49 +1677,79 @@ export class VoxelRenderer implements EnginePlugin {
     ]);
   }
 
+  // Starts compiling the pipelines of one composition for this frame's target; `key` holds them once they are ready.
+  #request(
+    c: Context,
+    gpu: Gpu,
+    key: string,
+    target: string,
+    code: string,
+    bevel: string,
+    effects: VoxelRendererEffect[],
+    lit: boolean,
+  ): { ready?: Pipelines } {
+    const samples = c.descriptor.multisample?.count ?? 1,
+      pending: { ready?: Pipelines } = {},
+      format = c.format;
+    gpu.pipelines.set(key, pending);
+    this.#compile(
+      gpu,
+      code,
+      bevel,
+      3,
+      (l) => {
+        const mode = l === 2 ? 3 : l && samples > 1 ? 2 : l;
+        return {
+          mode,
+          targets: [{ format, ...(l === 2 ? { blend: { color: OVER, alpha: OVER } } : {}) }],
+          write: l < 2,
+          compare: 'greater-equal',
+          coverage: mode === 2,
+        };
+      },
+      samples,
+      c.descriptor.depthStencil!.format,
+    )
+      .then(([layers, bevelLayers]) => {
+        if (this.#gpu !== gpu) return;
+        pending.ready = { target, layers, bevel: bevelLayers, effects, lit };
+        // The current composition's neighbours, each one effect short, stay among those kept.
+        retain(gpu.pipelines, target, key, KEPT + this.#effects.size);
+      })
+      .catch((error) => this.#engine?.onError(error));
+    return pending;
+  }
+
   // The pipelines for this target (format, samples, depth format) and composition, compiled asynchronously. While a
   // new composition compiles, the last pipelines for the target keep drawing as long as their effects are still added
   // and the lightmap is still on or off as they were built; undefined when there are none. The last KEPT compositions
-  // stay compiled, so taking out the effect added last draws the composition from before it at once.
+  // stay compiled, so putting an effect back draws at once, and once a composition is ready those without each one of
+  // its effects compile too, so taking out any one effect does: pipelines with a removed effect cannot keep drawing
+  // (they bind its resources, which its owner may dispose right away), and no stand-in for those is neutral (zeroed fog
+  // draws black, a zeroed environment has no ambient).
   #pipelines(c: Context, gpu: Gpu): Pipelines | undefined {
     const samples = c.descriptor.multisample?.count ?? 1,
       depth = c.descriptor.depthStencil!.format,
       target = `${c.format}|${samples}|${depth}`,
       { code, bevel, effects, id, lit } = this.#composition(),
-      key = `${target}|${id}`;
-    let entry = gpu.pipelines.get(key);
-    if (!entry) {
-      const pending: { ready?: Pipelines } = (entry = {});
-      gpu.pipelines.set(key, entry);
-      this.#compile(
-        gpu,
-        code,
-        bevel,
-        3,
-        (l) => {
-          const mode = l === 2 ? 3 : l && samples > 1 ? 2 : l;
-          return {
-            mode,
-            targets: [{ format: c.format, ...(l === 2 ? { blend: { color: OVER, alpha: OVER } } : {}) }],
-            write: l < 2,
-            compare: 'greater-equal',
-            coverage: mode === 2,
-          };
-        },
-        samples,
-        depth,
-      )
-        .then(([layers, bevelLayers]) => {
-          if (this.#gpu !== gpu) return;
-          pending.ready = { target, layers, bevel: bevelLayers, effects, lit };
-          retain(gpu.pipelines, target, key);
-        })
-        .catch((error) => this.#engine?.onError(error));
-    }
-    this.#stats.compiling = !entry.ready;
-    if (entry.ready) {
+      key = `${target}|${id}`,
+      entry = gpu.pipelines.get(key) ?? this.#request(c, gpu, key, target, code, bevel, effects, lit),
+      ready = entry.ready;
+    this.#stats.compiling = !ready;
+    if (ready) {
       touch(gpu.pipelines, key, entry);
-      return entry.ready;
+      if (!ready.ahead) {
+        ready.ahead = true;
+        for (const out of effects) {
+          const less = this.#hooked(effects.filter((e) => e !== out)),
+            lessCode = this.#finish(less.code),
+            lessBevel = less.bevel && this.#finish(less.bevel),
+            lessKey = `${target}|${this.#named(less.effects, lit, lessCode, lessBevel)}`;
+          if (!gpu.pipelines.has(lessKey))
+            this.#request(c, gpu, lessKey, target, lessCode, lessBevel, less.effects, lit);
+        }
+      }
+      return ready;
     }
     const last = this.#ready;
     return last?.target === target && last.lit === lit && last.effects.every((e) => this.#effects.has(e) && e.pbr(1))

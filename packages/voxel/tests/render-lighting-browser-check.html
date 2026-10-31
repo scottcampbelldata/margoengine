@@ -136,6 +136,31 @@ window.check={
   removeB();b.dispose();renderer.dispose();
   return {withA,withB,frames:[first.frames,second.frames],errors:errors.splice(0)};
  },
+ // Shadows and a clustered light, and either one taken out and disposed at once: the very next frame is drawn, with
+ // the other's result only, every pixel what the settled frame shows. `first` names the effect added first, the one
+ // whose removal leaves a composition never drawn before (it used to show the clear colour until that compiled).
+ async effectRemoval(first){
+  lights(3,0.2);const {w,keys}=floorWorld();w.setBlocks(slab.flatMap(([x,y,z])=>[x,y,z,STONE]));renderer=attach(w,keys);await ready(renderer,w,keys);look([18,22,14],[18,1,32]);
+  const P={under:[12,1,32],lamp:[20,1,32],far:[29.5,1,36]};
+  let pending=0;const gpu=device(),create=gpu.createRenderPipelineAsync;
+  gpu.createRenderPipelineAsync=(d)=>{pending++;const p=create.call(gpu,d);p.finally(()=>pending--);return p;};
+  const shadows=Shadows.attach(engine,{distance:60,cascades:1,filter:'hard',resolution:2048}),clustered=Clustered.attach(engine);clustered.setLights([{position:[20,4,32],range:8,intensity:30,color:[1,1,1]}]);
+  const add={shadows:()=>shadows.add(renderer,{static:true}),clustered:()=>clustered.add(renderer)},second=first==='shadows'?'clustered':'shadows',
+   removeFirst=add[first]();add[second]();
+  // Both on the floor at once, and the shadow map drawn; then nothing left compiling, the compositions without each.
+  const both=await until((i)=>at(i,P.under)[0]<at(i,P.far)[0]*0.5&&at(i,P.lamp)[0]>at(i,P.far)[0]*1.2);
+  for(let i=0;i<2000&&(pending||renderer.stats.compiling);i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}
+  const withBoth=probe(both.img,P);
+  gpu.createRenderPipelineAsync=create;
+  removeFirst();drop(first==='shadows'?shadows:clustered);
+  // The first frame after the remover, with nothing rendered in between.
+  const image=await shot(0),removedStats={...renderer.stats},removed=probe(image,P);
+  // The settled frame, some frames later; the effect is gone from the renderer and the engine.
+  const settled=await shot(4),settledProbe=probe(settled,P);let differing=0,biggest=0;
+  for(let i=0;i<image.length;i+=4){const d=Math.max(Math.abs(image[i]-settled[i]),Math.abs(image[i+1]-settled[i+1]),Math.abs(image[i+2]-settled[i+2]));if(d>0)differing++;if(d>biggest)biggest=d;}
+  drop(first==='shadows'?clustered:shadows);renderer.dispose();
+  return {withBoth,removed,settled:settledProbe,removedStats,differing,biggest,errors:errors.splice(0)};
+ },
  // Linear fog from 0 to 40 blocks toward a blue: a floor point's colour moves toward it by distance / 40.
  async fog(){
   lights(3,0);const {w,keys}=floorWorld();renderer=attach(w,keys);await ready(renderer,w,keys);look([32,12,14],[32,1,32]);

@@ -802,6 +802,132 @@ test('addLighting: hooks composed into every pipeline, group 1 bound in the bund
   );
 });
 
+test('addLighting: the frame right after taking an effect out of the middle is drawn, without its resources', async () => {
+  const { world, renderer, frame, device, passes, STONE, GLASS } = setup(),
+    made = [],
+    create = device.createRenderPipelineAsync;
+  device.createRenderPipelineAsync = (d) => (made.push(d), create(d));
+  try {
+    world.setBlocks([3, 3, 3, STONE, 9, 3, 3, GLASS]);
+    await settle(frame, () => renderer.stats.chunks === 1 && device.bundles.length > 0);
+    const effect = (name, binding) => {
+        const buffer = device.createBuffer({ size: 16, usage: 64 }),
+          e = {
+            disposed: false,
+            buffer,
+            pbr: (group) => ({
+              declarations: `@group(${group}) @binding(${binding}) var<uniform> ${name}:vec4f;\n`,
+              light: `${name}.rgb`,
+            }),
+            // As Shadows and Clustered do: the owner of a disposed effect throws rather than hand out dead resources.
+            bindings: () => {
+              if (e.disposed) throw new Error(`${name} is disposed`);
+              return [{ binding, resource: { buffer } }];
+            },
+          };
+        return e;
+      },
+      effects = ['a', 'b', 'c', 'd', 'e', 'f'].map((name, i) => effect(name, 10 + i)),
+      removers = effects.map((e) => renderer.addLighting(e)),
+      group1 = (bundle) => bundle.commands.find(([n, i]) => n === 'setBindGroup' && i === 1)?.[2],
+      executed = () => passes[0].commands.find(([name]) => name === 'executeBundles')?.[1][0],
+      code = (bundle) => bundle.commands.find(([n]) => n === 'setPipeline')[1].fragment.module.code,
+      shows = (...names) =>
+        ['a', 'b', 'c', 'd', 'e', 'f'].every(
+          (n) => code(executed()).includes(`var<uniform> ${n}:`) === names.includes(n),
+        );
+    await settle(frame, () => executed() && group1(executed()) && shows('a', 'b', 'c', 'd', 'e', 'f'), 'all lit');
+    // The composition without each effect compiles once that one is ready: six more, of three pipelines each. A frame
+    // later nothing more starts, so a still scene pays once.
+    for (let i = 0; i < 5; i++) {
+      frame();
+      await new Promise((resolve) => setTimeout(resolve));
+    }
+    const compiled = made.length;
+    frame();
+    await new Promise((resolve) => setTimeout(resolve));
+    assert.equal(made.length, compiled, 'a still scene compiles nothing more');
+    assert.equal(
+      made.filter((d) => /var<uniform> a:/.test(d.fragment.module.code) === false).length >= 3,
+      true,
+      'the composition without the first effect was compiled ahead',
+    );
+    // Out of the middle, disposed right away: the very next frame draws, every remaining effect bound, this one not.
+    for (const [index, ...left] of [
+      [2, 'a', 'b', 'd', 'e', 'f'],
+      [0, 'b', 'd', 'e', 'f'],
+      [4, 'b', 'd', 'f'],
+    ]) {
+      const out = effects[index];
+      removers[index]();
+      out.disposed = true;
+      frame();
+      assert.equal(renderer.stats.compiling, false, `taking out ${index}: nothing to wait for`);
+      assert.ok(renderer.stats.draws > 0, `taking out ${index}: drawn at once`);
+      assert.ok(executed(), `taking out ${index}: the bundle is executed`);
+      assert.ok(shows(...left), `taking out ${index}: the remaining effects' shader`);
+      const bound = group1(executed()).entries.map((e) => e.resource.buffer);
+      assert.deepEqual(
+        bound,
+        effects.filter((e) => !e.disposed).map((e) => e.buffer),
+      );
+      // The remaining compositions without one effect each compile before the next removal.
+      for (let i = 0; i < 5; i++) {
+        frame();
+        await new Promise((resolve) => setTimeout(resolve));
+      }
+    }
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('addLighting: nothing is compiled ahead before the composition itself is ready, or without effects', async () => {
+  const { world, renderer, frame, device, STONE } = setup(),
+    made = [],
+    gates = [],
+    create = device.createRenderPipelineAsync;
+  device.createRenderPipelineAsync = (d) => {
+    made.push(d);
+    return new Promise((resolve) => gates.push(resolve)).then(() => create(d));
+  };
+  const open = async () => {
+    for (const resolve of gates.splice(0)) resolve();
+    await new Promise((resolve) => setTimeout(resolve));
+  };
+  try {
+    world.setBlocks([3, 3, 3, STONE]);
+    const effect = (name, binding) => ({
+      pbr: (group) => ({
+        declarations: `@group(${group}) @binding(${binding}) var<uniform> ${name}:vec4f;\n`,
+        light: `${name}.rgb`,
+      }),
+      bindings: () => [{ binding, resource: { buffer: device.createBuffer({ size: 16, usage: 64 }) } }],
+    });
+    frame();
+    assert.equal(made.length, 3, 'one composition, three layers');
+    frame();
+    assert.equal(made.length, 3, 'still that one');
+    await open();
+    frame();
+    assert.equal(made.length, 3, 'no effects: nothing to take out, nothing ahead');
+    renderer.addLighting(effect('a', 10));
+    renderer.addLighting(effect('b', 11));
+    frame();
+    assert.equal(made.length, 6, 'the two-effect composition only, while it compiles');
+    frame();
+    assert.equal(made.length, 6);
+    await open();
+    frame();
+    assert.equal(made.length, 12, 'then the two without one effect each');
+    await open();
+    frame();
+    assert.equal(made.length, 12, 'only once');
+  } finally {
+    renderer.dispose();
+  }
+});
+
 test('drawShadow: opaque and cutout chunks inside the cascade only; shadowVersion moves for changes inside it', async () => {
   const { world, renderer, frame, device, STONE, LEAVES } = setup();
   try {

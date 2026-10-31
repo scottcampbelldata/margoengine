@@ -1184,7 +1184,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   and a composition is named by its effect objects, which also fixed a crash found on the way ("Clustered lighting is
   not attached" after one clustered light was replaced by another). Guard:
   `packages/voxel/tests/render-lighting-browser-check.mjs` and `packages/voxel/tests/render.test.js`. Removing an effect
-  out of order still draws nothing for a frame or two ([known-bugs.md](../known-bugs.md#voxelrenderer-draws-nothing-for-a-few-frames-after-an-effect-is-taken-out-of-the-middle)).
+  out of order drew nothing for a frame or two until 2026-10-31 ([known-bugs.md](../known-bugs.md#fixed-2026-10-31)).
 - **Second run (main `b92998d6`, 2026-10-28, not committed):** of 43 package GPU suites, 42 were started, one at a time;
   38 passed. The text suite failed "Emoji not drawn in color": the server has no colour emoji font, and the test relies
   on one from the system ([known-bugs.md](../known-bugs.md#text-the-colour-emoji-check-needs-a-colour-emoji-font-on-the-machine)).

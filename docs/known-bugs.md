@@ -298,19 +298,16 @@ does not own. Each entry says exactly what is needed to close it.
   when they were not yet held); with a browser check that edits while a tile waits (no frames drawn, so it waits for
   the drain timer) and compares the drawn tile with a fresh view of the edited world.
 
-### VoxelRenderer draws nothing for a few frames after an effect is taken out of the middle
+### VoxelRenderer draws nothing for a few frames after several effects leave in one frame
 
-- **Repro:** add two lighting effects to a `VoxelRenderer` (`shadows.add(voxels)`, then `clustered.add(voxels)`), let
-  both compile, then call the shadows remover: `voxels.stats.compiling` is true and `draws` 0 until the composition
-  with the clustered light alone has compiled (about 2 frames on an Intel UHD, 1 on an RTX A6000), so the clear colour
-  shows through for those frames.
-- **Cause:** the pipelines with the removed effect cannot keep drawing (they bind its resources, which its owner may
-  dispose right away), and a composition never drawn before has nothing compiled. Since bug 29 the last four
-  compositions stay compiled, so taking effects out in the reverse order they were added, or putting one back, draws
-  at once (`packages/voxel/tests/render.test.js` "addLighting", `render-lighting-browser-check.mjs` clustered).
-- **Fix needed:** draw with the remaining effects' last pipelines and a neutral stand-in for the removed effect's
-  bindings while the new composition compiles, or compile the compositions without each effect ahead of time; either
-  with a check that the frame right after an out-of-order removal is drawn.
+- **Repro:** add three lighting effects to a `VoxelRenderer`, let them compile, then call two removers before the next
+  frame: `voxels.stats.compiling` is true and `draws` 0 until the composition with the one left has compiled, so the
+  clear colour shows through. The same when a second effect leaves before the composition without the first has finished
+  compiling its own neighbours.
+- **Cause:** only the compositions one effect short of the current one are compiled ahead (one effect taken out draws at
+  once, see the fixed table); all subsets would be 2^n compositions, paid at startup by everyone with effects. A frame
+  with the removed effects' pipelines would bind resources their owners may have disposed.
+- **Fix needed:** a decision on what several effects leaving at once should show, then a check of the frame right after.
 
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 
@@ -701,6 +698,7 @@ All were found by `npm run modern:test:extensions` and the other `test:release` 
 | --- | --- | --- | --- |
 | The packed-browser step of `modern:test:packages` missed its fixed 30 s page-load limit on a busy machine ("Packed browser failure: state null") | a fixed time against load: a cold dev server transforming every package took longer while other check:merge runs shared the CPU | the step waits on the dev server (`waitForRequestsIdle`) and then gives the page 10 s; a 10 minute hard limit fails a real hang naming the server state and page errors, and the browser and server close (`scripts/support/page-ready.js`) | `tests/page-ready.test.js` (holds the last module back in a real dev server: the fixed wait fails, the new wait passes) |
 | `npm run dev:examples` refused every page (403) from a checkout reached through an 8.3 short path | Vite's file-serving allow list held the working directory as given and compared it with each file's real path | `dev:examples` runs `scripts/dev-examples.mjs`, which starts Vite in `realpathSync.native(process.cwd())`; no root Vite config, so every other root `vite` command is unchanged | `tests/dev-examples.test.js` (short-path cwd serves 200, a file outside the repository stays 403) |
+| Taking one lighting effect out of a `VoxelRenderer` other than the last one added drew the clear colour for 8 to 21 frames (`draws` 0, RTX A6000, 3 ms frames) | a composition never drawn before had nothing compiled, and the pipelines with the removed effect cannot draw (its owner may dispose its resources) | once a composition is ready, those without each one of its effects compile in the background, and stay among those kept (`packages/voxel/src/render.ts`). The stand-in way was measured and refused: zeroed bindings draw every voxel black with fog taken out, 190921 black pixels with an environment, 1956 wrong with shadows, and the renderer cannot make a depth or cube texture of a kind it does not know | `packages/voxel/tests/render.test.js` "addLighting: the frame right after", `render-lighting-browser-check.mjs` effectRemoval (either effect, disposed at once, 0 pixels off the settled frame) |
 | `modern:test:extensions` sat silent until the 30 min GPU lock limit | Chromium (Edge 156, RTX A6000) leaves a `getCompilationInfo()` asked once the device is idle pending until another GPU request runs; `material-extension-tests.js` asked for 41 modules then, inside a `page.evaluate` with no time limit, and the eight suites ran in one process with no limit | the WGSL guard asks every module at creation and answers later calls with that (`scripts/support/wgsl-guard.js`); each suite runs alone under `runLimited` (`scripts/modern-extension-suite.mjs`); engine source must ask at creation | `tests/wgsl-guard.test.js`, `tests/modern-extension-suite.test.js`, `tests/compilation-info-at-creation.test.js` |
 | IOR 1 transmission (materials) drew a 13-step highlight over the background | since `dc883a59` the host keeps reflections under extension transmission, but its F0 stayed 0.04 whatever `KHR_materials_ior` said | the extension slot takes an `ior` expression and the host sets `s.f0` from it (gltf-pro); transmission and node transmission pass it (materials) | `packages/materials/tests/transmission-ior.test.js`, `scripts/materials-transmission-tests.js` |
 | Transmission with a sheen or specular lobe drew about 148 steps of white on a fully transmissive surface | the lobes recompute diffuse light at full strength, ignoring the transmitted share `s.tr` | lobes composed over transmission scale their diffuse by 1 - `s.tr`; `install` composes transmission first (materials) | same two |
